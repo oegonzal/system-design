@@ -1,0 +1,32 @@
+{
+  "name": "storybook",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "tags": ["type:tooling"],
+  "targets": {
+    "storybook": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/storybook",
+        "command": "storybook dev -p 6006"
+      }
+    },
+    "build-storybook": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": ["{projectRoot}/storybook-static"],
+      "options": {
+        "cwd": "packages/storybook",
+        "command": "storybook build"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/storybook",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    }
+  }
+}

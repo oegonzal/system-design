@@ -15,10 +15,9 @@ export default defineConfig({
 
   plugins: [
     react({
-      // Emotion's JSX runtime + babel plugin: the Vite half of what
+      // Emotion's JSX runtime: the Vite half of what
       // next.config.js does with compiler.emotion for the app build.
       jsxImportSource: '@emotion/react',
-      babel: { plugins: ['@emotion/babel-plugin'] },
     }),
     nxViteTsPaths(),
   ],

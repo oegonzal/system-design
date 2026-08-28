@@ -19,10 +19,8 @@ export default defineConfig({
   plugins: [
     react({
       // The css prop and styled components compile through Emotion's JSX
-      // runtime; the babel plugin adds source-map-friendly labels and dedupes
-      // the runtime import.
+      // runtime (plugin-react v6 is oxc-based; no babel pass).
       jsxImportSource: '@emotion/react',
-      babel: { plugins: ['@emotion/babel-plugin'] },
     }),
     nxViteTsPaths(),
   ],
