@@ -50,3 +50,6 @@ playwright-report/
 # Local working notes and personal files — never part of the repo.
 /CLAUDE.md
 /Resume_a2.pdf
+
+# TypeScript incremental build state
+*.tsbuildinfo
