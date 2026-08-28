@@ -1,0 +1,56 @@
+import type { Metadata } from 'next';
+
+/**
+ * The navigation vocabulary and per-route metadata, in one place. The nav
+ * bar maps over `NAV_ITEMS`; each `page.tsx` exports
+ * `pageMetadata('/route')` so titles and the nav can never disagree.
+ */
+
+export interface NavItem {
+  href: string;
+  label: string;
+  description: string;
+}
+
+export const NAV_ITEMS = [
+  {
+    href: '/',
+    label: 'Dashboard',
+    description: 'Your experiences, recent practice sessions and shortcuts.',
+  },
+  {
+    href: '/prompts',
+    label: 'Prompts',
+    description: 'Generate and browse system-design prompts.',
+  },
+  {
+    href: '/stories',
+    label: 'STAR stories',
+    description: 'Interview-ready stories about past production work.',
+  },
+  {
+    href: '/settings',
+    label: 'Appearance',
+    description: 'Color mode, accent and motion preferences.',
+  },
+] as const satisfies readonly NavItem[];
+
+/** Routes with metadata but no nav entry. */
+const EXTRA_PAGES: readonly NavItem[] = [
+  {
+    href: '/practice',
+    label: 'Practice',
+    description: 'Design on the canvas and submit revisions for evaluation.',
+  },
+  {
+    href: '/stories/new',
+    label: 'New STAR story',
+    description: 'Capture a new interview story.',
+  },
+];
+
+export function pageMetadata(href: string): Metadata {
+  const item = [...NAV_ITEMS, ...EXTRA_PAGES].find((candidate) => candidate.href === href);
+  if (!item) return {};
+  return { title: item.label, description: item.description };
+}
