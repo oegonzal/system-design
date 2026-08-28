@@ -1,0 +1,32 @@
+{
+  "name": "studio-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "packages/studio-e2e/src",
+  "implicitDependencies": ["studio-ui", "studio-api", "eval-worker"],
+  "targets": {
+    "e2e": {
+      "dependsOn": []
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/studio-e2e",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    },
+    "e2e-demo": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/studio-e2e",
+        "command": "playwright test --project=chromium --grep @demo --workers=1",
+        "env": {
+          "DEMO": "1"
+        }
+      }
+    }
+  },
+  "tags": ["type:tooling"],
+  "// e2e-demo": "Runs only the @demo journey, headed and paced, so it plays as a ~60s story instead of a silent batch. Not wired into CI."
+}
