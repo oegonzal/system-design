@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CriticReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["critic", "findings"],
+  "properties": {
+    "critic": {
+      "type": "string",
+      "enum": ["architecture", "testability", "readability"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "category", "evidence", "problem", "recommendation"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["low", "medium", "high"] },
+          "file": { "type": "string", "description": "Repo-relative path, from the change set" },
+          "line": { "type": "integer", "minimum": 1 },
+          "category": {
+            "type": "string",
+            "description": "Replaced with the calling critic's own enum at run time by review.ts"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Verbatim quote from the diff or context supporting the finding"
+          },
+          "problem": { "type": "string" },
+          "recommendation": { "type": "string" }
+        }
+      }
+    }
+  }
+}

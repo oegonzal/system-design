@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evaluation",
+  "description": "The evaluator references existing critic findings; it never emits new ones, and it does not decide the outcome — evaluator.ts does.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["blockingFindings", "warnings", "informational", "summary"],
+  "properties": {
+    "blockingFindings": {
+      "type": "array",
+      "description": "Surviving high-severity findings",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["critic", "finding", "reason"],
+        "properties": {
+          "critic": {
+            "type": "string",
+            "enum": ["architecture", "testability", "readability"]
+          },
+          "finding": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based index into that critic's findings array"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Surviving medium-severity findings",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["critic", "finding", "reason"],
+        "properties": {
+          "critic": {
+            "type": "string",
+            "enum": ["architecture", "testability", "readability"]
+          },
+          "finding": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based index into that critic's findings array"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "informational": {
+      "type": "array",
+      "description": "Surviving low-severity findings",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["critic", "finding", "reason"],
+        "properties": {
+          "critic": {
+            "type": "string",
+            "enum": ["architecture", "testability", "readability"]
+          },
+          "finding": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Zero-based index into that critic's findings array"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "string"
+    }
+  }
+}

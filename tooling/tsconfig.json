@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "types": ["node"],
+    "resolveJsonModule": true
+  },
+  "// note": "Repo infrastructure, outside every Nx project, so nothing else type-checks it. The typecheck:tooling script and CI cover it.",
+  "include": ["**/*.ts"]
+}
