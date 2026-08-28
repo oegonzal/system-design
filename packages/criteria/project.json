@@ -1,0 +1,17 @@
+{
+  "name": "criteria",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/criteria/src",
+  "projectType": "library",
+  "tags": ["type:shared", "scope:universal"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/criteria",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    }
+  }
+}
