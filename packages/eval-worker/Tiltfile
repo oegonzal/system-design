@@ -1,0 +1,31 @@
+load('../../tilt/toolchain.Tiltfile', 'tool_env')
+
+docker_build(
+    'eval-worker',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'eval-worker'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './docker',
+        './packages/contracts',
+        './packages/criteria',
+        './packages/db',
+        './packages/eval-worker',
+    ],
+)
+
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+k8s_resource(
+    'eval-worker',
+    port_forwards='3002:3002',
+    resource_deps=['db: migration:up'],
+    labels=['backend'],
+    links=['http://localhost:3002/health']
+)

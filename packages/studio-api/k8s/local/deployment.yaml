@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studio-api
+  labels:
+    app: studio-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: studio-api
+  template:
+    metadata:
+      labels:
+        app: studio-api
+    spec:
+      containers:
+        - name: studio-api
+          image: studio-api
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DB_HOST
+              value: sysdesign-postgres-service
+            - name: DB_PORT
+              value: '5432'
+            - name: DB_USERNAME
+              value: admin
+            - name: DB_PASSWORD
+              value: admin
+            - name: DB_NAME
+              value: sysdesign
+            - name: CORS_ORIGIN
+              value: http://localhost:4200
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: studio-api-service
+spec:
+  selector:
+    app: studio-api
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: LoadBalancer

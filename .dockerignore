@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+.nx
+.git
+coverage
+storybook-static
+test-output
+playwright-report
+.code-review
+CLAUDE.md
+Resume_a2.pdf

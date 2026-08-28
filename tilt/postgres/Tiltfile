@@ -1,0 +1,8 @@
+k8s_yaml(['./postgres.yaml'])
+
+k8s_resource(
+    'sysdesign-postgres',
+    objects=['sysdesign-postgres-pvc'],
+    port_forwards=['5432:5432'],
+    labels=['database']
+)
