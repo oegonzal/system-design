@@ -25,6 +25,24 @@ export class SettingsPage {
 
   async expectColorMode(mode: ColorMode): Promise<void> {
     await expect(this.page.locator('html')).toHaveAttribute('data-color-mode', mode);
+
+    // The attribute alone once passed while the page rendered light-mode ink
+    // on a dark background (stale SSR-streamed globals outliving a theme
+    // switch), so also assert the *computed* body colors landed on the right
+    // side of the brightness line: dark text on light, light text on dark.
+    await expect
+      .poll(async () => {
+        const [textLuma, bgLuma] = (await this.page.evaluate(`(() => {
+          const luma = (rgb) => {
+            const [r, g, b] = rgb.match(/\\d+/g).map(Number);
+            return (r * 299 + g * 587 + b * 114) / 1000;
+          };
+          const styles = getComputedStyle(document.body);
+          return [luma(styles.color), luma(styles.backgroundColor)];
+        })()`)) as [number, number];
+        return mode === 'dark' ? textLuma > bgLuma : textLuma < bgLuma;
+      })
+      .toBe(true);
   }
 
   async expectAccent(accent: Accent): Promise<void> {
