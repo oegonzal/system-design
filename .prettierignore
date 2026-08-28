@@ -1,0 +1,7 @@
+dist
+coverage
+storybook-static
+.nx
+.next
+pnpm-lock.yaml
+packages/db/src/migrations

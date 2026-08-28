@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "lib": ["ES2022", "dom", "ESNext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@sysdesign/contracts": ["./packages/contracts/src/index.ts"],
+      "@sysdesign/criteria": ["./packages/criteria/src/index.ts"],
+      "@sysdesign/db": ["./packages/db/src/index.ts"],
+      "@sysdesign/design-system": ["./packages/design-system/src/index.ts"],
+      "@sysdesign/llm": ["./packages/llm/src/index.ts"]
+    },
+    "skipDefaultLibCheck": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "target": "ES2022",
+    "types": ["node"]
+  }
+}
