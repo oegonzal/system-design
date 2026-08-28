@@ -26,6 +26,7 @@ COPY nx.json tsconfig.base.json vite.nest.ts ./
 COPY packages/contracts ./packages/contracts
 COPY packages/criteria ./packages/criteria
 COPY packages/db ./packages/db
+COPY packages/llm ./packages/llm
 COPY packages/${APP} ./packages/${APP}
 # The vite binary directly rather than nx: no daemon, no graph, no cache
 # server inside a container build.
