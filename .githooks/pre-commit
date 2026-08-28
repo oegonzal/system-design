@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+#
+# Ordered cheapest-first, so the expensive step only runs on code that already
+# passes the free ones.
+#
+#   1. format staged files          instant
+#   2. branding tripwire            instant
+#   3. lint + typecheck affected    seconds, no tokens
+#   4. code review (quick)          one critic, budget-capped; rules always run
+#
+# Escape hatches:
+#   SKIP_REVIEW=1 git commit   skip step 4 only
+#   git commit --no-verify     skip all of it
+#
+# A staged review has no commit message to read a purpose from; to supply one:
+#   REVIEW_INTENT="tighten the eval polling loop" git commit
+#
+# bash rather than sh, and every path list read NUL-delimited, because both
+# alternatives lose files silently: newline-delimited output makes git *quote*
+# any path with non-ASCII bytes, which then matches none of the extension
+# patterns; unquoted word-splitting breaks paths containing spaces into
+# fragments that abort the commit with a pathspec error naming a file nobody
+# touched. NUL-delimited reads into arrays avoid both.
+set -e
+
+if [ -n "${CODE_REVIEW_RUNNING:-}" ]; then
+  # A commit made from inside a review must not start another review.
+  exit 0
+fi
+
+staged=()
+while IFS= read -r -d '' file; do staged+=("$file"); done \
+  < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if [ ${#staged[@]} -eq 0 ]; then exit 0; fi
+
+unstaged=()
+while IFS= read -r -d '' file; do unstaged+=("$file"); done < <(git diff --name-only -z)
+
+has_unstaged_changes() {
+  local needle="$1" candidate
+  for candidate in ${unstaged[@]+"${unstaged[@]}"}; do
+    if [ "$candidate" = "$needle" ]; then return 0; fi
+  done
+  return 1
+}
+
+code=()
+clean=()
+partial=()
+
+for file in "${staged[@]}"; do
+  case "$file" in
+    dist/* | */dist/* | coverage/* | */coverage/* | storybook-static/* | */storybook-static/* | .nx/* | */.nx/* | .next/* | */.next/*)
+      continue
+      ;;
+  esac
+
+  case "$file" in
+    *.ts | *.tsx | *.js | *.jsx | *.mjs | *.cjs) code+=("$file") ;;
+  esac
+
+  case "$file" in
+    *.ts | *.tsx | *.js | *.jsx | *.mjs | *.cjs | *.json | *.md | *.css)
+      if has_unstaged_changes "$file"; then partial+=("$file"); else clean+=("$file"); fi
+      ;;
+  esac
+done
+
+# ---------------------------------------------------------------- 1. format
+#
+# Only files that are *fully* staged are touched. Formatting a file and
+# re-adding it would otherwise stage whatever else was sitting unstaged in it —
+# silently committing work the author chose to hold back.
+if [ ${#clean[@]} -gt 0 ]; then
+  pnpm exec prettier --write --ignore-unknown --log-level warn -- "${clean[@]}"
+  # Safe to re-stage: worktree and index agreed before we formatted.
+  git add -- "${clean[@]}"
+fi
+
+if [ ${#partial[@]} -gt 0 ]; then
+  echo "  ! not formatted — these files have unstaged changes, so re-staging them"
+  echo "    would commit work you did not stage:"
+  printf '      %s\n' "${partial[@]}"
+fi
+
+# ------------------------------------------------- 2. branding tripwire
+#
+# This project must read as built-from-scratch. Staged content mentioning the
+# scaffolds it must never reference is refused outright, before any tokens or
+# CI minutes are spent. (CLAUDE.md is local-only and gitignored, so it cannot
+# reach the index in the first place.)
+if git diff --cached -G'[Cc]horus|[Pp]okemon' --name-only | grep -q .; then
+  echo "  ✗ commit refused: staged content matches the branding tripwire."
+  git diff --cached -G'[Cc]horus|[Pp]okemon' --name-only | sed 's/^/      /'
+  exit 1
+fi
+
+if [ ${#code[@]} -eq 0 ]; then exit 0; fi
+
+# ------------------------------------------------- 3. lint + typecheck (free)
+if printf '%s\n' "${code[@]}" | grep -q '^tooling/'; then
+  # tooling/ belongs to no Nx project, so `nx affected` reports nothing for
+  # it. Check it explicitly rather than let it through unverified.
+  echo "  → typecheck review tooling"
+  if ! pnpm typecheck:tooling; then
+    echo ""
+    echo "  ✗ commit refused: tooling/ failed to typecheck."
+    exit 1
+  fi
+fi
+
+file_list=$(IFS=,; printf '%s' "${code[*]}")
+
+echo "  → lint + typecheck on affected projects"
+if ! pnpm exec nx affected -t lint typecheck --files="$file_list"; then
+  echo ""
+  echo "  ✗ commit refused: lint or typecheck failed."
+  echo "    No review tokens were spent."
+  exit 1
+fi
+
+# ------------------------------------------------------- 4. code review
+if [ -n "${SKIP_REVIEW:-}" ]; then
+  echo "  – code review skipped (SKIP_REVIEW is set)"
+  exit 0
+fi
+
+if [ ! -f tooling/code-review/review.ts ]; then
+  # Early history: the hook lands before the review tooling does.
+  exit 0
+fi
+
+echo "  → code review (quick profile)"
+if ! pnpm exec tsx tooling/code-review/review.ts --staged --profile=quick; then
+  echo "  Commit refused by code review."
+  echo "  Re-run with SKIP_REVIEW=1 git commit … to bypass the review only,"
+  echo "  or git commit --no-verify to bypass every check."
+  exit 1
+fi
