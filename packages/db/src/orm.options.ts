@@ -1,0 +1,42 @@
+import { UnderscoreNamingStrategy } from '@mikro-orm/core';
+import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
+
+import { DesignRevision } from './entities/design-revision.entity';
+import { DesignSession } from './entities/design-session.entity';
+import { EvalJob } from './entities/eval-job.entity';
+import { Evaluation } from './entities/evaluation.entity';
+import { ExperienceProfile } from './entities/experience-profile.entity';
+import { Finding } from './entities/finding.entity';
+import { Prompt } from './entities/prompt.entity';
+import { StarStory } from './entities/star-story.entity';
+
+/**
+ * ORM settings shared by every entry point that configures MikroORM: the API's
+ * DbModule, the eval worker's DbModule, and `mikro-orm.config.ts` (the CLI
+ * that creates and applies migrations).
+ *
+ * They have to agree. `namingStrategy` in particular decides whether the apps
+ * query `revision_number` or `revisionNumber` — and since migrations are
+ * produced from the CLI side, a mismatch means an app cannot read the tables
+ * the CLI just created. One shared object makes the drift unrepresentable.
+ */
+export const ormOptions = {
+  host: process.env['DB_HOST'] ?? 'localhost',
+  port: parseInt(process.env['DB_PORT'] ?? '5432', 10),
+  user: process.env['DB_USERNAME'] ?? 'admin',
+  password: process.env['DB_PASSWORD'] ?? 'admin',
+  dbName: process.env['DB_NAME'] ?? 'sysdesign',
+
+  entities: [
+    ExperienceProfile,
+    Prompt,
+    DesignSession,
+    DesignRevision,
+    Evaluation,
+    Finding,
+    EvalJob,
+    StarStory,
+  ],
+  metadataProvider: ReflectMetadataProvider,
+  namingStrategy: UnderscoreNamingStrategy,
+};

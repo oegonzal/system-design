@@ -1,0 +1,17 @@
+{
+  "name": "db",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/db/src",
+  "projectType": "library",
+  "tags": ["type:shared", "scope:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/db",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    }
+  }
+}

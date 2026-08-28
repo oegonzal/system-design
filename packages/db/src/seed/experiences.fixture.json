@@ -1,0 +1,105 @@
+[
+  {
+    "id": "e1000000-0000-4000-8000-000000000001",
+    "slug": "ticketing-replatform",
+    "companyLabel": "Ticketing & events platform",
+    "title": "Re-architected ticketing services for flash on-sales",
+    "summary": "Lead engineer on a ticketing platform whose on-sales spiked from 350 to 10,000+ concurrent users. Re-architected the AWS service layer with JWT-based service allocation, tuned PostgreSQL with indexing, stored procedures and triggers, and moved order side-effects onto webhooks and transactional event processing.",
+    "archetype": "flash-sale-ticketing",
+    "techStack": ["Node.js", "TypeScript", "PostgreSQL", "AWS", "Redis", "JWT", "Webhooks"],
+    "scaleFacts": {
+      "concurrentUsers": 10000,
+      "requestsPerSecond": 4000,
+      "peakMultiplier": 28,
+      "notes": "Grew from 350 to 10,000+ concurrent users during high-demand on-sales; inventory is strictly finite and oversell is unacceptable."
+    },
+    "highlights": [
+      "Scaled ticket on-sales from 350 to 10,000+ concurrent users with JWT-based service allocation",
+      "Optimized PostgreSQL flows with indexing, stored procedures, triggers and transactional events",
+      "Built configurable dashboards for events, inventory and white-label partner workflows",
+      "Raised test coverage from near-zero to 70% across a 90,000+ line codebase"
+    ]
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000002",
+    "slug": "media-collectibles-platform",
+    "companyLabel": "Streaming & collectibles platform",
+    "title": "Media, collectibles and launch-day commerce at 10k+ concurrent",
+    "summary": "Full-stack lead across a film-streaming and digital-collectibles platform: creator-to-fan media flows, digital ownership, reward-driven viewing, and production-critical token launch days. Backend services on cloud infrastructure with a document store, automated media operations with a vision API and vector search over a headless CMS.",
+    "archetype": "media-streaming-pipeline",
+    "techStack": [
+      "NestJS",
+      "Node.js",
+      "MongoDB",
+      "GCP",
+      "Vision API",
+      "Vector search",
+      "CDN",
+      "Headless CMS"
+    ],
+    "scaleFacts": {
+      "concurrentUsers": 10000,
+      "dailyEvents": 2000000,
+      "dataVolumeGb": 40000,
+      "notes": "Launch-day drops concentrate a day of traffic into minutes; media assets dominate storage and egress."
+    },
+    "highlights": [
+      "Architected backend services scaling media, collectibles and user-state workflows to 10,000+ concurrent users",
+      "Automated content operations with a vision API, vector search and CMS-driven metadata",
+      "Owned production-critical launch flows across UX, backend services and release operations"
+    ]
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000003",
+    "slug": "adtech-workflow-automation",
+    "companyLabel": "AdTech automation platform",
+    "title": "Configurable campaign workflows and E2E automation at scale",
+    "summary": "Helped lead the frontend framework of an advertising-automation platform: extensible widgets and configurable UI workflows for campaign operations, plus an E2E automation program (browser regression across high-variation customer paths) that cut production bugs 50% and manual QA 60%.",
+    "archetype": "workflow-automation",
+    "techStack": ["TypeScript", "Angular", "Playwright", "Jest", "Datadog", "Node.js"],
+    "scaleFacts": {
+      "dailyEvents": 500000,
+      "notes": "Thousands of advertiser configurations; every workflow is a slightly different path through the same engine."
+    },
+    "highlights": [
+      "Architected extensible widgets and configurable UI workflows for campaign automation",
+      "Cut production bugs 50% and manual QA 60% with E2E automation and multimodal validation",
+      "Provided technical direction for 20+ engineers across architecture and testing strategy"
+    ]
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000004",
+    "slug": "network-risk-dashboards",
+    "companyLabel": "Payments network",
+    "title": "Real-time risk dashboards over network infrastructure",
+    "summary": "Built real-time risk dashboards with data-science teams to surface infrastructure exposure across a global payments network, reducing incidents by 30%+, and a real-time vendor portal that cut third-party approval cycles by 80%+.",
+    "archetype": "realtime-analytics",
+    "techStack": ["Node.js", "D3.js", "WebSockets", "PostgreSQL", "Angular"],
+    "scaleFacts": {
+      "requestsPerSecond": 2000,
+      "dailyEvents": 5000000,
+      "notes": "Dashboards must stay current against a continuous event firehose while historical queries stay fast."
+    },
+    "highlights": [
+      "Surfaced infrastructure exposure across a global network, reducing incidents by 30%+",
+      "Cut third-party tool approval cycles by 80%+ with a real-time vendor portal"
+    ]
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000005",
+    "slug": "agentic-dag-engine",
+    "companyLabel": "Personal project",
+    "title": "Agentic workflow engine compiling goals into DAGs",
+    "summary": "A workflow engine that compiles goals into executable DAGs using LLM critics and evals, strict JSON schemas, beam search and MCP tooling — orchestration, retries, and evaluation harnesses for multi-agent workflows.",
+    "archetype": "dag-orchestration",
+    "techStack": ["TypeScript", "Node.js", "Python", "XState", "MCP", "RAG", "LLM evals"],
+    "scaleFacts": {
+      "dailyEvents": 100000,
+      "notes": "Long-running multi-step jobs with fallible steps; progress must survive worker crashes and retries must be safe."
+    },
+    "highlights": [
+      "Compiled goals into DAGs with LLM critics/evals and strict JSON schemas",
+      "Built retry-safe orchestration with beam search over candidate plans"
+    ]
+  }
+]
