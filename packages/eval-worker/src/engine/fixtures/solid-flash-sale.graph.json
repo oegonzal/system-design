@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "client-1",
+      "kind": "client",
+      "label": "Fan browser",
+      "position": { "x": 0, "y": 200 }
+    },
+    {
+      "id": "gateway-1",
+      "kind": "gateway",
+      "label": "API gateway",
+      "config": { "rateLimit": true },
+      "position": { "x": 240, "y": 200 }
+    },
+    {
+      "id": "lb-1",
+      "kind": "load-balancer",
+      "label": "Load balancer",
+      "position": { "x": 480, "y": 200 }
+    },
+    {
+      "id": "service-1",
+      "kind": "service",
+      "label": "Ticket service",
+      "config": { "replicas": 3 },
+      "position": { "x": 720, "y": 200 }
+    },
+    {
+      "id": "cache-1",
+      "kind": "cache",
+      "label": "Read cache",
+      "position": { "x": 960, "y": 80 }
+    },
+    {
+      "id": "database-1",
+      "kind": "database",
+      "label": "Orders DB",
+      "position": { "x": 1200, "y": 80 }
+    },
+    {
+      "id": "replica-1",
+      "kind": "replica",
+      "label": "Read replica",
+      "position": { "x": 1440, "y": 80 }
+    },
+    {
+      "id": "queue-1",
+      "kind": "queue",
+      "label": "Order queue",
+      "config": { "dlq": true },
+      "position": { "x": 960, "y": 320 }
+    },
+    {
+      "id": "worker-1",
+      "kind": "worker",
+      "label": "Order worker",
+      "position": { "x": 1200, "y": 320 }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "client-1", "target": "gateway-1" },
+    { "id": "edge-2", "source": "gateway-1", "target": "lb-1" },
+    { "id": "edge-3", "source": "lb-1", "target": "service-1" },
+    { "id": "edge-4", "source": "service-1", "target": "cache-1" },
+    { "id": "edge-5", "source": "cache-1", "target": "database-1" },
+    { "id": "edge-6", "source": "database-1", "target": "replica-1", "kind": "async" },
+    { "id": "edge-7", "source": "service-1", "target": "queue-1", "kind": "async" },
+    { "id": "edge-8", "source": "queue-1", "target": "worker-1", "kind": "async" }
+  ]
+}
