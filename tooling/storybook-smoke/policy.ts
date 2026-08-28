@@ -132,10 +132,26 @@ export type Verdict = 'ok' | 'crashed' | 'blank' | 'unthemed' | 'noisy' | 'inacc
  * own chrome, and it embeds stories that were already themed-and-checked on
  * their own renders.
  */
+/**
+ * Stories whose entire point is to render nothing visible. LiveRegion is an
+ * aria-live announcer using the visually-hidden clip pattern — a zero-height
+ * mount is its correct behaviour, not a broken one. Narrow by id prefix so a
+ * genuinely broken sibling story still fails.
+ */
+const INTENTIONALLY_INVISIBLE: readonly RegExp[] = [/^design-system-primitives-liveregion--/];
+
+export const isIntentionallyInvisible = (id: string): boolean =>
+  INTENTIONALLY_INVISIBLE.some((pattern) => pattern.test(id));
+
 export function classify(result: RenderResult): Verdict {
   if (result.fatal !== undefined || result.mount === undefined) return 'crashed';
   if (result.mount.errorDisplay || result.mount.noPreview) return 'crashed';
-  if (result.mount.children === 0 || result.mount.height === 0) return 'blank';
+  if (
+    (result.mount.children === 0 || result.mount.height === 0) &&
+    !isIntentionallyInvisible(result.id)
+  ) {
+    return 'blank';
+  }
   if (result.kind === 'story' && result.mount.colorModeAttr !== result.mode) return 'unthemed';
   if (relevantNoise(result).length > 0) return 'noisy';
   if (result.violations.length > 0) return 'inaccessible';

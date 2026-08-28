@@ -16,7 +16,13 @@ function node(
   return { id, type: 'sd', position, data, selected };
 }
 
-/** Static React Flow canvas rendering the given nodes — no interactions. */
+/**
+ * Static React Flow canvas rendering the given nodes — no interactions.
+ *
+ * Attribution is hidden here and only here: the catalog's subject is our
+ * node component, and the vendor watermark's 10px grey link fails the smoke
+ * harness's axe contrast gate. The running app keeps it visible.
+ */
 function NodesPreview({ nodes }: { nodes: SdNodeModel[] }) {
   return (
     <ReactFlow
@@ -28,6 +34,7 @@ function NodesPreview({ nodes }: { nodes: SdNodeModel[] }) {
       nodesConnectable={false}
       zoomOnScroll={false}
       panOnDrag={false}
+      proOptions={{ hideAttribution: true }}
     />
   );
 }

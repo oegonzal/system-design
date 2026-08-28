@@ -104,6 +104,14 @@ describe('classify', () => {
     expect(classify(result({ mount: { ...mountedIn('light'), height: 0 } }))).toBe('blank');
   });
 
+  it('exempts intentionally invisible stories (aria-live announcers) from the blank verdict', () => {
+    const invisible = result({
+      id: 'design-system-primitives-liveregion--polite',
+      mount: { ...mountedIn('light'), height: 0, children: 0 },
+    });
+    expect(classify(invisible)).toBe('ok');
+  });
+
   /**
    * `data-color-mode` on the preview's <html> is ThemeRoot's receipt that the
    * requested mode actually applied. A dark render still stamped light tested
