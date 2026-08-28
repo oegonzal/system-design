@@ -1,0 +1,41 @@
+{
+  "name": "studio-ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/studio-ui/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/studio-ui",
+        "command": "next dev -p 4200"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": ["{projectRoot}/.next"],
+      "options": {
+        "cwd": "packages/studio-ui",
+        "command": "next build"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "packages/studio-ui",
+        "command": "next start -p 4200"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/studio-ui",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    }
+  }
+}

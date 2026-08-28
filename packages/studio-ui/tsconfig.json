@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }],
+    "types": ["node"],
+    // Redeclared app-locally (extends-inherited paths, being relative to the
+    // base file, don't reach Next's resolver). Deliberately only the
+    // browser-safe packages: with these shadowing the base map,
+    // @sysdesign/db and @sysdesign/llm cannot resolve from the UI at all.
+    "paths": {
+      "@sysdesign/contracts": ["../contracts/src/index.ts"],
+      "@sysdesign/design-system": ["../design-system/src/index.ts"]
+    }
+  },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}
