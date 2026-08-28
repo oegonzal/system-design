@@ -1,16 +1,29 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import type { FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { DEFAULT_LIST_LIMIT, type PromptDifficulty, type PromptStatus } from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt } from '@sysdesign/db';
+import type { LlmClient } from '@sysdesign/llm';
 
 import type { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
+import { enrichPrompt } from './generator/enrich-prompt';
 import { generatePrompt, GENERATOR_VERSION } from './generator/prompt-generator';
 import { fnv1a } from './generator/rng';
 
+/** Injection token for the LlmClient interface (interfaces erase at runtime). */
+export const LLM_CLIENT = Symbol('LLM_CLIENT');
+
 @Injectable()
 export class PromptsService {
-  constructor(private readonly em: EntityManager) {}
+  constructor(
+    private readonly em: EntityManager,
+    @Inject(LLM_CLIENT) private readonly llm: LlmClient,
+  ) {}
 
   /** 422 rather than 404: the request body is well-formed, just unsatisfiable. */
   async generate(
@@ -54,19 +67,22 @@ export class PromptsService {
     seed: number,
   ): Promise<Prompt> {
     const generated = generatePrompt({ experience, difficulty, seed });
+    // Prose polish only — scale targets and NFRs stay byte-deterministic.
+    const enriched = await enrichPrompt(this.llm, generated, experience);
 
     const prompt = this.em.create(Prompt, {
       experience,
       // Denormalized so list filtering by archetype needs no join.
       archetype: experience.archetype,
       title: generated.title,
-      scenario: generated.scenario,
-      functionalRequirements: generated.functionalRequirements,
+      scenario: enriched.scenario,
+      functionalRequirements: enriched.functionalRequirements,
       nonFunctionalRequirements: generated.nonFunctionalRequirements,
       scaleTargets: generated.scaleTargets,
       difficulty,
       seed,
       generatorVersion: GENERATOR_VERSION,
+      llmEnriched: enriched.llmEnriched,
     });
     this.em.persist(prompt);
     await this.em.flush();
