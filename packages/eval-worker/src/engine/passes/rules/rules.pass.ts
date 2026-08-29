@@ -9,6 +9,7 @@ import type { EngineFinding, FindingsArtifact } from '../../core/artifacts';
 import type { EvalPass } from '../../core/types';
 import type { GraphIndex } from '../../graph-index';
 import type { CanvasGraph } from '@sysdesign/contracts';
+import { applySeverityPolicy, readSeverityOverrides } from './severity-policy';
 
 export const RULES_PASS_ID = 'rules.core';
 
@@ -16,6 +17,8 @@ export interface RulesInput {
   graph: CanvasGraph;
   facts: PromptFacts;
   index: GraphIndex;
+  /** This pass's options from the active profile entry (severityOverrides). */
+  options?: Record<string, unknown>;
 }
 
 export function runRules(input: RulesInput, rules: readonly EvalRule[] = RULES): FindingsArtifact {
@@ -27,7 +30,14 @@ export function runRules(input: RulesInput, rules: readonly EvalRule[] = RULES):
       findings.push({ ...finding, countsAsViolation: true, expectationId: null, nfrId: null });
     }
   }
-  return { passId: RULES_PASS_ID, kind: 'findings', findings };
+  // Severity is re-graded last, so rules stay difficulty-blind on severity
+  // and the profile owns how hard each lesson lands per tier.
+  const overrides = readSeverityOverrides(input.options?.['severityOverrides']);
+  return {
+    passId: RULES_PASS_ID,
+    kind: 'findings',
+    findings: applySeverityPolicy(findings, input.facts.difficulty, overrides),
+  };
 }
 
 export function createRulesPass(): EvalPass {

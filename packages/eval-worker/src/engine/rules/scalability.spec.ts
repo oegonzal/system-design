@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contextFor, edge, flashSaleFacts, graph, node, ruleById } from '../testing';
+import { contextFor, edge, flashSaleFacts, graph, mediaFacts, node, ruleById } from '../testing';
 
 function readHeavyFacts(readWriteRatio = '95:5') {
   return flashSaleFacts({
@@ -137,5 +137,198 @@ describe('scalability.unbounded-fanout', () => {
 
   it('stays silent at four synchronous calls', () => {
     expect(rule.check(contextFor(fanout(4)))).toEqual([]);
+  });
+});
+
+describe('scalability.capacity-replicas-insufficient', () => {
+  const rule = ruleById('scalability.capacity-replicas-insufficient');
+  const fronted = graph(
+    [node('client-1', 'client'), node('lb-1', 'load-balancer'), node('svc-1', 'service')],
+    [edge('e1', 'client-1', 'lb-1'), edge('e2', 'lb-1', 'svc-1')],
+  );
+
+  it('fires when replicas × per-replica rate falls short of the peak', () => {
+    // 8,000 req/s against 1 × 3,000 req/s of assumed capacity.
+    const findings = rule.check(contextFor(fronted));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('high');
+    expect(findings[0].affectedNodeIds).toEqual(['svc-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'svc-1', set: { config: { replicas: 3 } } },
+    ]);
+  });
+
+  it('stays silent once the tier is sized for the peak', () => {
+    const sized = graph(
+      [
+        node('client-1', 'client'),
+        node('lb-1', 'load-balancer'),
+        node('svc-1', 'service', { config: { replicas: 3 } }),
+      ],
+      fronted.edges,
+    );
+    expect(rule.check(contextFor(sized))).toEqual([]);
+  });
+
+  it('stays silent for unfronted services — the balancer lesson comes first', () => {
+    const raw = graph(
+      [node('client-1', 'client'), node('svc-1', 'service')],
+      [edge('e1', 'client-1', 'svc-1')],
+    );
+    expect(rule.check(contextFor(raw))).toEqual([]);
+  });
+});
+
+describe('scalability.db-write-bottleneck', () => {
+  const rule = ruleById('scalability.db-write-bottleneck');
+  const writeHeavyFacts = flashSaleFacts({
+    scaleTargets: { ...flashSaleFacts().scaleTargets, readWriteRatio: '20:80' },
+  });
+  const unbuffered = graph(
+    [node('svc-1', 'service'), node('db-1', 'database')],
+    [edge('e1', 'svc-1', 'db-1')],
+  );
+
+  it('fires when write volume hits an unsharded primary with no buffer', () => {
+    // 8,000 req/s at 20:80 is 6,400 writes/s.
+    const findings = rule.check(contextFor(unbuffered, writeHeavyFacts));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('high');
+    expect(findings[0].affectedNodeIds).toEqual(['db-1']);
+    expect(findings[0].message).toContain('6,400 writes/s');
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent when a queue buffers the write path or the store is sharded', () => {
+    const buffered = graph(
+      [node('svc-1', 'service'), node('q-1', 'queue'), node('db-1', 'database')],
+      [edge('e1', 'svc-1', 'q-1', 'async'), edge('e2', 'q-1', 'db-1', 'async')],
+    );
+    expect(rule.check(contextFor(buffered, writeHeavyFacts))).toEqual([]);
+    const sharded = graph(
+      [node('svc-1', 'service'), node('db-1', 'database', { config: { sharding: 'hash' } })],
+      [edge('e1', 'svc-1', 'db-1')],
+    );
+    expect(rule.check(contextFor(sharded, writeHeavyFacts))).toEqual([]);
+  });
+
+  it('stays silent when the workload writes little', () => {
+    // The default 95:5 ratio puts writes at 400/s.
+    expect(rule.check(contextFor(unbuffered))).toEqual([]);
+  });
+});
+
+describe('scalability.worker-pool-underscaled', () => {
+  const rule = ruleById('scalability.worker-pool-underscaled');
+  const advanced = flashSaleFacts({ difficulty: 'advanced' });
+  const lopsided = graph(
+    [
+      node('svc-1', 'service', { config: { replicas: 3 } }),
+      node('q-1', 'queue'),
+      node('worker-1', 'worker'),
+    ],
+    [edge('e1', 'svc-1', 'q-1', 'async'), edge('e2', 'q-1', 'worker-1', 'async')],
+  );
+
+  it('fires at advanced when a scaled producer drains into one worker', () => {
+    const findings = rule.check(contextFor(lopsided, advanced));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['q-1', 'worker-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'worker-1', set: { config: { replicas: 3 } } },
+    ]);
+  });
+
+  it('stays silent when the pool is scaled or the producer is not', () => {
+    const pooled = graph(
+      [
+        node('svc-1', 'service', { config: { replicas: 3 } }),
+        node('q-1', 'queue'),
+        node('worker-1', 'worker', { config: { replicas: 3 } }),
+      ],
+      lopsided.edges,
+    );
+    expect(rule.check(contextFor(pooled, advanced))).toEqual([]);
+    const calmProducer = graph(
+      [node('svc-1', 'service'), node('q-1', 'queue'), node('worker-1', 'worker')],
+      lopsided.edges,
+    );
+    expect(rule.check(contextFor(calmProducer, advanced))).toEqual([]);
+  });
+
+  it('stays silent below advanced — standard reference designs run single workers', () => {
+    expect(rule.check(contextFor(lopsided))).toEqual([]);
+  });
+});
+
+describe('scalability.no-sharding-hot-writes', () => {
+  const rule = ruleById('scalability.no-sharding-hot-writes');
+  const hotFacts = flashSaleFacts({
+    difficulty: 'advanced',
+    scaleTargets: {
+      ...flashSaleFacts().scaleTargets,
+      requestsPerSecond: 200000,
+      readWriteRatio: '50:50',
+    },
+  });
+  const unsharded = graph(
+    [node('svc-1', 'service'), node('db-1', 'database')],
+    [edge('e1', 'svc-1', 'db-1')],
+  );
+
+  it('fires at advanced when writes/s outgrow any single primary', () => {
+    // 200,000 req/s at 50:50 is 100,000 writes/s.
+    const findings = rule.check(contextFor(unsharded, hotFacts));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['db-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'db-1', set: { config: { sharding: 'hash' } } },
+    ]);
+  });
+
+  it('stays silent when the store is sharded or the tier is not advanced', () => {
+    const sharded = graph(
+      [node('svc-1', 'service'), node('db-1', 'database', { config: { sharding: 'range' } })],
+      unsharded.edges,
+    );
+    expect(rule.check(contextFor(sharded, hotFacts))).toEqual([]);
+    expect(rule.check(contextFor(unsharded, { ...hotFacts, difficulty: 'standard' }))).toEqual([]);
+  });
+});
+
+describe('scalability.hot-partition-risk', () => {
+  const rule = ruleById('scalability.hot-partition-risk');
+  const advanced = flashSaleFacts({ difficulty: 'advanced' });
+  const unspread = graph(
+    [node('svc-1', 'service'), node('db-1', 'database'), node('stream-1', 'event-stream')],
+    [edge('e1', 'svc-1', 'db-1'), edge('e2', 'svc-1', 'stream-1', 'async')],
+  );
+
+  it('fires at advanced on the spike archetypes when nothing spreads the hot key', () => {
+    const findings = rule.check(contextFor(unspread, advanced));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['db-1', 'stream-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent once a store is sharded or a stream is partitioned', () => {
+    const sharded = graph(
+      [node('svc-1', 'service'), node('db-1', 'database', { config: { sharding: 'hash' } })],
+      [edge('e1', 'svc-1', 'db-1')],
+    );
+    expect(rule.check(contextFor(sharded, advanced))).toEqual([]);
+    const partitioned = graph(
+      [node('svc-1', 'service'), node('stream-1', 'event-stream', { config: { partitions: 4 } })],
+      [edge('e1', 'svc-1', 'stream-1', 'async')],
+    );
+    expect(rule.check(contextFor(partitioned, advanced))).toEqual([]);
+  });
+
+  it('stays silent below advanced and outside the spike archetypes', () => {
+    expect(rule.check(contextFor(unspread))).toEqual([]);
+    expect(rule.check(contextFor(unspread, mediaFacts({ difficulty: 'advanced' })))).toEqual([]);
   });
 });

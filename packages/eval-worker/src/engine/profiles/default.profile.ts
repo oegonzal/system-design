@@ -16,7 +16,20 @@ export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
   version: '2.0.0',
   passes: [
-    { pass: RULES_PASS_ID, enabled: true },
+    {
+      pass: RULES_PASS_ID,
+      enabled: true,
+      options: {
+        // Lessons that harden with the tier: forgivable at standard, real
+        // reliability/performance debts once the prompt plays at advanced.
+        severityOverrides: {
+          'messaging.queue-no-dlq': { advanced: 'high' },
+          'reliability.lb-single-target': { advanced: 'high' },
+          'performance.no-cdn-static': { advanced: 'high' },
+          'scalability.shared-db-many-services': { advanced: 'high' },
+        },
+      },
+    },
     { pass: EXPECTATIONS_PASS_ID, enabled: true },
     { pass: CRITIC_PASS_ID, enabled: true },
   ],
@@ -40,6 +53,29 @@ export const DEFAULT_PROFILE: EvalProfile = {
       { ruleId: 'security.no-gateway', whenExpectationUnmet: 'exp.fst.edge-front-door' },
       { ruleId: 'security.no-rate-limit', whenExpectationUnmet: 'exp.fst.rate-limit-edge' },
       { ruleId: 'messaging.queue-no-dlq', whenExpectationUnmet: 'exp.fst.dlq-on-queues' },
+      {
+        ruleId: 'scalability.capacity-replicas-insufficient',
+        whenExpectationUnmet: 'exp.fst.stateless-scale-out',
+      },
+      {
+        ruleId: 'scalability.hot-partition-risk',
+        whenExpectationUnmet: 'exp.fst.hot-partition-mitigation',
+      },
+      {
+        ruleId: 'data.no-idempotent-consumers',
+        whenExpectationUnmet: 'exp.fst.idempotent-checkout',
+      },
+      {
+        ruleId: 'data.no-idempotent-consumers',
+        whenExpectationUnmet: 'exp.wfa.exactly-once-actions',
+      },
+      { ruleId: 'data.no-idempotent-consumers', whenExpectationUnmet: 'exp.dag.idempotent-steps' },
+      {
+        ruleId: 'data.no-idempotent-consumers',
+        whenExpectationUnmet: 'exp.rta.exactly-once-counts',
+      },
+      { ruleId: 'data.multi-writer-inventory', whenExpectationUnmet: 'exp.fst.oversell-guard' },
+      { ruleId: 'data.stream-no-retention', whenExpectationUnmet: 'exp.rta.ingest-buffer-durable' },
     ],
   },
 };

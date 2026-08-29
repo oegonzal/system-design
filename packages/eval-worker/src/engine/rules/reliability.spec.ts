@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contextFor, edge, flashSaleFacts, graph, node, ruleById } from '../testing';
+import { contextFor, edge, flashSaleFacts, graph, node, ruleById, workflowFacts } from '../testing';
 
 describe('reliability.single-db-no-replica', () => {
   const rule = ruleById('reliability.single-db-no-replica');
@@ -105,5 +105,271 @@ describe('reliability.lb-single-target', () => {
       [edge('e1', 'lb-1', 'svc-1'), edge('e2', 'lb-1', 'svc-2')],
     );
     expect(rule.check(contextFor(spread))).toEqual([]);
+  });
+});
+
+describe('reliability.single-service-instance', () => {
+  const rule = ruleById('reliability.single-service-instance');
+  const fronted = graph(
+    [node('client-1', 'client'), node('lb-1', 'load-balancer'), node('svc-1', 'service')],
+    [edge('e1', 'client-1', 'lb-1'), edge('e2', 'lb-1', 'svc-1')],
+  );
+
+  it('fires on a fronted service running one instance', () => {
+    const findings = rule.check(contextFor(fronted));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['svc-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'svc-1', set: { config: { replicas: 3 } } },
+    ]);
+  });
+
+  it('stays silent once the service runs multiple replicas', () => {
+    const scaled = graph(
+      [
+        node('client-1', 'client'),
+        node('lb-1', 'load-balancer'),
+        node('svc-1', 'service', { config: { replicas: 3 } }),
+      ],
+      fronted.edges,
+    );
+    expect(rule.check(contextFor(scaled))).toEqual([]);
+  });
+
+  it('stays silent for an unfronted service — that is service-no-lb territory', () => {
+    const raw = graph(
+      [node('client-1', 'client'), node('svc-1', 'service')],
+      [edge('e1', 'client-1', 'svc-1')],
+    );
+    expect(rule.check(contextFor(raw))).toEqual([]);
+  });
+
+  it('stays silent at intro difficulty', () => {
+    expect(rule.check(contextFor(fronted, flashSaleFacts({ difficulty: 'intro' })))).toEqual([]);
+  });
+});
+
+describe('reliability.replica-not-wired', () => {
+  const rule = ruleById('reliability.replica-not-wired');
+
+  it('fires on a replica with no replication stream and wires it to the primary', () => {
+    const stranded = graph(
+      [node('db-1', 'database'), node('rep-1', 'replica'), node('svc-1', 'service')],
+      [edge('e1', 'svc-1', 'rep-1')],
+    );
+    const findings = rule.check(contextFor(stranded));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['rep-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      {
+        op: 'add-edge',
+        edge: {
+          id: 'suggested-edge-replication-1',
+          source: 'db-1',
+          target: 'rep-1',
+          kind: 'async',
+        },
+      },
+    ]);
+  });
+
+  it('skips the patch when no database exists to replicate from', () => {
+    const orphan = graph(
+      [node('rep-1', 'replica'), node('svc-1', 'service')],
+      [edge('e1', 'svc-1', 'rep-1')],
+    );
+    const findings = rule.check(contextFor(orphan));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent when the primary replicates into the replica', () => {
+    const wired = graph(
+      [node('db-1', 'database'), node('rep-1', 'replica')],
+      [edge('e1', 'db-1', 'rep-1', 'async')],
+    );
+    expect(rule.check(contextFor(wired))).toEqual([]);
+  });
+});
+
+describe('reliability.single-gateway-advanced', () => {
+  const rule = ruleById('reliability.single-gateway-advanced');
+  const singleFront = graph(
+    [node('client-1', 'client'), node('gw-1', 'gateway'), node('svc-1', 'service')],
+    [edge('e1', 'client-1', 'gw-1'), edge('e2', 'gw-1', 'svc-1')],
+  );
+
+  it('fires at advanced on the lone gateway front door', () => {
+    const findings = rule.check(
+      contextFor(singleFront, flashSaleFacts({ difficulty: 'advanced' })),
+    );
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['gw-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent below advanced difficulty', () => {
+    expect(rule.check(contextFor(singleFront))).toEqual([]);
+  });
+
+  it('stays silent with two gateways or with no client', () => {
+    const dual = graph(
+      [...singleFront.nodes, node('gw-2', 'gateway')],
+      [...singleFront.edges, edge('e3', 'client-1', 'gw-2')],
+    );
+    expect(rule.check(contextFor(dual, flashSaleFacts({ difficulty: 'advanced' })))).toEqual([]);
+    const headless = graph(
+      [node('gw-1', 'gateway'), node('svc-1', 'service')],
+      [edge('e1', 'gw-1', 'svc-1')],
+    );
+    expect(rule.check(contextFor(headless, flashSaleFacts({ difficulty: 'advanced' })))).toEqual(
+      [],
+    );
+  });
+});
+
+describe('reliability.circuit-breaker-missing', () => {
+  const rule = ruleById('reliability.circuit-breaker-missing');
+  const unguarded = graph(
+    [node('svc-1', 'service'), node('ext-1', 'external-api')],
+    [edge('e1', 'svc-1', 'ext-1')],
+  );
+
+  it('fires on a synchronous external call with no breaker', () => {
+    const findings = rule.check(contextFor(unguarded));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['ext-1', 'svc-1']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'ext-1', set: { config: { circuitBreaker: true } } },
+    ]);
+  });
+
+  it('stays silent when the breaker is on or the call is async', () => {
+    const guarded = graph(
+      [
+        node('svc-1', 'service'),
+        node('ext-1', 'external-api', { config: { circuitBreaker: true } }),
+      ],
+      [edge('e1', 'svc-1', 'ext-1')],
+    );
+    expect(rule.check(contextFor(guarded))).toEqual([]);
+    const buffered = graph(unguarded.nodes, [edge('e1', 'svc-1', 'ext-1', 'async')]);
+    expect(rule.check(contextFor(buffered))).toEqual([]);
+  });
+
+  it('stays silent at intro difficulty', () => {
+    expect(rule.check(contextFor(unguarded, flashSaleFacts({ difficulty: 'intro' })))).toEqual([]);
+  });
+});
+
+describe('reliability.deep-sync-no-timeouts', () => {
+  const rule = ruleById('reliability.deep-sync-no-timeouts');
+  const deep = graph(
+    [
+      node('client-1', 'client'),
+      node('svc-1', 'service'),
+      node('svc-2', 'service'),
+      node('svc-3', 'service'),
+      node('db-1', 'database'),
+    ],
+    [
+      edge('e1', 'client-1', 'svc-1'),
+      edge('e2', 'svc-1', 'svc-2'),
+      edge('e3', 'svc-2', 'svc-3'),
+      edge('e4', 'svc-3', 'db-1'),
+    ],
+  );
+
+  it('fires at advanced on a four-hop synchronous chain', () => {
+    const findings = rule.check(contextFor(deep, flashSaleFacts({ difficulty: 'advanced' })));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('low');
+    expect(findings[0].message).toContain('4 hops');
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent on shorter chains and below advanced', () => {
+    const shallow = graph(deep.nodes.slice(0, 4), deep.edges.slice(0, 3));
+    expect(rule.check(contextFor(shallow, flashSaleFacts({ difficulty: 'advanced' })))).toEqual([]);
+    expect(rule.check(contextFor(deep))).toEqual([]);
+  });
+});
+
+describe('reliability.scheduler-single-point', () => {
+  const rule = ruleById('reliability.scheduler-single-point');
+  const loneTick = graph(
+    [node('sched-1', 'scheduler'), node('q-1', 'queue')],
+    [edge('e1', 'sched-1', 'q-1', 'async')],
+  );
+
+  it('fires on the archetypes where the tick is the product', () => {
+    const findings = rule.check(contextFor(loneTick, workflowFacts()));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['sched-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent once a distributed lock makes a standby safe', () => {
+    const guarded = graph(
+      [...loneTick.nodes, node('lock-1', 'distributed-lock')],
+      [...loneTick.edges, edge('e2', 'sched-1', 'lock-1')],
+    );
+    expect(rule.check(contextFor(guarded, workflowFacts()))).toEqual([]);
+  });
+
+  it('stays silent with two orchestrators or outside the archetypes', () => {
+    const standby = graph(
+      [...loneTick.nodes, node('sched-2', 'scheduler')],
+      [...loneTick.edges, edge('e2', 'sched-2', 'q-1', 'async')],
+    );
+    expect(rule.check(contextFor(standby, workflowFacts()))).toEqual([]);
+    expect(rule.check(contextFor(loneTick))).toEqual([]);
+  });
+});
+
+describe('reliability.queue-producer-overload', () => {
+  const rule = ruleById('reliability.queue-producer-overload');
+  const funnel = graph(
+    [
+      node('svc-1', 'service'),
+      node('svc-2', 'service'),
+      node('svc-3', 'service'),
+      node('q-1', 'queue'),
+      node('worker-1', 'worker'),
+    ],
+    [
+      edge('e1', 'svc-1', 'q-1', 'async'),
+      edge('e2', 'svc-2', 'q-1', 'async'),
+      edge('e3', 'svc-3', 'q-1', 'async'),
+      edge('e4', 'q-1', 'worker-1', 'async'),
+    ],
+  );
+
+  it('fires when three producers feed one consumer edge', () => {
+    const findings = rule.check(contextFor(funnel));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('low');
+    expect(findings[0].affectedNodeIds).toEqual(['q-1', 'svc-1', 'svc-2', 'svc-3']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e4']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent with fewer producers or more consumers', () => {
+    const twoProducers = graph(
+      funnel.nodes,
+      funnel.edges.filter((e) => e.id !== 'e3'),
+    );
+    expect(rule.check(contextFor(twoProducers))).toEqual([]);
+    const twoConsumers = graph(
+      [...funnel.nodes, node('worker-2', 'worker')],
+      [...funnel.edges, edge('e5', 'q-1', 'worker-2', 'async')],
+    );
+    expect(rule.check(contextFor(twoConsumers))).toEqual([]);
   });
 });

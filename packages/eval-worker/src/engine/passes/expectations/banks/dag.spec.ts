@@ -20,9 +20,10 @@ const naiveGraph: CanvasGraph = graph(
 
 /**
  * The reference design that meets every intro and standard expectation: a
- * scheduler dispatches through a redelivering queue into an idempotent,
- * concurrency-bounded worker pool, both sides checkpoint into a replicated
- * run-state DB, status reads hit a KV store, and monitoring watches the runs.
+ * scheduler behind leader election dispatches through a redelivering queue
+ * into an idempotent, concurrency-bounded worker pool, both sides checkpoint
+ * into a replicated run-state DB, status reads hit a KV store, and monitoring
+ * watches the runs.
  */
 const solidGraph: CanvasGraph = graph(
   [
@@ -30,6 +31,7 @@ const solidGraph: CanvasGraph = graph(
     node('gateway-1', 'gateway', { label: 'API gateway' }),
     node('service-1', 'service', { label: 'Orchestration API', config: { replicas: 3 } }),
     node('scheduler-1', 'scheduler', { label: 'DAG scheduler' }),
+    node('distributed-lock-1', 'distributed-lock', { label: 'Leader election' }),
     node('queue-1', 'queue', {
       label: 'Step queue',
       config: { dlq: true, delivery: 'at-least-once', maxRetries: 5 },
@@ -51,6 +53,7 @@ const solidGraph: CanvasGraph = graph(
     edge('edge-6', 'queue-1', 'worker-1', 'async'),
     edge('edge-7', 'worker-1', 'database-1'),
     edge('edge-8', 'service-1', 'monitoring-1', 'async'),
+    edge('edge-9', 'scheduler-1', 'distributed-lock-1'),
   ],
 );
 
@@ -65,7 +68,8 @@ const TABLE: Array<{ id: string; onNaive: boolean; onSolid: boolean }> = [
   { id: 'exp.dag.status-read-path', onNaive: false, onSolid: true },
   { id: 'exp.dag.runs-observed', onNaive: false, onSolid: true },
   { id: 'exp.dag.idempotent-steps', onNaive: false, onSolid: true },
-  { id: 'exp.dag.scheduler-ha', onNaive: false, onSolid: false },
+  // The leader-election lock guarding the scheduler doubles as HA evidence.
+  { id: 'exp.dag.scheduler-ha', onNaive: false, onSolid: true },
   { id: 'exp.dag.scale-to-zero', onNaive: false, onSolid: true },
 ];
 

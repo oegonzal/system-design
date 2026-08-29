@@ -66,3 +66,21 @@ export function formatInt(value: number): string {
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
+
+/**
+ * A service is "fronted" when some client reaches it, but only by passing a
+ * load balancer or gateway — the structural complement of the raw-traffic
+ * check in `reliability.service-no-lb`. Rules about what the edge tier can
+ * fan out to (instance counts, capacity math) apply exactly to this set.
+ */
+export function frontedByEdgeTier(
+  index: GraphIndex,
+  clients: readonly CanvasNode[],
+  service: CanvasNode,
+): boolean {
+  return clients.some(
+    (client) =>
+      index.pathExists(client.id, service.id) &&
+      !index.pathExists(client.id, service.id, { avoidKinds: ['load-balancer', 'gateway'] }),
+  );
+}

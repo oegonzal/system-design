@@ -4,7 +4,14 @@
 import type { GraphPatch, PatchOp } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
-import { formatInt, replicasOf, sortById, SuggestedIds, uniqueSorted } from './shared';
+import {
+  formatInt,
+  frontedByEdgeTier,
+  replicasOf,
+  sortById,
+  SuggestedIds,
+  uniqueSorted,
+} from './shared';
 
 const singleDbNoReplica: EvalRule = {
   id: 'reliability.single-db-no-replica',
@@ -143,4 +150,250 @@ const lbSingleTarget: EvalRule = {
   },
 };
 
-export const reliabilityRules: EvalRule[] = [singleDbNoReplica, serviceNoLb, lbSingleTarget];
+/**
+ * The complement of `service-no-lb`: traffic IS spread through a balancer or
+ * gateway, but the tier behind it still runs one instance — the front door is
+ * fine, the room behind it is empty.
+ */
+const singleServiceInstance: EvalRule = {
+  id: 'reliability.single-service-instance',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (facts.difficulty === 'intro') return [];
+    const clients = sortById(index.clients());
+    if (clients.length === 0) return [];
+    const findings: RuleFinding[] = [];
+    for (const service of sortById(index.byKind('service'))) {
+      if (replicasOf(service) >= 2) continue;
+      if (!frontedByEdgeTier(index, clients, service)) continue;
+      findings.push({
+        ruleId: singleServiceInstance.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'Client-facing service runs a single instance',
+        message: `"${service.label}" sits behind the edge tier but runs one instance, so the balancer in front of it has exactly one place to send ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s — a deploy or a crash is a full outage, not a blip. Run at least two replicas so the front door has somewhere to fail over to.`,
+        affectedNodeIds: [service.id],
+        affectedEdgeIds: [],
+        suggestion: {
+          description: 'Scale the service to multiple replicas so one instance dying is routine.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: service.id,
+              set: { config: { ...(service.config ?? {}), replicas: 3 } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const replicaNotWired: EvalRule = {
+  id: 'reliability.replica-not-wired',
+  dimension: 'reliability',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    const databases = sortById(index.byKind('database'));
+    const ids = new SuggestedIds(index);
+    for (const replica of sortById(index.byKind('replica'))) {
+      const replicated = index
+        .inEdges(replica.id)
+        .some(
+          (edge) =>
+            index.edgeKind(edge) === 'async' && index.byId(edge.source)?.kind === 'database',
+        );
+      if (replicated) continue;
+      const primary = databases[0];
+      const suggestion: GraphPatch | null = primary
+        ? {
+            description:
+              'Wire the replica to its primary over async replication so it actually receives data.',
+            ops: [
+              {
+                op: 'add-edge',
+                edge: {
+                  id: ids.next('edge-replication'),
+                  source: primary.id,
+                  target: replica.id,
+                  kind: 'async',
+                },
+              },
+            ],
+          }
+        : null;
+      findings.push({
+        ruleId: replicaNotWired.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'Replica receives no replication stream',
+        message: `"${replica.label}" has no async edge from a database feeding it, so nothing replicates into it — it is a failover target with no data to fail over to. A replica only buys availability once a replication stream from the primary keeps it current.`,
+        affectedNodeIds: [replica.id],
+        affectedEdgeIds: [],
+        suggestion,
+      });
+    }
+    return findings;
+  },
+};
+
+/**
+ * Gateways carry no replicas knob in the canvas vocabulary, so this is a
+ * structural lesson reserved for the advanced tier: one gateway node is one
+ * front door, and the design should show a second entrance (or a second
+ * gateway) before claiming an availability story at that level.
+ */
+const singleGatewayAdvanced: EvalRule = {
+  id: 'reliability.single-gateway-advanced',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'advanced') return [];
+    const gateways = index.byKind('gateway');
+    if (gateways.length !== 1 || index.clients().length === 0) return [];
+    const gateway = gateways[0];
+    return [
+      {
+        ruleId: singleGatewayAdvanced.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'One gateway is the only front door',
+        message: `Every client request enters through "${gateway.label}" and nothing else — at the ${facts.scaleTargets.availabilityPct}% availability this prompt demands, the front door itself must survive an instance loss. Show the redundancy explicitly: a second gateway (typically per region) so ingress outlives any single box.`,
+        affectedNodeIds: [gateway.id],
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const circuitBreakerMissing: EvalRule = {
+  id: 'reliability.circuit-breaker-missing',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (facts.difficulty === 'intro') return [];
+    const findings: RuleFinding[] = [];
+    for (const api of sortById(index.byKind('external-api'))) {
+      if (api.config?.circuitBreaker === true) continue;
+      const syncCallers = sortById(
+        index.inEdges(api.id).filter((edge) => {
+          const sourceKind = index.byId(edge.source)?.kind;
+          return (
+            index.edgeKind(edge) === 'sync' && (sourceKind === 'service' || sourceKind === 'worker')
+          );
+        }),
+      );
+      if (syncCallers.length === 0) continue;
+      findings.push({
+        ruleId: circuitBreakerMissing.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'Synchronous external call with no circuit breaker',
+        message: `"${api.label}" is called synchronously and nothing breaks the circuit when it degrades, so its bad minute becomes your bad minute: callers stack up waiting on a dependency you do not control. A circuit breaker fails fast once the error rate spikes and lets your capacity serve the traffic that can still succeed.`,
+        affectedNodeIds: uniqueSorted([api.id, ...syncCallers.map((edge) => edge.source)]),
+        affectedEdgeIds: uniqueSorted(syncCallers.map((edge) => edge.id)),
+        suggestion: {
+          description:
+            'Wrap the external dependency in a circuit breaker so its outages fail fast instead of queueing.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: api.id,
+              set: { config: { ...(api.config ?? {}), circuitBreaker: true } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const deepSyncNoTimeouts: EvalRule = {
+  id: 'reliability.deep-sync-no-timeouts',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'advanced') return [];
+    const clients = sortById(index.clients());
+    if (clients.length === 0) return [];
+    const chain = index.longestChain(
+      clients.map((client) => client.id),
+      { edgeKinds: ['sync'] },
+    );
+    if (chain < 4) return [];
+    return [
+      {
+        ruleId: deepSyncNoTimeouts.id,
+        dimension: 'reliability',
+        severity: 'low',
+        title: 'Deep synchronous chain with no timeout budget',
+        message: `The longest synchronous request path runs ${chain} hops, and every hop is a place to hang: without an explicit timeout budget, the caller's deadline is the sum of the worst case at every layer. Give each hop a share of the p99 ${formatInt(facts.scaleTargets.p99LatencyMs)}ms budget — timeouts that shrink as the call goes deeper — so a stall fails fast at the layer that owns it.`,
+        affectedNodeIds: clients.map((client) => client.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const schedulerSinglePoint: EvalRule = {
+  id: 'reliability.scheduler-single-point',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (facts.archetype !== 'workflow-automation' && facts.archetype !== 'dag-orchestration') {
+      return [];
+    }
+    const owners = sortById([...index.byKind('scheduler'), ...index.byKind('workflow-engine')]);
+    if (owners.length !== 1 || index.hasKind('distributed-lock')) return [];
+    const owner = owners[0];
+    return [
+      {
+        ruleId: schedulerSinglePoint.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'The tick has a single owner and no leader election',
+        message: `"${owner.label}" is the only component that decides what runs next, and nothing on the canvas makes running a standby safe — when it dies, every workflow simply stops firing. A distributed lock gives you leader election: the standby takes the expiring lease and the tick survives the instance.`,
+        affectedNodeIds: [owner.id],
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const queueProducerOverload: EvalRule = {
+  id: 'reliability.queue-producer-overload',
+  dimension: 'reliability',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const queue of sortById(index.byKind('queue'))) {
+      const producerIds = uniqueSorted(index.inEdges(queue.id).map((edge) => edge.source));
+      const consumerEdges = index.outEdges(queue.id);
+      if (producerIds.length < 3 || consumerEdges.length !== 1) continue;
+      findings.push({
+        ruleId: queueProducerOverload.id,
+        dimension: 'reliability',
+        severity: 'low',
+        title: 'Many producers funnel into one consumer path',
+        message: `${producerIds.length} producers feed "${queue.label}" and exactly one consumer edge drains it, so the queue's depth grows at the sum of every producer's rate while draining at one consumer's. That asymmetry is fine in a lull and a runaway backlog in a burst — add consumers (or split the queue) so drain capacity scales with intake.`,
+        affectedNodeIds: uniqueSorted([queue.id, ...producerIds]),
+        affectedEdgeIds: [consumerEdges[0].id],
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+export const reliabilityRules: EvalRule[] = [
+  singleDbNoReplica,
+  serviceNoLb,
+  lbSingleTarget,
+  singleServiceInstance,
+  replicaNotWired,
+  singleGatewayAdvanced,
+  circuitBreakerMissing,
+  deepSyncNoTimeouts,
+  schedulerSinglePoint,
+  queueProducerOverload,
+];

@@ -4,7 +4,31 @@
 import type { PatchOp } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
-import { formatInt, readsFraction, sortById, SuggestedIds, uniqueSorted } from './shared';
+import {
+  configNumber,
+  formatInt,
+  frontedByEdgeTier,
+  readsFraction,
+  replicasOf,
+  sortById,
+  SuggestedIds,
+  uniqueSorted,
+} from './shared';
+
+/**
+ * Order-of-magnitude throughput each replica of a tier is assumed to sustain.
+ * Deliberately generous — real numbers depend on the workload, and the point
+ * of the capacity rules is the back-of-envelope habit (does replicas × rate
+ * cover the prompt's peak?), not queueing theory. Reference designs sized
+ * sanely must pass; only designs off by a multiple should hear about it.
+ */
+export const PER_REPLICA_RPS = { service: 3000, gateway: 10000, worker: 1000 } as const;
+
+/**
+ * Writes/s a single unsharded primary is assumed to absorb before write
+ * buffering or sharding becomes the lesson. Generous for the same reason.
+ */
+export const SINGLE_PRIMARY_WRITE_RPS = 5000;
 
 const noCacheReadHeavy: EvalRule = {
   id: 'scalability.no-cache-read-heavy',
@@ -183,9 +207,208 @@ const unboundedFanout: EvalRule = {
   },
 };
 
+const capacityReplicasInsufficient: EvalRule = {
+  id: 'scalability.capacity-replicas-insufficient',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    const clients = sortById(index.clients());
+    if (clients.length === 0) return [];
+    const rps = facts.scaleTargets.requestsPerSecond;
+    const findings: RuleFinding[] = [];
+    for (const service of sortById(index.byKind('service'))) {
+      if (!frontedByEdgeTier(index, clients, service)) continue;
+      const replicas = replicasOf(service);
+      if (rps <= replicas * PER_REPLICA_RPS.service) continue;
+      const needed = Math.ceil(rps / PER_REPLICA_RPS.service);
+      findings.push({
+        ruleId: capacityReplicasInsufficient.id,
+        dimension: 'scalability',
+        severity: 'high',
+        title: 'Service tier undersized for the stated peak',
+        message: `The prompt peaks at ${formatInt(rps)} req/s and "${service.label}" runs ${replicas} replica${replicas === 1 ? '' : 's'} — even at a generous ${formatInt(PER_REPLICA_RPS.service)} req/s per replica that is ${formatInt(replicas * PER_REPLICA_RPS.service)} req/s of capacity, short of the peak before any headroom. Back-of-envelope: peak ÷ per-replica rate says at least ${needed} replicas.`,
+        affectedNodeIds: [service.id],
+        affectedEdgeIds: [],
+        suggestion: {
+          description: 'Size the service tier so replicas × per-replica rate covers the peak.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: service.id,
+              set: { config: { ...(service.config ?? {}), replicas: needed } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const dbWriteBottleneck: EvalRule = {
+  id: 'scalability.db-write-bottleneck',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    const fraction = readsFraction(facts.scaleTargets.readWriteRatio);
+    if (fraction === null) return [];
+    const writesPerSecond = facts.scaleTargets.requestsPerSecond * (1 - fraction);
+    if (writesPerSecond <= SINGLE_PRIMARY_WRITE_RPS) return [];
+    const buffers = [...index.byKind('queue'), ...index.byKind('event-stream')];
+    const services = sortById(index.byKind('service'));
+    const findings: RuleFinding[] = [];
+    for (const db of sortById(index.byKind('database'))) {
+      const sharding = db.config?.['sharding'];
+      if (sharding !== undefined && sharding !== 'none') continue;
+      const unbuffered = services.some(
+        (service) =>
+          index.pathExists(service.id, db.id) &&
+          !buffers.some(
+            (buffer) =>
+              index.pathExists(service.id, buffer.id) && index.pathExists(buffer.id, db.id),
+          ),
+      );
+      if (!unbuffered) continue;
+      findings.push({
+        ruleId: dbWriteBottleneck.id,
+        dimension: 'scalability',
+        severity: 'high',
+        title: 'Write volume exceeds one primary with no buffer',
+        message: `At ${facts.scaleTargets.readWriteRatio} reads to writes, ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s is ${formatInt(writesPerSecond)} writes/s — beyond what a single unsharded primary like "${db.label}" absorbs, and the writes arrive with nothing to smooth them. Buffer the write path through a queue or stream, or shard the store, before the primary becomes the ceiling of the whole design.`,
+        affectedNodeIds: [db.id],
+        affectedEdgeIds: [],
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+/**
+ * Advanced-only on purpose: the standard-tier reference designs run single
+ * workers behind their queues and are frozen by calibration — at standard,
+ * a lone worker draining a buffered queue is an accepted starting point.
+ */
+const workerPoolUnderscaled: EvalRule = {
+  id: 'scalability.worker-pool-underscaled',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'advanced') return [];
+    const findings: RuleFinding[] = [];
+    for (const worker of sortById(index.byKind('worker'))) {
+      if (replicasOf(worker) > 1) continue;
+      const hotQueue = sortById(
+        index
+          .producersOf(worker.id)
+          .filter(
+            (producer) =>
+              producer.kind === 'queue' &&
+              index
+                .producersOf(producer.id)
+                .some((source) => source.kind === 'service' && replicasOf(source) >= 3),
+          ),
+      )[0];
+      if (!hotQueue) continue;
+      findings.push({
+        ruleId: workerPoolUnderscaled.id,
+        dimension: 'scalability',
+        severity: 'medium',
+        title: 'Scaled producers drain into a single worker',
+        message: `A service tier of 3+ replicas feeds "${hotQueue.label}", and "${worker.label}" drains it alone — the queue hides the imbalance until the backlog is hours deep. Consumers must scale with producers: at roughly ${formatInt(PER_REPLICA_RPS.worker)} jobs/s per worker replica, one instance cannot keep pace with a tier sized for the front-door peak.`,
+        affectedNodeIds: uniqueSorted([hotQueue.id, worker.id]),
+        affectedEdgeIds: [],
+        suggestion: {
+          description: 'Scale the worker pool so drain capacity keeps pace with the producers.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: worker.id,
+              set: { config: { ...(worker.config ?? {}), replicas: 3 } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const noShardingHotWrites: EvalRule = {
+  id: 'scalability.no-sharding-hot-writes',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'advanced') return [];
+    const fraction = readsFraction(facts.scaleTargets.readWriteRatio);
+    if (fraction === null) return [];
+    const writesPerSecond = facts.scaleTargets.requestsPerSecond * (1 - fraction);
+    if (writesPerSecond < 50000) return [];
+    const findings: RuleFinding[] = [];
+    for (const db of sortById(index.byKind('database'))) {
+      const sharding = db.config?.['sharding'];
+      if (sharding !== undefined && sharding !== 'none') continue;
+      findings.push({
+        ruleId: noShardingHotWrites.id,
+        dimension: 'scalability',
+        severity: 'medium',
+        title: 'Write volume this hot demands sharding',
+        message: `${formatInt(writesPerSecond)} writes/s is past what any single primary sustains, buffered or not — "${db.label}" needs the write load split across shards, each owning a slice of the key space. Hash sharding spreads a uniform key evenly; the deliberate choice of shard key is the design decision this scale exists to test.`,
+        affectedNodeIds: [db.id],
+        affectedEdgeIds: [],
+        suggestion: {
+          description:
+            'Shard the store by hash so write load divides across independent primaries.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: db.id,
+              set: { config: { ...(db.config ?? {}), sharding: 'hash' } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const hotPartitionRisk: EvalRule = {
+  id: 'scalability.hot-partition-risk',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'advanced') return [];
+    if (facts.archetype !== 'flash-sale-ticketing' && facts.archetype !== 'realtime-analytics') {
+      return [];
+    }
+    const shardedDbs = index
+      .byKind('database')
+      .filter((db) => db.config?.['sharding'] === 'hash' || db.config?.['sharding'] === 'range');
+    if (shardedDbs.length > 0) return [];
+    const partitionedStreams = index
+      .byKind('event-stream')
+      .filter((stream) => (configNumber(stream, 'partitions') ?? 0) >= 2);
+    if (partitionedStreams.length > 0) return [];
+    const candidates = sortById([...index.byKind('database'), ...index.byKind('event-stream')]);
+    return [
+      {
+        ruleId: hotPartitionRisk.id,
+        dimension: 'scalability',
+        severity: 'medium',
+        title: 'Nothing spreads the hot key',
+        message: `This workload concentrates on a few keys at once — the drop everyone wants, the dashboard everyone watches — and no store is sharded and no stream is partitioned, so the hottest key lands on one box at the worst moment. Partitioning only helps if the hot key's traffic is spread deliberately: shard the store or partition the stream, and choose the key so the spike divides instead of piling up.`,
+        affectedNodeIds: candidates.map((node) => node.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 export const scalabilityRules: EvalRule[] = [
   noCacheReadHeavy,
   syncToSlowConsumer,
   sharedDbManyServices,
   unboundedFanout,
+  capacityReplicasInsufficient,
+  dbWriteBottleneck,
+  workerPoolUnderscaled,
+  noShardingHotWrites,
+  hotPartitionRisk,
 ];

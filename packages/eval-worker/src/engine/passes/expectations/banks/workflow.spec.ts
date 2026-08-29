@@ -22,7 +22,8 @@ const naiveGraph: CanvasGraph = graph(
  * The reference design that meets every intro and standard expectation:
  * triggers buffer on a per-tenant queue behind a gateway, idempotent
  * executors checkpoint runs and call third parties asynchronously with
- * credentials from a vault, a scheduler owns delays, and monitoring watches.
+ * credentials from a vault, a scheduler owns delays behind leader election,
+ * and monitoring watches.
  */
 const solidGraph: CanvasGraph = graph(
   [
@@ -36,6 +37,7 @@ const solidGraph: CanvasGraph = graph(
     node('worker-1', 'worker', { label: 'Action executor', config: { idempotent: true } }),
     node('database-1', 'database', { label: 'Run-state DB' }),
     node('scheduler-1', 'scheduler', { label: 'Delay scheduler' }),
+    node('distributed-lock-1', 'distributed-lock', { label: 'Leader election' }),
     node('secrets-manager-1', 'secrets-manager', { label: 'Credentials vault' }),
     node('external-api-1', 'external-api', { label: 'Third-party action API' }),
     node('monitoring-1', 'monitoring', { label: 'Run monitoring' }),
@@ -51,6 +53,7 @@ const solidGraph: CanvasGraph = graph(
     edge('edge-8', 'worker-1', 'secrets-manager-1'),
     edge('edge-9', 'worker-1', 'external-api-1', 'async'),
     edge('edge-10', 'service-1', 'monitoring-1', 'async'),
+    edge('edge-11', 'scheduler-1', 'distributed-lock-1'),
   ],
 );
 
