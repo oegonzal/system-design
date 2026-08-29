@@ -4,9 +4,21 @@ import { SUGGESTED_ID_PREFIX, type CanvasGraph, type Grade } from '@sysdesign/co
 
 import { runEngine } from '../../../engine';
 import { contextFor, edge, graph, node, workflowFacts } from '../../../testing';
+import { expectationApplies } from '../types';
 import { workflowAutomationExpectations } from './workflow';
 
 const GRADE_RANK: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
+
+/**
+ * Facts whose prompt asks for delayed steps — the keyword that arms
+ * exp.wfa.scheduler-for-delays. The default workflowFacts() never mentions
+ * delays, so it doubles as the not-applicable case.
+ */
+const delayFacts = () =>
+  workflowFacts({
+    functionalText:
+      'define automation workflows; fire triggers from webhooks; delay a step before the next action; view run history',
+  });
 
 /** The three-box starting point every author draws first. */
 const naiveGraph: CanvasGraph = graph(
@@ -103,7 +115,7 @@ describe('workflow-automation expectation bank', () => {
       [naiveGraph, onNaive],
       [solidGraph, onSolid],
     ] as const) {
-      const check = expectation.satisfiedBy(contextFor(fixture, workflowFacts()));
+      const check = expectation.satisfiedBy(contextFor(fixture, delayFacts()));
       expect(check.met).toBe(expected);
       expect(check.evidenceNodeIds).toEqual([...check.evidenceNodeIds].sort());
       expect(check.evidenceEdgeIds).toEqual([...check.evidenceEdgeIds].sort());
@@ -111,17 +123,29 @@ describe('workflow-automation expectation bank', () => {
   });
 
   it('grades the naive three-box no better than D', () => {
-    const result = runEngine(naiveGraph, workflowFacts());
+    const result = runEngine(naiveGraph, delayFacts());
     expect(GRADE_RANK[result.grade]).toBeLessThanOrEqual(GRADE_RANK.D);
   });
 
   it('grades the solid platform at least a B', () => {
-    const result = runEngine(solidGraph, workflowFacts());
+    const result = runEngine(solidGraph, delayFacts());
     expect(GRADE_RANK[result.grade]).toBeGreaterThanOrEqual(GRADE_RANK.B);
   });
 
+  it('grades delayed-step timers only when the prompt asks for them', () => {
+    const expectation = expectationById('exp.wfa.scheduler-for-delays');
+    expect(expectationApplies(expectation, delayFacts())).toBe(true);
+    expect(expectationApplies(expectation, workflowFacts())).toBe(false);
+
+    // Not applicable end to end: a schedulerless design loses nothing when
+    // the prompt never mentions delays.
+    const withoutDelays = runEngine(naiveGraph, workflowFacts());
+    const findingIds = withoutDelays.findings.map((finding) => finding.expectationId);
+    expect(findingIds).not.toContain('exp.wfa.scheduler-for-delays');
+  });
+
   it('teaches on every unmet expectation — messages carry the lesson', () => {
-    const result = runEngine(naiveGraph, workflowFacts());
+    const result = runEngine(naiveGraph, delayFacts());
     const bankFindings = result.findings.filter((finding) =>
       finding.expectationId?.startsWith('exp.wfa.'),
     );
