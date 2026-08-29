@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph } from '../../../testing/fixtures';
+import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { PropertiesPanel } from './properties-panel';
 
@@ -110,6 +110,47 @@ export const EdgeSelected: Story = {
   decorators: [
     withCanvasStore((store) => {
       store.getState().setGraph(makeGraph());
+      store.getState().select('e-2');
+    }),
+  ],
+};
+
+/** A service with the full interface block: responsibilities and Operations. */
+export const ServiceInterfaceSelected: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeInterfaceGraph());
+      store.getState().select('n-3');
+    }),
+  ],
+};
+
+/** A queue's interface: Message types, no responsibilities. */
+export const QueueMessageTypesSelected: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeInterfaceGraph());
+      store.getState().select('n-4');
+    }),
+  ],
+};
+
+/** A call edge whose carries resolve against the callee's declared operations. */
+export const EdgeCarriesSelected: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeInterfaceGraph());
+      store.getState().select('e-2');
+    }),
+  ],
+};
+
+/** A carry the owner never declared: the warning chip and its hint. */
+export const EdgeUndeclaredCarrySelected: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeInterfaceGraph());
+      store.getState().updateEdge('e-2', { carries: ['PlaceOrder', 'chargeCard'] });
       store.getState().select('e-2');
     }),
   ],
