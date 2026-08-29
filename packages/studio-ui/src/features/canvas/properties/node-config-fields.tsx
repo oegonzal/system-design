@@ -160,6 +160,46 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
           {textRow(config, setKey, 'indexType', 'Index type')}
         </>
       );
+    case 'pub-sub':
+      return (
+        <>
+          {selectRow(config, setKey, 'delivery', 'Delivery', [
+            'at-least-once',
+            'at-most-once',
+            'exactly-once',
+          ])}
+          {numberRow(config, setKey, 'fanout', 'Fan-out (subscribers)')}
+        </>
+      );
+    case 'cdc-connector':
+      return selectRow(config, setKey, 'mode', 'Mode', ['log-based', 'outbox']);
+    case 'notification-service':
+      return (
+        <>
+          {textRow(config, setKey, 'channels', 'Channels')}
+          {checkboxRow(config, setKey, 'rateLimit', 'Rate limiting')}
+        </>
+      );
+    case 'stream-processor':
+      return (
+        <>
+          {numberRow(config, setKey, 'parallelism', 'Parallelism')}
+          {checkboxRow(config, setKey, 'checkpointing', 'Checkpointing')}
+        </>
+      );
+    case 'data-warehouse':
+      return selectRow(config, setKey, 'loadMode', 'Load mode', ['batch', 'streaming']);
+    case 'data-lake':
+      return selectRow(config, setKey, 'format', 'Format', ['parquet', 'json', 'raw']);
+    case 'ml-inference':
+      return (
+        <>
+          {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {checkboxRow(config, setKey, 'gpu', 'GPU')}
+          {numberRow(config, setKey, 'timeoutMs', 'Timeout (ms)')}
+          {checkboxRow(config, setKey, 'fallback', 'Fallback')}
+        </>
+      );
     default:
       return null;
   }

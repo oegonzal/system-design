@@ -42,6 +42,13 @@ export const DEFAULT_NODE_LABELS = {
   cache: 'Cache',
   queue: 'Queue',
   'event-stream': 'Event Stream',
+  'pub-sub': 'Pub/Sub Topic',
+  'cdc-connector': 'CDC Connector',
+  'notification-service': 'Notification Service',
+  'stream-processor': 'Stream Processor',
+  'data-warehouse': 'Data Warehouse',
+  'data-lake': 'Data Lake',
+  'ml-inference': 'ML Inference',
   scheduler: 'Scheduler',
   'external-api': 'External API',
 } as const satisfies Record<NodeKind, string>;

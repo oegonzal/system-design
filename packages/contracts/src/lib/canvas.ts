@@ -79,7 +79,51 @@ export const NODE_KINDS = [
   // ── Messaging & Streaming
   'queue',
   'event-stream',
+  /**
+   * Fan-out topic: one publish, N independent subscribers. Rule hooks:
+   * presence for notification fan-out; misuse: single subscriber (a queue
+   * would do), no DLQ path; knobs delivery, fanout
+   */
+  'pub-sub',
+  /**
+   * Change-data-capture / outbox relay: DB commits become stream events.
+   * Rule hooks: presence: fixes dual-write when a service writes DB and
+   * publishes events; misuse: no source database in-edge or no sink stream
+   * out-edge; knob mode (log-based|outbox)
+   */
+  'cdc-connector',
+  /**
+   * Dispatches push/email/SMS via providers. Rule hooks: misuse: called
+   * synchronously on the request path (belongs behind queue/pub-sub), no
+   * retry/DLQ semantics; knobs channels, rateLimit
+   */
+  'notification-service',
   // ── Analytics & ML
+  /**
+   * Continuous computation over streams (aggregation, windowing). Rule
+   * hooks: presence for realtime analytics; misuse: no inbound event-stream,
+   * writing aggregates to the OLTP primary under load; knobs parallelism,
+   * checkpointing
+   */
+  'stream-processor',
+  /**
+   * Columnar OLAP store for BI/reporting. Rule hooks: misuse: BI queries on
+   * the OLTP database when a warehouse exists, warehouse fed synchronously
+   * from request path; knob loadMode (batch|streaming)
+   */
+  'data-warehouse',
+  /**
+   * Schema-on-read storage of raw events for later processing. Rule hooks:
+   * misuse: serving user-facing queries directly from the lake; knob format
+   * (parquet|json|raw)
+   */
+  'data-lake',
+  /**
+   * Model-serving endpoint (recommendations, moderation, LLM). Rule hooks:
+   * misuse: sync inference on the critical path with no timeout/fallback;
+   * knobs replicas, gpu, timeoutMs, fallback
+   */
+  'ml-inference',
   // ── Coordination & Config
   'scheduler',
   // ── Identity & Security
@@ -141,6 +185,13 @@ export const NODE_KIND_CATEGORY = {
   cache: 'caching',
   queue: 'messaging',
   'event-stream': 'messaging',
+  'pub-sub': 'messaging',
+  'cdc-connector': 'messaging',
+  'notification-service': 'messaging',
+  'stream-processor': 'analytics',
+  'data-warehouse': 'analytics',
+  'data-lake': 'analytics',
+  'ml-inference': 'analytics',
   scheduler: 'coordination',
   'external-api': 'external',
 } as const satisfies Record<NodeKind, NodeKindCategoryId>;

@@ -42,6 +42,13 @@ const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfig }>
   cache: { label: 'Hot Cache', config: { strategy: 'cache-aside', ttlSeconds: 60 } },
   queue: { label: 'Jobs', config: { dlq: true } },
   'event-stream': { label: 'Order Events' },
+  'pub-sub': { label: 'Order Fan-out', config: { delivery: 'at-least-once', fanout: 3 } },
+  'cdc-connector': { label: 'Outbox Relay', config: { mode: 'outbox' } },
+  'notification-service': { label: 'Notifier', config: { channels: 'push,email' } },
+  'stream-processor': { label: 'Sales Aggregator', config: { parallelism: 4 } },
+  'data-warehouse': { label: 'BI Warehouse', config: { loadMode: 'batch' } },
+  'data-lake': { label: 'Raw Events' },
+  'ml-inference': { label: 'Recs Model', config: { gpu: true, timeoutMs: 250 } },
   scheduler: { label: 'Cron' },
 };
 

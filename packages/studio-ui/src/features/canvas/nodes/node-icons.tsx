@@ -163,6 +163,64 @@ export const NODE_ICONS = {
       <path d="M2 5c2-2 4 2 6 0s4 2 6 0M2 9c2-2 4 2 6 0s4 2 6 0M2 13c2-2 4 2 6 0s4 2 6 0" />
     </svg>
   ),
+  /* One publisher fanning to three subscribers — the load-balancer's family. */
+  'pub-sub': (
+    <svg {...svgProps}>
+      <path d="M4.7 7.2 10 3.9M4.9 8h5M4.7 8.8 10 12.1" />
+      <circle cx="3" cy="8" r="1.4" />
+      <circle cx="12" cy="3.5" r="1.4" />
+      <circle cx="12" cy="8" r="1.4" />
+      <circle cx="12" cy="12.5" r="1.4" />
+    </svg>
+  ),
+  /* The database motif shrunk, its commits curving out into stream dashes. */
+  'cdc-connector': (
+    <svg {...svgProps}>
+      <ellipse cx="4.5" cy="3.5" rx="2.5" ry="1.3" />
+      <path d="M2 3.5v3c0 .7 1.1 1.3 2.5 1.3S7 7.2 7 6.5v-3" />
+      <path d="M8.5 5.5c3 .5 4.5 2 4.5 4.5M11.5 8.5 13 10l1.5-1.5" />
+      <path d="M2.5 13h3M7 13h3M11.5 13h2" />
+    </svg>
+  ),
+  /* A bell with its ringer. */
+  'notification-service': (
+    <svg {...svgProps}>
+      <path d="M8 2.5a4 4 0 0 1 4 4v3l1.5 2h-11L4 9.5v-3a4 4 0 0 1 4-4z" />
+      <path d="M6.8 13.5a1.3 1.3 0 0 0 2.4 0" />
+    </svg>
+  ),
+  /* The stream's wave goes in; a settled straight line comes out. */
+  'stream-processor': (
+    <svg {...svgProps}>
+      <path d="M1.5 6.3c1-.9 2 .9 3 0M1.5 9.7c1-.9 2 .9 3 0" />
+      <rect x="6" y="4.5" width="5.5" height="7" rx="1" />
+      <path d="M11.5 8h3" />
+    </svg>
+  ),
+  /* A warehouse silhouette: pitched roof over three stored columns. */
+  'data-warehouse': (
+    <svg {...svgProps}>
+      <path d="M2.5 6.5 8 3l5.5 3.5v7h-11z" />
+      <path d="M5.5 9v4.5M8 9v4.5M10.5 9v4.5" />
+    </svg>
+  ),
+  /* Raw water in a basin — the event-stream's waves, stilled. */
+  'data-lake': (
+    <svg {...svgProps}>
+      <path d="M2.5 5.5c0 4 2.3 6.5 5.5 6.5s5.5-2.5 5.5-6.5" />
+      <path d="M4.5 7.2c1.2-1 2.3 1 3.5 0s2.3 1 3.5 0" />
+      <path d="M5.5 9.8c.9-.8 1.7.8 2.5 0s1.6.8 2.5 0" />
+    </svg>
+  ),
+  /* Two inputs, one prediction — the smallest possible network. */
+  'ml-inference': (
+    <svg {...svgProps}>
+      <path d="M5.6 5.2 10.4 7.3M5.6 10.8 10.4 8.7" />
+      <circle cx="4" cy="4.5" r="1.7" />
+      <circle cx="4" cy="11.5" r="1.7" />
+      <circle cx="12" cy="8" r="1.7" />
+    </svg>
+  ),
   scheduler: (
     <svg {...svgProps}>
       <circle cx="8" cy="8" r="6" />
