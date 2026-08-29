@@ -57,6 +57,26 @@ describe('generatePrompt', () => {
     }
   });
 
+  it('stamps every NFR with a stable id and quantifies targets machine-readably', () => {
+    for (const archetype of ARCHETYPES) {
+      const { nonFunctionalRequirements } = generatePrompt({
+        experience: experienceFor(archetype),
+        difficulty: 'advanced',
+        seed: 11,
+      });
+      for (const nfr of nonFunctionalRequirements) {
+        expect(nfr.id).toMatch(/^[a-z]+-[a-z]+-[a-z-]+$/);
+        if (nfr.targetSpec) {
+          // The spec quantifies the prose target — never a number of its own.
+          expect(nfr.target).toBeTruthy();
+          expect(Number.isFinite(nfr.targetSpec.value)).toBe(true);
+        }
+      }
+      const ids = nonFunctionalRequirements.map((nfr) => nfr.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
+
   it('always includes at least one latency and one availability NFR', () => {
     for (const archetype of ARCHETYPES) {
       for (const difficulty of PROMPT_DIFFICULTIES) {

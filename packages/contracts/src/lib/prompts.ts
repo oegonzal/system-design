@@ -20,12 +20,33 @@ export const NFR_KINDS = [
 ] as const;
 export type NfrKind = (typeof NFR_KINDS)[number];
 
+/**
+ * The machine-readable half of an NFR target — what the eval engine can
+ * check without parsing prose. The generator derives it from the same
+ * baseline numbers the prose quotes, so the two can never drift.
+ */
+export interface NfrTargetSpec {
+  /** Snake-case metric name, e.g. 'p99_latency_ms', 'availability_pct'. */
+  metric: string;
+  op: '<=' | '>=' | '=';
+  value: number;
+  unit: string;
+}
+
 export interface NfrItem {
+  /**
+   * Stable id within the archetype bank, e.g. 'fst-lat-read-spike'.
+   * Findings reference it, so evaluations can prove which requirement a
+   * design misses. Optional only for prompt rows generated before v2.
+   */
+  id?: string;
   kind: NfrKind;
   /** The requirement as prose, e.g. "Reads stay fast under the on-sale spike". */
   statement: string;
   /** A measurable target when one exists, e.g. "p99 ≤ 200ms". */
   target?: string;
+  /** Present when the prose target quantifies a single checkable number. */
+  targetSpec?: NfrTargetSpec;
 }
 
 /**

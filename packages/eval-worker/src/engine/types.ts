@@ -11,12 +11,23 @@ import type {
   Grade,
   GraphPatch,
   NfrKind,
+  NfrTargetSpec,
   PromptDifficulty,
   ScaleTargets,
   Severity,
 } from '@sysdesign/contracts';
 
 import type { GraphIndex } from './graph-index';
+
+/** One prompt NFR, normalized: statements and targets reach the rules intact. */
+export interface NfrFact {
+  /** Bank id, or a positional fallback for prompts generated before v2. */
+  id: string;
+  kind: NfrKind;
+  statement: string;
+  target: string | null;
+  targetSpec: NfrTargetSpec | null;
+}
 
 /**
  * Everything the rules are allowed to know about the prompt, extracted once by
@@ -27,7 +38,10 @@ export interface PromptFacts {
   archetype: Archetype;
   difficulty: PromptDifficulty;
   scaleTargets: ScaleTargets;
+  /** Distinct NFR kinds — the cheap gate most predicates need. */
   nfrKinds: NfrKind[];
+  /** The full NFR list, so findings can cite the exact requirement missed. */
+  nfrs: NfrFact[];
   /** Functional requirements joined and lowercased, for keyword probes. */
   functionalText: string;
 }

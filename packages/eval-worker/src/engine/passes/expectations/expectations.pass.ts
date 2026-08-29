@@ -32,12 +32,16 @@ export function runExpectations(
   for (const expectation of expectations) {
     if (!expectationApplies(expectation, input.facts)) continue;
     const check = expectation.satisfiedBy(ctx);
+    // The requirement this expectation enforces, when the prompt names one.
+    const nfrId = expectation.nfrKind
+      ? (input.facts.nfrs.find((nfr) => nfr.kind === expectation.nfrKind)?.id ?? null)
+      : null;
     entries.push({
       expectationId: expectation.id,
       dimension: expectation.dimension,
       weight: expectation.weight,
       met: check.met,
-      nfrId: null, // real NFR ids arrive with the generator v2 facts
+      nfrId,
       evidenceNodeIds: check.evidenceNodeIds,
       evidenceEdgeIds: check.evidenceEdgeIds,
     });
@@ -45,7 +49,7 @@ export function runExpectations(
     findings.push({
       ruleId: null,
       expectationId: expectation.id,
-      nfrId: null,
+      nfrId,
       dimension: expectation.dimension,
       severity: expectation.severityIfUnmet,
       title: expectation.title,

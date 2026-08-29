@@ -58,6 +58,14 @@ export class EvalRunnerService {
         difficulty: prompt.difficulty,
         scaleTargets: prompt.scaleTargets,
         nfrKinds: [...new Set(prompt.nonFunctionalRequirements.map((nfr) => nfr.kind))],
+        nfrs: prompt.nonFunctionalRequirements.map((nfr, position) => ({
+          // Pre-v2 prompt rows carry no ids — a positional fallback keeps them evaluable.
+          id: nfr.id ?? `${nfr.kind}-${position}`,
+          kind: nfr.kind,
+          statement: nfr.statement,
+          target: nfr.target ?? null,
+          targetSpec: nfr.targetSpec ?? null,
+        })),
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
       };
 

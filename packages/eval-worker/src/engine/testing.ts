@@ -49,6 +49,29 @@ export function flashSaleFacts(overrides: Partial<PromptFacts> = {}): PromptFact
       availabilityPct: '99.95',
     },
     nfrKinds: ['availability', 'latency', 'throughput'],
+    nfrs: [
+      {
+        id: 'fst-avail-sale-window',
+        kind: 'availability',
+        statement: 'The sale window stays up for the full on-sale, spike included',
+        target: '≥ 99.95% during sale windows',
+        targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
+      },
+      {
+        id: 'fst-lat-read-spike',
+        kind: 'latency',
+        statement: 'Availability reads stay fast for every buyer during the on-sale spike',
+        target: 'p99 ≤ 250ms at peak RPS',
+        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 250, unit: 'ms' },
+      },
+      {
+        id: 'fst-thr-stampede',
+        kind: 'throughput',
+        statement: 'The reservation path absorbs the opening-minute stampede without collapsing',
+        target: 'sustain stated peak RPS for 10 minutes',
+        targetSpec: { metric: 'sustained_peak_minutes', op: '>=', value: 10, unit: 'min' },
+      },
+    ],
     functionalText:
       'browse upcoming events; reserve seats during the on-sale; purchase tickets; view order confirmation',
     ...overrides,
@@ -67,6 +90,22 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
       availabilityPct: '99.9',
     },
     nfrKinds: ['latency', 'throughput'],
+    nfrs: [
+      {
+        id: 'rta-lat-tile-query',
+        kind: 'latency',
+        statement: 'Dashboard queries return fast enough to feel live',
+        target: 'p99 ≤ 500ms per tile query',
+        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 500, unit: 'ms' },
+      },
+      {
+        id: 'rta-thr-firehose',
+        kind: 'throughput',
+        statement: 'The pipeline sustains the full event firehose with headroom for spikes',
+        target: 'sustained ingest at stated peak with 3x burst headroom',
+        targetSpec: { metric: 'burst_headroom_x', op: '>=', value: 3, unit: 'x' },
+      },
+    ],
     functionalText: 'ingest click events; render live dashboards; export historical reports',
     ...overrides,
   };

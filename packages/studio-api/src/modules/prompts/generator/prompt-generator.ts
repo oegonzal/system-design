@@ -16,7 +16,7 @@ import { mulberry32, pick, pickN } from './rng';
  * honest audit records rather than claiming to be reproducible when they are
  * no longer.
  */
-export const GENERATOR_VERSION = '1.0.0';
+export const GENERATOR_VERSION = '2.0.0'; // 2.0.0: NFRs carry stable ids + machine-readable targetSpecs
 
 /** The slice of an experience the generator reads. Structural, so an
  * `ExperienceProfile` entity can be passed directly. */

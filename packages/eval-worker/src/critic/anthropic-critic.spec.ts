@@ -27,6 +27,22 @@ const facts: PromptFacts = {
     availabilityPct: '99.95',
   },
   nfrKinds: ['latency', 'availability'],
+  nfrs: [
+    {
+      id: 'fst-lat-read-spike',
+      kind: 'latency',
+      statement: 'Reads stay fast under the spike',
+      target: 'p99 ≤ 300ms',
+      targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 300, unit: 'ms' },
+    },
+    {
+      id: 'fst-avail-sale-window',
+      kind: 'availability',
+      statement: 'The sale stays up',
+      target: '≥ 99.95%',
+      targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
+    },
+  ],
   functionalText: 'sell tickets without overselling',
 };
 
