@@ -12,7 +12,6 @@ import { DEPTH_PASS_ID } from '../passes/depth/depth.pass';
 import { EXPECTATIONS_PASS_ID } from '../passes/expectations/expectations.pass';
 import { RULES_PASS_ID } from '../passes/rules/rules.pass';
 import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
-import { DIMENSION_WEIGHTS } from '../scoring';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
@@ -41,7 +40,17 @@ export const DEFAULT_PROFILE: EvalProfile = {
     model: 'coverage',
     violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
     violationDecay: 0.7,
-    dimensionWeights: DIMENSION_WEIGHTS,
+    // How much each dimension contributes to the overall score; sums to 1
+    // (validateProfile enforces it).
+    dimensionWeights: {
+      reliability: 0.2,
+      scalability: 0.25,
+      performance: 0.15,
+      data: 0.15,
+      messaging: 0.1,
+      security: 0.1,
+      hygiene: 0.05,
+    },
     gradeBands: { A: 92, B: 82, C: 68, D: 50 },
     gradeCaps: [
       { severity: 'critical', atLeast: 1, maxGrade: 'C' },

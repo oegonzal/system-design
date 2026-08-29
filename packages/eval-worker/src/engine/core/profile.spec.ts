@@ -8,8 +8,7 @@ import {
   type EvalProfile,
 } from './profile';
 
-// The default profile is the coverage variant; the cast makes that legible to the spread.
-const defaultScoring = DEFAULT_PROFILE.scoring as CoverageScoringPolicy;
+const defaultScoring = DEFAULT_PROFILE.scoring;
 
 function withScoring(patch: Partial<CoverageScoringPolicy>): EvalProfile {
   return { ...DEFAULT_PROFILE, scoring: { ...defaultScoring, ...patch } };

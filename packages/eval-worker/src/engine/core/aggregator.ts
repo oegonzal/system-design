@@ -22,14 +22,9 @@ import type {
   EvidenceArtifact,
   ScenarioArtifact,
 } from './artifacts';
-import {
-  gradeForScore,
-  type CoverageScoringPolicy,
-  type EvalProfile,
-  type SubtractiveScoringPolicy,
-} from './profile';
+import { gradeForScore, type CoverageScoringPolicy, type EvalProfile } from './profile';
 
-export const SEVERITY_RANK: Record<Severity, number> = {
+const SEVERITY_RANK: Record<Severity, number> = {
   critical: 0,
   high: 1,
   medium: 2,
@@ -104,9 +99,7 @@ export function aggregate(
   }
 
   const policy = profile.scoring;
-  if (policy.model === 'coverage') {
-    findings = applySuppressions(findings, coverage, policy);
-  }
+  findings = applySuppressions(findings, coverage, policy);
 
   findings.sort(
     (a, b) =>
@@ -114,16 +107,10 @@ export function aggregate(
       compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
   );
 
-  const dimensionScores =
-    policy.model === 'coverage'
-      ? scoreCoverage(findings, coverage, policy)
-      : scoreSubtractive(findings, policy);
+  const dimensionScores = scoreCoverage(findings, coverage, policy);
   const overallScore = weightedOverall(dimensionScores, policy.dimensionWeights);
   const bandGrade = gradeForScore(overallScore, policy.gradeBands);
-  const { grade, capApplied } =
-    policy.model === 'coverage'
-      ? applyGradeCaps(bandGrade, findings, policy)
-      : { grade: bandGrade, capApplied: null };
+  const { grade, capApplied } = applyGradeCaps(bandGrade, findings, policy);
 
   return {
     findings,
@@ -202,23 +189,6 @@ function scoreCoverage(
     });
 
     scores[dimension] = Math.round(Math.max(0, base - penalty) * 10) / 10;
-  }
-  return scores;
-}
-
-/** Every dimension starts at 100 and loses each violation's penalty, floored at 0. */
-function scoreSubtractive(
-  findings: readonly EngineFinding[],
-  policy: SubtractiveScoringPolicy,
-): DimensionScores {
-  const scores = {} as DimensionScores;
-  for (const dimension of EVAL_DIMENSIONS) scores[dimension] = 100;
-  for (const finding of findings) {
-    if (!finding.countsAsViolation) continue;
-    scores[finding.dimension] = Math.max(
-      0,
-      scores[finding.dimension] - policy.severityPenalties[finding.severity],
-    );
   }
   return scores;
 }

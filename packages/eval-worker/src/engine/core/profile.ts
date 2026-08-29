@@ -25,18 +25,6 @@ export interface GradeBands {
   D: number;
 }
 
-/**
- * The original model: every dimension starts at 100 and findings subtract.
- * Kept as a policy variant so historical evaluations stay reproducible; the
- * coverage model replaces it as the shipped default.
- */
-export interface SubtractiveScoringPolicy {
-  model: 'subtractive';
-  severityPenalties: Record<Severity, number>;
-  dimensionWeights: Record<EvalDimension, number>;
-  gradeBands: GradeBands;
-}
-
 /** "grade ≤ maxGrade once `atLeast` deterministic findings of `severity` exist." */
 export interface GradeCapRule {
   severity: Severity;
@@ -67,7 +55,7 @@ export interface CoverageScoringPolicy {
   suppressions: SuppressionRule[];
 }
 
-export type ScoringPolicy = SubtractiveScoringPolicy | CoverageScoringPolicy;
+export type ScoringPolicy = CoverageScoringPolicy;
 
 export interface EvalProfile {
   id: string;
@@ -101,11 +89,9 @@ export function validateProfile(profile: EvalProfile): void {
     throw new Error(`eval profile ${describe(profile)} grade bands must strictly descend`);
   }
 
-  if (profile.scoring.model === 'coverage') {
-    const decay = profile.scoring.violationDecay;
-    if (!(decay > 0 && decay <= 1)) {
-      throw new Error(`eval profile ${describe(profile)} violation decay must be in (0, 1]`);
-    }
+  const decay = profile.scoring.violationDecay;
+  if (!(decay > 0 && decay <= 1)) {
+    throw new Error(`eval profile ${describe(profile)} violation decay must be in (0, 1]`);
   }
 }
 

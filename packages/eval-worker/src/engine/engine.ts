@@ -14,8 +14,6 @@ import { RULES_PASS_ID, runRules } from './passes/rules/rules.pass';
 import { DEFAULT_PROFILE } from './profiles/default.profile';
 import type { EngineResult, PromptFacts } from './types';
 
-export { ENGINE_VERSION } from './scoring';
-
 export function runEngine(graph: CanvasGraph, facts: PromptFacts): EngineResult {
   const index = buildGraphIndex(graph);
   // The sync façade honors the same pass options the orchestrator would pass.

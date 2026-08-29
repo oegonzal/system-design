@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { Severity } from '@sysdesign/contracts';
 
-import { DIMENSION_WEIGHTS } from '../scoring';
 import { DEFAULT_PROFILE } from '../profiles/default.profile';
 import { aggregate } from './aggregator';
 import type {
@@ -12,20 +11,6 @@ import type {
   EvidenceArtifact,
   ScenarioArtifact,
 } from './artifacts';
-import type { EvalProfile } from './profile';
-
-/** The retired 1.0.0 rubric, kept as a spec value: the subtractive policy variant stays supported. */
-const LEGACY_PROFILE: EvalProfile = {
-  id: 'legacy',
-  version: '1.0.0',
-  passes: [],
-  scoring: {
-    model: 'subtractive',
-    severityPenalties: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
-    dimensionWeights: DIMENSION_WEIGHTS,
-    gradeBands: { A: 90, B: 75, C: 60, D: 45 },
-  },
-};
 
 function finding(overrides: Partial<EngineFinding> = {}): EngineFinding {
   return {
@@ -49,36 +34,13 @@ function findingsArtifact(findings: EngineFinding[]): EvidenceArtifact {
 }
 
 describe('aggregate', () => {
-  it('reproduces the subtractive model exactly', () => {
-    const result = aggregate(
-      [
-        findingsArtifact([
-          finding(), // critical reliability −40
-          finding({ ruleId: 'reliability.service-no-lb', severity: 'high' }), // −25
-          finding({ ruleId: 'security.no-gateway', dimension: 'security', severity: 'high' }),
-        ]),
-      ],
-      LEGACY_PROFILE,
-    );
-
-    expect(result.dimensionScores.reliability).toBe(35);
-    expect(result.dimensionScores.security).toBe(75);
-    expect(result.dimensionScores.hygiene).toBe(100);
-    // 35·.2 + 100·.25 + 100·.15 + 100·.15 + 100·.1 + 75·.1 + 100·.05 = 84.5
-    expect(result.overallScore).toBe(84.5);
-    expect(result.grade).toBe('B');
-    expect(result.bandGrade).toBe('B');
-    expect(result.capApplied).toBeNull();
-    expect(result.summary).toContain('grade B');
-  });
-
   it('is order-independent: shuffled artifacts deep-equal', () => {
     const a = findingsArtifact([finding({ ruleId: 'security.no-gateway', dimension: 'security' })]);
     const b = findingsArtifact([
       finding(),
       finding({ ruleId: 'hygiene.orphan-node', dimension: 'hygiene', severity: 'info' }),
     ]);
-    expect(aggregate([a, b], LEGACY_PROFILE)).toEqual(aggregate([b, a], LEGACY_PROFILE));
+    expect(aggregate([a, b], DEFAULT_PROFILE)).toEqual(aggregate([b, a], DEFAULT_PROFILE));
   });
 
   it('sorts findings by rule id, then affected node ids', () => {
@@ -90,7 +52,7 @@ describe('aggregate', () => {
           finding({ ruleId: 'a.rule', affectedNodeIds: ['n-2'] }),
         ]),
       ],
-      LEGACY_PROFILE,
+      DEFAULT_PROFILE,
     );
     expect(result.findings.map((f) => `${f.ruleId}:${f.affectedNodeIds[0]}`)).toEqual([
       'a.rule:n-2',
@@ -126,8 +88,8 @@ describe('aggregate', () => {
       model: 'claude-sonnet-5',
     };
 
-    const without = aggregate(base, LEGACY_PROFILE);
-    const withLlm = aggregate([...base, axis, scenarios], LEGACY_PROFILE);
+    const without = aggregate(base, DEFAULT_PROFILE);
+    const withLlm = aggregate([...base, axis, scenarios], DEFAULT_PROFILE);
 
     expect(withLlm.dimensionScores).toEqual(without.dimensionScores);
     expect(withLlm.overallScore).toBe(without.overallScore);
@@ -136,19 +98,6 @@ describe('aggregate', () => {
     // …but the artifacts ride along for display and audit.
     expect(withLlm.axes).toEqual([axis]);
     expect(withLlm.scenarios).toEqual(scenarios);
-  });
-
-  it('ignores non-violation findings in the subtractive model', () => {
-    const result = aggregate(
-      [
-        findingsArtifact([
-          finding({ countsAsViolation: false, expectationId: 'exp.fst.db-failover', ruleId: null }),
-        ]),
-      ],
-      LEGACY_PROFILE,
-    );
-    expect(result.dimensionScores.reliability).toBe(100);
-    expect(result.findings).toHaveLength(1); // still reported, still teaches
   });
 
   it('collects annotations and diagnostics without scoring them', () => {
@@ -178,7 +127,7 @@ describe('aggregate', () => {
           detail: null,
         },
       ],
-      LEGACY_PROFILE,
+      DEFAULT_PROFILE,
     );
     expect(result.dimensionScores.data).toBe(100);
     expect(result.overallScore).toBe(100);
