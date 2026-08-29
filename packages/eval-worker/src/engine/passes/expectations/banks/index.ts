@@ -5,13 +5,17 @@
  */
 import type { Expectation } from '../types';
 import { coreExpectations } from './core';
+import { dagOrchestrationExpectations } from './dag';
 import { flashSaleExpectations } from './flash-sale';
 import { mediaStreamingExpectations } from './media-streaming';
 import { realtimeAnalyticsExpectations } from './realtime-analytics';
+import { workflowAutomationExpectations } from './workflow';
 
 export const EXPECTATIONS: readonly Expectation[] = [
   ...coreExpectations,
   ...flashSaleExpectations,
   ...mediaStreamingExpectations,
   ...realtimeAnalyticsExpectations,
+  ...workflowAutomationExpectations,
+  ...dagOrchestrationExpectations,
 ];

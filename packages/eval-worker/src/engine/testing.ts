@@ -166,6 +166,88 @@ export function mediaFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
   };
 }
 
+export function workflowFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
+  return {
+    archetype: 'workflow-automation',
+    difficulty: 'standard',
+    scaleTargets: {
+      concurrentUsers: 8000,
+      requestsPerSecond: 900,
+      readWriteRatio: '50:50',
+      p99LatencyMs: 300,
+      availabilityPct: '99.9',
+    },
+    nfrKinds: ['durability', 'security', 'observability'],
+    nfrs: [
+      {
+        id: 'wfa-dur-triggers',
+        kind: 'durability',
+        statement: 'An accepted trigger always produces a run, whatever fails in between',
+        target: 'zero accepted triggers lost',
+        targetSpec: { metric: 'accepted_triggers_lost', op: '=', value: 0, unit: 'triggers' },
+      },
+      {
+        id: 'wfa-sec-credentials',
+        kind: 'security',
+        statement: 'Tenant credentials stay scoped to their tenant and out of run payloads',
+        target: 'credentials fetched per action from a guarded store',
+        targetSpec: null,
+      },
+      {
+        id: 'wfa-obs-runs',
+        kind: 'observability',
+        statement: 'A failing tenant workflow pages the platform before the tenant notices',
+        target: 'run failure-rate alerting in place',
+        targetSpec: null,
+      },
+    ],
+    functionalText:
+      'define automation workflows; fire triggers from webhooks; execute third-party actions; view run history',
+    ...overrides,
+  };
+}
+
+export function dagFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
+  return {
+    archetype: 'dag-orchestration',
+    difficulty: 'standard',
+    scaleTargets: {
+      concurrentUsers: 1200,
+      requestsPerSecond: 400,
+      readWriteRatio: '60:40',
+      p99LatencyMs: 800,
+      availabilityPct: '99.9',
+    },
+    nfrKinds: ['availability', 'latency', 'observability'],
+    nfrs: [
+      {
+        id: 'dag-avail-orphans',
+        kind: 'availability',
+        statement: 'A dead worker never strands a run — orphaned steps are reclaimed and rerun',
+        target: 'orphaned steps redelivered within 5 minutes',
+        targetSpec: { metric: 'orphan_reclaim_minutes', op: '<=', value: 5, unit: 'min' },
+      },
+      {
+        id: 'dag-lat-status',
+        kind: 'latency',
+        statement: 'Run-status dashboards stay responsive while pipelines execute',
+        target: 'p99 ≤ 800ms per status query',
+        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 800, unit: 'ms' },
+      },
+      {
+        id: 'dag-obs-runs',
+        kind: 'observability',
+        statement: 'A run missing its window raises an alert before downstream data goes stale',
+        target: 'run-duration and backlog alerting in place',
+        targetSpec: null,
+      },
+    ],
+    functionalText:
+      'define pipelines as dags; schedule and dispatch steps; retry failed steps; view run status',
+    ...overrides,
+  };
+}
+
 export function contextFor(
   canvas: CanvasGraph,
   facts: PromptFacts = flashSaleFacts(),
