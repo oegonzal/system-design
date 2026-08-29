@@ -13,6 +13,7 @@ export * from './lib/constants';
 export * from './lib/envelope';
 export * from './lib/appearance';
 export * from './lib/canvas';
+export * from './lib/interfaces';
 export * from './lib/patches';
 export * from './lib/experiences';
 export * from './lib/prompts';

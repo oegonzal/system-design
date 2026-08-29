@@ -136,7 +136,7 @@ describe('runEngine', () => {
           expect(existingEdgeIds.has(op.edge.id)).toBe(false);
           expect(existingNodeIds.has(op.edge.source) || introduced.has(op.edge.source)).toBe(true);
           expect(existingNodeIds.has(op.edge.target) || introduced.has(op.edge.target)).toBe(true);
-        } else if (op.op === 'remove-edge') {
+        } else if (op.op === 'remove-edge' || op.op === 'update-edge') {
           expect(existingEdgeIds.has(op.edgeId)).toBe(true);
         } else {
           expect(existingNodeIds.has(op.nodeId)).toBe(true);

@@ -289,11 +289,41 @@ export type EdgeKind = (typeof EDGE_KINDS)[number];
  */
 export type NodeConfig = Record<string, string | number | boolean>;
 
+/**
+ * The verb an operation exposes. `command` mutates, `query` reads,
+ * `event` is a fact published after something happened, `stream` is a
+ * continuous flow (subscription, tail, changefeed).
+ */
+export const OPERATION_KINDS = ['command', 'query', 'event', 'stream'] as const;
+export type OperationKind = (typeof OPERATION_KINDS)[number];
+
+/**
+ * One entry in a node's declared interface. What it *means* depends on the
+ * node's interface role (see `interfaces.ts`): for api-role kinds an
+ * operation is an endpoint the node SERVES; for channel kinds it is a
+ * message/event type the channel CARRIES. Names are matched exactly and
+ * case-sensitively by edge `carries` references — there is no normalization.
+ */
+export interface NodeOperation {
+  name: string;
+  kind: OperationKind;
+  idempotent?: boolean;
+  notes?: string;
+}
+
 export interface CanvasNode {
   id: string;
   kind: NodeKind;
   label: string;
   config?: NodeConfig;
+  /** Short role statements — "owns order lifecycle", one clause each. */
+  responsibilities?: string[];
+  /**
+   * The node's declared interface. Only kinds whose capability row (see
+   * `interfaces.ts`) lists operation kinds meaningfully declare these;
+   * storage/edge-infra/passive kinds leave it out.
+   */
+  operations?: NodeOperation[];
   /** Canvas layout, so a stored revision re-renders where the author left it. */
   position?: { x: number; y: number };
 }
@@ -305,6 +335,14 @@ export interface CanvasEdge {
   /** Defaults to `sync` when omitted. */
   kind?: EdgeKind;
   label?: string;
+  /**
+   * Operation names this edge exercises, resolved against the edge's
+   * interface owner (`resolveInterfaceOwner` in `interfaces.ts` — the one
+   * ownership rule). Plain strings by design: protocol modeling (paths,
+   * schemas, content types) is deferred, so a carry is just an exact,
+   * case-sensitive reference to an owner-declared operation name.
+   */
+  carries?: string[];
 }
 
 export interface CanvasGraph {
@@ -317,3 +355,16 @@ export const CANVAS_MAX_EDGES = 300;
 export const CANVAS_ID_MAX_LENGTH = 64;
 export const NODE_LABEL_MAX_LENGTH = 80;
 export const EDGE_LABEL_MAX_LENGTH = 80;
+
+export const NODE_MAX_RESPONSIBILITIES = 6;
+export const RESPONSIBILITY_MAX_LENGTH = 60;
+export const NODE_MAX_OPERATIONS = 12;
+export const OPERATION_NAME_MAX_LENGTH = 60;
+export const OPERATION_NOTES_MAX_LENGTH = 140;
+export const EDGE_MAX_CARRIES = 8;
+/** Whole-graph operation budget, enforced by the API's graph validator. */
+export const CANVAS_MAX_TOTAL_OPERATIONS = 400;
+
+export const NODE_CONFIG_MAX_KEYS = 20;
+export const NODE_CONFIG_KEY_MAX_LENGTH = 40;
+export const NODE_CONFIG_STRING_VALUE_MAX_LENGTH = 120;
