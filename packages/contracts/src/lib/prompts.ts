@@ -37,9 +37,9 @@ export interface NfrItem {
   /**
    * Stable id within the archetype bank, e.g. 'fst-lat-read-spike'.
    * Findings reference it, so evaluations can prove which requirement a
-   * design misses. Optional only for prompt rows generated before v2.
+   * design misses.
    */
-  id?: string;
+  id: string;
   kind: NfrKind;
   /** The requirement as prose, e.g. "Reads stay fast under the on-sale spike". */
   statement: string;

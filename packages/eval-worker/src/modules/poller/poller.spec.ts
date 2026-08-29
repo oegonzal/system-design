@@ -68,8 +68,20 @@ describe('poller (integration)', () => {
       scenario: 'Survive the drop.',
       functionalRequirements: ['sell tickets', 'prevent overselling'],
       nonFunctionalRequirements: [
-        { kind: 'latency', statement: 'fast reads', target: 'p99 ≤ 300ms' },
-        { kind: 'availability', statement: 'stay up', target: '99.95%' },
+        {
+          id: 'fst-lat-read-spike',
+          kind: 'latency',
+          statement: 'fast reads',
+          target: 'p99 ≤ 300ms',
+          targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 300, unit: 'ms' },
+        },
+        {
+          id: 'fst-avail-sale-window',
+          kind: 'availability',
+          statement: 'stay up',
+          target: '99.95%',
+          targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
+        },
       ],
       scaleTargets: {
         concurrentUsers: 10000,
@@ -80,7 +92,7 @@ describe('poller (integration)', () => {
       },
       difficulty: 'standard',
       seed: 1,
-      generatorVersion: '1.0.0',
+      generatorVersion: '2.0.0',
     });
     const session = fork.create(DesignSession, { prompt });
     const revision = fork.create(DesignRevision, { session, revisionNumber: 1, graph });

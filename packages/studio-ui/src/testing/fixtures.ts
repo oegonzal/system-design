@@ -141,9 +141,21 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
       'Confirmed orders are never double-sold',
     ],
     nonFunctionalRequirements: [
-      { kind: 'latency', statement: 'Reads stay fast under the spike', target: 'p99 ≤ 200ms' },
-      { kind: 'availability', statement: 'Checkout stays up during on-sale', target: '99.95%' },
-      { kind: 'consistency', statement: 'No double-sold seats' },
+      {
+        id: 'fst-lat-read-spike',
+        kind: 'latency',
+        statement: 'Reads stay fast under the spike',
+        target: 'p99 ≤ 200ms',
+        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 200, unit: 'ms' },
+      },
+      {
+        id: 'fst-avail-sale-window',
+        kind: 'availability',
+        statement: 'Checkout stays up during on-sale',
+        target: '99.95%',
+        targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
+      },
+      { id: 'fst-con-oversell', kind: 'consistency', statement: 'No double-sold seats' },
     ],
     scaleTargets: {
       concurrentUsers: 120_000,
@@ -156,7 +168,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     difficulty: 'standard',
     status: 'active',
     seed: 42,
-    generatorVersion: '1.0.0',
+    generatorVersion: '2.0.0',
     llmEnriched: false,
     createdAt: AT,
     updatedAt: AT,

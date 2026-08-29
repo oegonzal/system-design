@@ -21,7 +21,6 @@ import type { GraphIndex } from './graph-index';
 
 /** One prompt NFR, normalized: statements and targets reach the rules intact. */
 export interface NfrFact {
-  /** Bank id, or a positional fallback for prompts generated before v2. */
   id: string;
   kind: NfrKind;
   statement: string;
