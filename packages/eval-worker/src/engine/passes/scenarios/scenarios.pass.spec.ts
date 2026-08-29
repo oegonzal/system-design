@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { Archetype } from '@sysdesign/contracts';
+
 import { NoopLlmClient } from '@sysdesign/llm';
 
 import type { PassContext } from '../../core/types';
@@ -40,6 +42,11 @@ describe('scenario selection', () => {
       'scheduler-crash',
       'split-brain',
     ]);
+  });
+
+  it('degrades a stale persisted archetype to the universal scenario instead of throwing', () => {
+    const stale = 'retired-archetype' as unknown as Archetype;
+    expect(selectScenarios(stale, 'standard').map((s) => s.id)).toEqual(['region-loss']);
   });
 
   it('[EVAL-7] the schema is enum-locked to the selection — the model cannot invent scenarios', () => {

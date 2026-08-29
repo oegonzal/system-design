@@ -496,7 +496,7 @@ const clientCommandNotIdempotent: EvalRule = {
   id: 'data.client-command-not-idempotent',
   dimension: 'data',
   check({ facts, index }) {
-    if (facts.archetype !== 'flash-sale-ticketing') return [];
+    if (facts.difficulty === 'intro') return [];
     if (!index.declaresOperations()) return [];
     const clientFedGateways = new Set(
       index
@@ -519,8 +519,8 @@ const clientCommandNotIdempotent: EvalRule = {
         ruleId: clientCommandNotIdempotent.id,
         dimension: 'data',
         severity: 'medium',
-        title: 'Buyer-facing command with no idempotency declared',
-        message: `"${risky[0].name}" rides the buyer's path without being declared idempotent, and a flash sale is a retry storm by design: spinners time out, buyers mash the button, gateways resend. Every one of those retries is the same purchase again — and again is a double charge. Key the command (an idempotency key per attempt) so retries converge on one outcome, then declare it idempotent.`,
+        title: 'User-facing command with no idempotency declared',
+        message: `"${risky[0].name}" rides a user-facing path without being declared idempotent, and retry storms arrive by design: spinners time out, users mash the button, gateways resend. Every one of those retries is the same command again — and again is a duplicated side effect. Key the command (an idempotency key per attempt) so retries converge on one outcome, then declare it idempotent.`,
         affectedNodeIds: uniqueSorted([edge.source, edge.target]),
         affectedEdgeIds: [edge.id],
         suggestion: null,

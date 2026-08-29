@@ -374,9 +374,6 @@ const hotPartitionRisk: EvalRule = {
   dimension: 'scalability',
   check({ facts, index }) {
     if (facts.difficulty !== 'advanced') return [];
-    if (facts.archetype !== 'flash-sale-ticketing' && facts.archetype !== 'realtime-analytics') {
-      return [];
-    }
     const shardedDbs = index
       .byKind('database')
       .filter((db) => db.config?.['sharding'] === 'hash' || db.config?.['sharding'] === 'range');

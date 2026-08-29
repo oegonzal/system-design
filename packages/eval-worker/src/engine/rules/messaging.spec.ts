@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyticsFacts, contextFor, edge, graph, node, ruleById } from '../testing';
+import { analyticsFacts, contextFor, dagFacts, edge, graph, node, ruleById } from '../testing';
 
 describe('messaging.no-queue-for-spike', () => {
   const rule = ruleById('messaging.no-queue-for-spike');
@@ -9,7 +9,7 @@ describe('messaging.no-queue-for-spike', () => {
     [edge('e1', 'client-1', 'svc-1'), edge('e2', 'svc-1', 'db-1')],
   );
 
-  it('fires on a flash sale whose writes hit the database unbuffered', () => {
+  it('fires when a throughput-bound prompt lets writes hit the database unbuffered', () => {
     const findings = rule.check(contextFor(unbuffered));
     expect(findings).toHaveLength(1);
     expect(findings[0].severity).toBe('critical');
@@ -46,8 +46,14 @@ describe('messaging.no-queue-for-spike', () => {
     expect(rule.check(contextFor(withStream))).toEqual([]);
   });
 
-  it('stays silent for other archetypes and when no client reaches a database', () => {
-    expect(rule.check(contextFor(unbuffered, analyticsFacts()))).toEqual([]);
+  it('fires for any archetype whose prompt demands throughput, citing the write rate', () => {
+    const findings = rule.check(contextFor(unbuffered, analyticsFacts()));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain('roughly 450 of them writes');
+  });
+
+  it('stays silent without a throughput requirement and when no client reaches a database', () => {
+    expect(rule.check(contextFor(unbuffered, dagFacts()))).toEqual([]);
     const noPath = graph(
       [node('client-1', 'client'), node('svc-1', 'service'), node('db-1', 'database')],
       [edge('e1', 'client-1', 'svc-1')],

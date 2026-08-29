@@ -339,10 +339,7 @@ const deepSyncNoTimeouts: EvalRule = {
 const schedulerSinglePoint: EvalRule = {
   id: 'reliability.scheduler-single-point',
   dimension: 'reliability',
-  check({ facts, index }) {
-    if (facts.archetype !== 'workflow-automation' && facts.archetype !== 'dag-orchestration') {
-      return [];
-    }
+  check({ index }) {
     const owners = sortById([...index.byKind('scheduler'), ...index.byKind('workflow-engine')]);
     if (owners.length !== 1 || index.hasKind('distributed-lock')) return [];
     const owner = owners[0];

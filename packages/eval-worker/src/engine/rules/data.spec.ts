@@ -6,8 +6,10 @@ import {
   edge,
   flashSaleFacts,
   graph,
+  mediaFacts,
   node,
   ruleById,
+  workflowFacts,
 } from '../testing';
 
 describe('data.mixed-oltp-analytics', () => {
@@ -32,7 +34,14 @@ describe('data.mixed-oltp-analytics', () => {
     expect(rule.check(contextFor(split, analyticsFacts()))).toEqual([]);
   });
 
-  it('stays silent for other archetypes', () => {
+  it('fires for any archetype whose requirements ask for analytical reads', () => {
+    const reporting = workflowFacts({
+      functionalText: 'define automation workflows; view a run analytics dashboard',
+    });
+    expect(rule.check(contextFor(oneStore, reporting))).toHaveLength(1);
+  });
+
+  it('stays silent when the requirements ask for nothing analytical', () => {
     expect(rule.check(contextFor(oneStore))).toEqual([]);
   });
 });
@@ -382,7 +391,13 @@ describe('data.stream-no-retention', () => {
     expect(rule.check(contextFor(pinned, advancedAnalytics))).toEqual([]);
   });
 
-  it('stays silent below advanced and outside realtime analytics', () => {
+  it('fires for any archetype whose prompt demands durability', () => {
+    expect(rule.check(contextFor(defaulted, mediaFacts({ difficulty: 'advanced' })))).toHaveLength(
+      1,
+    );
+  });
+
+  it('stays silent below advanced and without a durability requirement', () => {
     expect(rule.check(contextFor(defaulted, analyticsFacts()))).toEqual([]);
     expect(rule.check(contextFor(defaulted, flashSaleFacts({ difficulty: 'advanced' })))).toEqual(
       [],

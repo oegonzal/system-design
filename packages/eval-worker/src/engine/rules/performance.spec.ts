@@ -165,8 +165,8 @@ describe('performance.origin-serves-media', () => {
     expect(rule.check(contextFor(edged, mediaFacts()))).toEqual([]);
   });
 
-  it('stays silent outside the media archetype', () => {
-    expect(rule.check(contextFor(originPull))).toEqual([]);
+  it('fires for any archetype — an uncached client path to an object store is generic', () => {
+    expect(rule.check(contextFor(originPull))).toHaveLength(1);
   });
 });
 

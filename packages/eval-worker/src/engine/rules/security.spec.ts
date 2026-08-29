@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  analyticsFacts,
   contextFor,
+  dagFacts,
   edge,
   flashSaleFacts,
   graph,
   node,
   ruleById,
+  workflowFacts,
 } from '../testing';
 
 describe('security.no-gateway', () => {
@@ -42,7 +43,7 @@ describe('security.no-gateway', () => {
 describe('security.no-rate-limit', () => {
   const rule = ruleById('security.no-rate-limit');
 
-  it('fires for a flash sale whose gateway has no rate limit, suggesting the config flip', () => {
+  it('fires at high request rates on a gateway with no rate limit, suggesting the config flip', () => {
     const unlimited = graph([node('gw-1', 'gateway')]);
     const findings = rule.check(contextFor(unlimited));
     expect(findings).toHaveLength(1);
@@ -55,17 +56,19 @@ describe('security.no-rate-limit', () => {
     });
   });
 
-  it('fires with no suggestion when there is no edge node to configure', () => {
-    const findings = rule.check(contextFor(graph([node('client-1', 'client')])));
+  it('fires below the traffic bar when the prompt makes security a requirement', () => {
+    const findings = rule.check(contextFor(graph([node('gw-1', 'gateway')]), workflowFacts()));
     expect(findings).toHaveLength(1);
-    expect(findings[0].suggestion).toBeNull();
-    expect(findings[0].affectedNodeIds).toEqual([]);
   });
 
-  it('stays silent when rate limiting is on, or for other archetypes', () => {
+  it('stays silent when no edge tier exists to enforce the limit', () => {
+    expect(rule.check(contextFor(graph([node('client-1', 'client')])))).toEqual([]);
+  });
+
+  it('stays silent when rate limiting is on, or when exposure is low', () => {
     const limited = graph([node('gw-1', 'gateway', { config: { rateLimit: true } })]);
     expect(rule.check(contextFor(limited))).toEqual([]);
-    expect(rule.check(contextFor(graph([node('gw-1', 'gateway')]), analyticsFacts()))).toEqual([]);
+    expect(rule.check(contextFor(graph([node('gw-1', 'gateway')]), dagFacts()))).toEqual([]);
   });
 });
 

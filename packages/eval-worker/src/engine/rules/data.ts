@@ -10,7 +10,9 @@ const mixedOltpAnalytics: EvalRule = {
   id: 'data.mixed-oltp-analytics',
   dimension: 'data',
   check({ facts, index }) {
-    if (facts.archetype !== 'realtime-analytics') return [];
+    // Same probe style as no-search-index below: the functional requirements
+    // asking for analytical reads are the evidence, not the archetype.
+    if (!/dashboard|analytic|report/.test(facts.functionalText)) return [];
     const databases = index.byKind('database');
     if (databases.length !== 1) return [];
     if (index.hasKind('replica') || index.hasKind('search-index')) return [];
@@ -21,7 +23,7 @@ const mixedOltpAnalytics: EvalRule = {
         dimension: 'data',
         severity: 'medium',
         title: 'Dashboards and OLTP share one store',
-        message: `Live dashboards and transactional writes both hit "${db.label}", and analytical scans are exactly the queries that evict the OLTP working set and hold the longest locks. Split the read path — a replica or a purpose-built analytics store — before the heaviest dashboard query becomes everyone's outage.`,
+        message: `Analytical reads — the dashboards and reports the requirements ask for — and transactional writes both hit "${db.label}", and analytical scans are exactly the queries that evict the OLTP working set and hold the longest locks. Split the read path — a replica or a purpose-built analytics store — before the heaviest dashboard query becomes everyone's outage.`,
         affectedNodeIds: [db.id],
         affectedEdgeIds: [],
         suggestion: null,
@@ -336,7 +338,7 @@ const streamNoRetention: EvalRule = {
   dimension: 'data',
   check({ facts, index }) {
     if (facts.difficulty !== 'advanced') return [];
-    if (facts.archetype !== 'realtime-analytics') return [];
+    if (!facts.nfrKinds.includes('durability')) return [];
     const findings: RuleFinding[] = [];
     for (const stream of sortById(index.byKind('event-stream'))) {
       if (configNumber(stream, 'retentionHours') !== undefined) continue;

@@ -540,7 +540,7 @@ describe('data.client-command-not-idempotent', () => {
     expect(findings[0].affectedEdgeIds).toEqual(['e1']);
   });
 
-  it('follows the buyer through a client-fed gateway', () => {
+  it('follows the user through a client-fed gateway', () => {
     const canvas = graph(
       [node('client-1', 'client'), node('gw-1', 'gateway'), svcWith(false)],
       [edge('e1', 'client-1', 'gw-1'), edge('e2', 'gw-1', 'svc-1', 'sync', ['purchase'])],
@@ -550,7 +550,15 @@ describe('data.client-command-not-idempotent', () => {
     expect(findings[0].affectedEdgeIds).toEqual(['e2']);
   });
 
-  it('stays silent when keyed, off the buyer path, or outside the archetype', () => {
+  it('fires for any non-intro archetype — user commands retry everywhere', () => {
+    const canvas = graph(
+      [node('client-1', 'client'), svcWith()],
+      [edge('e1', 'client-1', 'svc-1', 'sync', ['purchase'])],
+    );
+    expect(rule.check(contextFor(canvas, analyticsFacts()))).toHaveLength(1);
+  });
+
+  it('stays silent when keyed, off the user path, or at intro difficulty', () => {
     const keyed = graph(
       [node('client-1', 'client'), svcWith(true)],
       [edge('e1', 'client-1', 'svc-1', 'sync', ['purchase'])],
@@ -561,11 +569,11 @@ describe('data.client-command-not-idempotent', () => {
       [edge('e1', 'svc-0', 'svc-1', 'sync', ['purchase'])],
     );
     expect(rule.check(contextFor(internal))).toEqual([]);
-    const offArchetype = graph(
+    const intro = graph(
       [node('client-1', 'client'), svcWith()],
       [edge('e1', 'client-1', 'svc-1', 'sync', ['purchase'])],
     );
-    expect(rule.check(contextFor(offArchetype, analyticsFacts()))).toEqual([]);
+    expect(rule.check(contextFor(intro, flashSaleFacts({ difficulty: 'intro' })))).toEqual([]);
   });
 });
 

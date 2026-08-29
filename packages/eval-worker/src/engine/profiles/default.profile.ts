@@ -89,6 +89,12 @@ export const DEFAULT_PROFILE: EvalProfile = {
       },
       { ruleId: 'data.multi-writer-inventory', whenExpectationUnmet: 'exp.fst.oversell-guard' },
       { ruleId: 'data.stream-no-retention', whenExpectationUnmet: 'exp.rta.ingest-buffer-durable' },
+      // The media bank's CDN expectation owns the origin-offload lesson; the
+      // generic rule yields so the missing CDN is graded once.
+      {
+        ruleId: 'performance.origin-serves-media',
+        whenExpectationUnmet: 'exp.msp.cdn-delivery',
+      },
       // Observability is taught once: each archetype bank's "observed"
       // expectation owns the lesson, and the generic rule yields to it.
       {

@@ -22,7 +22,6 @@ const naiveAnalytics = loadFixture('naive-analytics.graph.json');
  * does not exist yet — so they may carry no affected elements.
  */
 const GLOBAL_FINDINGS = new Set([
-  'security.no-rate-limit',
   'data.no-search-index',
   'performance.no-cdn-static',
   'hygiene.orphan-node',

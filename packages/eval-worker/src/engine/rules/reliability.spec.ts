@@ -307,7 +307,7 @@ describe('reliability.scheduler-single-point', () => {
     [edge('e1', 'sched-1', 'q-1', 'async')],
   );
 
-  it('fires on the archetypes where the tick is the product', () => {
+  it('fires when one orchestrator owns the tick with no leader election', () => {
     const findings = rule.check(contextFor(loneTick, workflowFacts()));
     expect(findings).toHaveLength(1);
     expect(findings[0].severity).toBe('medium');
@@ -323,13 +323,16 @@ describe('reliability.scheduler-single-point', () => {
     expect(rule.check(contextFor(guarded, workflowFacts()))).toEqual([]);
   });
 
-  it('stays silent with two orchestrators or outside the archetypes', () => {
+  it('fires outside the workflow archetypes too — the lone scheduler is the evidence', () => {
+    expect(rule.check(contextFor(loneTick))).toHaveLength(1);
+  });
+
+  it('stays silent with two orchestrators', () => {
     const standby = graph(
       [...loneTick.nodes, node('sched-2', 'scheduler')],
       [...loneTick.edges, edge('e2', 'sched-2', 'q-1', 'async')],
     );
     expect(rule.check(contextFor(standby, workflowFacts()))).toEqual([]);
-    expect(rule.check(contextFor(loneTick))).toEqual([]);
   });
 });
 

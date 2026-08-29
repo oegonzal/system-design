@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { contextFor, dagFacts, edge, graph, node, ruleById } from '../testing';
+import { contextFor, dagFacts, edge, graph, node, ruleById, workflowFacts } from '../testing';
 
 describe('dag.scheduler-does-the-work', () => {
   const rule = ruleById('dag.scheduler-does-the-work');
@@ -27,13 +27,16 @@ describe('dag.scheduler-does-the-work', () => {
     expect(rule.check(contextFor(checkpointing, dagFacts()))).toEqual([]);
   });
 
-  it('stays silent on async hand-offs and outside the archetype', () => {
+  it('stays silent on async hand-offs', () => {
     const decoupled = graph(busybody.nodes, [
       edge('e1', 'sched-1', 'ext-1', 'async'),
       edge('e2', 'sched-1', 'store-1', 'async'),
     ]);
     expect(rule.check(contextFor(decoupled, dagFacts()))).toEqual([]);
-    expect(rule.check(contextFor(busybody))).toEqual([]);
+  });
+
+  it('fires outside dag orchestration too — the orchestrator kinds are the gate', () => {
+    expect(rule.check(contextFor(busybody, workflowFacts()))).toHaveLength(1);
   });
 });
 
@@ -91,8 +94,8 @@ describe('dag.sync-dispatch', () => {
     expect(rule.check(contextFor(queued, dagFacts()))).toEqual([]);
   });
 
-  it('stays silent outside the archetype', () => {
-    expect(rule.check(contextFor(directCall))).toEqual([]);
+  it('fires for a workflow-automation engine dispatching synchronously', () => {
+    expect(rule.check(contextFor(directCall, workflowFacts()))).toHaveLength(1);
   });
 });
 
@@ -150,6 +153,12 @@ describe('dag.dynamic-fanout-sync', () => {
       wideStep.edges.map((fanEdge) => ({ ...fanEdge, kind: 'async' as const })),
     );
     expect(rule.check(contextFor(streamed, advanced))).toEqual([]);
+  });
+
+  it('fires at advanced for other archetypes running a worker pool', () => {
+    expect(
+      rule.check(contextFor(wideStep, workflowFacts({ difficulty: 'advanced' }))),
+    ).toHaveLength(1);
   });
 
   it('stays silent below advanced difficulty', () => {

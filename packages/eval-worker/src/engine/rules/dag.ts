@@ -1,8 +1,9 @@
 /**
- * DAG orchestration misuse: the control plane decides, the data plane works,
- * and dispatch between them is buffered. These rules are gated to the
- * dag-orchestration archetype and register under the dimension each lesson
- * belongs to (scalability or messaging), not under a dimension of their own.
+ * Orchestration misuse: the control plane decides, the data plane works, and
+ * dispatch between them is buffered. No archetype gate — each rule iterates
+ * scheduler/workflow-engine nodes, so any design without an orchestrator is
+ * untouched. The rules register under the dimension each lesson belongs to
+ * (scalability or messaging), not under a dimension of their own.
  */
 import type { CanvasNode } from '@sysdesign/contracts';
 
@@ -25,8 +26,7 @@ const DATA_PLANE_TARGETS = new Set(['external-api', 'object-store']);
 const schedulerDoesTheWork: EvalRule = {
   id: 'dag.scheduler-does-the-work',
   dimension: 'scalability',
-  check({ facts, index }) {
-    if (facts.archetype !== 'dag-orchestration') return [];
+  check({ index }) {
     const findings: RuleFinding[] = [];
     for (const owner of orchestrators(index)) {
       const workEdges = sortById(
@@ -43,7 +43,7 @@ const schedulerDoesTheWork: EvalRule = {
         dimension: 'scalability',
         severity: 'high',
         title: 'The scheduler executes the steps itself',
-        message: `"${owner.label}" makes synchronous data-plane calls — fetching from APIs, touching object storage — which means the component that owns the tick is also doing the work. One slow step now stalls dispatch for every DAG on the platform, and the scheduler scales with the workload instead of with the schedule. Keep the split: the control plane decides what runs, workers run it.`,
+        message: `"${owner.label}" makes synchronous data-plane calls — fetching from APIs, touching object storage — which means the component that owns the tick is also doing the work. One slow step now stalls dispatch for every workflow on the platform, and the scheduler scales with the workload instead of with the schedule. Keep the split: the control plane decides what runs, workers run it.`,
         affectedNodeIds: uniqueSorted([owner.id, ...workEdges.map((edge) => edge.target)]),
         affectedEdgeIds: uniqueSorted(workEdges.map((edge) => edge.id)),
         suggestion: null,
@@ -56,8 +56,7 @@ const schedulerDoesTheWork: EvalRule = {
 const syncDispatch: EvalRule = {
   id: 'dag.sync-dispatch',
   dimension: 'messaging',
-  check({ facts, index }) {
-    if (facts.archetype !== 'dag-orchestration') return [];
+  check({ index }) {
     const findings: RuleFinding[] = [];
     const ids = new SuggestedIds(index);
     for (const owner of orchestrators(index)) {
@@ -120,7 +119,7 @@ const dynamicFanoutSync: EvalRule = {
   id: 'dag.dynamic-fanout-sync',
   dimension: 'scalability',
   check({ facts, index }) {
-    if (facts.archetype !== 'dag-orchestration' || facts.difficulty !== 'advanced') return [];
+    if (facts.difficulty !== 'advanced') return [];
     const findings: RuleFinding[] = [];
     const ids = new SuggestedIds(index);
     for (const worker of sortById(index.byKind('worker'))) {

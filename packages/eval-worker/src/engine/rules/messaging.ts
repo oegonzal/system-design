@@ -5,13 +5,13 @@
 import type { NodeKind, PatchOp } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
-import { formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
+import { formatInt, readsFraction, sortById, SuggestedIds, uniqueSorted } from './shared';
 
 const noQueueForSpike: EvalRule = {
   id: 'messaging.no-queue-for-spike',
   dimension: 'messaging',
   check({ facts, index }) {
-    if (facts.archetype !== 'flash-sale-ticketing') return [];
+    if (!facts.nfrKinds.includes('throughput')) return [];
     if (index.hasKind('queue') || index.hasKind('event-stream')) return [];
     const offenders: Array<{ clientId: string; dbId: string }> = [];
     for (const client of sortById(index.clients())) {
@@ -35,7 +35,7 @@ const noQueueForSpike: EvalRule = {
     const ops: PatchOp[] = [
       {
         op: 'add-node',
-        node: { id: queueId, kind: 'queue', label: 'Order queue', config: { dlq: true } },
+        node: { id: queueId, kind: 'queue', label: 'Write queue', config: { dlq: true } },
       },
     ];
     if (serviceBefore) {
@@ -71,18 +71,23 @@ const noQueueForSpike: EvalRule = {
       });
     }
 
+    const fraction = readsFraction(facts.scaleTargets.readWriteRatio);
+    const writesClause =
+      fraction === null
+        ? ''
+        : `, roughly ${formatInt(facts.scaleTargets.requestsPerSecond * (1 - fraction))} of them writes`;
     return [
       {
         ruleId: noQueueForSpike.id,
         dimension: 'messaging',
         severity: 'critical',
         title: 'No buffer between the spike and the database',
-        message: `A flash sale front-loads demand: ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s arrive in a burst, and this design lets that burst hit "${db.label}" directly. Without a queue or event stream to absorb the spike, the database saturates at the exact moment every user shows up. Buffering writes lets the system accept the surge instantly and process it at a rate the store survives.`,
+        message: `The prompt's throughput requirement front-loads demand: ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s arrive in a burst${writesClause}, and this design lets that burst hit "${db.label}" directly. Without a queue or event stream to absorb the spike, the database saturates at the exact moment every user shows up. Buffering writes lets the system accept the surge instantly and process it at a rate the store survives.`,
         affectedNodeIds: uniqueSorted(offenders.flatMap((o) => [o.clientId, o.dbId])),
         affectedEdgeIds: [],
         suggestion: {
           description:
-            'Absorb the on-sale burst in a queue so the database drains at a rate it survives.',
+            'Absorb the write burst in a queue so the database drains at a rate it survives.',
           ops,
         },
       },

@@ -306,7 +306,7 @@ describe('scalability.hot-partition-risk', () => {
     [edge('e1', 'svc-1', 'db-1'), edge('e2', 'svc-1', 'stream-1', 'async')],
   );
 
-  it('fires at advanced on the spike archetypes when nothing spreads the hot key', () => {
+  it('fires at advanced when nothing spreads the hot key', () => {
     const findings = rule.check(contextFor(unspread, advanced));
     expect(findings).toHaveLength(1);
     expect(findings[0].severity).toBe('medium');
@@ -327,9 +327,14 @@ describe('scalability.hot-partition-risk', () => {
     expect(rule.check(contextFor(partitioned, advanced))).toEqual([]);
   });
 
-  it('stays silent below advanced and outside the spike archetypes', () => {
+  it('fires for any archetype at advanced — hot keys are not archetype-specific', () => {
+    expect(rule.check(contextFor(unspread, mediaFacts({ difficulty: 'advanced' })))).toHaveLength(
+      1,
+    );
+  });
+
+  it('stays silent below advanced difficulty', () => {
     expect(rule.check(contextFor(unspread))).toEqual([]);
-    expect(rule.check(contextFor(unspread, mediaFacts({ difficulty: 'advanced' })))).toEqual([]);
   });
 });
 

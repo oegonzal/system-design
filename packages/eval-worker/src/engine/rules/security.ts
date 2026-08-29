@@ -42,8 +42,14 @@ const noRateLimit: EvalRule = {
   id: 'security.no-rate-limit',
   dimension: 'security',
   check({ facts, index }) {
-    if (facts.archetype !== 'flash-sale-ticketing') return [];
+    // The edge tier is the evidence the design has a front door to configure;
+    // the lesson applies once the prompt makes abuse worth limiting — a stated
+    // security requirement, or enough traffic to invite it.
     const edgeNodes = sortById([...index.byKind('gateway'), ...index.byKind('load-balancer')]);
+    if (edgeNodes.length === 0) return [];
+    if (!facts.nfrKinds.includes('security') && facts.scaleTargets.requestsPerSecond < 1000) {
+      return [];
+    }
     if (edgeNodes.some((node) => node.config?.rateLimit === true)) return [];
     return [
       {
@@ -51,23 +57,20 @@ const noRateLimit: EvalRule = {
         dimension: 'security',
         severity: 'info',
         title: 'No rate limiting at the edge',
-        message: `A flash sale invites bots and retry storms, and nothing at the edge enforces a rate limit. Limiting per-client request rates at the gateway keeps one aggressive buyer from consuming capacity meant for ${formatInt(facts.scaleTargets.concurrentUsers)} real fans.`,
+        message: `An internet-facing front door at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s invites bots and retry storms, and nothing at the edge enforces a rate limit. Limiting per-client request rates at the gateway keeps one aggressive caller from consuming capacity meant for ${formatInt(facts.scaleTargets.concurrentUsers)} real users.`,
         affectedNodeIds: edgeNodes.map((node) => node.id),
         affectedEdgeIds: [],
-        suggestion:
-          edgeNodes.length > 0
-            ? {
-                description:
-                  "Turn on rate limiting at the edge so one aggressive buyer cannot consume everyone else's capacity.",
-                ops: [
-                  {
-                    op: 'update-node',
-                    nodeId: edgeNodes[0].id,
-                    set: { config: { ...(edgeNodes[0].config ?? {}), rateLimit: true } },
-                  },
-                ],
-              }
-            : null,
+        suggestion: {
+          description:
+            "Turn on rate limiting at the edge so one aggressive caller cannot consume everyone else's capacity.",
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: edgeNodes[0].id,
+              set: { config: { ...(edgeNodes[0].config ?? {}), rateLimit: true } },
+            },
+          ],
+        },
       },
     ];
   },

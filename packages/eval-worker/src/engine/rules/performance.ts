@@ -86,7 +86,6 @@ const originServesMedia: EvalRule = {
   id: 'performance.origin-serves-media',
   dimension: 'performance',
   check({ facts, index }) {
-    if (facts.archetype !== 'media-streaming-pipeline') return [];
     const stores = sortById(index.byKind('object-store'));
     const clients = sortById(index.clients());
     const offenders: Array<{ clientId: string; storeId: string }> = [];

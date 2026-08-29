@@ -130,6 +130,11 @@ const ORDER: PromptDifficulty[] = ['intro', 'standard', 'advanced'];
 
 /** Cumulative selection: each tier faces everything easier tiers face. */
 export function selectScenarios(archetype: Archetype, difficulty: PromptDifficulty): ScenarioDef[] {
+  // A stale persisted archetype string degrades to the one universal scenario
+  // instead of throwing; a NEW archetype still fails to compile until TIERS
+  // covers it, because the Record above stays exhaustive.
+  const tiers = TIERS[archetype] as Record<PromptDifficulty, ScenarioDef[]> | undefined;
+  if (tiers === undefined) return [REGION_LOSS];
   const cutoff = ORDER.indexOf(difficulty);
-  return ORDER.slice(0, cutoff + 1).flatMap((tier) => TIERS[archetype][tier]);
+  return ORDER.slice(0, cutoff + 1).flatMap((tier) => tiers[tier]);
 }
