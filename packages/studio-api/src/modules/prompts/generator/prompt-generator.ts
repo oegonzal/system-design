@@ -16,7 +16,7 @@ import { mulberry32, pick, pickN } from './rng';
  * honest audit records rather than claiming to be reproducible when they are
  * no longer.
  */
-export const GENERATOR_VERSION = '2.0.0'; // 2.0.0: NFRs carry stable ids + machine-readable targetSpecs
+export const GENERATOR_VERSION = '2.1.0'; // 2.1.0: signature invariant always drawn + advanced fill floor
 
 /** The slice of an experience the generator reads. Structural, so an
  * `ExperienceProfile` entity can be passed directly. */
@@ -80,11 +80,14 @@ export function generatePrompt({
 }
 
 /**
- * 3–5 NFRs with the invariant the eval engine relies on: at least one latency
- * and one availability requirement, always. Those two are drawn first (from
- * pools of 2+ each, so seeds still vary them); advanced difficulty then adds
- * one twist (multi-region / exactly-once / cost-cap); the rest fill from the
- * remaining bank without duplicates.
+ * 4–6 NFRs with the invariants the eval engine relies on: at least one latency
+ * and one availability requirement, plus the archetype's signature invariant
+ * (`signatureNfrId`) — scenario prose asserts it on every prompt, so the
+ * requirement list must always state its bar. Latency and availability draw
+ * from pools of 2+ each, so seeds still vary them; advanced difficulty then
+ * adds one twist (multi-region / exactly-once / cost-cap); the rest fill from
+ * the remaining bank without duplicates, with the target floored so even the
+ * larger advanced guaranteed set draws at least one fill.
  */
 function pickNfrs(
   rng: () => number,
@@ -93,16 +96,27 @@ function pickNfrs(
 ): NfrItem[] {
   const latencyPool = bank.nfrs.filter((n) => n.kind === 'latency');
   const availabilityPool = bank.nfrs.filter((n) => n.kind === 'availability');
+  const signature = bank.nfrs.find((n) => n.id === bank.signatureNfrId);
+  if (!signature) throw new Error(`signatureNfrId '${bank.signatureNfrId}' is not in its bank`);
 
-  const chosen: NfrItem[] = [pick(rng, latencyPool), pick(rng, availabilityPool)];
+  const guaranteed = [pick(rng, latencyPool), pick(rng, availabilityPool), signature];
   if (difficulty === 'advanced') {
-    chosen.push(pick(rng, bank.advancedTwists));
+    guaranteed.push(pick(rng, bank.advancedTwists));
   }
 
-  const targetCount = 3 + Math.floor(rng() * 3); // 3..5
-  const remaining = bank.nfrs.filter((n) => !chosen.includes(n));
-  const fill = Math.max(0, targetCount - chosen.length);
-  chosen.push(...pickN(rng, remaining, fill));
+  const chosen: NfrItem[] = [];
+  const chosenIds = new Set<string>();
+  for (const nfr of guaranteed) {
+    if (!chosenIds.has(nfr.id)) {
+      chosen.push(nfr);
+      chosenIds.add(nfr.id);
+    }
+  }
+
+  // 4..6, floored to one past the guaranteed set so fills always vary the mix.
+  const targetCount = Math.max(4 + Math.floor(rng() * 3), chosen.length + 1);
+  const remaining = bank.nfrs.filter((n) => !chosenIds.has(n.id));
+  chosen.push(...pickN(rng, remaining, targetCount - chosen.length));
 
   // Fresh objects so a caller mutating its prompt can never corrupt the bank.
   return chosen.map((n) => ({ ...n }));

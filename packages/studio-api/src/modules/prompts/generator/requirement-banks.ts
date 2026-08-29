@@ -5,8 +5,9 @@ import { ARCHETYPE_BASELINES } from './archetype-templates';
 /**
  * The pools the generator samples from. Per archetype: 8+ functional
  * requirements, 6+ NFRs (at least two latency and two availability entries, so
- * the guaranteed picks still vary by seed), and the advanced-only twists that
- * raise the difficulty ceiling (multi-region, exactly-once, cost caps).
+ * the guaranteed picks still vary by seed), the signature invariant the
+ * scenario prose always asserts, and the advanced-only twists that raise the
+ * difficulty ceiling (multi-region, exactly-once, cost caps).
  *
  * Every NFR carries a stable `id` (findings cite it as proof of which
  * requirement a design misses) and, where the prose target quantifies one
@@ -16,6 +17,13 @@ import { ARCHETYPE_BASELINES } from './archetype-templates';
  */
 export interface RequirementBank {
   functional: readonly string[];
+  /**
+   * The archetype-defining invariant (zero oversell, originals never lost…).
+   * Scenario prose asserts it unconditionally, so the generator draws it on
+   * every prompt — the requirement list must state every bar the engine
+   * grades. Must name an entry in `nfrs`.
+   */
+  signatureNfrId: string;
   nfrs: readonly NfrItem[];
   advancedTwists: readonly NfrItem[];
 }
@@ -35,6 +43,7 @@ export const REQUIREMENT_BANKS = {
       'A buyer can view and cancel their orders, returning inventory when allowed',
       'Fraud and bot signals can flag a purchase for review before fulfilment',
     ],
+    signatureNfrId: 'fst-con-oversell',
     nfrs: [
       {
         id: 'fst-lat-read-spike',
@@ -99,6 +108,14 @@ export const REQUIREMENT_BANKS = {
         targetSpec: { metric: 'sustained_peak_minutes', op: '>=', value: 10, unit: 'min' },
       },
       {
+        id: 'fst-sec-bot-shed',
+        kind: 'security',
+        statement:
+          'Bot and scripted-buyer traffic is shed at the edge before it consumes checkout capacity',
+        target: '≥ 95% of scripted traffic dropped before the reservation tier',
+        targetSpec: { metric: 'bot_shed_pct', op: '>=', value: 95, unit: '%' },
+      },
+      {
         id: 'fst-obs-pipeline',
         kind: 'observability',
         statement: 'Oversell risk, queue depth and payment failures are visible in near-real time',
@@ -139,6 +156,7 @@ export const REQUIREMENT_BANKS = {
       'Moderation can take down an asset and invalidate cached copies',
       'Thumbnails and previews are generated automatically from source media',
     ],
+    signatureNfrId: 'msp-dur-originals',
     nfrs: [
       {
         id: 'msp-lat-playback-start',
@@ -237,12 +255,14 @@ export const REQUIREMENT_BANKS = {
       'Workflows execute automatically when their trigger events arrive',
       'A workflow run is inspectable step by step, with inputs and outputs',
       'Failed steps retry with backoff and surface to the customer after exhaustion',
+      'A workflow step can wait — e.g. delay N days before the next action — and fire on schedule',
       'Customers can test a workflow against sample data before enabling it',
       'Workflow definitions are versioned; in-flight runs finish on their version',
       'Actions call third-party APIs with per-customer credentials and rate limits',
       'Customers can pause, resume and cancel workflows and individual runs',
       'An audit log records who changed which workflow and when',
     ],
+    signatureNfrId: 'wfa-dur-triggers',
     nfrs: [
       {
         id: 'wfa-lat-trigger-dispatch',
@@ -341,6 +361,7 @@ export const REQUIREMENT_BANKS = {
       'Rollups are computed automatically so old data stays queryable cheaply',
       'An export pushes filtered event slices to external destinations',
     ],
+    signatureNfrId: 'rta-con-count-once',
     nfrs: [
       {
         id: 'rta-lat-dashboard-lag',
@@ -434,6 +455,7 @@ export const REQUIREMENT_BANKS = {
       'Completed runs are queryable by status, tag and time range',
       'A dead-letter path captures steps that exhaust their retries',
     ],
+    signatureNfrId: 'dag-dur-progress',
     nfrs: [
       {
         id: 'dag-lat-dispatch',
@@ -493,7 +515,9 @@ export const REQUIREMENT_BANKS = {
       {
         id: 'dag-thr-concurrent-runs',
         kind: 'throughput',
-        statement: 'Thousands of concurrent runs make progress without head-of-line blocking',
+        statement: 'Concurrent runs make progress without head-of-line blocking',
+        target: 'sustain 5000 concurrent runs',
+        targetSpec: { metric: 'concurrent_runs', op: '>=', value: 5000, unit: 'runs' },
       },
       {
         id: 'dag-obs-alerting',

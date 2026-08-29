@@ -41,7 +41,7 @@ describe('prompts', () => {
       expect(body.data.difficulty).toBe('standard'); // the default
       expect(body.data.status).toBe('active');
       expect(body.data.llmEnriched).toBe(false);
-      expect(body.data.generatorVersion).toBe('2.0.0');
+      expect(body.data.generatorVersion).toBe('2.1.0');
       expect(body.data.seed).toBeGreaterThanOrEqual(0);
 
       // Persisted: fetchable through the read endpoint with identical content.
@@ -71,8 +71,10 @@ describe('prompts', () => {
       expect(body.data.scenario.length).toBeGreaterThan(100);
       expect(body.data.functionalRequirements.length).toBeGreaterThanOrEqual(4);
       expect(body.data.functionalRequirements.length).toBeLessThanOrEqual(6);
-      expect(body.data.nonFunctionalRequirements.length).toBeGreaterThanOrEqual(3);
-      expect(body.data.nonFunctionalRequirements.length).toBeLessThanOrEqual(5);
+      // Advanced guarantees latency + availability + signature + twist, then
+      // the fill floor lifts the count to 5..6.
+      expect(body.data.nonFunctionalRequirements.length).toBeGreaterThanOrEqual(5);
+      expect(body.data.nonFunctionalRequirements.length).toBeLessThanOrEqual(6);
 
       const kinds = body.data.nonFunctionalRequirements.map((n) => n.kind);
       expect(kinds).toContain('latency');

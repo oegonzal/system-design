@@ -3,6 +3,7 @@ import { ARCHETYPES, PROMPT_DIFFICULTIES, type Archetype } from '@sysdesign/cont
 
 import { DIFFICULTY_MULTIPLIERS } from './archetype-templates';
 import { generatePrompt, type GeneratorExperience } from './prompt-generator';
+import { REQUIREMENT_BANKS } from './requirement-banks';
 
 /** Pure unit suite — no DB, no app boot. */
 
@@ -49,8 +50,8 @@ describe('generatePrompt', () => {
       expect(prompt.scenario).toContain('You are designing');
       expect(prompt.functionalRequirements.length).toBeGreaterThanOrEqual(4);
       expect(prompt.functionalRequirements.length).toBeLessThanOrEqual(6);
-      expect(prompt.nonFunctionalRequirements.length).toBeGreaterThanOrEqual(3);
-      expect(prompt.nonFunctionalRequirements.length).toBeLessThanOrEqual(5);
+      expect(prompt.nonFunctionalRequirements.length).toBeGreaterThanOrEqual(4);
+      expect(prompt.nonFunctionalRequirements.length).toBeLessThanOrEqual(6);
       expect(prompt.scaleTargets.concurrentUsers).toBeGreaterThan(0);
       expect(prompt.scaleTargets.requestsPerSecond).toBeGreaterThan(0);
       expect(prompt.scaleTargets.readWriteRatio).toMatch(/^\d+:\d+$/);
@@ -77,7 +78,7 @@ describe('generatePrompt', () => {
     }
   });
 
-  it('always includes at least one latency and one availability NFR', () => {
+  it('always includes latency, availability and the signature invariant, within count bounds', () => {
     for (const archetype of ARCHETYPES) {
       for (const difficulty of PROMPT_DIFFICULTIES) {
         for (let seed = 0; seed < 20; seed++) {
@@ -90,6 +91,19 @@ describe('generatePrompt', () => {
 
           expect(kinds).toContain('latency');
           expect(kinds).toContain('availability');
+
+          // Scenario prose asserts the signature invariant on every prompt,
+          // so the requirement list must state its bar on every draw.
+          const ids = nonFunctionalRequirements.map((n) => n.id);
+          expect(ids).toContain(REQUIREMENT_BANKS[archetype].signatureNfrId);
+
+          // 4..6 rolled, floored one past the guaranteed set: intro/standard
+          // guarantee 3 (latency, availability, signature) so 4..6; advanced
+          // adds a twist for 4 guaranteed, flooring the count at 5.
+          expect(nonFunctionalRequirements.length).toBeGreaterThanOrEqual(
+            difficulty === 'advanced' ? 5 : 4,
+          );
+          expect(nonFunctionalRequirements.length).toBeLessThanOrEqual(6);
 
           // Sampling never duplicates an entry.
           const statements = nonFunctionalRequirements.map((n) => n.statement);

@@ -11,7 +11,7 @@
       "concurrentUsers": 10000,
       "requestsPerSecond": 4000,
       "peakMultiplier": 28,
-      "notes": "Grew from 350 to 10,000+ concurrent users during high-demand on-sales; inventory is strictly finite and oversell is unacceptable."
+      "notes": "On-sale peaks hit 28x baseline traffic in the first minute; before the re-architecture the platform held only 350 concurrent buyers."
     },
     "highlights": [
       "Scaled ticket on-sales from 350 to 10,000+ concurrent users with JWT-based service allocation",
@@ -41,7 +41,7 @@
       "concurrentUsers": 10000,
       "dailyEvents": 2000000,
       "dataVolumeGb": 40000,
-      "notes": "Launch-day drops concentrate a day of traffic into minutes; media assets dominate storage and egress."
+      "notes": "The catalog holds 40TB of media, and playback plus ownership activity adds 2 million events a day."
     },
     "highlights": [
       "Architected backend services scaling media, collectibles and user-state workflows to 10,000+ concurrent users",
@@ -59,7 +59,7 @@
     "techStack": ["TypeScript", "Angular", "Playwright", "Jest", "Datadog", "Node.js"],
     "scaleFacts": {
       "dailyEvents": 500000,
-      "notes": "Thousands of advertiser configurations; every workflow is a slightly different path through the same engine."
+      "notes": "Campaign automations consume 500,000 trigger events a day across thousands of live advertiser configurations."
     },
     "highlights": [
       "Architected extensible widgets and configurable UI workflows for campaign automation",
@@ -78,7 +78,7 @@
     "scaleFacts": {
       "requestsPerSecond": 2000,
       "dailyEvents": 5000000,
-      "notes": "Dashboards must stay current against a continuous event firehose while historical queries stay fast."
+      "notes": "Risk telemetry lands at 5 million events a day from payment infrastructure spread across every region of the network."
     },
     "highlights": [
       "Surfaced infrastructure exposure across a global network, reducing incidents by 30%+",
@@ -95,7 +95,7 @@
     "techStack": ["TypeScript", "Node.js", "Python", "XState", "MCP", "RAG", "LLM evals"],
     "scaleFacts": {
       "dailyEvents": 100000,
-      "notes": "Long-running multi-step jobs with fallible steps; progress must survive worker crashes and retries must be safe."
+      "notes": "The engine executes 100,000 step events a day, and every candidate plan is screened by LLM critics before dispatch."
     },
     "highlights": [
       "Compiled goals into DAGs with LLM critics/evals and strict JSON schemas",
