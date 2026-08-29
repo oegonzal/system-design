@@ -1,7 +1,14 @@
+import {
+  kindsInCategory,
+  type NodeConfig,
+  type NodeKind,
+  type NodeKindCategoryId,
+} from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReactFlow } from '@xyflow/react';
 
 import { withReactFlow } from '../../../testing/story-decorators';
+import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import type { SdNode as SdNodeModel } from '../types';
 import { SdNode } from './sd-node';
 
@@ -14,6 +21,48 @@ function node(
   selected = false,
 ): SdNodeModel {
   return { id, type: 'sd', position, data, selected };
+}
+
+/**
+ * Representative labels — and configs where a knob count makes the meta line
+ * interesting — for the category catalogs below. Anything not listed renders
+ * under its palette default.
+ */
+const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfig }>> = {
+  client: { label: 'Web + Mobile' },
+  gateway: { config: { rateLimit: true } },
+  'websocket-gateway': { label: 'Live Updates', config: { maxConnections: 50_000, sticky: true } },
+  service: { label: 'Order Service', config: { replicas: 3 } },
+  'serverless-function': { label: 'Thumbnailer', config: { memoryMb: 512, timeoutSeconds: 30 } },
+  'batch-job': { label: 'Nightly ETL', config: { schedule: '0 2 * * *', idempotent: true } },
+  database: { label: 'Orders DB', config: { replicas: 2 } },
+  'kv-store': { label: 'Session Store', config: { ttlSeconds: 1800 } },
+  'time-series-db': { label: 'Metrics DB', config: { retentionDays: 30 } },
+  'vector-db': { label: 'Embeddings', config: { dimensions: 1536 } },
+  cache: { label: 'Hot Cache', config: { strategy: 'cache-aside', ttlSeconds: 60 } },
+  queue: { label: 'Jobs', config: { dlq: true } },
+  'event-stream': { label: 'Order Events' },
+  scheduler: { label: 'Cron' },
+};
+
+/**
+ * Every kind on one shelf, laid out two abreast. Driven by
+ * `kindsInCategory()`, so a kind added to the contract joins its category's
+ * story — and the smoke harness's axe gate — with no edit here.
+ */
+function categoryNodes(id: NodeKindCategoryId): SdNodeModel[] {
+  return kindsInCategory(id).map((kind, index) => {
+    const sample = SAMPLES[kind];
+    return node(
+      `n-${index + 1}`,
+      {
+        kind,
+        label: sample?.label ?? DEFAULT_NODE_LABELS[kind],
+        ...(sample?.config ? { config: sample.config } : {}),
+      },
+      { x: (index % 2) * 230, y: Math.floor(index / 2) * 90 },
+    );
+  });
 }
 
 /**
@@ -48,59 +97,64 @@ export default meta;
 
 type Story = StoryObj<typeof NodesPreview>;
 
-/** The traffic edge — blues, light to deep as requests move inward. */
-export const TrafficGroup: Story = {
-  args: {
-    nodes: [
-      node('n-1', { kind: 'client', label: 'Client' }, { x: 0, y: 0 }),
-      node('n-2', { kind: 'cdn', label: 'CDN' }, { x: 220, y: 0 }),
-      node('n-3', { kind: 'dns', label: 'DNS' }, { x: 0, y: 90 }),
-      node('n-4', { kind: 'gateway', label: 'API Gateway' }, { x: 220, y: 90 }),
-      node('n-5', { kind: 'load-balancer', label: 'Load Balancer' }, { x: 110, y: 180 }),
-    ],
-  },
+/*
+ * One catalog story per contract category — together they render every kind,
+ * which makes them the axe gate for each icon-on-chip colour combination.
+ */
+
+/** The boundary — light blue where requests originate. */
+export const ClientsEdgeCategory: Story = {
+  args: { nodes: categoryNodes('clients-edge') },
 };
 
-/** Compute — indigo and violet. */
-export const ComputeGroup: Story = {
-  args: {
-    nodes: [
-      node('n-1', { kind: 'service', label: 'Order Service' }, { x: 0, y: 0 }),
-      node('n-2', { kind: 'worker', label: 'Email Worker' }, { x: 220, y: 0 }),
-      node('n-3', { kind: 'scheduler', label: 'Cron' }, { x: 110, y: 90 }),
-    ],
-  },
+/** Deep blues as requests move inward. */
+export const TrafficCategory: Story = {
+  args: { nodes: categoryNodes('traffic') },
 };
 
-/** Data at rest — greens and teals. */
-export const DataGroup: Story = {
-  args: {
-    nodes: [
-      node(
-        'n-1',
-        { kind: 'database', label: 'Orders DB', config: { replicas: 2 } },
-        { x: 0, y: 0 },
-      ),
-      node('n-2', { kind: 'replica', label: 'Read Replica' }, { x: 220, y: 0 }),
-      node('n-3', { kind: 'object-store', label: 'Media Bucket' }, { x: 0, y: 90 }),
-      node('n-4', { kind: 'search-index', label: 'Search' }, { x: 220, y: 90 }),
-    ],
-  },
+/** Indigo — where the design's own code runs. */
+export const ComputeCategory: Story = {
+  args: { nodes: categoryNodes('compute') },
 };
 
-/** Caches and messaging — the warm hot path. */
-export const MessagingGroup: Story = {
-  args: {
-    nodes: [
-      node(
-        'n-1',
-        { kind: 'cache', label: 'Hot Cache', config: { strategy: 'cache-aside', ttlSeconds: 60 } },
-        { x: 0, y: 0 },
-      ),
-      node('n-2', { kind: 'queue', label: 'Jobs', config: { dlq: true } }, { x: 220, y: 0 }),
-      node('n-3', { kind: 'event-stream', label: 'Order Events' }, { x: 110, y: 90 }),
-    ],
-  },
+/** Greens — data at rest. */
+export const DataStoresCategory: Story = {
+  args: { nodes: categoryNodes('data-stores') },
+};
+
+/** Warm amber — the hot path. */
+export const CachingCategory: Story = {
+  args: { nodes: categoryNodes('caching') },
+};
+
+/** Orange — fire-and-forget in flight. */
+export const MessagingCategory: Story = {
+  args: { nodes: categoryNodes('messaging') },
+};
+
+/** Teal — derived data and models. */
+export const AnalyticsCategory: Story = {
+  args: { nodes: categoryNodes('analytics') },
+};
+
+/** Purple — the components that keep the others agreeing. */
+export const CoordinationCategory: Story = {
+  args: { nodes: categoryNodes('coordination') },
+};
+
+/** Crimson — identity and the trust boundary. */
+export const SecurityCategory: Story = {
+  args: { nodes: categoryNodes('security') },
+};
+
+/** Plum — the annotation shelf: watching, never a traffic hop. */
+export const ObservabilityCategory: Story = {
+  args: { nodes: categoryNodes('observability') },
+};
+
+/** Neutral gray — the actors the design doesn't own. */
+export const ExternalCategory: Story = {
+  args: { nodes: categoryNodes('external') },
 };
 
 /** The focus ring — theme border.focus, not a React Flow default. */

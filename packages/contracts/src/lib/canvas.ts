@@ -14,21 +14,77 @@
  * here refuses to compile until every consumer has caught up.
  */
 export const NODE_KINDS = [
+  // ── Clients & Edge
   'client',
   'cdn',
   'dns',
+  // ── Traffic & Routing
   'gateway',
   'load-balancer',
+  /**
+   * Terminates long-lived WebSocket/SSE connections for push traffic. Rule
+   * hooks: presence for realtime/chat/live prompts; misuse: plain LB fanning
+   * realtime out of a service with no connection tier; knobs maxConnections,
+   * sticky
+   */
+  'websocket-gateway',
+  /**
+   * Sidecar layer for east-west traffic: mTLS, retries, discovery. Rule
+   * hooks: presence in many-service graphs w/ security NFR; misuse: mesh in a
+   * 2-service design (overengineering); knob mtls
+   */
+  'service-mesh',
+  // ── Compute
   'service',
   'worker',
+  /**
+   * Event-triggered ephemeral compute (FaaS), scales to zero. Rule hooks:
+   * presence for spiky/low-duty workloads; misuse: latency-critical sync path
+   * (cold starts), unpooled DB connections at fan-out; knobs memoryMb,
+   * timeoutSeconds, provisionedConcurrency
+   */
+  'serverless-function',
+  /**
+   * Scheduled/bulk offline processing (ETL, reports). Rule hooks: misuse:
+   * reading the OLTP primary instead of replica/warehouse; no
+   * scheduler/workflow-engine trigger; knobs schedule, idempotent
+   */
+  'batch-job',
+  // ── Data Stores
   'database',
   'replica',
-  'cache',
-  'queue',
-  'event-stream',
   'object-store',
   'search-index',
+  /**
+   * Key-value store for sessions, counters, simple lookups. Rule hooks:
+   * presence: session state when services scale out; misuse: relational
+   * workloads on KV, session data with no TTL; knobs replicas, consistency,
+   * ttlSeconds
+   */
+  'kv-store',
+  /**
+   * Timestamped metrics/events store with retention/downsampling. Rule hooks:
+   * presence for metrics/IoT prompts; misuse: high-rate time-series in the
+   * OLTP database; knobs retentionDays, downsampling
+   */
+  'time-series-db',
+  /**
+   * Embedding store for similarity search (RAG, recommendations). Rule hooks:
+   * presence for AI/semantic-search prompts; misuse: no embedding pipeline
+   * feeding it; knobs dimensions, indexType
+   */
+  'vector-db',
+  // ── Caching
+  'cache',
+  // ── Messaging & Streaming
+  'queue',
+  'event-stream',
+  // ── Analytics & ML
+  // ── Coordination & Config
   'scheduler',
+  // ── Identity & Security
+  // ── Observability
+  // ── External & SaaS
   'external-api',
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
@@ -69,12 +125,19 @@ export const NODE_KIND_CATEGORY = {
   dns: 'clients-edge',
   gateway: 'traffic',
   'load-balancer': 'traffic',
+  'websocket-gateway': 'traffic',
+  'service-mesh': 'traffic',
   service: 'compute',
   worker: 'compute',
+  'serverless-function': 'compute',
+  'batch-job': 'compute',
   database: 'data-stores',
   replica: 'data-stores',
   'object-store': 'data-stores',
   'search-index': 'data-stores',
+  'kv-store': 'data-stores',
+  'time-series-db': 'data-stores',
+  'vector-db': 'data-stores',
   cache: 'caching',
   queue: 'messaging',
   'event-stream': 'messaging',

@@ -12,68 +12,153 @@ export interface NodeConfigFieldsProps {
 
 /**
  * Kind-specific knobs. The keys written here (`replicas`, `dlq`, `rateLimit`,
- * `strategy`, `ttlSeconds`) are exactly the ones the deterministic eval rules
- * read — this form is the UI half of that contract.
+ * `strategy`, `ttlSeconds`, …) are the canonical config vocabulary: the
+ * deterministic eval rules read them verbatim, so a key renamed here silently
+ * un-grades a rule. `responsibilities`, `operations` and `carries` are
+ * reserved for annotation features and must never appear as config keys.
  */
+
+type SetKey = (key: string, value: string | number | boolean) => void;
+
+/*
+ * Row helpers — one per control shape, so each `case` below reads as a knob
+ * list rather than four re-typed event handlers. Plain functions returning
+ * elements of stable component types (not locally-declared components), so
+ * React never remounts an input mid-keystroke.
+ */
+
+function numberRow(
+  config: NodeConfig,
+  setKey: SetKey,
+  key: string,
+  label: string,
+  bounds: { min?: number; max?: number } = {},
+) {
+  return (
+    <TextField
+      label={label}
+      type="number"
+      min={bounds.min ?? 0}
+      {...(bounds.max !== undefined ? { max: bounds.max } : {})}
+      value={typeof config[key] === 'number' ? (config[key] as number) : ''}
+      onChange={(event) => {
+        const parsed = Number(event.target.value);
+        if (!Number.isNaN(parsed)) setKey(key, parsed);
+      }}
+    />
+  );
+}
+
+function textRow(config: NodeConfig, setKey: SetKey, key: string, label: string) {
+  return (
+    <TextField
+      label={label}
+      value={typeof config[key] === 'string' ? (config[key] as string) : ''}
+      onChange={(event) => setKey(key, event.target.value)}
+    />
+  );
+}
+
+function selectRow(
+  config: NodeConfig,
+  setKey: SetKey,
+  key: string,
+  label: string,
+  options: readonly string[],
+) {
+  return (
+    <SelectField
+      label={label}
+      value={typeof config[key] === 'string' ? (config[key] as string) : options[0]}
+      onChange={(event) => setKey(key, event.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </SelectField>
+  );
+}
+
+function checkboxRow(config: NodeConfig, setKey: SetKey, key: string, label: string) {
+  return (
+    <CheckboxField
+      label={label}
+      checked={config[key] === true}
+      onChange={(event) => setKey(key, event.target.checked)}
+    />
+  );
+}
+
 export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsProps) {
-  const setKey = (key: string, value: string | number | boolean) =>
-    onChange({ ...config, [key]: value });
+  const setKey: SetKey = (key, value) => onChange({ ...config, [key]: value });
 
   switch (kind) {
     case 'database':
     case 'service':
-      return (
-        <TextField
-          label="Replicas"
-          type="number"
-          min={0}
-          max={99}
-          value={typeof config['replicas'] === 'number' ? config['replicas'] : ''}
-          onChange={(event) => {
-            const parsed = Number(event.target.value);
-            if (!Number.isNaN(parsed)) setKey('replicas', parsed);
-          }}
-        />
-      );
+      return numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 });
     case 'cache':
       return (
         <>
-          <SelectField
-            label="Strategy"
-            value={typeof config['strategy'] === 'string' ? config['strategy'] : 'cache-aside'}
-            onChange={(event) => setKey('strategy', event.target.value)}
-          >
-            <option value="cache-aside">cache-aside</option>
-            <option value="write-through">write-through</option>
-          </SelectField>
-          <TextField
-            label="TTL (seconds)"
-            type="number"
-            min={0}
-            value={typeof config['ttlSeconds'] === 'number' ? config['ttlSeconds'] : ''}
-            onChange={(event) => {
-              const parsed = Number(event.target.value);
-              if (!Number.isNaN(parsed)) setKey('ttlSeconds', parsed);
-            }}
-          />
+          {selectRow(config, setKey, 'strategy', 'Strategy', ['cache-aside', 'write-through'])}
+          {numberRow(config, setKey, 'ttlSeconds', 'TTL (seconds)')}
         </>
       );
     case 'queue':
-      return (
-        <CheckboxField
-          label="Dead-letter queue"
-          checked={config['dlq'] === true}
-          onChange={(event) => setKey('dlq', event.target.checked)}
-        />
-      );
+      return checkboxRow(config, setKey, 'dlq', 'Dead-letter queue');
     case 'gateway':
     case 'load-balancer':
+      return checkboxRow(config, setKey, 'rateLimit', 'Rate limiting');
+    case 'websocket-gateway':
       return (
-        <CheckboxField
-          label="Rate limiting"
-          checked={config['rateLimit'] === true}
-          onChange={(event) => setKey('rateLimit', event.target.checked)}
-        />
+        <>
+          {numberRow(config, setKey, 'maxConnections', 'Max connections')}
+          {checkboxRow(config, setKey, 'sticky', 'Sticky sessions')}
+        </>
+      );
+    case 'service-mesh':
+      return checkboxRow(config, setKey, 'mtls', 'mTLS');
+    case 'serverless-function':
+      return (
+        <>
+          {numberRow(config, setKey, 'memoryMb', 'Memory (MB)')}
+          {numberRow(config, setKey, 'timeoutSeconds', 'Timeout (seconds)')}
+          {numberRow(config, setKey, 'provisionedConcurrency', 'Provisioned concurrency')}
+        </>
+      );
+    case 'batch-job':
+      return (
+        <>
+          {textRow(config, setKey, 'schedule', 'Schedule')}
+          {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
+        </>
+      );
+    case 'kv-store':
+      return (
+        <>
+          {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {selectRow(config, setKey, 'consistency', 'Consistency', [
+            'strong',
+            'eventual',
+            'quorum',
+          ])}
+          {numberRow(config, setKey, 'ttlSeconds', 'TTL (seconds)')}
+        </>
+      );
+    case 'time-series-db':
+      return (
+        <>
+          {numberRow(config, setKey, 'retentionDays', 'Retention (days)')}
+          {checkboxRow(config, setKey, 'downsampling', 'Downsampling')}
+        </>
+      );
+    case 'vector-db':
+      return (
+        <>
+          {numberRow(config, setKey, 'dimensions', 'Dimensions')}
+          {textRow(config, setKey, 'indexType', 'Index type')}
+        </>
       );
     default:
       return null;
