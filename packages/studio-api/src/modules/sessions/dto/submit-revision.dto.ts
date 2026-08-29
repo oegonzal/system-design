@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsDefined, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { REVISION_NOTES_MAX_LENGTH, type SubmitRevisionRequest } from '@sysdesign/contracts';
+import { NARRATIVE_MAX_LENGTH, type SubmitRevisionRequest } from '@sysdesign/contracts';
 
 import { CanvasGraphDto } from './canvas-graph.dto';
 
@@ -13,6 +13,6 @@ export class SubmitRevisionRequestDto implements SubmitRevisionRequest {
 
   @IsOptional()
   @IsString()
-  @MaxLength(REVISION_NOTES_MAX_LENGTH)
-  notes?: string;
+  @MaxLength(NARRATIVE_MAX_LENGTH)
+  narrative?: string;
 }

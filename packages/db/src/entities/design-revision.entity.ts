@@ -39,8 +39,12 @@ export class DesignRevision {
   @Property({ type: 'json' })
   graph!: Contracts.CanvasGraph;
 
+  /**
+   * The design narrative — the author's prose explanation of what each
+   * component is for and how they cooperate to meet the requirements.
+   */
   @Property({ type: 'text', nullable: true })
-  notes: string | null = null;
+  narrative: string | null = null;
 
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();

@@ -23,7 +23,12 @@ export interface DesignRevisionDto {
   sessionId: Uuid;
   revisionNumber: number;
   graph: CanvasGraph;
-  notes: string | null;
+  /**
+   * The design narrative: the author's prose explanation of what each
+   * component is for and how they cooperate to meet the requirements.
+   * Submitted alongside the graph and graded for alignment with it.
+   */
+  narrative: string | null;
   /** Embedded so one GET answers "what did I submit and how did it do". */
   evaluation: EvaluationDto | null;
   createdAt: IsoDateString;
@@ -33,7 +38,8 @@ export interface DesignRevisionDto {
 export interface DesignRevisionSummaryDto {
   id: Uuid;
   revisionNumber: number;
-  notes: string | null;
+  /** See `DesignRevisionDto.narrative`. */
+  narrative: string | null;
   evaluationStatus: EvalStatus | null;
   overallScore: number | null;
   grade: Grade | null;
@@ -50,7 +56,11 @@ export interface UpdateSessionRequest {
 
 export interface SubmitRevisionRequest {
   graph: CanvasGraph;
-  notes?: string;
+  /**
+   * Optional design narrative — the author's explanation of what each
+   * component is for and how they cooperate to meet the requirements.
+   */
+  narrative?: string;
 }
 
 export interface ListSessionsQuery {
@@ -59,7 +69,7 @@ export interface ListSessionsQuery {
   offset?: number;
 }
 
-export const REVISION_NOTES_MAX_LENGTH = 2000;
+export const NARRATIVE_MAX_LENGTH = 4000;
 
 export type ListSessionsResponse = ApiListResponse<DesignSessionDto>;
 export type GetSessionResponse = ApiResponse<DesignSessionDto>;

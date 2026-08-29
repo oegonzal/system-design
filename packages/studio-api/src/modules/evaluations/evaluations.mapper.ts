@@ -66,7 +66,7 @@ export const toRevisionDto = (
   sessionId: r.session.id,
   revisionNumber: r.revisionNumber,
   graph: r.graph,
-  notes: r.notes,
+  narrative: r.narrative,
   evaluation: evaluation ? toEvaluationDto(evaluation) : null,
   createdAt: r.createdAt.toISOString(),
 });
@@ -78,7 +78,7 @@ export const toRevisionSummaryDto = (
 ): DesignRevisionSummaryDto => ({
   id: r.id,
   revisionNumber: r.revisionNumber,
-  notes: r.notes,
+  narrative: r.narrative,
   evaluationStatus: evaluation?.status ?? null,
   overallScore: evaluation?.overallScore ?? null,
   grade: evaluation?.grade ?? null,

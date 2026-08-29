@@ -196,7 +196,7 @@ export function makeRevisionSummary(
   return {
     id: 'rev-1',
     revisionNumber: 1,
-    notes: null,
+    narrative: null,
     evaluationStatus: 'complete',
     overallScore: 72,
     grade: 'B',

@@ -118,7 +118,7 @@ export class SessionsService {
           session: sessionId,
           revisionNumber: (latest?.revisionNumber ?? 0) + 1,
           graph: dto.graph,
-          notes: dto.notes ?? null,
+          narrative: dto.narrative ?? null,
         });
         em.persist(revision);
 

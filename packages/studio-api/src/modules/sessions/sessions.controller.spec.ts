@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type {
-  ApiErrorResponse,
-  CanvasGraph,
-  GetPromptResponse,
-  GetRevisionResponse,
-  GetSessionResponse,
-  ListRevisionsResponse,
-  ListSessionsResponse,
+import {
+  NARRATIVE_MAX_LENGTH,
+  type ApiErrorResponse,
+  type CanvasGraph,
+  type GetPromptResponse,
+  type GetRevisionResponse,
+  type GetSessionResponse,
+  type ListRevisionsResponse,
+  type ListSessionsResponse,
 } from '@sysdesign/contracts';
 import { EvalJob } from '@sysdesign/db';
 
@@ -54,10 +55,10 @@ describe('sessions', () => {
       body: JSON.stringify({ promptId }),
     });
 
-  const submitRevision = async (sessionId: string, graph: unknown, notes?: string) =>
+  const submitRevision = async (sessionId: string, graph: unknown, narrative?: string) =>
     call<GetRevisionResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
       method: 'POST',
-      body: JSON.stringify({ graph, ...(notes === undefined ? {} : { notes }) }),
+      body: JSON.stringify({ graph, ...(narrative === undefined ? {} : { narrative }) }),
     });
 
   describe('POST /api/sessions', () => {
@@ -104,7 +105,7 @@ describe('sessions', () => {
       expect(status).toBe(201);
       expect(body.data.sessionId).toBe(session.data.id);
       expect(body.data.revisionNumber).toBe(1);
-      expect(body.data.notes).toBe('first cut');
+      expect(body.data.narrative).toBe('first cut');
       expect(body.data.graph.nodes).toHaveLength(3);
       expect(body.data.evaluation?.status).toBe('queued');
       expect(body.data.evaluation?.findings).toEqual([]);
@@ -118,6 +119,23 @@ describe('sessions', () => {
       // Revision numbers are dense per session.
       const second = await submitRevision(session.data.id, validGraph());
       expect(second.body.data.revisionNumber).toBe(2);
+    });
+
+    it('caps the narrative at NARRATIVE_MAX_LENGTH and round-trips one under it', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+
+      const overCap = await submitRevision(
+        session.data.id,
+        validGraph(),
+        'x'.repeat(NARRATIVE_MAX_LENGTH + 1),
+      );
+      expect(overCap.status).toBe(400);
+
+      const narrative = 'The web client calls the API, which persists to the primary DB.';
+      const { status, body } = await submitRevision(session.data.id, validGraph(), narrative);
+      expect(status).toBe(201);
+      expect(body.data.narrative).toBe(narrative);
     });
 
     it('rejects a node kind outside the palette with 400 — a shape error', async () => {
@@ -375,7 +393,7 @@ describe('sessions', () => {
       expect(body.data.map((r) => r.revisionNumber)).toEqual([2, 1]);
       expect(body.data[0]).not.toHaveProperty('graph');
       expect(body.data[0]).toMatchObject({
-        notes: 'v2',
+        narrative: 'v2',
         evaluationStatus: 'queued',
         overallScore: null,
         grade: null,

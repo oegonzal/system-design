@@ -205,7 +205,7 @@ function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
   return {
     id: revision.id,
     revisionNumber: revision.revisionNumber,
-    notes: revision.notes,
+    narrative: revision.narrative,
     evaluationStatus: revision.evaluation?.status ?? 'queued',
     overallScore: revision.evaluation?.overallScore ?? null,
     grade: revision.evaluation?.grade ?? null,
