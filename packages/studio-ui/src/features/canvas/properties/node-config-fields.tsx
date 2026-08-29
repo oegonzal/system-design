@@ -200,6 +200,38 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
           {checkboxRow(config, setKey, 'fallback', 'Fallback')}
         </>
       );
+    case 'workflow-engine':
+      return selectRow(config, setKey, 'mode', 'Mode', ['orchestration', 'choreography']);
+    case 'distributed-lock':
+      return numberRow(config, setKey, 'ttlSeconds', 'TTL (seconds)');
+    case 'id-generator':
+      return selectRow(config, setKey, 'strategy', 'Strategy', ['snowflake', 'uuid', 'ticket']);
+    case 'config-service':
+      return checkboxRow(config, setKey, 'dynamic', 'Dynamic updates');
+    case 'auth-service':
+      return (
+        <>
+          {selectRow(config, setKey, 'tokenType', 'Token type', ['jwt', 'opaque'])}
+          {checkboxRow(config, setKey, 'mfa', 'MFA')}
+        </>
+      );
+    case 'secrets-manager':
+      return checkboxRow(config, setKey, 'rotation', 'Rotation');
+    case 'waf':
+      return selectRow(config, setKey, 'mode', 'Mode', ['block', 'monitor']);
+    case 'monitoring':
+      return checkboxRow(config, setKey, 'alerting', 'Alerting');
+    case 'logging':
+      return numberRow(config, setKey, 'retentionDays', 'Retention (days)');
+    case 'tracing':
+      return numberRow(config, setKey, 'sampling', 'Sampling (%)', { max: 100 });
+    case 'payment-provider':
+      return (
+        <>
+          {checkboxRow(config, setKey, 'idempotencyKeys', 'Idempotency keys')}
+          {checkboxRow(config, setKey, 'webhooks', 'Webhooks')}
+        </>
+      );
     default:
       return null;
   }

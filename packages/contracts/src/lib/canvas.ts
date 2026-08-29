@@ -126,10 +126,76 @@ export const NODE_KINDS = [
   'ml-inference',
   // ── Coordination & Config
   'scheduler',
+  /**
+   * Orchestrates multi-step/saga processes with state + compensation. Rule
+   * hooks: presence: multi-service transactions with no saga; misuse: fewer
+   * than 2 downstream steps; knob mode (orchestration|choreography)
+   */
+  'workflow-engine',
+  /**
+   * Mutual exclusion across instances (leader election, unique jobs). Rule
+   * hooks: misuse: lock on the hot request path, lock guarding work that
+   * could be idempotent; knob ttlSeconds
+   */
+  'distributed-lock',
+  /**
+   * Distributed unique-ID service for orderable ids at scale. Rule hooks:
+   * presence: sharded writes needing global ids; knob strategy
+   * (snowflake|uuid|ticket)
+   */
+  'id-generator',
+  /**
+   * Dynamic configuration + feature flags read at runtime. Rule hooks:
+   * presence for gradual-rollout prompts; misuse: synchronous per-request
+   * config fetches; knob dynamic
+   */
+  'config-service',
   // ── Identity & Security
+  /**
+   * Issues/validates identities and tokens (sessions, OAuth/OIDC). Rule
+   * hooks: presence: any user-facing design with auth requirement; misuse:
+   * token validation deep in the stack instead of at the gateway; knobs
+   * tokenType (jwt|opaque), mfa
+   */
+  'auth-service',
+  /**
+   * Central store for credentials/keys with rotation. Rule hooks:
+   * presence-graded for security/compliance NFRs; knob rotation
+   */
+  'secrets-manager',
+  /**
+   * Web application firewall filtering hostile traffic at the edge. Rule
+   * hooks: misuse: placed behind the LB/gateway instead of in front (in-edge
+   * from anything but client/cdn/dns); knob mode (block|monitor)
+   */
+  'waf',
   // ── Observability
+  /**
+   * Metrics collection, dashboards and alerting. ANNOTATION NODE:
+   * presence-graded, never a traffic hop — path rules must not count it.
+   * Knob alerting
+   */
+  'monitoring',
+  /**
+   * Centralized structured log collection/search. ANNOTATION NODE,
+   * presence-graded. Knob retentionDays
+   */
+  'logging',
+  /**
+   * Distributed request tracing across services. ANNOTATION NODE,
+   * presence-graded (expected once graphs have ≥4 compute nodes). Knob
+   * sampling (0-100 %)
+   */
+  'tracing',
   // ── External & SaaS
   'external-api',
+  /**
+   * External payment processor; PCI boundary. Rule hooks: misuse: sync
+   * charge on request path without idempotency, webhook callbacks not
+   * landing on a queue, card data in own database; knobs idempotencyKeys,
+   * webhooks
+   */
+  'payment-provider',
 ] as const;
 export type NodeKind = (typeof NODE_KINDS)[number];
 
@@ -138,10 +204,10 @@ export type NodeKind = (typeof NODE_KINDS)[number];
  * UI — so the palette's sections, the properties panel's optgroups and the
  * design system's per-category colors all read one ordering.
  *
- * Some categories are deliberately empty today (`analytics`, `security`,
- * `observability`): they exist ahead of the kinds that will fill them, and
- * every consumer must render "category with no kinds" as nothing rather
- * than assuming at least one member.
+ * Every category now holds at least one kind (`canvas.spec` asserts it), but
+ * a category may again be declared ahead of its members, so every consumer
+ * must still render "category with no kinds" as nothing rather than assuming
+ * at least one member.
  */
 export const NODE_KIND_CATEGORIES = [
   { id: 'clients-edge', label: 'Clients & Edge' },
@@ -193,7 +259,18 @@ export const NODE_KIND_CATEGORY = {
   'data-lake': 'analytics',
   'ml-inference': 'analytics',
   scheduler: 'coordination',
+  'workflow-engine': 'coordination',
+  'distributed-lock': 'coordination',
+  'id-generator': 'coordination',
+  'config-service': 'coordination',
+  'auth-service': 'security',
+  'secrets-manager': 'security',
+  waf: 'security',
+  monitoring: 'observability',
+  logging: 'observability',
+  tracing: 'observability',
   'external-api': 'external',
+  'payment-provider': 'external',
 } as const satisfies Record<NodeKind, NodeKindCategoryId>;
 
 /** The kinds on one shelf, in `NODE_KINDS` order. */

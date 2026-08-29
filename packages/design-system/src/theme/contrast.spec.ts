@@ -217,8 +217,9 @@ describe.each(COLOR_MODES)('%s mode', (colorMode) => {
       );
     });
 
-    // Every category anchor with its authored foreground — covers the three
-    // categories that hold no kinds yet, which the per-kind loop cannot reach.
+    // Every category anchor with its authored foreground — the direct check
+    // on the authored table, and cover for any category declared ahead of its
+    // kinds, which the per-kind loop cannot reach.
     it.each(NODE_KIND_CATEGORIES)(`the $id category pair clears ${WCAG_AA_TEXT}:1`, ({ id }) => {
       const ratio = contrastRatio(CATEGORY_COLORS[id].fg, color.nodeKindCategory[id]);
       expect(ratio, `nodeKindCategory.${id} is ${formatRatio(ratio)}`).toBeGreaterThanOrEqual(

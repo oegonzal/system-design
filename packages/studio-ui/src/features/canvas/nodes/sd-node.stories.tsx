@@ -50,6 +50,14 @@ const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfig }>
   'data-lake': { label: 'Raw Events' },
   'ml-inference': { label: 'Recs Model', config: { gpu: true, timeoutMs: 250 } },
   scheduler: { label: 'Cron' },
+  'workflow-engine': { label: 'Checkout Saga', config: { mode: 'orchestration' } },
+  'distributed-lock': { label: 'Job Lock', config: { ttlSeconds: 30 } },
+  'id-generator': { config: { strategy: 'snowflake' } },
+  'auth-service': { label: 'Identity', config: { tokenType: 'jwt', mfa: true } },
+  waf: { config: { mode: 'block' } },
+  monitoring: { config: { alerting: true } },
+  tracing: { config: { sampling: 10 } },
+  'payment-provider': { label: 'Card Processor', config: { idempotencyKeys: true } },
 };
 
 /**

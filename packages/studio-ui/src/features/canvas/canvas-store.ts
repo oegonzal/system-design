@@ -50,7 +50,18 @@ export const DEFAULT_NODE_LABELS = {
   'data-lake': 'Data Lake',
   'ml-inference': 'ML Inference',
   scheduler: 'Scheduler',
+  'workflow-engine': 'Workflow Engine',
+  'distributed-lock': 'Distributed Lock',
+  'id-generator': 'ID Generator',
+  'config-service': 'Config & Flags',
+  'auth-service': 'Auth Service',
+  'secrets-manager': 'Secrets Manager',
+  waf: 'WAF',
+  monitoring: 'Monitoring',
+  logging: 'Log Aggregation',
+  tracing: 'Tracing',
   'external-api': 'External API',
+  'payment-provider': 'Payment Provider',
 } as const satisfies Record<NodeKind, string>;
 
 export interface HighlightState {

@@ -227,10 +227,98 @@ export const NODE_ICONS = {
       <path d="M8 4.5V8l2.5 1.5" />
     </svg>
   ),
+  /* Three steps on an L-shaped arrowed path — the saga's happy route. */
+  'workflow-engine': (
+    <svg {...svgProps}>
+      <rect x="2" y="2.5" width="3.4" height="3.4" rx="0.6" />
+      <rect x="10.5" y="2.5" width="3.4" height="3.4" rx="0.6" />
+      <rect x="10.5" y="10" width="3.4" height="3.4" rx="0.6" />
+      <path d="M5.8 4.2h3.4M8.4 3.4l.9.8-.9.8" />
+      <path d="M12.2 6.3v2.6M11.4 8l.8.9.8-.9" />
+    </svg>
+  ),
+  /* A padlock: one holder at a time. */
+  'distributed-lock': (
+    <svg {...svgProps}>
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1" />
+      <path d="M5.5 7V5.5a2.5 2.5 0 0 1 5 0V7" />
+    </svg>
+  ),
+  /* The number sign — ids, minted in order. */
+  'id-generator': (
+    <svg {...svgProps}>
+      <path d="M6.5 3 5 13M11 3 9.5 13M3.5 6.5H13M3 9.5h9.5" />
+    </svg>
+  ),
+  /* Two slider tracks, thumbs offset — flags mid-rollout. */
+  'config-service': (
+    <svg {...svgProps}>
+      <path d="M2.5 5.5h1.6M7.9 5.5h5.6" />
+      <circle cx="6" cy="5.5" r="1.9" />
+      <path d="M2.5 10.5h5.6M11.9 10.5h1.6" />
+      <circle cx="10" cy="10.5" r="1.9" />
+    </svg>
+  ),
+  /* A person, verified. */
+  'auth-service': (
+    <svg {...svgProps}>
+      <circle cx="6.5" cy="5" r="2.5" />
+      <path d="M2.5 13.5c0-2.5 1.8-4 4-4s4 1.5 4 4" />
+      <path d="m10.5 5.5 1.5 1.5 2.5-3" />
+    </svg>
+  ),
+  /* The kv-store's key, kept inside a shield. */
+  'secrets-manager': (
+    <svg {...svgProps}>
+      <path d="M8 1.5l5 1.8v4.2c0 3.3-2.2 5.3-5 6.3-2.8-1-5-3-5-6.3V3.3z" />
+      <circle cx="6.3" cy="6.3" r="1.4" />
+      <path d="M7.3 7.3l2.4 2.4M9 9l1-1" />
+    </svg>
+  ),
+  /* The same shield, built from bricks — a wall at the edge. */
+  waf: (
+    <svg {...svgProps}>
+      <path d="M8 1.5l5 1.8v4.2c0 3.3-2.2 5.3-5 6.3-2.8-1-5-3-5-6.3V3.3z" />
+      <path d="M3.2 6.2h9.6M3.6 9.4h8.8" />
+      <path d="M8 3.4v2.8M5.7 6.2v3.2M10.3 6.2v3.2M8 9.4v3.4" />
+    </svg>
+  ),
+  /* A speedometer: the dial the operators watch. */
+  monitoring: (
+    <svg {...svgProps}>
+      <path d="M2.5 11a5.5 5.5 0 0 1 11 0" />
+      <path d="M2.5 11h11M8 11l2.8-3.6" />
+    </svg>
+  ),
+  /* A ruled document — structured lines of log. */
+  logging: (
+    <svg {...svgProps}>
+      <rect x="3.5" y="2" width="9" height="12" rx="1.2" />
+      <path d="M5.8 5.5h4.4M5.8 8h4.4M5.8 10.5h2.8" />
+    </svg>
+  ),
+  /* Three spans descending a stepped path — one request, hop by hop. */
+  tracing: (
+    <svg {...svgProps}>
+      <path d="M5.1 3.5H8v2M7.1 4.6l.9.9.9-.9" />
+      <path d="M9.6 8h2.9v2M11.6 9.1l.9.9.9-.9" />
+      <circle cx="3.5" cy="3.5" r="1.5" />
+      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="12.5" cy="12.5" r="1.5" />
+    </svg>
+  ),
   'external-api': (
     <svg {...svgProps}>
       <rect x="2.5" y="2.5" width="7" height="11" rx="1.5" />
       <path d="M9.5 8h4M11.5 6l2 2-2 2" />
+    </svg>
+  ),
+  /* A payment card: magstripe and chip-side dot. */
+  'payment-provider': (
+    <svg {...svgProps}>
+      <rect x="2" y="3.5" width="12" height="9" rx="1.2" />
+      <path d="M2 6h12" />
+      <circle cx="11.5" cy="10" r="1.2" />
     </svg>
   ),
 } as const satisfies Record<NodeKind, ReactElement>;
