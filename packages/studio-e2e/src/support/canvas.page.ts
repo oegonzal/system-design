@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type { EdgeKind, NodeKind } from '@sysdesign/contracts';
+import type { EdgeKind, NodeKind, OperationKind } from '@sysdesign/contracts';
 
 import { createPracticeSession } from './backend';
 
@@ -136,6 +136,40 @@ export class CanvasPage {
    */
   async deleteSelected(): Promise<void> {
     await this.page.keyboard.press('Delete');
+  }
+
+  // --- declared interfaces -----------------------------------------------
+
+  /**
+   * Declare an operation on the selected node: click "Add operation", then
+   * fill the freshly appended row. Scoped to the row because the panel has a
+   * second "Kind" combobox (the node's own) outside it.
+   */
+  async addOperation(name: string, kind: OperationKind): Promise<void> {
+    await this.properties.getByRole('button', { name: 'Add operation' }).click();
+    const row = this.properties.locator('[data-testid^="operation-row-"]').last();
+    await row.getByLabel('Name', { exact: true }).fill(name);
+    await row.getByRole('combobox', { name: 'Kind' }).selectOption(kind);
+  }
+
+  /**
+   * Toggle one declared operation's carry checkbox on the selected edge.
+   * Substring label match: the checkbox is named `<name> · <kind>`.
+   */
+  async toggleCarry(opName: string): Promise<void> {
+    await this.properties.getByTestId('edge-carries-field').getByLabel(opName).click();
+  }
+
+  /** The edge pill lives in React Flow's label-renderer overlay, not the <g>. */
+  async expectEdgePill(text: string): Promise<void> {
+    await expect(
+      this.canvas.locator('.react-flow__edgelabel-renderer').getByText(text),
+    ).toBeVisible();
+  }
+
+  /** The node's one-line meta summary — `service · 1 ops`, `queue · 2 types`, … */
+  async expectNodeMeta(nodeId: string, containsText: string): Promise<void> {
+    await expect(this.node(nodeId)).toContainText(containsText);
   }
 
   async submit(): Promise<void> {

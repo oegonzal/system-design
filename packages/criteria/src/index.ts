@@ -21,6 +21,10 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'UX-4',
     statement: 'Palette blocks are grouped into visible categories and filterable by name.',
   },
+  {
+    id: 'UX-5',
+    statement: 'Components declare operations and responsibilities, and connections carry them.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {
