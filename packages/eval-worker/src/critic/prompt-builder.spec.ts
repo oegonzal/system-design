@@ -125,4 +125,10 @@ describe('CRITIC_SYSTEM_PROMPT', () => {
     expect(CRITIC_SYSTEM_PROMPT).toContain('interface contracts');
     expect(CRITIC_SYSTEM_PROMPT).toContain('responsibilities, operations and carries');
   });
+
+  it('tells the critic to judge the API design when operations are declared', () => {
+    expect(CRITIC_SYSTEM_PROMPT).toContain('also judge the API design itself');
+    expect(CRITIC_SYSTEM_PROMPT).toContain('operation granularity');
+    expect(CRITIC_SYSTEM_PROMPT).toContain('idempotency choices');
+  });
 });

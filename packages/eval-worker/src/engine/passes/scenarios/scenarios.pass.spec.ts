@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Archetype } from '@sysdesign/contracts';
 
-import { NoopLlmClient } from '@sysdesign/llm';
+import { NoopLlmClient, type StructuredRequest } from '@sysdesign/llm';
 
 import type { PassContext } from '../../core/types';
 import { buildGraphIndex } from '../../graph-index';
@@ -115,5 +115,20 @@ describe('scenarios pass', () => {
   it('reports llm-failed when the model returns nothing usable', async () => {
     const artifacts = await createScenariosPass().run(contextWith(fakeLlm(null)));
     expect(artifacts[0]).toMatchObject({ kind: 'diagnostics', reason: 'llm-failed' });
+  });
+
+  it('tells the reviewer to honor declared operations and carries as contracts', async () => {
+    const capture: { system?: string } = {};
+    const llm: PassContext['llm'] = {
+      enabled: true,
+      model: 'test-model',
+      completeStructured: <T>(request: StructuredRequest<T>) => {
+        capture.system = request.system;
+        return Promise.resolve<T | null>(null);
+      },
+    };
+    await createScenariosPass().run(contextWith(llm));
+    expect(capture.system).toContain("operations and carries as the design's contracts");
+    expect(capture.system).toContain('declared idempotent converges');
   });
 });

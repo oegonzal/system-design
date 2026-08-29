@@ -17,6 +17,7 @@ import {
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 import {
+  declaresIdempotentOps,
   dlqCoverage,
   monitoringPresence,
   suggestDlq,
@@ -657,7 +658,9 @@ const idempotentCheckout: Expectation = {
     'Retry storms, double-clicks and at-least-once delivery all replay checkout. Unless the operation is idempotent — same order key, same single outcome — every replay risks a double charge or a double-sold seat. Mark the checkout path idempotent and enforce it with an idempotency key at the store.',
   satisfiedBy: ({ index }) => {
     const handlers = sortById([...index.byKind('service'), ...index.byKind('worker')]);
-    const idempotent = handlers.filter((node) => node.config?.idempotent === true);
+    const idempotent = handlers.filter(
+      (node) => node.config?.idempotent === true || declaresIdempotentOps(node),
+    );
     if (idempotent.length > 0) return met(idempotent.map((node) => node.id));
     return unmet(handlers.map((node) => node.id));
   },

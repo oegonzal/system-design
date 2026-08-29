@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { NoopLlmClient } from '@sysdesign/llm';
+import { NoopLlmClient, type StructuredRequest } from '@sysdesign/llm';
 
 import type { PassContext } from '../../core/types';
 import { buildGraphIndex } from '../../graph-index';
 import { fakeLlm, flashSaleFacts, graph, node } from '../../testing';
+import { depthSchema } from './depth-schema';
 import { createDepthPass } from './depth.pass';
 
 function contextWith(llm: PassContext['llm']): PassContext {
@@ -42,9 +43,22 @@ const CANNED = {
     bottleneckAwareness: 70,
     failureDesign: 50,
     dataFlowClarity: 68,
+    contractQuality: 58,
   },
   summary: 'Mechanisms are named but capacities are defaulted.',
 };
+
+/** An enabled client that records the system prompt it was handed. */
+function capturingLlm(capture: { system?: string }): PassContext['llm'] {
+  return {
+    enabled: true,
+    model: 'test-model',
+    completeStructured: <T>(request: StructuredRequest<T>) => {
+      capture.system = request.system;
+      return Promise.resolve(null);
+    },
+  };
+}
 
 describe('depth pass', () => {
   it('degrades to a diagnostics artifact when the LLM is disabled', async () => {
@@ -79,5 +93,21 @@ describe('depth pass', () => {
   it('reports llm-failed when the model returns nothing usable', async () => {
     const artifacts = await createDepthPass().run(contextWith(fakeLlm(null)));
     expect(artifacts[0]).toMatchObject({ kind: 'diagnostics', reason: 'llm-failed' });
+  });
+
+  it('the schema demands the contractQuality subscore', () => {
+    expect(depthSchema.safeParse(CANNED).success).toBe(true);
+    const withoutContracts = {
+      ...CANNED,
+      subScores: { ...CANNED.subScores, contractQuality: undefined },
+    };
+    expect(depthSchema.safeParse(withoutContracts).success).toBe(false);
+  });
+
+  it('tells the grader to judge declared contracts themselves', async () => {
+    const capture: { system?: string } = {};
+    await createDepthPass().run(contextWith(capturingLlm(capture)));
+    expect(capture.system).toContain('also grade the contracts themselves');
+    expect(capture.system).toContain('idempotency choices');
   });
 });

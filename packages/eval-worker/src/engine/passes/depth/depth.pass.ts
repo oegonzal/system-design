@@ -18,7 +18,10 @@ const SYSTEM_PROMPT = [
   'of this archetype by mechanism rather than by dropping a box? Judge',
   'trade-off articulation (labels, configs and declared operations that show',
   'the author chose, not defaulted), bottleneck awareness, failure design, and',
-  'data-flow clarity. Score 0–100 on each; be strict — 80+ means you would',
+  'data-flow clarity. When operations or carries are declared, also grade the',
+  'contracts themselves — operation granularity, command/query/event/stream',
+  'fit, idempotency choices, and how tightly callers couple to each surface.',
+  'Score 0–100 on each; be strict — 80+ means you would',
   'ship this review as a strong-hire signal. Keep the summary to what the',
   'author should deepen next.',
 ].join(' ');

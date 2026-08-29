@@ -546,7 +546,7 @@ const chattyInterface: EvalRule = {
       findings.push({
         ruleId: chattyInterface.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'One edge carrying a whole API surface',
         message: `This edge carries ${resolved.length} operations spanning ${kinds.size} kinds — one dependency touching most of what its target serves. Interface segregation says a caller should depend on the slice it actually uses; a fat edge more often hides two callers' worth of concerns travelling as one, and it makes every interface change a change for this caller too.`,
         affectedNodeIds: uniqueSorted([edge.source, edge.target]),

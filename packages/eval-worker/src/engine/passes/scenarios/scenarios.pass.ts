@@ -19,7 +19,10 @@ const SYSTEM_PROMPT = [
   'saturates, what times out, what loses data, what recovers. Verdict',
   '"survives" only when the design has a concrete mechanism for the scenario;',
   '"degrades" when it stays up but violates its targets; "fails" when the',
-  'scenario takes the workload down or corrupts data. Name the weakest node',
+  'scenario takes the workload down or corrupts data. Treat declared',
+  "operations and carries as the design's contracts: a replayed command",
+  'declared idempotent converges; one not declared idempotent repeats its',
+  'side effect. Name the weakest node',
   'ids. One report per scenario, no scenarios of your own.',
 ].join(' ');
 

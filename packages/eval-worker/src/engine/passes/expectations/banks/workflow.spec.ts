@@ -122,6 +122,24 @@ describe('workflow-automation expectation bank', () => {
     }
   });
 
+  it('exp.wfa.exactly-once-actions: declared idempotent operations satisfy without the config knob', () => {
+    const declared = graph(
+      [
+        node('queue-1', 'queue', { label: 'Trigger queue' }),
+        node('worker-1', 'worker', {
+          label: 'Action executor',
+          operations: [{ name: 'executeAction', kind: 'command', idempotent: true }],
+        }),
+      ],
+      [edge('edge-1', 'queue-1', 'worker-1', 'async')],
+    );
+    const check = expectationById('exp.wfa.exactly-once-actions').satisfiedBy(
+      contextFor(declared, workflowFacts()),
+    );
+    expect(check.met).toBe(true);
+    expect(check.evidenceNodeIds).toEqual(['worker-1']);
+  });
+
   it('grades the naive three-box no better than D', () => {
     const result = runEngine(naiveGraph, delayFacts());
     expect(GRADE_RANK[result.grade]).toBeLessThanOrEqual(GRADE_RANK.D);

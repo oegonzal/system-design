@@ -102,6 +102,24 @@ describe('realtime-analytics expectation bank', () => {
     }
   });
 
+  it('exp.rta.exactly-once-counts: declared idempotent operations satisfy without the config knob', () => {
+    const declared = graph(
+      [
+        node('event-stream-1', 'event-stream', { label: 'Click stream' }),
+        node('worker-1', 'worker', {
+          label: 'Count consumer',
+          operations: [{ name: 'applyClickCount', kind: 'command', idempotent: true }],
+        }),
+      ],
+      [edge('edge-1', 'event-stream-1', 'worker-1', 'async')],
+    );
+    const check = expectationById('exp.rta.exactly-once-counts').satisfiedBy(
+      contextFor(declared, analyticsFacts()),
+    );
+    expect(check.met).toBe(true);
+    expect(check.evidenceNodeIds).toEqual(['worker-1']);
+  });
+
   it('grades the naive three-box no better than D', () => {
     const result = runEngine(naiveGraph, analyticsFacts());
     expect(GRADE_RANK[result.grade]).toBeLessThanOrEqual(GRADE_RANK.D);

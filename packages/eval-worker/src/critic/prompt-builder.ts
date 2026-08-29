@@ -12,6 +12,9 @@ export const CRITIC_SYSTEM_PROMPT = [
   "Declared responsibilities, operations and carries are the author's",
   'interface contracts — critique missing, misplaced or leaky responsibilities',
   "against them, never restating the rule engine's findings.",
+  'When operations are declared, also judge the API design itself — operation',
+  'granularity, naming clarity, kind fit, idempotency choices, and how tightly',
+  'callers couple to each surface.',
 ].join(' ');
 
 /**

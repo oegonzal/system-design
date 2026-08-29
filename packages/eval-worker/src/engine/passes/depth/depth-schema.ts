@@ -15,6 +15,7 @@ export const depthSchema = z.object({
     bottleneckAwareness: z.number().int().min(0).max(100),
     failureDesign: z.number().int().min(0).max(100),
     dataFlowClarity: z.number().int().min(0).max(100),
+    contractQuality: z.number().int().min(0).max(100),
   }),
   summary: z.string().max(1200),
 });

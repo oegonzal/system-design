@@ -83,6 +83,21 @@ export function suggestDlq({ index }: RuleContext): GraphPatch | null {
 }
 
 /**
+ * The declared-interface route to idempotency. The interface rules tell the
+ * author to declare the flag on the operation itself, so the banks accept it
+ * alongside the `config.idempotent` knob: a handler qualifies when its
+ * declared command/event operations exist and every one is marked
+ * `idempotent: true`. Queries and streams carry no side effect to replay, so
+ * they neither qualify nor disqualify.
+ */
+export function declaresIdempotentOps(node: CanvasNode): boolean {
+  const effects = (node.operations ?? []).filter(
+    (op) => op.kind === 'command' || op.kind === 'event',
+  );
+  return effects.length > 0 && effects.every((op) => op.idempotent === true);
+}
+
+/**
  * Regional redundancy as the vocabulary can express it: ≥2 distinct
  * `config.region` values across the service/database tier, or a database
  * marked `multiRegion`. Only services and databases carry a region knob, so

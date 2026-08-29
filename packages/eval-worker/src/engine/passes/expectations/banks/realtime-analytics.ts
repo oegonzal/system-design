@@ -19,6 +19,7 @@ import {
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 import {
+  declaresIdempotentOps,
   monitoringPresence,
   onClientReadPath,
   regionSpread,
@@ -368,7 +369,12 @@ const exactlyOnceCounts: Expectation = {
           ),
         ),
     );
-    if (consumers.length > 0 && consumers.every((worker) => worker.config?.idempotent === true)) {
+    if (
+      consumers.length > 0 &&
+      consumers.every(
+        (worker) => worker.config?.idempotent === true || declaresIdempotentOps(worker),
+      )
+    ) {
       return met(consumers.map((node) => node.id));
     }
     return unmet(

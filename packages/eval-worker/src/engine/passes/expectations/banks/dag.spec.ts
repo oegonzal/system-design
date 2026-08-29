@@ -109,6 +109,20 @@ describe('dag-orchestration expectation bank', () => {
     }
   });
 
+  it('exp.dag.idempotent-steps: declared idempotent operations satisfy without the config knob', () => {
+    const declared = graph([
+      node('worker-1', 'worker', {
+        label: 'Step worker',
+        operations: [{ name: 'runStep', kind: 'command', idempotent: true }],
+      }),
+    ]);
+    const check = expectationById('exp.dag.idempotent-steps').satisfiedBy(
+      contextFor(declared, dagFacts()),
+    );
+    expect(check.met).toBe(true);
+    expect(check.evidenceNodeIds).toEqual(['worker-1']);
+  });
+
   it('grades the naive three-box no better than D', () => {
     const result = runEngine(naiveGraph, dagFacts());
     expect(GRADE_RANK[result.grade]).toBeLessThanOrEqual(GRADE_RANK.D);

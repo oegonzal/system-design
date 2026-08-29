@@ -18,6 +18,7 @@ import {
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 import {
+  declaresIdempotentOps,
   dlqCoverage,
   monitoringPresence,
   onClientReadPath,
@@ -416,7 +417,9 @@ const idempotentSteps: Expectation = {
   satisfiedBy: ({ index }) => {
     const workers = sortById(index.byKind('worker'));
     if (workers.length === 0) return unmet();
-    const replayable = workers.filter((worker) => worker.config?.idempotent !== true);
+    const replayable = workers.filter(
+      (worker) => worker.config?.idempotent !== true && !declaresIdempotentOps(worker),
+    );
     if (replayable.length > 0) return unmet(replayable.map((node) => node.id));
     return met(workers.map((node) => node.id));
   },

@@ -10,6 +10,7 @@ import { formatInt, sortById, SuggestedIds, uniqueSorted } from '../../../rules/
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 import {
+  declaresIdempotentOps,
   dlqCoverage,
   monitoringPresence,
   regionSpread,
@@ -495,7 +496,9 @@ const exactlyOnceActions: Expectation = {
         ),
     );
     if (consumers.length === 0) return unmet(sortById(queues).map((node) => node.id));
-    const replayable = consumers.filter((worker) => worker.config?.idempotent !== true);
+    const replayable = consumers.filter(
+      (worker) => worker.config?.idempotent !== true && !declaresIdempotentOps(worker),
+    );
     if (replayable.length > 0) return unmet(replayable.map((node) => node.id));
     return met(consumers.map((node) => node.id));
   },

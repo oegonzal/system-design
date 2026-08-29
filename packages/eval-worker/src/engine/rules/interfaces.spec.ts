@@ -593,7 +593,7 @@ describe('hygiene.chatty-interface', () => {
     );
     const findings = rule.check(contextFor(canvas));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedEdgeIds).toEqual(['e1']);
   });
 
