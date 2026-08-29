@@ -21,9 +21,9 @@ const naiveGraph: CanvasGraph = graph(
 /**
  * The reference design that meets every intro and standard expectation:
  * triggers buffer on a per-tenant queue behind a gateway, idempotent
- * executors checkpoint runs and call third parties asynchronously with
- * credentials from a vault, a scheduler owns delays behind leader election,
- * and monitoring watches.
+ * executors checkpoint runs into a backed-up state DB and call third parties
+ * asynchronously with credentials from a vault, a scheduler owns delays
+ * behind leader election, and monitoring watches.
  */
 const solidGraph: CanvasGraph = graph(
   [
@@ -35,7 +35,7 @@ const solidGraph: CanvasGraph = graph(
       config: { dlq: true, ordering: 'per-key' },
     }),
     node('worker-1', 'worker', { label: 'Action executor', config: { idempotent: true } }),
-    node('database-1', 'database', { label: 'Run-state DB' }),
+    node('database-1', 'database', { label: 'Run-state DB', config: { backups: true } }),
     node('scheduler-1', 'scheduler', { label: 'Delay scheduler' }),
     node('distributed-lock-1', 'distributed-lock', { label: 'Leader election' }),
     node('secrets-manager-1', 'secrets-manager', { label: 'Credentials vault' }),

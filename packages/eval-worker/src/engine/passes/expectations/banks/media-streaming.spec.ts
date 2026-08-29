@@ -20,8 +20,10 @@ const naiveGraph: CanvasGraph = graph(
 
 /**
  * The reference design that meets every intro and standard expectation:
- * uploads land in the object store, transcoding drains a DLQ'd queue, playback
- * rides the CDN, browse hits cache + search index, and monitoring watches it.
+ * uploads land in the object store, transcoding drains a DLQ'd queue, the CDN
+ * is the front door for playback and API traffic alike (so no client path
+ * pulls media from origin), browse hits cache + search index, the metadata
+ * store is backed up, and monitoring watches it.
  */
 const solidGraph: CanvasGraph = graph(
   [
@@ -33,13 +35,13 @@ const solidGraph: CanvasGraph = graph(
     node('object-store-1', 'object-store', { label: 'Originals bucket' }),
     node('queue-1', 'queue', { label: 'Transcode queue', config: { dlq: true } }),
     node('worker-1', 'worker', { label: 'Transcode worker' }),
-    node('database-1', 'database', { label: 'Metadata DB' }),
+    node('database-1', 'database', { label: 'Metadata DB', config: { backups: true } }),
     node('search-index-1', 'search-index', { label: 'Catalog search' }),
     node('cache-1', 'cache', { label: 'Manifest cache' }),
     node('monitoring-1', 'monitoring', { label: 'Pipeline monitoring' }),
   ],
   [
-    edge('edge-1', 'client-1', 'gateway-1'),
+    edge('edge-1', 'cdn-1', 'gateway-1'),
     edge('edge-2', 'gateway-1', 'service-1'),
     edge('edge-3', 'gateway-1', 'service-2'),
     edge('edge-4', 'client-1', 'cdn-1'),
