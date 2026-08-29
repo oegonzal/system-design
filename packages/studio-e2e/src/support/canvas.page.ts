@@ -65,10 +65,15 @@ export class CanvasPage {
     await this.paletteItem(kind).click();
   }
 
-  /** Drag a node's centre to a point given relative to the canvas frame. */
+  /**
+   * Drag a node to a point given relative to the canvas frame. Grabs near the
+   * node's top-left corner, not its centre: nodes render at 2× zoom, so the
+   * centre of a freshly staggered add can land under the (pannable, so
+   * pointer-eating) minimap in the canvas's bottom-right corner.
+   */
   async moveNode(id: string, to: { x: number; y: number }): Promise<void> {
     const node = this.node(id);
-    await node.hover();
+    await node.hover({ position: { x: 24, y: 24 } });
     const frame = await this.canvas.boundingBox();
     if (!frame) throw new Error('canvas frame has no bounding box');
     await this.page.mouse.down();
@@ -174,6 +179,26 @@ export class CanvasPage {
 
   async submit(): Promise<void> {
     await this.page.getByTestId('submit-revision').click();
+  }
+
+  // --- the design narrative ----------------------------------------------
+
+  get narrativeTab(): Locator {
+    return this.page.getByRole('tab', { name: 'Narrative' });
+  }
+
+  get narrativeEditor(): Locator {
+    return this.page.getByTestId('narrative-editor');
+  }
+
+  /**
+   * Author the design narrative: open the Narrative tab and type the story
+   * into the editor. Deliberately no submit — the narrative rides along with
+   * whatever revision the spec submits next.
+   */
+  async fillNarrative(text: string): Promise<void> {
+    await this.narrativeTab.click();
+    await this.narrativeEditor.fill(text);
   }
 
   async expectNodeCount(count: number): Promise<void> {

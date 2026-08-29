@@ -25,6 +25,10 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'UX-5',
     statement: 'Components declare operations and responsibilities, and connections carry them.',
   },
+  {
+    id: 'UX-6',
+    statement: 'A design narrative is authored alongside the diagram and submitted with it.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {
@@ -66,6 +70,11 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'EVAL-8',
     statement: 'Every evaluation records the profile it was graded under and its evidence trail.',
+  },
+  {
+    id: 'EVAL-9',
+    statement:
+      'The narrative is graded with the diagram for alignment: unexplained components become findings.',
   },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
