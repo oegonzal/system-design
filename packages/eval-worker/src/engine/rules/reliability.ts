@@ -385,6 +385,105 @@ const queueProducerOverload: EvalRule = {
   },
 };
 
+/**
+ * Mirrors the banks' `monitoringPresence` check: a monitoring block is the
+ * first-class evidence, and `config.monitoring === true` on a gateway,
+ * service, or queue is honored as the legacy spelling. The suppression pairs
+ * in the default profile keep this to one lesson wherever an archetype bank
+ * already teaches observability (`exp.*.{pipeline,runs,tenant}-observed`).
+ */
+const nothingMonitored: EvalRule = {
+  id: 'reliability.nothing-monitored',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('observability')) return [];
+    if (index.hasKind('monitoring')) return [];
+    const legacy = [
+      ...index.byKind('gateway'),
+      ...index.byKind('service'),
+      ...index.byKind('queue'),
+    ].some((node) => node.config?.monitoring === true);
+    if (legacy) return [];
+    const ids = new SuggestedIds(index);
+    return [
+      {
+        ruleId: nothingMonitored.id,
+        dimension: 'reliability',
+        severity: 'medium',
+        title: 'Nothing in the design is monitored',
+        message: `The prompt asks for observability and no monitoring block — nor a single monitored component — appears on the canvas, so at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s the first symptom of saturation is a user report, not an alert. A monitoring block watching queue depth, error rate and p99 turns trouble into something you see coming.`,
+        affectedNodeIds: [],
+        affectedEdgeIds: [],
+        suggestion: {
+          description: 'Add a monitoring block so saturation raises an alert before users notice.',
+          ops: [
+            {
+              op: 'add-node',
+              node: { id: ids.next('monitoring'), kind: 'monitoring', label: 'Monitoring' },
+            },
+          ],
+        },
+      },
+    ];
+  },
+};
+
+const dlqUnmonitored: EvalRule = {
+  id: 'reliability.dlq-unmonitored',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('observability')) return [];
+    if (index.hasKind('monitoring')) return [];
+    const deadLettered = sortById(
+      index.byKind('queue').filter((queue) => queue.config?.dlq === true),
+    );
+    if (deadLettered.length === 0) return [];
+    return [
+      {
+        ruleId: dlqUnmonitored.id,
+        dimension: 'reliability',
+        severity: 'info',
+        title: 'Dead-letter queue with nobody watching it',
+        message: `${deadLettered.map((queue) => `"${queue.label}"`).join(', ')} quarantines failed messages, but no monitoring block exists to notice them arriving — a dead-letter queue nobody watches is a landfill, and every message in it is a user-visible failure aging quietly. Alert on DLQ depth so quarantine is the start of an investigation, not the end of one.`,
+        affectedNodeIds: deadLettered.map((queue) => queue.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+/** The kinds a request can actually execute on — annotation nodes excluded. */
+const COMPUTE_KINDS = [
+  'service',
+  'worker',
+  'serverless-function',
+  'stream-processor',
+  'ml-inference',
+] as const;
+
+const noTracingManyServices: EvalRule = {
+  id: 'reliability.no-tracing-many-services',
+  dimension: 'reliability',
+  check({ index }) {
+    if (index.hasKind('tracing')) return [];
+    const compute = sortById(COMPUTE_KINDS.flatMap((kind) => index.byKind(kind)));
+    if (compute.length < 5) return [];
+    return [
+      {
+        ruleId: noTracingManyServices.id,
+        dimension: 'reliability',
+        severity: 'info',
+        title: 'Many compute tiers with no distributed tracing',
+        message: `${compute.length} compute components handle each request between them, and nothing traces a request across the hops — so "which tier spent the latency budget" is answered by correlating log timestamps at 2am. Distributed tracing stitches the hops into one timeline and points at the slow span directly.`,
+        affectedNodeIds: compute.map((node) => node.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 export const reliabilityRules: EvalRule[] = [
   singleDbNoReplica,
   serviceNoLb,
@@ -396,4 +495,7 @@ export const reliabilityRules: EvalRule[] = [
   deepSyncNoTimeouts,
   schedulerSinglePoint,
   queueProducerOverload,
+  nothingMonitored,
+  dlqUnmonitored,
+  noTracingManyServices,
 ];

@@ -332,3 +332,71 @@ describe('scalability.hot-partition-risk', () => {
     expect(rule.check(contextFor(unspread, mediaFacts({ difficulty: 'advanced' })))).toEqual([]);
   });
 });
+
+describe('scalability.no-autoscaling', () => {
+  const rule = ruleById('scalability.no-autoscaling');
+  const costCapped = flashSaleFacts({ nfrKinds: ['availability', 'cost'] });
+  const fixedFleet = graph(
+    [node('svc-1', 'service', { config: { replicas: 3 } }), node('db-1', 'database')],
+    [edge('e1', 'svc-1', 'db-1')],
+  );
+
+  it('fires when spend is capped and nothing scales with demand', () => {
+    const findings = rule.check(contextFor(fixedFleet, costCapped));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['svc-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'svc-1', set: { config: { replicas: 3, autoscaling: true } } },
+    ]);
+  });
+
+  it('stays silent once a service autoscales or serverless compute exists', () => {
+    const elastic = graph(
+      [node('svc-1', 'service', { config: { autoscaling: true } }), node('db-1', 'database')],
+      fixedFleet.edges,
+    );
+    expect(rule.check(contextFor(elastic, costCapped))).toEqual([]);
+    const serverless = graph([...fixedFleet.nodes, node('fn-1', 'serverless-function')]);
+    expect(rule.check(contextFor(serverless, costCapped))).toEqual([]);
+  });
+
+  it('stays silent when cost is not a stated requirement', () => {
+    expect(rule.check(contextFor(fixedFleet))).toEqual([]);
+  });
+});
+
+describe('scalability.overengineered-intro', () => {
+  const rule = ruleById('scalability.overengineered-intro');
+  const smallIntro = flashSaleFacts({
+    difficulty: 'intro',
+    scaleTargets: { ...flashSaleFacts().scaleTargets, requestsPerSecond: 300 },
+  });
+
+  it('fires at intro scale on layered caches, a mesh, or regional placement', () => {
+    const doubleCached = graph([node('cache-1', 'cache'), node('cache-2', 'cache')]);
+    const cacheFindings = rule.check(contextFor(doubleCached, smallIntro));
+    expect(cacheFindings).toHaveLength(1);
+    expect(cacheFindings[0].severity).toBe('info');
+    expect(cacheFindings[0].affectedNodeIds).toEqual(['cache-1', 'cache-2']);
+    expect(cacheFindings[0].suggestion).toBeNull();
+
+    const meshed = graph([node('mesh-1', 'service-mesh'), node('svc-1', 'service')]);
+    expect(rule.check(contextFor(meshed, smallIntro))[0]?.affectedNodeIds).toEqual(['mesh-1']);
+
+    const regional = graph([node('svc-1', 'service', { config: { region: 'us-east-1' } })]);
+    expect(rule.check(contextFor(regional, smallIntro))[0]?.affectedNodeIds).toEqual(['svc-1']);
+  });
+
+  it('forgives a single cache at intro scale', () => {
+    const modest = graph([node('cache-1', 'cache'), node('svc-1', 'service')]);
+    expect(rule.check(contextFor(modest, smallIntro))).toEqual([]);
+  });
+
+  it('stays silent above intro difficulty or at real traffic', () => {
+    const doubleCached = graph([node('cache-1', 'cache'), node('cache-2', 'cache')]);
+    expect(rule.check(contextFor(doubleCached))).toEqual([]);
+    const busyIntro = flashSaleFacts({ difficulty: 'intro' });
+    expect(rule.check(contextFor(doubleCached, busyIntro))).toEqual([]);
+  });
+});

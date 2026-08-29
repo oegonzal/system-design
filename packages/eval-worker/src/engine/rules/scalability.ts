@@ -401,6 +401,77 @@ const hotPartitionRisk: EvalRule = {
   },
 };
 
+/**
+ * Only services carry the autoscaling knob in the canvas vocabulary (workers
+ * declare `concurrency` instead), so cost-elasticity is evidenced by an
+ * autoscaled service tier or by serverless compute — which scales to zero by
+ * construction. Suppression-paired with the cost expectations
+ * (exp.fst.cost-scale-down, exp.dag.scale-to-zero) so the lesson lands once.
+ */
+const noAutoscaling: EvalRule = {
+  id: 'scalability.no-autoscaling',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('cost')) return [];
+    if (index.hasKind('serverless-function')) return [];
+    const services = sortById(index.byKind('service'));
+    if (services.some((service) => service.config?.autoscaling === true)) return [];
+    const first = services[0];
+    return [
+      {
+        ruleId: noAutoscaling.id,
+        dimension: 'scalability',
+        severity: 'medium',
+        title: 'Fixed capacity while the prompt caps spend',
+        message: `The prompt makes cost a requirement, and every tier here is provisioned statically — the fleet sized for the ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s peak burns the same money at 3am. Autoscale the stateless tiers (or run the bursty work on serverless compute) so capacity, and the bill, follow demand instead of the peak.`,
+        affectedNodeIds: services.map((service) => service.id),
+        affectedEdgeIds: [],
+        suggestion: first
+          ? {
+              description: 'Autoscale the stateless tier so capacity follows demand.',
+              ops: [
+                {
+                  op: 'update-node',
+                  nodeId: first.id,
+                  set: { config: { ...(first.config ?? {}), autoscaling: true } },
+                },
+              ],
+            }
+          : null,
+      },
+    ];
+  },
+};
+
+const overengineeredIntro: EvalRule = {
+  id: 'scalability.overengineered-intro',
+  dimension: 'scalability',
+  check({ facts, index }) {
+    if (facts.difficulty !== 'intro' || facts.scaleTargets.requestsPerSecond >= 500) return [];
+    const caches = sortById(index.byKind('cache'));
+    const meshes = sortById(index.byKind('service-mesh'));
+    const regional = sortById(
+      index
+        .nodes()
+        .filter((node) => typeof node.config?.region === 'string' && node.config.region.length > 0),
+    );
+    const excess = [...(caches.length >= 2 ? caches : []), ...meshes, ...regional];
+    if (excess.length === 0) return [];
+    return [
+      {
+        ruleId: overengineeredIntro.id,
+        dimension: 'scalability',
+        severity: 'info',
+        title: 'More machinery than the prompt asks for',
+        message: `This prompt plays at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s, and layered caches, a service mesh, or regional placement each add an operational surface no requirement here pays for. Right-sizing is the senior skill: every component must buy a stated requirement, and at this scale a simple tier does — save the heavy machinery for the prompt that demands it.`,
+        affectedNodeIds: uniqueSorted(excess.map((node) => node.id)),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 export const scalabilityRules: EvalRule[] = [
   noCacheReadHeavy,
   syncToSlowConsumer,
@@ -411,4 +482,6 @@ export const scalabilityRules: EvalRule[] = [
   workerPoolUnderscaled,
   noShardingHotWrites,
   hotPartitionRisk,
+  noAutoscaling,
+  overengineeredIntro,
 ];

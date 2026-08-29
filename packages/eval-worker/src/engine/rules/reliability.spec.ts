@@ -373,3 +373,99 @@ describe('reliability.queue-producer-overload', () => {
     expect(rule.check(contextFor(twoConsumers))).toEqual([]);
   });
 });
+
+describe('reliability.nothing-monitored', () => {
+  const rule = ruleById('reliability.nothing-monitored');
+  const observed = flashSaleFacts({ nfrKinds: ['availability', 'observability'] });
+  const blind = graph(
+    [node('gw-1', 'gateway'), node('svc-1', 'service')],
+    [edge('e1', 'gw-1', 'svc-1')],
+  );
+
+  it('fires when observability is demanded and nothing watches the design', () => {
+    const findings = rule.check(contextFor(blind, observed));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual([]);
+    expect(findings[0].suggestion?.ops).toEqual([
+      {
+        op: 'add-node',
+        node: { id: 'suggested-monitoring-1', kind: 'monitoring', label: 'Monitoring' },
+      },
+    ]);
+  });
+
+  it('stays silent once a monitoring block exists', () => {
+    const watched = graph([...blind.nodes, node('mon-1', 'monitoring')], blind.edges);
+    expect(rule.check(contextFor(watched, observed))).toEqual([]);
+  });
+
+  it('honors the legacy config.monitoring spelling', () => {
+    const legacy = graph(
+      [node('gw-1', 'gateway', { config: { monitoring: true } }), node('svc-1', 'service')],
+      blind.edges,
+    );
+    expect(rule.check(contextFor(legacy, observed))).toEqual([]);
+  });
+
+  it('stays silent when observability is not a stated requirement', () => {
+    expect(rule.check(contextFor(blind))).toEqual([]);
+  });
+});
+
+describe('reliability.dlq-unmonitored', () => {
+  const rule = ruleById('reliability.dlq-unmonitored');
+  const observed = flashSaleFacts({ nfrKinds: ['availability', 'observability'] });
+  const landfill = graph(
+    [node('q-1', 'queue', { config: { dlq: true } }), node('worker-1', 'worker')],
+    [edge('e1', 'q-1', 'worker-1', 'async')],
+  );
+
+  it('fires on a dead-letter queue with no monitoring block', () => {
+    const findings = rule.check(contextFor(landfill, observed));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('info');
+    expect(findings[0].affectedNodeIds).toEqual(['q-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent once monitoring exists or no queue dead-letters', () => {
+    const watched = graph([...landfill.nodes, node('mon-1', 'monitoring')], landfill.edges);
+    expect(rule.check(contextFor(watched, observed))).toEqual([]);
+    const bare = graph([node('q-1', 'queue'), node('worker-1', 'worker')], landfill.edges);
+    expect(rule.check(contextFor(bare, observed))).toEqual([]);
+  });
+
+  it('stays silent when observability is not a stated requirement', () => {
+    expect(rule.check(contextFor(landfill))).toEqual([]);
+  });
+});
+
+describe('reliability.no-tracing-many-services', () => {
+  const rule = ruleById('reliability.no-tracing-many-services');
+  const sprawl = graph([
+    node('svc-1', 'service'),
+    node('svc-2', 'service'),
+    node('worker-1', 'worker'),
+    node('sp-1', 'stream-processor'),
+    node('ml-1', 'ml-inference'),
+  ]);
+
+  it('fires on five compute nodes with no tracing', () => {
+    const findings = rule.check(contextFor(sprawl));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('info');
+    expect(findings[0].affectedNodeIds).toEqual(['ml-1', 'sp-1', 'svc-1', 'svc-2', 'worker-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent once a tracing block exists', () => {
+    const traced = graph([...sprawl.nodes, node('trace-1', 'tracing')]);
+    expect(rule.check(contextFor(traced))).toEqual([]);
+  });
+
+  it('stays silent below five compute nodes', () => {
+    const smaller = graph(sprawl.nodes.slice(0, 4));
+    expect(rule.check(contextFor(smaller))).toEqual([]);
+  });
+});

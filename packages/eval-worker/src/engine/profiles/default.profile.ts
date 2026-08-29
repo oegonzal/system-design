@@ -76,6 +76,27 @@ export const DEFAULT_PROFILE: EvalProfile = {
       },
       { ruleId: 'data.multi-writer-inventory', whenExpectationUnmet: 'exp.fst.oversell-guard' },
       { ruleId: 'data.stream-no-retention', whenExpectationUnmet: 'exp.rta.ingest-buffer-durable' },
+      // Observability is taught once: each archetype bank's "observed"
+      // expectation owns the lesson, and the generic rule yields to it.
+      {
+        ruleId: 'reliability.nothing-monitored',
+        whenExpectationUnmet: 'exp.fst.order-pipeline-observed',
+      },
+      {
+        ruleId: 'reliability.nothing-monitored',
+        whenExpectationUnmet: 'exp.msp.pipeline-observed',
+      },
+      {
+        ruleId: 'reliability.nothing-monitored',
+        whenExpectationUnmet: 'exp.wfa.tenant-observability',
+      },
+      {
+        ruleId: 'reliability.nothing-monitored',
+        whenExpectationUnmet: 'exp.rta.pipeline-observed',
+      },
+      { ruleId: 'reliability.nothing-monitored', whenExpectationUnmet: 'exp.dag.runs-observed' },
+      { ruleId: 'scalability.no-autoscaling', whenExpectationUnmet: 'exp.fst.cost-scale-down' },
+      { ruleId: 'scalability.no-autoscaling', whenExpectationUnmet: 'exp.dag.scale-to-zero' },
     ],
   },
 };
