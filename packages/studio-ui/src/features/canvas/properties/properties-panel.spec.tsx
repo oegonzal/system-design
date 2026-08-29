@@ -1,6 +1,7 @@
 import {
   NODE_KINDS,
   NODE_KIND_CATEGORIES,
+  NODE_KIND_GUIDE,
   kindsInCategory,
   type CanvasGraph,
 } from '@sysdesign/contracts';
@@ -29,6 +30,20 @@ describe('PropertiesPanel', () => {
   it('shows an empty state when nothing is selected', () => {
     renderPanel();
     expect(screen.getByText(/select a block or connection/i)).toBeTruthy();
+  });
+
+  it('[UX-7] teaches what the selected kind is, and swaps when the kind changes', async () => {
+    const user = userEvent.setup();
+    renderPanel((seeded) => seeded.getState().select('n-3')); // n-3 is a database
+
+    const guide = screen.getByTestId('kind-guide');
+    expect(guide.textContent).toContain(NODE_KIND_GUIDE.database.what);
+    expect(guide.textContent).toContain('Passive storage');
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /kind/i }), 'queue');
+
+    expect(screen.getByTestId('kind-guide').textContent).toContain(NODE_KIND_GUIDE.queue.what);
+    expect(screen.getByTestId('kind-guide').textContent).toContain('producers and consumers');
   });
 
   it('edits the selected node label straight into the store', async () => {

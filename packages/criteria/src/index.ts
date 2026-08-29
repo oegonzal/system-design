@@ -29,6 +29,10 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'UX-6',
     statement: 'A design narrative is authored alongside the diagram and submitted with it.',
   },
+  {
+    id: 'UX-7',
+    statement: 'Every block kind teaches what it is for and when to use it in the UI.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

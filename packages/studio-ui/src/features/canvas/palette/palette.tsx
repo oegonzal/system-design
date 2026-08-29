@@ -3,6 +3,7 @@
 import styled from '@emotion/styled';
 import {
   NODE_KIND_CATEGORIES,
+  NODE_KIND_GUIDE,
   kindsInCategory,
   type NodeKind,
   type NodeKindCategoryId,
@@ -175,6 +176,7 @@ export function Palette({ className }: PaletteProps) {
                   <KindButton
                     type="button"
                     $kind={kind}
+                    title={NODE_KIND_GUIDE[kind].what}
                     draggable
                     onDragStart={(event) => handleDragStart(event, kind)}
                     onClick={() => addNode(kind)}

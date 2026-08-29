@@ -5,7 +5,9 @@ import {
   EDGE_KINDS,
   INTERFACE_CAPABILITIES,
   NODE_KIND_CATEGORIES,
+  NODE_KIND_GUIDE,
   canDeclareOperations,
+  interfaceSummary,
   kindsInCategory,
   resolveInterfaceOwner,
   type NodeKind,
@@ -123,6 +125,21 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
               );
             })}
           </SelectField>
+          {/* The product explains its own vocabulary: what this kind is, when
+              to use it, and (derived from the capability table) its interface. */}
+          <Stack gap={1} data-testid="kind-guide">
+            <Text size="sm" tone="muted">
+              {NODE_KIND_GUIDE[node.data.kind].what}
+            </Text>
+            <Text size="sm" tone="muted">
+              {NODE_KIND_GUIDE[node.data.kind].whenToUse}
+            </Text>
+            {interfaceSummary(node.data.kind) !== null ? (
+              <Text size="sm" tone="muted">
+                {interfaceSummary(node.data.kind)}
+              </Text>
+            ) : null}
+          </Stack>
           <NodeConfigFields
             kind={node.data.kind}
             config={node.data.config ?? {}}

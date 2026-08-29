@@ -1,4 +1,9 @@
-import { NODE_KINDS, NODE_KIND_CATEGORIES, kindsInCategory } from '@sysdesign/contracts';
+import {
+  NODE_KINDS,
+  NODE_KIND_CATEGORIES,
+  NODE_KIND_GUIDE,
+  kindsInCategory,
+} from '@sysdesign/contracts';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -39,6 +44,16 @@ describe('Palette', () => {
 
     const landmark = screen.getByRole('complementary', { name: 'Building blocks' });
     expect(landmark.classList.contains('probe')).toBe(true);
+  });
+
+  it('[UX-7] every palette entry carries its guide sentence as hover text', () => {
+    renderPalette();
+
+    for (const kind of ['service', 'queue', 'payment-provider'] as const) {
+      expect(screen.getByTestId(`palette-${kind}`).getAttribute('title')).toBe(
+        NODE_KIND_GUIDE[kind].what,
+      );
+    }
   });
 
   it('[UX-1] click-to-add creates a node of that kind in the store', async () => {
