@@ -22,6 +22,26 @@ describe('LlmInsights', () => {
     expect(meters[0].getAttribute('aria-valuenow')).toBe('61');
   });
 
+  it('renders the narrative & alignment axis through the generic axis path', () => {
+    renderWithTheme(
+      <LlmInsights
+        axes={[
+          makeAxis({
+            id: 'narrative',
+            label: 'Narrative & alignment',
+            score: 82,
+            subScores: null,
+            summary: 'The prose and the diagram tell the same story.',
+          }),
+        ]}
+        scenarios={[]}
+      />,
+    );
+    expect(screen.getByTestId('axis-narrative')).toBeTruthy();
+    expect(screen.getByText('Narrative & alignment')).toBeTruthy();
+    expect(screen.getByText('The prose and the diagram tell the same story.')).toBeTruthy();
+  });
+
   it('explains an unscored axis instead of showing an empty meter', () => {
     renderWithTheme(
       <LlmInsights

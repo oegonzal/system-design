@@ -198,4 +198,37 @@ describe('canvas-store', () => {
     const store = createCanvasStore(makeGraph());
     expect(store.getState().serialize()).toEqual(makeGraph());
   });
+
+  it('setNarrative stores the prose and dirties the draft', () => {
+    const store = createCanvasStore();
+
+    store.getState().setNarrative('The Client calls the Order Service.');
+
+    expect(store.getState().narrative).toBe('The Client calls the Order Service.');
+    expect(store.getState().dirty).toBe(true);
+  });
+
+  it('loadNarrative replaces the narrative without touching dirty, mapping null to empty', () => {
+    const store = createCanvasStore();
+
+    store.getState().loadNarrative('Loaded from a revision.');
+    expect(store.getState().narrative).toBe('Loaded from a revision.');
+    expect(store.getState().dirty).toBe(false);
+
+    // …and it never cleans an already-dirty draft either.
+    store.getState().setNarrative('edited');
+    store.getState().loadNarrative(null);
+    expect(store.getState().narrative).toBe('');
+    expect(store.getState().dirty).toBe(true);
+  });
+
+  it('setGraph leaves the narrative alone — loading a revision pairs it with loadNarrative', () => {
+    const store = createCanvasStore();
+    store.getState().setNarrative('Prose that outlives a graph swap.');
+
+    store.getState().setGraph(makeGraph());
+
+    expect(store.getState().narrative).toBe('Prose that outlives a graph swap.');
+    expect(store.getState().dirty).toBe(false);
+  });
 });

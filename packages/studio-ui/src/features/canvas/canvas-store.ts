@@ -82,6 +82,13 @@ export interface CanvasState {
   selectedId: string | null;
   /** Unsaved-draft flag: set by edits, cleared by setGraph/markClean. */
   dirty: boolean;
+  /**
+   * The design-narrative draft submitted alongside the graph. Deliberately
+   * orthogonal to the graph: `setGraph` never touches it and `serialize`
+   * never includes it — loading a revision pairs `setGraph` with
+   * `loadNarrative`, and submitting reads both separately.
+   */
+  narrative: string;
   ghost: GhostState | null;
   highlight: HighlightState | null;
 
@@ -108,6 +115,10 @@ export interface CanvasState {
   previewPatch(patch: GraphPatch, findingId: string): void;
   clearGhost(): void;
   acceptGhost(): void;
+  /** Author edit — replaces the narrative and dirties the draft. */
+  setNarrative(text: string): void;
+  /** Revision load — replaces the narrative without touching `dirty`. */
+  loadNarrative(text: string | null): void;
   markClean(): void;
   markDirty(): void;
   serialize(): CanvasGraph;
@@ -156,6 +167,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     ...(initial ? fromCanvasGraph(initial) : { nodes: [], edges: [] }),
     selectedId: null,
     dirty: false,
+    narrative: '',
     ghost: null,
     highlight: null,
 
@@ -354,6 +366,14 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
         highlight: null,
         dirty: true,
       });
+    },
+
+    setNarrative(text) {
+      set({ narrative: text, dirty: true });
+    },
+
+    loadNarrative(text) {
+      set({ narrative: text ?? '' });
     },
 
     markClean() {

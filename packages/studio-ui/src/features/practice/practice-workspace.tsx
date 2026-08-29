@@ -34,6 +34,7 @@ import { EvaluationPanel } from '../evaluation/evaluation-panel';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { PromptPane } from '../prompts/prompt-pane';
+import { NarrativeEditor } from './narrative-editor';
 
 function CanvasSkeleton() {
   return <Skeleton variant="block" height="480px" />;
@@ -253,6 +254,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setRevisions(sorted);
         if (latestFull && latest) {
           storeApi.getState().setGraph(latestFull.graph);
+          storeApi.getState().loadNarrative(latestFull.narrative);
           setFeedback({ id: latest.id, revisionNumber: latest.revisionNumber });
         }
         setLoading(false);
@@ -281,11 +283,15 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   }, [polling.evaluation, sessionId, viewingRevision]);
 
   const handleSubmit = useCallback(async () => {
+    const { narrative } = storeApi.getState();
     const graph = storeApi.getState().serialize();
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const revision = await api.submitRevision(sessionId, { graph });
+      const revision = await api.submitRevision(sessionId, {
+        graph,
+        narrative: narrative.trim() || undefined,
+      });
       setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
       setViewingRevision(null);
       setRevisions((current) => [
@@ -336,6 +342,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       try {
         const revision = await api.getRevision(summary.id);
         storeApi.getState().setGraph(revision.graph);
+        storeApi.getState().loadNarrative(revision.narrative);
         setViewingRevision({ id: revision.id, revisionNumber: revision.revisionNumber });
         setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
         setTab('feedback');
@@ -415,6 +422,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           <DockTabs value={tab} onChange={setTab}>
             <TabList aria-label="Session panels">
               <Tab value="prompt">Prompt</Tab>
+              <Tab value="narrative">Narrative</Tab>
               <Tab value="feedback">Feedback</Tab>
               <Tab value="revisions">Revisions</Tab>
             </TabList>
@@ -426,6 +434,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                   Prompt unavailable.
                 </Text>
               )}
+            </DockPanel>
+            <DockPanel value="narrative">
+              <NarrativeEditor />
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel
