@@ -182,6 +182,183 @@ describe('sessions', () => {
     });
   });
 
+  describe('POST /api/sessions/:id/revisions — interface contracts', () => {
+    /** client → gateway → service → queue → worker with declared interfaces. */
+    const interfaceGraph = (): CanvasGraph => ({
+      nodes: [
+        { id: 'client', kind: 'client', label: 'Web client' },
+        {
+          id: 'gw',
+          kind: 'gateway',
+          label: 'API Gateway',
+          operations: [
+            { name: 'PlaceOrder', kind: 'command' },
+            { name: 'GetOrder', kind: 'query', idempotent: true },
+          ],
+        },
+        {
+          id: 'orders',
+          kind: 'service',
+          label: 'Order Service',
+          responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
+          operations: [
+            { name: 'PlaceOrder', kind: 'command', notes: 'Validates inventory first' },
+            { name: 'GetOrder', kind: 'query', idempotent: true },
+          ],
+        },
+        {
+          id: 'order-queue',
+          kind: 'queue',
+          label: 'Order Queue',
+          operations: [{ name: 'OrderPlaced', kind: 'event' }],
+        },
+        { id: 'fulfillment', kind: 'worker', label: 'Fulfillment Worker' },
+      ],
+      edges: [
+        { id: 'e-in', source: 'client', target: 'gw', kind: 'sync' },
+        {
+          id: 'e-call',
+          source: 'gw',
+          target: 'orders',
+          kind: 'sync',
+          carries: ['PlaceOrder', 'GetOrder'],
+        },
+        {
+          id: 'e-produce',
+          source: 'orders',
+          target: 'order-queue',
+          kind: 'async',
+          carries: ['OrderPlaced'],
+        },
+        {
+          id: 'e-consume',
+          source: 'order-queue',
+          target: 'fulfillment',
+          kind: 'async',
+          carries: ['OrderPlaced'],
+        },
+      ],
+    });
+
+    const startSession = async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+      return session.data.id;
+    };
+
+    it('round-trips an interface-rich graph through submit unchanged', async () => {
+      const sessionId = await startSession();
+
+      const { status, body } = await submitRevision(sessionId, interfaceGraph());
+
+      expect(status).toBe(201);
+      expect(body.data.graph).toEqual(interfaceGraph());
+    });
+
+    it('accepts a carry referencing an undeclared name — an eval lesson, not a save blocker', async () => {
+      const sessionId = await startSession();
+      const graph = interfaceGraph();
+      graph.edges[1] = { ...graph.edges[1], carries: ['CancelOrder'] };
+
+      expect((await submitRevision(sessionId, graph)).status).toBe(201);
+    });
+
+    it('rejects oversize interface shapes and config bags with 400', async () => {
+      const sessionId = await startSession();
+      const manyOps = (count: number) =>
+        Array.from({ length: count }, (_, i) => ({ name: `op-${i}`, kind: 'query' as const }));
+
+      const tooManyOps = interfaceGraph();
+      tooManyOps.nodes[2] = { ...tooManyOps.nodes[2], operations: manyOps(13) };
+
+      const tooManyResponsibilities = interfaceGraph();
+      tooManyResponsibilities.nodes[2] = {
+        ...tooManyResponsibilities.nodes[2],
+        responsibilities: Array.from({ length: 7 }, (_, i) => `responsibility ${i}`),
+      };
+
+      const overlongOpName = interfaceGraph();
+      overlongOpName.nodes[1] = {
+        ...overlongOpName.nodes[1],
+        operations: [{ name: 'x'.repeat(61), kind: 'command' }],
+      };
+
+      const bloatedConfig = interfaceGraph();
+      bloatedConfig.nodes[2] = {
+        ...bloatedConfig.nodes[2],
+        config: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`key-${i}`, i])),
+      };
+
+      const nestedConfig = interfaceGraph();
+      nestedConfig.nodes[2] = {
+        ...nestedConfig.nodes[2],
+        config: { retry: { attempts: 3 } as never },
+      };
+
+      for (const graph of [
+        tooManyOps,
+        tooManyResponsibilities,
+        overlongOpName,
+        bloatedConfig,
+        nestedConfig,
+      ]) {
+        expect((await submitRevision(sessionId, graph)).status).toBe(400);
+      }
+    });
+
+    it('rejects duplicate operation names and duplicate carries with 422', async () => {
+      const sessionId = await startSession();
+
+      const dupOps = interfaceGraph();
+      dupOps.nodes[2] = {
+        ...dupOps.nodes[2],
+        operations: [
+          { name: 'PlaceOrder', kind: 'command' },
+          { name: 'PlaceOrder', kind: 'query' },
+        ],
+      };
+      const dupOpsRes = await call<ApiErrorResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
+        method: 'POST',
+        body: JSON.stringify({ graph: dupOps }),
+      });
+      expect(dupOpsRes.status).toBe(422);
+      expect(JSON.stringify(dupOpsRes.body.message)).toContain('duplicate operation name');
+
+      const dupCarries = interfaceGraph();
+      dupCarries.edges[1] = { ...dupCarries.edges[1], carries: ['GetOrder', 'GetOrder'] };
+      const dupCarriesRes = await call<ApiErrorResponse>(
+        `${h.url}/sessions/${sessionId}/revisions`,
+        { method: 'POST', body: JSON.stringify({ graph: dupCarries }) },
+      );
+      expect(dupCarriesRes.status).toBe(422);
+      expect(JSON.stringify(dupCarriesRes.body.message)).toContain('duplicate carries entry');
+    });
+
+    it('rejects a graph over the whole-graph operation budget with 422', async () => {
+      const sessionId = await startSession();
+      // 33 × 12 + 5 = 401 declared operations — one past the budget of 400.
+      const graph: CanvasGraph = {
+        nodes: Array.from({ length: 34 }, (_, i) => ({
+          id: `svc-${i}`,
+          kind: 'service' as const,
+          label: `Service ${i}`,
+          operations: Array.from({ length: i === 33 ? 5 : 12 }, (_, j) => ({
+            name: `op-${j}`,
+            kind: 'query' as const,
+          })),
+        })),
+        edges: [],
+      };
+
+      const { status, body } = await call<ApiErrorResponse>(
+        `${h.url}/sessions/${sessionId}/revisions`,
+        { method: 'POST', body: JSON.stringify({ graph }) },
+      );
+      expect(status).toBe(422);
+      expect(JSON.stringify(body.message)).toContain('401 operations');
+    });
+  });
+
   describe('GET /api/sessions/:id/revisions', () => {
     it('lists graph-free summaries, newest revision first', async () => {
       const prompt = await makePrompt();

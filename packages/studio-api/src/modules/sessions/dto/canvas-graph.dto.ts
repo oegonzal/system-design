@@ -2,12 +2,14 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
+  IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   MaxLength,
+  Validate,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -16,15 +18,26 @@ import {
   CANVAS_MAX_NODES,
   EDGE_KINDS,
   EDGE_LABEL_MAX_LENGTH,
+  EDGE_MAX_CARRIES,
   NODE_KINDS,
   NODE_LABEL_MAX_LENGTH,
+  NODE_MAX_OPERATIONS,
+  NODE_MAX_RESPONSIBILITIES,
+  OPERATION_KINDS,
+  OPERATION_NAME_MAX_LENGTH,
+  OPERATION_NOTES_MAX_LENGTH,
+  RESPONSIBILITY_MAX_LENGTH,
   type CanvasEdge,
   type CanvasGraph,
   type CanvasNode,
   type EdgeKind,
   type NodeConfig,
   type NodeKind,
+  type NodeOperation,
+  type OperationKind,
 } from '@sysdesign/contracts';
+
+import { ScalarRecordConstraint } from './scalar-record.constraint';
 
 /**
  * Wire validation of a submitted canvas graph. Shape errors (bad kind, missing
@@ -41,6 +54,25 @@ export class PositionDto {
   y!: number;
 }
 
+export class NodeOperationDto implements NodeOperation {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(OPERATION_NAME_MAX_LENGTH)
+  name!: string;
+
+  @IsIn([...OPERATION_KINDS])
+  kind!: OperationKind;
+
+  @IsOptional()
+  @IsBoolean()
+  idempotent?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(OPERATION_NOTES_MAX_LENGTH)
+  notes?: string;
+}
+
 export class CanvasNodeDto implements CanvasNode {
   @IsString()
   @MaxLength(CANVAS_ID_MAX_LENGTH)
@@ -53,10 +85,24 @@ export class CanvasNodeDto implements CanvasNode {
   @MaxLength(NODE_LABEL_MAX_LENGTH)
   label!: string;
 
-  /** Per-node knobs the eval rules read; values validated defensively there. */
+  /** Per-node knobs the eval rules read; the constraint pins the flat-scalar shape. */
   @IsOptional()
-  @IsObject()
+  @Validate(ScalarRecordConstraint)
   config?: NodeConfig;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(NODE_MAX_RESPONSIBILITIES)
+  @IsString({ each: true })
+  @MaxLength(RESPONSIBILITY_MAX_LENGTH, { each: true })
+  responsibilities?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(NODE_MAX_OPERATIONS)
+  @ValidateNested({ each: true })
+  @Type(() => NodeOperationDto)
+  operations?: NodeOperationDto[];
 
   @IsOptional()
   @ValidateNested()
@@ -86,6 +132,14 @@ export class CanvasEdgeDto implements CanvasEdge {
   @IsString()
   @MaxLength(EDGE_LABEL_MAX_LENGTH)
   label?: string;
+
+  /** Operation-name references; whether each resolves is the eval's business. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(EDGE_MAX_CARRIES)
+  @IsString({ each: true })
+  @MaxLength(OPERATION_NAME_MAX_LENGTH, { each: true })
+  carries?: string[];
 }
 
 export class CanvasGraphDto implements CanvasGraph {
