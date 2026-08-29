@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { backoffMs } from './eval-runner.service';
 
 // Set before AppModule is imported anywhere Nest reads them: the poller's
-// interval is constructor-time and the critic factory is boot-time.
+// interval is constructor-time and the LLM client provider is boot-time.
 process.env['EVAL_POLL_INTERVAL_MS'] = '150';
 process.env['EVAL_DETERMINISTIC'] = '1';
 

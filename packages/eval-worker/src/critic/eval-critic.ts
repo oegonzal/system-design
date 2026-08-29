@@ -27,10 +27,9 @@ export interface CriticInput {
 }
 
 /**
- * Abstract class rather than an interface so it can double as the Nest
- * injection token. Critic failure is never fatal: implementations resolve to
- * an empty critique rather than throwing.
+ * Critic failure is never fatal: implementations resolve to an empty critique
+ * rather than throwing.
  */
-export abstract class EvalCritic {
-  abstract review(input: CriticInput): Promise<CritiqueResult>;
+export interface EvalCritic {
+  review(input: CriticInput): Promise<CritiqueResult>;
 }

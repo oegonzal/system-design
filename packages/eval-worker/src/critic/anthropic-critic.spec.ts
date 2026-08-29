@@ -5,8 +5,6 @@ import { describe, expect, it } from 'vitest';
 import type { PromptFacts } from '../engine/types';
 import { AnthropicCritic } from './anthropic-critic';
 import type { Critique } from './critique-schema';
-import { createCritic } from './critic.factory';
-import { NoopCritic } from './noop-critic';
 
 const graph: CanvasGraph = {
   nodes: [
@@ -84,16 +82,5 @@ describe('AnthropicCritic', () => {
     const critic = new AnthropicCritic(fakeLlm(null));
     const result = await critic.review({ graph, facts, deterministicFindings: [] });
     expect(result).toEqual({ findings: [], summary: null, model: null });
-  });
-});
-
-describe('createCritic', () => {
-  it('falls back to the noop critic when the llm client is disabled', () => {
-    const critic = createCritic({
-      enabled: false,
-      model: null,
-      completeStructured: () => Promise.resolve(null),
-    });
-    expect(critic).toBeInstanceOf(NoopCritic);
   });
 });

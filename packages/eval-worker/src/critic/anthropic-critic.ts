@@ -1,7 +1,7 @@
 import type { LlmClient } from '@sysdesign/llm';
 
 import { critiqueSchema } from './critique-schema';
-import { EvalCritic, type CriticInput, type CritiqueResult } from './eval-critic';
+import type { CriticInput, CritiqueResult, EvalCritic } from './eval-critic';
 import { buildCriticUserPrompt, CRITIC_SYSTEM_PROMPT } from './prompt-builder';
 
 const EMPTY: CritiqueResult = { findings: [], summary: null, model: null };
@@ -15,10 +15,8 @@ const EMPTY: CritiqueResult = { findings: [], summary: null, model: null };
  * Never throws: an API failure, refusal or schema miss resolves to the empty
  * critique and the deterministic result stands alone.
  */
-export class AnthropicCritic extends EvalCritic {
-  constructor(private readonly llm: LlmClient) {
-    super();
-  }
+export class AnthropicCritic implements EvalCritic {
+  constructor(private readonly llm: LlmClient) {}
 
   async review(input: CriticInput): Promise<CritiqueResult> {
     const critique = await this.llm.completeStructured({
