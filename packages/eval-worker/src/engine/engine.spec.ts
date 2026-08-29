@@ -62,7 +62,7 @@ describe('runEngine', () => {
     for (const finding of result.findings) {
       expect(finding.title.length).toBeGreaterThan(0);
       expect(finding.message.length).toBeGreaterThan(20);
-      if (!GLOBAL_RULES.has(finding.ruleId)) {
+      if (!GLOBAL_RULES.has(finding.ruleId ?? '')) {
         expect(finding.affectedNodeIds.length + finding.affectedEdgeIds.length).toBeGreaterThan(0);
       }
     }

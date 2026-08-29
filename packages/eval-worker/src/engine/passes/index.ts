@@ -1,0 +1,13 @@
+/**
+ * Every pass the orchestrator can resolve. A profile may only name passes
+ * registered here — an unknown name fails the run loudly rather than
+ * silently grading with less evidence than the profile promised.
+ */
+import type { EvalPass } from '../core/types';
+import { createCriticPass } from './critic/critic.pass';
+import { createRulesPass } from './rules/rules.pass';
+
+export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
+  const passes: EvalPass[] = [createRulesPass(), createCriticPass()];
+  return new Map(passes.map((pass) => [pass.id, pass]));
+}

@@ -35,7 +35,9 @@ export function buildCriticUserPrompt({
   const alreadyFound =
     deterministicFindings.length === 0
       ? '  (none)'
-      : deterministicFindings.map((f) => `  [${f.severity}] ${f.ruleId}: ${f.title}`).join('\n');
+      : deterministicFindings
+          .map((f) => `  [${f.severity}] ${f.ruleId ?? f.expectationId ?? 'finding'}: ${f.title}`)
+          .join('\n');
 
   const targets = facts.scaleTargets;
 

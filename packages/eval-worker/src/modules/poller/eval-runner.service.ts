@@ -1,11 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { DesignRevision, EvalJob, Evaluation, Finding } from '@sysdesign/db';
+import type { LlmClient } from '@sysdesign/llm';
 
-import { runEngine } from '../../engine/engine';
+import { runEvaluation } from '../../engine/core/orchestrator';
+import { createPassRegistry } from '../../engine/passes';
+import { ACTIVE_PROFILE } from '../../engine/profiles';
 import { ENGINE_VERSION } from '../../engine/scoring';
 import type { PromptFacts } from '../../engine/types';
-import { EvalCritic } from '../../critic/eval-critic';
+import { LLM_CLIENT } from './llm.token';
 
 /** Exponential backoff: 10s, 20s, 40s… capped at 5 minutes. */
 export const backoffMs = (attempts: number): number =>
@@ -19,10 +22,11 @@ export const backoffMs = (attempts: number): number =>
 @Injectable()
 export class EvalRunnerService {
   private readonly logger = new Logger(EvalRunnerService.name);
+  private readonly passRegistry = createPassRegistry();
 
   constructor(
     private readonly em: EntityManager,
-    private readonly critic: EvalCritic,
+    @Inject(LLM_CLIENT) private readonly llm: LlmClient,
   ) {}
 
   async run(jobId: string): Promise<void> {
@@ -57,12 +61,14 @@ export class EvalRunnerService {
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
       };
 
-      const result = runEngine(revision.graph, facts);
-      const critique = await this.critic.review({
+      const { result } = await runEvaluation({
         graph: revision.graph,
         facts,
-        deterministicFindings: result.findings,
+        llm: this.llm,
+        profile: ACTIVE_PROFILE,
+        registry: this.passRegistry,
       });
+      const critique = result.annotations;
 
       const evaluationId = evaluation.id;
       await em.transactional(async (tem) => {
@@ -83,7 +89,7 @@ export class EvalRunnerService {
             suggestion: finding.suggestion,
           });
         }
-        for (const finding of critique.findings) {
+        for (const finding of critique?.findings ?? []) {
           tem.create(Finding, {
             evaluation: evaluationId,
             source: 'llm',
@@ -106,9 +112,9 @@ export class EvalRunnerService {
             overallScore: result.overallScore,
             grade: result.grade,
             dimensionScores: result.dimensionScores,
-            summary: critique.summary ?? result.summary,
+            summary: critique?.summary ?? result.summary,
             engineVersion: ENGINE_VERSION,
-            criticModel: critique.model,
+            criticModel: critique?.model ?? null,
             completedAt: new Date(),
             updatedAt: new Date(),
           },

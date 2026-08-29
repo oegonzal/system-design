@@ -1,6 +1,6 @@
 import type { CanvasGraph, EvalDimension, Severity } from '@sysdesign/contracts';
 
-import type { PromptFacts, RuleFinding } from '../engine/types';
+import type { EngineFinding, PromptFacts } from '../engine/types';
 
 /** A finding the critic (LLM) contributed. Never carries a ruleId or patch. */
 export interface CriticFinding {
@@ -22,8 +22,8 @@ export interface CritiqueResult {
 export interface CriticInput {
   graph: CanvasGraph;
   facts: PromptFacts;
-  /** What the engine already found — the critic must add, not repeat. */
-  deterministicFindings: RuleFinding[];
+  /** What the deterministic passes already found — the critic must add, not repeat. */
+  deterministicFindings: EngineFinding[];
 }
 
 /**

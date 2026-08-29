@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+
+import { NoopLlmClient } from '@sysdesign/llm';
+
+import { graph, node, flashSaleFacts } from '../testing';
+import { LEGACY_PROFILE } from '../profiles/legacy.profile';
+import { createPassRegistry } from '../passes';
+import type { EvidenceArtifact } from './artifacts';
+import { runEvaluation } from './orchestrator';
+import type { EvalPass } from './types';
+
+const llm = new NoopLlmClient();
+
+describe('runEvaluation', () => {
+  it('runs the active profile and degrades LLM passes to diagnostics', async () => {
+    const run = await runEvaluation({
+      graph: graph([node('n-1', 'client')]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: LEGACY_PROFILE,
+      registry: createPassRegistry(),
+    });
+
+    expect(run.artifacts.map((artifact) => `${artifact.passId}:${artifact.kind}`)).toEqual([
+      'rules.core:findings',
+      'llm.critic:diagnostics',
+    ]);
+    expect(run.result.annotations).toBeNull();
+    expect(run.result.diagnostics[0]?.reason).toBe('llm-disabled');
+  });
+
+  it('feeds each pass the artifacts produced before it', async () => {
+    const seen: string[][] = [];
+    const probe = (id: string): EvalPass => ({
+      id,
+      mode: 'deterministic',
+      run: (ctx) => {
+        seen.push(ctx.priorArtifacts.map((artifact) => artifact.passId));
+        const produced: EvidenceArtifact[] = [{ passId: id, kind: 'findings', findings: [] }];
+        return Promise.resolve(produced);
+      },
+    });
+    const registry = new Map([probe('first'), probe('second')].map((pass) => [pass.id, pass]));
+
+    await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: {
+        ...LEGACY_PROFILE,
+        passes: [
+          { pass: 'first', enabled: true },
+          { pass: 'second', enabled: true },
+        ],
+      },
+      registry,
+    });
+
+    expect(seen).toEqual([[], ['first']]);
+  });
+
+  it('skips disabled passes and rejects unknown ones', async () => {
+    const registry = createPassRegistry();
+    const run = await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: {
+        ...LEGACY_PROFILE,
+        passes: [
+          { pass: 'rules.core', enabled: true },
+          { pass: 'llm.critic', enabled: false },
+        ],
+      },
+      registry,
+    });
+    expect(run.artifacts.map((artifact) => artifact.passId)).toEqual(['rules.core']);
+
+    await expect(
+      runEvaluation({
+        graph: graph([]),
+        facts: flashSaleFacts(),
+        llm,
+        profile: { ...LEGACY_PROFILE, passes: [{ pass: 'no.such.pass', enabled: true }] },
+        registry,
+      }),
+    ).rejects.toThrow(/unknown pass: no\.such\.pass/);
+  });
+
+  it('matches runEngine for the deterministic slice', async () => {
+    const canvas = graph([node('n-1', 'client'), node('n-2', 'service'), node('n-3', 'database')]);
+    const run = await runEvaluation({
+      graph: canvas,
+      facts: flashSaleFacts(),
+      llm,
+      profile: LEGACY_PROFILE,
+      registry: createPassRegistry(),
+    });
+    const { runEngine } = await import('../engine');
+    const direct = runEngine(canvas, flashSaleFacts());
+    expect(run.result.dimensionScores).toEqual(direct.dimensionScores);
+    expect(run.result.overallScore).toBe(direct.overallScore);
+    expect(run.result.grade).toBe(direct.grade);
+    expect(run.result.summary).toBe(direct.summary);
+  });
+});

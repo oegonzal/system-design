@@ -45,6 +45,21 @@ export interface RuleFinding {
   suggestion: GraphPatch | null;
 }
 
+/**
+ * A finding as the aggregator sees it, from any deterministic pass. Rule
+ * violations subtract points (`countsAsViolation`); unmet expectations do not
+ * — their absence already reduced the coverage base, and charging both would
+ * grade one lesson twice. Exactly one of ruleId/expectationId is set.
+ */
+export interface EngineFinding extends Omit<RuleFinding, 'ruleId'> {
+  ruleId: string | null;
+  countsAsViolation: boolean;
+  /** Set when the finding reports an unmet expectation (`exp.*`). */
+  expectationId: string | null;
+  /** The prompt NFR this finding proves unmet, when one motivated it. */
+  nfrId: string | null;
+}
+
 export interface RuleContext {
   graph: CanvasGraph;
   facts: PromptFacts;
@@ -59,7 +74,7 @@ export interface EvalRule {
 }
 
 export interface EngineResult {
-  findings: RuleFinding[];
+  findings: EngineFinding[];
   dimensionScores: DimensionScores;
   overallScore: number;
   grade: Grade;

@@ -1,17 +1,19 @@
 import { Module } from '@nestjs/common';
 
-import { createCritic } from '../../critic/critic.factory';
-import { EvalCritic } from '../../critic/eval-critic';
+import { createLlmClientFromEnv } from '@sysdesign/llm';
+
 import { EvalRunnerService } from './eval-runner.service';
+import { LLM_CLIENT } from './llm.token';
 import { PollerService } from './poller.service';
 
 @Module({
   providers: [
     PollerService,
     EvalRunnerService,
-    // Environment decides once, at boot: real critic with a key, no-op
-    // without one (or under EVAL_DETERMINISTIC=1).
-    { provide: EvalCritic, useFactory: createCritic },
+    // Environment decides once, at boot: real client with a key, no-op
+    // without one (or under EVAL_DETERMINISTIC=1). The LLM passes in the
+    // eval profile check `enabled` and degrade to diagnostics artifacts.
+    { provide: LLM_CLIENT, useFactory: createLlmClientFromEnv },
   ],
 })
 export class PollerModule {}
