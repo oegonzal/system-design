@@ -89,7 +89,7 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
       p99LatencyMs: 500,
       availabilityPct: '99.9',
     },
-    nfrKinds: ['latency', 'throughput'],
+    nfrKinds: ['latency', 'throughput', 'durability', 'observability'],
     nfrs: [
       {
         id: 'rta-lat-tile-query',
@@ -105,8 +105,63 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
         target: 'sustained ingest at stated peak with 3x burst headroom',
         targetSpec: { metric: 'burst_headroom_x', op: '>=', value: 3, unit: 'x' },
       },
+      {
+        id: 'rta-dur-ingest',
+        kind: 'durability',
+        statement: 'Accepted events survive a consumer crash and replay without gaps',
+        target: 'buffer replayable for 24h',
+        targetSpec: { metric: 'buffer_retention_hours', op: '>=', value: 24, unit: 'h' },
+      },
+      {
+        id: 'rta-obs-pipeline',
+        kind: 'observability',
+        statement: 'Pipeline lag and ingest errors surface as alerts before dashboards go stale',
+        target: 'consumer lag alerting in place',
+        targetSpec: null,
+      },
     ],
     functionalText: 'ingest click events; render live dashboards; export historical reports',
+    ...overrides,
+  };
+}
+
+export function mediaFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
+  return {
+    archetype: 'media-streaming-pipeline',
+    difficulty: 'standard',
+    scaleTargets: {
+      concurrentUsers: 120000,
+      requestsPerSecond: 6000,
+      readWriteRatio: '70:30',
+      p99LatencyMs: 400,
+      availabilityPct: '99.9',
+    },
+    nfrKinds: ['durability', 'throughput', 'observability'],
+    nfrs: [
+      {
+        id: 'msp-dur-originals',
+        kind: 'durability',
+        statement: 'An accepted upload is never lost, whatever fails mid-transcode',
+        target: 'zero accepted uploads lost',
+        targetSpec: { metric: 'accepted_uploads_lost', op: '=', value: 0, unit: 'uploads' },
+      },
+      {
+        id: 'msp-thr-transcode',
+        kind: 'throughput',
+        statement: 'The transcode pipeline keeps up with upload peaks without unbounded backlog',
+        target: 'backlog drains within 30 minutes of a peak',
+        targetSpec: { metric: 'backlog_drain_minutes', op: '<=', value: 30, unit: 'min' },
+      },
+      {
+        id: 'msp-obs-pipeline',
+        kind: 'observability',
+        statement: 'A stalled transcode backlog pages someone before uploaders notice',
+        target: 'queue depth and failure-rate alerting in place',
+        targetSpec: null,
+      },
+    ],
+    functionalText:
+      'upload videos; transcode into renditions; stream playback worldwide; search the media catalog',
     ...overrides,
   };
 }
