@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "types": ["vitest/globals", "node"]
+  },
+  "// include": "everything, on purpose: specs are only ever type-checked here, and the lib sources must check under the spec's type roots too",
+  "include": ["src/**/*.ts"]
+}

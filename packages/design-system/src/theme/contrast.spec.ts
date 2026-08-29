@@ -3,13 +3,15 @@ import {
   COLOR_MODES,
   DEFAULT_APPEARANCE_SETTINGS,
   NODE_KINDS,
+  NODE_KIND_CATEGORIES,
+  NODE_KIND_CATEGORY,
   SEVERITIES,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { ACCENT_RAMPS } from './accents';
 import { WCAG_AA_NON_TEXT, WCAG_AA_TEXT, contrastRatio, formatRatio } from './contrast';
-import type { SemanticColors } from './semantic';
+import { CATEGORY_COLORS, NODE_KIND_COLOR_OVERRIDES, type SemanticColors } from './semantic';
 import { createTheme } from './theme';
 
 /**
@@ -215,6 +217,15 @@ describe.each(COLOR_MODES)('%s mode', (colorMode) => {
       );
     });
 
+    // Every category anchor with its authored foreground — covers the three
+    // categories that hold no kinds yet, which the per-kind loop cannot reach.
+    it.each(NODE_KIND_CATEGORIES)(`the $id category pair clears ${WCAG_AA_TEXT}:1`, ({ id }) => {
+      const ratio = contrastRatio(CATEGORY_COLORS[id].fg, color.nodeKindCategory[id]);
+      expect(ratio, `nodeKindCategory.${id} is ${formatRatio(ratio)}`).toBeGreaterThanOrEqual(
+        WCAG_AA_TEXT,
+      );
+    });
+
     it('keeps a disabled control distinguishable from an enabled one', () => {
       expect(color.accent.disabled).not.toBe(color.accent.default);
     });
@@ -247,9 +258,25 @@ describe('the node-kind table', () => {
     expect(Object.keys(color.nodeKindFg).sort()).toEqual([...NODE_KINDS].sort());
   });
 
+  it('covers every category in the contract, and no extras', () => {
+    const declared = NODE_KIND_CATEGORIES.map((category) => category.id);
+    expect(Object.keys(color.nodeKindCategory).sort()).toEqual([...declared].sort());
+  });
+
   it('is mode-independent — domain colour, not theme colour', () => {
     const dark = createTheme({ ...DEFAULT_APPEARANCE_SETTINGS, colorMode: 'dark' }).color;
     expect(dark.nodeKind).toEqual(color.nodeKind);
     expect(dark.nodeKindFg).toEqual(color.nodeKindFg);
+    expect(dark.nodeKindCategory).toEqual(color.nodeKindCategory);
+  });
+
+  // Trivially green while the override table is empty — that is the point:
+  // the day an override lands, it must be a real departure from the category
+  // pair it shadows, or it is dead weight to delete.
+  it('keeps every colour override a genuine departure from its category default', () => {
+    for (const [kind, pair] of Object.entries(NODE_KIND_COLOR_OVERRIDES)) {
+      const fallback = CATEGORY_COLORS[NODE_KIND_CATEGORY[kind as (typeof NODE_KINDS)[number]]];
+      expect(pair, `override for ${kind} restates its category default`).not.toEqual(fallback);
+    }
   });
 });

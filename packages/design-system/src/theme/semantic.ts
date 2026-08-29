@@ -1,4 +1,12 @@
-import type { Accent, ColorMode, NodeKind, Severity } from '@sysdesign/contracts';
+import {
+  NODE_KINDS,
+  NODE_KIND_CATEGORY,
+  type Accent,
+  type ColorMode,
+  type NodeKind,
+  type NodeKindCategoryId,
+  type Severity,
+} from '@sysdesign/contracts';
 
 import { ACCENT_RAMPS } from './accents';
 import { INTENT_PAIRS, MODE_NEUTRALS, SEVERITY_PAIRS, palette, type IntentPair } from './tokens';
@@ -56,74 +64,70 @@ export interface SemanticColors {
   severity: Record<Severity, IntentPair>;
   nodeKind: Record<NodeKind, string>;
   nodeKindFg: Record<NodeKind, string>;
+  /** Category anchor hue — heading dots, legends, anywhere a shelf needs a swatch. */
+  nodeKindCategory: Record<NodeKindCategoryId, string>;
 }
 
 /**
- * Domain palette for the canvas. Typed against the contract's `NodeKind`, so
- * adding a kind to `NODE_KINDS` fails the build here until a colour is chosen
- * — the same trick the API uses to keep its validators honest.
+ * Domain palette for the canvas, authored *per category* rather than per
+ * kind: colour answers "what architectural role is this?", and per-kind
+ * identity is the icon's job. Typed against the contract's
+ * `NodeKindCategoryId`, so declaring a category fails the build here until a
+ * colour is chosen — the same trick the API uses to keep its validators
+ * honest.
  *
  * Deliberately *not* mode-dependent. A node's colour is domain data — a
  * database is green on any surface, the way a subway line keeps its colour on
- * any map — and `nodeKindFg` pairs each background with its own foreground, so
- * the chips are already self-contained in either mode.
+ * any map — and each `fg` pairs its background with its own foreground
+ * (whichever of ink/white clears 4.5:1 — asserted in `contrast.spec.ts`, not
+ * eyeballed), so the chips are self-contained in either mode.
  *
- * The hues group by architectural role, which is what makes a hundred-node
- * diagram scannable: blues for the traffic edge, indigo/violet for compute,
- * greens and teals for data at rest, warm ambers and oranges for caches and
- * messaging (the "hot path"), and neutral grays for the actors the design
- * doesn't own.
+ * The hues keep their long-standing anchors, which is what makes a
+ * hundred-node diagram scannable: light blue at the client edge, deep blues
+ * for traffic, indigo for compute, greens and teals for data at rest, warm
+ * ambers and oranges for caches and messaging (the "hot path"), and neutral
+ * gray for the actors the design doesn't own.
  */
-const nodeKind = {
-  // The actors the design doesn't own.
-  client: '#ccd6e3',
-  'external-api': '#5d6b7d',
-  // The traffic edge — blues, light to deep as requests move inward.
-  cdn: '#85c8f2',
-  dns: '#b6dcf8',
-  gateway: '#2a63ae',
-  'load-balancer': '#5a9ade',
-  // Compute — indigo and violet.
-  service: '#4653c8',
-  worker: '#a99bf2',
-  scheduler: '#8b5fc2',
-  // Data at rest — greens and teals.
-  database: '#1d7a4b',
-  replica: '#8ed6ab',
-  'object-store': '#0f6b74',
-  'search-index': '#7fd8d0',
-  // Caches and messaging — the warm hot path.
-  cache: '#f6c344',
-  queue: '#f19a3f',
-  'event-stream': '#ad4f12',
-} as const satisfies Record<NodeKind, string>;
+export const CATEGORY_COLORS = {
+  'clients-edge': { bg: '#85c8f2', fg: INK },
+  traffic: { bg: '#2a63ae', fg: PAPER },
+  compute: { bg: '#4653c8', fg: PAPER },
+  'data-stores': { bg: '#1d7a4b', fg: PAPER },
+  caching: { bg: '#f6c344', fg: INK },
+  messaging: { bg: '#f19a3f', fg: INK },
+  analytics: { bg: '#0f6b74', fg: PAPER },
+  coordination: { bg: '#8b5fc2', fg: PAPER },
+  security: { bg: '#a63a50', fg: PAPER },
+  observability: { bg: '#8f4b8f', fg: PAPER },
+  external: { bg: '#5d6b7d', fg: PAPER },
+} as const satisfies Record<NodeKindCategoryId, { bg: string; fg: string }>;
 
 /**
- * Text colour for each node chip, chosen per background rather than a blanket
- * white.
- *
- * White fails badly on the lighter kinds (cache would sit near 1.6:1) and ink
- * fails on the deep ones, so each background is paired with whichever of
- * ink/white clears 4.5:1 — asserted in `contrast.spec.ts`, not eyeballed.
+ * Escape hatch for a kind that must not wear its category's colour. Empty on
+ * purpose — per-kind identity is the icon's job — and an entry must supply
+ * *both* `bg` and `fg` as a pair: half an override would silently pair a
+ * custom background with the category's foreground and dodge the contrast
+ * spec's pairing. `contrast.spec.ts` also asserts every override actually
+ * differs from its category default, so a stale entry cannot linger.
  */
-const nodeKindFg = {
-  client: INK,
-  'external-api': PAPER,
-  cdn: INK,
-  dns: INK,
-  gateway: PAPER,
-  'load-balancer': INK,
-  service: PAPER,
-  worker: INK,
-  scheduler: PAPER,
-  database: PAPER,
-  replica: INK,
-  'object-store': PAPER,
-  'search-index': INK,
-  cache: INK,
-  queue: INK,
-  'event-stream': PAPER,
-} as const satisfies Record<NodeKind, string>;
+export const NODE_KIND_COLOR_OVERRIDES: Partial<Record<NodeKind, { bg: string; fg: string }>> = {};
+
+const kindPair = (kind: NodeKind): { bg: string; fg: string } =>
+  NODE_KIND_COLOR_OVERRIDES[kind] ?? CATEGORY_COLORS[NODE_KIND_CATEGORY[kind]];
+
+/** Derived, not authored: every kind wears its category's pair unless overridden. */
+const nodeKind = Object.fromEntries(NODE_KINDS.map((kind) => [kind, kindPair(kind).bg])) as Record<
+  NodeKind,
+  string
+>;
+
+const nodeKindFg = Object.fromEntries(
+  NODE_KINDS.map((kind) => [kind, kindPair(kind).fg]),
+) as Record<NodeKind, string>;
+
+const nodeKindCategory = Object.fromEntries(
+  Object.entries(CATEGORY_COLORS).map(([id, pair]) => [id, pair.bg]),
+) as Record<NodeKindCategoryId, string>;
 
 export interface SemanticColorInput {
   mode: ColorMode;
@@ -195,5 +199,6 @@ export function createSemanticColors({ mode, accent }: SemanticColorInput): Sema
 
     nodeKind: { ...nodeKind },
     nodeKindFg: { ...nodeKindFg },
+    nodeKindCategory: { ...nodeKindCategory },
   };
 }

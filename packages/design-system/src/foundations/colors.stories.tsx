@@ -4,12 +4,14 @@ import {
   ACCENTS,
   COLOR_MODES,
   DEFAULT_APPEARANCE_SETTINGS,
-  NODE_KINDS,
+  NODE_KIND_CATEGORIES,
   SEVERITIES,
+  kindsInCategory,
 } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { WCAG_AA_TEXT, contrastRatio, formatRatio } from '../theme/contrast';
+import { CATEGORY_COLORS } from '../theme/semantic';
 import { transient } from '../theme/styled';
 import { createTheme } from '../theme/theme';
 import { palette } from '../theme/tokens';
@@ -194,27 +196,76 @@ export const AccentMatrix: Story = {
 };
 
 /**
- * All sixteen node kinds, each chip carrying its own paired foreground —
- * mode-independent, so this grid is identical in dark mode. Hues group by
- * architectural role: blues at the traffic edge, indigo/violet for compute,
- * greens and teals for data at rest, warm ambers for the hot path, gray for
- * actors the design doesn't own.
+ * Every node kind, shelved under its contract category and wearing that
+ * category's colour — mode-independent, so this grid is identical in dark
+ * mode. Colour answers "what architectural role is this?" (per-kind identity
+ * is the icon's job): light blue at the client edge, deep blue for traffic,
+ * indigo for compute, green for data at rest, warm ambers for the hot path,
+ * gray for actors the design doesn't own. Categories with no kinds yet render
+ * nothing here; `NodeCategories` below shows the full colour table.
  */
 export const NodeKinds: Story = {
   render: function NodeKindsStory() {
     const theme = useTheme();
 
     return (
+      <>
+        {NODE_KIND_CATEGORIES.map((category) => {
+          const kinds = kindsInCategory(category.id);
+          if (kinds.length === 0) return null;
+
+          return (
+            <div key={category.id}>
+              <GroupTitle>{category.label}</GroupTitle>
+              <Grid>
+                {kinds.map((kind) => (
+                  <KindChip
+                    key={kind}
+                    $bg={theme.color.nodeKind[kind]}
+                    $fg={theme.color.nodeKindFg[kind]}
+                  >
+                    {kind}
+                    <code>
+                      {theme.color.nodeKind[kind]} ·{' '}
+                      {formatRatio(
+                        contrastRatio(theme.color.nodeKindFg[kind], theme.color.nodeKind[kind]),
+                      )}
+                    </code>
+                  </KindChip>
+                ))}
+              </Grid>
+            </div>
+          );
+        })}
+      </>
+    );
+  },
+};
+
+/**
+ * The eleven category anchors behind `nodeKind` — including the categories
+ * that hold no kinds yet, which `NodeKinds` above cannot show. Each pair
+ * prints its computed ratio, same as every other swatch in this catalog.
+ */
+export const NodeCategories: Story = {
+  render: function NodeCategoriesStory() {
+    const theme = useTheme();
+
+    return (
       <Grid>
-        {NODE_KINDS.map((kind) => (
-          <KindChip key={kind} $bg={theme.color.nodeKind[kind]} $fg={theme.color.nodeKindFg[kind]}>
-            {kind}
-            <code>
-              {theme.color.nodeKind[kind]} ·{' '}
-              {formatRatio(contrastRatio(theme.color.nodeKindFg[kind], theme.color.nodeKind[kind]))}
-            </code>
-          </KindChip>
-        ))}
+        {NODE_KIND_CATEGORIES.map((category) => {
+          const bg = theme.color.nodeKindCategory[category.id];
+          const { fg } = CATEGORY_COLORS[category.id];
+
+          return (
+            <KindChip key={category.id} $bg={bg} $fg={fg}>
+              {category.label}
+              <code>
+                {bg} · {formatRatio(contrastRatio(fg, bg))}
+              </code>
+            </KindChip>
+          );
+        })}
       </Grid>
     );
   },
