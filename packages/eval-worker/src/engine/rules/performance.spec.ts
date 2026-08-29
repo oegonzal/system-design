@@ -230,3 +230,119 @@ describe('performance.replica-unused-for-reads', () => {
     expect(rule.check(contextFor(plain))).toEqual([]);
   });
 });
+
+describe('performance.data-lake-serves-users', () => {
+  const rule = ruleById('performance.data-lake-serves-users');
+
+  it('fires when a client path reaches the lake', () => {
+    const crawled = graph(
+      [node('client-1', 'client'), node('svc-1', 'service'), node('lake-1', 'data-lake')],
+      [edge('e1', 'client-1', 'svc-1'), edge('e2', 'svc-1', 'lake-1')],
+    );
+    const findings = rule.check(contextFor(crawled));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['client-1', 'lake-1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent when the lake only feeds pipelines', () => {
+    const pipelined = graph(
+      [
+        node('client-1', 'client'),
+        node('svc-1', 'service'),
+        node('db-1', 'database'),
+        node('lake-1', 'data-lake'),
+        node('worker-1', 'worker'),
+      ],
+      [
+        edge('e1', 'client-1', 'svc-1'),
+        edge('e2', 'svc-1', 'db-1'),
+        edge('e3', 'worker-1', 'lake-1', 'async'),
+      ],
+    );
+    expect(rule.check(contextFor(pipelined))).toEqual([]);
+  });
+});
+
+describe('performance.ml-inference-unguarded', () => {
+  const rule = ruleById('performance.ml-inference-unguarded');
+
+  it('fires on sync inference with neither timeout nor fallback', () => {
+    const tail = graph(
+      [node('svc-1', 'service'), node('ml-1', 'ml-inference')],
+      [edge('e1', 'svc-1', 'ml-1')],
+    );
+    const findings = rule.check(contextFor(tail));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['ml-1', 'svc-1']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'ml-1', set: { config: { timeoutMs: 500, fallback: true } } },
+    ]);
+  });
+
+  it('stays silent once a timeout or a fallback guards the call', () => {
+    const bounded = graph(
+      [node('svc-1', 'service'), node('ml-1', 'ml-inference', { config: { timeoutMs: 250 } })],
+      [edge('e1', 'svc-1', 'ml-1')],
+    );
+    expect(rule.check(contextFor(bounded))).toEqual([]);
+    const degradable = graph(
+      [node('svc-1', 'service'), node('ml-1', 'ml-inference', { config: { fallback: true } })],
+      [edge('e1', 'svc-1', 'ml-1')],
+    );
+    expect(rule.check(contextFor(degradable))).toEqual([]);
+  });
+
+  it('stays silent when inference is called asynchronously', () => {
+    const buffered = graph(
+      [node('worker-1', 'worker'), node('ml-1', 'ml-inference')],
+      [edge('e1', 'worker-1', 'ml-1', 'async')],
+    );
+    expect(rule.check(contextFor(buffered))).toEqual([]);
+  });
+});
+
+describe('performance.serverless-cold-hot-path', () => {
+  const rule = ruleById('performance.serverless-cold-hot-path');
+  const hotPath = graph(
+    [node('client-1', 'client'), node('gw-1', 'gateway'), node('fn-1', 'serverless-function')],
+    [edge('e1', 'client-1', 'gw-1'), edge('e2', 'gw-1', 'fn-1')],
+  );
+
+  it('fires on an unwarmed function serving a tight sync path', () => {
+    const findings = rule.check(contextFor(hotPath));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('low');
+    expect(findings[0].affectedNodeIds).toEqual(['fn-1']);
+    expect(findings[0].suggestion?.ops).toEqual([
+      { op: 'update-node', nodeId: 'fn-1', set: { config: { provisionedConcurrency: 10 } } },
+    ]);
+  });
+
+  it('stays silent when the function is provisioned or off the sync path', () => {
+    const warmed = graph(
+      [
+        node('client-1', 'client'),
+        node('gw-1', 'gateway'),
+        node('fn-1', 'serverless-function', { config: { provisionedConcurrency: 5 } }),
+      ],
+      hotPath.edges,
+    );
+    expect(rule.check(contextFor(warmed))).toEqual([]);
+    const offPath = graph(
+      [node('client-1', 'client'), node('gw-1', 'gateway'), node('fn-1', 'serverless-function')],
+      [edge('e1', 'client-1', 'gw-1'), edge('e2', 'gw-1', 'fn-1', 'async')],
+    );
+    expect(rule.check(contextFor(offPath))).toEqual([]);
+  });
+
+  it('stays silent on a relaxed latency budget', () => {
+    const relaxed = flashSaleFacts({
+      scaleTargets: { ...flashSaleFacts().scaleTargets, p99LatencyMs: 800 },
+    });
+    expect(rule.check(contextFor(hotPath, relaxed))).toEqual([]);
+  });
+});

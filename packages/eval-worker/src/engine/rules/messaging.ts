@@ -2,7 +2,7 @@
  * Messaging: are bursts absorbed and consumers decoupled, or is everything a
  * synchronous chain that fails together?
  */
-import type { PatchOp } from '@sysdesign/contracts';
+import type { NodeKind, PatchOp } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
 import { formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
@@ -154,4 +154,128 @@ const queueNoDlq: EvalRule = {
   },
 };
 
-export const messagingRules: EvalRule[] = [noQueueForSpike, noEventStreamFanout, queueNoDlq];
+const pubSubSingleSubscriber: EvalRule = {
+  id: 'messaging.pub-sub-single-subscriber',
+  dimension: 'messaging',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const topic of sortById(index.byKind('pub-sub'))) {
+      const outs = index.outEdges(topic.id);
+      if (outs.length !== 1) continue;
+      findings.push({
+        ruleId: pubSubSingleSubscriber.id,
+        dimension: 'messaging',
+        severity: 'info',
+        title: 'Pub/sub topic with a single subscriber',
+        message: `"${topic.label}" fans out to exactly one subscriber, which is the shape of a queue wearing a topic's costume. A topic pays for fan-out semantics — every subscriber gets every message — and with one consumer that buys nothing a queue does not do better: queues give you competing consumers, per-message acknowledgement, and a natural DLQ story.`,
+        affectedNodeIds: [topic.id],
+        affectedEdgeIds: [outs[0].id],
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+/** The stores and channels a CDC relay can legitimately feed. */
+const CDC_SINK_KINDS: readonly NodeKind[] = [
+  'queue',
+  'event-stream',
+  'search-index',
+  'data-warehouse',
+  'object-store',
+  'kv-store',
+];
+
+const cdcDangling: EvalRule = {
+  id: 'messaging.cdc-dangling',
+  dimension: 'messaging',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const connector of sortById(index.byKind('cdc-connector'))) {
+      const hasSource = index
+        .inEdges(connector.id)
+        .some((edge) => index.byId(edge.source)?.kind === 'database');
+      const hasSink = index.outEdges(connector.id).some((edge) => {
+        const kind = index.byId(edge.target)?.kind;
+        return kind !== undefined && CDC_SINK_KINDS.includes(kind);
+      });
+      if (hasSource && hasSink) continue;
+      findings.push({
+        ruleId: cdcDangling.id,
+        dimension: 'messaging',
+        severity: 'medium',
+        title: 'CDC connector wired to nothing it can relay',
+        message: `"${connector.label}" ${hasSource ? 'reads a commit log but delivers it nowhere — no stream, queue, or derived store consumes what it captures' : 'has no database feeding it, so there is no commit log to capture changes from'}. A CDC relay is a pipe with two mandatory ends: the database whose commits it tails, and the stream or derived store those commits become.`,
+        affectedNodeIds: [connector.id],
+        affectedEdgeIds: [],
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+const notificationOnRequestPath: EvalRule = {
+  id: 'messaging.notification-on-request-path',
+  dimension: 'messaging',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const edge of sortById(index.edges())) {
+      if (index.edgeKind(edge) !== 'sync') continue;
+      const source = index.byId(edge.source);
+      const target = index.byId(edge.target);
+      if (source?.kind !== 'service' || target?.kind !== 'notification-service') continue;
+      findings.push({
+        ruleId: notificationOnRequestPath.id,
+        dimension: 'messaging',
+        severity: 'medium',
+        title: 'Notifications dispatched on the request path',
+        message: `"${source.label}" calls "${target.label}" synchronously, so every request waits on push/email/SMS providers — the flakiest, most rate-limited dependencies in the graph — before it can answer. Nobody's checkout should fail because an email was slow: enqueue the notification and let a consumer dispatch it off the request path.`,
+        affectedNodeIds: uniqueSorted([edge.source, edge.target]),
+        affectedEdgeIds: [edge.id],
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+const paymentWebhooksDirect: EvalRule = {
+  id: 'messaging.payment-webhooks-direct',
+  dimension: 'messaging',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const provider of sortById(index.byKind('payment-provider'))) {
+      if (provider.config?.webhooks !== true) continue;
+      const direct = sortById(
+        index.outEdges(provider.id).filter((edge) => {
+          const kind = index.byId(edge.target)?.kind;
+          return kind === 'service' || kind === 'worker';
+        }),
+      );
+      if (direct.length === 0) continue;
+      findings.push({
+        ruleId: paymentWebhooksDirect.id,
+        dimension: 'messaging',
+        severity: 'medium',
+        title: 'Payment webhooks land directly on compute',
+        message: `"${provider.label}" delivers webhooks straight into your handlers with no queue or topic between, so the provider's retry storm after your next deploy arrives as a burst your compute must absorb mid-restart — and every callback missed in that window is a payment state you no longer know about. Land webhooks on a buffer: acknowledge fast, process at your own pace, and replay what the outage missed.`,
+        affectedNodeIds: uniqueSorted([provider.id, ...direct.map((edge) => edge.target)]),
+        affectedEdgeIds: uniqueSorted(direct.map((edge) => edge.id)),
+        suggestion: null,
+      });
+    }
+    return findings;
+  },
+};
+
+export const messagingRules: EvalRule[] = [
+  noQueueForSpike,
+  noEventStreamFanout,
+  queueNoDlq,
+  pubSubSingleSubscriber,
+  cdcDangling,
+  notificationOnRequestPath,
+  paymentWebhooksDirect,
+];

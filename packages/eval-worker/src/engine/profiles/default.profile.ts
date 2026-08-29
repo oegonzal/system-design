@@ -97,6 +97,9 @@ export const DEFAULT_PROFILE: EvalProfile = {
       { ruleId: 'reliability.nothing-monitored', whenExpectationUnmet: 'exp.dag.runs-observed' },
       { ruleId: 'scalability.no-autoscaling', whenExpectationUnmet: 'exp.fst.cost-scale-down' },
       { ruleId: 'scalability.no-autoscaling', whenExpectationUnmet: 'exp.dag.scale-to-zero' },
+      // When queued dispatch is unmet, the missing queue is already the
+      // lesson — the sync-dispatch rule would grade the same edge twice.
+      { ruleId: 'dag.sync-dispatch', whenExpectationUnmet: 'exp.dag.dispatch-queue' },
     ],
   },
 };

@@ -111,3 +111,143 @@ describe('messaging.queue-no-dlq', () => {
     expect(rule.check(contextFor(chained))).toEqual([]);
   });
 });
+
+describe('messaging.pub-sub-single-subscriber', () => {
+  const rule = ruleById('messaging.pub-sub-single-subscriber');
+
+  it('fires on a topic that fans out to exactly one subscriber', () => {
+    const lonely = graph(
+      [node('svc-1', 'service'), node('topic-1', 'pub-sub'), node('worker-1', 'worker')],
+      [edge('e1', 'svc-1', 'topic-1', 'async'), edge('e2', 'topic-1', 'worker-1', 'async')],
+    );
+    const findings = rule.check(contextFor(lonely));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('info');
+    expect(findings[0].affectedNodeIds).toEqual(['topic-1']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e2']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent with real fan-out or no subscribers yet', () => {
+    const fanned = graph(
+      [
+        node('svc-1', 'service'),
+        node('topic-1', 'pub-sub'),
+        node('worker-1', 'worker'),
+        node('worker-2', 'worker'),
+      ],
+      [
+        edge('e1', 'svc-1', 'topic-1', 'async'),
+        edge('e2', 'topic-1', 'worker-1', 'async'),
+        edge('e3', 'topic-1', 'worker-2', 'async'),
+      ],
+    );
+    expect(rule.check(contextFor(fanned))).toEqual([]);
+    const unwired = graph(
+      [node('svc-1', 'service'), node('topic-1', 'pub-sub')],
+      [edge('e1', 'svc-1', 'topic-1', 'async')],
+    );
+    expect(rule.check(contextFor(unwired))).toEqual([]);
+  });
+});
+
+describe('messaging.cdc-dangling', () => {
+  const rule = ruleById('messaging.cdc-dangling');
+
+  it('fires when the connector has no sink for what it captures', () => {
+    const deadEnd = graph(
+      [node('db-1', 'database'), node('cdc-1', 'cdc-connector'), node('svc-1', 'service')],
+      [edge('e1', 'db-1', 'cdc-1', 'async'), edge('e2', 'cdc-1', 'svc-1', 'async')],
+    );
+    const findings = rule.check(contextFor(deadEnd));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['cdc-1']);
+    expect(findings[0].message).toContain('delivers it nowhere');
+  });
+
+  it('fires when no database feeds the connector', () => {
+    const sourceless = graph(
+      [node('cdc-1', 'cdc-connector'), node('stream-1', 'event-stream')],
+      [edge('e1', 'cdc-1', 'stream-1', 'async')],
+    );
+    const findings = rule.check(contextFor(sourceless));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain('no database feeding it');
+  });
+
+  it('stays silent on a connector with both ends wired', () => {
+    const wired = graph(
+      [node('db-1', 'database'), node('cdc-1', 'cdc-connector'), node('search-1', 'search-index')],
+      [edge('e1', 'db-1', 'cdc-1', 'async'), edge('e2', 'cdc-1', 'search-1', 'async')],
+    );
+    expect(rule.check(contextFor(wired))).toEqual([]);
+  });
+});
+
+describe('messaging.notification-on-request-path', () => {
+  const rule = ruleById('messaging.notification-on-request-path');
+
+  it('fires on a synchronous call into the notification service', () => {
+    const blocking = graph(
+      [node('svc-1', 'service'), node('notify-1', 'notification-service')],
+      [edge('e1', 'svc-1', 'notify-1')],
+    );
+    const findings = rule.check(contextFor(blocking));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['notify-1', 'svc-1']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent when dispatch is async or buffered through a queue', () => {
+    const asyncDispatch = graph(
+      [node('svc-1', 'service'), node('notify-1', 'notification-service')],
+      [edge('e1', 'svc-1', 'notify-1', 'async')],
+    );
+    expect(rule.check(contextFor(asyncDispatch))).toEqual([]);
+    const buffered = graph(
+      [node('svc-1', 'service'), node('q-1', 'queue'), node('notify-1', 'notification-service')],
+      [edge('e1', 'svc-1', 'q-1', 'async'), edge('e2', 'q-1', 'notify-1', 'async')],
+    );
+    expect(rule.check(contextFor(buffered))).toEqual([]);
+  });
+});
+
+describe('messaging.payment-webhooks-direct', () => {
+  const rule = ruleById('messaging.payment-webhooks-direct');
+
+  it('fires when webhooks land straight on compute', () => {
+    const direct = graph(
+      [node('pay-1', 'payment-provider', { config: { webhooks: true } }), node('svc-1', 'service')],
+      [edge('e1', 'pay-1', 'svc-1', 'async')],
+    );
+    const findings = rule.check(contextFor(direct));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].affectedNodeIds).toEqual(['pay-1', 'svc-1']);
+    expect(findings[0].affectedEdgeIds).toEqual(['e1']);
+    expect(findings[0].suggestion).toBeNull();
+  });
+
+  it('stays silent when webhooks land on a buffer first', () => {
+    const buffered = graph(
+      [
+        node('pay-1', 'payment-provider', { config: { webhooks: true } }),
+        node('q-1', 'queue'),
+        node('worker-1', 'worker'),
+      ],
+      [edge('e1', 'pay-1', 'q-1', 'async'), edge('e2', 'q-1', 'worker-1', 'async')],
+    );
+    expect(rule.check(contextFor(buffered))).toEqual([]);
+  });
+
+  it('stays silent when the provider does not deliver webhooks', () => {
+    const polling = graph(
+      [node('pay-1', 'payment-provider'), node('svc-1', 'service')],
+      [edge('e1', 'pay-1', 'svc-1', 'async')],
+    );
+    expect(rule.check(contextFor(polling))).toEqual([]);
+  });
+});

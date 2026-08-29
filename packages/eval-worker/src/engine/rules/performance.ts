@@ -4,7 +4,7 @@
 import type { GraphPatch } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
-import { formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
+import { configNumber, formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
 
 const noCdnStatic: EvalRule = {
   id: 'performance.no-cdn-static',
@@ -188,10 +188,120 @@ const replicaUnusedForReads: EvalRule = {
   },
 };
 
+const dataLakeServesUsers: EvalRule = {
+  id: 'performance.data-lake-serves-users',
+  dimension: 'performance',
+  check({ index }) {
+    const lakes = sortById(index.byKind('data-lake'));
+    const clients = sortById(index.clients());
+    const offenders: Array<{ clientId: string; lakeId: string }> = [];
+    for (const client of clients) {
+      for (const lake of lakes) {
+        if (index.pathExists(client.id, lake.id)) {
+          offenders.push({ clientId: client.id, lakeId: lake.id });
+        }
+      }
+    }
+    if (offenders.length === 0) return [];
+    const firstLake = index.byId(offenders[0].lakeId);
+    if (!firstLake) return [];
+    return [
+      {
+        ruleId: dataLakeServesUsers.id,
+        dimension: 'performance',
+        severity: 'medium',
+        title: 'User requests reach the data lake',
+        message: `A client path leads into "${firstLake.label}", and a lake is schema-on-read storage built for batch scans — a user query against it is a full-file crawl with seconds-to-minutes latency, not an index lookup. The lake feeds pipelines; users read from a serving layer (a database, cache, or warehouse aggregate) that those pipelines keep current.`,
+        affectedNodeIds: uniqueSorted(offenders.flatMap((o) => [o.clientId, o.lakeId])),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const mlInferenceUnguarded: EvalRule = {
+  id: 'performance.ml-inference-unguarded',
+  dimension: 'performance',
+  check({ index }) {
+    const findings: RuleFinding[] = [];
+    for (const model of sortById(index.byKind('ml-inference'))) {
+      if (configNumber(model, 'timeoutMs') !== undefined || model.config?.fallback === true) {
+        continue;
+      }
+      const syncCallers = sortById(
+        index.inEdges(model.id).filter((edge) => index.edgeKind(edge) === 'sync'),
+      );
+      if (syncCallers.length === 0) continue;
+      findings.push({
+        ruleId: mlInferenceUnguarded.id,
+        dimension: 'performance',
+        severity: 'medium',
+        title: 'Synchronous inference with no timeout or fallback',
+        message: `"${model.label}" sits on a synchronous path with neither a timeout nor a fallback, and model serving has the widest latency tail in the graph — a cold model, a saturated GPU, or a big input turns one slow inference into the whole request's latency. Bound the call with a timeout and define what the caller returns when it fires; a slightly staler answer beats a spinner every time.`,
+        affectedNodeIds: uniqueSorted([model.id, ...syncCallers.map((edge) => edge.source)]),
+        affectedEdgeIds: uniqueSorted(syncCallers.map((edge) => edge.id)),
+        suggestion: {
+          description: 'Bound the inference call and give the caller a fallback answer.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: model.id,
+              set: { config: { ...(model.config ?? {}), timeoutMs: 500, fallback: true } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
+const serverlessColdHotPath: EvalRule = {
+  id: 'performance.serverless-cold-hot-path',
+  dimension: 'performance',
+  check({ facts, index }) {
+    if (facts.scaleTargets.p99LatencyMs > 300) return [];
+    const clients = sortById(index.clients());
+    if (clients.length === 0) return [];
+    const findings: RuleFinding[] = [];
+    for (const fn of sortById(index.byKind('serverless-function'))) {
+      if (configNumber(fn, 'provisionedConcurrency') !== undefined) continue;
+      const onHotPath = clients.some((client) =>
+        index.pathExists(client.id, fn.id, { edgeKinds: ['sync'] }),
+      );
+      if (!onHotPath) continue;
+      findings.push({
+        ruleId: serverlessColdHotPath.id,
+        dimension: 'performance',
+        severity: 'low',
+        title: 'Cold starts on a tight latency budget',
+        message: `"${fn.label}" serves a synchronous client path against a p99 budget of ${formatInt(facts.scaleTargets.p99LatencyMs)}ms, and an unwarmed function's cold start alone can spend that budget before a line of handler runs. Provisioned concurrency keeps instances warm for the hot path — or move the function off the synchronous path entirely.`,
+        affectedNodeIds: [fn.id],
+        affectedEdgeIds: [],
+        suggestion: {
+          description: 'Keep warm instances ready so the hot path never pays a cold start.',
+          ops: [
+            {
+              op: 'update-node',
+              nodeId: fn.id,
+              set: { config: { ...(fn.config ?? {}), provisionedConcurrency: 10 } },
+            },
+          ],
+        },
+      });
+    }
+    return findings;
+  },
+};
+
 export const performanceRules: EvalRule[] = [
   noCdnStatic,
   chattyClient,
   deepSyncChain,
   originServesMedia,
   replicaUnusedForReads,
+  dataLakeServesUsers,
+  mlInferenceUnguarded,
+  serverlessColdHotPath,
 ];

@@ -4,6 +4,7 @@
  * it in rubric order makes the catalog easy to audit against the dimensions.
  */
 import type { EvalRule } from '../types';
+import { dagRules } from './dag';
 import { dataRules } from './data';
 import { hygieneRules } from './hygiene';
 import { messagingRules } from './messaging';
@@ -20,4 +21,7 @@ export const RULES: EvalRule[] = [
   ...messagingRules,
   ...securityRules,
   ...hygieneRules,
+  // Archetype packs sit after the dimension files; each rule still registers
+  // under the dimension its lesson belongs to.
+  ...dagRules,
 ];
