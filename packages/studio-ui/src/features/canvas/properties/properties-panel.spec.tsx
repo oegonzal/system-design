@@ -1,3 +1,4 @@
+import { NODE_KINDS, NODE_KIND_CATEGORIES, kindsInCategory } from '@sysdesign/contracts';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -47,6 +48,24 @@ describe('PropertiesPanel', () => {
     await user.selectOptions(screen.getByLabelText('Kind'), 'worker');
 
     expect(store.getState().nodes.find((node) => node.id === 'n-2')?.data.kind).toBe('worker');
+  });
+
+  it('[UX-4] groups the kind select into one optgroup per non-empty category', () => {
+    renderPanel((seeded) => seeded.getState().select('n-2'));
+
+    const select = screen.getByLabelText('Kind') as HTMLSelectElement;
+    const nonEmpty = NODE_KIND_CATEGORIES.filter(
+      (category) => kindsInCategory(category.id).length > 0,
+    );
+
+    const groups = Array.from(select.querySelectorAll('optgroup'));
+    expect(groups.map((group) => group.label)).toEqual(nonEmpty.map((category) => category.label));
+
+    // Options show human labels; values stay the contract slugs the store writes.
+    expect(select.options).toHaveLength(NODE_KINDS.length);
+    const loadBalancer = select.querySelector('option[value="load-balancer"]');
+    expect(loadBalancer?.textContent).toBe('Load Balancer');
+    expect(loadBalancer?.closest('optgroup')?.label).toBe('Traffic & Routing');
   });
 
   it('writes kind-specific config keys the eval rules read', async () => {

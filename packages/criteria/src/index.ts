@@ -17,6 +17,10 @@ export const CRITERIA: readonly Criterion[] = [
   { id: 'UX-1', statement: 'The palette offers every system-design node kind in the contract.' },
   { id: 'UX-2', statement: 'Nodes can be added, connected, edited and deleted on the canvas.' },
   { id: 'UX-3', statement: 'Edges distinguish sync from async communication.' },
+  {
+    id: 'UX-4',
+    statement: 'Palette blocks are grouped into visible categories and filterable by name.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

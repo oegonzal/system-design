@@ -1,11 +1,17 @@
 'use client';
 
 import styled from '@emotion/styled';
-import { EDGE_KINDS, NODE_KINDS } from '@sysdesign/contracts';
+import {
+  EDGE_KINDS,
+  NODE_KIND_CATEGORIES,
+  kindsInCategory,
+  type NodeKind,
+} from '@sysdesign/contracts';
 import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
 
 import { SelectField, TextField } from '../../../components/fields';
 import { useCanvasStore } from '../canvas-store-context';
+import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import { NodeConfigFields } from './node-config-fields';
 
 const Root = styled.aside`
@@ -66,15 +72,25 @@ export function PropertiesPanel() {
             value={node.data.kind}
             onChange={(event) =>
               updateNode(node.id, {
-                kind: event.target.value as (typeof NODE_KINDS)[number],
+                kind: event.target.value as NodeKind,
               })
             }
           >
-            {NODE_KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind}
-              </option>
-            ))}
+            {/* One group per contract category; a category with no kinds renders nothing. */}
+            {NODE_KIND_CATEGORIES.map((category) => {
+              const kinds = kindsInCategory(category.id);
+              if (kinds.length === 0) return null;
+
+              return (
+                <optgroup key={category.id} label={category.label}>
+                  {kinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {DEFAULT_NODE_LABELS[kind]}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </SelectField>
           <NodeConfigFields
             kind={node.data.kind}
