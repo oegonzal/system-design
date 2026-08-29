@@ -295,7 +295,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     summary: 'Solid read path; reliability is the weak dimension.',
     engineVersion: '2.0.0',
     profileId: 'default',
-    profileVersion: '2.0.0',
+    profileVersion: '2.1.0',
     capApplied: null,
     criticModel: null,
     error: null,

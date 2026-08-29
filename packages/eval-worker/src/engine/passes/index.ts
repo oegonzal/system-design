@@ -7,6 +7,7 @@ import type { EvalPass } from '../core/types';
 import { createCriticPass } from './critic/critic.pass';
 import { createDepthPass } from './depth/depth.pass';
 import { createExpectationsPass } from './expectations/expectations.pass';
+import { createNarrativePass } from './narrative/narrative.pass';
 import { createRulesPass } from './rules/rules.pass';
 import { createScenariosPass } from './scenarios/scenarios.pass';
 
@@ -16,6 +17,7 @@ export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
     createExpectationsPass(),
     createCriticPass(),
     createDepthPass(),
+    createNarrativePass(),
     createScenariosPass(),
   ];
   return new Map(passes.map((pass) => [pass.id, pass]));

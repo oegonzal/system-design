@@ -34,6 +34,30 @@ describe('describeDesign', () => {
     );
   });
 
+  it('appends the design narrative as its own section when one is submitted', () => {
+    const canvas = graph([node('n-1', 'client')]);
+    const { text } = describeDesign(canvas, flashSaleFacts(), 'The client asks; nobody answers.');
+    expect(text).toContain(
+      "# Design narrative (the author's own explanation)\nThe client asks; nobody answers.",
+    );
+    expect(describeDesign(canvas, flashSaleFacts()).text).not.toContain('# Design narrative');
+    expect(describeDesign(canvas, flashSaleFacts(), '   ').text).not.toContain(
+      '# Design narrative',
+    );
+  });
+
+  it('clips an oversized narrative at 2000 chars with its own marker', () => {
+    const long = 'w'.repeat(2500);
+    const { text, clipped } = describeDesign(
+      graph([node('n-1', 'client')]),
+      flashSaleFacts(),
+      long,
+    );
+    expect(clipped).toBe(false); // the whole document still fits the budget
+    expect(text).toContain(`${'w'.repeat(2000)} […narrative clipped]`);
+    expect(text).not.toContain('w'.repeat(2001));
+  });
+
   it('clips oversized designs with a deterministic marker', () => {
     const many = graph(
       Array.from({ length: 100 }, (_, i) => node(`n-${i}`, 'service', { label: 'x'.repeat(400) })),

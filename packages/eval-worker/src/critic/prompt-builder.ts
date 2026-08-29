@@ -15,6 +15,9 @@ export const CRITIC_SYSTEM_PROMPT = [
   'When operations are declared, also judge the API design itself — operation',
   'granularity, naming clarity, kind fit, idempotency choices, and how tightly',
   'callers couple to each surface.',
+  'When a design narrative is submitted, cross-examine it against the diagram:',
+  'flag components the story leaves unexplained, claims the diagram does not',
+  'implement, and flows described differently than drawn.',
 ].join(' ');
 
 /**
@@ -25,6 +28,7 @@ export const CRITIC_SYSTEM_PROMPT = [
 export function buildCriticUserPrompt({
   graph,
   facts,
+  narrative,
   deterministicFindings,
 }: CriticInput): string {
   const alreadyFound =
@@ -35,7 +39,7 @@ export function buildCriticUserPrompt({
           .join('\n');
 
   return [
-    describeDesign(graph, facts).text,
+    describeDesign(graph, facts, narrative).text,
     ``,
     `# Already found by the rule engine (do not repeat)`,
     alreadyFound,

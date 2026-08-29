@@ -12,6 +12,8 @@ import type { PromptFacts } from '../types';
 const MAX_SERIALIZED_OPS = 8;
 /** Notes are context, not content — clip them before they dominate the line. */
 const MAX_SERIALIZED_NOTE_LENGTH = 60;
+/** The narrative rides along whole up to this; beyond it, the graph wins the budget. */
+const MAX_SERIALIZED_NARRATIVE_CHARS = 2_000;
 /**
  * Whole-document ceiling. A 100-node canvas with full interfaces stays well
  * under this; anything larger is clipped with a deterministic marker and the
@@ -67,10 +69,15 @@ export function renderEdgeLine(edge: CanvasGraph['edges'][number]): string {
 
 /**
  * The shared document: the prompt (scale, every NFR with statement and
- * target, functional text) followed by the candidate design. Callers append
- * their own pass-specific sections before sending.
+ * target, functional text) followed by the candidate design and — when the
+ * author submitted one — the design narrative, so every LLM pass reads the
+ * same story. Callers append their own pass-specific sections before sending.
  */
-export function describeDesign(graph: CanvasGraph, facts: PromptFacts): GraphText {
+export function describeDesign(
+  graph: CanvasGraph,
+  facts: PromptFacts,
+  narrative: string | null = null,
+): GraphText {
   const targets = facts.scaleTargets;
   const nfrs =
     facts.nfrs.length === 0
@@ -86,6 +93,18 @@ export function describeDesign(graph: CanvasGraph, facts: PromptFacts): GraphTex
             }`,
         );
 
+  const story = narrative?.trim() ?? '';
+  const narrativeSection =
+    story.length === 0
+      ? []
+      : [
+          ``,
+          `# Design narrative (the author's own explanation)`,
+          story.length > MAX_SERIALIZED_NARRATIVE_CHARS
+            ? `${story.slice(0, MAX_SERIALIZED_NARRATIVE_CHARS)} […narrative clipped]`
+            : story,
+        ];
+
   const full = [
     `# Design prompt`,
     `archetype: ${facts.archetype} · difficulty: ${facts.difficulty}`,
@@ -100,6 +119,7 @@ export function describeDesign(graph: CanvasGraph, facts: PromptFacts): GraphTex
     `# Candidate design (canvas graph)`,
     ...graph.nodes.map(renderNodeLine),
     ...graph.edges.map(renderEdgeLine),
+    ...narrativeSection,
   ].join('\n');
 
   if (full.length <= GRAPH_TEXT_MAX_CHARS) return { text: full, clipped: false };

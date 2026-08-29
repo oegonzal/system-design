@@ -10,12 +10,13 @@ import type { EvalProfile } from '../core/profile';
 import { CRITIC_PASS_ID } from '../passes/critic/critic.pass';
 import { DEPTH_PASS_ID } from '../passes/depth/depth.pass';
 import { EXPECTATIONS_PASS_ID } from '../passes/expectations/expectations.pass';
+import { NARRATIVE_PASS_ID } from '../passes/narrative/narrative.pass';
 import { RULES_PASS_ID } from '../passes/rules/rules.pass';
 import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '2.0.0',
+  version: '2.1.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -34,6 +35,7 @@ export const DEFAULT_PROFILE: EvalProfile = {
     { pass: EXPECTATIONS_PASS_ID, enabled: true },
     { pass: CRITIC_PASS_ID, enabled: true },
     { pass: DEPTH_PASS_ID, enabled: true },
+    { pass: NARRATIVE_PASS_ID, enabled: true },
     { pass: SCENARIOS_PASS_ID, enabled: true },
   ],
   scoring: {

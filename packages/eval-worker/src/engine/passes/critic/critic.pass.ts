@@ -34,6 +34,7 @@ export function createCriticPass(): EvalPass {
       const critique = await new AnthropicCritic(ctx.llm).review({
         graph: ctx.graph,
         facts: ctx.facts,
+        narrative: ctx.narrative,
         deterministicFindings,
       });
 

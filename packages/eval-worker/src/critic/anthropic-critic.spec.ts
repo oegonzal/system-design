@@ -70,7 +70,12 @@ describe('AnthropicCritic', () => {
       }),
     );
 
-    const result = await critic.review({ graph, facts, deterministicFindings: [] });
+    const result = await critic.review({
+      graph,
+      facts,
+      narrative: null,
+      deterministicFindings: [],
+    });
 
     expect(result.model).toBe('claude-sonnet-5');
     expect(result.summary).toContain('write path');
@@ -80,7 +85,12 @@ describe('AnthropicCritic', () => {
 
   it('resolves to the empty critique when the llm returns null', async () => {
     const critic = new AnthropicCritic(fakeLlm(null));
-    const result = await critic.review({ graph, facts, deterministicFindings: [] });
+    const result = await critic.review({
+      graph,
+      facts,
+      narrative: null,
+      deterministicFindings: [],
+    });
     expect(result).toEqual({ findings: [], summary: null, model: null });
   });
 });

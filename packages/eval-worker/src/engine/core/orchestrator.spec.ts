@@ -27,6 +27,7 @@ describe('runEvaluation', () => {
       'expectations.banks:findings',
       'llm.critic:diagnostics',
       'llm.depth:diagnostics',
+      'llm.narrative:diagnostics',
       'llm.scenarios:diagnostics',
     ]);
     expect(run.result.annotations).toBeNull();

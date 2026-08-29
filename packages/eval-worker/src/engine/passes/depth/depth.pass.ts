@@ -59,7 +59,7 @@ export function createDepthPass(): EvalPass {
         ];
       }
 
-      const design = describeDesign(ctx.graph, ctx.facts);
+      const design = describeDesign(ctx.graph, ctx.facts, ctx.narrative);
       const critique = await ctx.llm.completeStructured({
         system: SYSTEM_PROMPT,
         user: [

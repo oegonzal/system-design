@@ -27,8 +27,8 @@ const facts: PromptFacts = {
   functionalText: 'sell tickets without overselling',
 };
 
-function build(graph: CanvasGraph): string {
-  return buildCriticUserPrompt({ graph, facts, deterministicFindings: [] });
+function build(graph: CanvasGraph, narrative: string | null = null): string {
+  return buildCriticUserPrompt({ graph, facts, narrative, deterministicFindings: [] });
 }
 
 describe('buildCriticUserPrompt', () => {
@@ -106,6 +106,17 @@ describe('buildCriticUserPrompt', () => {
     expect(prompt).not.toContain('op9');
   });
 
+  it('carries the design narrative into the shared document', () => {
+    const canvas: CanvasGraph = {
+      nodes: [{ id: 'n-svc', kind: 'service', label: 'Orders' }],
+      edges: [],
+    };
+    const prompt = build(canvas, 'Orders owns the write path.');
+    expect(prompt).toContain("# Design narrative (the author's own explanation)");
+    expect(prompt).toContain('Orders owns the write path.');
+    expect(build(canvas)).not.toContain('# Design narrative');
+  });
+
   it('leaves undeclared nodes and edges in the original format', () => {
     const prompt = build({
       nodes: [{ id: 'n-db', kind: 'database', label: 'Orders DB', config: { replicas: 2 } }],
@@ -130,5 +141,11 @@ describe('CRITIC_SYSTEM_PROMPT', () => {
     expect(CRITIC_SYSTEM_PROMPT).toContain('also judge the API design itself');
     expect(CRITIC_SYSTEM_PROMPT).toContain('operation granularity');
     expect(CRITIC_SYSTEM_PROMPT).toContain('idempotency choices');
+  });
+
+  it('tells the critic to cross-examine the narrative against the diagram', () => {
+    expect(CRITIC_SYSTEM_PROMPT).toContain('cross-examine it against the diagram');
+    expect(CRITIC_SYSTEM_PROMPT).toContain('components the story leaves unexplained');
+    expect(CRITIC_SYSTEM_PROMPT).toContain('flows described differently than drawn');
   });
 });

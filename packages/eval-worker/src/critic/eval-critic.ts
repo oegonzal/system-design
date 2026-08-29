@@ -22,6 +22,8 @@ export interface CritiqueResult {
 export interface CriticInput {
   graph: CanvasGraph;
   facts: PromptFacts;
+  /** The design narrative submitted with the revision; null when absent. */
+  narrative: string | null;
   /** What the deterministic passes already found — the critic must add, not repeat. */
   deterministicFindings: EngineFinding[];
 }

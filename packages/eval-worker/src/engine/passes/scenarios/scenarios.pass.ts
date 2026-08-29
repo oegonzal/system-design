@@ -44,7 +44,7 @@ export function createScenariosPass(): EvalPass {
       }
 
       const selected = selectScenarios(ctx.facts.archetype, ctx.facts.difficulty);
-      const design = describeDesign(ctx.graph, ctx.facts);
+      const design = describeDesign(ctx.graph, ctx.facts, ctx.narrative);
       const critique = await ctx.llm.completeStructured({
         system: SYSTEM_PROMPT,
         user: [
