@@ -25,7 +25,15 @@ export function runExpectations(
   input: ExpectationsInput,
   expectations: readonly Expectation[] = EXPECTATIONS,
 ): [CoverageArtifact, FindingsArtifact] {
-  const ctx: RuleContext = { graph: input.graph, facts: input.facts, index: input.index };
+  // Expectations are deliberately narrative-blind: applicability stays a
+  // function of the prompt facts alone, so prose can never add or remove a
+  // demand the prompt itself did not make.
+  const ctx: RuleContext = {
+    graph: input.graph,
+    facts: input.facts,
+    index: input.index,
+    narrative: null,
+  };
   const entries: CoverageArtifact['entries'] = [];
   const findings: EngineFinding[] = [];
 

@@ -48,7 +48,7 @@ describe('poller (integration)', () => {
   let em: EntityManager;
 
   /** Inserts a full prompt→session→revision→evaluation→job chain. */
-  async function seedJob(graph: CanvasGraph, maxAttempts = 3) {
+  async function seedJob(graph: CanvasGraph, maxAttempts = 3, narrative: string | null = null) {
     const fork = em.fork();
     const experience = fork.create(ExperienceProfile, {
       id: crypto.randomUUID(),
@@ -95,7 +95,7 @@ describe('poller (integration)', () => {
       generatorVersion: '2.0.0',
     });
     const session = fork.create(DesignSession, { prompt });
-    const revision = fork.create(DesignRevision, { session, revisionNumber: 1, graph });
+    const revision = fork.create(DesignRevision, { session, revisionNumber: 1, graph, narrative });
     const evaluation = fork.create(Evaluation, { revision });
     const job = fork.create(EvalJob, { revision, maxAttempts });
     await fork.flush();
@@ -182,6 +182,23 @@ describe('poller (integration)', () => {
     expect(done.axes).toEqual([]);
     expect(done.scenarios).toEqual([]);
     expect(done.capApplied).toBeNull(); // an F is already below every cap
+  });
+
+  it('feeds the revision narrative to the engine — the narrative rules grade it', async () => {
+    // Five words, no node label, no flow verb: every narrative rule's trigger.
+    const { evaluationId } = await seedJob(naiveGraph, 3, 'Too short to explain anything.');
+
+    const done = await waitFor(async () => {
+      const evaluation = await em
+        .fork()
+        .findOne(Evaluation, { id: evaluationId }, { populate: ['findings'] });
+      return evaluation?.status === 'complete' ? evaluation : null;
+    });
+
+    const ruleIds = done.findings.getItems().map((finding) => finding.ruleId);
+    expect(ruleIds).toContain('hygiene.narrative-unexplained-components');
+    expect(ruleIds).toContain('hygiene.narrative-too-thin');
+    expect(ruleIds).toContain('hygiene.narrative-no-flow-story');
   });
 
   it('marks the job and evaluation failed when the graph is unprocessable and retries are exhausted', async () => {

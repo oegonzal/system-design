@@ -15,6 +15,8 @@ export interface PassContext {
   graph: CanvasGraph;
   facts: PromptFacts;
   index: GraphIndex;
+  /** The design narrative submitted with the revision; null when absent. */
+  narrative: string | null;
   /** The no-op client when LLM work is disabled — passes check `enabled`. */
   llm: LlmClient;
   /** Evidence from earlier passes in profile order (e.g. findings to dedupe against). */

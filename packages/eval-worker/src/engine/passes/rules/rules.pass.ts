@@ -17,12 +17,19 @@ export interface RulesInput {
   graph: CanvasGraph;
   facts: PromptFacts;
   index: GraphIndex;
+  /** The design narrative submitted with the revision; omitted/null when absent. */
+  narrative?: string | null;
   /** This pass's options from the active profile entry (severityOverrides). */
   options?: Record<string, unknown>;
 }
 
 export function runRules(input: RulesInput, rules: readonly EvalRule[] = RULES): FindingsArtifact {
-  const ctx: RuleContext = { graph: input.graph, facts: input.facts, index: input.index };
+  const ctx: RuleContext = {
+    graph: input.graph,
+    facts: input.facts,
+    index: input.index,
+    narrative: input.narrative ?? null,
+  };
   const findings: EngineFinding[] = [];
   for (const rule of rules) {
     // The requirement this rule enforces, when the prompt names one.

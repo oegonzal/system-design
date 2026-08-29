@@ -77,6 +77,12 @@ export interface RuleContext {
   graph: CanvasGraph;
   facts: PromptFacts;
   index: GraphIndex;
+  /**
+   * The design narrative submitted with the revision, or null when the author
+   * wrote none. Rules that read it must feature-gate on its presence — a
+   * canvas submitted without prose is graded exactly as before.
+   */
+  narrative: string | null;
 }
 
 /** A rule owns one lesson; severity is decided per finding, not per rule. */

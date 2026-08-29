@@ -24,6 +24,8 @@ export interface EvaluationRun {
 export interface RunEvaluationInput {
   graph: CanvasGraph;
   facts: PromptFacts;
+  /** The design narrative submitted with the revision; omitted/null when absent. */
+  narrative?: string | null;
   llm: LlmClient;
   profile: EvalProfile;
   registry: ReadonlyMap<string, EvalPass>;
@@ -31,6 +33,7 @@ export interface RunEvaluationInput {
 
 export async function runEvaluation(input: RunEvaluationInput): Promise<EvaluationRun> {
   const { graph, facts, llm, profile, registry } = input;
+  const narrative = input.narrative ?? null;
   validateProfile(profile);
 
   const index = buildGraphIndex(graph);
@@ -46,6 +49,7 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
       graph,
       facts,
       index,
+      narrative,
       llm,
       priorArtifacts: artifacts,
       options: config.options ?? {},

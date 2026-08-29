@@ -276,8 +276,9 @@ export function dagFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
 export function contextFor(
   canvas: CanvasGraph,
   facts: PromptFacts = flashSaleFacts(),
+  narrative: string | null = null,
 ): RuleContext {
-  return { graph: canvas, facts, index: buildGraphIndex(canvas) };
+  return { graph: canvas, facts, index: buildGraphIndex(canvas), narrative };
 }
 
 export function indexFor(canvas: CanvasGraph): GraphIndex {

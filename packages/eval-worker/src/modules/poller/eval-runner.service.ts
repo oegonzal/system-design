@@ -71,6 +71,7 @@ export class EvalRunnerService {
       const { result, artifacts } = await runEvaluation({
         graph: revision.graph,
         facts,
+        narrative: revision.narrative,
         llm: this.llm,
         profile: ACTIVE_PROFILE,
         registry: this.passRegistry,
