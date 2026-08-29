@@ -59,5 +59,70 @@ describe('GraphIndex', () => {
     expect(empty.nodes()).toEqual([]);
     expect(empty.pathExists('x', 'y')).toBe(false);
     expect(empty.reachableFrom(['x'])).toEqual(new Set());
+    expect(empty.hopCount('x', 'y')).toBeNull();
+    expect(empty.longestChain(['x'])).toBe(0);
+    expect(empty.hasCycle()).toBe(false);
+    expect(empty.components()).toEqual([]);
+  });
+
+  it('counts hops on the shortest path', () => {
+    expect(index.hopCount('a', 'c')).toBe(2);
+    expect(index.hopCount('a', 'b')).toBe(1);
+    expect(index.hopCount('a', 'a')).toBe(0);
+    expect(index.hopCount('c', 'a')).toBeNull();
+    expect(index.hopCount('a', 'c', { avoidKinds: ['service'] })).toBeNull();
+  });
+
+  it('restricts traversal to the given edge kinds', () => {
+    // a → b is sync, b → c is async: the sync-only walk stops at b.
+    expect(index.pathExists('a', 'c', { edgeKinds: ['sync'] })).toBe(false);
+    expect(index.pathExists('a', 'b', { edgeKinds: ['sync'] })).toBe(true);
+    expect(index.reachableFrom(['a'], { edgeKinds: ['sync'] })).toEqual(new Set(['a', 'b']));
+    expect(index.hopCount('a', 'c', { edgeKinds: ['async'] })).toBeNull();
+  });
+
+  it('measures the longest chain, tolerating cycles', () => {
+    expect(index.longestChain(['a'])).toBe(2);
+    expect(index.longestChain(['a'], { edgeKinds: ['sync'] })).toBe(1);
+    expect(index.longestChain(['d'])).toBe(0);
+    const cyclic = buildGraphIndex(
+      graph(
+        [node('a', 'service'), node('b', 'service'), node('c', 'service')],
+        [edge('e1', 'a', 'b'), edge('e2', 'b', 'c'), edge('e3', 'c', 'a')],
+      ),
+    );
+    expect(cyclic.longestChain(['a'])).toBe(2); // a → b → c, then the cycle closes
+  });
+
+  it('detects directed cycles, honouring the edge-kind filter', () => {
+    expect(index.hasCycle()).toBe(false);
+    const cyclic = buildGraphIndex(
+      graph(
+        [node('a', 'service'), node('b', 'service')],
+        [edge('e1', 'a', 'b'), edge('e2', 'b', 'a', 'async')],
+      ),
+    );
+    expect(cyclic.hasCycle()).toBe(true);
+    expect(cyclic.hasCycle({ edgeKinds: ['sync'] })).toBe(false);
+  });
+
+  it('splits the graph into weakly-connected components in canvas order', () => {
+    expect(index.components().map((component) => component.map((n) => n.id))).toEqual([
+      ['a', 'b', 'c'],
+      ['d'],
+    ]);
+  });
+
+  it('lists directed edges between two nodes', () => {
+    expect(index.edgesBetween('a', 'b').map((e) => e.id)).toEqual(['e1']);
+    expect(index.edgesBetween('b', 'a')).toEqual([]);
+  });
+
+  it('finds async producers and consumers', () => {
+    // b feeds c asynchronously; a feeds b synchronously (not a producer).
+    expect(index.producersOf('c').map((n) => n.id)).toEqual(['b']);
+    expect(index.producersOf('b')).toEqual([]);
+    expect(index.consumersOf('b').map((n) => n.id)).toEqual(['c']);
+    expect(index.consumersOf('a')).toEqual([]);
   });
 });
