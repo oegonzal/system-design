@@ -9,16 +9,18 @@ import type { CanvasGraph } from '@sysdesign/contracts';
 
 import { aggregate } from './core/aggregator';
 import { buildGraphIndex } from './graph-index';
+import { runExpectations } from './passes/expectations/expectations.pass';
 import { runRules } from './passes/rules/rules.pass';
-import { LEGACY_PROFILE } from './profiles/legacy.profile';
+import { DEFAULT_PROFILE } from './profiles/default.profile';
 import type { EngineResult, PromptFacts } from './types';
 
 export { ENGINE_VERSION } from './scoring';
 
 export function runEngine(graph: CanvasGraph, facts: PromptFacts): EngineResult {
   const index = buildGraphIndex(graph);
-  const artifact = runRules({ graph, facts, index });
-  const result = aggregate([artifact], LEGACY_PROFILE);
+  const rules = runRules({ graph, facts, index });
+  const [coverage, expectationFindings] = runExpectations({ graph, facts, index });
+  const result = aggregate([rules, coverage, expectationFindings], DEFAULT_PROFILE);
   return {
     findings: result.findings,
     dimensionScores: result.dimensionScores,

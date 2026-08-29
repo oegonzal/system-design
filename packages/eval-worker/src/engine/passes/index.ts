@@ -5,9 +5,10 @@
  */
 import type { EvalPass } from '../core/types';
 import { createCriticPass } from './critic/critic.pass';
+import { createExpectationsPass } from './expectations/expectations.pass';
 import { createRulesPass } from './rules/rules.pass';
 
 export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
-  const passes: EvalPass[] = [createRulesPass(), createCriticPass()];
+  const passes: EvalPass[] = [createRulesPass(), createExpectationsPass(), createCriticPass()];
   return new Map(passes.map((pass) => [pass.id, pass]));
 }

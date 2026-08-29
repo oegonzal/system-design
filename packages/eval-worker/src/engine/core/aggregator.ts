@@ -16,12 +16,18 @@ import {
 import type {
   AnnotationArtifact,
   AxisArtifact,
+  CoverageArtifact,
   DiagnosticsArtifact,
   EngineFinding,
   EvidenceArtifact,
   ScenarioArtifact,
 } from './artifacts';
-import { gradeForScore, type EvalProfile } from './profile';
+import {
+  gradeForScore,
+  type CoverageScoringPolicy,
+  type EvalProfile,
+  type SubtractiveScoringPolicy,
+} from './profile';
 
 export const SEVERITY_RANK: Record<Severity, number> = {
   critical: 0,
@@ -61,11 +67,14 @@ function sortKey(finding: EngineFinding): string {
   return finding.ruleId ?? finding.expectationId ?? '';
 }
 
+const GRADE_ORDER: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
+
 export function aggregate(
   artifacts: readonly EvidenceArtifact[],
   profile: EvalProfile,
 ): AggregateResult {
-  const findings: EngineFinding[] = [];
+  let findings: EngineFinding[] = [];
+  const coverage: CoverageArtifact['entries'] = [];
   const axes: AxisArtifact[] = [];
   const diagnostics: DiagnosticsArtifact[] = [];
   let scenarios: ScenarioArtifact | null = null;
@@ -75,6 +84,9 @@ export function aggregate(
     switch (artifact.kind) {
       case 'findings':
         findings.push(...artifact.findings);
+        break;
+      case 'coverage':
+        coverage.push(...artifact.entries);
         break;
       case 'axis':
         axes.push(artifact);
@@ -88,9 +100,12 @@ export function aggregate(
       case 'diagnostics':
         diagnostics.push(artifact);
         break;
-      case 'coverage':
-        break; // consumed by the coverage scoring model when it lands
     }
+  }
+
+  const policy = profile.scoring;
+  if (policy.model === 'coverage') {
+    findings = applySuppressions(findings, coverage, policy);
   }
 
   findings.sort(
@@ -99,18 +114,25 @@ export function aggregate(
       compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
   );
 
-  const dimensionScores = scoreSubtractive(findings, profile);
-  const overallScore = weightedOverall(dimensionScores, profile);
-  const bandGrade = gradeForScore(overallScore, profile.scoring.gradeBands);
+  const dimensionScores =
+    policy.model === 'coverage'
+      ? scoreCoverage(findings, coverage, policy)
+      : scoreSubtractive(findings, policy);
+  const overallScore = weightedOverall(dimensionScores, policy.dimensionWeights);
+  const bandGrade = gradeForScore(overallScore, policy.gradeBands);
+  const { grade, capApplied } =
+    policy.model === 'coverage'
+      ? applyGradeCaps(bandGrade, findings, policy)
+      : { grade: bandGrade, capApplied: null };
 
   return {
     findings,
     dimensionScores,
     overallScore,
     bandGrade,
-    grade: bandGrade,
-    capApplied: null,
-    summary: composeSummary(findings, dimensionScores, overallScore, bandGrade),
+    grade,
+    capApplied,
+    summary: composeSummary(findings, dimensionScores, overallScore, grade),
     axes,
     scenarios,
     annotations,
@@ -118,10 +140,76 @@ export function aggregate(
   };
 }
 
+/**
+ * One lesson, one finding: a rule finding is dropped when the policy pairs it
+ * with an expectation the design leaves unmet — the unmet expectation already
+ * carries the lesson (and the fix), so the rule would only double-charge it.
+ */
+function applySuppressions(
+  findings: EngineFinding[],
+  coverage: CoverageArtifact['entries'],
+  policy: CoverageScoringPolicy,
+): EngineFinding[] {
+  if (policy.suppressions.length === 0) return findings;
+  const unmet = new Set(coverage.filter((entry) => !entry.met).map((entry) => entry.expectationId));
+  return findings.filter(
+    (finding) =>
+      !finding.ruleId ||
+      !policy.suppressions.some(
+        (rule) => rule.ruleId === finding.ruleId && unmet.has(rule.whenExpectationUnmet),
+      ),
+  );
+}
+
+/**
+ * Coverage model: the base is earned — 100 × met weight / total weight over
+ * the prompt's applicable expectations (a dimension the prompt asks nothing
+ * of stays at 100) — then rule violations subtract with geometric decay.
+ */
+function scoreCoverage(
+  findings: readonly EngineFinding[],
+  coverage: CoverageArtifact['entries'],
+  policy: CoverageScoringPolicy,
+): DimensionScores {
+  const earned = {} as Record<EvalDimension, { met: number; total: number }>;
+  for (const dimension of EVAL_DIMENSIONS) earned[dimension] = { met: 0, total: 0 };
+  for (const entry of coverage) {
+    earned[entry.dimension].total += entry.weight;
+    if (entry.met) earned[entry.dimension].met += entry.weight;
+  }
+
+  const violations = {} as Record<EvalDimension, EngineFinding[]>;
+  for (const dimension of EVAL_DIMENSIONS) violations[dimension] = [];
+  for (const finding of findings) {
+    if (finding.countsAsViolation) violations[finding.dimension].push(finding);
+  }
+
+  const scores = {} as DimensionScores;
+  for (const dimension of EVAL_DIMENSIONS) {
+    const { met, total } = earned[dimension];
+    const base = total > 0 ? (100 * met) / total : 100;
+
+    // Deterministic penalty order: worst first, then stable identity.
+    const ordered = [...violations[dimension]].sort(
+      (a, b) =>
+        SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+        compareStrings(sortKey(a), sortKey(b)) ||
+        compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
+    );
+    let penalty = 0;
+    ordered.forEach((finding, position) => {
+      penalty += policy.violationPenalties[finding.severity] * policy.violationDecay ** position;
+    });
+
+    scores[dimension] = Math.round(Math.max(0, base - penalty) * 10) / 10;
+  }
+  return scores;
+}
+
 /** Every dimension starts at 100 and loses each violation's penalty, floored at 0. */
 function scoreSubtractive(
   findings: readonly EngineFinding[],
-  profile: EvalProfile,
+  policy: SubtractiveScoringPolicy,
 ): DimensionScores {
   const scores = {} as DimensionScores;
   for (const dimension of EVAL_DIMENSIONS) scores[dimension] = 100;
@@ -129,16 +217,40 @@ function scoreSubtractive(
     if (!finding.countsAsViolation) continue;
     scores[finding.dimension] = Math.max(
       0,
-      scores[finding.dimension] - profile.scoring.severityPenalties[finding.severity],
+      scores[finding.dimension] - policy.severityPenalties[finding.severity],
     );
   }
   return scores;
 }
 
-function weightedOverall(scores: DimensionScores, profile: EvalProfile): number {
+/**
+ * A critical problem caps the letter no matter how the numbers average out —
+ * an interviewer does not hand out an A over an unaddressed single point of
+ * failure. Counts deterministic findings only; LLM output never reaches here.
+ */
+function applyGradeCaps(
+  bandGrade: Grade,
+  findings: readonly EngineFinding[],
+  policy: CoverageScoringPolicy,
+): { grade: Grade; capApplied: CapApplied | null } {
+  let binding: CapApplied | null = null;
+  for (const cap of policy.gradeCaps) {
+    const count = findings.filter((finding) => finding.severity === cap.severity).length;
+    if (count < cap.atLeast) continue;
+    if (!binding || GRADE_ORDER[cap.maxGrade] < GRADE_ORDER[binding.maxGrade]) {
+      binding = { severity: cap.severity, count, maxGrade: cap.maxGrade };
+    }
+  }
+  if (!binding || GRADE_ORDER[bandGrade] <= GRADE_ORDER[binding.maxGrade]) {
+    return { grade: bandGrade, capApplied: null };
+  }
+  return { grade: binding.maxGrade, capApplied: binding };
+}
+
+function weightedOverall(scores: DimensionScores, weights: Record<EvalDimension, number>): number {
   let total = 0;
   for (const dimension of EVAL_DIMENSIONS) {
-    total += scores[dimension] * profile.scoring.dimensionWeights[dimension];
+    total += scores[dimension] * weights[dimension];
   }
   return Math.round(total * 10) / 10;
 }

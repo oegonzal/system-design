@@ -37,6 +37,15 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'EVAL-3',
     statement: 'An accepted suggestion, resubmitted, improves the overall score.',
   },
+  {
+    id: 'EVAL-4',
+    statement: 'Unmet expectations surface as teaching findings with ghost-fix suggestions.',
+  },
+  {
+    id: 'EVAL-5',
+    statement:
+      'Scores are calibrated: an empty canvas fails, a naive design fails, and only demonstrated depth earns an A.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

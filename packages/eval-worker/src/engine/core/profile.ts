@@ -27,8 +27,8 @@ export interface GradeBands {
 
 /**
  * The original model: every dimension starts at 100 and findings subtract.
- * Kept as a policy variant so history stays reproducible; the coverage model
- * replaces it as the shipped default.
+ * Kept as a policy variant so historical evaluations stay reproducible; the
+ * coverage model replaces it as the shipped default.
  */
 export interface SubtractiveScoringPolicy {
   model: 'subtractive';
@@ -37,7 +37,37 @@ export interface SubtractiveScoringPolicy {
   gradeBands: GradeBands;
 }
 
-export type ScoringPolicy = SubtractiveScoringPolicy;
+/** "grade ≤ maxGrade once `atLeast` deterministic findings of `severity` exist." */
+export interface GradeCapRule {
+  severity: Severity;
+  atLeast: number;
+  maxGrade: Grade;
+}
+
+/** One lesson, one finding: drop the rule's finding when its paired expectation is unmet. */
+export interface SuppressionRule {
+  ruleId: string;
+  whenExpectationUnmet: string;
+}
+
+/**
+ * The coverage model: each dimension's base is earned by meeting the prompt's
+ * expectations, violations subtract with geometric decay (stacking hurts but
+ * never nukes a dimension the way a hard floor did), and critical findings
+ * cap the letter grade regardless of the numbers. Absence is no longer free.
+ */
+export interface CoverageScoringPolicy {
+  model: 'coverage';
+  violationPenalties: Record<Severity, number>;
+  /** Multiplier on each successive violation within a dimension, in (0, 1]. */
+  violationDecay: number;
+  dimensionWeights: Record<EvalDimension, number>;
+  gradeBands: GradeBands;
+  gradeCaps: GradeCapRule[];
+  suppressions: SuppressionRule[];
+}
+
+export type ScoringPolicy = SubtractiveScoringPolicy | CoverageScoringPolicy;
 
 export interface EvalProfile {
   id: string;
@@ -69,6 +99,13 @@ export function validateProfile(profile: EvalProfile): void {
   const { A, B, C, D } = profile.scoring.gradeBands;
   if (!(A > B && B > C && C > D && D > 0)) {
     throw new Error(`eval profile ${describe(profile)} grade bands must strictly descend`);
+  }
+
+  if (profile.scoring.model === 'coverage') {
+    const decay = profile.scoring.violationDecay;
+    if (!(decay > 0 && decay <= 1)) {
+      throw new Error(`eval profile ${describe(profile)} violation decay must be in (0, 1]`);
+    }
   }
 }
 

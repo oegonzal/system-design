@@ -2,9 +2,30 @@ import { describe, expect, it } from 'vitest';
 
 import type { Severity } from '@sysdesign/contracts';
 
-import { LEGACY_PROFILE } from '../profiles/legacy.profile';
+import { DIMENSION_WEIGHTS } from '../scoring';
+import { DEFAULT_PROFILE } from '../profiles/default.profile';
 import { aggregate } from './aggregator';
-import type { AxisArtifact, EngineFinding, EvidenceArtifact, ScenarioArtifact } from './artifacts';
+import type {
+  AxisArtifact,
+  CoverageArtifact,
+  EngineFinding,
+  EvidenceArtifact,
+  ScenarioArtifact,
+} from './artifacts';
+import type { EvalProfile } from './profile';
+
+/** The retired 1.0.0 rubric, kept as a spec value: the subtractive policy variant stays supported. */
+const LEGACY_PROFILE: EvalProfile = {
+  id: 'legacy',
+  version: '1.0.0',
+  passes: [],
+  scoring: {
+    model: 'subtractive',
+    severityPenalties: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
+    dimensionWeights: DIMENSION_WEIGHTS,
+    gradeBands: { A: 90, B: 75, C: 60, D: 45 },
+  },
+};
 
 function finding(overrides: Partial<EngineFinding> = {}): EngineFinding {
   return {
@@ -163,5 +184,112 @@ describe('aggregate', () => {
     expect(result.overallScore).toBe(100);
     expect(result.annotations?.summary).toBe('A model opinion.');
     expect(result.diagnostics).toHaveLength(1);
+  });
+});
+
+function coverageEntry(
+  overrides: Partial<CoverageArtifact['entries'][number]> = {},
+): CoverageArtifact['entries'][number] {
+  return {
+    expectationId: 'exp.fst.db-failover',
+    dimension: 'reliability',
+    weight: 2,
+    met: false,
+    nfrId: null,
+    evidenceNodeIds: [],
+    evidenceEdgeIds: [],
+    ...overrides,
+  };
+}
+
+function coverageArtifact(entries: CoverageArtifact['entries']): EvidenceArtifact {
+  return { passId: 'expectations.banks', kind: 'coverage', entries };
+}
+
+describe('aggregate — coverage model', () => {
+  it('earns each dimension base from met expectation weight', () => {
+    const result = aggregate(
+      [
+        coverageArtifact([
+          coverageEntry({ expectationId: 'a', met: true, weight: 2 }),
+          coverageEntry({ expectationId: 'b', met: false, weight: 2 }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    expect(result.dimensionScores.reliability).toBe(50);
+    // A dimension the prompt demands nothing of stays at par.
+    expect(result.dimensionScores.hygiene).toBe(100);
+  });
+
+  it('decays stacked violations instead of flooring the dimension', () => {
+    const result = aggregate(
+      [
+        findingsArtifact([
+          finding({ ruleId: 'a.one' }),
+          finding({ ruleId: 'b.two' }),
+          finding({ ruleId: 'c.three' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    // 100 − (35 + 35·0.7 + 35·0.49) = 23.35 → 23.3 — the third critical still hurts.
+    expect(result.dimensionScores.reliability).toBe(23.3);
+  });
+
+  it('suppresses a rule finding when its paired expectation is unmet', () => {
+    const gateway = finding({
+      ruleId: 'security.no-gateway',
+      dimension: 'security',
+      severity: 'high',
+    });
+    const unmetDoor = coverageArtifact([
+      coverageEntry({
+        expectationId: 'exp.fst.edge-front-door',
+        dimension: 'security',
+        met: false,
+      }),
+    ]);
+    const metDoor = coverageArtifact([
+      coverageEntry({ expectationId: 'exp.fst.edge-front-door', dimension: 'security', met: true }),
+    ]);
+
+    const suppressed = aggregate([findingsArtifact([gateway]), unmetDoor], DEFAULT_PROFILE);
+    expect(suppressed.findings).toEqual([]);
+
+    const kept = aggregate([findingsArtifact([gateway]), metDoor], DEFAULT_PROFILE);
+    expect(kept.findings.map((f) => f.ruleId)).toEqual(['security.no-gateway']);
+  });
+
+  it('caps the grade on critical findings no matter the numeric score', () => {
+    const one = aggregate([findingsArtifact([finding({ dimension: 'hygiene' })])], DEFAULT_PROFILE);
+    expect(one.overallScore).toBe(98.3);
+    expect(one.bandGrade).toBe('A');
+    expect(one.grade).toBe('C');
+    expect(one.capApplied).toEqual({ severity: 'critical', count: 1, maxGrade: 'C' });
+
+    const two = aggregate(
+      [
+        findingsArtifact([
+          finding({ dimension: 'hygiene', ruleId: 'a.one' }),
+          finding({ dimension: 'hygiene', ruleId: 'b.two' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    expect(two.grade).toBe('D');
+    expect(two.capApplied?.count).toBe(2);
+
+    // A grade already at or below the cap reports no cap at all.
+    const alreadyLow = aggregate(
+      [
+        coverageArtifact([coverageEntry({ expectationId: 'exp.unpaired', met: false })]),
+        findingsArtifact([finding({ ruleId: 'reliability.unpaired' })]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    expect(alreadyLow.bandGrade).toBe('C');
+    expect(alreadyLow.grade).toBe('C');
+    expect(alreadyLow.capApplied).toBeNull();
   });
 });

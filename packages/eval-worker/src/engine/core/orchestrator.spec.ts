@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { NoopLlmClient } from '@sysdesign/llm';
 
 import { graph, node, flashSaleFacts } from '../testing';
-import { LEGACY_PROFILE } from '../profiles/legacy.profile';
+import { DEFAULT_PROFILE } from '../profiles/default.profile';
 import { createPassRegistry } from '../passes';
 import type { EvidenceArtifact } from './artifacts';
 import { runEvaluation } from './orchestrator';
@@ -17,12 +17,14 @@ describe('runEvaluation', () => {
       graph: graph([node('n-1', 'client')]),
       facts: flashSaleFacts(),
       llm,
-      profile: LEGACY_PROFILE,
+      profile: DEFAULT_PROFILE,
       registry: createPassRegistry(),
     });
 
     expect(run.artifacts.map((artifact) => `${artifact.passId}:${artifact.kind}`)).toEqual([
       'rules.core:findings',
+      'expectations.banks:coverage',
+      'expectations.banks:findings',
       'llm.critic:diagnostics',
     ]);
     expect(run.result.annotations).toBeNull();
@@ -47,7 +49,7 @@ describe('runEvaluation', () => {
       facts: flashSaleFacts(),
       llm,
       profile: {
-        ...LEGACY_PROFILE,
+        ...DEFAULT_PROFILE,
         passes: [
           { pass: 'first', enabled: true },
           { pass: 'second', enabled: true },
@@ -66,7 +68,7 @@ describe('runEvaluation', () => {
       facts: flashSaleFacts(),
       llm,
       profile: {
-        ...LEGACY_PROFILE,
+        ...DEFAULT_PROFILE,
         passes: [
           { pass: 'rules.core', enabled: true },
           { pass: 'llm.critic', enabled: false },
@@ -81,7 +83,7 @@ describe('runEvaluation', () => {
         graph: graph([]),
         facts: flashSaleFacts(),
         llm,
-        profile: { ...LEGACY_PROFILE, passes: [{ pass: 'no.such.pass', enabled: true }] },
+        profile: { ...DEFAULT_PROFILE, passes: [{ pass: 'no.such.pass', enabled: true }] },
         registry,
       }),
     ).rejects.toThrow(/unknown pass: no\.such\.pass/);
@@ -93,7 +95,7 @@ describe('runEvaluation', () => {
       graph: canvas,
       facts: flashSaleFacts(),
       llm,
-      profile: LEGACY_PROFILE,
+      profile: DEFAULT_PROFILE,
       registry: createPassRegistry(),
     });
     const { runEngine } = await import('../engine');

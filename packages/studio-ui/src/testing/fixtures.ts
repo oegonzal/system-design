@@ -179,7 +179,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
       hygiene: 82,
     },
     summary: 'Solid read path; reliability is the weak dimension.',
-    engineVersion: '1.0.0',
+    engineVersion: '2.0.0',
     criticModel: null,
     error: null,
     findings: [makeFinding()],

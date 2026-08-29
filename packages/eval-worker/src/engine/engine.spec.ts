@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { EVAL_DIMENSIONS, SUGGESTED_ID_PREFIX, type CanvasGraph } from '@sysdesign/contracts';
+import { SUGGESTED_ID_PREFIX, type CanvasGraph } from '@sysdesign/contracts';
 
 import { runEngine } from './engine';
 import { analyticsFacts, flashSaleFacts } from './testing';
@@ -17,43 +17,65 @@ const naiveFlashSale = loadFixture('naive-flash-sale.graph.json');
 const solidFlashSale = loadFixture('solid-flash-sale.graph.json');
 const naiveAnalytics = loadFixture('naive-analytics.graph.json');
 
-/** Rules whose lesson is about the whole graph, so they may carry no affected elements. */
-const GLOBAL_RULES = new Set([
+/**
+ * Findings whose lesson is about the whole graph — a capability that simply
+ * does not exist yet — so they may carry no affected elements.
+ */
+const GLOBAL_FINDINGS = new Set([
   'security.no-rate-limit',
   'data.no-search-index',
   'performance.no-cdn-static',
   'hygiene.orphan-node',
+  'exp.core.entry-service',
+  'exp.core.durable-store-reachable',
+  'exp.fst.async-worker-drain',
+  'exp.fst.rate-limit-edge',
+  'exp.fst.dlq-on-queues',
+  'exp.fst.cdn-static',
 ]);
+
+function identityOf(finding: { ruleId: string | null; expectationId: string | null }): string {
+  return finding.ruleId ?? finding.expectationId ?? '';
+}
 
 describe('runEngine', () => {
   it('[EVAL-1] grades a naive flash-sale design with per-dimension scores', () => {
     const result = runEngine(naiveFlashSale, flashSaleFacts());
 
-    expect(result.findings.map((finding) => finding.ruleId)).toEqual([
-      'messaging.no-queue-for-spike',
+    // Suppression keeps one lesson to one finding: the paired rules
+    // (no-replica, no-queue, no-cache, no-gateway, no-rate-limit) yield to
+    // their unmet expectations; only service-no-lb survives as a violation.
+    expect(result.findings.map(identityOf)).toEqual([
+      'exp.fst.async-worker-drain',
+      'exp.fst.cdn-static',
+      'exp.fst.db-failover',
+      'exp.fst.dlq-on-queues',
+      'exp.fst.edge-front-door',
+      'exp.fst.low-latency-read-path',
+      'exp.fst.payment-isolation',
+      'exp.fst.rate-limit-edge',
+      'exp.fst.read-cache',
+      'exp.fst.stateless-scale-out',
+      'exp.fst.waiting-room',
+      'exp.fst.write-spike-buffer',
       'reliability.service-no-lb',
-      'reliability.single-db-no-replica',
-      'scalability.no-cache-read-heavy',
-      'security.no-gateway',
-      'security.no-rate-limit',
     ]);
 
+    // Coverage-earned bases: data and hygiene are the only demands this
+    // design meets; everything else earned nothing.
     expect(result.dimensionScores).toEqual({
-      reliability: 35,
-      scalability: 75,
-      performance: 100,
+      reliability: 0,
+      scalability: 0,
+      performance: 0,
       data: 100,
-      messaging: 60,
-      security: 75,
+      messaging: 0,
+      security: 0,
       hygiene: 100,
     });
-    for (const dimension of EVAL_DIMENSIONS) {
-      expect(result.dimensionScores[dimension]).toBeTypeOf('number');
-    }
 
-    expect(result.overallScore).toBe(74.3);
-    expect(result.grade).toBe('C');
-    expect(result.summary).toContain('grade C');
+    expect(result.overallScore).toBe(20);
+    expect(result.grade).toBe('F');
+    expect(result.summary).toContain('grade F');
   });
 
   it('[EVAL-2] findings teach — message + affected elements', () => {
@@ -62,18 +84,25 @@ describe('runEngine', () => {
     for (const finding of result.findings) {
       expect(finding.title.length).toBeGreaterThan(0);
       expect(finding.message.length).toBeGreaterThan(20);
-      if (!GLOBAL_RULES.has(finding.ruleId ?? '')) {
+      if (!GLOBAL_FINDINGS.has(identityOf(finding))) {
         expect(finding.affectedNodeIds.length + finding.affectedEdgeIds.length).toBeGreaterThan(0);
       }
     }
   });
 
-  it('scores the solid flash-sale design an A with nothing above info', () => {
+  it('keeps the replica lesson under its historical title with the same ghost fix', () => {
+    const result = runEngine(naiveFlashSale, flashSaleFacts());
+    const replica = result.findings.find((f) => f.expectationId === 'exp.fst.db-failover');
+    expect(replica?.title).toBe('Single database with no replica');
+    expect(replica?.affectedNodeIds).toEqual(['database-1']);
+    expect(replica?.suggestion?.ops.map((op) => op.op)).toEqual(['add-node', 'add-edge']);
+  });
+
+  it('holds the solid flash-sale design at a B — an A demands real depth', () => {
     const result = runEngine(solidFlashSale, flashSaleFacts());
-    expect(result.findings.filter((finding) => finding.severity !== 'info')).toEqual([]);
-    expect(result.findings).toEqual([]);
-    expect(result.overallScore).toBe(100);
-    expect(result.grade).toBe('A');
+    expect(result.findings.map(identityOf)).toEqual(['exp.fst.cdn-static', 'exp.fst.waiting-room']);
+    expect(result.overallScore).toBe(86.5);
+    expect(result.grade).toBe('B');
   });
 
   it('is deterministic — two runs deep-equal', () => {
@@ -116,10 +145,11 @@ describe('runEngine', () => {
     }
   });
 
-  it('handles an empty graph without crashing', () => {
+  it('grades an empty canvas an F — a design that demonstrates nothing earns nothing', () => {
     const result = runEngine({ nodes: [], edges: [] }, flashSaleFacts());
-    expect(result.findings.map((finding) => finding.ruleId)).toEqual(['security.no-rate-limit']);
-    expect(result.overallScore).toBe(100);
-    expect(result.grade).toBe('A');
+    expect(result.overallScore).toBe(0);
+    expect(result.grade).toBe('F');
+    expect(result.findings.length).toBeGreaterThan(10);
+    expect(result.findings.every((finding) => finding.expectationId !== null)).toBe(true);
   });
 });
