@@ -17,6 +17,7 @@ import {
 import type { RuleContext } from '../../../types';
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
+import { monitoringPresence } from './shared';
 
 const FLASH_SALE = ['flash-sale-ticketing'] as const;
 
@@ -594,16 +595,10 @@ const orderPipelineObserved: Expectation = {
   archetypes: FLASH_SALE,
   title: 'The order pipeline runs blind',
   teach: () =>
-    'The prompt asks for observability, and during an on-sale the first sign of trouble should be a dashboard, not social media. Monitor the pipeline — queue depth, error rate, p99 — so saturation is something you see coming.',
-  satisfiedBy: ({ index }) => {
-    const observed = sortById(
-      [...index.byKind('gateway'), ...index.byKind('service'), ...index.byKind('queue')].filter(
-        (node) => node.config?.monitoring === true,
-      ),
-    );
-    if (observed.length > 0) return met(observed.map((node) => node.id));
-    return unmet();
-  },
+    'The prompt asks for observability, and during an on-sale the first sign of trouble should be a dashboard, not social media. Put a monitoring block on the pipeline — queue depth, error rate, p99 — so saturation is something you see coming.',
+  // A monitoring node is the first-class evidence; config.monitoring on a
+  // gateway/service/queue is honored as the legacy spelling (shared check).
+  satisfiedBy: monitoringPresence,
   suggest: ({ index }) => {
     const target =
       sortById(index.byKind('gateway'))[0] ?? sortById(index.byKind('service'))[0] ?? null;
