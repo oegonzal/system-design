@@ -34,6 +34,26 @@ export const GradeA: Story = {
   },
 };
 
+/** A prompt that never examined security or messaging — those rows read "Not assessed". */
+export const NotAssessed: Story = {
+  args: {
+    evaluation: makeEvaluation({
+      overallScore: 81,
+      grade: 'B',
+      summary: 'Strong core; this prompt put nothing on security or messaging.',
+      dimensionScores: {
+        reliability: 84,
+        scalability: 79,
+        performance: 82,
+        data: 80,
+        messaging: null,
+        security: null,
+        hygiene: 90,
+      },
+    }),
+  },
+};
+
 /** A failing design — every meter in the danger band. */
 export const GradeF: Story = {
   args: {

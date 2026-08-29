@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Severity } from '@sysdesign/contracts';
+import { EVAL_DIMENSIONS, type Severity } from '@sysdesign/contracts';
 
 import { DEFAULT_PROFILE } from '../profiles/default.profile';
 import { aggregate } from './aggregator';
@@ -31,6 +31,34 @@ function finding(overrides: Partial<EngineFinding> = {}): EngineFinding {
 
 function findingsArtifact(findings: EngineFinding[]): EvidenceArtifact {
   return { passId: 'rules.core', kind: 'findings', findings };
+}
+
+function coverageEntry(
+  overrides: Partial<CoverageArtifact['entries'][number]> = {},
+): CoverageArtifact['entries'][number] {
+  return {
+    expectationId: 'exp.fst.db-failover',
+    dimension: 'reliability',
+    weight: 2,
+    met: false,
+    nfrId: null,
+    evidenceNodeIds: [],
+    evidenceEdgeIds: [],
+    ...overrides,
+  };
+}
+
+function coverageArtifact(entries: CoverageArtifact['entries']): EvidenceArtifact {
+  return { passId: 'expectations.banks', kind: 'coverage', entries };
+}
+
+/** One met expectation per dimension — a prompt that assesses everything. */
+function fullCoverage(): EvidenceArtifact {
+  return coverageArtifact(
+    EVAL_DIMENSIONS.map((dimension) =>
+      coverageEntry({ expectationId: `exp.test.${dimension}`, dimension, weight: 1, met: true }),
+    ),
+  );
 }
 
 describe('aggregate', () => {
@@ -103,7 +131,7 @@ describe('aggregate', () => {
   it('collects annotations and diagnostics without scoring them', () => {
     const result = aggregate(
       [
-        findingsArtifact([]),
+        coverageArtifact([coverageEntry({ expectationId: 'a', dimension: 'data', met: true })]),
         {
           passId: 'llm.critic',
           kind: 'annotations',
@@ -136,25 +164,6 @@ describe('aggregate', () => {
   });
 });
 
-function coverageEntry(
-  overrides: Partial<CoverageArtifact['entries'][number]> = {},
-): CoverageArtifact['entries'][number] {
-  return {
-    expectationId: 'exp.fst.db-failover',
-    dimension: 'reliability',
-    weight: 2,
-    met: false,
-    nfrId: null,
-    evidenceNodeIds: [],
-    evidenceEdgeIds: [],
-    ...overrides,
-  };
-}
-
-function coverageArtifact(entries: CoverageArtifact['entries']): EvidenceArtifact {
-  return { passId: 'expectations.banks', kind: 'coverage', entries };
-}
-
 describe('aggregate — coverage model', () => {
   it('earns each dimension base from met expectation weight', () => {
     const result = aggregate(
@@ -167,8 +176,45 @@ describe('aggregate — coverage model', () => {
       DEFAULT_PROFILE,
     );
     expect(result.dimensionScores.reliability).toBe(50);
-    // A dimension the prompt demands nothing of stays at par.
-    expect(result.dimensionScores.hygiene).toBe(100);
+    // A dimension nothing examined is not assessed — never a free 100.
+    expect(result.dimensionScores.hygiene).toBeNull();
+  });
+
+  it('scores an uncovered dimension null and excludes it from the overall', () => {
+    const result = aggregate(
+      [coverageArtifact([coverageEntry({ expectationId: 'a', met: true, weight: 2 })])],
+      DEFAULT_PROFILE,
+    );
+    expect(result.dimensionScores.reliability).toBe(100);
+    for (const dimension of EVAL_DIMENSIONS.filter((d) => d !== 'reliability')) {
+      expect(result.dimensionScores[dimension]).toBeNull();
+    }
+    // Weights renormalize over covered dimensions: 100, not 100 × 0.2.
+    expect(result.overallScore).toBe(100);
+  });
+
+  it('treats a violation-only dimension as covered', () => {
+    const result = aggregate(
+      [
+        findingsArtifact([
+          finding({ ruleId: 'security.no-rate-limit', dimension: 'security', severity: 'high' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    expect(result.dimensionScores.security).toBe(78);
+    expect(result.dimensionScores.reliability).toBeNull();
+    expect(result.overallScore).toBe(78);
+  });
+
+  it('grades 0 when no dimension is covered at all', () => {
+    const result = aggregate([], DEFAULT_PROFILE);
+    for (const dimension of EVAL_DIMENSIONS) {
+      expect(result.dimensionScores[dimension]).toBeNull();
+    }
+    expect(result.overallScore).toBe(0);
+    expect(result.grade).toBe('F');
+    expect(result.summary).toContain('No dimension was assessed');
   });
 
   it('decays stacked violations instead of flooring the dimension', () => {
@@ -211,7 +257,10 @@ describe('aggregate — coverage model', () => {
   });
 
   it('caps the grade on critical findings no matter the numeric score', () => {
-    const one = aggregate([findingsArtifact([finding({ dimension: 'hygiene' })])], DEFAULT_PROFILE);
+    const one = aggregate(
+      [fullCoverage(), findingsArtifact([finding({ dimension: 'hygiene' })])],
+      DEFAULT_PROFILE,
+    );
     expect(one.overallScore).toBe(98.3);
     expect(one.bandGrade).toBe('A');
     expect(one.grade).toBe('C');
@@ -219,6 +268,7 @@ describe('aggregate — coverage model', () => {
 
     const two = aggregate(
       [
+        fullCoverage(),
         findingsArtifact([
           finding({ dimension: 'hygiene', ruleId: 'a.one' }),
           finding({ dimension: 'hygiene', ruleId: 'b.two' }),
@@ -232,7 +282,17 @@ describe('aggregate — coverage model', () => {
     // A grade already at or below the cap reports no cap at all.
     const alreadyLow = aggregate(
       [
-        coverageArtifact([coverageEntry({ expectationId: 'exp.unpaired', met: false })]),
+        coverageArtifact([
+          coverageEntry({ expectationId: 'exp.unpaired', met: false }),
+          ...EVAL_DIMENSIONS.filter((dimension) => dimension !== 'reliability').map((dimension) =>
+            coverageEntry({
+              expectationId: `exp.test.${dimension}`,
+              dimension,
+              weight: 1,
+              met: true,
+            }),
+          ),
+        ]),
         findingsArtifact([finding({ ruleId: 'reliability.unpaired' })]),
       ],
       DEFAULT_PROFILE,

@@ -33,6 +33,24 @@ describe('ScoreSummary', () => {
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it('renders a null dimension as "Not assessed" with no meter', () => {
+    const evaluation = makeEvaluation();
+    renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({
+          dimensionScores: { ...evaluation.dimensionScores!, security: null },
+        })}
+      />,
+    );
+
+    expect(screen.getAllByRole('meter')).toHaveLength(EVAL_DIMENSIONS.length - 1);
+    const row = screen.getByTestId('not-assessed-security');
+    expect(row.textContent).toContain('security');
+    expect(row.textContent).toContain('Not assessed');
+    // No measurement is exposed for the unassessed dimension.
+    expect(row.querySelector('[aria-valuenow]')).toBeNull();
+  });
+
   it('renders a placeholder when scores are not present yet', () => {
     renderWithTheme(
       <ScoreSummary

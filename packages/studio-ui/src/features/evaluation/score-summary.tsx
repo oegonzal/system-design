@@ -18,6 +18,14 @@ const BigScore = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
+/** Mirrors the Meter's label row so assessed and unassessed rows align. */
+const NotAssessedRow = styled.div`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space[4]}px;
+`;
+
 export interface ScoreSummaryProps {
   evaluation: EvaluationDto;
 }
@@ -46,9 +54,23 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
       {evaluation.summary ? <Text size="sm">{evaluation.summary}</Text> : null}
       {scores ? (
         <Stack gap={3}>
-          {EVAL_DIMENSIONS.map((dimension) => (
-            <Meter key={dimension} label={dimension} value={scores[dimension]} />
-          ))}
+          {EVAL_DIMENSIONS.map((dimension) => {
+            const value = scores[dimension];
+            // Null = the rubric never examined this dimension — no meter, no
+            // value, so a screen reader hears nothing measurable either.
+            return value === null ? (
+              <NotAssessedRow key={dimension} data-testid={`not-assessed-${dimension}`}>
+                <Text as="span" size="sm" tone="muted">
+                  {dimension}
+                </Text>
+                <Text as="span" size="sm" tone="muted">
+                  Not assessed
+                </Text>
+              </NotAssessedRow>
+            ) : (
+              <Meter key={dimension} label={dimension} value={value} />
+            );
+          })}
         </Stack>
       ) : null}
     </Stack>

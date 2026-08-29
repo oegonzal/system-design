@@ -28,7 +28,12 @@ export type FindingSource = (typeof FINDING_SOURCES)[number];
 export const GRADES = ['A', 'B', 'C', 'D', 'F'] as const;
 export type Grade = (typeof GRADES)[number];
 
-export type DimensionScores = Record<EvalDimension, number>;
+/**
+ * 0–100 per dimension; null when nothing examined the dimension — no
+ * applicable expectation and no violation — so it carries no weight in the
+ * overall score and renders as "not assessed" rather than a free 100.
+ */
+export type DimensionScores = Record<EvalDimension, number | null>;
 
 export interface FindingDto {
   id: Uuid;

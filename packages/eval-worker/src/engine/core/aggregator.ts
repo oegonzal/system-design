@@ -150,18 +150,21 @@ function applySuppressions(
 
 /**
  * Coverage model: the base is earned — 100 × met weight / total weight over
- * the prompt's applicable expectations (a dimension the prompt asks nothing
- * of stays at 100) — then rule violations subtract with geometric decay.
+ * the prompt's applicable expectations — then rule violations subtract with
+ * geometric decay. A dimension is covered only when at least one applicable
+ * expectation or one violation examined it; anything else scores null and
+ * drops out of the overall, so an unexamined dimension is never a free 100.
  */
 function scoreCoverage(
   findings: readonly EngineFinding[],
   coverage: CoverageArtifact['entries'],
   policy: CoverageScoringPolicy,
 ): DimensionScores {
-  const earned = {} as Record<EvalDimension, { met: number; total: number }>;
-  for (const dimension of EVAL_DIMENSIONS) earned[dimension] = { met: 0, total: 0 };
+  const earned = {} as Record<EvalDimension, { met: number; total: number; entries: number }>;
+  for (const dimension of EVAL_DIMENSIONS) earned[dimension] = { met: 0, total: 0, entries: 0 };
   for (const entry of coverage) {
     earned[entry.dimension].total += entry.weight;
+    earned[entry.dimension].entries += 1;
     if (entry.met) earned[entry.dimension].met += entry.weight;
   }
 
@@ -173,7 +176,11 @@ function scoreCoverage(
 
   const scores = {} as DimensionScores;
   for (const dimension of EVAL_DIMENSIONS) {
-    const { met, total } = earned[dimension];
+    const { met, total, entries } = earned[dimension];
+    if (entries === 0 && violations[dimension].length === 0) {
+      scores[dimension] = null;
+      continue;
+    }
     const base = total > 0 ? (100 * met) / total : 100;
 
     // Deterministic penalty order: worst first, then stable identity.
@@ -217,12 +224,22 @@ function applyGradeCaps(
   return { grade: binding.maxGrade, capApplied: binding };
 }
 
+/**
+ * Weighted mean over the covered dimensions only — weights renormalize so a
+ * prompt that assesses five dimensions is graded out of those five. With
+ * nothing covered there is no evidence of any kind, and no evidence earns 0.
+ */
 function weightedOverall(scores: DimensionScores, weights: Record<EvalDimension, number>): number {
   let total = 0;
+  let weightSum = 0;
   for (const dimension of EVAL_DIMENSIONS) {
-    total += scores[dimension] * weights[dimension];
+    const score = scores[dimension];
+    if (score === null) continue;
+    total += score * weights[dimension];
+    weightSum += weights[dimension];
   }
-  return Math.round(total * 10) / 10;
+  if (weightSum === 0) return 0;
+  return Math.round((total / weightSum) * 10) / 10;
 }
 
 function composeSummary(
@@ -240,9 +257,16 @@ function composeSummary(
         compareStrings(sortKey(a), sortKey(b)),
     );
 
-  let strongest: EvalDimension = EVAL_DIMENSIONS[0];
+  // Null dimensions were never assessed — they cannot be anyone's strongest.
+  let strongest: EvalDimension | null = null;
   for (const dimension of EVAL_DIMENSIONS) {
-    if (scores[dimension] > scores[strongest]) strongest = dimension;
+    const score = scores[dimension];
+    if (score === null) continue;
+    if (strongest === null || score > (scores[strongest] as number)) strongest = dimension;
+  }
+
+  if (strongest === null) {
+    return `No dimension was assessed — the prompt produced no applicable expectations and no findings. Overall ${overall}/100, grade ${grade}.`;
   }
 
   if (actionable.length === 0) {

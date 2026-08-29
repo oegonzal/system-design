@@ -64,8 +64,15 @@ export const DEFAULT_PROFILE: EvalProfile = {
       },
       { ruleId: 'scalability.no-cache-read-heavy', whenExpectationUnmet: 'exp.fst.read-cache' },
       { ruleId: 'security.no-gateway', whenExpectationUnmet: 'exp.fst.edge-front-door' },
+      { ruleId: 'security.no-gateway', whenExpectationUnmet: 'exp.wfa.edge-front-door' },
       { ruleId: 'security.no-rate-limit', whenExpectationUnmet: 'exp.fst.rate-limit-edge' },
       { ruleId: 'messaging.queue-no-dlq', whenExpectationUnmet: 'exp.fst.dlq-on-queues' },
+      { ruleId: 'messaging.queue-no-dlq', whenExpectationUnmet: 'exp.dag.step-dlq' },
+      { ruleId: 'messaging.queue-no-dlq', whenExpectationUnmet: 'exp.wfa.retry-dlq' },
+      {
+        ruleId: 'messaging.queue-no-dlq',
+        whenExpectationUnmet: 'exp.msp.transcode-backlog-buffer',
+      },
       {
         ruleId: 'scalability.capacity-replicas-insufficient',
         whenExpectationUnmet: 'exp.fst.stateless-scale-out',
@@ -119,6 +126,10 @@ export const DEFAULT_PROFILE: EvalProfile = {
       // When queued dispatch is unmet, the missing queue is already the
       // lesson — the sync-dispatch rule would grade the same edge twice.
       { ruleId: 'dag.sync-dispatch', whenExpectationUnmet: 'exp.dag.dispatch-queue' },
+      {
+        ruleId: 'reliability.scheduler-single-point',
+        whenExpectationUnmet: 'exp.dag.scheduler-ha',
+      },
     ],
   },
 };
