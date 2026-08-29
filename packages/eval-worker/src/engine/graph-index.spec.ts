@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { NodeOperation } from '@sysdesign/contracts';
+
 import { buildGraphIndex } from './graph-index';
 import { edge, graph, node } from './testing';
 
@@ -124,5 +126,53 @@ describe('GraphIndex', () => {
     expect(index.producersOf('b')).toEqual([]);
     expect(index.consumersOf('b').map((n) => n.id)).toEqual(['c']);
     expect(index.consumersOf('a')).toEqual([]);
+  });
+
+  describe('declared interfaces', () => {
+    const placeOrder: NodeOperation = { name: 'placeOrder', kind: 'command' };
+    const orderPlaced: NodeOperation = { name: 'orderPlaced', kind: 'event' };
+    const call = edge('e-call', 'client-1', 'svc-1', 'sync', ['placeOrder', 'ghost']);
+    const produce = edge('e-produce', 'svc-1', 'q-1', 'async', ['orderPlaced']);
+    const consume = edge('e-consume', 'q-1', 'svc-1', 'async');
+    const store = edge('e-store', 'svc-1', 'db-1', 'sync', ['saveOrder']);
+    const wired = buildGraphIndex(
+      graph(
+        [
+          node('client-1', 'client'),
+          node('svc-1', 'service', { operations: [placeOrder] }),
+          node('q-1', 'queue', { operations: [orderPlaced] }),
+          node('db-1', 'database'),
+        ],
+        [call, produce, consume, store],
+      ),
+    );
+
+    it('returns declared operations, empty for silent or missing nodes', () => {
+      expect(wired.opsOf('svc-1')).toEqual([placeOrder]);
+      expect(wired.opsOf('db-1')).toEqual([]);
+      expect(wired.opsOf('missing')).toEqual([]);
+    });
+
+    it('resolves the interface owner by the one ownership rule', () => {
+      expect(wired.interfaceOwnerOf(call)?.id).toBe('svc-1'); // callee serves the endpoints
+      expect(wired.interfaceOwnerOf(produce)?.id).toBe('q-1'); // target channel wins
+      expect(wired.interfaceOwnerOf(consume)?.id).toBe('q-1'); // source channel wins
+      expect(wired.interfaceOwnerOf(store)).toBeNull(); // storage declares nothing
+      expect(wired.interfaceOwnerOf(edge('e-x', 'missing', 'svc-1'))).toBeNull();
+    });
+
+    it('resolves carried names against the owner, null for dangling', () => {
+      expect(wired.carriedOps(call)).toEqual([
+        { name: 'placeOrder', op: placeOrder },
+        { name: 'ghost', op: null },
+      ]);
+      expect(wired.carriedOps(consume)).toEqual([]); // carries nothing
+      expect(wired.carriedOps(store)).toEqual([]); // carries, but no owner
+    });
+
+    it('reports whether any node declares operations — the interface pack gate', () => {
+      expect(wired.declaresOperations()).toBe(true);
+      expect(index.declaresOperations()).toBe(false);
+    });
   });
 });

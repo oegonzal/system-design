@@ -7,6 +7,7 @@ import type { EvalRule } from '../types';
 import { dagRules } from './dag';
 import { dataRules } from './data';
 import { hygieneRules } from './hygiene';
+import { interfaceRules } from './interfaces';
 import { messagingRules } from './messaging';
 import { performanceRules } from './performance';
 import { reliabilityRules } from './reliability';
@@ -24,4 +25,7 @@ export const RULES: EvalRule[] = [
   // Archetype packs sit after the dimension files; each rule still registers
   // under the dimension its lesson belongs to.
   ...dagRules,
+  // Interface-aware pack: wakes only once the author declares operations
+  // (see rules/interfaces.ts for the feature gate), inert everywhere else.
+  ...interfaceRules,
 ];

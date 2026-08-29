@@ -4,7 +4,16 @@
  * Edges are directed (source → target); helpers accept a direction so rules
  * can also ask "adjacent either way" questions (replica next to a database).
  */
-import type { CanvasEdge, CanvasGraph, CanvasNode, EdgeKind, NodeKind } from '@sysdesign/contracts';
+import {
+  canDeclareOperations,
+  resolveInterfaceOwner,
+  type CanvasEdge,
+  type CanvasGraph,
+  type CanvasNode,
+  type EdgeKind,
+  type NodeKind,
+  type NodeOperation,
+} from '@sysdesign/contracts';
 
 export type TraversalDirection = 'out' | 'in' | 'both';
 
@@ -102,6 +111,54 @@ export class GraphIndex {
 
   degree(nodeId: string): number {
     return this.inEdges(nodeId).length + this.outEdges(nodeId).length;
+  }
+
+  // ── Declared interfaces ─────────────────────────────────────────────────
+
+  /** The node's declared operations; [] when the node is absent or declares none. */
+  opsOf(nodeId: string): NodeOperation[] {
+    return this.nodeById.get(nodeId)?.operations ?? [];
+  }
+
+  /**
+   * The node whose declared operations this edge's `carries` names resolve
+   * against — `resolveInterfaceOwner` in contracts is the one ownership rule.
+   * Null when either endpoint is missing, or when the resolved owner's kind
+   * cannot declare operations (nothing to resolve against).
+   */
+  interfaceOwnerOf(edge: CanvasEdge): CanvasNode | null {
+    const source = this.nodeById.get(edge.source);
+    const target = this.nodeById.get(edge.target);
+    if (!source || !target) return null;
+    const side = resolveInterfaceOwner(source.kind, target.kind);
+    if (side === null) return null;
+    const owner = side === 'source' ? source : target;
+    return canDeclareOperations(owner.kind) ? owner : null;
+  }
+
+  /**
+   * The edge's carried names resolved against its owner's declared operations
+   * (a null op is a dangling reference). [] when the edge carries nothing or
+   * has no interface owner to resolve against.
+   */
+  carriedOps(edge: CanvasEdge): Array<{ name: string; op: NodeOperation | null }> {
+    const carries = edge.carries ?? [];
+    if (carries.length === 0) return [];
+    const owner = this.interfaceOwnerOf(edge);
+    if (!owner) return [];
+    const declared = owner.operations ?? [];
+    return carries.map((name) => ({
+      name,
+      op: declared.find((candidate) => candidate.name === name) ?? null,
+    }));
+  }
+
+  /** Does any node declare a non-empty interface? The interface pack's feature gate. */
+  declaresOperations(): boolean {
+    for (const node of this.nodeById.values()) {
+      if (node.operations !== undefined && node.operations.length > 0) return true;
+    }
+    return false;
   }
 
   /** Adjacent nodes in either direction (self-loops resolve to the node itself). */

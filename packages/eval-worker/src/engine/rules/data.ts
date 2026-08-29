@@ -365,11 +365,10 @@ const streamNoRetention: EvalRule = {
 };
 
 /*
- * NOTE: the planned `data.replica-receives-writes` rule is deliberately not
- * built. Edges carry no per-operation semantics (read vs write), so an edge
- * into a replica is indistinguishable from a legitimate read path — flagging
- * it would punish exactly the read/write split the other rules teach. It
- * returns with the ops pack once edges can declare their operation.
+ * NOTE: the once-deferred `data.replica-receives-writes` lesson now lives in
+ * the interface pack as `data.replica-receives-commands` (rules/interfaces.ts).
+ * Edges can declare the operations they carry, so a write into a replica is
+ * provable there instead of presumed here.
  */
 export const dataRules: EvalRule[] = [
   mixedOltpAnalytics,

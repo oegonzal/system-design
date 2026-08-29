@@ -9,6 +9,7 @@ import type {
   EdgeKind,
   NodeConfig,
   NodeKind,
+  NodeOperation,
 } from '@sysdesign/contracts';
 
 import type { LlmClient } from '@sysdesign/llm';
@@ -30,18 +31,31 @@ export function fakeLlm(response: unknown): LlmClient {
 export function node(
   id: string,
   kind: NodeKind,
-  options: { label?: string; config?: NodeConfig } = {},
+  options: {
+    label?: string;
+    config?: NodeConfig;
+    responsibilities?: string[];
+    operations?: NodeOperation[];
+  } = {},
 ): CanvasNode {
   return {
     id,
     kind,
     label: options.label ?? id,
     ...(options.config ? { config: options.config } : {}),
+    ...(options.responsibilities ? { responsibilities: options.responsibilities } : {}),
+    ...(options.operations ? { operations: options.operations } : {}),
   };
 }
 
-export function edge(id: string, source: string, target: string, kind?: EdgeKind): CanvasEdge {
-  return { id, source, target, ...(kind ? { kind } : {}) };
+export function edge(
+  id: string,
+  source: string,
+  target: string,
+  kind?: EdgeKind,
+  carries?: string[],
+): CanvasEdge {
+  return { id, source, target, ...(kind ? { kind } : {}), ...(carries ? { carries } : {}) };
 }
 
 export function graph(nodes: CanvasNode[], edges: CanvasEdge[] = []): CanvasGraph {
