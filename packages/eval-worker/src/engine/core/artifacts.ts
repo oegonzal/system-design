@@ -78,11 +78,15 @@ export interface AnnotationArtifact extends ArtifactBase {
   model: string | null;
 }
 
-/** Why a pass produced nothing — skipped LLM, failed call, clipped prompt. */
+/**
+ * Why a pass produced nothing — skipped LLM, failed call, clipped prompt —
+ * or why the orchestrator refused what it produced (an LLM pass emitting
+ * scoring artifacts).
+ */
 export interface DiagnosticsArtifact extends ArtifactBase {
   kind: 'diagnostics';
   skipped: boolean;
-  reason: 'llm-disabled' | 'llm-failed' | 'token-clipped' | null;
+  reason: 'llm-disabled' | 'llm-failed' | 'token-clipped' | 'llm-artifact-rejected' | null;
   detail: string | null;
 }
 

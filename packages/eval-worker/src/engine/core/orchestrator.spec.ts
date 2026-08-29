@@ -91,6 +91,57 @@ describe('runEvaluation', () => {
     ).rejects.toThrow(/unknown pass: no\.such\.pass/);
   });
 
+  it('[EVAL-6] drops findings and coverage from an llm-mode pass', async () => {
+    const rogue: EvalPass = {
+      id: 'llm.rogue',
+      mode: 'llm',
+      run: () =>
+        Promise.resolve<EvidenceArtifact[]>([
+          {
+            passId: 'llm.rogue',
+            kind: 'findings',
+            findings: [
+              {
+                ruleId: 'reliability.fabricated',
+                dimension: 'reliability',
+                severity: 'critical',
+                title: 'A hallucinated catastrophe',
+                message: 'The model would like this to count as a violation.',
+                affectedNodeIds: [],
+                affectedEdgeIds: [],
+                suggestion: null,
+                countsAsViolation: true,
+                expectationId: null,
+                nfrId: null,
+              },
+            ],
+          },
+        ]),
+    };
+
+    const run = await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: { ...DEFAULT_PROFILE, passes: [{ pass: 'llm.rogue', enabled: true }] },
+      registry: new Map([[rogue.id, rogue]]),
+    });
+
+    // The scoring artifact never reaches the aggregator; the refusal is audited.
+    expect(run.artifacts).toEqual([
+      {
+        passId: 'llm.rogue',
+        kind: 'diagnostics',
+        skipped: false,
+        reason: 'llm-artifact-rejected',
+        detail: expect.stringContaining('llm.rogue') as string,
+      },
+    ]);
+    expect(run.result.findings).toEqual([]);
+    expect(run.result.overallScore).toBe(0);
+    expect(run.result.capApplied).toBeNull();
+  });
+
   it('matches runEngine for the deterministic slice', async () => {
     const canvas = graph([node('n-1', 'client'), node('n-2', 'service'), node('n-3', 'database')]);
     const run = await runEvaluation({

@@ -50,8 +50,32 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
       priorArtifacts: artifacts,
       options: config.options ?? {},
     });
-    artifacts.push(...produced);
+    artifacts.push(...enforceMode(pass, produced));
   }
 
   return { artifacts, result: aggregate(artifacts, profile) };
+}
+
+/**
+ * The mode contract, enforced: an LLM pass may narrate (axis, scenarios,
+ * annotations, diagnostics) but never emit the findings or coverage the
+ * aggregator scores. Dropping them here makes "LLM output cannot move the
+ * grade" structural rather than a convention each pass must remember.
+ */
+function enforceMode(pass: EvalPass, produced: EvidenceArtifact[]): EvidenceArtifact[] {
+  if (pass.mode !== 'llm') return produced;
+  const kept = produced.filter(
+    (artifact) => artifact.kind !== 'findings' && artifact.kind !== 'coverage',
+  );
+  if (kept.length === produced.length) return produced;
+  return [
+    ...kept,
+    {
+      passId: pass.id,
+      kind: 'diagnostics',
+      skipped: false,
+      reason: 'llm-artifact-rejected',
+      detail: `llm pass ${pass.id} emitted ${produced.length - kept.length} scoring artifact(s) (findings/coverage); dropped — only deterministic passes may move the score`,
+    },
+  ];
 }
