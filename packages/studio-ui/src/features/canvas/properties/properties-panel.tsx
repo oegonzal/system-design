@@ -30,11 +30,16 @@ const Root = styled.aside`
   border-radius: ${({ theme }) => theme.radius.lg};
 `;
 
+export interface PropertiesPanelProps {
+  /** Lets a parent layout size the panel as a flex item (Emotion composition). */
+  className?: string;
+}
+
 /**
  * Edit surface for the selected element. Reads and writes the canvas store
  * directly; the config sub-forms write the keys the eval rules read.
  */
-export function PropertiesPanel() {
+export function PropertiesPanel({ className }: PropertiesPanelProps) {
   const selectedId = useCanvasStore((state) => state.selectedId);
   const node = useCanvasStore((state) =>
     state.selectedId === null
@@ -55,7 +60,7 @@ export function PropertiesPanel() {
 
   if (selectedId === null || (!node && !edge)) {
     return (
-      <Root aria-label="Properties" data-testid="properties-panel">
+      <Root aria-label="Properties" data-testid="properties-panel" className={className}>
         <Heading level={2}>Properties</Heading>
         <Text size="sm" tone="muted">
           Select a block or connection to edit it.
@@ -82,7 +87,7 @@ export function PropertiesPanel() {
     ownerNode && canDeclareOperations(ownerNode.data.kind) ? ownerNode : undefined;
 
   return (
-    <Root aria-label="Properties" data-testid="properties-panel">
+    <Root aria-label="Properties" data-testid="properties-panel" className={className}>
       <Heading level={2}>Properties</Heading>
 
       {node ? (

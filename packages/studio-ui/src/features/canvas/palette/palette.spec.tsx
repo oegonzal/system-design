@@ -29,6 +29,18 @@ describe('Palette', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(NODE_KINDS.length);
   });
 
+  it('forwards className so a parent layout can size the palette as a flex item', () => {
+    const store = createCanvasStore();
+    renderWithTheme(
+      <CanvasStoreProvider store={store}>
+        <Palette className="probe" />
+      </CanvasStoreProvider>,
+    );
+
+    const landmark = screen.getByRole('complementary', { name: 'Building blocks' });
+    expect(landmark.classList.contains('probe')).toBe(true);
+  });
+
   it('[UX-1] click-to-add creates a node of that kind in the store', async () => {
     const user = userEvent.setup();
     const store = renderPalette();

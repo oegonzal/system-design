@@ -82,8 +82,7 @@ export const globalStyles = (theme: AppTheme): SerializedStyles => css`
   }
 
   html,
-  body,
-  #root {
+  body {
     height: 100%;
   }
 

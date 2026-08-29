@@ -17,6 +17,11 @@ test.describe('interactive design canvas', () => {
     }
     // …and nothing beyond the contract's vocabulary.
     await expect(page.locator('[data-testid^="palette-"]')).toHaveCount(NODE_KINDS.length);
+
+    // The very last entry is reachable and usable — the palette scrolls
+    // internally instead of relying on page scroll that clipped it before.
+    await canvas.addFromPalette(NODE_KINDS[NODE_KINDS.length - 1]); // n-1
+    await canvas.expectNodeCount(1);
   });
 
   test('[UX-2] adds, connects, edits and deletes blocks on the canvas', async ({

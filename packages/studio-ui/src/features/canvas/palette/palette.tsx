@@ -107,6 +107,11 @@ function matches(kind: NodeKind, categoryLabel: string, query: string): boolean 
   );
 }
 
+export interface PaletteProps {
+  /** Lets a parent layout size the palette as a flex item (Emotion composition). */
+  className?: string;
+}
+
 /**
  * The building-block sidebar. Shelved by the contract's `NODE_KIND_CATEGORIES`
  * and mapped over `kindsInCategory` — the palette can never drift from the
@@ -122,7 +127,7 @@ function matches(kind: NodeKind, categoryLabel: string, query: string): boolean 
  * buttons carry `palette-*` (an e2e gate counts them); everything the
  * category layer adds is `blocks-*`.
  */
-export function Palette() {
+export function Palette({ className }: PaletteProps) {
   const addNode = useCanvasStore((state) => state.addNode);
   const [query, setQuery] = useState('');
   const normalized = query.trim().toLowerCase();
@@ -138,7 +143,7 @@ export function Palette() {
   })).filter((section) => section.kinds.length > 0);
 
   return (
-    <Root aria-label="Building blocks">
+    <Root aria-label="Building blocks" className={className}>
       <Heading level={2}>Blocks</Heading>
       <Text size="sm" tone="muted">
         Drag onto the canvas, or press Enter to add.

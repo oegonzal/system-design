@@ -3,13 +3,16 @@
 import styled from '@emotion/styled';
 import { SkipLink } from '@sysdesign/design-system';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { PrimaryNav } from './primary-nav';
 import { RouteAnnouncer } from './route-announcer';
 
 const Shell = styled.div`
-  min-height: 100vh;
+  height: 100vh; /* fallback for browsers without dvh */
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: ${({ theme }) => theme.color.bg.app};
@@ -46,8 +49,17 @@ const BrandMark = styled.span`
   color: ${({ theme }) => theme.color.accent.default};
 `;
 
+/**
+ * The app's single scroll container. Pages fill it by growing as flex items
+ * (never by measuring chrome heights), and viewport-bounded pages like the
+ * practice workspace scroll their own columns instead of this element.
+ */
 const Main = styled.main`
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
@@ -60,6 +72,15 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const mainRef = useRef<HTMLElement>(null);
+  const pathname = usePathname();
+
+  // The router resets *document* scroll on navigation, but the document no
+  // longer scrolls — Main does, and it persists across client navigations.
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [pathname]);
+
   return (
     <Shell>
       <SkipLink href="#main">Skip to main content</SkipLink>
@@ -69,7 +90,9 @@ export function AppShell({ children }: AppShellProps) {
         </Brand>
         <PrimaryNav />
       </Header>
-      <Main id="main">{children}</Main>
+      <Main id="main" ref={mainRef}>
+        {children}
+      </Main>
       <RouteAnnouncer />
     </Shell>
   );

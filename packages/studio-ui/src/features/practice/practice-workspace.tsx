@@ -49,12 +49,48 @@ const SdCanvasLazy = dynamic(
   { ssr: false, loading: CanvasSkeleton },
 );
 
+const SIDE_COLUMN_WIDTH = { md: '200px', lg: '248px' };
+const DOCK_COLUMN_WIDTH = { md: '320px', lg: '380px' };
+/** Floor below which the shell's Main scrolls instead of crushing the canvas. */
+const WORKSPACE_MIN_HEIGHT = '640px';
+/** A tall node editor may not evict the palette from the side column. */
+const PROPERTIES_MAX_SHARE = '45%';
+
+/**
+ * Fills the shell's Main (a flex column with a definite height): shrinkable
+ * past its content so the columns clamp to the viewport and scroll
+ * internally. Below the Layout floor the content overflows this box and Main
+ * scrolls instead — the short-window degradation.
+ */
+const WorkspaceRoot = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]}px;
+
+  ${({ theme }) => theme.media.md} {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+`;
+
 const Layout = styled.div`
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr);
   gap: ${({ theme }) => theme.space[5]}px;
-  align-items: stretch;
-  min-height: 640px;
+
+  /* minmax(0, 1fr) on the row plus min-height: 0 on all three grid items is
+     the load-bearing pair: it lets each column shrink to the row and scroll
+     internally instead of content-sizing the whole page. */
+  ${({ theme }) => theme.media.md} {
+    grid-template-columns: ${SIDE_COLUMN_WIDTH.md} minmax(0, 1fr) ${DOCK_COLUMN_WIDTH.md};
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1;
+    min-height: ${WORKSPACE_MIN_HEIGHT};
+  }
+
+  ${({ theme }) => theme.media.lg} {
+    grid-template-columns: ${SIDE_COLUMN_WIDTH.lg} minmax(0, 1fr) ${DOCK_COLUMN_WIDTH.lg};
+  }
 `;
 
 const SideColumn = styled.div`
@@ -64,23 +100,71 @@ const SideColumn = styled.div`
   min-height: 0;
 `;
 
+const WorkspacePalette = styled(Palette)`
+  max-height: 40vh;
+  max-height: 40dvh;
+
+  ${({ theme }) => theme.media.md} {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+  }
+`;
+
+const WorkspaceProperties = styled(PropertiesPanel)`
+  overflow-y: auto;
+
+  ${({ theme }) => theme.media.md} {
+    flex: 0 1 auto;
+    max-height: ${PROPERTIES_MAX_SHARE};
+  }
+`;
+
 const CanvasColumn = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space[4]}px;
   min-width: 0;
+  min-height: 0;
 `;
 
 const CanvasArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 60vh; /* definite height so CanvasFrame's 100% binds when stacked */
+  height: 60dvh;
+
+  ${({ theme }) => theme.media.md} {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+  }
+`;
+
+const Dock = styled(Surface)`
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+`;
+
+const DockTabs = styled(Tabs)`
   flex: 1;
-  min-height: 520px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 `;
 
-const Dock = styled(Surface)`
+const DockPanel = styled(TabPanel)`
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: calc(100vh - 160px);
+
+  /* No authored display above: it would beat the UA [hidden] rule and break
+     the state-preserving hide. This guard keeps the attribute honored. */
+  &[hidden] {
+    display: none;
+  }
 `;
 
 const ReadOnlyBanner = styled.div`
@@ -294,12 +378,12 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     : null;
 
   return (
-    <Stack gap={4}>
+    <WorkspaceRoot>
       <Heading level={1}>{prompt?.title ?? 'Practice session'}</Heading>
       <Layout>
         <SideColumn>
-          <Palette />
-          <PropertiesPanel />
+          <WorkspacePalette />
+          <WorkspaceProperties />
         </SideColumn>
 
         <CanvasColumn>
@@ -328,13 +412,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         </CanvasColumn>
 
         <Dock as="aside" padding={5} aria-label="Session details">
-          <Tabs value={tab} onChange={setTab}>
+          <DockTabs value={tab} onChange={setTab}>
             <TabList aria-label="Session panels">
               <Tab value="prompt">Prompt</Tab>
               <Tab value="feedback">Feedback</Tab>
               <Tab value="revisions">Revisions</Tab>
             </TabList>
-            <TabPanel value="prompt">
+            <DockPanel value="prompt">
               {prompt ? (
                 <PromptPane prompt={prompt} />
               ) : (
@@ -342,8 +426,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                   Prompt unavailable.
                 </Text>
               )}
-            </TabPanel>
-            <TabPanel value="feedback">
+            </DockPanel>
+            <DockPanel value="feedback">
               <EvaluationPanel
                 evaluation={polling.evaluation}
                 error={polling.error}
@@ -353,17 +437,17 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 onSelectFinding={handleSelectFinding}
                 onPreviewFix={handlePreviewFix}
               />
-            </TabPanel>
-            <TabPanel value="revisions">
+            </DockPanel>
+            <DockPanel value="revisions">
               <RevisionTimeline
                 revisions={revisions}
                 activeRevisionId={viewingRevision?.id ?? feedback?.id ?? null}
                 onSelect={(summary) => void handleSelectRevision(summary)}
               />
-            </TabPanel>
-          </Tabs>
+            </DockPanel>
+          </DockTabs>
         </Dock>
       </Layout>
-    </Stack>
+    </WorkspaceRoot>
   );
 }

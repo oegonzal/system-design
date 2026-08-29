@@ -1,3 +1,4 @@
+import styled from '@emotion/styled';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 
@@ -31,4 +32,30 @@ export const Filtered: Story = {
     const canvas = within(canvasElement);
     await userEvent.type(canvas.getByLabelText('Filter blocks'), 'cache');
   },
+};
+
+const BoundedColumn480 = styled.div`
+  height: 480px;
+  display: flex;
+  flex-direction: column;
+
+  & > aside {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+`;
+
+/**
+ * The palette as the practice workspace mounts it: a bounded flex column, so
+ * the Root's own scrollbar and the sticky category headers are live — the
+ * smoke gate axe-checks this scrolling state.
+ */
+export const BoundedColumn: Story = {
+  decorators: [
+    (StoryComponent) => (
+      <BoundedColumn480>
+        <StoryComponent />
+      </BoundedColumn480>
+    ),
+  ],
 };
