@@ -11,10 +11,21 @@ import type {
   NodeKind,
 } from '@sysdesign/contracts';
 
+import type { LlmClient } from '@sysdesign/llm';
+
 import type { GraphIndex } from './graph-index';
 import { buildGraphIndex } from './graph-index';
 import { RULES } from './rules';
 import type { EvalRule, PromptFacts, RuleContext } from './types';
+
+/** An enabled client that returns one canned structured response (or null = failure). */
+export function fakeLlm(response: unknown): LlmClient {
+  return {
+    enabled: true,
+    model: 'test-model',
+    completeStructured: <T>() => Promise.resolve(response as T | null),
+  };
+}
 
 export function node(
   id: string,

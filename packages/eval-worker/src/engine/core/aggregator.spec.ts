@@ -99,7 +99,7 @@ describe('aggregate', () => {
     ]);
   });
 
-  it('never lets axis or scenario artifacts move the score', () => {
+  it('[EVAL-6] never lets axis or scenario artifacts move the score', () => {
     const base: EvidenceArtifact[] = [findingsArtifact([finding()])];
     const axis: AxisArtifact = {
       passId: 'llm.depth',

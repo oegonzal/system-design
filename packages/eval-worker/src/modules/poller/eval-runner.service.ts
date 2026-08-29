@@ -117,6 +117,26 @@ export class EvalRunnerService {
             suggestion: null,
           });
         }
+        // Scenario failure stories persist as advisory findings too — same
+        // llm source, so they teach without ever touching the score math.
+        for (const report of result.scenarios?.reports ?? []) {
+          if (report.verdict === 'survives') continue;
+          tem.create(Finding, {
+            evaluation: evaluationId,
+            source: 'llm',
+            ruleId: null,
+            expectationId: null,
+            nfrId: null,
+            scenarioId: report.scenarioId,
+            dimension: 'reliability',
+            severity: report.verdict === 'fails' ? 'high' : 'medium',
+            title: report.title,
+            message: report.story,
+            affectedNodeIds: report.weakestNodeIds,
+            affectedEdgeIds: [],
+            suggestion: null,
+          });
+        }
 
         await tem.nativeUpdate(
           Evaluation,

@@ -26,6 +26,8 @@ describe('runEvaluation', () => {
       'expectations.banks:coverage',
       'expectations.banks:findings',
       'llm.critic:diagnostics',
+      'llm.depth:diagnostics',
+      'llm.scenarios:diagnostics',
     ]);
     expect(run.result.annotations).toBeNull();
     expect(run.result.diagnostics[0]?.reason).toBe('llm-disabled');

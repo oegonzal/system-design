@@ -55,6 +55,15 @@ export const CRITERIA: readonly Criterion[] = [
       'Scores are calibrated: an empty canvas fails, a naive design fails, and only demonstrated depth earns an A.',
   },
   {
+    id: 'EVAL-6',
+    statement: 'The LLM depth axis is displayed beside, and never alters, the deterministic score.',
+  },
+  {
+    id: 'EVAL-7',
+    statement:
+      'Adversarial scenarios are selected deterministically and narrated as failure stories.',
+  },
+  {
     id: 'EVAL-8',
     statement: 'Every evaluation records the profile it was graded under and its evidence trail.',
   },

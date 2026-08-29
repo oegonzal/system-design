@@ -25,7 +25,7 @@ export class AnthropicCritic extends EvalCritic {
       system: CRITIC_SYSTEM_PROMPT,
       user: buildCriticUserPrompt(input),
       schema: critiqueSchema,
-      maxTokens: 4096,
+      maxTokens: 8192,
     });
 
     if (!critique) return EMPTY;

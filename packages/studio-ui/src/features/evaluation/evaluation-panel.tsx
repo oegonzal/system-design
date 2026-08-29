@@ -4,6 +4,7 @@ import type { EvaluationDto, FindingDto } from '@sysdesign/contracts';
 import { Button, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
 import { FindingsList } from './findings-list';
+import { LlmInsights } from './llm-insights';
 import { ScoreSummary } from './score-summary';
 import { SuggestionControls } from './suggestion-controls';
 
@@ -77,6 +78,7 @@ export function EvaluationPanel({
             onSelect={onSelectFinding}
             onPreviewFix={onPreviewFix}
           />
+          <LlmInsights axes={evaluation.axes} scenarios={evaluation.scenarios} />
         </>
       ) : null}
     </Stack>

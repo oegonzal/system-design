@@ -8,8 +8,10 @@
  */
 import type { EvalProfile } from '../core/profile';
 import { CRITIC_PASS_ID } from '../passes/critic/critic.pass';
+import { DEPTH_PASS_ID } from '../passes/depth/depth.pass';
 import { EXPECTATIONS_PASS_ID } from '../passes/expectations/expectations.pass';
 import { RULES_PASS_ID } from '../passes/rules/rules.pass';
+import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 import { DIMENSION_WEIGHTS } from '../scoring';
 
 export const DEFAULT_PROFILE: EvalProfile = {
@@ -32,6 +34,8 @@ export const DEFAULT_PROFILE: EvalProfile = {
     },
     { pass: EXPECTATIONS_PASS_ID, enabled: true },
     { pass: CRITIC_PASS_ID, enabled: true },
+    { pass: DEPTH_PASS_ID, enabled: true },
+    { pass: SCENARIOS_PASS_ID, enabled: true },
   ],
   scoring: {
     model: 'coverage',

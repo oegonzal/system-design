@@ -2,10 +2,12 @@ import type {
   CanvasGraph,
   DesignRevisionSummaryDto,
   DesignSessionDto,
+  EvalAxisDto,
   EvaluationDto,
   ExperienceProfileDto,
   FindingDto,
   PromptDto,
+  ScenarioReportDto,
   StarStoryDto,
 } from '@sysdesign/contracts';
 
@@ -230,6 +232,34 @@ export function makeFinding(overrides: Partial<FindingDto> = {}): FindingDto {
         },
       ],
     },
+    ...overrides,
+  };
+}
+
+export function makeAxis(overrides: Partial<EvalAxisDto> = {}): EvalAxisDto {
+  return {
+    id: 'depth',
+    label: 'Depth & justification',
+    score: 61,
+    subScores: {
+      tradeoffArticulation: 55,
+      bottleneckAwareness: 70,
+      failureDesign: 50,
+      dataFlowClarity: 68,
+    },
+    summary: 'Mechanisms are named but capacities are defaulted.',
+    model: 'claude-sonnet-5',
+    ...overrides,
+  };
+}
+
+export function makeScenarioReport(overrides: Partial<ScenarioReportDto> = {}): ScenarioReportDto {
+  return {
+    scenarioId: 'thundering-herd',
+    title: 'The on-sale thundering herd',
+    verdict: 'degrades',
+    story: 'The cache absorbs the read storm, but checkout latency triples while the queue drains.',
+    weakestNodeIds: ['n-3'],
     ...overrides,
   };
 }

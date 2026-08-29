@@ -28,7 +28,7 @@ export const critiqueSchema = z.object({
           .describe('Ids of existing canvas nodes this concerns. Empty if graph-wide.'),
       }),
     )
-    .max(4)
+    .max(10)
     .describe('New insights only — never restate a deterministic finding.'),
 });
 
