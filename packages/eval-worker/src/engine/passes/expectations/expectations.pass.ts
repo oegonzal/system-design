@@ -33,8 +33,9 @@ export function runExpectations(
     if (!expectationApplies(expectation, input.facts)) continue;
     const check = expectation.satisfiedBy(ctx);
     // The requirement this expectation enforces, when the prompt names one.
-    const nfrId = expectation.nfrKind
-      ? (input.facts.nfrs.find((nfr) => nfr.kind === expectation.nfrKind)?.id ?? null)
+    const nfrKind = expectation.nfrKind ?? expectation.citesNfrKind;
+    const nfrId = nfrKind
+      ? (input.facts.nfrs.find((nfr) => nfr.kind === nfrKind)?.id ?? null)
       : null;
     entries.push({
       expectationId: expectation.id,

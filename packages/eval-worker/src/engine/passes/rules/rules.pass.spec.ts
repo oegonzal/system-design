@@ -34,3 +34,19 @@ describe('rules pass severity policy', () => {
     expect(dlqFinding('standard')?.severity).toBe('low');
   });
 });
+
+describe('rules pass NFR citation', () => {
+  it('resolves nfrId from the rule nfrKind against the prompt NFRs', () => {
+    // A lone database trips reliability.single-db-no-replica (availability-gated).
+    const canvas = graph([node('db-1', 'database')]);
+    const artifact = runRules({
+      graph: canvas,
+      facts: flashSaleFacts(),
+      index: buildGraphIndex(canvas),
+    });
+    const finding = artifact.findings.find(
+      (candidate) => candidate.ruleId === 'reliability.single-db-no-replica',
+    );
+    expect(finding?.nfrId).toBe('fst-avail-sale-window');
+  });
+});

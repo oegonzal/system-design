@@ -83,6 +83,8 @@ export interface RuleContext {
 export interface EvalRule {
   id: string;
   dimension: EvalDimension;
+  /** The requirement kind this rule enforces; used to resolve nfrId on findings. */
+  nfrKind?: NfrKind;
   check(ctx: RuleContext): RuleFinding[];
 }
 

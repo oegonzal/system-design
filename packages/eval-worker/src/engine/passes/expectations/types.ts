@@ -31,6 +31,12 @@ export interface Expectation {
   severityIfUnmet: Severity;
   /** Applies only when the prompt carries this NFR kind. */
   nfrKind?: NfrKind;
+  /**
+   * Citation-only: names the NFR kind this expectation embodies for nfrId
+   * lookup, WITHOUT gating applicability — use nfrKind when the expectation
+   * should also be skipped when the kind is absent.
+   */
+  citesNfrKind?: NfrKind;
   /** The easiest difficulty that demands this capability. */
   minDifficulty: PromptDifficulty;
   archetypes: readonly Archetype[] | 'all';

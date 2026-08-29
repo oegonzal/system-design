@@ -408,6 +408,7 @@ const hotPartitionRisk: EvalRule = {
 const noAutoscaling: EvalRule = {
   id: 'scalability.no-autoscaling',
   dimension: 'scalability',
+  nfrKind: 'cost',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('cost')) return [];
     if (index.hasKind('serverless-function')) return [];

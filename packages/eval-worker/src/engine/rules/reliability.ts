@@ -16,6 +16,7 @@ import {
 const singleDbNoReplica: EvalRule = {
   id: 'reliability.single-db-no-replica',
   dimension: 'reliability',
+  nfrKind: 'availability',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('availability')) return [];
     const findings: RuleFinding[] = [];
@@ -391,6 +392,7 @@ const queueProducerOverload: EvalRule = {
 const nothingMonitored: EvalRule = {
   id: 'reliability.nothing-monitored',
   dimension: 'reliability',
+  nfrKind: 'observability',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('observability')) return [];
     if (index.hasKind('monitoring')) return [];
@@ -421,6 +423,7 @@ const nothingMonitored: EvalRule = {
 const dlqUnmonitored: EvalRule = {
   id: 'reliability.dlq-unmonitored',
   dimension: 'reliability',
+  nfrKind: 'observability',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('observability')) return [];
     if (index.hasKind('monitoring')) return [];

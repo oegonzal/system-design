@@ -79,6 +79,10 @@ export function describeDesign(graph: CanvasGraph, facts: PromptFacts): GraphTex
           (nfr) =>
             `  nfr ${nfr.id} [${nfr.kind}] ${JSON.stringify(nfr.statement)}${
               nfr.target ? ` target ${nfr.target}` : ''
+            }${
+              nfr.targetSpec
+                ? ` spec ${nfr.targetSpec.metric} ${nfr.targetSpec.op} ${nfr.targetSpec.value}${nfr.targetSpec.unit}`
+                : ''
             }`,
         );
 
@@ -87,7 +91,8 @@ export function describeDesign(graph: CanvasGraph, facts: PromptFacts): GraphTex
     `archetype: ${facts.archetype} · difficulty: ${facts.difficulty}`,
     `scale: ${targets.concurrentUsers} concurrent users, ${targets.requestsPerSecond} req/s, ` +
       `read:write ${targets.readWriteRatio}, p99 ≤ ${targets.p99LatencyMs}ms, ` +
-      `availability ${targets.availabilityPct}%`,
+      `availability ${targets.availabilityPct}%` +
+      (targets.dataRetention ? `, retention ${targets.dataRetention}` : ''),
     `non-functional requirements:`,
     ...nfrs,
     `functional requirements: ${facts.functionalText}`,

@@ -25,9 +25,13 @@ export function runRules(input: RulesInput, rules: readonly EvalRule[] = RULES):
   const ctx: RuleContext = { graph: input.graph, facts: input.facts, index: input.index };
   const findings: EngineFinding[] = [];
   for (const rule of rules) {
+    // The requirement this rule enforces, when the prompt names one.
+    const nfrId = rule.nfrKind
+      ? (input.facts.nfrs.find((nfr) => nfr.kind === rule.nfrKind)?.id ?? null)
+      : null;
     for (const finding of rule.check(ctx)) {
       // Every rule finding is a violation: it subtracts from its dimension.
-      findings.push({ ...finding, countsAsViolation: true, expectationId: null, nfrId: null });
+      findings.push({ ...finding, countsAsViolation: true, expectationId: null, nfrId });
     }
   }
   // Severity is re-graded last, so rules stay difficulty-blind on severity

@@ -47,6 +47,7 @@ const ingestStream: Expectation = {
   dimension: 'messaging',
   weight: 2,
   severityIfUnmet: 'critical',
+  citesNfrKind: 'throughput',
   minDifficulty: 'intro',
   archetypes: REALTIME_ANALYTICS,
   title: 'The firehose writes straight to storage',

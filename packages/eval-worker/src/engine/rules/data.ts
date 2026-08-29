@@ -159,6 +159,7 @@ const dualWriteNoOutbox: EvalRule = {
 const noIdempotentConsumers: EvalRule = {
   id: 'data.no-idempotent-consumers',
   dimension: 'data',
+  nfrKind: 'consistency',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('consistency')) return [];
     const findings: RuleFinding[] = [];
@@ -238,6 +239,7 @@ const cacheNoInvalidation: EvalRule = {
 const multiWriterInventory: EvalRule = {
   id: 'data.multi-writer-inventory',
   dimension: 'data',
+  nfrKind: 'consistency',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('consistency')) return [];
     const findings: RuleFinding[] = [];
@@ -267,6 +269,7 @@ const multiWriterInventory: EvalRule = {
 const queueNotDurable: EvalRule = {
   id: 'data.queue-not-durable',
   dimension: 'data',
+  nfrKind: 'durability',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('durability')) return [];
     const databases = index.byKind('database');
@@ -302,6 +305,7 @@ const queueNotDurable: EvalRule = {
 const noBackupStrategy: EvalRule = {
   id: 'data.no-backup-strategy',
   dimension: 'data',
+  nfrKind: 'durability',
   check({ facts, index }) {
     if (facts.difficulty === 'intro') return [];
     if (!facts.nfrKinds.includes('durability')) return [];
@@ -336,6 +340,7 @@ const noBackupStrategy: EvalRule = {
 const streamNoRetention: EvalRule = {
   id: 'data.stream-no-retention',
   dimension: 'data',
+  nfrKind: 'durability',
   check({ facts, index }) {
     if (facts.difficulty !== 'advanced') return [];
     if (!facts.nfrKinds.includes('durability')) return [];

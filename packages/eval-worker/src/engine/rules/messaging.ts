@@ -10,6 +10,7 @@ import { formatInt, readsFraction, sortById, SuggestedIds, uniqueSorted } from '
 const noQueueForSpike: EvalRule = {
   id: 'messaging.no-queue-for-spike',
   dimension: 'messaging',
+  nfrKind: 'throughput',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('throughput')) return [];
     if (index.hasKind('queue') || index.hasKind('event-stream')) return [];
