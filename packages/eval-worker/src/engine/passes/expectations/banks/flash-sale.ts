@@ -4,7 +4,7 @@
  * discipline (rate limits, DLQs, admission control); advanced demands the
  * hard guarantees (multi-region, idempotency, partitioning).
  */
-import type { CanvasNode, GraphPatch } from '@sysdesign/contracts';
+import type { CanvasNode } from '@sysdesign/contracts';
 
 import type { GraphIndex } from '../../../graph-index';
 import {
@@ -14,38 +14,17 @@ import {
   sortById,
   SuggestedIds,
 } from '../../../rules/shared';
-import type { RuleContext } from '../../../types';
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
-import { monitoringPresence, suggestMonitoring } from './shared';
+import {
+  dlqCoverage,
+  monitoringPresence,
+  suggestDlq,
+  suggestMonitoring,
+  suggestReadCache,
+} from './shared';
 
 const FLASH_SALE = ['flash-sale-ticketing'] as const;
-
-/** Shared with the read-path expectations: hang a cache off the read path. */
-function suggestReadCache({ index }: RuleContext): GraphPatch | null {
-  const client = sortById(index.clients())[0];
-  if (!client) return null;
-  const ids = new SuggestedIds(index);
-  const db = sortById(index.byKind('database')).find((candidate) =>
-    index.pathExists(client.id, candidate.id),
-  );
-  const serviceBefore = sortById(index.byKind('service')).find(
-    (service) =>
-      index.pathExists(client.id, service.id) && (!db || index.pathExists(service.id, db.id)),
-  );
-  const source = serviceBefore ?? client;
-  const cacheId = ids.next('cache');
-  return {
-    description: 'Put a cache on the read path so repeat reads stop hitting the database.',
-    ops: [
-      { op: 'add-node', node: { id: cacheId, kind: 'cache', label: 'Read cache' } },
-      {
-        op: 'add-edge',
-        edge: { id: ids.next('edge-cache'), source: source.id, target: cacheId, kind: 'sync' },
-      },
-    ],
-  };
-}
 
 /** Services taking client traffic — the tier that must scale horizontally. */
 function clientFacingServices(index: GraphIndex): CanvasNode[] {
@@ -394,31 +373,8 @@ const dlqOnQueues: Expectation = {
   title: 'Failed messages have nowhere to go',
   teach: () =>
     'When an order message fails processing mid-sale, redelivery alone turns one poison message into a stuck queue. A dead-letter queue quarantines failures so the rest of the backlog keeps draining — and gives you a place to replay from once the bug is fixed.',
-  satisfiedBy: ({ index }) => {
-    const queues = sortById(index.byKind('queue'));
-    if (queues.length === 0) return unmet();
-    const bare = queues.filter(
-      (queue) =>
-        queue.config?.dlq !== true &&
-        !index.neighbors(queue.id).some((neighbor) => neighbor.kind === 'queue'),
-    );
-    if (bare.length > 0) return unmet(bare.map((node) => node.id));
-    return met(queues.map((node) => node.id));
-  },
-  suggest: ({ index }) => {
-    const queue = sortById(index.byKind('queue')).find(
-      (candidate) =>
-        candidate.config?.dlq !== true &&
-        !index.neighbors(candidate.id).some((neighbor) => neighbor.kind === 'queue'),
-    );
-    if (!queue) return null;
-    return {
-      description: 'Give the queue a dead-letter target for messages that keep failing.',
-      ops: [
-        { op: 'update-node', nodeId: queue.id, set: { config: { ...queue.config, dlq: true } } },
-      ],
-    };
-  },
+  satisfiedBy: dlqCoverage,
+  suggest: suggestDlq,
 };
 
 const lowLatencyReadPath: Expectation = {
