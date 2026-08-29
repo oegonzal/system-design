@@ -89,6 +89,17 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   const ghost = data?.ghost ?? false;
   const severity = data?.severity ?? null;
 
+  // The pill: carries win, the prose label is the fallback — a structured
+  // declaration outranks prose. Graphs without carries render exactly as
+  // they always have.
+  const carries = data?.carries ?? [];
+  const pill =
+    carries.length > 0
+      ? carries.slice(0, 3).join(' · ') + (carries.length > 3 ? ` +${carries.length - 3}` : '')
+      : typeof label === 'string' && label.length > 0
+        ? label
+        : null;
+
   return (
     <EdgeGroup
       $kind={kind}
@@ -100,12 +111,12 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
       {...(ghost ? { 'data-ghost': 'true' } : {})}
     >
       <BaseEdge id={id} path={path} markerEnd={markerEnd} />
-      {typeof label === 'string' && label.length > 0 ? (
+      {pill !== null ? (
         <EdgeLabelRenderer>
           <LabelChip
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
-            {label}
+            {pill}
           </LabelChip>
         </EdgeLabelRenderer>
       ) : null}

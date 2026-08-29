@@ -1,7 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { NodeKind, Severity } from '@sysdesign/contracts';
+import { INTERFACE_CAPABILITIES, type NodeKind, type Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
@@ -77,11 +77,26 @@ const Label = styled.span`
 const Meta = styled.span`
   font-size: ${({ theme }) => theme.font.size.xs};
   color: ${({ theme }) => theme.color.text.muted};
+  /* One line, however much the node declares — the panel holds the detail. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
   const configCount = data.config ? Object.keys(data.config).length : 0;
   const severity = data.severity ?? null;
+
+  // Declared interface, summarized in the role's own vocabulary: an api-role
+  // node serves ops, a channel carries types; other roles declare nothing
+  // worth counting even if stale data lingers after a kind switch.
+  const role = INTERFACE_CAPABILITIES[data.kind].role;
+  const opCount = data.operations?.length ?? 0;
+  const roleCount = data.responsibilities?.length ?? 0;
+  const opsSegment =
+    opCount > 0 && (role === 'api' || role === 'channel')
+      ? ` · ${opCount} ${role === 'api' ? 'ops' : 'types'}`
+      : '';
 
   return (
     <Root
@@ -91,6 +106,7 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
       $severity={severity}
       data-testid={`node-${id}`}
       data-kind={data.kind}
+      {...(opCount > 0 ? { 'data-op-count': opCount } : {})}
       {...(severity ? { 'data-severity': severity } : {})}
       {...(data.ghost ? { 'data-ghost': 'true' } : {})}
     >
@@ -100,6 +116,8 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
         <Label title={data.label}>{data.label}</Label>
         <Meta>
           {data.kind}
+          {opsSegment}
+          {roleCount > 0 ? ` · ${roleCount} roles` : ''}
           {configCount > 0 ? ` · ${configCount} ${configCount === 1 ? 'knob' : 'knobs'}` : ''}
         </Meta>
       </Body>

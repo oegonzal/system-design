@@ -50,4 +50,45 @@ describe('SdNode', () => {
     expect(root.getAttribute('data-ghost')).toBe('true');
     expect(root.textContent).toContain('2 knobs');
   });
+
+  it('summarizes a service’s declared interface: ops, then roles, knobs last', async () => {
+    renderNode({
+      kind: 'service',
+      label: 'Order Service',
+      operations: [
+        { name: 'placeOrder', kind: 'command' },
+        { name: 'getOrder', kind: 'query' },
+      ],
+      responsibilities: ['owns orders'],
+      config: { replicas: 3 },
+    });
+
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.textContent).toContain('service · 2 ops · 1 roles · 1 knob');
+    expect(root.getAttribute('data-op-count')).toBe('2');
+  });
+
+  it('counts a channel’s operations as types', async () => {
+    renderNode({
+      kind: 'queue',
+      label: 'Order Queue',
+      operations: [{ name: 'OrderPlaced', kind: 'event' }],
+    });
+
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.textContent).toContain('queue · 1 types');
+  });
+
+  it('never counts ops on a role that declares none, even with stale data', async () => {
+    renderNode({
+      kind: 'database',
+      label: 'Orders DB',
+      // Leftover from before the node was re-shelved to storage.
+      operations: [{ name: 'placeOrder', kind: 'command' }],
+    });
+
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.textContent).not.toContain('ops');
+    expect(root.textContent).not.toContain('types');
+  });
 });

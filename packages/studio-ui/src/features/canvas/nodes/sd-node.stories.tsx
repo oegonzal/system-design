@@ -9,10 +9,13 @@ import { ReactFlow } from '@xyflow/react';
 
 import { withReactFlow } from '../../../testing/story-decorators';
 import { DEFAULT_NODE_LABELS } from '../canvas-store';
-import type { SdNode as SdNodeModel } from '../types';
+import { SdEdge } from '../edges/sd-edge';
+import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
 import { SdNode } from './sd-node';
 
 const nodeTypes = { sd: SdNode };
+const edgeTypes = { sd: SdEdge };
+const NO_EDGES: SdEdgeModel[] = [];
 
 function node(
   id: string,
@@ -87,12 +90,19 @@ function categoryNodes(id: NodeKindCategoryId): SdNodeModel[] {
  * node component, and the vendor watermark's 10px grey link fails the smoke
  * harness's axe contrast gate. The running app keeps it visible.
  */
-function NodesPreview({ nodes }: { nodes: SdNodeModel[] }) {
+function NodesPreview({
+  nodes,
+  edges = NO_EDGES,
+}: {
+  nodes: SdNodeModel[];
+  edges?: SdEdgeModel[];
+}) {
   return (
     <ReactFlow
       nodes={nodes}
-      edges={[]}
+      edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       nodesDraggable={false}
       nodesConnectable={false}
@@ -189,6 +199,72 @@ export const Ghost: Story = {
         { kind: 'replica', label: 'Read Replica', ghost: true },
         { x: 220, y: 40 },
       ),
+    ],
+  },
+};
+
+/** Declared interfaces on the meta line: ops and roles for a service, types for a channel. */
+export const WithDeclaredInterface: Story = {
+  args: {
+    nodes: [
+      node(
+        'n-1',
+        {
+          kind: 'service',
+          label: 'Order Service',
+          operations: [
+            { name: 'placeOrder', kind: 'command' },
+            { name: 'getOrder', kind: 'query', idempotent: true },
+          ],
+          responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
+          config: { replicas: 3 },
+        },
+        { x: 0, y: 0 },
+      ),
+      node(
+        'n-2',
+        {
+          kind: 'queue',
+          label: 'Order Queue',
+          operations: [{ name: 'OrderPlaced', kind: 'event' }],
+        },
+        { x: 230, y: 0 },
+      ),
+    ],
+  },
+};
+
+/** A call edge showing what it carries — the pill lists the first three, then +N. */
+export const WithCarriesPill: Story = {
+  args: {
+    nodes: [
+      node('n-1', { kind: 'client', label: 'Client' }, { x: 60, y: 0 }),
+      node(
+        'n-2',
+        {
+          kind: 'service',
+          label: 'Order Service',
+          operations: [
+            { name: 'placeOrder', kind: 'command' },
+            { name: 'getOrder', kind: 'query' },
+            { name: 'cancelOrder', kind: 'command' },
+            { name: 'listOrders', kind: 'query' },
+          ],
+        },
+        { x: 60, y: 180 },
+      ),
+    ],
+    edges: [
+      {
+        id: 'e-1',
+        type: 'sd',
+        source: 'n-1',
+        target: 'n-2',
+        data: {
+          kind: 'sync',
+          carries: ['placeOrder', 'getOrder', 'cancelOrder', 'listOrders'],
+        },
+      },
     ],
   },
 };
