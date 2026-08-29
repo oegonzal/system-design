@@ -38,6 +38,14 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
     if (node.data.config && Object.keys(node.data.config).length > 0) {
       out.config = { ...node.data.config };
     }
+    // Interface fields serialize only when non-empty, so an emptied editor
+    // list never leaves an `operations: []` key rattling around the wire.
+    if (node.data.responsibilities && node.data.responsibilities.length > 0) {
+      out.responsibilities = [...node.data.responsibilities];
+    }
+    if (node.data.operations && node.data.operations.length > 0) {
+      out.operations = node.data.operations.map((operation) => ({ ...operation }));
+    }
     return out;
   });
 
@@ -53,6 +61,9 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
         kind: edge.data?.kind ?? 'sync',
       };
       if (typeof edge.label === 'string' && edge.label.length > 0) out.label = edge.label;
+      if (edge.data?.carries && edge.data.carries.length > 0) {
+        out.carries = [...edge.data.carries];
+      }
       return out;
     });
 
@@ -69,6 +80,10 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
       kind: node.kind,
       label: node.label,
       ...(node.config ? { config: { ...node.config } } : {}),
+      ...(node.responsibilities ? { responsibilities: [...node.responsibilities] } : {}),
+      ...(node.operations
+        ? { operations: node.operations.map((operation) => ({ ...operation })) }
+        : {}),
     },
   }));
 
@@ -78,7 +93,10 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
     source: edge.source,
     target: edge.target,
     ...(edge.label !== undefined ? { label: edge.label } : {}),
-    data: { kind: edge.kind ?? 'sync' },
+    data: {
+      kind: edge.kind ?? 'sync',
+      ...(edge.carries ? { carries: [...edge.carries] } : {}),
+    },
   }));
 
   return { nodes, edges };
@@ -112,8 +130,20 @@ export function applySuggestionPatch(graph: CanvasGraph, patch: GraphPatch): Can
         edges = edges.filter((edge) => edge.id !== op.edgeId);
         break;
       }
+      case 'remove-node': {
+        // Mirrors the store's removeSelected: a node never leaves dangling
+        // edges behind. An unknown id filters to a no-op.
+        nodes = nodes.filter((node) => node.id !== op.nodeId);
+        edges = edges.filter((edge) => edge.source !== op.nodeId && edge.target !== op.nodeId);
+        break;
+      }
       case 'update-node': {
         nodes = nodes.map((node) => (node.id === op.nodeId ? { ...node, ...op.set } : node));
+        break;
+      }
+      case 'update-edge': {
+        // Spread semantics match the contract: set values replace wholesale.
+        edges = edges.map((edge) => (edge.id === op.edgeId ? { ...edge, ...op.set } : edge));
         break;
       }
     }
@@ -126,8 +156,8 @@ export function applySuggestionPatch(graph: CanvasGraph, patch: GraphPatch): Can
  * Render a patch as ghost overlay elements against the current graph. Ids
  * come through as-is (they carry the `suggested-` prefix), so an accepted
  * patch can never collide with the author's ids. Only add-ops become ghosts:
- * update/remove ops are described by the finding's prose and applied on
- * accept.
+ * the non-geometric ops — update-node, update-edge, remove-edge and
+ * remove-node — are described by the finding's prose and applied on accept.
  */
 export function toGhostElements(
   patch: GraphPatch,
@@ -171,7 +201,11 @@ export function toGhostElements(
         source: op.edge.source,
         target: op.edge.target,
         ...(op.edge.label !== undefined ? { label: op.edge.label } : {}),
-        data: { kind: op.edge.kind ?? 'sync', ghost: true },
+        data: {
+          kind: op.edge.kind ?? 'sync',
+          ...(op.edge.carries ? { carries: [...op.edge.carries] } : {}),
+          ghost: true,
+        },
       });
     }
   }

@@ -38,6 +38,75 @@ export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
   };
 }
 
+/**
+ * A graph exercising the interface layer: declared operations on the
+ * gateway/service, responsibilities on the service, message types on the
+ * queue, and carries on the call and produce/consume edges.
+ */
+export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
+  return {
+    nodes: [
+      { id: 'n-1', kind: 'client', label: 'Client', position: { x: 40, y: 40 } },
+      {
+        id: 'n-2',
+        kind: 'gateway',
+        label: 'API Gateway',
+        operations: [
+          { name: 'PlaceOrder', kind: 'command' },
+          { name: 'GetOrder', kind: 'query', idempotent: true },
+        ],
+        position: { x: 40, y: 200 },
+      },
+      {
+        id: 'n-3',
+        kind: 'service',
+        label: 'Order Service',
+        responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
+        operations: [
+          { name: 'PlaceOrder', kind: 'command', notes: 'Validates inventory first' },
+          { name: 'GetOrder', kind: 'query', idempotent: true },
+        ],
+        position: { x: 40, y: 360 },
+      },
+      {
+        id: 'n-4',
+        kind: 'queue',
+        label: 'Order Queue',
+        operations: [{ name: 'OrderPlaced', kind: 'event' }],
+        position: { x: 40, y: 520 },
+      },
+      { id: 'n-5', kind: 'worker', label: 'Fulfillment Worker', position: { x: 40, y: 680 } },
+    ],
+    edges: [
+      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+      {
+        id: 'e-2',
+        source: 'n-2',
+        target: 'n-3',
+        kind: 'sync',
+        carries: ['PlaceOrder', 'GetOrder'],
+      },
+      {
+        id: 'e-3',
+        source: 'n-3',
+        target: 'n-4',
+        kind: 'async',
+        label: 'produce',
+        carries: ['OrderPlaced'],
+      },
+      {
+        id: 'e-4',
+        source: 'n-4',
+        target: 'n-5',
+        kind: 'async',
+        label: 'consume',
+        carries: ['OrderPlaced'],
+      },
+    ],
+    ...overrides,
+  };
+}
+
 export function makeExperience(
   overrides: Partial<ExperienceProfileDto> = {},
 ): ExperienceProfileDto {

@@ -1,4 +1,4 @@
-import type { EdgeKind, NodeConfig, NodeKind, Severity } from '@sysdesign/contracts';
+import type { EdgeKind, NodeConfig, NodeKind, NodeOperation, Severity } from '@sysdesign/contracts';
 import type { Edge, Node } from '@xyflow/react';
 
 /**
@@ -13,6 +13,8 @@ export type SdNodeData = {
   kind: NodeKind;
   label: string;
   config?: NodeConfig;
+  responsibilities?: string[];
+  operations?: NodeOperation[];
   /** A suggestion overlay element — stripped before serialization. */
   ghost?: boolean;
   /** Set while a finding highlights this element; drives the outline color. */
@@ -23,6 +25,7 @@ export type SdNode = Node<SdNodeData, 'sd'>;
 
 export type SdEdgeData = {
   kind: EdgeKind;
+  carries?: string[];
   ghost?: boolean;
   severity?: Severity | null;
 };

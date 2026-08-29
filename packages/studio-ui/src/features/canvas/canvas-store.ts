@@ -4,6 +4,7 @@ import type {
   GraphPatch,
   NodeConfig,
   NodeKind,
+  NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
 import {
@@ -89,8 +90,17 @@ export interface CanvasState {
   onNodesChange(changes: NodeChange<SdNode>[]): void;
   onEdgesChange(changes: EdgeChange<SdEdge>[]): void;
   onConnect(connection: Connection): void;
-  updateNode(id: string, patch: { label?: string; kind?: NodeKind; config?: NodeConfig }): void;
-  updateEdge(id: string, patch: { kind?: EdgeKind; label?: string }): void;
+  updateNode(
+    id: string,
+    patch: {
+      label?: string;
+      kind?: NodeKind;
+      config?: NodeConfig;
+      responsibilities?: string[];
+      operations?: NodeOperation[];
+    },
+  ): void;
+  updateEdge(id: string, patch: { kind?: EdgeKind; label?: string; carries?: string[] }): void;
   removeSelected(): void;
   select(id: string | null): void;
   setHighlight(highlight: HighlightState): void;
@@ -242,6 +252,14 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
                 ...(patch.label !== undefined ? { label: patch.label } : {}),
                 data: {
                   kind: patch.kind ?? edge.data?.kind ?? 'sync',
+                  // The rebuilt literal must pass carries through: a kind-only
+                  // patch keeps the existing list, and `carries: []` clears it
+                  // (serialization omits empty lists).
+                  ...(patch.carries !== undefined
+                    ? { carries: patch.carries }
+                    : edge.data?.carries !== undefined
+                      ? { carries: edge.data.carries }
+                      : {}),
                   ...(edge.data?.ghost ? { ghost: edge.data.ghost } : {}),
                   severity: edge.data?.severity ?? null,
                 },

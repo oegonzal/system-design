@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeFinding, makeGraph } from '../../testing/fixtures';
+import { makeFinding, makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
 import { createCanvasStore } from './canvas-store';
 
 describe('canvas-store', () => {
@@ -60,6 +60,45 @@ describe('canvas-store', () => {
     const edge = store.getState().edges.find((candidate) => candidate.id === 'e-1');
     expect(edge?.data?.kind).toBe('async');
     expect(edge?.label).toBe('order events');
+  });
+
+  it('updateEdge preserves carries on a kind-only patch and clears them on an empty list', () => {
+    const store = createCanvasStore(makeInterfaceGraph());
+
+    store.getState().updateEdge('e-2', { kind: 'async' });
+    const patched = store.getState().edges.find((edge) => edge.id === 'e-2');
+    expect(patched?.data?.kind).toBe('async');
+    expect(patched?.data?.carries).toEqual(['PlaceOrder', 'GetOrder']);
+
+    store.getState().updateEdge('e-2', { carries: [] });
+    const cleared = store.getState().edges.find((edge) => edge.id === 'e-2');
+    expect(cleared?.data?.carries).toEqual([]);
+    // …and an emptied list serializes as an absent key.
+    expect(
+      store
+        .getState()
+        .serialize()
+        .edges.find((edge) => edge.id === 'e-2'),
+    ).not.toHaveProperty('carries');
+  });
+
+  it('updateNode carries responsibilities and operations through serialize', () => {
+    const store = createCanvasStore(makeGraph());
+
+    store.getState().updateNode('n-2', {
+      responsibilities: ['Owns checkout'],
+      operations: [{ name: 'Checkout', kind: 'command' }],
+    });
+
+    const serialized = store.getState().serialize();
+    const node = serialized.nodes.find((candidate) => candidate.id === 'n-2');
+    expect(node?.responsibilities).toEqual(['Owns checkout']);
+    expect(node?.operations).toEqual([{ name: 'Checkout', kind: 'command' }]);
+  });
+
+  it('serialize round-trips the interface fixture unchanged', () => {
+    const store = createCanvasStore(makeInterfaceGraph());
+    expect(store.getState().serialize()).toEqual(makeInterfaceGraph());
   });
 
   it('[UX-2] removeSelected deletes a node together with its edges', () => {
