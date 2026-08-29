@@ -12,20 +12,12 @@ import type { ExpectationCheck } from '../types';
 import { met, unmet } from '../types';
 
 /**
- * The observability check every archetype asks: a monitoring block on the
- * canvas is the first-class evidence, and `config.monitoring === true` on a
- * gateway/service/queue is honored as the legacy spelling from before the
- * monitoring kind existed.
+ * The observability check every archetype asks: a wired monitoring block on
+ * the canvas is the only evidence that counts.
  */
 export function monitoringPresence({ index }: RuleContext): ExpectationCheck {
   const monitors = sortById(index.byKind('monitoring'));
   if (monitors.length > 0) return met(monitors.map((node) => node.id));
-  const legacy = sortById(
-    [...index.byKind('gateway'), ...index.byKind('service'), ...index.byKind('queue')].filter(
-      (node) => node.config?.monitoring === true,
-    ),
-  );
-  if (legacy.length > 0) return met(legacy.map((node) => node.id));
   return unmet();
 }
 

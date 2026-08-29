@@ -386,11 +386,10 @@ const queueProducerOverload: EvalRule = {
 };
 
 /**
- * Mirrors the banks' `monitoringPresence` check: a monitoring block is the
- * first-class evidence, and `config.monitoring === true` on a gateway,
- * service, or queue is honored as the legacy spelling. The suppression pairs
- * in the default profile keep this to one lesson wherever an archetype bank
- * already teaches observability (`exp.*.{pipeline,runs,tenant}-observed`).
+ * Mirrors the banks' `monitoringPresence` check: a monitoring block on the
+ * canvas is the evidence. The suppression pairs in the default profile keep
+ * this to one lesson wherever an archetype bank already teaches observability
+ * (`exp.*.{pipeline,runs,tenant}-observed`).
  */
 const nothingMonitored: EvalRule = {
   id: 'reliability.nothing-monitored',
@@ -398,12 +397,6 @@ const nothingMonitored: EvalRule = {
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('observability')) return [];
     if (index.hasKind('monitoring')) return [];
-    const legacy = [
-      ...index.byKind('gateway'),
-      ...index.byKind('service'),
-      ...index.byKind('queue'),
-    ].some((node) => node.config?.monitoring === true);
-    if (legacy) return [];
     const ids = new SuggestedIds(index);
     return [
       {
@@ -411,7 +404,7 @@ const nothingMonitored: EvalRule = {
         dimension: 'reliability',
         severity: 'medium',
         title: 'Nothing in the design is monitored',
-        message: `The prompt asks for observability and no monitoring block — nor a single monitored component — appears on the canvas, so at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s the first symptom of saturation is a user report, not an alert. A monitoring block watching queue depth, error rate and p99 turns trouble into something you see coming.`,
+        message: `The prompt asks for observability and no monitoring block appears on the canvas, so at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s the first symptom of saturation is a user report, not an alert. A monitoring block watching queue depth, error rate and p99 turns trouble into something you see coming.`,
         affectedNodeIds: [],
         affectedEdgeIds: [],
         suggestion: {

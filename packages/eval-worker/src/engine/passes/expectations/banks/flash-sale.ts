@@ -17,29 +17,9 @@ import {
 import type { RuleContext } from '../../../types';
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
-import { monitoringPresence } from './shared';
+import { monitoringPresence, suggestMonitoring } from './shared';
 
 const FLASH_SALE = ['flash-sale-ticketing'] as const;
-
-/** Services taking client traffic — the tier that must scale horizontally. */
-function clientFacingServices(index: GraphIndex): CanvasNode[] {
-  const reachable = index.reachableFrom(index.clients().map((client) => client.id));
-  return sortById(index.byKind('service').filter((service) => reachable.has(service.id)));
-}
-
-function cachesOnReadPath(index: GraphIndex): CanvasNode[] {
-  const clients = index.clients();
-  const databases = index.byKind('database');
-  return sortById(
-    index
-      .byKind('cache')
-      .filter(
-        (cache) =>
-          clients.some((client) => index.pathExists(client.id, cache.id)) &&
-          databases.some((db) => index.pathExists(cache.id, db.id)),
-      ),
-  );
-}
 
 /** Shared with the read-path expectations: hang a cache off the read path. */
 function suggestReadCache({ index }: RuleContext): GraphPatch | null {
@@ -65,6 +45,26 @@ function suggestReadCache({ index }: RuleContext): GraphPatch | null {
       },
     ],
   };
+}
+
+/** Services taking client traffic — the tier that must scale horizontally. */
+function clientFacingServices(index: GraphIndex): CanvasNode[] {
+  const reachable = index.reachableFrom(index.clients().map((client) => client.id));
+  return sortById(index.byKind('service').filter((service) => reachable.has(service.id)));
+}
+
+function cachesOnReadPath(index: GraphIndex): CanvasNode[] {
+  const clients = index.clients();
+  const databases = index.byKind('database');
+  return sortById(
+    index
+      .byKind('cache')
+      .filter(
+        (cache) =>
+          clients.some((client) => index.pathExists(client.id, cache.id)) &&
+          databases.some((db) => index.pathExists(cache.id, db.id)),
+      ),
+  );
 }
 
 const edgeFrontDoor: Expectation = {
@@ -596,24 +596,8 @@ const orderPipelineObserved: Expectation = {
   title: 'The order pipeline runs blind',
   teach: () =>
     'The prompt asks for observability, and during an on-sale the first sign of trouble should be a dashboard, not social media. Put a monitoring block on the pipeline — queue depth, error rate, p99 — so saturation is something you see coming.',
-  // A monitoring node is the first-class evidence; config.monitoring on a
-  // gateway/service/queue is honored as the legacy spelling (shared check).
   satisfiedBy: monitoringPresence,
-  suggest: ({ index }) => {
-    const target =
-      sortById(index.byKind('gateway'))[0] ?? sortById(index.byKind('service'))[0] ?? null;
-    if (!target) return null;
-    return {
-      description: 'Turn on monitoring where the pipeline starts, so saturation is visible early.',
-      ops: [
-        {
-          op: 'update-node',
-          nodeId: target.id,
-          set: { config: { ...target.config, monitoring: true } },
-        },
-      ],
-    };
-  },
+  suggest: (ctx) => suggestMonitoring(ctx, 'Pipeline monitoring'),
 };
 
 const paymentIsolation: Expectation = {

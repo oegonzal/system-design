@@ -400,14 +400,6 @@ describe('reliability.nothing-monitored', () => {
     expect(rule.check(contextFor(watched, observed))).toEqual([]);
   });
 
-  it('honors the legacy config.monitoring spelling', () => {
-    const legacy = graph(
-      [node('gw-1', 'gateway', { config: { monitoring: true } }), node('svc-1', 'service')],
-      blind.edges,
-    );
-    expect(rule.check(contextFor(legacy, observed))).toEqual([]);
-  });
-
   it('stays silent when observability is not a stated requirement', () => {
     expect(rule.check(contextFor(blind))).toEqual([]);
   });

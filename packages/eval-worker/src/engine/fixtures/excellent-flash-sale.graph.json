@@ -16,8 +16,14 @@
       "id": "gateway-1",
       "kind": "gateway",
       "label": "API gateway",
-      "config": { "rateLimit": true, "monitoring": true },
+      "config": { "rateLimit": true },
       "position": { "x": 240, "y": 200 }
+    },
+    {
+      "id": "monitoring-1",
+      "kind": "monitoring",
+      "label": "Pipeline monitoring",
+      "position": { "x": 240, "y": 400 }
     },
     {
       "id": "queue-2",
@@ -73,6 +79,7 @@
   ],
   "edges": [
     { "id": "edge-1", "source": "client-1", "target": "gateway-1" },
+    { "id": "edge-11", "source": "gateway-1", "target": "monitoring-1", "kind": "async" },
     { "id": "edge-9", "source": "client-1", "target": "cdn-1" },
     { "id": "edge-2", "source": "gateway-1", "target": "queue-2", "kind": "async" },
     { "id": "edge-10", "source": "queue-2", "target": "lb-1", "kind": "async" },
