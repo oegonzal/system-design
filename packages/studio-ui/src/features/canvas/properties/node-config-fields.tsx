@@ -20,6 +20,9 @@ export interface NodeConfigFieldsProps {
 
 type SetKey = (key: string, value: string | number | boolean) => void;
 
+/** Delivery guarantees — one vocabulary for queue, event-stream and pub-sub. */
+const DELIVERY_OPTIONS = ['at-least-once', 'at-most-once', 'exactly-once'] as const;
+
 /*
  * Row helpers — one per control shape, so each `case` below reads as a knob
  * list rather than four re-typed event handlers. Plain functions returning
@@ -96,20 +99,108 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
 
   switch (kind) {
     case 'database':
+      return (
+        <>
+          {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {selectRow(config, setKey, 'engine', 'Engine', [
+            'postgres',
+            'mysql',
+            'document',
+            'wide-column',
+          ])}
+          {selectRow(config, setKey, 'sharding', 'Sharding', ['none', 'hash', 'range'])}
+          {selectRow(config, setKey, 'consistency', 'Consistency', [
+            'strong',
+            'eventual',
+            'quorum',
+          ])}
+          {textRow(config, setKey, 'region', 'Region')}
+          {checkboxRow(config, setKey, 'multiRegion', 'Multi-region')}
+          {checkboxRow(config, setKey, 'backups', 'Backups')}
+        </>
+      );
     case 'service':
-      return numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 });
+      return (
+        <>
+          {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {checkboxRow(config, setKey, 'autoscaling', 'Autoscaling')}
+          {textRow(config, setKey, 'region', 'Region')}
+          {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
+        </>
+      );
+    case 'worker':
+      return (
+        <>
+          {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {numberRow(config, setKey, 'concurrency', 'Concurrency')}
+          {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
+        </>
+      );
+    case 'replica':
+      return numberRow(config, setKey, 'lagToleranceMs', 'Lag tolerance (ms)');
     case 'cache':
       return (
         <>
-          {selectRow(config, setKey, 'strategy', 'Strategy', ['cache-aside', 'write-through'])}
+          {selectRow(config, setKey, 'strategy', 'Strategy', [
+            'cache-aside',
+            'write-through',
+            'write-back',
+          ])}
           {numberRow(config, setKey, 'ttlSeconds', 'TTL (seconds)')}
+          {selectRow(config, setKey, 'eviction', 'Eviction', ['lru', 'lfu', 'ttl-only'])}
+          {checkboxRow(config, setKey, 'invalidation', 'Invalidation')}
         </>
       );
     case 'queue':
-      return checkboxRow(config, setKey, 'dlq', 'Dead-letter queue');
+      return (
+        <>
+          {selectRow(config, setKey, 'delivery', 'Delivery', DELIVERY_OPTIONS)}
+          {selectRow(config, setKey, 'ordering', 'Ordering', ['none', 'fifo', 'per-key'])}
+          {checkboxRow(config, setKey, 'dlq', 'Dead-letter queue')}
+          {numberRow(config, setKey, 'maxRetries', 'Max retries')}
+        </>
+      );
+    case 'event-stream':
+      return (
+        <>
+          {numberRow(config, setKey, 'partitions', 'Partitions')}
+          {numberRow(config, setKey, 'retentionHours', 'Retention (hours)')}
+          {selectRow(config, setKey, 'delivery', 'Delivery', DELIVERY_OPTIONS)}
+        </>
+      );
     case 'gateway':
+      return (
+        <>
+          {checkboxRow(config, setKey, 'rateLimit', 'Rate limiting')}
+          {selectRow(config, setKey, 'authMode', 'Auth mode', ['none', 'jwt', 'api-key'])}
+          {checkboxRow(config, setKey, 'admissionControl', 'Admission control')}
+        </>
+      );
     case 'load-balancer':
-      return checkboxRow(config, setKey, 'rateLimit', 'Rate limiting');
+      return (
+        <>
+          {checkboxRow(config, setKey, 'rateLimit', 'Rate limiting')}
+          {selectRow(config, setKey, 'algorithm', 'Algorithm', [
+            'round-robin',
+            'least-connections',
+            'ip-hash',
+          ])}
+        </>
+      );
+    case 'object-store':
+      return checkboxRow(config, setKey, 'versioning', 'Versioning');
+    case 'search-index':
+      return numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 });
+    case 'external-api':
+      return (
+        <>
+          {numberRow(config, setKey, 'timeoutMs', 'Timeout (ms)')}
+          {numberRow(config, setKey, 'retries', 'Retries')}
+          {checkboxRow(config, setKey, 'circuitBreaker', 'Circuit breaker')}
+        </>
+      );
+    case 'scheduler':
+      return textRow(config, setKey, 'schedule', 'Schedule');
     case 'websocket-gateway':
       return (
         <>
@@ -163,11 +254,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
     case 'pub-sub':
       return (
         <>
-          {selectRow(config, setKey, 'delivery', 'Delivery', [
-            'at-least-once',
-            'at-most-once',
-            'exactly-once',
-          ])}
+          {selectRow(config, setKey, 'delivery', 'Delivery', DELIVERY_OPTIONS)}
           {numberRow(config, setKey, 'fanout', 'Fan-out (subscribers)')}
         </>
       );

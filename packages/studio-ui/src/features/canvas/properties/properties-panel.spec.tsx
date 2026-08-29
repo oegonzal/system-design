@@ -83,6 +83,33 @@ describe('PropertiesPanel', () => {
     ).toBe(3);
   });
 
+  it('renders a new-catalog kind’s config form as soon as the kind switches', async () => {
+    const user = userEvent.setup();
+    renderPanel((seeded) => seeded.getState().select('n-2'));
+
+    await user.selectOptions(screen.getByLabelText('Kind'), 'pub-sub');
+
+    expect(screen.getByLabelText('Delivery')).toBeTruthy();
+    expect(screen.getByLabelText('Fan-out (subscribers)')).toBeTruthy();
+  });
+
+  it('round-trips a new-catalog knob edit through the store', async () => {
+    const user = userEvent.setup();
+    const store = renderPanel((seeded) => {
+      seeded.getState().updateNode('n-2', { kind: 'pub-sub', label: 'Order Fan-out' });
+      seeded.getState().select('n-2');
+    });
+
+    await user.selectOptions(screen.getByLabelText('Delivery'), 'exactly-once');
+    const fanout = screen.getByLabelText('Fan-out (subscribers)');
+    await user.clear(fanout);
+    await user.type(fanout, '3');
+
+    const config = store.getState().nodes.find((node) => node.id === 'n-2')?.data.config;
+    expect(config?.['delivery']).toBe('exactly-once');
+    expect(config?.['fanout']).toBe(3);
+  });
+
   it('edits the selected edge: kind toggle and label', async () => {
     const user = userEvent.setup();
     const store = renderPanel((seeded) => seeded.getState().select('e-1'));
