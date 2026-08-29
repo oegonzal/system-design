@@ -98,6 +98,17 @@ describe('poller (integration)', () => {
   });
 
   afterAll(async () => {
+    // This spec shares a database with the API suite locally — remove every
+    // row this file seeded (sessions cascade to revisions → evaluations →
+    // findings → jobs; prompts and experiences are restrict-protected, so
+    // they go last, narrowest first).
+    const connection = em.fork().getConnection();
+    const specExperiences = `select id from "experience_profile" where "slug" like 'exp-%'`;
+    await connection.execute(
+      `delete from "design_session" where "prompt_id" in (select id from "prompt" where "experience_id" in (${specExperiences}))`,
+    );
+    await connection.execute(`delete from "prompt" where "experience_id" in (${specExperiences})`);
+    await connection.execute(`delete from "experience_profile" where "slug" like 'exp-%'`);
     await app.close();
   });
 
@@ -118,12 +129,47 @@ describe('poller (integration)', () => {
     // EVAL_DETERMINISTIC=1 → no-op critic: engine summary, no model recorded.
     expect(done.criticModel).toBeNull();
     expect(done.summary).toBeTruthy();
-    expect(done.findings.length).toBeGreaterThan(0);
-    expect(done.findings.getItems().every((finding) => finding.source === 'rule')).toBe(true);
+
+    const findings = done.findings.getItems();
+    expect(findings.length).toBeGreaterThan(0);
+    // The deterministic passes persist both violation and coverage findings —
+    // never anything LLM-sourced under EVAL_DETERMINISTIC.
+    expect(findings.every((finding) => finding.source !== 'llm')).toBe(true);
+    const ruleFindings = findings.filter((finding) => finding.source === 'rule');
+    const coverageFindings = findings.filter((finding) => finding.source === 'expectation');
+    expect(ruleFindings.length).toBeGreaterThan(0);
+    expect(coverageFindings.length).toBeGreaterThan(0);
+    expect(ruleFindings.every((finding) => finding.ruleId !== null)).toBe(true);
+    expect(
+      coverageFindings.every(
+        (finding) => finding.expectationId !== null && finding.ruleId === null,
+      ),
+    ).toBe(true);
 
     const job = await em.fork().findOneOrFail(EvalJob, { id: jobId });
     expect(job.status).toBe('completed');
     expect(job.attempts).toBe(1);
+  });
+
+  it('[EVAL-8] records the grading profile and the evidence trail', async () => {
+    const { evaluationId } = await seedJob(naiveGraph);
+
+    const done = await waitFor(async () => {
+      const evaluation = await em.fork().findOne(Evaluation, { id: evaluationId });
+      return evaluation?.status === 'complete' ? evaluation : null;
+    });
+
+    expect(done.profileId).toBe('default');
+    expect(done.profileVersion).toBe('2.0.0');
+    const artifactKinds = (done.evidence ?? []).map(
+      (artifact) => (artifact as { kind: string }).kind,
+    );
+    expect(artifactKinds).toContain('findings');
+    expect(artifactKinds).toContain('coverage');
+    expect(artifactKinds).toContain('diagnostics'); // the skipped LLM pass, on the record
+    expect(done.axes).toEqual([]);
+    expect(done.scenarios).toEqual([]);
+    expect(done.capApplied).toBeNull(); // an F is already below every cap
   });
 
   it('marks the job and evaluation failed when the graph is unprocessable and retries are exhausted', async () => {

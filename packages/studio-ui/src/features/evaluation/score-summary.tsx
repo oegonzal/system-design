@@ -37,6 +37,11 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
           / 100
         </Text>
         {evaluation.grade ? <Badge tone="accent">{`grade ${evaluation.grade}`}</Badge> : null}
+        {evaluation.capApplied ? (
+          <Badge tone="critical" data-testid="grade-cap">
+            {`capped at ${evaluation.capApplied.maxGrade} · ${evaluation.capApplied.count} critical`}
+          </Badge>
+        ) : null}
       </ScoreRow>
       {evaluation.summary ? <Text size="sm">{evaluation.summary}</Text> : null}
       {scores ? (

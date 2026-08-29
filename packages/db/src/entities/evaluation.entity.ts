@@ -63,6 +63,32 @@ export class Evaluation {
   @Property({ type: 'varchar', length: 20, nullable: true })
   engineVersion: string | null = null;
 
+  /** The rubric that produced this grade — audit across profile evolution. */
+  @Property({ type: 'varchar', length: 40, nullable: true })
+  profileId: string | null = null;
+
+  @Property({ type: 'varchar', length: 20, nullable: true })
+  profileVersion: string | null = null;
+
+  /** Set when critical findings lowered the letter below its numeric band. */
+  @Property({ type: 'json', nullable: true })
+  capApplied: Contracts.CapAppliedDto | null = null;
+
+  /**
+   * The full ordered evidence-artifact list the aggregator decided from —
+   * the audit trail for "why this grade". Opaque to the API by design.
+   */
+  @Property({ type: 'json', nullable: true })
+  evidence: unknown[] | null = null;
+
+  /** LLM-scored axes, displayed beside the deterministic score. */
+  @Property({ type: 'json', nullable: true })
+  axes: Contracts.EvalAxisDto[] | null = null;
+
+  /** Adversarial scenario narrations from the scenario pass. */
+  @Property({ type: 'json', nullable: true })
+  scenarios: Contracts.ScenarioReportDto[] | null = null;
+
   @Property({ type: 'varchar', length: 60, nullable: true })
   criticModel: string | null = null;
 

@@ -19,6 +19,7 @@ export interface FindingsListProps {
 
 const SOURCE_LABEL: Record<FindingSource, string> = {
   rule: 'rule',
+  expectation: 'coverage',
   llm: 'ai',
 };
 

@@ -1,3 +1,4 @@
+import type { CapAppliedDto, EvalAxisDto, ScenarioReportDto } from './eval-profile';
 import type { ApiResponse } from './envelope';
 import type { GraphPatch } from './patches';
 import type { IsoDateString, Uuid } from './primitives';
@@ -20,7 +21,8 @@ export type EvalDimension = (typeof EVAL_DIMENSIONS)[number];
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
-export const FINDING_SOURCES = ['rule', 'llm'] as const;
+/** rule = deterministic violation · expectation = unmet coverage · llm = advisory annotation. */
+export const FINDING_SOURCES = ['rule', 'expectation', 'llm'] as const;
 export type FindingSource = (typeof FINDING_SOURCES)[number];
 
 export const GRADES = ['A', 'B', 'C', 'D', 'F'] as const;
@@ -31,8 +33,14 @@ export type DimensionScores = Record<EvalDimension, number>;
 export interface FindingDto {
   id: Uuid;
   source: FindingSource;
-  /** Stable rule id (`reliability.single-db-no-replica`) — null for LLM findings. */
+  /** Stable rule id (`reliability.single-db-no-replica`) — set only for rule findings. */
   ruleId: string | null;
+  /** Stable expectation id (`exp.fst.db-failover`) — set only for coverage findings. */
+  expectationId: string | null;
+  /** The prompt NFR this finding proves unmet, when one motivated it. */
+  nfrId: string | null;
+  /** The adversarial scenario that produced this failure story, when one did. */
+  scenarioId: string | null;
   dimension: EvalDimension;
   severity: Severity;
   title: string;
@@ -53,10 +61,19 @@ export interface EvaluationDto {
   dimensionScores: DimensionScores | null;
   summary: string | null;
   engineVersion: string | null;
+  /** The rubric that produced this grade, for audit across profile evolution. */
+  profileId: string | null;
+  profileVersion: string | null;
+  /** Set when critical findings lowered the letter below its numeric band. */
+  capApplied: CapAppliedDto | null;
   /** Which model critiqued, or null when the deterministic engine ran alone. */
   criticModel: string | null;
   error: string | null;
   findings: FindingDto[];
+  /** LLM-scored axes displayed beside the deterministic score, never merged into it. */
+  axes: EvalAxisDto[];
+  /** Adversarial scenario narrations; empty until the scenario pass runs. */
+  scenarios: ScenarioReportDto[];
   startedAt: IsoDateString | null;
   completedAt: IsoDateString | null;
   createdAt: IsoDateString;

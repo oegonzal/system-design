@@ -18,4 +18,5 @@ export * from './lib/experiences';
 export * from './lib/prompts';
 export * from './lib/sessions';
 export * from './lib/evaluations';
+export * from './lib/eval-profile';
 export * from './lib/star-stories';

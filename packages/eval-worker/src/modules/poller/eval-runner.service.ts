@@ -61,7 +61,7 @@ export class EvalRunnerService {
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
       };
 
-      const { result } = await runEvaluation({
+      const { result, artifacts } = await runEvaluation({
         graph: revision.graph,
         facts,
         llm: this.llm,
@@ -78,8 +78,11 @@ export class EvalRunnerService {
         for (const finding of result.findings) {
           tem.create(Finding, {
             evaluation: evaluationId,
-            source: 'rule',
+            source: finding.expectationId ? 'expectation' : 'rule',
             ruleId: finding.ruleId,
+            expectationId: finding.expectationId,
+            nfrId: finding.nfrId,
+            scenarioId: null,
             dimension: finding.dimension,
             severity: finding.severity,
             title: finding.title,
@@ -94,6 +97,9 @@ export class EvalRunnerService {
             evaluation: evaluationId,
             source: 'llm',
             ruleId: null,
+            expectationId: null,
+            nfrId: null,
+            scenarioId: null,
             dimension: finding.dimension,
             severity: finding.severity,
             title: finding.title,
@@ -114,6 +120,19 @@ export class EvalRunnerService {
             dimensionScores: result.dimensionScores,
             summary: critique?.summary ?? result.summary,
             engineVersion: ENGINE_VERSION,
+            profileId: ACTIVE_PROFILE.id,
+            profileVersion: ACTIVE_PROFILE.version,
+            capApplied: result.capApplied,
+            evidence: artifacts,
+            axes: result.axes.map((axis) => ({
+              id: axis.axisId,
+              label: axis.label,
+              score: axis.score,
+              subScores: axis.subScores,
+              summary: axis.summary,
+              model: axis.model,
+            })),
+            scenarios: result.scenarios?.reports ?? [],
             criticModel: critique?.model ?? null,
             completedAt: new Date(),
             updatedAt: new Date(),

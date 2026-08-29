@@ -12,7 +12,7 @@ import type * as Contracts from '@sysdesign/contracts';
 import { Evaluation } from './evaluation.entity';
 
 type ContractSources = (typeof Contracts)['FINDING_SOURCES'];
-const SOURCES = ['rule', 'llm'] as const satisfies ContractSources;
+const SOURCES = ['rule', 'expectation', 'llm'] as const satisfies ContractSources;
 
 type ContractDimensions = (typeof Contracts)['EVAL_DIMENSIONS'];
 const DIMENSIONS = [
@@ -59,9 +59,21 @@ export class Finding {
   @Property({ type: 'text' })
   source!: Contracts.FindingSource;
 
-  /** Stable engine rule id; null when the critic (LLM) produced the finding. */
+  /** Stable engine rule id; set only for rule findings. */
   @Property({ type: 'varchar', length: 60, nullable: true })
   ruleId: string | null = null;
+
+  /** Stable expectation id; set only for unmet-coverage findings. */
+  @Property({ type: 'varchar', length: 60, nullable: true })
+  expectationId: string | null = null;
+
+  /** The prompt NFR this finding proves unmet, when one motivated it. */
+  @Property({ type: 'varchar', length: 60, nullable: true })
+  nfrId: string | null = null;
+
+  /** The adversarial scenario that produced this failure story, when one did. */
+  @Property({ type: 'varchar', length: 40, nullable: true })
+  scenarioId: string | null = null;
 
   @Property({ type: 'text' })
   dimension!: Contracts.EvalDimension;

@@ -46,6 +46,10 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Scores are calibrated: an empty canvas fails, a naive design fails, and only demonstrated depth earns an A.',
   },
+  {
+    id: 'EVAL-8',
+    statement: 'Every evaluation records the profile it was graded under and its evidence trail.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },
