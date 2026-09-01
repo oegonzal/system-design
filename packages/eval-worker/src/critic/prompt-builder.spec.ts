@@ -143,9 +143,9 @@ describe('CRITIC_SYSTEM_PROMPT', () => {
     expect(CRITIC_SYSTEM_PROMPT).toContain('idempotency choices');
   });
 
-  it('tells the critic to cross-examine the narrative against the diagram', () => {
-    expect(CRITIC_SYSTEM_PROMPT).toContain('cross-examine it against the diagram');
-    expect(CRITIC_SYSTEM_PROMPT).toContain('components the story leaves unexplained');
-    expect(CRITIC_SYSTEM_PROMPT).toContain('flows described differently than drawn');
+  it('leaves story-diagram alignment to the dedicated narrative critic', () => {
+    expect(CRITIC_SYSTEM_PROMPT).toContain('leave');
+    expect(CRITIC_SYSTEM_PROMPT).toContain('story-diagram alignment to it');
+    expect(CRITIC_SYSTEM_PROMPT).not.toContain('cross-examine it against the diagram');
   });
 });

@@ -72,8 +72,8 @@ export function aggregate(
   const coverage: CoverageArtifact['entries'] = [];
   const axes: AxisArtifact[] = [];
   const diagnostics: DiagnosticsArtifact[] = [];
+  const annotationArtifacts: AnnotationArtifact[] = [];
   let scenarios: ScenarioArtifact | null = null;
-  let annotations: AnnotationArtifact | null = null;
 
   for (const artifact of artifacts) {
     switch (artifact.kind) {
@@ -90,13 +90,24 @@ export function aggregate(
         scenarios ??= artifact;
         break;
       case 'annotations':
-        annotations ??= artifact;
+        annotationArtifacts.push(artifact);
         break;
       case 'diagnostics':
         diagnostics.push(artifact);
         break;
     }
   }
+
+  // Annotation artifacts merge in artifact order: findings concatenate, but
+  // the FIRST artifact's identity/summary/model win — the general critic
+  // runs before the narrative critic and owns the evaluation summary.
+  const first = annotationArtifacts[0];
+  const annotations: AnnotationArtifact | null =
+    first === undefined
+      ? null
+      : annotationArtifacts.length === 1
+        ? first
+        : { ...first, findings: annotationArtifacts.flatMap((artifact) => artifact.findings) };
 
   const policy = profile.scoring;
   findings = applySuppressions(findings, coverage, policy);

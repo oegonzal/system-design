@@ -15,9 +15,9 @@ export const CRITIC_SYSTEM_PROMPT = [
   'When operations are declared, also judge the API design itself — operation',
   'granularity, naming clarity, kind fit, idempotency choices, and how tightly',
   'callers couple to each surface.',
-  'When a design narrative is submitted, cross-examine it against the diagram:',
-  'flag components the story leaves unexplained, claims the diagram does not',
-  'implement, and flows described differently than drawn.',
+  'A submitted design narrative is context, not your subject — a dedicated',
+  'narrative critic cross-examines the story against the diagram, so leave',
+  'story-diagram alignment to it.',
 ].join(' ');
 
 /**

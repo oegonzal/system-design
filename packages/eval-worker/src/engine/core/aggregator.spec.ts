@@ -162,6 +162,45 @@ describe('aggregate', () => {
     expect(result.annotations?.summary).toBe('A model opinion.');
     expect(result.diagnostics).toHaveLength(1);
   });
+
+  it('merges annotation artifacts: findings concatenate, the first summary and model win', () => {
+    const criticFinding = {
+      dimension: 'data' as const,
+      severity: 'high' as const,
+      title: 'Consistency trap',
+      message: 'The cache and database can disagree about inventory.',
+      affectedNodeIds: [],
+    };
+    const narrativeFinding = {
+      dimension: 'communication' as const,
+      severity: 'medium' as const,
+      title: 'The story caches reads the diagram never draws',
+      message: '"reads are cached" — no cache node exists.',
+      affectedNodeIds: ['n-2'],
+    };
+    const result = aggregate(
+      [
+        {
+          passId: 'llm.critic',
+          kind: 'annotations',
+          findings: [criticFinding],
+          summary: 'The general critic speaks first.',
+          model: 'claude-sonnet-5',
+        },
+        {
+          passId: 'llm.narrative',
+          kind: 'annotations',
+          findings: [narrativeFinding],
+          summary: null,
+          model: 'claude-sonnet-5',
+        },
+      ],
+      DEFAULT_PROFILE,
+    );
+    expect(result.annotations?.findings).toEqual([criticFinding, narrativeFinding]);
+    expect(result.annotations?.summary).toBe('The general critic speaks first.');
+    expect(result.annotations?.passId).toBe('llm.critic');
+  });
 });
 
 describe('aggregate — coverage model', () => {

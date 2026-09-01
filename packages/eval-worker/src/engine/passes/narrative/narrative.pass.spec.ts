@@ -32,6 +32,15 @@ const CANNED = {
     diagramConsistency: 60,
   },
   summary: 'The story explains the parts but never ties them to the latency target.',
+  findings: [],
+};
+
+const MISALIGNMENT = {
+  dimension: 'communication',
+  severity: 'medium',
+  title: 'The story caches reads the diagram never draws',
+  message: '"reads are cached" — no cache node exists; draw one or drop the claim.',
+  affectedNodeIds: ['n-2'],
 };
 
 /** An enabled client that records the request it was handed. */
@@ -76,7 +85,7 @@ describe('narrative pass', () => {
     }
   });
 
-  it('emits an axis artifact from a structured critique', async () => {
+  it('emits an axis artifact from a structured critique — no annotations when nothing misaligns', async () => {
     const artifacts = await createNarrativePass().run(contextWith(fakeLlm(CANNED)));
     expect(artifacts).toEqual([
       {
@@ -92,26 +101,79 @@ describe('narrative pass', () => {
     ]);
   });
 
+  it('emits misalignment findings as an advisory annotations artifact beside the axis', async () => {
+    const artifacts = await createNarrativePass().run(
+      contextWith(fakeLlm({ ...CANNED, findings: [MISALIGNMENT] })),
+    );
+    expect(artifacts).toHaveLength(2);
+    expect(artifacts[1]).toEqual({
+      passId: NARRATIVE_PASS_ID,
+      kind: 'annotations',
+      findings: [MISALIGNMENT],
+      // The general critic owns the evaluation summary; this stays silent.
+      summary: null,
+      model: 'test-model',
+    });
+  });
+
   it('reports llm-failed when the model returns nothing usable', async () => {
     const artifacts = await createNarrativePass().run(contextWith(fakeLlm(null)));
     expect(artifacts[0]).toMatchObject({ kind: 'diagnostics', reason: 'llm-failed' });
   });
 
-  it('the schema demands every alignment subscore', () => {
+  it('the schema demands every alignment subscore and the findings array', () => {
     expect(narrativeSchema.safeParse(CANNED).success).toBe(true);
+    expect(narrativeSchema.safeParse({ ...CANNED, findings: [MISALIGNMENT] }).success).toBe(true);
     const withoutConsistency = {
       ...CANNED,
       subScores: { ...CANNED.subScores, diagramConsistency: undefined },
     };
     expect(narrativeSchema.safeParse(withoutConsistency).success).toBe(false);
+    expect(narrativeSchema.safeParse({ ...CANNED, findings: undefined }).success).toBe(false);
   });
 
   it('grades prose against diagram and prompt, and sends the model both', async () => {
     const capture: { system?: string; user?: string } = {};
     await createNarrativePass().run(contextWith(capturingLlm(capture)));
     expect(capture.system).toContain('THIS diagram against THIS prompt');
-    expect(capture.system).toContain('claims the diagram does not implement');
+    expect(capture.system).toContain('Report misalignments as findings');
     expect(capture.user).toContain('# Candidate design (canvas graph)');
     expect(capture.user).toContain(STORY);
+  });
+
+  it('hands the model the deterministic narrative verdicts as a do-not-repeat section', async () => {
+    const capture: { system?: string; user?: string } = {};
+    const ctx = contextWith(capturingLlm(capture));
+    ctx.priorArtifacts = [
+      {
+        passId: 'expectations.banks',
+        kind: 'coverage',
+        entries: [
+          {
+            expectationId: 'exp.nar.addresses-latency',
+            dimension: 'communication',
+            weight: 1,
+            met: false,
+            nfrId: 'fst-lat-read-spike',
+            evidenceNodeIds: [],
+            evidenceEdgeIds: [],
+          },
+          {
+            // Diagram coverage stays out of the narrative critic's ledger.
+            expectationId: 'exp.core.entry-service',
+            dimension: 'hygiene',
+            weight: 1,
+            met: true,
+            nfrId: null,
+            evidenceNodeIds: ['n-2'],
+            evidenceEdgeIds: [],
+          },
+        ],
+      },
+    ];
+    await createNarrativePass().run(ctx);
+    expect(capture.user).toContain('# Already graded deterministically (do not repeat)');
+    expect(capture.user).toContain('[unmet] exp.nar.addresses-latency');
+    expect(capture.user).not.toContain('exp.core.entry-service');
   });
 });
