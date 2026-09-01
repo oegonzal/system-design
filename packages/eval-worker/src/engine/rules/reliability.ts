@@ -420,6 +420,31 @@ const nothingMonitored: EvalRule = {
   },
 };
 
+const monitoringWithoutAlerting: EvalRule = {
+  id: 'reliability.monitoring-without-alerting',
+  dimension: 'reliability',
+  check({ facts, index }) {
+    const blocks = sortById(index.byKind('monitoring'));
+    if (blocks.length === 0) return [];
+    // Only once there is enough traffic for nobody-is-watching to be a real risk.
+    if (facts.scaleTargets.requestsPerSecond < 500) return [];
+    const silent = blocks.filter((block) => block.config?.['alerting'] !== true);
+    if (silent.length === 0) return [];
+    return [
+      {
+        ruleId: monitoringWithoutAlerting.id,
+        dimension: 'reliability',
+        severity: 'low',
+        title: 'Metrics collected, nobody paged',
+        message: `${silent.map((block) => `"${block.label}"`).join(', ')} collects metrics with alerting switched off, so at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s the first person to notice an outage is a user. A dashboard answers questions you already thought to ask; an alert is what tells you to look.`,
+        affectedNodeIds: silent.map((block) => block.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 const dlqUnmonitored: EvalRule = {
   id: 'reliability.dlq-unmonitored',
   dimension: 'reliability',
@@ -490,5 +515,6 @@ export const reliabilityRules: EvalRule[] = [
   queueProducerOverload,
   nothingMonitored,
   dlqUnmonitored,
+  monitoringWithoutAlerting,
   noTracingManyServices,
 ];

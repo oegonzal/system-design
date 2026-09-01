@@ -102,7 +102,9 @@ const TABLE: CalibrationRow[] = [
     design: 'excellent design (waiting room, CDN, monitoring)',
     graph: loadFixture('excellent-flash-sale.graph.json'),
     dimensionScores: {
-      reliability: 100,
+      // 96, not 100: the monitoring block collects metrics and alerts on
+      // nothing, which the rubric now says out loud.
+      reliability: 96,
       scalability: 100,
       performance: 100,
       data: 100,
@@ -111,7 +113,7 @@ const TABLE: CalibrationRow[] = [
       hygiene: 100,
       explanation: 0,
     },
-    overallScore: 90,
+    overallScore: 89.3,
     grade: 'B',
   },
 ];
@@ -214,7 +216,7 @@ describe('brief calibration', () => {
   it('[EVAL-10] the excellent design with a complete brief keeps its 100/A', () => {
     const result = runEngine(excellent(), flashSaleFacts(), null, fullBrief);
     expect(result.dimensionScores.explanation).toBe(100);
-    expect(result.overallScore).toBe(100);
+    expect(result.overallScore).toBe(99.3);
     expect(result.grade).toBe('A');
   });
 
@@ -223,7 +225,7 @@ describe('brief calibration', () => {
     // Not null: renormalising the dimension away would make explaining nothing
     // strictly better than explaining badly, which is what this pins against.
     expect(result.dimensionScores.explanation).toBe(0);
-    expect(result.overallScore).toBe(90);
+    expect(result.overallScore).toBe(89.3);
     expect(result.grade).toBe('B');
     expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.brf.present');
   });
@@ -232,7 +234,7 @@ describe('brief calibration', () => {
     const minimal: DesignBrief = { version: 1, nfrBindings: [fullBrief.nfrBindings[0]], flows: [] };
     const result = runEngine(excellent(), flashSaleFacts(), null, minimal);
     expect(result.dimensionScores.explanation).toBe(16.7);
-    expect(result.overallScore).toBe(91.7);
+    expect(result.overallScore).toBe(91);
     expect(result.grade).toBe('B');
   });
 
@@ -255,7 +257,7 @@ describe('brief calibration', () => {
       flows: [],
     };
     const result = runEngine(graph, flashSaleFacts(), null, shotgun);
-    expect(result.overallScore).toBeLessThan(91.7);
+    expect(result.overallScore).toBeLessThan(91);
     expect(result.findings.map((finding) => finding.ruleId)).toContain(
       'explanation.shotgun-binding',
     );
@@ -275,6 +277,6 @@ describe('brief calibration', () => {
       'explanation.unbacked-binding',
     );
     // Below the one honest binding, and below a brief that claimed nothing new.
-    expect(result.overallScore).toBeLessThan(91.7);
+    expect(result.overallScore).toBeLessThan(91);
   });
 });

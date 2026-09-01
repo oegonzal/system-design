@@ -377,7 +377,63 @@ const streamNoRetention: EvalRule = {
  * Edges can declare the operations they carry, so a write into a replica is
  * provable there instead of presumed here.
  */
+const cacheStalenessUnbounded: EvalRule = {
+  id: 'data.cache-staleness-unbounded',
+  dimension: 'data',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('consistency')) return [];
+    const caches = sortById(index.byKind('cache'));
+    // A TTL or an invalidation strategy both bound how stale a read can be;
+    // neither means the answer is "until something happens to evict it".
+    const unbounded = caches.filter(
+      (cache) =>
+        configNumber(cache, 'ttlSeconds') === undefined &&
+        typeof cache.config?.['invalidation'] !== 'string',
+    );
+    if (unbounded.length === 0) return [];
+    return [
+      {
+        ruleId: cacheStalenessUnbounded.id,
+        dimension: 'data',
+        severity: 'low',
+        title: 'Cached reads with no staleness bound',
+        message: `${unbounded.map((cache) => `"${cache.label}"`).join(', ')} declares neither a TTL nor an invalidation strategy, so nothing says how old a cached answer may be — and this prompt states a consistency requirement. "How stale is acceptable, and enforced how" is the question a cache exists to answer.`,
+        affectedNodeIds: unbounded.map((cache) => cache.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const replicaLagUnbounded: EvalRule = {
+  id: 'data.replica-lag-unbounded',
+  dimension: 'data',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('consistency')) return [];
+    const replicas = sortById(index.byKind('replica'));
+    const unbounded = replicas.filter(
+      (replica) => configNumber(replica, 'lagToleranceMs') === undefined,
+    );
+    if (unbounded.length === 0) return [];
+    return [
+      {
+        ruleId: replicaLagUnbounded.id,
+        dimension: 'data',
+        severity: 'low',
+        title: 'Replica reads with no lag budget',
+        message: `${unbounded.map((replica) => `"${replica.label}"`).join(', ')} serves reads with no stated lag tolerance, so a read-after-write can return the old value and nothing in the design says how far behind is too far. Naming the budget is what turns "eventually consistent" from a shrug into a promise.`,
+        affectedNodeIds: unbounded.map((replica) => replica.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 export const dataRules: EvalRule[] = [
+  cacheStalenessUnbounded,
+  replicaLagUnbounded,
   mixedOltpAnalytics,
   noSearchIndex,
   cacheAsSourceOfTruth,

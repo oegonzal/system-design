@@ -38,6 +38,52 @@ const noGateway: EvalRule = {
   },
 };
 
+const meshWithoutMtls: EvalRule = {
+  id: 'security.mesh-without-mtls',
+  dimension: 'security',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('security')) return [];
+    const meshes = sortById(index.byKind('service-mesh'));
+    const plaintext = meshes.filter((mesh) => mesh.config?.['mtls'] !== true);
+    if (plaintext.length === 0) return [];
+    return [
+      {
+        ruleId: meshWithoutMtls.id,
+        dimension: 'security',
+        severity: 'low',
+        title: 'A mesh that does not encrypt what it carries',
+        message: `${plaintext.map((mesh) => `"${mesh.label}"`).join(', ')} routes service-to-service traffic with mTLS off, so the prompt's security requirement is met at the edge and abandoned behind it. Mutual TLS is most of the reason to accept a mesh's overhead in the first place.`,
+        affectedNodeIds: plaintext.map((mesh) => mesh.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
+const secretsWithoutRotation: EvalRule = {
+  id: 'security.secrets-without-rotation',
+  dimension: 'security',
+  check({ facts, index }) {
+    if (!facts.nfrKinds.includes('security')) return [];
+    const stores = sortById(index.byKind('secrets-manager'));
+    const static_ = stores.filter((store) => store.config?.['rotation'] !== true);
+    if (static_.length === 0) return [];
+    return [
+      {
+        ruleId: secretsWithoutRotation.id,
+        dimension: 'security',
+        severity: 'low',
+        title: 'Secrets that never change',
+        message: `${static_.map((store) => `"${store.label}"`).join(', ')} holds credentials with rotation off. A secret that never rotates turns any single leak — a log line, a stale backup, a departed engineer — into permanent access, which is the failure mode a secrets manager exists to bound.`,
+        affectedNodeIds: static_.map((store) => store.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 const noRateLimit: EvalRule = {
   id: 'security.no-rate-limit',
   dimension: 'security',
@@ -220,6 +266,8 @@ const paymentProviderUnguarded: EvalRule = {
 export const securityRules: EvalRule[] = [
   noGateway,
   noRateLimit,
+  meshWithoutMtls,
+  secretsWithoutRotation,
   edgeHitsDataLayer,
   gatewayNoAuth,
   clientWritesQueue,

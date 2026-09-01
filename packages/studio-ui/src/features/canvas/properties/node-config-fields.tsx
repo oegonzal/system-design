@@ -16,6 +16,14 @@ export interface NodeConfigFieldsProps {
  * deterministic eval rules read them verbatim, so a key renamed here silently
  * un-grades a rule. `responsibilities`, `operations` and `carries` are
  * reserved for annotation features and must never appear as config keys.
+ *
+ * That warning used to be the only thing standing between this file and drift,
+ * and drift won: twenty-nine of these knobs turned out to be read by nothing,
+ * so an author could tune them and change no verdict. Purely descriptive ones
+ * (which database engine, which file format, how many vector dimensions) are
+ * gone — a dial that cannot change an answer should not ask for an answer —
+ * and `tooling/config-knobs.spec.ts` now fails the build when a knob is neither
+ * graded nor explicitly, reasonedly reserved.
  */
 
 type SetKey = (key: string, value: string | number | boolean) => void;
@@ -102,12 +110,6 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
       return (
         <>
           {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
-          {selectRow(config, setKey, 'engine', 'Engine', [
-            'postgres',
-            'mysql',
-            'document',
-            'wide-column',
-          ])}
           {selectRow(config, setKey, 'sharding', 'Sharding', ['none', 'hash', 'range'])}
           {selectRow(config, setKey, 'consistency', 'Consistency', [
             'strong',
@@ -200,7 +202,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         </>
       );
     case 'scheduler':
-      return textRow(config, setKey, 'schedule', 'Schedule');
+      return null;
     case 'websocket-gateway':
       return (
         <>
@@ -219,12 +221,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         </>
       );
     case 'batch-job':
-      return (
-        <>
-          {textRow(config, setKey, 'schedule', 'Schedule')}
-          {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
-        </>
-      );
+      return <>{checkboxRow(config, setKey, 'idempotent', 'Idempotent')}</>;
     case 'kv-store':
       return (
         <>
@@ -245,12 +242,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         </>
       );
     case 'vector-db':
-      return (
-        <>
-          {numberRow(config, setKey, 'dimensions', 'Dimensions')}
-          {textRow(config, setKey, 'indexType', 'Index type')}
-        </>
-      );
+      return null;
     case 'pub-sub':
       return (
         <>
@@ -261,12 +253,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
     case 'cdc-connector':
       return selectRow(config, setKey, 'mode', 'Mode', ['log-based', 'outbox']);
     case 'notification-service':
-      return (
-        <>
-          {textRow(config, setKey, 'channels', 'Channels')}
-          {checkboxRow(config, setKey, 'rateLimit', 'Rate limiting')}
-        </>
-      );
+      return <>{checkboxRow(config, setKey, 'rateLimit', 'Rate limiting')}</>;
     case 'stream-processor':
       return (
         <>
@@ -275,14 +262,13 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         </>
       );
     case 'data-warehouse':
-      return selectRow(config, setKey, 'loadMode', 'Load mode', ['batch', 'streaming']);
+      return null;
     case 'data-lake':
-      return selectRow(config, setKey, 'format', 'Format', ['parquet', 'json', 'raw']);
+      return null;
     case 'ml-inference':
       return (
         <>
           {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
-          {checkboxRow(config, setKey, 'gpu', 'GPU')}
           {numberRow(config, setKey, 'timeoutMs', 'Timeout (ms)')}
           {checkboxRow(config, setKey, 'fallback', 'Fallback')}
         </>
