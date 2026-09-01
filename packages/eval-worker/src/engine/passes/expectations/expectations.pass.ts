@@ -4,7 +4,7 @@
  * unmet expectation as a teaching finding with a ghost fix when one exists.
  * Synchronous core shared with `runEngine`, async wrapper for the profile.
  */
-import type { CanvasGraph } from '@sysdesign/contracts';
+import { briefHasClaims, type CanvasGraph, type DesignBrief } from '@sysdesign/contracts';
 
 import type { CoverageArtifact, EvidenceArtifact, FindingsArtifact } from '../../core/artifacts';
 import type { EvalPass } from '../../core/types';
@@ -20,41 +20,42 @@ export interface ExpectationsInput {
   facts: PromptFacts;
   index: GraphIndex;
   narrative?: string | null;
+  brief?: DesignBrief | null;
 }
 
 export function runExpectations(
   input: ExpectationsInput,
   expectations: readonly Expectation[] = EXPECTATIONS,
 ): [CoverageArtifact, FindingsArtifact] {
-  // Two scopes, one invariant: diagram expectations get `narrative: null`
-  // mechanically, so prose can never add or remove a demand on the diagram
-  // that the prompt itself did not make. Narrative-scoped expectations
-  // (`requiresNarrative`) grade the prose itself, and only they may read it.
-  // Most have nothing to grade when no prose was submitted and are skipped;
-  // the one that asks whether prose exists at all opts out of that skip
-  // (`appliesWithoutNarrative`), so a submission with no narrative scores
-  // explanation 0 rather than dropping out of the rubric entirely.
-  const narrative = input.narrative?.trim() || null;
+  // Two scopes, one invariant: diagram expectations get `brief: null`
+  // mechanically, so the author's claims about a design can never add or
+  // remove a demand on the diagram that the prompt itself did not make.
+  // Brief-scoped expectations (`requiresBrief`) grade the claims, and only
+  // they may read them. Most have nothing to grade when no brief was
+  // submitted and are skipped; the one that asks whether a brief exists at
+  // all opts out of that skip (`appliesWithoutBrief`), so a submission with
+  // no brief scores explanation 0 rather than dropping out of the rubric.
+  //
+  // Neither context sees the walkthrough. Prose is read by the LLM critic and
+  // by nothing that scores.
+  const brief = input.brief ?? null;
   const diagramCtx: RuleContext = {
     graph: input.graph,
     facts: input.facts,
     index: input.index,
     narrative: null,
+    brief: null,
   };
-  const narrativeCtx: RuleContext = { ...diagramCtx, narrative };
+  const briefCtx: RuleContext = { ...diagramCtx, brief };
   const entries: CoverageArtifact['entries'] = [];
   const findings: EngineFinding[] = [];
 
   for (const expectation of expectations) {
-    if (
-      expectation.requiresNarrative &&
-      narrative === null &&
-      !expectation.appliesWithoutNarrative
-    ) {
+    if (expectation.requiresBrief && !briefHasClaims(brief) && !expectation.appliesWithoutBrief) {
       continue;
     }
     if (!expectationApplies(expectation, input.facts)) continue;
-    const ctx = expectation.requiresNarrative ? narrativeCtx : diagramCtx;
+    const ctx = expectation.requiresBrief ? briefCtx : diagramCtx;
     const check = expectation.satisfiedBy(ctx);
     // The requirement this expectation enforces, when the prompt names one.
     const nfrKind = expectation.nfrKind ?? expectation.citesNfrKind;

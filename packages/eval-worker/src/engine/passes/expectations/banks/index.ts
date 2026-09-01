@@ -4,11 +4,11 @@
  * archetype, so banks can never leak findings across prompt families.
  */
 import type { Expectation } from '../types';
+import { briefExpectations } from './brief';
 import { coreExpectations } from './core';
 import { dagOrchestrationExpectations } from './dag';
 import { flashSaleExpectations } from './flash-sale';
 import { mediaStreamingExpectations } from './media-streaming';
-import { narrativeExpectations } from './narrative';
 import { realtimeAnalyticsExpectations } from './realtime-analytics';
 import { workflowAutomationExpectations } from './workflow';
 
@@ -19,7 +19,7 @@ export const EXPECTATIONS: readonly Expectation[] = [
   ...realtimeAnalyticsExpectations,
   ...workflowAutomationExpectations,
   ...dagOrchestrationExpectations,
-  // Narrative-scoped last: these apply only when a design narrative was
-  // submitted and are the only expectations allowed to read the prose.
-  ...narrativeExpectations,
+  // Brief-scoped last: these grade the author's claims about the design and
+  // are the only expectations allowed to read them.
+  ...briefExpectations,
 ];

@@ -31,7 +31,7 @@ const GLOBAL_FINDINGS = new Set([
   'exp.fst.rate-limit-edge',
   'exp.fst.dlq-on-queues',
   'exp.fst.cdn-static',
-  'exp.nar.present',
+  'exp.brf.present',
 ]);
 
 function identityOf(finding: { ruleId: string | null; expectationId: string | null }): string {
@@ -46,6 +46,7 @@ describe('runEngine', () => {
     // (no-replica, no-queue, no-cache, no-gateway, no-rate-limit) yield to
     // their unmet expectations; only service-no-lb survives as a violation.
     expect(result.findings.map(identityOf)).toEqual([
+      'exp.brf.present',
       'exp.fst.async-worker-drain',
       'exp.fst.cdn-static',
       'exp.fst.db-failover',
@@ -58,7 +59,6 @@ describe('runEngine', () => {
       'exp.fst.stateless-scale-out',
       'exp.fst.waiting-room',
       'exp.fst.write-spike-buffer',
-      'exp.nar.present',
       'reliability.service-no-lb',
     ]);
 
@@ -103,9 +103,9 @@ describe('runEngine', () => {
   it('holds the solid flash-sale design at a C — depth is missing and so is the narrative', () => {
     const result = runEngine(solidFlashSale, flashSaleFacts());
     expect(result.findings.map(identityOf)).toEqual([
+      'exp.brf.present',
       'exp.fst.cdn-static',
       'exp.fst.waiting-room',
-      'exp.nar.present',
     ]);
     expect(result.overallScore).toBe(77.9);
     expect(result.grade).toBe('C');

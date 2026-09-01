@@ -25,6 +25,7 @@ const facts: PromptFacts = {
     },
   ],
   functionalCapabilities: [],
+  functionalRequirementCount: 4,
   functionalText: 'sell tickets without overselling',
 };
 

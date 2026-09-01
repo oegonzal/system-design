@@ -436,7 +436,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               )}
             </DockPanel>
             <DockPanel value="narrative">
-              <NarrativeEditor prompt={prompt} />
+              <NarrativeEditor />
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel

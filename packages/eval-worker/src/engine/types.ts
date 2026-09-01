@@ -6,6 +6,7 @@
 import type {
   Archetype,
   CanvasGraph,
+  DesignBrief,
   DimensionScores,
   EvalDimension,
   FunctionalCapability,
@@ -49,6 +50,8 @@ export interface PromptFacts {
    * fact, and grading that a rewording can silently change is not grading.
    */
   functionalCapabilities: readonly FunctionalCapability[];
+  /** How many things the prompt says the system must do — flows are traced per requirement. */
+  functionalRequirementCount: number;
   /**
    * Functional requirements joined and lowercased. Serialized into LLM prompts
    * so a critic reads what the author read — NEVER read by a scoring
@@ -90,11 +93,17 @@ export interface RuleContext {
   facts: PromptFacts;
   index: GraphIndex;
   /**
-   * The design narrative submitted with the revision, or null when the author
-   * wrote none. Rules that read it must feature-gate on its presence — a
-   * canvas submitted without prose is graded exactly as before.
+   * The walkthrough submitted with the revision, or null when the author wrote
+   * none. Advisory: the deterministic score never reads it — only the LLM
+   * critic does, and by EVAL-6 that cannot move a grade.
    */
   narrative: string | null;
+  /**
+   * The design brief, or null when none was submitted. Rules that read it must
+   * feature-gate on its presence — a canvas submitted without one is graded
+   * exactly as before.
+   */
+  brief: DesignBrief | null;
 }
 
 /** A rule owns one lesson; severity is decided per finding, not per rule. */

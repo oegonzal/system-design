@@ -28,12 +28,13 @@ const SYSTEM_PROMPT = [
   'node or edge behind it is a hole, not a plan; a flow described differently',
   'than drawn is a contradiction; a requirement the prose waves at without',
   'naming its mechanism is unearned confidence. Quote the offending claim in',
-  'each finding and reference node ids. The deterministic engine already',
-  'graded prose coverage — its verdicts are included; never restate them.',
+  'each finding and reference node ids. The deterministic engine grades the',
+  'design brief, never this prose, so judging the writing is yours alone —',
+  'its brief verdicts are included below; never restate them.',
   'Keep the summary to what the author should rewrite next.',
 ].join(' ');
 
-/** The deterministic engine's narrative verdicts, as a do-not-repeat section. */
+/** The deterministic engine's brief verdicts, as a do-not-repeat section. */
 function deterministicSection(ctx: PassContext): string {
   const entries = ctx.priorArtifacts
     .filter(isCoverageArtifact)

@@ -50,4 +50,37 @@ describe('grounded scoring', () => {
     // The five probes that used to grep prose; if this drops, a gate was lost.
     expect(gated.length).toBeGreaterThanOrEqual(4);
   });
+
+  /**
+   * The explanation dimension is scored by corroborating references against
+   * the graph. If a scoring predicate ever reads the walkthrough again, the
+   * substring regime is back — negation invisible, paraphrase fatal.
+   */
+  it('no scoring predicate reads the walkthrough prose', () => {
+    const offenders = files.filter((path) => {
+      const source = readFileSync(path, 'utf8');
+      // `narrative: null` in the pass is the invariant that keeps it out.
+      return /ctx\.narrative|input\.narrative|\bnarrative\.(includes|match|split|toLowerCase)/.test(
+        source,
+      );
+    });
+    expect(offenders.map((path) => path.slice(REPO.length + 1))).toEqual([]);
+  });
+
+  it('every mechanism an author may claim can be verified by the system', () => {
+    // Totality is enforced by `satisfies Record<MechanismClaim, …>` at compile
+    // time; this asserts the Record never quietly becomes a Partial.
+    const source = readFileSync(join(REPO, 'packages/contracts/src/lib/mechanisms.ts'), 'utf8');
+    expect(source).toContain('satisfies Record<MechanismClaim, MechanismEvidence>');
+    expect(source).not.toContain('satisfies Partial<Record<MechanismClaim, MechanismEvidence>>');
+  });
+
+  /**
+   * The note field is where an author's reasoning goes, and it must stay
+   * unscored — grading free text is exactly the back door this work closed.
+   */
+  it('no scoring predicate reads a binding note', () => {
+    const offenders = files.filter((path) => /\.note\b/.test(readFileSync(path, 'utf8')));
+    expect(offenders.map((path) => path.slice(REPO.length + 1))).toEqual([]);
+  });
 });

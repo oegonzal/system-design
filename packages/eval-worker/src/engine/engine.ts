@@ -5,7 +5,7 @@
  * profile: the rule sweep feeds the same aggregator the orchestrator uses,
  * so there is exactly one scoring implementation.
  */
-import type { CanvasGraph } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
 
 import { aggregate } from './core/aggregator';
 import { buildGraphIndex } from './graph-index';
@@ -18,14 +18,21 @@ export function runEngine(
   graph: CanvasGraph,
   facts: PromptFacts,
   narrative: string | null = null,
+  brief: DesignBrief | null = null,
 ): EngineResult {
   const index = buildGraphIndex(graph);
   // The sync façade honors the same pass options the orchestrator would pass.
   const rulesOptions = DEFAULT_PROFILE.passes.find(
     (config) => config.pass === RULES_PASS_ID,
   )?.options;
-  const rules = runRules({ graph, facts, index, narrative, options: rulesOptions });
-  const [coverage, expectationFindings] = runExpectations({ graph, facts, index, narrative });
+  const rules = runRules({ graph, facts, index, narrative, brief, options: rulesOptions });
+  const [coverage, expectationFindings] = runExpectations({
+    graph,
+    facts,
+    index,
+    narrative,
+    brief,
+  });
   const result = aggregate([rules, coverage, expectationFindings], DEFAULT_PROFILE);
   return {
     findings: result.findings,

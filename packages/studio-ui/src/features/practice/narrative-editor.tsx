@@ -1,90 +1,42 @@
 'use client';
 
-import styled from '@emotion/styled';
-import {
-  NARRATIVE_MAX_LENGTH,
-  hasFlowStory,
-  readsAsProse,
-  unaddressedNfrKinds,
-  unmentionedNodeLabels,
-  type PromptDto,
-} from '@sysdesign/contracts';
-import { Badge, Stack, Text } from '@sysdesign/design-system';
-import { useMemo } from 'react';
+import { NARRATIVE_MAX_LENGTH } from '@sysdesign/contracts';
+import { Stack, Text } from '@sysdesign/design-system';
 
 import { TextAreaField } from '../../components/fields';
 import { useCanvasStore } from '../canvas/canvas-store-context';
 
-const ChipRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: ${({ theme }) => theme.space[2]}px;
-`;
-
-/** Words in the draft: whitespace-separated runs, zero for blank text. */
+/** Whitespace-split; good enough for a length hint, and it grades nothing. */
 function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
-}
-
-export interface NarrativeEditorProps {
-  /** The practice prompt, so the checklist can track its requirements. */
-  prompt: PromptDto | null;
+  return text.split(/\s+/).filter(Boolean).length;
 }
 
 /**
- * The design-narrative author box. Reads and writes the canvas store
- * directly: the textarea edits `narrative`, and every checklist runs the
- * same contracts helpers the eval engine grades with (`unmentionedNodeLabels`,
- * `unaddressedNfrKinds`, `hasFlowStory`) — the author can never be told
- * "covered" by one definition and scored by another. Ghost (suggested-fix
- * preview) nodes are not the author's components yet, so they never appear
- * in the checklist.
+ * The walkthrough: prose for a human reader and for the LLM critic.
+ *
+ * It is deliberately NOT scored. The deterministic grade used to come from
+ * substring probes over this box — does each node label appear, does a lexicon
+ * term for each requirement appear — which measured the text rather than the
+ * design, and which a pasted keyword list satisfied perfectly. The graded
+ * explanation is now the design brief, where every claim is a reference the
+ * engine checks against the canvas.
+ *
+ * The caption says as much, because an editor that implies a box is graded
+ * when it is not is its own kind of dishonesty.
  */
-export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
+export function NarrativeEditor() {
   const narrative = useCanvasStore((state) => state.narrative);
-  const nodes = useCanvasStore((state) => state.nodes);
-  const edgeCount = useCanvasStore((state) => state.edges.length);
   const setNarrative = useCanvasStore((state) => state.setNarrative);
-
-  const labeledCount = useMemo(
-    () => nodes.filter((node) => !node.data.ghost && node.data.label.trim().length > 0).length,
-    [nodes],
-  );
-  const unmentioned = useMemo(
-    () =>
-      unmentionedNodeLabels(
-        {
-          nodes: nodes
-            .filter((node) => !node.data.ghost)
-            .map((node) => ({ id: node.id, kind: node.data.kind, label: node.data.label })),
-          edges: [],
-        },
-        narrative,
-      ),
-    [nodes, narrative],
-  );
-  const unaddressed = useMemo(() => {
-    if (prompt === null) return [];
-    const kinds = [...new Set(prompt.nonFunctionalRequirements.map((nfr) => nfr.kind))];
-    return unaddressedNfrKinds(kinds, narrative);
-  }, [prompt, narrative]);
-
   const words = countWords(narrative);
-  const missingFlow = words > 0 && edgeCount > 0 && !hasFlowStory(narrative);
-  // The engine credits the checklist above only inside real prose, so the
-  // author is warned before submitting rather than after being graded.
-  const notProse = words > 0 && !readsAsProse(narrative);
 
   return (
     <Stack gap={3}>
       <Text size="sm" tone="muted">
-        The story is graded with the diagram: say what each component is for, how a request flows
-        between them, and which requirement each mechanism serves.
+        Walk a reader through the design in your own words — what each component is for, how a
+        request travels, and which requirement each mechanism serves.
       </Text>
       <TextAreaField
-        label="Design narrative"
+        label="Walkthrough"
         data-testid="narrative-editor"
         rows={10}
         maxLength={NARRATIVE_MAX_LENGTH}
@@ -95,49 +47,10 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
       <Text size="sm" tone="muted" data-testid="narrative-word-count">
         {words} {words === 1 ? 'word' : 'words'}
       </Text>
-      {labeledCount === 0 ? null : unmentioned.length === 0 ? (
-        <Text size="sm" tone="muted" data-testid="narrative-all-covered">
-          Every component on the canvas is mentioned.
-        </Text>
-      ) : (
-        <ChipRow data-testid="narrative-unmentioned">
-          <Text size="sm" tone="muted">
-            Not yet mentioned:
-          </Text>
-          {unmentioned.map((label) => (
-            <Badge key={label} tone="neutral">
-              {label}
-            </Badge>
-          ))}
-        </ChipRow>
-      )}
-      {prompt === null ? null : unaddressed.length === 0 ? (
-        <Text size="sm" tone="muted" data-testid="narrative-nfr-covered">
-          Every requirement kind is addressed.
-        </Text>
-      ) : (
-        <ChipRow data-testid="narrative-nfr-unaddressed">
-          <Text size="sm" tone="muted">
-            Requirements not yet addressed:
-          </Text>
-          {unaddressed.map((kind) => (
-            <Badge key={kind} tone="neutral">
-              {kind}
-            </Badge>
-          ))}
-        </ChipRow>
-      )}
-      {missingFlow ? (
-        <Text size="sm" tone="muted" data-testid="narrative-flow-hint">
-          No flow verbs yet — narrate the arrows: who calls whom, what is written where.
-        </Text>
-      ) : null}
-      {notProse ? (
-        <Text size="sm" tone="secondary" data-testid="narrative-prose-hint">
-          This does not read as prose yet. Ticking the lists above earns nothing on its own — write
-          the walkthrough in sentences and the coverage counts.
-        </Text>
-      ) : null}
+      <Text size="sm" tone="muted" data-testid="narrative-advisory">
+        Not scored by the engine — the critic reads it and comments. The graded explanation is the
+        design brief.
+      </Text>
     </Stack>
   );
 }

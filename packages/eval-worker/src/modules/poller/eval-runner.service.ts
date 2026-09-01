@@ -66,6 +66,7 @@ export class EvalRunnerService {
           targetSpec: nfr.targetSpec ?? null,
         })),
         functionalCapabilities: prompt.functionalCapabilities,
+        functionalRequirementCount: prompt.functionalRequirements.length,
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
       };
 

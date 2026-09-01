@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { CanvasGraph } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
 import {
   DesignRevision,
   DesignSession,
@@ -48,7 +48,12 @@ describe('poller (integration)', () => {
   let em: EntityManager;
 
   /** Inserts a full prompt→session→revision→evaluation→job chain. */
-  async function seedJob(graph: CanvasGraph, maxAttempts = 3, narrative: string | null = null) {
+  async function seedJob(
+    graph: CanvasGraph,
+    maxAttempts = 3,
+    narrative: string | null = null,
+    brief: DesignBrief | null = null,
+  ) {
     const fork = em.fork();
     const experience = fork.create(ExperienceProfile, {
       id: crypto.randomUUID(),
@@ -96,7 +101,13 @@ describe('poller (integration)', () => {
       generatorVersion: '2.0.0',
     });
     const session = fork.create(DesignSession, { prompt });
-    const revision = fork.create(DesignRevision, { session, revisionNumber: 1, graph, narrative });
+    const revision = fork.create(DesignRevision, {
+      session,
+      revisionNumber: 1,
+      graph,
+      narrative,
+      brief,
+    });
     const evaluation = fork.create(Evaluation, { revision });
     const job = fork.create(EvalJob, { revision, maxAttempts });
     await fork.flush();
@@ -138,7 +149,7 @@ describe('poller (integration)', () => {
     expect(done.overallScore).toBeGreaterThan(0);
     expect(done.grade).toBeTruthy();
     expect(done.dimensionScores).toBeTruthy();
-    expect(done.engineVersion).toBe('2.2.0');
+    expect(done.engineVersion).toBe('2.3.0');
     // EVAL_DETERMINISTIC=1 → no-op critic: engine summary, no model recorded.
     expect(done.criticModel).toBeNull();
     expect(done.summary).toBeTruthy();
@@ -173,7 +184,7 @@ describe('poller (integration)', () => {
     });
 
     expect(done.profileId).toBe('default');
-    expect(done.profileVersion).toBe('2.3.0');
+    expect(done.profileVersion).toBe('3.0.0');
     const artifactKinds = (done.evidence ?? []).map(
       (artifact) => (artifact as { kind: string }).kind,
     );
@@ -185,10 +196,14 @@ describe('poller (integration)', () => {
     expect(done.capApplied).toBeNull(); // an F is already below every cap
   });
 
-  it('feeds the revision narrative to the engine — the narrative expectations grade it', async () => {
-    // Five words, no node label, no flow verb: every structural narrative
-    // expectation goes unmet, and explanation is scored (not null).
-    const { evaluationId } = await seedJob(naiveGraph, 3, 'Too short to explain anything.');
+  it('feeds the revision brief to the engine — the brief expectations grade it', async () => {
+    // A brief that names a mechanism the naive canvas does not provide: the
+    // claim is stored and graded, never rejected, and explanation is scored.
+    const { evaluationId } = await seedJob(naiveGraph, 3, 'Prose the engine never reads.', {
+      version: 1,
+      nfrBindings: [{ nfrId: 'fst-avail-sale-window', nodeIds: ['n-db'], mechanism: 'backups' }],
+      flows: [],
+    });
 
     const done = await waitFor(async () => {
       const evaluation = await em
@@ -201,9 +216,9 @@ describe('poller (integration)', () => {
       .getItems()
       .filter((finding) => finding.source === 'expectation')
       .map((finding) => finding.expectationId);
-    expect(unmetIds).toContain('exp.nar.components-explained');
-    expect(unmetIds).toContain('exp.nar.flow-story');
-    expect(unmetIds).toContain('exp.nar.substance');
+    expect(unmetIds).toContain('exp.brf.mechanisms-corroborated');
+    const ruleIds = done.findings.getItems().map((finding) => finding.ruleId);
+    expect(ruleIds).toContain('explanation.unbacked-binding');
     expect(done.dimensionScores?.explanation).not.toBeNull();
   });
 

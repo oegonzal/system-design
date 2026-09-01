@@ -17,7 +17,7 @@ import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '2.3.0',
+  version: '3.0.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -44,7 +44,7 @@ export const DEFAULT_PROFILE: EvalProfile = {
     violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
     violationDecay: 0.7,
     // How much each dimension contributes to the overall score; sums to 1
-    // (validateProfile enforces it). Communication holds 0.10 and the seven
+    // (validateProfile enforces it). Explanation holds 0.10 and the seven
     // diagram dimensions keep their original ratios (×0.9). As of 2.3.0 a
     // submission with no narrative scores explanation 0 rather than null
     // (exp.nar.present applies either way), so silence costs the full 0.10

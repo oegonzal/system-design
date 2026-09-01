@@ -6,7 +6,10 @@ import type {
   CanvasEdge,
   CanvasGraph,
   CanvasNode,
+  DesignBrief,
   EdgeKind,
+  FlowBinding,
+  NfrBinding,
   NodeConfig,
   NodeKind,
   NodeOperation,
@@ -98,6 +101,7 @@ export function flashSaleFacts(overrides: Partial<PromptFacts> = {}): PromptFact
       },
     ],
     functionalCapabilities: ['payments'],
+    functionalRequirementCount: 4,
     functionalText:
       'browse upcoming events; reserve seats during the on-sale; purchase tickets; view order confirmation',
     ...overrides,
@@ -147,6 +151,7 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
       },
     ],
     functionalCapabilities: ['analytics'],
+    functionalRequirementCount: 4,
     functionalText: 'ingest click events; render live dashboards; export historical reports',
     ...overrides,
   };
@@ -188,6 +193,7 @@ export function mediaFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
       },
     ],
     functionalCapabilities: ['search'],
+    functionalRequirementCount: 4,
     functionalText:
       'upload videos; transcode into renditions; stream playback worldwide; search the media catalog',
     ...overrides,
@@ -230,6 +236,7 @@ export function workflowFacts(overrides: Partial<PromptFacts> = {}): PromptFacts
       },
     ],
     functionalCapabilities: [],
+    functionalRequirementCount: 4,
     functionalText:
       'define automation workflows; fire triggers from webhooks; execute third-party actions; view run history',
     ...overrides,
@@ -272,6 +279,7 @@ export function dagFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
       },
     ],
     functionalCapabilities: [],
+    functionalRequirementCount: 4,
     functionalText:
       'define pipelines as dags; schedule and dispatch steps; retry failed steps; view run status',
     ...overrides,
@@ -282,8 +290,14 @@ export function contextFor(
   canvas: CanvasGraph,
   facts: PromptFacts = flashSaleFacts(),
   narrative: string | null = null,
+  brief: DesignBrief | null = null,
 ): RuleContext {
-  return { graph: canvas, facts, index: buildGraphIndex(canvas), narrative };
+  return { graph: canvas, facts, index: buildGraphIndex(canvas), narrative, brief };
+}
+
+/** A brief literal without the ceremony — specs only ever vary the bindings. */
+export function brief(nfrBindings: NfrBinding[] = [], flows: FlowBinding[] = []): DesignBrief {
+  return { version: 1, nfrBindings, flows };
 }
 
 export function indexFor(canvas: CanvasGraph): GraphIndex {

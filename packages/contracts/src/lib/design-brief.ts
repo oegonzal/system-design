@@ -59,7 +59,10 @@ export const BINDING_MAX_NODES = 12;
 export const FLOW_MAX_STEPS = 24;
 export const BINDING_NOTE_MAX_LENGTH = 200;
 
-/** True when the brief carries at least one claim worth grading. */
+/**
+ * True when the brief carries something worth grading. Tracing a flow is an
+ * explanation even with no binding beside it, so either half counts.
+ */
 export function briefHasClaims(brief: DesignBrief | null): boolean {
-  return brief !== null && brief.nfrBindings.length > 0;
+  return brief !== null && (brief.nfrBindings.length > 0 || brief.flows.length > 0);
 }

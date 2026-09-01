@@ -27,7 +27,8 @@ export const CRITERIA: readonly Criterion[] = [
   },
   {
     id: 'UX-6',
-    statement: 'A design narrative is authored alongside the diagram and submitted with it.',
+    statement:
+      'A design brief — requirement bindings and traced flows — is authored alongside the diagram and submitted with it.',
   },
   {
     id: 'UX-7',
@@ -36,7 +37,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-8',
     statement:
-      'The narrative editor shows which prompt requirements the draft has not yet addressed.',
+      'The walkthrough editor says plainly that prose is advisory, so no author is misled about what earns the grade.',
   },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
@@ -83,22 +84,22 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'EVAL-9',
     statement:
-      'The narrative is graded with the diagram for alignment: unexplained components become findings.',
+      'A component that no traced flow and no corroborated binding accounts for becomes a finding.',
   },
   {
     id: 'EVAL-10',
     statement:
-      'A submitted narrative earns the explanation dimension: components, flows, and requirements coverage graded deterministically.',
+      'A submitted brief earns the explanation dimension by corroboration: each claim is checked against the diagram the author drew.',
   },
   {
     id: 'EVAL-11',
     statement:
-      'A design submitted without a narrative — or with a keyword list in place of one — is graded on that, never excused from the explanation dimension.',
+      'A design submitted without a brief — or with one that names more components than hold a claim — is graded on that, never excused from the explanation dimension.',
   },
   {
     id: 'EVAL-12',
     statement:
-      'A narrative that denies a capability the diagram configures is caught deterministically and cannot outscore saying nothing.',
+      'A claim the diagram cannot back up is caught deterministically and costs more than making no claim at all.',
   },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
