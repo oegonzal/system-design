@@ -82,6 +82,7 @@ runEvaluation(graph, facts, narrative, brief, llm, profile, registry)
 | Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.3.0'`                                                            |
 | Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only             |
 | Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                   |
+| Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                       |
 
 ### The six passes
 
@@ -89,7 +90,7 @@ Registered in `engine/passes/index.ts`, ordered by the profile.
 
 | Pass id              | Mode          | File                                         | Produces                                  |
 | -------------------- | ------------- | -------------------------------------------- | ----------------------------------------- |
-| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 86 rules → `findings`                     |
+| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 92 rules → `findings`                     |
 | `expectations.banks` | deterministic | `engine/passes/expectations/`                | 78 expectations → `coverage` + `findings` |
 | `llm.critic`         | llm           | `engine/passes/critic/` + `src/critic/`      | `annotations`                             |
 | `llm.depth`          | llm           | `engine/passes/depth/`                       | `axis` (advisory score)                   |
@@ -126,6 +127,10 @@ error — the port collapses all three to `null`), `not-applicable`,
    `penalty = Σ price[severity] × 0.7^position`.
    Prices: `critical 35 · high 22 · medium 10 · low 4 · info 0`.
    Stacking hurts without nuking a dimension the way a hard floor did.
+   `info` is priced at zero on purpose and is reserved for genuine footnotes —
+   today only `explanation.unclaimed-mechanism`, which nudges toward a fuller
+   brief rather than reporting a fault. Anything that describes a real problem
+   carries `low` or above, because a fault priced at zero is not graded at all.
 5. **Null out the unexamined.** A dimension with zero applicable expectations
    _and_ zero violations scores `null`, renders as "Not assessed", and drops out
    of the overall — so an unexamined dimension is never a free 100.
@@ -163,11 +168,12 @@ rubric moves these; moving them is allowed, silently moving them is not.
 | naive three-box             | 18      | F     |
 | naive plus accepted replica | 23      | F     |
 | solid reference design      | 77.9    | C     |
-| excellent design            | 90      | B     |
+| excellent design            | 89.3    | B     |
 
-The excellent design stops at 90 because it submits no brief: `explanation`
-scores 0, not `null`. Silence is graded — otherwise writing nothing would beat
-writing badly, which was a live perverse incentive until it was fixed.
+The excellent design stops at 89.3 for two reasons worth knowing. It submits no
+brief, so `explanation` scores 0 rather than `null` — silence is graded, or
+writing nothing would beat writing badly. And its monitoring block alerts on
+nothing, which the rubric now says out loud.
 
 ---
 
@@ -204,6 +210,9 @@ numbers are untouched; the sentence beside them is not.
   `engine/passes/expectations` may read `functionalText`, the narrative, or a
   binding `note`. Applicability branches on the typed `functionalCapabilities`
   vocabulary instead.
+- `tooling/config-knobs.spec.ts` — the drift gate. Every knob the properties
+  panel writes must be read by the scoring path or reserved with a stated
+  reason, so a dial that cannot change an answer cannot ship unnoticed.
 - The walkthrough is **not scored**. It is persisted, displayed, and read by the
   critic; `narrative-editor.tsx` says so in the UI, because an editor that
   implies a box is graded when it is not is its own kind of dishonesty.
@@ -298,7 +307,28 @@ LLM pass returns before assembling a prompt — and the manifest says so.
 
 ---
 
-## 8. Changing it safely
+## 8. What the score is allowed to mean
+
+`QUALITY_AREAS` (`contracts/src/lib/quality-areas.ts`) declares the map and its
+edge: the eight areas a dimension grades, and the seven the rubric does not
+model at all — cost, migration and rollout, data modelling, operability, team
+shape, threat modelling, measured evidence.
+
+This matters because a score out of 100 invites a reading it has not earned.
+100 means nothing the engine checks is missing, not that the design is good, and
+those are different claims. The summary and the score panel both name the
+boundary rather than leaving it implied.
+
+Some quantities the author can now state, which the engine used to assume on
+their behalf: the p99 target a rule derives its hop budget from, the shard key a
+partitioned store splits on, and `rpsPerInstance` — so capacity arithmetic is
+checked against the author's number rather than a hardcoded 3000. An edge can
+also declare `intent`, which is what stops an honestly-drawn read path being
+counted as a second writer.
+
+---
+
+## 9. Changing it safely
 
 - **Adding a rule or expectation moves the calibration table.** Re-pin
   `calibration.spec.ts` deliberately and say why in the commit.
