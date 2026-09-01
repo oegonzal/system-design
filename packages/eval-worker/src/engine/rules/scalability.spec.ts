@@ -405,3 +405,47 @@ describe('scalability.overengineered-intro', () => {
     expect(rule.check(contextFor(doubleCached, busyIntro))).toEqual([]);
   });
 });
+
+/**
+ * The rule pack already told authors that "the deliberate choice of shard key
+ * is the design decision this scale exists to test" — and then checked only
+ * that a strategy had been picked, because the key had nowhere to live.
+ */
+describe('scalability.shard-key-unnamed', () => {
+  const rule = ruleById('scalability.shard-key-unnamed');
+
+  const sharded = (partitionKey?: string) =>
+    graph(
+      [
+        node('db-1', 'database', {
+          config: { sharding: 'hash', ...(partitionKey ? { partitionKey } : {}) },
+        }),
+      ],
+      [],
+    );
+
+  it('fires on a store that shards without saying what it shards on', () => {
+    const findings = rule.check(contextFor(sharded()));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].severity).toBe('medium');
+    expect(findings[0].message).toContain('the key is the decision');
+  });
+
+  it('stays silent once the key is named', () => {
+    expect(rule.check(contextFor(sharded('tenant_id')))).toEqual([]);
+  });
+
+  it('treats whitespace as unnamed — a blank field is not a decision', () => {
+    expect(rule.check(contextFor(sharded('   ')))).toHaveLength(1);
+  });
+
+  it('says nothing about a store that does not shard at all', () => {
+    const single = graph([node('db-1', 'database', { config: { sharding: 'none' } })], []);
+    expect(rule.check(contextFor(single))).toEqual([]);
+  });
+
+  it('asks the same of a partitioned stream', () => {
+    const stream = graph([node('s-1', 'event-stream', { config: { partitions: 12 } })], []);
+    expect(rule.check(contextFor(stream))).toHaveLength(1);
+  });
+});

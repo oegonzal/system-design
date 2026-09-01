@@ -441,6 +441,36 @@ const noAutoscaling: EvalRule = {
   },
 };
 
+const shardKeyUnnamed: EvalRule = {
+  id: 'scalability.shard-key-unnamed',
+  dimension: 'scalability',
+  check({ index }) {
+    const partitioned = sortById([
+      ...index
+        .byKind('database')
+        .filter((db) => db.config?.['sharding'] === 'hash' || db.config?.['sharding'] === 'range'),
+      ...index.byKind('event-stream').filter((s) => (configNumber(s, 'partitions') ?? 0) >= 2),
+    ]);
+    const unnamed = partitioned.filter((store) => {
+      const key = store.config?.['partitionKey'];
+      return typeof key !== 'string' || key.trim().length === 0;
+    });
+    if (unnamed.length === 0) return [];
+    return [
+      {
+        ruleId: shardKeyUnnamed.id,
+        dimension: 'scalability',
+        severity: 'medium',
+        title: 'Partitioned, but the key is unnamed',
+        message: `${unnamed.map((store) => `"${store.label}"`).join(', ')} splits its load across partitions without saying what it splits on. The strategy is the easy half — the key is the decision: it fixes which queries stay single-partition, which become scatter-gather, and whether one hot value can put a whole shard underwater. Name it.`,
+        affectedNodeIds: unnamed.map((store) => store.id),
+        affectedEdgeIds: [],
+        suggestion: null,
+      },
+    ];
+  },
+};
+
 const overengineeredIntro: EvalRule = {
   id: 'scalability.overengineered-intro',
   dimension: 'scalability',
@@ -483,5 +513,6 @@ export const scalabilityRules: EvalRule[] = [
   noShardingHotWrites,
   hotPartitionRisk,
   noAutoscaling,
+  shardKeyUnnamed,
   overengineeredIntro,
 ];

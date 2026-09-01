@@ -111,6 +111,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         <>
           {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
           {selectRow(config, setKey, 'sharding', 'Sharding', ['none', 'hash', 'range'])}
+          {textRow(config, setKey, 'partitionKey', 'Partition key')}
           {selectRow(config, setKey, 'consistency', 'Consistency', [
             'strong',
             'eventual',
@@ -166,6 +167,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
       return (
         <>
           {numberRow(config, setKey, 'partitions', 'Partitions')}
+          {textRow(config, setKey, 'partitionKey', 'Partition key')}
           {numberRow(config, setKey, 'retentionHours', 'Retention (hours)')}
           {selectRow(config, setKey, 'delivery', 'Delivery', DELIVERY_OPTIONS)}
         </>
