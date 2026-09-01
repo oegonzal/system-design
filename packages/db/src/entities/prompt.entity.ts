@@ -56,6 +56,10 @@ export class Prompt {
   @Property({ type: 'string[]' })
   functionalRequirements!: string[];
 
+  /** The machine-readable half of the requirements — what the engine gates on. */
+  @Property({ type: 'json' })
+  functionalCapabilities: Contracts.FunctionalCapability[] = [];
+
   @Property({ type: 'json' })
   nonFunctionalRequirements!: Contracts.NfrItem[];
 

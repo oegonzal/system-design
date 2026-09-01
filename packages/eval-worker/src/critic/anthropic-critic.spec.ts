@@ -41,6 +41,7 @@ const facts: PromptFacts = {
       targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
     },
   ],
+  functionalCapabilities: [],
   functionalText: 'sell tickets without overselling',
 };
 

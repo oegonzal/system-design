@@ -8,6 +8,7 @@ import type {
   CanvasGraph,
   DimensionScores,
   EvalDimension,
+  FunctionalCapability,
   Grade,
   GraphPatch,
   NfrKind,
@@ -41,7 +42,18 @@ export interface PromptFacts {
   nfrKinds: NfrKind[];
   /** The full NFR list, so findings can cite the exact requirement missed. */
   nfrs: NfrFact[];
-  /** Functional requirements joined and lowercased, for keyword probes. */
+  /**
+   * What the prompt's functional requirements DEMAND — the closed vocabulary
+   * every applicability gate reads. Rules and expectations must branch on
+   * this, never on `functionalText`: prose is the human's copy of the same
+   * fact, and grading that a rewording can silently change is not grading.
+   */
+  functionalCapabilities: readonly FunctionalCapability[];
+  /**
+   * Functional requirements joined and lowercased. Serialized into LLM prompts
+   * so a critic reads what the author read — NEVER read by a scoring
+   * predicate (`tooling/criteria-coverage.spec.ts` enforces it).
+   */
   functionalText: string;
 }
 

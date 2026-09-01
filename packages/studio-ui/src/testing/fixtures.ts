@@ -135,6 +135,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     title: 'Design the on-sale checkout path',
     scenario:
       'A ticketing platform announces a stadium tour. At on-sale time, traffic spikes to 40x baseline within 90 seconds.',
+    functionalCapabilities: [],
     functionalRequirements: [
       'Users can view seat availability in near-real time',
       'Users can hold seats for a bounded window',

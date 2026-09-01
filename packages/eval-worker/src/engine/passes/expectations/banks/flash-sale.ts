@@ -566,7 +566,7 @@ const paymentIsolation: Expectation = {
   severityIfUnmet: 'medium',
   minDifficulty: 'standard',
   archetypes: FLASH_SALE,
-  appliesWhen: (facts) => /purchase|checkout|payment/.test(facts.functionalText),
+  appliesWhen: (facts) => facts.functionalCapabilities.includes('payments'),
   title: 'Order finalization blocks on synchronous calls',
   teach: () =>
     'Checkout is the flow that must not die when a downstream dependency slows: finalize orders asynchronously (accept, enqueue, confirm) and never call an external processor synchronously on the request path — its bad minute becomes your outage.',

@@ -12,7 +12,7 @@ const mixedOltpAnalytics: EvalRule = {
   check({ facts, index }) {
     // Same probe style as no-search-index below: the functional requirements
     // asking for analytical reads are the evidence, not the archetype.
-    if (!/dashboard|analytic|report/.test(facts.functionalText)) return [];
+    if (!facts.functionalCapabilities.includes('analytics')) return [];
     const databases = index.byKind('database');
     if (databases.length !== 1) return [];
     if (index.hasKind('replica') || index.hasKind('search-index')) return [];
@@ -36,7 +36,7 @@ const noSearchIndex: EvalRule = {
   id: 'data.no-search-index',
   dimension: 'data',
   check({ facts, index }) {
-    if (!facts.functionalText.includes('search')) return [];
+    if (!facts.functionalCapabilities.includes('search')) return [];
     if (index.hasKind('search-index')) return [];
     return [
       {

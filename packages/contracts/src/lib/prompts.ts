@@ -64,6 +64,30 @@ export interface ScaleTargets {
   dataRetention?: string;
 }
 
+/**
+ * What a functional requirement demands of the design, as a closed
+ * vocabulary the engine can gate on.
+ *
+ * The same trick as `NfrItem.targetSpec`: a machine-readable field beside the
+ * human sentence. Rules used to grep the requirement prose (`includes('search')`,
+ * `/dashboard|analytic|report/`), which made grading hostage to wording — a
+ * requirement reworded "find past runs by tag" silently switched a rule off,
+ * and free text appended by prompt enrichment could switch one on. Capabilities
+ * are declared by the requirement bank that authors the sentence, so the two
+ * can never drift.
+ */
+export const FUNCTIONAL_CAPABILITIES = [
+  /** Free-text lookup over stored entities — a catalog or archive search. */
+  'search',
+  /** Dashboards, reporting, aggregates over history. */
+  'analytics',
+  /** Money movement: checkout, capture, refund. */
+  'payments',
+  /** Work that must happen later: delays, timers, waits between steps. */
+  'scheduled-work',
+] as const;
+export type FunctionalCapability = (typeof FUNCTIONAL_CAPABILITIES)[number];
+
 export interface PromptDto {
   id: Uuid;
   experienceId: Uuid;
@@ -71,6 +95,8 @@ export interface PromptDto {
   title: string;
   scenario: string;
   functionalRequirements: string[];
+  /** Union of the capabilities the drawn functional requirements demand. */
+  functionalCapabilities: FunctionalCapability[];
   nonFunctionalRequirements: NfrItem[];
   scaleTargets: ScaleTargets;
   difficulty: PromptDifficulty;

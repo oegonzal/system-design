@@ -38,16 +38,14 @@ function deterministicSection(ctx: PassContext): string {
   const entries = ctx.priorArtifacts
     .filter(isCoverageArtifact)
     .flatMap((artifact) => artifact.entries)
-    .filter((entry) => entry.expectationId.startsWith('exp.nar.'))
+    // By dimension, not by id prefix: the typed field is the fact, an id
+    // naming convention is a coincidence that a rename would silently break.
+    .filter((entry) => entry.dimension === 'communication')
     .map((entry) => `  [${entry.met ? 'met' : 'unmet'}] ${entry.expectationId}`);
   const findings = ctx.priorArtifacts
     .filter(isFindingsArtifact)
     .flatMap((artifact) => artifact.findings)
-    .filter(
-      (finding) =>
-        finding.expectationId?.startsWith('exp.nar.') ||
-        finding.ruleId?.startsWith('communication.'),
-    )
+    .filter((finding) => finding.dimension === 'communication')
     .map(
       (finding) =>
         `  [${finding.severity}] ${finding.ruleId ?? finding.expectationId}: ${finding.title}`,

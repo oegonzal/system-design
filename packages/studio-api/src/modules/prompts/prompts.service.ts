@@ -77,6 +77,9 @@ export class PromptsService {
       title: generated.title,
       scenario: enriched.scenario,
       functionalRequirements: enriched.functionalRequirements,
+      // From the generator, never from enriched prose: LLM polish must not be
+      // able to switch an eval rule on or off.
+      functionalCapabilities: generated.functionalCapabilities,
       nonFunctionalRequirements: generated.nonFunctionalRequirements,
       scaleTargets: generated.scaleTargets,
       difficulty,

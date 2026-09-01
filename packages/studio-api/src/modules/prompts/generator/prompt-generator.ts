@@ -1,5 +1,6 @@
 import type {
   Archetype,
+  FunctionalCapability,
   NfrItem,
   PromptDifficulty,
   ScaleFacts,
@@ -16,7 +17,7 @@ import { mulberry32, pick, pickN } from './rng';
  * honest audit records rather than claiming to be reproducible when they are
  * no longer.
  */
-export const GENERATOR_VERSION = '2.1.0'; // 2.1.0: signature invariant always drawn + advanced fill floor
+export const GENERATOR_VERSION = '2.2.0'; // 2.2.0: requirements carry machine-readable capabilities
 
 /** The slice of an experience the generator reads. Structural, so an
  * `ExperienceProfile` entity can be passed directly. */
@@ -39,6 +40,8 @@ export interface GeneratedPrompt {
   title: string;
   scenario: string;
   functionalRequirements: string[];
+  /** Union of what the drawn requirements demand — what the engine gates on. */
+  functionalCapabilities: FunctionalCapability[];
   nonFunctionalRequirements: NfrItem[];
   scaleTargets: ScaleTargets;
 }
@@ -55,7 +58,9 @@ export function generatePrompt({
   seed,
 }: GeneratePromptInput): GeneratedPrompt {
   const template = ARCHETYPE_TEMPLATES[experience.archetype];
-  const bank = REQUIREMENT_BANKS[experience.archetype];
+  // Annotated, not inferred: `as const` on the banks gives each entry a
+  // distinct literal type that pickN cannot unify.
+  const bank: RequirementBank = REQUIREMENT_BANKS[experience.archetype];
   const rng = mulberry32(seed);
 
   const scaleTargets = template.deriveScaleTargets(experience.scaleFacts, difficulty);
@@ -68,12 +73,18 @@ export function generatePrompt({
   });
 
   const functionalCount = 4 + Math.floor(rng() * 3); // 4..6
-  const functionalRequirements = pickN(rng, bank.functional, functionalCount);
+  const drawn = pickN(rng, bank.functional, functionalCount);
+  // Sorted so the same draw always serializes identically — a stored prompt
+  // stays byte-reproducible from its seed.
+  const functionalCapabilities = [
+    ...new Set(drawn.flatMap((requirement) => requirement.capabilities)),
+  ].sort();
 
   return {
     title,
     scenario,
-    functionalRequirements,
+    functionalRequirements: drawn.map((requirement) => requirement.text),
+    functionalCapabilities,
     nonFunctionalRequirements: pickNfrs(rng, bank, difficulty),
     scaleTargets,
   };

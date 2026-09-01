@@ -9,6 +9,7 @@ export const toPromptDto = (e: Prompt): PromptDto => ({
   title: e.title,
   scenario: e.scenario,
   functionalRequirements: e.functionalRequirements,
+  functionalCapabilities: e.functionalCapabilities,
   nonFunctionalRequirements: e.nonFunctionalRequirements,
   scaleTargets: e.scaleTargets,
   difficulty: e.difficulty,

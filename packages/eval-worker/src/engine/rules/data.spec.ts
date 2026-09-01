@@ -35,9 +35,7 @@ describe('data.mixed-oltp-analytics', () => {
   });
 
   it('fires for any archetype whose requirements ask for analytical reads', () => {
-    const reporting = workflowFacts({
-      functionalText: 'define automation workflows; view a run analytics dashboard',
-    });
+    const reporting = workflowFacts({ functionalCapabilities: ['analytics'] });
     expect(rule.check(contextFor(oneStore, reporting))).toHaveLength(1);
   });
 
@@ -48,9 +46,7 @@ describe('data.mixed-oltp-analytics', () => {
 
 describe('data.no-search-index', () => {
   const rule = ruleById('data.no-search-index');
-  const searchFacts = analyticsFacts({
-    functionalText: 'search past campaigns; render live dashboards',
-  });
+  const searchFacts = analyticsFacts({ functionalCapabilities: ['search', 'analytics'] });
 
   it('fires when the requirements mention search and no index exists', () => {
     const findings = rule.check(contextFor(graph([node('db-1', 'database')]), searchFacts));

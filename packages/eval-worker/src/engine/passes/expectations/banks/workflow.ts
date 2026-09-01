@@ -305,7 +305,7 @@ const schedulerForDelays: Expectation = {
   archetypes: WORKFLOW_AUTOMATION,
   // Only a prompt that asks for delayed/scheduled steps grades this bar —
   // never fail a design for timer support no requirement requested.
-  appliesWhen: (facts) => /delay|wait|schedul|timer/.test(facts.functionalText),
+  appliesWhen: (facts) => facts.functionalCapabilities.includes('scheduled-work'),
   title: 'Nothing owns time-based execution',
   teach: () =>
     '"Wait three days, then send the follow-up" is half of workflow automation, and sleeping inside an executor does not survive a deploy. A scheduler (or workflow engine) owns durable timers: the delay is a row, not a process, and firing it is a tick nothing has to stay alive for.',

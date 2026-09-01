@@ -291,7 +291,7 @@ const searchBrowseIndex: Expectation = {
   severityIfUnmet: 'medium',
   minDifficulty: 'standard',
   archetypes: MEDIA_STREAMING,
-  appliesWhen: (facts) => facts.functionalText.includes('search'),
+  appliesWhen: (facts) => facts.functionalCapabilities.includes('search'),
   title: 'Catalog search with no search index',
   teach: (facts) =>
     `The requirements call for catalog search, and LIKE-scans against the metadata database are a latency cliff at ${formatInt(facts.scaleTargets.concurrentUsers)} concurrent viewers. A search index answers text queries off the transactional store — browse stays fast no matter what the pipeline is doing.`,

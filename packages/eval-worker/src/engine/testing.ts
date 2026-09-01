@@ -97,6 +97,7 @@ export function flashSaleFacts(overrides: Partial<PromptFacts> = {}): PromptFact
         targetSpec: { metric: 'sustained_peak_minutes', op: '>=', value: 10, unit: 'min' },
       },
     ],
+    functionalCapabilities: ['payments'],
     functionalText:
       'browse upcoming events; reserve seats during the on-sale; purchase tickets; view order confirmation',
     ...overrides,
@@ -145,6 +146,7 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
         targetSpec: null,
       },
     ],
+    functionalCapabilities: ['analytics'],
     functionalText: 'ingest click events; render live dashboards; export historical reports',
     ...overrides,
   };
@@ -185,6 +187,7 @@ export function mediaFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
         targetSpec: null,
       },
     ],
+    functionalCapabilities: ['search'],
     functionalText:
       'upload videos; transcode into renditions; stream playback worldwide; search the media catalog',
     ...overrides,
@@ -226,6 +229,7 @@ export function workflowFacts(overrides: Partial<PromptFacts> = {}): PromptFacts
         targetSpec: null,
       },
     ],
+    functionalCapabilities: [],
     functionalText:
       'define automation workflows; fire triggers from webhooks; execute third-party actions; view run history',
     ...overrides,
@@ -267,6 +271,7 @@ export function dagFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
         targetSpec: null,
       },
     ],
+    functionalCapabilities: [],
     functionalText:
       'define pipelines as dags; schedule and dispatch steps; retry failed steps; view run status',
     ...overrides,

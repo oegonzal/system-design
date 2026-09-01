@@ -66,6 +66,7 @@ describe('poller (integration)', () => {
       archetype: 'flash-sale-ticketing',
       title: 'Design a ticket on-sale platform',
       scenario: 'Survive the drop.',
+      functionalCapabilities: [],
       functionalRequirements: ['sell tickets', 'prevent overselling'],
       nonFunctionalRequirements: [
         {

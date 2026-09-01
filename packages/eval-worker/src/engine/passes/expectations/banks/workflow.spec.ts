@@ -14,11 +14,7 @@ const GRADE_RANK: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
  * exp.wfa.scheduler-for-delays. The default workflowFacts() never mentions
  * delays, so it doubles as the not-applicable case.
  */
-const delayFacts = () =>
-  workflowFacts({
-    functionalText:
-      'define automation workflows; fire triggers from webhooks; delay a step before the next action; view run history',
-  });
+const delayFacts = () => workflowFacts({ functionalCapabilities: ['scheduled-work'] });
 
 /** The three-box starting point every author draws first. */
 const naiveGraph: CanvasGraph = graph(

@@ -1,4 +1,4 @@
-import type { Archetype, NfrItem } from '@sysdesign/contracts';
+import type { Archetype, FunctionalCapability, NfrItem } from '@sysdesign/contracts';
 
 import { ARCHETYPE_BASELINES } from './archetype-templates';
 
@@ -15,8 +15,19 @@ import { ARCHETYPE_BASELINES } from './archetype-templates';
  * derivations over `ARCHETYPE_BASELINES`, so an NFR can never quote a number
  * the scale targets do not carry.
  */
+/**
+ * A functional requirement is a sentence for the human PLUS the closed-vocabulary
+ * capabilities it demands, so the engine never has to read the sentence. The
+ * bank that writes the prose declares the tags, which is what keeps the two
+ * from drifting.
+ */
+export interface FunctionalRequirementSeed {
+  text: string;
+  capabilities: readonly FunctionalCapability[];
+}
+
 export interface RequirementBank {
-  functional: readonly string[];
+  functional: readonly FunctionalRequirementSeed[];
   /**
    * The archetype-defining invariant (zero oversell, originals never lost…).
    * Scenario prose asserts it unconditionally, so the generator draws it on
@@ -33,15 +44,36 @@ const B = ARCHETYPE_BASELINES;
 export const REQUIREMENT_BANKS = {
   'flash-sale-ticketing': {
     functional: [
-      'Buyers browse upcoming events and see live seat/ticket availability',
-      'A buyer reserves tickets, holding inventory for a bounded time before payment',
-      'Checkout captures payment and finalizes the order exactly once',
-      'Expired reservations release their inventory automatically',
-      'A waiting-room admits buyers into the sale at a controlled rate',
-      'Buyers receive an order confirmation with a verifiable ticket credential',
-      'Operations can configure per-event inventory, pricing tiers and sale windows',
-      'A buyer can view and cancel their orders, returning inventory when allowed',
-      'Fraud and bot signals can flag a purchase for review before fulfilment',
+      {
+        text: 'Buyers browse upcoming events and see live seat/ticket availability',
+        capabilities: [],
+      },
+      {
+        text: 'A buyer reserves tickets, holding inventory for a bounded time before payment',
+        capabilities: ['payments'],
+      },
+      {
+        text: 'Checkout captures payment and finalizes the order exactly once',
+        capabilities: ['payments'],
+      },
+      { text: 'Expired reservations release their inventory automatically', capabilities: [] },
+      { text: 'A waiting-room admits buyers into the sale at a controlled rate', capabilities: [] },
+      {
+        text: 'Buyers receive an order confirmation with a verifiable ticket credential',
+        capabilities: [],
+      },
+      {
+        text: 'Operations can configure per-event inventory, pricing tiers and sale windows',
+        capabilities: [],
+      },
+      {
+        text: 'A buyer can view and cancel their orders, returning inventory when allowed',
+        capabilities: [],
+      },
+      {
+        text: 'Fraud and bot signals can flag a purchase for review before fulfilment',
+        capabilities: ['payments'],
+      },
     ],
     signatureNfrId: 'fst-con-oversell',
     nfrs: [
@@ -146,15 +178,36 @@ export const REQUIREMENT_BANKS = {
   },
   'media-streaming-pipeline': {
     functional: [
-      'Creators upload large video files with resumable, validated uploads',
-      'Uploaded media is transcoded into multiple renditions for adaptive playback',
-      'Viewers stream video with adaptive bitrate from edge locations',
-      'Browse and search surfaces titles by metadata, popularity and freshness',
-      'A drop can gate content behind a release timestamp visible to all viewers at once',
-      'Playback position and watch history sync across a viewer’s devices',
-      'Creators see per-title analytics: views, completion rate, geography',
-      'Moderation can take down an asset and invalidate cached copies',
-      'Thumbnails and previews are generated automatically from source media',
+      {
+        text: 'Creators upload large video files with resumable, validated uploads',
+        capabilities: [],
+      },
+      {
+        text: 'Uploaded media is transcoded into multiple renditions for adaptive playback',
+        capabilities: [],
+      },
+      { text: 'Viewers stream video with adaptive bitrate from edge locations', capabilities: [] },
+      {
+        text: 'Browse and search surfaces titles by metadata, popularity and freshness',
+        capabilities: ['search'],
+      },
+      {
+        text: 'A drop can gate content behind a release timestamp visible to all viewers at once',
+        capabilities: ['scheduled-work'],
+      },
+      {
+        text: 'Playback position and watch history sync across a viewer’s devices',
+        capabilities: [],
+      },
+      {
+        text: 'Creators see per-title analytics: views, completion rate, geography',
+        capabilities: ['analytics'],
+      },
+      { text: 'Moderation can take down an asset and invalidate cached copies', capabilities: [] },
+      {
+        text: 'Thumbnails and previews are generated automatically from source media',
+        capabilities: [],
+      },
     ],
     signatureNfrId: 'msp-dur-originals',
     nfrs: [
@@ -251,16 +304,43 @@ export const REQUIREMENT_BANKS = {
   },
   'workflow-automation': {
     functional: [
-      'Customers compose workflows from triggers, conditions and actions',
-      'Workflows execute automatically when their trigger events arrive',
-      'A workflow run is inspectable step by step, with inputs and outputs',
-      'Failed steps retry with backoff and surface to the customer after exhaustion',
-      'A workflow step can wait — e.g. delay N days before the next action — and fire on schedule',
-      'Customers can test a workflow against sample data before enabling it',
-      'Workflow definitions are versioned; in-flight runs finish on their version',
-      'Actions call third-party APIs with per-customer credentials and rate limits',
-      'Customers can pause, resume and cancel workflows and individual runs',
-      'An audit log records who changed which workflow and when',
+      {
+        text: 'Customers compose workflows from triggers, conditions and actions',
+        capabilities: [],
+      },
+      {
+        text: 'Workflows execute automatically when their trigger events arrive',
+        capabilities: [],
+      },
+      {
+        text: 'A workflow run is inspectable step by step, with inputs and outputs',
+        capabilities: [],
+      },
+      {
+        text: 'Failed steps retry with backoff and surface to the customer after exhaustion',
+        capabilities: [],
+      },
+      {
+        text: 'A workflow step can wait — e.g. delay N days before the next action — and fire on schedule',
+        capabilities: ['scheduled-work'],
+      },
+      {
+        text: 'Customers can test a workflow against sample data before enabling it',
+        capabilities: [],
+      },
+      {
+        text: 'Workflow definitions are versioned; in-flight runs finish on their version',
+        capabilities: [],
+      },
+      {
+        text: 'Actions call third-party APIs with per-customer credentials and rate limits',
+        capabilities: [],
+      },
+      {
+        text: 'Customers can pause, resume and cancel workflows and individual runs',
+        capabilities: [],
+      },
+      { text: 'An audit log records who changed which workflow and when', capabilities: [] },
     ],
     signatureNfrId: 'wfa-dur-triggers',
     nfrs: [
@@ -351,15 +431,36 @@ export const REQUIREMENT_BANKS = {
   },
   'realtime-analytics': {
     functional: [
-      'Events are ingested continuously from many producers with schema validation',
-      'Live dashboards show aggregates over sliding windows of recent events',
-      'Users drill down from an aggregate to the underlying event records',
-      'Alert rules evaluate continuously and notify when thresholds are crossed',
-      'Historical queries span months of data with filtering and grouping',
-      'Dashboards are shareable with per-user access control',
-      'Late or out-of-order events are folded into the correct windows',
-      'Rollups are computed automatically so old data stays queryable cheaply',
-      'An export pushes filtered event slices to external destinations',
+      {
+        text: 'Events are ingested continuously from many producers with schema validation',
+        capabilities: [],
+      },
+      {
+        text: 'Live dashboards show aggregates over sliding windows of recent events',
+        capabilities: ['analytics'],
+      },
+      {
+        text: 'Users drill down from an aggregate to the underlying event records',
+        capabilities: ['analytics'],
+      },
+      {
+        text: 'Alert rules evaluate continuously and notify when thresholds are crossed',
+        capabilities: [],
+      },
+      {
+        text: 'Historical queries span months of data with filtering and grouping',
+        capabilities: ['analytics'],
+      },
+      {
+        text: 'Dashboards are shareable with per-user access control',
+        capabilities: ['analytics'],
+      },
+      { text: 'Late or out-of-order events are folded into the correct windows', capabilities: [] },
+      {
+        text: 'Rollups are computed automatically so old data stays queryable cheaply',
+        capabilities: ['analytics'],
+      },
+      { text: 'An export pushes filtered event slices to external destinations', capabilities: [] },
     ],
     signatureNfrId: 'rta-con-count-once',
     nfrs: [
@@ -445,15 +546,27 @@ export const REQUIREMENT_BANKS = {
   },
   'dag-orchestration': {
     functional: [
-      'Clients submit a DAG of dependent steps for execution',
-      'The scheduler dispatches steps whose dependencies have completed',
-      'Step results are persisted and fed as inputs to dependent steps',
-      'Failed steps retry with backoff up to a per-step attempt budget',
-      'A run can be paused, resumed and cancelled without corrupting its state',
-      'Fan-out steps spawn dynamic children and a join waits for all of them',
-      'Operators inspect any run: per-step status, timings, inputs and outputs',
-      'Completed runs are queryable by status, tag and time range',
-      'A dead-letter path captures steps that exhaust their retries',
+      { text: 'Clients submit a DAG of dependent steps for execution', capabilities: [] },
+      {
+        text: 'The scheduler dispatches steps whose dependencies have completed',
+        capabilities: [],
+      },
+      { text: 'Step results are persisted and fed as inputs to dependent steps', capabilities: [] },
+      { text: 'Failed steps retry with backoff up to a per-step attempt budget', capabilities: [] },
+      {
+        text: 'A run can be paused, resumed and cancelled without corrupting its state',
+        capabilities: [],
+      },
+      {
+        text: 'Fan-out steps spawn dynamic children and a join waits for all of them',
+        capabilities: [],
+      },
+      {
+        text: 'Operators inspect any run: per-step status, timings, inputs and outputs',
+        capabilities: [],
+      },
+      { text: 'Completed runs are queryable by status, tag and time range', capabilities: [] },
+      { text: 'A dead-letter path captures steps that exhaust their retries', capabilities: [] },
     ],
     signatureNfrId: 'dag-dur-progress',
     nfrs: [

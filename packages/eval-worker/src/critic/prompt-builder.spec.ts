@@ -24,6 +24,7 @@ const facts: PromptFacts = {
       targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 300, unit: 'ms' },
     },
   ],
+  functionalCapabilities: [],
   functionalText: 'sell tickets without overselling',
 };
 
