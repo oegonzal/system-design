@@ -7,9 +7,9 @@
  * before, and detection rides the shared contracts probes
  * (`phantomMechanismTerms`) that keep engine and editor in agreement.
  */
-import { phantomMechanismTerms } from '@sysdesign/contracts';
+import { contradictedCapabilities, phantomMechanismTerms } from '@sysdesign/contracts';
 
-import type { EvalRule } from '../types';
+import type { EvalRule, RuleFinding } from '../types';
 
 /** The gate every rule in this pack shares: null or blank prose → silent. */
 function presentNarrative(narrative: string | null): string | null {
@@ -45,6 +45,42 @@ const phantomClaims: EvalRule = {
   },
 };
 
+/**
+ * The mirror of phantom claims, and the more dangerous lie: naming only the
+ * components the diagram draws slips past every substring probe in the bank,
+ * so without this a narrative can deny its own design's configuration in
+ * every sentence and still earn full marks. One finding per contradicted
+ * capability, so a story that misrepresents the whole design is penalized
+ * for the whole design.
+ */
+const contradictsConfig: EvalRule = {
+  id: 'communication.narrative-contradicts-config',
+  dimension: 'communication',
+  check({ graph, narrative }) {
+    const story = presentNarrative(narrative);
+    if (story === null) return [];
+    const findings: RuleFinding[] = [];
+
+    for (const contradiction of contradictedCapabilities(graph, story)) {
+      const owners = contradiction.labels.map((label) => `"${label}"`).join(', ');
+      findings.push({
+        ruleId: contradictsConfig.id,
+        dimension: 'communication',
+        severity: 'high',
+        title: `The story denies ${contradiction.capability} the diagram configures`,
+        message: `The narrative says "${contradiction.phrase}", but ${owners} ${
+          contradiction.labels.length === 1 ? 'is' : 'are'
+        } configured with ${contradiction.capability} on the canvas. A reader cannot trust either artifact when they disagree: fix the prose if the diagram is right, or fix the diagram if the prose is. An interviewer reads the contradiction as not knowing your own design.`,
+        affectedNodeIds: [...contradiction.nodeIds].sort(),
+        affectedEdgeIds: [],
+        suggestion: null,
+      });
+    }
+
+    return findings;
+  },
+};
+
 /** Below this request rate a qualitative story is forgivable. */
 const MIN_RPS_FOR_NUMBERS = 1000;
 
@@ -71,4 +107,4 @@ const noNumbers: EvalRule = {
   },
 };
 
-export const narrativeRules: EvalRule[] = [phantomClaims, noNumbers];
+export const narrativeRules: EvalRule[] = [phantomClaims, contradictsConfig, noNumbers];

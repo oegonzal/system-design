@@ -29,8 +29,11 @@ export function runExpectations(
   // Two scopes, one invariant: diagram expectations get `narrative: null`
   // mechanically, so prose can never add or remove a demand on the diagram
   // that the prompt itself did not make. Narrative-scoped expectations
-  // (`requiresNarrative`) grade the prose itself — they exist only once
-  // prose exists, and only they may read it.
+  // (`requiresNarrative`) grade the prose itself, and only they may read it.
+  // Most have nothing to grade when no prose was submitted and are skipped;
+  // the one that asks whether prose exists at all opts out of that skip
+  // (`appliesWithoutNarrative`), so a submission with no narrative scores
+  // communication 0 rather than dropping out of the rubric entirely.
   const narrative = input.narrative?.trim() || null;
   const diagramCtx: RuleContext = {
     graph: input.graph,
@@ -43,7 +46,13 @@ export function runExpectations(
   const findings: EngineFinding[] = [];
 
   for (const expectation of expectations) {
-    if (expectation.requiresNarrative && narrative === null) continue;
+    if (
+      expectation.requiresNarrative &&
+      narrative === null &&
+      !expectation.appliesWithoutNarrative
+    ) {
+      continue;
+    }
     if (!expectationApplies(expectation, input.facts)) continue;
     const ctx = expectation.requiresNarrative ? narrativeCtx : diagramCtx;
     const check = expectation.satisfiedBy(ctx);

@@ -25,6 +25,13 @@ interface CalibrationRow {
  * The regression anchor for every future rubric change: what each reference
  * design is worth, to the decimal. If a new rule or expectation moves these
  * numbers, that movement must be deliberate and re-pinned here.
+ *
+ * Every row here is a diagram submitted WITHOUT a narrative. Since profile
+ * 2.3.0 that is itself a graded answer — `exp.nar.present` applies whether or
+ * not prose was written — so each score is the old diagram-only number minus
+ * the communication tenth. The excellent design is a B until its author
+ * explains it, which is the point: a diagram nobody can follow is not a
+ * finished answer.
  */
 const TABLE: CalibrationRow[] = [
   {
@@ -38,7 +45,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 0,
-      communication: null,
+      communication: 0,
     },
     overallScore: 0,
     grade: 'F',
@@ -54,9 +61,9 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: null,
+      communication: 0,
     },
-    overallScore: 20,
+    overallScore: 18,
     grade: 'F',
   },
   {
@@ -70,9 +77,9 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: null,
+      communication: 0,
     },
-    overallScore: 25.6,
+    overallScore: 23,
     grade: 'F',
   },
   {
@@ -86,10 +93,10 @@ const TABLE: CalibrationRow[] = [
       messaging: 100,
       security: 100,
       hygiene: 100,
-      communication: null,
+      communication: 0,
     },
-    overallScore: 86.5,
-    grade: 'B',
+    overallScore: 77.9,
+    grade: 'C',
   },
   {
     design: 'excellent design (waiting room, CDN, monitoring)',
@@ -102,10 +109,10 @@ const TABLE: CalibrationRow[] = [
       messaging: 100,
       security: 100,
       hygiene: 100,
-      communication: null,
+      communication: 0,
     },
-    overallScore: 100,
-    grade: 'A',
+    overallScore: 90,
+    grade: 'B',
   },
 ];
 
@@ -141,8 +148,9 @@ describe('calibration', () => {
 /**
  * The narrative half of the anchor: the excellent diagram is held fixed and
  * only the prose varies, so these rows pin exactly what the communication
- * dimension is worth. The diagram-only TABLE above must never move — a
- * narrative can only be graded when one is submitted.
+ * dimension is worth — and, since 2.3.0, what each way of dodging it costs.
+ * The ordering is the point: an explanation earns the tenth, a bad attempt
+ * earns almost none of it, and silence earns none at all.
  */
 describe('narrative calibration', () => {
   const excellent = () => loadFixture('excellent-flash-sale.graph.json');
@@ -164,10 +172,48 @@ describe('narrative calibration', () => {
     expect(result.grade).toBe('A');
   });
 
-  it('[EVAL-10] the same diagram with a throwaway story drops to 90/B — prose is a tenth of the grade', () => {
-    const result = runEngine(excellent(), flashSaleFacts(), 'It just works.');
+  it('[EVAL-11] the same diagram submitted in silence scores 90/B — the absence is graded, not excused', () => {
+    const result = runEngine(excellent(), flashSaleFacts());
+    // Not null: renormalizing the dimension away would make writing nothing
+    // strictly better than writing badly, which is what this pins against.
     expect(result.dimensionScores.communication).toBe(0);
     expect(result.overallScore).toBe(90);
     expect(result.grade).toBe('B');
+    expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.nar.present');
+  });
+
+  it('[EVAL-11] a throwaway story beats silence, but only just', () => {
+    const result = runEngine(excellent(), flashSaleFacts(), 'It just works.');
+    expect(result.dimensionScores.communication).toBe(11.1);
+    expect(result.overallScore).toBe(91.1);
+    expect(result.grade).toBe('B');
+  });
+
+  /**
+   * The attack every substring check invites: paste the labels the checker
+   * looks for and add the requirement vocabulary. Built from the graph itself,
+   * so it is the best possible keyword list for this exact diagram.
+   */
+  it('[EVAL-11] a list of the right words scores like silence — substring coverage is not an explanation', () => {
+    const graph = excellent();
+    const salad = [
+      ...new Set(graph.nodes.map((node) => node.label)),
+      'calls',
+      'latency',
+      'availability',
+      'throughput',
+      'failover',
+      'idempotent',
+      'persist',
+      'burst',
+      'monitor',
+      'alert',
+    ].join(' ');
+
+    const result = runEngine(graph, flashSaleFacts(), salad);
+    expect(result.grade).toBe('B');
+    expect(result.overallScore).toBeLessThan(92);
+    // Only "you wrote something" is earned; every content check is voided.
+    expect(result.dimensionScores.communication).toBeLessThan(20);
   });
 });

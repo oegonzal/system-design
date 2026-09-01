@@ -90,6 +90,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A submitted narrative earns the communication dimension: components, flows, and requirements coverage graded deterministically.',
   },
+  {
+    id: 'EVAL-11',
+    statement:
+      'A design submitted without a narrative — or with a keyword list in place of one — is graded on that, never excused from the communication dimension.',
+  },
+  {
+    id: 'EVAL-12',
+    statement:
+      'A narrative that denies a capability the diagram configures is caught deterministically and cannot outscore saying nothing.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

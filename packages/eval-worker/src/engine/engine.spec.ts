@@ -31,6 +31,7 @@ const GLOBAL_FINDINGS = new Set([
   'exp.fst.rate-limit-edge',
   'exp.fst.dlq-on-queues',
   'exp.fst.cdn-static',
+  'exp.nar.present',
 ]);
 
 function identityOf(finding: { ruleId: string | null; expectationId: string | null }): string {
@@ -57,6 +58,7 @@ describe('runEngine', () => {
       'exp.fst.stateless-scale-out',
       'exp.fst.waiting-room',
       'exp.fst.write-spike-buffer',
+      'exp.nar.present',
       'reliability.service-no-lb',
     ]);
 
@@ -70,10 +72,10 @@ describe('runEngine', () => {
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: null,
+      communication: 0,
     });
 
-    expect(result.overallScore).toBe(20);
+    expect(result.overallScore).toBe(18);
     expect(result.grade).toBe('F');
     expect(result.summary).toContain('grade F');
   });
@@ -98,11 +100,15 @@ describe('runEngine', () => {
     expect(replica?.suggestion?.ops.map((op) => op.op)).toEqual(['add-node', 'add-edge']);
   });
 
-  it('holds the solid flash-sale design at a B — an A demands real depth', () => {
+  it('holds the solid flash-sale design at a C — depth is missing and so is the narrative', () => {
     const result = runEngine(solidFlashSale, flashSaleFacts());
-    expect(result.findings.map(identityOf)).toEqual(['exp.fst.cdn-static', 'exp.fst.waiting-room']);
-    expect(result.overallScore).toBe(86.5);
-    expect(result.grade).toBe('B');
+    expect(result.findings.map(identityOf)).toEqual([
+      'exp.fst.cdn-static',
+      'exp.fst.waiting-room',
+      'exp.nar.present',
+    ]);
+    expect(result.overallScore).toBe(77.9);
+    expect(result.grade).toBe('C');
   });
 
   it('is deterministic — two runs deep-equal', () => {

@@ -49,11 +49,19 @@ export interface Expectation {
   /** Extra gating beyond archetype/difficulty/NFR (e.g. functional keywords). */
   appliesWhen?: (facts: PromptFacts) => boolean;
   /**
-   * Narrative-scoped: applies only when the revision carries a non-blank
-   * design narrative, and its `satisfiedBy` receives that prose. Diagram
-   * expectations never set this and never see the narrative.
+   * Narrative-scoped: its `satisfiedBy` receives the submitted prose. Diagram
+   * expectations never set this and never see the narrative. By default a
+   * narrative-scoped expectation is skipped when no prose was submitted —
+   * there is nothing of its kind to grade.
    */
   requiresNarrative?: true;
+  /**
+   * The opt-out for the one expectation whose subject IS the absence: it
+   * reads the prose like any narrative-scoped check but stays applicable when
+   * there is none, so silence scores zero instead of vanishing from the
+   * rubric. Exactly one expectation should set this.
+   */
+  appliesWithoutNarrative?: true;
   /** Finding title when unmet. */
   title: string;
   /** The lesson: why this capability matters at the prompt's scale. */

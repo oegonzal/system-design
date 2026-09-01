@@ -137,7 +137,7 @@ describe('poller (integration)', () => {
     expect(done.overallScore).toBeGreaterThan(0);
     expect(done.grade).toBeTruthy();
     expect(done.dimensionScores).toBeTruthy();
-    expect(done.engineVersion).toBe('2.1.0');
+    expect(done.engineVersion).toBe('2.2.0');
     // EVAL_DETERMINISTIC=1 → no-op critic: engine summary, no model recorded.
     expect(done.criticModel).toBeNull();
     expect(done.summary).toBeTruthy();
@@ -172,7 +172,7 @@ describe('poller (integration)', () => {
     });
 
     expect(done.profileId).toBe('default');
-    expect(done.profileVersion).toBe('2.2.0');
+    expect(done.profileVersion).toBe('2.3.0');
     const artifactKinds = (done.evidence ?? []).map(
       (artifact) => (artifact as { kind: string }).kind,
     );

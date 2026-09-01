@@ -23,9 +23,15 @@ function run(narrative: string | null) {
 }
 
 describe('narrative expectations bank', () => {
-  it('[EVAL-10] applies nothing without a narrative — communication stays unassessed', () => {
-    expect(run(null).entries).toEqual([]);
-    expect(run('   ').entries).toEqual([]);
+  it('[EVAL-11] silence is graded: only the presence check applies, and it is unmet', () => {
+    for (const nothing of [null, '   ']) {
+      const { entries, findings } = run(nothing);
+      expect(entries.map((entry) => entry.expectationId)).toEqual(['exp.nar.present']);
+      expect(entries[0].met).toBe(false);
+      // One finding, not one per unwritten sentence — the lesson is singular.
+      expect(findings).toHaveLength(1);
+      expect(findings[0].title).toBe('The design ships without a narrative');
+    }
   });
 
   it('[EVAL-10] a covering story meets every applicable expectation', () => {
@@ -35,8 +41,9 @@ describe('narrative expectations bank', () => {
         'inside budget on the hot path, and absorbs the flash-sale burst without dropping requests.',
     );
 
-    // flash-sale facts carry availability/latency/throughput → 3 structural + 3 per-kind.
-    expect(entries).toHaveLength(6);
+    // flash-sale facts carry availability/latency/throughput → 5 structural
+    // (present, components, flow, substance, prose) + 3 per-kind.
+    expect(entries).toHaveLength(8);
     expect(entries.every((entry) => entry.met)).toBe(true);
     expect(findings).toEqual([]);
   });
@@ -84,8 +91,57 @@ describe('narrative expectations bank', () => {
     expect(byId.get('exp.nar.flow-story')).toBe(false);
     expect(byId.get('exp.nar.components-explained')).toBe(false);
 
+    // Too short to be prose at all, so the content checks report the gate
+    // rather than a word count they could not honestly measure.
     const substance = findings.find((finding) => finding.expectationId === 'exp.nar.substance');
-    expect(substance?.message).toContain('3 words');
+    expect(substance?.message).toContain('never puts them in sentences');
+  });
+
+  it('[EVAL-11] a keyword list satisfies every substring probe and still earns nothing', () => {
+    // Every label plus the requirement vocabulary — the best possible list.
+    const { entries } = run(
+      'Client Order Service Orders DB calls latency availability throughput failover persist burst',
+    );
+
+    const byId = new Map(entries.map((entry) => [entry.expectationId, entry.met]));
+    expect(byId.get('exp.nar.present')).toBe(true);
+    expect(byId.get('exp.nar.written-as-prose')).toBe(false);
+    // The substrings are all there; none of them count.
+    expect(byId.get('exp.nar.components-explained')).toBe(false);
+    expect(byId.get('exp.nar.addresses-latency')).toBe(false);
+    expect(byId.get('exp.nar.addresses-availability')).toBe(false);
+  });
+
+  it('[EVAL-12] prose that wholesale contradicts the canvas earns none of its coverage', () => {
+    const configured = graph(
+      [
+        node('n-1', 'gateway', {
+          label: 'Edge gateway',
+          config: { rateLimit: true, authMode: 'jwt' },
+        }),
+        node('n-2', 'worker', { label: 'Order worker', config: { idempotent: true } }),
+        node('n-3', 'database', {
+          label: 'Orders DB',
+          config: { consistency: 'strong', backups: true },
+        }),
+      ],
+      [edge('e-1', 'n-1', 'n-2', 'sync'), edge('e-2', 'n-2', 'n-3', 'sync')],
+    );
+    const liar =
+      'The Edge gateway does no rate limiting and no authentication, so anyone reaches through. ' +
+      'The Order worker is not idempotent, and the Orders DB is eventually consistent with no backups. ' +
+      'Reads miss the latency budget, availability suffers, and the burst is never absorbed.';
+
+    const [coverage] = runExpectations(
+      { graph: configured, facts: flashSaleFacts(), index: indexFor(configured), narrative: liar },
+      narrativeExpectations,
+    );
+    const byId = new Map(coverage.entries.map((entry) => [entry.expectationId, entry.met]));
+    // It is fluent prose that names every component and every requirement —
+    // and describes a different system, so none of that is credited.
+    expect(byId.get('exp.nar.written-as-prose')).toBe(true);
+    expect(byId.get('exp.nar.components-explained')).toBe(false);
+    expect(byId.get('exp.nar.addresses-latency')).toBe(false);
   });
 
   it('forgives flow on an edgeless canvas and length on a tiny one', () => {

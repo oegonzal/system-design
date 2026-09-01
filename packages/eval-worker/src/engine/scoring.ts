@@ -5,4 +5,4 @@
  * dimension. The math itself lives in the aggregator, driven by the active
  * profile's declarative policy.
  */
-export const ENGINE_VERSION = '2.1.0';
+export const ENGINE_VERSION = '2.2.0';

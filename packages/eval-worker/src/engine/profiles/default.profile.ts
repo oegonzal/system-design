@@ -3,8 +3,9 @@
  * meeting the prompt's expectations, violations subtract with geometric decay,
  * critical findings cap the letter grade, and suppression pairs keep one
  * lesson to one finding. Calibration (engine/calibration.spec.ts) pins what
- * these numbers mean: empty canvas 0/F, naive three-box 20/F, the solid
- * fixture 86.5/B, a genuinely excellent design 100/A.
+ * these numbers mean. Since 2.3.0 those pins are quoted for a diagram
+ * submitted WITHOUT a narrative — which now costs the communication tenth —
+ * so the excellent fixture is 90/B until its author explains it.
  */
 import type { EvalProfile } from '../core/profile';
 import { CRITIC_PASS_ID } from '../passes/critic/critic.pass';
@@ -16,7 +17,7 @@ import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '2.2.0',
+  version: '2.3.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -44,10 +45,11 @@ export const DEFAULT_PROFILE: EvalProfile = {
     violationDecay: 0.7,
     // How much each dimension contributes to the overall score; sums to 1
     // (validateProfile enforces it). Communication holds 0.10 and the seven
-    // diagram dimensions keep their original ratios (×0.9) — so when no
-    // narrative is submitted and communication scores null, renormalization
-    // restores the exact pre-communication weighting and every calibration
-    // pin is unchanged.
+    // diagram dimensions keep their original ratios (×0.9). As of 2.3.0 a
+    // submission with no narrative scores communication 0 rather than null
+    // (exp.nar.present applies either way), so silence costs the full 0.10
+    // instead of being renormalized away — the calibration pins below moved
+    // by exactly that factor and were re-pinned deliberately.
     dimensionWeights: {
       reliability: 0.18,
       scalability: 0.225,

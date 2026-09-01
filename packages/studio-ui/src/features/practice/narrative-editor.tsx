@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import {
   NARRATIVE_MAX_LENGTH,
   hasFlowStory,
+  readsAsProse,
   unaddressedNfrKinds,
   unmentionedNodeLabels,
   type PromptDto,
@@ -72,6 +73,9 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
 
   const words = countWords(narrative);
   const missingFlow = words > 0 && edgeCount > 0 && !hasFlowStory(narrative);
+  // The engine credits the checklist above only inside real prose, so the
+  // author is warned before submitting rather than after being graded.
+  const notProse = words > 0 && !readsAsProse(narrative);
 
   return (
     <Stack gap={3}>
@@ -126,6 +130,12 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
       {missingFlow ? (
         <Text size="sm" tone="muted" data-testid="narrative-flow-hint">
           No flow verbs yet — narrate the arrows: who calls whom, what is written where.
+        </Text>
+      ) : null}
+      {notProse ? (
+        <Text size="sm" tone="secondary" data-testid="narrative-prose-hint">
+          This does not read as prose yet. Ticking the lists above earns nothing on its own — write
+          the walkthrough in sentences and the coverage counts.
         </Text>
       ) : null}
     </Stack>
