@@ -15,6 +15,7 @@ import {
   type NodeKind,
 } from '@sysdesign/contracts';
 import { Badge, Stack, Surface, Text } from '@sysdesign/design-system';
+import type { ReactNode } from 'react';
 
 import { CheckboxField, SelectField, TextField } from '../../../components/fields';
 import { eligibleNodes } from '../../canvas/brief-draft';
@@ -37,6 +38,12 @@ export interface NfrBindingRowProps {
   onToggleNode: (nodeId: string) => void;
   onNote: (note: string) => void;
   onClear: () => void;
+  /**
+   * A machine proposal for this requirement, rendered by the parent. Passed as
+   * a slot rather than as data so the row stays presentational and knows
+   * nothing about where proposals come from.
+   */
+  proposal?: ReactNode;
 }
 
 /**
@@ -57,6 +64,7 @@ export function NfrBindingRow({
   onToggleNode,
   onNote,
   onClear,
+  proposal,
 }: NfrBindingRowProps) {
   const candidates = binding ? eligibleNodes(graph, binding.mechanism) : [];
   const labelOf = (id: string) => graph.nodes.find((node) => node.id === id)?.label ?? id;
@@ -103,6 +111,10 @@ export function NfrBindingRow({
             </option>
           ))}
         </SelectField>
+
+        {/* Outside the ternary: the interesting case is a proposal for a
+            requirement nothing is bound to yet. */}
+        {proposal}
 
         {binding ? (
           <Stack gap={3}>

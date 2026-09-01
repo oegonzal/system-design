@@ -35,6 +35,7 @@ import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { PromptPane } from '../prompts/prompt-pane';
 import { DesignBriefEditor } from './brief/design-brief-editor';
+import { useBriefSuggestions } from './brief/use-brief-suggestions';
 import { NarrativeEditor } from './narrative-editor';
 
 function CanvasSkeleton() {
@@ -231,6 +232,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [tab, setTab] = useState('prompt');
 
   const polling = useEvaluationPolling(feedback?.id ?? null);
+  const suggestions = useBriefSuggestions(sessionId);
   const completedFor = useRef<string | null>(null);
 
   // Initial load: session → prompt + revision summaries → latest full graph.
@@ -445,7 +447,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             </DockPanel>
             <DockPanel value="brief">
               {prompt ? (
-                <DesignBriefEditor prompt={prompt} />
+                <DesignBriefEditor prompt={prompt} suggestions={suggestions} />
               ) : (
                 <Text size="sm" tone="muted">
                   Prompt unavailable.

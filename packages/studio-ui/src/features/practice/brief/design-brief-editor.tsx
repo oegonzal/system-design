@@ -12,11 +12,21 @@ import { useMemo } from 'react';
 import { accountedNodeIds, reconcileBrief } from '../../canvas/brief-draft';
 import { useCanvasStore } from '../../canvas/canvas-store-context';
 import { toCanvasGraph } from '../../canvas/graph-io';
+import { BindingProposal } from './binding-proposal';
 import { FlowTracer } from './flow-tracer';
 import { NfrBindingRow } from './nfr-binding-row';
+import { SuggestionsPanel } from './suggestions-panel';
+import type { BriefSuggestionsState } from './use-brief-suggestions';
 
 export interface DesignBriefEditorProps {
   prompt: PromptDto;
+  /**
+   * Output of `useBriefSuggestions` — the workspace owns the hook, as it owns
+   * evaluation polling. Keeping the fetch out of this component is what lets it
+   * appear in the catalog at all: the API client reads `process.env` at module
+   * scope, which does not exist under the catalog's bundler.
+   */
+  suggestions?: BriefSuggestionsState;
 }
 
 /**
@@ -32,7 +42,7 @@ export interface DesignBriefEditorProps {
  * presentational and controlled, so this is the only component that needs to
  * know where the draft lives.
  */
-export function DesignBriefEditor({ prompt }: DesignBriefEditorProps) {
+export function DesignBriefEditor({ prompt, suggestions }: DesignBriefEditorProps) {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const bindings = useCanvasStore((state) => state.briefBindings);
@@ -42,6 +52,9 @@ export function DesignBriefEditor({ prompt }: DesignBriefEditorProps) {
   const setBindingNote = useCanvasStore((state) => state.setBindingNote);
   const clearBinding = useCanvasStore((state) => state.clearBinding);
   const setFlowPath = useCanvasStore((state) => state.setFlowPath);
+  const proposals = useCanvasStore((state) => state.briefProposals);
+  const acceptProposal = useCanvasStore((state) => state.acceptProposal);
+  const dismissProposal = useCanvasStore((state) => state.dismissProposal);
 
   const graph: CanvasGraph = useMemo(() => toCanvasGraph(nodes, edges), [nodes, edges]);
   // Built once per graph, not once per row: the adapter rebuilds its adjacency
@@ -58,12 +71,38 @@ export function DesignBriefEditor({ prompt }: DesignBriefEditorProps) {
     );
   }, [bindings, flows, graph]);
 
+  const renderProposal = (nfrId: string) => {
+    const proposal = proposals.find((candidate) => candidate.nfrId === nfrId);
+    if (!proposal) return null;
+    return (
+      <BindingProposal
+        proposal={proposal}
+        graph={graph}
+        mechanismGraph={mechanismGraph}
+        replaces={bindings.find((candidate) => candidate.nfrId === nfrId) ?? null}
+        onAccept={() => acceptProposal(nfrId)}
+        onDismiss={() => dismissProposal(nfrId)}
+      />
+    );
+  };
+
   return (
     <Stack gap={5}>
       <Text size="sm" tone="muted">
         Say which components hold each requirement, and trace how a request travels. Every claim is
         checked against your diagram as you make it — an unsupported one is allowed, and graded.
       </Text>
+
+      {suggestions ? (
+        <SuggestionsPanel
+          asking={suggestions.asking}
+          error={suggestions.error}
+          askedAndEmpty={suggestions.askedAndEmpty}
+          pending={proposals.length}
+          canAsk={graph.nodes.length > 0}
+          onAsk={suggestions.ask}
+        />
+      ) : null}
 
       <Stack gap={3}>
         <Heading level={3}>Requirements</Heading>
@@ -78,6 +117,7 @@ export function DesignBriefEditor({ prompt }: DesignBriefEditorProps) {
             onToggleNode={(nodeId) => toggleBindingNode(nfr.id, nodeId)}
             onNote={(note) => setBindingNote(nfr.id, note)}
             onClear={() => clearBinding(nfr.id)}
+            proposal={renderProposal(nfr.id)}
           />
         ))}
       </Stack>

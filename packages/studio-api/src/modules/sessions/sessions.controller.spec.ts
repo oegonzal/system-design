@@ -5,6 +5,7 @@ import {
   type CanvasGraph,
   type GetPromptResponse,
   type GetRevisionResponse,
+  type BriefSuggestionsResponse,
   type GetSessionResponse,
   type ListRevisionsResponse,
   type ListSessionsResponse,
@@ -532,6 +533,71 @@ describe('sessions', () => {
         body: JSON.stringify({ status: 'completed' }),
       });
       expect(status).toBe(404);
+    });
+  });
+
+  /**
+   * Every automated context here runs EVAL_DETERMINISTIC=1, so this is the only
+   * path CI can reach — which is exactly why the response shape must not depend
+   * on whether a model is configured. An empty list is the deterministic answer,
+   * not an error, so production and CI exercise the same contract.
+   */
+  describe('brief suggestions', () => {
+    it('answers 200 with an empty list and no model when none is configured', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+
+      const { status, body } = await call<BriefSuggestionsResponse>(
+        `${h.url}/sessions/${session.data.id}/brief-suggestions`,
+        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
+      );
+
+      expect(status).toBe(200);
+      expect(body.data).toEqual({ proposals: [], model: null });
+    });
+
+    it('404s for an unknown session', async () => {
+      const { status } = await call<ApiErrorResponse>(
+        `${h.url}/sessions/${UNKNOWN_UUID}/brief-suggestions`,
+        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
+      );
+      expect(status).toBe(404);
+    });
+
+    it('400s without a graph, and 422s on a graph that does not hold together', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+      const url = `${h.url}/sessions/${session.data.id}/brief-suggestions`;
+
+      const missing = await call<ApiErrorResponse>(url, { method: 'POST', body: '{}' });
+      expect(missing.status).toBe(400);
+
+      const dangling = await call<ApiErrorResponse>(url, {
+        method: 'POST',
+        body: JSON.stringify({
+          graph: {
+            nodes: [{ id: 'a', kind: 'client', label: 'A' }],
+            edges: [{ id: 'e', source: 'a', target: 'ghost' }],
+          },
+        }),
+      });
+      expect(dangling.status).toBe(422);
+      expect(JSON.stringify(dangling.body.message)).toContain('ghost');
+    });
+
+    /** Read-only by construction: asking must never create a revision. */
+    it('stores nothing — the brief is only ever written by submitting', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+      await call<BriefSuggestionsResponse>(
+        `${h.url}/sessions/${session.data.id}/brief-suggestions`,
+        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
+      );
+
+      const { body: revisions } = await call<ListRevisionsResponse>(
+        `${h.url}/sessions/${session.data.id}/revisions`,
+      );
+      expect(revisions.data).toEqual([]);
     });
   });
 });

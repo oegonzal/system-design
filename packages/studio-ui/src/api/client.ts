@@ -1,5 +1,7 @@
 import type {
   ApiListResponse,
+  BriefSuggestionsDto,
+  BriefSuggestionsRequest,
   ApiResponse,
   CreateSessionRequest,
   DesignRevisionDto,
@@ -81,6 +83,11 @@ export function query(params: Record<string, string | number | boolean | undefin
   return encoded.length > 0 ? `?${encoded}` : '';
 }
 
+/**
+ * Cancellation. Named for its first users — every GET — but a POST that a
+ * component can outlive needs it just as much, and brief suggestions is the
+ * first of those.
+ */
 export interface GetOptions {
   signal?: AbortSignal;
 }
@@ -195,6 +202,25 @@ export const api = {
       await request<ApiResponse<DesignRevisionDto>>(`/sessions/${sessionId}/revisions`, {
         method: 'POST',
         body,
+      }),
+    );
+  },
+
+  /**
+   * Candidate bindings for the draft in the body — the canvas being worked on,
+   * not the last one submitted. Cancellable: the author can switch tabs or edit
+   * the diagram out from under a request that is still in flight.
+   */
+  async briefSuggestions(
+    sessionId: string,
+    body: BriefSuggestionsRequest,
+    opts: GetOptions = {},
+  ): Promise<BriefSuggestionsDto> {
+    return unwrap(
+      await request<ApiResponse<BriefSuggestionsDto>>(`/sessions/${sessionId}/brief-suggestions`, {
+        method: 'POST',
+        body,
+        ...opts,
       }),
     );
   },

@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   DEFAULT_LIST_LIMIT,
+  type BriefSuggestionsResponse,
   type GetRevisionResponse,
   type GetSessionResponse,
   type ListRevisionsResponse,
@@ -9,6 +20,7 @@ import {
 
 import { ok, page } from '../../common/envelope';
 import { toRevisionDto, toRevisionSummaryDto } from '../evaluations/evaluations.mapper';
+import { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
 import { CreateSessionRequestDto } from './dto/create-session.dto';
 import { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
 import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
@@ -59,6 +71,19 @@ export class SessionsController {
   ): Promise<GetRevisionResponse> {
     const { revision, evaluation } = await this.sessions.submitRevision(id, dto);
     return ok(toRevisionDto(revision, evaluation));
+  }
+
+  /**
+   * 200, not 201: this computes an answer and stores nothing. The proposals are
+   * offered to the author and reach the graded brief only if they accept one.
+   */
+  @Post(':id/brief-suggestions')
+  @HttpCode(200)
+  async suggestBrief(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: BriefSuggestionsRequestDto,
+  ): Promise<BriefSuggestionsResponse> {
+    return ok(await this.sessions.suggestBrief(id, dto));
   }
 
   @Get(':id/revisions')

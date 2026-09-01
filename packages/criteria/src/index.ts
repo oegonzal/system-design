@@ -39,6 +39,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The walkthrough editor says plainly that prose is advisory, so no author is misled about what earns the grade.',
   },
+  {
+    id: 'UX-9',
+    statement:
+      'Suggested bindings are proposals the author accepts or dismisses one at a time; an unaccepted proposal is never submitted, and each shows the same corroboration verdict the grade will use.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

@@ -69,3 +69,44 @@ export const FlowTraced: Story = {
     }),
   ],
 };
+
+/**
+ * A machine proposal awaiting an answer. Dashed and tinted like every other
+ * not-yet-real thing in this app, carrying the same verdict chip the author's
+ * own bindings carry — the fixture database declares no backups, so the model's
+ * claim shows as uncorroborated and accepting it would cost marks.
+ */
+export const ProposalPending: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeGraph());
+      store.getState().loadProposals([
+        {
+          nfrId: 'fst-avail-sale-window',
+          mechanism: 'backups',
+          nodeIds: ['n-3'],
+          rationale: 'The orders database is where the durable state lives.',
+        },
+      ]);
+    }),
+  ],
+};
+
+/** A proposal that would overwrite a binding the author already made. */
+export const ProposalReplacesABinding: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeGraph());
+      store.getState().setBindingMechanism('fst-avail-sale-window', 'failover');
+      store.getState().toggleBindingNode('fst-avail-sale-window', 'n-3');
+      store.getState().loadProposals([
+        {
+          nfrId: 'fst-avail-sale-window',
+          mechanism: 'backups',
+          nodeIds: ['n-3'],
+          rationale: 'Backups protect the sale window better than failover here.',
+        },
+      ]);
+    }),
+  ],
+};

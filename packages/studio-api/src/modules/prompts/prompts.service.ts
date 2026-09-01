@@ -12,14 +12,12 @@ import { ExperienceProfile, Prompt } from '@sysdesign/db';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
+import { LLM_CLIENT } from '../llm/llm.token';
 import { buildPromptDump, startPromptDump, type PromptDump, type PromptDumpLlm } from './dump';
 import type { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
 import { enrichPrompt } from './generator/enrich-prompt';
 import { generatePrompt, GENERATOR_VERSION } from './generator/prompt-generator';
 import { fnv1a } from './generator/rng';
-
-/** Injection token for the LlmClient interface (interfaces erase at runtime). */
-export const LLM_CLIENT = Symbol('LLM_CLIENT');
 
 @Injectable()
 export class PromptsService {

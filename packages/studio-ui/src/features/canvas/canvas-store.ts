@@ -1,4 +1,5 @@
 import type {
+  BriefBindingProposal,
   CanvasGraph,
   DesignBrief,
   EdgeKind,
@@ -111,6 +112,16 @@ export interface CanvasState {
    */
   briefBindings: NfrBinding[];
   briefFlows: FlowBinding[];
+  /**
+   * Machine proposals awaiting a human answer. A SEPARATE slice, not a flag on
+   * a binding, so `serializeBrief` structurally cannot reach them — the ghost
+   * overlay solves the same problem by filtering at the serialization boundary,
+   * but a brief payload is validated field by field (`forbidNonWhitelisted`),
+   * so an extra marker parked on a binding would reject the whole submission.
+   * Keeping proposals out of `briefBindings` makes "unaccepted work is never
+   * submitted" a property of the shape rather than of remembering to strip.
+   */
+  briefProposals: BriefBindingProposal[];
   ghost: GhostState | null;
   highlight: HighlightState | null;
 
@@ -154,6 +165,11 @@ export interface CanvasState {
   setFlowPath(requirementIndex: number, path: string[]): void;
   /** Revision load — replaces the brief without touching `dirty`. */
   loadBrief(brief: DesignBrief | null): void;
+  /** Fresh proposals from the model. Never dirties: nobody has decided yet. */
+  loadProposals(proposals: BriefBindingProposal[]): void;
+  /** Take the proposal for this requirement, replacing any binding there. */
+  acceptProposal(nfrId: string): void;
+  dismissProposal(nfrId: string): void;
   markClean(): void;
   markDirty(): void;
   serialize(): CanvasGraph;
@@ -207,12 +223,24 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     narrative: '',
     briefBindings: [],
     briefFlows: [],
+    briefProposals: [],
     ghost: null,
     highlight: null,
 
     setGraph(graph) {
       const { nodes, edges } = fromCanvasGraph(graph);
-      set({ nodes, edges, selectedId: null, dirty: false, ghost: null, highlight: null });
+      // Proposals are cleared with the ghost and for the same reason: both were
+      // computed against the design being replaced, and a stale one would
+      // invite the author to accept a claim about a diagram they no longer have.
+      set({
+        nodes,
+        edges,
+        selectedId: null,
+        dirty: false,
+        ghost: null,
+        highlight: null,
+        briefProposals: [],
+      });
     },
 
     addNode(kind, position) {
@@ -493,6 +521,40 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
 
     loadBrief(brief) {
       set({ briefBindings: brief?.nfrBindings ?? [], briefFlows: brief?.flows ?? [] });
+    },
+
+    loadProposals(proposals) {
+      set({ briefProposals: proposals });
+    },
+
+    acceptProposal(nfrId) {
+      const { briefProposals, briefBindings } = get();
+      const proposal = briefProposals.find((candidate) => candidate.nfrId === nfrId);
+      if (!proposal) return;
+
+      // Accepting is an author edit, so it dirties — matching `acceptGhost`.
+      // The rationale is deliberately NOT carried into `note`: that field is
+      // the author's own reasoning, and storing model prose there would be a
+      // lie about who wrote it.
+      const binding: NfrBinding = {
+        nfrId: proposal.nfrId,
+        mechanism: proposal.mechanism,
+        nodeIds: [...proposal.nodeIds],
+      };
+      const existing = briefBindings.some((candidate) => candidate.nfrId === nfrId);
+      set({
+        briefBindings: existing
+          ? briefBindings.map((candidate) => (candidate.nfrId === nfrId ? binding : candidate))
+          : [...briefBindings, binding],
+        briefProposals: briefProposals.filter((candidate) => candidate.nfrId !== nfrId),
+        dirty: true,
+      });
+    },
+
+    dismissProposal(nfrId) {
+      const { briefProposals } = get();
+      if (!briefProposals.some((candidate) => candidate.nfrId === nfrId)) return;
+      set({ briefProposals: briefProposals.filter((candidate) => candidate.nfrId !== nfrId) });
     },
 
     markClean() {
