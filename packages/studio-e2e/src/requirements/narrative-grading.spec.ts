@@ -60,7 +60,7 @@ test.describe('the design narrative', () => {
     await canvas.expectNodeHighlighted('n-3');
   });
 
-  test('[EVAL-10] a submitted narrative earns communication, and a skipped requirement is cited by id', async ({
+  test('[EVAL-10] a submitted narrative earns explanation, and a skipped requirement is cited by id', async ({
     page,
     request,
   }) => {
@@ -86,8 +86,8 @@ test.describe('the design narrative', () => {
     await canvas.expectEvaluationComplete(1);
 
     // Communication is now assessed — a real meter, not the "Not assessed" row.
-    await expect(page.getByRole('meter', { name: 'communication' })).toBeVisible();
-    await expect(page.getByTestId('not-assessed-communication')).toHaveCount(0);
+    await expect(page.getByRole('meter', { name: 'explanation' })).toBeVisible();
+    await expect(page.getByTestId('not-assessed-explanation')).toHaveCount(0);
 
     // The silent requirement becomes a teaching finding citing the NFR's own id.
     const silent = canvas.findingItem('A story silent on the availability requirement');

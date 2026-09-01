@@ -33,7 +33,7 @@ export function runExpectations(
   // Most have nothing to grade when no prose was submitted and are skipped;
   // the one that asks whether prose exists at all opts out of that skip
   // (`appliesWithoutNarrative`), so a submission with no narrative scores
-  // communication 0 rather than dropping out of the rubric entirely.
+  // explanation 0 rather than dropping out of the rubric entirely.
   const narrative = input.narrative?.trim() || null;
   const diagramCtx: RuleContext = {
     graph: input.graph,

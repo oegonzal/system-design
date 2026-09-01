@@ -34,8 +34,8 @@ test.describe('the critic pipeline', () => {
     }
     // No narrative was submitted — that is graded, not excused, so the
     // dimension shows a real meter at zero rather than dropping out.
-    await expect(page.getByTestId('not-assessed-communication')).toHaveCount(0);
-    await expect(page.getByRole('meter', { name: 'communication' })).toHaveAttribute(
+    await expect(page.getByTestId('not-assessed-explanation')).toHaveCount(0);
+    await expect(page.getByRole('meter', { name: 'explanation' })).toHaveAttribute(
       'aria-valuenow',
       '0',
     );

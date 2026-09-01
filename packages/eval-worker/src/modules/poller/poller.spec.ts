@@ -187,7 +187,7 @@ describe('poller (integration)', () => {
 
   it('feeds the revision narrative to the engine — the narrative expectations grade it', async () => {
     // Five words, no node label, no flow verb: every structural narrative
-    // expectation goes unmet, and communication is scored (not null).
+    // expectation goes unmet, and explanation is scored (not null).
     const { evaluationId } = await seedJob(naiveGraph, 3, 'Too short to explain anything.');
 
     const done = await waitFor(async () => {
@@ -204,7 +204,7 @@ describe('poller (integration)', () => {
     expect(unmetIds).toContain('exp.nar.components-explained');
     expect(unmetIds).toContain('exp.nar.flow-story');
     expect(unmetIds).toContain('exp.nar.substance');
-    expect(done.dimensionScores?.communication).not.toBeNull();
+    expect(done.dimensionScores?.explanation).not.toBeNull();
   });
 
   it('marks the job and evaluation failed when the graph is unprocessable and retries are exhausted', async () => {

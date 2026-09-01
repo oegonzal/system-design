@@ -172,7 +172,7 @@ describe('aggregate', () => {
       affectedNodeIds: [],
     };
     const narrativeFinding = {
-      dimension: 'communication' as const,
+      dimension: 'explanation' as const,
       severity: 'medium' as const,
       title: 'The story caches reads the diagram never draws',
       message: '"reads are cached" — no cache node exists.',
@@ -319,7 +319,7 @@ describe('aggregate — coverage model', () => {
     expect(two.capApplied?.count).toBe(2);
 
     // A grade already at or below the cap reports no cap at all.
-    // Two zeroed dimensions: with communication in the rubric, reliability
+    // Two zeroed dimensions: with explanation in the rubric, reliability
     // alone (weight .18) leaves the numeric grade at 82/B — above the cap.
     const zeroed = new Set(['reliability', 'performance']);
     const alreadyLow = aggregate(

@@ -1,6 +1,6 @@
 /**
  * Narrative↔diagram alignment rules. Where the narrative expectations bank
- * EARNS communication (did the prose do its job?), these rules SUBTRACT for
+ * EARNS explanation (did the prose do its job?), these rules SUBTRACT for
  * contradictions between the story and the drawing — claims the diagram
  * never implements. The ENTIRE pack is feature-gated on a non-blank
  * narrative, so a canvas submitted without prose is graded exactly as
@@ -18,8 +18,8 @@ function presentNarrative(narrative: string | null): string | null {
 }
 
 const phantomClaims: EvalRule = {
-  id: 'communication.narrative-phantom-claims',
-  dimension: 'communication',
+  id: 'explanation.narrative-phantom-claims',
+  dimension: 'explanation',
   check({ graph, narrative }) {
     const story = presentNarrative(narrative);
     if (story === null) return [];
@@ -29,7 +29,7 @@ const phantomClaims: EvalRule = {
     return [
       {
         ruleId: phantomClaims.id,
-        dimension: 'communication',
+        dimension: 'explanation',
         severity: 'low',
         title: 'The story claims mechanisms the diagram never draws',
         message: `The narrative mentions ${list} but the diagram draws no component that provides ${
@@ -54,8 +54,8 @@ const phantomClaims: EvalRule = {
  * for the whole design.
  */
 const contradictsConfig: EvalRule = {
-  id: 'communication.narrative-contradicts-config',
-  dimension: 'communication',
+  id: 'explanation.narrative-contradicts-config',
+  dimension: 'explanation',
   check({ graph, narrative }) {
     const story = presentNarrative(narrative);
     if (story === null) return [];
@@ -65,7 +65,7 @@ const contradictsConfig: EvalRule = {
       const owners = contradiction.labels.map((label) => `"${label}"`).join(', ');
       findings.push({
         ruleId: contradictsConfig.id,
-        dimension: 'communication',
+        dimension: 'explanation',
         severity: 'high',
         title: `The story denies ${contradiction.capability} the diagram configures`,
         message: `The narrative says "${contradiction.phrase}", but ${owners} ${
@@ -85,8 +85,8 @@ const contradictsConfig: EvalRule = {
 const MIN_RPS_FOR_NUMBERS = 1000;
 
 const noNumbers: EvalRule = {
-  id: 'communication.narrative-no-numbers',
-  dimension: 'communication',
+  id: 'explanation.narrative-no-numbers',
+  dimension: 'explanation',
   check({ facts, narrative }) {
     const story = presentNarrative(narrative);
     if (story === null) return [];
@@ -95,7 +95,7 @@ const noNumbers: EvalRule = {
     return [
       {
         ruleId: noNumbers.id,
-        dimension: 'communication',
+        dimension: 'explanation',
         severity: 'info',
         title: 'A capacity story without a single number',
         message: `The prompt plays at ${facts.scaleTargets.requestsPerSecond.toLocaleString('en-US')} req/s, yet the narrative contains no number at all — no rate, no replica count, no latency budget. Capacity claims earn trust when they are arithmetic: say what each tier absorbs and why the math holds at peak.`,

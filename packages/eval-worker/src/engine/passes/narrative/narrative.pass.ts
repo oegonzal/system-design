@@ -40,12 +40,12 @@ function deterministicSection(ctx: PassContext): string {
     .flatMap((artifact) => artifact.entries)
     // By dimension, not by id prefix: the typed field is the fact, an id
     // naming convention is a coincidence that a rename would silently break.
-    .filter((entry) => entry.dimension === 'communication')
+    .filter((entry) => entry.dimension === 'explanation')
     .map((entry) => `  [${entry.met ? 'met' : 'unmet'}] ${entry.expectationId}`);
   const findings = ctx.priorArtifacts
     .filter(isFindingsArtifact)
     .flatMap((artifact) => artifact.findings)
-    .filter((finding) => finding.dimension === 'communication')
+    .filter((finding) => finding.dimension === 'explanation')
     .map(
       (finding) =>
         `  [${finding.severity}] ${finding.ruleId ?? finding.expectationId}: ${finding.title}`,

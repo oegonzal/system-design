@@ -292,7 +292,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
       messaging: 66,
       security: 74,
       hygiene: 82,
-      communication: 76,
+      explanation: 76,
     },
     summary: 'Solid read path; reliability is the weak dimension.',
     engineVersion: '2.0.0',

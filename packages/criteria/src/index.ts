@@ -88,12 +88,12 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'EVAL-10',
     statement:
-      'A submitted narrative earns the communication dimension: components, flows, and requirements coverage graded deterministically.',
+      'A submitted narrative earns the explanation dimension: components, flows, and requirements coverage graded deterministically.',
   },
   {
     id: 'EVAL-11',
     statement:
-      'A design submitted without a narrative — or with a keyword list in place of one — is graded on that, never excused from the communication dimension.',
+      'A design submitted without a narrative — or with a keyword list in place of one — is graded on that, never excused from the explanation dimension.',
   },
   {
     id: 'EVAL-12',

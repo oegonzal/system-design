@@ -7,7 +7,7 @@ export const EVAL_STATUSES = ['queued', 'running', 'complete', 'failed'] as cons
 export type EvalStatus = (typeof EVAL_STATUSES)[number];
 
 /**
- * The rubric. Scores and findings are grouped by these. `communication` is
+ * The rubric. Scores and findings are grouped by these. `explanation` is
  * earned only when a design narrative is submitted — without one it scores
  * null ("Not assessed") and carries no weight.
  */
@@ -19,7 +19,7 @@ export const EVAL_DIMENSIONS = [
   'messaging',
   'security',
   'hygiene',
-  'communication',
+  'explanation',
 ] as const;
 export type EvalDimension = (typeof EVAL_DIMENSIONS)[number];
 

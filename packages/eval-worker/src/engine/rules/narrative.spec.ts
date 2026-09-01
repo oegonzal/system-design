@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { contextFor, flashSaleFacts, graph, node, ruleById } from '../testing';
 
-const phantomClaims = ruleById('communication.narrative-phantom-claims');
-const contradictsConfig = ruleById('communication.narrative-contradicts-config');
-const noNumbers = ruleById('communication.narrative-no-numbers');
+const phantomClaims = ruleById('explanation.narrative-phantom-claims');
+const contradictsConfig = ruleById('explanation.narrative-contradicts-config');
+const noNumbers = ruleById('explanation.narrative-no-numbers');
 
 /** Everything this canvas declares, so the prose has something to deny. */
 const configuredCanvas = graph([
@@ -22,7 +22,7 @@ const bareCanvas = graph([
   node('n-3', 'database', { label: 'Orders DB' }),
 ]);
 
-describe('communication.narrative-phantom-claims', () => {
+describe('explanation.narrative-phantom-claims', () => {
   it('stays silent without a narrative — calibration unmoved', () => {
     expect(phantomClaims.check(contextFor(bareCanvas, flashSaleFacts()))).toEqual([]);
     expect(phantomClaims.check(contextFor(bareCanvas, flashSaleFacts(), '   '))).toEqual([]);
@@ -51,7 +51,7 @@ describe('communication.narrative-phantom-claims', () => {
   });
 });
 
-describe('communication.narrative-contradicts-config', () => {
+describe('explanation.narrative-contradicts-config', () => {
   it('stays silent without a narrative', () => {
     expect(contradictsConfig.check(contextFor(configuredCanvas, flashSaleFacts()))).toEqual([]);
     expect(contradictsConfig.check(contextFor(configuredCanvas, flashSaleFacts(), ' '))).toEqual(
@@ -108,7 +108,7 @@ describe('communication.narrative-contradicts-config', () => {
   });
 });
 
-describe('communication.narrative-no-numbers', () => {
+describe('explanation.narrative-no-numbers', () => {
   it('flags a numberless story at four-digit request rates', () => {
     const findings = noNumbers.check(
       contextFor(

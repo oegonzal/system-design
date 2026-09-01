@@ -37,7 +37,7 @@ const CANNED = {
 };
 
 const MISALIGNMENT = {
-  dimension: 'communication',
+  dimension: 'explanation',
   severity: 'medium',
   title: 'The story caches reads the diagram never draws',
   message: '"reads are cached" — no cache node exists; draw one or drop the claim.',
@@ -152,7 +152,7 @@ describe('narrative pass', () => {
         entries: [
           {
             expectationId: 'exp.nar.addresses-latency',
-            dimension: 'communication',
+            dimension: 'explanation',
             weight: 1,
             met: false,
             nfrId: 'fst-lat-read-spike',

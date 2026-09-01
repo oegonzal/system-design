@@ -72,7 +72,7 @@ describe('runEngine', () => {
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: 0,
+      explanation: 0,
     });
 
     expect(result.overallScore).toBe(18);

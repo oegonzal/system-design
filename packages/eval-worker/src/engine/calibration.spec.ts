@@ -29,7 +29,7 @@ interface CalibrationRow {
  * Every row here is a diagram submitted WITHOUT a narrative. Since profile
  * 2.3.0 that is itself a graded answer — `exp.nar.present` applies whether or
  * not prose was written — so each score is the old diagram-only number minus
- * the communication tenth. The excellent design is a B until its author
+ * the explanation tenth. The excellent design is a B until its author
  * explains it, which is the point: a diagram nobody can follow is not a
  * finished answer.
  */
@@ -45,7 +45,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 0,
-      communication: 0,
+      explanation: 0,
     },
     overallScore: 0,
     grade: 'F',
@@ -61,7 +61,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: 0,
+      explanation: 0,
     },
     overallScore: 18,
     grade: 'F',
@@ -77,7 +77,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 0,
       security: 0,
       hygiene: 100,
-      communication: 0,
+      explanation: 0,
     },
     overallScore: 23,
     grade: 'F',
@@ -93,7 +93,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 100,
       security: 100,
       hygiene: 100,
-      communication: 0,
+      explanation: 0,
     },
     overallScore: 77.9,
     grade: 'C',
@@ -109,7 +109,7 @@ const TABLE: CalibrationRow[] = [
       messaging: 100,
       security: 100,
       hygiene: 100,
-      communication: 0,
+      explanation: 0,
     },
     overallScore: 90,
     grade: 'B',
@@ -147,7 +147,7 @@ describe('calibration', () => {
 
 /**
  * The narrative half of the anchor: the excellent diagram is held fixed and
- * only the prose varies, so these rows pin exactly what the communication
+ * only the prose varies, so these rows pin exactly what the explanation
  * dimension is worth — and, since 2.3.0, what each way of dodging it costs.
  * The ordering is the point: an explanation earns the tenth, a bad attempt
  * earns almost none of it, and silence earns none at all.
@@ -165,9 +165,9 @@ describe('narrative calibration', () => {
     'through the Order queue into the Order worker, and Pipeline monitoring alerts on-call ' +
     'before fans notice anything.';
 
-  it('[EVAL-10] the excellent design with a covering story keeps its 100/A — communication earned in full', () => {
+  it('[EVAL-10] the excellent design with a covering story keeps its 100/A — explanation earned in full', () => {
     const result = runEngine(excellent(), flashSaleFacts(), coveringStory);
-    expect(result.dimensionScores.communication).toBe(100);
+    expect(result.dimensionScores.explanation).toBe(100);
     expect(result.overallScore).toBe(100);
     expect(result.grade).toBe('A');
   });
@@ -176,7 +176,7 @@ describe('narrative calibration', () => {
     const result = runEngine(excellent(), flashSaleFacts());
     // Not null: renormalizing the dimension away would make writing nothing
     // strictly better than writing badly, which is what this pins against.
-    expect(result.dimensionScores.communication).toBe(0);
+    expect(result.dimensionScores.explanation).toBe(0);
     expect(result.overallScore).toBe(90);
     expect(result.grade).toBe('B');
     expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.nar.present');
@@ -184,7 +184,7 @@ describe('narrative calibration', () => {
 
   it('[EVAL-11] a throwaway story beats silence, but only just', () => {
     const result = runEngine(excellent(), flashSaleFacts(), 'It just works.');
-    expect(result.dimensionScores.communication).toBe(11.1);
+    expect(result.dimensionScores.explanation).toBe(11.1);
     expect(result.overallScore).toBe(91.1);
     expect(result.grade).toBe('B');
   });
@@ -214,6 +214,6 @@ describe('narrative calibration', () => {
     expect(result.grade).toBe('B');
     expect(result.overallScore).toBeLessThan(92);
     // Only "you wrote something" is earned; every content check is voided.
-    expect(result.dimensionScores.communication).toBeLessThan(20);
+    expect(result.dimensionScores.explanation).toBeLessThan(20);
   });
 });

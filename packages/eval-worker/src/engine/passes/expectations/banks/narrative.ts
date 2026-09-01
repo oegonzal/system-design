@@ -1,6 +1,6 @@
 /**
  * The narrative bank: what a design narrative must do to earn the
- * communication dimension.
+ * explanation dimension.
  *
  * `exp.nar.present` applies whether or not prose was submitted, so silence
  * scores 0 rather than dropping the dimension out of the rubric — a diagram
@@ -80,13 +80,13 @@ function formatLabels(labels: readonly string[]): string {
 /**
  * The one expectation whose subject is the absence of prose. Every other
  * check here is skipped when nothing was submitted; this one applies anyway,
- * so a diagram shipped in silence scores communication 0 instead of having
+ * so a diagram shipped in silence scores explanation 0 instead of having
  * the dimension renormalized out of its grade. Explaining your design is part
  * of the exercise, and a design nobody can follow is not a finished answer.
  */
 const narrativePresent: Expectation = {
   id: 'exp.nar.present',
-  dimension: 'communication',
+  dimension: 'explanation',
   weight: 1,
   severityIfUnmet: 'high',
   minDifficulty: 'intro',
@@ -101,7 +101,7 @@ const narrativePresent: Expectation = {
 
 const componentsExplained: Expectation = {
   id: 'exp.nar.components-explained',
-  dimension: 'communication',
+  dimension: 'explanation',
   weight: 2,
   severityIfUnmet: 'medium',
   minDifficulty: 'intro',
@@ -135,7 +135,7 @@ const componentsExplained: Expectation = {
 
 const flowStory: Expectation = {
   id: 'exp.nar.flow-story',
-  dimension: 'communication',
+  dimension: 'explanation',
   weight: 1,
   severityIfUnmet: 'low',
   minDifficulty: 'intro',
@@ -161,7 +161,7 @@ const MIN_NODES_FOR_SUBSTANCE = 3;
 
 const substance: Expectation = {
   id: 'exp.nar.substance',
-  dimension: 'communication',
+  dimension: 'explanation',
   weight: 1,
   severityIfUnmet: 'low',
   minDifficulty: 'intro',
@@ -196,7 +196,7 @@ const substance: Expectation = {
  */
 const writtenAsProse: Expectation = {
   id: 'exp.nar.written-as-prose',
-  dimension: 'communication',
+  dimension: 'explanation',
   weight: 1,
   severityIfUnmet: 'medium',
   minDifficulty: 'intro',
@@ -216,7 +216,7 @@ const writtenAsProse: Expectation = {
 function addressesKind(kind: NfrKind): Expectation {
   return {
     id: `exp.nar.addresses-${kind}`,
-    dimension: 'communication',
+    dimension: 'explanation',
     weight: 1,
     severityIfUnmet: 'low',
     nfrKind: kind,
