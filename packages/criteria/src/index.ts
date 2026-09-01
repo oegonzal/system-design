@@ -80,6 +80,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The narrative is graded with the diagram for alignment: unexplained components become findings.',
   },
+  {
+    id: 'EVAL-10',
+    statement:
+      'A submitted narrative earns the communication dimension: components, flows, and requirements coverage graded deterministically.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

@@ -137,7 +137,7 @@ describe('poller (integration)', () => {
     expect(done.overallScore).toBeGreaterThan(0);
     expect(done.grade).toBeTruthy();
     expect(done.dimensionScores).toBeTruthy();
-    expect(done.engineVersion).toBe('2.0.0');
+    expect(done.engineVersion).toBe('2.1.0');
     // EVAL_DETERMINISTIC=1 → no-op critic: engine summary, no model recorded.
     expect(done.criticModel).toBeNull();
     expect(done.summary).toBeTruthy();
@@ -184,8 +184,9 @@ describe('poller (integration)', () => {
     expect(done.capApplied).toBeNull(); // an F is already below every cap
   });
 
-  it('feeds the revision narrative to the engine — the narrative rules grade it', async () => {
-    // Five words, no node label, no flow verb: every narrative rule's trigger.
+  it('feeds the revision narrative to the engine — the narrative expectations grade it', async () => {
+    // Five words, no node label, no flow verb: every structural narrative
+    // expectation goes unmet, and communication is scored (not null).
     const { evaluationId } = await seedJob(naiveGraph, 3, 'Too short to explain anything.');
 
     const done = await waitFor(async () => {
@@ -195,10 +196,14 @@ describe('poller (integration)', () => {
       return evaluation?.status === 'complete' ? evaluation : null;
     });
 
-    const ruleIds = done.findings.getItems().map((finding) => finding.ruleId);
-    expect(ruleIds).toContain('hygiene.narrative-unexplained-components');
-    expect(ruleIds).toContain('hygiene.narrative-too-thin');
-    expect(ruleIds).toContain('hygiene.narrative-no-flow-story');
+    const unmetIds = done.findings
+      .getItems()
+      .filter((finding) => finding.source === 'expectation')
+      .map((finding) => finding.expectationId);
+    expect(unmetIds).toContain('exp.nar.components-explained');
+    expect(unmetIds).toContain('exp.nar.flow-story');
+    expect(unmetIds).toContain('exp.nar.substance');
+    expect(done.dimensionScores?.communication).not.toBeNull();
   });
 
   it('marks the job and evaluation failed when the graph is unprocessable and retries are exhausted', async () => {

@@ -19,26 +19,33 @@ export interface ExpectationsInput {
   graph: CanvasGraph;
   facts: PromptFacts;
   index: GraphIndex;
+  narrative?: string | null;
 }
 
 export function runExpectations(
   input: ExpectationsInput,
   expectations: readonly Expectation[] = EXPECTATIONS,
 ): [CoverageArtifact, FindingsArtifact] {
-  // Expectations are deliberately narrative-blind: applicability stays a
-  // function of the prompt facts alone, so prose can never add or remove a
-  // demand the prompt itself did not make.
-  const ctx: RuleContext = {
+  // Two scopes, one invariant: diagram expectations get `narrative: null`
+  // mechanically, so prose can never add or remove a demand on the diagram
+  // that the prompt itself did not make. Narrative-scoped expectations
+  // (`requiresNarrative`) grade the prose itself — they exist only once
+  // prose exists, and only they may read it.
+  const narrative = input.narrative?.trim() || null;
+  const diagramCtx: RuleContext = {
     graph: input.graph,
     facts: input.facts,
     index: input.index,
     narrative: null,
   };
+  const narrativeCtx: RuleContext = { ...diagramCtx, narrative };
   const entries: CoverageArtifact['entries'] = [];
   const findings: EngineFinding[] = [];
 
   for (const expectation of expectations) {
+    if (expectation.requiresNarrative && narrative === null) continue;
     if (!expectationApplies(expectation, input.facts)) continue;
+    const ctx = expectation.requiresNarrative ? narrativeCtx : diagramCtx;
     const check = expectation.satisfiedBy(ctx);
     // The requirement this expectation enforces, when the prompt names one.
     const nfrKind = expectation.nfrKind ?? expectation.citesNfrKind;
@@ -62,7 +69,8 @@ export function runExpectations(
       dimension: expectation.dimension,
       severity: expectation.severityIfUnmet,
       title: expectation.title,
-      message: expectation.teach(input.facts),
+      // A check that saw the actual gap words it better than the prompt-only lesson.
+      message: check.unmetDetail ?? expectation.teach(input.facts),
       affectedNodeIds: check.evidenceNodeIds,
       affectedEdgeIds: check.evidenceEdgeIds,
       suggestion: expectation.suggest?.(ctx) ?? null,

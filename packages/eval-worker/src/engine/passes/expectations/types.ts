@@ -20,6 +20,12 @@ export interface ExpectationCheck {
   /** Met: the elements that prove it. Unmet: the elements that should satisfy it. */
   evidenceNodeIds: string[];
   evidenceEdgeIds: string[];
+  /**
+   * Optional unmet message computed from what the check actually saw (e.g.
+   * naming the components the narrative skipped) — wins over `teach`, which
+   * only sees the prompt facts.
+   */
+  unmetDetail?: string;
 }
 
 export interface Expectation {
@@ -42,6 +48,12 @@ export interface Expectation {
   archetypes: readonly Archetype[] | 'all';
   /** Extra gating beyond archetype/difficulty/NFR (e.g. functional keywords). */
   appliesWhen?: (facts: PromptFacts) => boolean;
+  /**
+   * Narrative-scoped: applies only when the revision carries a non-blank
+   * design narrative, and its `satisfiedBy` receives that prose. Diagram
+   * expectations never set this and never see the narrative.
+   */
+  requiresNarrative?: true;
   /** Finding title when unmet. */
   title: string;
   /** The lesson: why this capability matters at the prompt's scale. */
@@ -74,6 +86,7 @@ export function met(evidenceNodeIds: string[], evidenceEdgeIds: string[] = []): 
 export function unmet(
   evidenceNodeIds: string[] = [],
   evidenceEdgeIds: string[] = [],
+  unmetDetail?: string,
 ): ExpectationCheck {
-  return { met: false, evidenceNodeIds, evidenceEdgeIds };
+  return { met: false, evidenceNodeIds, evidenceEdgeIds, unmetDetail };
 }

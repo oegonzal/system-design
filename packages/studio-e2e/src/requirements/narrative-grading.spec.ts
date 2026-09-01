@@ -9,7 +9,7 @@ import { buildNaiveDesign, openPracticeSession } from '../support/canvas.page';
  * function of graph + narrative.
  */
 
-/** The exact title `hygiene.narrative-unexplained-components` emits. */
+/** The exact title the unmet `exp.nar.components-explained` expectation emits. */
 const UNEXPLAINED_TITLE = 'Components the narrative never explains';
 
 test.describe('the design narrative', () => {

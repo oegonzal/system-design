@@ -137,3 +137,37 @@ describe('calibration', () => {
     expect(coverageFindings.some((f) => f.suggestion !== null)).toBe(true);
   });
 });
+
+/**
+ * The narrative half of the anchor: the excellent diagram is held fixed and
+ * only the prose varies, so these rows pin exactly what the communication
+ * dimension is worth. The diagram-only TABLE above must never move — a
+ * narrative can only be graded when one is submitted.
+ */
+describe('narrative calibration', () => {
+  const excellent = () => loadFixture('excellent-flash-sale.graph.json');
+
+  /** Mentions all 12 labels, narrates the flows, and engages every NFR kind. */
+  const coveringStory =
+    'The Fan browser hits the CDN for static assets while the API gateway authenticates and ' +
+    'rate limits calls, then routes them through the Load balancer to the Ticket service. ' +
+    'The Waiting room absorbs the opening burst and admits fans fairly. Hot reads come from ' +
+    'the Read cache and the Read replica, keeping p99 latency inside budget; the Orders DB ' +
+    'stays the system of record with failover so availability holds. Checkout writes drain ' +
+    'through the Order queue into the Order worker, and Pipeline monitoring alerts on-call ' +
+    'before fans notice anything.';
+
+  it('[EVAL-10] the excellent design with a covering story keeps its 100/A — communication earned in full', () => {
+    const result = runEngine(excellent(), flashSaleFacts(), coveringStory);
+    expect(result.dimensionScores.communication).toBe(100);
+    expect(result.overallScore).toBe(100);
+    expect(result.grade).toBe('A');
+  });
+
+  it('[EVAL-10] the same diagram with a throwaway story drops to 90/B — prose is a tenth of the grade', () => {
+    const result = runEngine(excellent(), flashSaleFacts(), 'It just works.');
+    expect(result.dimensionScores.communication).toBe(0);
+    expect(result.overallScore).toBe(90);
+    expect(result.grade).toBe('B');
+  });
+});
