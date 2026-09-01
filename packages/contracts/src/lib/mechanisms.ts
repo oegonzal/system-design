@@ -146,6 +146,83 @@ export const MECHANISM_KINDS = {
   monitoring: ['monitoring', 'logging', 'tracing'],
 } as const satisfies Record<MechanismClaim, readonly NodeKind[]>;
 
+/* ─── how each claim reads to a human ─────────────────────────────────── */
+
+export interface MechanismGuide {
+  /** Sentence-case name for a dropdown. */
+  label: string;
+  /**
+   * What the system looks for. Stated because corroboration is deliberately
+   * NOT uniform — some claims are proved by a config knob on the bound node,
+   * others by where the node sits in the graph — and an author staring at an
+   * uncorroborated chip deserves to know which, rather than guessing.
+   */
+  proof: string;
+}
+
+/**
+ * Total over the vocabulary, so a new claim cannot ship without a way to say
+ * what it means — the same discipline `MECHANISM_EVIDENCE` applies to proving
+ * one. Lives here rather than in the editor because the words a grade uses and
+ * the words an author reads should come from one place.
+ */
+export const MECHANISM_GUIDE = {
+  'rate-limit': {
+    label: 'Rate limiting',
+    proof: 'the bound gateway or load balancer has rate limiting switched on',
+  },
+  authentication: {
+    label: 'Authentication',
+    proof: 'the bound gateway sets an auth mode, or the node is an auth service',
+  },
+  'strong-consistency': {
+    label: 'Strong consistency',
+    proof: 'the bound store declares strong consistency',
+  },
+  backups: { label: 'Backups', proof: 'the bound database has backups enabled' },
+  'multi-region': {
+    label: 'Multi-region',
+    proof: 'the bound node declares multi-region, or two nodes declare different regions',
+  },
+  sharding: { label: 'Sharding', proof: 'the bound database declares a sharding strategy' },
+  partitioning: {
+    label: 'Partitioning',
+    proof: 'the bound event stream declares a partition count',
+  },
+  idempotency: {
+    label: 'Idempotent writes',
+    proof: 'the bound handler sets idempotency, or declares an operation marked idempotent',
+  },
+  dlq: { label: 'Dead-letter queue', proof: 'the bound queue has a DLQ enabled' },
+  'at-least-once': {
+    label: 'At-least-once delivery',
+    proof: 'the bound channel declares at-least-once delivery',
+  },
+  retention: { label: 'Retention', proof: 'the bound store declares a retention window' },
+  autoscaling: { label: 'Autoscaling', proof: 'the bound service or worker declares autoscaling' },
+  'read-cache': {
+    label: 'Read cache',
+    proof: 'a client can reach the bound cache, and the cache can reach a store behind it',
+  },
+  'read-replica': {
+    label: 'Read replica',
+    proof: 'the bound replica is fed by a database and is reachable for reads',
+  },
+  failover: {
+    label: 'Failover',
+    proof: 'the bound node is one of at least two peers of its kind, or declares replicas',
+  },
+  'queue-buffer': {
+    label: 'Write buffering',
+    proof: 'the bound channel sits between a writer and the store it protects',
+  },
+  'cdn-offload': { label: 'CDN offload', proof: 'a client can reach the bound CDN' },
+  monitoring: {
+    label: 'Monitoring',
+    proof: 'the bound block is a monitoring, logging or tracing component',
+  },
+} as const satisfies Record<MechanismClaim, MechanismGuide>;
+
 /* ─── evidence ────────────────────────────────────────────────────────── */
 
 /**

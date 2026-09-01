@@ -5,12 +5,14 @@ import type { HTMLAttributes } from 'react';
 import { transient } from '../../theme/styled';
 import type { AppTheme } from '../../theme/theme';
 
-export type BadgeTone = 'neutral' | 'accent' | Severity;
+export type BadgeTone = 'neutral' | 'accent' | 'success' | Severity;
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   /**
-   * `neutral`/`accent` for counts and states; a `Severity` for finding
-   * chips, which colour from the same pairs the findings panel uses.
+   * `neutral`/`accent` for counts and states; `success` for a check that
+   * PASSED — a status chip that can only express degrees of bad cannot say
+   * "this holds up"; a `Severity` for finding chips, which colour from the
+   * same pairs the findings panel uses.
    */
   tone?: BadgeTone;
   /**
@@ -26,6 +28,7 @@ const colors = (theme: AppTheme, tone: BadgeTone, kind: NodeKind | undefined) =>
   if (kind) return { bg: theme.color.nodeKind[kind], fg: theme.color.nodeKindFg[kind] };
   if (tone === 'neutral') return { bg: theme.color.bg.subtle, fg: theme.color.text.secondary };
   if (tone === 'accent') return { bg: theme.color.bg.selected, fg: theme.color.text.onSelected };
+  if (tone === 'success') return theme.color.success;
   return theme.color.severity[tone];
 };
 

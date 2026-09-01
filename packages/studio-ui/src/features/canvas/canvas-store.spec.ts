@@ -231,4 +231,110 @@ describe('canvas-store', () => {
     expect(store.getState().narrative).toBe('Prose that outlives a graph swap.');
     expect(store.getState().dirty).toBe(false);
   });
+
+  /**
+   * The brief slice obeys the same orthogonality rules as the narrative: it is
+   * the author's own artifact, so a graph swap never rewrites it and only the
+   * author's own edits dirty the draft.
+   */
+  describe('design brief', () => {
+    /** makeGraph is client n-1 → service n-2 → database n-3. */
+    const seedBinding = (store: ReturnType<typeof createCanvasStore>) => {
+      store.getState().setGraph(makeGraph());
+      store.getState().setBindingMechanism('nfr-1', 'backups');
+      store.getState().toggleBindingNode('nfr-1', 'n-3');
+    };
+
+    it('binds a requirement to a component and dirties the draft', () => {
+      const store = createCanvasStore();
+      seedBinding(store);
+
+      expect(store.getState().briefBindings).toEqual([
+        { nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] },
+      ]);
+      expect(store.getState().dirty).toBe(true);
+    });
+
+    it('toggles a component off again', () => {
+      const store = createCanvasStore();
+      seedBinding(store);
+      store.getState().toggleBindingNode('nfr-1', 'n-3');
+      expect(store.getState().briefBindings[0]?.nodeIds).toEqual([]);
+    });
+
+    it('drops components the new mechanism cannot carry when the claim changes', () => {
+      const store = createCanvasStore();
+      seedBinding(store);
+      // A database can hold backups; it cannot hold rate limiting.
+      store.getState().setBindingMechanism('nfr-1', 'rate-limit');
+      expect(store.getState().briefBindings[0]).toMatchObject({
+        mechanism: 'rate-limit',
+        nodeIds: [],
+      });
+    });
+
+    it('keeps one flow per functional requirement, so a duplicate id is unreachable', () => {
+      const store = createCanvasStore();
+      store.getState().setGraph(makeGraph());
+
+      store.getState().setFlowPath(0, ['e-1']);
+      store.getState().setFlowPath(0, ['e-1', 'e-2']);
+
+      expect(store.getState().briefFlows).toEqual([
+        { id: 'flow-0', requirementIndex: 0, path: ['e-1', 'e-2'] },
+      ]);
+    });
+
+    it('clears a flow when its path empties', () => {
+      const store = createCanvasStore();
+      store.getState().setGraph(makeGraph());
+      store.getState().setFlowPath(0, ['e-1']);
+      store.getState().setFlowPath(0, []);
+      expect(store.getState().briefFlows).toEqual([]);
+    });
+
+    it('loadBrief replaces the brief without touching dirty, mapping null to empty', () => {
+      const store = createCanvasStore();
+
+      store.getState().loadBrief({
+        version: 1,
+        nfrBindings: [{ nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] }],
+        flows: [],
+      });
+      expect(store.getState().briefBindings).toHaveLength(1);
+      expect(store.getState().dirty).toBe(false);
+
+      store.getState().loadBrief(null);
+      expect(store.getState().briefBindings).toEqual([]);
+      expect(store.getState().briefFlows).toEqual([]);
+    });
+
+    it('setGraph leaves the brief alone — loading a revision pairs it with loadBrief', () => {
+      const store = createCanvasStore();
+      seedBinding(store);
+
+      store.getState().setGraph(makeGraph());
+
+      expect(store.getState().briefBindings).toHaveLength(1);
+      expect(store.getState().dirty).toBe(false);
+    });
+
+    it('serializeBrief reconciles against the live graph and is null when nothing is claimed', () => {
+      const store = createCanvasStore();
+      expect(store.getState().serializeBrief()).toBeNull();
+
+      seedBinding(store);
+      expect(store.getState().serializeBrief()).toEqual({
+        version: 1,
+        nfrBindings: [{ nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] }],
+        flows: [],
+      });
+
+      // Deleting the bound component drops the claim rather than sending a
+      // reference the API would reject.
+      store.getState().select('n-3');
+      store.getState().removeSelected();
+      expect(store.getState().serializeBrief()).toBeNull();
+    });
+  });
 });

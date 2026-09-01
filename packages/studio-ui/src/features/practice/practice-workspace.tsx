@@ -34,6 +34,7 @@ import { EvaluationPanel } from '../evaluation/evaluation-panel';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { PromptPane } from '../prompts/prompt-pane';
+import { DesignBriefEditor } from './brief/design-brief-editor';
 import { NarrativeEditor } from './narrative-editor';
 
 function CanvasSkeleton() {
@@ -255,6 +256,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         if (latestFull && latest) {
           storeApi.getState().setGraph(latestFull.graph);
           storeApi.getState().loadNarrative(latestFull.narrative);
+          storeApi.getState().loadBrief(latestFull.brief);
           setFeedback({ id: latest.id, revisionNumber: latest.revisionNumber });
         }
         setLoading(false);
@@ -285,12 +287,16 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const handleSubmit = useCallback(async () => {
     const { narrative } = storeApi.getState();
     const graph = storeApi.getState().serialize();
+    // null when nothing is claimed — an empty brief would be stored as an
+    // artifact while grading exactly like silence.
+    const brief = storeApi.getState().serializeBrief() ?? undefined;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const revision = await api.submitRevision(sessionId, {
         graph,
         narrative: narrative.trim() || undefined,
+        brief,
       });
       setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
       setViewingRevision(null);
@@ -343,6 +349,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         const revision = await api.getRevision(summary.id);
         storeApi.getState().setGraph(revision.graph);
         storeApi.getState().loadNarrative(revision.narrative);
+        storeApi.getState().loadBrief(revision.brief);
         setViewingRevision({ id: revision.id, revisionNumber: revision.revisionNumber });
         setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
         setTab('feedback');
@@ -422,6 +429,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           <DockTabs value={tab} onChange={setTab}>
             <TabList aria-label="Session panels">
               <Tab value="prompt">Prompt</Tab>
+              <Tab value="brief">Brief</Tab>
               <Tab value="narrative">Narrative</Tab>
               <Tab value="feedback">Feedback</Tab>
               <Tab value="revisions">Revisions</Tab>
@@ -429,6 +437,15 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             <DockPanel value="prompt">
               {prompt ? (
                 <PromptPane prompt={prompt} />
+              ) : (
+                <Text size="sm" tone="muted">
+                  Prompt unavailable.
+                </Text>
+              )}
+            </DockPanel>
+            <DockPanel value="brief">
+              {prompt ? (
+                <DesignBriefEditor prompt={prompt} />
               ) : (
                 <Text size="sm" tone="muted">
                   Prompt unavailable.

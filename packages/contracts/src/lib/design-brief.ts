@@ -1,3 +1,4 @@
+import type { NodeKind } from './canvas';
 import type { MechanismClaim } from './mechanisms';
 
 /**
@@ -51,6 +52,33 @@ export interface DesignBrief {
 }
 
 export const DESIGN_BRIEF_VERSION = 1;
+
+/**
+ * Where a traced flow has to end for the walk to mean anything, and which
+ * components are exempt from needing to be accounted for.
+ *
+ * Both live here rather than in the eval engine because the brief editor has to
+ * guide the author by the SAME vocabulary the grade uses. A UI that told an
+ * author their flow was complete while the engine disagreed would be the exact
+ * defect this whole artifact replaced — a claim nothing keeps in sync.
+ *
+ * Note the deliberate difference from the module-private durable set in
+ * `mechanisms.ts`: that one answers "what may back a cache", this one answers
+ * "where may a request come to rest". Same-looking lists, different questions.
+ */
+export const FLOW_SINK_KINDS: readonly NodeKind[] = [
+  'database',
+  'replica',
+  'object-store',
+  'data-warehouse',
+  'data-lake',
+  'time-series-db',
+  'kv-store',
+  'search-index',
+];
+
+/** Observability blocks annotate a design; nothing routes through them. */
+export const ANNOTATION_KINDS: readonly NodeKind[] = ['monitoring', 'logging', 'tracing'];
 
 export const BRIEF_MAX_NFR_BINDINGS = 24;
 export const BRIEF_MAX_FLOWS = 12;

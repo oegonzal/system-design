@@ -1,12 +1,17 @@
 import type {
   CanvasGraph,
+  DesignBrief,
   EdgeKind,
+  FlowBinding,
   GraphPatch,
+  MechanismClaim,
+  NfrBinding,
   NodeConfig,
   NodeKind,
   NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
+import { BINDING_MAX_NODES, MECHANISM_KINDS } from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -17,6 +22,7 @@ import {
 } from '@xyflow/react';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import { flowIdFor, reconcileBrief } from './brief-draft';
 import { applySuggestionPatch, fromCanvasGraph, toCanvasGraph, toGhostElements } from './graph-io';
 import type { SdEdge, SdNode } from './types';
 
@@ -89,6 +95,22 @@ export interface CanvasState {
    * `loadNarrative`, and submitting reads both separately.
    */
   narrative: string;
+  /**
+   * The design brief being drafted — the GRADED half of explaining a design,
+   * beside the unscored walkthrough. Orthogonal to the graph exactly as the
+   * narrative is: `setGraph` never touches it, `serialize` never includes it.
+   *
+   * Held as the draft the editor edits, not as a payload. Stale references are
+   * tolerated here (a bound node can be deleted afterwards) and resolved once,
+   * at `serializeBrief`, because a canvas edit must never silently rewrite what
+   * the author wrote.
+   *
+   * At most one binding per requirement and one flow per functional
+   * requirement, which is what makes the API's uniqueness rules unreachable
+   * rather than merely respected.
+   */
+  briefBindings: NfrBinding[];
+  briefFlows: FlowBinding[];
   ghost: GhostState | null;
   highlight: HighlightState | null;
 
@@ -119,9 +141,24 @@ export interface CanvasState {
   setNarrative(text: string): void;
   /** Revision load — replaces the narrative without touching `dirty`. */
   loadNarrative(text: string | null): void;
+  /**
+   * Claim a requirement is held by this mechanism. Changing the mechanism
+   * drops nodes the new one cannot legally carry, so the picker and the
+   * binding can never disagree about eligibility.
+   */
+  setBindingMechanism(nfrId: string, mechanism: MechanismClaim): void;
+  toggleBindingNode(nfrId: string, nodeId: string): void;
+  setBindingNote(nfrId: string, note: string): void;
+  clearBinding(nfrId: string): void;
+  /** Replace the walk for one functional requirement; an empty path clears it. */
+  setFlowPath(requirementIndex: number, path: string[]): void;
+  /** Revision load — replaces the brief without touching `dirty`. */
+  loadBrief(brief: DesignBrief | null): void;
   markClean(): void;
   markDirty(): void;
   serialize(): CanvasGraph;
+  /** The brief as a payload, reconciled against the live graph, or null. */
+  serializeBrief(): DesignBrief | null;
 }
 
 export type CanvasStore = StoreApi<CanvasState>;
@@ -168,6 +205,8 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     selectedId: null,
     dirty: false,
     narrative: '',
+    briefBindings: [],
+    briefFlows: [],
     ghost: null,
     highlight: null,
 
@@ -376,6 +415,86 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       set({ narrative: text ?? '' });
     },
 
+    setBindingMechanism(nfrId, mechanism) {
+      const { briefBindings, nodes } = get();
+      const existing = briefBindings.find((binding) => binding.nfrId === nfrId);
+      // Re-filter rather than clear: switching from `backups` to `sharding`
+      // keeps the databases already picked and drops anything else, because
+      // the API refuses a kind that cannot carry the claim.
+      const kinds: readonly NodeKind[] = MECHANISM_KINDS[mechanism];
+      const nodeIds = (existing?.nodeIds ?? []).filter((id) =>
+        nodes.some((node) => node.id === id && kinds.includes(node.data.kind)),
+      );
+      const next: NfrBinding = {
+        nfrId,
+        mechanism,
+        nodeIds,
+        ...(existing?.note !== undefined ? { note: existing.note } : {}),
+      };
+      set({
+        briefBindings: existing
+          ? briefBindings.map((binding) => (binding.nfrId === nfrId ? next : binding))
+          : [...briefBindings, next],
+        dirty: true,
+      });
+    },
+
+    toggleBindingNode(nfrId, nodeId) {
+      const { briefBindings } = get();
+      const existing = briefBindings.find((binding) => binding.nfrId === nfrId);
+      if (!existing) return;
+      const has = existing.nodeIds.includes(nodeId);
+      // Capped here as well as in the payload, so the checkbox that would
+      // exceed the limit is simply inert rather than silently dropped later.
+      if (!has && existing.nodeIds.length >= BINDING_MAX_NODES) return;
+      const nodeIds = has
+        ? existing.nodeIds.filter((id) => id !== nodeId)
+        : [...existing.nodeIds, nodeId];
+      set({
+        briefBindings: briefBindings.map((binding) =>
+          binding.nfrId === nfrId ? { ...binding, nodeIds } : binding,
+        ),
+        dirty: true,
+      });
+    },
+
+    setBindingNote(nfrId, note) {
+      const { briefBindings } = get();
+      set({
+        briefBindings: briefBindings.map((binding) =>
+          binding.nfrId === nfrId ? { ...binding, note } : binding,
+        ),
+        dirty: true,
+      });
+    },
+
+    clearBinding(nfrId) {
+      const { briefBindings } = get();
+      if (!briefBindings.some((binding) => binding.nfrId === nfrId)) return;
+      set({
+        briefBindings: briefBindings.filter((binding) => binding.nfrId !== nfrId),
+        dirty: true,
+      });
+    },
+
+    setFlowPath(requirementIndex, path) {
+      const { briefFlows } = get();
+      const others = briefFlows.filter((flow) => flow.requirementIndex !== requirementIndex);
+      set({
+        briefFlows:
+          path.length === 0
+            ? others
+            : [...others, { id: flowIdFor(requirementIndex), requirementIndex, path }].sort(
+                (a, b) => a.requirementIndex - b.requirementIndex,
+              ),
+        dirty: true,
+      });
+    },
+
+    loadBrief(brief) {
+      set({ briefBindings: brief?.nfrBindings ?? [], briefFlows: brief?.flows ?? [] });
+    },
+
     markClean() {
       set({ dirty: false });
     },
@@ -387,6 +506,11 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     serialize() {
       const { nodes, edges } = get();
       return toCanvasGraph(nodes, edges);
+    },
+
+    serializeBrief() {
+      const { nodes, edges, briefBindings, briefFlows } = get();
+      return reconcileBrief(briefBindings, briefFlows, toCanvasGraph(nodes, edges));
     },
   }));
 }

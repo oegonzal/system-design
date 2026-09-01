@@ -12,13 +12,13 @@ export default meta;
 
 type Story = StoryObj<typeof NarrativeEditor>;
 
-/** A blank draft against a small diagram — every label still unmentioned. */
+/** A blank draft, with the advisory caption doing the honest work. */
 export const Empty: Story = {
   decorators: [withCanvasStore((store) => store.getState().setGraph(makeGraph()))],
 };
 
-/** A partial draft: the checklist tracks what the prose has not covered yet. */
-export const PartiallyCovered: Story = {
+/** A short walkthrough. Length is counted, never graded. */
+export const ShortDraft: Story = {
   decorators: [
     withCanvasStore((store) => {
       store.getState().setGraph(makeGraph());
@@ -27,8 +27,8 @@ export const PartiallyCovered: Story = {
   ],
 };
 
-/** Every component mentioned — the subtle all-covered line. */
-export const FullyCovered: Story = {
+/** A fuller walkthrough — still unscored; the brief is what earns the grade. */
+export const FullDraft: Story = {
   decorators: [
     withCanvasStore((store) => {
       store.getState().setGraph(makeGraph());

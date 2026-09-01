@@ -13,7 +13,13 @@
  * `exp.brf.present` applies whether or not a brief was submitted, so silence
  * scores 0 rather than dropping the dimension out of the rubric.
  */
-import { NFR_KINDS, briefHasClaims, type NfrKind, type NodeKind } from '@sysdesign/contracts';
+import {
+  ANNOTATION_KINDS,
+  FLOW_SINK_KINDS,
+  NFR_KINDS,
+  briefHasClaims,
+  type NfrKind,
+} from '@sysdesign/contracts';
 
 import {
   bindingBackedNodeIds,
@@ -25,20 +31,8 @@ import { sortById, uniqueSorted } from '../../../rules/shared';
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 
-/** Observability blocks annotate a design; nothing routes through them. */
-const ANNOTATION_KINDS: readonly NodeKind[] = ['monitoring', 'logging', 'tracing'];
-
-/** Where a traced flow has to end up for the walk to mean anything. */
-const DURABLE_KINDS: readonly NodeKind[] = [
-  'database',
-  'replica',
-  'object-store',
-  'data-warehouse',
-  'data-lake',
-  'time-series-db',
-  'kv-store',
-  'search-index',
-];
+// `ANNOTATION_KINDS` and `FLOW_SINK_KINDS` come from contracts so the brief
+// editor guides the author by the same vocabulary this grades with.
 
 function labelsOf(ids: readonly string[], byId: (id: string) => { label: string } | undefined) {
   const named = ids
@@ -134,7 +128,7 @@ const flowsTraced: Expectation = {
       }
       const first = index.byId(edges[0]?.source ?? '');
       const last = index.byId(edges[edges.length - 1]?.target ?? '');
-      return first?.kind === 'client' && last !== undefined && DURABLE_KINDS.includes(last.kind);
+      return first?.kind === 'client' && last !== undefined && FLOW_SINK_KINDS.includes(last.kind);
     });
 
     if (complete.length === 0) return unmet();
