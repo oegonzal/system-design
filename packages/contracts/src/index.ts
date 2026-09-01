@@ -19,6 +19,8 @@ export * from './lib/experiences';
 export * from './lib/prompts';
 export * from './lib/sessions';
 export * from './lib/narrative';
+export * from './lib/mechanisms';
+export * from './lib/design-brief';
 export * from './lib/node-guide';
 export * from './lib/evaluations';
 export * from './lib/eval-profile';
