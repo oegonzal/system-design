@@ -62,6 +62,19 @@ describe('performance.chatty-client', () => {
   });
 });
 
+/** A prompt whose latency demand is loose in BOTH places it can be stated. */
+function relaxedLatency(ms: number) {
+  const base = flashSaleFacts();
+  return flashSaleFacts({
+    scaleTargets: { ...base.scaleTargets, p99LatencyMs: ms },
+    nfrs: base.nfrs.map((nfr) =>
+      nfr.targetSpec?.metric === 'p99_latency_ms'
+        ? { ...nfr, targetSpec: { ...nfr.targetSpec, value: ms } }
+        : nfr,
+    ),
+  });
+}
+
 describe('performance.deep-sync-chain', () => {
   const rule = ruleById('performance.deep-sync-chain');
 
@@ -92,10 +105,24 @@ describe('performance.deep-sync-chain', () => {
   });
 
   it('stays silent when the latency budget is loose', () => {
-    const relaxed = flashSaleFacts({
-      scaleTargets: { ...flashSaleFacts().scaleTargets, p99LatencyMs: 400 },
+    // Both numbers, because the budget is the strictest the prompt states:
+    // relaxing the headline while a requirement still pins 250ms relaxes nothing.
+    expect(rule.check(contextFor(chainOf(6), relaxedLatency(400)))).toEqual([]);
+  });
+
+  /** The capability this rule gained: the requirement's own target is read. */
+  it('tightens with the requirement, not just the headline figure', () => {
+    // Headline stays 250ms; the requirement drops to 100ms → two hops of
+    // headroom, so a three-hop chain now costs where it did not before.
+    const strict = flashSaleFacts({
+      nfrs: flashSaleFacts().nfrs.map((nfr) =>
+        nfr.targetSpec?.metric === 'p99_latency_ms'
+          ? { ...nfr, targetSpec: { ...nfr.targetSpec, value: 100 } }
+          : nfr,
+      ),
     });
-    expect(rule.check(contextFor(chainOf(6), relaxed))).toEqual([]);
+    expect(rule.check(contextFor(chainOf(3), strict))).toHaveLength(1);
+    expect(rule.check(contextFor(chainOf(3)))).toEqual([]);
   });
 
   it('does not count async segments toward the chain', () => {
@@ -340,9 +367,7 @@ describe('performance.serverless-cold-hot-path', () => {
   });
 
   it('stays silent on a relaxed latency budget', () => {
-    const relaxed = flashSaleFacts({
-      scaleTargets: { ...flashSaleFacts().scaleTargets, p99LatencyMs: 800 },
-    });
-    expect(rule.check(contextFor(hotPath, relaxed))).toEqual([]);
+    // Relaxed in both places, since the budget is the strictest stated.
+    expect(rule.check(contextFor(hotPath, relaxedLatency(800)))).toEqual([]);
   });
 });

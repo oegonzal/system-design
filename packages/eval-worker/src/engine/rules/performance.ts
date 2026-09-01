@@ -3,6 +3,7 @@
  */
 import type { GraphPatch } from '@sysdesign/contracts';
 
+import { affordableSyncHops, COLD_START_MS, latencyBudgetMs } from '../targets';
 import type { EvalRule, RuleFinding } from '../types';
 import { configNumber, formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
 
@@ -59,21 +60,23 @@ const deepSyncChain: EvalRule = {
   id: 'performance.deep-sync-chain',
   dimension: 'performance',
   check({ facts, index }) {
-    if (facts.scaleTargets.p99LatencyMs > 300) return [];
+    const budget = latencyBudgetMs(facts);
     const clients = sortById(index.clients());
     if (clients.length === 0) return [];
     const chain = index.longestChain(
       clients.map((client) => client.id),
       { edgeKinds: ['sync'] },
     );
-    if (chain <= 5) return [];
+    // How deep a chain the stated p99 pays for, rather than a fixed five.
+    const affordable = affordableSyncHops(facts);
+    if (chain <= affordable) return [];
     return [
       {
         ruleId: deepSyncChain.id,
         dimension: 'performance',
         severity: 'medium',
         title: 'Request path too deep for the latency budget',
-        message: `The longest synchronous path from a client runs ${chain} hops, and the prompt's p99 budget is ${formatInt(facts.scaleTargets.p99LatencyMs)}ms — every hop spends a slice of it on serialization, queuing and the network before any work happens. Collapse hops on the hot path or move work off it asynchronously; depth is a latency tax paid on every single request.`,
+        message: `The longest synchronous path from a client runs ${chain} hops, and the p99 budget this design is held to is ${formatInt(budget)}ms — about ${affordable} synchronous hop${affordable === 1 ? '' : 's'} of headroom. Every hop spends a slice of that on serialization, queuing and the network before any work happens. Collapse hops on the hot path or move work off it asynchronously; depth is a latency tax paid on every single request.`,
         affectedNodeIds: clients.map((client) => client.id),
         affectedEdgeIds: [],
         suggestion: null,
@@ -260,7 +263,7 @@ const serverlessColdHotPath: EvalRule = {
   id: 'performance.serverless-cold-hot-path',
   dimension: 'performance',
   check({ facts, index }) {
-    if (facts.scaleTargets.p99LatencyMs > 300) return [];
+    if (latencyBudgetMs(facts) > COLD_START_MS) return [];
     const clients = sortById(index.clients());
     if (clients.length === 0) return [];
     const findings: RuleFinding[] = [];
@@ -275,7 +278,7 @@ const serverlessColdHotPath: EvalRule = {
         dimension: 'performance',
         severity: 'low',
         title: 'Cold starts on a tight latency budget',
-        message: `"${fn.label}" serves a synchronous client path against a p99 budget of ${formatInt(facts.scaleTargets.p99LatencyMs)}ms, and an unwarmed function's cold start alone can spend that budget before a line of handler runs. Provisioned concurrency keeps instances warm for the hot path — or move the function off the synchronous path entirely.`,
+        message: `"${fn.label}" serves a synchronous client path against a p99 budget of ${formatInt(latencyBudgetMs(facts))}ms, and an unwarmed function's cold start alone can spend that budget before a line of handler runs. Provisioned concurrency keeps instances warm for the hot path — or move the function off the synchronous path entirely.`,
         affectedNodeIds: [fn.id],
         affectedEdgeIds: [],
         suggestion: {
