@@ -5,7 +5,7 @@
  * entry point into the engine; `runEngine` remains the pure synchronous
  * façade for deterministic-only callers.
  */
-import type { CanvasGraph } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
 import { buildGraphIndex } from '../graph-index';
@@ -26,6 +26,8 @@ export interface RunEvaluationInput {
   facts: PromptFacts;
   /** The design narrative submitted with the revision; omitted/null when absent. */
   narrative?: string | null;
+  /** The design brief submitted with the revision; omitted/null when absent. */
+  brief?: DesignBrief | null;
   llm: LlmClient;
   profile: EvalProfile;
   registry: ReadonlyMap<string, EvalPass>;
@@ -34,6 +36,7 @@ export interface RunEvaluationInput {
 export async function runEvaluation(input: RunEvaluationInput): Promise<EvaluationRun> {
   const { graph, facts, llm, profile, registry } = input;
   const narrative = input.narrative ?? null;
+  const brief = input.brief ?? null;
   validateProfile(profile);
 
   const index = buildGraphIndex(graph);
@@ -50,6 +53,7 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
       facts,
       index,
       narrative,
+      brief,
       llm,
       priorArtifacts: artifacts,
       options: config.options ?? {},

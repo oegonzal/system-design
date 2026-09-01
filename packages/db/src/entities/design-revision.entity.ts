@@ -40,11 +40,20 @@ export class DesignRevision {
   graph!: Contracts.CanvasGraph;
 
   /**
-   * The design narrative — the author's prose explanation of what each
-   * component is for and how they cooperate to meet the requirements.
+   * The walkthrough — the author's prose explanation, for a human reader and
+   * the LLM critic. Advisory: the deterministic score never reads it, because
+   * nothing deterministic can judge writing without guessing at substrings.
    */
   @Property({ type: 'text', nullable: true })
   narrative: string | null = null;
+
+  /**
+   * The graded half of the explanation: requirement bindings and traced flows,
+   * every field a reference into the graph or the prompt rather than text.
+   * Null on revisions submitted before briefs existed.
+   */
+  @Property({ type: 'json', nullable: true })
+  brief: Contracts.DesignBrief | null = null;
 
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();

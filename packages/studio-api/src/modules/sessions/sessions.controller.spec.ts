@@ -55,10 +55,19 @@ describe('sessions', () => {
       body: JSON.stringify({ promptId }),
     });
 
-  const submitRevision = async (sessionId: string, graph: unknown, narrative?: string) =>
+  const submitRevision = async (
+    sessionId: string,
+    graph: unknown,
+    narrative?: string,
+    brief?: unknown,
+  ) =>
     call<GetRevisionResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
       method: 'POST',
-      body: JSON.stringify({ graph, ...(narrative === undefined ? {} : { narrative }) }),
+      body: JSON.stringify({
+        graph,
+        ...(narrative === undefined ? {} : { narrative }),
+        ...(brief === undefined ? {} : { brief }),
+      }),
     });
 
   describe('POST /api/sessions', () => {
@@ -136,6 +145,77 @@ describe('sessions', () => {
       const { status, body } = await submitRevision(session.data.id, validGraph(), narrative);
       expect(status).toBe(201);
       expect(body.data.narrative).toBe(narrative);
+    });
+
+    it('round-trips a design brief, and defaults it to null when none is sent', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+
+      const bare = await submitRevision(session.data.id, validGraph());
+      expect(bare.body.data.brief).toBeNull();
+
+      const brief = {
+        version: 1,
+        nfrBindings: [
+          {
+            nfrId: prompt.nonFunctionalRequirements[0].id,
+            nodeIds: ['db'],
+            mechanism: 'backups',
+            note: 'nightly snapshots, 30 day retention',
+          },
+        ],
+        flows: [{ id: 'f-1', requirementIndex: 0, path: ['e-client-api', 'e-api-db'] }],
+      };
+      const { status, body } = await submitRevision(
+        session.data.id,
+        validGraph(),
+        undefined,
+        brief,
+      );
+      expect(status).toBe(201);
+      expect(body.data.brief).toEqual(brief);
+    });
+
+    it('rejects an unknown mechanism with 400 and an impossible one with 422', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+      const nfrId = prompt.nonFunctionalRequirements[0].id;
+
+      const unknownMechanism = await submitRevision(session.data.id, validGraph(), undefined, {
+        version: 1,
+        nfrBindings: [{ nfrId, nodeIds: ['db'], mechanism: 'vibes' }],
+        flows: [],
+      });
+      expect(unknownMechanism.status).toBe(400);
+
+      // Shape is fine; a client simply cannot be a dead-letter queue.
+      const impossible = await submitRevision(session.data.id, validGraph(), undefined, {
+        version: 1,
+        nfrBindings: [{ nfrId, nodeIds: ['client'], mechanism: 'dlq' }],
+        flows: [],
+      });
+      expect(impossible.status).toBe(422);
+      expect(JSON.stringify(impossible.body)).toContain('cannot provide dlq');
+    });
+
+    it('accepts a binding the diagram fails to back up — that is a grade, not a 400', async () => {
+      const prompt = await makePrompt();
+      const { body: session } = await createSession(prompt.id);
+
+      // No `backups` knob anywhere, so nothing corroborates this claim. The
+      // API must still store it; the evaluation is what teaches the author.
+      const { status } = await submitRevision(session.data.id, validGraph(), undefined, {
+        version: 1,
+        nfrBindings: [
+          {
+            nfrId: prompt.nonFunctionalRequirements[0].id,
+            nodeIds: ['db'],
+            mechanism: 'backups',
+          },
+        ],
+        flows: [],
+      });
+      expect(status).toBe(201);
     });
 
     it('rejects a node kind outside the palette with 400 — a shape error', async () => {

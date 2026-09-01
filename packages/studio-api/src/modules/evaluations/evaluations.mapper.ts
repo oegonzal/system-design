@@ -67,6 +67,7 @@ export const toRevisionDto = (
   revisionNumber: r.revisionNumber,
   graph: r.graph,
   narrative: r.narrative,
+  brief: r.brief,
   evaluation: evaluation ? toEvaluationDto(evaluation) : null,
   createdAt: r.createdAt.toISOString(),
 });

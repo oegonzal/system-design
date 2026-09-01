@@ -73,6 +73,7 @@ export class EvalRunnerService {
         graph: revision.graph,
         facts,
         narrative: revision.narrative,
+        brief: revision.brief,
         llm: this.llm,
         profile: ACTIVE_PROFILE,
         registry: this.passRegistry,

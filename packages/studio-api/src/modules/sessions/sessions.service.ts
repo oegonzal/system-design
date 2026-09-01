@@ -13,6 +13,7 @@ import type { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
 import type { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
 import type { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
 import { EvalQueue } from './eval-queue';
+import { validateBriefReferences } from './brief-validator';
 import { validateGraphReferences } from './graph-validator';
 
 /** A session plus what its DTO summarises about the newest revision. */
@@ -91,7 +92,10 @@ export class SessionsService {
     sessionId: string,
     dto: SubmitRevisionRequestDto,
   ): Promise<RevisionWithEvaluation> {
-    const session = await this.em.findOne(DesignSession, sessionId);
+    // The prompt is populated because a brief's references are checked against
+    // it: an nfrId it never declared, or a functional requirement index past
+    // the end, is impossible rather than merely unsupported.
+    const session = await this.em.findOne(DesignSession, sessionId, { populate: ['prompt'] });
     if (!session) {
       throw new NotFoundException(`Session ${sessionId} not found`);
     }
@@ -101,7 +105,10 @@ export class SessionsService {
       );
     }
 
-    const problems = validateGraphReferences(dto.graph);
+    const problems = [
+      ...validateGraphReferences(dto.graph),
+      ...(dto.brief ? validateBriefReferences(dto.graph, dto.brief, session.prompt) : []),
+    ];
     if (problems.length > 0) {
       throw new UnprocessableEntityException(problems);
     }
@@ -119,6 +126,7 @@ export class SessionsService {
           revisionNumber: (latest?.revisionNumber ?? 0) + 1,
           graph: dto.graph,
           narrative: dto.narrative ?? null,
+          brief: dto.brief ?? null,
         });
         em.persist(revision);
 

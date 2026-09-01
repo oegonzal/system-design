@@ -1,4 +1,5 @@
 import type { CanvasGraph } from './canvas';
+import type { DesignBrief } from './design-brief';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { EvalStatus, EvaluationDto, Grade } from './evaluations';
 import type { IsoDateString, Uuid } from './primitives';
@@ -24,11 +25,12 @@ export interface DesignRevisionDto {
   revisionNumber: number;
   graph: CanvasGraph;
   /**
-   * The design narrative: the author's prose explanation of what each
-   * component is for and how they cooperate to meet the requirements.
-   * Submitted alongside the graph and graded for alignment with it.
+   * The walkthrough: the author's prose explanation, for a human reader and
+   * the LLM critic. Advisory — the deterministic score never reads it.
    */
   narrative: string | null;
+  /** The graded explanation: requirement bindings and traced flows. */
+  brief: DesignBrief | null;
   /** Embedded so one GET answers "what did I submit and how did it do". */
   evaluation: EvaluationDto | null;
   createdAt: IsoDateString;
@@ -56,6 +58,12 @@ export interface UpdateSessionRequest {
 
 export interface SubmitRevisionRequest {
   graph: CanvasGraph;
+  /**
+   * The graded explanation: which components hold each requirement, and how a
+   * request travels. Optional — a diagram may be submitted without one, and
+   * that absence is itself graded.
+   */
+  brief?: DesignBrief;
   /**
    * Optional design narrative — the author's explanation of what each
    * component is for and how they cooperate to meet the requirements.
