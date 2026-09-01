@@ -435,7 +435,7 @@ const dlqUnmonitored: EvalRule = {
       {
         ruleId: dlqUnmonitored.id,
         dimension: 'reliability',
-        severity: 'info',
+        severity: 'low',
         title: 'Dead-letter queue with nobody watching it',
         message: `${deadLettered.map((queue) => `"${queue.label}"`).join(', ')} quarantines failed messages, but no monitoring block exists to notice them arriving — a dead-letter queue nobody watches is a landfill, and every message in it is a user-visible failure aging quietly. Alert on DLQ depth so quarantine is the start of an investigation, not the end of one.`,
         affectedNodeIds: deadLettered.map((queue) => queue.id),
@@ -466,7 +466,7 @@ const noTracingManyServices: EvalRule = {
       {
         ruleId: noTracingManyServices.id,
         dimension: 'reliability',
-        severity: 'info',
+        severity: 'low',
         title: 'Many compute tiers with no distributed tracing',
         message: `${compute.length} compute components handle each request between them, and nothing traces a request across the hops — so "which tier spent the latency budget" is answered by correlating log timestamps at 2am. Distributed tracing stitches the hops into one timeline and points at the slow span directly.`,
         affectedNodeIds: compute.map((node) => node.id),

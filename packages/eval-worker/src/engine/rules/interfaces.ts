@@ -130,7 +130,7 @@ const unreferencedOperation: EvalRule = {
       findings.push({
         ruleId: unreferencedOperation.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'Declared operations no edge exercises',
         message: `"${node.label}" declares ${names}, yet no edge touching it carries ${unreferenced.length > 1 ? 'them' : 'it'}. This design annotates its edges with the calls they make, so an unreferenced operation reads as either dead surface or a missing arrow — draw the caller that uses it, or prune it.`,
         affectedNodeIds: [node.id],
@@ -207,7 +207,7 @@ const responsibilityOverlap: EvalRule = {
       findings.push({
         ruleId: responsibilityOverlap.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'Two components claim the same responsibility',
         message: `${nodeIds.length} components declare "${statement}" as their job, and a responsibility with two owners effectively has none — when it breaks, each owner assumes the other has it. Give the duty one home and let everyone else call that home.`,
         affectedNodeIds: uniqueSorted(nodeIds),
@@ -480,7 +480,7 @@ const opKindMismatch: EvalRule = {
       findings.push({
         ruleId: opKindMismatch.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'Declared operations this node kind cannot serve',
         message: `"${node.label}" declares ${names}, but ${surface} — usually the residue of switching the node's kind after its interface was written. Move the declaration to a component that can serve it, or redeclare it as a kind this node supports.`,
         affectedNodeIds: [node.id],

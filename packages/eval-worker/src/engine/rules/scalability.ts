@@ -445,7 +445,9 @@ const overengineeredIntro: EvalRule = {
   id: 'scalability.overengineered-intro',
   dimension: 'scalability',
   check({ facts, index }) {
-    if (facts.difficulty !== 'intro' || facts.scaleTargets.requestsPerSecond >= 500) return [];
+    // Scale decides, not the difficulty label: heavy machinery at 400 req/s is
+    // the same over-build whether the prompt calls itself intro or standard.
+    if (facts.scaleTargets.requestsPerSecond >= 500) return [];
     const caches = sortById(index.byKind('cache'));
     const meshes = sortById(index.byKind('service-mesh'));
     const regional = sortById(
@@ -459,7 +461,7 @@ const overengineeredIntro: EvalRule = {
       {
         ruleId: overengineeredIntro.id,
         dimension: 'scalability',
-        severity: 'info',
+        severity: 'low',
         title: 'More machinery than the prompt asks for',
         message: `This prompt plays at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s, and layered caches, a service mesh, or regional placement each add an operational surface no requirement here pays for. Right-sizing is the senior skill: every component must buy a stated requirement, and at this scale a simple tier does — save the heavy machinery for the prompt that demands it.`,
         affectedNodeIds: uniqueSorted(excess.map((node) => node.id)),

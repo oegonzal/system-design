@@ -419,7 +419,7 @@ describe('reliability.dlq-unmonitored', () => {
   it('fires on a dead-letter queue with no monitoring block', () => {
     const findings = rule.check(contextFor(landfill, observed));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['q-1']);
     expect(findings[0].suggestion).toBeNull();
   });
@@ -449,7 +449,7 @@ describe('reliability.no-tracing-many-services', () => {
   it('fires on five compute nodes with no tracing', () => {
     const findings = rule.check(contextFor(sprawl));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['ml-1', 'sp-1', 'svc-1', 'svc-2', 'worker-1']);
     expect(findings[0].suggestion).toBeNull();
   });

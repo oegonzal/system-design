@@ -17,7 +17,13 @@ const orphanNode: EvalRule = {
       {
         ruleId: orphanNode.id,
         dimension: 'hygiene',
-        severity: 'info',
+        /**
+         * One lesson, one finding — but magnitude still has to register. A
+         * single stray box is an oversight; a canvas with several is a habit,
+         * and scoring them identically was how twenty spare nodes used to cost
+         * exactly what one did.
+         */
+        severity: orphans.length >= 3 ? 'medium' : 'low',
         title: 'Disconnected nodes',
         message: `${labels} ${plural ? 'are' : 'is'} connected to nothing, so ${plural ? 'they play' : 'it plays'} no part in the design being evaluated. Wire ${plural ? 'them' : 'it'} in or remove ${plural ? 'them' : 'it'} — a reviewer reads dangling boxes as unfinished thinking.`,
         affectedNodeIds: orphans.map((node) => node.id),
@@ -131,7 +137,7 @@ const duplicateEdges: EvalRule = {
       findings.push({
         ruleId: duplicateEdges.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'Duplicate edges between the same nodes',
         message: `"${sourceNode.label}" connects to "${targetNode.label}" ${edgeIds.length} times with the same edge kind — the extra arrows say nothing the first one did not, and a reviewer will wonder which one carries the meaning. One edge per relationship keeps the diagram legible.`,
         affectedNodeIds: uniqueSorted([source, target]),
@@ -156,7 +162,7 @@ const meshOverkill: EvalRule = {
       {
         ruleId: meshOverkill.id,
         dimension: 'hygiene',
-        severity: 'info',
+        severity: 'low',
         title: 'A service mesh with almost nothing to mesh',
         message: `A service mesh earns its sidecar tax when many services need uniform mTLS, retries and discovery — this design runs fewer than three, so the mesh adds a proxy hop and an operations burden to traffic a direct call handles fine. Save the mesh for the graph that actually sprawls.`,
         affectedNodeIds: meshes.map((mesh) => mesh.id),

@@ -133,6 +133,35 @@ describe('calibration', () => {
     expect(after.overallScore).toBeGreaterThan(before.overallScore);
   });
 
+  /**
+   * Unjustified machinery used to be free. Every rule that named it —
+   * disconnected nodes, a mesh with nothing to mesh, more layers than the scale
+   * asks for — was `info`, which the profile prices at zero, so a canvas with
+   * twenty spare boxes scored exactly what the clean one did. It no longer does,
+   * and magnitude registers: a habit costs more than an oversight.
+   */
+  it('unjustified machinery costs something, and more of it costs more', () => {
+    const excellent = loadFixture('excellent-flash-sale.graph.json');
+    const spare = (count: number) => ({
+      ...excellent,
+      nodes: [
+        ...excellent.nodes,
+        ...Array.from({ length: count }, (_, i) => ({
+          id: `spare-${i}`,
+          kind: 'vector-db' as const,
+          label: `Spare ${i}`,
+        })),
+      ],
+    });
+
+    const clean = runEngine(excellent, flashSaleFacts()).overallScore;
+    const oneStray = runEngine(spare(1), flashSaleFacts()).overallScore;
+    const aHabit = runEngine(spare(5), flashSaleFacts()).overallScore;
+
+    expect(oneStray).toBeLessThan(clean);
+    expect(aHabit).toBeLessThan(oneStray);
+  });
+
   it('[EVAL-4] unmet expectations surface as teaching findings with ghost fixes', () => {
     const result = runEngine(loadFixture('naive-flash-sale.graph.json'), flashSaleFacts());
     const coverageFindings = result.findings.filter((f) => f.expectationId !== null);

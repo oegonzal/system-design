@@ -171,7 +171,7 @@ const pubSubSingleSubscriber: EvalRule = {
       findings.push({
         ruleId: pubSubSingleSubscriber.id,
         dimension: 'messaging',
-        severity: 'info',
+        severity: 'low',
         title: 'Pub/sub topic with a single subscriber',
         message: `"${topic.label}" fans out to exactly one subscriber, which is the shape of a queue wearing a topic's costume. A topic pays for fan-out semantics — every subscriber gets every message — and with one consumer that buys nothing a queue does not do better: queues give you competing consumers, per-message acknowledgement, and a natural DLQ story.`,
         affectedNodeIds: [topic.id],

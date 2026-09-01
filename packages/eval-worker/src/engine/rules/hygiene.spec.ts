@@ -17,7 +17,7 @@ describe('hygiene.orphan-node', () => {
     );
     const findings = rule.check(contextFor(withOrphans));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['cache-9', 'sched-1']);
   });
 
@@ -146,7 +146,7 @@ describe('hygiene.duplicate-edges', () => {
     );
     const findings = rule.check(contextFor(doubled));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedEdgeIds).toEqual(['e2', 'e3']);
     expect(findings[0].suggestion?.ops).toEqual([
       { op: 'remove-edge', edgeId: 'e2' },
@@ -181,7 +181,7 @@ describe('hygiene.mesh-overkill', () => {
     );
     const findings = rule.check(contextFor(overdressed));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['mesh-1']);
     expect(findings[0].suggestion).toBeNull();
   });

@@ -128,7 +128,7 @@ describe('messaging.pub-sub-single-subscriber', () => {
     );
     const findings = rule.check(contextFor(lonely));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['topic-1']);
     expect(findings[0].affectedEdgeIds).toEqual(['e2']);
     expect(findings[0].suggestion).toBeNull();

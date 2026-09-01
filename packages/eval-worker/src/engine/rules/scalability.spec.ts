@@ -382,7 +382,7 @@ describe('scalability.overengineered-intro', () => {
     const doubleCached = graph([node('cache-1', 'cache'), node('cache-2', 'cache')]);
     const cacheFindings = rule.check(contextFor(doubleCached, smallIntro));
     expect(cacheFindings).toHaveLength(1);
-    expect(cacheFindings[0].severity).toBe('info');
+    expect(cacheFindings[0].severity).toBe('low');
     expect(cacheFindings[0].affectedNodeIds).toEqual(['cache-1', 'cache-2']);
     expect(cacheFindings[0].suggestion).toBeNull();
 

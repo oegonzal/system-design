@@ -55,7 +55,7 @@ const noRateLimit: EvalRule = {
       {
         ruleId: noRateLimit.id,
         dimension: 'security',
-        severity: 'info',
+        severity: 'medium',
         title: 'No rate limiting at the edge',
         message: `An internet-facing front door at ${formatInt(facts.scaleTargets.requestsPerSecond)} req/s invites bots and retry storms, and nothing at the edge enforces a rate limit. Limiting per-client request rates at the gateway keeps one aggressive caller from consuming capacity meant for ${formatInt(facts.scaleTargets.concurrentUsers)} real users.`,
         affectedNodeIds: edgeNodes.map((node) => node.id),

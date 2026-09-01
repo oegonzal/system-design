@@ -132,7 +132,7 @@ describe('hygiene.unreferenced-operation', () => {
     );
     const findings = rule.check(contextFor(canvas));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['svc-1']);
     expect(findings[0].message).toContain('"placeOrder"');
   });
@@ -200,7 +200,7 @@ describe('hygiene.responsibility-overlap', () => {
     ]);
     const findings = rule.check(contextFor(canvas));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['svc-1', 'svc-2']);
   });
 
@@ -507,7 +507,7 @@ describe('hygiene.op-kind-mismatch', () => {
     const canvas = graph([node('worker-1', 'worker', { operations: [op('getStatus', 'query')] })]);
     const findings = rule.check(contextFor(canvas));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('low');
     expect(findings[0].affectedNodeIds).toEqual(['worker-1']);
     expect(findings[0].message).toContain('"getStatus" (query)');
   });

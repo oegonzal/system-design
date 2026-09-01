@@ -47,7 +47,7 @@ describe('security.no-rate-limit', () => {
     const unlimited = graph([node('gw-1', 'gateway')]);
     const findings = rule.check(contextFor(unlimited));
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe('info');
+    expect(findings[0].severity).toBe('medium');
     expect(findings[0].affectedNodeIds).toEqual(['gw-1']);
     expect(findings[0].suggestion?.ops[0]).toMatchObject({
       op: 'update-node',
