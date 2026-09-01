@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph, makePrompt } from '../../testing/fixtures';
 import { renderWithTheme } from '../../testing/render';
 import { createCanvasStore, type CanvasStore } from '../canvas/canvas-store';
 import { CanvasStoreProvider } from '../canvas/canvas-store-context';
@@ -15,7 +15,7 @@ function renderEditor(seed?: (store: CanvasStore) => void) {
   seed?.(store);
   renderWithTheme(
     <CanvasStoreProvider store={store}>
-      <NarrativeEditor />
+      <NarrativeEditor prompt={makePrompt()} />
     </CanvasStoreProvider>,
   );
   return store;
@@ -69,5 +69,42 @@ describe('NarrativeEditor', () => {
 
     act(() => store.getState().loadNarrative('one two three'));
     expect(screen.getByTestId('narrative-word-count').textContent).toBe('3 words');
+  });
+
+  it("[UX-8] tracks the prompt's requirement kinds the draft has not yet addressed", () => {
+    const store = renderEditor();
+
+    // Blank draft: every prompt NFR kind is unaddressed (latency,
+    // availability, consistency in the fixture prompt).
+    const chips = screen.getByTestId('narrative-nfr-unaddressed');
+    expect(chips.textContent).toContain('latency');
+    expect(chips.textContent).toContain('availability');
+    expect(chips.textContent).toContain('consistency');
+
+    act(() => store.getState().loadNarrative('p99 stays low; failover keeps checkout up.'));
+    const partial = screen.getByTestId('narrative-nfr-unaddressed');
+    expect(partial.textContent).not.toContain('latency');
+    expect(partial.textContent).not.toContain('availability');
+    expect(partial.textContent).toContain('consistency');
+
+    act(() =>
+      store
+        .getState()
+        .loadNarrative('p99 stays low; failover keeps checkout up; holds are idempotent.'),
+    );
+    expect(screen.queryByTestId('narrative-nfr-unaddressed')).toBeNull();
+    expect(screen.getByTestId('narrative-nfr-covered')).toBeTruthy();
+  });
+
+  it('nudges toward a flow story once prose exists but no flow verb does', () => {
+    const store = renderEditor();
+    // Blank draft: no nag before the author starts writing.
+    expect(screen.queryByTestId('narrative-flow-hint')).toBeNull();
+
+    act(() => store.getState().loadNarrative('A gateway, a service, and a database.'));
+    expect(screen.getByTestId('narrative-flow-hint')).toBeTruthy();
+
+    act(() => store.getState().loadNarrative('The client calls the service.'));
+    expect(screen.queryByTestId('narrative-flow-hint')).toBeNull();
   });
 });

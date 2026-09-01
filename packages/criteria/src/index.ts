@@ -33,6 +33,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'UX-7',
     statement: 'Every block kind teaches what it is for and when to use it in the UI.',
   },
+  {
+    id: 'UX-8',
+    statement:
+      'The narrative editor shows which prompt requirements the draft has not yet addressed.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

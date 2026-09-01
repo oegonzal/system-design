@@ -101,6 +101,12 @@ export function FindingsList({ findings, onSelect, onPreviewFix }: FindingsListP
                   <Badge tone={finding.severity}>{finding.severity}</Badge>
                   <Badge tone="neutral">{SOURCE_LABEL[finding.source]}</Badge>
                   <Badge tone="neutral">{finding.dimension}</Badge>
+                  {finding.nfrId ? (
+                    // The prompt requirement this finding proves unmet.
+                    <Badge tone="neutral" data-testid="finding-nfr">
+                      {finding.nfrId}
+                    </Badge>
+                  ) : null}
                 </BadgeRow>
                 <TitleButton type="button" onClick={() => onSelect(finding)}>
                   {finding.title}

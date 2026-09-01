@@ -9,6 +9,11 @@ const VERDICT_TONE: Record<ScenarioVerdict, BadgeTone> = {
   fails: 'critical',
 };
 
+/** Subscore keys arrive camelCased from the engine; readers get words. */
+function humanizeSubScore(name: string): string {
+  return name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
 export interface LlmInsightsProps {
   axes: EvalAxisDto[];
   scenarios: ScenarioReportDto[];
@@ -37,7 +42,7 @@ export function LlmInsights({ axes, scenarios }: LlmInsightsProps) {
           {axis.subScores ? (
             <Stack gap={2}>
               {Object.entries(axis.subScores).map(([name, value]) => (
-                <Meter key={name} label={name} value={value} />
+                <Meter key={name} label={humanizeSubScore(name)} value={value} />
               ))}
             </Stack>
           ) : null}

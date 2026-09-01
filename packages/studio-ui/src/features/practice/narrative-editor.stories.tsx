@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph, makePrompt } from '../../testing/fixtures';
 import { withCanvasStore } from '../../testing/story-decorators';
 import { NarrativeEditor } from './narrative-editor';
 
 const meta: Meta<typeof NarrativeEditor> = {
   title: 'Studio/Practice/NarrativeEditor',
   component: NarrativeEditor,
+  args: { prompt: makePrompt() },
 };
 export default meta;
 

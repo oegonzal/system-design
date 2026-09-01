@@ -1,7 +1,13 @@
 'use client';
 
 import styled from '@emotion/styled';
-import { NARRATIVE_MAX_LENGTH, unmentionedNodeLabels } from '@sysdesign/contracts';
+import {
+  NARRATIVE_MAX_LENGTH,
+  hasFlowStory,
+  unaddressedNfrKinds,
+  unmentionedNodeLabels,
+  type PromptDto,
+} from '@sysdesign/contracts';
 import { Badge, Stack, Text } from '@sysdesign/design-system';
 import { useMemo } from 'react';
 
@@ -21,17 +27,24 @@ function countWords(text: string): number {
   return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
 }
 
+export interface NarrativeEditorProps {
+  /** The practice prompt, so the checklist can track its requirements. */
+  prompt: PromptDto | null;
+}
+
 /**
  * The design-narrative author box. Reads and writes the canvas store
- * directly: the textarea edits `narrative`, and the coverage checklist runs
- * the same `unmentionedNodeLabels` helper the eval engine grades with — the
- * author can never be told "covered" by one definition and scored by
- * another. Ghost (suggested-fix preview) nodes are not the author's
- * components yet, so they never appear in the checklist.
+ * directly: the textarea edits `narrative`, and every checklist runs the
+ * same contracts helpers the eval engine grades with (`unmentionedNodeLabels`,
+ * `unaddressedNfrKinds`, `hasFlowStory`) — the author can never be told
+ * "covered" by one definition and scored by another. Ghost (suggested-fix
+ * preview) nodes are not the author's components yet, so they never appear
+ * in the checklist.
  */
-export function NarrativeEditor() {
+export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
   const narrative = useCanvasStore((state) => state.narrative);
   const nodes = useCanvasStore((state) => state.nodes);
+  const edgeCount = useCanvasStore((state) => state.edges.length);
   const setNarrative = useCanvasStore((state) => state.setNarrative);
 
   const labeledCount = useMemo(
@@ -51,14 +64,20 @@ export function NarrativeEditor() {
       ),
     [nodes, narrative],
   );
+  const unaddressed = useMemo(() => {
+    if (prompt === null) return [];
+    const kinds = [...new Set(prompt.nonFunctionalRequirements.map((nfr) => nfr.kind))];
+    return unaddressedNfrKinds(kinds, narrative);
+  }, [prompt, narrative]);
 
   const words = countWords(narrative);
+  const missingFlow = words > 0 && edgeCount > 0 && !hasFlowStory(narrative);
 
   return (
     <Stack gap={3}>
       <Text size="sm" tone="muted">
-        Explain what each component is for and how they work together to meet the requirements — the
-        evaluation reads this along with the diagram.
+        The story is graded with the diagram: say what each component is for, how a request flows
+        between them, and which requirement each mechanism serves.
       </Text>
       <TextAreaField
         label="Design narrative"
@@ -88,6 +107,27 @@ export function NarrativeEditor() {
           ))}
         </ChipRow>
       )}
+      {prompt === null ? null : unaddressed.length === 0 ? (
+        <Text size="sm" tone="muted" data-testid="narrative-nfr-covered">
+          Every requirement kind is addressed.
+        </Text>
+      ) : (
+        <ChipRow data-testid="narrative-nfr-unaddressed">
+          <Text size="sm" tone="muted">
+            Requirements not yet addressed:
+          </Text>
+          {unaddressed.map((kind) => (
+            <Badge key={kind} tone="neutral">
+              {kind}
+            </Badge>
+          ))}
+        </ChipRow>
+      )}
+      {missingFlow ? (
+        <Text size="sm" tone="muted" data-testid="narrative-flow-hint">
+          No flow verbs yet — narrate the arrows: who calls whom, what is written where.
+        </Text>
+      ) : null}
     </Stack>
   );
 }
