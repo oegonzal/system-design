@@ -1,5 +1,12 @@
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type { EdgeKind, NodeKind, OperationKind } from '@sysdesign/contracts';
+import type {
+  EdgeKind,
+  EvalDimension,
+  MechanismClaim,
+  NodeKind,
+  OperationKind,
+  PromptDto,
+} from '@sysdesign/contracts';
 
 import { createPracticeSession } from './backend';
 
@@ -201,6 +208,79 @@ export class CanvasPage {
     await this.narrativeEditor.fill(text);
   }
 
+  // --- the design brief --------------------------------------------------
+
+  get briefTab(): Locator {
+    return this.page.getByRole('tab', { name: 'Brief' });
+  }
+
+  bindingRow(nfrId: string): Locator {
+    return this.page.getByTestId(`binding-row-${nfrId}`);
+  }
+
+  /**
+   * Claim a requirement is held by this mechanism. By test id rather than by
+   * role: every field here wraps its control in the `<label>`, and the picker
+   * that follows is keyed by the same requirement id.
+   */
+  async bindMechanism(nfrId: string, mechanism: MechanismClaim): Promise<void> {
+    await this.briefTab.click();
+    await this.page.getByTestId(`binding-mechanism-${nfrId}`).selectOption(mechanism);
+  }
+
+  /** Tick one of the components the mechanism admits. */
+  async toggleBindingNode(nfrId: string, nodeId: string): Promise<void> {
+    await this.page.getByTestId(`binding-node-${nfrId}-${nodeId}`).click();
+  }
+
+  /**
+   * Trace a request by taking the offered hops in order.
+   *
+   * Note what this does NOT do: click edges on the canvas. The builder offers
+   * only edges that continue the walk, as buttons in the dock — so a broken
+   * path is unrepresentable, and this sidesteps the bezier hit-target problem
+   * `selectEdge` has to work around.
+   */
+  async traceFlow(requirementIndex: number, edgeIds: readonly string[]): Promise<void> {
+    await this.briefTab.click();
+    for (const edgeId of edgeIds) {
+      await this.page.getByTestId(`flow-hop-${requirementIndex}-${edgeId}`).click();
+    }
+  }
+
+  /** The live verdict beside a binding: corroborated / uncorroborated / … */
+  async expectBindingVerdict(nfrId: string, tone: string): Promise<void> {
+    await expect(this.bindingRow(nfrId).getByTestId('mechanism-verdict')).toHaveAttribute(
+      'data-tone',
+      tone,
+    );
+  }
+
+  async expectFlowComplete(requirementIndex: number): Promise<void> {
+    await expect(this.page.getByTestId(`flow-status-${requirementIndex}`)).toContainText(
+      'Traced end to end',
+    );
+  }
+
+  /**
+   * A dimension the rubric actually assessed. `not-assessed-<dimension>` is
+   * rendered in place of the meter when the score is null, so its absence
+   * beside a visible summary is the assertion.
+   */
+  async expectDimensionScored(dimension: EvalDimension): Promise<void> {
+    await expect(this.page.getByTestId('score-summary')).toContainText(dimension);
+    await expect(this.page.getByTestId(`not-assessed-${dimension}`)).toHaveCount(0);
+  }
+
+  async askForSuggestions(): Promise<void> {
+    await this.briefTab.click();
+    await this.page.getByTestId('ask-for-suggestions').click();
+  }
+
+  async expectNoSuggestionsOffered(): Promise<void> {
+    await expect(this.page.getByTestId('suggestions-empty')).toBeVisible();
+  }
+
   async expectNodeCount(count: number): Promise<void> {
     await expect(this.canvas.locator('.react-flow__node')).toHaveCount(count);
   }
@@ -335,16 +415,30 @@ export class CanvasPage {
   }
 }
 
+/**
+ * Arrange a fresh practice session and land on its canvas, keeping the prompt.
+ *
+ * The prompt is generated per test, so its requirement ids and the number of
+ * functional requirements are not literals a spec may hard-code — anything
+ * binding a requirement has to read them off the prompt it was actually given.
+ */
+export async function openPracticeSessionWithPrompt(
+  page: Page,
+  request: APIRequestContext,
+): Promise<{ canvas: CanvasPage; prompt: PromptDto }> {
+  const { prompt, session } = await createPracticeSession(request);
+  await page.goto(`/practice/${session.id}`);
+  const canvas = new CanvasPage(page);
+  await canvas.ready();
+  return { canvas, prompt };
+}
+
 /** Arrange a fresh practice session over the API and land on its canvas. */
 export async function openPracticeSession(
   page: Page,
   request: APIRequestContext,
 ): Promise<CanvasPage> {
-  const { session } = await createPracticeSession(request);
-  await page.goto(`/practice/${session.id}`);
-  const canvas = new CanvasPage(page);
-  await canvas.ready();
-  return canvas;
+  return (await openPracticeSessionWithPrompt(page, request)).canvas;
 }
 
 /**

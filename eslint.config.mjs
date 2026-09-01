@@ -115,6 +115,10 @@ export default [
             'expectScoreTrendIncreasing',
             'expectEdgePill',
             'expectNodeMeta',
+            'expectBindingVerdict',
+            'expectFlowComplete',
+            'expectDimensionScored',
+            'expectNoSuggestionsOffered',
             // app-nav.ts
             'expectActiveNav',
             // stories.page.ts
