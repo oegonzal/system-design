@@ -449,3 +449,48 @@ describe('scalability.shard-key-unnamed', () => {
     expect(rule.check(contextFor(stream))).toHaveLength(1);
   });
 });
+
+/**
+ * The same move the design brief made one level up: the author supplies the
+ * claim and the engine checks it holds, instead of the engine asserting a
+ * number on their behalf and grading the arithmetic against its own guess.
+ */
+describe('scalability.capacity-replicas-insufficient — declared capacity', () => {
+  const rule = ruleById('scalability.capacity-replicas-insufficient');
+  // flashSaleFacts peaks at 8000 req/s.
+  // Fronted by an edge tier, which is what brings the rule into scope at all.
+  const tier = (config: Record<string, number>) =>
+    graph(
+      [
+        node('client-1', 'client'),
+        node('lb-1', 'load-balancer'),
+        node('svc-1', 'service', { config }),
+      ],
+      [edge('e1', 'client-1', 'lb-1'), edge('e2', 'lb-1', 'svc-1')],
+    );
+
+  it('uses the default when the author states nothing', () => {
+    // 2 × 3000 = 6000, short of 8000.
+    expect(rule.check(contextFor(tier({ replicas: 2 })))).toHaveLength(1);
+    // 3 × 3000 = 9000, enough.
+    expect(rule.check(contextFor(tier({ replicas: 3 })))).toEqual([]);
+  });
+
+  it('checks the author’s own arithmetic when they state a figure', () => {
+    // Two replicas is plenty if each really does serve 5000 req/s.
+    expect(rule.check(contextFor(tier({ replicas: 2, rpsPerInstance: 5000 })))).toEqual([]);
+    // …and a modest instance makes the same replica count insufficient.
+    expect(rule.check(contextFor(tier({ replicas: 3, rpsPerInstance: 500 })))).toHaveLength(1);
+  });
+
+  it('says whose number it used, so the arithmetic can be argued with', () => {
+    const mine = rule.check(contextFor(tier({ replicas: 3, rpsPerInstance: 500 })));
+    expect(mine[0].message).toContain('your own figure');
+    const ours = rule.check(contextFor(tier({ replicas: 2 })));
+    expect(ours[0].message).toContain('a generous default');
+  });
+
+  it('ignores a nonsense figure rather than dividing by it', () => {
+    expect(rule.check(contextFor(tier({ replicas: 3, rpsPerInstance: 0 })))).toEqual([]);
+  });
+});

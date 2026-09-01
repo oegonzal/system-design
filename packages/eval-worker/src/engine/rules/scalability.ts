@@ -1,7 +1,7 @@
 /**
  * Scalability: does throughput grow without a single component melting first?
  */
-import type { PatchOp } from '@sysdesign/contracts';
+import type { CanvasNode, PatchOp } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
 import {
@@ -23,6 +23,23 @@ import {
  * sanely must pass; only designs off by a multiple should hear about it.
  */
 export const PER_REPLICA_RPS = { service: 3000, gateway: 10000, worker: 1000 } as const;
+
+/**
+ * What one instance of this node serves — the author's number when they state
+ * one, ours when they do not.
+ *
+ * The engine used to assert 3000 req/s per service replica and grade the
+ * arithmetic against its own assumption, which is the one number in a capacity
+ * argument an engineer would actually have measured. Declaring
+ * `rpsPerInstance` moves the check from "does your replica count match OUR
+ * assumption" to "does it match YOUR arithmetic" — which is the same move the
+ * design brief made one level up: the author supplies the claim, the engine
+ * checks it holds.
+ */
+export function perInstanceRps(node: CanvasNode, fallback: number): number {
+  const declared = configNumber(node, 'rpsPerInstance');
+  return declared !== undefined && declared > 0 ? declared : fallback;
+}
 
 /**
  * Writes/s a single unsharded primary is assumed to absorb before write
@@ -218,14 +235,16 @@ const capacityReplicasInsufficient: EvalRule = {
     for (const service of sortById(index.byKind('service'))) {
       if (!frontedByEdgeTier(index, clients, service)) continue;
       const replicas = replicasOf(service);
-      if (rps <= replicas * PER_REPLICA_RPS.service) continue;
-      const needed = Math.ceil(rps / PER_REPLICA_RPS.service);
+      const perInstance = perInstanceRps(service, PER_REPLICA_RPS.service);
+      if (rps <= replicas * perInstance) continue;
+      const needed = Math.ceil(rps / perInstance);
+      const declared = configNumber(service, 'rpsPerInstance') !== undefined;
       findings.push({
         ruleId: capacityReplicasInsufficient.id,
         dimension: 'scalability',
         severity: 'high',
         title: 'Service tier undersized for the stated peak',
-        message: `The prompt peaks at ${formatInt(rps)} req/s and "${service.label}" runs ${replicas} replica${replicas === 1 ? '' : 's'} — even at a generous ${formatInt(PER_REPLICA_RPS.service)} req/s per replica that is ${formatInt(replicas * PER_REPLICA_RPS.service)} req/s of capacity, short of the peak before any headroom. Back-of-envelope: peak ÷ per-replica rate says at least ${needed} replicas.`,
+        message: `The prompt peaks at ${formatInt(rps)} req/s and "${service.label}" runs ${replicas} replica${replicas === 1 ? '' : 's'} at ${formatInt(perInstance)} req/s each${declared ? ' — your own figure' : ', a generous default since none is stated'} — ${formatInt(replicas * perInstance)} req/s of capacity, short of the peak before any headroom. Back-of-envelope: peak ÷ per-instance rate says at least ${needed} replicas.`,
         affectedNodeIds: [service.id],
         affectedEdgeIds: [],
         suggestion: {

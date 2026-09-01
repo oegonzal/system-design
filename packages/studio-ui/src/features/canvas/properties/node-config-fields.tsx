@@ -126,6 +126,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
       return (
         <>
           {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
+          {numberRow(config, setKey, 'rpsPerInstance', 'Req/s per instance')}
           {checkboxRow(config, setKey, 'autoscaling', 'Autoscaling')}
           {textRow(config, setKey, 'region', 'Region')}
           {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
@@ -134,6 +135,7 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
     case 'worker':
       return (
         <>
+          {numberRow(config, setKey, 'rpsPerInstance', 'Req/s per instance')}
           {numberRow(config, setKey, 'replicas', 'Replicas', { max: 99 })}
           {numberRow(config, setKey, 'concurrency', 'Concurrency')}
           {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
