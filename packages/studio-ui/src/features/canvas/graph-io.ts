@@ -59,6 +59,7 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
         source: edge.source,
         target: edge.target,
         kind: edge.data?.kind ?? 'sync',
+        ...(edge.data?.intent ? { intent: edge.data.intent } : {}),
       };
       if (typeof edge.label === 'string' && edge.label.length > 0) out.label = edge.label;
       if (edge.data?.carries && edge.data.carries.length > 0) {
@@ -95,6 +96,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
     ...(edge.label !== undefined ? { label: edge.label } : {}),
     data: {
       kind: edge.kind ?? 'sync',
+      ...(edge.intent ? { intent: edge.intent } : {}),
       ...(edge.carries ? { carries: [...edge.carries] } : {}),
     },
   }));

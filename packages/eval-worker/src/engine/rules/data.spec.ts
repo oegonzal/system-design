@@ -400,3 +400,38 @@ describe('data.stream-no-retention', () => {
     );
   });
 });
+
+/**
+ * Intent is what lets an honest diagram stop being punished for its honesty.
+ * The rule presumes a service touching a store may write it — which is right
+ * when nothing is stated — so an author who draws the read path and the write
+ * path separately used to be flagged for a race between them.
+ */
+describe('data.multi-writer-inventory — declared intent', () => {
+  const rule = ruleById('data.multi-writer-inventory');
+
+  const consistencyFacts = flashSaleFacts({
+    nfrKinds: [...flashSaleFacts().nfrKinds, 'consistency'],
+  });
+
+  const twoServices = (readerIntent?: 'read' | 'write') =>
+    graph(
+      [node('svc-1', 'service'), node('svc-2', 'service'), node('db-1', 'database')],
+      [
+        edge('e1', 'svc-1', 'db-1'),
+        { ...edge('e2', 'svc-2', 'db-1'), ...(readerIntent ? { intent: readerIntent } : {}) },
+      ],
+    );
+
+  it('still fires when nothing is declared — silence presumes nothing changed', () => {
+    expect(rule.check(contextFor(twoServices(), consistencyFacts))).toHaveLength(1);
+  });
+
+  it('stops firing once one side is declared read-only', () => {
+    expect(rule.check(contextFor(twoServices('read'), consistencyFacts))).toEqual([]);
+  });
+
+  it('keeps firing when both are declared writers', () => {
+    expect(rule.check(contextFor(twoServices('write'), consistencyFacts))).toHaveLength(1);
+  });
+});

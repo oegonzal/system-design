@@ -2,6 +2,7 @@
 
 import styled from '@emotion/styled';
 import {
+  EDGE_INTENTS,
   EDGE_KINDS,
   INTERFACE_CAPABILITIES,
   NODE_KIND_CATEGORIES,
@@ -11,6 +12,7 @@ import {
   kindsInCategory,
   resolveInterfaceOwner,
   type NodeKind,
+  type EdgeIntent,
 } from '@sysdesign/contracts';
 import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
 
@@ -180,6 +182,29 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
             {EDGE_KINDS.map((kind) => (
               <option key={kind} value={kind}>
                 {kind === 'sync' ? 'sync (request/response)' : 'async (fire-and-forget)'}
+              </option>
+            ))}
+          </SelectField>
+
+          {/*
+            What the connection is FOR, beside how it is called. Optional: the
+            engine presumes nothing from silence, and declaring `read` is what
+            keeps an honestly-drawn read path from being counted as a writer.
+          */}
+          <SelectField
+            label="Intent"
+            data-testid="edge-intent"
+            value={edge.data?.intent ?? ''}
+            onChange={(event) =>
+              updateEdge(edge.id, {
+                intent: (event.target.value || undefined) as EdgeIntent | undefined,
+              })
+            }
+          >
+            <option value="">Not stated</option>
+            {EDGE_INTENTS.map((intent) => (
+              <option key={intent} value={intent}>
+                {intent}
               </option>
             ))}
           </SelectField>

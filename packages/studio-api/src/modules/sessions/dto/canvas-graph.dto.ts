@@ -16,6 +16,7 @@ import {
   CANVAS_ID_MAX_LENGTH,
   CANVAS_MAX_EDGES,
   CANVAS_MAX_NODES,
+  EDGE_INTENTS,
   EDGE_KINDS,
   EDGE_LABEL_MAX_LENGTH,
   EDGE_MAX_CARRIES,
@@ -30,6 +31,7 @@ import {
   type CanvasEdge,
   type CanvasGraph,
   type CanvasNode,
+  type EdgeIntent,
   type EdgeKind,
   type NodeConfig,
   type NodeKind,
@@ -127,6 +129,10 @@ export class CanvasEdgeDto implements CanvasEdge {
   @IsOptional()
   @IsIn([...EDGE_KINDS])
   kind?: EdgeKind;
+
+  @IsOptional()
+  @IsIn([...EDGE_INTENTS])
+  intent?: EdgeIntent;
 
   @IsOptional()
   @IsString()

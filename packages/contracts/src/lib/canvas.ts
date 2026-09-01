@@ -283,6 +283,21 @@ export const EDGE_KINDS = ['sync', 'async'] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];
 
 /**
+ * What a connection is FOR, as opposed to how it is called.
+ *
+ * `kind` says sync or async; this says read or write. The engine used to
+ * presume the difference from the endpoints — a service touching a database
+ * was a writer — which made an honest diagram worse than a vague one: draw the
+ * read path and the write path separately and you were flagged for two writers
+ * racing on a store only one of them mutates.
+ *
+ * Optional on purpose. A design that says nothing is read exactly as it was
+ * before; declaring intent can only ever clarify, never newly incriminate.
+ */
+export const EDGE_INTENTS = ['read', 'write', 'replicate', 'publish', 'consume', 'batch'] as const;
+export type EdgeIntent = (typeof EDGE_INTENTS)[number];
+
+/**
  * Per-node knobs some eval rules read (`replicas`, `dlq`, `rateLimit`, …).
  * A flat scalar record rather than per-kind shapes: the canvas edits it
  * generically and rules read specific keys defensively.
@@ -334,6 +349,8 @@ export interface CanvasEdge {
   target: string;
   /** Defaults to `sync` when omitted. */
   kind?: EdgeKind;
+  /** What the connection is for. Undeclared means the engine presumes nothing. */
+  intent?: EdgeIntent;
   label?: string;
   /**
    * Operation names this edge exercises, resolved against the edge's

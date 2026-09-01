@@ -1,4 +1,11 @@
-import type { EdgeKind, NodeConfig, NodeKind, NodeOperation, Severity } from '@sysdesign/contracts';
+import type {
+  EdgeIntent,
+  EdgeKind,
+  NodeConfig,
+  NodeKind,
+  NodeOperation,
+  Severity,
+} from '@sysdesign/contracts';
 import type { Edge, Node } from '@xyflow/react';
 
 /**
@@ -25,6 +32,7 @@ export type SdNode = Node<SdNodeData, 'sd'>;
 
 export type SdEdgeData = {
   kind: EdgeKind;
+  intent?: EdgeIntent;
   carries?: string[];
   ghost?: boolean;
   severity?: Severity | null;

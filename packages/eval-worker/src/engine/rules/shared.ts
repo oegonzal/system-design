@@ -2,7 +2,7 @@
  * Small helpers every rule file leans on. All pure; anything that could vary
  * by environment (locales, clocks) is reimplemented deterministically here.
  */
-import { SUGGESTED_ID_PREFIX, type CanvasNode } from '@sysdesign/contracts';
+import { SUGGESTED_ID_PREFIX, type CanvasEdge, type CanvasNode } from '@sysdesign/contracts';
 
 import type { GraphIndex } from '../graph-index';
 
@@ -40,6 +40,23 @@ export function uniqueSorted(ids: readonly string[]): string[] {
 }
 
 /** Reads a numeric config knob defensively — anything non-numeric is "unset". */
+/**
+ * Whether an edge mutates what it points at.
+ *
+ * Intent is optional, so absence has to mean "presume nothing has changed":
+ * an undeclared edge counts as a possible writer exactly as it always did.
+ * Declaring `read` is the only thing that buys an author out — which is why
+ * declaring intent can clarify a design but never newly incriminate one.
+ */
+export function mayWrite(edge: CanvasEdge): boolean {
+  return edge.intent !== 'read' && edge.intent !== 'consume';
+}
+
+/** Whether the author has said, in so many words, that this edge only reads. */
+export function declaredReadOnly(edge: CanvasEdge): boolean {
+  return edge.intent === 'read';
+}
+
 export function configNumber(node: CanvasNode, key: string): number | undefined {
   const value = node.config?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;

@@ -2,6 +2,7 @@ import type {
   BriefBindingProposal,
   CanvasGraph,
   DesignBrief,
+  EdgeIntent,
   EdgeKind,
   FlowBinding,
   GraphPatch,
@@ -140,7 +141,10 @@ export interface CanvasState {
       operations?: NodeOperation[];
     },
   ): void;
-  updateEdge(id: string, patch: { kind?: EdgeKind; label?: string; carries?: string[] }): void;
+  updateEdge(
+    id: string,
+    patch: { kind?: EdgeKind; intent?: EdgeIntent; label?: string; carries?: string[] },
+  ): void;
   removeSelected(): void;
   select(id: string | null): void;
   setHighlight(highlight: HighlightState): void;
@@ -331,6 +335,11 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
                 ...(patch.label !== undefined ? { label: patch.label } : {}),
                 data: {
                   kind: patch.kind ?? edge.data?.kind ?? 'sync',
+                  ...(patch.intent !== undefined
+                    ? { intent: patch.intent }
+                    : edge.data?.intent !== undefined
+                      ? { intent: edge.data.intent }
+                      : {}),
                   // The rebuilt literal must pass carries through: a kind-only
                   // patch keeps the existing list, and `carries: []` clears it
                   // (serialization omits empty lists).

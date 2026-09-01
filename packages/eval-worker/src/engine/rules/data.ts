@@ -4,7 +4,7 @@
 import type { NodeKind } from '@sysdesign/contracts';
 
 import type { EvalRule, RuleFinding } from '../types';
-import { configNumber, formatInt, sortById, SuggestedIds, uniqueSorted } from './shared';
+import { configNumber, formatInt, mayWrite, sortById, SuggestedIds, uniqueSorted } from './shared';
 
 const mixedOltpAnalytics: EvalRule = {
   id: 'data.mixed-oltp-analytics',
@@ -244,11 +244,13 @@ const multiWriterInventory: EvalRule = {
     if (!facts.nfrKinds.includes('consistency')) return [];
     const findings: RuleFinding[] = [];
     for (const db of sortById(index.byKind('database'))) {
-      const writerEdges = index
-        .inEdges(db.id)
-        .filter(
-          (edge) => index.edgeKind(edge) === 'sync' && index.byId(edge.source)?.kind === 'service',
-        );
+      const writerEdges = index.inEdges(db.id).filter(
+        (edge) =>
+          index.edgeKind(edge) === 'sync' &&
+          index.byId(edge.source)?.kind === 'service' &&
+          // A service the author has declared read-only is not in the race.
+          mayWrite(edge),
+      );
       const writerIds = uniqueSorted(writerEdges.map((edge) => edge.source));
       if (writerIds.length < 2) continue;
       findings.push({

@@ -20,7 +20,7 @@ make them structural rather than conventional:
 
 ```
 studio-ui                studio-api                       Postgres            eval-worker
-   │                        │                                │                     │
+   │                        │                                 │                     │
    ├─ POST /sessions/:id/revisions ─────────────────────────► │                     │
    │                        ├─ DTO validation (400)           │                     │
    │                        ├─ referential validation (422)   │                     │
