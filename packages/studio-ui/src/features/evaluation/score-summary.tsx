@@ -1,7 +1,11 @@
 'use client';
 
 import styled from '@emotion/styled';
-import { EVAL_DIMENSIONS, type EvaluationDto } from '@sysdesign/contracts';
+import {
+  EVAL_DIMENSIONS,
+  UNMODELLED_QUALITY_AREAS,
+  type EvaluationDto,
+} from '@sysdesign/contracts';
 import { Badge, Meter, Stack, Text } from '@sysdesign/design-system';
 
 const ScoreRow = styled.div`
@@ -73,6 +77,18 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
           })}
         </Stack>
       ) : null}
+
+      {/*
+        The edge of the map. A score out of 100 invites the reading that 100
+        means the design is good, rather than that nothing the engine knows how
+        to check is missing — and the gap between those is where a reviewer's
+        first questions live. Naming it costs one line and stops the number
+        teaching the wrong lesson.
+      */}
+      <Text size="sm" tone="muted" data-testid="unassessed-areas">
+        Outside this rubric:{' '}
+        {UNMODELLED_QUALITY_AREAS.map((area) => area.label.toLowerCase()).join(', ')}.
+      </Text>
     </Stack>
   );
 }

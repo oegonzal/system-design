@@ -482,3 +482,20 @@ describe('aggregate — scoring trace', () => {
     expect(hygiene?.penalties).toEqual([]);
   });
 });
+
+/**
+ * A teaching tool that overclaims at full marks teaches the wrong lesson. The
+ * summary used to say a clean run "covers the load-bearing concerns for this
+ * prompt", which asserts something the engine cannot know.
+ */
+describe('aggregate — the summary does not overclaim', () => {
+  it('says nothing it checks is missing, not that the design is good', () => {
+    const result = aggregate([fullCoverage()], DEFAULT_PROFILE);
+
+    expect(result.overallScore).toBe(100);
+    expect(result.summary).toContain('Nothing this rubric checks is missing');
+    expect(result.summary).not.toContain('covers the load-bearing concerns');
+    // …and it names the edge of the map rather than leaving it implied.
+    expect(result.summary).toMatch(/cost|rollout|outside what this can see/i);
+  });
+});

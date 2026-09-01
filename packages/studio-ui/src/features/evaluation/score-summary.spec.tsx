@@ -67,3 +67,17 @@ describe('ScoreSummary', () => {
     expect(screen.queryAllByRole('meter')).toHaveLength(0);
   });
 });
+
+/**
+ * A score out of 100 invites the reading that 100 means the design is good,
+ * rather than that nothing the engine checks is missing. The gap is where a
+ * reviewer's first questions live, so the panel names it.
+ */
+describe('ScoreSummary — the edge of the rubric', () => {
+  it('names what it does not assess at all', () => {
+    renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
+    const text = screen.getByTestId('unassessed-areas').textContent ?? '';
+    expect(text).toContain('cost');
+    expect(text).toContain('migration and rollout');
+  });
+});

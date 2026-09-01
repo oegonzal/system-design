@@ -477,7 +477,12 @@ function composeSummary(
   }
 
   if (actionable.length === 0) {
-    return `No blocking issues found — the design covers the load-bearing concerns for this prompt. Every dimension holds at or near full marks, led by ${strongest} at ${scores[strongest]}/100. Overall ${overall}/100, grade ${grade}.`;
+    // Deliberately narrower than it used to be. This said "the design covers
+    // the load-bearing concerns for this prompt", which claims something the
+    // engine cannot know: it checked what it models, and cost, rollout, schema
+    // design and team shape are not among them. A teaching tool that overclaims
+    // at full marks teaches the wrong lesson.
+    return `Nothing this rubric checks is missing — every assessed dimension holds at or near full marks, led by ${strongest} at ${scores[strongest]}/100. That is not the same as a finished design: cost, rollout, data modelling and operability sit outside what this can see. Overall ${overall}/100, grade ${grade}.`;
   }
 
   const topTitles = actionable.slice(0, 3).map((finding) => finding.title);

@@ -18,6 +18,7 @@ export * from './lib/interfaces';
 export * from './lib/patches';
 export * from './lib/experiences';
 export * from './lib/prompts';
+export * from './lib/quality-areas';
 export * from './lib/sessions';
 export * from './lib/graph-render';
 export * from './lib/mechanisms';
