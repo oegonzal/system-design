@@ -172,7 +172,7 @@ describe('poller (integration)', () => {
     });
 
     expect(done.profileId).toBe('default');
-    expect(done.profileVersion).toBe('2.1.0');
+    expect(done.profileVersion).toBe('2.2.0');
     const artifactKinds = (done.evidence ?? []).map(
       (artifact) => (artifact as { kind: string }).kind,
     );

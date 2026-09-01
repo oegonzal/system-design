@@ -16,7 +16,7 @@ import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '2.1.0',
+  version: '2.2.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -43,15 +43,20 @@ export const DEFAULT_PROFILE: EvalProfile = {
     violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
     violationDecay: 0.7,
     // How much each dimension contributes to the overall score; sums to 1
-    // (validateProfile enforces it).
+    // (validateProfile enforces it). Communication holds 0.10 and the seven
+    // diagram dimensions keep their original ratios (×0.9) — so when no
+    // narrative is submitted and communication scores null, renormalization
+    // restores the exact pre-communication weighting and every calibration
+    // pin is unchanged.
     dimensionWeights: {
-      reliability: 0.2,
-      scalability: 0.25,
-      performance: 0.15,
-      data: 0.15,
-      messaging: 0.1,
-      security: 0.1,
-      hygiene: 0.05,
+      reliability: 0.18,
+      scalability: 0.225,
+      performance: 0.135,
+      data: 0.135,
+      messaging: 0.09,
+      security: 0.09,
+      hygiene: 0.045,
+      communication: 0.1,
     },
     gradeBands: { A: 92, B: 82, C: 68, D: 50 },
     gradeCaps: [

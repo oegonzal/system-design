@@ -30,6 +30,11 @@ test.describe('the critic pipeline', () => {
     // 0–100, possibly fractional (weighted dimension means, e.g. "74.3").
     await expect(page.getByTestId('overall-score')).toHaveText(/^\d{1,3}(\.\d+)?$/);
     for (const dimension of EVAL_DIMENSIONS) {
+      if (dimension === 'communication') {
+        // No narrative was submitted, so the prose dimension is not assessed.
+        await expect(page.getByTestId('not-assessed-communication')).toBeVisible();
+        continue;
+      }
       await expect(page.getByRole('meter', { name: dimension })).toBeVisible();
     }
   });

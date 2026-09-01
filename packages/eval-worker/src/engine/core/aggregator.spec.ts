@@ -261,7 +261,7 @@ describe('aggregate — coverage model', () => {
       [fullCoverage(), findingsArtifact([finding({ dimension: 'hygiene' })])],
       DEFAULT_PROFILE,
     );
-    expect(one.overallScore).toBe(98.3);
+    expect(one.overallScore).toBe(98.4);
     expect(one.bandGrade).toBe('A');
     expect(one.grade).toBe('C');
     expect(one.capApplied).toEqual({ severity: 'critical', count: 1, maxGrade: 'C' });
@@ -280,11 +280,20 @@ describe('aggregate — coverage model', () => {
     expect(two.capApplied?.count).toBe(2);
 
     // A grade already at or below the cap reports no cap at all.
+    // Two zeroed dimensions: with communication in the rubric, reliability
+    // alone (weight .18) leaves the numeric grade at 82/B — above the cap.
+    const zeroed = new Set(['reliability', 'performance']);
     const alreadyLow = aggregate(
       [
         coverageArtifact([
           coverageEntry({ expectationId: 'exp.unpaired', met: false }),
-          ...EVAL_DIMENSIONS.filter((dimension) => dimension !== 'reliability').map((dimension) =>
+          coverageEntry({
+            expectationId: 'exp.test.performance-unmet',
+            dimension: 'performance',
+            weight: 1,
+            met: false,
+          }),
+          ...EVAL_DIMENSIONS.filter((dimension) => !zeroed.has(dimension)).map((dimension) =>
             coverageEntry({
               expectationId: `exp.test.${dimension}`,
               dimension,
