@@ -16,6 +16,16 @@
  */
 import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
 import type { LlmCall, LlmExchange } from '@sysdesign/llm';
+import {
+  capText,
+  describeError,
+  DUMP_SCHEMA_VERSION,
+  jsonSafe,
+  type BuiltDump,
+  type DumpFile,
+  type ErrorShape,
+  type GitContext,
+} from '@sysdesign/run-dump';
 
 import type { AggregateResult } from '../engine/core/aggregator';
 import type { EvidenceArtifact } from '../engine/core/artifacts';
@@ -23,10 +33,6 @@ import type { EvalProfile } from '../engine/core/profile';
 import type { PassRecorder } from '../engine/core/orchestrator';
 import type { EvalPass } from '../engine/core/types';
 import type { PromptFacts } from '../engine/types';
-import { capText, describeError, jsonSafe, type ErrorShape } from './serialize';
-
-/** Bump when a field changes meaning, so a later reader can tell records apart. */
-export const DUMP_SCHEMA_VERSION = 1;
 
 export interface PassRecord {
   passId: string;
@@ -83,11 +89,6 @@ export interface EvalDumpState {
   result: AggregateResult | null;
   persisted: { evaluationId: string; findingCount: number } | null;
   error: ErrorShape | null;
-}
-
-export interface GitContext {
-  branch: string;
-  headSha: string;
 }
 
 /**
@@ -187,19 +188,6 @@ export function startEvalDump(options: {
       state.error = describeError(error);
     },
   };
-}
-
-export interface DumpFile {
-  /** Relative to the run folder. */
-  path: string;
-  content: string;
-}
-
-export interface BuiltDump {
-  runId: string;
-  files: DumpFile[];
-  /** One flat line for `index.jsonl`, appended only once the folder is whole. */
-  indexRow: string;
 }
 
 const json = (value: unknown): string => `${JSON.stringify(jsonSafe(value), null, 2)}\n`;

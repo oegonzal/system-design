@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -8,8 +9,10 @@ import type { FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { DEFAULT_LIST_LIMIT, type PromptDifficulty, type PromptStatus } from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt } from '@sysdesign/db';
-import type { LlmClient } from '@sysdesign/llm';
+import { asRecordable, type LlmClient } from '@sysdesign/llm';
+import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
+import { buildPromptDump, startPromptDump, type PromptDump, type PromptDumpLlm } from './dump';
 import type { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
 import { enrichPrompt } from './generator/enrich-prompt';
 import { generatePrompt, GENERATOR_VERSION } from './generator/prompt-generator';
@@ -20,6 +23,8 @@ export const LLM_CLIENT = Symbol('LLM_CLIENT');
 
 @Injectable()
 export class PromptsService {
+  private readonly logger = new Logger(PromptsService.name);
+
   constructor(
     private readonly em: EntityManager,
     @Inject(LLM_CLIENT) private readonly llm: LlmClient,
@@ -66,31 +71,88 @@ export class PromptsService {
     difficulty: PromptDifficulty,
     seed: number,
   ): Promise<Prompt> {
-    const generated = generatePrompt({ experience, difficulty, seed });
-    // Prose polish only — scale targets and NFRs stay byte-deterministic.
-    const enriched = await enrichPrompt(this.llm, generated, experience);
-
-    const prompt = this.em.create(Prompt, {
-      experience,
-      // Denormalized so list filtering by archetype needs no join.
-      archetype: experience.archetype,
-      title: generated.title,
-      scenario: enriched.scenario,
-      functionalRequirements: enriched.functionalRequirements,
-      // From the generator, never from enriched prose: LLM polish must not be
-      // able to switch an eval rule on or off.
-      functionalCapabilities: generated.functionalCapabilities,
-      nonFunctionalRequirements: generated.nonFunctionalRequirements,
-      scaleTargets: generated.scaleTargets,
+    const dump = startPromptDump({
+      runId: makeRunId(Date.now(), 'prompt'),
+      now: Date.now(),
+      llm: this.llmStatus(),
+      git: GIT_CONTEXT,
+    });
+    dump.request({
+      experienceId: experience.id,
+      experienceSlug: experience.slug,
       difficulty,
       seed,
-      generatorVersion: GENERATOR_VERSION,
-      llmEnriched: enriched.llmEnriched,
     });
-    this.em.persist(prompt);
-    await this.em.flush();
 
-    return prompt;
+    try {
+      const generated = generatePrompt({ experience, difficulty, seed });
+      dump.generated(generated);
+
+      // Prose polish only — scale targets and NFRs stay byte-deterministic.
+      const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
+      const enriched = await enrichPrompt(llm, generated, experience);
+      dump.enriched(enriched);
+
+      const prompt = this.em.create(Prompt, {
+        experience,
+        // Denormalized so list filtering by archetype needs no join.
+        archetype: experience.archetype,
+        title: generated.title,
+        scenario: enriched.scenario,
+        functionalRequirements: enriched.functionalRequirements,
+        // From the generator, never from enriched prose: LLM polish must not be
+        // able to switch an eval rule on or off.
+        functionalCapabilities: generated.functionalCapabilities,
+        nonFunctionalRequirements: generated.nonFunctionalRequirements,
+        scaleTargets: generated.scaleTargets,
+        difficulty,
+        seed,
+        generatorVersion: GENERATOR_VERSION,
+        llmEnriched: enriched.llmEnriched,
+      });
+      this.em.persist(prompt);
+      await this.em.flush();
+
+      // After the flush, so the dump carries the id an evaluation will join on.
+      dump.persisted({
+        promptId: prompt.id,
+        llmEnriched: prompt.llmEnriched,
+        generatorVersion: prompt.generatorVersion,
+      });
+      return prompt;
+    } catch (error) {
+      dump.failed(error);
+      throw error;
+    } finally {
+      this.writeDump(dump);
+    }
+  }
+
+  /**
+   * Deliberately swallowing: this runs in a `finally`, so a throw here would
+   * replace whatever error generation was already reporting. An audit trail
+   * must never cost a request.
+   */
+  private writeDump(dump: PromptDump): void {
+    try {
+      writeDump(buildPromptDump(dump.state, Date.now()));
+    } catch (error) {
+      this.logger.warn(
+        `prompt run dump ${dump.state.runId} not written: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+    }
+  }
+
+  /** Derived facts only — the API key is never recorded, in any form. */
+  private llmStatus(): PromptDumpLlm {
+    const deterministic = process.env['EVAL_DETERMINISTIC'] === '1';
+    return {
+      enabled: this.llm.enabled,
+      model: this.llm.model,
+      reason: this.llm.enabled ? null : deterministic ? 'deterministic' : 'no-key',
+    };
   }
 
   async list(query: ListPromptsQueryDto): Promise<[Prompt[], number]> {

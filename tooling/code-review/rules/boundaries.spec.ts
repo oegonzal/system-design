@@ -24,10 +24,11 @@ describe('the dependency matrix', () => {
     ['criteria', ['contracts']],
     ['db', ['contracts']],
     ['llm', ['contracts']],
+    ['run-dump', []],
     ['design-system', ['contracts']],
     ['studio-ui', ['contracts', 'design-system']],
-    ['studio-api', ['contracts', 'db', 'llm', 'criteria']],
-    ['eval-worker', ['contracts', 'db', 'llm', 'criteria']],
+    ['studio-api', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
+    ['eval-worker', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
     expect(ALLOWED[pkg]).toEqual(allowed);
   });

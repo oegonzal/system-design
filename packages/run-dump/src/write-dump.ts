@@ -1,30 +1,53 @@
 /**
- * The only I/O in the dump path.
+ * Run-folder plumbing, shared by the two pipelines that dump.
  *
- * Three rules, each earned:
+ * What is shared is deliberately only the payload-AGNOSTIC half: a run id, a
+ * list of files, one index line. The records themselves stay in the apps that
+ * own their types — an evaluation dump is written against `EvidenceArtifact`
+ * and `AggregateResult`, a prompt dump against the generator's output, and
+ * neither vocabulary belongs in a package the other has to depend on.
  *
- * 1. **Never throw.** The caller invokes this from a `finally`. A throw there
+ * Three rules here, each earned:
+ *
+ * 1. **Never throw.** Callers invoke this from a `finally`. A throw there
  *    replaces whatever error the run was already reporting, turning a retryable
- *    failure into a crashed poll tick.
- * 2. **Write each file through a temp name and rename.** A worker killed
- *    mid-write must not leave half a JSON file behind for every later reader to
- *    trip over.
- * 3. **Append the index row last.** The row is the claim that a run folder is
- *    complete; a half-written folder must never be indexed. One small flat line
- *    per run keeps the append atomic, which matters because several worker
- *    processes can share this directory.
+ *    failure into a crashed loop.
+ * 2. **Write each file through a temp name and rename.** A process killed
+ *    mid-write must not leave half a JSON file for every later reader to trip
+ *    over.
+ * 3. **Append the index row last.** The row is the claim that a folder is
+ *    complete, so a half-written run is never indexed. One small flat line per
+ *    run keeps the append atomic — several processes share this directory.
  *
- * Synchronous `fs` is deliberate: the poller re-arms only after a tick settles,
- * so there is no throughput to protect, and async would only add an unawaited
- * promise to a path that must not fail.
+ * Synchronous `fs` is deliberate: neither caller has throughput to protect, and
+ * async would only add an unawaited promise to a path that must not fail.
  */
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
-import type { BuiltDump, GitContext } from './eval-dump';
+/** Bump when a field changes meaning, so a later reader can tell records apart. */
+export const DUMP_SCHEMA_VERSION = 1;
 
 export const INDEX_FILE = 'index.jsonl';
+
+export interface DumpFile {
+  /** Relative to the run folder. */
+  path: string;
+  content: string;
+}
+
+export interface BuiltDump {
+  runId: string;
+  files: DumpFile[];
+  /** One flat line for `index.jsonl`, appended only once the folder is whole. */
+  indexRow: string;
+}
+
+export interface GitContext {
+  branch: string;
+  headSha: string;
+}
 
 /**
  * `EVAL_DUMP_DIR` exists so test suites can point this at a temp directory —
@@ -79,7 +102,7 @@ export function findPromptRunId(promptId: string, dir = dumpDir()): string | nul
 }
 
 /**
- * Read once at module load, not per run: a long-lived worker's HEAD does not
+ * Read once at module load, not per run: a long-lived service's HEAD does not
  * move, and three `git` subprocesses on every submission is a real cost on a
  * background loop's hot path.
  */

@@ -23,9 +23,13 @@ export interface CappedText {
 export function capText(value: string, max = MAX_TEXT_BYTES): CappedText {
   const originalBytes = Buffer.byteLength(value, 'utf8');
   if (originalBytes <= max) return { text: value, truncated: false, originalBytes };
-  // Slice by bytes, then decode — a multi-byte character split at the boundary
-  // becomes a replacement char rather than corrupting the file.
-  const text = Buffer.from(value, 'utf8').subarray(0, max).toString('utf8');
+  // Decoded in stream mode so a multi-byte character straddling the boundary is
+  // DROPPED rather than replaced: `toString('utf8')` would turn those bytes into
+  // U+FFFD, which is three bytes — so a naive slice can come back over the
+  // ceiling it was supposed to enforce.
+  const text = new TextDecoder('utf-8').decode(Buffer.from(value, 'utf8').subarray(0, max), {
+    stream: true,
+  });
   return { text, truncated: true, originalBytes };
 }
 

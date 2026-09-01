@@ -6,9 +6,9 @@ import { aggregate } from '../engine/core/aggregator';
 import type { EvidenceArtifact } from '../engine/core/artifacts';
 import { DEFAULT_PROFILE } from '../engine/profiles/default.profile';
 import { flashSaleFacts, graph, node } from '../engine/testing';
+import { capText, describeError, jsonSafe, makeRunId, MAX_TEXT_BYTES } from '@sysdesign/run-dump';
+
 import { buildEvalDump, startEvalDump, type EvalDumpState } from './eval-dump';
-import { makeRunId } from './run-id';
-import { capText, describeError, jsonSafe, MAX_TEXT_BYTES } from './serialize';
 
 const NOW = Date.parse('2026-09-01T07:20:05.880Z');
 
@@ -63,44 +63,6 @@ function inputs() {
 
 const pathsOf = (state: EvalDumpState) =>
   buildEvalDump(state, NOW + 900).files.map((file) => file.path);
-
-describe('makeRunId', () => {
-  it('sorts chronologically as a plain string, across a day boundary', () => {
-    const before = makeRunId(Date.parse('2026-08-31T23:59:59.000Z'), 'eval', () => 0.9);
-    const after = makeRunId(Date.parse('2026-09-01T00:00:01.000Z'), 'eval', () => 0.1);
-    expect([after, before].sort()).toEqual([before, after]);
-  });
-
-  it('names the kind so a listing distinguishes the two pipelines', () => {
-    expect(makeRunId(NOW, 'prompt', () => 0)).toMatch(/-prompt$/);
-    expect(makeRunId(NOW, 'eval', () => 0)).toMatch(/-eval$/);
-  });
-
-  it('has no characters a filesystem or a shell would fight over', () => {
-    expect(makeRunId(NOW, 'eval', () => 0.5)).toMatch(/^[A-Za-z0-9-]+$/);
-  });
-});
-
-describe('serialize', () => {
-  it('survives a circular structure instead of throwing', () => {
-    const circular: Record<string, unknown> = { name: 'loop' };
-    circular['self'] = circular;
-    expect(jsonSafe(circular)).toEqual({ unserializable: expect.stringContaining('circular') });
-  });
-
-  it('keeps an Error readable — stringifying one directly yields {}', () => {
-    expect(JSON.stringify(new Error('boom'))).toBe('{}');
-    expect(describeError(new Error('boom'))).toMatchObject({ name: 'Error', message: 'boom' });
-    expect(describeError('a thrown string')).toMatchObject({ name: 'UnknownError' });
-  });
-
-  it('caps a pathological field and says what was lost', () => {
-    const capped = capText('x'.repeat(MAX_TEXT_BYTES + 500));
-    expect(capped.truncated).toBe(true);
-    expect(capped.originalBytes).toBe(MAX_TEXT_BYTES + 500);
-    expect(Buffer.byteLength(capped.text, 'utf8')).toBe(MAX_TEXT_BYTES);
-  });
-});
 
 describe('buildEvalDump', () => {
   it('lays out inputs, passes, exchanges, artifacts and scoring', () => {

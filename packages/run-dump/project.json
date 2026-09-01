@@ -1,0 +1,17 @@
+{
+  "name": "run-dump",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/run-dump/src",
+  "projectType": "library",
+  "tags": ["type:shared", "scope:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/run-dump",
+        "command": "tsc --noEmit -p tsconfig.lib.json"
+      }
+    }
+  }
+}

@@ -3,16 +3,9 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import { DesignRevision, EvalJob, Evaluation, Finding } from '@sysdesign/db';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 
-import {
-  buildEvalDump,
-  findPromptRunId,
-  GIT_CONTEXT,
-  makeRunId,
-  startEvalDump,
-  writeDump,
-  type EvalDump,
-  type EvalDumpLlm,
-} from '../../dump';
+import { findPromptRunId, GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
+
+import { buildEvalDump, startEvalDump, type EvalDump, type EvalDumpLlm } from '../../dump';
 import { runEvaluation } from '../../engine/core/orchestrator';
 import { createPassRegistry } from '../../engine/passes';
 import { ACTIVE_PROFILE } from '../../engine/profiles';

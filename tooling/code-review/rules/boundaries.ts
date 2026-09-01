@@ -15,10 +15,11 @@ import type { ChangedFile } from './index';
  *   criteria       -> contracts         completion criteria as data
  *   db             -> contracts         MikroORM entities and migrations
  *   llm            -> contracts         provider adapters
+ *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
  *   design-system  -> contracts         tokens and domain-free primitives
  *   studio-ui      -> contracts, design-system
- *   studio-api     -> contracts, db, llm, criteria
- *   eval-worker    -> contracts, db, llm, criteria
+ *   studio-api     -> contracts, db, llm, criteria, run-dump
+ *   eval-worker    -> contracts, db, llm, criteria, run-dump
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -29,10 +30,11 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   criteria: ['contracts'],
   db: ['contracts'],
   llm: ['contracts'],
+  'run-dump': [],
   'design-system': ['contracts'],
   'studio-ui': ['contracts', 'design-system'],
-  'studio-api': ['contracts', 'db', 'llm', 'criteria'],
-  'eval-worker': ['contracts', 'db', 'llm', 'criteria'],
+  'studio-api': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
+  'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   storybook: null,
   'studio-e2e': null,
 };
