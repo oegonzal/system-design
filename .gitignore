@@ -43,6 +43,9 @@ tooling/node_modules/
 # Code review run history — local by default; CI keeps its own as an artifact.
 .code-review/
 
+# Eval pipeline run dumps — local by default, unbounded, and full of author prose.
+/static/runs/
+
 # Playwright output
 test-output/
 playwright-report/

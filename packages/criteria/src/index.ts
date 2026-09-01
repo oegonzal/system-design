@@ -101,6 +101,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A claim the diagram cannot back up is caught deterministically and costs more than making no claim at all.',
   },
+  {
+    id: 'EVAL-13',
+    statement:
+      'Every evaluation writes a run dump: its inputs, every LLM prompt and response, the scoring arithmetic, and the result — on the failure path too.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

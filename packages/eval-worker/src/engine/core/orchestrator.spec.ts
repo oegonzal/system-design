@@ -143,6 +143,80 @@ describe('runEvaluation', () => {
     expect(run.result.capApplied).toBeNull();
   });
 
+  /**
+   * Attribution for a run dump is derived here, from the id that already
+   * stamps the artifacts — never declared by a pass or threaded through the
+   * LLM port, where a second copy could drift.
+   */
+  it('brackets every enabled pass in profile order for a recorder', async () => {
+    const seen: string[] = [];
+    const rejected: EvidenceArtifact[] = [];
+
+    const rogue: EvalPass = {
+      id: 'llm.rogue',
+      mode: 'llm',
+      run: () => Promise.resolve([{ passId: 'llm.rogue', kind: 'findings', findings: [] }]),
+    };
+    const plain: EvalPass = {
+      id: 'rules.plain',
+      mode: 'deterministic',
+      run: () => Promise.resolve([]),
+    };
+
+    const run = await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: {
+        ...DEFAULT_PROFILE,
+        passes: [
+          { pass: 'rules.plain', enabled: true, options: { depth: 2 } },
+          { pass: 'llm.rogue', enabled: true },
+          { pass: 'rules.disabled', enabled: false },
+        ],
+      },
+      registry: new Map([rogue, plain].map((pass) => [pass.id, pass])),
+      recorder: {
+        beginPass: (passId, mode, options) =>
+          seen.push(`begin:${passId}:${mode}:${JSON.stringify(options)}`),
+        endPass: (passId, produced) => {
+          seen.push(`end:${passId}:${produced.length}`);
+          rejected.push(...produced);
+        },
+      },
+    });
+
+    expect(seen).toEqual([
+      'begin:rules.plain:deterministic:{"depth":2}',
+      'end:rules.plain:0',
+      'begin:llm.rogue:llm:{}',
+      'end:llm.rogue:1',
+    ]);
+    // endPass sees the artifact BEFORE mode enforcement drops it — the
+    // diagnostic that replaces it records only a count.
+    expect(rejected).toEqual([{ passId: 'llm.rogue', kind: 'findings', findings: [] }]);
+    expect(run.artifacts.map((artifact) => artifact.kind)).toEqual(['diagnostics']);
+  });
+
+  it('is unchanged by the presence of a recorder', async () => {
+    const canvas = graph([node('n-1', 'client'), node('n-2', 'service'), node('n-3', 'database')]);
+    const base = {
+      graph: canvas,
+      facts: flashSaleFacts(),
+      llm,
+      profile: DEFAULT_PROFILE,
+      registry: createPassRegistry(),
+    };
+    const without = await runEvaluation(base);
+    const withRecorder = await runEvaluation({
+      ...base,
+      recorder: { beginPass: () => undefined, endPass: () => undefined },
+    });
+
+    expect(withRecorder.result).toEqual(without.result);
+    expect(withRecorder.artifacts).toEqual(without.artifacts);
+  });
+
   it('matches runEngine for the deterministic slice', async () => {
     const canvas = graph([node('n-1', 'client'), node('n-2', 'service'), node('n-3', 'database')]);
     const run = await runEvaluation({

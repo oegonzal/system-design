@@ -1,4 +1,7 @@
 /// <reference types='vitest' />
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { defineConfig } from 'vitest/config';
 
 import { nestBuildConfig } from '../../vite.nest';
@@ -10,6 +13,10 @@ export default defineConfig({
     globals: true,
     root: __dirname,
     environment: 'node',
+
+    // Run dumps are always on, so a test run would otherwise fill `static/runs`
+    // with fixtures. That tree means REAL runs; tests get a temp directory.
+    env: { EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps') },
 
     // The poller integration suite shares the one Postgres with everything
     // else; engine unit tests are pure but cheap, so a single lane is fine.

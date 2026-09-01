@@ -9,5 +9,6 @@ storybook-static
 test-output
 playwright-report
 .code-review
+static/runs
 CLAUDE.md
 Resume_a2.pdf

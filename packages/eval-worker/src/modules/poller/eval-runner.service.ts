@@ -1,8 +1,18 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { DesignRevision, EvalJob, Evaluation, Finding } from '@sysdesign/db';
-import type { LlmClient } from '@sysdesign/llm';
+import { asRecordable, type LlmClient } from '@sysdesign/llm';
 
+import {
+  buildEvalDump,
+  findPromptRunId,
+  GIT_CONTEXT,
+  makeRunId,
+  startEvalDump,
+  writeDump,
+  type EvalDump,
+  type EvalDumpLlm,
+} from '../../dump';
 import { runEvaluation } from '../../engine/core/orchestrator';
 import { createPassRegistry } from '../../engine/passes';
 import { ACTIVE_PROFILE } from '../../engine/profiles';
@@ -33,8 +43,20 @@ export class EvalRunnerService {
     const em = this.em.fork();
 
     // If even the job row cannot load, leave it 'running' — the reaper will
-    // requeue it once the lock goes stale.
+    // requeue it once the lock goes stale. Nothing is dumped for that case:
+    // there are no inputs yet to dump.
     const job = await em.findOneOrFail(EvalJob, jobId);
+
+    const dump = startEvalDump({
+      runId: makeRunId(Date.now(), 'eval'),
+      jobId: job.id,
+      now: Date.now(),
+      llm: this.llmStatus(),
+      git: GIT_CONTEXT,
+    });
+    // The no-op client cannot record, and does not need to: every LLM pass
+    // returns before assembling a prompt when the model is off.
+    const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
 
     let evaluation: Evaluation | null = null;
     try {
@@ -70,15 +92,46 @@ export class EvalRunnerService {
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
       };
 
+      dump.inputs({
+        revisionId: revision.id,
+        revisionNumber: revision.revisionNumber,
+        sessionId: revision.session.id,
+        promptId: prompt.id,
+        // Projected explicitly: `prompt` is a populated ORM entity, and its
+        // relations are proxies that do not survive a stringify.
+        prompt: {
+          id: prompt.id,
+          title: prompt.title,
+          archetype: prompt.archetype,
+          difficulty: prompt.difficulty,
+          seed: prompt.seed,
+          generatorVersion: prompt.generatorVersion,
+          llmEnriched: prompt.llmEnriched,
+          scenario: prompt.scenario,
+          functionalRequirements: prompt.functionalRequirements,
+          functionalCapabilities: prompt.functionalCapabilities,
+          nonFunctionalRequirements: prompt.nonFunctionalRequirements,
+          scaleTargets: prompt.scaleTargets,
+        },
+        graph: revision.graph,
+        narrative: revision.narrative,
+        brief: revision.brief,
+        facts,
+        profile: ACTIVE_PROFILE,
+        engineVersion: ENGINE_VERSION,
+      });
+
       const { result, artifacts } = await runEvaluation({
         graph: revision.graph,
         facts,
         narrative: revision.narrative,
         brief: revision.brief,
-        llm: this.llm,
+        llm,
         profile: ACTIVE_PROFILE,
         registry: this.passRegistry,
+        recorder: dump.passes,
       });
+      dump.outcome({ artifacts, result });
       const critique = result.annotations;
 
       const evaluationId = evaluation.id;
@@ -176,12 +229,58 @@ export class EvalRunnerService {
         );
       });
 
+      dump.persisted({
+        evaluationId: evaluationId,
+        findingCount: result.findings.length,
+      });
+
       this.logger.log(
         `evaluated revision ${job.revision.id}: ${result.grade} ${result.overallScore}`,
       );
     } catch (error) {
+      dump.failed(error);
       await this.fail(em, job, evaluation, error);
+    } finally {
+      // A failed run is when the dump is most wanted, so it is written on both
+      // paths — and after the transaction closes, so a slow fsync never holds a
+      // Postgres transaction open.
+      this.writeDump(dump);
     }
+  }
+
+  /**
+   * Deliberately swallowing: this runs in a `finally`, so a throw here would
+   * replace whatever error the run was already reporting and turn a retryable
+   * failure into a crashed poll tick. An audit trail must never cost a grade.
+   */
+  private writeDump(dump: EvalDump): void {
+    try {
+      const promptId = dump.state.inputs?.promptId;
+      const built = buildEvalDump(
+        dump.state,
+        Date.now(),
+        promptId ? findPromptRunId(promptId) : null,
+      );
+      writeDump(built);
+    } catch (error) {
+      this.logger.warn(
+        `run dump ${dump.state.runId} not written: ${error instanceof Error ? error.message : error}`,
+      );
+    }
+  }
+
+  /**
+   * What the dump may record about the model: derived facts only. The API key
+   * is never captured — not its value, not its length, not a per-run boolean of
+   * its presence.
+   */
+  private llmStatus(): EvalDumpLlm {
+    const deterministic = process.env['EVAL_DETERMINISTIC'] === '1';
+    return {
+      enabled: this.llm.enabled,
+      model: this.llm.model,
+      reason: this.llm.enabled ? null : deterministic ? 'deterministic' : 'no-key',
+    };
   }
 
   private async fail(

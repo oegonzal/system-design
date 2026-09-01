@@ -10,6 +10,9 @@ import {
   ExperienceProfile,
   Prompt,
 } from '@sysdesign/db';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { backoffMs } from './eval-runner.service';
@@ -18,6 +21,10 @@ import { backoffMs } from './eval-runner.service';
 // interval is constructor-time and the LLM client provider is boot-time.
 process.env['EVAL_POLL_INTERVAL_MS'] = '150';
 process.env['EVAL_DETERMINISTIC'] = '1';
+// A directory of this file's own, so the assertions below never see a dump
+// another suite (or an earlier run) left behind.
+const DUMP_DIR = join(tmpdir(), `sysdesign-poller-dumps-${crypto.randomUUID()}`);
+process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
 
 const { AppModule } = await import('../app/app.module');
 
@@ -242,5 +249,111 @@ describe('poller (integration)', () => {
     expect(backoffMs(2)).toBe(20_000);
     expect(backoffMs(3)).toBe(40_000);
     expect(backoffMs(20)).toBe(300_000);
+  });
+
+  /**
+   * The run dump. The evaluation row keeps the verdict; this keeps the working
+   * — inputs, per-pass timing, the scoring arithmetic, and every model call.
+   */
+  describe('run dump', () => {
+    /** The dump is written in a `finally`, just after the row goes complete. */
+    function waitForDump(match: (manifest: Record<string, unknown>) => boolean) {
+      return waitFor(async () => {
+        if (!existsSync(DUMP_DIR)) return null;
+        for (const entry of readdirSync(DUMP_DIR)) {
+          const manifestPath = join(DUMP_DIR, entry, 'manifest.json');
+          if (!existsSync(manifestPath)) continue;
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<
+            string,
+            unknown
+          >;
+          if (match(manifest)) return { dir: join(DUMP_DIR, entry), manifest };
+        }
+        return null;
+      });
+    }
+
+    const read = (dir: string, file: string) => JSON.parse(readFileSync(join(dir, file), 'utf8'));
+
+    it('[EVAL-13] writes the inputs, the arithmetic and the result for a graded run', async () => {
+      const { evaluationId } = await seedJob(naiveGraph);
+      const { dir, manifest } = await waitForDump((m) => m['evaluationId'] === evaluationId);
+
+      expect(manifest).toMatchObject({ kind: 'eval', status: 'complete', phase: 'complete' });
+      expect(manifest['runId']).toMatch(/-eval$/);
+
+      // The inputs the engine actually read — none of which the row keeps.
+      expect(read(dir, '02-submission.json').graph.nodes).toHaveLength(3);
+      expect(read(dir, '03-facts.json').archetype).toBe('flash-sale-ticketing');
+      expect(read(dir, '04-profile.json').profile.version).toBe('3.0.0');
+
+      // Per-pass timing and options, also discarded before now.
+      const passes = read(dir, '05-passes.json') as { passId: string }[];
+      expect(passes.map((pass) => pass.passId)).toEqual([
+        'rules.core',
+        'expectations.banks',
+        'llm.critic',
+        'llm.depth',
+        'llm.narrative',
+        'llm.scenarios',
+      ]);
+
+      // The arithmetic reproduces the number the candidate was given.
+      const trace = read(dir, '08-scoring.json');
+      const result = read(dir, '09-result.json');
+      expect(trace.overallScore).toBe(result.overallScore);
+      expect(Math.round((trace.weightedTotal / trace.weightSum) * 10) / 10).toBe(
+        result.overallScore,
+      );
+      expect(manifest['overallScore']).toBe(result.overallScore);
+    });
+
+    it('[EVAL-13] says plainly that a deterministic run had nothing to capture', async () => {
+      const { evaluationId } = await seedJob(naiveGraph);
+      const { dir, manifest } = await waitForDump((m) => m['evaluationId'] === evaluationId);
+
+      expect(manifest['llm']).toEqual({ enabled: false, model: null, reason: 'deterministic' });
+      expect(manifest['exchangeCount']).toBe(0);
+      // Not a lost capture: every LLM pass returns before assembling a prompt.
+      expect(existsSync(join(dir, '06-llm'))).toBe(false);
+      expect(readFileSync(join(dir, 'run.md'), 'utf8')).toContain('the model is off');
+    });
+
+    it('[EVAL-13] dumps a run that failed, which is when it is most wanted', async () => {
+      const corrupt = { nodes: null, edges: [] } as unknown as CanvasGraph;
+      const { evaluationId } = await seedJob(corrupt, 1);
+
+      const failed = await waitFor(async () => {
+        const evaluation = await em.fork().findOne(Evaluation, { id: evaluationId });
+        return evaluation?.status === 'failed' ? evaluation : null;
+      });
+      expect(failed.error).toBeTruthy();
+
+      const { dir, manifest } = await waitForDump(
+        (m) => m['status'] === 'failed' && m['revisionId'] !== null,
+      );
+      // The row keeps only a message; the dump keeps the phase and the inputs.
+      expect(manifest['phase']).toBe('evaluating');
+      expect((manifest['error'] as { message: string }).message).toBeTruthy();
+      expect(read(dir, '02-submission.json').graph.nodes).toBeNull();
+    });
+
+    it('[EVAL-13] indexes one flat line per run', async () => {
+      const { evaluationId } = await seedJob(naiveGraph);
+      await waitForDump((m) => m['evaluationId'] === evaluationId);
+
+      const rows = readFileSync(join(DUMP_DIR, 'index.jsonl'), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+      const row = rows.find((candidate) => candidate['evaluationId'] === evaluationId);
+      expect(row).toMatchObject({ kind: 'eval', status: 'complete', llmEnabled: false });
+      // One row per run — several worker processes append to this file, so the
+      // write has to stay a single atomic line.
+      expect(rows.filter((candidate) => candidate['runId'] === row?.['runId'])).toHaveLength(1);
+    });
+
+    afterAll(() => rmSync(DUMP_DIR, { recursive: true, force: true }));
   });
 });
