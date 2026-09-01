@@ -4,6 +4,12 @@
  * scenario, and annotation artifacts pass through untouched, which is the
  * structural guarantee that LLM output can never move the deterministic
  * grade. No clock, no randomness: identical inputs, byte-identical result.
+ *
+ * The arithmetic is done ONCE, by `explainAggregate`, which returns both the
+ * numbers and the ledger that produced them. `aggregate` reads that ledger
+ * rather than recomputing, so the trace a run dump stores cannot disagree with
+ * the score a candidate is given — a separately-maintained explainer would only
+ * hold that property until someone skipped a spec.
  */
 import {
   EVAL_DIMENSIONS,
@@ -38,6 +44,64 @@ export interface CapApplied {
   maxGrade: Grade;
 }
 
+/** One violation's actual cost, at the decay position it was charged at. */
+export interface PenaltyTrace {
+  /** 0-based: the multiplier applied was `violationDecay ** position`. */
+  position: number;
+  severity: Severity;
+  ruleId: string | null;
+  expectationId: string | null;
+  affectedNodeIds: string[];
+  /** Full price before decay. */
+  listPoints: number;
+  /** What it actually subtracted. */
+  points: number;
+}
+
+export interface DimensionTrace {
+  dimension: EvalDimension;
+  /** Applicable expectations examined; 0 with no violations means unassessed. */
+  entries: number;
+  met: number;
+  total: number;
+  /** `100 * met / total`, or null when the dimension was not assessed. */
+  base: number | null;
+  penalties: PenaltyTrace[];
+  score: number | null;
+  /** The weight it contributed to the overall, or null when unassessed. */
+  weight: number | null;
+}
+
+export interface SuppressionTrace {
+  ruleId: string;
+  whenExpectationUnmet: string;
+  /** The finding this silenced, so a reader can see what was not said. */
+  droppedTitle: string;
+}
+
+/** Every cap the policy evaluated — including the ones that did not bind. */
+export interface CapTrace {
+  severity: Severity;
+  atLeast: number;
+  maxGrade: Grade;
+  count: number;
+  reached: boolean;
+  binding: boolean;
+}
+
+export interface AggregateTrace {
+  dimensions: DimensionTrace[];
+  /** Renormalised over assessed dimensions only. */
+  weightSum: number;
+  /** Sum of score × weight, before division and rounding. */
+  weightedTotal: number;
+  overallScore: number;
+  suppressions: SuppressionTrace[];
+  caps: CapTrace[];
+  bandGrade: Grade;
+  grade: Grade;
+}
+
 export interface AggregateResult {
   findings: EngineFinding[];
   dimensionScores: DimensionScores;
@@ -51,6 +115,8 @@ export interface AggregateResult {
   scenarios: ScenarioArtifact | null;
   annotations: AnnotationArtifact | null;
   diagnostics: DiagnosticsArtifact[];
+  /** How the numbers above were arrived at. Derived from the same pass. */
+  trace: AggregateTrace;
 }
 
 function compareStrings(a: string, b: string): number {
@@ -64,11 +130,17 @@ function sortKey(finding: EngineFinding): string {
 
 const GRADE_ORDER: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
 
-export function aggregate(
-  artifacts: readonly EvidenceArtifact[],
-  profile: EvalProfile,
-): AggregateResult {
-  let findings: EngineFinding[] = [];
+interface Collected {
+  findings: EngineFinding[];
+  coverage: CoverageArtifact['entries'];
+  axes: AxisArtifact[];
+  diagnostics: DiagnosticsArtifact[];
+  annotations: AnnotationArtifact | null;
+  scenarios: ScenarioArtifact | null;
+}
+
+function collect(artifacts: readonly EvidenceArtifact[]): Collected {
+  const findings: EngineFinding[] = [];
   const coverage: CoverageArtifact['entries'] = [];
   const axes: AxisArtifact[] = [];
   const diagnostics: DiagnosticsArtifact[] = [];
@@ -109,19 +181,59 @@ export function aggregate(
         ? first
         : { ...first, findings: annotationArtifacts.flatMap((artifact) => artifact.findings) };
 
-  const policy = profile.scoring;
-  findings = applySuppressions(findings, coverage, policy);
+  return { findings, coverage, axes, diagnostics, annotations, scenarios };
+}
 
-  findings.sort(
+export interface Explanation {
+  /** Post-suppression, in the result's stable order. */
+  findings: EngineFinding[];
+  dimensionScores: DimensionScores;
+  overallScore: number;
+  bandGrade: Grade;
+  grade: Grade;
+  capApplied: CapApplied | null;
+  trace: AggregateTrace;
+}
+
+/**
+ * The whole score, and the ledger behind it, computed together.
+ *
+ * Exported so a run dump can be explained without re-deriving anything — and
+ * so the scoring math has exactly one implementation.
+ */
+export function explainAggregate(
+  artifacts: readonly EvidenceArtifact[],
+  profile: EvalProfile,
+): Explanation {
+  const policy = profile.scoring;
+  const { findings: raw, coverage } = collect(artifacts);
+
+  const { kept, suppressions } = applySuppressions(raw, coverage, policy);
+  const findings = [...kept].sort(
     (a, b) =>
       compareStrings(sortKey(a), sortKey(b)) ||
       compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
   );
 
-  const dimensionScores = scoreCoverage(findings, coverage, policy);
-  const overallScore = weightedOverall(dimensionScores, policy.dimensionWeights);
+  const dimensions = scoreCoverage(findings, coverage, policy);
+  const dimensionScores = {} as DimensionScores;
+  for (const entry of dimensions) dimensionScores[entry.dimension] = entry.score;
+
+  // Weights renormalize over the assessed dimensions, so a prompt that
+  // assesses five is graded out of those five.
+  let weightedTotal = 0;
+  let weightSum = 0;
+  for (const entry of dimensions) {
+    if (entry.score === null || entry.weight === null) continue;
+    weightedTotal += entry.score * entry.weight;
+    weightSum += entry.weight;
+  }
+  // With nothing covered there is no evidence of any kind, and no evidence
+  // earns 0.
+  const overallScore = weightSum === 0 ? 0 : Math.round((weightedTotal / weightSum) * 10) / 10;
+
   const bandGrade = gradeForScore(overallScore, policy.gradeBands);
-  const { grade, capApplied } = applyGradeCaps(bandGrade, findings, policy);
+  const { grade, capApplied, caps } = applyGradeCaps(bandGrade, findings, policy);
 
   return {
     findings,
@@ -130,11 +242,44 @@ export function aggregate(
     bandGrade,
     grade,
     capApplied,
-    summary: composeSummary(findings, dimensionScores, overallScore, grade),
+    trace: {
+      dimensions,
+      weightSum,
+      weightedTotal,
+      overallScore,
+      suppressions,
+      caps,
+      bandGrade,
+      grade,
+    },
+  };
+}
+
+export function aggregate(
+  artifacts: readonly EvidenceArtifact[],
+  profile: EvalProfile,
+): AggregateResult {
+  const { axes, diagnostics, annotations, scenarios } = collect(artifacts);
+  const explained = explainAggregate(artifacts, profile);
+
+  return {
+    findings: explained.findings,
+    dimensionScores: explained.dimensionScores,
+    overallScore: explained.overallScore,
+    bandGrade: explained.bandGrade,
+    grade: explained.grade,
+    capApplied: explained.capApplied,
+    summary: composeSummary(
+      explained.findings,
+      explained.dimensionScores,
+      explained.overallScore,
+      explained.grade,
+    ),
     axes,
     scenarios,
     annotations,
     diagnostics,
+    trace: explained.trace,
   };
 }
 
@@ -144,19 +289,35 @@ export function aggregate(
  * carries the lesson (and the fix), so the rule would only double-charge it.
  */
 function applySuppressions(
-  findings: EngineFinding[],
+  findings: readonly EngineFinding[],
   coverage: CoverageArtifact['entries'],
   policy: CoverageScoringPolicy,
-): EngineFinding[] {
-  if (policy.suppressions.length === 0) return findings;
+): { kept: EngineFinding[]; suppressions: SuppressionTrace[] } {
+  if (policy.suppressions.length === 0) return { kept: [...findings], suppressions: [] };
+
   const unmet = new Set(coverage.filter((entry) => !entry.met).map((entry) => entry.expectationId));
-  return findings.filter(
-    (finding) =>
-      !finding.ruleId ||
-      !policy.suppressions.some(
-        (rule) => rule.ruleId === finding.ruleId && unmet.has(rule.whenExpectationUnmet),
-      ),
-  );
+  const kept: EngineFinding[] = [];
+  const suppressions: SuppressionTrace[] = [];
+
+  for (const finding of findings) {
+    const rule = finding.ruleId
+      ? policy.suppressions.find(
+          (candidate) =>
+            candidate.ruleId === finding.ruleId && unmet.has(candidate.whenExpectationUnmet),
+        )
+      : undefined;
+    if (rule === undefined) {
+      kept.push(finding);
+      continue;
+    }
+    suppressions.push({
+      ruleId: rule.ruleId,
+      whenExpectationUnmet: rule.whenExpectationUnmet,
+      droppedTitle: finding.title,
+    });
+  }
+
+  return { kept, suppressions };
 }
 
 /**
@@ -170,7 +331,7 @@ function scoreCoverage(
   findings: readonly EngineFinding[],
   coverage: CoverageArtifact['entries'],
   policy: CoverageScoringPolicy,
-): DimensionScores {
+): DimensionTrace[] {
   const earned = {} as Record<EvalDimension, { met: number; total: number; entries: number }>;
   for (const dimension of EVAL_DIMENSIONS) earned[dimension] = { met: 0, total: 0, entries: 0 };
   for (const entry of coverage) {
@@ -185,30 +346,61 @@ function scoreCoverage(
     if (finding.countsAsViolation) violations[finding.dimension].push(finding);
   }
 
-  const scores = {} as DimensionScores;
-  for (const dimension of EVAL_DIMENSIONS) {
+  return EVAL_DIMENSIONS.map((dimension) => {
     const { met, total, entries } = earned[dimension];
     if (entries === 0 && violations[dimension].length === 0) {
-      scores[dimension] = null;
-      continue;
+      return {
+        dimension,
+        entries,
+        met,
+        total,
+        base: null,
+        penalties: [],
+        score: null,
+        weight: null,
+      };
     }
     const base = total > 0 ? (100 * met) / total : 100;
 
-    // Deterministic penalty order: worst first, then stable identity.
+    // Deterministic penalty order: worst first, then stable identity. This is
+    // NOT the order `findings` ends up in — that sort carries no severity term —
+    // which is why the position each penalty was charged at has to be recorded
+    // here or it is unrecoverable.
     const ordered = [...violations[dimension]].sort(
       (a, b) =>
         SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
         compareStrings(sortKey(a), sortKey(b)) ||
         compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
     );
+
     let penalty = 0;
-    ordered.forEach((finding, position) => {
-      penalty += policy.violationPenalties[finding.severity] * policy.violationDecay ** position;
+    const penalties = ordered.map((finding, position) => {
+      const listPoints = policy.violationPenalties[finding.severity];
+      const points = listPoints * policy.violationDecay ** position;
+      penalty += points;
+      return {
+        position,
+        severity: finding.severity,
+        ruleId: finding.ruleId,
+        expectationId: finding.expectationId,
+        affectedNodeIds: finding.affectedNodeIds,
+        listPoints,
+        points,
+      };
     });
 
-    scores[dimension] = Math.round(Math.max(0, base - penalty) * 10) / 10;
-  }
-  return scores;
+    const score = Math.round(Math.max(0, base - penalty) * 10) / 10;
+    return {
+      dimension,
+      entries,
+      met,
+      total,
+      base,
+      penalties,
+      score,
+      weight: policy.dimensionWeights[dimension],
+    };
+  });
 }
 
 /**
@@ -220,37 +412,41 @@ function applyGradeCaps(
   bandGrade: Grade,
   findings: readonly EngineFinding[],
   policy: CoverageScoringPolicy,
-): { grade: Grade; capApplied: CapApplied | null } {
-  let binding: CapApplied | null = null;
-  for (const cap of policy.gradeCaps) {
+): { grade: Grade; capApplied: CapApplied | null; caps: CapTrace[] } {
+  // Every cap is counted, including the ones that will not bind — a reader
+  // asking "why was this an A?" needs to see the caps that were checked and
+  // came up short, not only the one that fired.
+  const evaluated = policy.gradeCaps.map((cap) => {
     const count = findings.filter((finding) => finding.severity === cap.severity).length;
-    if (count < cap.atLeast) continue;
-    if (!binding || GRADE_ORDER[cap.maxGrade] < GRADE_ORDER[binding.maxGrade]) {
-      binding = { severity: cap.severity, count, maxGrade: cap.maxGrade };
+    return { ...cap, count, reached: count >= cap.atLeast };
+  });
+
+  // The strictest reached cap wins. Derived from `evaluated` rather than
+  // accumulated inside its map, so the narrowing below stays legible.
+  let strictest: (typeof evaluated)[number] | null = null;
+  for (const cap of evaluated) {
+    if (!cap.reached) continue;
+    if (strictest === null || GRADE_ORDER[cap.maxGrade] < GRADE_ORDER[strictest.maxGrade]) {
+      strictest = cap;
     }
   }
-  if (!binding || GRADE_ORDER[bandGrade] <= GRADE_ORDER[binding.maxGrade]) {
-    return { grade: bandGrade, capApplied: null };
-  }
-  return { grade: binding.maxGrade, capApplied: binding };
-}
 
-/**
- * Weighted mean over the covered dimensions only — weights renormalize so a
- * prompt that assesses five dimensions is graded out of those five. With
- * nothing covered there is no evidence of any kind, and no evidence earns 0.
- */
-function weightedOverall(scores: DimensionScores, weights: Record<EvalDimension, number>): number {
-  let total = 0;
-  let weightSum = 0;
-  for (const dimension of EVAL_DIMENSIONS) {
-    const score = scores[dimension];
-    if (score === null) continue;
-    total += score * weights[dimension];
-    weightSum += weights[dimension];
-  }
-  if (weightSum === 0) return 0;
-  return Math.round((total / weightSum) * 10) / 10;
+  const applies = strictest !== null && GRADE_ORDER[bandGrade] > GRADE_ORDER[strictest.maxGrade];
+  const caps: CapTrace[] = evaluated.map((cap) => ({
+    ...cap,
+    binding: applies && cap === strictest,
+  }));
+
+  if (!applies || strictest === null) return { grade: bandGrade, capApplied: null, caps };
+  return {
+    grade: strictest.maxGrade,
+    capApplied: {
+      severity: strictest.severity,
+      count: strictest.count,
+      maxGrade: strictest.maxGrade,
+    },
+    caps,
+  };
 }
 
 function composeSummary(

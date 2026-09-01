@@ -350,3 +350,135 @@ describe('aggregate — coverage model', () => {
     expect(alreadyLow.capApplied).toBeNull();
   });
 });
+
+/**
+ * The ledger behind the number. None of this was recoverable from the result:
+ * `findings` is re-sorted without a severity term, so the decay position each
+ * penalty was charged at existed only inside the loop that applied it, and a
+ * suppressed finding left no trace of having been suppressed at all.
+ */
+describe('aggregate — scoring trace', () => {
+  it('records each penalty at the decay position it was actually charged at', () => {
+    const result = aggregate(
+      [
+        findingsArtifact([
+          // Deliberately not in penalty order, and `findings` will not end up
+          // in penalty order either — only the trace knows.
+          finding({ ruleId: 'z.low', severity: 'low' }),
+          finding({ ruleId: 'a.high', severity: 'high' }),
+          finding({ ruleId: 'm.critical', severity: 'critical' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+
+    const reliability = result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    expect(reliability?.penalties.map((p) => [p.position, p.ruleId, p.points])).toEqual([
+      [0, 'm.critical', 35],
+      [1, 'a.high', 22 * 0.7 ** 1],
+      [2, 'z.low', 4 * 0.7 ** 2],
+    ]);
+
+    // The result's own order is different — which is exactly why position
+    // cannot be read off it.
+    expect(result.findings.map((f) => f.ruleId)).toEqual(['a.high', 'm.critical', 'z.low']);
+  });
+
+  it('reproduces the dimension score from base minus the recorded penalties', () => {
+    const result = aggregate(
+      [
+        coverageArtifact([
+          coverageEntry({ expectationId: 'a', met: true, weight: 3 }),
+          coverageEntry({ expectationId: 'b', met: false, weight: 1 }),
+        ]),
+        findingsArtifact([finding({ severity: 'high' }), finding({ ruleId: 'b.two' })]),
+      ],
+      DEFAULT_PROFILE,
+    );
+
+    const reliability = result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    expect(reliability?.base).toBe(75);
+    const charged = (reliability?.penalties ?? []).reduce((sum, p) => sum + p.points, 0);
+    expect(Math.round(Math.max(0, (reliability?.base ?? 0) - charged) * 10) / 10).toBe(
+      result.dimensionScores.reliability,
+    );
+  });
+
+  it('reproduces the overall from the recorded weights', () => {
+    const result = aggregate(
+      [
+        coverageArtifact([
+          coverageEntry({ expectationId: 'a', dimension: 'reliability', met: true, weight: 1 }),
+          coverageEntry({ expectationId: 'b', dimension: 'security', met: false, weight: 1 }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+
+    const assessed = result.trace.dimensions.filter((d) => d.score !== null);
+    expect(assessed.map((d) => d.dimension)).toEqual(['reliability', 'security']);
+    expect(result.trace.weightSum).toBeCloseTo(
+      assessed.reduce((sum, d) => sum + (d.weight ?? 0), 0),
+      10,
+    );
+    expect(Math.round((result.trace.weightedTotal / result.trace.weightSum) * 10) / 10).toBe(
+      result.overallScore,
+    );
+  });
+
+  it('names the suppression that fired and what it silenced', () => {
+    const result = aggregate(
+      [
+        findingsArtifact([
+          finding({ ruleId: 'security.no-gateway', dimension: 'security', severity: 'high' }),
+        ]),
+        coverageArtifact([
+          coverageEntry({
+            expectationId: 'exp.fst.edge-front-door',
+            dimension: 'security',
+            met: false,
+          }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+
+    expect(result.findings).toEqual([]);
+    expect(result.trace.suppressions).toEqual([
+      {
+        ruleId: 'security.no-gateway',
+        whenExpectationUnmet: 'exp.fst.edge-front-door',
+        droppedTitle: 'Single database with no replica',
+      },
+    ]);
+  });
+
+  it('lists every cap the policy evaluated, not only the one that bound', () => {
+    const result = aggregate(
+      [fullCoverage(), findingsArtifact([finding({ dimension: 'hygiene' })])],
+      DEFAULT_PROFILE,
+    );
+
+    expect(result.trace.caps.length).toBe(DEFAULT_PROFILE.scoring.gradeCaps.length);
+    expect(result.trace.caps.filter((cap) => cap.binding)).toHaveLength(1);
+    // A cap that did not bind still reports what it counted — the thing that
+    // vanished entirely before.
+    expect(result.trace.caps.every((cap) => typeof cap.count === 'number')).toBe(true);
+  });
+
+  it('marks no cap binding when the band grade is already at or below it', () => {
+    const result = aggregate([findingsArtifact([finding({ severity: 'high' })])], DEFAULT_PROFILE);
+    expect(result.capApplied).toBeNull();
+    expect(result.trace.caps.some((cap) => cap.binding)).toBe(false);
+  });
+
+  it('leaves an unassessed dimension null throughout the ledger', () => {
+    const result = aggregate(
+      [coverageArtifact([coverageEntry({ expectationId: 'a', met: true, weight: 1 })])],
+      DEFAULT_PROFILE,
+    );
+    const hygiene = result.trace.dimensions.find((d) => d.dimension === 'hygiene');
+    expect(hygiene).toMatchObject({ entries: 0, base: null, score: null, weight: null });
+    expect(hygiene?.penalties).toEqual([]);
+  });
+});
