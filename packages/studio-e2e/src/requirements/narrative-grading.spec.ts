@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import { buildNaiveDesign, openPracticeSession } from '../support/canvas.page';
+import { createPracticeSession } from '../support/backend';
+import { buildNaiveDesign, CanvasPage, openPracticeSession } from '../support/canvas.page';
 
 /**
  * The design narrative: prose authored beside the diagram, submitted with it,
@@ -57,5 +58,40 @@ test.describe('the design narrative', () => {
     // …and the finding points at it on the canvas.
     await canvas.clickFinding(UNEXPLAINED_TITLE);
     await canvas.expectNodeHighlighted('n-3');
+  });
+
+  test('[EVAL-10] a submitted narrative earns communication, and a skipped requirement is cited by id', async ({
+    page,
+    request,
+  }) => {
+    const { prompt, session } = await createPracticeSession(request);
+    const availability = prompt.nonFunctionalRequirements.find(
+      (nfr) => nfr.kind === 'availability',
+    );
+    if (!availability) throw new Error('every generated prompt carries an availability NFR');
+
+    await page.goto(`/practice/${session.id}`);
+    const canvas = new CanvasPage(page);
+    await canvas.ready();
+    await buildNaiveDesign(canvas);
+
+    // Covers every component and flow, engages latency/consistency/throughput —
+    // but never says a word about staying up.
+    await canvas.fillNarrative(
+      'The Client calls the Service, which validates each order and writes it to the Database. ' +
+        'Reads stay inside the p99 budget during the spike, checkout is idempotent so no seat ' +
+        'is ever oversold, and the opening burst is absorbed by autoscaled copies of the Service.',
+    );
+    await canvas.submit();
+    await canvas.expectEvaluationComplete(1);
+
+    // Communication is now assessed — a real meter, not the "Not assessed" row.
+    await expect(page.getByRole('meter', { name: 'communication' })).toBeVisible();
+    await expect(page.getByTestId('not-assessed-communication')).toHaveCount(0);
+
+    // The silent requirement becomes a teaching finding citing the NFR's own id.
+    const silent = canvas.findingItem('A story silent on the availability requirement');
+    await expect(silent).toBeVisible();
+    await expect(silent.getByTestId('finding-nfr')).toHaveText(availability.id);
   });
 });
