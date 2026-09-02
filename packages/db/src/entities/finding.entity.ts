@@ -24,6 +24,7 @@ const DIMENSIONS = [
   'security',
   'hygiene',
   'explanation',
+  'product',
 ] as const satisfies ContractDimensions;
 
 type ContractSeverities = (typeof Contracts)['SEVERITIES'];

@@ -72,6 +72,12 @@ export const QUALITY_AREAS: readonly QualityArea[] = [
     assessedBy: 'explanation',
     note: 'Which component holds which requirement, corroborated against the canvas.',
   },
+  {
+    id: 'product',
+    label: 'Product workability',
+    assessedBy: 'product',
+    note: 'API contracts, entity lifecycles, event flows and the aggregates they feed — the business story, corroborated against the canvas.',
+  },
 
   // Everything below has no dimension. Each is something a reviewer asks and
   // this rubric cannot: not an oversight, a stated boundary.

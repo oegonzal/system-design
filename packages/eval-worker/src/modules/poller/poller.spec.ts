@@ -191,7 +191,7 @@ describe('poller (integration)', () => {
     });
 
     expect(done.profileId).toBe('default');
-    expect(done.profileVersion).toBe('3.0.0');
+    expect(done.profileVersion).toBe('3.1.0');
     const artifactKinds = (done.evidence ?? []).map(
       (artifact) => (artifact as { kind: string }).kind,
     );
@@ -285,7 +285,7 @@ describe('poller (integration)', () => {
       // The inputs the engine actually read — none of which the row keeps.
       expect(read(dir, '02-submission.json').graph.nodes).toHaveLength(3);
       expect(read(dir, '03-facts.json').archetype).toBe('flash-sale-ticketing');
-      expect(read(dir, '04-profile.json').profile.version).toBe('3.0.0');
+      expect(read(dir, '04-profile.json').profile.version).toBe('3.1.0');
 
       // Per-pass timing and options, also discarded before now.
       const passes = read(dir, '05-passes.json') as { passId: string }[];

@@ -73,6 +73,7 @@ describe('runEngine', () => {
       security: 0,
       hygiene: 100,
       explanation: 0,
+      product: null,
     });
 
     expect(result.overallScore).toBe(18);

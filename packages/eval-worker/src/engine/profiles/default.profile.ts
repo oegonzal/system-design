@@ -17,7 +17,7 @@ import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '3.0.0',
+  version: '3.1.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -44,21 +44,24 @@ export const DEFAULT_PROFILE: EvalProfile = {
     violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
     violationDecay: 0.7,
     // How much each dimension contributes to the overall score; sums to 1
-    // (validateProfile enforces it). Explanation holds 0.10 and the seven
-    // diagram dimensions keep their original ratios (×0.9). As of 2.3.0 a
-    // submission with no narrative scores explanation 0 rather than null
-    // (exp.nar.present applies either way), so silence costs the full 0.10
-    // instead of being renormalized away — the calibration pins below moved
-    // by exactly that factor and were re-pinned deliberately.
+    // (validateProfile enforces it). Explanation holds 0.09 and the eight
+    // pre-product dimensions keep their 3.0.0 ratios (×0.9); product takes
+    // the freed tenth. On a prompt with no workflow spec, product scores null
+    // and renormalization divides the surviving weights by 0.9, restoring the
+    // 3.0.0 ratios exactly — which is why every pre-product calibration pin
+    // is unchanged. On a workflow prompt, authoring nothing scores product 0
+    // (silence is graded, never renormalized away — the exp.nar.present
+    // lesson, applied to the business layer).
     dimensionWeights: {
-      reliability: 0.18,
-      scalability: 0.225,
-      performance: 0.135,
-      data: 0.135,
-      messaging: 0.09,
-      security: 0.09,
-      hygiene: 0.045,
-      explanation: 0.1,
+      reliability: 0.162,
+      scalability: 0.2025,
+      performance: 0.1215,
+      data: 0.1215,
+      messaging: 0.081,
+      security: 0.081,
+      hygiene: 0.0405,
+      explanation: 0.09,
+      product: 0.1,
     },
     gradeBands: { A: 92, B: 82, C: 68, D: 50 },
     gradeCaps: [

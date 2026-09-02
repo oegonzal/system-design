@@ -300,7 +300,9 @@ describe('aggregate — coverage model', () => {
       [fullCoverage(), findingsArtifact([finding({ dimension: 'hygiene' })])],
       DEFAULT_PROFILE,
     );
-    expect(one.overallScore).toBe(98.4);
+    // 100 − 35×hygiene(.0405) = 98.5825 → 98.6 (was 98.4 before the product
+    // dimension shrank hygiene's slice — re-pinned with the 3.1.0 rescale).
+    expect(one.overallScore).toBe(98.6);
     expect(one.bandGrade).toBe('A');
     expect(one.grade).toBe('C');
     expect(one.capApplied).toEqual({ severity: 'critical', count: 1, maxGrade: 'C' });
@@ -319,8 +321,8 @@ describe('aggregate — coverage model', () => {
     expect(two.capApplied?.count).toBe(2);
 
     // A grade already at or below the cap reports no cap at all.
-    // Two zeroed dimensions: with explanation in the rubric, reliability
-    // alone (weight .18) leaves the numeric grade at 82/B — above the cap.
+    // Two zeroed dimensions: reliability alone (weight .162) leaves the
+    // numeric grade at 83.8/B — above the cap.
     const zeroed = new Set(['reliability', 'performance']);
     const alreadyLow = aggregate(
       [

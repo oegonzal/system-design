@@ -9,7 +9,10 @@ export type EvalStatus = (typeof EVAL_STATUSES)[number];
 /**
  * The rubric. Scores and findings are grouped by these. `explanation` is
  * earned only when a design narrative is submitted — without one it scores
- * null ("Not assessed") and carries no weight.
+ * null ("Not assessed") and carries no weight. `product` grades business
+ * workability — API contracts, event flows, lifecycles — and is assessed only
+ * when the prompt carries a workflow spec; on such a prompt silence scores 0,
+ * on any other prompt the dimension is null and renormalizes away.
  */
 export const EVAL_DIMENSIONS = [
   'reliability',
@@ -20,6 +23,7 @@ export const EVAL_DIMENSIONS = [
   'security',
   'hygiene',
   'explanation',
+  'product',
 ] as const;
 export type EvalDimension = (typeof EVAL_DIMENSIONS)[number];
 
