@@ -24,6 +24,7 @@ export * from './lib/sessions';
 export * from './lib/graph-render';
 export * from './lib/mechanisms';
 export * from './lib/design-brief';
+export * from './lib/narration';
 export * from './lib/node-guide';
 export * from './lib/evaluations';
 export * from './lib/eval-profile';
