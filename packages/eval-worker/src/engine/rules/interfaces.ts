@@ -9,6 +9,9 @@
  */
 import {
   INTERFACE_CAPABILITIES,
+  eventsTransportedInto,
+  eventsTransportedOutOf,
+  isApiLikeRole,
   type CanvasEdge,
   type InterfaceRole,
   type NodeOperation,
@@ -61,7 +64,9 @@ const unspecifiedInterface: EvalRule = {
     const findings: RuleFinding[] = [];
     for (const node of sortById(index.nodes())) {
       const role = roleOf(node.kind);
-      if (role !== 'api' && role !== 'channel') continue;
+      // event-handler included: a silent event-driven node that owns a call edge
+      // still owes an interface, exactly like an api that owns one.
+      if (!isApiLikeRole(role) && role !== 'channel') continue;
       if ((node.operations?.length ?? 0) > 0) continue;
       const edges = owned.get(node.id) ?? [];
       if (edges.length === 0) continue;
@@ -111,11 +116,12 @@ const danglingCarries: EvalRule = {
 const unreferencedOperation: EvalRule = {
   id: 'hygiene.unreferenced-operation',
   dimension: 'hygiene',
-  check({ index }) {
+  check({ facts, index, graph }) {
     if (!index.declaresOperations()) return [];
     // Only meaningful once the author annotates edges at all — a design that
     // declares operations but never uses carries has not opted into this.
     if (!index.edges().some((edge) => (edge.carries?.length ?? 0) > 0)) return [];
+    const spec = facts.workflow;
     const findings: RuleFinding[] = [];
     for (const node of sortById(index.nodes())) {
       const declared = node.operations ?? [];
@@ -124,15 +130,39 @@ const unreferencedOperation: EvalRule = {
       for (const edge of [...index.inEdges(node.id), ...index.outEdges(node.id)]) {
         for (const name of edge.carries ?? []) carried.add(name);
       }
-      const unreferenced = declared.filter((op) => !carried.has(op.name));
+      // An api operation is exercised by being CALLED — its name carried on an
+      // adjacent edge. An event-handler operation is exercised by the message
+      // FLOW instead: it emits an event that is transported out, or consumes one
+      // (per the workflow spec) that is transported in. Its own name is never
+      // carried (the channel's message-type names are), so the name check alone
+      // would false-flag every event-driven or scheduled operation — the ones
+      // the product dimension simultaneously requires declared.
+      const eventDriven = roleOf(node.kind) === 'event-handler';
+      const exercised = (op: NodeOperation): boolean => {
+        if (carried.has(op.name)) return true;
+        if (!eventDriven) return false;
+        if (
+          (op.emits ?? []).length > 0 &&
+          eventsTransportedOutOf(graph, node.id, op.emits ?? []).length > 0
+        ) {
+          return true;
+        }
+        const consumes = spec?.operations.find((item) => item.id === op.fulfills)?.consumes ?? [];
+        return consumes.length > 0 && eventsTransportedInto(graph, node.id, consumes).length > 0;
+      };
+      const unreferenced = declared.filter((op) => !exercised(op));
       if (unreferenced.length === 0) continue;
       const names = unreferenced.map((op) => `"${op.name}"`).join(', ');
+      const them = unreferenced.length > 1 ? 'them' : 'it';
+      const howExercised = eventDriven
+        ? `no edge carries ${them} and neither the events ${them === 'them' ? 'they emit' : 'it emits'} nor the ones ${them === 'them' ? 'they consume' : 'it consumes'} are wired`
+        : `no edge touching it carries ${them}`;
       findings.push({
         ruleId: unreferencedOperation.id,
         dimension: 'hygiene',
         severity: 'low',
         title: 'Declared operations no edge exercises',
-        message: `"${node.label}" declares ${names}, yet no edge touching it carries ${unreferenced.length > 1 ? 'them' : 'it'}. This design annotates its edges with the calls they make, so an unreferenced operation reads as either dead surface or a missing arrow — draw the caller that uses it, or prune it.`,
+        message: `"${node.label}" declares ${names}, yet ${howExercised}. This design annotates its edges with the calls and events they carry, so an unexercised operation reads as either dead surface or a missing arrow — wire the flow that uses it, or prune it.`,
         affectedNodeIds: [node.id],
         affectedEdgeIds: [],
         suggestion: null,
@@ -152,7 +182,9 @@ const srpOverload: EvalRule = {
     if (!index.declaresOperations()) return [];
     const findings: RuleFinding[] = [];
     for (const node of sortById(index.nodes())) {
-      if (roleOf(node.kind) !== 'api') continue;
+      // Overload applies to any operation-running node — an event-handler can be
+      // just as overstuffed as an api.
+      if (!isApiLikeRole(roleOf(node.kind))) continue;
       const responsibilities = node.responsibilities?.length ?? 0;
       const operations = node.operations?.length ?? 0;
       if (responsibilities <= SRP_MAX_RESPONSIBILITIES && operations <= SRP_MAX_OPERATIONS) {
@@ -404,6 +436,9 @@ const queryOnWritePath: EvalRule = {
         .some((neighbor) => neighbor.kind === 'cache' || neighbor.kind === 'replica');
     const findings: RuleFinding[] = [];
     for (const node of sortById(index.nodes())) {
+      // Deliberately api-only: this is about a read/write API surface sharing an
+      // unshielded path. Event-handlers declare no query op, so the hasQuery gate
+      // below is unreachable for them anyway — the lesson does not apply.
       if (roleOf(node.kind) !== 'api') continue;
       const ops = node.operations ?? [];
       const hasCommand = ops.some((op) => op.kind === 'command');

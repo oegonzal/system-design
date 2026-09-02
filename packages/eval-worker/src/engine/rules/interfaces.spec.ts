@@ -9,6 +9,7 @@ import {
   flashSaleFacts,
   graph,
   node,
+  orderHistoryFacts,
   ruleById,
 } from '../testing';
 
@@ -148,6 +149,63 @@ describe('hygiene.unreferenced-operation', () => {
       [edge('e1', 'gw-1', 'svc-1', 'sync', ['getOrder', 'placeOrder'])],
     );
     expect(rule.check(contextFor(covered))).toEqual([]);
+  });
+
+  // Event-handler operations are exercised by the message flow, not by a caller
+  // carrying their name — so the name check alone must not flag them.
+  it('does not flag an event-handler op exercised by an emitted event transported out', () => {
+    const canvas = graph(
+      [
+        node('bj-1', 'batch-job', {
+          operations: [
+            {
+              name: 'import',
+              kind: 'command',
+              fulfills: 'ing-pos-import',
+              emits: ['evt-offline-order-received'],
+            },
+          ],
+        }),
+        node('q-1', 'queue', {
+          operations: [
+            { name: 'OfflineReceived', kind: 'event', fulfills: 'evt-offline-order-received' },
+          ],
+        }),
+      ],
+      [edge('e1', 'bj-1', 'q-1', 'async', ['OfflineReceived'])],
+    );
+    expect(rule.check(contextFor(canvas, orderHistoryFacts()))).toEqual([]);
+  });
+
+  it('does not flag an event-handler op exercised by a consumed event transported in', () => {
+    // op-ingest-index consumes evt-online-order-received per the order-history spec.
+    const canvas = graph(
+      [
+        node('q-1', 'queue', {
+          operations: [
+            { name: 'OnlineReceived', kind: 'event', fulfills: 'evt-online-order-received' },
+          ],
+        }),
+        node('w-1', 'worker', {
+          operations: [{ name: 'ingest', kind: 'command', fulfills: 'op-ingest-index' }],
+        }),
+      ],
+      [edge('e1', 'q-1', 'w-1', 'async', ['OnlineReceived'])],
+    );
+    expect(rule.check(contextFor(canvas, orderHistoryFacts()))).toEqual([]);
+  });
+
+  it('still flags an event-handler op that neither is carried nor participates in the flow', () => {
+    const canvas = graph(
+      [
+        node('gw-1', 'gateway'),
+        svc,
+        node('w-1', 'worker', { operations: [{ name: 'orphan', kind: 'command' }] }),
+      ],
+      [edge('e1', 'gw-1', 'svc-1', 'sync', ['getOrder', 'placeOrder'])],
+    );
+    const findings = rule.check(contextFor(canvas, orderHistoryFacts()));
+    expect(findings.flatMap((finding) => finding.affectedNodeIds)).toContain('w-1');
   });
 });
 

@@ -15,11 +15,9 @@
  * others are skipped when nothing substantive was written — there is nothing of
  * their kind to grade until a narrative exists.
  */
-import { ANNOTATION_KINDS } from '@sysdesign/contracts';
+import { realComponentNodeIds } from '@sysdesign/contracts';
 
-import { bindingBackedNodeIds, flowTouchedNodeIds, judgeBrief } from '../../../mechanisms';
 import { uniqueSorted } from '../../../rules/shared';
-import type { RuleContext } from '../../../types';
 import type { Expectation } from '../types';
 import { met, unmet } from '../types';
 
@@ -30,25 +28,6 @@ function labelsOf(ids: readonly string[], byId: (id: string) => { label: string 
     .join(', ');
   const elided = ids.length - Math.min(ids.length, 5);
   return elided > 0 ? `${named} +${elided} more` : named;
-}
-
-/**
- * The components the design accounts for through its brief — corroborated
- * bindings and traced flows. These are the boxes the walkthrough is expected to
- * explain; a box no claim rests on is not yet part of the answer, so the
- * narrative is not asked to justify it.
- */
-function accountedNodeIds(ctx: RuleContext): Set<string> {
-  const { graph, index, brief } = ctx;
-  const verdicts = judgeBrief(index, brief);
-  const backed = bindingBackedNodeIds(verdicts);
-  const touched = flowTouchedNodeIds(index, brief);
-  const accounted = new Set<string>();
-  for (const node of graph.nodes) {
-    if (ANNOTATION_KINDS.includes(node.kind)) continue;
-    if (backed.has(node.id) || touched.has(node.id)) accounted.add(node.id);
-  }
-  return accounted;
 }
 
 const narrativePresent: Expectation = {
@@ -67,10 +46,11 @@ const narrativePresent: Expectation = {
 };
 
 /**
- * The walkthrough has to explain the components the design leans on — not merely
- * mention them. Grounded: intersect the brief-accounted node set with the nodes
- * whose rationale reads as prose; any accounted node without a substantive
- * rationale is the gap.
+ * The walkthrough has to explain the components the design rests on — not merely
+ * mention them. Grounded and independent of the brief: intersect every real
+ * (non-annotation) component with the nodes whose rationale reads as prose; any
+ * component without a substantive rationale is the gap. A complete walkthrough
+ * explains every box.
  */
 const componentsExplained: Expectation = {
   id: 'exp.nar.components-explained',
@@ -84,9 +64,9 @@ const componentsExplained: Expectation = {
   teach: () =>
     'Every component the design rests on should have a reason the reader can hear you give: what it does, and why it earns its place. A box the walkthrough never speaks to reads as unexamined — the reviewer cannot tell a deliberate choice from an accident.',
   satisfiedBy: (ctx) => {
-    const accounted = accountedNodeIds(ctx);
+    const components = realComponentNodeIds(ctx.graph);
     const explained = new Set(ctx.narration?.explainedNodeIds ?? []);
-    const missing = uniqueSorted([...accounted].filter((id) => !explained.has(id)));
+    const missing = uniqueSorted([...components].filter((id) => !explained.has(id)));
     if (missing.length === 0) return met(uniqueSorted([...explained]));
     return unmet(
       missing,

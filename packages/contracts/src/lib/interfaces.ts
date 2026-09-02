@@ -8,19 +8,48 @@ import type { NodeKind, OperationKind } from './canvas';
  */
 
 /**
- * The five interface roles a kind can play:
- * - `api`        — serves endpoints; its operations are what callers invoke.
- * - `channel`    — carries messages; its operations are the message/event
- *                  types flowing through it, declared once on the channel and
- *                  referenced by both producer and consumer edges.
- * - `storage`    — spoken *to* via a driver/protocol, not an app-level API;
- *                  declares no operations.
- * - `edge-infra` — transparent traffic infrastructure (proxying, filtering,
- *                  resolution); declares no operations of its own.
- * - `passive`    — originates traffic or observes it; declares nothing.
+ * The six interface roles a kind can play:
+ * - `api`           — serves endpoints; its operations are what callers invoke,
+ *                     so an operation is exercised by being *called* (its name
+ *                     carried on an inbound edge).
+ * - `event-handler` — event-driven or scheduled compute (a worker, a batch job,
+ *                     a stream processor). It declares operations like an api,
+ *                     but they are exercised by the *message flow* — an emitted
+ *                     event transported out, or a consumed one transported in —
+ *                     not by a caller naming them. Distinguished from `api` so
+ *                     the interface rules judge "exercised" by the flow, not the
+ *                     name; treated *as* api wherever the question is "does this
+ *                     node run operations / produce events".
+ * - `channel`       — carries messages; its operations are the message/event
+ *                     types flowing through it, declared once on the channel and
+ *                     referenced by both producer and consumer edges.
+ * - `storage`       — spoken *to* via a driver/protocol, not an app-level API;
+ *                     declares no operations.
+ * - `edge-infra`    — transparent traffic infrastructure (proxying, filtering,
+ *                     resolution); declares no operations of its own.
+ * - `passive`       — originates traffic or observes it; declares nothing.
  */
-export const INTERFACE_ROLES = ['api', 'channel', 'storage', 'edge-infra', 'passive'] as const;
+export const INTERFACE_ROLES = [
+  'api',
+  'event-handler',
+  'channel',
+  'storage',
+  'edge-infra',
+  'passive',
+] as const;
 export type InterfaceRole = (typeof INTERFACE_ROLES)[number];
+
+/**
+ * True for the roles that RUN operations and can PRODUCE events — `api` and
+ * `event-handler`. The single source of truth for every site that used to ask
+ * `role === 'api'` to mean "this node has an operation surface" (workflow
+ * corroboration, the operations editor, the emits gate). The two differ only in
+ * how the interface *hygiene* rules judge whether a declared operation is
+ * exercised — see `role: 'event-handler'` above.
+ */
+export function isApiLikeRole(role: InterfaceRole): boolean {
+  return role === 'api' || role === 'event-handler';
+}
 
 export interface InterfaceCapability {
   role: InterfaceRole;
@@ -53,13 +82,13 @@ export const INTERFACE_CAPABILITIES = {
   'service-mesh': { role: 'edge-infra', operationKinds: [], editorLabel: null },
   // ── Compute
   service: { role: 'api', operationKinds: ['command', 'query'], editorLabel: API_LABEL },
-  worker: { role: 'api', operationKinds: ['command'], editorLabel: API_LABEL },
+  worker: { role: 'event-handler', operationKinds: ['command'], editorLabel: API_LABEL },
   'serverless-function': {
     role: 'api',
     operationKinds: ['command', 'query'],
     editorLabel: API_LABEL,
   },
-  'batch-job': { role: 'api', operationKinds: ['command'], editorLabel: API_LABEL },
+  'batch-job': { role: 'event-handler', operationKinds: ['command'], editorLabel: API_LABEL },
   // ── Data Stores
   database: { role: 'storage', operationKinds: [], editorLabel: null },
   replica: { role: 'storage', operationKinds: [], editorLabel: null },
@@ -82,7 +111,7 @@ export const INTERFACE_CAPABILITIES = {
   'notification-service': { role: 'api', operationKinds: ['command'], editorLabel: API_LABEL },
   // ── Analytics & ML
   'stream-processor': {
-    role: 'api',
+    role: 'event-handler',
     operationKinds: ['command', 'stream'],
     editorLabel: API_LABEL,
   },
@@ -112,7 +141,12 @@ export const INTERFACE_CAPABILITIES = {
   },
 } as const satisfies Record<NodeKind, InterfaceCapability>;
 
-/** True when the kind's capability row lists at least one operation kind. */
+/**
+ * True when the kind's capability row lists at least one operation kind. Note
+ * `event-handler` kinds keep non-empty `operationKinds`, so they declare
+ * operations and can own a call/webhook edge exactly like an `api` kind — the
+ * role only changes how hygiene judges an operation "exercised".
+ */
 export function canDeclareOperations(kind: NodeKind): boolean {
   return INTERFACE_CAPABILITIES[kind].operationKinds.length > 0;
 }

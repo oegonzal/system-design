@@ -7,6 +7,7 @@ import {
   OPERATION_NAME_MAX_LENGTH,
   OPERATION_NOTES_MAX_LENGTH,
   fulfillableItems,
+  isApiLikeRole,
   type InterfaceRole,
   type NodeOperation,
   type OperationKind,
@@ -119,9 +120,9 @@ export function OperationsEditor({
     }
     if (
       (operation.emits ?? []).length > 0 &&
-      (operation.kind !== 'command' || workflow.role !== 'api')
+      (operation.kind !== 'command' || !isApiLikeRole(workflow.role))
     ) {
-      return 'Only commands on api-role components produce events — untick these emissions or move them to the command that causes them.';
+      return 'Only commands on api or event-driven components produce events — untick these emissions or move them to the command that causes them.';
     }
     return null;
   };
@@ -195,7 +196,7 @@ export function OperationsEditor({
               ? (() => {
                   const emits = operation.emits ?? [];
                   const emitsAtCap = emits.length >= OPERATION_MAX_EMITS;
-                  const mayEmit = workflow.role === 'api' && operation.kind === 'command';
+                  const mayEmit = isApiLikeRole(workflow.role) && operation.kind === 'command';
                   // Rendered for eligible rows, and ALSO whenever emissions
                   // already exist: a kind or role flip must never strand
                   // claims behind vanished checkboxes the author cannot

@@ -375,6 +375,24 @@ describe('order-history calibration', () => {
     ).toEqual([]);
   });
 
+  /**
+   * The event-handler-role regression lock: the POS importer (batch-job) and
+   * the order indexer (worker) are exercised by the message flow — they emit
+   * events transported out and consume events transported in — so
+   * `hygiene.unreferenced-operation` must not flag their fulfilling operations,
+   * even though those op names are never carried by an edge. This is the pair
+   * that fought the product dimension before the role split.
+   */
+  it('does not flag event-driven fulfilling operations as unreferenced', () => {
+    const result = runEngine(excellent(), orderHistoryFacts());
+    const unreferenced = result.findings.filter(
+      (finding) => finding.ruleId === 'hygiene.unreferenced-operation',
+    );
+    const flagged = unreferenced.flatMap((finding) => finding.affectedNodeIds);
+    expect(flagged).not.toContain('worker-1');
+    expect(flagged).not.toContain('batch-job-1');
+  });
+
   it('[PRD-5] a declared cadence over the stated budget is contradicted at high severity', () => {
     const graph = excellent();
     const slowPoll: CanvasGraph = {

@@ -71,6 +71,15 @@ describe('the workflow vocabulary', () => {
     expect(fulfillableItems(full, 'channel', 'event').map((i) => i.id)).toEqual(['evt-a']);
     expect(fulfillableItems(full, 'storage', 'command')).toEqual([]);
     expect(fulfillableItems(full, 'api', 'event')).toEqual([]);
+    // event-handler declares operations like an api: same command/query offerings.
+    expect(fulfillableItems(full, 'event-handler', 'command').map((i) => i.id)).toEqual([
+      'op-c',
+      'ing-p',
+    ]);
+    expect(fulfillableItems(full, 'event-handler', 'query').map((i) => i.id)).toEqual([
+      'op-q',
+      'agg-1',
+    ]);
   });
 });
 

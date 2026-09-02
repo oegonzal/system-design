@@ -238,6 +238,10 @@ const OPERATION_KIND_PLURALS: Record<OperationKind, string> = {
 export function interfaceSummary(kind: NodeKind): string | null {
   const capability = INTERFACE_CAPABILITIES[kind];
   switch (capability.role) {
+    // An event-handler declares operations exactly like an api; they are
+    // exercised by the message flow rather than by a caller, but the guide copy
+    // is the same "declare X on its interface" sentence.
+    case 'event-handler':
     case 'api': {
       const plurals = capability.operationKinds.map((op) => OPERATION_KIND_PLURALS[op]);
       if (plurals.length === 0) return null;

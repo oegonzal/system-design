@@ -1,7 +1,12 @@
 'use client';
 
 import styled from '@emotion/styled';
-import { INTERFACE_CAPABILITIES, type NodeKind, type Severity } from '@sysdesign/contracts';
+import {
+  INTERFACE_CAPABILITIES,
+  isApiLikeRole,
+  type NodeKind,
+  type Severity,
+} from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
@@ -87,15 +92,15 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
   const configCount = data.config ? Object.keys(data.config).length : 0;
   const severity = data.severity ?? null;
 
-  // Declared interface, summarized in the role's own vocabulary: an api-role
-  // node serves ops, a channel carries types; other roles declare nothing
-  // worth counting even if stale data lingers after a kind switch.
+  // Declared interface, summarized in the role's own vocabulary: an api or
+  // event-handler node serves ops, a channel carries types; other roles declare
+  // nothing worth counting even if stale data lingers after a kind switch.
   const role = INTERFACE_CAPABILITIES[data.kind].role;
   const opCount = data.operations?.length ?? 0;
   const roleCount = data.responsibilities?.length ?? 0;
   const opsSegment =
-    opCount > 0 && (role === 'api' || role === 'channel')
-      ? ` · ${opCount} ${role === 'api' ? 'ops' : 'types'}`
+    opCount > 0 && (isApiLikeRole(role) || role === 'channel')
+      ? ` · ${opCount} ${isApiLikeRole(role) ? 'ops' : 'types'}`
       : '';
 
   return (

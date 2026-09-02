@@ -1,11 +1,10 @@
 'use client';
 
-import { ANNOTATION_KINDS, type CanvasGraph, type PromptDto } from '@sysdesign/contracts';
+import { realComponentNodes, type CanvasGraph, type PromptDto } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 import { useMemo } from 'react';
 
 import { TextAreaField } from '../../components/fields';
-import { accountedNodeIds, reconcileBrief } from '../canvas/brief-draft';
 import { useCanvasStore } from '../canvas/canvas-store-context';
 import { toCanvasGraph } from '../canvas/graph-io';
 import { narrationSlotState, type NarrationSlotState } from '../canvas/narration-draft';
@@ -57,8 +56,6 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
   const overview = useCanvasStore((state) => state.narrativeOverview);
   const rationales = useCanvasStore((state) => state.componentRationales);
   const flowNarrations = useCanvasStore((state) => state.flowNarrations);
-  const bindings = useCanvasStore((state) => state.briefBindings);
-  const briefFlows = useCanvasStore((state) => state.briefFlows);
   const setOverview = useCanvasStore((state) => state.setNarrativeOverview);
   const setRationale = useCanvasStore((state) => state.setComponentRationale);
   const setFlow = useCanvasStore((state) => state.setFlowNarration);
@@ -74,23 +71,21 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
   );
 
   // Annotations narrate nothing — a request never routes through monitoring —
-  // so they get no slot, exactly as the brief exempts them from being accounted.
-  const componentNodes = useMemo(
-    () => graph.nodes.filter((node) => !ANNOTATION_KINDS.includes(node.kind)),
-    [graph],
-  );
+  // so they get no slot. `realComponentNodes` is the SAME set the grade explains
+  // over (`exp.nar.components-explained`), so the editor and the grade can never
+  // disagree about which boxes need a rationale.
+  const componentNodes = useMemo(() => realComponentNodes(graph), [graph]);
 
-  // The gap the grade measures: `exp.nar.components-explained` credits the
-  // brief-accounted nodes that also read as explained, so the nudge names the
-  // accounted ones still missing a substantive rationale.
-  const unexplained = useMemo(() => {
-    const accounted = accountedNodeIds(reconcileBrief(bindings, briefFlows, graph), graph);
-    return componentNodes.filter(
-      (node) =>
-        accounted.has(node.id) &&
-        narrationSlotState(proseByNode.get(node.id) ?? '') !== 'explained',
-    );
-  }, [bindings, briefFlows, graph, componentNodes, proseByNode]);
+  // The gap the grade measures: every real component the walkthrough has not yet
+  // explained. Each is a genuine graded finding, so a complete walkthrough
+  // leaves this empty.
+  const unexplained = useMemo(
+    () =>
+      componentNodes.filter(
+        (node) => narrationSlotState(proseByNode.get(node.id) ?? '') !== 'explained',
+      ),
+    [componentNodes, proseByNode],
+  );
 
   return (
     <Stack gap={5}>
@@ -170,8 +165,8 @@ export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
       {unexplained.length > 0 ? (
         <Stack gap={2} data-testid="narrative-unexplained">
           <Text size="sm" tone="secondary">
-            {unexplained.length === 1 ? 'This component is' : 'These components are'} accounted for
-            in the brief but not yet explained
+            {unexplained.length === 1 ? 'This component is' : 'These components are'} not yet
+            explained
           </Text>
           <Stack direction="row" gap={2} wrap>
             {unexplained.map((node) => (

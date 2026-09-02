@@ -9,26 +9,22 @@ import { INTERFACE_CAPABILITIES, canDeclareOperations, resolveInterfaceOwner } f
  * kinds agree) plus the ownership rule's decision table.
  */
 describe('interface capabilities', () => {
-  it('gives every api/channel kind a non-empty operation vocabulary and an editor label', () => {
+  it('gives every operation-declaring kind (api/event-handler/channel) a vocabulary and an editor label', () => {
     for (const kind of NODE_KINDS) {
       const capability = INTERFACE_CAPABILITIES[kind];
-      if (capability.role !== 'api' && capability.role !== 'channel') continue;
-      expect(
-        capability.operationKinds.length,
-        `${kind} declares no operation kinds`,
-      ).toBeGreaterThan(0);
+      if (!canDeclareOperations(kind)) continue;
+      expect(['api', 'event-handler', 'channel']).toContain(capability.role);
       expect(capability.editorLabel, `${kind} has no editor label`).toBeTruthy();
-      expect(canDeclareOperations(kind)).toBe(true);
     }
   });
 
   it('keeps storage/edge-infra/passive kinds operation-free with no editor label', () => {
     for (const kind of NODE_KINDS) {
       const capability = INTERFACE_CAPABILITIES[kind];
-      if (capability.role === 'api' || capability.role === 'channel') continue;
+      if (canDeclareOperations(kind)) continue;
+      expect(['storage', 'edge-infra', 'passive']).toContain(capability.role);
       expect(capability.operationKinds, `${kind} should declare nothing`).toHaveLength(0);
       expect(capability.editorLabel, `${kind} should hide the editor section`).toBeNull();
-      expect(canDeclareOperations(kind)).toBe(false);
     }
   });
 });

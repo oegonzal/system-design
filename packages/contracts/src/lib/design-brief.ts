@@ -1,4 +1,4 @@
-import type { NodeKind } from './canvas';
+import type { CanvasGraph, CanvasNode, NodeKind } from './canvas';
 import type { MechanismClaim } from './mechanisms';
 
 /**
@@ -79,6 +79,20 @@ export const FLOW_SINK_KINDS: readonly NodeKind[] = [
 
 /** Observability blocks annotate a design; nothing routes through them. */
 export const ANNOTATION_KINDS: readonly NodeKind[] = ['monitoring', 'logging', 'tracing'];
+
+/**
+ * The components a design rests on — every node that is not an observability
+ * annotation. This is the set the walkthrough is expected to explain, computed
+ * once here so the narrative grade and the narrative editor read the identical
+ * definition and can never drift. Independent of any brief.
+ */
+export function realComponentNodes(graph: CanvasGraph): CanvasNode[] {
+  return graph.nodes.filter((node) => !ANNOTATION_KINDS.includes(node.kind));
+}
+
+export function realComponentNodeIds(graph: CanvasGraph): Set<string> {
+  return new Set(realComponentNodes(graph).map((node) => node.id));
+}
 
 export const BRIEF_MAX_NFR_BINDINGS = 24;
 export const BRIEF_MAX_FLOWS = 12;

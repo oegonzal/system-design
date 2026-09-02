@@ -9,6 +9,7 @@ import {
   NODE_KIND_GUIDE,
   canDeclareOperations,
   interfaceSummary,
+  isApiLikeRole,
   kindsInCategory,
   resolveInterfaceOwner,
   type NodeKind,
@@ -159,8 +160,8 @@ export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPa
           {capability && capability.operationKinds.length > 0 ? (
             <Stack gap={4} data-testid="interface-section">
               <Heading level={3}>Interface</Heading>
-              {/* Channels carry other components' facts; only api-role kinds own responsibilities. */}
-              {capability.role === 'api' ? (
+              {/* Channels carry other components' facts; api and event-handler kinds own responsibilities. */}
+              {isApiLikeRole(capability.role) ? (
                 <ResponsibilitiesEditor
                   responsibilities={node.data.responsibilities ?? []}
                   onChange={(responsibilities) => updateNode(node.id, { responsibilities })}

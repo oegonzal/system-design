@@ -56,8 +56,9 @@ export function runExpectations(
     narration: null,
   };
   const briefCtx: RuleContext = { ...diagramCtx, brief };
-  // Narration expectations grade the walkthrough against the components the
-  // brief accounts for, so this context carries both the projection and the brief.
+  // Narration expectations grade the walkthrough against every real component
+  // and the prompt's requirements — independent of the brief. The brief rides
+  // along only so the context shape matches; no narrative check reads it.
   const narrationCtx: RuleContext = { ...diagramCtx, brief, narration };
   const entries: CoverageArtifact['entries'] = [];
   const findings: EngineFinding[] = [];

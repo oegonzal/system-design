@@ -1,4 +1,9 @@
-import { INTERFACE_CAPABILITIES, type CanvasGraph, type WorkflowSpec } from '@sysdesign/contracts';
+import {
+  INTERFACE_CAPABILITIES,
+  isApiLikeRole,
+  type CanvasGraph,
+  type WorkflowSpec,
+} from '@sysdesign/contracts';
 
 /**
  * Referential validation of the workflow claims on a graph whose shape
@@ -57,9 +62,9 @@ export function validateWorkflowReferences(
           problems.push(`node ${node.id} emits unknown workflow event: ${eventId}`);
         }
       }
-      if ((op.emits ?? []).length > 0 && role !== 'api') {
+      if ((op.emits ?? []).length > 0 && !isApiLikeRole(role)) {
         problems.push(
-          `node ${node.id} (${node.kind}) cannot emit events — only api-role components produce`,
+          `node ${node.id} (${node.kind}) cannot emit events — only api and event-driven compute components produce`,
         );
       }
     }

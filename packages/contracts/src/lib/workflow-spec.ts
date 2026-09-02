@@ -1,5 +1,5 @@
 import type { CanvasEdge, CanvasNode, NodeOperation, OperationKind } from './canvas';
-import { INTERFACE_CAPABILITIES, resolveInterfaceOwner } from './interfaces';
+import { INTERFACE_CAPABILITIES, isApiLikeRole, resolveInterfaceOwner } from './interfaces';
 import type { InterfaceRole } from './interfaces';
 import type { MechanismGraph } from './mechanisms';
 import { PROMPT_DIFFICULTIES } from './prompts';
@@ -135,11 +135,11 @@ export interface WorkflowFulfiller {
  * claim: a query op with `fulfills` set to the aggregation id.
  */
 export const WORKFLOW_FULFILLERS = {
-  'operation-command': { roles: ['api'], opKinds: ['command'] },
-  'operation-query': { roles: ['api'], opKinds: ['query'] },
+  'operation-command': { roles: ['api', 'event-handler'], opKinds: ['command'] },
+  'operation-query': { roles: ['api', 'event-handler'], opKinds: ['query'] },
   event: { roles: ['channel'], opKinds: ['event', 'stream'] },
-  'ingest-push': { roles: ['api'], opKinds: ['command'] },
-  'ingest-pull': { roles: ['api'], opKinds: ['command'] },
+  'ingest-push': { roles: ['api', 'event-handler'], opKinds: ['command'] },
+  'ingest-pull': { roles: ['api', 'event-handler'], opKinds: ['command'] },
 } as const satisfies Record<WorkflowItemClass, WorkflowFulfiller>;
 
 /** One row in the editor's Fulfills select. */
@@ -160,7 +160,7 @@ export function fulfillableItems(
   role: InterfaceRole,
   opKind: OperationKind,
 ): FulfillableItem[] {
-  if (role === 'api' && opKind === 'command') {
+  if (isApiLikeRole(role) && opKind === 'command') {
     return [
       ...spec.operations
         .filter((op) => op.kind === 'command')
@@ -168,7 +168,7 @@ export function fulfillableItems(
       ...spec.ingests.map((ingest) => ({ id: ingest.id, label: ingest.statement })),
     ];
   }
-  if (role === 'api' && opKind === 'query') {
+  if (isApiLikeRole(role) && opKind === 'query') {
     return [
       ...spec.operations
         .filter((op) => op.kind === 'query')
@@ -375,6 +375,70 @@ function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort();
 }
 
+/** The minimal graph shape the transport helpers read — satisfied by both `CanvasGraph` and `MechanismGraph`. */
+type NodeEdgeGraph = { nodes: readonly CanvasNode[]; edges: readonly CanvasEdge[] };
+
+/** The interface owner of an edge, by the one ownership rule (`resolveInterfaceOwner`). */
+function edgeOwner(graph: NodeEdgeGraph, edge: CanvasEdge): CanvasNode | undefined {
+  const source = graph.nodes.find((node) => node.id === edge.source);
+  const target = graph.nodes.find((node) => node.id === edge.target);
+  if (!source || !target) return undefined;
+  const side = resolveInterfaceOwner(source.kind, target.kind);
+  return side === 'source' ? source : side === 'target' ? target : undefined;
+}
+
+function eventsTransported(
+  graph: NodeEdgeGraph,
+  nodeId: string,
+  eventIds: readonly string[],
+  direction: 'in' | 'out',
+): CanvasEdge[] {
+  if (eventIds.length === 0) return [];
+  const wanted = new Set(eventIds);
+  return graph.edges.filter((edge) => {
+    if (direction === 'in' ? edge.target !== nodeId : edge.source !== nodeId) return false;
+    const owner = edgeOwner(graph, edge);
+    if (!owner || owner.id === nodeId) return false;
+    if (INTERFACE_CAPABILITIES[owner.kind].role !== 'channel') return false;
+    const carried = new Set(edge.carries ?? []);
+    return (owner.operations ?? []).some(
+      (channelOp) =>
+        carried.has(channelOp.name) &&
+        channelOp.fulfills !== undefined &&
+        wanted.has(channelOp.fulfills),
+    );
+  });
+}
+
+/**
+ * Edges by which one of `eventIds` is transported INTO `nodeId` — an in-edge
+ * owned by a channel that carries a message type whose `fulfills` is one of the
+ * events. This is how a consumer operation is "exercised by the flow": the
+ * events it consumes actually arrive on a wired channel. `judgeWorkflow`'s
+ * consume branch delegates here so the two never diverge.
+ */
+export function eventsTransportedInto(
+  graph: NodeEdgeGraph,
+  nodeId: string,
+  eventIds: readonly string[],
+): CanvasEdge[] {
+  return eventsTransported(graph, nodeId, eventIds, 'in');
+}
+
+/**
+ * Edges by which one of `eventIds` is transported OUT OF `nodeId` — the emit
+ * mirror of {@link eventsTransportedInto}: an out-edge to a channel that carries
+ * a message type fulfilling one of the emitted events. How a producer operation
+ * is "exercised by the flow": what it emits actually leaves the node.
+ */
+export function eventsTransportedOutOf(
+  graph: NodeEdgeGraph,
+  nodeId: string,
+  eventIds: readonly string[],
+): CanvasEdge[] {
+  return eventsTransported(graph, nodeId, eventIds, 'out');
+}
+
 export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): WorkflowReport {
   const roleOf = (node: CanvasNode): InterfaceRole => INTERFACE_CAPABILITIES[node.kind].role;
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
@@ -407,19 +471,7 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
   const consumesFromChannel = (
     node: CanvasNode,
     consumedEventIds: readonly string[],
-  ): CanvasEdge[] =>
-    graph.edges.filter((edge) => {
-      if (edge.target !== node.id) return false;
-      const owner = ownerOf(edge);
-      if (!owner || owner.id === node.id || roleOf(owner) !== 'channel') return false;
-      const carried = new Set(edge.carries ?? []);
-      return (owner.operations ?? []).some(
-        (channelOp) =>
-          carried.has(channelOp.name) &&
-          channelOp.fulfills !== undefined &&
-          consumedEventIds.includes(channelOp.fulfills),
-      );
-    });
+  ): CanvasEdge[] => eventsTransportedInto(graph, node.id, consumedEventIds);
 
   const eligible = (declaration: Declaration, itemClass: WorkflowItemClass): boolean => {
     // Annotated: the `as const` table's per-class literal tuples would
@@ -583,9 +635,9 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
     const declarations = declarationsOf(event.id);
     const transports = declarations.filter((declaration) => eligible(declaration, 'event'));
 
-    /** Producers: command ops on api-role nodes declaring the emission. */
+    /** Producers: command ops on api / event-handler nodes declaring the emission. */
     const producers = graph.nodes.flatMap((node) =>
-      roleOf(node) === 'api'
+      isApiLikeRole(roleOf(node))
         ? (node.operations ?? [])
             .filter((op) => op.kind === 'command' && (op.emits ?? []).includes(event.id))
             .map((op) => ({ node, op }))
@@ -631,7 +683,7 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
         const target = byId.get(edge.target);
         return (
           target !== undefined &&
-          roleOf(target) === 'api' &&
+          isApiLikeRole(roleOf(target)) &&
           (edge.carries ?? []).includes(transport.op.name)
         );
       }),
