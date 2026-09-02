@@ -172,6 +172,34 @@ export class CanvasPage {
     await this.properties.getByTestId('edge-carries-field').getByLabel(opName).click();
   }
 
+  /**
+   * Link the last-added operation row to a workflow-spec item. Select-only:
+   * the control offers exactly the ids the prompt declares for this node's
+   * role and the row's kind.
+   */
+  async setOperationFulfills(itemId: string): Promise<void> {
+    await this.properties
+      .locator('[data-testid^="operation-fulfills-"]')
+      .last()
+      .selectOption(itemId);
+  }
+
+  /** Toggle one spec event's emission checkbox on the last-added command row. */
+  async toggleOperationEmit(eventId: string): Promise<void> {
+    await this.properties.locator(`[data-testid$="-${eventId}"]`).last().click();
+  }
+
+  /** The live workflow verdict chip in the Brief tab's Workflow section. */
+  async expectWorkflowVerdict(
+    itemId: string,
+    tone: 'empty' | 'uncorroborated' | 'contradicted' | 'corroborated',
+  ): Promise<void> {
+    await expect(this.page.getByTestId(`workflow-verdict-${itemId}`)).toHaveAttribute(
+      'data-tone',
+      tone,
+    );
+  }
+
   /** The edge pill lives in React Flow's label-renderer overlay, not the <g>. */
   async expectEdgePill(text: string): Promise<void> {
     await expect(
@@ -425,8 +453,9 @@ export class CanvasPage {
 export async function openPracticeSessionWithPrompt(
   page: Page,
   request: APIRequestContext,
+  experienceId?: string,
 ): Promise<{ canvas: CanvasPage; prompt: PromptDto }> {
-  const { prompt, session } = await createPracticeSession(request);
+  const { prompt, session } = await createPracticeSession(request, experienceId);
   await page.goto(`/practice/${session.id}`);
   const canvas = new CanvasPage(page);
   await canvas.ready();

@@ -30,6 +30,12 @@ test.describe('the critic pipeline', () => {
     // 0–100, possibly fractional (weighted dimension means, e.g. "74.3").
     await expect(page.getByTestId('overall-score')).toHaveText(/^\d{1,3}(\.\d+)?$/);
     for (const dimension of EVAL_DIMENSIONS) {
+      if (dimension === 'product') {
+        // A ticketing prompt states no workflow spec, so the product
+        // dimension is honestly "Not assessed" rather than a free meter.
+        await expect(page.getByTestId('not-assessed-product')).toBeVisible();
+        continue;
+      }
       await expect(page.getByRole('meter', { name: dimension })).toBeVisible();
     }
     // No narrative was submitted — that is graded, not excused, so the

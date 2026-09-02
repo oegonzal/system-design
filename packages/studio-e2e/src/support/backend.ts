@@ -31,18 +31,33 @@ export async function listExperiences(request: APIRequestContext): Promise<Exper
 
 /** The seeded flash-sale experience the generation specs anchor on. */
 export const TICKETING_COMPANY = 'Ticketing & events platform';
+/** The seeded order-history experience — the one archetype whose prompts carry a workflow spec. */
+export const ORDER_HISTORY_COMPANY = 'Retail commerce brand';
+
+async function experienceByCompany(
+  request: APIRequestContext,
+  companyLabel: string,
+): Promise<ExperienceProfileDto> {
+  const experiences = await listExperiences(request);
+  const found = experiences.find((experience) => experience.companyLabel === companyLabel);
+  if (!found) {
+    throw new Error(
+      `Seed data is missing the "${companyLabel}" experience — run \`pnpm db:seed\`.`,
+    );
+  }
+  return found;
+}
 
 export async function ticketingExperience(
   request: APIRequestContext,
 ): Promise<ExperienceProfileDto> {
-  const experiences = await listExperiences(request);
-  const ticketing = experiences.find((experience) => experience.companyLabel === TICKETING_COMPANY);
-  if (!ticketing) {
-    throw new Error(
-      `Seed data is missing the "${TICKETING_COMPANY}" experience — run \`pnpm db:seed\`.`,
-    );
-  }
-  return ticketing;
+  return experienceByCompany(request, TICKETING_COMPANY);
+}
+
+export async function orderHistoryExperience(
+  request: APIRequestContext,
+): Promise<ExperienceProfileDto> {
+  return experienceByCompany(request, ORDER_HISTORY_COMPANY);
 }
 
 export async function generatePrompt(
@@ -59,8 +74,9 @@ export async function getPrompt(request: APIRequestContext, promptId: string): P
 
 export async function createPracticeSession(
   request: APIRequestContext,
+  experienceId?: string,
 ): Promise<{ prompt: PromptDto; session: DesignSessionDto }> {
-  const prompt = await generatePrompt(request);
+  const prompt = await generatePrompt(request, experienceId);
   const session = await unwrap<DesignSessionDto>(
     await request.post(`${API_URL}/sessions`, { data: { promptId: prompt.id } }),
   );

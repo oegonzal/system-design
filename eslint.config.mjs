@@ -119,6 +119,7 @@ export default [
             'expectFlowComplete',
             'expectDimensionScored',
             'expectNoSuggestionsOffered',
+            'expectWorkflowVerdict',
             // app-nav.ts
             'expectActiveNav',
             // stories.page.ts
