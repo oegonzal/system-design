@@ -17,7 +17,13 @@ import {
   type BriefSuggestionsDto,
   type SessionStatus,
 } from '@sysdesign/contracts';
-import { DesignRevision, DesignSession, Evaluation, Prompt } from '@sysdesign/db';
+import {
+  createRevisionRecords,
+  DesignRevision,
+  DesignSession,
+  Evaluation,
+  Prompt,
+} from '@sysdesign/db';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
@@ -234,30 +240,11 @@ export class SessionsService {
     }
 
     try {
-      return await this.em.transactional(async (em) => {
-        const latest = await em.findOne(
-          DesignRevision,
-          { session: sessionId },
-          { orderBy: { revisionNumber: 'desc' } },
-        );
-
-        const revision = em.create(DesignRevision, {
-          session: sessionId,
-          revisionNumber: (latest?.revisionNumber ?? 0) + 1,
-          graph: dto.graph,
-          narrative: dto.narrative ?? null,
-          brief: dto.brief ?? null,
-        });
-        em.persist(revision);
-
-        // Born queued; the worker moves it through running → complete/failed.
-        const evaluation = em.create(Evaluation, { revision });
-        em.persist(evaluation);
-
-        await this.evalQueue.enqueue(em, revision);
-
-        return { revision, evaluation };
-      });
+      return await this.em.transactional((em) =>
+        createRevisionRecords(em, sessionId, dto, 'user', (txEm, revision) =>
+          this.evalQueue.enqueue(txEm, revision),
+        ),
+      );
     } catch (err) {
       // Two concurrent submits computed the same revisionNumber; the unique
       // (session, revision_number) constraint is the arbiter.

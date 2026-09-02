@@ -85,5 +85,17 @@ export interface StartImprovementRunRequest extends SubmitRevisionRequest {
 export const DEFAULT_IMPROVE_ITERATIONS = 6;
 export const MAX_IMPROVE_ITERATIONS = 10;
 
+/**
+ * Whether the coach can run at all — it requires a live LLM (an
+ * ANTHROPIC_API_KEY, and not being forced deterministic). The UI reads this to
+ * disable the Improve button with an honest reason instead of a failing call.
+ */
+export interface ImproverAvailabilityDto {
+  enabled: boolean;
+  model: string | null;
+  reason: 'deterministic' | 'no-key' | null;
+}
+
 export type StartImprovementRunResponse = ApiResponse<ImprovementRunDto>;
 export type GetImprovementRunResponse = ApiResponse<ImprovementRunDto>;
+export type GetImproverAvailabilityResponse = ApiResponse<ImproverAvailabilityDto>;

@@ -8,4 +8,5 @@ export * from './entities/improvement-run.entity';
 export * from './entities/prompt.entity';
 export * from './entities/star-story.entity';
 export * from './orm.options';
+export * from './revision-factory';
 export * from './testing/ensure-database';

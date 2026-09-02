@@ -18,5 +18,8 @@ import { SessionsService } from './sessions.service';
     // The BullMQ swap seam: change useClass, nothing else moves.
     { provide: EvalQueue, useClass: PostgresEvalQueue },
   ],
+  // The queue seam only: improvement runs create base revisions through the
+  // same enqueue path, so a queue swap changes exactly one provider.
+  exports: [EvalQueue],
 })
 export class SessionsModule {}
