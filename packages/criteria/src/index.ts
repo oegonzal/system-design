@@ -44,6 +44,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Suggested bindings are proposals the author accepts or dismisses one at a time; an unaccepted proposal is never submitted, and each shows the same corroboration verdict the grade will use.',
   },
+  {
+    id: 'UX-10',
+    statement:
+      'A run exports in one click as a single zip — the diagram as a PDF plus prompt, narrative, brief, feedback and revisions each as its own Markdown file — so a design survives outside the database.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

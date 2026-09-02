@@ -12,6 +12,9 @@ export interface CanvasToolbarProps {
   submitting: boolean;
   revisionStatus: EvalStatus | null;
   revisionNumber: number | null;
+  /** Download the run (diagram PDF + per-artifact Markdown) as one zip. */
+  onExport: () => void;
+  exporting: boolean;
 }
 
 const STATUS_LABEL: Record<EvalStatus, string> = {
@@ -31,6 +34,8 @@ export function CanvasToolbar({
   submitting,
   revisionStatus,
   revisionNumber,
+  onExport,
+  exporting,
 }: CanvasToolbarProps) {
   const dirty = useCanvasStore((state) => state.dirty);
   const isEmpty = useCanvasStore((state) => state.nodes.length === 0);
@@ -63,6 +68,14 @@ export function CanvasToolbar({
       </Button>
       <Button variant="subtle" onClick={() => void fitView({ padding: 0.2 })}>
         Fit view
+      </Button>
+      <Button
+        variant="subtle"
+        onClick={onExport}
+        disabled={exporting || isEmpty}
+        data-testid="export-run"
+      >
+        {exporting ? 'Exporting…' : 'Export'}
       </Button>
       {dirty ? <Badge tone="accent">unsaved draft</Badge> : null}
       {revisionStatus && revisionNumber !== null ? (

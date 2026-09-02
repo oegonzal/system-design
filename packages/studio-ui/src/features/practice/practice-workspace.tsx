@@ -20,13 +20,14 @@ import {
   Tabs,
   Text,
 } from '@sysdesign/design-system';
-import { ReactFlowProvider } from '@xyflow/react';
+import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, toErrorMessage } from '../../api/client';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 import { CanvasStoreProvider, useCanvasStoreApi } from '../canvas/canvas-store-context';
+import { buildAndDownloadRunZip } from '../export/export-run';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
@@ -230,9 +231,11 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [feedback, setFeedback] = useState<FeedbackTarget | null>(null);
   const [viewingRevision, setViewingRevision] = useState<FeedbackTarget | null>(null);
   const [tab, setTab] = useState('prompt');
+  const [exporting, setExporting] = useState(false);
 
   const polling = useEvaluationPolling(feedback?.id ?? null);
   const suggestions = useBriefSuggestions(sessionId);
+  const { getNodes } = useReactFlow();
   const completedFor = useRef<string | null>(null);
 
   // Initial load: session → prompt + revision summaries → latest full graph.
@@ -313,6 +316,31 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       setSubmitting(false);
     }
   }, [sessionId]);
+
+  // Export the run as one zip: the diagram as a PDF plus prompt/narrative/brief/
+  // feedback/revisions each as a separate .md. Reads whatever revision is on
+  // screen — the live draft, or an older revision being viewed.
+  const handleExport = useCallback(async () => {
+    if (!prompt) return;
+    setExporting(true);
+    setSubmitError(null);
+    try {
+      await buildAndDownloadRunZip({
+        prompt,
+        graph: storeApi.getState().serialize(),
+        narrative: storeApi.getState().serializeNarrative(),
+        brief: storeApi.getState().serializeBrief(),
+        evaluation: polling.evaluation,
+        revisions,
+        revisionNumber: (viewingRevision ?? feedback)?.revisionNumber ?? null,
+        nodes: getNodes(),
+      });
+    } catch (error) {
+      setSubmitError(toErrorMessage(error, 'Could not export the run.'));
+    } finally {
+      setExporting(false);
+    }
+  }, [prompt, revisions, polling.evaluation, viewingRevision, feedback, getNodes, storeApi]);
 
   const handleRetry = useCallback(() => {
     if (!feedback) return;
@@ -408,6 +436,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             submitting={submitting}
             revisionStatus={revisionStatus}
             revisionNumber={feedback?.revisionNumber ?? null}
+            onExport={() => void handleExport()}
+            exporting={exporting}
           />
           {submitError !== null ? (
             <Text size="sm" tone="secondary" data-testid="submit-error">
