@@ -4,6 +4,7 @@ export * from './entities/eval-job.entity';
 export * from './entities/evaluation.entity';
 export * from './entities/experience-profile.entity';
 export * from './entities/finding.entity';
+export * from './entities/improvement-run.entity';
 export * from './entities/prompt.entity';
 export * from './entities/star-story.entity';
 export * from './orm.options';

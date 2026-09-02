@@ -372,6 +372,7 @@ export function makeRevisionSummary(
   return {
     id: 'rev-1',
     revisionNumber: 1,
+    origin: 'user',
     narrative: null,
     evaluationStatus: 'complete',
     overallScore: 72,

@@ -1,5 +1,6 @@
 import type { Opt, Rel } from '@mikro-orm/core';
 import {
+  Check,
   Entity,
   Index,
   ManyToOne,
@@ -10,6 +11,9 @@ import {
 import type * as Contracts from '@sysdesign/contracts';
 
 import { DesignSession } from './design-session.entity';
+
+type ContractOrigins = (typeof Contracts)['REVISION_ORIGINS'];
+const ORIGINS = ['user', 'assistant'] as const satisfies ContractOrigins;
 
 /**
  * An immutable snapshot of the canvas at submit time. No `updatedAt` on
@@ -23,6 +27,10 @@ import { DesignSession } from './design-session.entity';
  */
 @Entity()
 @Unique({ properties: ['session', 'revisionNumber'] })
+@Check({
+  name: 'design_revision_origin_check',
+  expression: `origin in (${ORIGINS.map((o) => `'${o}'`).join(', ')})`,
+})
 export class DesignRevision {
   @PrimaryKey({ type: 'uuid' })
   id: string = crypto.randomUUID();
@@ -35,6 +43,10 @@ export class DesignRevision {
   /** 1-indexed, dense per session — assigned as max + 1 inside the submit transaction. */
   @Property({ type: 'integer' })
   revisionNumber!: number;
+
+  /** Who authored this snapshot: the user, or the AI coach's improvement run. */
+  @Property({ type: 'text' })
+  origin: Opt<Contracts.RevisionOrigin> = 'user';
 
   @Property({ type: 'json' })
   graph!: Contracts.CanvasGraph;

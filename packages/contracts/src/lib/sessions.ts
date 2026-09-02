@@ -8,6 +8,14 @@ import type { IsoDateString, Uuid } from './primitives';
 export const SESSION_STATUSES = ['in-progress', 'completed', 'abandoned'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
+/**
+ * Who authored a revision: the practising user, or the AI coach's improvement
+ * run. The timeline renders assistant revisions with an explicit badge so a
+ * machine-made grade is never mistaken for the author's own.
+ */
+export const REVISION_ORIGINS = ['user', 'assistant'] as const;
+export type RevisionOrigin = (typeof REVISION_ORIGINS)[number];
+
 export interface DesignSessionDto {
   id: Uuid;
   promptId: Uuid;
@@ -24,6 +32,7 @@ export interface DesignRevisionDto {
   id: Uuid;
   sessionId: Uuid;
   revisionNumber: number;
+  origin: RevisionOrigin;
   graph: CanvasGraph;
   /**
    * The walkthrough: reference-anchored prose explaining why each component is
@@ -42,6 +51,7 @@ export interface DesignRevisionDto {
 export interface DesignRevisionSummaryDto {
   id: Uuid;
   revisionNumber: number;
+  origin: RevisionOrigin;
   /** See `DesignRevisionDto.narrative`. */
   narrative: DesignNarrative | null;
   evaluationStatus: EvalStatus | null;

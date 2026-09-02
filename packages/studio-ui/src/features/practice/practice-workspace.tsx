@@ -209,6 +209,7 @@ function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
   return {
     id: revision.id,
     revisionNumber: revision.revisionNumber,
+    origin: revision.origin,
     narrative: revision.narrative,
     evaluationStatus: revision.evaluation?.status ?? 'queued',
     overallScore: revision.evaluation?.overallScore ?? null,

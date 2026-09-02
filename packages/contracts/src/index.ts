@@ -21,6 +21,7 @@ export * from './lib/prompts';
 export * from './lib/workflow-spec';
 export * from './lib/quality-areas';
 export * from './lib/sessions';
+export * from './lib/improvement';
 export * from './lib/graph-render';
 export * from './lib/graph-validator';
 export * from './lib/workflow-validator';

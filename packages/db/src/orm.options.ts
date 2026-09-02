@@ -7,6 +7,7 @@ import { EvalJob } from './entities/eval-job.entity';
 import { Evaluation } from './entities/evaluation.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
 import { Finding } from './entities/finding.entity';
+import { ImprovementRun } from './entities/improvement-run.entity';
 import { Prompt } from './entities/prompt.entity';
 import { StarStory } from './entities/star-story.entity';
 
@@ -35,6 +36,7 @@ export const ormOptions = {
     Evaluation,
     Finding,
     EvalJob,
+    ImprovementRun,
     StarStory,
   ],
   metadataProvider: ReflectMetadataProvider,
