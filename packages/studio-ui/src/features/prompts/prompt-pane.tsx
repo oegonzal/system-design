@@ -89,6 +89,104 @@ export function PromptPane({ prompt }: PromptPaneProps) {
         </Stack>
       </Stack>
 
+      {prompt.workflowSpec ? (
+        <Stack gap={3} data-testid="prompt-workflow">
+          <Heading level={3}>Business workflow</Heading>
+          <Text size="sm" tone="muted">
+            The graded business layer: cover each item by linking your operations to it (Fulfills)
+            and wiring the events. The Brief tab shows live coverage.
+          </Text>
+
+          <Stack gap={2}>
+            <Heading level={4}>API contract</Heading>
+            <Checklist>
+              {prompt.workflowSpec.operations.map((op) => (
+                <li key={op.id}>
+                  <Badge tone="neutral">{op.kind}</Badge> {op.statement}
+                  {op.emits?.length ? (
+                    <Text as="span" size="sm" tone="muted">
+                      {' '}
+                      → {op.emits.join(', ')}
+                    </Text>
+                  ) : null}
+                  {op.onFailureEmits?.length ? (
+                    <Text as="span" size="sm" tone="muted">
+                      {' '}
+                      · on failure → {op.onFailureEmits.join(', ')}
+                    </Text>
+                  ) : null}
+                </li>
+              ))}
+            </Checklist>
+          </Stack>
+
+          <Stack gap={2}>
+            <Heading level={4}>Events</Heading>
+            <Checklist>
+              {prompt.workflowSpec.events.map((event) => (
+                <li key={event.id}>{event.statement}</li>
+              ))}
+            </Checklist>
+          </Stack>
+
+          <Stack gap={2}>
+            <Heading level={4}>Ingest SLAs</Heading>
+            <Checklist>
+              {prompt.workflowSpec.ingests.map((ingest) => {
+                const nfr = prompt.nonFunctionalRequirements.find(
+                  (candidate) => candidate.id === ingest.nfrId,
+                );
+                return (
+                  <li key={ingest.id}>
+                    <Badge tone="neutral">{ingest.mode}</Badge> {ingest.statement}
+                    {nfr?.target ? (
+                      <Text as="span" size="sm" tone="muted">
+                        {' '}
+                        ({nfr.target})
+                      </Text>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </Checklist>
+          </Stack>
+
+          {prompt.workflowSpec.entities.length > 0 ? (
+            <Stack gap={2}>
+              <Heading level={4}>Lifecycle</Heading>
+              <Checklist>
+                {prompt.workflowSpec.entities.flatMap((entity) =>
+                  entity.transitions.map((transition, index) => (
+                    <li key={`${entity.id}-${index}`}>
+                      {transition.from ?? '·'} → {transition.to}{' '}
+                      <Text as="span" size="sm" tone="muted">
+                        (via {transition.via})
+                      </Text>
+                    </li>
+                  )),
+                )}
+              </Checklist>
+            </Stack>
+          ) : null}
+
+          {prompt.workflowSpec.aggregations.length > 0 ? (
+            <Stack gap={2}>
+              <Heading level={4}>Aggregations</Heading>
+              <Checklist>
+                {prompt.workflowSpec.aggregations.map((agg) => (
+                  <li key={agg.id}>
+                    {agg.statement}{' '}
+                    <Text as="span" size="sm" tone="muted">
+                      (fed by {agg.sourceEventIds.join(', ')})
+                    </Text>
+                  </li>
+                ))}
+              </Checklist>
+            </Stack>
+          ) : null}
+        </Stack>
+      ) : null}
+
       <Surface padding={4}>
         <Stack gap={3}>
           <Heading level={3}>Scale targets</Heading>

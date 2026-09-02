@@ -17,6 +17,7 @@ import { FlowTracer } from './flow-tracer';
 import { NfrBindingRow } from './nfr-binding-row';
 import { SuggestionsPanel } from './suggestions-panel';
 import type { BriefSuggestionsState } from './use-brief-suggestions';
+import { WorkflowCoverage } from './workflow-coverage';
 
 export interface DesignBriefEditorProps {
   prompt: PromptDto;
@@ -121,6 +122,14 @@ export function DesignBriefEditor({ prompt, suggestions }: DesignBriefEditorProp
           />
         ))}
       </Stack>
+
+      {prompt.workflowSpec ? (
+        <WorkflowCoverage
+          spec={prompt.workflowSpec}
+          mechanismGraph={mechanismGraph}
+          nfrs={prompt.nonFunctionalRequirements}
+        />
+      ) : null}
 
       <Stack gap={3}>
         <Heading level={3}>Flows</Heading>

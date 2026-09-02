@@ -132,6 +132,11 @@ export const CRITERIA: readonly Criterion[] = [
       'On a workflow prompt, declaring nothing scores the product dimension 0; on any other prompt it is not assessed and renormalizes out.',
   },
   {
+    id: 'PRD-4',
+    statement:
+      'Workflow coverage chips show the same corroboration verdict the grade will use, live while authoring.',
+  },
+  {
     id: 'PRD-5',
     statement:
       'Freshness SLAs are graded structurally: declared polling cadence and push wiring against the budgets the prompt states.',

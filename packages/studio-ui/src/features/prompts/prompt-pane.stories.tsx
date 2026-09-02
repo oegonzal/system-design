@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makePrompt } from '../../testing/fixtures';
+import { makePrompt, makeWorkflowPrompt } from '../../testing/fixtures';
 import { PromptPane } from './prompt-pane';
 
 const meta: Meta<typeof PromptPane> = {
@@ -38,4 +38,9 @@ export const Advanced: Story = {
       },
     }),
   },
+};
+
+/** A workflow prompt: the business layer rendered beside the prose requirements. */
+export const WorkflowPrompt: Story = {
+  args: { prompt: makeWorkflowPrompt() },
 };

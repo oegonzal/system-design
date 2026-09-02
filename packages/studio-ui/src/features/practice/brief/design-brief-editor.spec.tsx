@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createCanvasStore } from '../../canvas/canvas-store';
 import { CanvasStoreProvider } from '../../canvas/canvas-store-context';
+import { makeOrderHistoryGraph, makeWorkflowPrompt } from '../../../testing/fixtures';
 import { renderWithTheme } from '../../../testing/render';
 import { DesignBriefEditor } from './design-brief-editor';
 
@@ -167,5 +168,42 @@ describe('DesignBriefEditor', () => {
     // No queue exists, so nothing can carry a dead-letter queue.
     await userEvent.selectOptions(screen.getByTestId('binding-mechanism-nfr-sec'), 'dlq');
     expect(screen.getByTestId('binding-no-candidates-nfr-sec').textContent).toContain('a queue');
+  });
+});
+
+describe('DesignBriefEditor — workflow coverage', () => {
+  it('renders the Workflow section only when the prompt carries a spec', () => {
+    renderEditor();
+    expect(screen.queryByTestId('workflow-coverage')).toBeNull();
+  });
+
+  it('[PRD-4] chips show the verdict the grade will use, live: designing the coverage flips the tone', () => {
+    const workflowPrompt = makeWorkflowPrompt();
+    const bare = createCanvasStore({ nodes: [], edges: [] });
+    const { unmount } = renderWithTheme(
+      <CanvasStoreProvider store={bare}>
+        <DesignBriefEditor prompt={workflowPrompt} />
+      </CanvasStoreProvider>,
+    );
+    // An empty canvas: the serving query is not started.
+    expect(screen.getByTestId('workflow-verdict-op-list-orders').getAttribute('data-tone')).toBe(
+      'empty',
+    );
+    unmount();
+
+    // The order-history graph fulfils and carries it — same judge, new verdict.
+    const covered = createCanvasStore(makeOrderHistoryGraph());
+    renderWithTheme(
+      <CanvasStoreProvider store={covered}>
+        <DesignBriefEditor prompt={workflowPrompt} />
+      </CanvasStoreProvider>,
+    );
+    expect(screen.getByTestId('workflow-verdict-op-list-orders').getAttribute('data-tone')).toBe(
+      'corroborated',
+    );
+    // The pull ingest is not drawn in that graph — its chip stays honest.
+    const pull = screen.getByTestId('workflow-verdict-ing-pos-import');
+    expect(pull.getAttribute('data-tone')).toBe('empty');
+    expect(pull.textContent).toContain('Not started');
   });
 });

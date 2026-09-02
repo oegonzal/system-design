@@ -1,12 +1,25 @@
 'use client';
 
-import type { EvalAxisDto, ScenarioReportDto, ScenarioVerdict } from '@sysdesign/contracts';
+import type {
+  AxisFactorLevel,
+  EvalAxisDto,
+  ScenarioReportDto,
+  ScenarioVerdict,
+} from '@sysdesign/contracts';
 import { Badge, Heading, Meter, Stack, Text, type BadgeTone } from '@sysdesign/design-system';
 
 const VERDICT_TONE: Record<ScenarioVerdict, BadgeTone> = {
   survives: 'accent',
   degrades: 'medium',
   fails: 'critical',
+};
+
+/** Ordinal factor levels; low reads as caution except where none is honest work. */
+const FACTOR_TONE: Record<AxisFactorLevel, BadgeTone> = {
+  none: 'critical',
+  low: 'medium',
+  medium: 'neutral',
+  high: 'accent',
 };
 
 /** Subscore keys arrive camelCased from the engine; readers get words. */
@@ -39,7 +52,26 @@ export function LlmInsights({ axes, scenarios }: LlmInsightsProps) {
               Not scored — the model critic was unavailable.
             </Text>
           )}
-          {axis.subScores ? (
+          {axis.factors ? (
+            // An evaluator that answered in ordinals: level + the rationale
+            // that earned it. The meters would repeat the same information
+            // with less of it, so factors replace them.
+            <Stack gap={2}>
+              {axis.factors.map((factor) => (
+                <Stack key={factor.id} gap={1} data-testid={`factor-${factor.id}`}>
+                  <Stack direction="row" gap={2} align="center">
+                    <Badge tone={FACTOR_TONE[factor.level]}>{factor.level}</Badge>
+                    <Text as="span" size="sm">
+                      {factor.label}
+                    </Text>
+                  </Stack>
+                  <Text size="sm" tone="muted">
+                    {factor.rationale}
+                  </Text>
+                </Stack>
+              ))}
+            </Stack>
+          ) : axis.subScores ? (
             <Stack gap={2}>
               {Object.entries(axis.subScores).map(([name, value]) => (
                 <Meter key={name} label={humanizeSubScore(name)} value={value} />

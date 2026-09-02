@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph, makePrompt } from '../../../testing/fixtures';
+import {
+  makeGraph,
+  makeOrderHistoryGraph,
+  makePrompt,
+  makeWorkflowPrompt,
+} from '../../../testing/fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { DesignBriefEditor } from './design-brief-editor';
 
@@ -109,4 +114,16 @@ export const ProposalReplacesABinding: Story = {
       ]);
     }),
   ],
+};
+
+/** A workflow prompt with a blank canvas: every chip reads Not started — the silence that scores 0. */
+export const WorkflowNothingClaimed: Story = {
+  args: { prompt: makeWorkflowPrompt() },
+  decorators: [withCanvasStore()],
+};
+
+/** The order-history graph covers the query and push path; the pull path is still missing. */
+export const WorkflowPartialCoverage: Story = {
+  args: { prompt: makeWorkflowPrompt() },
+  decorators: [withCanvasStore((store) => store.getState().setGraph(makeOrderHistoryGraph()))],
 };

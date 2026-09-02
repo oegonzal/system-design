@@ -74,3 +74,43 @@ describe('LlmInsights', () => {
     expect(screen.getByText('Everything in the region goes with it.')).toBeTruthy();
   });
 });
+
+describe('LlmInsights — ordinal factors', () => {
+  it('[PRD-6] renders an evaluator axis as levels with rationales, replacing the meters', () => {
+    renderWithTheme(
+      <LlmInsights
+        axes={[
+          makeAxis({
+            id: 'workability',
+            label: 'Business workability',
+            score: 67,
+            subScores: { objectiveAlignment: 100, riskContainment: 67 },
+            factors: [
+              {
+                id: 'objectiveAlignment',
+                label: 'Objective alignment',
+                level: 'high',
+                rationale: 'The read model serves the account page.',
+              },
+              {
+                id: 'risk',
+                label: 'Remaining risk',
+                level: 'low',
+                rationale: 'Replay duplicates remain the main exposure.',
+              },
+            ],
+          }),
+        ]}
+        scenarios={[]}
+      />,
+    );
+
+    const alignment = screen.getByTestId('factor-objectiveAlignment');
+    expect(alignment.textContent).toContain('high');
+    expect(alignment.textContent).toContain('The read model serves the account page.');
+    // Factors replace the sub-score meters — one judgement, one rendering.
+    expect(screen.queryByText('objective alignment')).toBeNull();
+    // And the EVAL-6 caption still stands beside it.
+    expect(screen.getAllByText('AI-assessed — does not affect the grade.').length).toBe(1);
+  });
+});
