@@ -435,3 +435,33 @@ describe('data.multi-writer-inventory — declared intent', () => {
     expect(rule.check(contextFor(twoServices('write'), consistencyFacts))).toHaveLength(1);
   });
 });
+
+describe('data.cache-staleness-unbounded', () => {
+  const rule = ruleById('data.cache-staleness-unbounded');
+  const consistencyFacts = flashSaleFacts({
+    nfrKinds: [...flashSaleFacts().nfrKinds, 'consistency'],
+  });
+  const cache = (config: Record<string, unknown> = {}) =>
+    graph([node('cache-1', 'cache', { config: config as never })], []);
+
+  it('fires when nothing bounds how stale a cached read may be', () => {
+    expect(rule.check(contextFor(cache(), consistencyFacts))).toHaveLength(1);
+  });
+
+  it('is satisfied by a TTL', () => {
+    expect(rule.check(contextFor(cache({ ttlSeconds: 5 }), consistencyFacts))).toEqual([]);
+  });
+
+  /**
+   * `invalidation` is a checkbox — a boolean. Reading it as a string meant
+   * ticking the box satisfied nothing, which only showed up when the real UI
+   * was driven against the real engine.
+   */
+  it('is satisfied by the invalidation checkbox the panel actually writes', () => {
+    expect(rule.check(contextFor(cache({ invalidation: true }), consistencyFacts))).toEqual([]);
+  });
+
+  it('says nothing without a consistency requirement to be stale against', () => {
+    expect(rule.check(contextFor(cache()))).toEqual([]);
+  });
+});

@@ -385,12 +385,14 @@ const cacheStalenessUnbounded: EvalRule = {
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('consistency')) return [];
     const caches = sortById(index.byKind('cache'));
-    // A TTL or an invalidation strategy both bound how stale a read can be;
+    // A TTL or a declared invalidation both bound how stale a read can be;
     // neither means the answer is "until something happens to evict it".
+    // `invalidation` is a BOOLEAN in the config vocabulary — the panel writes a
+    // checkbox — and reading it as a string here meant ticking the box could
+    // never satisfy this rule. Caught by driving the real UI.
     const unbounded = caches.filter(
       (cache) =>
-        configNumber(cache, 'ttlSeconds') === undefined &&
-        typeof cache.config?.['invalidation'] !== 'string',
+        configNumber(cache, 'ttlSeconds') === undefined && cache.config?.invalidation !== true,
     );
     if (unbounded.length === 0) return [];
     return [
