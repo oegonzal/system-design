@@ -1,9 +1,6 @@
-import {
-  MECHANISM_KINDS,
-  type CanvasGraph,
-  type DesignBrief,
-  type NodeKind,
-} from '@sysdesign/contracts';
+import { type CanvasGraph, type NodeKind } from './canvas';
+import type { DesignBrief } from './design-brief';
+import { MECHANISM_KINDS } from './mechanisms';
 
 /** The slice of the prompt a brief must line up with. */
 export interface BriefPromptRefs {

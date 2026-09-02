@@ -27,7 +27,7 @@ import {
  * shape errors (oversize prose, a version mismatch, a negative ordinal) are a
  * 400 here; referential errors (a rationale for a node the graph never
  * declared, a flow ordinal past the prompt's requirements) belong to
- * `narration-validator.ts` and answer 422.
+ * the shared `validateNarration` in `@sysdesign/contracts` and answer 422.
  *
  * Prose is length-capped but never inspected for content — the grade reads a
  * typed projection of these slots, never the strings, so nothing here decides

@@ -6,6 +6,7 @@ import {
   MECHANISM_GUIDE,
   MECHANISM_KINDS,
   PROPOSAL_RATIONALE_MAX_LENGTH,
+  validateBriefReferences,
   type BriefBindingProposal,
   type CanvasGraph,
   type NfrItem,
@@ -14,7 +15,6 @@ import {
 import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
-import { validateBriefReferences } from '../brief-validator';
 import { describeCanvas } from './describe-canvas';
 
 /**

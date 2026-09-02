@@ -1,4 +1,5 @@
-import type { CanvasGraph, DesignNarrative } from '@sysdesign/contracts';
+import type { CanvasGraph } from './canvas';
+import type { DesignNarrative } from './narration';
 
 /** The slice of the prompt a narrative's flow slots must line up with. */
 export interface NarrationPromptRefs {

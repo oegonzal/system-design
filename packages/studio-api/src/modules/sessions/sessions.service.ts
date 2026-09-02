@@ -10,6 +10,10 @@ import { UniqueConstraintViolationException } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_LIST_LIMIT,
+  validateBriefReferences,
+  validateGraphReferences,
+  validateNarration,
+  validateWorkflowReferences,
   type BriefSuggestionsDto,
   type SessionStatus,
 } from '@sysdesign/contracts';
@@ -30,10 +34,6 @@ import type { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
 import type { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
 import type { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
 import { EvalQueue } from './eval-queue';
-import { validateBriefReferences } from './brief-validator';
-import { validateGraphReferences } from './graph-validator';
-import { validateNarration } from './narration-validator';
-import { validateWorkflowReferences } from './workflow-validator';
 
 /** A session plus what its DTO summarises about the newest revision. */
 export interface SessionWithLatest {

@@ -1,9 +1,11 @@
-import { CANVAS_MAX_TOTAL_OPERATIONS, type CanvasGraph } from '@sysdesign/contracts';
+import { CANVAS_MAX_TOTAL_OPERATIONS, type CanvasGraph } from './canvas';
 
 /**
  * Referential validation of a graph whose *shape* already passed the DTO
  * layer. Pure and total: collects every problem rather than failing fast, so
- * the 422 the service raises lists all of them in one round trip.
+ * the 422 the service raises lists all of them in one round trip. Shared here
+ * because everything that persists a revision — the API's submit path and the
+ * eval-worker's improvement loop — must hold the same line.
  *
  * Deliberately NOT a 422: a `carries` entry referencing a name its interface
  * owner never declared. That graph is semantically incomplete, not

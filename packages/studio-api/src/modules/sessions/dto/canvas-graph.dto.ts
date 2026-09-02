@@ -49,8 +49,8 @@ import { ScalarRecordConstraint } from './scalar-record.constraint';
  * Wire validation of a submitted canvas graph. Shape errors (bad kind, missing
  * id, oversize arrays) are caught here and answered with a 400; referential
  * errors (dangling edges, duplicate ids, self-loops) belong to
- * `graph-validator.ts` and answer 422 — the payload parsed fine but describes
- * an impossible graph.
+ * the shared `validateGraphReferences` in `@sysdesign/contracts` and answer
+ * 422 — the payload parsed fine but describes an impossible graph.
  */
 export class PositionDto {
   @IsNumber()
@@ -82,7 +82,7 @@ export class NodeOperationDto implements NodeOperation {
    * Workflow-spec item reference. MinLength because "not linked" must be an
    * ABSENT key — an empty string would parse here and then 422 downstream as
    * an unknown id. Whether the id exists on the session's prompt is
-   * `workflow-validator.ts`'s business.
+   * the shared workflow validator's business (@sysdesign/contracts).
    */
   @IsOptional()
   @IsString()

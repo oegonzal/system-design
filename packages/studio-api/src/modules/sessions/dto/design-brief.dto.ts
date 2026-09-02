@@ -30,7 +30,8 @@ import {
  * Wire validation of a submitted design brief. Same split as
  * `canvas-graph.dto.ts`: shape errors (unknown mechanism, oversize arrays) are
  * a 400 here; referential errors (a node id the graph never declares, a flow
- * path that does not connect) belong to `graph-validator.ts` and answer 422.
+ * path that does not connect) belong to the shared brief validator in
+ * `@sysdesign/contracts` and answer 422.
  *
  * The boundary that must not blur: an IMPOSSIBLE binding is rejected, an
  * UNSUPPORTED one is graded. If the API refused claims the diagram fails to

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
-
 import { validateBriefReferences, type BriefPromptRefs } from './brief-validator';
+import type { CanvasGraph } from './canvas';
+import type { DesignBrief } from './design-brief';
 
 const graph: CanvasGraph = {
   nodes: [

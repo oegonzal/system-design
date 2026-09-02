@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CanvasGraph, NodeOperation, WorkflowSpec } from '@sysdesign/contracts';
-
+import type { CanvasGraph, NodeOperation } from './canvas';
+import type { WorkflowSpec } from './workflow-spec';
 import { validateWorkflowReferences } from './workflow-validator';
 
 const spec: WorkflowSpec = {

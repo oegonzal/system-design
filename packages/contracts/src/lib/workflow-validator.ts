@@ -1,9 +1,6 @@
-import {
-  INTERFACE_CAPABILITIES,
-  isApiLikeRole,
-  type CanvasGraph,
-  type WorkflowSpec,
-} from '@sysdesign/contracts';
+import { type CanvasGraph } from './canvas';
+import { INTERFACE_CAPABILITIES, isApiLikeRole } from './interfaces';
+import type { WorkflowSpec } from './workflow-spec';
 
 /**
  * Referential validation of the workflow claims on a graph whose shape
