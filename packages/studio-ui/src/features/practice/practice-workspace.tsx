@@ -6,6 +6,7 @@ import type {
   DesignRevisionSummaryDto,
   DesignSessionDto,
   FindingDto,
+  ImproverAvailabilityDto,
   PromptDto,
 } from '@sysdesign/contracts';
 import {
@@ -34,6 +35,8 @@ import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
 import { EvaluationPanel } from '../evaluation/evaluation-panel';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
+import { ImprovementPanel } from '../improve/improvement-panel';
+import { useImprovementRunPolling } from '../improve/use-improvement-run-polling';
 import { PromptPane } from '../prompts/prompt-pane';
 import { DesignBriefEditor } from './brief/design-brief-editor';
 import { useBriefSuggestions } from './brief/use-brief-suggestions';
@@ -233,11 +236,15 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [viewingRevision, setViewingRevision] = useState<FeedbackTarget | null>(null);
   const [tab, setTab] = useState('prompt');
   const [exporting, setExporting] = useState(false);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<ImproverAvailabilityDto | null>(null);
 
   const polling = useEvaluationPolling(feedback?.id ?? null);
+  const improve = useImprovementRunPolling(activeRunId);
   const suggestions = useBriefSuggestions(sessionId);
   const { getNodes } = useReactFlow();
   const completedFor = useRef<string | null>(null);
+  const acceptedSeen = useRef(0);
 
   // Initial load: session → prompt + revision summaries → latest full graph.
   useEffect(() => {
@@ -273,6 +280,33 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       }
     })();
   }, [sessionId]);
+
+  // Whether the AI coach can run at all — the button explains itself when not.
+  useEffect(() => {
+    let disposed = false;
+    void api
+      .improverAvailability()
+      .then((loaded) => {
+        if (!disposed) setAvailability(loaded);
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  // Every accepted coach iteration is a new revision the timeline should show
+  // as soon as its trajectory entry appears — not minutes later at run end.
+  useEffect(() => {
+    if (improve.acceptedCount <= acceptedSeen.current) return;
+    acceptedSeen.current = improve.acceptedCount;
+    void api
+      .listRevisions(sessionId)
+      .then((refreshed) =>
+        setRevisions([...refreshed.data].sort((a, b) => b.revisionNumber - a.revisionNumber)),
+      )
+      .catch(() => undefined);
+  }, [improve.acceptedCount, sessionId]);
 
   // When the evaluation for the submitted draft completes, the draft is no
   // longer "unsaved work" — and the timeline needs the fresh grade.
@@ -351,6 +385,42 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       .catch((error) => setSubmitError(toErrorMessage(error, 'Could not retry the evaluation.')));
   }, [feedback, polling]);
 
+  // Hand the current canvas to the AI coach: the draft is submitted as a base
+  // revision (so what the coach improved is on the record), then a background
+  // run iterates — the coach tab streams its trajectory.
+  const handleImprove = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Hand this design to the AI coach? Your current draft is submitted as a revision first.',
+      )
+    ) {
+      return;
+    }
+    const graph = storeApi.getState().serialize();
+    const brief = storeApi.getState().serializeBrief() ?? undefined;
+    const narrative = storeApi.getState().serializeNarrative() ?? undefined;
+    setSubmitError(null);
+    try {
+      const run = await api.startImprovementRun(sessionId, { graph, narrative, brief });
+      acceptedSeen.current = 0;
+      setActiveRunId(run.id);
+      setFeedback(null);
+      setViewingRevision(null);
+      storeApi.getState().markClean();
+      setTab('coach');
+    } catch (error) {
+      setSubmitError(toErrorMessage(error, 'Could not start the improvement run.'));
+    }
+  }, [sessionId, storeApi]);
+
+  const handleCancelImprove = useCallback(() => {
+    if (activeRunId === null) return;
+    // The poll observes the cancelled status on its next tick and stops.
+    void api
+      .cancelImprovementRun(activeRunId)
+      .catch((error) => setSubmitError(toErrorMessage(error, 'Could not stop the coach.')));
+  }, [activeRunId]);
+
   const handleSelectFinding = useCallback(
     (finding: FindingDto) => {
       storeApi.getState().setHighlight({
@@ -370,8 +440,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     [storeApi],
   );
 
+  // Accepts anything carrying a revision id — a timeline summary, or the
+  // coach panel's bare best-revision reference.
   const handleSelectRevision = useCallback(
-    async (summary: DesignRevisionSummaryDto) => {
+    async (summary: { id: string }) => {
       const { dirty } = storeApi.getState();
       if (dirty && !window.confirm('Load this revision? Your unsaved draft will be replaced.')) {
         return;
@@ -439,6 +511,15 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             revisionNumber={feedback?.revisionNumber ?? null}
             onExport={() => void handleExport()}
             exporting={exporting}
+            onImprove={() => void handleImprove()}
+            improving={improve.isPolling}
+            improveDisabledReason={
+              availability !== null && !availability.enabled
+                ? availability.reason === 'deterministic'
+                  ? 'The AI coach is off in deterministic mode.'
+                  : 'The AI coach needs an ANTHROPIC_API_KEY.'
+                : null
+            }
           />
           {submitError !== null ? (
             <Text size="sm" tone="secondary" data-testid="submit-error">
@@ -465,6 +546,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               <Tab value="brief">Brief</Tab>
               <Tab value="narrative">Narrative</Tab>
               <Tab value="feedback">Feedback</Tab>
+              <Tab value="coach">Coach</Tab>
               <Tab value="revisions">Revisions</Tab>
             </TabList>
             <DockPanel value="prompt">
@@ -503,6 +585,17 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 onRetry={handleRetry}
                 onSelectFinding={handleSelectFinding}
                 onPreviewFix={handlePreviewFix}
+              />
+            </DockPanel>
+            <DockPanel value="coach">
+              <ImprovementPanel
+                run={improve.run}
+                error={improve.error}
+                isPolling={improve.isPolling}
+                message={improve.message}
+                availability={availability}
+                onCancel={handleCancelImprove}
+                onLoadRevision={(revisionId) => void handleSelectRevision({ id: revisionId })}
               />
             </DockPanel>
             <DockPanel value="revisions">

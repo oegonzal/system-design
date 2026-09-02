@@ -15,6 +15,12 @@ export interface CanvasToolbarProps {
   /** Download the run (diagram PDF + per-artifact Markdown) as one zip. */
   onExport: () => void;
   exporting: boolean;
+  /** Hand the current canvas to the AI coach (a background improvement run). */
+  onImprove: () => void;
+  /** True while a run is active for this session. */
+  improving: boolean;
+  /** Why the coach cannot run (no key / deterministic), or null when it can. */
+  improveDisabledReason: string | null;
 }
 
 const STATUS_LABEL: Record<EvalStatus, string> = {
@@ -36,6 +42,9 @@ export function CanvasToolbar({
   revisionNumber,
   onExport,
   exporting,
+  onImprove,
+  improving,
+  improveDisabledReason,
 }: CanvasToolbarProps) {
   const dirty = useCanvasStore((state) => state.dirty);
   const isEmpty = useCanvasStore((state) => state.nodes.length === 0);
@@ -76,6 +85,15 @@ export function CanvasToolbar({
         data-testid="export-run"
       >
         {exporting ? 'Exporting…' : 'Export'}
+      </Button>
+      <Button
+        variant="subtle"
+        onClick={onImprove}
+        disabled={improving || evaluationInFlight || isEmpty || improveDisabledReason !== null}
+        title={improveDisabledReason ?? undefined}
+        data-testid="improve-run"
+      >
+        {improving ? 'Coaching…' : 'Improve with AI'}
       </Button>
       {dirty ? <Badge tone="accent">unsaved draft</Badge> : null}
       {revisionStatus && revisionNumber !== null ? (

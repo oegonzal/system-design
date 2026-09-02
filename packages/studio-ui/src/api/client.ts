@@ -10,12 +10,15 @@ import type {
   EvaluationDto,
   ExperienceProfileDto,
   GeneratePromptRequest,
+  ImprovementRunDto,
+  ImproverAvailabilityDto,
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
   PromptDto,
   SaveStarStoryRequest,
   StarStoryDto,
+  StartImprovementRunRequest,
   SubmitRevisionRequest,
   UpdatePromptRequest,
   UpdateSessionRequest,
@@ -248,6 +251,38 @@ export const api = {
   async retryEvaluation(revisionId: string): Promise<EvaluationDto> {
     return unwrap(
       await request<ApiResponse<EvaluationDto>>(`/revisions/${revisionId}/evaluation/retry`, {
+        method: 'POST',
+      }),
+    );
+  },
+
+  // Improvement runs (the AI coach) -----------------------------------------
+  async improverAvailability(opts: GetOptions = {}): Promise<ImproverAvailabilityDto> {
+    return unwrap(
+      await request<ApiResponse<ImproverAvailabilityDto>>('/improvement-runs/availability', opts),
+    );
+  },
+
+  /** Submits the current canvas as a base revision and queues the run (202). */
+  async startImprovementRun(
+    sessionId: string,
+    body: StartImprovementRunRequest,
+  ): Promise<ImprovementRunDto> {
+    return unwrap(
+      await request<ApiResponse<ImprovementRunDto>>(`/sessions/${sessionId}/improvement-runs`, {
+        method: 'POST',
+        body,
+      }),
+    );
+  },
+
+  async getImprovementRun(id: string, opts: GetOptions = {}): Promise<ImprovementRunDto> {
+    return unwrap(await request<ApiResponse<ImprovementRunDto>>(`/improvement-runs/${id}`, opts));
+  },
+
+  async cancelImprovementRun(id: string): Promise<ImprovementRunDto> {
+    return unwrap(
+      await request<ApiResponse<ImprovementRunDto>>(`/improvement-runs/${id}/cancel`, {
         method: 'POST',
       }),
     );

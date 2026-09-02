@@ -49,6 +49,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A run exports in one click as a single zip — the diagram as a PDF plus prompt, narrative, brief, feedback and revisions each as its own Markdown file — so a design survives outside the database.',
   },
+  {
+    id: 'UX-11',
+    statement:
+      'A stuck author can hand the design to the AI coach: the coach tab streams the run’s trajectory live while it works, the improved design loads back from the timeline, and every machine-made revision is marked with its assistant origin. Without a live model the control explains itself instead of failing.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

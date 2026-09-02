@@ -2,7 +2,7 @@
 
 import styled from '@emotion/styled';
 import type { DesignRevisionSummaryDto } from '@sysdesign/contracts';
-import { Stack, Text, transient } from '@sysdesign/design-system';
+import { Badge, Stack, Text, transient } from '@sysdesign/design-system';
 
 export interface RevisionTimelineProps {
   revisions: DesignRevisionSummaryDto[];
@@ -69,7 +69,10 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
           data-testid={`revision-chip-${revision.revisionNumber}`}
         >
           #{revision.revisionNumber} {revision.grade ?? '·'}
-          {revision.overallScore !== null ? <Score>{revision.overallScore}</Score> : null}
+          {revision.overallScore !== null ? (
+            <Score data-testid="revision-score">{revision.overallScore}</Score>
+          ) : null}
+          {revision.origin === 'assistant' ? <Badge tone="accent">AI</Badge> : null}
         </Chip>
       ))}
     </Stack>

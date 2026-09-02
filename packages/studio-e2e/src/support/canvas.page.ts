@@ -401,8 +401,9 @@ export class CanvasPage {
           for (const chip of chips) {
             const testId = (await chip.getAttribute('data-testid')) ?? '';
             const revision = Number(testId.replace('revision-chip-', ''));
-            // The score renders in the chip's only <span>; an ungraded chip has none.
-            const scoreSpan = chip.locator('span');
+            // The score carries its own testid — the chip may also hold an AI
+            // origin badge, so "the only span" stopped being safe to assume.
+            const scoreSpan = chip.locator('[data-testid="revision-score"]');
             if ((await scoreSpan.count()) === 0) return `revision #${revision} is not graded yet`;
             scored.push({ revision, score: Number(await scoreSpan.first().textContent()) });
           }

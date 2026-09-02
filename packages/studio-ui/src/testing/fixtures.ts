@@ -6,6 +6,7 @@ import type {
   EvaluationDto,
   ExperienceProfileDto,
   FindingDto,
+  ImprovementRunDto,
   PromptDto,
   ScenarioReportDto,
   StarStoryDto,
@@ -484,6 +485,32 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     scenarios: [],
     startedAt: AT,
     completedAt: AT,
+    createdAt: AT,
+    updatedAt: AT,
+    ...overrides,
+  };
+}
+
+export function makeImprovementRun(overrides: Partial<ImprovementRunDto> = {}): ImprovementRunDto {
+  return {
+    id: 'run-1',
+    sessionId: 'session-1',
+    baseRevisionId: 'rev-1',
+    bestRevisionId: null,
+    status: 'running',
+    maxIterations: 6,
+    iterations: [
+      {
+        iteration: 0,
+        proposer: 'baseline',
+        description: 'The design as submitted.',
+        score: 41,
+        accepted: true,
+        revisionId: 'rev-1',
+      },
+    ],
+    stoppedReason: null,
+    error: null,
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
