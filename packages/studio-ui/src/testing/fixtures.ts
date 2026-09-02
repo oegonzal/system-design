@@ -204,6 +204,7 @@ export function makeWorkflowSpec(overrides: Partial<WorkflowSpec> = {}): Workflo
         id: 'op-ingest-index',
         kind: 'command',
         statement: 'Normalize an incoming order into the read model',
+        consumes: ['evt-order-received'],
         emits: ['evt-order-indexed'],
         onFailureEmits: ['evt-ingest-failed'],
       },

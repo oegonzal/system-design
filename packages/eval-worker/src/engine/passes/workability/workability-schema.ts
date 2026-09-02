@@ -63,6 +63,9 @@ export function factorsToDisplay(critique: WorkabilityCritique): {
     label: FACTOR_LABELS[id],
     level: value.level,
     rationale: value.rationale.trim(),
+    // Risk keeps its RAW judged level (the rationale describes remaining
+    // exposure), so the display must know its direction is inverted.
+    ...(id === 'risk' ? { polarity: 'higher-is-worse' as const } : {}),
   }));
   const subScores: Record<string, number> = {};
   for (const [id, value] of entries) {

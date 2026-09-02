@@ -61,8 +61,33 @@ const ownOrdersScoped: Expectation = {
       return unmet(serving.map((node) => node.id));
     }
 
+    // Every client→serving path must pass an AUTHENTICATED gateway — not
+    // merely any gateway while an authed one idles on an internal path. BFS
+    // with the authed gateways removed: whatever a client still reaches, it
+    // reaches without authenticating.
+    const authedIds = new Set(authed.map((node) => node.id));
+    const forward = new Map<string, string[]>();
+    for (const edge of index.edges()) {
+      if (authedIds.has(edge.source) || authedIds.has(edge.target)) continue;
+      forward.set(edge.source, [...(forward.get(edge.source) ?? []), edge.target]);
+    }
+    const reachesUnauthenticated = (fromId: string, toId: string): boolean => {
+      const seen = new Set<string>([fromId]);
+      const queue = [fromId];
+      while (queue.length > 0) {
+        const current = queue.shift() as string;
+        if (current === toId) return true;
+        for (const next of forward.get(current) ?? []) {
+          if (!seen.has(next)) {
+            seen.add(next);
+            queue.push(next);
+          }
+        }
+      }
+      return false;
+    };
     const exposed = sortById(index.clients()).filter((client) =>
-      serving.some((node) => index.pathExists(client.id, node.id, { avoidKinds: ['gateway'] })),
+      serving.some((node) => reachesUnauthenticated(client.id, node.id)),
     );
     if (exposed.length > 0) {
       return unmet(exposed.map((node) => node.id));

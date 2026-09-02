@@ -14,12 +14,20 @@ const VERDICT_TONE: Record<ScenarioVerdict, BadgeTone> = {
   fails: 'critical',
 };
 
-/** Ordinal factor levels; low reads as caution except where none is honest work. */
+/** Ordinal factor levels, higher-is-better direction. */
 const FACTOR_TONE: Record<AxisFactorLevel, BadgeTone> = {
   none: 'critical',
   low: 'medium',
   medium: 'neutral',
   high: 'accent',
+};
+
+/** The same levels when higher is WORSE — "remaining risk: high" is bad news. */
+const INVERSE_FACTOR_TONE: Record<AxisFactorLevel, BadgeTone> = {
+  none: 'accent',
+  low: 'neutral',
+  medium: 'medium',
+  high: 'critical',
 };
 
 /** Subscore keys arrive camelCased from the engine; readers get words. */
@@ -60,7 +68,15 @@ export function LlmInsights({ axes, scenarios }: LlmInsightsProps) {
               {axis.factors.map((factor) => (
                 <Stack key={factor.id} gap={1} data-testid={`factor-${factor.id}`}>
                   <Stack direction="row" gap={2} align="center">
-                    <Badge tone={FACTOR_TONE[factor.level]}>{factor.level}</Badge>
+                    <Badge
+                      tone={
+                        (factor.polarity === 'higher-is-worse' ? INVERSE_FACTOR_TONE : FACTOR_TONE)[
+                          factor.level
+                        ]
+                      }
+                    >
+                      {factor.level}
+                    </Badge>
                     <Text as="span" size="sm">
                       {factor.label}
                     </Text>

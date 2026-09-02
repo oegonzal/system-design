@@ -59,9 +59,11 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
       {scores ? (
         <Stack gap={3}>
           {EVAL_DIMENSIONS.map((dimension) => {
-            const value = scores[dimension];
-            // Null = the rubric never examined this dimension — no meter, no
-            // value, so a screen reader hears nothing measurable either.
+            // `?? null`: an evaluation stored before a dimension existed has
+            // no key for it at all — that is "not assessed", never a NaN
+            // meter. Null = the rubric never examined this dimension — no
+            // meter, no value, so a screen reader hears nothing measurable.
+            const value = scores[dimension] ?? null;
             return value === null ? (
               <NotAssessedRow key={dimension} data-testid={`not-assessed-${dimension}`}>
                 <Text as="span" size="sm" tone="muted">

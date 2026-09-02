@@ -52,6 +52,7 @@ const ORDER_HISTORY_SPEC: WorkflowSpec = {
       kind: 'command',
       statement:
         'Normalize an incoming order from either source and upsert it into the read model exactly once',
+      consumes: ['evt-online-order-received', 'evt-offline-order-received', 'evt-order-refunded'],
       emits: ['evt-order-indexed'],
       onFailureEmits: ['evt-ingest-failed'],
     },

@@ -164,6 +164,22 @@ export const DEFAULT_PROFILE: EvalProfile = {
         whenExpectationUnmet: 'exp.prd.commands-fulfilled',
       },
       { ruleId: 'product.fulfills-kind-mismatch', whenExpectationUnmet: 'exp.prd.queries-served' },
+      // The same mistake on any other item class also unmeets exactly one
+      // expectation — pair them all, or an ingest mismatch is charged twice
+      // where a command mismatch is charged once.
+      {
+        ruleId: 'product.fulfills-kind-mismatch',
+        whenExpectationUnmet: 'exp.prd.ingest-push-wired',
+      },
+      {
+        ruleId: 'product.fulfills-kind-mismatch',
+        whenExpectationUnmet: 'exp.prd.ingest-pull-wired',
+      },
+      { ruleId: 'product.fulfills-kind-mismatch', whenExpectationUnmet: 'exp.prd.events-flowing' },
+      {
+        ruleId: 'product.fulfills-kind-mismatch',
+        whenExpectationUnmet: 'exp.prd.aggregations-fed',
+      },
       // The archetype's authorization expectation owns the front-door lesson.
       { ruleId: 'security.no-gateway', whenExpectationUnmet: 'exp.ohi.own-orders-scoped' },
       { ruleId: 'security.gateway-no-auth', whenExpectationUnmet: 'exp.ohi.own-orders-scoped' },

@@ -325,6 +325,7 @@ export function orderHistoryWorkflowSpec(): WorkflowSpec {
         id: 'op-ingest-index',
         kind: 'command',
         statement: 'Normalize an incoming order and upsert it into the read model exactly once',
+        consumes: ['evt-online-order-received', 'evt-offline-order-received', 'evt-order-refunded'],
         emits: ['evt-order-indexed'],
         onFailureEmits: ['evt-ingest-failed'],
       },

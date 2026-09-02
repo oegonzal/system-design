@@ -127,25 +127,62 @@ describe('judgeWorkflow — operations', () => {
 
   it('corroborates an async-consumed command through its channel — no fake sync call needed', () => {
     // The consumer's own op is structurally uncarryable on a channel-owned
-    // edge, so being a wired consumer of the channel IS the exercise.
+    // edge, so consuming the channel that transports the events the spec
+    // says this command runs on IS the exercise.
+    const consumerSpec = spec({
+      operations: [{ id: 'op-c', kind: 'command', statement: 'do', consumes: ['evt-m'] }],
+      events: [{ id: 'evt-m', statement: 'a message arrived' }],
+    });
     const nodes = [
-      node('q', 'queue', { operations: [{ name: 'MsgT', kind: 'command' }] }),
+      node('q', 'queue', { operations: [{ name: 'MsgT', kind: 'event', fulfills: 'evt-m' }] }),
       node('w', 'worker', {
         operations: [{ name: 'handle', kind: 'command', fulfills: 'op-c' }],
       }),
     ];
     const edges = [edge('e1', 'q', 'w', ['MsgT'])];
-    expect(verdict(opSpec, nodes, edges, 'op-c')).toMatchObject({
+    expect(verdict(consumerSpec, nodes, edges, 'op-c')).toMatchObject({
       status: 'corroborated',
       evidenceNodeIds: ['w'],
       evidenceEdgeIds: ['e1'],
     });
   });
 
-  it('does not extend the async-consumer branch to queries', () => {
-    const qSpec = spec({ operations: [{ id: 'op-q', kind: 'query', statement: 'read' }] });
+  it('never blanket-credits a stacked command the consume edge does not feed', () => {
+    // One consume edge, two commands on the node: only the one whose declared
+    // consumption the channel transports is exercised. Without the event
+    // link, stacking every spec command on any consumer would game the
+    // write-contract half of the dimension with a single edge.
+    const stacked = spec({
+      operations: [
+        { id: 'op-c', kind: 'command', statement: 'do', consumes: ['evt-m'] },
+        { id: 'op-on-demand', kind: 'command', statement: 'resync on demand' },
+      ],
+      events: [{ id: 'evt-m', statement: 'a message arrived' }],
+    });
     const nodes = [
-      node('q', 'queue', { operations: [{ name: 'MsgT', kind: 'command' }] }),
+      node('q', 'queue', { operations: [{ name: 'MsgT', kind: 'event', fulfills: 'evt-m' }] }),
+      node('w', 'worker', {
+        operations: [
+          { name: 'handle', kind: 'command', fulfills: 'op-c' },
+          { name: 'resync', kind: 'command', fulfills: 'op-on-demand' },
+        ],
+      }),
+    ];
+    const edges = [edge('e1', 'q', 'w', ['MsgT'])];
+    expect(verdict(stacked, nodes, edges, 'op-c').status).toBe('corroborated');
+    expect(verdict(stacked, nodes, edges, 'op-on-demand')).toMatchObject({
+      status: 'uncorroborated',
+      gaps: ['not-exercised'],
+    });
+  });
+
+  it('does not extend the async-consumer branch to queries', () => {
+    const qSpec = spec({
+      operations: [{ id: 'op-q', kind: 'query', statement: 'read' }],
+      events: [{ id: 'evt-m', statement: 'a message arrived' }],
+    });
+    const nodes = [
+      node('q', 'queue', { operations: [{ name: 'MsgT', kind: 'event', fulfills: 'evt-m' }] }),
       node('w', 'service', {
         operations: [{ name: 'read', kind: 'query', fulfills: 'op-q' }],
       }),
@@ -360,6 +397,20 @@ describe('judgeWorkflow — aggregations, transitions, entities', () => {
     const agg = verdict(fullSpec, nodes, wiredEdges(), 'agg-1');
     expect(agg.status).toBe('uncorroborated');
     expect(agg.gaps).toContain('not-served');
+  });
+
+  it('feeds an aggregation through ANY serving node — never just the first in canvas order', () => {
+    // A gateway also (legally) serves the aggregate but is not fed; the
+    // properly fed service sits later in the nodes array. Which node happens
+    // to come first must never decide the verdict.
+    const nodes = [
+      node('gw', 'gateway', {
+        operations: [{ name: 'total', kind: 'query', fulfills: 'agg-1' }],
+      }),
+      ...wiredNodes(),
+    ];
+    const edges = [...wiredEdges(), edge('e8', 'c', 'gw', ['total'])];
+    expect(verdict(fullSpec, nodes, edges, 'agg-1').status).toBe('corroborated');
   });
 
   it('derives transition and entity verdicts from their via items — no state-machine editor required', () => {

@@ -66,6 +66,14 @@ export interface WorkflowOperation {
   emits?: readonly string[];
   /** Event ids published on the failure path — the half designs forget. */
   onFailureEmits?: readonly string[];
+  /**
+   * Event ids this command runs ON — declared when the contract is executed
+   * by consuming messages rather than by being called. Only a command with
+   * `consumes` can be exercised through a channel: without this the judge
+   * would blanket-credit every command stacked on any wired consumer node,
+   * and an on-demand contract could hide behind someone else's queue.
+   */
+  consumes?: readonly string[];
   minDifficulty?: PromptDifficulty;
 }
 
@@ -201,6 +209,7 @@ export function specAtDifficulty(spec: WorkflowSpec, difficulty: PromptDifficult
       ...op,
       emits: op.emits?.filter((id) => eventIds.has(id)),
       onFailureEmits: op.onFailureEmits?.filter((id) => eventIds.has(id)),
+      consumes: op.consumes?.filter((id) => eventIds.has(id)),
     }))
     .map((op) => ({
       ...op,
@@ -208,6 +217,7 @@ export function specAtDifficulty(spec: WorkflowSpec, difficulty: PromptDifficult
       ...(op.onFailureEmits === undefined || op.onFailureEmits.length === 0
         ? { onFailureEmits: undefined }
         : {}),
+      ...(op.consumes === undefined || op.consumes.length === 0 ? { consumes: undefined } : {}),
     }));
 
   const ingests = spec.ingests.map((ingest) => ({
@@ -280,6 +290,9 @@ export function validateWorkflowSpec(spec: WorkflowSpec): string[] {
   for (const op of spec.operations) {
     for (const id of [...(op.emits ?? []), ...(op.onFailureEmits ?? [])]) {
       if (!eventIds.has(id)) problems.push(`operation '${op.id}' emits unknown event '${id}'`);
+    }
+    for (const id of op.consumes ?? []) {
+      if (!eventIds.has(id)) problems.push(`operation '${op.id}' consumes unknown event '${id}'`);
     }
   }
   for (const ingest of spec.ingests) {
@@ -385,14 +398,27 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
       (edge) => ownerOf(edge)?.id === node.id && (edge.carries ?? []).includes(opName),
     );
 
-  /** The wired-async-consumer branch: an in-edge owned by a channel whose carries resolve there. */
-  const consumesFromChannel = (node: CanvasNode): CanvasEdge[] =>
+  /**
+   * The wired-async-consumer branch, PER DECLARATION: an in-edge owned by a
+   * channel whose carried message types transport one of the events the spec
+   * says this command consumes. The event link is what keeps one consume
+   * edge from blanket-crediting every command stacked on the node.
+   */
+  const consumesFromChannel = (
+    node: CanvasNode,
+    consumedEventIds: readonly string[],
+  ): CanvasEdge[] =>
     graph.edges.filter((edge) => {
       if (edge.target !== node.id) return false;
       const owner = ownerOf(edge);
       if (!owner || owner.id === node.id || roleOf(owner) !== 'channel') return false;
-      const declared = new Set((owner.operations ?? []).map((op) => op.name));
-      return (edge.carries ?? []).some((name) => declared.has(name));
+      const carried = new Set(edge.carries ?? []);
+      return (owner.operations ?? []).some(
+        (channelOp) =>
+          carried.has(channelOp.name) &&
+          channelOp.fulfills !== undefined &&
+          consumedEventIds.includes(channelOp.fulfills),
+      );
     });
 
   const eligible = (declaration: Declaration, itemClass: WorkflowItemClass): boolean => {
@@ -441,7 +467,10 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
     }
     const exercised = fit.flatMap((declaration) => {
       const carried = carryingEdges(declaration.node, declaration.op.name);
-      const consumed = op.kind === 'command' ? consumesFromChannel(declaration.node) : [];
+      const consumed =
+        op.kind === 'command' && (op.consumes ?? []).length > 0
+          ? consumesFromChannel(declaration.node, op.consumes ?? [])
+          : [];
       const edges = [...carried, ...consumed];
       return edges.length > 0 ? [{ declaration, edges }] : [];
     });
@@ -674,8 +703,10 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
     });
     if (served.length === 0) gaps.add('not-served');
 
-    /** Fed: every source corroborated, and each source's transport reaches the
-     *  serving node — or a node the serving node reads (its out-neighbors). */
+    /** Fed: every source corroborated, and each source's transport reaches
+     *  SOME serving node — or a node that server reads. Any server, not the
+     *  first: queries scale out legally, and which node happens to sit first
+     *  in the nodes array must never decide the verdict. */
     let fedEvidence: string[] = [];
     const allSourcesCorroborated = sourceVerdicts.every(
       (verdict) => verdict?.status === 'corroborated',
@@ -683,10 +714,6 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
     if (!allSourcesCorroborated) {
       gaps.add('not-fed');
     } else if (served.length > 0) {
-      const servingNode = served[0].server.node;
-      const readTargets = graph.edges
-        .filter((edge) => edge.source === servingNode.id)
-        .map((edge) => edge.target);
       const transportsOf = (eventId: string): string[] =>
         graph.nodes
           .filter(
@@ -695,13 +722,21 @@ export function judgeWorkflow(graph: MechanismGraph, spec: WorkflowSpec): Workfl
               (node.operations ?? []).some((op) => op.fulfills === eventId),
           )
           .map((node) => node.id);
-      const fed = agg.sourceEventIds.every((eventId) =>
-        transportsOf(eventId).some(
-          (channelId) =>
-            graph.reaches(channelId, servingNode.id) ||
-            readTargets.some((target) => channelId === target || graph.reaches(channelId, target)),
-        ),
-      );
+      const feeds = (servingNode: CanvasNode): boolean => {
+        const readTargets = graph.edges
+          .filter((edge) => edge.source === servingNode.id)
+          .map((edge) => edge.target);
+        return agg.sourceEventIds.every((eventId) =>
+          transportsOf(eventId).some(
+            (channelId) =>
+              graph.reaches(channelId, servingNode.id) ||
+              readTargets.some(
+                (target) => channelId === target || graph.reaches(channelId, target),
+              ),
+          ),
+        );
+      };
+      const fed = served.some((entry) => feeds(entry.server.node));
       if (!fed) gaps.add('not-fed');
       else fedEvidence = agg.sourceEventIds.flatMap((eventId) => transportsOf(eventId));
     }

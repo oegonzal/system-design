@@ -96,21 +96,32 @@ export function OperationsEditor({
     workflow === null ? [] : fulfillableItems(workflow.spec, workflow.role, operation.kind);
 
   /**
-   * A kind flip after a Fulfills pick, or emissions left on a non-command
-   * row. Deliberately warned, never cleared or blocked: silently deleting a
-   * claim is hostile, the API accepts both shapes, and the evaluation grades
-   * them — this ink previews the finding.
+   * A kind flip after a Fulfills pick, emissions left on an ineligible row,
+   * or two rows claiming the same item. The first two are warned, never
+   * cleared or blocked: silently deleting a claim is hostile, the API
+   * accepts both shapes, and the evaluation grades them — this ink previews
+   * the finding. The duplicate is warned because the API would 422 it, the
+   * same posture as the duplicate-name warning below.
    */
   const workflowWarning = (operation: NodeOperation): string | null => {
     if (workflow === null) return null;
+    if (
+      operation.fulfills !== undefined &&
+      operations.filter((sibling) => sibling.fulfills === operation.fulfills).length > 1
+    ) {
+      return 'Two rows on this component fulfil the same requirement — the save would be rejected. Keep one claim.';
+    }
     if (
       operation.fulfills !== undefined &&
       !fulfillableFor(operation).some((item) => item.id === operation.fulfills)
     ) {
       return `This row's kind no longer matches the linked requirement (${operation.fulfills}) — the evaluation will grade the mismatch.`;
     }
-    if ((operation.emits ?? []).length > 0 && operation.kind !== 'command') {
-      return 'Only commands produce events — emissions on this row will not count as a producer.';
+    if (
+      (operation.emits ?? []).length > 0 &&
+      (operation.kind !== 'command' || workflow.role !== 'api')
+    ) {
+      return 'Only commands on api-role components produce events — untick these emissions or move them to the command that causes them.';
     }
     return null;
   };
@@ -180,16 +191,25 @@ export function OperationsEditor({
                 ))}
               </SelectField>
             ) : null}
-            {workflow !== null && workflow.role === 'api' && operation.kind === 'command'
+            {workflow !== null
               ? (() => {
                   const emits = operation.emits ?? [];
                   const emitsAtCap = emits.length >= OPERATION_MAX_EMITS;
-                  return workflow.spec.events.length > 0 ? (
+                  const mayEmit = workflow.role === 'api' && operation.kind === 'command';
+                  // Rendered for eligible rows, and ALSO whenever emissions
+                  // already exist: a kind or role flip must never strand
+                  // claims behind vanished checkboxes the author cannot
+                  // untick (the API rejects ineligible emissions).
+                  if (!mayEmit && emits.length === 0) return null;
+                  const shown = mayEmit
+                    ? workflow.spec.events
+                    : workflow.spec.events.filter((event) => emits.includes(event.id));
+                  return shown.length > 0 ? (
                     <Stack gap={2} role="group" aria-label={`Emits for ${displayName}`}>
                       <Text as="span" size="sm" tone="muted">
                         Emits ({emits.length} of {OPERATION_MAX_EMITS})
                       </Text>
-                      {workflow.spec.events.map((event) => {
+                      {shown.map((event) => {
                         const checked = emits.includes(event.id);
                         return (
                           <CheckboxField

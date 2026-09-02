@@ -21,6 +21,13 @@ export interface AxisFactor {
   label: string;
   level: AxisFactorLevel;
   rationale: string;
+  /**
+   * Which direction is good. "Remaining risk: high" is bad news and must
+   * never wear the celebratory badge that "alignment: high" earns; the
+   * display flips its tone scale for higher-is-worse factors. Defaults to
+   * higher-is-better.
+   */
+  polarity?: 'higher-is-better' | 'higher-is-worse';
 }
 
 /**
