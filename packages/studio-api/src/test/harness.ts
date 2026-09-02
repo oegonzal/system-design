@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { ExperienceProfileDto } from '@sysdesign/contracts';
-import { ExperienceProfile } from '@sysdesign/db';
+import { ensureDatabase, ExperienceProfile } from '@sysdesign/db';
 
 import { configureApp } from '../common/configure-app';
 import { AppModule } from '../modules/app/app.module';
@@ -29,6 +29,11 @@ export interface Harness {
  * request-scoped MikroORM context included.
  */
 export async function createHarness(): Promise<Harness> {
+  // The suite's database (sysdesign_test by default — vite.config.ts) is
+  // created and migrated on first use, so `nx test` never needs the dev
+  // database and never truncates it.
+  await ensureDatabase();
+
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
   const app = configureApp(moduleRef.createNestApplication());

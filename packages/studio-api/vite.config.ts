@@ -17,10 +17,13 @@ export default defineConfig({
     // Determinism specs ([GEN-2]) must hold on machines where a developer
     // has an ANTHROPIC_API_KEY exported — enrichment stays off under test.
     // Run dumps are always on, so tests also get a temp directory: `static/runs`
-    // means REAL runs.
+    // means REAL runs. And the suites truncate tables between tests, so they
+    // get their own database unless the environment (CI) pins one — the
+    // harness creates and migrates it on first boot.
     env: {
       EVAL_DETERMINISTIC: '1',
       EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
+      DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
     },
 
     // These suites are integration-level and share one Postgres. Several

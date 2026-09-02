@@ -19,10 +19,14 @@ const DEMO = !!process.env['DEMO'];
 
 /**
  * Postgres connection details ride through to all three servers. `tilt up`
- * (or the compose file) provides the database itself — the suite never
- * starts one.
+ * (or the compose file) provides the Postgres server itself — the suite never
+ * starts one — but the suite's *database* defaults to its own
+ * `sysdesign_test` (created/migrated/seeded by `global-setup.ts`), so an e2e
+ * run never truncates the developer's real practice history. CI pins
+ * `DB_NAME` explicitly and keeps its ephemeral service database.
  */
 const DB_PORT = process.env['DB_PORT'] ?? '5432';
+const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
 
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
@@ -78,7 +82,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: workspaceRoot,
       timeout: 180_000,
-      env: { DB_PORT, EVAL_DETERMINISTIC: '1' },
+      env: { DB_PORT, DB_NAME, EVAL_DETERMINISTIC: '1' },
     },
     {
       command: 'pnpm exec nx run eval-worker:serve',
@@ -87,7 +91,7 @@ export default defineConfig({
       cwd: workspaceRoot,
       timeout: 180_000,
       /* A 300ms poll keeps submit → verdict under two seconds in the specs. */
-      env: { DB_PORT, EVAL_DETERMINISTIC: '1', EVAL_POLL_INTERVAL_MS: '300' },
+      env: { DB_PORT, DB_NAME, EVAL_DETERMINISTIC: '1', EVAL_POLL_INTERVAL_MS: '300' },
     },
     {
       command: 'pnpm exec nx run studio-ui:serve',

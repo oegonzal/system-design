@@ -16,7 +16,12 @@ export default defineConfig({
 
     // Run dumps are always on, so a test run would otherwise fill `static/runs`
     // with fixtures. That tree means REAL runs; tests get a temp directory.
-    env: { EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps') },
+    // The poller suite truncates tables, so it gets its own database unless
+    // the environment (CI) pins one — `ensureDatabase()` creates/migrates it.
+    env: {
+      EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
+      DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
+    },
 
     // The poller integration suite shares the one Postgres with everything
     // else; engine unit tests are pure but cheap, so a single lane is fine.

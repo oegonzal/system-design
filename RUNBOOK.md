@@ -59,6 +59,20 @@ The practice workspace's **Export** button downloads a single `.zip` with
 `feedback.md`, and `revisions.md` — a copy of a run that lives outside the
 database entirely.
 
+## Tests never touch your runs
+
+Integration suites (`nx test studio-api`, `nx test eval-worker`) and the e2e
+suite truncate tables between tests — so they default to their **own database,
+`sysdesign_test`**, created and migrated automatically on the same Postgres
+server (run them with `DB_PORT=5433` so they land on the compose server). Your
+`sysdesign` practice history is never truncated by a test run. CI pins
+`DB_NAME` explicitly and keeps its ephemeral service database.
+
+One caveat: Playwright reuses already-running dev servers locally. A reused dev
+API points at `sysdesign` while the suite prepared `sysdesign_test`, so specs
+may fail confusingly (your data still safe — nothing truncates `sysdesign`).
+Stop the dev stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
+
 ## Notes / gotchas
 
 - Port **5433** (not the app default 5432) avoids a stale `:5432` container that

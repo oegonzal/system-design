@@ -5,6 +5,7 @@ import type { CanvasGraph, DesignBrief, DesignNarrative } from '@sysdesign/contr
 import {
   DesignRevision,
   DesignSession,
+  ensureDatabase,
   EvalJob,
   Evaluation,
   ExperienceProfile,
@@ -122,6 +123,9 @@ describe('poller (integration)', () => {
   }
 
   beforeAll(async () => {
+    // sysdesign_test by default (vite.config.ts) — created/migrated on first
+    // boot, so this suite never touches the dev database.
+    await ensureDatabase();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     await app.init(); // starts the poll loop

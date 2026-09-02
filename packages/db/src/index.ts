@@ -7,3 +7,4 @@ export * from './entities/finding.entity';
 export * from './entities/prompt.entity';
 export * from './entities/star-story.entity';
 export * from './orm.options';
+export * from './testing/ensure-database';
