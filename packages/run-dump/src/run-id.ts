@@ -11,7 +11,7 @@
  * Clock and randomness are parameters, both so this is testable and because the
  * engine promises neither — this lives in the app layer for that reason.
  */
-export type RunKind = 'eval' | 'prompt' | 'suggestion';
+export type RunKind = 'eval' | 'prompt' | 'suggestion' | 'improve';
 
 export function makeRunId(now: number, kind: RunKind, random: () => number = Math.random): string {
   const stamp = new Date(now).toISOString().replace(/[:.]/g, '-').replace('Z', '');

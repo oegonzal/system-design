@@ -117,6 +117,11 @@ export const CRITERIA: readonly Criterion[] = [
       'Every evaluation writes a run dump: its inputs, every LLM prompt and response, the scoring arithmetic, and the result — on the failure path too.',
   },
   {
+    id: 'EVAL-14',
+    statement:
+      'An improvement run raises the score monotonically: every accepted iteration persists as an assistant-origin revision graded strictly higher than the one before, and rejected candidates are never persisted as revisions.',
+  },
+  {
     id: 'EVAL-15',
     statement:
       'The design narrative is graded by reference and required for a top grade: a missing or insubstantial walkthrough both loses explanation points and caps the letter grade below an A.',

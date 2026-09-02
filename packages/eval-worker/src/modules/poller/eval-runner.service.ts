@@ -12,6 +12,7 @@ import { createPassRegistry } from '../../engine/passes';
 import { ACTIVE_PROFILE } from '../../engine/profiles';
 import { ENGINE_VERSION } from '../../engine/scoring';
 import type { PromptFacts } from '../../engine/types';
+import { promptFactsFrom } from '../shared/prompt-facts';
 import { LLM_CLIENT } from './llm.token';
 
 /** Exponential backoff: 10s, 20s, 40s… capped at 5 minutes. */
@@ -69,23 +70,7 @@ export class EvalRunnerService {
       );
 
       const prompt = revision.session.prompt;
-      const facts: PromptFacts = {
-        archetype: prompt.archetype,
-        difficulty: prompt.difficulty,
-        scaleTargets: prompt.scaleTargets,
-        nfrKinds: [...new Set(prompt.nonFunctionalRequirements.map((nfr) => nfr.kind))],
-        nfrs: prompt.nonFunctionalRequirements.map((nfr) => ({
-          id: nfr.id,
-          kind: nfr.kind,
-          statement: nfr.statement,
-          target: nfr.target ?? null,
-          targetSpec: nfr.targetSpec ?? null,
-        })),
-        functionalCapabilities: prompt.functionalCapabilities,
-        functionalRequirementCount: prompt.functionalRequirements.length,
-        functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
-        workflow: prompt.workflowSpec ?? null,
-      };
+      const facts: PromptFacts = promptFactsFrom(prompt);
 
       dump.inputs({
         revisionId: revision.id,

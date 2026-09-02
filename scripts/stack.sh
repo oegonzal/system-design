@@ -8,12 +8,16 @@
 #
 # Grading is deterministic: with no ANTHROPIC_API_KEY the app uses the no-op LLM,
 # and EVAL_DETERMINISTIC=1 pins it, so re-evaluating a stored revision reproduces
-# its score.
+# its score. The AI coach (improvement runs) is the exception by design: it only
+# PROPOSES — the deterministic engine re-scores every candidate — so
+# IMPROVER_DETERMINISTIC=0 lets it go live when ANTHROPIC_API_KEY is exported,
+# without touching grade reproducibility.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export DB_PORT="${DB_PORT:-5433}"
 export EVAL_DETERMINISTIC="${EVAL_DETERMINISTIC:-1}"
+export IMPROVER_DETERMINISTIC="${IMPROVER_DETERMINISTIC:-0}"
 
 wait_db() {
   echo "waiting for postgres on :${DB_PORT} ..."

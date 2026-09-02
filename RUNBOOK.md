@@ -52,6 +52,20 @@ A **failed** evaluation can be re-queued in place from the UI (or
 iterate by submitting a new revision. Either way the grade is deterministic, so
 a re-run of the same design yields the same result.
 
+## The AI coach (improvement runs)
+
+Stuck, or curious how a model would improve your current design? **Improve with
+AI** hands the canvas to a background improvement run: it submits your draft as
+a base revision, then iterates — propose, validate, re-score with the same
+deterministic engine that grades you — accepting only candidates that score
+STRICTLY higher. Every accepted iteration lands in your timeline as an
+AI-badged revision; the coach tab streams the trajectory live.
+
+The coach is LLM-required: export `ANTHROPIC_API_KEY` before `pnpm stack:up`
+(the stack sets `IMPROVER_DETERMINISTIC=0` so the coach runs live while grading
+stays deterministic — the coach only proposes; the engine decides). Without a
+key the button explains why it is disabled.
+
 ## Export a run as portable files
 
 The practice workspace's **Export** button downloads a single `.zip` with
