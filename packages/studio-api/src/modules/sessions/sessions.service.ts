@@ -32,6 +32,7 @@ import type { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
 import { EvalQueue } from './eval-queue';
 import { validateBriefReferences } from './brief-validator';
 import { validateGraphReferences } from './graph-validator';
+import { validateWorkflowReferences } from './workflow-validator';
 
 /** A session plus what its DTO summarises about the newest revision. */
 export interface SessionWithLatest {
@@ -82,7 +83,10 @@ export class SessionsService {
       throw new NotFoundException(`Session ${sessionId} not found`);
     }
 
-    const problems = validateGraphReferences(dto.graph);
+    const problems = [
+      ...validateGraphReferences(dto.graph),
+      ...validateWorkflowReferences(dto.graph, session.prompt.workflowSpec ?? null),
+    ];
     if (problems.length > 0) {
       throw new UnprocessableEntityException(problems);
     }
@@ -220,6 +224,7 @@ export class SessionsService {
 
     const problems = [
       ...validateGraphReferences(dto.graph),
+      ...validateWorkflowReferences(dto.graph, session.prompt.workflowSpec ?? null),
       ...(dto.brief ? validateBriefReferences(dto.graph, dto.brief, session.prompt) : []),
     ];
     if (problems.length > 0) {

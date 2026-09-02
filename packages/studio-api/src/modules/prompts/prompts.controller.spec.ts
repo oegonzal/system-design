@@ -10,6 +10,7 @@ import { call, createHarness, resetDesignData, type Harness } from '../../test/h
 
 const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
 const MEDIA_ID = 'e1000000-0000-4000-8000-000000000002';
+const ORDER_HISTORY_ID = 'e1000000-0000-4000-8000-000000000006';
 const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
 
 describe('prompts', () => {
@@ -82,6 +83,26 @@ describe('prompts', () => {
 
       // advanced = intro ×100; the fixture states 10,000 concurrent users.
       expect(body.data.scaleTargets.concurrentUsers).toBe(1000000);
+    });
+
+    it('[PRD-1] an order-history prompt persists and returns its workflow spec; other archetypes carry null', async () => {
+      const ticketing = await generate({ experienceId: TICKETING_ID });
+      expect(ticketing.body.data.workflowSpec).toBeNull();
+
+      const { status, body } = await generate({
+        experienceId: ORDER_HISTORY_ID,
+        difficulty: 'standard',
+      });
+      expect(status).toBe(201);
+      const spec = body.data.workflowSpec;
+      expect(spec).not.toBeNull();
+      expect(spec?.operations.map((op) => op.id)).toContain('op-list-orders');
+      expect(spec?.ingests.map((ingest) => ingest.mode).sort()).toEqual(['pull', 'push']);
+      // Every budget an ingest quotes is on the prompt — the generator guarantees it.
+      const nfrIds = new Set(body.data.nonFunctionalRequirements.map((n) => n.id));
+      for (const ingest of spec?.ingests ?? []) {
+        expect(nfrIds.has(ingest.nfrId)).toBe(true);
+      }
     });
 
     it('rejects an unknown experience with 422 — well-formed but unsatisfiable', async () => {

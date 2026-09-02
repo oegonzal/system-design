@@ -115,6 +115,17 @@ export const CRITERIA: readonly Criterion[] = [
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },
   { id: 'STAR-3', statement: 'A story can link to a prompt and an experience.' },
+  // Business-workflow (product) layer
+  {
+    id: 'PRD-1',
+    statement:
+      'A workflow prompt presents its API contract, events, ingest SLAs and entity lifecycle beside the prose requirements.',
+  },
+  {
+    id: 'PRD-2',
+    statement:
+      'Workflow coverage is claimed by reference — a Fulfills pick and event emissions — and corroborated structurally, never by matching names.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

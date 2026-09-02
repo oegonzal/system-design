@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsIn,
@@ -9,6 +10,7 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
   Validate,
   ValidateNested,
 } from 'class-validator';
@@ -25,9 +27,11 @@ import {
   NODE_MAX_OPERATIONS,
   NODE_MAX_RESPONSIBILITIES,
   OPERATION_KINDS,
+  OPERATION_MAX_EMITS,
   OPERATION_NAME_MAX_LENGTH,
   OPERATION_NOTES_MAX_LENGTH,
   RESPONSIBILITY_MAX_LENGTH,
+  WORKFLOW_ID_MAX_LENGTH,
   type CanvasEdge,
   type CanvasGraph,
   type CanvasNode,
@@ -73,6 +77,27 @@ export class NodeOperationDto implements NodeOperation {
   @IsString()
   @MaxLength(OPERATION_NOTES_MAX_LENGTH)
   notes?: string;
+
+  /**
+   * Workflow-spec item reference. MinLength because "not linked" must be an
+   * ABSENT key — an empty string would parse here and then 422 downstream as
+   * an unknown id. Whether the id exists on the session's prompt is
+   * `workflow-validator.ts`'s business.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(WORKFLOW_ID_MAX_LENGTH)
+  fulfills?: string;
+
+  /** Workflow-spec event ids this op publishes; existence checked downstream. */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(OPERATION_MAX_EMITS)
+  @IsString({ each: true })
+  @MaxLength(WORKFLOW_ID_MAX_LENGTH, { each: true })
+  emits?: string[];
 }
 
 export class CanvasNodeDto implements CanvasNode {
