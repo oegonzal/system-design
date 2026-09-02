@@ -43,11 +43,13 @@ export function Dashboard() {
       .catch((caught) => setError(toErrorMessage(caught, 'Could not load the dashboard.')));
   }, []);
 
-  const handleGenerate = async (experienceId: string) => {
-    setGeneratingFor(experienceId);
+  // No experienceId = "surprise me": the API rotates to the least-practiced
+  // experience, so repeated practice covers every archetype.
+  const handleGenerate = async (experienceId?: string) => {
+    setGeneratingFor(experienceId ?? 'surprise');
     setError(null);
     try {
-      const prompt = await api.generatePrompt({ experienceId });
+      const prompt = await api.generatePrompt(experienceId ? { experienceId } : {});
       router.push(`/prompts/${prompt.id}`);
     } catch (caught) {
       setError(toErrorMessage(caught, 'Could not generate a prompt.'));
@@ -68,7 +70,18 @@ export function Dashboard() {
       {error !== null ? <Text tone="secondary">{error}</Text> : null}
 
       <Stack gap={4}>
-        <Heading level={2}>Experiences</Heading>
+        <Stack direction="row" gap={4} align="center" justify="between">
+          <Heading level={2}>Experiences</Heading>
+          <Button
+            variant="subtle"
+            onClick={() => void handleGenerate()}
+            disabled={generatingFor !== null}
+            data-testid="surprise-me"
+            title="Generate a prompt from your least-practiced experience"
+          >
+            {generatingFor === 'surprise' ? 'Generating…' : 'Surprise me'}
+          </Button>
+        </Stack>
         {experiences === null ? (
           <Grid aria-busy="true">
             <Skeleton variant="block" height="160px" />

@@ -12,12 +12,17 @@ import { ExperienceProfile, Prompt } from '@sysdesign/db';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
+import { randomInt } from 'node:crypto';
+
 import { LLM_CLIENT } from '../llm/llm.token';
 import { buildPromptDump, startPromptDump, type PromptDump, type PromptDumpLlm } from './dump';
 import type { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
 import { enrichPrompt } from './generator/enrich-prompt';
 import { generatePrompt, GENERATOR_VERSION } from './generator/prompt-generator';
-import { fnv1a } from './generator/rng';
+
+/** How many recent prompts a new one must not echo, and how hard to try. */
+const RECENT_FRAMINGS = 3;
+const MAX_SEED_DRAWS = 12;
 
 @Injectable()
 export class PromptsService {
@@ -28,21 +33,32 @@ export class PromptsService {
     @Inject(LLM_CLIENT) private readonly llm: LlmClient,
   ) {}
 
-  /** 422 rather than 404: the request body is well-formed, just unsatisfiable. */
+  /**
+   * 422 rather than 404: the request body is well-formed, just unsatisfiable.
+   * No `experienceId` means "surprise me" — practice rotates to the
+   * least-practiced experience, so coverage spreads across every archetype
+   * instead of re-drilling one.
+   */
   async generate(
-    experienceId: string,
+    experienceId: string | undefined,
     difficulty: PromptDifficulty = 'standard',
     seed?: number,
   ): Promise<Prompt> {
-    const experience = await this.em.findOne(ExperienceProfile, experienceId);
+    const experience = experienceId
+      ? await this.em.findOne(ExperienceProfile, experienceId)
+      : await this.leastPracticedExperience();
     if (!experience) {
       throw new UnprocessableEntityException(`Unknown experienceId: ${experienceId}`);
     }
 
-    return this.createPrompt(experience, difficulty, seed ?? (await this.nextSeed(experience)));
+    return this.createPrompt(
+      experience,
+      difficulty,
+      seed ?? (await this.noveltySeed(experience, difficulty)),
+    );
   }
 
-  /** Same experience and difficulty, next derived seed → a fresh variant. */
+  /** Same experience and difficulty, a fresh non-repeating seed → a fresh variant. */
   async regenerate(id: string): Promise<Prompt> {
     const existing = await this.em.findOne(Prompt, id, { populate: ['experience'] });
     if (!existing) {
@@ -50,18 +66,73 @@ export class PromptsService {
     }
 
     const experience = existing.experience;
-    return this.createPrompt(experience, existing.difficulty, await this.nextSeed(experience));
+    return this.createPrompt(
+      experience,
+      existing.difficulty,
+      await this.noveltySeed(experience, existing.difficulty),
+    );
   }
 
   /**
-   * Derived, not random: hash of slug + how many prompts the experience
-   * already has. Deterministic for a fresh database, yet every generation
-   * bumps the count and therefore the next seed — regenerate always moves.
-   * Masked to 31 bits because `seed` is an int4 column.
+   * A random seed, drawn again while its framing echoes a recent prompt.
+   *
+   * Random rather than derived-from-row-count (the old scheme): the count
+   * resets whenever a database starts fresh, which made "the first prompt"
+   * identical every time. Reproducibility is untouched — the chosen seed is
+   * stored on the row, and `generatePrompt` stays a pure function of it
+   * ([GEN-2]); only the *selection* is non-deterministic. The prompt table is
+   * the seen-list: a candidate whose title matches one of the last few for
+   * this experience is redrawn (titles are generator-owned and never
+   * LLM-enriched, so the comparison is stable). If every draw collides —
+   * the variant pool is finite — the first draw stands.
    */
-  private async nextSeed(experience: ExperienceProfile): Promise<number> {
-    const count = await this.em.count(Prompt, { experience });
-    return fnv1a(`${experience.slug}:${count}`) & 0x7fffffff;
+  private async noveltySeed(
+    experience: ExperienceProfile,
+    difficulty: PromptDifficulty,
+  ): Promise<number> {
+    const recent = await this.em.find(
+      Prompt,
+      { experience },
+      { orderBy: { createdAt: 'desc', id: 'desc' }, limit: RECENT_FRAMINGS },
+    );
+    const seen = new Set(recent.map((prompt) => prompt.title));
+
+    let first: number | null = null;
+    for (let draw = 0; draw < MAX_SEED_DRAWS; draw++) {
+      const seed = randomInt(0, 0x80000000); // int4 column: 31 bits
+      first ??= seed;
+      const candidate = generatePrompt({ experience, difficulty, seed });
+      if (!seen.has(candidate.title)) return seed;
+    }
+    return first as number;
+  }
+
+  /**
+   * The rotation behind "surprise me": the experience with the fewest prompts,
+   * ties broken by the longest-untouched, then by fixture order — one grouped
+   * count, no per-experience queries.
+   */
+  private async leastPracticedExperience(): Promise<ExperienceProfile> {
+    const experiences = await this.em.find(ExperienceProfile, {}, { orderBy: { id: 'asc' } });
+    if (experiences.length === 0) {
+      throw new UnprocessableEntityException('no experiences seeded — run pnpm db:seed first');
+    }
+
+    const rows = await this.em
+      .getConnection()
+      .execute<{ id: string; n: string; latest: Date }[]>(
+        'select "experience_id" as id, count(*) as n, max("created_at") as latest from "prompt" group by "experience_id"',
+      );
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    return [...experiences].sort((a, b) => {
+      const [ra, rb] = [byId.get(a.id), byId.get(b.id)];
+      const countDiff = Number(ra?.n ?? 0) - Number(rb?.n ?? 0);
+      if (countDiff !== 0) return countDiff;
+      const latestDiff = new Date(ra?.latest ?? 0).getTime() - new Date(rb?.latest ?? 0).getTime();
+      if (latestDiff !== 0) return latestDiff;
+      return a.id.localeCompare(b.id);
+    })[0];
   }
 
   private async createPrompt(

@@ -64,6 +64,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'GEN-3',
     statement: 'A prompt presents scenario, functional requirements, NFRs and scale targets.',
   },
+  {
+    id: 'GEN-4',
+    statement:
+      'Successive generated prompts vary: a fresh seed is drawn per generation and redrawn while its framing echoes a recent prompt, and generating without an experience rotates to the least-practiced one — so practice covers every archetype instead of repeating the same prompt.',
+  },
   // Critic / eval pipeline
   { id: 'EVAL-1', statement: 'A submitted revision is graded with per-dimension scores.' },
   {

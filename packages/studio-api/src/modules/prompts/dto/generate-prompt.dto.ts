@@ -7,8 +7,10 @@ import {
 } from '@sysdesign/contracts';
 
 export class GeneratePromptRequestDto implements GeneratePromptRequest {
+  /** Omitted → the service rotates to the least-practiced experience. */
+  @IsOptional()
   @IsUUID()
-  experienceId!: string;
+  experienceId?: string;
 
   /** Defaults to 'standard' in the service. */
   @IsOptional()

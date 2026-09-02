@@ -66,6 +66,23 @@ describe('prompts', () => {
       expect(second.body.data.scaleTargets).toEqual(first.body.data.scaleTargets);
     });
 
+    it('[GEN-4] successive generations vary the framing, and omitting the experience rotates to the least practiced', async () => {
+      const first = await generate({ experienceId: TICKETING_ID });
+      const second = await generate({ experienceId: TICKETING_ID });
+
+      // Fresh random seeds, and the no-repeat draw keeps the framing moving —
+      // the old count-derived scheme served the identical "first prompt" after
+      // every database reset.
+      expect(second.body.data.seed).not.toBe(first.body.data.seed);
+      expect(second.body.data.title).not.toBe(first.body.data.title);
+
+      // "Surprise me": ticketing now has prompts and every other experience has
+      // none, so rotation picks the first untouched one in fixture order.
+      const surprise = await generate({});
+      expect(surprise.status).toBe(201);
+      expect(surprise.body.data.experienceId).toBe(MEDIA_ID);
+    });
+
     it('[GEN-3] carries scenario, requirements and scale targets in the response', async () => {
       const { body } = await generate({ experienceId: TICKETING_ID, difficulty: 'advanced' });
 

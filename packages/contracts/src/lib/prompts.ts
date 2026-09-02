@@ -121,7 +121,12 @@ export interface PromptDto {
 
 /** No server-owned fields — echoing a fetched PromptDto back is a compile error. */
 export interface GeneratePromptRequest {
-  experienceId: Uuid;
+  /**
+   * Omitted → "surprise me": the service rotates to the least-practiced
+   * experience, so repeated practice covers every archetype instead of
+   * re-drilling one.
+   */
+  experienceId?: Uuid;
   difficulty?: PromptDifficulty;
   seed?: number;
 }
