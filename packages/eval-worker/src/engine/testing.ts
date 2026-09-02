@@ -13,6 +13,7 @@ import type {
   NodeConfig,
   NodeKind,
   NodeOperation,
+  WorkflowSpec,
 } from '@sysdesign/contracts';
 
 import type { LlmClient } from '@sysdesign/llm';
@@ -104,6 +105,7 @@ export function flashSaleFacts(overrides: Partial<PromptFacts> = {}): PromptFact
     functionalRequirementCount: 4,
     functionalText:
       'browse upcoming events; reserve seats during the on-sale; purchase tickets; view order confirmation',
+    workflow: null,
     ...overrides,
   };
 }
@@ -153,6 +155,7 @@ export function analyticsFacts(overrides: Partial<PromptFacts> = {}): PromptFact
     functionalCapabilities: ['analytics'],
     functionalRequirementCount: 4,
     functionalText: 'ingest click events; render live dashboards; export historical reports',
+    workflow: null,
     ...overrides,
   };
 }
@@ -196,6 +199,7 @@ export function mediaFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
     functionalRequirementCount: 4,
     functionalText:
       'upload videos; transcode into renditions; stream playback worldwide; search the media catalog',
+    workflow: null,
     ...overrides,
   };
 }
@@ -239,6 +243,7 @@ export function workflowFacts(overrides: Partial<PromptFacts> = {}): PromptFacts
     functionalRequirementCount: 4,
     functionalText:
       'define automation workflows; fire triggers from webhooks; execute third-party actions; view run history',
+    workflow: null,
     ...overrides,
   };
 }
@@ -282,6 +287,153 @@ export function dagFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
     functionalRequirementCount: 4,
     functionalText:
       'define pipelines as dags; schedule and dispatch steps; retry failed steps; view run status',
+    workflow: null,
+    ...overrides,
+  };
+}
+
+/**
+ * The order-history archetype's standard-tier business layer, mirrored from
+ * the generator's `workflow-specs.ts` (eval-worker may not import studio-api
+ * — app→app is blocked, so calibration carries its own copy the way every
+ * facts builder carries its bank's NFRs). The e2e suite grades against the
+ * live generator's spec, which is what keeps this mirror honest.
+ */
+export function orderHistoryWorkflowSpec(): WorkflowSpec {
+  return {
+    version: 1,
+    entities: [
+      {
+        id: 'ent-order',
+        name: 'Order (history projection)',
+        states: ['received', 'indexed', 'amended'],
+        transitions: [
+          { from: null, to: 'received', via: 'ing-shopify-webhooks' },
+          { from: null, to: 'received', via: 'ing-pos-import' },
+          { from: 'received', to: 'indexed', via: 'op-ingest-index' },
+          { from: 'indexed', to: 'amended', via: 'evt-order-refunded' },
+        ],
+      },
+    ],
+    operations: [
+      {
+        id: 'op-list-orders',
+        kind: 'query',
+        statement: 'Return the authenticated customer’s merged order history, paginated',
+      },
+      {
+        id: 'op-ingest-index',
+        kind: 'command',
+        statement: 'Normalize an incoming order and upsert it into the read model exactly once',
+        emits: ['evt-order-indexed'],
+        onFailureEmits: ['evt-ingest-failed'],
+      },
+      {
+        id: 'op-get-order',
+        kind: 'query',
+        statement: 'Return one order’s detail for its owner',
+      },
+      {
+        id: 'op-resync-customer',
+        kind: 'command',
+        statement: 'Re-sync one customer’s orders from both sources',
+        emits: ['evt-order-indexed'],
+      },
+    ],
+    events: [
+      { id: 'evt-online-order-received', statement: 'A new online order arrived by webhook' },
+      { id: 'evt-offline-order-received', statement: 'The POS import delivered in-store orders' },
+      { id: 'evt-order-indexed', statement: 'An order became queryable in the read model' },
+      { id: 'evt-order-refunded', statement: 'A refund was reported for an existing order' },
+      { id: 'evt-ingest-failed', statement: 'An order failed normalization' },
+    ],
+    aggregations: [
+      {
+        id: 'agg-spend-summary',
+        statement: 'A spend summary tile totals purchases across both channels',
+        sourceEventIds: ['evt-order-indexed', 'evt-order-refunded'],
+      },
+    ],
+    ingests: [
+      {
+        id: 'ing-shopify-webhooks',
+        mode: 'push',
+        statement: 'The storefront pushes order webhooks',
+        nfrId: 'ohi-fresh-online',
+        emits: ['evt-online-order-received', 'evt-order-refunded'],
+      },
+      {
+        id: 'ing-pos-import',
+        mode: 'pull',
+        statement: 'Poll the Retail POS for new and changed orders',
+        nfrId: 'ohi-fresh-offline',
+        emits: ['evt-offline-order-received'],
+      },
+    ],
+  };
+}
+
+export function orderHistoryFacts(overrides: Partial<PromptFacts> = {}): PromptFacts {
+  return {
+    archetype: 'order-history-integration',
+    difficulty: 'standard',
+    scaleTargets: {
+      concurrentUsers: 20000,
+      requestsPerSecond: 1500,
+      readWriteRatio: '98:2',
+      p99LatencyMs: 300,
+      availabilityPct: '99.9',
+    },
+    nfrKinds: ['latency', 'availability', 'security', 'consistency'],
+    nfrs: [
+      {
+        id: 'ohi-lat-history-read',
+        kind: 'latency',
+        statement: 'The order history page stays fast while both ingests run',
+        target: 'p99 ≤ 300ms',
+        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 300, unit: 'ms' },
+      },
+      {
+        id: 'ohi-fresh-online',
+        kind: 'consistency',
+        statement: 'An online order is visible within a minute of the storefront confirming it',
+        target: 'visible ≤ 60s after purchase',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
+      },
+      {
+        id: 'ohi-fresh-offline',
+        kind: 'consistency',
+        statement: 'An in-store POS sale is visible within five minutes of ringing up',
+        target: 'visible ≤ 300s after sale',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 300, unit: 's' },
+      },
+      {
+        id: 'ohi-avail-history',
+        kind: 'availability',
+        statement: 'The history read path holds through business hours and promos',
+        target: '≥ 99.9%',
+        targetSpec: { metric: 'availability_pct', op: '>=', value: 99.9, unit: '%' },
+      },
+      {
+        id: 'ohi-sec-own-orders',
+        kind: 'security',
+        statement: 'A logged-in customer can read only their own orders, and a guest can read none',
+        target: 'authorization enforced before any order row is returned',
+        targetSpec: { metric: 'cross_customer_reads', op: '=', value: 0, unit: 'orders' },
+      },
+      {
+        id: 'ohi-con-no-dupes',
+        kind: 'consistency',
+        statement: 'An order reported by both sources appears exactly once',
+        target: 'zero duplicate rows',
+        targetSpec: { metric: 'duplicate_orders', op: '=', value: 0, unit: 'orders' },
+      },
+    ],
+    functionalCapabilities: ['analytics', 'scheduled-work'],
+    functionalRequirementCount: 5,
+    functionalText:
+      'show a merged paginated order history; import pos orders on a schedule; update refunded orders; show a spend summary tile; scope every read to the signed-in customer',
+    workflow: orderHistoryWorkflowSpec(),
     ...overrides,
   };
 }

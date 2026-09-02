@@ -66,6 +66,32 @@ export function replicasOf(node: CanvasNode): number {
   return configNumber(node, 'replicas') ?? 1;
 }
 
+/**
+ * Every declared polling cadence attributable to one PULL-ingest fulfiller:
+ * the node's own `pollIntervalSeconds`, plus every scheduler driving it
+ * through a direct edge. Deliberately narrow — a push pipeline's internal
+ * batch hops are NOT walked, because a shared indexer or resync edge would
+ * cross-contaminate one ingest's budget with the other's cadence. Push
+ * freshness is corroboration-only in v1; the hop analysis is future work.
+ */
+export function declaredPollIntervals(
+  index: GraphIndex,
+  fulfillerNodeId: string,
+): Array<{ nodeId: string; seconds: number }> {
+  const intervals: Array<{ nodeId: string; seconds: number }> = [];
+  const self = index.byId(fulfillerNodeId);
+  const own = self ? configNumber(self, 'pollIntervalSeconds') : undefined;
+  if (own !== undefined) intervals.push({ nodeId: fulfillerNodeId, seconds: own });
+
+  for (const edge of index.inEdges(fulfillerNodeId)) {
+    const driver = index.byId(edge.source);
+    if (driver?.kind !== 'scheduler') continue;
+    const seconds = configNumber(driver, 'pollIntervalSeconds');
+    if (seconds !== undefined) intervals.push({ nodeId: driver.id, seconds });
+  }
+  return intervals.sort((a, b) => (a.nodeId < b.nodeId ? -1 : 1));
+}
+
 /** '95:5' → 0.95. Null when the ratio cannot be parsed — rules then stay silent. */
 export function readsFraction(readWriteRatio: string): number | null {
   const parts = readWriteRatio.split(':');

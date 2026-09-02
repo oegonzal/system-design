@@ -17,6 +17,7 @@ import type {
   PromptDifficulty,
   ScaleTargets,
   Severity,
+  WorkflowSpec,
 } from '@sysdesign/contracts';
 
 import type { GraphIndex } from './graph-index';
@@ -58,6 +59,13 @@ export interface PromptFacts {
    * predicate (`tooling/criteria-coverage.spec.ts` enforces it).
    */
   functionalText: string;
+  /**
+   * The machine-readable business layer, or null when the prompt carries
+   * none. The gate for the entire product dimension: every expectation and
+   * rule that reads it MUST no-op on null, which is what keeps every
+   * pre-existing prompt grading byte-identically.
+   */
+  workflow: WorkflowSpec | null;
 }
 
 /** One lesson: what is wrong, why it matters at this scale, and (sometimes) a machine-applicable fix. */

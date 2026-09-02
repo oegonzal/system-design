@@ -1,0 +1,218 @@
+{
+  "nodes": [
+    { "id": "client-1", "kind": "client", "label": "Shopper", "position": { "x": 0, "y": 200 } },
+    {
+      "id": "gateway-1",
+      "kind": "gateway",
+      "label": "API gateway",
+      "config": { "authMode": "jwt", "rateLimit": true },
+      "position": { "x": 240, "y": 200 }
+    },
+    {
+      "id": "service-1",
+      "kind": "service",
+      "label": "History service",
+      "config": { "replicas": 4, "rpsPerInstance": 500, "autoscaling": true },
+      "operations": [
+        { "name": "listOrders", "kind": "query", "fulfills": "op-list-orders" },
+        { "name": "getOrder", "kind": "query", "fulfills": "op-get-order" },
+        { "name": "getSpendSummary", "kind": "query", "fulfills": "agg-spend-summary" },
+        { "name": "resyncCustomer", "kind": "command", "fulfills": "op-resync-customer" }
+      ],
+      "position": { "x": 500, "y": 200 }
+    },
+    {
+      "id": "service-2",
+      "kind": "service",
+      "label": "Webhook receiver",
+      "config": { "replicas": 2, "idempotent": true },
+      "operations": [
+        {
+          "name": "receiveShopifyWebhook",
+          "kind": "command",
+          "idempotent": true,
+          "fulfills": "ing-shopify-webhooks",
+          "emits": ["evt-online-order-received", "evt-order-refunded"]
+        }
+      ],
+      "position": { "x": 240, "y": -40 }
+    },
+    {
+      "id": "batch-job-1",
+      "kind": "batch-job",
+      "label": "POS importer",
+      "config": { "pollIntervalSeconds": 120, "idempotent": true },
+      "operations": [
+        {
+          "name": "importPosOrders",
+          "kind": "command",
+          "idempotent": true,
+          "fulfills": "ing-pos-import",
+          "emits": ["evt-offline-order-received"]
+        }
+      ],
+      "position": { "x": 240, "y": 440 }
+    },
+    {
+      "id": "queue-1",
+      "kind": "queue",
+      "label": "Orders queue",
+      "config": {
+        "delivery": "at-least-once",
+        "ordering": "per-key",
+        "dlq": true,
+        "maxRetries": 5
+      },
+      "operations": [
+        { "name": "OrderReceivedOnline", "kind": "event", "fulfills": "evt-online-order-received" },
+        {
+          "name": "OrderReceivedOffline",
+          "kind": "event",
+          "fulfills": "evt-offline-order-received"
+        },
+        { "name": "OrderRefunded", "kind": "event", "fulfills": "evt-order-refunded" }
+      ],
+      "position": { "x": 500, "y": 40 }
+    },
+    {
+      "id": "worker-1",
+      "kind": "worker",
+      "label": "Order indexer",
+      "config": { "replicas": 2, "idempotent": true },
+      "operations": [
+        {
+          "name": "ingestIndex",
+          "kind": "command",
+          "idempotent": true,
+          "fulfills": "op-ingest-index",
+          "emits": ["evt-order-indexed", "evt-ingest-failed"]
+        }
+      ],
+      "position": { "x": 760, "y": 40 }
+    },
+    {
+      "id": "event-stream-1",
+      "kind": "event-stream",
+      "label": "Order events",
+      "config": {
+        "partitions": 12,
+        "partitionKey": "customer_id",
+        "retentionHours": 168,
+        "delivery": "at-least-once"
+      },
+      "operations": [
+        { "name": "OrderIndexed", "kind": "event", "fulfills": "evt-order-indexed" },
+        { "name": "IngestFailed", "kind": "event", "fulfills": "evt-ingest-failed" }
+      ],
+      "position": { "x": 1020, "y": 40 }
+    },
+    {
+      "id": "stream-processor-1",
+      "kind": "stream-processor",
+      "label": "Spend aggregator",
+      "config": { "parallelism": 4, "checkpointing": true },
+      "position": { "x": 1280, "y": 120 }
+    },
+    {
+      "id": "notification-service-1",
+      "kind": "notification-service",
+      "label": "Ops alerts",
+      "position": { "x": 1280, "y": -40 }
+    },
+    {
+      "id": "database-1",
+      "kind": "database",
+      "label": "Order history DB",
+      "config": {
+        "consistency": "strong",
+        "sharding": "hash",
+        "partitionKey": "customer_id",
+        "replicas": 2,
+        "backups": true
+      },
+      "position": { "x": 760, "y": 320 }
+    },
+    {
+      "id": "external-1",
+      "kind": "external-api",
+      "label": "Shopify",
+      "config": { "webhooks": true, "timeoutMs": 2000, "circuitBreaker": true },
+      "position": { "x": 0, "y": -40 }
+    },
+    {
+      "id": "external-2",
+      "kind": "external-api",
+      "label": "Retail POS",
+      "config": { "timeoutMs": 3000, "retries": 2, "circuitBreaker": true },
+      "position": { "x": 0, "y": 440 }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "client-1", "target": "gateway-1" },
+    {
+      "id": "edge-2",
+      "source": "gateway-1",
+      "target": "service-1",
+      "carries": ["listOrders", "getOrder", "getSpendSummary", "resyncCustomer"]
+    },
+    { "id": "edge-3", "source": "service-1", "target": "database-1", "intent": "read" },
+    {
+      "id": "edge-4",
+      "source": "external-1",
+      "target": "service-2",
+      "kind": "async",
+      "carries": ["receiveShopifyWebhook"]
+    },
+    {
+      "id": "edge-5",
+      "source": "service-2",
+      "target": "queue-1",
+      "kind": "async",
+      "intent": "publish",
+      "carries": ["OrderReceivedOnline", "OrderRefunded"]
+    },
+    { "id": "edge-6", "source": "batch-job-1", "target": "external-2", "intent": "read" },
+    {
+      "id": "edge-7",
+      "source": "batch-job-1",
+      "target": "queue-1",
+      "kind": "async",
+      "intent": "publish",
+      "carries": ["OrderReceivedOffline"]
+    },
+    {
+      "id": "edge-8",
+      "source": "queue-1",
+      "target": "worker-1",
+      "kind": "async",
+      "intent": "consume",
+      "carries": ["OrderReceivedOnline", "OrderReceivedOffline", "OrderRefunded"]
+    },
+    { "id": "edge-9", "source": "worker-1", "target": "database-1", "intent": "write" },
+    {
+      "id": "edge-10",
+      "source": "worker-1",
+      "target": "event-stream-1",
+      "kind": "async",
+      "intent": "publish",
+      "carries": ["OrderIndexed", "IngestFailed"]
+    },
+    {
+      "id": "edge-11",
+      "source": "event-stream-1",
+      "target": "stream-processor-1",
+      "kind": "async",
+      "intent": "consume",
+      "carries": ["OrderIndexed"]
+    },
+    {
+      "id": "edge-12",
+      "source": "event-stream-1",
+      "target": "notification-service-1",
+      "kind": "async",
+      "intent": "consume",
+      "carries": ["IngestFailed"]
+    },
+    { "id": "edge-13", "source": "stream-processor-1", "target": "database-1", "intent": "write" }
+  ]
+}

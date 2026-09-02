@@ -5,8 +5,8 @@
  * deterministic grade, structurally unable to move it.
  */
 import { describeDesign } from '../../serialization/graph-text';
-import { isCoverageArtifact, isFindingsArtifact } from '../../core/artifacts';
-import type { EvalPass, PassContext } from '../../core/types';
+import type { EvalPass } from '../../core/types';
+import { coverageSection, findingsSection } from '../deterministic-sections';
 import { DEPTH_AXIS_ID, DEPTH_AXIS_LABEL, depthSchema } from './depth-schema';
 
 export const DEPTH_PASS_ID = 'llm.depth';
@@ -25,22 +25,6 @@ const SYSTEM_PROMPT = [
   'ship this review as a strong-hire signal. Keep the summary to what the',
   'author should deepen next.',
 ].join(' ');
-
-function coverageSection(ctx: PassContext): string {
-  const entries = ctx.priorArtifacts.filter(isCoverageArtifact).flatMap((a) => a.entries);
-  if (entries.length === 0) return '  (none)';
-  return entries
-    .map((entry) => `  [${entry.met ? 'met' : 'unmet'}] ${entry.expectationId}`)
-    .join('\n');
-}
-
-function findingsSection(ctx: PassContext): string {
-  const findings = ctx.priorArtifacts.filter(isFindingsArtifact).flatMap((a) => a.findings);
-  if (findings.length === 0) return '  (none)';
-  return findings
-    .map((f) => `  [${f.severity}] ${f.ruleId ?? f.expectationId ?? 'finding'}: ${f.title}`)
-    .join('\n');
-}
 
 export function createDepthPass(): EvalPass {
   return {
@@ -95,6 +79,7 @@ export function createDepthPass(): EvalPass {
           label: DEPTH_AXIS_LABEL,
           score: critique.depthScore,
           subScores: critique.subScores,
+          factors: null,
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },

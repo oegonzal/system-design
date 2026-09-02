@@ -7,6 +7,22 @@
  */
 import type { Grade, Severity } from './evaluations';
 
+/** Ordinal factor levels — what the evidence implies, not a false-precision number. */
+export const AXIS_FACTOR_LEVELS = ['none', 'low', 'medium', 'high'] as const;
+export type AxisFactorLevel = (typeof AXIS_FACTOR_LEVELS)[number];
+
+/**
+ * One evaluator factor: an ordinal judgement with the rationale that earned
+ * it. Factors ride beside the numeric subScores (which exist so meters can
+ * render); the rationale is the part a person actually reads.
+ */
+export interface AxisFactor {
+  id: string;
+  label: string;
+  level: AxisFactorLevel;
+  rationale: string;
+}
+
 /**
  * An LLM-graded axis (e.g. depth & justification). Advisory by construction:
  * the aggregator's scoring path never reads axes, so `score` can disagree
@@ -18,6 +34,8 @@ export interface EvalAxisDto {
   /** 0–100, or null when the LLM was disabled or failed. */
   score: number | null;
   subScores: Record<string, number> | null;
+  /** Ordinal factor judgements with rationales; null on axes that score numerically. */
+  factors: AxisFactor[] | null;
   summary: string | null;
   model: string | null;
 }

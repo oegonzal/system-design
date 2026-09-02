@@ -126,6 +126,21 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Workflow coverage is claimed by reference — a Fulfills pick and event emissions — and corroborated structurally, never by matching names.',
   },
+  {
+    id: 'PRD-3',
+    statement:
+      'On a workflow prompt, declaring nothing scores the product dimension 0; on any other prompt it is not assessed and renormalizes out.',
+  },
+  {
+    id: 'PRD-5',
+    statement:
+      'Freshness SLAs are graded structurally: declared polling cadence and push wiring against the budgets the prompt states.',
+  },
+  {
+    id: 'PRD-6',
+    statement:
+      'The workability axis reports ordinal factor evaluations with rationales and never moves the deterministic score.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

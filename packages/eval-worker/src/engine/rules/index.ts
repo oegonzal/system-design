@@ -12,6 +12,7 @@ import { interfaceRules } from './interfaces';
 import { messagingRules } from './messaging';
 
 import { performanceRules } from './performance';
+import { productRules } from './product';
 import { reliabilityRules } from './reliability';
 import { scalabilityRules } from './scalability';
 import { securityRules } from './security';
@@ -33,4 +34,7 @@ export const RULES: EvalRule[] = [
   // Brief-alignment pack: wakes only once a design brief is submitted (see
   // rules/brief.ts for the feature gate), inert otherwise.
   ...briefRules,
+  // Product pack: wakes only when the prompt carries a workflow spec (see
+  // rules/product.ts for the feature gate), inert on every other prompt.
+  ...productRules,
 ];

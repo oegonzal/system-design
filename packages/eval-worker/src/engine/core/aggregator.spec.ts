@@ -98,6 +98,7 @@ describe('aggregate', () => {
       label: 'Depth & justification',
       score: 0,
       subScores: null,
+      factors: null,
       summary: 'The model thinks this is terrible.',
       model: 'claude-sonnet-5',
     };

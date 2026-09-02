@@ -261,6 +261,7 @@ export function makeAxis(overrides: Partial<EvalAxisDto> = {}): EvalAxisDto {
       failureDesign: 50,
       dataFlowClarity: 68,
     },
+    factors: null,
     summary: 'Mechanisms are named but capacities are defaulted.',
     model: 'claude-sonnet-5',
     ...overrides,

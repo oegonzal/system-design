@@ -5,7 +5,7 @@
  * grade". Pure types only: nothing here may import from passes, rules, or the
  * critic, which is what keeps the kernel's dependency arrow one-directional.
  */
-import type { EvalDimension, Severity } from '@sysdesign/contracts';
+import type { AxisFactor, EvalDimension, Severity } from '@sysdesign/contracts';
 
 import type { EngineFinding } from '../types';
 
@@ -45,6 +45,8 @@ export interface AxisArtifact extends ArtifactBase {
   label: string;
   score: number | null;
   subScores: Record<string, number> | null;
+  /** Ordinal factor judgements with rationales; null on numeric-only axes. */
+  factors: AxisFactor[] | null;
   summary: string | null;
   model: string | null;
 }

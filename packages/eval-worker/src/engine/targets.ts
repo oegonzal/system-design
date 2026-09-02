@@ -1,3 +1,5 @@
+import type { WorkflowIngest } from '@sysdesign/contracts';
+
 import type { NfrFact, PromptFacts } from './types';
 
 /**
@@ -15,7 +17,12 @@ import type { NfrFact, PromptFacts } from './types';
  */
 
 /** Metrics the engine knows how to grade against. Others ride along unread. */
-export const GRADED_METRICS = ['p99_latency_ms', 'availability_pct', 'rto_minutes'] as const;
+export const GRADED_METRICS = [
+  'p99_latency_ms',
+  'availability_pct',
+  'rto_minutes',
+  'freshness_seconds',
+] as const;
 export type GradedMetric = (typeof GRADED_METRICS)[number];
 
 /**
@@ -90,4 +97,24 @@ export function availabilityNines(facts: PromptFacts): number {
   const pct = availabilityTargetPct(facts);
   if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) return 0;
   return Math.round(-Math.log10(1 - pct / 100) * 10) / 10;
+}
+
+/**
+ * The staleness budget one workflow ingest is held to: its linked NFR's
+ * `freshness_seconds` target, or null when the prompt states none.
+ *
+ * Deliberately per-ingest by `nfrId`, not `strictestTarget`: two ingests
+ * carry two different budgets (a webhook minute beside a polling
+ * five-minutes), and holding the slow one to the fast one's bar would grade
+ * a requirement the prompt never stated.
+ */
+export function freshnessBudgetSeconds(facts: PromptFacts, ingest: WorkflowIngest): number | null {
+  const nfr = facts.nfrs.find((candidate) => candidate.id === ingest.nfrId);
+  const spec = nfr?.targetSpec;
+  return spec !== null &&
+    spec !== undefined &&
+    spec.metric === 'freshness_seconds' &&
+    spec.op === '<='
+    ? spec.value
+    : null;
 }

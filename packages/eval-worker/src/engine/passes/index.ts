@@ -10,6 +10,7 @@ import { createExpectationsPass } from './expectations/expectations.pass';
 import { createNarrativePass } from './narrative/narrative.pass';
 import { createRulesPass } from './rules/rules.pass';
 import { createScenariosPass } from './scenarios/scenarios.pass';
+import { createWorkabilityPass } from './workability/workability.pass';
 
 export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
   const passes: EvalPass[] = [
@@ -18,6 +19,7 @@ export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
     createCriticPass(),
     createDepthPass(),
     createNarrativePass(),
+    createWorkabilityPass(),
     createScenariosPass(),
   ];
   return new Map(passes.map((pass) => [pass.id, pass]));

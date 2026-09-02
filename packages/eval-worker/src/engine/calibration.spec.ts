@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { CanvasGraph, DesignBrief, DimensionScores, Grade } from '@sysdesign/contracts';
 
 import { runEngine } from './engine';
-import { flashSaleFacts } from './testing';
+import { flashSaleFacts, orderHistoryFacts } from './testing';
 
 function loadFixture(name: string): CanvasGraph {
   return JSON.parse(
@@ -283,5 +283,112 @@ describe('brief calibration', () => {
     );
     // Below the one honest binding, and below a brief that claimed nothing new.
     expect(result.overallScore).toBeLessThan(91);
+  });
+});
+
+/**
+ * The product dimension's own anchor, on the archetype that carries the
+ * first workflow spec. Held apart from the flash-sale table because these
+ * rows pin one dimension's meaning, not the whole rubric: what business-
+ * workflow silence, partial coverage and full coverage are worth.
+ */
+describe('order-history calibration', () => {
+  const naive = () => loadFixture('naive-order-history.graph.json');
+  const excellent = () => loadFixture('excellent-order-history.graph.json');
+
+  /**
+   * Excellent minus two deliberate gaps: the POS poller loses its declared
+   * cadence (freshness unprovable) and the failure event loses its consumer
+   * (evt-ingest-failed stops at the stream). The delta IS the lesson list.
+   */
+  const solid = (): CanvasGraph => {
+    const graph = excellent();
+    return {
+      nodes: graph.nodes.map((node) =>
+        node.kind === 'batch-job'
+          ? { ...node, config: { ...node.config, pollIntervalSeconds: undefined } as never }
+          : node,
+      ),
+      edges: graph.edges.filter((edge) => edge.id !== 'edge-12'),
+    };
+  };
+
+  it('[PRD-3] silence on a workflow prompt scores product 0 — never "not assessed"', () => {
+    const result = runEngine(naive(), orderHistoryFacts());
+    expect(result.dimensionScores.product).toBe(0);
+    // The unmet coverage names what the business layer is missing.
+    const expectationIds = result.findings
+      .map((finding) => finding.expectationId)
+      .filter((id): id is string => id !== null);
+    expect(expectationIds).toContain('exp.prd.queries-served');
+    expect(expectationIds).toContain('exp.prd.events-flowing');
+    // And the archetype's own bullets grade beside it: the naive design
+    // proxies the sources and scopes nothing — both conscious pins.
+    expect(expectationIds).toContain('exp.ohi.own-orders-scoped');
+    expect(expectationIds).toContain('exp.ohi.read-through-outage');
+  });
+
+  it('[PRD-3] a prompt without a workflow spec never assesses the dimension', () => {
+    const result = runEngine(naive(), flashSaleFacts());
+    expect(result.dimensionScores.product).toBeNull();
+  });
+
+  it('[PRD-5] the solid design pays for its two gaps: unstated cadence, unconsumed failure event', () => {
+    const result = runEngine(solid(), orderHistoryFacts());
+    expect(result.dimensionScores.product).toBe(65.7);
+    const expectationIds = result.findings
+      .map((finding) => finding.expectationId)
+      .filter((id): id is string => id !== null);
+    expect(expectationIds).toContain('exp.prd.freshness-within-budget');
+    expect(expectationIds).toContain('exp.prd.events-flowing');
+  });
+
+  it('full coverage pins product at 100 — contracts, events, ingests, budgets, lifecycle, aggregate', () => {
+    const result = runEngine(excellent(), orderHistoryFacts());
+    expect(result.dimensionScores.product).toBe(100);
+    expect(
+      result.findings.filter(
+        (finding) => finding.dimension === 'product' && finding.countsAsViolation,
+      ),
+    ).toEqual([]);
+  });
+
+  it('[PRD-5] a declared cadence over the stated budget is contradicted at high severity', () => {
+    const graph = excellent();
+    const slowPoll: CanvasGraph = {
+      nodes: graph.nodes.map((node) =>
+        node.kind === 'batch-job'
+          ? { ...node, config: { ...node.config, pollIntervalSeconds: 900 } }
+          : node,
+      ),
+      edges: graph.edges,
+    };
+    const result = runEngine(slowPoll, orderHistoryFacts());
+    const finding = result.findings.find(
+      (candidate) => candidate.ruleId === 'product.freshness-unachievable',
+    );
+    // The suppression yields the rule to the unmet expectation — one lesson,
+    // one finding — so assert the pair: the expectation is unmet, and the
+    // score fell.
+    const expectationIds = result.findings
+      .map((candidate) => candidate.expectationId)
+      .filter((id): id is string => id !== null);
+    expect(expectationIds).toContain('exp.prd.freshness-within-budget');
+    expect(finding ?? null).toBeNull();
+    expect(result.dimensionScores.product).toBeLessThan(100);
+  });
+
+  it('the ordering is the property: naive < solid < excellent on product and overall', () => {
+    const scores = [naive(), solid(), excellent()].map((graph) =>
+      runEngine(graph, orderHistoryFacts()),
+    );
+    expect(scores[0].dimensionScores.product ?? -1).toBeLessThan(
+      scores[1].dimensionScores.product ?? -1,
+    );
+    expect(scores[1].dimensionScores.product ?? -1).toBeLessThan(
+      scores[2].dimensionScores.product ?? -1,
+    );
+    expect(scores[0].overallScore).toBeLessThan(scores[1].overallScore);
+    expect(scores[1].overallScore).toBeLessThan(scores[2].overallScore);
   });
 });

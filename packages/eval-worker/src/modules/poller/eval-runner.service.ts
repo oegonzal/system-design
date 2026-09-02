@@ -83,6 +83,7 @@ export class EvalRunnerService {
         functionalCapabilities: prompt.functionalCapabilities,
         functionalRequirementCount: prompt.functionalRequirements.length,
         functionalText: prompt.functionalRequirements.join(' ').toLowerCase(),
+        workflow: prompt.workflowSpec ?? null,
       };
 
       dump.inputs({
@@ -206,6 +207,7 @@ export class EvalRunnerService {
               label: axis.label,
               score: axis.score,
               subScores: axis.subScores,
+              factors: axis.factors,
               summary: axis.summary,
               model: axis.model,
             })),

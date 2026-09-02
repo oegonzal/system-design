@@ -64,6 +64,40 @@ export function describeDesign(
             : story,
         ];
 
+  const workflow = facts.workflow;
+  const workflowSection =
+    workflow === null
+      ? []
+      : [
+          ``,
+          `# Workflow spec (the business layer; ops reference these ids via fulfills/emits)`,
+          ...workflow.operations.map(
+            (op) =>
+              `  operation ${op.id} [${op.kind}] ${JSON.stringify(op.statement)}` +
+              `${op.emits?.length ? ` emits=[${op.emits.join(',')}]` : ''}` +
+              `${op.onFailureEmits?.length ? ` onFailure=[${op.onFailureEmits.join(',')}]` : ''}`,
+          ),
+          ...workflow.events.map(
+            (event) => `  event ${event.id} ${JSON.stringify(event.statement)}`,
+          ),
+          ...workflow.ingests.map(
+            (ingest) =>
+              `  ingest ${ingest.id} [${ingest.mode}] ${JSON.stringify(ingest.statement)} ` +
+              `budget-nfr=${ingest.nfrId} emits=[${ingest.emits.join(',')}]`,
+          ),
+          ...workflow.aggregations.map(
+            (agg) =>
+              `  aggregation ${agg.id} ${JSON.stringify(agg.statement)} sources=[${agg.sourceEventIds.join(',')}]`,
+          ),
+          ...workflow.entities.map(
+            (entity) =>
+              `  entity ${entity.id} ${JSON.stringify(entity.name)} states=[${entity.states.join(',')}] ` +
+              `transitions=[${entity.transitions
+                .map((t) => `${t.from ?? '·'}->${t.to} via ${t.via}`)
+                .join('; ')}]`,
+          ),
+        ];
+
   const full = [
     `# Design prompt`,
     `archetype: ${facts.archetype} · difficulty: ${facts.difficulty}`,
@@ -74,6 +108,7 @@ export function describeDesign(
     `non-functional requirements:`,
     ...nfrs,
     `functional requirements: ${facts.functionalText}`,
+    ...workflowSection,
     ``,
     `# Candidate design (canvas graph)`,
     ...graph.nodes.map(renderNodeLine),

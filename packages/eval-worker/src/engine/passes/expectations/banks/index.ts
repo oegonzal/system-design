@@ -9,6 +9,8 @@ import { coreExpectations } from './core';
 import { dagOrchestrationExpectations } from './dag';
 import { flashSaleExpectations } from './flash-sale';
 import { mediaStreamingExpectations } from './media-streaming';
+import { orderHistoryExpectations } from './order-history';
+import { productExpectations } from './product';
 import { realtimeAnalyticsExpectations } from './realtime-analytics';
 import { workflowAutomationExpectations } from './workflow';
 
@@ -19,6 +21,10 @@ export const EXPECTATIONS: readonly Expectation[] = [
   ...realtimeAnalyticsExpectations,
   ...workflowAutomationExpectations,
   ...dagOrchestrationExpectations,
+  ...orderHistoryExpectations,
+  // Workflow-scoped: gated on the prompt carrying a spec, so only workflow
+  // prompts assess the product dimension.
+  ...productExpectations,
   // Brief-scoped last: these grade the author's claims about the design and
   // are the only expectations allowed to read them.
   ...briefExpectations,

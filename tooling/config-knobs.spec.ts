@@ -29,6 +29,9 @@ const SCORING_SOURCES = [
   'packages/eval-worker/src/engine/rules',
   'packages/eval-worker/src/engine/passes/expectations',
   'packages/contracts/src/lib/mechanisms.ts',
+  // Like mechanisms.ts: shared corroboration predicates the engine scores
+  // with — judgeWorkflow reads the `webhooks` knob for push-ingest evidence.
+  'packages/contracts/src/lib/workflow-spec.ts',
 ];
 
 /**

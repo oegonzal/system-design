@@ -1,0 +1,35 @@
+{
+  "nodes": [
+    { "id": "client-1", "kind": "client", "label": "Shopper", "position": { "x": 0, "y": 120 } },
+    {
+      "id": "service-1",
+      "kind": "service",
+      "label": "History service",
+      "position": { "x": 280, "y": 120 }
+    },
+    {
+      "id": "database-1",
+      "kind": "database",
+      "label": "Orders DB",
+      "position": { "x": 560, "y": 120 }
+    },
+    {
+      "id": "external-1",
+      "kind": "external-api",
+      "label": "Shopify",
+      "position": { "x": 280, "y": -60 }
+    },
+    {
+      "id": "external-2",
+      "kind": "external-api",
+      "label": "Retail POS",
+      "position": { "x": 280, "y": 300 }
+    }
+  ],
+  "edges": [
+    { "id": "edge-1", "source": "client-1", "target": "service-1" },
+    { "id": "edge-2", "source": "service-1", "target": "database-1" },
+    { "id": "edge-3", "source": "service-1", "target": "external-1" },
+    { "id": "edge-4", "source": "service-1", "target": "external-2" }
+  ]
+}

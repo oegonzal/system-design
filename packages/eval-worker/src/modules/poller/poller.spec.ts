@@ -156,7 +156,7 @@ describe('poller (integration)', () => {
     expect(done.overallScore).toBeGreaterThan(0);
     expect(done.grade).toBeTruthy();
     expect(done.dimensionScores).toBeTruthy();
-    expect(done.engineVersion).toBe('2.3.0');
+    expect(done.engineVersion).toBe('2.4.0');
     // EVAL_DETERMINISTIC=1 → no-op critic: engine summary, no model recorded.
     expect(done.criticModel).toBeNull();
     expect(done.summary).toBeTruthy();
@@ -295,6 +295,7 @@ describe('poller (integration)', () => {
         'llm.critic',
         'llm.depth',
         'llm.narrative',
+        'llm.workability',
         'llm.scenarios',
       ]);
 

@@ -27,6 +27,7 @@ const facts: PromptFacts = {
   functionalCapabilities: [],
   functionalRequirementCount: 4,
   functionalText: 'sell tickets without overselling',
+  workflow: null,
 };
 
 function build(graph: CanvasGraph, narrative: string | null = null): string {

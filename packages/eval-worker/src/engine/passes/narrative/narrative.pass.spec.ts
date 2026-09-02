@@ -96,6 +96,7 @@ describe('narrative pass', () => {
         label: 'Narrative & alignment',
         score: 58,
         subScores: CANNED.subScores,
+        factors: null,
         summary: CANNED.summary,
         model: 'test-model',
       },

@@ -117,6 +117,7 @@ export function createNarrativePass(): EvalPass {
           label: NARRATIVE_AXIS_LABEL,
           score: critique.score,
           subScores: critique.subScores,
+          factors: null,
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },

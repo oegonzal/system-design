@@ -14,6 +14,7 @@ import { EXPECTATIONS_PASS_ID } from '../passes/expectations/expectations.pass';
 import { NARRATIVE_PASS_ID } from '../passes/narrative/narrative.pass';
 import { RULES_PASS_ID } from '../passes/rules/rules.pass';
 import { SCENARIOS_PASS_ID } from '../passes/scenarios/scenarios.pass';
+import { WORKABILITY_PASS_ID } from '../passes/workability/workability.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
@@ -37,6 +38,7 @@ export const DEFAULT_PROFILE: EvalProfile = {
     { pass: CRITIC_PASS_ID, enabled: true },
     { pass: DEPTH_PASS_ID, enabled: true },
     { pass: NARRATIVE_PASS_ID, enabled: true },
+    { pass: WORKABILITY_PASS_ID, enabled: true },
     { pass: SCENARIOS_PASS_ID, enabled: true },
   ],
   scoring: {
@@ -142,6 +144,29 @@ export const DEFAULT_PROFILE: EvalProfile = {
         ruleId: 'reliability.scheduler-single-point',
         whenExpectationUnmet: 'exp.dag.scheduler-ha',
       },
+      // Product pack: when the whole event story is unmet, its per-event
+      // rules would grade the same wiring again — one lesson, one finding.
+      { ruleId: 'product.event-no-producer', whenExpectationUnmet: 'exp.prd.events-flowing' },
+      { ruleId: 'product.event-no-consumer', whenExpectationUnmet: 'exp.prd.events-flowing' },
+      { ruleId: 'product.emits-not-published', whenExpectationUnmet: 'exp.prd.events-flowing' },
+      // The spec-aware event lesson outranks the generic channel one.
+      {
+        ruleId: 'messaging.event-published-nowhere',
+        whenExpectationUnmet: 'exp.prd.events-flowing',
+      },
+      { ruleId: 'product.aggregation-unfed', whenExpectationUnmet: 'exp.prd.aggregations-fed' },
+      {
+        ruleId: 'product.freshness-unachievable',
+        whenExpectationUnmet: 'exp.prd.freshness-within-budget',
+      },
+      {
+        ruleId: 'product.fulfills-kind-mismatch',
+        whenExpectationUnmet: 'exp.prd.commands-fulfilled',
+      },
+      { ruleId: 'product.fulfills-kind-mismatch', whenExpectationUnmet: 'exp.prd.queries-served' },
+      // The archetype's authorization expectation owns the front-door lesson.
+      { ruleId: 'security.no-gateway', whenExpectationUnmet: 'exp.ohi.own-orders-scoped' },
+      { ruleId: 'security.gateway-no-auth', whenExpectationUnmet: 'exp.ohi.own-orders-scoped' },
     ],
   },
 };
