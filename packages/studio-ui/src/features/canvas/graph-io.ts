@@ -1,6 +1,27 @@
-import type { CanvasEdge, CanvasGraph, CanvasNode, GraphPatch } from '@sysdesign/contracts';
+import type {
+  CanvasEdge,
+  CanvasGraph,
+  CanvasNode,
+  GraphPatch,
+  NodeOperation,
+} from '@sysdesign/contracts';
 
 import type { SdEdge, SdNode } from './types';
+
+/**
+ * Deep enough to sever store↔wire aliasing: a shallow spread would share the
+ * `emits` array both ways. Empty `emits` and blank `fulfills` are omitted —
+ * the same omit-when-empty discipline as the interface fields, and a blank
+ * `fulfills` would otherwise 400 at the API's MinLength gate.
+ */
+function cloneOperation(operation: NodeOperation): NodeOperation {
+  const { fulfills, emits, ...rest } = operation;
+  return {
+    ...rest,
+    ...(fulfills !== undefined && fulfills.length > 0 ? { fulfills } : {}),
+    ...(emits !== undefined && emits.length > 0 ? { emits: [...emits] } : {}),
+  };
+}
 
 /**
  * The only module that knows both graph shapes: the wire `CanvasGraph` and
@@ -44,7 +65,7 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
       out.responsibilities = [...node.data.responsibilities];
     }
     if (node.data.operations && node.data.operations.length > 0) {
-      out.operations = node.data.operations.map((operation) => ({ ...operation }));
+      out.operations = node.data.operations.map(cloneOperation);
     }
     return out;
   });
@@ -82,9 +103,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
       label: node.label,
       ...(node.config ? { config: { ...node.config } } : {}),
       ...(node.responsibilities ? { responsibilities: [...node.responsibilities] } : {}),
-      ...(node.operations
-        ? { operations: node.operations.map((operation) => ({ ...operation })) }
-        : {}),
+      ...(node.operations ? { operations: node.operations.map(cloneOperation) } : {}),
     },
   }));
 

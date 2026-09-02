@@ -64,6 +64,12 @@ export const ARCHETYPE_BASELINES = {
     availabilityPct: '99.5',
     dataRetention: '90 days of run logs and step outputs',
   },
+  'order-history-integration': {
+    readWriteRatio: '98:2',
+    p99LatencyMs: 300,
+    availabilityPct: '99.9',
+    dataRetention: 'full order history retained; 25 months hot and queryable',
+  },
 } as const satisfies Record<Archetype, ArchetypeBaseline>;
 
 /** intro is the experience's real scale; standard and advanced turn it up. */
@@ -222,5 +228,29 @@ export const ARCHETYPE_TEMPLATES = {
       );
     },
     deriveScaleTargets: deriveFrom(ARCHETYPE_BASELINES['dag-orchestration']),
+  },
+  'order-history-integration': {
+    titleVariants: [
+      'Design an Order History Integration Service',
+      'Unify Online and In-Store Orders Behind One History',
+      'Power My Account Order History From Two Sources',
+      'Two Systems of Record, One Customer Order List',
+    ],
+    scenario: ({ facts, difficulty, targets, rng }) => {
+      const angle = pick(rng, [
+        'Shoppers check their phones on the way out of the store and expect the sale they just made to be there.',
+        'Holiday promotions spike both channels at once, and ingest competes with browsing on the same afternoon.',
+        'Support wants "where is my order" tickets deflected to the history page, which only works if the page is trusted.',
+        'The one-off sync script this replaces silently dropped a week of in-store orders; nobody noticed until returns season.',
+      ]);
+      return (
+        `You are designing the service behind My Account > Order History for a retail brand ` +
+        `whose storefront is hosted on Shopify: online orders live in Shopify (a GraphQL API ` +
+        `plus order webhooks), in-store orders live in a Retail POS that only answers REST ` +
+        `calls, and your new service must merge both into one per-customer history. ${angle} ` +
+        `${targetsClause(targets)} ${CHARGE_BY_DIFFICULTY[difficulty]}${fieldNotes(facts)}`
+      );
+    },
+    deriveScaleTargets: deriveFrom(ARCHETYPE_BASELINES['order-history-integration']),
   },
 } as const satisfies Record<Archetype, ArchetypeTemplate>;

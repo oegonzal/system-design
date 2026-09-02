@@ -5,11 +5,13 @@ import type {
   PromptDifficulty,
   ScaleFacts,
   ScaleTargets,
+  WorkflowSpec,
 } from '@sysdesign/contracts';
 
 import { ARCHETYPE_TEMPLATES } from './archetype-templates';
 import { REQUIREMENT_BANKS, type RequirementBank } from './requirement-banks';
 import { mulberry32, pick, pickN } from './rng';
+import { WORKFLOW_SPECS } from './workflow-specs';
 
 /**
  * Bump when template or bank changes would alter output for an existing seed —
@@ -17,7 +19,7 @@ import { mulberry32, pick, pickN } from './rng';
  * honest audit records rather than claiming to be reproducible when they are
  * no longer.
  */
-export const GENERATOR_VERSION = '2.2.0'; // 2.2.0: requirements carry machine-readable capabilities
+export const GENERATOR_VERSION = '2.3.0'; // 2.3.0: order-history archetype; prompts may carry a workflowSpec
 
 /** The slice of an experience the generator reads. Structural, so an
  * `ExperienceProfile` entity can be passed directly. */
@@ -44,6 +46,11 @@ export interface GeneratedPrompt {
   functionalCapabilities: FunctionalCapability[];
   nonFunctionalRequirements: NfrItem[];
   scaleTargets: ScaleTargets;
+  /**
+   * The business layer, a pure function of (archetype, difficulty) — never
+   * drawn from the RNG, so attaching it costs existing seeds nothing.
+   */
+  workflowSpec: WorkflowSpec | null;
 }
 
 /**
@@ -80,13 +87,16 @@ export function generatePrompt({
     ...new Set(drawn.flatMap((requirement) => requirement.capabilities)),
   ].sort();
 
+  const workflowSpec = WORKFLOW_SPECS[experience.archetype](difficulty);
+
   return {
     title,
     scenario,
     functionalRequirements: drawn.map((requirement) => requirement.text),
     functionalCapabilities,
-    nonFunctionalRequirements: pickNfrs(rng, bank, difficulty),
+    nonFunctionalRequirements: pickNfrs(rng, bank, difficulty, workflowSpec),
     scaleTargets,
+    workflowSpec,
   };
 }
 
@@ -104,6 +114,7 @@ function pickNfrs(
   rng: () => number,
   bank: RequirementBank,
   difficulty: PromptDifficulty,
+  workflowSpec: WorkflowSpec | null,
 ): NfrItem[] {
   const latencyPool = bank.nfrs.filter((n) => n.kind === 'latency');
   const availabilityPool = bank.nfrs.filter((n) => n.kind === 'availability');
@@ -115,6 +126,16 @@ function pickNfrs(
     guaranteed.push(pick(rng, bank.advancedTwists));
   }
 
+  // Every NFR a workflow ingest quotes a budget from must be on the prompt —
+  // DERIVED from the spec, not a second bank field that could drift. Appends
+  // consume no rng, so archetypes without a spec draw byte-identically.
+  for (const ingest of workflowSpec?.ingests ?? []) {
+    const linked = bank.nfrs.find((n) => n.id === ingest.nfrId);
+    if (!linked)
+      throw new Error(`ingest '${ingest.id}' names NFR '${ingest.nfrId}' not in its bank`);
+    guaranteed.push(linked);
+  }
+
   const chosen: NfrItem[] = [];
   const chosenIds = new Set<string>();
   for (const nfr of guaranteed) {
@@ -124,10 +145,12 @@ function pickNfrs(
     }
   }
 
-  // 4..6, floored to one past the guaranteed set so fills always vary the mix.
-  const targetCount = Math.max(4 + Math.floor(rng() * 3), chosen.length + 1);
+  // 4..6, floored to one past the guaranteed set so fills always vary the
+  // mix — capped at 6 so a large guaranteed set (signature + two freshness
+  // budgets + a twist) cannot push the count past the stated bound.
+  const targetCount = Math.min(6, Math.max(4 + Math.floor(rng() * 3), chosen.length + 1));
   const remaining = bank.nfrs.filter((n) => !chosenIds.has(n.id));
-  chosen.push(...pickN(rng, remaining, targetCount - chosen.length));
+  chosen.push(...pickN(rng, remaining, Math.max(0, targetCount - chosen.length)));
 
   // Fresh objects so a caller mutating its prompt can never corrupt the bank.
   return chosen.map((n) => ({ ...n }));

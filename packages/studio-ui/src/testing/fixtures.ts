@@ -166,6 +166,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
       availabilityPct: '99.95',
       dataRetention: '7 years',
     },
+    workflowSpec: null,
     difficulty: 'standard',
     status: 'active',
     seed: 42,

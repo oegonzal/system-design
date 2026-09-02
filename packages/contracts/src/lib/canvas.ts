@@ -324,6 +324,19 @@ export interface NodeOperation {
   kind: OperationKind;
   idempotent?: boolean;
   notes?: string;
+  /**
+   * Id of the prompt workflow-spec item this operation realizes (see
+   * `workflow-spec.ts`). A reference, never a name to match: the evaluation
+   * corroborates the claim structurally, and an id the prompt never declared
+   * is rejected at submit. Absent on prompts without a workflow spec.
+   */
+  fulfills?: string;
+  /**
+   * Workflow-spec event ids this operation publishes when it runs. Only
+   * meaningful on command-kind operations of api-role nodes — the producer
+   * half of a domain event's producer→consumer story.
+   */
+  emits?: string[];
 }
 
 export interface CanvasNode {

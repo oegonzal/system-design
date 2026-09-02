@@ -8,9 +8,11 @@ import type { GeneratedPrompt, GeneratorExperience } from './prompt-generator';
  *
  * Scope is deliberately narrow: the model may rewrite the scenario *prose*
  * and append at most two extra functional requirements. It never touches
- * scale targets or NFRs — those are scoring inputs the eval engine reads, and
- * they stay byte-deterministic. On any failure (no key, refusal, schema
- * miss) the generated prompt stands unchanged with `llmEnriched: false`.
+ * scale targets, NFRs or the workflow spec — those are scoring inputs the
+ * eval engine reads, and they stay byte-deterministic. On any failure (no
+ * key, refusal, schema miss) the generated prompt stands unchanged with
+ * `llmEnriched: false`. `EnrichedFields` has no workflowSpec key, so the
+ * polish is structurally unable to reshape the graded surface.
  */
 const enrichmentSchema = z.object({
   scenario: z

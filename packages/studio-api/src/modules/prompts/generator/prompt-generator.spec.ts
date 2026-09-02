@@ -113,6 +113,34 @@ describe('generatePrompt', () => {
     }
   });
 
+  it('attaches the workflow spec as a pure function of archetype and difficulty — never the seed', () => {
+    for (const archetype of ARCHETYPES) {
+      const experience = experienceFor(archetype);
+      for (const difficulty of PROMPT_DIFFICULTIES) {
+        const a = generatePrompt({ experience, difficulty, seed: 5 });
+        const b = generatePrompt({ experience, difficulty, seed: 91 });
+        // Same spec regardless of seed; null everywhere the archetype declares none.
+        expect(b.workflowSpec).toEqual(a.workflowSpec);
+        if (archetype !== 'order-history-integration') {
+          expect(a.workflowSpec).toBeNull();
+        }
+      }
+    }
+  });
+
+  it('guarantees every NFR a workflow ingest quotes — a spec can never cite a budget the prompt omits', () => {
+    const experience = experienceFor('order-history-integration');
+    for (const difficulty of PROMPT_DIFFICULTIES) {
+      for (let seed = 0; seed < 20; seed++) {
+        const prompt = generatePrompt({ experience, difficulty, seed });
+        const ids = new Set(prompt.nonFunctionalRequirements.map((n) => n.id));
+        for (const ingest of prompt.workflowSpec?.ingests ?? []) {
+          expect(ids.has(ingest.nfrId), `${ingest.id} budget ${ingest.nfrId} not drawn`).toBe(true);
+        }
+      }
+    }
+  });
+
   it('multiplies scale targets by the difficulty multiplier', () => {
     const experience = experienceFor('realtime-analytics', {
       scaleFacts: { concurrentUsers: 100, requestsPerSecond: 10 },

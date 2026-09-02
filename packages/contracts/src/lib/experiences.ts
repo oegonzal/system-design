@@ -11,6 +11,7 @@ export const ARCHETYPES = [
   'workflow-automation',
   'realtime-analytics',
   'dag-orchestration',
+  'order-history-integration',
 ] as const;
 export type Archetype = (typeof ARCHETYPES)[number];
 

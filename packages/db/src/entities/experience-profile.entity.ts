@@ -19,6 +19,7 @@ const ARCHETYPES = [
   'workflow-automation',
   'realtime-analytics',
   'dag-orchestration',
+  'order-history-integration',
 ] as const satisfies ContractArchetypes;
 
 @Entity()

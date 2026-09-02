@@ -29,6 +29,11 @@ export const MAX_SERIALIZED_NOTE_LENGTH = 60;
 function renderOperation(operation: NodeOperation): string {
   const idempotency =
     typeof operation.idempotent === 'boolean' ? (operation.idempotent ? ' idem' : ' non-idem') : '';
+  const fulfills = operation.fulfills !== undefined ? ` fulfills=${operation.fulfills}` : '';
+  const emits =
+    operation.emits !== undefined && operation.emits.length > 0
+      ? ` emits=[${operation.emits.join(',')}]`
+      : '';
   const notes =
     operation.notes !== undefined && operation.notes.length > 0
       ? ` (${
@@ -37,7 +42,7 @@ function renderOperation(operation: NodeOperation): string {
             : operation.notes
         })`
       : '';
-  return `${operation.kind} ${operation.name}${idempotency}${notes}`;
+  return `${operation.kind} ${operation.name}${idempotency}${fulfills}${emits}${notes}`;
 }
 
 export function renderNodeLine(node: CanvasGraph['nodes'][number]): string {

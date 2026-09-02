@@ -101,5 +101,33 @@
       "Compiled goals into DAGs with LLM critics/evals and strict JSON schemas",
       "Built retry-safe orchestration with beam search over candidate plans"
     ]
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000006",
+    "slug": "retail-order-history",
+    "companyLabel": "Retail commerce brand",
+    "title": "Unified online + in-store order history on a hosted storefront",
+    "summary": "Designed the order-history integration for a retail brand whose storefront runs on Shopify: webhook-driven ingestion of online orders, scheduled REST import of in-store POS sales, a normalized per-customer read model, and a My Account page that only ever shows a signed-in customer their own orders.",
+    "archetype": "order-history-integration",
+    "techStack": [
+      "Node.js",
+      "TypeScript",
+      "PostgreSQL",
+      "Shopify GraphQL",
+      "Webhooks",
+      "REST",
+      "Redis"
+    ],
+    "scaleFacts": {
+      "concurrentUsers": 2000,
+      "requestsPerSecond": 150,
+      "dailyEvents": 50000,
+      "notes": "A mid-size retail brand: tens of thousands of orders a day across web and stores, with holiday peaks concentrating ingest and browsing on the same afternoons."
+    },
+    "highlights": [
+      "Merged storefront webhook orders and scheduled POS imports into one per-customer read model",
+      "Held online freshness under a minute and in-store under five across two ingest paths",
+      "Scoped every order query to the authenticated customer; guests saw nothing"
+    ]
   }
 ]

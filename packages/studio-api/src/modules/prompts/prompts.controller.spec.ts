@@ -41,7 +41,7 @@ describe('prompts', () => {
       expect(body.data.difficulty).toBe('standard'); // the default
       expect(body.data.status).toBe('active');
       expect(body.data.llmEnriched).toBe(false);
-      expect(body.data.generatorVersion).toBe('2.2.0');
+      expect(body.data.generatorVersion).toBe('2.3.0');
       expect(body.data.seed).toBeGreaterThanOrEqual(0);
 
       // Persisted: fetchable through the read endpoint with identical content.

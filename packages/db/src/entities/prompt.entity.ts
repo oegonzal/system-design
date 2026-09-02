@@ -66,6 +66,14 @@ export class Prompt {
   @Property({ type: 'json' })
   scaleTargets!: Contracts.ScaleTargets;
 
+  /**
+   * The business layer, when the archetype declares one. Nullable and never
+   * backfilled: absence is exactly what keeps the product dimension out of
+   * pre-existing prompts' rubrics.
+   */
+  @Property({ type: 'json', nullable: true })
+  workflowSpec: Contracts.WorkflowSpec | null = null;
+
   @Property({ type: 'text' })
   difficulty!: Contracts.PromptDifficulty;
 

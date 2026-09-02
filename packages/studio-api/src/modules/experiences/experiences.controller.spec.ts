@@ -21,12 +21,12 @@ describe('experiences', () => {
   });
 
   describe('GET /api/experiences', () => {
-    it('lists all 5 seeded experiences with meta', async () => {
+    it('lists all 6 seeded experiences with meta', async () => {
       const { status, body } = await call<ListExperiencesResponse>(`${h.url}/experiences`);
 
       expect(status).toBe(200);
-      expect(body.data).toHaveLength(5);
-      expect(body.meta.total).toBe(5);
+      expect(body.data).toHaveLength(6);
+      expect(body.meta.total).toBe(6);
       expect(body.data[0]?.id).toBe(TICKETING_ID);
       expect(body.data.map((e) => e.archetype)).toEqual([
         'flash-sale-ticketing',
@@ -34,6 +34,7 @@ describe('experiences', () => {
         'workflow-automation',
         'realtime-analytics',
         'dag-orchestration',
+        'order-history-integration',
       ]);
       expect(body.data[0]?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO, not a Date
     });

@@ -99,10 +99,12 @@ export class PromptsService {
         scenario: enriched.scenario,
         functionalRequirements: enriched.functionalRequirements,
         // From the generator, never from enriched prose: LLM polish must not be
-        // able to switch an eval rule on or off.
+        // able to switch an eval rule on or off — nor add or reshape the
+        // workflow spec the product dimension grades.
         functionalCapabilities: generated.functionalCapabilities,
         nonFunctionalRequirements: generated.nonFunctionalRequirements,
         scaleTargets: generated.scaleTargets,
+        workflowSpec: generated.workflowSpec,
         difficulty,
         seed,
         generatorVersion: GENERATOR_VERSION,

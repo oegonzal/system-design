@@ -1,6 +1,9 @@
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { Archetype } from './experiences';
 import type { IsoDateString, Uuid } from './primitives';
+// Type-only on purpose: workflow-spec.ts imports PROMPT_DIFFICULTIES from
+// this module at runtime, so a value import here would be a cycle.
+import type { WorkflowSpec } from './workflow-spec';
 
 export const PROMPT_DIFFICULTIES = ['intro', 'standard', 'advanced'] as const;
 export type PromptDifficulty = (typeof PROMPT_DIFFICULTIES)[number];
@@ -99,6 +102,13 @@ export interface PromptDto {
   functionalCapabilities: FunctionalCapability[];
   nonFunctionalRequirements: NfrItem[];
   scaleTargets: ScaleTargets;
+  /**
+   * The machine-readable business layer — contracts, events, ingests,
+   * lifecycles (see `workflow-spec.ts`). Null on prompts whose archetype
+   * declares none; its absence is what keeps the `product` dimension out of
+   * their rubric.
+   */
+  workflowSpec: WorkflowSpec | null;
   difficulty: PromptDifficulty;
   status: PromptStatus;
   /** Generator input. Same experience + difficulty + seed → identical prompt. */

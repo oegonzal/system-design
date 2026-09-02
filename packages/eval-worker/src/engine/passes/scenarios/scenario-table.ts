@@ -124,6 +124,25 @@ const TIERS: Record<Archetype, Record<PromptDifficulty, ScenarioDef[]>> = {
       },
     ],
   },
+  'order-history-integration': {
+    intro: [
+      {
+        id: 'webhook-replay',
+        title: 'The storefront redelivers an hour of webhooks',
+        description:
+          'An incident recovery replays every order webhook from the last hour — duplicated, out of order, some for orders the POS import already landed.',
+      },
+    ],
+    standard: [
+      {
+        id: 'pos-brownout',
+        title: 'The POS API browns out',
+        description:
+          'The Retail POS REST API times out on 70% of calls for 40 minutes, then recovers to face a full store-day backlog while shoppers keep checking their history.',
+      },
+    ],
+    advanced: [REGION_LOSS],
+  },
 };
 
 const ORDER: PromptDifficulty[] = ['intro', 'standard', 'advanced'];

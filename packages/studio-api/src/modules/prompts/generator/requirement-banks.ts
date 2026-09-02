@@ -659,4 +659,152 @@ export const REQUIREMENT_BANKS = {
       },
     ],
   },
+  'order-history-integration': {
+    functional: [
+      {
+        text: "The My Account section shows a customer's order history as one merged, paginated list",
+        capabilities: [],
+      },
+      {
+        text: 'Online orders placed on the storefront appear in the history without manual steps',
+        capabilities: [],
+      },
+      {
+        text: 'In-store POS orders are imported on a schedule and appear beside online orders',
+        capabilities: ['scheduled-work'],
+      },
+      {
+        text: 'Each entry shows channel, status, items and totals, normalized across both sources',
+        capabilities: [],
+      },
+      {
+        text: 'A refund or cancellation updates how that order is displayed in the history',
+        capabilities: [],
+      },
+      {
+        text: 'A logged-in customer sees only their own orders; guests are refused',
+        capabilities: [],
+      },
+      {
+        text: 'Support can trigger a re-sync of one customer’s orders when a source disagrees',
+        capabilities: [],
+      },
+      {
+        text: "A spend summary tile totals a customer's purchases across both channels",
+        capabilities: ['analytics'],
+      },
+    ],
+    signatureNfrId: 'ohi-sec-own-orders',
+    nfrs: [
+      {
+        id: 'ohi-lat-history-read',
+        kind: 'latency',
+        statement: 'The order history page stays fast while both ingests run',
+        target: `p99 ≤ ${B['order-history-integration'].p99LatencyMs}ms`,
+        targetSpec: {
+          metric: 'p99_latency_ms',
+          op: '<=',
+          value: B['order-history-integration'].p99LatencyMs,
+          unit: 'ms',
+        },
+      },
+      {
+        id: 'ohi-lat-order-detail',
+        kind: 'latency',
+        statement: 'Opening one order’s detail stays fast even for customers with years of history',
+        target: `p99 ≤ ${B['order-history-integration'].p99LatencyMs + 100}ms`,
+        targetSpec: {
+          metric: 'p99_latency_ms',
+          op: '<=',
+          value: B['order-history-integration'].p99LatencyMs + 100,
+          unit: 'ms',
+        },
+      },
+      // Freshness is a staleness bound, not request latency — kind
+      // `consistency`, metric `freshness_seconds` (engine/targets.ts reads
+      // it), and deliberately first-of-kind so citations link here.
+      {
+        id: 'ohi-fresh-online',
+        kind: 'consistency',
+        statement:
+          'An online order is visible in the customer’s history within a minute of the storefront confirming it',
+        target: 'visible ≤ 60s after purchase',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
+      },
+      {
+        id: 'ohi-fresh-offline',
+        kind: 'consistency',
+        statement: 'An in-store POS sale is visible within five minutes of ringing up',
+        target: 'visible ≤ 300s after sale',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 300, unit: 's' },
+      },
+      {
+        id: 'ohi-avail-history',
+        kind: 'availability',
+        statement: 'The history read path holds through business hours and promos',
+        target: `≥ ${B['order-history-integration'].availabilityPct}%`,
+        targetSpec: {
+          metric: 'availability_pct',
+          op: '>=',
+          value: Number(B['order-history-integration'].availabilityPct),
+          unit: '%',
+        },
+      },
+      {
+        id: 'ohi-avail-ingest-isolation',
+        kind: 'availability',
+        statement:
+          'History stays readable while either source integration is down — stale beats down',
+        target: 'read path independent of both source systems',
+      },
+      {
+        id: 'ohi-sec-own-orders',
+        kind: 'security',
+        statement: 'A logged-in customer can read only their own orders, and a guest can read none',
+        target: 'authorization enforced before any order row is returned',
+        targetSpec: { metric: 'cross_customer_reads', op: '=', value: 0, unit: 'orders' },
+      },
+      {
+        id: 'ohi-con-no-dupes',
+        kind: 'consistency',
+        statement:
+          'An order reported by both sources appears exactly once, keyed by its source order id',
+        target: 'zero duplicate rows in a customer’s history',
+        targetSpec: { metric: 'duplicate_orders', op: '=', value: 0, unit: 'orders' },
+      },
+      {
+        id: 'ohi-dur-ingested',
+        kind: 'durability',
+        statement:
+          'An acknowledged webhook or completed import batch is never lost, whatever crashes next',
+      },
+      {
+        id: 'ohi-obs-lag',
+        kind: 'observability',
+        statement:
+          'Per-source ingest lag and webhook failure rates are visible before a customer notices',
+      },
+    ],
+    advancedTwists: [
+      {
+        id: 'ohi-avail-multi-region',
+        kind: 'availability',
+        statement: 'A region outage must not lose ingested orders or take the history page down',
+        target: 'failover with RTO ≤ 15 min',
+        targetSpec: { metric: 'rto_minutes', op: '<=', value: 15, unit: 'min' },
+      },
+      {
+        id: 'ohi-con-replay',
+        kind: 'consistency',
+        statement:
+          'A source replay redelivers every order; the history must neither duplicate nor regress',
+      },
+      {
+        id: 'ohi-cost-import',
+        kind: 'cost',
+        statement: 'POS import work is proportional to new orders, not catalog size',
+        target: 'incremental import, not full-table scans',
+      },
+    ],
+  },
 } as const satisfies Record<Archetype, RequirementBank>;
