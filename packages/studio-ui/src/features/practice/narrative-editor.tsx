@@ -1,56 +1,187 @@
 'use client';
 
-import { NARRATIVE_MAX_LENGTH } from '@sysdesign/contracts';
-import { Stack, Text } from '@sysdesign/design-system';
+import { ANNOTATION_KINDS, type CanvasGraph, type PromptDto } from '@sysdesign/contracts';
+import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
+import { useMemo } from 'react';
 
 import { TextAreaField } from '../../components/fields';
+import { accountedNodeIds, reconcileBrief } from '../canvas/brief-draft';
 import { useCanvasStore } from '../canvas/canvas-store-context';
+import { toCanvasGraph } from '../canvas/graph-io';
+import { narrationSlotState, type NarrationSlotState } from '../canvas/narration-draft';
 
-/** Whitespace-split; good enough for a length hint, and it grades nothing. */
-function countWords(text: string): number {
-  return text.split(/\s+/).filter(Boolean).length;
+const CHIP: Record<NarrationSlotState, { tone: 'neutral' | 'medium' | 'success'; label: string }> =
+  {
+    empty: { tone: 'neutral', label: 'Not written' },
+    // The engine's distinction, said in the editor: present prose that does not
+    // yet read as an explanation earns nothing until it does.
+    thin: { tone: 'medium', label: 'Too thin to count' },
+    explained: { tone: 'success', label: 'Explained' },
+  };
+
+/** The live verdict the grade will use, shown as the author writes. */
+function SlotChip({ prose }: { prose: string }) {
+  const chip = CHIP[narrationSlotState(prose)];
+  return (
+    <Badge
+      tone={chip.tone}
+      data-testid="narrative-slot-state"
+      data-state={narrationSlotState(prose)}
+    >
+      {chip.label}
+    </Badge>
+  );
+}
+
+export interface NarrativeEditorProps {
+  prompt: PromptDto;
 }
 
 /**
- * The walkthrough: prose for a human reader and for the LLM critic.
+ * The walkthrough — the half of explaining a design an interviewer actually
+ * listens to, and now graded like the brief beside it.
  *
- * It is deliberately NOT scored. The deterministic grade used to come from
- * substring probes over this box — does each node label appear, does a lexicon
- * term for each requirement appear — which measured the text rather than the
- * design, and which a pasted keyword list satisfied perfectly. The graded
- * explanation is now the design brief, where every claim is a reference the
- * engine checks against the canvas.
+ * It is authored as reference-anchored slots, not one free-text box: an
+ * overview, a rationale per component, a narration per requirement. That is what
+ * makes it gradeable without the substring heuristics the old free-text
+ * narrative was deleted for — "explains this component" is a reference check
+ * over `explainedNodeIds`, and "reads as an explanation" a shape check
+ * (`readsAsProse`), neither of which a pasted keyword list can fake.
  *
- * The caption says as much, because an editor that implies a box is graded
- * when it is not is its own kind of dishonesty.
+ * Every slot shows the same verdict the grade will read, so the author learns
+ * what a thin rationale earns while they write it rather than after they submit.
  */
-export function NarrativeEditor() {
-  const narrative = useCanvasStore((state) => state.narrative);
-  const setNarrative = useCanvasStore((state) => state.setNarrative);
-  const words = countWords(narrative);
+export function NarrativeEditor({ prompt }: NarrativeEditorProps) {
+  const nodes = useCanvasStore((state) => state.nodes);
+  const edges = useCanvasStore((state) => state.edges);
+  const overview = useCanvasStore((state) => state.narrativeOverview);
+  const rationales = useCanvasStore((state) => state.componentRationales);
+  const flowNarrations = useCanvasStore((state) => state.flowNarrations);
+  const bindings = useCanvasStore((state) => state.briefBindings);
+  const briefFlows = useCanvasStore((state) => state.briefFlows);
+  const setOverview = useCanvasStore((state) => state.setNarrativeOverview);
+  const setRationale = useCanvasStore((state) => state.setComponentRationale);
+  const setFlow = useCanvasStore((state) => state.setFlowNarration);
+
+  const graph: CanvasGraph = useMemo(() => toCanvasGraph(nodes, edges), [nodes, edges]);
+  const proseByNode = useMemo(
+    () => new Map(rationales.map((rationale) => [rationale.nodeId, rationale.prose])),
+    [rationales],
+  );
+  const proseByRequirement = useMemo(
+    () => new Map(flowNarrations.map((flow) => [flow.requirementIndex, flow.prose])),
+    [flowNarrations],
+  );
+
+  // Annotations narrate nothing — a request never routes through monitoring —
+  // so they get no slot, exactly as the brief exempts them from being accounted.
+  const componentNodes = useMemo(
+    () => graph.nodes.filter((node) => !ANNOTATION_KINDS.includes(node.kind)),
+    [graph],
+  );
+
+  // The gap the grade measures: `exp.nar.components-explained` credits the
+  // brief-accounted nodes that also read as explained, so the nudge names the
+  // accounted ones still missing a substantive rationale.
+  const unexplained = useMemo(() => {
+    const accounted = accountedNodeIds(reconcileBrief(bindings, briefFlows, graph), graph);
+    return componentNodes.filter(
+      (node) =>
+        accounted.has(node.id) &&
+        narrationSlotState(proseByNode.get(node.id) ?? '') !== 'explained',
+    );
+  }, [bindings, briefFlows, graph, componentNodes, proseByNode]);
 
   return (
-    <Stack gap={3}>
+    <Stack gap={5}>
       <Text size="sm" tone="muted">
-        Walk a reader through the design in your own words — what each component is for, how a
-        request travels, and which requirement each mechanism serves.
+        Walk a reader through the design — the big picture, why each component is there, and how
+        each requirement&apos;s request travels. This is graded: a substantive, aligned walkthrough
+        earns the explanation score and is required for a top grade.
       </Text>
-      <TextAreaField
-        label="Walkthrough"
-        data-testid="narrative-editor"
-        rows={10}
-        maxLength={NARRATIVE_MAX_LENGTH}
-        value={narrative}
-        onChange={(event) => setNarrative(event.target.value)}
-        placeholder="e.g. The API Gateway authenticates every request, then…"
-      />
-      <Text size="sm" tone="muted" data-testid="narrative-word-count">
-        {words} {words === 1 ? 'word' : 'words'}
-      </Text>
-      <Text size="sm" tone="muted" data-testid="narrative-advisory">
-        Not scored by the engine — the critic reads it and comments. The graded explanation is the
-        design brief.
-      </Text>
+
+      <Stack gap={2}>
+        <Heading level={3}>Overview</Heading>
+        <TextAreaField
+          label="The big picture — why this shape"
+          data-testid="narrative-overview"
+          rows={4}
+          value={overview}
+          onChange={(event) => setOverview(event.target.value)}
+          placeholder="e.g. Reads and writes are split so a spike in order lookups never…"
+        />
+        <SlotChip prose={overview} />
+      </Stack>
+
+      <Stack gap={3}>
+        <Heading level={3}>Why each component is here</Heading>
+        {componentNodes.length === 0 ? (
+          <Text size="sm" tone="muted">
+            Add components to the diagram, then explain what each one is for.
+          </Text>
+        ) : (
+          componentNodes.map((node) => {
+            const prose = proseByNode.get(node.id) ?? '';
+            return (
+              <Stack key={node.id} gap={2}>
+                <Stack direction="row" gap={2} align="center" wrap>
+                  <Badge kind={node.kind}>{node.label}</Badge>
+                  <SlotChip prose={prose} />
+                </Stack>
+                <TextAreaField
+                  label={`Why ${node.label} is here`}
+                  data-testid={`narrative-rationale-${node.id}`}
+                  rows={3}
+                  value={prose}
+                  onChange={(event) => setRationale(node.id, event.target.value)}
+                  placeholder="What this component does for the design, and why it earns its place."
+                />
+              </Stack>
+            );
+          })
+        )}
+      </Stack>
+
+      <Stack gap={3}>
+        <Heading level={3}>How each requirement is served</Heading>
+        {prompt.functionalRequirements.map((requirement, index) => {
+          const prose = proseByRequirement.get(index) ?? '';
+          return (
+            <Stack key={requirement} gap={2}>
+              <Stack direction="row" gap={2} align="center" wrap>
+                <Text as="span" size="sm">
+                  {requirement}
+                </Text>
+                <SlotChip prose={prose} />
+              </Stack>
+              <TextAreaField
+                label={`Walkthrough for requirement ${index + 1}`}
+                data-testid={`narrative-flow-${index}`}
+                rows={3}
+                value={prose}
+                onChange={(event) => setFlow(index, event.target.value)}
+                placeholder="Trace the request in words — which components it touches, in order, and why."
+              />
+            </Stack>
+          );
+        })}
+      </Stack>
+
+      {unexplained.length > 0 ? (
+        <Stack gap={2} data-testid="narrative-unexplained">
+          <Text size="sm" tone="secondary">
+            {unexplained.length === 1 ? 'This component is' : 'These components are'} accounted for
+            in the brief but not yet explained
+          </Text>
+          <Stack direction="row" gap={2} wrap>
+            {unexplained.map((node) => (
+              <Badge key={node.id} kind={node.kind}>
+                {node.label}
+              </Badge>
+            ))}
+          </Stack>
+        </Stack>
+      ) : null}
     </Stack>
   );
 }

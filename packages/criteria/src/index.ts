@@ -37,7 +37,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-8',
     statement:
-      'The walkthrough editor says plainly that prose is advisory, so no author is misled about what earns the grade.',
+      'The walkthrough is authored as reference-anchored slots — an overview, a rationale per component, a narration per requirement — and each slot shows the same graded verdict the engine will read.',
   },
   {
     id: 'UX-9',

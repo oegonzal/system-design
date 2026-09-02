@@ -138,6 +138,30 @@ export function readsAsProse(text: string): boolean {
   return connective / words.length >= MIN_FUNCTION_WORD_RATIO;
 }
 
+/**
+ * Flatten the narrative to a single prose blob for the ADVISORY consumers — the
+ * LLM critic that reads the author's own words, the brief suggester. The
+ * deterministic grade never calls this; it reads {@link NarrationFacts}. Order
+ * is stable (overview, then rationales, then flows) and empty slots are
+ * dropped; returns null when nothing substantive remains.
+ */
+export function narrationToProse(narration: DesignNarrative | null): string | null {
+  if (narration === null) return null;
+  const parts: string[] = [];
+  const overview = narration.overview?.trim() ?? '';
+  if (overview.length > 0) parts.push(overview);
+  for (const rationale of narration.componentRationales) {
+    const prose = rationale.prose.trim();
+    if (prose.length > 0) parts.push(prose);
+  }
+  for (const flow of narration.flowNarrations) {
+    const prose = flow.prose.trim();
+    if (prose.length > 0) parts.push(prose);
+  }
+  const joined = parts.join('\n\n');
+  return joined.length > 0 ? joined : null;
+}
+
 /** True when the narrative carries any slot worth grading. */
 export function narrationHasClaims(narration: DesignNarrative | null): boolean {
   if (narration === null) return false;

@@ -1,5 +1,6 @@
 'use client';
 
+import { narrationToProse } from '@sysdesign/contracts';
 import { useCallback, useState } from 'react';
 
 import { api, toErrorMessage } from '../../../api/client';
@@ -43,12 +44,14 @@ export function useBriefSuggestions(sessionId: string): BriefSuggestionsState {
     void (async () => {
       try {
         // The draft as it stands, not the last revision — the design they want
-        // help with is the one on screen.
-        const { narrative } = storeApi.getState();
+        // help with is the one on screen. The structured narrative is flattened
+        // to prose here because the suggester reads the author's words, not the
+        // graded projection.
         const graph = storeApi.getState().serialize();
+        const narrative = narrationToProse(storeApi.getState().serializeNarrative());
         const result = await api.briefSuggestions(
           sessionId,
-          { graph, ...(narrative.trim() ? { narrative: narrative.trim() } : {}) },
+          { graph, ...(narrative ? { narrative } : {}) },
           { signal },
         );
         if (!request.isCurrent(id)) return;

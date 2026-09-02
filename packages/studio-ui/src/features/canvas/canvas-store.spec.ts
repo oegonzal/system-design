@@ -199,37 +199,84 @@ describe('canvas-store', () => {
     expect(store.getState().serialize()).toEqual(makeGraph());
   });
 
-  it('setNarrative stores the prose and dirties the draft', () => {
+  it('setNarrativeOverview stores the overview and dirties the draft', () => {
     const store = createCanvasStore();
 
-    store.getState().setNarrative('The Client calls the Order Service.');
+    store.getState().setNarrativeOverview('Reads and writes are split.');
 
-    expect(store.getState().narrative).toBe('The Client calls the Order Service.');
+    expect(store.getState().narrativeOverview).toBe('Reads and writes are split.');
     expect(store.getState().dirty).toBe(true);
   });
 
-  it('loadNarrative replaces the narrative without touching dirty, mapping null to empty', () => {
+  it('setComponentRationale upserts a slot by node id and clears it on empty prose', () => {
     const store = createCanvasStore();
 
-    store.getState().loadNarrative('Loaded from a revision.');
-    expect(store.getState().narrative).toBe('Loaded from a revision.');
+    store.getState().setComponentRationale('n-3', 'The Orders DB persists every order.');
+    expect(store.getState().componentRationales).toEqual([
+      { nodeId: 'n-3', prose: 'The Orders DB persists every order.' },
+    ]);
+
+    store.getState().setComponentRationale('n-3', '   ');
+    expect(store.getState().componentRationales).toEqual([]);
+  });
+
+  it('setFlowNarration upserts by ordinal, keeps them sorted, and clears on empty prose', () => {
+    const store = createCanvasStore();
+
+    store.getState().setFlowNarration(1, 'Second flow.');
+    store.getState().setFlowNarration(0, 'First flow.');
+    expect(store.getState().flowNarrations.map((flow) => flow.requirementIndex)).toEqual([0, 1]);
+
+    store.getState().setFlowNarration(0, '');
+    expect(store.getState().flowNarrations.map((flow) => flow.requirementIndex)).toEqual([1]);
+  });
+
+  it('loadNarrative replaces the draft without touching dirty, mapping null to empty', () => {
+    const store = createCanvasStore();
+
+    store.getState().loadNarrative({
+      version: 1,
+      overview: 'Loaded overview.',
+      componentRationales: [{ nodeId: 'n-3', prose: 'Loaded rationale.' }],
+      flowNarrations: [],
+    });
+    expect(store.getState().narrativeOverview).toBe('Loaded overview.');
+    expect(store.getState().componentRationales).toEqual([
+      { nodeId: 'n-3', prose: 'Loaded rationale.' },
+    ]);
     expect(store.getState().dirty).toBe(false);
 
     // …and it never cleans an already-dirty draft either.
-    store.getState().setNarrative('edited');
+    store.getState().setNarrativeOverview('edited');
     store.getState().loadNarrative(null);
-    expect(store.getState().narrative).toBe('');
+    expect(store.getState().narrativeOverview).toBe('');
+    expect(store.getState().componentRationales).toEqual([]);
     expect(store.getState().dirty).toBe(true);
   });
 
   it('setGraph leaves the narrative alone — loading a revision pairs it with loadNarrative', () => {
     const store = createCanvasStore();
-    store.getState().setNarrative('Prose that outlives a graph swap.');
+    store.getState().setNarrativeOverview('Prose that outlives a graph swap.');
 
     store.getState().setGraph(makeGraph());
 
-    expect(store.getState().narrative).toBe('Prose that outlives a graph swap.');
+    expect(store.getState().narrativeOverview).toBe('Prose that outlives a graph swap.');
     expect(store.getState().dirty).toBe(false);
+  });
+
+  it('serializeNarrative reconciles against the live graph, dropping stale slots', () => {
+    const store = createCanvasStore(makeGraph()); // n-1 → n-2 → n-3
+    const prose = 'The Orders DB persists every order and serves point reads for status lookups.';
+    store.getState().setNarrativeOverview('A read/write split keeps lookups fast under spikes.');
+    store.getState().setComponentRationale('n-3', prose);
+    store.getState().setComponentRationale('ghost', prose); // no such node
+
+    expect(store.getState().serializeNarrative()).toEqual({
+      version: 1,
+      overview: 'A read/write split keeps lookups fast under spikes.',
+      componentRationales: [{ nodeId: 'n-3', prose }],
+      flowNarrations: [],
+    });
   });
 
   /**

@@ -1,5 +1,6 @@
 import type { CanvasGraph } from './canvas';
 import type { DesignBrief } from './design-brief';
+import type { DesignNarrative } from './narration';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { EvalStatus, EvaluationDto, Grade } from './evaluations';
 import type { IsoDateString, Uuid } from './primitives';
@@ -25,10 +26,11 @@ export interface DesignRevisionDto {
   revisionNumber: number;
   graph: CanvasGraph;
   /**
-   * The walkthrough: the author's prose explanation, for a human reader and
-   * the LLM critic. Advisory — the deterministic score never reads it.
+   * The walkthrough: reference-anchored prose explaining why each component is
+   * there and how each requirement's flow travels. Graded — a substantive,
+   * aligned narrative is required for a top grade; see {@link DesignNarrative}.
    */
-  narrative: string | null;
+  narrative: DesignNarrative | null;
   /** The graded explanation: requirement bindings and traced flows. */
   brief: DesignBrief | null;
   /** Embedded so one GET answers "what did I submit and how did it do". */
@@ -41,7 +43,7 @@ export interface DesignRevisionSummaryDto {
   id: Uuid;
   revisionNumber: number;
   /** See `DesignRevisionDto.narrative`. */
-  narrative: string | null;
+  narrative: DesignNarrative | null;
   evaluationStatus: EvalStatus | null;
   overallScore: number | null;
   grade: Grade | null;
@@ -65,10 +67,11 @@ export interface SubmitRevisionRequest {
    */
   brief?: DesignBrief;
   /**
-   * Optional design narrative — the author's explanation of what each
-   * component is for and how they cooperate to meet the requirements.
+   * The design narrative — reference-anchored prose explaining what each
+   * component is for and how the requirements' flows travel. Optional to
+   * submit, but its absence is graded and caps the grade below a top mark.
    */
-  narrative?: string;
+  narrative?: DesignNarrative;
 }
 
 export interface ListSessionsQuery {

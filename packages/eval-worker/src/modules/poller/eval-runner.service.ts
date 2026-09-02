@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { DesignRevision, EvalJob, Evaluation, Finding } from '@sysdesign/db';
+import { narrationToProse } from '@sysdesign/contracts';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 
 import { findPromptRunId, GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
@@ -108,7 +109,7 @@ export class EvalRunnerService {
           scaleTargets: prompt.scaleTargets,
         },
         graph: revision.graph,
-        narrative: revision.narrative,
+        narrative: narrationToProse(revision.narrative),
         brief: revision.brief,
         facts,
         profile: ACTIVE_PROFILE,
@@ -118,7 +119,7 @@ export class EvalRunnerService {
       const { result, artifacts } = await runEvaluation({
         graph: revision.graph,
         facts,
-        narrative: revision.narrative,
+        narrative: narrationToProse(revision.narrative),
         brief: revision.brief,
         llm,
         profile: ACTIVE_PROFILE,

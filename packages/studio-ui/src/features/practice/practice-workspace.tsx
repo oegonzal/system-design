@@ -287,17 +287,17 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   }, [polling.evaluation, sessionId, viewingRevision]);
 
   const handleSubmit = useCallback(async () => {
-    const { narrative } = storeApi.getState();
     const graph = storeApi.getState().serialize();
-    // null when nothing is claimed — an empty brief would be stored as an
-    // artifact while grading exactly like silence.
+    // null when nothing is claimed — an empty brief or narrative would be
+    // stored as an artifact while grading exactly like silence.
     const brief = storeApi.getState().serializeBrief() ?? undefined;
+    const narrative = storeApi.getState().serializeNarrative() ?? undefined;
     setSubmitting(true);
     setSubmitError(null);
     try {
       const revision = await api.submitRevision(sessionId, {
         graph,
-        narrative: narrative.trim() || undefined,
+        narrative,
         brief,
       });
       setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
@@ -455,7 +455,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               )}
             </DockPanel>
             <DockPanel value="narrative">
-              <NarrativeEditor />
+              {prompt ? (
+                <NarrativeEditor prompt={prompt} />
+              ) : (
+                <Text size="sm" tone="muted">
+                  Prompt unavailable.
+                </Text>
+              )}
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel

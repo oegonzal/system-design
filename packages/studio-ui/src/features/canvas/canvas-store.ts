@@ -1,10 +1,13 @@
 import type {
   BriefBindingProposal,
   CanvasGraph,
+  ComponentRationale,
   DesignBrief,
+  DesignNarrative,
   EdgeIntent,
   EdgeKind,
   FlowBinding,
+  FlowNarration,
   GraphPatch,
   MechanismClaim,
   NfrBinding,
@@ -26,6 +29,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import { flowIdFor, reconcileBrief } from './brief-draft';
 import { applySuggestionPatch, fromCanvasGraph, toCanvasGraph, toGhostElements } from './graph-io';
+import { reconcileNarration } from './narration-draft';
 import type { SdEdge, SdNode } from './types';
 
 /** Default label when a kind is dropped from the palette. */
@@ -91,12 +95,20 @@ export interface CanvasState {
   /** Unsaved-draft flag: set by edits, cleared by setGraph/markClean. */
   dirty: boolean;
   /**
-   * The design-narrative draft submitted alongside the graph. Deliberately
-   * orthogonal to the graph: `setGraph` never touches it and `serialize`
-   * never includes it — loading a revision pairs `setGraph` with
-   * `loadNarrative`, and submitting reads both separately.
+   * The design-narrative draft submitted alongside the graph — reference-
+   * anchored prose held as three slot groups (an overview, a rationale per
+   * node id, a narration per functional-requirement ordinal), the shape
+   * `serializeNarrative` reconciles into a `DesignNarrative`.
+   *
+   * Deliberately orthogonal to the graph, exactly as the brief is: `setGraph`
+   * never touches these and `serialize` never includes them — loading a
+   * revision pairs `setGraph` with `loadNarrative`, and submitting reads both
+   * separately. Stale references (a rationale for a deleted node) are tolerated
+   * and dropped once, at `serializeNarrative`.
    */
-  narrative: string;
+  narrativeOverview: string;
+  componentRationales: ComponentRationale[];
+  flowNarrations: FlowNarration[];
   /**
    * The design brief being drafted — the GRADED half of explaining a design,
    * beside the unscored walkthrough. Orthogonal to the graph exactly as the
@@ -152,10 +164,14 @@ export interface CanvasState {
   previewPatch(patch: GraphPatch, findingId: string): void;
   clearGhost(): void;
   acceptGhost(): void;
-  /** Author edit — replaces the narrative and dirties the draft. */
-  setNarrative(text: string): void;
-  /** Revision load — replaces the narrative without touching `dirty`. */
-  loadNarrative(text: string | null): void;
+  /** Author edit — sets the big-picture overview and dirties the draft. */
+  setNarrativeOverview(text: string): void;
+  /** Author edit — sets one component's rationale; empty prose clears the slot. */
+  setComponentRationale(nodeId: string, prose: string): void;
+  /** Author edit — sets one requirement's flow narration; empty prose clears it. */
+  setFlowNarration(requirementIndex: number, prose: string): void;
+  /** Revision load — replaces the narrative draft without touching `dirty`. */
+  loadNarrative(narrative: DesignNarrative | null): void;
   /**
    * Claim a requirement is held by this mechanism. Changing the mechanism
    * drops nodes the new one cannot legally carry, so the picker and the
@@ -179,6 +195,8 @@ export interface CanvasState {
   serialize(): CanvasGraph;
   /** The brief as a payload, reconciled against the live graph, or null. */
   serializeBrief(): DesignBrief | null;
+  /** The narrative as a payload, reconciled against the live graph, or null. */
+  serializeNarrative(): DesignNarrative | null;
 }
 
 export type CanvasStore = StoreApi<CanvasState>;
@@ -224,7 +242,9 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     ...(initial ? fromCanvasGraph(initial) : { nodes: [], edges: [] }),
     selectedId: null,
     dirty: false,
-    narrative: '',
+    narrativeOverview: '',
+    componentRationales: [],
+    flowNarrations: [],
     briefBindings: [],
     briefFlows: [],
     briefProposals: [],
@@ -444,12 +464,41 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       });
     },
 
-    setNarrative(text) {
-      set({ narrative: text, dirty: true });
+    setNarrativeOverview(text) {
+      set({ narrativeOverview: text, dirty: true });
     },
 
-    loadNarrative(text) {
-      set({ narrative: text ?? '' });
+    setComponentRationale(nodeId, prose) {
+      const { componentRationales } = get();
+      const others = componentRationales.filter((rationale) => rationale.nodeId !== nodeId);
+      // Empty prose is a cleared slot, not a stored empty one — mirrors how a
+      // flow with an empty path clears rather than persists.
+      set({
+        componentRationales: prose.trim() === '' ? others : [...others, { nodeId, prose }],
+        dirty: true,
+      });
+    },
+
+    setFlowNarration(requirementIndex, prose) {
+      const { flowNarrations } = get();
+      const others = flowNarrations.filter((flow) => flow.requirementIndex !== requirementIndex);
+      set({
+        flowNarrations:
+          prose.trim() === ''
+            ? others
+            : [...others, { requirementIndex, prose }].sort(
+                (a, b) => a.requirementIndex - b.requirementIndex,
+              ),
+        dirty: true,
+      });
+    },
+
+    loadNarrative(narrative) {
+      set({
+        narrativeOverview: narrative?.overview ?? '',
+        componentRationales: narrative?.componentRationales ?? [],
+        flowNarrations: narrative?.flowNarrations ?? [],
+      });
     },
 
     setBindingMechanism(nfrId, mechanism) {
@@ -582,6 +631,16 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     serializeBrief() {
       const { nodes, edges, briefBindings, briefFlows } = get();
       return reconcileBrief(briefBindings, briefFlows, toCanvasGraph(nodes, edges));
+    },
+
+    serializeNarrative() {
+      const { nodes, edges, narrativeOverview, componentRationales, flowNarrations } = get();
+      return reconcileNarration(
+        narrativeOverview,
+        componentRationales,
+        flowNarrations,
+        toCanvasGraph(nodes, edges),
+      );
     },
   }));
 }

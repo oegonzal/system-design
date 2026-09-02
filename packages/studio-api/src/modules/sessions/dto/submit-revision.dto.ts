@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsDefined, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { NARRATIVE_MAX_LENGTH, type SubmitRevisionRequest } from '@sysdesign/contracts';
+import { IsDefined, IsOptional, ValidateNested } from 'class-validator';
+import type { SubmitRevisionRequest } from '@sysdesign/contracts';
 
 import { CanvasGraphDto } from './canvas-graph.dto';
 import { DesignBriefDto } from './design-brief.dto';
+import { DesignNarrativeDto } from './design-narrative.dto';
 
 export class SubmitRevisionRequestDto implements SubmitRevisionRequest {
   /** @IsDefined because @ValidateNested alone lets an absent graph through. */
@@ -13,9 +14,9 @@ export class SubmitRevisionRequestDto implements SubmitRevisionRequest {
   graph!: CanvasGraphDto;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(NARRATIVE_MAX_LENGTH)
-  narrative?: string;
+  @ValidateNested()
+  @Type(() => DesignNarrativeDto)
+  narrative?: DesignNarrativeDto;
 
   @IsOptional()
   @ValidateNested()

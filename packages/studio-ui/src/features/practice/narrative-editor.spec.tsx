@@ -1,15 +1,19 @@
-import { NARRATIVE_MAX_LENGTH } from '@sysdesign/contracts';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { createCanvasStore } from '../canvas/canvas-store';
 import { CanvasStoreProvider } from '../canvas/canvas-store-context';
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph, makePrompt } from '../../testing/fixtures';
 import { renderWithTheme } from '../../testing/render';
 import { NarrativeEditor } from './narrative-editor';
 
 type Seed = (store: ReturnType<typeof createCanvasStore>) => void;
+
+/** Two real sentences with ample connectives — clears the prose gate. */
+const PROSE =
+  'The Orders DB persists every order and owns the write path for order state. ' +
+  'It is the source of truth that every read is reconciled against.';
 
 function renderEditor(seed?: Seed) {
   const store = createCanvasStore();
@@ -17,41 +21,69 @@ function renderEditor(seed?: Seed) {
   seed?.(store);
   renderWithTheme(
     <CanvasStoreProvider store={store}>
-      <NarrativeEditor />
+      <NarrativeEditor prompt={makePrompt()} />
     </CanvasStoreProvider>,
   );
   return store;
 }
 
 describe('NarrativeEditor', () => {
-  it('writes the walkthrough into the store and dirties the draft', async () => {
+  it('writes the overview into the store and dirties the draft', async () => {
     const store = renderEditor();
-    await userEvent.type(screen.getByTestId('narrative-editor'), 'The Client calls the Service.');
+    await userEvent.type(screen.getByTestId('narrative-overview'), 'Reads and writes are split.');
 
-    expect(store.getState().narrative).toBe('The Client calls the Service.');
+    expect(store.getState().narrativeOverview).toBe('Reads and writes are split.');
     expect(store.getState().dirty).toBe(true);
   });
 
-  it('caps the walkthrough at the contract length', () => {
-    renderEditor();
-    expect(screen.getByTestId('narrative-editor').getAttribute('maxlength')).toBe(
-      String(NARRATIVE_MAX_LENGTH),
-    );
+  it('writes a component rationale keyed to the node id', async () => {
+    const store = renderEditor();
+    // makeGraph is n-1 client → n-2 service → n-3 database.
+    await userEvent.type(screen.getByTestId('narrative-rationale-n-3'), 'Persists every order.');
+
+    expect(store.getState().componentRationales).toEqual([
+      { nodeId: 'n-3', prose: 'Persists every order.' },
+    ]);
   });
 
-  it('counts words without grading them', () => {
-    renderEditor((store) => store.getState().loadNarrative('one two three'));
-    expect(screen.getByTestId('narrative-word-count').textContent).toContain('3 words');
+  it('writes a flow narration keyed to the requirement ordinal', async () => {
+    const store = renderEditor();
+    await userEvent.type(screen.getByTestId('narrative-flow-0'), 'The client reads availability.');
+
+    expect(store.getState().flowNarrations).toEqual([
+      { requirementIndex: 0, prose: 'The client reads availability.' },
+    ]);
+  });
+
+  it('shows the live verdict the grade will use — thin vs explained', () => {
+    renderEditor((store) => {
+      store.getState().setComponentRationale('n-3', 'too short');
+      store.getState().loadNarrative({
+        version: 1,
+        overview: PROSE,
+        componentRationales: [{ nodeId: 'n-3', prose: 'too short' }],
+        flowNarrations: [],
+      });
+    });
+
+    const overviewState = screen
+      .getAllByTestId('narrative-slot-state')
+      .map((chip) => chip.getAttribute('data-state'));
+    // The overview reads as prose; the n-3 rationale is present but thin.
+    expect(overviewState).toContain('explained');
+    expect(overviewState).toContain('thin');
   });
 
   /**
-   * The honesty requirement. Substring probes over this box used to BE the
-   * explanation grade; a reader must not be left thinking they still are.
+   * The reference-anchored, graded editor UX-8 now describes. An author reading
+   * this must understand the walkthrough earns the grade, not that it is ignored.
    */
-  it('[UX-8] says plainly that the walkthrough is advisory, not scored', () => {
+  it('[UX-8] presents the walkthrough as graded, reference-anchored slots', () => {
     renderEditor();
-    const advisory = screen.getByTestId('narrative-advisory').textContent ?? '';
-    expect(advisory).toMatch(/not scored by the engine/i);
-    expect(advisory).toMatch(/design brief/i);
+    // A slot per component and per requirement, not one free-text box.
+    expect(screen.getByTestId('narrative-rationale-n-1')).toBeTruthy();
+    expect(screen.getByTestId('narrative-rationale-n-3')).toBeTruthy();
+    expect(screen.getByTestId('narrative-flow-0')).toBeTruthy();
+    expect(screen.queryByTestId('narrative-advisory')).toBeNull();
   });
 });

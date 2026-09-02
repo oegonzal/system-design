@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  NARRATIVE_MAX_LENGTH,
+  NARRATION_PROSE_MAX_LENGTH,
   type ApiErrorResponse,
   type CanvasGraph,
   type GetPromptResponse,
@@ -16,6 +16,14 @@ import { call, createHarness, resetDesignData, type Harness } from '../../test/h
 
 const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
 const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
+
+/** A minimal structured narrative — overview only — for round-trip assertions. */
+const narrativeWith = (overview: string) => ({
+  version: 1,
+  overview,
+  componentRationales: [],
+  flowNarrations: [],
+});
 
 const validGraph = (): CanvasGraph => ({
   nodes: [
@@ -59,7 +67,7 @@ describe('sessions', () => {
   const submitRevision = async (
     sessionId: string,
     graph: unknown,
-    narrative?: string,
+    narrative?: unknown,
     brief?: unknown,
   ) =>
     call<GetRevisionResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
@@ -110,12 +118,16 @@ describe('sessions', () => {
       const prompt = await makePrompt();
       const { body: session } = await createSession(prompt.id);
 
-      const { status, body } = await submitRevision(session.data.id, validGraph(), 'first cut');
+      const { status, body } = await submitRevision(
+        session.data.id,
+        validGraph(),
+        narrativeWith('first cut'),
+      );
 
       expect(status).toBe(201);
       expect(body.data.sessionId).toBe(session.data.id);
       expect(body.data.revisionNumber).toBe(1);
-      expect(body.data.narrative).toBe('first cut');
+      expect(body.data.narrative?.overview).toBe('first cut');
       expect(body.data.graph.nodes).toHaveLength(3);
       expect(body.data.evaluation?.status).toBe('queued');
       expect(body.data.evaluation?.findings).toEqual([]);
@@ -131,21 +143,42 @@ describe('sessions', () => {
       expect(second.body.data.revisionNumber).toBe(2);
     });
 
-    it('caps the narrative at NARRATIVE_MAX_LENGTH and round-trips one under it', async () => {
+    it('rejects an oversize rationale (400), an unknown-node rationale (422), and round-trips a valid structured narrative', async () => {
       const prompt = await makePrompt();
       const { body: session } = await createSession(prompt.id);
 
-      const overCap = await submitRevision(
-        session.data.id,
-        validGraph(),
-        'x'.repeat(NARRATIVE_MAX_LENGTH + 1),
-      );
+      // Shape: a rationale past the per-slot cap is a 400 at the DTO layer.
+      const overCap = await submitRevision(session.data.id, validGraph(), {
+        version: 1,
+        componentRationales: [{ nodeId: 'db', prose: 'x'.repeat(NARRATION_PROSE_MAX_LENGTH + 1) }],
+        flowNarrations: [],
+      });
       expect(overCap.status).toBe(400);
 
-      const narrative = 'The web client calls the API, which persists to the primary DB.';
+      // Reference: a rationale for a node the graph never declared is a 422.
+      const unknownNode = await submitRevision(session.data.id, validGraph(), {
+        version: 1,
+        componentRationales: [{ nodeId: 'ghost', prose: 'This node is not on the canvas at all.' }],
+        flowNarrations: [],
+      });
+      expect(unknownNode.status).toBe(422);
+
+      const narrative = {
+        version: 1,
+        overview: 'The web client calls the API, which persists to the primary DB.',
+        componentRationales: [
+          {
+            nodeId: 'db',
+            prose: 'The primary DB persists every order and is the source of truth.',
+          },
+        ],
+        flowNarrations: [
+          { requirementIndex: 0, prose: 'The client reads availability from the API.' },
+        ],
+      };
       const { status, body } = await submitRevision(session.data.id, validGraph(), narrative);
       expect(status).toBe(201);
-      expect(body.data.narrative).toBe(narrative);
+      expect(body.data.narrative).toEqual(narrative);
     });
 
     it('round-trips a design brief, and defaults it to null when none is sent', async () => {
@@ -462,8 +495,8 @@ describe('sessions', () => {
     it('lists graph-free summaries, newest revision first', async () => {
       const prompt = await makePrompt();
       const { body: session } = await createSession(prompt.id);
-      await submitRevision(session.data.id, validGraph(), 'v1');
-      await submitRevision(session.data.id, validGraph(), 'v2');
+      await submitRevision(session.data.id, validGraph(), narrativeWith('v1'));
+      await submitRevision(session.data.id, validGraph(), narrativeWith('v2'));
 
       const { status, body } = await call<ListRevisionsResponse>(
         `${h.url}/sessions/${session.data.id}/revisions`,
@@ -473,8 +506,8 @@ describe('sessions', () => {
       expect(body.meta.total).toBe(2);
       expect(body.data.map((r) => r.revisionNumber)).toEqual([2, 1]);
       expect(body.data[0]).not.toHaveProperty('graph');
+      expect(body.data[0].narrative?.overview).toBe('v2');
       expect(body.data[0]).toMatchObject({
-        narrative: 'v2',
         evaluationStatus: 'queued',
         overallScore: null,
         grade: null,

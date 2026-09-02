@@ -32,6 +32,7 @@ import type { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
 import { EvalQueue } from './eval-queue';
 import { validateBriefReferences } from './brief-validator';
 import { validateGraphReferences } from './graph-validator';
+import { validateNarration } from './narration-validator';
 import { validateWorkflowReferences } from './workflow-validator';
 
 /** A session plus what its DTO summarises about the newest revision. */
@@ -226,6 +227,7 @@ export class SessionsService {
       ...validateGraphReferences(dto.graph),
       ...validateWorkflowReferences(dto.graph, session.prompt.workflowSpec ?? null),
       ...(dto.brief ? validateBriefReferences(dto.graph, dto.brief, session.prompt) : []),
+      ...(dto.narrative ? validateNarration(dto.graph, dto.narrative, session.prompt) : []),
     ];
     if (problems.length > 0) {
       throw new UnprocessableEntityException(problems);

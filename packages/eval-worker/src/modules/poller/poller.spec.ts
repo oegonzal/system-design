@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief, DesignNarrative } from '@sysdesign/contracts';
 import {
   DesignRevision,
   DesignSession,
@@ -58,7 +58,7 @@ describe('poller (integration)', () => {
   async function seedJob(
     graph: CanvasGraph,
     maxAttempts = 3,
-    narrative: string | null = null,
+    narrative: DesignNarrative | null = null,
     brief: DesignBrief | null = null,
   ) {
     const fork = em.fork();
@@ -206,11 +206,25 @@ describe('poller (integration)', () => {
   it('feeds the revision brief to the engine — the brief expectations grade it', async () => {
     // A brief that names a mechanism the naive canvas does not provide: the
     // claim is stored and graded, never rejected, and explanation is scored.
-    const { evaluationId } = await seedJob(naiveGraph, 3, 'Prose the engine never reads.', {
-      version: 1,
-      nfrBindings: [{ nfrId: 'fst-avail-sale-window', nodeIds: ['n-db'], mechanism: 'backups' }],
-      flows: [],
-    });
+    const { evaluationId } = await seedJob(
+      naiveGraph,
+      3,
+      {
+        version: 1,
+        componentRationales: [
+          {
+            nodeId: 'n-db',
+            prose: 'The database persists every order and backs the availability claim.',
+          },
+        ],
+        flowNarrations: [],
+      },
+      {
+        version: 1,
+        nfrBindings: [{ nfrId: 'fst-avail-sale-window', nodeIds: ['n-db'], mechanism: 'backups' }],
+        flows: [],
+      },
+    );
 
     const done = await waitFor(async () => {
       const evaluation = await em

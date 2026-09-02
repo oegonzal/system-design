@@ -40,12 +40,13 @@ export class DesignRevision {
   graph!: Contracts.CanvasGraph;
 
   /**
-   * The walkthrough — the author's prose explanation, for a human reader and
-   * the LLM critic. Advisory: the deterministic score never reads it, because
-   * nothing deterministic can judge writing without guessing at substrings.
+   * The walkthrough — reference-anchored prose (an overview, per-node
+   * rationales, per-requirement flow narrations). Graded: a typed projection of
+   * this drives the explanation dimension and caps the grade when it is missing.
+   * Null on revisions submitted before the narrative was structured.
    */
-  @Property({ type: 'text', nullable: true })
-  narrative: string | null = null;
+  @Property({ type: 'json', nullable: true })
+  narrative: Contracts.DesignNarrative | null = null;
 
   /**
    * The graded half of the explanation: requirement bindings and traced flows,
