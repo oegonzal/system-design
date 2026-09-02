@@ -61,10 +61,17 @@ deterministic engine that grades you — accepting only candidates that score
 STRICTLY higher. Every accepted iteration lands in your timeline as an
 AI-badged revision; the coach tab streams the trajectory live.
 
-The coach is LLM-required: export `ANTHROPIC_API_KEY` before `pnpm stack:up`
-(the stack sets `IMPROVER_DETERMINISTIC=0` so the coach runs live while grading
-stays deterministic — the coach only proposes; the engine decides). Without a
-key the button explains why it is disabled.
+The coach is LLM-required, with two auth routes (grading stays deterministic
+either way — the coach only proposes; the engine decides):
+
+- **Claude subscription (default):** the stack sets `IMPROVER_AUTH=claude-code`,
+  which runs coach calls through this machine's Claude Code login via the Agent
+  SDK — if `claude` is logged in, the coach just works. No key is read or stored.
+- **API key:** export `ANTHROPIC_API_KEY` before `pnpm stack:up`; an explicit
+  key outranks the subscription route.
+
+Set `IMPROVER_AUTH=off` (and no key) to disable the coach; the button then
+explains why it is disabled.
 
 ## Export a run as portable files
 

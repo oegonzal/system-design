@@ -93,7 +93,7 @@ export function ImprovementPanel({
             <Text size="sm" tone="muted" data-testid="improver-unavailable">
               {availability.reason === 'deterministic'
                 ? 'The coach is off in deterministic mode — set IMPROVER_DETERMINISTIC=0 to enable it.'
-                : 'The coach needs a live model — set ANTHROPIC_API_KEY to enable it.'}
+                : 'The coach needs a live model — set ANTHROPIC_API_KEY, or IMPROVER_AUTH=claude-code to use your Claude login.'}
             </Text>
           ) : null}
         </Stack>

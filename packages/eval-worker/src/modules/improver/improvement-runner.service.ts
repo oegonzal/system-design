@@ -284,7 +284,13 @@ export class ImprovementRunnerService {
     }
   }
 
-  /** Progress is one guarded row update — cheap enough to do every iteration. */
+  /**
+   * Progress is one guarded row update — cheap enough to do every iteration.
+   * It doubles as the heartbeat: `lockedAt` is refreshed so the reaper's
+   * stale-lock window measures silence, not total run length — a
+   * subscription-backed iteration can take minutes, and a healthy run must
+   * never be requeued mid-flight while a crashed one still reaps on time.
+   */
   private async flushProgress(
     em: EntityManager,
     runId: string,
@@ -297,6 +303,7 @@ export class ImprovementRunnerService {
       {
         iterations: trajectory,
         ...(bestRevisionId ? { bestRevision: bestRevisionId } : {}),
+        lockedAt: new Date(),
         updatedAt: new Date(),
       },
     );

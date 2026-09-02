@@ -1,4 +1,5 @@
 import { AnthropicLlmClient, DEFAULT_LLM_MODEL } from './anthropic-client';
+import { ClaudeAgentLlmClient } from './claude-agent-client';
 import type { LlmClient } from './llm-client';
 import { NoopLlmClient } from './noop-client';
 
@@ -35,8 +36,20 @@ const improverEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
   EVAL_DETERMINISTIC: env['IMPROVER_DETERMINISTIC'] ?? env['EVAL_DETERMINISTIC'],
 });
 
+/**
+ * The improver's second auth route: `IMPROVER_AUTH=claude-code` runs coach
+ * calls through the machine's Claude Code login (a Claude subscription) via
+ * the Agent SDK — no API key required, none ever read. An explicit API key
+ * still wins when both are configured, and determinism outranks everything.
+ */
 export function createImproverLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  return createLlmClientFromEnv(improverEnv(env));
+  const derived = improverEnv(env);
+  if (derived['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
+  if (derived['ANTHROPIC_API_KEY']) return createLlmClientFromEnv(derived);
+  if (derived['IMPROVER_AUTH'] === 'claude-code') {
+    return new ClaudeAgentLlmClient({ model: derived['LLM_MODEL'] || undefined });
+  }
+  return new NoopLlmClient();
 }
 
 export interface ImproverAvailability {
@@ -57,8 +70,15 @@ export function improverAvailabilityFromEnv(
   if (derived['EVAL_DETERMINISTIC'] === '1') {
     return { enabled: false, model: null, reason: 'deterministic' };
   }
-  if (!derived['ANTHROPIC_API_KEY']) {
-    return { enabled: false, model: null, reason: 'no-key' };
+  if (derived['ANTHROPIC_API_KEY']) {
+    return { enabled: true, model: derived['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
   }
-  return { enabled: true, model: derived['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
+  if (derived['IMPROVER_AUTH'] === 'claude-code') {
+    return {
+      enabled: true,
+      model: derived['LLM_MODEL'] || 'claude-code/subscription',
+      reason: null,
+    };
+  }
+  return { enabled: false, model: null, reason: 'no-key' };
 }

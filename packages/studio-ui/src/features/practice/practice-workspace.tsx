@@ -517,7 +517,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               availability !== null && !availability.enabled
                 ? availability.reason === 'deterministic'
                   ? 'The AI coach is off in deterministic mode.'
-                  : 'The AI coach needs an ANTHROPIC_API_KEY.'
+                  : 'The AI coach needs an ANTHROPIC_API_KEY or IMPROVER_AUTH=claude-code.'
                 : null
             }
           />

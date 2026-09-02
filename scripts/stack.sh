@@ -18,6 +18,10 @@ cd "$(dirname "$0")/.."
 export DB_PORT="${DB_PORT:-5433}"
 export EVAL_DETERMINISTIC="${EVAL_DETERMINISTIC:-1}"
 export IMPROVER_DETERMINISTIC="${IMPROVER_DETERMINISTIC:-0}"
+# The coach's auth: an exported ANTHROPIC_API_KEY wins; otherwise claude-code
+# runs it through this machine's Claude Code login (subscription) — set
+# IMPROVER_AUTH=off to disable.
+export IMPROVER_AUTH="${IMPROVER_AUTH:-claude-code}"
 
 wait_db() {
   echo "waiting for postgres on :${DB_PORT} ..."
