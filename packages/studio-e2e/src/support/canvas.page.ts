@@ -222,18 +222,26 @@ export class CanvasPage {
     return this.page.getByRole('tab', { name: 'Narrative' });
   }
 
-  get narrativeEditor(): Locator {
-    return this.page.getByTestId('narrative-editor');
+  narrativeOverview(): Locator {
+    return this.page.getByTestId('narrative-overview');
   }
 
-  /**
-   * Author the design narrative: open the Narrative tab and type the story
-   * into the editor. Deliberately no submit — the narrative rides along with
-   * whatever revision the spec submits next.
-   */
-  async fillNarrative(text: string): Promise<void> {
+  /** The big-picture overview slot. No submit — the narrative rides the next revision. */
+  async setOverview(text: string): Promise<void> {
     await this.narrativeTab.click();
-    await this.narrativeEditor.fill(text);
+    await this.narrativeOverview().fill(text);
+  }
+
+  /** One component's rationale, keyed to its node id. */
+  async explainComponent(nodeId: string, prose: string): Promise<void> {
+    await this.narrativeTab.click();
+    await this.page.getByTestId(`narrative-rationale-${nodeId}`).fill(prose);
+  }
+
+  /** One requirement's flow narration, keyed to its ordinal. */
+  async narrateFlow(index: number, prose: string): Promise<void> {
+    await this.narrativeTab.click();
+    await this.page.getByTestId(`narrative-flow-${index}`).fill(prose);
   }
 
   // --- the design brief --------------------------------------------------

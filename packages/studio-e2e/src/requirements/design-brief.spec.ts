@@ -9,40 +9,33 @@ import {
 /**
  * The design brief is the graded explanation: requirement bindings and traced
  * flows, each one a reference the engine checks against the canvas. The prose
- * walkthrough survives beside it, persisted and read by the LLM critic, and is
- * deliberately not scored — substring probes over it used to BE the grade.
+ * walkthrough is graded beside it — authored as reference-anchored slots and
+ * scored by reference, not by substring, which is what let the narrative be
+ * graded again after the substring regime was deleted.
  *
  * `EVAL_DETERMINISTIC=1` (set by the webServer config) pins grading to the
- * rule engine, so every verdict here is a pure function of graph + brief.
+ * rule engine, so every verdict here is a pure function of graph + brief +
+ * narrative.
  */
 test.describe('the design brief', () => {
-  test('the walkthrough is submitted with the diagram and survives a reload', async ({
+  test('the walkthrough overview is submitted with the diagram and survives a reload', async ({
     page,
     request,
   }) => {
     const canvas = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
 
-    const walkthrough =
-      'The Client calls the Service, which writes every order to the Database before acknowledging.';
-    await canvas.fillNarrative(walkthrough);
+    const overview =
+      'The Client calls the Service, which writes every order to the Database before acknowledging. ' +
+      'Reads are served from the same Service so the account page stays consistent with what was written.';
+    await canvas.setOverview(overview);
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
 
     await page.reload();
     await canvas.ready();
     await canvas.narrativeTab.click();
-    await expect(canvas.narrativeEditor).toHaveValue(walkthrough);
-  });
-
-  test('the walkthrough says plainly that it is not what earns the grade', async ({
-    page,
-    request,
-  }) => {
-    const canvas = await openPracticeSession(page, request);
-    await canvas.narrativeTab.click();
-
-    await expect(page.getByTestId('narrative-advisory')).toContainText(/not scored by the engine/i);
+    await expect(canvas.narrativeOverview()).toHaveValue(overview);
   });
 
   /**
