@@ -13,6 +13,7 @@ import {
   resolveInterfaceOwner,
   type NodeKind,
   type EdgeIntent,
+  type WorkflowSpec,
 } from '@sysdesign/contracts';
 import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
 
@@ -37,13 +38,21 @@ const Root = styled.aside`
 export interface PropertiesPanelProps {
   /** Lets a parent layout size the panel as a flex item (Emotion composition). */
   className?: string;
+  /**
+   * The session prompt's business layer, when it carries one. Prop-driven on
+   * purpose: the canvas store stays prompt-ignorant, and a null (the
+   * default) renders no workflow controls — which IS the gating for every
+   * non-workflow prompt, and what keeps the panel storyable without a
+   * network.
+   */
+  workflowSpec?: WorkflowSpec | null;
 }
 
 /**
  * Edit surface for the selected element. Reads and writes the canvas store
  * directly; the config sub-forms write the keys the eval rules read.
  */
-export function PropertiesPanel({ className }: PropertiesPanelProps) {
+export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPanelProps) {
   const selectedId = useCanvasStore((state) => state.selectedId);
   const node = useCanvasStore((state) =>
     state.selectedId === null
@@ -162,6 +171,7 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
                 operations={node.data.operations ?? []}
                 allowedKinds={capability.operationKinds}
                 onChange={(operations) => updateNode(node.id, { operations })}
+                workflow={workflowSpec ? { spec: workflowSpec, role: capability.role } : null}
               />
             </Stack>
           ) : null}

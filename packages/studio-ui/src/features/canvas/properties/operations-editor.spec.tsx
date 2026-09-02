@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { makeWorkflowSpec } from '../../../testing/fixtures';
 import { renderWithTheme } from '../../../testing/render';
 import { OperationsEditor, type OperationsEditorProps } from './operations-editor';
 
@@ -17,11 +18,13 @@ function Harness({
   allowedKinds = DEFAULT_KINDS,
   heading = 'Operations',
   onChange = noop,
+  workflow = null,
 }: {
   initial?: NodeOperation[];
   allowedKinds?: OperationsEditorProps['allowedKinds'];
   heading?: string;
   onChange?: OperationsEditorProps['onChange'];
+  workflow?: OperationsEditorProps['workflow'];
 }) {
   const [operations, setOperations] = useState(initial);
   return (
@@ -29,6 +32,7 @@ function Harness({
       operations={operations}
       allowedKinds={allowedKinds}
       heading={heading}
+      workflow={workflow}
       onChange={(next) => {
         setOperations(next);
         onChange(next);
@@ -158,5 +162,96 @@ describe('OperationsEditor', () => {
     const row = within(screen.getByTestId('operation-row-0'));
     expect((row.getByLabelText('Name') as HTMLInputElement).maxLength).toBe(60);
     expect((row.getByLabelText('Notes') as HTMLInputElement).maxLength).toBe(140);
+  });
+});
+
+describe('OperationsEditor — workflow claims', () => {
+  const spec = makeWorkflowSpec();
+  const api = { spec, role: 'api' as const };
+
+  it('[PRD-2] the Fulfills select offers only ids the spec declares for this role and the row’s kind — never free text', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithTheme(
+      <Harness
+        initial={[{ name: 'listOrders', kind: 'query' }]}
+        workflow={api}
+        onChange={onChange}
+      />,
+    );
+
+    const select = screen.getByTestId('operation-fulfills-0') as HTMLSelectElement;
+    // Query rows see query contracts + aggregations, never commands or events.
+    expect([...select.options].map((option) => option.value)).toEqual([
+      '',
+      'op-list-orders',
+      'agg-spend-summary',
+    ]);
+
+    await user.selectOptions(select, 'op-list-orders');
+    expect(onChange).toHaveBeenLastCalledWith([
+      { name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' },
+    ]);
+  });
+
+  it('renders no workflow controls at all without a spec — the default surface is untouched', () => {
+    renderWithTheme(<Harness initial={twoOps} />);
+    expect(screen.queryByTestId('operation-fulfills-0')).toBeNull();
+    expect(screen.queryByTestId('operation-emit-0-evt-order-received')).toBeNull();
+  });
+
+  it('keeps the claim on a kind flip and warns instead — silently deleting a claim is hostile', async () => {
+    const user = userEvent.setup();
+    renderWithTheme(
+      <Harness
+        initial={[{ name: 'ingest', kind: 'command', fulfills: 'op-ingest-index' }]}
+        workflow={api}
+      />,
+    );
+    expect(screen.queryByTestId('operation-workflow-warning-0')).toBeNull();
+
+    const row = within(screen.getByTestId('operation-row-0'));
+    await user.selectOptions(row.getByLabelText('Kind'), 'query');
+
+    expect(screen.getByTestId('operation-workflow-warning-0').textContent).toContain(
+      'op-ingest-index',
+    );
+  });
+
+  it('offers emissions on command rows only, capped at the contract', async () => {
+    const user = userEvent.setup();
+    renderWithTheme(
+      <Harness
+        initial={[
+          { name: 'do', kind: 'command' },
+          { name: 'read', kind: 'query' },
+        ]}
+        workflow={api}
+      />,
+    );
+
+    // Command row: one checkbox per spec event.
+    await user.click(screen.getByTestId('operation-emit-0-evt-order-received'));
+    expect(
+      (screen.getByTestId('operation-emit-0-evt-order-received') as HTMLInputElement).checked,
+    ).toBe(true);
+    // Query row: no emissions surface at all.
+    expect(screen.queryByTestId('operation-emit-1-evt-order-received')).toBeNull();
+  });
+
+  it('"Not linked" deletes the claim rather than writing an empty string', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithTheme(
+      <Harness
+        initial={[{ name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' }]}
+        workflow={api}
+        onChange={onChange}
+      />,
+    );
+
+    await user.selectOptions(screen.getByTestId('operation-fulfills-0'), '');
+    const [operations] = onChange.mock.lastCall as [NodeOperation[]];
+    expect(operations[0].fulfills).toBeUndefined();
   });
 });

@@ -9,6 +9,7 @@ import type {
   PromptDto,
   ScenarioReportDto,
   StarStoryDto,
+  WorkflowSpec,
 } from '@sysdesign/contracts';
 
 /**
@@ -174,6 +175,178 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     llmEnriched: false,
     createdAt: AT,
     updatedAt: AT,
+    ...overrides,
+  };
+}
+
+/** A compact order-history business layer for workflow-aware surfaces. */
+export function makeWorkflowSpec(overrides: Partial<WorkflowSpec> = {}): WorkflowSpec {
+  return {
+    version: 1,
+    entities: [
+      {
+        id: 'ent-order',
+        name: 'Order',
+        states: ['received', 'indexed'],
+        transitions: [
+          { from: null, to: 'received', via: 'ing-webhooks' },
+          { from: 'received', to: 'indexed', via: 'op-ingest-index' },
+        ],
+      },
+    ],
+    operations: [
+      {
+        id: 'op-list-orders',
+        kind: 'query',
+        statement: 'Return the customer’s merged order history',
+      },
+      {
+        id: 'op-ingest-index',
+        kind: 'command',
+        statement: 'Normalize an incoming order into the read model',
+        emits: ['evt-order-indexed'],
+        onFailureEmits: ['evt-ingest-failed'],
+      },
+    ],
+    events: [
+      { id: 'evt-order-received', statement: 'A new order arrived from a source' },
+      { id: 'evt-order-indexed', statement: 'An order became queryable' },
+      { id: 'evt-ingest-failed', statement: 'An order failed normalization' },
+    ],
+    aggregations: [
+      {
+        id: 'agg-spend-summary',
+        statement: 'A spend summary tile totals purchases',
+        sourceEventIds: ['evt-order-indexed'],
+      },
+    ],
+    ingests: [
+      {
+        id: 'ing-webhooks',
+        mode: 'push',
+        statement: 'The storefront pushes order webhooks',
+        nfrId: 'ohi-fresh-online',
+        emits: ['evt-order-received'],
+      },
+      {
+        id: 'ing-pos-import',
+        mode: 'pull',
+        statement: 'Poll the POS for new orders',
+        nfrId: 'ohi-fresh-offline',
+        emits: ['evt-order-received'],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+/** A prompt whose archetype carries the business layer above. */
+export function makeWorkflowPrompt(overrides: Partial<PromptDto> = {}): PromptDto {
+  return makePrompt({
+    id: 'prompt-ohi-1',
+    archetype: 'order-history-integration',
+    title: 'Design an Order History Integration Service',
+    scenario:
+      'Online orders live in a hosted storefront (GraphQL plus webhooks), in-store orders in a Retail POS that only answers REST; merge both into one per-customer history.',
+    functionalCapabilities: ['analytics', 'scheduled-work'],
+    nonFunctionalRequirements: [
+      {
+        id: 'ohi-fresh-online',
+        kind: 'consistency',
+        statement: 'An online order is visible within a minute',
+        target: 'visible ≤ 60s after purchase',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
+      },
+      {
+        id: 'ohi-fresh-offline',
+        kind: 'consistency',
+        statement: 'An in-store sale is visible within five minutes',
+        target: 'visible ≤ 300s after sale',
+        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 300, unit: 's' },
+      },
+      {
+        id: 'ohi-sec-own-orders',
+        kind: 'security',
+        statement: 'A customer reads only their own orders; guests read none',
+      },
+    ],
+    workflowSpec: makeWorkflowSpec(),
+    ...overrides,
+  });
+}
+
+/** A graph with workflow claims: a serving query, a webhook intake, a wired channel. */
+export function makeOrderHistoryGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
+  return {
+    nodes: [
+      { id: 'n-1', kind: 'client', label: 'Shopper', position: { x: 40, y: 40 } },
+      {
+        id: 'n-2',
+        kind: 'gateway',
+        label: 'API Gateway',
+        config: { authMode: 'jwt' },
+        position: { x: 40, y: 180 },
+      },
+      {
+        id: 'n-3',
+        kind: 'service',
+        label: 'History service',
+        operations: [{ name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' }],
+        position: { x: 40, y: 320 },
+      },
+      {
+        id: 'n-4',
+        kind: 'service',
+        label: 'Webhook receiver',
+        operations: [
+          {
+            name: 'receiveWebhook',
+            kind: 'command',
+            fulfills: 'ing-webhooks',
+            emits: ['evt-order-received'],
+          },
+        ],
+        position: { x: 320, y: 40 },
+      },
+      {
+        id: 'n-5',
+        kind: 'queue',
+        label: 'Orders queue',
+        operations: [{ name: 'OrderReceived', kind: 'event', fulfills: 'evt-order-received' }],
+        position: { x: 320, y: 180 },
+      },
+      {
+        id: 'n-6',
+        kind: 'worker',
+        label: 'Indexer',
+        operations: [
+          {
+            name: 'ingestIndex',
+            kind: 'command',
+            fulfills: 'op-ingest-index',
+            emits: ['evt-order-indexed'],
+          },
+        ],
+        position: { x: 320, y: 320 },
+      },
+      {
+        id: 'n-7',
+        kind: 'external-api',
+        label: 'Storefront',
+        config: { webhooks: true },
+        position: { x: 600, y: 40 },
+      },
+      { id: 'n-8', kind: 'database', label: 'History DB', position: { x: 600, y: 320 } },
+    ],
+    edges: [
+      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+      { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync', carries: ['listOrders'] },
+      { id: 'e-3', source: 'n-7', target: 'n-4', kind: 'async', carries: ['receiveWebhook'] },
+      { id: 'e-4', source: 'n-4', target: 'n-5', kind: 'async', carries: ['OrderReceived'] },
+      { id: 'e-5', source: 'n-5', target: 'n-6', kind: 'async', carries: ['OrderReceived'] },
+      { id: 'e-6', source: 'n-6', target: 'n-8', kind: 'sync', intent: 'write' },
+      { id: 'e-7', source: 'n-3', target: 'n-8', kind: 'sync', intent: 'read' },
+    ],
     ...overrides,
   };
 }

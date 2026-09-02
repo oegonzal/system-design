@@ -2,6 +2,7 @@ import { NODE_MAX_OPERATIONS, type NodeOperation } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
+import { makeWorkflowSpec } from '../../../testing/fixtures';
 import { OperationsEditor, type OperationsEditorProps } from './operations-editor';
 
 const meta: Meta<typeof OperationsEditor> = {
@@ -70,6 +71,77 @@ export const AtCapacity: Story = {
         name: `operation${index + 1}`,
         kind: 'command' as const,
       }))}
+    />
+  ),
+};
+
+/** A workflow prompt in play: rows link to spec contracts and declare emissions. */
+export const WithFulfills: Story = {
+  render: () => (
+    <Controlled
+      heading="Operations"
+      allowedKinds={['command', 'query']}
+      workflow={{ spec: makeWorkflowSpec(), role: 'api' }}
+      initial={[
+        { name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' },
+        {
+          name: 'ingestIndex',
+          kind: 'command',
+          fulfills: 'op-ingest-index',
+          emits: ['evt-order-indexed'],
+        },
+      ]}
+    />
+  ),
+};
+
+/** A channel's message types linking to the spec's domain events. */
+export const ChannelEventTransport: Story = {
+  render: () => (
+    <Controlled
+      heading="Message types"
+      allowedKinds={['command', 'event']}
+      workflow={{ spec: makeWorkflowSpec(), role: 'channel' }}
+      initial={[{ name: 'OrderReceived', kind: 'event', fulfills: 'evt-order-received' }]}
+    />
+  ),
+};
+
+/** A kind flipped after its Fulfills pick — warned, never silently cleared. */
+export const FulfillsKindMismatch: Story = {
+  render: () => (
+    <Controlled
+      heading="Operations"
+      allowedKinds={['command', 'query']}
+      workflow={{ spec: makeWorkflowSpec(), role: 'api' }}
+      initial={[{ name: 'ingest', kind: 'query', fulfills: 'op-ingest-index' }]}
+    />
+  ),
+};
+
+/** Emissions at the contract cap: unchecked boxes go inert. */
+export const EmitsAtCap: Story = {
+  render: () => (
+    <Controlled
+      heading="Operations"
+      allowedKinds={['command', 'query']}
+      workflow={{
+        spec: makeWorkflowSpec({
+          events: [
+            { id: 'evt-a', statement: 'A happened' },
+            { id: 'evt-b', statement: 'B happened' },
+            { id: 'evt-c', statement: 'C happened' },
+            { id: 'evt-d', statement: 'D happened' },
+            { id: 'evt-e', statement: 'E happened' },
+          ],
+          entities: [],
+          operations: [],
+          aggregations: [],
+          ingests: [],
+        }),
+        role: 'api',
+      }}
+      initial={[{ name: 'do', kind: 'command', emits: ['evt-a', 'evt-b', 'evt-c', 'evt-d'] }]}
     />
   ),
 };

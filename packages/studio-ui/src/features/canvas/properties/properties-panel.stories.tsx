@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
+import {
+  makeGraph,
+  makeInterfaceGraph,
+  makeOrderHistoryGraph,
+  makeWorkflowSpec,
+} from '../../../testing/fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { PropertiesPanel } from './properties-panel';
 
@@ -152,6 +157,43 @@ export const EdgeUndeclaredCarrySelected: Story = {
       store.getState().setGraph(makeInterfaceGraph());
       store.getState().updateEdge('e-2', { carries: ['PlaceOrder', 'chargeCard'] });
       store.getState().select('e-2');
+    }),
+  ],
+};
+
+/** A workflow prompt in play: the serving service's ops link to spec contracts. */
+export const OrderHistoryServiceSelected: Story = {
+  args: { workflowSpec: makeWorkflowSpec() },
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeOrderHistoryGraph());
+      store.getState().select('n-3');
+    }),
+  ],
+};
+
+/** The poller's cadence knob — the number the freshness budget is checked against. */
+export const SchedulerPollIntervalSelected: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeGraph());
+      store.getState().updateNode('n-2', {
+        kind: 'scheduler',
+        label: 'POS poll schedule',
+        config: { pollIntervalSeconds: 120 },
+      });
+      store.getState().select('n-2');
+    }),
+  ],
+};
+
+/** An external source marked as pushing webhooks — push-ingest evidence. */
+export const ExternalApiWebhooksSelected: Story = {
+  args: { workflowSpec: makeWorkflowSpec() },
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeOrderHistoryGraph());
+      store.getState().select('n-7');
     }),
   ],
 };

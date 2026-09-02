@@ -3,10 +3,14 @@
 import styled from '@emotion/styled';
 import {
   NODE_MAX_OPERATIONS,
+  OPERATION_MAX_EMITS,
   OPERATION_NAME_MAX_LENGTH,
   OPERATION_NOTES_MAX_LENGTH,
+  fulfillableItems,
+  type InterfaceRole,
   type NodeOperation,
   type OperationKind,
+  type WorkflowSpec,
 } from '@sysdesign/contracts';
 import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
 
@@ -19,6 +23,15 @@ export interface OperationsEditorProps {
   /** "Operations" for api-role kinds, "Message types" for channels. */
   heading: string;
   onChange: (operations: NodeOperation[]) => void;
+  /**
+   * The prompt's business layer plus this node's interface role, when the
+   * session's prompt carries a workflow spec. Absent (the default) the
+   * workflow controls render nothing and every existing call site is
+   * untouched. The select offers only ids the spec declares for this role
+   * and the row's kind — an ineligible pick is unrepresentable here; a
+   * hand-crafted payload is the API validator's business.
+   */
+  workflow?: { spec: WorkflowSpec; role: InterfaceRole } | null;
 }
 
 const Row = styled.div`
@@ -63,6 +76,7 @@ export function OperationsEditor({
   allowedKinds,
   heading,
   onChange,
+  workflow = null,
 }: OperationsEditorProps) {
   if (allowedKinds.length === 0) return null;
 
@@ -75,6 +89,30 @@ export function OperationsEditor({
         current === index ? { ...operation, ...patch } : operation,
       ),
     );
+  };
+
+  /** What THIS row may claim, given its current kind. */
+  const fulfillableFor = (operation: NodeOperation) =>
+    workflow === null ? [] : fulfillableItems(workflow.spec, workflow.role, operation.kind);
+
+  /**
+   * A kind flip after a Fulfills pick, or emissions left on a non-command
+   * row. Deliberately warned, never cleared or blocked: silently deleting a
+   * claim is hostile, the API accepts both shapes, and the evaluation grades
+   * them — this ink previews the finding.
+   */
+  const workflowWarning = (operation: NodeOperation): string | null => {
+    if (workflow === null) return null;
+    if (
+      operation.fulfills !== undefined &&
+      !fulfillableFor(operation).some((item) => item.id === operation.fulfills)
+    ) {
+      return `This row's kind no longer matches the linked requirement (${operation.fulfills}) — the evaluation will grade the mismatch.`;
+    }
+    if ((operation.emits ?? []).length > 0 && operation.kind !== 'command') {
+      return 'Only commands produce events — emissions on this row will not count as a producer.';
+    }
+    return null;
   };
 
   return (
@@ -121,6 +159,66 @@ export function OperationsEditor({
               maxLength={OPERATION_NOTES_MAX_LENGTH}
               onChange={(event) => patchRow(index, { notes: event.target.value })}
             />
+            {workflow !== null && fulfillableFor(operation).length > 0 ? (
+              <SelectField
+                label="Fulfills"
+                data-testid={`operation-fulfills-${index}`}
+                value={operation.fulfills ?? ''}
+                onChange={(event) =>
+                  // "Not linked" DELETES the claim: an empty string would
+                  // parse at the DTO and then 422 as an unknown id.
+                  patchRow(index, {
+                    fulfills: event.target.value.length > 0 ? event.target.value : undefined,
+                  })
+                }
+              >
+                <option value="">Not linked</option>
+                {fulfillableFor(operation).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </SelectField>
+            ) : null}
+            {workflow !== null && workflow.role === 'api' && operation.kind === 'command'
+              ? (() => {
+                  const emits = operation.emits ?? [];
+                  const emitsAtCap = emits.length >= OPERATION_MAX_EMITS;
+                  return workflow.spec.events.length > 0 ? (
+                    <Stack gap={2} role="group" aria-label={`Emits for ${displayName}`}>
+                      <Text as="span" size="sm" tone="muted">
+                        Emits ({emits.length} of {OPERATION_MAX_EMITS})
+                      </Text>
+                      {workflow.spec.events.map((event) => {
+                        const checked = emits.includes(event.id);
+                        return (
+                          <CheckboxField
+                            key={event.id}
+                            label={event.statement}
+                            data-testid={`operation-emit-${index}-${event.id}`}
+                            checked={checked}
+                            // Inert at the cap, the EdgeCarriesField pattern.
+                            disabled={!checked && emitsAtCap}
+                            onChange={(changeEvent) => {
+                              const next = changeEvent.target.checked
+                                ? [...emits, event.id]
+                                : emits.filter((id) => id !== event.id);
+                              patchRow(index, {
+                                emits: next.length > 0 ? next : undefined,
+                              });
+                            }}
+                          />
+                        );
+                      })}
+                    </Stack>
+                  ) : null;
+                })()
+              : null}
+            {workflowWarning(operation) !== null ? (
+              <DuplicateWarning size="sm" data-testid={`operation-workflow-warning-${index}`}>
+                {workflowWarning(operation)}
+              </DuplicateWarning>
+            ) : null}
             {duplicates.has(index) ? (
               // UI guard for the API's 422: the save would be rejected anyway,
               // so say it here, next to the offending name.

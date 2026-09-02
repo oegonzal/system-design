@@ -203,10 +203,15 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
           {numberRow(config, setKey, 'timeoutMs', 'Timeout (ms)')}
           {numberRow(config, setKey, 'retries', 'Retries')}
           {checkboxRow(config, setKey, 'circuitBreaker', 'Circuit breaker')}
+          {checkboxRow(config, setKey, 'webhooks', 'Webhooks (pushes events)')}
         </>
       );
     case 'scheduler':
-      return null;
+      return (
+        <>
+          {numberRow(config, setKey, 'pollIntervalSeconds', 'Poll interval (seconds)', { min: 1 })}
+        </>
+      );
     case 'websocket-gateway':
       return (
         <>
@@ -225,7 +230,12 @@ export function NodeConfigFields({ kind, config, onChange }: NodeConfigFieldsPro
         </>
       );
     case 'batch-job':
-      return <>{checkboxRow(config, setKey, 'idempotent', 'Idempotent')}</>;
+      return (
+        <>
+          {checkboxRow(config, setKey, 'idempotent', 'Idempotent')}
+          {numberRow(config, setKey, 'pollIntervalSeconds', 'Poll interval (seconds)', { min: 1 })}
+        </>
+      );
     case 'kv-store':
       return (
         <>

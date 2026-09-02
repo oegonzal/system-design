@@ -399,7 +399,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       <Layout>
         <SideColumn>
           <WorkspacePalette />
-          <WorkspaceProperties />
+          <WorkspaceProperties workflowSpec={prompt?.workflowSpec ?? null} />
         </SideColumn>
 
         <CanvasColumn>
