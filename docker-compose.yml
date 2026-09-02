@@ -1,0 +1,32 @@
+# Canonical local-dev database for System Design Studio.
+#
+# Durable and self-restarting, so practice runs (sessions, designs, evaluations)
+# survive a shutdown or reboot and come back with `pnpm stack:up`:
+#   - a NAMED volume (`sysdesign-pgdata`) keeps the data on disk, reproducibly
+#     from this repo — unlike an ad-hoc container's anonymous volume;
+#   - `restart: unless-stopped` brings the server back after a Docker/machine
+#     restart without anyone having to `docker start` it.
+#
+# Port 5433 matches the app's `DB_PORT` and avoids a stale :5432 on this machine.
+# Credentials/db name match `packages/db/src/orm.options.ts` defaults.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sysdesign-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: sysdesign
+    ports:
+      - '5433:5432'
+    volumes:
+      - sysdesign-pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d sysdesign']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  sysdesign-pgdata:

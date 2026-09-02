@@ -47,6 +47,22 @@ enrichment and the design critic). Without it — or with
 `EVAL_DETERMINISTIC=1` — everything still works: the deterministic rules
 engine grades alone and output is byte-reproducible.
 
+### Without Kubernetes — durable local stack
+
+If you're not running Tilt/k8s, `pnpm stack:up` brings the whole stack up
+against a **durable** Postgres (a `docker-compose` service on port **5433**
+with a named volume, so your practice runs survive a shutdown or reboot and
+come back on the next `pnpm stack:up`):
+
+```bash
+pnpm stack:up     # durable db → migrate → seed → api + worker + ui
+pnpm stack:down   # stop the db (data persists in the named volume)
+```
+
+Past runs re-appear on the Dashboard, since every session/design/evaluation is
+a Postgres row. See **[RUNBOOK.md](./RUNBOOK.md)** for the persistence model and
+how to bring your runs back in the future.
+
 ## Workspace layout
 
 Packages carry a `project.json` (no per-package `package.json`); every
