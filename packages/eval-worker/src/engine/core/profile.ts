@@ -32,6 +32,12 @@ export interface GradeCapRule {
   maxGrade: Grade;
 }
 
+/** "grade ≤ maxGrade whenever this expectation is unmet" — e.g. no A without a walkthrough. */
+export interface ExpectationGradeCapRule {
+  whenExpectationUnmet: string;
+  maxGrade: Grade;
+}
+
 /** One lesson, one finding: drop the rule's finding when its paired expectation is unmet. */
 export interface SuppressionRule {
   ruleId: string;
@@ -52,6 +58,8 @@ export interface CoverageScoringPolicy {
   dimensionWeights: Record<EvalDimension, number>;
   gradeBands: GradeBands;
   gradeCaps: GradeCapRule[];
+  /** Caps keyed to an unmet expectation rather than a finding count. */
+  expectationGradeCaps: ExpectationGradeCapRule[];
   suppressions: SuppressionRule[];
 }
 

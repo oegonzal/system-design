@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { CanvasGraph, DesignBrief, DimensionScores, Grade } from '@sysdesign/contracts';
 
 import { runEngine } from './engine';
-import { flashSaleFacts, orderHistoryFacts } from './testing';
+import { flashSaleFacts, fullNarration, orderHistoryFacts } from './testing';
 
 function loadFixture(name: string): CanvasGraph {
   return JSON.parse(
@@ -26,12 +26,13 @@ interface CalibrationRow {
  * design is worth, to the decimal. If a new rule or expectation moves these
  * numbers, that movement must be deliberate and re-pinned here.
  *
- * Every row here is a diagram submitted WITHOUT a brief. Since profile
- * 2.3.0 that is itself a graded answer — `exp.brf.present` applies whether or
- * not a brief was written — so each score is the old diagram-only number minus
- * the explanation tenth. The excellent design is a B until its author
- * explains it, which is the point: a diagram nobody can follow is not a
- * finished answer.
+ * Every row here is a diagram submitted WITHOUT a brief AND without a
+ * narrative. Both absences are graded — `exp.brf.present` and `exp.nar.present`
+ * apply whether or not either was written — so each score is the old
+ * diagram-only number minus the explanation tenth, and the missing walkthrough
+ * caps the letter at C. The excellent design is a capped C until its author
+ * both explains it in words and accounts for it in a brief: a diagram nobody
+ * can follow is not a finished answer, however clean the boxes.
  */
 const TABLE: CalibrationRow[] = [
   {
@@ -119,7 +120,9 @@ const TABLE: CalibrationRow[] = [
       product: null,
     },
     overallScore: 89.3,
-    grade: 'B',
+    // Capped from B: the walkthrough is missing (exp.nar.present unmet), and no
+    // top grade is handed to a design its author never explained.
+    grade: 'C',
   },
 ];
 
@@ -182,14 +185,16 @@ describe('calibration', () => {
 });
 
 /**
- * The brief half of the anchor: the excellent diagram is held fixed and only
- * the author's claims about it vary, so these rows pin exactly what the
- * explanation dimension is worth — and what each way of dodging it costs.
+ * The explanation half of the anchor: the excellent diagram is held fixed and
+ * only the author's account of it varies — the brief's claims and the
+ * narrative's prose — so these rows pin exactly what the explanation dimension
+ * is worth, and what each way of dodging it costs.
  *
- * The ordering is the property, not the numbers: an honest account earns the
- * tenth; naming more components than hold a claim scores BELOW naming fewer
- * honestly; a claim the canvas cannot back costs more than making no claim;
- * and silence earns nothing at all.
+ * The ordering is the property, not the numbers: a complete brief AND a
+ * complete walkthrough earn the tenth and the A; a complete brief with no
+ * walkthrough loses points AND is capped below a top grade; naming more
+ * components than hold a claim scores BELOW naming fewer honestly; a claim the
+ * canvas cannot back costs more than making no claim; and silence earns nothing.
  */
 describe('brief calibration', () => {
   const excellent = () => loadFixture('excellent-flash-sale.graph.json');
@@ -218,29 +223,46 @@ describe('brief calibration', () => {
     ],
   };
 
-  it('[EVAL-10] the excellent design with a complete brief keeps its 100/A', () => {
-    const result = runEngine(excellent(), flashSaleFacts(), null, fullBrief);
+  it('[EVAL-10] the excellent design with a complete brief AND walkthrough earns 100/A', () => {
+    const result = runEngine(
+      excellent(),
+      flashSaleFacts(),
+      null,
+      fullBrief,
+      fullNarration(excellent(), flashSaleFacts()),
+    );
     expect(result.dimensionScores.explanation).toBe(100);
     expect(result.overallScore).toBe(99.3);
     expect(result.grade).toBe('A');
   });
 
-  it('[EVAL-11] the same diagram submitted in silence scores 90/B — the absence is graded', () => {
+  it('[EVAL-15] a complete brief with no walkthrough loses the tenth AND is capped below an A', () => {
+    // brief 12/12 met, but exp.nar.present unmet adds weight to the denominator
+    // (12/13 = 92.3) and its cap forbids a top grade — a design you drew and
+    // accounted for but never explained in words is not a finished answer.
+    const result = runEngine(excellent(), flashSaleFacts(), null, fullBrief);
+    expect(result.dimensionScores.explanation).toBe(92.3);
+    expect(result.overallScore).toBe(98.5);
+    expect(result.grade).toBe('C');
+  });
+
+  it('[EVAL-11] the same diagram submitted in silence is capped at C — the absence is graded', () => {
     const result = runEngine(excellent(), flashSaleFacts());
     // Not null: renormalising the dimension away would make explaining nothing
     // strictly better than explaining badly, which is what this pins against.
     expect(result.dimensionScores.explanation).toBe(0);
     expect(result.overallScore).toBe(89.3);
-    expect(result.grade).toBe('B');
+    expect(result.grade).toBe('C');
     expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.brf.present');
+    expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.nar.present');
   });
 
   it('[EVAL-11] one honest binding beats silence, and still cannot reach an A', () => {
     const minimal: DesignBrief = { version: 1, nfrBindings: [fullBrief.nfrBindings[0]], flows: [] };
     const result = runEngine(excellent(), flashSaleFacts(), null, minimal);
-    expect(result.dimensionScores.explanation).toBe(16.7);
-    expect(result.overallScore).toBe(91);
-    expect(result.grade).toBe('B');
+    expect(result.dimensionScores.explanation).toBe(15.4);
+    expect(result.overallScore).toBe(90.8);
+    expect(result.grade).toBe('C');
   });
 
   /**

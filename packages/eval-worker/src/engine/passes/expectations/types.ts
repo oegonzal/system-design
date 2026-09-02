@@ -61,6 +61,20 @@ export interface Expectation {
    * the rubric. Exactly one expectation should set this.
    */
   appliesWithoutBrief?: true;
+  /**
+   * Narration-scoped: its `satisfiedBy` receives the narrative's typed
+   * projection (`ctx.narration`) — and the brief, since a narrative claim is
+   * graded relative to the components the brief accounts for. Skipped by default
+   * when no substantive narrative was submitted; the inverse of the brief flag.
+   */
+  requiresNarration?: true;
+  /**
+   * The opt-out for the one narration expectation whose subject IS the absence:
+   * it stays applicable with no narrative, so a missing walkthrough scores zero
+   * and trips the "no top grade without a narrative" cap instead of vanishing.
+   * Exactly one expectation should set this.
+   */
+  appliesWithoutNarration?: true;
   /** Finding title when unmet. */
   title: string;
   /** The lesson: why this capability matters at the prompt's scale. */

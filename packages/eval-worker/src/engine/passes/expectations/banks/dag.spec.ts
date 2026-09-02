@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SUGGESTED_ID_PREFIX, type CanvasGraph, type Grade } from '@sysdesign/contracts';
 
 import { runEngine } from '../../../engine';
-import { contextFor, dagFacts, edge, graph, node } from '../../../testing';
+import { contextFor, dagFacts, edge, fullNarration, graph, node } from '../../../testing';
 import { dagOrchestrationExpectations } from './dag';
 
 const GRADE_RANK: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
@@ -129,7 +129,13 @@ describe('dag-orchestration expectation bank', () => {
   });
 
   it('grades the solid orchestrator at least a B', () => {
-    const result = runEngine(solidGraph, dagFacts());
+    const result = runEngine(
+      solidGraph,
+      dagFacts(),
+      null,
+      null,
+      fullNarration(solidGraph, dagFacts()),
+    );
     expect(GRADE_RANK[result.grade]).toBeGreaterThanOrEqual(GRADE_RANK.B);
   });
 

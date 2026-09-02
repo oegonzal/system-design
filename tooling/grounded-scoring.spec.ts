@@ -67,6 +67,24 @@ describe('grounded scoring', () => {
     expect(offenders.map((path) => path.slice(REPO.length + 1))).toEqual([]);
   });
 
+  /**
+   * The narrative was once scored by substrings and deleted for it. Its revival
+   * grades the walkthrough through the typed projection `NarrationFacts` —
+   * which references carry substantive prose — so the bans above already prove
+   * it never re-reads `ctx.narrative`. This is the positive half: the bank does
+   * grade the narrative, and does it through the typed fields.
+   */
+  it('the revived narrative scoring reads the typed projection, staying grounded', () => {
+    const source = readFileSync(
+      join(REPO, 'packages/eval-worker/src/engine/passes/expectations/banks/narrative.ts'),
+      'utf8',
+    );
+    expect(source).toContain('narration');
+    expect(source).toMatch(
+      /explainedNodeIds|narratedRequirementIndexes|overviewSubstantive|\.present/,
+    );
+  });
+
   it('every mechanism an author may claim can be verified by the system', () => {
     // Totality is enforced by `satisfies Record<MechanismClaim, …>` at compile
     // time; this asserts the Record never quietly becomes a Partial.

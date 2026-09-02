@@ -9,6 +9,7 @@ import { coreExpectations } from './core';
 import { dagOrchestrationExpectations } from './dag';
 import { flashSaleExpectations } from './flash-sale';
 import { mediaStreamingExpectations } from './media-streaming';
+import { narrativeExpectations } from './narrative';
 import { orderHistoryExpectations } from './order-history';
 import { productExpectations } from './product';
 import { realtimeAnalyticsExpectations } from './realtime-analytics';
@@ -25,7 +26,11 @@ export const EXPECTATIONS: readonly Expectation[] = [
   // Workflow-scoped: gated on the prompt carrying a spec, so only workflow
   // prompts assess the product dimension.
   ...productExpectations,
-  // Brief-scoped last: these grade the author's claims about the design and
+  // Brief-scoped: these grade the author's claims about the design and
   // are the only expectations allowed to read them.
   ...briefExpectations,
+  // Narration-scoped last: they grade the prose walkthrough by reference, read
+  // the narrative's typed projection, and carry the "no top grade without a
+  // walkthrough" cap through `exp.nar.present`.
+  ...narrativeExpectations,
 ];

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SUGGESTED_ID_PREFIX, type CanvasGraph, type Grade } from '@sysdesign/contracts';
 
 import { runEngine } from '../../../engine';
-import { contextFor, edge, graph, node, workflowFacts } from '../../../testing';
+import { contextFor, edge, fullNarration, graph, node, workflowFacts } from '../../../testing';
 import { expectationApplies } from '../types';
 import { workflowAutomationExpectations } from './workflow';
 
@@ -142,7 +142,13 @@ describe('workflow-automation expectation bank', () => {
   });
 
   it('grades the solid platform at least a B', () => {
-    const result = runEngine(solidGraph, delayFacts());
+    const result = runEngine(
+      solidGraph,
+      delayFacts(),
+      null,
+      null,
+      fullNarration(solidGraph, delayFacts()),
+    );
     expect(GRADE_RANK[result.grade]).toBeGreaterThanOrEqual(GRADE_RANK.B);
   });
 

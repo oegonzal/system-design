@@ -354,8 +354,13 @@ export function renderRunMarkdown(
       ``,
     );
     if (state.result.capApplied) {
+      const cap = state.result.capApplied;
+      const reason =
+        cap.expectationId !== undefined
+          ? `unmet expectation ${cap.expectationId}`
+          : `${cap.count} ${cap.severity} finding(s)`;
       lines.push(
-        `Grade capped at ${state.result.capApplied.maxGrade} by ${state.result.capApplied.count} ${state.result.capApplied.severity} finding(s); bands alone gave ${state.result.bandGrade}.`,
+        `Grade capped at ${cap.maxGrade} by ${reason}; bands alone gave ${state.result.bandGrade}.`,
         ``,
       );
     }

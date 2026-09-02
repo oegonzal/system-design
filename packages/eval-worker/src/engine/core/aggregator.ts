@@ -38,10 +38,16 @@ const SEVERITY_RANK: Record<Severity, number> = {
   info: 4,
 };
 
+/**
+ * The cap that bound the grade — a SEVERITY cap (`count` findings of `severity`)
+ * or an EXPECTATION cap (an unmet `expectationId`, e.g. no top grade without a
+ * walkthrough). Mutually exclusive; structurally compatible with `CapAppliedDto`.
+ */
 export interface CapApplied {
-  severity: Severity;
-  count: number;
   maxGrade: Grade;
+  severity?: Severity;
+  count?: number;
+  expectationId?: string;
 }
 
 /** One violation's actual cost, at the decay position it was charged at. */
@@ -79,12 +85,20 @@ export interface SuppressionTrace {
   droppedTitle: string;
 }
 
-/** Every cap the policy evaluated — including the ones that did not bind. */
+/** Every severity cap the policy evaluated — including the ones that did not bind. */
 export interface CapTrace {
   severity: Severity;
   atLeast: number;
   maxGrade: Grade;
   count: number;
+  reached: boolean;
+  binding: boolean;
+}
+
+/** Every expectation cap the policy evaluated — including the ones that did not bind. */
+export interface ExpectationCapTrace {
+  whenExpectationUnmet: string;
+  maxGrade: Grade;
   reached: boolean;
   binding: boolean;
 }
@@ -98,6 +112,8 @@ export interface AggregateTrace {
   overallScore: number;
   suppressions: SuppressionTrace[];
   caps: CapTrace[];
+  /** Expectation-keyed caps, traced beside the severity caps. */
+  expectationCaps: ExpectationCapTrace[];
   bandGrade: Grade;
   grade: Grade;
 }
@@ -233,7 +249,12 @@ export function explainAggregate(
   const overallScore = weightSum === 0 ? 0 : Math.round((weightedTotal / weightSum) * 10) / 10;
 
   const bandGrade = gradeForScore(overallScore, policy.gradeBands);
-  const { grade, capApplied, caps } = applyGradeCaps(bandGrade, findings, policy);
+  const { grade, capApplied, caps, expectationCaps } = applyGradeCaps(
+    bandGrade,
+    findings,
+    coverage,
+    policy,
+  );
 
   return {
     findings,
@@ -249,6 +270,7 @@ export function explainAggregate(
       overallScore,
       suppressions,
       caps,
+      expectationCaps,
       bandGrade,
       grade,
     },
@@ -404,15 +426,25 @@ function scoreCoverage(
 }
 
 /**
- * A critical problem caps the letter no matter how the numbers average out —
- * an interviewer does not hand out an A over an unaddressed single point of
- * failure. Counts deterministic findings only; LLM output never reaches here.
+ * A grave problem caps the letter no matter how the numbers average out — an
+ * interviewer does not hand out an A over an unaddressed single point of
+ * failure, nor over a design its author never explained. Two kinds of cap:
+ * severity caps (N deterministic findings of a severity) and expectation caps
+ * (a specific expectation left unmet, read from the coverage ledger). Both count
+ * deterministic evidence only; LLM output never reaches here. The strictest
+ * reached cap of either kind wins.
  */
 function applyGradeCaps(
   bandGrade: Grade,
   findings: readonly EngineFinding[],
+  coverage: CoverageArtifact['entries'],
   policy: CoverageScoringPolicy,
-): { grade: Grade; capApplied: CapApplied | null; caps: CapTrace[] } {
+): {
+  grade: Grade;
+  capApplied: CapApplied | null;
+  caps: CapTrace[];
+  expectationCaps: ExpectationCapTrace[];
+} {
   // Every cap is counted, including the ones that will not bind — a reader
   // asking "why was this an A?" needs to see the caps that were checked and
   // came up short, not only the one that fired.
@@ -420,33 +452,57 @@ function applyGradeCaps(
     const count = findings.filter((finding) => finding.severity === cap.severity).length;
     return { ...cap, count, reached: count >= cap.atLeast };
   });
+  const unmetExpectations = new Set(
+    coverage.filter((entry) => !entry.met).map((entry) => entry.expectationId),
+  );
+  const evaluatedExpectation = policy.expectationGradeCaps.map((cap) => ({
+    ...cap,
+    reached: unmetExpectations.has(cap.whenExpectationUnmet),
+  }));
 
-  // The strictest reached cap wins. Derived from `evaluated` rather than
-  // accumulated inside its map, so the narrowing below stays legible.
-  let strictest: (typeof evaluated)[number] | null = null;
-  for (const cap of evaluated) {
-    if (!cap.reached) continue;
-    if (strictest === null || GRADE_ORDER[cap.maxGrade] < GRADE_ORDER[strictest.maxGrade]) {
-      strictest = cap;
+  // The strictest reached cap wins, across both kinds. Each candidate carries
+  // the `capApplied` it would produce, so the winner needs no re-derivation.
+  type Candidate = { maxGrade: Grade; capApplied: CapApplied; ref: unknown };
+  const candidates: Candidate[] = [
+    ...evaluated
+      .filter((cap) => cap.reached)
+      .map((cap) => ({
+        maxGrade: cap.maxGrade,
+        capApplied: { severity: cap.severity, count: cap.count, maxGrade: cap.maxGrade },
+        ref: cap,
+      })),
+    ...evaluatedExpectation
+      .filter((cap) => cap.reached)
+      .map((cap) => ({
+        maxGrade: cap.maxGrade,
+        capApplied: { expectationId: cap.whenExpectationUnmet, maxGrade: cap.maxGrade },
+        ref: cap,
+      })),
+  ];
+
+  let strictest: Candidate | null = null;
+  for (const candidate of candidates) {
+    if (strictest === null || GRADE_ORDER[candidate.maxGrade] < GRADE_ORDER[strictest.maxGrade]) {
+      strictest = candidate;
     }
   }
 
   const applies = strictest !== null && GRADE_ORDER[bandGrade] > GRADE_ORDER[strictest.maxGrade];
   const caps: CapTrace[] = evaluated.map((cap) => ({
     ...cap,
-    binding: applies && cap === strictest,
+    binding: applies && strictest?.ref === cap,
+  }));
+  const expectationCaps: ExpectationCapTrace[] = evaluatedExpectation.map((cap) => ({
+    whenExpectationUnmet: cap.whenExpectationUnmet,
+    maxGrade: cap.maxGrade,
+    reached: cap.reached,
+    binding: applies && strictest?.ref === cap,
   }));
 
-  if (!applies || strictest === null) return { grade: bandGrade, capApplied: null, caps };
-  return {
-    grade: strictest.maxGrade,
-    capApplied: {
-      severity: strictest.severity,
-      count: strictest.count,
-      maxGrade: strictest.maxGrade,
-    },
-    caps,
-  };
+  if (!applies || strictest === null) {
+    return { grade: bandGrade, capApplied: null, caps, expectationCaps };
+  }
+  return { grade: strictest.maxGrade, capApplied: strictest.capApplied, caps, expectationCaps };
 }
 
 function composeSummary(

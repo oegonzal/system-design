@@ -111,6 +111,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every evaluation writes a run dump: its inputs, every LLM prompt and response, the scoring arithmetic, and the result — on the failure path too.',
   },
+  {
+    id: 'EVAL-15',
+    statement:
+      'The design narrative is graded by reference and required for a top grade: a missing or insubstantial walkthrough both loses explanation points and caps the letter grade below an A.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

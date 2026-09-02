@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { SUGGESTED_ID_PREFIX, type CanvasGraph, type Grade } from '@sysdesign/contracts';
 
 import { runEngine } from '../../../engine';
-import { analyticsFacts, contextFor, edge, graph, node } from '../../../testing';
+import { analyticsFacts, contextFor, edge, fullNarration, graph, node } from '../../../testing';
 import { realtimeAnalyticsExpectations } from './realtime-analytics';
 
 const GRADE_RANK: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
@@ -126,7 +126,13 @@ describe('realtime-analytics expectation bank', () => {
   });
 
   it('grades the solid pipeline at least a B', () => {
-    const result = runEngine(solidGraph, analyticsFacts());
+    const result = runEngine(
+      solidGraph,
+      analyticsFacts(),
+      null,
+      null,
+      fullNarration(solidGraph, analyticsFacts()),
+    );
     expect(GRADE_RANK[result.grade]).toBeGreaterThanOrEqual(GRADE_RANK.B);
   });
 

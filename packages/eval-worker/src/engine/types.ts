@@ -12,6 +12,7 @@ import type {
   FunctionalCapability,
   Grade,
   GraphPatch,
+  NarrationFacts,
   NfrKind,
   NfrTargetSpec,
   PromptDifficulty,
@@ -112,6 +113,14 @@ export interface RuleContext {
    * exactly as before.
    */
   brief: DesignBrief | null;
+  /**
+   * The typed projection of the design narrative — which references carry
+   * substantive prose — or null when none was submitted. This is what the
+   * deterministic grade reads about the walkthrough: never the raw prose (that
+   * stays on `narrative`, advisory), so the grounded-scoring invariant holds.
+   * Only `requiresNarration` expectations receive it populated.
+   */
+  narration: NarrationFacts | null;
 }
 
 /** A rule owns one lesson; severity is decided per finding, not per rule. */

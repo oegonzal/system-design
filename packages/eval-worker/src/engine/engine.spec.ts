@@ -32,6 +32,7 @@ const GLOBAL_FINDINGS = new Set([
   'exp.fst.dlq-on-queues',
   'exp.fst.cdn-static',
   'exp.brf.present',
+  'exp.nar.present',
 ]);
 
 function identityOf(finding: { ruleId: string | null; expectationId: string | null }): string {
@@ -59,6 +60,7 @@ describe('runEngine', () => {
       'exp.fst.stateless-scale-out',
       'exp.fst.waiting-room',
       'exp.fst.write-spike-buffer',
+      'exp.nar.present',
       'reliability.service-no-lb',
     ]);
 
@@ -107,6 +109,7 @@ describe('runEngine', () => {
       'exp.brf.present',
       'exp.fst.cdn-static',
       'exp.fst.waiting-room',
+      'exp.nar.present',
     ]);
     expect(result.overallScore).toBe(77.9);
     expect(result.grade).toBe('C');

@@ -9,6 +9,7 @@ import type {
   DesignBrief,
   EdgeKind,
   FlowBinding,
+  NarrationFacts,
   NfrBinding,
   NodeConfig,
   NodeKind,
@@ -444,8 +445,28 @@ export function contextFor(
   facts: PromptFacts = flashSaleFacts(),
   narrative: string | null = null,
   brief: DesignBrief | null = null,
+  narration: NarrationFacts | null = null,
 ): RuleContext {
-  return { graph: canvas, facts, index: buildGraphIndex(canvas), narrative, brief };
+  return { graph: canvas, facts, index: buildGraphIndex(canvas), narrative, brief, narration };
+}
+
+/**
+ * A complete narration for grading a design that is "solid AND explained": every
+ * component has a substantive rationale, every functional requirement is
+ * narrated, and the overview reads as prose. Passing this lifts the "no top
+ * grade without a walkthrough" cap, so a bank test can assert the grade its
+ * structure earns rather than the ceiling a missing narrative would impose.
+ */
+export function fullNarration(canvas: CanvasGraph, facts: PromptFacts): NarrationFacts {
+  return {
+    present: true,
+    overviewSubstantive: true,
+    explainedNodeIds: [...canvas.nodes.map((node) => node.id)].sort(),
+    narratedRequirementIndexes: Array.from(
+      { length: facts.functionalRequirementCount },
+      (_unused, index) => index,
+    ),
+  };
 }
 
 /** A brief literal without the ceremony — specs only ever vary the bindings. */

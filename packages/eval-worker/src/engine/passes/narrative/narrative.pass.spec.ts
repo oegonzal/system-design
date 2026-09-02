@@ -18,6 +18,7 @@ function contextWith(llm: PassContext['llm'], narrative: string | null = STORY):
     index: buildGraphIndex(canvas),
     narrative,
     brief: null,
+    narration: null,
     llm,
     priorArtifacts: [],
     options: {},

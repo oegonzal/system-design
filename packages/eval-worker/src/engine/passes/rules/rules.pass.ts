@@ -8,7 +8,7 @@ import type { EvalRule, PromptFacts, RuleContext } from '../../types';
 import type { EngineFinding, FindingsArtifact } from '../../core/artifacts';
 import type { EvalPass } from '../../core/types';
 import type { GraphIndex } from '../../graph-index';
-import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief, NarrationFacts } from '@sysdesign/contracts';
 import { applySeverityPolicy, readSeverityOverrides } from './severity-policy';
 
 export const RULES_PASS_ID = 'rules.core';
@@ -21,6 +21,8 @@ export interface RulesInput {
   narrative?: string | null;
   /** The design brief submitted with the revision; omitted/null when absent. */
   brief?: DesignBrief | null;
+  /** The narrative's typed projection; omitted/null when absent. */
+  narration?: NarrationFacts | null;
   /** This pass's options from the active profile entry (severityOverrides). */
   options?: Record<string, unknown>;
 }
@@ -32,6 +34,7 @@ export function runRules(input: RulesInput, rules: readonly EvalRule[] = RULES):
     index: input.index,
     narrative: input.narrative ?? null,
     brief: input.brief ?? null,
+    narration: input.narration ?? null,
   };
   const findings: EngineFinding[] = [];
   for (const rule of rules) {

@@ -59,9 +59,17 @@ export interface ScenarioReportDto {
   weakestNodeIds: string[];
 }
 
-/** Why a grade shows a lower letter than its numeric band alone would give. */
+/**
+ * Why a grade shows a lower letter than its numeric band alone would give.
+ * A cap is either a SEVERITY cap (`count` findings of `severity` forced the
+ * ceiling) or an EXPECTATION cap (the unmet `expectationId` forced it — e.g. no
+ * top grade without a design walkthrough). The two are mutually exclusive.
+ */
 export interface CapAppliedDto {
-  severity: Severity;
-  count: number;
   maxGrade: Grade;
+  /** Present for a severity cap. */
+  severity?: Severity;
+  count?: number;
+  /** Present for an expectation cap: the unmet expectation that forced the ceiling. */
+  expectationId?: string;
 }

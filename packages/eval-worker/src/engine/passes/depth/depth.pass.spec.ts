@@ -15,6 +15,7 @@ function contextWith(llm: PassContext['llm']): PassContext {
     facts: flashSaleFacts(),
     index: buildGraphIndex(canvas),
     brief: null,
+    narration: null,
     narrative: null,
     llm,
     priorArtifacts: [

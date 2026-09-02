@@ -4,7 +4,7 @@
  * evidence artifacts. Passes compose declaratively through an EvalProfile;
  * they never talk to each other except through `priorArtifacts`.
  */
-import type { CanvasGraph, DesignBrief } from '@sysdesign/contracts';
+import type { CanvasGraph, DesignBrief, NarrationFacts } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { GraphIndex } from '../graph-index';
@@ -19,6 +19,8 @@ export interface PassContext {
   narrative: string | null;
   /** The graded explanation: requirement bindings and traced flows. */
   brief: DesignBrief | null;
+  /** The typed projection of the narrative the deterministic grade reads; null when absent. */
+  narration: NarrationFacts | null;
   /** The no-op client when LLM work is disabled — passes check `enabled`. */
   llm: LlmClient;
   /** Evidence from earlier passes in profile order (e.g. findings to dedupe against). */

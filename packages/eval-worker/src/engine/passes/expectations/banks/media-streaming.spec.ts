@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SUGGESTED_ID_PREFIX, type CanvasGraph, type Grade } from '@sysdesign/contracts';
 
 import { runEngine } from '../../../engine';
-import { contextFor, edge, graph, mediaFacts, node } from '../../../testing';
+import { contextFor, edge, fullNarration, graph, mediaFacts, node } from '../../../testing';
 import { mediaStreamingExpectations } from './media-streaming';
 
 const GRADE_RANK: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
@@ -116,7 +116,13 @@ describe('media-streaming expectation bank', () => {
   });
 
   it('grades the solid pipeline at least a B', () => {
-    const result = runEngine(solidGraph, mediaFacts());
+    const result = runEngine(
+      solidGraph,
+      mediaFacts(),
+      null,
+      null,
+      fullNarration(solidGraph, mediaFacts()),
+    );
     expect(GRADE_RANK[result.grade]).toBeGreaterThanOrEqual(GRADE_RANK.B);
   });
 

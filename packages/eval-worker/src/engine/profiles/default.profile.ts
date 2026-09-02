@@ -18,7 +18,7 @@ import { WORKABILITY_PASS_ID } from '../passes/workability/workability.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '3.1.0',
+  version: '3.2.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -70,6 +70,10 @@ export const DEFAULT_PROFILE: EvalProfile = {
       { severity: 'critical', atLeast: 1, maxGrade: 'C' },
       { severity: 'critical', atLeast: 2, maxGrade: 'D' },
     ],
+    // No top grade over a design its author never explained: a missing or
+    // insubstantial walkthrough (exp.nar.present unmet) caps the letter at C,
+    // the deterministic teeth behind "the narrative is required".
+    expectationGradeCaps: [{ whenExpectationUnmet: 'exp.nar.present', maxGrade: 'C' }],
     suppressions: [
       { ruleId: 'reliability.single-db-no-replica', whenExpectationUnmet: 'exp.fst.db-failover' },
       {

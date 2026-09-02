@@ -4,7 +4,12 @@
  * unmet expectation as a teaching finding with a ghost fix when one exists.
  * Synchronous core shared with `runEngine`, async wrapper for the profile.
  */
-import { briefHasClaims, type CanvasGraph, type DesignBrief } from '@sysdesign/contracts';
+import {
+  briefHasClaims,
+  type CanvasGraph,
+  type DesignBrief,
+  type NarrationFacts,
+} from '@sysdesign/contracts';
 
 import type { CoverageArtifact, EvidenceArtifact, FindingsArtifact } from '../../core/artifacts';
 import type { EvalPass } from '../../core/types';
@@ -21,6 +26,7 @@ export interface ExpectationsInput {
   index: GraphIndex;
   narrative?: string | null;
   brief?: DesignBrief | null;
+  narration?: NarrationFacts | null;
 }
 
 export function runExpectations(
@@ -36,17 +42,23 @@ export function runExpectations(
   // all opts out of that skip (`appliesWithoutBrief`), so a submission with
   // no brief scores explanation 0 rather than dropping out of the rubric.
   //
-  // Neither context sees the walkthrough. Prose is read by the LLM critic and
-  // by nothing that scores.
+  // No context sees the walkthrough PROSE. Prose is read by the LLM critic and
+  // by nothing that scores; the deterministic narrative grade reads the typed
+  // projection (`narration`), and only the narration-scoped expectations get it.
   const brief = input.brief ?? null;
+  const narration = input.narration ?? null;
   const diagramCtx: RuleContext = {
     graph: input.graph,
     facts: input.facts,
     index: input.index,
     narrative: null,
     brief: null,
+    narration: null,
   };
   const briefCtx: RuleContext = { ...diagramCtx, brief };
+  // Narration expectations grade the walkthrough against the components the
+  // brief accounts for, so this context carries both the projection and the brief.
+  const narrationCtx: RuleContext = { ...diagramCtx, brief, narration };
   const entries: CoverageArtifact['entries'] = [];
   const findings: EngineFinding[] = [];
 
@@ -54,8 +66,19 @@ export function runExpectations(
     if (expectation.requiresBrief && !briefHasClaims(brief) && !expectation.appliesWithoutBrief) {
       continue;
     }
+    if (
+      expectation.requiresNarration &&
+      !(narration?.present ?? false) &&
+      !expectation.appliesWithoutNarration
+    ) {
+      continue;
+    }
     if (!expectationApplies(expectation, input.facts)) continue;
-    const ctx = expectation.requiresBrief ? briefCtx : diagramCtx;
+    const ctx = expectation.requiresNarration
+      ? narrationCtx
+      : expectation.requiresBrief
+        ? briefCtx
+        : diagramCtx;
     const check = expectation.satisfiedBy(ctx);
     // The requirement this expectation enforces, when the prompt names one.
     const nfrKind = expectation.nfrKind ?? expectation.citesNfrKind;

@@ -16,6 +16,7 @@ function contextWith(overrides: Partial<PassContext>): PassContext {
     index: buildGraphIndex(graph),
     narrative: null,
     brief: null,
+    narration: null,
     llm: fakeLlm(null),
     priorArtifacts: [],
     options: {},
