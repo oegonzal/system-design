@@ -12,14 +12,28 @@ import type { PromptFacts } from '../types';
 // describes a canvas to a model too, and both must describe it identically.
 export { renderEdgeLine, renderNodeLine };
 
-/** The narrative rides along whole up to this; beyond it, the graph wins the budget. */
-const MAX_SERIALIZED_NARRATIVE_CHARS = 2_000;
 /**
  * Whole-document ceiling. A 100-node canvas with full interfaces stays well
  * under this; anything larger is clipped with a deterministic marker and the
  * pass reports a token-clipped diagnostic so the audit trail says so.
  */
 export const GRAPH_TEXT_MAX_CHARS = 24_000;
+const NARRATIVE_HEADER = ['', `# Design narrative (the author's own explanation)`];
+const NARRATIVE_CLIPPED = ' […narrative clipped]';
+
+/**
+ * The narrative rides whole as long as the document fits; only when it does
+ * not does the graph win the budget and the story lose its tail. A flat 2k
+ * ceiling used to sit here regardless of room, which cut a contract-sized
+ * structured narrative (1.2k overview + 600 per component) after the fifth
+ * component — so the critics charged authors for prose they were never shown.
+ */
+function narrativeSection(story: string, room: number): string[] {
+  if (story.length === 0) return [];
+  if (story.length <= room) return [...NARRATIVE_HEADER, story];
+  const keep = Math.max(0, room - NARRATIVE_CLIPPED.length);
+  return [...NARRATIVE_HEADER, `${story.slice(0, keep)}${NARRATIVE_CLIPPED}`];
+}
 
 export interface GraphText {
   text: string;
@@ -51,18 +65,6 @@ export function describeDesign(
                 : ''
             }`,
         );
-
-  const story = narrative?.trim() ?? '';
-  const narrativeSection =
-    story.length === 0
-      ? []
-      : [
-          ``,
-          `# Design narrative (the author's own explanation)`,
-          story.length > MAX_SERIALIZED_NARRATIVE_CHARS
-            ? `${story.slice(0, MAX_SERIALIZED_NARRATIVE_CHARS)} […narrative clipped]`
-            : story,
-        ];
 
   const workflow = facts.workflow;
   const workflowSection =
@@ -98,7 +100,7 @@ export function describeDesign(
           ),
         ];
 
-  const full = [
+  const design = [
     `# Design prompt`,
     `archetype: ${facts.archetype} · difficulty: ${facts.difficulty}`,
     `scale: ${targets.concurrentUsers} concurrent users, ${targets.requestsPerSecond} req/s, ` +
@@ -113,8 +115,10 @@ export function describeDesign(
     `# Candidate design (canvas graph)`,
     ...graph.nodes.map(renderNodeLine),
     ...graph.edges.map(renderEdgeLine),
-    ...narrativeSection,
   ].join('\n');
+
+  const room = GRAPH_TEXT_MAX_CHARS - design.length - NARRATIVE_HEADER.join('\n').length - 2;
+  const full = [design, ...narrativeSection(narrative?.trim() ?? '', room)].join('\n');
 
   if (full.length <= GRAPH_TEXT_MAX_CHARS) return { text: full, clipped: false };
   return {

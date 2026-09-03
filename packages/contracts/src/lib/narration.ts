@@ -143,7 +143,10 @@ export function readsAsProse(text: string): boolean {
  * LLM critic that reads the author's own words, the brief suggester. The
  * deterministic grade never calls this; it reads {@link NarrationFacts}. Order
  * is stable (overview, then rationales, then flows) and empty slots are
- * dropped; returns null when nothing substantive remains.
+ * dropped; returns null when nothing substantive remains. Each slot keeps the
+ * reference it is keyed to — `[n-4]`, `[requirement #0]` — so a reader that
+ * also holds the graph can tie every sentence to the node it explains instead
+ * of guessing from labels.
  */
 export function narrationToProse(narration: DesignNarrative | null): string | null {
   if (narration === null) return null;
@@ -152,11 +155,11 @@ export function narrationToProse(narration: DesignNarrative | null): string | nu
   if (overview.length > 0) parts.push(overview);
   for (const rationale of narration.componentRationales) {
     const prose = rationale.prose.trim();
-    if (prose.length > 0) parts.push(prose);
+    if (prose.length > 0) parts.push(`[${rationale.nodeId}] ${prose}`);
   }
   for (const flow of narration.flowNarrations) {
     const prose = flow.prose.trim();
-    if (prose.length > 0) parts.push(prose);
+    if (prose.length > 0) parts.push(`[requirement #${flow.requirementIndex}] ${prose}`);
   }
   const joined = parts.join('\n\n');
   return joined.length > 0 ? joined : null;

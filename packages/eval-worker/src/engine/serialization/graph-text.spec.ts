@@ -46,16 +46,28 @@ describe('describeDesign', () => {
     );
   });
 
-  it('clips an oversized narrative at 2000 chars with its own marker', () => {
-    const long = 'w'.repeat(2500);
+  it('carries a contract-sized narrative whole while the document fits the budget', () => {
+    // 1.2k overview + 600 per component for a dozen components — the shape a
+    // structured narrative legitimately takes; nothing of it may be lost.
+    const story = 'w'.repeat(1_200 + 12 * 600);
     const { text, clipped } = describeDesign(
       graph([node('n-1', 'client')]),
       flashSaleFacts(),
-      long,
+      story,
     );
-    expect(clipped).toBe(false); // the whole document still fits the budget
-    expect(text).toContain(`${'w'.repeat(2000)} […narrative clipped]`);
-    expect(text).not.toContain('w'.repeat(2001));
+    expect(clipped).toBe(false);
+    expect(text).toContain(story);
+    expect(text).not.toContain('[…narrative clipped]');
+  });
+
+  it('gives the narrative only what the graph leaves, clipping it with its own marker', () => {
+    const canvas = graph([node('n-1', 'client')]);
+    const story = 'w'.repeat(GRAPH_TEXT_MAX_CHARS);
+    const { text, clipped } = describeDesign(canvas, flashSaleFacts(), story);
+    expect(clipped).toBe(false); // the narrative yielded, so the document itself fits
+    expect(text.length).toBeLessThanOrEqual(GRAPH_TEXT_MAX_CHARS);
+    expect(text.endsWith(' […narrative clipped]')).toBe(true);
+    expect(text).toContain('node n-1 kind=client'); // the graph is never the part that yields
   });
 
   it('clips oversized designs with a deterministic marker', () => {
