@@ -73,8 +73,11 @@ const SYSTEM_PROMPT = [
   'objective), completeness (contracts, lifecycles, events beyond the',
   'checklist), feasibility (would the declared workflow actually run as',
   'drawn), risk (how much business risk REMAINS unmitigated — high means',
-  'exposed), futureGain (what headroom this modelling buys later). Be strict;',
-  'quote node ids. Keep the summary to what the author should fix first.',
+  'exposed), futureGain (what headroom this modelling buys later). Then list',
+  'the worst shortfalls, each grounded to one workflow item: WHERE (the item',
+  'and node ids), HOW BAD (a weakness magnitude of none/low/medium/high), HOW',
+  'SURE (confidence), and WHY. Be strict; quote node ids. Keep every rationale',
+  'to one or two sentences and the summary to what the author should fix first.',
 ].join(' ');
 
 export function createWorkabilityPass(): EvalPass {

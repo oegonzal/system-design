@@ -22,7 +22,7 @@ export const WORKABILITY_AXIS_LABEL = 'Business workability';
  */
 const factor = z.object({
   level: z.enum(AXIS_FACTOR_LEVELS),
-  rationale: z.string().max(400),
+  rationale: z.string().max(300),
 });
 
 /** The four shortfall lenses a grounded weakness can come from (futureGain is upside, not a shortfall). */
@@ -116,14 +116,14 @@ export function buildWorkabilitySchema(
             .enum(AXIS_FACTOR_LEVELS)
             .describe('How sure you are the shortfall is real.'),
           affectedComponents,
-          rationale: z.string().max(400),
+          rationale: z.string().max(240),
         }),
       )
-      .max(10)
+      .max(6)
       .describe(
-        'Grounded, per-item shortfalls only — one per real gap, never restating existence checks.',
+        'Grounded, per-item shortfalls only — the worst six at most, one per real gap, never restating existence checks.',
       ),
-    summary: z.string().max(800),
+    summary: z.string().max(600),
   }) as z.ZodType<WorkabilityCritique>;
 }
 

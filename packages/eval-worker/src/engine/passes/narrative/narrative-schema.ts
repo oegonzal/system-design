@@ -67,7 +67,7 @@ export function buildNarrativeSchema(
           title: z.string().max(120),
           message: z
             .string()
-            .max(1000)
+            .max(600)
             .describe(
               'Quote the offending narrative claim, then say what the diagram actually shows and how to reconcile them.',
             ),

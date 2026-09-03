@@ -39,6 +39,28 @@ describe('extractStructured', () => {
     expect(extractStructured(text, schema)).toEqual({ answer: 'real', score: 9 });
   });
 
+  it('clamps a length overshoot to its cap instead of losing the whole answer', () => {
+    // No server-side constraint on this route: a model shown `.max(10)` still
+    // writes twelve characters, and a 900-char summary must not sink a pass.
+    const capped = z.object({
+      summary: z.string().max(10),
+      items: z.array(z.object({ note: z.string().max(4) })).max(1),
+    });
+    const text = JSON.stringify({
+      summary: 'twelve chars',
+      items: [{ note: 'toolong' }, { note: 'dropped' }],
+    });
+    expect(extractStructured(text, capped)).toEqual({
+      summary: 'twelve cha',
+      items: [{ note: 'tool' }],
+    });
+  });
+
+  it('does not clamp its way past a real schema miss', () => {
+    const capped = z.object({ summary: z.string().max(10), score: z.number() });
+    expect(extractStructured('{"summary":"twelve chars","score":"nope"}', capped)).toBeNull();
+  });
+
   it('skips a first fenced block that fails the schema and takes the second that passes', () => {
     const text =
       'Current brief:\n```json\n{"answer":"stale"}\n```\nProposal:\n```json\n{"answer":"new","score":3}\n```';

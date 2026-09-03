@@ -1,4 +1,4 @@
-import { z, type ZodType } from 'zod';
+import { z, type ZodIssue, type ZodType } from 'zod';
 
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import type { LlmClient, StructuredRequest } from './llm-client';
@@ -76,10 +76,60 @@ function* braceObjects(text: string): Generator<string> {
 }
 
 /**
+ * A `too_big` issue on a string or array is an overshoot, not a wrong answer:
+ * with no server-side constraint the model writes past a `.max()` it was shown,
+ * and rejecting a whole pass for a 900-character summary loses everything
+ * grounded in it. Clamp each such value to its maximum and let the schema
+ * judge again — schema-driven, so no caller knows a cap exists. Anything that
+ * is not an overshoot is left for the schema to reject.
+ */
+function clampOvershoot(value: unknown, issues: readonly ZodIssue[]): unknown {
+  let next = value;
+  for (const issue of issues) {
+    if (issue.code !== 'too_big' || typeof issue.maximum !== 'number') continue;
+    if (issue.origin !== 'string' && issue.origin !== 'array') continue;
+    const path = issue.path.filter(
+      (key): key is string | number => typeof key === 'string' || typeof key === 'number',
+    );
+    next = updateAt(next, path, (current) =>
+      typeof current === 'string'
+        ? current.slice(0, issue.maximum as number)
+        : Array.isArray(current)
+          ? current.slice(0, issue.maximum as number)
+          : current,
+    );
+  }
+  return next;
+}
+
+function updateAt(
+  value: unknown,
+  path: readonly (string | number)[],
+  fn: (v: unknown) => unknown,
+): unknown {
+  if (path.length === 0) return fn(value);
+  const [head, ...rest] = path;
+  if (Array.isArray(value) && typeof head === 'number') {
+    const copy = [...value];
+    copy[head] = updateAt(copy[head], rest, fn);
+    return copy;
+  }
+  if (value !== null && typeof value === 'object' && typeof head === 'string') {
+    const record = value as Record<string, unknown>;
+    return { ...record, [head]: updateAt(record[head], rest, fn) };
+  }
+  return value;
+}
+
+/** Overshoot clamps can cascade (an array trimmed, then a member's string); a few rounds settle it. */
+const CLAMP_ROUNDS = 3;
+
+/**
  * Pull the one schema-valid JSON object out of an agent's final text.
  * Tries every fenced block, then every balanced brace span, returning the
- * first that both parses AND satisfies the schema. Anything else is `null` —
- * the port's deterministic path.
+ * first that both parses AND satisfies the schema — clamping length
+ * overshoots on the way. Anything else is `null`, the port's deterministic
+ * path.
  */
 export function extractStructured<T>(text: string, schema: ZodType<T>): T | null {
   const candidates: string[] = [];
@@ -94,8 +144,13 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
     } catch {
       continue;
     }
-    const result = schema.safeParse(parsed);
-    if (result.success) return result.data;
+    for (let round = 0; round <= CLAMP_ROUNDS; round++) {
+      const result = schema.safeParse(parsed);
+      if (result.success) return result.data;
+      const overshoots = result.error.issues.filter((issue) => issue.code === 'too_big');
+      if (overshoots.length === 0 || overshoots.length !== result.error.issues.length) break;
+      parsed = clampOvershoot(parsed, overshoots);
+    }
   }
   return null;
 }
