@@ -44,11 +44,15 @@ const SYSTEM_PROMPT = [
   'severe findings first. You may add, change or remove components and edges,',
   'and you may replace the brief and the walkthrough wholesale. A design with',
   'no walkthrough cannot earn a top grade — when the narrative is missing or',
-  'thin, write a complete one: an overview, two-sentence rationales for every',
-  'real component (not monitoring/logging/tracing), and a flow narration per',
-  'functional requirement. Every rationale must read as prose — at least two',
-  'sentences. Keep the description to one concrete sentence: it is shown to',
-  'the learner as the lesson of this iteration.',
+  'thin, write a complete one: an overview, a rationale for every real',
+  'component (not monitoring/logging/tracing), and a flow narration per',
+  'functional requirement.',
+  '',
+  'BE CONCISE. Your whole reply is one JSON object that MUST be complete and',
+  'valid — an over-long answer is truncated and thrown away, which helps the',
+  'learner not at all. Keep every rationale and flow narration to exactly two',
+  'short sentences (never more), the overview to three short sentences, and the',
+  'description to one sentence. Prefer fewer words over more; do not pad.',
 ].join(' ');
 
 const MAX_FINDINGS_SHOWN = 12;
