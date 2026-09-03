@@ -15,6 +15,7 @@ import {
   validateNarration,
   validateWorkflowReferences,
   type BriefSuggestionsDto,
+  type InterfaceSuggestionsDto,
   type SessionStatus,
 } from '@sysdesign/contracts';
 import {
@@ -29,7 +30,9 @@ import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
 import { LLM_CLIENT } from '../llm/llm.token';
 import type { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
+import type { InterfaceSuggestionsRequestDto } from './dto/interface-suggestions.dto';
 import { suggestBindings } from './suggestions/suggest-bindings';
+import { suggestInterface } from './suggestions/suggest-interface';
 import {
   buildSuggestionDump,
   startSuggestionDump,
@@ -124,6 +127,71 @@ export class SessionsService {
       // that ran and had nothing to offer is a different fact from no model at
       // all, and collapsing them would make an empty list unreadable.
       return { proposals, model: this.llm.enabled ? this.llm.model : null };
+    } catch (error) {
+      dump.failed(error);
+      throw error;
+    } finally {
+      this.writeDump(dump);
+    }
+  }
+
+  /**
+   * Candidate interface declarations for one component of an unsubmitted
+   * draft — the sibling of `suggestBrief`, with the same read-only guarantee:
+   * a proposal reaches the graph only when the author accepts it in the editor.
+   * The node must exist in the submitted graph; the same referential checks
+   * submit runs guard the graph itself.
+   */
+  async suggestInterface(
+    sessionId: string,
+    dto: InterfaceSuggestionsRequestDto,
+  ): Promise<InterfaceSuggestionsDto> {
+    const session = await this.em.findOne(
+      DesignSession,
+      { id: sessionId },
+      { populate: ['prompt'] },
+    );
+    if (!session) {
+      throw new NotFoundException(`Session ${sessionId} not found`);
+    }
+
+    const spec = session.prompt.workflowSpec ?? null;
+    const problems = [
+      ...validateGraphReferences(dto.graph),
+      ...validateWorkflowReferences(dto.graph, spec),
+      ...(dto.graph.nodes.some((node) => node.id === dto.nodeId)
+        ? []
+        : [`unknown node: ${dto.nodeId}`]),
+    ];
+    if (problems.length > 0) {
+      throw new UnprocessableEntityException(problems);
+    }
+
+    const dump = startSuggestionDump({
+      runId: makeRunId(Date.now(), 'suggestion'),
+      sessionId,
+      now: Date.now(),
+      llm: this.llmStatus(),
+      git: GIT_CONTEXT,
+    });
+    dump.input({
+      promptId: session.prompt.id,
+      graph: dto.graph,
+      narrative: dto.narrative ?? null,
+    });
+
+    try {
+      const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
+      const proposals = await suggestInterface(llm, {
+        graph: dto.graph,
+        nodeId: dto.nodeId,
+        spec,
+        nfrs: session.prompt.nonFunctionalRequirements,
+        functionalRequirements: session.prompt.functionalRequirements,
+        narrative: dto.narrative ?? null,
+      });
+      dump.offered(proposals);
+      return { nodeId: dto.nodeId, proposals, model: this.llm.enabled ? this.llm.model : null };
     } catch (error) {
       dump.failed(error);
       throw error;

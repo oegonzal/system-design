@@ -8,6 +8,7 @@ import {
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
   canDeclareOperations,
+  configFieldsFor,
   interfaceSummary,
   isApiLikeRole,
   kindsInCategory,
@@ -21,7 +22,9 @@ import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
 import { SelectField, TextField } from '../../../components/fields';
 import { useCanvasStore } from '../canvas-store-context';
 import { DEFAULT_NODE_LABELS } from '../canvas-store';
+import type { InterfaceSuggestionsState } from '../../practice/use-interface-suggestions';
 import { EdgeCarriesField } from './edge-carries-field';
+import { InterfaceProposals } from './interface-proposals';
 import { NodeConfigFields } from './node-config-fields';
 import { OperationsEditor } from './operations-editor';
 import { ResponsibilitiesEditor } from './responsibilities-editor';
@@ -47,13 +50,23 @@ export interface PropertiesPanelProps {
    * network.
    */
   workflowSpec?: WorkflowSpec | null;
+  /**
+   * The interface suggester, owned by the workspace (a component that fetched
+   * would be uncatalogable). Absent → no Suggest button, which is also the
+   * storyable default.
+   */
+  interfaceSuggestions?: InterfaceSuggestionsState | null;
 }
 
 /**
  * Edit surface for the selected element. Reads and writes the canvas store
  * directly; the config sub-forms write the keys the eval rules read.
  */
-export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  className,
+  workflowSpec = null,
+  interfaceSuggestions = null,
+}: PropertiesPanelProps) {
   const selectedId = useCanvasStore((state) => state.selectedId);
   const node = useCanvasStore((state) =>
     state.selectedId === null
@@ -71,6 +84,9 @@ export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPa
   const updateNode = useCanvasStore((state) => state.updateNode);
   const updateEdge = useCanvasStore((state) => state.updateEdge);
   const removeSelected = useCanvasStore((state) => state.removeSelected);
+  const interfaceProposals = useCanvasStore((state) => state.interfaceProposals);
+  const acceptInterfaceProposal = useCanvasStore((state) => state.acceptInterfaceProposal);
+  const dismissInterfaceProposal = useCanvasStore((state) => state.dismissInterfaceProposal);
 
   if (selectedId === null || (!node && !edge)) {
     return (
@@ -86,6 +102,10 @@ export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPa
   // What the selected node's interface *is* — nothing renders for kinds whose
   // capability row declares no operation kinds (storage, edge-infra, passive).
   const capability = node ? INTERFACE_CAPABILITIES[node.data.kind] : undefined;
+  const configFields = node ? configFieldsFor(node.data.kind) : [];
+  // Anything a model could propose for this kind: an interface or a knob.
+  const suggestable =
+    node !== undefined && (canDeclareOperations(node.data.kind) || configFields.length > 0);
 
   // The selected edge's interface owner: the one node whose declared
   // operations its `carries` names resolve against.
@@ -152,20 +172,45 @@ export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPa
               </Text>
             ) : null}
           </Stack>
-          <NodeConfigFields
-            kind={node.data.kind}
-            config={node.data.config ?? {}}
-            onChange={(config) => updateNode(node.id, { config })}
-          />
+          {/* Each section says why it applies to THIS kind — the answer comes
+              from the same tables that gate it, never from a per-kind string. */}
+          {configFields.length > 0 ? (
+            <Stack gap={2} data-testid="config-section">
+              <Heading level={3}>Configuration</Heading>
+              <Text size="sm" tone="muted" data-testid="config-guide">
+                The knobs the grader reads for a {DEFAULT_NODE_LABELS[node.data.kind]} — each one
+                changes a verdict; nothing here is decorative.
+              </Text>
+              <NodeConfigFields
+                kind={node.data.kind}
+                config={node.data.config ?? {}}
+                onChange={(config) => updateNode(node.id, { config })}
+              />
+            </Stack>
+          ) : null}
           {capability && capability.operationKinds.length > 0 ? (
             <Stack gap={4} data-testid="interface-section">
               <Heading level={3}>Interface</Heading>
+              <Text size="sm" tone="muted" data-testid="interface-guide">
+                What this component declares — the{' '}
+                {capability.editorLabel?.toLowerCase() ?? 'operations'} it{' '}
+                {capability.role === 'channel' ? 'carries' : 'serves'}
+                {isApiLikeRole(capability.role) ? ' and the responsibilities it owns' : ''}. The
+                grader corroborates these contracts against the connections you draw and, on a
+                workflow prompt, the prompt&apos;s own items — never by matching names.
+              </Text>
               {/* Channels carry other components' facts; api and event-handler kinds own responsibilities. */}
               {isApiLikeRole(capability.role) ? (
-                <ResponsibilitiesEditor
-                  responsibilities={node.data.responsibilities ?? []}
-                  onChange={(responsibilities) => updateNode(node.id, { responsibilities })}
-                />
+                <Stack gap={2}>
+                  <Text size="sm" tone="muted" data-testid="responsibilities-guide">
+                    Responsibilities — short clauses for what this component owns. A component that
+                    nothing accounts for becomes a finding; a duplicated one, another.
+                  </Text>
+                  <ResponsibilitiesEditor
+                    responsibilities={node.data.responsibilities ?? []}
+                    onChange={(responsibilities) => updateNode(node.id, { responsibilities })}
+                  />
+                </Stack>
               ) : null}
               <OperationsEditor
                 heading={capability.editorLabel ?? 'Operations'}
@@ -175,6 +220,20 @@ export function PropertiesPanel({ className, workflowSpec = null }: PropertiesPa
                 workflow={workflowSpec ? { spec: workflowSpec, role: capability.role } : null}
               />
             </Stack>
+          ) : null}
+          {/* The propose→verify seam for this component: the model selects from
+              the vocabulary above, the same validators submit runs verify each
+              item, and the author takes them one at a time. */}
+          {suggestable && interfaceSuggestions ? (
+            <InterfaceProposals
+              proposals={interfaceProposals?.nodeId === node.id ? interfaceProposals.items : []}
+              asking={interfaceSuggestions.asking}
+              error={interfaceSuggestions.error}
+              askedAndEmpty={interfaceSuggestions.askedAndEmptyFor === node.id}
+              onAsk={() => interfaceSuggestions.ask(node.id)}
+              onAccept={acceptInterfaceProposal}
+              onDismiss={dismissInterfaceProposal}
+            />
           ) : null}
         </Stack>
       ) : null}

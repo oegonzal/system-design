@@ -2,6 +2,8 @@ import type {
   ApiListResponse,
   BriefSuggestionsDto,
   BriefSuggestionsRequest,
+  InterfaceSuggestionsDto,
+  InterfaceSuggestionsRequest,
   ApiResponse,
   CreateSessionRequest,
   DesignRevisionDto,
@@ -225,6 +227,19 @@ export const api = {
         body,
         ...opts,
       }),
+    );
+  },
+
+  async interfaceSuggestions(
+    sessionId: string,
+    body: InterfaceSuggestionsRequest,
+    opts: GetOptions = {},
+  ): Promise<InterfaceSuggestionsDto> {
+    return unwrap(
+      await request<ApiResponse<InterfaceSuggestionsDto>>(
+        `/sessions/${sessionId}/interface-suggestions`,
+        { method: 'POST', body, ...opts },
+      ),
     );
   },
 

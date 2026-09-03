@@ -192,6 +192,12 @@ export function OperationsEditor({
                 ))}
               </SelectField>
             ) : null}
+            {workflow !== null && fulfillableFor(operation).length > 0 ? (
+              <Text size="sm" tone="muted" data-testid={`fulfills-guide-${index}`}>
+                Which item of the prompt&apos;s workflow this operation realizes — claimed by
+                reference and corroborated by the connections that exercise it, never by name.
+              </Text>
+            ) : null}
             {workflow !== null
               ? (() => {
                   const emits = operation.emits ?? [];
@@ -208,7 +214,9 @@ export function OperationsEditor({
                   return shown.length > 0 ? (
                     <Stack gap={2} role="group" aria-label={`Emits for ${displayName}`}>
                       <Text as="span" size="sm" tone="muted">
-                        Emits ({emits.length} of {OPERATION_MAX_EMITS})
+                        Emits ({emits.length} of {OPERATION_MAX_EMITS}) — the prompt&apos;s events
+                        this command publishes when it runs; the producer half of each event&apos;s
+                        story.
                       </Text>
                       {shown.map((event) => {
                         const checked = emits.includes(event.id);

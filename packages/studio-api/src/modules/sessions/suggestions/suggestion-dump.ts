@@ -6,7 +6,7 @@ import {
   type DumpFile,
   type GitContext,
 } from '@sysdesign/run-dump';
-import type { BriefBindingProposal, CanvasGraph } from '@sysdesign/contracts';
+import type { BriefBindingProposal, CanvasGraph, InterfaceProposal } from '@sysdesign/contracts';
 import type { LlmCall, LlmExchange } from '@sysdesign/llm';
 
 /**
@@ -45,16 +45,34 @@ export interface SuggestionDumpState {
   exchanges: LlmExchange[];
   /** What the model returned, before admissibility filtering. */
   raw: unknown;
-  /** What survived — what the author was actually offered. */
-  offered: BriefBindingProposal[] | null;
+  /** What survived — what the author was actually offered (bindings or interface items). */
+  offered: SuggestionOffer[] | null;
   error: { name: string; message: string } | null;
+}
+
+/** Either suggester's proposal — the dump is payload-agnostic past this line. */
+export type SuggestionOffer = BriefBindingProposal | InterfaceProposal;
+
+/** One line per offer, whichever suggester made it. */
+function describeOffer(offer: SuggestionOffer): string {
+  if (!('kind' in offer)) {
+    return `\`${offer.nfrId}\` → **${offer.mechanism}** on ${offer.nodeIds.join(', ')} — ${offer.rationale}`;
+  }
+  switch (offer.kind) {
+    case 'operation':
+      return `operation **${offer.operation.name}** (${offer.operation.kind}${offer.operation.fulfills ? ` → ${offer.operation.fulfills}` : ''}) — ${offer.rationale}`;
+    case 'config':
+      return `config **${offer.key}** = ${JSON.stringify(offer.value)} — ${offer.rationale}`;
+    case 'responsibility':
+      return `responsibility **${offer.text}** — ${offer.rationale}`;
+  }
 }
 
 export interface SuggestionDump {
   readonly state: SuggestionDumpState;
   record: (call: LlmCall) => void;
   input(input: { promptId: string; graph: CanvasGraph; narrative: string | null }): void;
-  offered(proposals: BriefBindingProposal[]): void;
+  offered(proposals: SuggestionOffer[]): void;
   failed(error: unknown): void;
 }
 
@@ -221,10 +239,7 @@ export function renderSuggestionMarkdown(
     );
   } else {
     lines.push(
-      ...offered.map(
-        (proposal) =>
-          `- \`${proposal.nfrId}\` → **${proposal.mechanism}** on ${proposal.nodeIds.join(', ')} — ${proposal.rationale}`,
-      ),
+      ...offered.map((proposal) => `- ${describeOffer(proposal)}`),
       ``,
       `These were offered, not applied. Whether any became part of the brief is recorded on the revision the author submitted, not here.`,
       ``,

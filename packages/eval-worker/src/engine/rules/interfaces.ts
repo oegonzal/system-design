@@ -118,10 +118,14 @@ const unreferencedOperation: EvalRule = {
   dimension: 'hygiene',
   check({ facts, index, graph }) {
     if (!index.declaresOperations()) return [];
-    // Only meaningful once the author annotates edges at all — a design that
-    // declares operations but never uses carries has not opted into this.
-    if (!index.edges().some((edge) => (edge.carries?.length ?? 0) > 0)) return [];
     const spec = facts.workflow;
+    const usesCarries = index.edges().some((edge) => (edge.carries?.length ?? 0) > 0);
+    // On a scale-only prompt the author opts in by annotating edges at all — a
+    // design that declares operations but never uses carries has not. On a
+    // workflow prompt the spec is the reference frame instead: an operation
+    // that realizes no item, emits nothing and is carried nowhere is hanging
+    // whether or not the edges are annotated.
+    if (!usesCarries && spec === null) return [];
     const findings: RuleFinding[] = [];
     for (const node of sortById(index.nodes())) {
       const declared = node.operations ?? [];
@@ -140,6 +144,9 @@ const unreferencedOperation: EvalRule = {
       const eventDriven = roleOf(node.kind) === 'event-handler';
       const exercised = (op: NodeOperation): boolean => {
         if (carried.has(op.name)) return true;
+        // A claimed workflow item is the workflow judge's to corroborate; its
+        // shortfall is taught there (not-exercised), never charged twice here.
+        if (spec !== null && op.fulfills !== undefined) return true;
         if (!eventDriven) return false;
         if (
           (op.emits ?? []).length > 0 &&
@@ -157,12 +164,15 @@ const unreferencedOperation: EvalRule = {
       const howExercised = eventDriven
         ? `no edge carries ${them} and neither the events ${them === 'them' ? 'they emit' : 'it emits'} nor the ones ${them === 'them' ? 'they consume' : 'it consumes'} are wired`
         : `no edge touching it carries ${them}`;
+      const frame = usesCarries
+        ? 'This design annotates its edges with the calls and events they carry, so an unexercised operation reads as either dead surface or a missing arrow — wire the flow that uses it, or prune it.'
+        : "On a workflow prompt an operation should realize one of the prompt's items (Fulfills) or be exercised by a connection; one that does neither is a hanging declaration — link it, wire it, or prune it.";
       findings.push({
         ruleId: unreferencedOperation.id,
         dimension: 'hygiene',
         severity: 'low',
         title: 'Declared operations no edge exercises',
-        message: `"${node.label}" declares ${names}, yet ${howExercised}. This design annotates its edges with the calls and events they carry, so an unexercised operation reads as either dead surface or a missing arrow — wire the flow that uses it, or prune it.`,
+        message: `"${node.label}" declares ${names}, yet ${howExercised}${spec !== null ? ' and none of them realizes a workflow item' : ''}. ${frame}`,
         affectedNodeIds: [node.id],
         affectedEdgeIds: [],
         suggestion: null,

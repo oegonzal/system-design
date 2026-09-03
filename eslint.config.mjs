@@ -119,6 +119,7 @@ export default [
             'expectFlowComplete',
             'expectDimensionScored',
             'expectNoSuggestionsOffered',
+            'expectNoInterfaceSuggestionsOffered',
             'expectWorkflowVerdict',
             // app-nav.ts
             'expectActiveNav',

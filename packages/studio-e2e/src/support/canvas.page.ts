@@ -317,6 +317,15 @@ export class CanvasPage {
     await expect(this.page.getByTestId('suggestions-empty')).toBeVisible();
   }
 
+  /** The properties panel's own suggester, for the selected component. */
+  async askForInterfaceSuggestions(): Promise<void> {
+    await this.page.getByTestId('suggest-interface').click();
+  }
+
+  async expectNoInterfaceSuggestionsOffered(): Promise<void> {
+    await expect(this.page.getByTestId('interface-proposals-empty')).toBeVisible();
+  }
+
   async expectNodeCount(count: number): Promise<void> {
     await expect(this.canvas.locator('.react-flow__node')).toHaveCount(count);
   }

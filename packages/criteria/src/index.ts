@@ -153,6 +153,11 @@ export const CRITERIA: readonly Criterion[] = [
       'The config-knob vocabulary is one declarative table shared by the editor, the drift gate, the suggester and the validators — a knob the grader cannot read cannot be set.',
   },
   {
+    id: 'UX-14',
+    statement:
+      "A component's interface can be suggested: proposals are enum-locked to that component's gradeable vocabulary, verified by the same validators submit runs, and accepted one at a time — never all at once.",
+  },
+  {
     id: 'EVAL-17',
     statement:
       'Every LLM lens — critic, narrative, depth, workability, scenarios — emits grounded graded evidence; none emits a free-form finding.',

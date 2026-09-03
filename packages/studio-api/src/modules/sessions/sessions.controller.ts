@@ -15,12 +15,14 @@ import {
   type GetRevisionResponse,
   type GetSessionResponse,
   type ListRevisionsResponse,
+  type InterfaceSuggestionsResponse,
   type ListSessionsResponse,
 } from '@sysdesign/contracts';
 
 import { ok, page } from '../../common/envelope';
 import { toRevisionDto, toRevisionSummaryDto } from '../evaluations/evaluations.mapper';
 import { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
+import { InterfaceSuggestionsRequestDto } from './dto/interface-suggestions.dto';
 import { CreateSessionRequestDto } from './dto/create-session.dto';
 import { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
 import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
@@ -84,6 +86,16 @@ export class SessionsController {
     @Body() dto: BriefSuggestionsRequestDto,
   ): Promise<BriefSuggestionsResponse> {
     return ok(await this.sessions.suggestBrief(id, dto));
+  }
+
+  /** Same contract as brief suggestions: computed, offered, stored nowhere. */
+  @Post(':id/interface-suggestions')
+  @HttpCode(200)
+  async suggestInterface(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: InterfaceSuggestionsRequestDto,
+  ): Promise<InterfaceSuggestionsResponse> {
+    return ok(await this.sessions.suggestInterface(id, dto));
   }
 
   @Get(':id/revisions')

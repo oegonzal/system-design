@@ -120,4 +120,25 @@ test.describe('the design brief', () => {
     // Nothing was proposed, so nothing can have been accepted into the brief.
     await expect(page.locator('[data-testid^="binding-proposal-"]')).toHaveCount(0);
   });
+
+  /**
+   * The same honesty for a component's interface: the panel explains why each
+   * section applies, offers to suggest, and says plainly when no model answered
+   * — never a spinner, never a phantom proposal.
+   */
+  test('[UX-14] a component explains its sections and asks for its interface honestly', async ({
+    page,
+    request,
+  }) => {
+    const canvas = await openPracticeSession(page, request);
+    await buildNaiveDesign(canvas);
+
+    await canvas.selectNode('n-2'); // the service
+    await expect(page.getByTestId('config-guide')).toBeVisible();
+    await expect(page.getByTestId('interface-guide')).toBeVisible();
+
+    await canvas.askForInterfaceSuggestions();
+    await canvas.expectNoInterfaceSuggestionsOffered();
+    await expect(page.locator('[data-testid^="interface-proposal-proposal-"]')).toHaveCount(0);
+  });
 });

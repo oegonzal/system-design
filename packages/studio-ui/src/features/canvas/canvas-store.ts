@@ -9,6 +9,7 @@ import type {
   FlowBinding,
   FlowNarration,
   GraphPatch,
+  InterfaceProposal,
   MechanismClaim,
   NfrBinding,
   NodeConfig,
@@ -16,7 +17,13 @@ import type {
   NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
-import { BINDING_MAX_NODES, canonicalizeGraphConfig, MECHANISM_KINDS } from '@sysdesign/contracts';
+import {
+  BINDING_MAX_NODES,
+  canonicalizeGraphConfig,
+  MECHANISM_KINDS,
+  NODE_MAX_OPERATIONS,
+  NODE_MAX_RESPONSIBILITIES,
+} from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -135,6 +142,13 @@ export interface CanvasState {
    * submitted" a property of the shape rather than of remembering to strip.
    */
   briefProposals: BriefBindingProposal[];
+  /**
+   * Machine-proposed interface items for ONE node, held apart from the node
+   * for the same reason brief proposals are held apart from bindings: an
+   * unaccepted item must be structurally unable to reach `serialize`. Tied to
+   * the node they were computed for — selecting another node discards them.
+   */
+  interfaceProposals: { nodeId: string; items: InterfaceProposal[] } | null;
   ghost: GhostState | null;
   highlight: HighlightState | null;
 
@@ -190,6 +204,11 @@ export interface CanvasState {
   /** Take the proposal for this requirement, replacing any binding there. */
   acceptProposal(nfrId: string): void;
   dismissProposal(nfrId: string): void;
+  /** Fresh interface proposals for a node. Never dirties: nobody has decided yet. */
+  loadInterfaceProposals(nodeId: string, items: InterfaceProposal[]): void;
+  /** Take one item into the node it was proposed for — an author edit, so it dirties. */
+  acceptInterfaceProposal(id: string): void;
+  dismissInterfaceProposal(id: string): void;
   markClean(): void;
   markDirty(): void;
   serialize(): CanvasGraph;
@@ -248,6 +267,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     briefBindings: [],
     briefFlows: [],
     briefProposals: [],
+    interfaceProposals: null,
     ghost: null,
     highlight: null,
 
@@ -268,6 +288,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
         ghost: null,
         highlight: null,
         briefProposals: [],
+        interfaceProposals: null,
       });
     },
 
@@ -404,7 +425,14 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     },
 
     select(id) {
-      set({ selectedId: id });
+      const { interfaceProposals } = get();
+      // Proposals were computed for one node; they do not follow the selection.
+      set({
+        selectedId: id,
+        ...(interfaceProposals !== null && interfaceProposals.nodeId !== id
+          ? { interfaceProposals: null }
+          : {}),
+      });
     },
 
     setHighlight(highlight) {
@@ -617,6 +645,64 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       const { briefProposals } = get();
       if (!briefProposals.some((candidate) => candidate.nfrId === nfrId)) return;
       set({ briefProposals: briefProposals.filter((candidate) => candidate.nfrId !== nfrId) });
+    },
+
+    loadInterfaceProposals(nodeId, items) {
+      set({ interfaceProposals: { nodeId, items } });
+    },
+
+    acceptInterfaceProposal(id) {
+      const { interfaceProposals, nodes } = get();
+      const proposal = interfaceProposals?.items.find((candidate) => candidate.id === id);
+      const node = nodes.find((candidate) => candidate.id === interfaceProposals?.nodeId);
+      if (!interfaceProposals || !proposal || !node) return;
+
+      // Each kind lands through the same field the editor writes, under the
+      // same caps — an accepted proposal is indistinguishable from a typed one.
+      // The rationale is display only, never stored (see acceptProposal).
+      const patch = ((): Partial<SdNode['data']> | null => {
+        switch (proposal.kind) {
+          case 'operation': {
+            const operations = node.data.operations ?? [];
+            if (operations.length >= NODE_MAX_OPERATIONS) return null;
+            if (operations.some((op) => op.name === proposal.operation.name)) return null;
+            return { operations: [...operations, proposal.operation] };
+          }
+          case 'config':
+            return { config: { ...(node.data.config ?? {}), [proposal.key]: proposal.value } };
+          case 'responsibility': {
+            const responsibilities = node.data.responsibilities ?? [];
+            if (responsibilities.length >= NODE_MAX_RESPONSIBILITIES) return null;
+            if (responsibilities.includes(proposal.text)) return null;
+            return { responsibilities: [...responsibilities, proposal.text] };
+          }
+        }
+      })();
+      const remaining = interfaceProposals.items.filter((candidate) => candidate.id !== id);
+      if (patch === null) {
+        set({ interfaceProposals: { ...interfaceProposals, items: remaining } });
+        return;
+      }
+      set({
+        nodes: nodes.map((candidate) =>
+          candidate.id === node.id
+            ? { ...candidate, data: { ...candidate.data, ...patch } }
+            : candidate,
+        ),
+        interfaceProposals: { ...interfaceProposals, items: remaining },
+        dirty: true,
+      });
+    },
+
+    dismissInterfaceProposal(id) {
+      const { interfaceProposals } = get();
+      if (!interfaceProposals?.items.some((candidate) => candidate.id === id)) return;
+      set({
+        interfaceProposals: {
+          ...interfaceProposals,
+          items: interfaceProposals.items.filter((candidate) => candidate.id !== id),
+        },
+      });
     },
 
     markClean() {

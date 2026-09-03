@@ -41,6 +41,7 @@ import { useImprovementRunPolling } from '../improve/use-improvement-run-polling
 import { PromptPane } from '../prompts/prompt-pane';
 import { DesignBriefEditor } from './brief/design-brief-editor';
 import { useBriefSuggestions } from './brief/use-brief-suggestions';
+import { useInterfaceSuggestions } from './use-interface-suggestions';
 import { NarrativeEditor } from './narrative-editor';
 
 function CanvasSkeleton() {
@@ -245,6 +246,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const polling = useEvaluationPolling(feedback?.id ?? null);
   const improve = useImprovementRunPolling(activeRunId);
   const suggestions = useBriefSuggestions(sessionId);
+  const interfaceSuggestions = useInterfaceSuggestions(sessionId);
   const { getNodes } = useReactFlow();
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
@@ -526,7 +528,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       <Layout>
         <SideColumn>
           <WorkspacePalette />
-          <WorkspaceProperties workflowSpec={prompt?.workflowSpec ?? null} />
+          <WorkspaceProperties
+            workflowSpec={prompt?.workflowSpec ?? null}
+            interfaceSuggestions={interfaceSuggestions}
+          />
         </SideColumn>
 
         <CanvasColumn>

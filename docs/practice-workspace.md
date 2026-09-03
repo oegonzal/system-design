@@ -50,6 +50,37 @@ _(Above the canvas, the toolbar holds the actions: **Submit for evaluation**,
 **Clear**, **Fit view**, **Export** (a zip of the diagram PDF + per-artifact
 Markdown), and **Improve with AI**, which starts a Coach run.)_
 
+## The Properties panel: why a component shows what it shows
+
+Select a block and the panel shows, in order: **Label**, **Kind** (with a
+one-line guide: what the kind is, when to use it, and what interface it has),
+**Configuration**, **Interface**, then the block's suggestions. **Nothing here
+is global** — every section is gated by a table the grader also reads, and the
+panel now says so in a caption under each heading:
+
+- **Configuration** — the knobs the grader reads _for this kind_ (a database
+  offers `sharding`; a queue offers `dlq`; a vector store offers none). Each knob
+  changes a verdict or is reserved with a stated reason; a knob the grader cannot
+  read cannot be set.
+- **Interface** — only for kinds whose role declares operations (services and
+  workers _serve_ commands/queries; queues and streams _carry_ message types;
+  storage and edge infrastructure declare none). **Responsibilities** appear only
+  for api-like roles. Inside an operation row, **Fulfills** offers only the
+  prompt's workflow items that this role and this op kind may legally realize,
+  and **Emits** only the prompt's declared events, on commands — both are claims
+  by reference that the grader corroborates against your connections, never by
+  matching names.
+- **Suggest for this component** — the model proposes best-fit operations,
+  workflow groundings, knobs and responsibilities _from that same vocabulary_;
+  the validators submit runs verify each item before it is offered; you accept
+  them **one at a time** (there is deliberately no accept-all). With no model
+  configured the panel says so plainly.
+
+Why two tiers? The grader reads typed facts — kinds, knobs, ids, connections —
+never prose, so the vocabulary it grades is closed on purpose. Your open-ended
+intent lives in operation names, responsibilities, the brief and the narrative,
+which the AI critics judge.
+
 ## Brief vs Narrative
 
 They explain the **same** design in two different forms:

@@ -301,15 +301,16 @@ point where a draft becomes a payload.
 
 ## 6. Where the LLM is used
 
-Three call sites, one seam (`packages/llm/`), one contract: **one structured
+Four call sites, one seam (`packages/llm/`), one contract: **one structured
 call, `null` on any failure.** Every caller must already hold a deterministic
 answer, so "unavailable / refused / returned junk" is never an error path.
 
-| Job                                   | Where                                                     | If there is no model                                               |
-| ------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
-| Prompt enrichment (prose polish only) | `studio-api/.../generator/enrich-prompt.ts`               | The generated prompt stands, `llmEnriched: false`                  |
-| Critic, depth, narrative, scenarios   | `eval-worker/src/engine/passes/*`                         | A `llm-disabled` diagnostic; the deterministic grade is unaffected |
-| Binding suggestions                   | `studio-api/.../sessions/suggestions/suggest-bindings.ts` | An empty list — the same response shape                            |
+| Job                                   | Where                                                      | If there is no model                                               |
+| ------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------ |
+| Prompt enrichment (prose polish only) | `studio-api/.../generator/enrich-prompt.ts`                | The generated prompt stands, `llmEnriched: false`                  |
+| Critic, depth, narrative, scenarios   | `eval-worker/src/engine/passes/*`                          | A `llm-disabled` diagnostic; the deterministic grade is unaffected |
+| Binding suggestions                   | `studio-api/.../sessions/suggestions/suggest-bindings.ts`  | An empty list — the same response shape                            |
+| Interface suggestions (one component) | `studio-api/.../sessions/suggestions/suggest-interface.ts` | An empty list — the same response shape                            |
 
 `createLlmClientFromEnv` (`packages/llm/src/create-client.ts`) is the only place
 env vars are read. `EVAL_DETERMINISTIC=1` outranks a present key, which is why
@@ -321,11 +322,24 @@ over contract tuples, and per-request enums of the real ids — the model cannot
 name a node that is not on the canvas), then **filter what you cannot** against
 the real graph after parsing.
 
-One deliberate omission worth knowing about: the suggester is given mechanism
-_labels_ but never `MECHANISM_GUIDE[claim].proof`. Those strings say what the
-engine looks for, and a model that knew them could propose only bindings
-guaranteed to corroborate — the explanation dimension would stop measuring the
-author. `suggest-bindings.spec.ts` pins their absence from the prompt.
+One deliberate omission worth knowing about: the suggesters are given
+vocabulary _labels_ but never a grading predicate — not
+`MECHANISM_GUIDE[claim].proof`, not what a rule reads a knob for. Those strings
+say what the engine looks for, and a model that knew them could propose only
+claims guaranteed to corroborate — the dimension would stop measuring the
+author. `suggest-bindings.spec.ts` and `suggest-interface.spec.ts` pin their
+absence from the prompts.
+
+The interface suggester (`[UX-14]`) is the answer to "the option space is
+finite": it lets a model pick the best-fit **gradeable** options for one
+component — op kinds its role allows (`INTERFACE_CAPABILITIES`), workflow items
+its role and kind may fulfill (`fulfillableItems`), events the prompt declares,
+knobs its kind offers (`NODE_CONFIG_FIELDS`) — each enum-locked per request,
+then each item applied ALONE to a copy of the graph and kept only if
+`validateGraphReferences` + `validateWorkflowReferences` pass. Free-form
+expression (operation names, responsibilities, notes) stays open and is the
+LLM critic's to judge; the vocabulary the grader reads stays closed, because a
+knob the engine cannot read is not a knob.
 
 ---
 

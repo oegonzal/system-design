@@ -138,9 +138,33 @@ describe('hygiene.unreferenced-operation', () => {
     expect(findings[0].message).toContain('"placeOrder"');
   });
 
-  it('stays silent when no edge in the graph uses carries', () => {
+  it('stays silent when no edge in the graph uses carries — on a scale-only prompt', () => {
     const unannotated = graph([node('gw-1', 'gateway'), svc], [edge('e1', 'gw-1', 'svc-1')]);
     expect(rule.check(contextFor(unannotated))).toEqual([]);
+  });
+
+  // On a workflow prompt the spec is the reference frame: an operation that
+  // realizes no item, emits nothing and is carried nowhere is hanging even
+  // when the author never annotated an edge.
+  it('flags a hanging operation on a workflow prompt even without carries', () => {
+    const unannotated = graph([node('gw-1', 'gateway'), svc], [edge('e1', 'gw-1', 'svc-1')]);
+    const findings = rule.check(contextFor(unannotated, orderHistoryFacts()));
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain('"getOrder", "placeOrder"');
+    expect(findings[0].message).toContain('hanging declaration');
+  });
+
+  // …but a claimed item is the workflow judge's to corroborate: its
+  // shortfall is taught there (not-exercised), never charged twice here.
+  it('treats an operation that fulfills a workflow item as exercised', () => {
+    const claimed = node('svc-1', 'service', {
+      operations: [
+        { name: 'getOrder', kind: 'query', fulfills: 'op-get-order' },
+        { name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' },
+      ],
+    });
+    const unannotated = graph([node('gw-1', 'gateway'), claimed], [edge('e1', 'gw-1', 'svc-1')]);
+    expect(rule.check(contextFor(unannotated, orderHistoryFacts()))).toEqual([]);
   });
 
   it('stays silent when every operation is referenced', () => {
