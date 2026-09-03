@@ -74,6 +74,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Successive generated prompts vary: a fresh seed is drawn per generation and redrawn while its framing echoes a recent prompt, and generating without an experience rotates to the least-practiced one — so practice covers every archetype instead of repeating the same prompt.',
   },
+  {
+    id: 'GEN-5',
+    statement:
+      "A prompt can be authored from an assessment's own requirements — validated against the same vocabularies and spec closure the generator honors — and graded by its experience's archetype rubric as it applies to those requirements.",
+  },
   // Critic / eval pipeline
   { id: 'EVAL-1', statement: 'A submitted revision is graded with per-dimension scores.' },
   {

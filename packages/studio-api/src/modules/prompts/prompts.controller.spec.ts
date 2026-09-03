@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type {
   ApiErrorResponse,
+  AuthorPromptRequest,
   GeneratePromptRequest,
   GetPromptResponse,
   ListPromptsResponse,
@@ -225,6 +226,154 @@ describe('prompts', () => {
         body: JSON.stringify({ status: 'deleted' }),
       });
       expect(status).toBe(400);
+    });
+  });
+
+  /**
+   * "Bring your own take-home": the requirement set is stored verbatim, not
+   * drawn — so an assessment that states two requirements and two SLAs is
+   * graded on exactly those.
+   */
+  describe('POST /api/prompts (authored)', () => {
+    const assessment: AuthorPromptRequest = {
+      experienceId: ORDER_HISTORY_ID,
+      title: 'Order History Service for My Account',
+      scenario:
+        'You are designing the Order History service behind My Account on a storefront hosted on Shopify. Assume 2,000 concurrent shoppers.',
+      difficulty: 'standard',
+      functionalRequirements: [
+        'Show an Order History list within the My Account section',
+        'Show both online (Shopify) and offline (Retail POS) orders in that one list',
+      ],
+      functionalCapabilities: [],
+      nonFunctionalRequirements: [
+        {
+          id: 'ohi-fresh-online',
+          kind: 'consistency',
+          statement: 'An online order appears in the list within 1 minute',
+          target: 'visible ≤ 60s',
+          targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
+        },
+        {
+          id: 'ohi-sec-own-orders',
+          kind: 'security',
+          statement: 'A logged-in user can view only their own orders',
+        },
+      ],
+      scaleTargets: {
+        concurrentUsers: 2000,
+        requestsPerSecond: 150,
+        readWriteRatio: '98:2',
+        p99LatencyMs: 300,
+        availabilityPct: '99.9',
+      },
+      workflowSpec: {
+        version: 1,
+        entities: [
+          {
+            id: 'ent-order',
+            name: 'Order',
+            states: ['received', 'indexed'],
+            transitions: [
+              { from: null, to: 'received', via: 'ing-shopify-webhooks' },
+              { from: 'received', to: 'indexed', via: 'op-ingest-index' },
+            ],
+          },
+        ],
+        operations: [
+          { id: 'op-list-orders', kind: 'query', statement: 'Return the merged history' },
+          {
+            id: 'op-ingest-index',
+            kind: 'command',
+            statement: 'Upsert an incoming order',
+            consumes: ['evt-online-order-received'],
+          },
+        ],
+        events: [{ id: 'evt-online-order-received', statement: 'A new online order arrived' }],
+        aggregations: [],
+        ingests: [
+          {
+            id: 'ing-shopify-webhooks',
+            mode: 'push',
+            statement: 'Shopify pushes order webhooks',
+            nfrId: 'ohi-fresh-online',
+            emits: ['evt-online-order-received'],
+          },
+        ],
+      },
+    };
+
+    const author = (body: unknown) =>
+      call<GetPromptResponse>(`${h.url}/prompts`, { method: 'POST', body: JSON.stringify(body) });
+
+    it('[GEN-5] stores the assessment verbatim, graded under its experience archetype, and practicable', async () => {
+      const { status, body } = await author(assessment);
+      expect(status).toBe(201);
+      expect(body.data).toMatchObject({
+        experienceId: ORDER_HISTORY_ID,
+        archetype: 'order-history-integration',
+        title: assessment.title,
+        difficulty: 'standard',
+        generatorVersion: 'authored',
+        seed: 0,
+        llmEnriched: false,
+        functionalRequirements: assessment.functionalRequirements,
+        nonFunctionalRequirements: assessment.nonFunctionalRequirements,
+        scaleTargets: assessment.scaleTargets,
+      });
+      expect(body.data.workflowSpec?.ingests[0]?.nfrId).toBe('ohi-fresh-online');
+
+      const fetched = await call<GetPromptResponse>(`${h.url}/prompts/${body.data.id}`);
+      expect(fetched.body.data.nonFunctionalRequirements).toHaveLength(2);
+
+      const session = await call<{ data: { id: string } }>(`${h.url}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ promptId: body.data.id }),
+      });
+      expect(session.status).toBe(201);
+    });
+
+    it('rejects a shape outside the vocabularies with 400', async () => {
+      const { status } = await author({
+        ...assessment,
+        nonFunctionalRequirements: [{ id: 'x', kind: 'vibes', statement: 'no' }],
+      });
+      expect(status).toBe(400);
+      const capability = await author({ ...assessment, functionalCapabilities: ['telepathy'] });
+      expect(capability.status).toBe(400);
+    });
+
+    it('collects every referential problem into one 422', async () => {
+      const spec = assessment.workflowSpec;
+      if (!spec) throw new Error('fixture has a spec');
+      const { status, body } = await call<ApiErrorResponse>(`${h.url}/prompts`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...assessment,
+          workflowSpec: {
+            ...spec,
+            // The ingest names an NFR this prompt does not carry, and an
+            // operation emits an event the spec never declares.
+            ingests: [{ ...spec.ingests[0], nfrId: 'ohi-not-here' }],
+            operations: [
+              ...spec.operations,
+              { id: 'op-x', kind: 'command', statement: 'x', emits: ['evt-ghost'] },
+            ],
+          },
+        }),
+      });
+      expect(status).toBe(422);
+      const message = JSON.stringify(body);
+      expect(message).toContain('ohi-not-here');
+      expect(message).toContain('evt-ghost');
+    });
+
+    it('rejects an unknown experience with 422', async () => {
+      const { status } = await author({
+        ...assessment,
+        experienceId: '00000000-0000-4000-8000-000000000000',
+      });
+      expect(status).toBe(422);
     });
   });
 });

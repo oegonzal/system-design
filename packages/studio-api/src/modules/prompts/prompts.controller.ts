@@ -6,6 +6,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { ok, page } from '../../common/envelope';
+import { AuthorPromptRequestDto } from './dto/author-prompt.dto';
 import { GeneratePromptRequestDto } from './dto/generate-prompt.dto';
 import { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
 import { UpdatePromptRequestDto } from './dto/update-prompt.dto';
@@ -23,6 +24,16 @@ export class PromptsController {
   @Post('generate')
   async generate(@Body() dto: GeneratePromptRequestDto): Promise<GetPromptResponse> {
     return ok(toPromptDto(await this.prompts.generate(dto.experienceId, dto.difficulty, dto.seed)));
+  }
+
+  /**
+   * A prompt authored from an assessment's own requirements, verbatim —
+   * validated against the same vocabularies and spec closure the generator
+   * honors, then graded like any other. 201: a prompt row is created.
+   */
+  @Post()
+  async author(@Body() dto: AuthorPromptRequestDto): Promise<GetPromptResponse> {
+    return ok(toPromptDto(await this.prompts.author(dto)));
   }
 
   /** New prompt from the same experience + difficulty with a fresh seed. */

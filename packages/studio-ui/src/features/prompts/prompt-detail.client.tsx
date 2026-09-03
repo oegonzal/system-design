@@ -8,7 +8,7 @@ import { api, ApiError, toErrorMessage } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 import { PromptPane } from './prompt-pane';
-import type { PromptDto } from '@sysdesign/contracts';
+import { AUTHORED_GENERATOR_VERSION, type PromptDto } from '@sysdesign/contracts';
 
 export interface PromptDetailProps {
   promptId: string;
@@ -117,9 +117,13 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
         >
           {busy === 'start' ? 'Starting…' : 'Start practice'}
         </Button>
-        <Button variant="subtle" onClick={() => void handleRegenerate()} disabled={busy !== null}>
-          {busy === 'regenerate' ? 'Regenerating…' : 'Regenerate'}
-        </Button>
+        {/* Regenerate re-runs the generator; on an authored prompt it would
+            replace the assessment's own requirements with a drawn set. */}
+        {prompt.generatorVersion !== AUTHORED_GENERATOR_VERSION ? (
+          <Button variant="subtle" onClick={() => void handleRegenerate()} disabled={busy !== null}>
+            {busy === 'regenerate' ? 'Regenerating…' : 'Regenerate'}
+          </Button>
+        ) : null}
         <Button variant="ghost" onClick={() => void handleToggleArchive()} disabled={busy !== null}>
           {prompt.status === 'active' ? 'Archive' : 'Unarchive'}
         </Button>

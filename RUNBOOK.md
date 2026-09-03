@@ -45,6 +45,34 @@ Because the volume is named and the container has `restart: unless-stopped`, the
 database returns on its own after a Docker or machine restart; `pnpm stack:up`
 then just re-attaches the app. Your sessions are exactly where you left them.
 
+## Author a prompt from your own assessment
+
+A prompt does not have to be generated. `POST /api/prompts` stores an
+assessment's requirements verbatim — functional requirements, NFRs (with their
+kinds and target specs), your stated scale assumptions, and an optional
+workflow spec — under the experience whose archetype rubric should grade it.
+Shape is validated against the same closed vocabularies the generator uses
+(`NFR_KINDS`, `FUNCTIONAL_CAPABILITIES`), references in one 422
+(`validateWorkflowSpec`, every ingest naming an NFR on the prompt). The row
+carries `generatorVersion: "authored"`, shows an `authored` badge, and cannot be
+regenerated (that would replace the assessment with a drawn set). Example:
+
+```
+curl -X POST localhost:3000/api/prompts -H 'content-type: application/json' -d '{
+  "experienceId": "<experience uuid>", "title": "…", "scenario": "…", "difficulty": "standard",
+  "functionalRequirements": ["…"], "functionalCapabilities": [],
+  "nonFunctionalRequirements": [{ "id": "x-fresh-online", "kind": "consistency", "statement": "…",
+     "target": "≤ 60s", "targetSpec": { "metric": "freshness_seconds", "op": "<=", "value": 60, "unit": "s" } }],
+  "scaleTargets": { "concurrentUsers": 2000, "requestsPerSecond": 150, "readWriteRatio": "98:2",
+     "p99LatencyMs": 300, "availabilityPct": "99.9" },
+  "workflowSpec": null
+}'
+```
+
+The rubric applies exactly as far as the requirements reach: an NFR kind the
+assessment never states gates its expectations off; a workflow item it never
+declares is never demanded. Scale targets are always read, so state them.
+
 ## Re-grading a stored design
 
 A **failed** evaluation can be re-queued in place from the UI (or

@@ -7,7 +7,13 @@ import {
 } from '@nestjs/common';
 import type { FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { DEFAULT_LIST_LIMIT, type PromptDifficulty, type PromptStatus } from '@sysdesign/contracts';
+import {
+  AUTHORED_GENERATOR_VERSION,
+  DEFAULT_LIST_LIMIT,
+  validateWorkflowSpec,
+  type PromptDifficulty,
+  type PromptStatus,
+} from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt } from '@sysdesign/db';
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
@@ -16,6 +22,7 @@ import { randomInt } from 'node:crypto';
 
 import { LLM_CLIENT } from '../llm/llm.token';
 import { buildPromptDump, startPromptDump, type PromptDump, type PromptDumpLlm } from './dump';
+import type { AuthorPromptRequestDto } from './dto/author-prompt.dto';
 import type { ListPromptsQueryDto } from './dto/list-prompts-query.dto';
 import { enrichPrompt } from './generator/enrich-prompt';
 import { generatePrompt, GENERATOR_VERSION } from './generator/prompt-generator';
@@ -39,6 +46,62 @@ export class PromptsService {
    * least-practiced experience, so coverage spreads across every archetype
    * instead of re-drilling one.
    */
+  /**
+   * A prompt from an assessment's own requirements — "bring your own
+   * take-home". Nothing is drawn or enriched: the requirement set is stored
+   * verbatim, the archetype rubric applies as it applies to those
+   * requirements, and `generatorVersion` records the provenance. Shape was
+   * the DTO's job; this pass collects every REFERENTIAL problem into one 422 —
+   * a spec that does not close, an ingest naming an NFR this prompt does not
+   * carry, a repeated NFR id — the way submit does for a revision.
+   */
+  async author(dto: AuthorPromptRequestDto): Promise<Prompt> {
+    const experience = await this.em.findOne(ExperienceProfile, dto.experienceId);
+    if (!experience) {
+      throw new UnprocessableEntityException(`Unknown experienceId: ${dto.experienceId}`);
+    }
+
+    const nfrIds = new Set<string>();
+    const problems: string[] = [];
+    for (const nfr of dto.nonFunctionalRequirements) {
+      if (nfrIds.has(nfr.id)) problems.push(`duplicate NFR id: ${nfr.id}`);
+      nfrIds.add(nfr.id);
+    }
+    if (dto.workflowSpec !== null) {
+      problems.push(...validateWorkflowSpec(dto.workflowSpec));
+      for (const ingest of dto.workflowSpec.ingests) {
+        if (!nfrIds.has(ingest.nfrId)) {
+          problems.push(
+            `ingest '${ingest.id}' names an NFR this prompt does not carry: ${ingest.nfrId}`,
+          );
+        }
+      }
+    }
+    if (problems.length > 0) {
+      throw new UnprocessableEntityException(problems);
+    }
+
+    const prompt = this.em.create(Prompt, {
+      experience,
+      archetype: experience.archetype,
+      title: dto.title,
+      scenario: dto.scenario,
+      functionalRequirements: dto.functionalRequirements,
+      functionalCapabilities: dto.functionalCapabilities,
+      nonFunctionalRequirements: dto.nonFunctionalRequirements,
+      scaleTargets: dto.scaleTargets,
+      workflowSpec: dto.workflowSpec,
+      difficulty: dto.difficulty,
+      // Provenance, not reproducibility: there was no draw to replay.
+      seed: 0,
+      generatorVersion: AUTHORED_GENERATOR_VERSION,
+      llmEnriched: false,
+    });
+    this.em.persist(prompt);
+    await this.em.flush();
+    return prompt;
+  }
+
   async generate(
     experienceId: string | undefined,
     difficulty: PromptDifficulty = 'standard',

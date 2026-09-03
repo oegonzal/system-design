@@ -131,6 +131,32 @@ export interface GeneratePromptRequest {
   seed?: number;
 }
 
+/**
+ * A prompt authored from an assessment's own requirements — "bring your own
+ * take-home". The requirement set is given verbatim rather than drawn from a
+ * bank, validated against the same closed vocabularies and workflow-spec
+ * closure the generator honors, and graded by the experience's archetype
+ * rubric exactly as it applies to those requirements: an NFR kind the
+ * assessment never states gates its expectations off, a workflow item it
+ * never declares is never demanded. Scale targets are the author's stated
+ * assumptions (the engine always reads them); `generatorVersion` records the
+ * provenance as `AUTHORED_GENERATOR_VERSION`.
+ */
+export interface AuthorPromptRequest {
+  experienceId: Uuid;
+  title: string;
+  scenario: string;
+  difficulty: PromptDifficulty;
+  functionalRequirements: string[];
+  functionalCapabilities: FunctionalCapability[];
+  nonFunctionalRequirements: NfrItem[];
+  scaleTargets: ScaleTargets;
+  workflowSpec: WorkflowSpec | null;
+}
+
+/** The `generatorVersion` of an authored prompt — provenance, not a generator release. */
+export const AUTHORED_GENERATOR_VERSION = 'authored';
+
 export interface UpdatePromptRequest {
   status: PromptStatus;
 }

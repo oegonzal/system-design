@@ -1,7 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { PromptDto } from '@sysdesign/contracts';
+import { AUTHORED_GENERATOR_VERSION, type PromptDto } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Surface, Text } from '@sysdesign/design-system';
 
 export interface PromptPaneProps {
@@ -54,6 +54,11 @@ export function PromptPane({ prompt }: PromptPaneProps) {
           <Badge tone="accent">{prompt.archetype}</Badge>
           <Badge tone="neutral">{prompt.difficulty}</Badge>
           {prompt.llmEnriched ? <Badge tone="neutral">ai-enriched</Badge> : null}
+          {prompt.generatorVersion === AUTHORED_GENERATOR_VERSION ? (
+            <Badge tone="neutral" data-testid="prompt-authored">
+              authored
+            </Badge>
+          ) : null}
         </Stack>
       </Stack>
 
