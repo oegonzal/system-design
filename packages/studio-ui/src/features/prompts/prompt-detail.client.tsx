@@ -1,10 +1,11 @@
 'use client';
 
-import { Button, Heading, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/design-system';
+import { Button, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/design-system';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api, ApiError, toErrorMessage } from '../../api/client';
+import { FullPageNotice } from '../../components/full-page-notice';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 import { PromptPane } from './prompt-pane';
 import type { PromptDto } from '@sysdesign/contracts';
@@ -93,16 +94,15 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
 
   if (notFound || !prompt) {
     return (
-      <Surface padding={6}>
-        <Stack gap={3}>
-          <Heading level={1}>Prompt not found</Heading>
-          <Text tone="secondary">
-            {notFound
-              ? 'This prompt does not exist — it may have been deleted.'
-              : (error ?? 'Something went wrong loading this prompt.')}
-          </Text>
-        </Stack>
-      </Surface>
+      <FullPageNotice
+        title="Prompt not found"
+        message={
+          notFound
+            ? 'This prompt does not exist — it may have been deleted.'
+            : (error ?? 'Something went wrong loading this prompt.')
+        }
+        backHref="/"
+      />
     );
   }
 

@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api, ApiError, toErrorMessage } from '../../api/client';
+import { FullPageNotice } from '../../components/full-page-notice';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 import { StoryForm } from './story-form';
 
@@ -92,16 +93,15 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
 
   if (notFound || !story) {
     return (
-      <Surface padding={6}>
-        <Stack gap={3}>
-          <Heading level={1}>Story not found</Heading>
-          <Text tone="secondary">
-            {notFound
-              ? 'This story does not exist — it may have been deleted.'
-              : (error ?? 'Something went wrong loading this story.')}
-          </Text>
-        </Stack>
-      </Surface>
+      <FullPageNotice
+        title="Story not found"
+        message={
+          notFound
+            ? 'This story does not exist — it may have been deleted.'
+            : (error ?? 'Something went wrong loading this story.')
+        }
+        backHref="/"
+      />
     );
   }
 

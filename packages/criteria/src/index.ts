@@ -54,6 +54,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A stuck author can hand the design to the AI coach: the coach tab streams the run’s trajectory live while it works, the improved design loads back from the timeline, and every machine-made revision is marked with its assistant origin. Without a live model the control explains itself instead of failing.',
   },
+  {
+    id: 'UX-12',
+    statement:
+      'A practice URL for a session that no longer exists shows a graceful not-found with a way back to the dashboard, never a raw server error; a transient load failure offers a retry instead.',
+  },
   // Prompt generation from experience
   { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
   {

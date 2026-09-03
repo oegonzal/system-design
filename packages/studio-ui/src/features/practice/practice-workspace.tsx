@@ -25,7 +25,8 @@ import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
+import { api, ApiError, toErrorMessage } from '../../api/client';
+import { FullPageNotice } from '../../components/full-page-notice';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 import { CanvasStoreProvider, useCanvasStoreApi } from '../canvas/canvas-store-context';
 import { buildAndDownloadRunZip } from '../export/export-run';
@@ -230,6 +231,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [revisions, setRevisions] = useState<DesignRevisionSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackTarget | null>(null);
@@ -275,11 +278,24 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setLoading(false);
       } catch (error) {
         if (loader.isStale(id, error)) return;
-        setLoadError(toErrorMessage(error, 'Could not load this practice session.'));
+        // A 404 means the session is gone — retrying cannot help, so offer a way
+        // back instead. Anything else (network, 5xx) is transient and retryable.
+        if (error instanceof ApiError && error.status === 404) {
+          setNotFound(true);
+        } else {
+          setLoadError(toErrorMessage(error, 'Could not load this practice session.'));
+        }
         setLoading(false);
       }
     })();
-  }, [sessionId]);
+  }, [sessionId, reloadKey]);
+
+  const handleRetryLoad = useCallback(() => {
+    setLoadError(null);
+    setNotFound(false);
+    setLoading(true);
+    setReloadKey((key) => key + 1);
+  }, []);
 
   // Whether the AI coach can run at all — the button explains itself when not.
   useEffect(() => {
@@ -477,14 +493,24 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     );
   }
 
+  if (notFound) {
+    return (
+      <FullPageNotice
+        title="Session not found"
+        message="This practice session couldn't be found. It may have been removed, or created in a different environment."
+        backHref="/"
+      />
+    );
+  }
+
   if (loadError !== null) {
     return (
-      <Surface padding={6}>
-        <Stack gap={3}>
-          <Heading level={1}>Practice session</Heading>
-          <Text tone="secondary">{loadError}</Text>
-        </Stack>
-      </Surface>
+      <FullPageNotice
+        title="Couldn't load this session"
+        message={loadError}
+        onRetry={handleRetryLoad}
+        backHref="/"
+      />
     );
   }
 
