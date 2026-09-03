@@ -113,7 +113,11 @@ export class EvalRunnerService {
         recorder: dump.passes,
       });
       dump.outcome({ artifacts, result });
-      const critique = result.annotations;
+      // The narrative critic still rides as annotations; the general critic now
+      // grounds its weaknesses as graded evidence and owns the header summary.
+      const annotations = result.annotations;
+      const criticGraded =
+        result.gradedEvidence.find((artifact) => artifact.lens === 'critic') ?? null;
 
       const evaluationId = evaluation.id;
       await em.transactional(async (tem) => {
@@ -137,7 +141,7 @@ export class EvalRunnerService {
             suggestion: finding.suggestion,
           });
         }
-        for (const finding of critique?.findings ?? []) {
+        for (const finding of annotations?.findings ?? []) {
           tem.create(Finding, {
             evaluation: evaluationId,
             source: 'llm',
@@ -153,6 +157,28 @@ export class EvalRunnerService {
             affectedEdgeIds: [],
             suggestion: null,
           });
+        }
+        // Graded weaknesses persist as advisory llm findings too — the score
+        // already moved through the engine's scorer; here they surface as
+        // grounded improvement areas, titled by lens and requirement.
+        for (const artifact of result.gradedEvidence) {
+          for (const item of artifact.items) {
+            tem.create(Finding, {
+              evaluation: evaluationId,
+              source: 'llm',
+              ruleId: null,
+              expectationId: null,
+              nfrId: null,
+              scenarioId: null,
+              dimension: item.dimension,
+              severity: item.severity,
+              title: `${artifact.lens}: ${item.requirementId ?? item.dimension}`,
+              message: item.rationale,
+              affectedNodeIds: item.affectedNodeIds,
+              affectedEdgeIds: [],
+              suggestion: item.suggestion,
+            });
+          }
         }
         // Scenario failure stories persist as advisory findings too — same
         // llm source, so they teach without ever touching the score math.
@@ -183,7 +209,7 @@ export class EvalRunnerService {
             overallScore: result.overallScore,
             grade: result.grade,
             dimensionScores: result.dimensionScores,
-            summary: critique?.summary ?? result.summary,
+            summary: criticGraded?.summary ?? annotations?.summary ?? result.summary,
             engineVersion: ENGINE_VERSION,
             profileId: ACTIVE_PROFILE.id,
             profileVersion: ACTIVE_PROFILE.version,
@@ -199,7 +225,7 @@ export class EvalRunnerService {
               model: axis.model,
             })),
             scenarios: result.scenarios?.reports ?? [],
-            criticModel: critique?.model ?? null,
+            criticModel: criticGraded?.model ?? annotations?.model ?? null,
             completedAt: new Date(),
             updatedAt: new Date(),
           },

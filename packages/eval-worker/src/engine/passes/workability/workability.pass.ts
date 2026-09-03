@@ -11,17 +11,57 @@
  * be the evaluator grading requirements the prompt never made.
  */
 import { describeDesign } from '../../serialization/graph-text';
+import type { GradedEvidenceItem } from '../../core/artifacts';
 import type { EvalPass } from '../../core/types';
 import { judgeGraphWorkflow } from '../../workflows';
 import { coverageSection, findingsSection } from '../deterministic-sections';
 import {
+  admitGrounding,
+  nodeIdSet,
+  SEVERITY_FROM_LEVEL,
+  workflowItemIds,
+} from '../graded-grounding';
+import {
   WORKABILITY_AXIS_ID,
   WORKABILITY_AXIS_LABEL,
+  buildWorkabilitySchema,
   factorsToDisplay,
-  workabilitySchema,
+  FACTOR_DIMENSION,
+  type WorkabilityCritique,
 } from './workability-schema';
 
 export const WORKABILITY_PASS_ID = 'llm.workability';
+
+/**
+ * The evaluator's grounded shortfalls → graded evidence. The lens (factor) maps
+ * to a dimension by the engine's fixed map; the model reports the weakness
+ * MAGNITUDE directly (no inversion), so the currency matches the critic's. Every
+ * grounding is re-checked against the real workflow items and nodes.
+ */
+function weaknessesToGraded(
+  critique: WorkabilityCritique,
+  knownItems: ReadonlySet<string>,
+  knownNodes: ReadonlySet<string>,
+): GradedEvidenceItem[] {
+  return critique.weaknesses.map((weakness) => {
+    const grounding = admitGrounding(
+      weakness.requirementId,
+      weakness.affectedComponents,
+      knownItems,
+      knownNodes,
+    );
+    return {
+      dimension: FACTOR_DIMENSION[weakness.factor],
+      level: weakness.weakness,
+      confidence: weakness.confidence,
+      severity: SEVERITY_FROM_LEVEL[weakness.weakness],
+      requirementId: grounding.requirementId,
+      affectedNodeIds: grounding.affectedNodeIds,
+      rationale: `${weakness.factor}: ${weakness.rationale.trim()}`,
+      suggestion: null,
+    };
+  });
+}
 
 const SYSTEM_PROMPT = [
   'You are a product-minded principal engineer judging whether this system',
@@ -42,7 +82,8 @@ export function createWorkabilityPass(): EvalPass {
     id: WORKABILITY_PASS_ID,
     mode: 'llm',
     run: async (ctx) => {
-      if (ctx.facts.workflow === null) {
+      const spec = ctx.facts.workflow;
+      if (spec === null) {
         return [
           {
             passId: WORKABILITY_PASS_ID,
@@ -66,7 +107,7 @@ export function createWorkabilityPass(): EvalPass {
       }
 
       const design = describeDesign(ctx.graph, ctx.facts, ctx.narrative);
-      const report = judgeGraphWorkflow(ctx.index, ctx.facts.workflow);
+      const report = judgeGraphWorkflow(ctx.index, spec);
       const ledger = (report?.items ?? [])
         .map(
           (item) =>
@@ -88,7 +129,7 @@ export function createWorkabilityPass(): EvalPass {
           `# Deterministic findings`,
           findingsSection(ctx),
         ].join('\n'),
-        schema: workabilitySchema,
+        schema: buildWorkabilitySchema(ctx.graph, spec),
         maxTokens: 2048,
       });
 
@@ -105,6 +146,11 @@ export function createWorkabilityPass(): EvalPass {
       }
 
       const display = factorsToDisplay(critique);
+      const items = weaknessesToGraded(
+        critique,
+        new Set(workflowItemIds(spec)),
+        nodeIdSet(ctx.graph),
+      );
       return [
         {
           passId: WORKABILITY_PASS_ID,
@@ -117,6 +163,19 @@ export function createWorkabilityPass(): EvalPass {
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },
+        // The grounded shortfalls score; the axis above stays advisory display.
+        ...(items.length > 0
+          ? [
+              {
+                passId: WORKABILITY_PASS_ID,
+                kind: 'graded-evidence' as const,
+                lens: 'evaluator.workability',
+                items,
+                summary: null,
+                model: ctx.llm.model,
+              },
+            ]
+          : []),
         ...(design.clipped
           ? [
               {

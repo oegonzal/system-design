@@ -571,16 +571,20 @@ describe('aggregate — graded evidence', () => {
     expect(result.overallScore).toBe(100);
   });
 
-  it("'none' items and an empty evidence set leave the result byte-identical to baseline", () => {
+  it("'none' items and an empty evidence set contribute nothing to the score", () => {
     const baseline = aggregate([oneReliability], DEFAULT_PROFILE);
-    expect(aggregate([oneReliability, gradedArtifact([])], DEFAULT_PROFILE)).toEqual(baseline);
-    const inert = aggregate(
-      [oneReliability, gradedArtifact([gradedItem({ level: 'none', confidence: 'none' })])],
-      DEFAULT_PROFILE,
-    );
-    expect(inert.dimensionScores).toEqual(baseline.dimensionScores);
-    expect(inert.overallScore).toBe(baseline.overallScore);
-    expect(inert.grade).toBe(baseline.grade);
+    // The artifact rides along for audit, but the score is untouched.
+    for (const inert of [
+      aggregate([oneReliability, gradedArtifact([])], DEFAULT_PROFILE),
+      aggregate(
+        [oneReliability, gradedArtifact([gradedItem({ level: 'none', confidence: 'none' })])],
+        DEFAULT_PROFILE,
+      ),
+    ]) {
+      expect(inert.dimensionScores).toEqual(baseline.dimensionScores);
+      expect(inert.overallScore).toBe(baseline.overallScore);
+      expect(inert.grade).toBe(baseline.grade);
+    }
   });
 
   it('records each graded subtraction in the trace, grounded and attributed', () => {

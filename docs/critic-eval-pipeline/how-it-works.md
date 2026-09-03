@@ -7,8 +7,14 @@ this one describes what is there now and where to find it.
 Two properties govern every decision below, and most of the design exists to
 make them structural rather than conventional:
 
-1. **The LLM cannot move the score.** It comments, it scores an advisory axis,
-   it proposes; it never grades. This is `[EVAL-6]`.
+1. **The LLM never authors a number, and its free-form findings are dropped.**
+   It comments, it scores an advisory axis, it proposes — and a rogue `findings`
+   or `coverage` artifact from an LLM pass is thrown away (`[EVAL-6]`). The one
+   way an LLM lens moves the grade is by emitting **grounded ordinal evidence**
+   (a weakness magnitude + confidence, tied to a prompt requirement and the
+   affected nodes); a generic, engine-owned scorer turns that into a bounded,
+   weakness-only subtraction — it can only lower an already-assessed dimension,
+   never past a letter cap, and only when the eval LLM is live (`[EVAL-16]`).
 2. **A grading predicate reads facts, never prose.** Evidence is a node kind, a
    config knob, a graph path, or an id the author bound — never a substring.
    Anything that reads text can be defeated by rewording it and satisfied by a
@@ -72,30 +78,39 @@ runEvaluation(graph, facts, narrative, brief, llm, profile, registry)
    └─ aggregate(artifacts, profile) ──► scores, grade, summary, trace
 ```
 
-| Piece                     | File                                 | What it does                                                                          |
-| ------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
-| Orchestrator              | `engine/core/orchestrator.ts`        | Runs passes serially, enforces the mode contract, brackets each pass for the run dump |
-| Artifact union            | `engine/core/artifacts.ts`           | `findings` · `coverage` · `axis` · `scenarios` · `annotations` · `diagnostics`        |
-| Aggregator                | `engine/core/aggregator.ts`          | `explainAggregate` computes the score and the ledger together                         |
-| Profile type + validation | `engine/core/profile.ts`             | `validateProfile` fails fast on a malformed rubric                                    |
-| Active profile            | `engine/profiles/default.profile.ts` | `default@3.3.0` — weights, bands, caps, penalties, suppressions                       |
-| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.6.0'`                                                            |
-| Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only             |
-| Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                   |
-| Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                       |
+| Piece                     | File                                 | What it does                                                                                       |
+| ------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Orchestrator              | `engine/core/orchestrator.ts`        | Runs passes serially, enforces the mode contract, brackets each pass for the run dump              |
+| Artifact union            | `engine/core/artifacts.ts`           | `findings` · `coverage` · `axis` · `scenarios` · `annotations` · `graded-evidence` · `diagnostics` |
+| Aggregator                | `engine/core/aggregator.ts`          | `explainAggregate` computes the score and the ledger together                                      |
+| Profile type + validation | `engine/core/profile.ts`             | `validateProfile` fails fast on a malformed rubric                                                 |
+| Active profile            | `engine/profiles/default.profile.ts` | `default@3.3.0` — weights, bands, caps, penalties, suppressions                                    |
+| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.6.0'`                                                                         |
+| Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only                          |
+| Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                                |
+| Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                                    |
 
-### The six passes
+### The seven passes
 
 Registered in `engine/passes/index.ts`, ordered by the profile.
 
-| Pass id              | Mode          | File                                         | Produces                                  |
-| -------------------- | ------------- | -------------------------------------------- | ----------------------------------------- |
-| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 92 rules → `findings`                     |
-| `expectations.banks` | deterministic | `engine/passes/expectations/`                | 78 expectations → `coverage` + `findings` |
-| `llm.critic`         | llm           | `engine/passes/critic/` + `src/critic/`      | `annotations`                             |
-| `llm.depth`          | llm           | `engine/passes/depth/`                       | `axis` (advisory score)                   |
-| `llm.narrative`      | llm           | `engine/passes/narrative/`                   | `axis` + `annotations`                    |
-| `llm.scenarios`      | llm           | `engine/passes/scenarios/`                   | `scenarios`                               |
+| Pass id              | Mode          | File                                         | Produces                                                  |
+| -------------------- | ------------- | -------------------------------------------- | --------------------------------------------------------- |
+| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 92 rules → `findings`                                     |
+| `expectations.banks` | deterministic | `engine/passes/expectations/`                | 78 expectations → `coverage` + `findings`                 |
+| `llm.critic`         | llm           | `engine/passes/critic/` + `src/critic/`      | `graded-evidence` (lens `critic`) + summary               |
+| `llm.depth`          | llm           | `engine/passes/depth/`                       | `axis` (advisory score)                                   |
+| `llm.narrative`      | llm           | `engine/passes/narrative/`                   | `axis` + `annotations`                                    |
+| `llm.workability`    | llm           | `engine/passes/workability/`                 | `axis` + `graded-evidence` (lens `evaluator.workability`) |
+| `llm.scenarios`      | llm           | `engine/passes/scenarios/`                   | `scenarios`                                               |
+
+The two graded producers ground each weakness to a prompt requirement — the
+critic across all NFRs and workflow items, the workability evaluator across the
+workflow items — via a per-request `z.enum(ids)` (the same idiom the binding
+suggester uses), re-checked admissible before emission (`engine/passes/graded-grounding.ts`).
+They run live only under the opt-in deep eval (`EVAL_DETERMINISTIC=0`, see the
+RUNBOOK); on the default deterministic stack they emit nothing and the score is
+byte-identical.
 
 **Rules subtract, expectations earn.** A rule fires when something is wrong. An
 expectation states something a design of this archetype and difficulty ought to
@@ -187,25 +202,40 @@ rest.
 
 ## 4. The two invariants, and what enforces them
 
-### The LLM cannot move the score
+### The LLM never authors a number; graded evidence moves the score only through the engine
 
-Three independent mechanisms, none of which relies on a pass behaving:
+The guarantee is not "the LLM is inert" — it is "the LLM cannot pick a number,
+and cannot smuggle a finished finding into the ledger." What it CAN do is hand
+the engine grounded ordinals; the engine does the arithmetic.
 
 - **`enforceMode`** (`engine/core/orchestrator.ts`) filters `findings` and
   `coverage` out of anything declared `mode: 'llm'`, replacing them with an
   `llm-artifact-rejected` diagnostic. A misbehaving pass is audited, not obeyed.
-- **The aggregator routes by kind.** `axis`, `scenarios`, `annotations` and
-  `diagnostics` never reach `scoreCoverage` or `applyGradeCaps`.
+  `graded-evidence` is neither of those kinds, so it passes through — carrying
+  ordinals (level + confidence + a requirement id + node ids), never a number.
+- **The generic scorer owns the math.** `scoreCoverage` (`aggregator.ts`) turns
+  graded evidence into a per-dimension subtraction: each weakness is worth at
+  most `maxPointsPerItem` scaled by `w(level) × w(confidence)`, charged
+  worst-first with decay, clamped to `maxPenaltyPerDimension` — weakness-only
+  (it only lowers), and only for a dimension the deterministic layer already
+  assessed. `applyGradeCaps` never sees it, so a lens can dent the number but
+  never trip a letter cap. Zero graded items → zero contribution, which is why
+  the deterministic stack and every calibration pin are untouched.
+- **The aggregator routes the rest by kind.** `axis`, `scenarios`, `annotations`
+  and `diagnostics` never reach `scoreCoverage` or `applyGradeCaps`.
 - **Suggestions live outside the engine entirely.** Binding proposals are an API
   endpoint, produce no artifact, and reach a graded brief only when a human
   accepts one.
 
-Claimed by `orchestrator.spec.ts`, `aggregator.spec.ts` and
-`studio-ui/.../llm-insights.spec.tsx`.
+Claimed by `orchestrator.spec.ts` (`[EVAL-16]`: graded evidence survives
+`enforceMode` and scores; a rogue `findings` pass is still dropped),
+`aggregator.spec.ts` (the bounded weakness-only scorer, decay, clamp, trace, and
+empty → no contribution) and `studio-ui/.../llm-insights.spec.tsx`.
 
-_Known wrinkle:_ `eval-runner.service.ts` persists `critique?.summary ?? result.summary`,
-so the stored `evaluation.summary` is the model's prose when the critic ran. The
-numbers are untouched; the sentence beside them is not.
+_Known wrinkle:_ `eval-runner.service.ts` persists the critic's graded summary
+(`criticGraded?.summary ?? …`) as the stored `evaluation.summary`, so the
+sentence beside the numbers is the model's prose when the critic ran. The numbers
+are the engine's.
 
 ### Grading reads facts, not prose
 

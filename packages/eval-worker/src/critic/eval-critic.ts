@@ -1,18 +1,11 @@
-import type { CanvasGraph, EvalDimension, Severity } from '@sysdesign/contracts';
+import type { CanvasGraph } from '@sysdesign/contracts';
 
+import type { GradedEvidenceItem } from '../engine/core/artifacts';
 import type { EngineFinding, PromptFacts } from '../engine/types';
 
-/** A finding the critic (LLM) contributed. Never carries a ruleId or patch. */
-export interface CriticFinding {
-  dimension: EvalDimension;
-  severity: Severity;
-  title: string;
-  message: string;
-  affectedNodeIds: string[];
-}
-
 export interface CritiqueResult {
-  findings: CriticFinding[];
+  /** Grounded weaknesses as graded evidence — the engine's scorer turns these into a bounded subtraction. */
+  items: GradedEvidenceItem[];
   /** Narrative for the evaluation header; null → the engine's summary stands. */
   summary: string | null;
   /** Model id that produced the critique, for the audit column. */

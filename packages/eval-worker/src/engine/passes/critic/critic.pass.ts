@@ -1,7 +1,11 @@
 /**
- * The free-form LLM critic as a pass: commentary the deterministic engine
- * cannot produce, emitted as an annotation artifact the aggregator carries
- * through without ever scoring.
+ * The LLM critic as a pass: a grounded weakness-finder. It reports what the
+ * deterministic engine cannot see — misplaced responsibilities, consistency
+ * traps, operational blind spots — as graded evidence (each weakness a magnitude
+ * + confidence tied to a prompt requirement and components). The artifact is
+ * neither findings nor coverage, so `enforceMode` carries it through; the
+ * engine's generic scorer turns it into a bounded, weakness-only subtraction.
+ * The LLM still never authors a number.
  */
 import { AnthropicCritic } from '../../../critic/anthropic-critic';
 import { isFindingsArtifact } from '../../core/artifacts';
@@ -41,8 +45,9 @@ export function createCriticPass(): EvalPass {
       return [
         {
           passId: CRITIC_PASS_ID,
-          kind: 'annotations',
-          findings: critique.findings,
+          kind: 'graded-evidence',
+          lens: 'critic',
+          items: critique.items,
           summary: critique.summary,
           model: critique.model,
         },

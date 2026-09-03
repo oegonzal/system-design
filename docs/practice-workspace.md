@@ -83,8 +83,14 @@ Two rules keep the grade honest:
   provide that mechanism. You can't talk your way to a score the design doesn't
   support.
 - **No keyword gaming.** Prose is judged by its references plus a "reads-as-prose"
-  check, never by matching words — and the AI critic only adds advisory notes; the
-  deterministic engine sets the actual number.
+  check, never by matching words. On the default stack the AI critic only adds
+  advisory notes and the deterministic engine sets the number. Under the opt-in
+  **deep eval** (RUNBOOK: `EVAL_DETERMINISTIC=0`), the critic and workability
+  evaluator can also _lower_ the score by finding **grounded weaknesses** —
+  each tied to a specific requirement and components, expressed as an ordinal
+  magnitude and confidence that the engine turns into a bounded, downward-only
+  deduction. The AI still never picks the number and can never trip a letter cap;
+  it only supplies grounded evidence for the engine to price.
 
 ## How the score is built
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AxisArtifact, DiagnosticsArtifact } from '../../core/artifacts';
+import type {
+  AxisArtifact,
+  DiagnosticsArtifact,
+  GradedEvidenceArtifact,
+} from '../../core/artifacts';
 import type { PassContext } from '../../core/types';
 import { buildGraphIndex } from '../../graph-index';
 import { fakeLlm, flashSaleFacts, orderHistoryFacts } from '../../testing';
@@ -32,6 +36,25 @@ const critique: WorkabilityCritique = {
     risk: { level: 'low', rationale: 'Replay duplicates are the main residual exposure.' },
     futureGain: { level: 'medium', rationale: 'The event stream leaves room for new consumers.' },
   },
+  weaknesses: [
+    {
+      requirementId: 'ing-shopify-webhooks',
+      factor: 'feasibility',
+      weakness: 'high',
+      confidence: 'medium',
+      affectedComponents: [],
+      rationale: 'No idempotency on the webhook path; a Shopify retry double-indexes the order.',
+    },
+    {
+      // A workflow item the spec does not declare is re-checked to null.
+      requirementId: 'op-does-not-exist',
+      factor: 'completeness',
+      weakness: 'low',
+      confidence: 'low',
+      affectedComponents: [],
+      rationale: 'A speculative gap.',
+    },
+  ],
   summary: 'Model the dispute path next.',
 };
 
@@ -41,7 +64,12 @@ describe('llm.workability', () => {
     const artifacts = await pass.run(contextWith({ llm: fakeLlm(critique) }));
 
     expect(
-      artifacts.every((artifact) => artifact.kind === 'axis' || artifact.kind === 'diagnostics'),
+      artifacts.every(
+        (artifact) =>
+          artifact.kind === 'axis' ||
+          artifact.kind === 'diagnostics' ||
+          artifact.kind === 'graded-evidence',
+      ),
     ).toBe(true);
     const axis = artifacts.find((artifact) => artifact.kind === 'axis') as AxisArtifact;
     expect(axis.factors?.map((factor) => `${factor.id}:${factor.level}`)).toEqual([
@@ -63,6 +91,26 @@ describe('llm.workability', () => {
     expect(axis.score).toBe(factorsToDisplay(critique).score);
     // mode:'llm' — enforceMode would strip findings/coverage; the pass emits none to strip.
     expect(pass.mode).toBe('llm');
+  });
+
+  it('[EVAL-16] emits its grounded shortfalls as graded evidence, mapped lens→dimension', async () => {
+    const pass = createWorkabilityPass();
+    const artifacts = await pass.run(contextWith({ llm: fakeLlm(critique) }));
+    const graded = artifacts.find(
+      (artifact) => artifact.kind === 'graded-evidence',
+    ) as GradedEvidenceArtifact;
+
+    expect(graded.lens).toBe('evaluator.workability');
+    expect(graded.items).toHaveLength(2);
+    // feasibility → reliability, magnitude and confidence carried, grounded to the item.
+    expect(graded.items[0]).toMatchObject({
+      dimension: 'reliability',
+      level: 'high',
+      confidence: 'medium',
+      requirementId: 'ing-shopify-webhooks',
+    });
+    // The undeclared workflow item is re-checked to null grounding.
+    expect(graded.items[1]?.requirementId).toBeNull();
   });
 
   it('skips as not-applicable on a prompt without a workflow spec', async () => {

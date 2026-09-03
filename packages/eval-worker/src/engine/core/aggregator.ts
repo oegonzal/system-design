@@ -28,9 +28,11 @@ import type {
   DiagnosticsArtifact,
   EngineFinding,
   EvidenceArtifact,
+  GradedEvidenceArtifact,
   GradedEvidenceItem,
   ScenarioArtifact,
 } from './artifacts';
+import { isGradedEvidenceArtifact } from './artifacts';
 import { gradeForScore, type CoverageScoringPolicy, type EvalProfile } from './profile';
 
 const SEVERITY_RANK: Record<Severity, number> = {
@@ -168,6 +170,8 @@ export interface AggregateResult {
   axes: AxisArtifact[];
   scenarios: ScenarioArtifact | null;
   annotations: AnnotationArtifact | null;
+  /** The graded-evidence artifacts that scored — carried for persistence and audit. */
+  gradedEvidence: GradedEvidenceArtifact[];
   diagnostics: DiagnosticsArtifact[];
   /** How the numbers above were arrived at. Derived from the same pass. */
   trace: AggregateTrace;
@@ -343,6 +347,7 @@ export function aggregate(
     axes,
     scenarios,
     annotations,
+    gradedEvidence: artifacts.filter(isGradedEvidenceArtifact),
     diagnostics,
     trace: explained.trace,
   };

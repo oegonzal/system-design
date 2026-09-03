@@ -57,7 +57,7 @@ function fakeLlm(response: Critique | null): LlmClient {
 }
 
 describe('AnthropicCritic', () => {
-  it('maps a critique and drops node ids the graph does not contain', async () => {
+  it('maps a critique to graded evidence, keeping grounding and dropping unknown ids', async () => {
     const critic = new AnthropicCritic(
       fakeLlm({
         summary: 'Solid start; the write path is the risk.',
@@ -65,9 +65,23 @@ describe('AnthropicCritic', () => {
           {
             dimension: 'data',
             severity: 'medium',
+            weakness: 'high',
+            confidence: 'medium',
+            requirementId: 'fst-lat-read-spike',
+            affectedComponents: ['n-svc', 'n-ghost'],
             title: 'Inventory decrement is not atomic',
-            message: 'At 4000 req/s two buyers can read the same seat count.',
-            affectedNodeIds: ['n-svc', 'n-ghost'],
+            rationale: 'At 4000 req/s two buyers can read the same seat count.',
+          },
+          {
+            // A requirement the prompt never made is re-checked to null.
+            dimension: 'reliability',
+            severity: 'low',
+            weakness: 'low',
+            confidence: 'low',
+            requirementId: 'not-a-real-requirement',
+            affectedComponents: [],
+            title: 'Minor nit',
+            rationale: 'A stylistic point.',
           },
         ],
       }),
@@ -82,8 +96,19 @@ describe('AnthropicCritic', () => {
 
     expect(result.model).toBe('claude-sonnet-5');
     expect(result.summary).toContain('write path');
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0]?.affectedNodeIds).toEqual(['n-svc']);
+    expect(result.items).toHaveLength(2);
+    // Ordinals carried through, grounding kept, ghost node dropped.
+    expect(result.items[0]).toMatchObject({
+      dimension: 'data',
+      level: 'high',
+      confidence: 'medium',
+      severity: 'medium',
+      requirementId: 'fst-lat-read-spike',
+      affectedNodeIds: ['n-svc'],
+    });
+    expect(result.items[0]?.rationale).toContain('Inventory decrement is not atomic');
+    // The inadmissible requirement is nulled rather than trusted.
+    expect(result.items[1]?.requirementId).toBeNull();
   });
 
   it('resolves to the empty critique when the llm returns null', async () => {
@@ -94,6 +119,6 @@ describe('AnthropicCritic', () => {
       narrative: null,
       deterministicFindings: [],
     });
-    expect(result).toEqual({ findings: [], summary: null, model: null });
+    expect(result).toEqual({ items: [], summary: null, model: null });
   });
 });
