@@ -6,9 +6,14 @@
  * untouched (advisory llm-source findings, structurally unable to move the
  * score). Without a narrative there is nothing to grade, so the pass records
  * a not-applicable diagnostic rather than inventing an axis score for
- * silence. The deterministic narrative verdicts ride along as a dedup
- * section, so the model adds rather than repeats.
+ * silence. Two grounding sections keep the critique honest: a reference frame
+ * built from typed facts (which real components carry substantive prose, which
+ * requirements are narrated) so it grades quality against the same anchors the
+ * score uses, and the deterministic verdicts as a dedup section so the model
+ * adds rather than repeats.
  */
+import { realComponentNodes } from '@sysdesign/contracts';
+
 import { describeDesign } from '../../serialization/graph-text';
 import { isCoverageArtifact, isFindingsArtifact } from '../../core/artifacts';
 import type { EvalPass, PassContext } from '../../core/types';
@@ -17,22 +22,55 @@ import { NARRATIVE_AXIS_ID, NARRATIVE_AXIS_LABEL, narrativeSchema } from './narr
 export const NARRATIVE_PASS_ID = 'llm.narrative';
 
 const SYSTEM_PROMPT = [
-  'You are a principal engineer grading the DESIGN NARRATIVE of a',
-  'system-design exercise — the prose the author submitted with the diagram.',
-  'Grade how well the prose explains THIS diagram against THIS prompt: does',
-  "it state every component's purpose, say how data and control flow between",
-  'the components, and tie each described mechanism to the requirement it',
-  'serves? Score 0–100 on each subscore; be strict — 80+ means the prose',
-  'alone would let a new engineer rebuild the diagram.',
-  'Report misalignments as findings: a mechanism the story relies on with no',
-  'node or edge behind it is a hole, not a plan; a flow described differently',
-  'than drawn is a contradiction; a requirement the prose waves at without',
-  'naming its mechanism is unearned confidence. Quote the offending claim in',
-  'each finding and reference node ids. The deterministic engine grades the',
-  'design brief, never this prose, so judging the writing is yours alone —',
-  'its brief verdicts are included below; never restate them.',
-  'Keep the summary to what the author should rewrite next.',
+  'You are a principal engineer grading the DESIGN NARRATIVE — the prose the',
+  'author wrote to explain their diagram. Judge explanation QUALITY, not',
+  'eloquence: for THIS diagram and THIS prompt, does the prose give every',
+  'component a clear purpose, trace how control and data actually flow, and tie',
+  'each mechanism to the requirement it serves?',
+  'Reward prose that is specific to THIS design — that names real components,',
+  "cites the diagram's own numbers and mechanisms, and explains WHY a choice",
+  'was made. Penalize vague, generic, or filler sentences that would fit any',
+  "diagram, and prose that restates a component's label without adding meaning.",
+  'Score each subscore 0–100 and be strict: 80+ means the prose alone would let',
+  'a new engineer rebuild and defend the design.',
+  'Report ONLY misalignments as findings: a mechanism the story leans on with',
+  'no node or edge behind it, a flow described differently than drawn, a',
+  'requirement waved at without naming its mechanism. Quote the offending claim',
+  'and reference node ids.',
+  'The deterministic engine already grades the brief and whether prose is',
+  'present — its verdicts are listed below; never restate them. Your job is the',
+  "writing's quality and its alignment to the diagram alone.",
+  'Keep the summary to the single most valuable rewrite.',
 ].join(' ');
+
+/**
+ * The reference frame the deterministic layer credits: which real components
+ * carry substantive prose, which requirements are narrated, whether the
+ * overview holds up. Given so the critic grades the QUALITY of the explanation
+ * against the same anchors the score uses — not a set it hallucinates — and can
+ * see the gaps. Built from typed facts already on the context; no prose is read
+ * here, and it names nothing archetype-specific.
+ */
+function groundingSection(ctx: PassContext): string {
+  const explained = new Set(ctx.narration?.explainedNodeIds ?? []);
+  const components = realComponentNodes(ctx.graph).map(
+    (node) =>
+      `  ${node.id} (${node.label}) — ${explained.has(node.id) ? 'has substantive prose' : 'NOT yet explained'}`,
+  );
+  const narrated = new Set(ctx.narration?.narratedRequirementIndexes ?? []);
+  const requirements = Array.from({ length: ctx.facts.functionalRequirementCount }, (_, index) =>
+    narrated.has(index)
+      ? `  requirement #${index} — narrated`
+      : `  requirement #${index} — NOT narrated`,
+  );
+  return [
+    `Overview: ${ctx.narration?.overviewSubstantive ? 'substantive' : 'thin or missing'}`,
+    `Components on the diagram (grade the quality of each explanation; a missing one is a gap):`,
+    components.length > 0 ? components.join('\n') : '  (none)',
+    `Functional requirements (each should have a flow narration):`,
+    requirements.length > 0 ? requirements.join('\n') : '  (none)',
+  ].join('\n');
+}
 
 /** The deterministic engine's brief verdicts, as a do-not-repeat section. */
 function deterministicSection(ctx: PassContext): string {
@@ -89,6 +127,9 @@ export function createNarrativePass(): EvalPass {
         system: SYSTEM_PROMPT,
         user: [
           design.text,
+          ``,
+          `# Reference frame (grade the QUALITY for each; do not merely check presence)`,
+          groundingSection(ctx),
           ``,
           `# Already graded deterministically (do not repeat)`,
           deterministicSection(ctx),

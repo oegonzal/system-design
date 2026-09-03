@@ -138,10 +138,15 @@ describe('narrative pass', () => {
   it('grades prose against diagram and prompt, and sends the model both', async () => {
     const capture: { system?: string; user?: string } = {};
     await createNarrativePass().run(contextWith(capturingLlm(capture)));
-    expect(capture.system).toContain('THIS diagram against THIS prompt');
-    expect(capture.system).toContain('Report misalignments as findings');
+    // The stable contract: it grades quality for this diagram/prompt, and asks
+    // for misalignment findings — not the exact wording.
+    expect(capture.system).toContain('THIS diagram');
+    expect(capture.system?.toLowerCase()).toContain('quality');
+    expect(capture.system?.toLowerCase()).toContain('misalignment');
     expect(capture.user).toContain('# Candidate design (canvas graph)');
     expect(capture.user).toContain(STORY);
+    // And the reference frame grounds the critique in the real components.
+    expect(capture.user).toContain('# Reference frame');
   });
 
   it('hands the model the deterministic narrative verdicts as a do-not-repeat section', async () => {

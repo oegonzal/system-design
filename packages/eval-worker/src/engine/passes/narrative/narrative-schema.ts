@@ -11,13 +11,41 @@ export const NARRATIVE_AXIS_ID = 'narrative';
 export const NARRATIVE_AXIS_LABEL = 'Narrative & alignment';
 
 export const narrativeSchema = z.object({
-  /** How well the prose explains this diagram against this prompt, 0–100. */
+  /** Overall explanation quality of the prose for this diagram and prompt, 0–100. */
   score: z.number().int().min(0).max(100),
   subScores: z.object({
-    componentClarity: z.number().int().min(0).max(100),
-    flowStory: z.number().int().min(0).max(100),
-    requirementCoverage: z.number().int().min(0).max(100),
-    diagramConsistency: z.number().int().min(0).max(100),
+    componentClarity: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe(
+        'Does every real component get a clear, specific purpose (not just its label restated)? Lower it for unexplained boxes or generic prose.',
+      ),
+    flowStory: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe(
+        'Does the prose trace how control and data actually move between the drawn components, end to end?',
+      ),
+    requirementCoverage: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe(
+        'Is each functional requirement narrated and tied to the mechanism that serves it, rather than waved at?',
+      ),
+    diagramConsistency: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .describe(
+        'Does the prose match what is drawn? Lower it for mechanisms with no node/edge behind them or flows described differently than drawn.',
+      ),
   }),
   summary: z.string().max(800),
   findings: z
