@@ -36,6 +36,23 @@ export interface PassRecorder {
   endPass(passId: string, produced: readonly EvidenceArtifact[], durationMs: number): void;
 }
 
+/**
+ * Several observers of the same pass boundaries as one — the run dump and a
+ * lock heartbeat, say — called in order with identical arguments. Keeps the
+ * orchestrator's single `recorder` seam while letting infrastructure concerns
+ * stack without knowing about each other.
+ */
+export function composeRecorders(...recorders: readonly PassRecorder[]): PassRecorder {
+  return {
+    beginPass: (passId, mode, options) => {
+      for (const recorder of recorders) recorder.beginPass(passId, mode, options);
+    },
+    endPass: (passId, produced, durationMs) => {
+      for (const recorder of recorders) recorder.endPass(passId, produced, durationMs);
+    },
+  };
+}
+
 export interface RunEvaluationInput {
   graph: CanvasGraph;
   facts: PromptFacts;

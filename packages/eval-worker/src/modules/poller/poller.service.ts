@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
+import { CLAUDE_AGENT_TIMEOUT_MS } from '@sysdesign/llm';
 
 import { EvalRunnerService } from './eval-runner.service';
 
@@ -19,7 +20,16 @@ import { EvalRunnerService } from './eval-runner.service';
 export class PollerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PollerService.name);
   private readonly intervalMs = parseInt(process.env['EVAL_POLL_INTERVAL_MS'] ?? '1000', 10);
-  private readonly staleMs = parseInt(process.env['EVAL_STALE_RUNNING_MS'] ?? '300000', 10);
+  /**
+   * A lock is stale only once it is older than the longest single step could
+   * take: the runner refreshes it at every pass boundary (`lockHeartbeat`), so
+   * a live deep eval's lock ages by at most one model call — bounded by the
+   * subscription client's hard timeout — plus slack.
+   */
+  private readonly staleMs = parseInt(
+    process.env['EVAL_STALE_RUNNING_MS'] ?? String(CLAUDE_AGENT_TIMEOUT_MS + 60_000),
+    10,
+  );
   private readonly workerId = `eval-worker-${process.pid}`;
 
   private timer: NodeJS.Timeout | null = null;

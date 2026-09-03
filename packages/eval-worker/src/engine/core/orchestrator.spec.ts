@@ -6,7 +6,7 @@ import { graph, node, flashSaleFacts } from '../testing';
 import { DEFAULT_PROFILE } from '../profiles/default.profile';
 import { createPassRegistry } from '../passes';
 import type { EvidenceArtifact } from './artifacts';
-import { runEvaluation } from './orchestrator';
+import { composeRecorders, runEvaluation, type PassRecorder } from './orchestrator';
 import type { EvalPass } from './types';
 
 const llm = new NoopLlmClient();
@@ -274,6 +274,33 @@ describe('runEvaluation', () => {
     // diagnostic that replaces it records only a count.
     expect(rejected).toEqual([{ passId: 'llm.rogue', kind: 'findings', findings: [] }]);
     expect(run.artifacts.map((artifact) => artifact.kind)).toEqual(['diagnostics']);
+  });
+
+  it('composeRecorders hands every observer the same boundaries, in order', async () => {
+    const seen: string[] = [];
+    const observer = (name: string): PassRecorder => ({
+      beginPass: (passId) => seen.push(`${name}:begin:${passId}`),
+      endPass: (passId, produced) => seen.push(`${name}:end:${passId}:${produced.length}`),
+    });
+    const plain: EvalPass = {
+      id: 'rules.plain',
+      mode: 'deterministic',
+      run: () => Promise.resolve([{ passId: 'rules.plain', kind: 'findings', findings: [] }]),
+    };
+    await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: { ...DEFAULT_PROFILE, passes: [{ pass: 'rules.plain', enabled: true }] },
+      registry: new Map([[plain.id, plain]]),
+      recorder: composeRecorders(observer('dump'), observer('heartbeat')),
+    });
+    expect(seen).toEqual([
+      'dump:begin:rules.plain',
+      'heartbeat:begin:rules.plain',
+      'dump:end:rules.plain:1',
+      'heartbeat:end:rules.plain:1',
+    ]);
   });
 
   it('is unchanged by the presence of a recorder', async () => {

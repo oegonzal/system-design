@@ -162,6 +162,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every LLM lens — critic, narrative, depth, workability, scenarios — emits grounded graded evidence; none emits a free-form finding.',
   },
+  {
+    id: 'EVAL-18',
+    statement:
+      'A running evaluation refreshes its job lock at every pass boundary, fenced by the worker that holds it, so a long live eval is never reaped as dead nor resurrected by a stale heartbeat.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

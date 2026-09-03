@@ -7,13 +7,14 @@ import { asRecordable, type LlmClient } from '@sysdesign/llm';
 import { findPromptRunId, GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
 import { buildEvalDump, startEvalDump, type EvalDump, type EvalDumpLlm } from '../../dump';
-import { runEvaluation } from '../../engine/core/orchestrator';
+import { composeRecorders, runEvaluation } from '../../engine/core/orchestrator';
 import { createPassRegistry } from '../../engine/passes';
 import { ACTIVE_PROFILE } from '../../engine/profiles';
 import { ENGINE_VERSION } from '../../engine/scoring';
 import type { PromptFacts } from '../../engine/types';
 import { promptFactsFrom } from '../shared/prompt-facts';
 import { LLM_CLIENT } from './llm.token';
+import { lockHeartbeat } from './lock-heartbeat';
 
 /** Exponential backoff: 10s, 20s, 40s… capped at 5 minutes. */
 export const backoffMs = (attempts: number): number =>
@@ -112,7 +113,9 @@ export class EvalRunnerService {
         llm,
         profile: ACTIVE_PROFILE,
         registry: this.passRegistry,
-        recorder: dump.passes,
+        // The dump records each pass; the heartbeat keeps the job's lock fresh
+        // across them, so a live deep eval is never reaped as a dead worker's.
+        recorder: composeRecorders(dump.passes, lockHeartbeat(this.em, job, this.logger)),
       });
       dump.outcome({ artifacts, result });
       // The general critic owns the header summary and the audit column.

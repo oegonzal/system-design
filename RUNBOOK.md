@@ -66,7 +66,10 @@ EVAL_DETERMINISTIC=0 EVAL_AUTH=claude-code pnpm stack:up   # subscription (claud
 
 This is **heavy**: each submission runs several LLM passes serially (minutes on a
 subscription), so grades become non-reproducible and slow — use it deliberately,
-not for quick iteration. `EVAL_AUTH` mirrors `IMPROVER_AUTH` but is separate:
+not for quick iteration. A running job refreshes its lock at every pass boundary,
+so a multi-minute eval is never mistaken for a crashed worker's; the reaper's
+window (`EVAL_STALE_RUNNING_MS`, default one subscription-call timeout plus a
+minute) therefore only has to outlast a single pass, not the whole run. `EVAL_AUTH` mirrors `IMPROVER_AUTH` but is separate:
 eval determinism is never overridable (there is no `EVAL_DETERMINISTIC` fork), so
 CI/e2e/calibration always stay deterministic.
 
