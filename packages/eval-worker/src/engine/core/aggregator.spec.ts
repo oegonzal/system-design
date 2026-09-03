@@ -149,25 +149,17 @@ describe('aggregate', () => {
     expect(withLlm.scenarios).toEqual(scenarios);
   });
 
-  it('collects annotations and diagnostics without scoring them', () => {
+  it('collects diagnostics and carries every graded-evidence artifact for persistence', () => {
+    const critic = gradedArtifact([gradedItem({ dimension: 'data' })], 'critic');
+    const narrative = gradedArtifact(
+      [gradedItem({ dimension: 'explanation' })],
+      'critic.narrative',
+    );
     const result = aggregate(
       [
         coverageArtifact([coverageEntry({ expectationId: 'a', dimension: 'data', met: true })]),
-        {
-          passId: 'llm.critic',
-          kind: 'annotations',
-          findings: [
-            {
-              dimension: 'data',
-              severity: 'high',
-              title: 'Consistency trap',
-              message: 'The cache and database can disagree about inventory.',
-              affectedNodeIds: [],
-            },
-          ],
-          summary: 'A model opinion.',
-          model: 'claude-sonnet-5',
-        },
+        critic,
+        narrative,
         {
           passId: 'llm.depth',
           kind: 'diagnostics',
@@ -178,49 +170,13 @@ describe('aggregate', () => {
       ],
       DEFAULT_PROFILE,
     );
-    expect(result.dimensionScores.data).toBe(100);
-    expect(result.overallScore).toBe(100);
-    expect(result.annotations?.summary).toBe('A model opinion.');
+    // Each lens's artifact rides through in order, lens and summary intact —
+    // the runner reads the critic's summary from here.
+    expect(result.gradedEvidence.map((artifact) => artifact.lens)).toEqual([
+      'critic',
+      'critic.narrative',
+    ]);
     expect(result.diagnostics).toHaveLength(1);
-  });
-
-  it('merges annotation artifacts: findings concatenate, the first summary and model win', () => {
-    const criticFinding = {
-      dimension: 'data' as const,
-      severity: 'high' as const,
-      title: 'Consistency trap',
-      message: 'The cache and database can disagree about inventory.',
-      affectedNodeIds: [],
-    };
-    const narrativeFinding = {
-      dimension: 'explanation' as const,
-      severity: 'medium' as const,
-      title: 'The story caches reads the diagram never draws',
-      message: '"reads are cached" — no cache node exists.',
-      affectedNodeIds: ['n-2'],
-    };
-    const result = aggregate(
-      [
-        {
-          passId: 'llm.critic',
-          kind: 'annotations',
-          findings: [criticFinding],
-          summary: 'The general critic speaks first.',
-          model: 'claude-sonnet-5',
-        },
-        {
-          passId: 'llm.narrative',
-          kind: 'annotations',
-          findings: [narrativeFinding],
-          summary: null,
-          model: 'claude-sonnet-5',
-        },
-      ],
-      DEFAULT_PROFILE,
-    );
-    expect(result.annotations?.findings).toEqual([criticFinding, narrativeFinding]);
-    expect(result.annotations?.summary).toBe('The general critic speaks first.');
-    expect(result.annotations?.passId).toBe('llm.critic');
   });
 });
 

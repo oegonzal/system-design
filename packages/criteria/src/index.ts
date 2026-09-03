@@ -147,6 +147,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A critic or evaluator lens's grounded ordinal evidence — a weakness magnitude and confidence tied to a prompt requirement and the affected components — moves the score only through the engine's generic, bounded, weakness-only deterministic scorer: it can lower an already-assessed dimension, never by a raw LLM number, never past a deterministic cap, and never at all on the deterministic path.",
   },
+  {
+    id: 'EVAL-17',
+    statement:
+      'Every LLM lens — critic, narrative, depth, workability, scenarios — emits grounded graded evidence; none emits a free-form finding.',
+  },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },

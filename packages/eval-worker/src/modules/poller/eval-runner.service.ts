@@ -20,9 +20,11 @@ export const backoffMs = (attempts: number): number =>
   Math.min(10_000 * 2 ** Math.max(0, attempts - 1), 5 * 60_000);
 
 /**
- * Executes one claimed job: engine → critic → persist. The engine alone
- * decides scores; critic findings are annotations (source='llm'), so an
- * unavailable model changes commentary, never the grade.
+ * Executes one claimed job: engine → persist. The engine alone decides
+ * scores; every LLM lens's grounded weaknesses are graded evidence the
+ * engine's bounded scorer priced, persisted here as source='llm' findings so
+ * they surface as improvement areas. An unavailable model changes nothing
+ * but the absence of that evidence.
  */
 @Injectable()
 export class EvalRunnerService {
@@ -113,9 +115,7 @@ export class EvalRunnerService {
         recorder: dump.passes,
       });
       dump.outcome({ artifacts, result });
-      // The narrative critic still rides as annotations; the general critic now
-      // grounds its weaknesses as graded evidence and owns the header summary.
-      const annotations = result.annotations;
+      // The general critic owns the header summary and the audit column.
       const criticGraded =
         result.gradedEvidence.find((artifact) => artifact.lens === 'critic') ?? null;
 
@@ -141,26 +141,10 @@ export class EvalRunnerService {
             suggestion: finding.suggestion,
           });
         }
-        for (const finding of annotations?.findings ?? []) {
-          tem.create(Finding, {
-            evaluation: evaluationId,
-            source: 'llm',
-            ruleId: null,
-            expectationId: null,
-            nfrId: null,
-            scenarioId: null,
-            dimension: finding.dimension,
-            severity: finding.severity,
-            title: finding.title,
-            message: finding.message,
-            affectedNodeIds: finding.affectedNodeIds,
-            affectedEdgeIds: [],
-            suggestion: null,
-          });
-        }
-        // Graded weaknesses persist as advisory llm findings too — the score
+        // Every lens's graded weaknesses persist as llm findings — the score
         // already moved through the engine's scorer; here they surface as
-        // grounded improvement areas, titled by lens and requirement.
+        // grounded improvement areas, titled by lens and requirement. Scenario
+        // failure stories arrive this way too (lens evaluator.scenarios).
         for (const artifact of result.gradedEvidence) {
           for (const item of artifact.items) {
             tem.create(Finding, {
@@ -180,27 +164,6 @@ export class EvalRunnerService {
             });
           }
         }
-        // Scenario failure stories persist as advisory findings too — same
-        // llm source, so they teach without ever touching the score math.
-        for (const report of result.scenarios?.reports ?? []) {
-          if (report.verdict === 'survives') continue;
-          tem.create(Finding, {
-            evaluation: evaluationId,
-            source: 'llm',
-            ruleId: null,
-            expectationId: null,
-            nfrId: null,
-            scenarioId: report.scenarioId,
-            dimension: 'reliability',
-            severity: report.verdict === 'fails' ? 'high' : 'medium',
-            title: report.title,
-            message: report.story,
-            affectedNodeIds: report.weakestNodeIds,
-            affectedEdgeIds: [],
-            suggestion: null,
-          });
-        }
-
         await tem.nativeUpdate(
           Evaluation,
           { id: evaluationId },
@@ -209,7 +172,7 @@ export class EvalRunnerService {
             overallScore: result.overallScore,
             grade: result.grade,
             dimensionScores: result.dimensionScores,
-            summary: criticGraded?.summary ?? annotations?.summary ?? result.summary,
+            summary: criticGraded?.summary ?? result.summary,
             engineVersion: ENGINE_VERSION,
             profileId: ACTIVE_PROFILE.id,
             profileVersion: ACTIVE_PROFILE.version,
@@ -225,7 +188,7 @@ export class EvalRunnerService {
               model: axis.model,
             })),
             scenarios: result.scenarios?.reports ?? [],
-            criticModel: criticGraded?.model ?? annotations?.model ?? null,
+            criticModel: criticGraded?.model ?? null,
             completedAt: new Date(),
             updatedAt: new Date(),
           },

@@ -1,25 +1,28 @@
 /**
  * The dedicated narrative critic: an LLM grades how well the author's prose
  * explains the diagram it was submitted with — alignment, not eloquence —
- * and reports the misalignments it finds. The score is an AxisArtifact and
- * the findings an AnnotationArtifact; the aggregator carries both through
- * untouched (advisory llm-source findings, structurally unable to move the
- * score). Without a narrative there is nothing to grade, so the pass records
- * a not-applicable diagnostic rather than inventing an axis score for
- * silence. Two grounding sections keep the critique honest: a reference frame
- * built from typed facts (which real components carry substantive prose, which
- * requirements are narrated) so it grades quality against the same anchors the
- * score uses, and the deterministic verdicts as a dedup section so the model
- * adds rather than repeats.
+ * and reports the misalignments it finds. The score is an advisory
+ * AxisArtifact; the misalignments are graded evidence on the explanation
+ * dimension (the narrative lens IS the explanation lens), which the engine's
+ * bounded scorer prices — the model never authors a number. Without a
+ * narrative there is nothing to grade, so the pass records a not-applicable
+ * diagnostic rather than inventing an axis score for silence. Two grounding
+ * sections keep the critique honest: a reference frame built from typed facts
+ * (which real components carry substantive prose, which requirements are
+ * narrated) so it grades quality against the same anchors the score uses, and
+ * the deterministic verdicts as a dedup section so the model adds rather than
+ * repeats.
  */
 import { realComponentNodes } from '@sysdesign/contracts';
 
 import { describeDesign } from '../../serialization/graph-text';
 import { isCoverageArtifact, isFindingsArtifact } from '../../core/artifacts';
 import type { EvalPass, PassContext } from '../../core/types';
-import { NARRATIVE_AXIS_ID, NARRATIVE_AXIS_LABEL, narrativeSchema } from './narrative-schema';
+import { groundingSets, toGradedItem } from '../graded-grounding';
+import { NARRATIVE_AXIS_ID, NARRATIVE_AXIS_LABEL, buildNarrativeSchema } from './narrative-schema';
 
 export const NARRATIVE_PASS_ID = 'llm.narrative';
+export const NARRATIVE_LENS = 'critic.narrative';
 
 const SYSTEM_PROMPT = [
   'You are a principal engineer grading the DESIGN NARRATIVE — the prose the',
@@ -134,7 +137,7 @@ export function createNarrativePass(): EvalPass {
           `# Already graded deterministically (do not repeat)`,
           deterministicSection(ctx),
         ].join('\n'),
-        schema: narrativeSchema,
+        schema: buildNarrativeSchema(ctx.graph, ctx.facts),
         maxTokens: 2048,
       });
 
@@ -150,6 +153,21 @@ export function createNarrativePass(): EvalPass {
         ];
       }
 
+      // Every misalignment lands on the explanation dimension — the lens's
+      // fixed dimension, like workability's factor map — never one the model picks.
+      const known = groundingSets(ctx.graph, ctx.facts);
+      const items = critique.findings.map((finding) =>
+        toGradedItem(
+          finding,
+          {
+            dimension: 'explanation',
+            severity: finding.severity,
+            rationale: `${finding.title.trim()} — ${finding.message.trim()}`,
+          },
+          known,
+        ),
+      );
+
       return [
         {
           passId: NARRATIVE_PASS_ID,
@@ -162,14 +180,14 @@ export function createNarrativePass(): EvalPass {
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },
-        // Misalignment findings ride as advisory annotations; the general
-        // critic's summary stays the evaluation summary (first-wins merge).
-        ...(critique.findings.length > 0
+        // The general critic owns the evaluation summary; this lens's items score.
+        ...(items.length > 0
           ? [
               {
                 passId: NARRATIVE_PASS_ID,
-                kind: 'annotations' as const,
-                findings: critique.findings,
+                kind: 'graded-evidence' as const,
+                lens: NARRATIVE_LENS,
+                items,
                 summary: null,
                 model: ctx.llm.model,
               },

@@ -31,7 +31,7 @@ describe('runEvaluation', () => {
       'llm.workability:diagnostics',
       'llm.scenarios:diagnostics',
     ]);
-    expect(run.result.annotations).toBeNull();
+    expect(run.result.gradedEvidence).toEqual([]);
     expect(run.result.diagnostics[0]?.reason).toBe('llm-disabled');
   });
 

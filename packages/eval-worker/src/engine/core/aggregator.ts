@@ -1,9 +1,9 @@
 /**
  * The pure decision point: evidence artifacts + a profile in, scores, grade,
- * and summary out. Only findings and coverage feed the score math — axis,
- * scenario, and annotation artifacts pass through untouched, which is the
- * structural guarantee that LLM output can never move the deterministic
- * grade. No clock, no randomness: identical inputs, byte-identical result.
+ * and summary out. Findings and coverage feed the score math; graded evidence
+ * subtracts through the bounded, weakness-only scorer below; axis and scenario
+ * artifacts pass through untouched for display. The LLM never authors a
+ * number. No clock, no randomness: identical inputs, byte-identical result.
  *
  * The arithmetic is done ONCE, by `explainAggregate`, which returns both the
  * numbers and the ledger that produced them. `aggregate` reads that ledger
@@ -22,7 +22,6 @@ import {
 } from '@sysdesign/contracts';
 
 import type {
-  AnnotationArtifact,
   AxisArtifact,
   CoverageArtifact,
   DiagnosticsArtifact,
@@ -169,7 +168,6 @@ export interface AggregateResult {
   summary: string;
   axes: AxisArtifact[];
   scenarios: ScenarioArtifact | null;
-  annotations: AnnotationArtifact | null;
   /** The graded-evidence artifacts that scored — carried for persistence and audit. */
   gradedEvidence: GradedEvidenceArtifact[];
   diagnostics: DiagnosticsArtifact[];
@@ -194,7 +192,6 @@ interface Collected {
   gradedEvidence: CollectedGradedItem[];
   axes: AxisArtifact[];
   diagnostics: DiagnosticsArtifact[];
-  annotations: AnnotationArtifact | null;
   scenarios: ScenarioArtifact | null;
 }
 
@@ -204,7 +201,6 @@ function collect(artifacts: readonly EvidenceArtifact[]): Collected {
   const gradedEvidence: CollectedGradedItem[] = [];
   const axes: AxisArtifact[] = [];
   const diagnostics: DiagnosticsArtifact[] = [];
-  const annotationArtifacts: AnnotationArtifact[] = [];
   let scenarios: ScenarioArtifact | null = null;
 
   for (const artifact of artifacts) {
@@ -224,27 +220,13 @@ function collect(artifacts: readonly EvidenceArtifact[]): Collected {
       case 'scenarios':
         scenarios ??= artifact;
         break;
-      case 'annotations':
-        annotationArtifacts.push(artifact);
-        break;
       case 'diagnostics':
         diagnostics.push(artifact);
         break;
     }
   }
 
-  // Annotation artifacts merge in artifact order: findings concatenate, but
-  // the FIRST artifact's identity/summary/model win — the general critic
-  // runs before the narrative critic and owns the evaluation summary.
-  const first = annotationArtifacts[0];
-  const annotations: AnnotationArtifact | null =
-    first === undefined
-      ? null
-      : annotationArtifacts.length === 1
-        ? first
-        : { ...first, findings: annotationArtifacts.flatMap((artifact) => artifact.findings) };
-
-  return { findings, coverage, gradedEvidence, axes, diagnostics, annotations, scenarios };
+  return { findings, coverage, gradedEvidence, axes, diagnostics, scenarios };
 }
 
 export interface Explanation {
@@ -328,7 +310,7 @@ export function aggregate(
   artifacts: readonly EvidenceArtifact[],
   profile: EvalProfile,
 ): AggregateResult {
-  const { axes, diagnostics, annotations, scenarios } = collect(artifacts);
+  const { axes, diagnostics, scenarios } = collect(artifacts);
   const explained = explainAggregate(artifacts, profile);
 
   return {
@@ -346,7 +328,6 @@ export function aggregate(
     ),
     axes,
     scenarios,
-    annotations,
     gradedEvidence: artifacts.filter(isGradedEvidenceArtifact),
     diagnostics,
     trace: explained.trace,

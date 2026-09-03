@@ -1,15 +1,18 @@
 /**
  * The depth axis: an LLM grades how deeply the design addresses the hard
- * problems of its archetype — by mechanism, not by box. The score is an
- * AxisArtifact the aggregator carries through untouched: displayed beside the
- * deterministic grade, structurally unable to move it.
+ * problems of its archetype — by mechanism, not by box. The numeric score is
+ * an advisory AxisArtifact displayed beside the grade; the specific shallow
+ * spots it names are graded evidence the engine's bounded scorer prices — the
+ * model never authors the number that moves the grade.
  */
 import { describeDesign } from '../../serialization/graph-text';
 import type { EvalPass } from '../../core/types';
 import { coverageSection, findingsSection } from '../deterministic-sections';
-import { DEPTH_AXIS_ID, DEPTH_AXIS_LABEL, depthSchema } from './depth-schema';
+import { groundingSets, toGradedItem } from '../graded-grounding';
+import { DEPTH_AXIS_ID, DEPTH_AXIS_LABEL, buildDepthSchema } from './depth-schema';
 
 export const DEPTH_PASS_ID = 'llm.depth';
+export const DEPTH_LENS = 'evaluator.depth';
 
 const SYSTEM_PROMPT = [
   'You are a principal engineer grading the DEPTH of a system-design exercise.',
@@ -22,8 +25,11 @@ const SYSTEM_PROMPT = [
   'contracts themselves — operation granularity, command/query/event/stream',
   'fit, idempotency choices, and how tightly callers couple to each surface.',
   'Score 0–100 on each; be strict — 80+ means you would',
-  'ship this review as a strong-hire signal. Keep the summary to what the',
-  'author should deepen next.',
+  'ship this review as a strong-hire signal. Then list the specific shallow',
+  'spots as weaknesses: for each, WHERE it is (the requirement it leaves',
+  'under-addressed and the node ids), HOW BAD (a weakness magnitude of',
+  'none/low/medium/high at the stated scale), HOW SURE (confidence), and WHY.',
+  'Keep the summary to what the author should deepen next.',
 ].join(' ');
 
 export function createDepthPass(): EvalPass {
@@ -55,8 +61,8 @@ export function createDepthPass(): EvalPass {
           `# Deterministic findings`,
           findingsSection(ctx),
         ].join('\n'),
-        schema: depthSchema,
-        maxTokens: 2048,
+        schema: buildDepthSchema(ctx.graph, ctx.facts),
+        maxTokens: 3072,
       });
 
       if (critique === null) {
@@ -71,6 +77,19 @@ export function createDepthPass(): EvalPass {
         ];
       }
 
+      const known = groundingSets(ctx.graph, ctx.facts);
+      const items = critique.weaknesses.map((weakness) =>
+        toGradedItem(
+          weakness,
+          {
+            dimension: weakness.dimension,
+            severity: weakness.severity,
+            rationale: weakness.rationale.trim(),
+          },
+          known,
+        ),
+      );
+
       return [
         {
           passId: DEPTH_PASS_ID,
@@ -83,6 +102,18 @@ export function createDepthPass(): EvalPass {
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },
+        ...(items.length > 0
+          ? [
+              {
+                passId: DEPTH_PASS_ID,
+                kind: 'graded-evidence' as const,
+                lens: DEPTH_LENS,
+                items,
+                summary: null,
+                model: ctx.llm.model,
+              },
+            ]
+          : []),
         ...(design.clipped
           ? [
               {

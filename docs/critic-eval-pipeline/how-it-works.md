@@ -78,36 +78,41 @@ runEvaluation(graph, facts, narrative, brief, llm, profile, registry)
    └─ aggregate(artifacts, profile) ──► scores, grade, summary, trace
 ```
 
-| Piece                     | File                                 | What it does                                                                                       |
-| ------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Orchestrator              | `engine/core/orchestrator.ts`        | Runs passes serially, enforces the mode contract, brackets each pass for the run dump              |
-| Artifact union            | `engine/core/artifacts.ts`           | `findings` · `coverage` · `axis` · `scenarios` · `annotations` · `graded-evidence` · `diagnostics` |
-| Aggregator                | `engine/core/aggregator.ts`          | `explainAggregate` computes the score and the ledger together                                      |
-| Profile type + validation | `engine/core/profile.ts`             | `validateProfile` fails fast on a malformed rubric                                                 |
-| Active profile            | `engine/profiles/default.profile.ts` | `default@3.3.0` — weights, bands, caps, penalties, suppressions                                    |
-| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.6.0'`                                                                         |
-| Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only                          |
-| Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                                |
-| Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                                    |
+| Piece                     | File                                 | What it does                                                                          |
+| ------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
+| Orchestrator              | `engine/core/orchestrator.ts`        | Runs passes serially, enforces the mode contract, brackets each pass for the run dump |
+| Artifact union            | `engine/core/artifacts.ts`           | `findings` · `coverage` · `axis` · `scenarios` · `graded-evidence` · `diagnostics`    |
+| Aggregator                | `engine/core/aggregator.ts`          | `explainAggregate` computes the score and the ledger together                         |
+| Profile type + validation | `engine/core/profile.ts`             | `validateProfile` fails fast on a malformed rubric                                    |
+| Active profile            | `engine/profiles/default.profile.ts` | `default@3.3.0` — weights, bands, caps, penalties, suppressions                       |
+| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.6.0'`                                                            |
+| Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only             |
+| Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                   |
+| Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                       |
 
 ### The seven passes
 
 Registered in `engine/passes/index.ts`, ordered by the profile.
 
-| Pass id              | Mode          | File                                         | Produces                                                  |
-| -------------------- | ------------- | -------------------------------------------- | --------------------------------------------------------- |
-| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 92 rules → `findings`                                     |
-| `expectations.banks` | deterministic | `engine/passes/expectations/`                | 78 expectations → `coverage` + `findings`                 |
-| `llm.critic`         | llm           | `engine/passes/critic/` + `src/critic/`      | `graded-evidence` (lens `critic`) + summary               |
-| `llm.depth`          | llm           | `engine/passes/depth/`                       | `axis` (advisory score)                                   |
-| `llm.narrative`      | llm           | `engine/passes/narrative/`                   | `axis` + `annotations`                                    |
-| `llm.workability`    | llm           | `engine/passes/workability/`                 | `axis` + `graded-evidence` (lens `evaluator.workability`) |
-| `llm.scenarios`      | llm           | `engine/passes/scenarios/`                   | `scenarios`                                               |
+| Pass id              | Mode          | File                                         | Produces                                                     |
+| -------------------- | ------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| `rules.core`         | deterministic | `engine/passes/rules/` + `engine/rules/*.ts` | 92 rules → `findings`                                        |
+| `expectations.banks` | deterministic | `engine/passes/expectations/`                | 78 expectations → `coverage` + `findings`                    |
+| `llm.critic`         | llm           | `engine/passes/critic/` + `src/critic/`      | `graded-evidence` (lens `critic`) + summary                  |
+| `llm.depth`          | llm           | `engine/passes/depth/`                       | `axis` + `graded-evidence` (lens `evaluator.depth`)          |
+| `llm.narrative`      | llm           | `engine/passes/narrative/`                   | `axis` + `graded-evidence` (lens `critic.narrative`)         |
+| `llm.workability`    | llm           | `engine/passes/workability/`                 | `axis` + `graded-evidence` (lens `evaluator.workability`)    |
+| `llm.scenarios`      | llm           | `engine/passes/scenarios/`                   | `scenarios` + `graded-evidence` (lens `evaluator.scenarios`) |
 
-The two graded producers ground each weakness to a prompt requirement — the
-critic across all NFRs and workflow items, the workability evaluator across the
-workflow items — via a per-request `z.enum(ids)` (the same idiom the binding
-suggester uses), re-checked admissible before emission (`engine/passes/graded-grounding.ts`).
+Every LLM lens grounds each weakness to a prompt requirement — the NFRs and,
+on a workflow prompt, the workflow items — via a per-request `z.enum(ids)` (the
+same idiom the binding suggester uses), re-checked admissible before emission;
+one shared declaration, `gradedWeaknessShape` + `toGradedItem` in
+`engine/passes/graded-grounding.ts`, keeps the currency identical across lenses
+(`[EVAL-17]`). A lens either names the dimension itself (critic, depth) or has a
+fixed one (narrative → explanation, scenarios → reliability, workability by
+factor map); the engine maps a scenario verdict to its magnitude. There is no
+free-form LLM findings path any more.
 They run live only under the opt-in deep eval (`EVAL_DETERMINISTIC=0`, see the
 RUNBOOK); on the default deterministic stack they emit nothing and the score is
 byte-identical.
@@ -221,8 +226,8 @@ the engine grounded ordinals; the engine does the arithmetic.
   assessed. `applyGradeCaps` never sees it, so a lens can dent the number but
   never trip a letter cap. Zero graded items → zero contribution, which is why
   the deterministic stack and every calibration pin are untouched.
-- **The aggregator routes the rest by kind.** `axis`, `scenarios`, `annotations`
-  and `diagnostics` never reach `scoreCoverage` or `applyGradeCaps`.
+- **The aggregator routes the rest by kind.** `axis`, `scenarios` and
+  `diagnostics` never reach `scoreCoverage` or `applyGradeCaps`.
 - **Suggestions live outside the engine entirely.** Binding proposals are an API
   endpoint, produce no artifact, and reach a graded brief only when a human
   accepts one.

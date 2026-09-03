@@ -4,6 +4,7 @@ import type { Archetype } from '@sysdesign/contracts';
 
 import { NoopLlmClient, type StructuredRequest } from '@sysdesign/llm';
 
+import type { GradedEvidenceArtifact } from '../../core/artifacts';
 import type { PassContext } from '../../core/types';
 import { buildGraphIndex } from '../../graph-index';
 import { fakeLlm, flashSaleFacts, graph, node } from '../../testing';
@@ -52,20 +53,47 @@ describe('scenario selection', () => {
     expect(selectScenarios(stale, 'standard').map((s) => s.id)).toEqual(['region-loss']);
   });
 
-  it('[EVAL-7] the schema is enum-locked to the selection — the model cannot invent scenarios', () => {
-    const schema = buildScenarioSchema(selectScenarios('flash-sale-ticketing', 'intro'));
-    const invented = schema.safeParse({
-      reports: [
-        { scenarioId: 'alien-invasion', verdict: 'fails', story: 'aliens', weakestNodeIds: [] },
-      ],
-    });
-    expect(invented.success).toBe(false);
-    const legit = schema.safeParse({
-      reports: [
-        { scenarioId: 'thundering-herd', verdict: 'degrades', story: 'slows', weakestNodeIds: [] },
-      ],
-    });
-    expect(legit.success).toBe(true);
+  it('[EVAL-7] the schema is enum-locked to the selection, the NFRs and the nodes', () => {
+    const ctx = contextWith(fakeLlm(null));
+    const schema = buildScenarioSchema(
+      selectScenarios('flash-sale-ticketing', 'intro'),
+      ctx.graph,
+      ctx.facts,
+    );
+    const base = {
+      verdict: 'degrades',
+      story: 'slows',
+      weakestNodeIds: [],
+      violatesRequirementId: null,
+      confidence: 'medium',
+    };
+    // The model cannot invent a scenario…
+    expect(schema.safeParse({ reports: [{ ...base, scenarioId: 'alien-invasion' }] }).success).toBe(
+      false,
+    );
+    // …nor a requirement or a node.
+    expect(
+      schema.safeParse({
+        reports: [{ ...base, scenarioId: 'thundering-herd', violatesRequirementId: 'not-real' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        reports: [{ ...base, scenarioId: 'thundering-herd', weakestNodeIds: ['ghost-node'] }],
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        reports: [
+          {
+            ...base,
+            scenarioId: 'thundering-herd',
+            violatesRequirementId: 'fst-lat-read-spike',
+            weakestNodeIds: ['n-3'],
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
 });
 
@@ -79,7 +107,7 @@ describe('scenarios pass', () => {
     });
   });
 
-  it('narrates reports with clamped node ids, one report per scenario', async () => {
+  it('narrates reports with clamped node ids, one report per scenario — and grades the failure', async () => {
     const canned = {
       reports: [
         {
@@ -87,32 +115,64 @@ describe('scenarios pass', () => {
           verdict: 'fails',
           story: 'The database saturates in the first minute.',
           weakestNodeIds: ['n-3', 'ghost-node'],
+          violatesRequirementId: 'fst-lat-read-spike',
+          confidence: 'high',
         },
         {
           scenarioId: 'thundering-herd', // duplicate — first report wins
           verdict: 'survives',
           story: 'second opinion',
           weakestNodeIds: [],
+          violatesRequirementId: null,
+          confidence: 'low',
         },
       ],
     };
     const artifacts = await createScenariosPass().run(contextWith(fakeLlm(canned)));
-    expect(artifacts).toEqual([
-      {
-        passId: SCENARIOS_PASS_ID,
-        kind: 'scenarios',
-        reports: [
-          {
-            scenarioId: 'thundering-herd',
-            title: 'The on-sale thundering herd',
-            verdict: 'fails',
-            story: 'The database saturates in the first minute.',
-            weakestNodeIds: ['n-3'],
-          },
-        ],
-        model: 'test-model',
-      },
-    ]);
+    expect(artifacts[0]).toEqual({
+      passId: SCENARIOS_PASS_ID,
+      kind: 'scenarios',
+      reports: [
+        {
+          scenarioId: 'thundering-herd',
+          title: 'The on-sale thundering herd',
+          verdict: 'fails',
+          story: 'The database saturates in the first minute.',
+          weakestNodeIds: ['n-3'],
+        },
+      ],
+      model: 'test-model',
+    });
+    // [EVAL-16] The failure is graded evidence: the engine maps the verdict to
+    // the magnitude (fails → high), grounded to the NFR it breaks.
+    const graded = artifacts[1] as GradedEvidenceArtifact;
+    expect(graded.lens).toBe('evaluator.scenarios');
+    expect(graded.items).toHaveLength(1);
+    expect(graded.items[0]).toMatchObject({
+      dimension: 'reliability',
+      level: 'high',
+      confidence: 'high',
+      severity: 'high',
+      requirementId: 'fst-lat-read-spike',
+      affectedNodeIds: ['n-3'],
+    });
+  });
+
+  it('a surviving verdict is no weakness — no graded evidence is emitted', async () => {
+    const canned = {
+      reports: [
+        {
+          scenarioId: 'thundering-herd',
+          verdict: 'survives',
+          story: 'The cache absorbs it.',
+          weakestNodeIds: [],
+          violatesRequirementId: null,
+          confidence: 'high',
+        },
+      ],
+    };
+    const artifacts = await createScenariosPass().run(contextWith(fakeLlm(canned)));
+    expect(artifacts.map((a) => a.kind)).toEqual(['scenarios']);
   });
 
   it('reports llm-failed when the model returns nothing usable', async () => {

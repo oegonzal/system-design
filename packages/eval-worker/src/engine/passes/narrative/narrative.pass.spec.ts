@@ -5,7 +5,8 @@ import { NoopLlmClient, type StructuredRequest } from '@sysdesign/llm';
 import type { PassContext } from '../../core/types';
 import { buildGraphIndex } from '../../graph-index';
 import { fakeLlm, flashSaleFacts, graph, node } from '../../testing';
-import { narrativeSchema } from './narrative-schema';
+import type { GradedEvidenceArtifact } from '../../core/artifacts';
+import { buildNarrativeSchema, type NarrativeCritique } from './narrative-schema';
 import { createNarrativePass, NARRATIVE_PASS_ID } from './narrative.pass';
 
 const STORY = 'The client calls the service, which writes every order durably.';
@@ -25,7 +26,7 @@ function contextWith(llm: PassContext['llm'], narrative: string | null = STORY):
   };
 }
 
-const CANNED = {
+const CANNED: NarrativeCritique = {
   score: 58,
   subScores: {
     componentClarity: 62,
@@ -38,11 +39,13 @@ const CANNED = {
 };
 
 const MISALIGNMENT = {
-  dimension: 'explanation',
-  severity: 'medium',
+  severity: 'medium' as const,
+  weakness: 'medium' as const,
+  confidence: 'high' as const,
+  requirementId: 'fst-lat-read-spike',
+  affectedComponents: ['n-2', 'n-ghost'],
   title: 'The story caches reads the diagram never draws',
   message: '"reads are cached" — no cache node exists; draw one or drop the claim.',
-  affectedNodeIds: ['n-2'],
 };
 
 /** An enabled client that records the request it was handed. */
@@ -87,7 +90,7 @@ describe('narrative pass', () => {
     }
   });
 
-  it('emits an axis artifact from a structured critique — no annotations when nothing misaligns', async () => {
+  it('emits an axis artifact from a structured critique — no graded evidence when nothing misaligns', async () => {
     const artifacts = await createNarrativePass().run(contextWith(fakeLlm(CANNED)));
     expect(artifacts).toEqual([
       {
@@ -104,19 +107,31 @@ describe('narrative pass', () => {
     ]);
   });
 
-  it('emits misalignment findings as an advisory annotations artifact beside the axis', async () => {
+  it('[EVAL-16] emits misalignments as graded evidence on the explanation dimension', async () => {
     const artifacts = await createNarrativePass().run(
       contextWith(fakeLlm({ ...CANNED, findings: [MISALIGNMENT] })),
     );
     expect(artifacts).toHaveLength(2);
-    expect(artifacts[1]).toEqual({
+    const graded = artifacts[1] as GradedEvidenceArtifact;
+    expect(graded).toMatchObject({
       passId: NARRATIVE_PASS_ID,
-      kind: 'annotations',
-      findings: [MISALIGNMENT],
+      kind: 'graded-evidence',
+      lens: 'critic.narrative',
       // The general critic owns the evaluation summary; this stays silent.
       summary: null,
       model: 'test-model',
     });
+    // The lens fixes the dimension — the model never picks one — and the
+    // grounding is re-checked (ghost node dropped).
+    expect(graded.items[0]).toMatchObject({
+      dimension: 'explanation',
+      level: 'medium',
+      confidence: 'high',
+      severity: 'medium',
+      requirementId: 'fst-lat-read-spike',
+      affectedNodeIds: ['n-2'],
+    });
+    expect(graded.items[0]?.rationale).toContain('reads are cached');
   });
 
   it('reports llm-failed when the model returns nothing usable', async () => {
@@ -124,15 +139,23 @@ describe('narrative pass', () => {
     expect(artifacts[0]).toMatchObject({ kind: 'diagnostics', reason: 'llm-failed' });
   });
 
-  it('the schema demands every alignment subscore and the findings array', () => {
-    expect(narrativeSchema.safeParse(CANNED).success).toBe(true);
-    expect(narrativeSchema.safeParse({ ...CANNED, findings: [MISALIGNMENT] }).success).toBe(true);
+  it('the schema demands every alignment subscore and enum-locks each finding to real ids', () => {
+    const ctx = contextWith(fakeLlm(null));
+    const schema = buildNarrativeSchema(ctx.graph, ctx.facts);
+    expect(schema.safeParse(CANNED).success).toBe(true);
+    // Only real node ids are representable at the schema; the pass re-checks anyway.
+    const real = { ...MISALIGNMENT, affectedComponents: ['n-2'] };
+    expect(schema.safeParse({ ...CANNED, findings: [real] }).success).toBe(true);
+    expect(schema.safeParse({ ...CANNED, findings: [MISALIGNMENT] }).success).toBe(false);
+    expect(
+      schema.safeParse({ ...CANNED, findings: [{ ...real, requirementId: 'not-real' }] }).success,
+    ).toBe(false);
     const withoutConsistency = {
       ...CANNED,
       subScores: { ...CANNED.subScores, diagramConsistency: undefined },
     };
-    expect(narrativeSchema.safeParse(withoutConsistency).success).toBe(false);
-    expect(narrativeSchema.safeParse({ ...CANNED, findings: undefined }).success).toBe(false);
+    expect(schema.safeParse(withoutConsistency).success).toBe(false);
+    expect(schema.safeParse({ ...CANNED, findings: undefined }).success).toBe(false);
   });
 
   it('grades prose against diagram and prompt, and sends the model both', async () => {

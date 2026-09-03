@@ -1,7 +1,6 @@
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { GradedEvidenceItem } from '../engine/core/artifacts';
-import { admitGrounding, nodeIdSet, requirementIds } from '../engine/passes/graded-grounding';
+import { groundingSets, toGradedItem } from '../engine/passes/graded-grounding';
 import { buildCriticSchema } from './critique-schema';
 import type { CriticInput, CritiqueResult, EvalCritic } from './eval-critic';
 import { buildCriticUserPrompt, CRITIC_SYSTEM_PROMPT } from './prompt-builder';
@@ -13,10 +12,9 @@ const EMPTY: CritiqueResult = { items: [], summary: null, model: null };
  * returns weaknesses as graded evidence (a magnitude + confidence tied to a
  * requirement and components), which the engine's bounded scorer turns into a
  * weakness-only subtraction. The schema is enum-locked to this prompt's
- * requirements and this canvas's nodes; the re-check below is defense in depth —
- * a requirement or node the model somehow named that does not exist is dropped
- * to null / filtered out rather than trusted (it would break click-to-highlight
- * and mis-ground the score).
+ * requirements and this canvas's nodes; `toGradedItem` re-checks that grounding
+ * as defense in depth — a requirement or node the model somehow named that does
+ * not exist is dropped to null / filtered out rather than trusted.
  *
  * Never throws: an API failure, refusal or schema miss resolves to the empty
  * critique and the deterministic result stands alone.
@@ -34,27 +32,18 @@ export class AnthropicCritic implements EvalCritic {
 
     if (!critique) return EMPTY;
 
-    const knownNodes = nodeIdSet(input.graph);
-    const knownRequirements = new Set(requirementIds(input.facts));
-
-    const items: GradedEvidenceItem[] = critique.findings.map((finding) => {
-      const grounding = admitGrounding(
-        finding.requirementId,
-        finding.affectedComponents,
-        knownRequirements,
-        knownNodes,
-      );
-      return {
-        dimension: finding.dimension,
-        level: finding.weakness,
-        confidence: finding.confidence,
-        severity: finding.severity,
-        requirementId: grounding.requirementId,
-        affectedNodeIds: grounding.affectedNodeIds,
-        rationale: `${finding.title.trim()} — ${finding.rationale.trim()}`,
-        suggestion: null,
-      };
-    });
+    const known = groundingSets(input.graph, input.facts);
+    const items = critique.findings.map((finding) =>
+      toGradedItem(
+        finding,
+        {
+          dimension: finding.dimension,
+          severity: finding.severity,
+          rationale: `${finding.title.trim()} — ${finding.rationale.trim()}`,
+        },
+        known,
+      ),
+    );
 
     return { items, summary: critique.summary.trim() || null, model: this.llm.model };
   }

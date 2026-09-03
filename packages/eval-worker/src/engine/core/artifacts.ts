@@ -69,23 +69,6 @@ export interface ScenarioArtifact extends ArtifactBase {
   model: string | null;
 }
 
-/** Structurally identical to the critic's finding shape — kept import-free on purpose. */
-export interface AnnotationFinding {
-  dimension: EvalDimension;
-  severity: Severity;
-  title: string;
-  message: string;
-  affectedNodeIds: string[];
-}
-
-/** Free-form LLM commentary: persisted as source='llm' findings, advisory only. */
-export interface AnnotationArtifact extends ArtifactBase {
-  kind: 'annotations';
-  findings: AnnotationFinding[];
-  summary: string | null;
-  model: string | null;
-}
-
 /**
  * One grounded weakness a critic/evaluator lens found, expressed as the ordinals
  * the engine scores — never a number the model picked. `level` is the weakness
@@ -153,7 +136,6 @@ export type EvidenceArtifact =
   | CoverageArtifact
   | AxisArtifact
   | ScenarioArtifact
-  | AnnotationArtifact
   | GradedEvidenceArtifact
   | DiagnosticsArtifact;
 
