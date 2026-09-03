@@ -91,6 +91,13 @@ either way — the coach only proposes; the engine decides):
 Set `IMPROVER_AUTH=off` (and no key) to disable the coach; the button then
 explains why it is disabled.
 
+The same switches back the two **suggesters** — the Brief tab's "Suggest
+bindings" and the properties panel's "Suggest for this component" — because
+they are assistive in the same way: the model proposes, you accept one item
+at a time, and nothing it returns reaches a grade. Prompt enrichment stays on
+the API-key client only, so "Generate prompt" never waits on a subscription
+round-trip.
+
 ## Export a run as portable files
 
 The practice workspace's **Export** button downloads a single `.zip` with
