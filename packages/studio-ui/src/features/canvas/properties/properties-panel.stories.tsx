@@ -88,7 +88,7 @@ export const MlInferenceSelected: Story = {
       store.getState().updateNode('n-2', {
         kind: 'ml-inference',
         label: 'Recs Model',
-        config: { replicas: 2, gpu: true, timeoutMs: 250, fallback: true },
+        config: { replicas: 2, timeoutMs: 250, fallback: true },
       });
       store.getState().select('n-2');
     }),

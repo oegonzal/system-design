@@ -16,7 +16,7 @@ import type {
   NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
-import { BINDING_MAX_NODES, MECHANISM_KINDS } from '@sysdesign/contracts';
+import { BINDING_MAX_NODES, canonicalizeGraphConfig, MECHANISM_KINDS } from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -252,7 +252,11 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     highlight: null,
 
     setGraph(graph) {
-      const { nodes, edges } = fromCanvasGraph(graph);
+      // A stored design may carry a knob its kind no longer offers (retired
+      // since it was saved). The panel could not show it and the grader never
+      // read it, so dropping it here loses nothing visible — and keeps a
+      // resubmit from being refused for a key the author never chose.
+      const { nodes, edges } = fromCanvasGraph(canonicalizeGraphConfig(graph));
       // Proposals are cleared with the ghost and for the same reason: both were
       // computed against the design being replaced, and a stale one would
       // invite the author to accept a claim about a diagram they no longer have.

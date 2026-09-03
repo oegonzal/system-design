@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { UniqueConstraintViolationException } from '@mikro-orm/core';
 import {
+  canonicalizeGraphConfig,
   narrationToProse,
   projectNarration,
   validateBriefReferences,
@@ -170,6 +171,10 @@ export class ImprovementRunnerService {
             rejectedReason: 'no-proposal',
           });
         } else {
+          // A knob the node's kind does not offer is quietly discarded rather
+          // than sinking the candidate: the model cannot see the vocabulary's
+          // edges, and an off-vocabulary knob is inert to the grade anyway.
+          const proposed = { ...candidate, graph: canonicalizeGraphConfig(candidate.graph) };
           // The graph is the foundation everything else references — an
           // invalid one is a hard reject. But an imperfect brief or narrative
           // (a flow whose hops do not join, say) must not sink an otherwise
@@ -177,19 +182,19 @@ export class ImprovementRunnerService {
           // improvement stand, scoring on its own merits. A later iteration
           // over the stabilized graph tends to produce a valid brief.
           const graphProblems = [
-            ...validateGraphReferences(candidate.graph),
-            ...validateWorkflowReferences(candidate.graph, facts.workflow),
+            ...validateGraphReferences(proposed.graph),
+            ...validateWorkflowReferences(proposed.graph, facts.workflow),
           ];
           const briefOk =
-            !candidate.brief ||
-            validateBriefReferences(candidate.graph, candidate.brief, prompt).length === 0;
+            !proposed.brief ||
+            validateBriefReferences(proposed.graph, proposed.brief, prompt).length === 0;
           const narrativeOk =
-            !candidate.narrative ||
-            validateNarration(candidate.graph, candidate.narrative, prompt).length === 0;
+            !proposed.narrative ||
+            validateNarration(proposed.graph, proposed.narrative, prompt).length === 0;
           const cleaned: ImprovementCandidate = {
-            ...candidate,
-            brief: briefOk ? candidate.brief : best.brief,
-            narrative: narrativeOk ? candidate.narrative : best.narrative,
+            ...proposed,
+            brief: briefOk ? proposed.brief : best.brief,
+            narrative: narrativeOk ? proposed.narrative : best.narrative,
           };
 
           if (graphProblems.length > 0) {

@@ -1,4 +1,5 @@
 import { CANVAS_MAX_TOTAL_OPERATIONS, type CanvasGraph } from './canvas';
+import { configVocabularyProblems } from './node-config-fields';
 
 /**
  * Referential validation of a graph whose *shape* already passed the DTO
@@ -7,12 +8,20 @@ import { CANVAS_MAX_TOTAL_OPERATIONS, type CanvasGraph } from './canvas';
  * because everything that persists a revision — the API's submit path and the
  * eval-worker's improvement loop — must hold the same line.
  *
+ * A config key its node kind does not offer, or a value outside the field's
+ * domain, is IMPOSSIBLE the same way an unknown edge target is: the editor
+ * renders only `NODE_CONFIG_FIELDS`, so a stranger knob is a hand-crafted
+ * payload — and one nothing grades, which is exactly why it must not be
+ * silently stored. Callers that would rather discard than reject (a model
+ * proposal, a stored design from before a knob was retired) run
+ * `canonicalizeGraphConfig` first.
+ *
  * Deliberately NOT a 422: a `carries` entry referencing a name its interface
  * owner never declared. That graph is semantically incomplete, not
  * impossible — an eval lesson for the critic to teach, never a save blocker.
  */
 export function validateGraphReferences(graph: CanvasGraph): string[] {
-  const problems: string[] = [];
+  const problems: string[] = [...configVocabularyProblems(graph)];
 
   const nodeIds = new Set<string>();
   let totalOperations = 0;

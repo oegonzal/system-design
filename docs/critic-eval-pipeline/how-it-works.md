@@ -253,9 +253,15 @@ are the engine's.
   `engine/passes/expectations` may read `functionalText`, the narrative, or a
   binding `note`. Applicability branches on the typed `functionalCapabilities`
   vocabulary instead.
-- `tooling/config-knobs.spec.ts` — the drift gate. Every knob the properties
-  panel writes must be read by the scoring path or reserved with a stated
-  reason, so a dial that cannot change an answer cannot ship unnoticed.
+- `contracts/lib/node-config-fields.ts` — `NODE_CONFIG_FIELDS`, the config-knob
+  vocabulary as data (`satisfies`-gated over every node kind): the properties
+  panel renders from it, the interface suggester enum-locks to it, and
+  `validateGraphReferences` refuses a key or value outside it (a stranger knob
+  is a hand-crafted payload; `canonicalizeGraphConfig` is the quiet-discard path
+  for a model proposal or a design saved before a knob was retired) `[UX-13]`.
+- `tooling/config-knobs.spec.ts` — the drift gate. Every knob in that table must
+  be read by the scoring path or reserved with a stated reason, so a dial that
+  cannot change an answer cannot ship unnoticed.
 - The walkthrough is **not scored**. It is persisted, displayed, and read by the
   critic; `narrative-editor.tsx` says so in the UI, because an editor that
   implies a box is graded when it is not is its own kind of dishonesty.

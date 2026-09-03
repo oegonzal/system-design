@@ -3,12 +3,15 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { allConfigKeys } from '../packages/contracts/src/lib/node-config-fields';
+
 /**
  * Every config knob is graded, or reserved on purpose.
  *
- * The properties panel is the canonical config vocabulary — the rules read its
- * keys verbatim — and for a long time the only thing enforcing that was a
- * comment asking people to be careful. Drift won: twenty-nine of the fifty-seven
+ * `NODE_CONFIG_FIELDS` in contracts is the canonical config vocabulary — the
+ * properties panel renders from it and the rules read its keys verbatim — and
+ * for a long time the only thing enforcing that was a comment asking people to
+ * be careful. Drift won: twenty-nine of the fifty-seven
  * knobs turned out to be read by nothing, disproportionately the quantitative
  * ones. An author could set a TTL, a lag budget, a retry count, mTLS, and change
  * no verdict at all. A dial that cannot change an answer is a promise the
@@ -19,11 +22,6 @@ import { describe, expect, it } from 'vitest';
  * grade it, drop it, or say out loud why it is here unread.
  */
 const REPO = join(__dirname, '..');
-
-const UI_FIELDS = join(
-  REPO,
-  'packages/studio-ui/src/features/canvas/properties/node-config-fields.tsx',
-);
 
 const SCORING_SOURCES = [
   'packages/eval-worker/src/engine/rules',
@@ -85,10 +83,9 @@ function readAll(paths: readonly string[]): string {
   return blob;
 }
 
-/** Keys the properties panel writes onto `node.config`. */
+/** Keys the vocabulary offers — what the properties panel can write onto `node.config`. */
 function writtenKnobs(): string[] {
-  const source = readFileSync(UI_FIELDS, 'utf8');
-  return [...new Set([...source.matchAll(/setKey,\s*\n?\s*'([A-Za-z0-9_]+)'/g)].map((m) => m[1]))];
+  return allConfigKeys();
 }
 
 /**
