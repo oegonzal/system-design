@@ -35,7 +35,11 @@ import { z } from 'zod';
  * The graph keeps op form so the author's layout and untouched nodes survive.
  */
 
-const NEW_ID = z.string().regex(/^ai-[a-z0-9][a-z0-9-]{0,38}$/);
+// New elements must carry an `ai-` prefix so they cannot collide with author
+// ids or the `suggested-` ghost prefix; the rest is permissive (any id string
+// is valid on the canvas) so a stray underscore or capital never rejects an
+// otherwise-good proposal.
+const NEW_ID = z.string().regex(/^ai-[A-Za-z0-9._-]{1,60}$/);
 
 /** `z.record` maps poorly onto structured-output JSON schema; entries fold later. */
 const configEntry = z.object({
@@ -166,16 +170,35 @@ export function buildImprovementSchema(
       .max(BRIEF_MAX_FLOWS),
   });
 
+  // Prose caps are generous here and clamped to the contract maxima when the
+  // candidate is assembled (see llm-proposer). A model that writes a slightly
+  // richer overview or rationale than the contract allows should have it
+  // trimmed, never have the whole proposal rejected over a few characters.
   const narrative = z.object({
-    overview: z.string().min(1).max(NARRATION_OVERVIEW_MAX_LENGTH),
+    overview: z
+      .string()
+      .min(1)
+      .max(NARRATION_OVERVIEW_MAX_LENGTH * 2),
     componentRationales: z
       .array(
-        z.object({ nodeId: nodeRef, prose: z.string().min(1).max(NARRATION_PROSE_MAX_LENGTH) }),
+        z.object({
+          nodeId: nodeRef,
+          prose: z
+            .string()
+            .min(1)
+            .max(NARRATION_PROSE_MAX_LENGTH * 2),
+        }),
       )
       .max(NARRATION_MAX_COMPONENT_RATIONALES),
     flowNarrations: z
       .array(
-        z.object({ requirementIndex, prose: z.string().min(1).max(NARRATION_PROSE_MAX_LENGTH) }),
+        z.object({
+          requirementIndex,
+          prose: z
+            .string()
+            .min(1)
+            .max(NARRATION_PROSE_MAX_LENGTH * 2),
+        }),
       )
       .max(NARRATION_MAX_FLOW_NARRATIONS),
   });
@@ -184,7 +207,7 @@ export function buildImprovementSchema(
     description: z
       .string()
       .min(1)
-      .max(200)
+      .max(400)
       .describe('One sentence: what this iteration changes and why — the lesson.'),
     graphOps: z.array(graphOp).max(8).optional(),
     brief: brief.optional().describe('WHOLE replacement of the design brief when provided.'),

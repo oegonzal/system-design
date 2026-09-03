@@ -29,6 +29,28 @@ describe('extractStructured', () => {
     expect(extractStructured('no json here', schema)).toBeNull();
     expect(extractStructured('{"answer":"a","score":"not-a-number"}', schema)).toBeNull();
   });
+
+  it('finds the valid object past a schema echo the agent quoted (the real failure mode)', () => {
+    // The prompt embeds the JSON Schema; a chatty agent echoes it, then answers.
+    // First-brace-to-last-brace would sweep both and fail — the scan must not.
+    const text =
+      'The schema {"type":"object","properties":{"answer":{"type":"string"}}} asks for a string.\n' +
+      'Here is my answer: {"answer":"real","score":9}';
+    expect(extractStructured(text, schema)).toEqual({ answer: 'real', score: 9 });
+  });
+
+  it('skips a first fenced block that fails the schema and takes the second that passes', () => {
+    const text =
+      'Current brief:\n```json\n{"answer":"stale"}\n```\nProposal:\n```json\n{"answer":"new","score":3}\n```';
+    expect(extractStructured(text, schema)?.answer).toBe('new');
+  });
+
+  it('ignores braces inside strings when scanning', () => {
+    expect(extractStructured('{"answer":"has } and { braces","score":1}', schema)).toEqual({
+      answer: 'has } and { braces',
+      score: 1,
+    });
+  });
 });
 
 describe('claude-code subscription auth for the improver', () => {

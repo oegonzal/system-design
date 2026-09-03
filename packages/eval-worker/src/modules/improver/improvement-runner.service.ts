@@ -57,6 +57,12 @@ export class ImprovementRunnerService {
       { populate: ['session', 'session.prompt', 'baseRevision', 'bestRevision'] },
     );
 
+    // The fencing token from the poller's claim. Every guarded write matches
+    // on it, so if the reaper requeues this run (a hung LLM call outliving the
+    // stale window) and a second worker reclaims it, this worker's writes
+    // match zero rows instead of clobbering the new owner's trajectory.
+    const fence = run.lockedBy;
+
     const llmCalls: LlmCall[] = [];
     const llm =
       asRecordable(this.llm)?.withRecorder((call) => {
@@ -66,17 +72,18 @@ export class ImprovementRunnerService {
     const trajectory: ImprovementIteration[] = [...run.iterations];
     try {
       if (run.attempts > run.maxAttempts) {
-        await this.finalize(em, run.id, trajectory, 'failed', null, 'too many attempts');
+        await this.finalize(em, run.id, fence, trajectory, 'failed', null, 'too many attempts');
         return;
       }
       if (!this.llm.enabled) {
         await this.finalize(
           em,
           run.id,
+          fence,
           trajectory,
           'failed',
           'llm-unavailable',
-          'the improver has no live model — set ANTHROPIC_API_KEY and IMPROVER_DETERMINISTIC=0',
+          'the improver has no live model — set ANTHROPIC_API_KEY or IMPROVER_AUTH=claude-code',
         );
         return;
       }
@@ -118,15 +125,15 @@ export class ImprovementRunnerService {
           accepted: true,
           revisionId: run.baseRevision.id,
         });
-        await this.flushProgress(em, run.id, trajectory, null);
+        await this.flushProgress(em, run.id, fence, trajectory, null);
       }
 
       if (bestResult.overallScore >= 100) {
-        await this.finalize(em, run.id, trajectory, 'completed', 'perfect');
+        await this.finalize(em, run.id, fence, trajectory, 'completed', 'perfect');
         return;
       }
       if (!bestResult.findings.some((finding) => finding.severity !== 'info')) {
-        await this.finalize(em, run.id, trajectory, 'completed', 'already-clean');
+        await this.finalize(em, run.id, fence, trajectory, 'completed', 'already-clean');
         return;
       }
 
@@ -134,12 +141,12 @@ export class ImprovementRunnerService {
       let consecutiveRejects = 0;
 
       for (let proposals = proposalsSoFar; proposals < run.maxIterations; proposals++) {
-        // A cancel (or anything else that moved the run off 'running') wins;
-        // accepted work is kept.
+        // A cancel (moved the run off 'running') or a reclaim (another worker
+        // owns the lock now) wins; accepted work is kept, this worker stops.
         const current = await em
           .fork()
-          .findOneOrFail(ImprovementRun, { id: run.id }, { fields: ['status'] });
-        if (current.status !== 'running') return;
+          .findOneOrFail(ImprovementRun, { id: run.id }, { fields: ['status', 'lockedBy'] });
+        if (current.status !== 'running' || current.lockedBy !== fence) return;
 
         const iteration = trajectory[trajectory.length - 1].iteration + 1;
         const candidate = await proposeImprovement(llm, {
@@ -220,29 +227,32 @@ export class ImprovementRunnerService {
         await this.flushProgress(
           em,
           run.id,
+          fence,
           trajectory,
           bestRevisionId === run.baseRevision.id ? null : bestRevisionId,
         );
 
         if (bestResult.overallScore >= 100) {
-          await this.finalize(em, run.id, trajectory, 'completed', 'perfect');
+          await this.finalize(em, run.id, fence, trajectory, 'completed', 'perfect');
           return;
         }
         if (consecutiveRejects >= PLATEAU_AFTER) {
-          await this.finalize(em, run.id, trajectory, 'completed', 'plateau');
+          await this.finalize(em, run.id, fence, trajectory, 'completed', 'plateau');
           return;
         }
       }
 
-      await this.finalize(em, run.id, trajectory, 'completed', 'max-iterations');
+      await this.finalize(em, run.id, fence, trajectory, 'completed', 'max-iterations');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`improvement run ${runId} failed: ${message}`);
       const retryable = run.attempts < run.maxAttempts;
-      // Guarded like every worker write: a cancel that landed first wins.
+      // Guarded like every worker write: a cancel or reclaim that landed first
+      // wins (status + fencing token), so this never revives a run another
+      // worker now owns.
       await em.nativeUpdate(
         ImprovementRun,
-        { id: run.id, status: 'running' },
+        { id: run.id, status: 'running', lockedBy: fence },
         retryable
           ? { status: 'queued', error: message, lockedAt: null, lockedBy: null }
           : { status: 'failed', error: message, iterations: trajectory },
@@ -294,12 +304,13 @@ export class ImprovementRunnerService {
   private async flushProgress(
     em: EntityManager,
     runId: string,
+    fence: string | null,
     trajectory: ImprovementIteration[],
     bestRevisionId: string | null,
   ): Promise<void> {
     await em.nativeUpdate(
       ImprovementRun,
-      { id: runId, status: 'running' },
+      { id: runId, status: 'running', lockedBy: fence },
       {
         iterations: trajectory,
         ...(bestRevisionId ? { bestRevision: bestRevisionId } : {}),
@@ -312,6 +323,7 @@ export class ImprovementRunnerService {
   private async finalize(
     em: EntityManager,
     runId: string,
+    fence: string | null,
     trajectory: ImprovementIteration[],
     status: 'completed' | 'failed',
     stoppedReason: ImprovementStopReason | null,
@@ -319,7 +331,7 @@ export class ImprovementRunnerService {
   ): Promise<void> {
     await em.nativeUpdate(
       ImprovementRun,
-      { id: runId, status: 'running' },
+      { id: runId, status: 'running', lockedBy: fence },
       {
         status,
         stoppedReason,

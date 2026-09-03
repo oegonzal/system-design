@@ -1,6 +1,8 @@
 import {
   applySuggestionPatch,
   narrationToProse,
+  NARRATION_OVERVIEW_MAX_LENGTH,
+  NARRATION_PROSE_MAX_LENGTH,
   type CanvasGraph,
   type DesignBrief,
   type DesignNarrative,
@@ -50,6 +52,14 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 
 const MAX_FINDINGS_SHOWN = 12;
+
+/** Trim to a contract maximum without cutting mid-word where avoidable. */
+function clamp(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastStop = cut.lastIndexOf('. ');
+  return lastStop >= max - 120 ? cut.slice(0, lastStop + 1) : cut.trimEnd();
+}
 
 function buildUserPrompt(input: ImprovementProposalInput): string {
   const design = describeDesign(input.graph, input.facts, narrationToProse(input.narrative));
@@ -252,8 +262,22 @@ export async function proposeImprovement(
   const brief: DesignBrief | null = proposal.brief
     ? { version: 1, nfrBindings: proposal.brief.nfrBindings, flows: proposal.brief.flows }
     : input.brief;
+  // Clamp the model's prose to the contract maxima the schema deliberately let
+  // run over — a persisted assistant revision must never carry a longer field
+  // than the DTO layer would have accepted from a human.
   const narrative: DesignNarrative | null = proposal.narrative
-    ? { version: 1, ...proposal.narrative }
+    ? {
+        version: 1,
+        overview: clamp(proposal.narrative.overview, NARRATION_OVERVIEW_MAX_LENGTH),
+        componentRationales: proposal.narrative.componentRationales.map((r) => ({
+          nodeId: r.nodeId,
+          prose: clamp(r.prose, NARRATION_PROSE_MAX_LENGTH),
+        })),
+        flowNarrations: proposal.narrative.flowNarrations.map((f) => ({
+          requirementIndex: f.requirementIndex,
+          prose: clamp(f.prose, NARRATION_PROSE_MAX_LENGTH),
+        })),
+      }
     : input.narrative;
 
   const pruned = prune(graph, brief, narrative);

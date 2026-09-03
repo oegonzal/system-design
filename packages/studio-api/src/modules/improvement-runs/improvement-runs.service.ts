@@ -64,7 +64,7 @@ export class ImprovementRunsService {
       throw new ConflictException(
         availability.reason === 'deterministic'
           ? 'the AI coach is disabled in deterministic mode — set IMPROVER_DETERMINISTIC=0 to enable it'
-          : 'the AI coach needs a live model — set ANTHROPIC_API_KEY to enable it',
+          : 'the AI coach needs a live model — set ANTHROPIC_API_KEY, or IMPROVER_AUTH=claude-code to use your Claude login',
       );
     }
 
