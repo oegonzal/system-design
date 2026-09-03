@@ -3,14 +3,18 @@
 import type { EvaluationDto } from '@sysdesign/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
+import { api, ApiError, toErrorMessage } from '../../api/client';
 import { useLatestRequest } from '../../hooks/use-latest-request';
 
 export const POLL_INTERVAL_MS = 1200;
-export const POLL_CAP_MS = 90_000;
+/** Backoff ceiling while the API cannot be reached — it restarts, the tab does not give up. */
+export const POLL_BACKOFF_MAX_MS = 10_000;
+/** Consecutive unreachable ticks before the panel says so (one blip stays silent). */
+export const UNREACHABLE_AFTER = 3;
 
 export interface EvaluationPollingResult {
   evaluation: EvaluationDto | null;
+  /** A TERMINAL problem — the evaluation failed, or cannot exist. Never a transient outage. */
   error: string | null;
   isPolling: boolean;
   /** For a LiveRegion — the consumer renders it so announcements have a home. */
@@ -23,8 +27,10 @@ function describe(
   evaluation: EvaluationDto | null,
   error: string | null,
   isPolling: boolean,
+  unreachable: boolean,
 ): string {
   if (error !== null) return `Evaluation problem: ${error}`;
+  if (unreachable) return 'Cannot reach the API — retrying…';
   if (evaluation === null) return isPolling ? 'Checking evaluation status…' : '';
   switch (evaluation.status) {
     case 'queued':
@@ -38,6 +44,10 @@ function describe(
   }
 }
 
+/** The one HTTP failure that is a fact about the evaluation, not about the connection. */
+const isTerminalFailure = (caught: unknown): boolean =>
+  caught instanceof ApiError && caught.status === 404;
+
 /**
  * Polls the evaluation for a revision until it reaches a terminal status.
  *
@@ -45,11 +55,23 @@ function describe(
  * only after the previous response lands, so a slow API never stacks
  * requests. `useLatestRequest` aborts the in-flight GET when the revision
  * changes or the consumer unmounts, and treats that abort as stale, not as
- * an error. A ~90s cap turns a stuck queue into an explicit timeout.
+ * an error.
+ *
+ * Status-driven, not clock-capped. Only the server knows how long a grade
+ * takes — milliseconds on the deterministic stack, minutes under the deep
+ * eval — and it already bounds a run itself (a job completes, fails, or is
+ * requeued by the reaper). A tab that gave up on its own clock would sit on a
+ * stale `running` with Submit disabled while the worker was still grading:
+ * the page looks hung when nothing is. So the loop stops on `complete` or
+ * `failed`, and an unreachable API (restarting, a dropped connection) backs
+ * off and keeps asking rather than stopping — `error`, and the Retry button
+ * it drives, are reserved for an evaluation that actually failed. A tab
+ * coming back into view re-checks at once instead of waiting out its timer.
  */
 export function useEvaluationPolling(revisionId: string | null): EvaluationPollingResult {
   const [evaluation, setEvaluation] = useState<EvaluationDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [cycle, setCycle] = useState(0);
   const { begin, isCurrent, isStale } = useLatestRequest();
@@ -59,6 +81,7 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
        resetting per-revision state at cycle start is this effect's contract */
     setEvaluation(null);
     setError(null);
+    setUnreachable(false);
 
     if (revisionId === null) {
       setIsPolling(false);
@@ -67,9 +90,13 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
 
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const startedAt = Date.now();
+    let failures = 0;
     setIsPolling(true);
     /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
+    const schedule = (ms: number) => {
+      timer = setTimeout(() => void tick(), ms);
+    };
 
     const tick = async () => {
       const { id, signal } = begin();
@@ -77,6 +104,8 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
         const next = await api.getEvaluation(revisionId, { signal });
         if (disposed || !isCurrent(id)) return;
 
+        failures = 0;
+        setUnreachable(false);
         setEvaluation(next);
 
         if (next.status === 'complete') {
@@ -88,23 +117,36 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
           setIsPolling(false);
           return;
         }
-        if (Date.now() - startedAt >= POLL_CAP_MS) {
-          setError('Evaluation timed out. Retry when the worker is back.');
+        schedule(POLL_INTERVAL_MS);
+      } catch (caught) {
+        if (disposed || isStale(id, caught)) return;
+        if (isTerminalFailure(caught)) {
+          setError(toErrorMessage(caught, 'Could not load the evaluation.'));
           setIsPolling(false);
           return;
         }
-        timer = setTimeout(() => void tick(), POLL_INTERVAL_MS);
-      } catch (caught) {
-        if (disposed || isStale(id, caught)) return;
-        setError(toErrorMessage(caught, 'Could not load the evaluation.'));
-        setIsPolling(false);
+        // Transient: keep polling with backoff. The evaluation is untouched;
+        // only the road to it is out.
+        failures += 1;
+        if (failures >= UNREACHABLE_AFTER) setUnreachable(true);
+        schedule(Math.min(POLL_INTERVAL_MS * 2 ** failures, POLL_BACKOFF_MAX_MS));
       }
     };
+
+    // Back in view after a while away: ask now, do not wait out the timer.
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      void tick();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     void tick();
 
     return () => {
       disposed = true;
+      document.removeEventListener('visibilitychange', onVisible);
       if (timer !== undefined) clearTimeout(timer);
     };
   }, [revisionId, cycle, begin, isCurrent, isStale]);
@@ -115,7 +157,7 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
     evaluation,
     error,
     isPolling,
-    message: describe(evaluation, error, isPolling),
+    message: describe(evaluation, error, isPolling, unreachable),
     restart,
   };
 }

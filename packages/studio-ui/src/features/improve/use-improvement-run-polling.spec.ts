@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeImprovementRun } from '../../testing/fixtures';
 import { stubApi } from '../../testing/stub-api';
-import { IMPROVE_POLL_INTERVAL_MS, useImprovementRunPolling } from './use-improvement-run-polling';
+import {
+  IMPROVE_POLL_BACKOFF_MAX_MS,
+  IMPROVE_POLL_INTERVAL_MS,
+  IMPROVE_UNREACHABLE_AFTER,
+  useImprovementRunPolling,
+} from './use-improvement-run-polling';
 
 const RUN_PATH = /^\/api\/improvement-runs\/run-1$/;
 
@@ -108,6 +113,64 @@ describe('useImprovementRunPolling', () => {
     const callsAtFailure = fetchMock.mock.calls.length;
     await advance(IMPROVE_POLL_INTERVAL_MS * 5);
     expect(fetchMock.mock.calls.length).toBe(callsAtFailure);
+  });
+
+  /**
+   * A subscription run of several iterations outlasts any cap a tab would
+   * pick; a tab that gave up on its own clock told the author the coach had
+   * timed out while the run kept going. Only the run's status ends the poll.
+   */
+  it('never gives up on a long run — status-driven, not clock-capped', async () => {
+    const { fetchMock } = stubApi([
+      {
+        path: RUN_PATH,
+        handler: ({ count }) => ({
+          body:
+            count < 500
+              ? running(1)
+              : { data: makeImprovementRun({ status: 'completed', stoppedReason: 'plateau' }) },
+        }),
+      },
+    ]);
+
+    const hook = renderHook(() => useImprovementRunPolling('run-1'));
+    await advance(0);
+    await advance(15 * 60_000); // fifteen minutes of `running`
+
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(500);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.run?.status).toBe('completed');
+    expect(hook.result.current.isPolling).toBe(false);
+  });
+
+  it('backs off through an unreachable API and recovers instead of failing the run', async () => {
+    const { fetchMock } = stubApi([
+      {
+        path: RUN_PATH,
+        handler: ({ count }) =>
+          count < IMPROVE_UNREACHABLE_AFTER
+            ? { status: 503, body: { message: 'restarting' } }
+            : {
+                body: {
+                  data: makeImprovementRun({ status: 'completed', stoppedReason: 'plateau' }),
+                },
+              },
+      },
+    ]);
+
+    const hook = renderHook(() => useImprovementRunPolling('run-1'));
+    await advance(0);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.isPolling).toBe(true);
+
+    await advance(IMPROVE_POLL_INTERVAL_MS * 2);
+    await advance(IMPROVE_POLL_INTERVAL_MS * 4);
+    expect(hook.result.current.message).toBe('Cannot reach the API — retrying…');
+
+    await advance(IMPROVE_POLL_BACKOFF_MAX_MS);
+    expect(hook.result.current.run?.status).toBe('completed');
+    expect(hook.result.current.error).toBeNull();
+    expect(fetchMock.mock.calls.length).toBe(IMPROVE_UNREACHABLE_AFTER + 1);
   });
 
   it('a null run id never fetches; unmount stops the chain', async () => {
