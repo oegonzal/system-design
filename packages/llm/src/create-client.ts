@@ -21,6 +21,31 @@ export function createLlmClientFromEnv(env: NodeJS.ProcessEnv = process.env): Ll
 }
 
 /**
+ * The eval critic's client. Same determinism-first ordering as
+ * `createLlmClientFromEnv`, plus one opt-in route: `EVAL_AUTH=claude-code` runs
+ * the eval passes through the machine's Claude Code login (a subscription) via
+ * the Agent SDK — for a developer with no API key who wants the graded critic
+ * live. Unlike the improver, eval reads the RAW `EVAL_DETERMINISTIC` with no
+ * override fork: eval determinism protects grading reproducibility and must
+ * never be switchable, so CI/e2e/calibration (which set `EVAL_DETERMINISTIC=1`)
+ * stay byte-identical, and the subscription route is inert unless explicitly
+ * opted into.
+ */
+export function createEvalLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
+  if (env['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
+  if (env['ANTHROPIC_API_KEY']) {
+    return new AnthropicLlmClient({
+      apiKey: env['ANTHROPIC_API_KEY'],
+      model: env['LLM_MODEL'] || undefined,
+    });
+  }
+  if (env['EVAL_AUTH'] === 'claude-code') {
+    return new ClaudeAgentLlmClient({ model: env['LLM_MODEL'] || undefined });
+  }
+  return new NoopLlmClient();
+}
+
+/**
  * The improver (AI coach) reads its own determinism switch,
  * `IMPROVER_DETERMINISTIC`, falling back to `EVAL_DETERMINISTIC`. The
  * distinction exists because the two flags protect different things:

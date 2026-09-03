@@ -49,8 +49,26 @@ then just re-attaches the app. Your sessions are exactly where you left them.
 
 A **failed** evaluation can be re-queued in place from the UI (or
 `POST /api/evaluations/:revisionId/retry`). A **completed** one is immutable —
-iterate by submitting a new revision. Either way the grade is deterministic, so
+iterate by submitting a new revision. By default the grade is deterministic, so
 a re-run of the same design yields the same result.
+
+## Deep graded eval (opt-in, LLM critics move the score)
+
+By default the stack runs `EVAL_DETERMINISTIC=1`: the LLM critics are off and the
+grade is byte-reproducible. To run the **graded critic/evaluator** eval — where a
+lens's grounded weaknesses (tied to the prompt's requirements) actually lower the
+score within bounds — start the stack with the eval LLM live:
+
+```
+EVAL_DETERMINISTIC=0 EVAL_AUTH=claude-code pnpm stack:up   # subscription (claude login)
+# or:  EVAL_DETERMINISTIC=0 ANTHROPIC_API_KEY=… pnpm stack:up
+```
+
+This is **heavy**: each submission runs several LLM passes serially (minutes on a
+subscription), so grades become non-reproducible and slow — use it deliberately,
+not for quick iteration. `EVAL_AUTH` mirrors `IMPROVER_AUTH` but is separate:
+eval determinism is never overridable (there is no `EVAL_DETERMINISTIC` fork), so
+CI/e2e/calibration always stay deterministic.
 
 ## The AI coach (improvement runs)
 
