@@ -170,18 +170,29 @@ export class ImprovementRunnerService {
             rejectedReason: 'no-proposal',
           });
         } else {
-          const problems = [
+          // The graph is the foundation everything else references — an
+          // invalid one is a hard reject. But an imperfect brief or narrative
+          // (a flow whose hops do not join, say) must not sink an otherwise
+          // good graph change: drop just that document and let the graph
+          // improvement stand, scoring on its own merits. A later iteration
+          // over the stabilized graph tends to produce a valid brief.
+          const graphProblems = [
             ...validateGraphReferences(candidate.graph),
             ...validateWorkflowReferences(candidate.graph, facts.workflow),
-            ...(candidate.brief
-              ? validateBriefReferences(candidate.graph, candidate.brief, prompt)
-              : []),
-            ...(candidate.narrative
-              ? validateNarration(candidate.graph, candidate.narrative, prompt)
-              : []),
           ];
+          const briefOk =
+            !candidate.brief ||
+            validateBriefReferences(candidate.graph, candidate.brief, prompt).length === 0;
+          const narrativeOk =
+            !candidate.narrative ||
+            validateNarration(candidate.graph, candidate.narrative, prompt).length === 0;
+          const cleaned: ImprovementCandidate = {
+            ...candidate,
+            brief: briefOk ? candidate.brief : best.brief,
+            narrative: narrativeOk ? candidate.narrative : best.narrative,
+          };
 
-          if (problems.length > 0) {
+          if (graphProblems.length > 0) {
             consecutiveRejects++;
             trajectory.push({
               iteration,
@@ -193,11 +204,11 @@ export class ImprovementRunnerService {
               rejectedReason: 'invalid',
             });
           } else {
-            const result = score(candidate);
+            const result = score(cleaned);
             // THE monotonic gate: strictly better or it never persists.
             if (result.overallScore > bestResult.overallScore) {
-              const revisionId = await this.persistAccepted(run, candidate);
-              best = candidate;
+              const revisionId = await this.persistAccepted(run, cleaned);
+              best = cleaned;
               bestResult = result;
               bestRevisionId = revisionId;
               consecutiveRejects = 0;
