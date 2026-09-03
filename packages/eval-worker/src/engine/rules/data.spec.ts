@@ -85,6 +85,14 @@ describe('data.cache-as-source-of-truth', () => {
     expect(rule.check(contextFor(durable))).toEqual([]);
   });
 
+  it('stays silent for cache-aside, where the writer itself reaches the store', () => {
+    const aside = graph(
+      [node('svc-1', 'service'), node('cache-1', 'cache'), node('db-1', 'database')],
+      [edge('e1', 'svc-1', 'cache-1'), edge('e2', 'svc-1', 'db-1')],
+    );
+    expect(rule.check(contextFor(aside))).toEqual([]);
+  });
+
   it('stays silent when nothing write-shaped feeds the cache', () => {
     const readOnly = graph(
       [node('db-1', 'database'), node('cache-1', 'cache')],

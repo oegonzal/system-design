@@ -110,6 +110,18 @@ const DURABLE_KINDS: readonly NodeKind[] = [
   'data-lake',
   'time-series-db',
 ];
+
+/**
+ * Whether a cache stands in front of a store: the cache itself reaches it
+ * (read-through), or a node that reads the cache does (cache-aside — the
+ * reader continues to the store on a miss). Only the second shape is how a
+ * cache-aside design is honestly drawn; requiring the first forced a
+ * "Redis fetches from Postgres" arrow no real system has.
+ */
+export function cacheFronts(graph: MechanismGraph, cacheId: string, storeId: string): boolean {
+  if (graph.reaches(cacheId, storeId)) return true;
+  return graph.edges.some((edge) => edge.target === cacheId && graph.reaches(edge.source, storeId));
+}
 const CHANNEL_KINDS: readonly NodeKind[] = ['queue', 'event-stream', 'pub-sub'];
 const HANDLER_KINDS: readonly NodeKind[] = [
   'service',
@@ -316,7 +328,7 @@ export const MECHANISM_EVIDENCE = {
   'read-cache': (graph) =>
     ids(
       clientReachable(graph, MECHANISM_KINDS['read-cache']).filter((cache) =>
-        ofKind(graph, ...DURABLE_KINDS).some((store) => graph.reaches(cache.id, store.id)),
+        ofKind(graph, ...DURABLE_KINDS).some((store) => cacheFronts(graph, cache.id, store.id)),
       ),
     ),
 

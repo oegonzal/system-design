@@ -1,7 +1,9 @@
 /**
  * Scalability: does throughput grow without a single component melting first?
  */
-import type { CanvasNode, PatchOp } from '@sysdesign/contracts';
+import { cacheFronts, type CanvasNode, type PatchOp } from '@sysdesign/contracts';
+
+import { mechanismGraphOf } from '../mechanisms';
 
 import type { EvalRule, RuleFinding } from '../types';
 import {
@@ -54,12 +56,13 @@ const noCacheReadHeavy: EvalRule = {
     const fraction = readsFraction(facts.scaleTargets.readWriteRatio);
     if (fraction === null || fraction < 0.8) return [];
     const caches = index.byKind('cache');
+    const graph = mechanismGraphOf(index);
     const offenders: Array<{ clientId: string; dbId: string }> = [];
     for (const client of sortById(index.clients())) {
       for (const db of sortById(index.byKind('database'))) {
         if (!index.pathExists(client.id, db.id)) continue;
         const cacheOnPath = caches.some(
-          (cache) => index.pathExists(client.id, cache.id) && index.pathExists(cache.id, db.id),
+          (cache) => index.pathExists(client.id, cache.id) && cacheFronts(graph, cache.id, db.id),
         );
         if (!cacheOnPath) offenders.push({ clientId: client.id, dbId: db.id });
       }

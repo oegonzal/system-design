@@ -110,6 +110,18 @@ describe('evidence is read off structure, not words', () => {
       [edge('e-1', 'c-1', 'k-1')],
     );
     expect(evidenceFor('read-cache', dangling)).toEqual([]);
+
+    // Cache-aside: the reader, not the cache, continues to the store on a miss.
+    const aside = graphOf(
+      [
+        node('c-1', 'client'),
+        node('s-1', 'service'),
+        node('k-1', 'cache'),
+        node('d-1', 'database'),
+      ],
+      [edge('e-1', 'c-1', 's-1'), edge('e-2', 's-1', 'k-1'), edge('e-3', 's-1', 'd-1')],
+    );
+    expect(evidenceFor('read-cache', aside)).toEqual(['k-1']);
   });
 
   it('reads a channel as a buffer only when something fills it and something drains it', () => {

@@ -48,6 +48,23 @@ describe('scalability.no-cache-read-heavy', () => {
     expect(rule.check(contextFor(cached, readHeavyFacts()))).toEqual([]);
   });
 
+  it('stays silent for cache-aside, where the service reads the cache and then the store', () => {
+    const aside = graph(
+      [
+        node('client-1', 'client'),
+        node('svc-1', 'service'),
+        node('cache-1', 'cache'),
+        node('db-1', 'database'),
+      ],
+      [
+        edge('e1', 'client-1', 'svc-1'),
+        edge('e2', 'svc-1', 'cache-1'),
+        edge('e3', 'svc-1', 'db-1'),
+      ],
+    );
+    expect(rule.check(contextFor(aside, readHeavyFacts()))).toEqual([]);
+  });
+
   it('stays silent when the workload is not read-heavy', () => {
     expect(rule.check(contextFor(uncached, readHeavyFacts('50:50')))).toEqual([]);
   });

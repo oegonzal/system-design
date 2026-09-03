@@ -1,7 +1,9 @@
 /**
  * Data: is the right store doing the right job, and is truth durable?
  */
-import type { NodeKind } from '@sysdesign/contracts';
+import { cacheFronts, type NodeKind } from '@sysdesign/contracts';
+
+import { mechanismGraphOf } from '../mechanisms';
 
 import type { EvalRule, RuleFinding } from '../types';
 import { configNumber, formatInt, mayWrite, sortById, SuggestedIds, uniqueSorted } from './shared';
@@ -67,7 +69,7 @@ const cacheAsSourceOfTruth: EvalRule = {
         }),
       );
       if (writerEdges.length === 0) continue;
-      const durable = databases.some((db) => index.pathExists(cache.id, db.id));
+      const durable = databases.some((db) => cacheFronts(mechanismGraphOf(index), cache.id, db.id));
       if (durable) continue;
       findings.push({
         ruleId: cacheAsSourceOfTruth.id,
