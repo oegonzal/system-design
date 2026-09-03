@@ -78,7 +78,7 @@ describe('runEngine', () => {
       product: null,
     });
 
-    expect(result.overallScore).toBe(18);
+    expect(result.overallScore).toBe(16.9);
     expect(result.grade).toBe('F');
     expect(result.summary).toContain('grade F');
   });
@@ -111,7 +111,7 @@ describe('runEngine', () => {
       'exp.fst.waiting-room',
       'exp.nar.present',
     ]);
-    expect(result.overallScore).toBe(77.9);
+    expect(result.overallScore).toBe(70.1);
     expect(result.grade).toBe('C');
   });
 

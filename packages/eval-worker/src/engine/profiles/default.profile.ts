@@ -3,9 +3,14 @@
  * meeting the prompt's expectations, violations subtract with geometric decay,
  * critical findings cap the letter grade, and suppression pairs keep one
  * lesson to one finding. Calibration (engine/calibration.spec.ts) pins what
- * these numbers mean. Since 2.3.0 those pins are quoted for a diagram
- * submitted WITHOUT a narrative — which now costs the explanation tenth —
- * so the excellent fixture is 90/B until its author explains it.
+ * these numbers mean.
+ *
+ * Since 3.3.0 the explanation dimension carries 0.17 of the overall — nearly a
+ * fifth, second only to scalability — a deliberate statement that a design is
+ * not finished until its brief and narrative explain it well. A diagram
+ * submitted WITHOUT a narrative therefore forfeits far more than before (and is
+ * still capped at C by exp.nar.present), so an unexplained excellent design
+ * lands well below a explained one.
  */
 import type { EvalProfile } from '../core/profile';
 import { CRITIC_PASS_ID } from '../passes/critic/critic.pass';
@@ -18,7 +23,7 @@ import { WORKABILITY_PASS_ID } from '../passes/workability/workability.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
-  version: '3.2.0',
+  version: '3.3.0',
   passes: [
     {
       pass: RULES_PASS_ID,
@@ -46,23 +51,25 @@ export const DEFAULT_PROFILE: EvalProfile = {
     violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
     violationDecay: 0.7,
     // How much each dimension contributes to the overall score; sums to 1
-    // (validateProfile enforces it). Explanation holds 0.09 and the eight
-    // pre-product dimensions keep their 3.0.0 ratios (×0.9); product takes
-    // the freed tenth. On a prompt with no workflow spec, product scores null
-    // and renormalization divides the surviving weights by 0.9, restoring the
-    // 3.0.0 ratios exactly — which is why every pre-product calibration pin
-    // is unchanged. On a workflow prompt, authoring nothing scores product 0
-    // (silence is graded, never renormalized away — the exp.nar.present
-    // lesson, applied to the business layer).
+    // (validateProfile enforces it). 3.3.0 deliberately reweights toward
+    // explanation (0.09 → 0.17, now second only to scalability) at the expense
+    // of the technical dimensions — the brief and narrative are worth nearly a
+    // fifth of the grade. Product keeps its tenth; on a prompt with no workflow
+    // spec it scores null and renormalization divides the surviving weights by
+    // their sum (0.9), which is generic and needs no per-weight bookkeeping. On
+    // a workflow prompt, authoring nothing scores product 0 (silence is graded,
+    // never renormalized away — the exp.nar.present lesson on the business
+    // layer). A dimension's own 0–100 score never reads these weights, so this
+    // retune moves only the overalls, never the per-dimension calibration.
     dimensionWeights: {
-      reliability: 0.162,
-      scalability: 0.2025,
-      performance: 0.1215,
-      data: 0.1215,
-      messaging: 0.081,
-      security: 0.081,
+      reliability: 0.142,
+      scalability: 0.1825,
+      performance: 0.1115,
+      data: 0.1115,
+      messaging: 0.071,
+      security: 0.071,
       hygiene: 0.0405,
-      explanation: 0.09,
+      explanation: 0.17,
       product: 0.1,
     },
     gradeBands: { A: 92, B: 82, C: 68, D: 50 },

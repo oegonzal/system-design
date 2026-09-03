@@ -78,8 +78,8 @@ runEvaluation(graph, facts, narrative, brief, llm, profile, registry)
 | Artifact union            | `engine/core/artifacts.ts`           | `findings` · `coverage` · `axis` · `scenarios` · `annotations` · `diagnostics`        |
 | Aggregator                | `engine/core/aggregator.ts`          | `explainAggregate` computes the score and the ledger together                         |
 | Profile type + validation | `engine/core/profile.ts`             | `validateProfile` fails fast on a malformed rubric                                    |
-| Active profile            | `engine/profiles/default.profile.ts` | `default@3.0.0` — weights, bands, caps, penalties, suppressions                       |
-| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.3.0'`                                                            |
+| Active profile            | `engine/profiles/default.profile.ts` | `default@3.3.0` — weights, bands, caps, penalties, suppressions                       |
+| Engine version            | `engine/scoring.ts`                  | `ENGINE_VERSION = '2.6.0'`                                                            |
 | Pure sync façade          | `engine/engine.ts`                   | `runEngine(graph, facts, narrative?, brief?)` — deterministic passes only             |
 | Graph traversal           | `engine/graph-index.ts`              | Memoised adjacency and reachability                                                   |
 | Stated targets            | `engine/targets.ts`                  | Reads the prompt's own `targetSpec` — the strictest number wins                       |
@@ -138,14 +138,20 @@ error — the port collapses all three to `null`), `not-applicable`,
 7. **Band, then cap.** Bands `A 92 · B 82 · C 68 · D 50`; below D is F. One
    critical finding caps the letter at C, two at D, regardless of the number.
 
-Weights (sum to 1, enforced by `validateProfile`):
+Weights (`default@3.3.0`, sum to 1, enforced by `validateProfile`). Since 3.3.0
+`explanation` carries 0.17 — second only to scalability — so the brief and
+narrative are worth nearly a fifth of the grade:
 
-| dimension   | weight |     | dimension   | weight |
-| ----------- | ------ | --- | ----------- | ------ |
-| scalability | 0.225  |     | messaging   | 0.09   |
-| reliability | 0.18   |     | security    | 0.09   |
-| performance | 0.135  |     | hygiene     | 0.045  |
-| data        | 0.135  |     | explanation | 0.10   |
+| dimension   | weight |     | dimension | weight |
+| ----------- | ------ | --- | --------- | ------ |
+| scalability | 0.1825 |     | product   | 0.10   |
+| explanation | 0.17   |     | messaging | 0.071  |
+| reliability | 0.142  |     | security  | 0.071  |
+| performance | 0.1115 |     | hygiene   | 0.0405 |
+| data        | 0.1115 |     |           |        |
+
+`product` applies only to prompts carrying a workflow spec; otherwise it scores
+`null` and the surviving weights renormalize over their own sum.
 
 ### The trace
 
@@ -165,15 +171,17 @@ rubric moves these; moving them is allowed, silently moving them is not.
 | design                      | overall | grade |
 | --------------------------- | ------- | ----- |
 | empty canvas                | 0       | F     |
-| naive three-box             | 18      | F     |
-| naive plus accepted replica | 23      | F     |
-| solid reference design      | 77.9    | C     |
-| excellent design            | 89.3    | B     |
+| naive three-box             | 16.9    | F     |
+| naive plus accepted replica | 21.3    | F     |
+| solid reference design      | 70.1    | C     |
+| excellent design            | 80.5    | C     |
 
-The excellent design stops at 89.3 for two reasons worth knowing. It submits no
-brief, so `explanation` scores 0 rather than `null` — silence is graded, or
-writing nothing would beat writing badly. And its monitoring block alerts on
-nothing, which the rubric now says out loud.
+The excellent design stops at 80.5 for reasons worth knowing. It submits no
+brief or narrative, so `explanation` scores 0 rather than `null` — silence is
+graded, or writing nothing would beat writing badly — and with explanation now
+weighted 0.17 that omission costs far more than it used to (`exp.nar.present`
+also caps the letter at C). Its monitoring block alerting on nothing costs the
+rest.
 
 ---
 

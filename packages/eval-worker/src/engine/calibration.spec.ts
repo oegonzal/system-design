@@ -66,7 +66,7 @@ const TABLE: CalibrationRow[] = [
       explanation: 0,
       product: null,
     },
-    overallScore: 18,
+    overallScore: 16.9,
     grade: 'F',
   },
   {
@@ -83,7 +83,7 @@ const TABLE: CalibrationRow[] = [
       explanation: 0,
       product: null,
     },
-    overallScore: 23,
+    overallScore: 21.3,
     grade: 'F',
   },
   {
@@ -100,7 +100,7 @@ const TABLE: CalibrationRow[] = [
       explanation: 0,
       product: null,
     },
-    overallScore: 77.9,
+    overallScore: 70.1,
     grade: 'C',
   },
   {
@@ -119,7 +119,7 @@ const TABLE: CalibrationRow[] = [
       explanation: 0,
       product: null,
     },
-    overallScore: 89.3,
+    overallScore: 80.5,
     // Capped from B: the walkthrough is missing (exp.nar.present unmet), and no
     // top grade is handed to a design its author never explained.
     grade: 'C',
@@ -232,7 +232,7 @@ describe('brief calibration', () => {
       fullNarration(excellent(), flashSaleFacts()),
     );
     expect(result.dimensionScores.explanation).toBe(100);
-    expect(result.overallScore).toBe(99.3);
+    expect(result.overallScore).toBe(99.4);
     expect(result.grade).toBe('A');
   });
 
@@ -242,7 +242,7 @@ describe('brief calibration', () => {
     // accounted for but never explained in words is not a finished answer.
     const result = runEngine(excellent(), flashSaleFacts(), null, fullBrief);
     expect(result.dimensionScores.explanation).toBe(92.3);
-    expect(result.overallScore).toBe(98.5);
+    expect(result.overallScore).toBe(97.9);
     expect(result.grade).toBe('C');
   });
 
@@ -251,7 +251,7 @@ describe('brief calibration', () => {
     // Not null: renormalising the dimension away would make explaining nothing
     // strictly better than explaining badly, which is what this pins against.
     expect(result.dimensionScores.explanation).toBe(0);
-    expect(result.overallScore).toBe(89.3);
+    expect(result.overallScore).toBe(80.5);
     expect(result.grade).toBe('C');
     expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.brf.present');
     expect(result.findings.map((finding) => finding.expectationId)).toContain('exp.nar.present');
@@ -261,7 +261,7 @@ describe('brief calibration', () => {
     const minimal: DesignBrief = { version: 1, nfrBindings: [fullBrief.nfrBindings[0]], flows: [] };
     const result = runEngine(excellent(), flashSaleFacts(), null, minimal);
     expect(result.dimensionScores.explanation).toBe(15.4);
-    expect(result.overallScore).toBe(90.8);
+    expect(result.overallScore).toBe(83.4);
     expect(result.grade).toBe('C');
   });
 
