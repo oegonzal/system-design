@@ -9,6 +9,8 @@ import type {
   CoverageArtifact,
   EngineFinding,
   EvidenceArtifact,
+  GradedEvidenceArtifact,
+  GradedEvidenceItem,
   ScenarioArtifact,
 } from './artifacts';
 
@@ -50,6 +52,24 @@ function coverageEntry(
 
 function coverageArtifact(entries: CoverageArtifact['entries']): EvidenceArtifact {
   return { passId: 'expectations.banks', kind: 'coverage', entries };
+}
+
+function gradedItem(overrides: Partial<GradedEvidenceItem> = {}): GradedEvidenceItem {
+  return {
+    dimension: 'reliability',
+    level: 'high',
+    confidence: 'high',
+    severity: 'high',
+    requirementId: 'ohi-con-no-dupes',
+    affectedNodeIds: ['n-3'],
+    rationale: 'The write path has no idempotency guard, so a retried checkout double-writes.',
+    suggestion: null,
+    ...overrides,
+  };
+}
+
+function gradedArtifact(items: GradedEvidenceItem[], lens = 'critic'): GradedEvidenceArtifact {
+  return { passId: 'llm.critic', kind: 'graded-evidence', lens, items, summary: null, model: 'm' };
 }
 
 /** One met expectation per dimension — a prompt that assesses everything. */
@@ -483,6 +503,112 @@ describe('aggregate — scoring trace', () => {
     const hygiene = result.trace.dimensions.find((d) => d.dimension === 'hygiene');
     expect(hygiene).toMatchObject({ entries: 0, base: null, score: null, weight: null });
     expect(hygiene?.penalties).toEqual([]);
+  });
+});
+
+/**
+ * The graded path: a critic/evaluator lens's grounded ordinal evidence subtracts
+ * from a dimension through a generic, bounded, weakness-only scorer — the ONE way
+ * an LLM lens moves the deterministic score, and only downward. [EVAL-16]
+ */
+describe('aggregate — graded evidence', () => {
+  const oneReliability = coverageArtifact([
+    coverageEntry({ expectationId: 'a', dimension: 'reliability', met: true, weight: 1 }),
+  ]);
+
+  it('[EVAL-16] a single high/high weakness lowers its dimension by the per-item price', () => {
+    const result = aggregate([oneReliability, gradedArtifact([gradedItem()])], DEFAULT_PROFILE);
+    // base 100 − 8 (maxPointsPerItem × w(high) × w(high) × decay^0) = 92.
+    expect(result.dimensionScores.reliability).toBe(92);
+    expect(result.overallScore).toBe(92);
+  });
+
+  it('scales the price by BOTH the weakness magnitude and the lens confidence', () => {
+    const result = aggregate(
+      [oneReliability, gradedArtifact([gradedItem({ level: 'medium', confidence: 'low' })])],
+      DEFAULT_PROFILE,
+    );
+    // 100 − 8 × 0.67 × 0.33 = 98.2312 → 98.2. A hedged, low-magnitude call barely counts.
+    expect(result.dimensionScores.reliability).toBe(98.2);
+  });
+
+  it('charges stacked weaknesses worst-first with geometric decay', () => {
+    const result = aggregate(
+      [
+        oneReliability,
+        gradedArtifact([
+          gradedItem({ requirementId: 'r-1' }),
+          gradedItem({ requirementId: 'r-2' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    // 100 − (8 + 8×0.7) = 86.4.
+    expect(result.dimensionScores.reliability).toBe(86.4);
+  });
+
+  it('clamps a dimension to maxPenaltyPerDimension no matter how many weaknesses stack', () => {
+    const many = Array.from({ length: 5 }, (_unused, index) =>
+      gradedItem({ requirementId: `r-${index}` }),
+    );
+    const result = aggregate([oneReliability, gradedArtifact(many)], DEFAULT_PROFILE);
+    // Undecayed the five would subtract >22; the per-dimension clamp holds it to 20.
+    expect(result.dimensionScores.reliability).toBe(80);
+    const reliability = result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    const charged = (reliability?.gradedPenalties ?? []).reduce((sum, p) => sum + p.points, 0);
+    // The clamp is distributed pro rata, so the recorded points sum to the actual subtraction.
+    expect(charged).toBeCloseTo(20, 6);
+  });
+
+  it('is weakness-only: evidence never lifts an unassessed dimension out of null', () => {
+    // hygiene has no deterministic baseline; a lens must not decide it was assessed.
+    const result = aggregate(
+      [oneReliability, gradedArtifact([gradedItem({ dimension: 'hygiene' })])],
+      DEFAULT_PROFILE,
+    );
+    expect(result.dimensionScores.hygiene).toBeNull();
+    expect(result.dimensionScores.reliability).toBe(100);
+    expect(result.overallScore).toBe(100);
+  });
+
+  it("'none' items and an empty evidence set leave the result byte-identical to baseline", () => {
+    const baseline = aggregate([oneReliability], DEFAULT_PROFILE);
+    expect(aggregate([oneReliability, gradedArtifact([])], DEFAULT_PROFILE)).toEqual(baseline);
+    const inert = aggregate(
+      [oneReliability, gradedArtifact([gradedItem({ level: 'none', confidence: 'none' })])],
+      DEFAULT_PROFILE,
+    );
+    expect(inert.dimensionScores).toEqual(baseline.dimensionScores);
+    expect(inert.overallScore).toBe(baseline.overallScore);
+    expect(inert.grade).toBe(baseline.grade);
+  });
+
+  it('records each graded subtraction in the trace, grounded and attributed', () => {
+    const result = aggregate([oneReliability, gradedArtifact([gradedItem()])], DEFAULT_PROFILE);
+    const reliability = result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    expect(reliability?.gradedPenalties).toEqual([
+      {
+        position: 0,
+        lens: 'critic',
+        level: 'high',
+        confidence: 'high',
+        requirementId: 'ohi-con-no-dupes',
+        affectedNodeIds: ['n-3'],
+        listPoints: 8,
+        points: 8,
+      },
+    ]);
+  });
+
+  it('never touches a letter cap — caps read deterministic evidence only', () => {
+    // A pile of graded weaknesses tanks the number but cannot cap the grade the
+    // way a single deterministic critical does.
+    const many = Array.from({ length: 5 }, (_unused, index) =>
+      gradedItem({ requirementId: `r-${index}` }),
+    );
+    const result = aggregate([oneReliability, gradedArtifact(many)], DEFAULT_PROFILE);
+    expect(result.capApplied).toBeNull();
+    expect(result.trace.caps.some((cap) => cap.binding)).toBe(false);
   });
 });
 

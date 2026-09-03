@@ -12,7 +12,9 @@
  * hold that property until someone skipped a spec.
  */
 import {
+  AXIS_FACTOR_LEVELS,
   EVAL_DIMENSIONS,
+  type AxisFactorLevel,
   type DimensionScores,
   type EvalDimension,
   type Grade,
@@ -26,6 +28,7 @@ import type {
   DiagnosticsArtifact,
   EngineFinding,
   EvidenceArtifact,
+  GradedEvidenceItem,
   ScenarioArtifact,
 } from './artifacts';
 import { gradeForScore, type CoverageScoringPolicy, type EvalProfile } from './profile';
@@ -37,6 +40,24 @@ const SEVERITY_RANK: Record<Severity, number> = {
   low: 3,
   info: 4,
 };
+
+/**
+ * Ordinal → weight in [0, 1], the same anchors the workability axis uses
+ * (LEVEL_SCORE/100). A graded weakness's price scales by its magnitude AND the
+ * lens's confidence, so a hedged low-magnitude call barely moves the score and
+ * only a confident high-magnitude one approaches the per-item cap.
+ */
+const LEVEL_WEIGHT: Record<AxisFactorLevel, number> = { none: 0, low: 0.33, medium: 0.67, high: 1 };
+
+/** Higher ordinal ranks first — worst weaknesses charged before decay bites. */
+const LEVEL_RANK: Record<AxisFactorLevel, number> = Object.fromEntries(
+  AXIS_FACTOR_LEVELS.map((level, index) => [level, AXIS_FACTOR_LEVELS.length - index]),
+) as Record<AxisFactorLevel, number>;
+
+/** A graded weakness carried with the lens that raised it, for scoring + trace. */
+export interface CollectedGradedItem extends GradedEvidenceItem {
+  lens: string;
+}
 
 /**
  * The cap that bound the grade — a SEVERITY cap (`count` findings of `severity`)
@@ -64,6 +85,21 @@ export interface PenaltyTrace {
   points: number;
 }
 
+/** One graded weakness's actual cost, at the decay position it was charged at. */
+export interface GradedPenaltyTrace {
+  /** 0-based: the multiplier applied was `gradedEvidence.decay ** position`. */
+  position: number;
+  lens: string;
+  level: AxisFactorLevel;
+  confidence: AxisFactorLevel;
+  requirementId: string | null;
+  affectedNodeIds: string[];
+  /** Full price before decay: maxPointsPerItem × w(level) × w(confidence). */
+  listPoints: number;
+  /** What it actually subtracted, after decay and the per-dimension clamp. */
+  points: number;
+}
+
 export interface DimensionTrace {
   dimension: EvalDimension;
   /** Applicable expectations examined; 0 with no violations means unassessed. */
@@ -73,6 +109,8 @@ export interface DimensionTrace {
   /** `100 * met / total`, or null when the dimension was not assessed. */
   base: number | null;
   penalties: PenaltyTrace[];
+  /** Graded LLM-lens subtractions, empty on the deterministic path. */
+  gradedPenalties: GradedPenaltyTrace[];
   score: number | null;
   /** The weight it contributed to the overall, or null when unassessed. */
   weight: number | null;
@@ -149,6 +187,7 @@ const GRADE_ORDER: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
 interface Collected {
   findings: EngineFinding[];
   coverage: CoverageArtifact['entries'];
+  gradedEvidence: CollectedGradedItem[];
   axes: AxisArtifact[];
   diagnostics: DiagnosticsArtifact[];
   annotations: AnnotationArtifact | null;
@@ -158,6 +197,7 @@ interface Collected {
 function collect(artifacts: readonly EvidenceArtifact[]): Collected {
   const findings: EngineFinding[] = [];
   const coverage: CoverageArtifact['entries'] = [];
+  const gradedEvidence: CollectedGradedItem[] = [];
   const axes: AxisArtifact[] = [];
   const diagnostics: DiagnosticsArtifact[] = [];
   const annotationArtifacts: AnnotationArtifact[] = [];
@@ -170,6 +210,9 @@ function collect(artifacts: readonly EvidenceArtifact[]): Collected {
         break;
       case 'coverage':
         coverage.push(...artifact.entries);
+        break;
+      case 'graded-evidence':
+        for (const item of artifact.items) gradedEvidence.push({ ...item, lens: artifact.lens });
         break;
       case 'axis':
         axes.push(artifact);
@@ -197,7 +240,7 @@ function collect(artifacts: readonly EvidenceArtifact[]): Collected {
         ? first
         : { ...first, findings: annotationArtifacts.flatMap((artifact) => artifact.findings) };
 
-  return { findings, coverage, axes, diagnostics, annotations, scenarios };
+  return { findings, coverage, gradedEvidence, axes, diagnostics, annotations, scenarios };
 }
 
 export interface Explanation {
@@ -222,7 +265,7 @@ export function explainAggregate(
   profile: EvalProfile,
 ): Explanation {
   const policy = profile.scoring;
-  const { findings: raw, coverage } = collect(artifacts);
+  const { findings: raw, coverage, gradedEvidence } = collect(artifacts);
 
   const { kept, suppressions } = applySuppressions(raw, coverage, policy);
   const findings = [...kept].sort(
@@ -231,7 +274,7 @@ export function explainAggregate(
       compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')),
   );
 
-  const dimensions = scoreCoverage(findings, coverage, policy);
+  const dimensions = scoreCoverage(findings, coverage, gradedEvidence, policy);
   const dimensionScores = {} as DimensionScores;
   for (const entry of dimensions) dimensionScores[entry.dimension] = entry.score;
 
@@ -345,13 +388,18 @@ function applySuppressions(
 /**
  * Coverage model: the base is earned — 100 × met weight / total weight over
  * the prompt's applicable expectations — then rule violations subtract with
- * geometric decay. A dimension is covered only when at least one applicable
- * expectation or one violation examined it; anything else scores null and
- * drops out of the overall, so an unexamined dimension is never a free 100.
+ * geometric decay, and grounded LLM-lens weaknesses subtract a second, bounded
+ * term (see `scoreGradedPenalty`). A dimension is covered only when at least one
+ * applicable expectation or one violation examined it; anything else scores null
+ * and drops out of the overall, so an unexamined dimension is never a free 100 —
+ * and graded evidence is weakness-ONLY, so it can lower an already-assessed
+ * dimension but never lift an unassessed one out of null (a lens's evidence
+ * alone must not decide a dimension was assessed).
  */
 function scoreCoverage(
   findings: readonly EngineFinding[],
   coverage: CoverageArtifact['entries'],
+  gradedEvidence: readonly CollectedGradedItem[],
   policy: CoverageScoringPolicy,
 ): DimensionTrace[] {
   const earned = {} as Record<EvalDimension, { met: number; total: number; entries: number }>;
@@ -368,6 +416,10 @@ function scoreCoverage(
     if (finding.countsAsViolation) violations[finding.dimension].push(finding);
   }
 
+  const graded = {} as Record<EvalDimension, CollectedGradedItem[]>;
+  for (const dimension of EVAL_DIMENSIONS) graded[dimension] = [];
+  for (const item of gradedEvidence) graded[item.dimension].push(item);
+
   return EVAL_DIMENSIONS.map((dimension) => {
     const { met, total, entries } = earned[dimension];
     if (entries === 0 && violations[dimension].length === 0) {
@@ -378,6 +430,7 @@ function scoreCoverage(
         total,
         base: null,
         penalties: [],
+        gradedPenalties: [],
         score: null,
         weight: null,
       };
@@ -411,7 +464,10 @@ function scoreCoverage(
       };
     });
 
-    const score = Math.round(Math.max(0, base - penalty) * 10) / 10;
+    const gradedPenalties = scoreGradedPenalty(graded[dimension], policy.gradedEvidence);
+    const gradedPenalty = gradedPenalties.reduce((sum, item) => sum + item.points, 0);
+
+    const score = Math.round(Math.max(0, base - penalty - gradedPenalty) * 10) / 10;
     return {
       dimension,
       entries,
@@ -419,10 +475,59 @@ function scoreCoverage(
       total,
       base,
       penalties,
+      gradedPenalties,
       score,
       weight: policy.dimensionWeights[dimension],
     };
   });
+}
+
+/**
+ * The generic, engine-owned graded scorer: a bounded weakness-only subtraction
+ * from one dimension. Each weakness's list price is `maxPointsPerItem` scaled by
+ * its magnitude AND the lens's confidence (so a hedged low call barely counts);
+ * they charge worst-first with geometric decay, and the total is clamped to
+ * `maxPenaltyPerDimension`. The clamp is distributed back over the trace pro rata
+ * so the recorded `points` always sum to what was actually subtracted. Pure
+ * ordinals in, points out — the LLM never picks a number, and 'none'/'none'
+ * items contribute exactly 0.
+ */
+function scoreGradedPenalty(
+  items: readonly CollectedGradedItem[],
+  policy: CoverageScoringPolicy['gradedEvidence'],
+): GradedPenaltyTrace[] {
+  const ordered = [...items].sort(
+    (a, b) =>
+      LEVEL_RANK[b.level] - LEVEL_RANK[a.level] ||
+      LEVEL_RANK[b.confidence] - LEVEL_RANK[a.confidence] ||
+      compareStrings(a.requirementId ?? '', b.requirementId ?? '') ||
+      compareStrings(a.affectedNodeIds.join(','), b.affectedNodeIds.join(',')) ||
+      compareStrings(a.lens, b.lens),
+  );
+
+  let running = 0;
+  const raw = ordered.map((item, position) => {
+    const listPoints =
+      policy.maxPointsPerItem * LEVEL_WEIGHT[item.level] * LEVEL_WEIGHT[item.confidence];
+    const decayed = listPoints * policy.decay ** position;
+    running += decayed;
+    return { item, position, listPoints, decayed };
+  });
+
+  const total = running;
+  // Distribute the per-dimension clamp pro rata so the trace's points sum to the
+  // actual subtraction even when the cap bites.
+  const scale = total > policy.maxPenaltyPerDimension ? policy.maxPenaltyPerDimension / total : 1;
+  return raw.map(({ item, position, listPoints, decayed }) => ({
+    position,
+    lens: item.lens,
+    level: item.level,
+    confidence: item.confidence,
+    requirementId: item.requirementId,
+    affectedNodeIds: item.affectedNodeIds,
+    listPoints,
+    points: decayed * scale,
+  }));
 }
 
 /**

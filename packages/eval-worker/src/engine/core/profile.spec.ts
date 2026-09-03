@@ -46,6 +46,20 @@ describe('validateProfile', () => {
     const profile = withScoring({ violationDecay: 0 });
     expect(() => validateProfile(profile)).toThrow(/violation decay/);
   });
+
+  it('rejects negative graded-evidence bounds', () => {
+    const profile = withScoring({
+      gradedEvidence: { ...defaultScoring.gradedEvidence, maxPointsPerItem: -1 },
+    });
+    expect(() => validateProfile(profile)).toThrow(/graded-evidence bounds/);
+  });
+
+  it('rejects a graded-evidence decay outside (0, 1]', () => {
+    const profile = withScoring({
+      gradedEvidence: { ...defaultScoring.gradedEvidence, decay: 1.5 },
+    });
+    expect(() => validateProfile(profile)).toThrow(/graded-evidence decay/);
+  });
 });
 
 describe('gradeForScore', () => {

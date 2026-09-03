@@ -95,7 +95,8 @@ export const CRITERIA: readonly Criterion[] = [
   },
   {
     id: 'EVAL-6',
-    statement: 'The LLM depth axis is displayed beside, and never alters, the deterministic score.',
+    statement:
+      'An LLM pass never emits the findings or coverage the score reads, nor authors a number: its advisory axes and scenarios ride beside the grade for display, and a rogue LLM scoring artifact is dropped.',
   },
   {
     id: 'EVAL-7',
@@ -140,6 +141,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'EVAL-15',
     statement:
       'The design narrative is graded by reference and required for a top grade: a missing or insubstantial walkthrough both loses explanation points and caps the letter grade below an A.',
+  },
+  {
+    id: 'EVAL-16',
+    statement:
+      "A critic or evaluator lens's grounded ordinal evidence — a weakness magnitude and confidence tied to a prompt requirement and the affected components — moves the score only through the engine's generic, bounded, weakness-only deterministic scorer: it can lower an already-assessed dimension, never by a raw LLM number, never past a deterministic cap, and never at all on the deterministic path.",
   },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },

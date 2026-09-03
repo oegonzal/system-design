@@ -5,7 +5,13 @@
  * grade". Pure types only: nothing here may import from passes, rules, or the
  * critic, which is what keeps the kernel's dependency arrow one-directional.
  */
-import type { AxisFactor, EvalDimension, Severity } from '@sysdesign/contracts';
+import type {
+  AxisFactor,
+  AxisFactorLevel,
+  EvalDimension,
+  GraphPatch,
+  Severity,
+} from '@sysdesign/contracts';
 
 import type { EngineFinding } from '../types';
 
@@ -81,6 +87,50 @@ export interface AnnotationArtifact extends ArtifactBase {
 }
 
 /**
+ * One grounded weakness a critic/evaluator lens found, expressed as the ordinals
+ * the engine scores — never a number the model picked. `level` is the weakness
+ * MAGNITUDE (the uniform currency: a critic's issue and an evaluator's
+ * requirement shortfall both express it here), `confidence` the lens's certainty
+ * the weakness is real; the engine's generic scorer reads only those two ordinals
+ * plus the profile's bounds. `severity` rides for display/persistence only.
+ * `requirementId` grounds the weakness to a prompt requirement (an nfr id, a
+ * workflow item id, or a synthetic `fr-<n>` ordinal) and `affectedNodeIds` to the
+ * components — both re-checked admissible by the producer before emission, so the
+ * ids the engine reads are always real.
+ */
+export interface GradedEvidenceItem {
+  dimension: EvalDimension;
+  /** Weakness magnitude; 'none' contributes nothing. */
+  level: AxisFactorLevel;
+  /** The lens's confidence the weakness is real. */
+  confidence: AxisFactorLevel;
+  severity: Severity;
+  requirementId: string | null;
+  affectedNodeIds: string[];
+  rationale: string;
+  suggestion: GraphPatch | null;
+}
+
+/**
+ * A lens's grounded evidence set. It is neither `findings` nor `coverage`, so
+ * `enforceMode` carries it through from an `mode:'llm'` pass untouched — and the
+ * aggregator's generic scorer turns its ordinals into a BOUNDED, WEAKNESS-ONLY
+ * per-dimension subtraction. That is the one way an LLM lens moves the
+ * deterministic score: only downward, only off a dimension the deterministic
+ * layer already assessed, only within the profile's per-dimension bound, and
+ * never past a letter cap. The LLM still never authors a number and its
+ * findings/coverage are still dropped. [EVAL-16]
+ */
+export interface GradedEvidenceArtifact extends ArtifactBase {
+  kind: 'graded-evidence';
+  /** The lens that produced it — 'critic', 'evaluator.workability', … */
+  lens: string;
+  items: GradedEvidenceItem[];
+  summary: string | null;
+  model: string | null;
+}
+
+/**
  * Why a pass produced nothing — skipped LLM, failed call, clipped prompt,
  * input the pass does not apply to — or why the orchestrator refused what it
  * produced (an LLM pass emitting scoring artifacts).
@@ -104,6 +154,7 @@ export type EvidenceArtifact =
   | AxisArtifact
   | ScenarioArtifact
   | AnnotationArtifact
+  | GradedEvidenceArtifact
   | DiagnosticsArtifact;
 
 export function isFindingsArtifact(artifact: EvidenceArtifact): artifact is FindingsArtifact {
@@ -112,4 +163,10 @@ export function isFindingsArtifact(artifact: EvidenceArtifact): artifact is Find
 
 export function isCoverageArtifact(artifact: EvidenceArtifact): artifact is CoverageArtifact {
   return artifact.kind === 'coverage';
+}
+
+export function isGradedEvidenceArtifact(
+  artifact: EvidenceArtifact,
+): artifact is GradedEvidenceArtifact {
+  return artifact.kind === 'graded-evidence';
 }

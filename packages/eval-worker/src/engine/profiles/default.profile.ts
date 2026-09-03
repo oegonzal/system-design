@@ -81,6 +81,14 @@ export const DEFAULT_PROFILE: EvalProfile = {
     // insubstantial walkthrough (exp.nar.present unmet) caps the letter at C,
     // the deterministic teeth behind "the narrative is required".
     expectationGradeCaps: [{ whenExpectationUnmet: 'exp.nar.present', maxGrade: 'C' }],
+    // Grounded critic/evaluator evidence subtracts, bounded and weakness-only:
+    // a single graded weakness is worth at most 8 points (scaled by its level
+    // and confidence, decayed as they stack), and any one dimension loses at
+    // most 20 to graded evidence — so a live lens can lower an already-assessed
+    // dimension it grounds a real gap in, but never dominate it or reach a
+    // letter cap. On the deterministic stack no graded evidence exists, so this
+    // block contributes exactly 0 and every calibration pin is byte-identical.
+    gradedEvidence: { maxPointsPerItem: 8, maxPenaltyPerDimension: 20, decay: 0.7 },
     suppressions: [
       { ruleId: 'reliability.single-db-no-replica', whenExpectationUnmet: 'exp.fst.db-failover' },
       {

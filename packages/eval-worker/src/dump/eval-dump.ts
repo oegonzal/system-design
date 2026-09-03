@@ -345,11 +345,11 @@ export function renderRunMarkdown(
     lines.push(
       `**${state.result.grade} · ${state.result.overallScore}/100**`,
       ``,
-      `| dimension | score | met/total | penalties |`,
-      `| --- | --- | --- | --- |`,
+      `| dimension | score | met/total | penalties | graded |`,
+      `| --- | --- | --- | --- | --- |`,
       ...state.result.trace.dimensions.map(
         (dimension) =>
-          `| ${dimension.dimension} | ${dimension.score ?? '—'} | ${dimension.met}/${dimension.total} | ${dimension.penalties.length} |`,
+          `| ${dimension.dimension} | ${dimension.score ?? '—'} | ${dimension.met}/${dimension.total} | ${dimension.penalties.length} | ${dimension.gradedPenalties.length} |`,
       ),
       ``,
     );

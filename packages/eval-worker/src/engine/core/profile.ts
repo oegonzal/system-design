@@ -45,6 +45,22 @@ export interface SuppressionRule {
 }
 
 /**
+ * How a critic/evaluator lens's grounded ordinal evidence subtracts from a
+ * dimension. Bounded and weakness-only by construction: each graded weakness is
+ * worth at most `maxPointsPerItem`, scaled by its level and confidence and
+ * decayed as they stack, and a dimension can lose at most
+ * `maxPenaltyPerDimension` to graded evidence in total — so an LLM lens can lower
+ * an already-assessed dimension but never dominate it, and never touch a letter
+ * cap. Set all three to 0 / (0,1] to make the graded path inert.
+ */
+export interface GradedEvidenceScoringPolicy {
+  maxPointsPerItem: number;
+  maxPenaltyPerDimension: number;
+  /** Multiplier on each successive graded weakness within a dimension, in (0, 1]. */
+  decay: number;
+}
+
+/**
  * The coverage model: each dimension's base is earned by meeting the prompt's
  * expectations, violations subtract with geometric decay (stacking hurts but
  * never nukes a dimension the way a hard floor did), and critical findings
@@ -61,6 +77,8 @@ export interface CoverageScoringPolicy {
   /** Caps keyed to an unmet expectation rather than a finding count. */
   expectationGradeCaps: ExpectationGradeCapRule[];
   suppressions: SuppressionRule[];
+  /** How grounded LLM-lens evidence subtracts — bounded, weakness-only. */
+  gradedEvidence: GradedEvidenceScoringPolicy;
 }
 
 export type ScoringPolicy = CoverageScoringPolicy;
@@ -100,6 +118,16 @@ export function validateProfile(profile: EvalProfile): void {
   const decay = profile.scoring.violationDecay;
   if (!(decay > 0 && decay <= 1)) {
     throw new Error(`eval profile ${describe(profile)} violation decay must be in (0, 1]`);
+  }
+
+  const graded = profile.scoring.gradedEvidence;
+  if (!(graded.maxPointsPerItem >= 0 && graded.maxPenaltyPerDimension >= 0)) {
+    throw new Error(
+      `eval profile ${describe(profile)} graded-evidence bounds must be non-negative`,
+    );
+  }
+  if (!(graded.decay > 0 && graded.decay <= 1)) {
+    throw new Error(`eval profile ${describe(profile)} graded-evidence decay must be in (0, 1]`);
   }
 }
 

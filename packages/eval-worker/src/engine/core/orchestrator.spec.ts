@@ -144,6 +144,83 @@ describe('runEvaluation', () => {
     expect(run.result.capApplied).toBeNull();
   });
 
+  it('[EVAL-16] carries graded evidence through from an llm pass, and it scores', async () => {
+    // A deterministic pass establishes a reliability baseline…
+    const base: EvalPass = {
+      id: 'rules.base',
+      mode: 'deterministic',
+      run: () =>
+        Promise.resolve<EvidenceArtifact[]>([
+          {
+            passId: 'rules.base',
+            kind: 'coverage',
+            entries: [
+              {
+                expectationId: 'exp.base',
+                dimension: 'reliability',
+                weight: 1,
+                met: true,
+                nfrId: null,
+                evidenceNodeIds: [],
+                evidenceEdgeIds: [],
+              },
+            ],
+          },
+        ]),
+    };
+    // …then the same llm-mode pass whose findings/coverage would be dropped emits
+    // graded evidence — grounded ordinals, not a raw number — and the engine's
+    // bounded scorer lowers the dimension it grounds a weakness in.
+    const lens: EvalPass = {
+      id: 'llm.critic',
+      mode: 'llm',
+      run: () =>
+        Promise.resolve<EvidenceArtifact[]>([
+          {
+            passId: 'llm.critic',
+            kind: 'graded-evidence',
+            lens: 'critic',
+            summary: null,
+            model: 'm',
+            items: [
+              {
+                dimension: 'reliability',
+                level: 'high',
+                confidence: 'high',
+                severity: 'high',
+                requirementId: 'exp.base',
+                affectedNodeIds: [],
+                rationale: 'A grounded reliability gap.',
+                suggestion: null,
+              },
+            ],
+          },
+        ]),
+    };
+
+    const run = await runEvaluation({
+      graph: graph([]),
+      facts: flashSaleFacts(),
+      llm,
+      profile: {
+        ...DEFAULT_PROFILE,
+        passes: [
+          { pass: 'rules.base', enabled: true },
+          { pass: 'llm.critic', enabled: true },
+        ],
+      },
+      registry: new Map([base, lens].map((pass) => [pass.id, pass])),
+    });
+
+    // It survives enforceMode (neither findings nor coverage)…
+    expect(run.artifacts.some((a) => a.kind === 'graded-evidence')).toBe(true);
+    // …and it moved the score: reliability was pulled below its deterministic base.
+    const reliability = run.result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    expect(reliability?.base).toBe(100);
+    expect(reliability?.gradedPenalties).toHaveLength(1);
+    expect(reliability?.score).toBe(92);
+  });
+
   /**
    * Attribution for a run dump is derived here, from the id that already
    * stamps the artifacts — never declared by a pass or threaded through the
