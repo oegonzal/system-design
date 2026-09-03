@@ -50,9 +50,14 @@ const SEVERITY_RANK: Record<Severity, number> = {
  */
 const LEVEL_WEIGHT: Record<AxisFactorLevel, number> = { none: 0, low: 0.33, medium: 0.67, high: 1 };
 
-/** Higher ordinal ranks first — worst weaknesses charged before decay bites. */
+/**
+ * Higher ordinal ranks first — worst weaknesses charged before decay bites.
+ * AXIS_FACTOR_LEVELS runs none → high, so the index IS the rank; subtracting it
+ * from the length (as this once did) ranked 'none' above 'high' and charged
+ * the mildest item at full price while the worst one decayed.
+ */
 const LEVEL_RANK: Record<AxisFactorLevel, number> = Object.fromEntries(
-  AXIS_FACTOR_LEVELS.map((level, index) => [level, AXIS_FACTOR_LEVELS.length - index]),
+  AXIS_FACTOR_LEVELS.map((level, index) => [level, index]),
 ) as Record<AxisFactorLevel, number>;
 
 /** A graded weakness carried with the lens that raised it, for scoring + trace. */

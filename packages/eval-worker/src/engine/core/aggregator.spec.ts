@@ -503,6 +503,28 @@ describe('aggregate — graded evidence', () => {
     expect(result.dimensionScores.reliability).toBe(86.4);
   });
 
+  it('ranks by magnitude then confidence, so the mild item is the one that decays', () => {
+    const result = aggregate(
+      [
+        oneReliability,
+        gradedArtifact([
+          gradedItem({ requirementId: 'r-mild', level: 'low', confidence: 'high' }),
+          gradedItem({ requirementId: 'r-hedged', level: 'high', confidence: 'medium' }),
+          gradedItem({ requirementId: 'r-worst', level: 'high', confidence: 'high' }),
+        ]),
+      ],
+      DEFAULT_PROFILE,
+    );
+    const reliability = result.trace.dimensions.find((d) => d.dimension === 'reliability');
+    expect(reliability?.gradedPenalties.map((p) => [p.position, p.requirementId])).toEqual([
+      [0, 'r-worst'],
+      [1, 'r-hedged'],
+      [2, 'r-mild'],
+    ]);
+    // 8 + (8×0.67)×0.7 + (8×0.33)×0.49 = 8 + 3.752 + 1.2936 → 86.95, rounded to a tenth.
+    expect(result.dimensionScores.reliability).toBe(87);
+  });
+
   it('clamps a dimension to maxPenaltyPerDimension no matter how many weaknesses stack', () => {
     const many = Array.from({ length: 5 }, (_unused, index) =>
       gradedItem({ requirementId: `r-${index}` }),
