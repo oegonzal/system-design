@@ -25,10 +25,10 @@ import {
   Evaluation,
   Prompt,
 } from '@sysdesign/db';
-import { asRecordable, type LlmClient } from '@sysdesign/llm';
+import { asRecordable, improverAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
 import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
-import { LLM_CLIENT } from '../llm/llm.token';
+import { SUGGESTION_LLM } from '../llm/llm.token';
 import type { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
 import type { InterfaceSuggestionsRequestDto } from './dto/interface-suggestions.dto';
 import { suggestBindings } from './suggestions/suggest-bindings';
@@ -63,7 +63,7 @@ export class SessionsService {
   constructor(
     private readonly em: EntityManager,
     private readonly evalQueue: EvalQueue,
-    @Inject(LLM_CLIENT) private readonly llm: LlmClient,
+    @Inject(SUGGESTION_LLM) private readonly llm: LlmClient,
   ) {}
 
   /**
@@ -217,13 +217,16 @@ export class SessionsService {
     }
   }
 
-  /** Derived facts only — the API key is never recorded, in any form. */
+  /**
+   * Derived facts only — the API key is never recorded, in any form. The
+   * suggesters run on the assistive client, so "why is it off" is answered
+   * by the coach's switches, not the eval's.
+   */
   private llmStatus(): SuggestionDumpLlm {
-    const deterministic = process.env['EVAL_DETERMINISTIC'] === '1';
     return {
       enabled: this.llm.enabled,
       model: this.llm.model,
-      reason: this.llm.enabled ? null : deterministic ? 'deterministic' : 'no-key',
+      reason: this.llm.enabled ? null : improverAvailabilityFromEnv().reason,
     };
   }
 
