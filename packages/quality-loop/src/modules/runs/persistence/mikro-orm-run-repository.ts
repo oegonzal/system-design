@@ -152,9 +152,12 @@ async function countByRun(
   return new Map(rows.map((row) => [row.run_id, row.n]));
 }
 
-const withoutRunId = <T extends { runId: string }>({ runId: _runId, ...rest }: T) => rest;
-const withoutIds = <T extends { runId: string; iterationId: string }>({
-  runId: _runId,
-  iterationId: _iterationId,
-  ...rest
-}: T) => rest;
+/** Row fields minus the flattened relation ids; the entity gets references instead. */
+function omit<T extends object, K extends keyof T>(value: T, keys: readonly K[]): Omit<T, K> {
+  const copy: Partial<T> = { ...value };
+  for (const key of keys) delete copy[key];
+  return copy as Omit<T, K>;
+}
+const withoutRunId = <T extends { runId: string }>(row: T) => omit(row, ['runId']);
+const withoutIds = <T extends { runId: string; iterationId: string }>(row: T) =>
+  omit(row, ['runId', 'iterationId']);
