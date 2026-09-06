@@ -111,7 +111,7 @@ pnpm exec nx run studio-e2e:e2e                            # end-to-end (servers
 pnpm review:code --staged --profile=quick                  # what the pre-commit hook runs
 pnpm test:stories                                          # render every story, both modes
 pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
-pnpm quality:start                         # quality-loop on :3003 + its web client on :4201
+pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 ```
 
 Git hooks live in `.githooks` (activated by `pnpm install` via the `prepare`

@@ -32,7 +32,7 @@ describe('the dependency matrix', () => {
     ['quality-loop-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['studio-api', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
     ['eval-worker', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
-    ['quality-loop', ['contracts', 'llm', 'run-dump']],
+    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
     expect(ALLOWED[pkg]).toEqual(allowed);
   });

@@ -3,6 +3,8 @@ import type {
   GetQualityRunResponse,
   ListPipelinesResponse,
   ListPromptLibraryResponse,
+  ListQualityRunsQuery,
+  ListQualityRunsResponse,
   PipelineSummary,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
@@ -11,9 +13,13 @@ import type {
   StartQualityRunRequest,
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
-import { createRequest, unwrap, type GetOptions } from '@sysdesign/web-kit';
+import { createRequest, query as toQueryString, unwrap, type GetOptions } from '@sysdesign/web-kit';
 
-/** The one HTTP boundary to the quality-loop service; every method returns the unwrapped DTO. */
+/**
+ * The one HTTP boundary to the quality-loop service. Single resources come
+ * back unwrapped; `listRuns` keeps its envelope, since the list's `meta` is
+ * part of the answer.
+ */
 
 const BASE_URL = process.env['NEXT_PUBLIC_QUALITY_LOOP_URL'] ?? 'http://localhost:3003';
 const request = createRequest(BASE_URL);
@@ -35,6 +41,13 @@ export const api = {
 
   async startRun(body: StartQualityRunRequest): Promise<QualityRunStartedDto> {
     return unwrap(await request<StartQualityRunResponse>('/runs', { method: 'POST', body }));
+  },
+
+  async listRuns(
+    query: ListQualityRunsQuery = {},
+    opts: GetOptions = {},
+  ): Promise<ListQualityRunsResponse> {
+    return request<ListQualityRunsResponse>(`/runs${toQueryString({ ...query })}`, opts);
   },
 
   async getRun(runId: string, opts: GetOptions = {}): Promise<QualityRunDto> {

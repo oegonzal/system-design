@@ -1,7 +1,13 @@
 import { stubApi } from '@sysdesign/web-testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makePipeline, makePromptDocument, makeRun, PROMPT_ENTRIES } from '../testing/fixtures';
+import {
+  makePipeline,
+  makePromptDocument,
+  makeRun,
+  PROMPT_ENTRIES,
+  RUN_SUMMARIES,
+} from '../testing/fixtures';
 import { api } from './client';
 
 afterEach(() => {
@@ -54,5 +60,16 @@ describe('quality-loop api client', () => {
     });
 
     expect((await api.getRun(run.runId)).trace?.finalDecision).toBe('revise');
+  });
+
+  it('[QLU-4] lists runs with the query string and keeps the page meta', async () => {
+    const meta = { total: 3, limit: 20, offset: 0 };
+    const { calls } = stubApi([{ path: '/runs', body: { data: RUN_SUMMARIES, meta } }]);
+
+    const page = await api.listRuns({ limit: 20, status: 'complete' });
+
+    expect(page.data).toEqual(RUN_SUMMARIES);
+    expect(page.meta).toEqual(meta);
+    expect(calls[0]?.url).toBe('/runs?limit=20&status=complete');
   });
 });

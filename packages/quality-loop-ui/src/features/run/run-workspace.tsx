@@ -4,14 +4,17 @@ import type {
   PipelineSummary,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
+  QualityRunSummaryDto,
 } from '@sysdesign/contracts';
 import { Heading, LiveRegion, Spinner, Stack, Surface, Text } from '@sysdesign/design-system';
 import { isAbortError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
-import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
 import { PrewrapText } from '../../components/prewrap-text';
 import { RunResults } from '../results/run-results';
+import { RecentRuns } from './recent-runs';
 import { RunControls } from './run-controls';
 import { clampIterations, initialForm, type RunForm } from './run-form';
 import { RunProgress } from './run-progress';
@@ -22,9 +25,12 @@ interface Library {
   pipelines: PipelineSummary[];
 }
 
+const RECENT_LIMIT = 20;
+
 /**
  * The one screen: choose a prompt and a pipeline, run, watch the exchanges
- * arrive, read the verdict. Everything shown comes off the wire contract.
+ * arrive, read the verdict — or reopen a recent run, which the URL remembers
+ * as `?run=<id>`. Everything shown comes off the wire contract.
  */
 export function RunWorkspace() {
   const [library, setLibrary] = useState<Library | null>(null);
@@ -32,8 +38,12 @@ export function RunWorkspace() {
   const [form, setForm] = useState<RunForm>(() => initialForm([], []));
   const [document, setDocument] = useState<PromptLibraryDocumentDto | null>(null);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<QualityRunSummaryDto[] | null>(null);
+  const [recentError, setRecentError] = useState<string | null>(null);
   const prompt = useLatestRequest();
   const run = useRun();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -68,6 +78,44 @@ export function RunWorkspace() {
         }
       });
   }, [form.promptId, prompt]);
+
+  // The list on mount, and again each time the followed run reaches its end.
+  const status = run.run?.status ?? null;
+  useEffect(() => {
+    const idle = run.runId === null && status === null;
+    const ended = status !== null && status !== 'running';
+    if (!idle && !ended) return;
+    const controller = new AbortController();
+    api
+      .listRuns({ limit: RECENT_LIMIT }, { signal: controller.signal })
+      .then((page) => {
+        setRecent(page.data);
+        setRecentError(null);
+      })
+      .catch((caught: unknown) => {
+        if (!isAbortError(caught)) {
+          setRecentError(toErrorMessage(caught, 'Could not load recent runs.'));
+        }
+      });
+    return () => controller.abort();
+  }, [status, run.runId]);
+
+  // `?run=<id>` is read once: a reload or a shared link reopens that run.
+  const linkConsumed = useRef(false);
+  const { select } = run;
+  useEffect(() => {
+    if (linkConsumed.current) return;
+    linkConsumed.current = true;
+    const linked = searchParams.get('run');
+    if (linked) select(linked);
+  }, [searchParams, select]);
+
+  // The URL follows the run being shown.
+  useEffect(() => {
+    if (run.runId !== null && searchParams.get('run') !== run.runId) {
+      router.replace(`?run=${encodeURIComponent(run.runId)}`);
+    }
+  }, [run.runId, router, searchParams]);
 
   const busy = run.starting || run.isPolling;
 
@@ -110,14 +158,24 @@ export function RunWorkspace() {
         </Surface>
       )}
 
+      <Surface as="section" aria-label="Recent runs">
+        {recent ? (
+          <RecentRuns runs={recent} activeRunId={run.runId} onSelect={run.select} />
+        ) : recentError ? (
+          <Text tone="secondary">{recentError}</Text>
+        ) : (
+          <Spinner label="Loading recent runs" />
+        )}
+      </Surface>
+
       <LiveRegion message={run.message} />
       {run.run && (
-        <Surface as="section">
+        <Surface as="section" aria-label="Run progress">
           <RunProgress run={run.run} />
         </Surface>
       )}
       {run.run?.trace && (
-        <Surface as="section">
+        <Surface as="section" aria-label="Results">
           <RunResults key={run.run.runId} trace={run.run.trace} />
         </Surface>
       )}

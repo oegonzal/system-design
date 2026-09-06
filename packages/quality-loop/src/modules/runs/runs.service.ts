@@ -1,46 +1,63 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { PipelineSummary, StartQualityRunRequest } from '@sysdesign/contracts';
-import { qualityLoopAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
+import { Inject, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
+import type {
+  PipelineSummary,
+  QualityRunDto,
+  QualityRunSummaryDto,
+  StartQualityRunRequest,
+} from '@sysdesign/contracts';
+import { qualityLoopAvailabilityFromEnv, type LlmClient, type LlmExchange } from '@sysdesign/llm';
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
 
-import type { RunRecord } from '../../core/contracts';
+import { summariseExchange, type RunRecord } from '../../core/contracts';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
-import type { TraceStore } from '../../core/ports';
+import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { runPipeline } from '../../core/run-pipeline';
-import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
+import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
 /**
- * Runs, and the in-memory index of them. A run is minutes long on the
- * subscription client, so HTTP starts one and polls; the CLI awaits it. The
- * dump is the durable record — this map forgets on restart, by design.
+ * Runs. A run is minutes long on the subscription client, so HTTP starts one
+ * and polls; the CLI awaits it. The repository is the record of truth between
+ * requests and across restarts; the dump stays the full audit trail, prompts
+ * included. The in-memory `RunRecord` lives only for the duration of the
+ * loop, sinking exchanges as they are attributed.
  */
 @Injectable()
-export class RunsService {
+export class RunsService implements OnModuleInit {
   private readonly logger = new Logger(RunsService.name);
-  private readonly records = new Map<string, RunRecord>();
 
   constructor(
     @Inject(QUALITY_LOOP_LLM) private readonly llm: LlmClient,
     @Inject(PIPELINES_TOKEN)
     private readonly pipelines: ReadonlyMap<string, PipelineDefinition<unknown>>,
     @Inject(TRACE_STORE) private readonly traces: TraceStore,
+    @Inject(RUN_REPOSITORY) private readonly repository: RunRepository,
   ) {
     // A malformed pipeline fails boot, never a run.
     for (const definition of pipelines.values()) validatePipeline(definition);
+  }
+
+  /** Boot only: a run still `running` that this process never saw died with the previous one. */
+  async onModuleInit(): Promise<void> {
+    const failed = await this.repository.failInterrupted();
+    if (failed > 0) this.logger.warn(`marked ${failed} interrupted run(s) failed`);
   }
 
   list(): PipelineSummary[] {
     return [...this.pipelines.values()].map(describePipeline);
   }
 
-  get(runId: string): RunRecord | null {
-    return this.records.get(runId) ?? null;
+  get(runId: string): Promise<QualityRunDto | null> {
+    return this.repository.find(runId);
   }
 
-  /** Start in the background; the record is readable at once. */
-  start(request: StartQualityRunRequest): RunRecord {
+  listRuns(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]> {
+    return this.repository.list(query);
+  }
+
+  /** Start in the background; the row is readable at once. */
+  async start(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
-    const record = this.open(request, definition);
+    const record = await this.open(request, definition);
     void this.perform(record, request, definition);
     return record;
   }
@@ -48,7 +65,7 @@ export class RunsService {
   /** Run to completion — the CLI's path. */
   async execute(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
-    const record = this.open(request, definition);
+    const record = await this.open(request, definition);
     await this.perform(record, request, definition);
     return record;
   }
@@ -59,18 +76,16 @@ export class RunsService {
     return definition;
   }
 
-  private open(
+  private async open(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
-  ): RunRecord {
+  ): Promise<RunRecord> {
     const record: RunRecord = {
       runId: makeRunId(Date.now(), 'quality'),
       pipeline: request.pipeline,
       status: 'running',
       startedAt: new Date().toISOString(),
       finishedAt: null,
-      // Availability from the client that will actually answer; the reason it
-      // is off comes from the environment, never the key.
       llm: {
         enabled: this.llm.enabled,
         model: this.llm.model,
@@ -86,7 +101,7 @@ export class RunsService {
       exchanges: [],
       error: null,
     };
-    this.records.set(record.runId, record);
+    await this.repository.open(record, definition.version);
     return record;
   }
 
@@ -95,11 +110,23 @@ export class RunsService {
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
   ): Promise<void> {
+    // Exchange writes are chained, never awaited by the loop: order is kept,
+    // a slow database never stalls a model call, and a failed write is logged.
+    let writes: Promise<void> = Promise.resolve();
+    const sink = (exchange: LlmExchange) => {
+      record.exchanges.push(exchange);
+      const summaries = record.exchanges.map(summariseExchange);
+      writes = writes
+        .then(() => this.repository.recordExchange(record.runId, summaries))
+        .catch((error: unknown) =>
+          this.logger.warn(`run ${record.runId}: exchange not recorded: ${String(error)}`),
+        );
+    };
     try {
       record.trace = await runPipeline(
         definition,
         { goal: request.goal, output: request.output, maxIterations: request.maxIterations },
-        { llm: this.llm, sink: (exchange) => record.exchanges.push(exchange), now: Date.now },
+        { llm: this.llm, sink, now: Date.now },
       );
       record.status = 'complete';
     } catch (error) {
@@ -109,6 +136,12 @@ export class RunsService {
     } finally {
       record.finishedAt = new Date().toISOString();
       this.traces.save(record, describePipeline(definition));
+      await writes;
+      try {
+        await this.repository.close(record);
+      } catch (error) {
+        this.logger.error(`run ${record.runId}: not persisted: ${String(error)}`);
+      }
     }
   }
 }

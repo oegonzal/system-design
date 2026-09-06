@@ -1,11 +1,21 @@
-import { Body, Controller, Get, HttpCode, NotFoundException, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import type {
   GetQualityRunResponse,
+  ListQualityRunsResponse,
   StartQualityRunRequest,
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
 
-import { toRunDto } from '../../core/contracts';
+import { listRunsQuerySchema, type ListRunsQuery } from './list-runs-query';
 import { runRequestSchema } from './run-request';
 import { RunsService } from './runs.service';
 import { ZodValidationPipe } from './zod.pipe';
@@ -17,17 +27,26 @@ export class RunsController {
   /** 202: the run is minutes long on the subscription client; poll `GET /runs/:id`. */
   @Post()
   @HttpCode(202)
-  start(
+  async start(
     @Body(new ZodValidationPipe(runRequestSchema)) body: StartQualityRunRequest,
-  ): StartQualityRunResponse {
-    const record = this.runs.start(body);
+  ): Promise<StartQualityRunResponse> {
+    const record = await this.runs.start(body);
     return { data: { runId: record.runId, status: record.status } };
   }
 
+  /** Newest first. Declared before `:id` so the bare collection never reads as an id. */
+  @Get()
+  async list(
+    @Query(new ZodValidationPipe(listRunsQuerySchema)) query: ListRunsQuery,
+  ): Promise<ListQualityRunsResponse> {
+    const [data, total] = await this.runs.listRuns(query);
+    return { data, meta: { total, limit: query.limit, offset: query.offset } };
+  }
+
   @Get(':id')
-  get(@Param('id') id: string): GetQualityRunResponse {
-    const record = this.runs.get(id);
-    if (!record) throw new NotFoundException(`run ${id} not found`);
-    return { data: toRunDto(record) };
+  async get(@Param('id') id: string): Promise<GetQualityRunResponse> {
+    const run = await this.runs.get(id);
+    if (!run) throw new NotFoundException(`run ${id} not found`);
+    return { data: run };
   }
 }

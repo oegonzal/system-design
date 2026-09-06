@@ -15,11 +15,14 @@ export default defineConfig({
     environment: 'node',
 
     // Run dumps are always on; `static/runs` means REAL runs, so tests get a
-    // temp directory. No database here — the loop's only persistence is the
-    // dump — so the suites may run in parallel.
+    // temp directory. Runs persist in Postgres too: the HTTP suites truncate
+    // `quality_run` between files, so they get their own database unless the
+    // environment (CI) pins one, and share one lane like studio-api.
     env: {
       EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
+      DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
     },
+    fileParallelism: false,
 
     include: ['src/**/*.{test,spec}.{ts,mts}'],
     reporters: ['default'],

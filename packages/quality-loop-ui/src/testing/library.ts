@@ -2,6 +2,7 @@ import type {
   PipelineSummary,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
+  QualityRunSummaryDto,
 } from '@sysdesign/contracts';
 
 /** What the service's library and pipeline registry answer, shaped exactly like the wire. */
@@ -77,3 +78,49 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
   },
   ...overrides,
 });
+
+export const makeRunSummary = (
+  overrides: Partial<QualityRunSummaryDto> = {},
+): QualityRunSummaryDto => ({
+  runId: '2026-09-06T00-00-00-000-abc123-quality',
+  pipeline: 'system-design',
+  pipelineVersion: '1.0.0',
+  status: 'complete',
+  startedAt: '2026-09-06T00:00:00.000Z',
+  finishedAt: '2026-09-06T00:05:17.000Z',
+  finalDecision: 'revise',
+  stopReason: 'max-iterations',
+  overall: 65.2,
+  iterations: 1,
+  criteria: 2,
+  exchangeCount: 4,
+  llm: { enabled: true, model: 'test-model', reason: null },
+  ...overrides,
+});
+
+/** Newest first, as `GET /runs` lists them: one live, one revised, one accepted. */
+export const RUN_SUMMARIES: QualityRunSummaryDto[] = [
+  makeRunSummary({
+    runId: '2026-09-06T01-00-00-000-def456-quality',
+    status: 'running',
+    startedAt: '2026-09-06T01:00:00.000Z',
+    finishedAt: null,
+    finalDecision: null,
+    stopReason: null,
+    overall: null,
+    iterations: 0,
+    criteria: 0,
+    exchangeCount: 1,
+  }),
+  makeRunSummary(),
+  makeRunSummary({
+    runId: '2026-09-05T23-00-00-000-000aaa-quality',
+    startedAt: '2026-09-05T23:00:00.000Z',
+    finishedAt: '2026-09-05T23:10:30.000Z',
+    finalDecision: 'accept',
+    stopReason: 'accepted',
+    overall: 100,
+    iterations: 2,
+    exchangeCount: 18,
+  }),
+];

@@ -12,4 +12,4 @@ Layout: `src/core` (pure engine), `src/pipelines/<id>` (one folder per pipeline)
 
 How it works, the env variables, the dump layout and the guarantees: [docs/pipeline-best-practices/quality-loop.md](../../docs/pipeline-best-practices/quality-loop.md).
 
-HTTP: `GET /pipelines`, `GET /prompts`, `GET /prompts/:id`, `POST /runs` (202), `GET /runs/:id`, `GET /health`. Every wire type is in `@sysdesign/contracts` under `lib/quality-loop`. The web client is `packages/quality-loop-ui` (`pnpm quality:start`).
+Runs persist in Postgres through MikroORM (`pnpm stack:db` then `pnpm db:migrate`; the scripts default `DB_PORT` to 5433). HTTP: `GET /pipelines`, `GET /prompts`, `GET /prompts/:id`, `POST /runs` (202), `GET /runs`, `GET /runs/:id`, `GET /health`. Every wire type is in `@sysdesign/contracts` under `lib/quality-loop`. The web client is `packages/quality-loop-ui` (`pnpm quality:start`).

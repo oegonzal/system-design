@@ -17,6 +17,8 @@ export interface RunState {
   starting: boolean;
   startError: string | null;
   start(body: StartQualityRunRequest): Promise<void>;
+  /** Follow an existing run — from the recent list or a `?run=` link. */
+  select(runId: string): void;
 }
 
 function describeRun(
@@ -74,6 +76,11 @@ export function useRun(): RunState {
     }
   }, []);
 
+  const select = useCallback((next: string) => {
+    setStartError(null);
+    setRunId(next);
+  }, []);
+
   return {
     runId,
     run,
@@ -83,5 +90,6 @@ export function useRun(): RunState {
     starting,
     startError,
     start,
+    select,
   };
 }

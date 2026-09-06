@@ -10,7 +10,7 @@ import { vi, type Mock } from 'vitest';
  * `createNextNavigationMock()` — the dynamic import keeps `vi.mock` hoisting
  * happy, since factory code must not close over top-level imports.
  *
- * Then drive it with `setMockPathname` / `setMockParams` and assert against
+ * Then drive it with `setMockPathname` / `setMockParams` / `setMockSearchParams` and assert against
  * `routerMock.push` etc.
  */
 
@@ -28,6 +28,7 @@ export const routerMock: RouterMock = {
 
 let pathname = '/';
 let params: Record<string, string | string[]> = {};
+let searchParams = new URLSearchParams();
 
 export function setMockPathname(next: string): void {
   pathname = next;
@@ -37,9 +38,15 @@ export function setMockParams(next: Record<string, string | string[]>): void {
   params = next;
 }
 
+/** Drive `useSearchParams()` from a spec: `setMockSearchParams({ run: 'r1' })`. */
+export function setMockSearchParams(init: string | Record<string, string> | URLSearchParams): void {
+  searchParams = new URLSearchParams(init);
+}
+
 export function resetNavigationMock(): void {
   pathname = '/';
   params = {};
+  searchParams = new URLSearchParams();
   for (const fn of Object.values(routerMock)) fn.mockReset();
 }
 
@@ -58,7 +65,7 @@ export function createNextNavigationMock(): NextNavigationMock {
     useRouter: () => routerMock,
     usePathname: () => pathname,
     useParams: () => params,
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => searchParams,
     notFound: (): never => {
       throw new Error('notFound()');
     },

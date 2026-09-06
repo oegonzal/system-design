@@ -39,16 +39,17 @@ curl -s localhost:3003/runs/<runId>                          # poll until status
 pnpm quality:start
 ```
 
-| Variable                       | Effect                                                                                          |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `QUALITY_LOOP_DETERMINISTIC`   | `1` forces the no-op model. Falls back to `EVAL_DETERMINISTIC`; `0` overrides it for this loop. |
-| `ANTHROPIC_API_KEY`            | The API route (with `LLM_MODEL`). Wins over the subscription route.                             |
-| `QUALITY_LOOP_AUTH`            | `claude-code` runs the loop through this machine's Claude Code login via the Agent SDK.         |
-| `QUALITY_LOOP_PORT`            | HTTP port, default 3003.                                                                        |
-| `QUALITY_LOOP_CORS_ORIGIN`     | The browser origin allowed to call the service; default `http://localhost:4201`.                |
-| `QUALITY_LOOP_PROMPTS_DIR`     | The prompt library directory, read per request; default `<cwd>/packages/quality-loop/prompts`.  |
-| `EVAL_DUMP_DIR`                | Where dumps go; default `./static/runs`.                                                        |
-| `NEXT_PUBLIC_QUALITY_LOOP_URL` | (web client) the service's base URL; default `http://localhost:3003`.                           |
+| Variable                                                  | Effect                                                                                                                                                                                                                     |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QUALITY_LOOP_DETERMINISTIC`                              | `1` forces the no-op model. Falls back to `EVAL_DETERMINISTIC`; `0` overrides it for this loop.                                                                                                                            |
+| `ANTHROPIC_API_KEY`                                       | The API route (with `LLM_MODEL`). Wins over the subscription route.                                                                                                                                                        |
+| `QUALITY_LOOP_AUTH`                                       | `claude-code` runs the loop through this machine's Claude Code login via the Agent SDK.                                                                                                                                    |
+| `QUALITY_LOOP_PORT`                                       | HTTP port, default 3003.                                                                                                                                                                                                   |
+| `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME` | Postgres for the run tables (`quality_run` and its children); defaults `localhost`/`5432`/`admin`/`admin`/`sysdesign`. `pnpm stack:db` listens on 5433, which `pnpm quality:start` and `pnpm quality-loop:run` default to. |
+| `QUALITY_LOOP_CORS_ORIGIN`                                | The browser origin allowed to call the service; default `http://localhost:4201`.                                                                                                                                           |
+| `QUALITY_LOOP_PROMPTS_DIR`                                | The prompt library directory, read per request; default `<cwd>/packages/quality-loop/prompts`.                                                                                                                             |
+| `EVAL_DUMP_DIR`                                           | Where dumps go; default `./static/runs`.                                                                                                                                                                                   |
+| `NEXT_PUBLIC_QUALITY_LOOP_URL`                            | (web client) the service's base URL; default `http://localhost:3003`.                                                                                                                                                      |
 
 Without a live model the loop is honest rather than empty: no criteria are derived, the producer cannot produce, the lenses are skipped, and the controller escalates with `llm-disabled` diagnostics and no invented number. The dump is still written.
 
@@ -64,8 +65,13 @@ Every wire type lives in `@sysdesign/contracts` under `lib/quality-loop/`, so th
 | `GET /prompts/:id` | `GetPromptLibraryDocumentResponse` — the markdown verbatim; 404 when the file is not there                      |
 | `POST /runs`       | 202 `StartQualityRunResponse` — body `StartQualityRunRequest` (`pipeline`, `goal`, `output?`, `maxIterations?`) |
 | `GET /runs/:id`    | `GetQualityRunResponse` — `QualityRunDto`: status, availability, the trace once complete, exchanges summarised  |
+| `GET /runs`        | `ListQualityRunsResponse` — newest first; `?pipeline`, `?status`, `?limit` (default 50, max 100), `?offset`     |
 
 `GET /runs/:id` summarises each exchange to `{ scope, ordinal, outcome, durationMs, startedAt }`; the prompts and responses are only in the dump. The prompt library is a port (`PromptLibrary`) with a filesystem adapter — a database-backed one drops in behind the same routes.
+
+## Persistence
+
+Runs persist through MikroORM's EntityManager the way evaluations do, in normalized tables: `quality_run` (the header and the live exchange log), `quality_run_criterion` (the derived contract), `quality_run_iteration` (one row per loop turn), `quality_run_finding` and `quality_run_criterion_result` (the ledger's two lists, each with a denormalised `run_id` for cross-run SQL). The wire record is reassembled exactly from these rows, so `GET /runs/:id` answers the same after a restart; the `RunRepository` port (`core/ports.ts`) is the seam, `modules/runs/persistence/` the MikroORM adapter and the pure mapper. The row is opened before the loop starts, exchanges flush as they are attributed, and the trace lands in one transaction when the loop ends. A run still `running` when the service boots died with the previous process and is marked failed. The dump is unchanged and remains the full audit trail. Migrations live in `packages/db` (`pnpm db:migrate`, `pnpm db:migrate:check`).
 
 ## The dump
 
@@ -108,12 +114,16 @@ A folder beside `src/pipelines/system-design/` and one line in `src/pipelines/in
 | The client lists the library and pipelines and starts a run from the chosen prompt                       | `[QLU-1]`                                            |
 | A run is followed by its own status; progress shows the attributed exchanges                             | `[QLU-2]`                                            |
 | Results render every part of the verdict from the wire contract alone                                    | `[QLU-3]`                                            |
+| Runs persist in normalized tables, reassemble exactly, survive a restart, list newest first              | `[QL-13]`                                            |
+| The client lists recent runs, reopens one on click or from `?run=<id>`, refreshes when a run ends        | `[QLU-4]`                                            |
 
 Deliberate deviations from the doctrine's literal shapes: severities are the repo's (`critical` is the doctrine's `fatal`); fixability has four values (no tools or backtracking exist); `suggestedFixType`, report-level confidence and `qualityEvidence` are omitted; constraints are criteria of a gated kind and failure modes are finding types the policy gates.
 
 ## The web client (`packages/quality-loop-ui`)
 
 One screen on :4201 (`pnpm quality:start` serves both): pick a prompt from the library and a pipeline from `GET /pipelines`, choose the iterations (default 1 — a live iteration is minutes), run. While the loop runs the page follows `GET /runs/:id` by the run's own status and lists each model exchange as it is attributed; when it ends it shows, per iteration, the decision with its gates and reason, the overall and per-dimension scores, the criteria joined to the contract, the confirmed findings grouped by severity with the remediation notes the policy selected, how the policy decided step by step, and the rendered artifact with its `[component.N]` ids. The prompt and the artifact display as text — no markdown renderer, so the ids a finding points at stay visible.
+
+A "Recent runs" panel lists what the service has persisted, newest first; clicking one reopens it, and the run being shown lands in the URL as `?run=<id>`, so a reload or a bookmark brings it back for analysis.
 
 The client renders the wire contract and nothing else; it shares the request core and polling hook with the studio through `@sysdesign/web-kit` and the spec harness through `@sysdesign/web-testing`.
 

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { PromptLibraryEntryDto } from '@sysdesign/contracts';
+import { ensureDatabase } from '@sysdesign/db';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,6 +61,7 @@ describe('GET /prompts', () => {
   let url: string;
 
   beforeAll(async () => {
+    await ensureDatabase();
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(QUALITY_LOOP_LLM)
       .useValue(fakeLlm())

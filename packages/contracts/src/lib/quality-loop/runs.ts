@@ -1,7 +1,8 @@
-import type { ApiResponse } from '../envelope';
+import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { LlmAvailabilityDto } from '../llm-availability';
 import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
+import type { Decision, StopReason } from './vocab';
 
 export const QUALITY_RUN_STATUSES = ['running', 'complete', 'failed'] as const;
 export type QualityRunStatus = (typeof QUALITY_RUN_STATUSES)[number];
@@ -64,3 +65,31 @@ export const MAX_QUALITY_RUN_ITERATIONS = 10;
 
 export type StartQualityRunResponse = ApiResponse<QualityRunStartedDto>;
 export type GetQualityRunResponse = ApiResponse<QualityRunDto>;
+
+/** One row of `GET /runs`: the header the list needs, never the trace. */
+export interface QualityRunSummaryDto {
+  runId: string;
+  pipeline: string;
+  pipelineVersion: string | null;
+  status: QualityRunStatus;
+  startedAt: IsoDateString;
+  finishedAt: IsoDateString | null;
+  finalDecision: Decision | null;
+  stopReason: StopReason | null;
+  /** The best iteration's overall score; null until the loop ends. */
+  overall: number | null;
+  iterations: number;
+  criteria: number;
+  exchangeCount: number;
+  llm: LlmAvailabilityDto;
+}
+
+/** `GET /runs` — newest first; `limit` defaults to DEFAULT_LIST_LIMIT, capped at MAX_LIST_LIMIT. */
+export interface ListQualityRunsQuery {
+  pipeline?: string;
+  status?: QualityRunStatus;
+  limit?: number;
+  offset?: number;
+}
+
+export type ListQualityRunsResponse = ApiListResponse<QualityRunSummaryDto>;

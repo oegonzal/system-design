@@ -9,8 +9,12 @@ import type {
   Diagnostic,
   EvaluationReport,
   LensOutcome,
+  ListQualityRunsQuery,
+  LlmExchangeSummaryDto,
   PipelineSummary,
   ProduceMode,
+  QualityRunDto,
+  QualityRunSummaryDto,
   RemediationNote,
   SuccessCriterion,
   ValidationReport,
@@ -83,3 +87,24 @@ export interface TraceStore {
 
 /** Where attributed model exchanges go — the dump collector, in production. */
 export type ExchangeSink = (exchange: LlmExchange) => void;
+
+/** The list query after the HTTP edge applied its defaults. */
+export type RunListQuery = ListQualityRunsQuery & { limit: number; offset: number };
+
+/**
+ * Where runs live between requests and across restarts — Postgres, in
+ * production. The dump (`TraceStore`) stays the full audit trail; this is the
+ * record of truth the HTTP surface answers from.
+ */
+export interface RunRepository {
+  /** Insert the running header before the loop starts; `GET /runs/:id` answers from here on. */
+  open(record: RunRecord, pipelineVersion: string): Promise<void>;
+  /** The live exchange log — a fresh snapshot each time, in the caller's order. */
+  recordExchange(runId: string, exchanges: LlmExchangeSummaryDto[]): Promise<void>;
+  /** The terminal write: the header plus every child row, in one transaction. */
+  close(record: RunRecord): Promise<void>;
+  find(runId: string): Promise<QualityRunDto | null>;
+  list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]>;
+  /** Rows still `running` from a previous process are failed; returns how many. */
+  failInterrupted(): Promise<number>;
+}

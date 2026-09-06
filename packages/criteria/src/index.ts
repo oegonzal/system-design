@@ -268,6 +268,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The run on the wire is the shared contract: every quality-loop wire type lives in contracts, GET /runs/:id summarises exchanges, and each iteration carries its rendered artifact.',
   },
+  {
+    id: 'QL-13',
+    statement:
+      'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, surviving a restart, and listing newest first.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
@@ -283,6 +288,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'QLU-3',
     statement:
       'Results render, per iteration and from the wire contract alone, the decision with gates and reason, per-dimension scores, criteria evidence joined to the contract, confirmed findings with their remediation notes, and the rendered artifact.',
+  },
+  {
+    id: 'QLU-4',
+    statement:
+      'The client lists recent runs, reopens one on click or from ?run=<id>, and refreshes the list when a run ends.',
   },
   // Shared web libraries (packages/web-kit, packages/web-testing)
   {

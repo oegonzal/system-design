@@ -8,6 +8,11 @@ import { Evaluation } from './entities/evaluation.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
 import { Finding } from './entities/finding.entity';
 import { ImprovementRun } from './entities/improvement-run.entity';
+import { QualityRun } from './entities/quality-run.entity';
+import { QualityRunCriterion } from './entities/quality-run-criterion.entity';
+import { QualityRunCriterionResult } from './entities/quality-run-criterion-result.entity';
+import { QualityRunFinding } from './entities/quality-run-finding.entity';
+import { QualityRunIteration } from './entities/quality-run-iteration.entity';
 import { Prompt } from './entities/prompt.entity';
 import { StarStory } from './entities/star-story.entity';
 
@@ -37,6 +42,11 @@ export const ormOptions = {
     Finding,
     EvalJob,
     ImprovementRun,
+    QualityRun,
+    QualityRunCriterion,
+    QualityRunIteration,
+    QualityRunFinding,
+    QualityRunCriterionResult,
     StarStory,
   ],
   metadataProvider: ReflectMetadataProvider,

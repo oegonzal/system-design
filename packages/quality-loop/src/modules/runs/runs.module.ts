@@ -1,14 +1,32 @@
 import { Module } from '@nestjs/common';
+import { MikroOrmModule } from '@mikro-orm/nestjs';
+import {
+  QualityRun,
+  QualityRunCriterion,
+  QualityRunCriterionResult,
+  QualityRunFinding,
+  QualityRunIteration,
+} from '@sysdesign/db';
 import { createQualityLoopLlmFromEnv } from '@sysdesign/llm';
 
 import { PIPELINES } from '../../pipelines';
 import { DumpTraceStore } from './dump-trace-store';
+import { MikroOrmRunRepository } from './persistence/mikro-orm-run-repository';
 import { PipelinesController } from './pipelines.controller';
 import { RunsController } from './runs.controller';
 import { RunsService } from './runs.service';
-import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
+import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
 @Module({
+  imports: [
+    MikroOrmModule.forFeature([
+      QualityRun,
+      QualityRunCriterion,
+      QualityRunIteration,
+      QualityRunFinding,
+      QualityRunCriterionResult,
+    ]),
+  ],
   controllers: [RunsController, PipelinesController],
   providers: [
     RunsService,
@@ -18,6 +36,7 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
     { provide: QUALITY_LOOP_LLM, useFactory: createQualityLoopLlmFromEnv },
     { provide: PIPELINES_TOKEN, useValue: PIPELINES },
     { provide: TRACE_STORE, useClass: DumpTraceStore },
+    { provide: RUN_REPOSITORY, useClass: MikroOrmRunRepository },
   ],
 })
 export class RunsModule {}
