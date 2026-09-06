@@ -74,6 +74,7 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
   const narrative = input.narrative ?? null;
   const narration = input.narration ?? null;
   const brief = input.brief ?? null;
+
   validateProfile(profile);
 
   const index = buildGraphIndex(graph);
@@ -81,15 +82,18 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
 
   for (const config of profile.passes) {
     if (!config.enabled) continue;
+
     const pass = registry.get(config.pass);
     if (!pass) {
       throw new Error(`eval profile ${describe(profile)} names unknown pass: ${config.pass}`);
     }
+
     // Attribution is temporal: everything the recorder hears between these two
     // calls belongs to this pass. That holds because the loop is serial, which
     // is already the contract `priorArtifacts` depends on — a parallel-pass
     // refactor would have to give the recorder an explicit scope instead.
     recorder?.beginPass(pass.id, pass.mode, config.options ?? {});
+
     const startedAt = Date.now();
     const produced = await pass.run({
       graph,
@@ -102,11 +106,16 @@ export async function runEvaluation(input: RunEvaluationInput): Promise<Evaluati
       priorArtifacts: artifacts,
       options: config.options ?? {},
     });
+
     recorder?.endPass(pass.id, produced, Date.now() - startedAt);
+
     artifacts.push(...enforceMode(pass, produced));
   }
 
-  return { artifacts, result: aggregate(artifacts, profile) };
+  return {
+    artifacts,
+    result: aggregate(artifacts, profile),
+  };
 }
 
 /**

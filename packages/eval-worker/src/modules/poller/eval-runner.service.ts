@@ -31,7 +31,6 @@ export const backoffMs = (attempts: number): number =>
 export class EvalRunnerService {
   private readonly logger = new Logger(EvalRunnerService.name);
   private readonly passRegistry = createPassRegistry();
-
   constructor(
     private readonly em: EntityManager,
     @Inject(LLM_CLIENT) private readonly llm: LlmClient,
@@ -45,6 +44,7 @@ export class EvalRunnerService {
     // there are no inputs yet to dump.
     const job = await em.findOneOrFail(EvalJob, jobId);
 
+    // Getting the dump structure to fill it up as process proceeds
     const dump = startEvalDump({
       runId: makeRunId(Date.now(), 'eval'),
       jobId: job.id,
@@ -52,6 +52,7 @@ export class EvalRunnerService {
       llm: this.llmStatus(),
       git: GIT_CONTEXT,
     });
+
     // The no-op client cannot record, and does not need to: every LLM pass
     // returns before assembling a prompt when the model is off.
     const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
@@ -63,6 +64,7 @@ export class EvalRunnerService {
         { id: job.revision.id },
         { populate: ['session', 'session.prompt'] },
       );
+
       evaluation = await em.findOneOrFail(Evaluation, { revision: revision.id });
 
       // Visible state transition before the (possibly slow) critic call.
@@ -117,8 +119,10 @@ export class EvalRunnerService {
         // across them, so a live deep eval is never reaped as a dead worker's.
         recorder: composeRecorders(dump.passes, lockHeartbeat(this.em, job, this.logger)),
       });
+
       dump.outcome({ artifacts, result });
       // The general critic owns the header summary and the audit column.
+
       const criticGraded =
         result.gradedEvidence.find((artifact) => artifact.lens === 'critic') ?? null;
 
@@ -144,6 +148,7 @@ export class EvalRunnerService {
             suggestion: finding.suggestion,
           });
         }
+
         // Every lens's graded weaknesses persist as llm findings — the score
         // already moved through the engine's scorer; here they surface as
         // grounded improvement areas, titled by lens and requirement. Scenario
@@ -167,6 +172,7 @@ export class EvalRunnerService {
             });
           }
         }
+
         await tem.nativeUpdate(
           Evaluation,
           { id: evaluationId },

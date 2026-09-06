@@ -36,6 +36,7 @@ export function createDepthPass(): EvalPass {
   return {
     id: DEPTH_PASS_ID,
     mode: 'llm',
+
     run: async (ctx) => {
       if (!ctx.llm.enabled) {
         return [
@@ -102,6 +103,7 @@ export function createDepthPass(): EvalPass {
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },
+
         ...(items.length > 0
           ? [
               {
@@ -114,6 +116,7 @@ export function createDepthPass(): EvalPass {
               },
             ]
           : []),
+
         ...(design.clipped
           ? [
               {

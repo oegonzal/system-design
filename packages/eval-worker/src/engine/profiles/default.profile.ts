@@ -23,8 +23,11 @@ import { WORKABILITY_PASS_ID } from '../passes/workability/workability.pass';
 
 export const DEFAULT_PROFILE: EvalProfile = {
   id: 'default',
+
   version: '3.3.0',
+
   passes: [
+    // deterministic passes below
     {
       pass: RULES_PASS_ID,
       enabled: true,
@@ -40,16 +43,28 @@ export const DEFAULT_PROFILE: EvalProfile = {
       },
     },
     { pass: EXPECTATIONS_PASS_ID, enabled: true },
+
+    // llm passes below
     { pass: CRITIC_PASS_ID, enabled: true },
     { pass: DEPTH_PASS_ID, enabled: true },
     { pass: NARRATIVE_PASS_ID, enabled: true },
     { pass: WORKABILITY_PASS_ID, enabled: true },
     { pass: SCENARIOS_PASS_ID, enabled: true },
   ],
+
   scoring: {
     model: 'coverage',
-    violationPenalties: { critical: 35, high: 22, medium: 10, low: 4, info: 0 },
+
+    violationPenalties: {
+      critical: 35,
+      high: 22,
+      medium: 10,
+      low: 4,
+      info: 0,
+    },
+
     violationDecay: 0.7,
+
     // How much each dimension contributes to the overall score; sums to 1
     // (validateProfile enforces it). 3.3.0 deliberately reweights toward
     // explanation (0.09 → 0.17, now second only to scalability) at the expense
@@ -65,22 +80,33 @@ export const DEFAULT_PROFILE: EvalProfile = {
       reliability: 0.142,
       scalability: 0.1825,
       performance: 0.1115,
+
       data: 0.1115,
       messaging: 0.071,
       security: 0.071,
+
       hygiene: 0.0405,
       explanation: 0.17,
       product: 0.1,
     },
-    gradeBands: { A: 92, B: 82, C: 68, D: 50 },
+
+    gradeBands: {
+      A: 92,
+      B: 82,
+      C: 68,
+      D: 50,
+    },
+
     gradeCaps: [
       { severity: 'critical', atLeast: 1, maxGrade: 'C' },
       { severity: 'critical', atLeast: 2, maxGrade: 'D' },
     ],
+
     // No top grade over a design its author never explained: a missing or
     // insubstantial walkthrough (exp.nar.present unmet) caps the letter at C,
     // the deterministic teeth behind "the narrative is required".
     expectationGradeCaps: [{ whenExpectationUnmet: 'exp.nar.present', maxGrade: 'C' }],
+
     // Grounded critic/evaluator evidence subtracts, bounded and weakness-only:
     // a single graded weakness is worth at most 8 points (scaled by its level
     // and confidence, decayed as they stack), and any one dimension loses at
@@ -88,7 +114,12 @@ export const DEFAULT_PROFILE: EvalProfile = {
     // dimension it grounds a real gap in, but never dominate it or reach a
     // letter cap. On the deterministic stack no graded evidence exists, so this
     // block contributes exactly 0 and every calibration pin is byte-identical.
-    gradedEvidence: { maxPointsPerItem: 8, maxPenaltyPerDimension: 20, decay: 0.7 },
+    gradedEvidence: {
+      maxPointsPerItem: 8,
+      maxPenaltyPerDimension: 20,
+      decay: 0.7,
+    },
+
     suppressions: [
       { ruleId: 'reliability.single-db-no-replica', whenExpectationUnmet: 'exp.fst.db-failover' },
       {

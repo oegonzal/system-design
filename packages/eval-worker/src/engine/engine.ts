@@ -26,6 +26,7 @@ export function runEngine(
   const rulesOptions = DEFAULT_PROFILE.passes.find(
     (config) => config.pass === RULES_PASS_ID,
   )?.options;
+
   const rules = runRules({
     graph,
     facts,
@@ -35,6 +36,7 @@ export function runEngine(
     narration,
     options: rulesOptions,
   });
+
   const [coverage, expectationFindings] = runExpectations({
     graph,
     facts,
@@ -43,7 +45,9 @@ export function runEngine(
     brief,
     narration,
   });
+
   const result = aggregate([rules, coverage, expectationFindings], DEFAULT_PROFILE);
+
   return {
     findings: result.findings,
     dimensionScores: result.dimensionScores,

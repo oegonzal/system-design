@@ -197,6 +197,7 @@ export const NODE_KINDS = [
    */
   'payment-provider',
 ] as const;
+
 export type NodeKind = (typeof NODE_KINDS)[number];
 
 /**
@@ -222,6 +223,7 @@ export const NODE_KIND_CATEGORIES = [
   { id: 'observability', label: 'Observability' },
   { id: 'external', label: 'External & SaaS' },
 ] as const;
+
 export type NodeKindCategoryId = (typeof NODE_KIND_CATEGORIES)[number]['id'];
 
 /**

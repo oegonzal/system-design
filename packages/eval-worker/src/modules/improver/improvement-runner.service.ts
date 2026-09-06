@@ -91,6 +91,7 @@ export class ImprovementRunnerService {
 
       const prompt = run.session.prompt;
       const facts = promptFactsFrom(prompt);
+
       const score = (design: Design): EngineResult =>
         runEngine(
           design.graph,

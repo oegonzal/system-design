@@ -50,6 +50,7 @@ function weaknessesToGraded(
       knownItems,
       knownNodes,
     );
+
     return {
       dimension: FACTOR_DIMENSION[weakness.factor],
       level: weakness.weakness,
@@ -154,6 +155,7 @@ export function createWorkabilityPass(): EvalPass {
         new Set(workflowItemIds(spec)),
         nodeIdSet(ctx.graph),
       );
+
       return [
         {
           passId: WORKABILITY_PASS_ID,
@@ -166,6 +168,7 @@ export function createWorkabilityPass(): EvalPass {
           summary: critique.summary.trim() || null,
           model: ctx.llm.model,
         },
+
         // The grounded shortfalls score; the axis above stays advisory display.
         ...(items.length > 0
           ? [
@@ -179,6 +182,7 @@ export function createWorkabilityPass(): EvalPass {
               },
             ]
           : []),
+
         ...(design.clipped
           ? [
               {

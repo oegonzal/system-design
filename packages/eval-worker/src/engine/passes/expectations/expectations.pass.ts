@@ -67,6 +67,7 @@ export function runExpectations(
     if (expectation.requiresBrief && !briefHasClaims(brief) && !expectation.appliesWithoutBrief) {
       continue;
     }
+
     if (
       expectation.requiresNarration &&
       !(narration?.present ?? false) &&
@@ -74,7 +75,9 @@ export function runExpectations(
     ) {
       continue;
     }
+
     if (!expectationApplies(expectation, input.facts)) continue;
+
     const ctx = expectation.requiresNarration
       ? narrationCtx
       : expectation.requiresBrief
@@ -95,7 +98,9 @@ export function runExpectations(
       evidenceNodeIds: check.evidenceNodeIds,
       evidenceEdgeIds: check.evidenceEdgeIds,
     });
+
     if (check.met) continue;
+
     findings.push({
       ruleId: null,
       expectationId: expectation.id,

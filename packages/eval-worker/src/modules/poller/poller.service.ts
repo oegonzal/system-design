@@ -31,7 +31,6 @@ export class PollerService implements OnModuleInit, OnModuleDestroy {
     10,
   );
   private readonly workerId = `eval-worker-${process.pid}`;
-
   private timer: NodeJS.Timeout | null = null;
   private stopped = false;
 

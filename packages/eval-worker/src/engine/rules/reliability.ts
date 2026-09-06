@@ -23,6 +23,7 @@ const singleDbNoReplica: EvalRule = {
     const ids = new SuggestedIds(index);
     for (const db of sortById(index.byKind('database'))) {
       if (replicasOf(db) > 1) continue;
+
       if (index.neighbors(db.id).some((neighbor) => neighbor.kind === 'replica')) continue;
       const replicaId = ids.next('replica');
       const suggestion: GraphPatch = {
@@ -425,11 +426,16 @@ const monitoringWithoutAlerting: EvalRule = {
   dimension: 'reliability',
   check({ facts, index }) {
     const blocks = sortById(index.byKind('monitoring'));
+
     if (blocks.length === 0) return [];
+
     // Only once there is enough traffic for nobody-is-watching to be a real risk.
     if (facts.scaleTargets.requestsPerSecond < 500) return [];
+
     const silent = blocks.filter((block) => block.config?.['alerting'] !== true);
+
     if (silent.length === 0) return [];
+
     return [
       {
         ruleId: monitoringWithoutAlerting.id,
@@ -451,11 +457,15 @@ const dlqUnmonitored: EvalRule = {
   nfrKind: 'observability',
   check({ facts, index }) {
     if (!facts.nfrKinds.includes('observability')) return [];
+
     if (index.hasKind('monitoring')) return [];
+
     const deadLettered = sortById(
       index.byKind('queue').filter((queue) => queue.config?.dlq === true),
     );
+
     if (deadLettered.length === 0) return [];
+
     return [
       {
         ruleId: dlqUnmonitored.id,
@@ -485,8 +495,11 @@ const noTracingManyServices: EvalRule = {
   dimension: 'reliability',
   check({ index }) {
     if (index.hasKind('tracing')) return [];
+
     const compute = sortById(COMPUTE_KINDS.flatMap((kind) => index.byKind(kind)));
+
     if (compute.length < 5) return [];
+
     return [
       {
         ruleId: noTracingManyServices.id,

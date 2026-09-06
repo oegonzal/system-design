@@ -22,5 +22,6 @@ export function createPassRegistry(): ReadonlyMap<string, EvalPass> {
     createWorkabilityPass(),
     createScenariosPass(),
   ];
+
   return new Map(passes.map((pass) => [pass.id, pass]));
 }

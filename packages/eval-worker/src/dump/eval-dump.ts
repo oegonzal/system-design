@@ -139,12 +139,14 @@ export function startEvalDump(options: {
 
   return {
     state,
+
     record(call) {
       const scope = openPass ?? 'unscoped';
       const ordinal = (ordinals.get(scope) ?? 0) + 1;
       ordinals.set(scope, ordinal);
       state.exchanges.push({ ...call, scope, ordinal });
     },
+
     passes: {
       beginPass(passId, mode, passOptions) {
         openPass = passId;
@@ -157,6 +159,7 @@ export function startEvalDump(options: {
           rejected: [],
         });
       },
+
       endPass(passId, produced, durationMs) {
         const record = state.passes.find((candidate) => candidate.passId === passId);
         openPass = null;
@@ -171,19 +174,23 @@ export function startEvalDump(options: {
             : [];
       },
     },
+
     inputs(inputs) {
       state.inputs = inputs;
       state.phase = 'evaluating';
     },
+
     outcome({ artifacts, result }) {
       state.artifacts = artifacts;
       state.result = result;
       state.phase = 'persisting';
     },
+
     persisted(persisted) {
       state.persisted = persisted;
       state.phase = 'complete';
     },
+
     failed(error) {
       state.error = describeError(error);
     },
