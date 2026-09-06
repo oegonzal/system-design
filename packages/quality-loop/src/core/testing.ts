@@ -1,0 +1,244 @@
+/**
+ * Builders the specs share. Pure helpers only — no vitest imports, so this
+ * file compiles under the app tsconfig even though only specs use it. The
+ * `tinyPipeline` is also the standing proof that the core assumes nothing
+ * about system design.
+ */
+import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
+import { z } from 'zod';
+
+import type {
+  Criterion,
+  CriticReport,
+  EvaluationReport,
+  EvidenceLedger,
+  LensOutcome,
+  RawCriterionResult,
+  RawFinding,
+} from './contracts';
+import type { PipelineDefinition } from './pipeline';
+import type { DecisionPolicy } from './policy';
+import type { Critic, Evaluator, Producer } from './ports';
+
+/**
+ * A model that answers by SCHEMA: the first canned object that satisfies the
+ * request's schema is the reply. Stage schemas are strict, so canned answers
+ * for different stages never cross-match. Recordable, so attribution specs
+ * see real exchanges.
+ */
+export function fakeLlm(...canned: readonly unknown[]): LlmClient & LlmRecordable {
+  const build = (sink: LlmCallSink | null): LlmClient & LlmRecordable => ({
+    enabled: true,
+    model: 'test-model',
+    async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+      const hit = canned
+        .map((candidate) => request.schema.safeParse(candidate))
+        .find((r) => r.success);
+      const response = hit?.success ? hit.data : null;
+      sink?.({
+        model: 'test-model',
+        system: request.system,
+        user: request.user,
+        schema: z.toJSONSchema(request.schema),
+        maxTokens: request.maxTokens ?? 0,
+        startedAt: '1970-01-01T00:00:00.000Z',
+        durationMs: 0,
+        outcome: response === null ? 'schema-miss' : 'ok',
+        stopReason: null,
+        usage: null,
+        requestId: null,
+        text: null,
+        response,
+        error: null,
+      });
+      return response;
+    },
+    withRecorder: (next) => build(next),
+  });
+  return build(null);
+}
+
+export const disabledLlm = (): LlmClient => ({
+  enabled: false,
+  model: null,
+  completeStructured: () => Promise.resolve(null),
+});
+
+// ---- the tiny task ----------------------------------------------------------
+
+export const tinyOutputSchema = z.strictObject({ text: z.string(), parts: z.array(z.string()) });
+export type TinyOutput = z.infer<typeof tinyOutputSchema>;
+
+export const tinyPolicy = (): DecisionPolicy => ({
+  version: 'test',
+  dimensionWeights: { substance: 0.6, form: 0.4 },
+  criterionKinds: {
+    must: { dimension: 'substance', weight: 1, gate: false },
+    nice: { dimension: 'form', weight: 1, gate: false },
+  },
+  findingTypes: {
+    gap: { dimension: 'substance', gate: false },
+    wrong: { dimension: 'form', gate: false },
+  },
+  resultValues: { pass: 1, partial: 0.5, fail: 0 },
+  confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
+  penalties: {
+    bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
+    decay: 0.7,
+    maxPerDimension: 60,
+  },
+  blockingSeverities: ['critical'],
+  evidence: { minHits: 1, minAssessedShare: 0.75 },
+  thresholds: { acceptAt: 80, rejectBelow: 35 },
+  loop: { maxIterations: 3, plateauAfter: 2, concurrency: 2 },
+});
+
+export function tinyPipeline(
+  overrides: Partial<PipelineDefinition<TinyOutput>> = {},
+): PipelineDefinition<TinyOutput> {
+  return {
+    id: 'tiny',
+    version: '0.0.1',
+    description: 'A two-field artifact for specs.',
+    task: {
+      criterionKinds: {
+        must: 'Something the goal requires.',
+        nice: 'Something the goal would like.',
+      },
+      findingTypes: { gap: 'Something required is missing.', wrong: 'Something stated is wrong.' },
+      maxCriteria: 6,
+      output: {
+        schema: tinyOutputSchema,
+        locate: (output) => [
+          { id: 'text', label: 'Text' },
+          ...output.parts.map((part, index) => ({ id: `part.${index + 1}`, label: part })),
+        ],
+        render: (output) =>
+          [
+            `[text] ${output.text}`,
+            ...output.parts.map((part, index) => `[part.${index + 1}] ${part}`),
+          ].join('\n'),
+      },
+    },
+    deriveCriteria: { persona: 'You extract requirements.', maxTokens: 500 },
+    producer: { persona: 'You write two-field artifacts.', maxTokens: 500 },
+    validators: [],
+    critics: [
+      { id: 'critic.tiny', persona: 'You find gaps.', samples: 1, maxItems: 4, maxTokens: 500 },
+    ],
+    evaluators: [
+      {
+        id: 'evaluator.tiny',
+        persona: 'You judge criteria.',
+        samples: 1,
+        maxItems: 8,
+        maxTokens: 500,
+        criterionKinds: ['must', 'nice'],
+      },
+    ],
+    policy: tinyPolicy(),
+    ...overrides,
+  };
+}
+
+export const criterion = (id: string, kind = 'must', statement = `criterion ${id}`): Criterion => ({
+  id,
+  kind,
+  statement,
+});
+
+export const finding = (overrides: Partial<RawFinding> = {}): RawFinding => ({
+  type: 'gap',
+  severity: 'medium',
+  confidence: 'high',
+  fixability: 'fixable_local',
+  locationRefs: ['text'],
+  criterionIds: [],
+  rationale: 'something is missing',
+  ...overrides,
+});
+
+export const result = (overrides: Partial<RawCriterionResult> = {}): RawCriterionResult => ({
+  criterionId: 'c1',
+  result: 'pass',
+  confidence: 'high',
+  locationRefs: ['text'],
+  rationale: 'it is there',
+  ...overrides,
+});
+
+export const reported = <R>(report: R): LensOutcome<R> => ({ report, diagnostic: null });
+
+// ---- scripted stages ---------------------------------------------------------
+
+export const scriptedProducer = (outputs: readonly (TinyOutput | null)[]): Producer<TinyOutput> => {
+  let call = 0;
+  return {
+    enabled: true,
+    produce: () => {
+      const output = outputs[Math.min(call++, outputs.length - 1)] ?? null;
+      return Promise.resolve({
+        output,
+        diagnostic:
+          output === null
+            ? { stage: 'producer', sample: null, reason: 'llm-failed', detail: null }
+            : null,
+        model: 'scripted',
+      });
+    },
+  };
+};
+
+/** One report per sample per iteration: `perIteration[i][sample]`. */
+export const scriptedCritic = (
+  id: string,
+  perIteration: readonly (readonly RawFinding[][])[],
+): Critic<TinyOutput> => {
+  let call = 0;
+  return {
+    id,
+    run: () => {
+      const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
+      return Promise.resolve(
+        samples.map((findings, index) =>
+          reported<CriticReport>({ criticId: id, sample: index + 1, findings: [...findings] }),
+        ),
+      );
+    },
+  };
+};
+
+export const scriptedEvaluator = (
+  id: string,
+  perIteration: readonly (readonly RawCriterionResult[][])[],
+  advisoryVerdict: EvaluationReport['advisoryVerdict'] = null,
+): Evaluator<TinyOutput> => {
+  let call = 0;
+  return {
+    id,
+    run: () => {
+      const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
+      return Promise.resolve(
+        samples.map((results, index) =>
+          reported<EvaluationReport>({
+            evaluatorId: id,
+            sample: index + 1,
+            results: [...results],
+            advisoryVerdict,
+          }),
+        ),
+      );
+    },
+  };
+};
+
+/** A ledger with sensible defaults, for `decide` specs. */
+export const ledger = (overrides: Partial<EvidenceLedger> = {}): EvidenceLedger => ({
+  artifactPresent: true,
+  validation: [{ validatorId: 'schema', gate: 'block', problems: [] }],
+  criteria: [],
+  findings: [],
+  discarded: [],
+  diagnostics: [],
+  ...overrides,
+});

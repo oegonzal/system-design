@@ -46,59 +46,81 @@ export function createEvalLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmC
 }
 
 /**
- * The improver (AI coach) reads its own determinism switch,
- * `IMPROVER_DETERMINISTIC`, falling back to `EVAL_DETERMINISTIC`. The
- * distinction exists because the two flags protect different things:
- * `EVAL_DETERMINISTIC` keeps GRADING byte-reproducible, while the improver
- * only PROPOSES — every proposal is re-scored by the deterministic engine, so
- * a live improver never touches a grade. A dev stack can therefore run
- * `EVAL_DETERMINISTIC=1 IMPROVER_DETERMINISTIC=0` and get deterministic
- * grades with a live coach; CI and e2e set neither override and stay fully
+ * A model-consuming ROLE that only proposes or judges — never grades — gets its
+ * own determinism switch (falling back to `EVAL_DETERMINISTIC`) and its own
+ * subscription opt-in. `EVAL_DETERMINISTIC` protects GRADING reproducibility;
+ * a role whose every output is re-scored or re-decided by deterministic code
+ * can go live without touching a grade, so a dev stack can run
+ * `EVAL_DETERMINISTIC=1 IMPROVER_DETERMINISTIC=0` and get deterministic grades
+ * with a live coach. CI and e2e set neither override and stay fully
  * deterministic.
  */
-const improverEnv = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
+export interface LlmRole {
+  /** The role's determinism switch; `EVAL_DETERMINISTIC` applies when unset. */
+  deterministicVar: string;
+  /** The role's auth opt-in: `claude-code` routes through the Agent SDK. */
+  authVar: string;
+}
+
+/** The improver (AI coach). */
+export const IMPROVER_ROLE: LlmRole = {
+  deterministicVar: 'IMPROVER_DETERMINISTIC',
+  authVar: 'IMPROVER_AUTH',
+};
+
+/** The quality loop's producer and lenses. */
+export const QUALITY_LOOP_ROLE: LlmRole = {
+  deterministicVar: 'QUALITY_LOOP_DETERMINISTIC',
+  authVar: 'QUALITY_LOOP_AUTH',
+};
+
+const roleEnv = (env: NodeJS.ProcessEnv, role: LlmRole): NodeJS.ProcessEnv => ({
   ...env,
-  EVAL_DETERMINISTIC: env['IMPROVER_DETERMINISTIC'] ?? env['EVAL_DETERMINISTIC'],
+  EVAL_DETERMINISTIC: env[role.deterministicVar] ?? env['EVAL_DETERMINISTIC'],
 });
 
 /**
- * The improver's second auth route: `IMPROVER_AUTH=claude-code` runs coach
- * calls through the machine's Claude Code login (a Claude subscription) via
- * the Agent SDK — no API key required, none ever read. An explicit API key
- * still wins when both are configured, and determinism outranks everything.
+ * The role's client. Determinism outranks everything; an explicit API key wins
+ * over the subscription route; `<authVar>=claude-code` runs the role through
+ * this machine's Claude Code login via the Agent SDK — no API key required,
+ * none ever read.
  */
-export function createImproverLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  const derived = improverEnv(env);
+export function createRoleLlmFromEnv(
+  role: LlmRole,
+  env: NodeJS.ProcessEnv = process.env,
+): LlmClient {
+  const derived = roleEnv(env, role);
   if (derived['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
   if (derived['ANTHROPIC_API_KEY']) return createLlmClientFromEnv(derived);
-  if (derived['IMPROVER_AUTH'] === 'claude-code') {
+  if (derived[role.authVar] === 'claude-code') {
     return new ClaudeAgentLlmClient({ model: derived['LLM_MODEL'] || undefined });
   }
   return new NoopLlmClient();
 }
 
-export interface ImproverAvailability {
+export interface LlmAvailability {
   enabled: boolean;
   model: string | null;
   reason: 'deterministic' | 'no-key' | null;
 }
 
 /**
- * Derived facts only — never the key. Answers "would `createImproverLlmFromEnv`
- * yield a live client, and why not" without constructing one, so the API can
+ * Derived facts only — never the key. Answers "would the role's factory yield
+ * a live client, and why not" without constructing one, so a service can
  * report availability per request.
  */
-export function improverAvailabilityFromEnv(
+export function roleAvailabilityFromEnv(
+  role: LlmRole,
   env: NodeJS.ProcessEnv = process.env,
-): ImproverAvailability {
-  const derived = improverEnv(env);
+): LlmAvailability {
+  const derived = roleEnv(env, role);
   if (derived['EVAL_DETERMINISTIC'] === '1') {
     return { enabled: false, model: null, reason: 'deterministic' };
   }
   if (derived['ANTHROPIC_API_KEY']) {
     return { enabled: true, model: derived['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
   }
-  if (derived['IMPROVER_AUTH'] === 'claude-code') {
+  if (derived[role.authVar] === 'claude-code') {
     return {
       enabled: true,
       model: derived['LLM_MODEL'] || 'claude-code/subscription',
@@ -107,3 +129,17 @@ export function improverAvailabilityFromEnv(
   }
   return { enabled: false, model: null, reason: 'no-key' };
 }
+
+export const createImproverLlmFromEnv = (env: NodeJS.ProcessEnv = process.env): LlmClient =>
+  createRoleLlmFromEnv(IMPROVER_ROLE, env);
+
+export const improverAvailabilityFromEnv = (
+  env: NodeJS.ProcessEnv = process.env,
+): LlmAvailability => roleAvailabilityFromEnv(IMPROVER_ROLE, env);
+
+export const createQualityLoopLlmFromEnv = (env: NodeJS.ProcessEnv = process.env): LlmClient =>
+  createRoleLlmFromEnv(QUALITY_LOOP_ROLE, env);
+
+export const qualityLoopAvailabilityFromEnv = (
+  env: NodeJS.ProcessEnv = process.env,
+): LlmAvailability => roleAvailabilityFromEnv(QUALITY_LOOP_ROLE, env);

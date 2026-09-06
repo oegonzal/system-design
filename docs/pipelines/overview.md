@@ -332,3 +332,7 @@ Notes, not fixes. None affects behaviour.
   one-binding brief, which the doc does not mention. A gap, not an error.
 - how-it-works §4's known wrinkle still holds: when the critic ran, its prose
   summary is stored as the evaluation summary. The numbers are the engine's.
+
+## A sixth, standalone family: the quality loop
+
+`packages/quality-loop` runs the generic doctrine from `docs/pipeline-best-practices/overview.md` over any task declared as data, starting with a system-design prompt held in a markdown file. It shares `@sysdesign/llm` (its own role: `QUALITY_LOOP_DETERMINISTIC` / `QUALITY_LOOP_AUTH`) and `@sysdesign/run-dump` (kind `quality`) with the five pipelines above, touches none of them, and has no database: the dump is its record. See [pipeline-best-practices/quality-loop.md](../pipeline-best-practices/quality-loop.md).

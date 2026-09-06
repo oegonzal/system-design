@@ -35,6 +35,10 @@ anything the map already generates is deliberately absent, because a second copy
 - `studio-api` — the NestJS API: DTO validation, services, the response envelope.
 - `eval-worker` — the NestJS worker: polls eval jobs, runs the deterministic engine, then the
   critics, and writes findings back.
+- `quality-loop` — the generic quality-control loop as a NestJS starter: a pipeline is data (task
+  vocabulary, md lens personas, a decision policy); producer → deterministic validators → critic
+  and evaluator lenses → evidence normalizer → deterministic policy, and every run writes a dump.
+  Lenses return enums and ordinals only; the policy owns every number and the final decision.
 - `storybook` — the catalog host. It owns no stories; it globs the two projects that do.
 - `studio-e2e` — Playwright, driving a real browser against the real API.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it

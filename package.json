@@ -12,6 +12,8 @@
     "studio-ui:serve": "nx run studio-ui:serve",
     "studio-api:serve": "nx run studio-api:serve",
     "eval-worker:serve": "nx run eval-worker:serve",
+    "quality-loop:serve": "nx run quality-loop:serve",
+    "quality-loop:run": "nx build quality-loop && node packages/quality-loop/dist/main.js run",
     "start": "concurrently --kill-others \"pnpm studio-api:serve\" \"pnpm eval-worker:serve\" \"pnpm studio-ui:serve\"",
     "stack:up": "bash scripts/stack.sh up",
     "stack:down": "bash scripts/stack.sh down",

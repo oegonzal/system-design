@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { AnthropicLlmClient } from './anthropic-client';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
-import { createEvalLlmFromEnv, createLlmClientFromEnv } from './create-client';
+import {
+  createEvalLlmFromEnv,
+  createImproverLlmFromEnv,
+  createLlmClientFromEnv,
+  createQualityLoopLlmFromEnv,
+  qualityLoopAvailabilityFromEnv,
+} from './create-client';
 import { NoopLlmClient } from './noop-client';
 
 describe('createLlmClientFromEnv', () => {
@@ -69,5 +75,62 @@ describe('createEvalLlmFromEnv', () => {
 
   it('no key and no opt-in stays no-op — the default, byte-identical to before', () => {
     expect(createEvalLlmFromEnv({})).toBeInstanceOf(NoopLlmClient);
+  });
+});
+
+describe('role factories', () => {
+  it('the improver falls back to EVAL_DETERMINISTIC and overrides it with its own switch', () => {
+    expect(
+      createImproverLlmFromEnv({ EVAL_DETERMINISTIC: '1', IMPROVER_AUTH: 'claude-code' }),
+    ).toBeInstanceOf(NoopLlmClient);
+    expect(
+      createImproverLlmFromEnv({
+        EVAL_DETERMINISTIC: '1',
+        IMPROVER_DETERMINISTIC: '0',
+        IMPROVER_AUTH: 'claude-code',
+      }),
+    ).toBeInstanceOf(ClaudeAgentLlmClient);
+  });
+
+  it("the quality loop reads its own switch and auth route, never the improver's", () => {
+    expect(
+      createQualityLoopLlmFromEnv({ EVAL_DETERMINISTIC: '1', QUALITY_LOOP_AUTH: 'claude-code' }),
+    ).toBeInstanceOf(NoopLlmClient);
+    expect(
+      createQualityLoopLlmFromEnv({
+        EVAL_DETERMINISTIC: '1',
+        QUALITY_LOOP_DETERMINISTIC: '0',
+        QUALITY_LOOP_AUTH: 'claude-code',
+      }),
+    ).toBeInstanceOf(ClaudeAgentLlmClient);
+    expect(
+      createQualityLoopLlmFromEnv({ IMPROVER_DETERMINISTIC: '0', IMPROVER_AUTH: 'claude-code' }),
+    ).toBeInstanceOf(NoopLlmClient);
+  });
+
+  it("a key outranks the quality loop's claude-code route", () => {
+    const client = createQualityLoopLlmFromEnv({
+      ANTHROPIC_API_KEY: 'sk-test',
+      QUALITY_LOOP_AUTH: 'claude-code',
+    });
+    expect(client).toBeInstanceOf(AnthropicLlmClient);
+  });
+
+  it('availability reports the reason the model is off, never the key', () => {
+    expect(qualityLoopAvailabilityFromEnv({})).toEqual({
+      enabled: false,
+      model: null,
+      reason: 'no-key',
+    });
+    expect(qualityLoopAvailabilityFromEnv({ QUALITY_LOOP_DETERMINISTIC: '1' })).toEqual({
+      enabled: false,
+      model: null,
+      reason: 'deterministic',
+    });
+    expect(qualityLoopAvailabilityFromEnv({ QUALITY_LOOP_AUTH: 'claude-code' })).toEqual({
+      enabled: true,
+      model: 'claude-code/subscription',
+      reason: null,
+    });
   });
 });

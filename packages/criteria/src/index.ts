@@ -207,6 +207,57 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The workability axis reports ordinal factor evaluations with rationales and never moves the deterministic score.',
   },
+  // Quality-control loop (packages/quality-loop)
+  {
+    id: 'QL-1',
+    statement:
+      'A quality-loop pipeline is declared as data — task vocabulary, md lens personas, lens specs and a decision policy — and validated before any run, so a malformed pipeline never runs.',
+  },
+  {
+    id: 'QL-2',
+    statement:
+      'Success criteria are derived from the goal text by one structured extraction with engine-assigned ids; the goal reaches only prompts, never scoring code.',
+  },
+  {
+    id: 'QL-3',
+    statement:
+      'Deterministic validators run before any model; a blocking failure skips every lens and yields retry.',
+  },
+  {
+    id: 'QL-4',
+    statement:
+      'Lens outputs are schema-bound with refs enum-locked to real criterion and location ids; an inadmissible type or ref is dropped before scoring and traced.',
+  },
+  {
+    id: 'QL-5',
+    statement:
+      'Multi-sample agreement confirms an item at or above minHits with lower-middle-median ordinals, discards and traces the rest, and a finding reconciled to a failed or partial criterion is never priced twice.',
+  },
+  {
+    id: 'QL-6',
+    statement:
+      "Every number in a quality-loop decision comes from the policy: weighted criteria results form each dimension's base, confirmed findings subtract priced, decayed, clamped penalties, unassessed dimensions renormalise out, and the trace reproduces every figure.",
+  },
+  {
+    id: 'QL-7',
+    statement:
+      "An evaluator's advisory verdict is recorded in the trace and structurally unreadable by the policy: the evidence ledger carries no prose, and flipping every verdict leaves the decision byte-identical.",
+  },
+  {
+    id: 'QL-8',
+    statement:
+      'Gates and routing are ordered and deterministic — artifact, validators, evidence, blockers, accept threshold, reject floor, fixability route — each step traced, and a blocking finding never accepts.',
+  },
+  {
+    id: 'QL-9',
+    statement:
+      'The loop revises or retries with the selected remediations, keeps the best artifact by a strict-better gate, stops with an explicit reason, and without a live model escalates honestly with llm-disabled diagnostics and no invented number.',
+  },
+  {
+    id: 'QL-10',
+    statement:
+      'Every quality-loop run writes a dump — goal verbatim, contract, pipeline summary, per-iteration evidence and decision, every exchange attributed by stage and sample under concurrent lenses, lessons — on the failure path too; the HTTP surface validates with zod and lists its pipelines.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

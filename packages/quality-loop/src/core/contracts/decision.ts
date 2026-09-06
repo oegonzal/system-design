@@ -1,0 +1,152 @@
+import type { LlmAvailability, LlmExchange } from '@sysdesign/llm';
+import type { ErrorShape, GitContext } from '@sysdesign/run-dump';
+
+import type {
+  CriticReport,
+  EvaluationReport,
+  EvidenceLedger,
+  EvidenceResult,
+  LensOutcome,
+  ValidationReport,
+} from './evidence';
+import type { Criterion, Location } from './task';
+import type { AxisFactorLevel, Decision, ProduceMode, Severity, StopReason } from './vocab';
+
+/** What the producer is asked to act on. Chosen by the policy from the ledger. */
+export interface Remediation {
+  subject: { finding: string } | { criterion: string } | { validator: string };
+  action: 'revise' | 'retry';
+  severity: Severity;
+  targetRefs: string[];
+}
+
+/** A remediation with the lens's own words attached — hydrated by the runner, never by the policy. */
+export interface RemediationNote extends Remediation {
+  note: string;
+}
+
+export interface Gates {
+  artifactPresent: boolean;
+  validatorsPassed: boolean;
+  evidenceSufficient: boolean;
+  policyAllowed: boolean;
+}
+
+export interface PenaltyTrace {
+  key: string;
+  /** 0-based; the multiplier applied was `decay ** position`. */
+  position: number;
+  severity: Severity;
+  confidence: AxisFactorLevel;
+  listPoints: number;
+  decayed: number;
+  /** What it actually subtracted after the per-dimension clamp. */
+  points: number;
+}
+
+export interface CriterionTrace {
+  criterionId: string;
+  kind: string;
+  weight: number;
+  result: EvidenceResult;
+  value: number | null;
+}
+
+export interface DimensionTrace {
+  dimension: string;
+  weight: number | null;
+  criteria: CriterionTrace[];
+  base: number | null;
+  penalties: PenaltyTrace[];
+  penaltyTotal: number;
+  clampScale: number;
+  score: number | null;
+}
+
+export const DECISION_FACTORS = [
+  'scores',
+  'artifact',
+  'validators',
+  'evidence',
+  'policy-allowed',
+  'accept-threshold',
+  'reject-floor',
+  'route',
+] as const;
+export type DecisionFactor = (typeof DECISION_FACTORS)[number];
+
+export interface DecisionStep {
+  order: number;
+  factor: DecisionFactor;
+  outcome: 'computed' | 'passed' | 'decided' | 'skipped';
+  detail: string;
+}
+
+export interface DecisionTrace {
+  steps: DecisionStep[];
+  dimensions: DimensionTrace[];
+  weightSum: number;
+  weightedTotal: number;
+}
+
+export interface QualityControlDecision {
+  finalDecision: Decision;
+  gates: Gates;
+  scores: { dimensions: Record<string, number | null>; overall: number };
+  selectedRemediations: Remediation[];
+  reason: string;
+  trace: DecisionTrace;
+}
+
+export interface IterationTrace<T> {
+  iteration: number;
+  mode: ProduceMode | 'provided';
+  artifact: T | null;
+  locations: Location[];
+  validation: ValidationReport[];
+  critics: LensOutcome<CriticReport>[];
+  evaluators: LensOutcome<EvaluationReport>[];
+  ledger: EvidenceLedger;
+  decision: QualityControlDecision;
+  remediations: RemediationNote[];
+  durationMs: number;
+}
+
+export interface Lesson {
+  kind: 'persisted' | 'resolved' | 'improved' | 'regressed';
+  subject: string;
+  iterations: number[];
+  detail: string;
+}
+
+export interface RunTrace<T> {
+  pipeline: { id: string; version: string };
+  contract: { goal: string; criteria: readonly Criterion[] };
+  iterations: IterationTrace<T>[];
+  bestIteration: number;
+  finalDecision: Decision;
+  stopReason: StopReason;
+  lessons: Lesson[];
+}
+
+export interface RunRequest {
+  pipeline: string;
+  goal: string;
+  output?: unknown;
+  maxIterations?: number;
+}
+
+/** One run, as the API reports it and the dump stores it. */
+export interface RunRecord {
+  runId: string;
+  pipeline: string;
+  status: 'running' | 'complete' | 'failed';
+  startedAt: string;
+  finishedAt: string | null;
+  llm: LlmAvailability;
+  git: GitContext;
+  request: { goal: string; outputProvided: boolean; maxIterations: number };
+  trace: RunTrace<unknown> | null;
+  exchanges: LlmExchange[];
+  error: ErrorShape | null;
+}

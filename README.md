@@ -76,6 +76,8 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/design-system` | Emotion tokens → semantic roles → 14 primitives, contrast-asserted         |
 | `packages/studio-api`    | NestJS REST API: prompts, sessions, revisions, evaluations, stories        |
 | `packages/eval-worker`   | Postgres-queue poller + rules engine + LLM critic                          |
+| `packages/run-dump`      | Run-folder plumbing every pipeline dumps through (`static/runs`)           |
+| `packages/quality-loop`  | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI    |
 | `packages/studio-ui`     | Next.js app: canvas workspace, feedback loop, STAR repository              |
 | `packages/storybook`     | Catalog host globbing sibling stories                                      |
 | `packages/studio-e2e`    | Playwright: requirement specs + the full practice-loop journey             |
@@ -104,6 +106,7 @@ pnpm db:migrate:check                                      # entities vs migrati
 pnpm exec nx run studio-e2e:e2e                            # end-to-end (servers auto-start)
 pnpm review:code --staged --profile=quick                  # what the pre-commit hook runs
 pnpm test:stories                                          # render every story, both modes
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/samples/order-history.prompt.md
 ```
 
 Git hooks live in `.githooks` (activated by `pnpm install` via the `prepare`

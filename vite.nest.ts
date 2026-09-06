@@ -12,6 +12,10 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
  */
 export const NEST_EXTERNALS = [
   /^@nestjs\//,
+  // The Anthropic SDKs stay external: the Agent SDK locates its native CLI
+  // binary (an optional platform package) relative to its own installed path,
+  // which an inlined copy under dist/ cannot do.
+  /^@anthropic-ai\//,
   /^@mikro-orm\//,
   'reflect-metadata',
   'rxjs',

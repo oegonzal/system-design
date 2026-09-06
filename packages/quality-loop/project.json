@@ -1,0 +1,30 @@
+{
+  "name": "quality-loop",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/quality-loop/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "targets": {
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "quality-loop:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": { "buildTarget": "quality-loop:build:development" },
+        "production": { "buildTarget": "quality-loop:build:production" }
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/quality-loop",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

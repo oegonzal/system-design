@@ -1,0 +1,55 @@
+/**
+ * The task contract's criteria come from the goal itself: one structured
+ * extraction, classified into the pipeline's kinds. Ids are assigned here,
+ * positionally, so the model never authors an identifier and the policy can
+ * price a kind without trusting a name.
+ */
+import type { LlmClient } from '@sysdesign/llm';
+
+import type { TaskSpec } from '../contracts';
+import type { ProducerSpec } from '../pipeline';
+import type { CriteriaDeriver } from '../ports';
+import { goalSection, joinSections, kindsSection, systemPrompt } from '../prompting';
+import { criteriaSchema, enumTuple } from '../schemas';
+import { CRITERIA_STAGE, diagnostic } from './shared';
+
+export function createCriteriaDeriver<T>(
+  task: TaskSpec<T>,
+  spec: ProducerSpec,
+  llm: LlmClient,
+): CriteriaDeriver {
+  return async (goal) => {
+    if (!llm.enabled) {
+      return { criteria: null, diagnostic: diagnostic(CRITERIA_STAGE, null, 'llm-disabled') };
+    }
+    const kinds = enumTuple(Object.keys(task.criterionKinds));
+    if (!kinds) {
+      return {
+        criteria: null,
+        diagnostic: diagnostic(CRITERIA_STAGE, null, 'not-applicable', 'no criterion kinds'),
+      };
+    }
+
+    const goalText = goalSection(goal);
+    const response = await llm.completeStructured({
+      system: systemPrompt('criteria', spec.persona),
+      user: joinSections(kindsSection(task.criterionKinds), goalText.text),
+      schema: criteriaSchema(kinds, task.maxCriteria),
+      maxTokens: spec.maxTokens,
+    });
+    if (response === null) {
+      return { criteria: null, diagnostic: diagnostic(CRITERIA_STAGE, null, 'llm-failed') };
+    }
+
+    return {
+      criteria: response.criteria.slice(0, task.maxCriteria).map((item, index) => ({
+        id: `c${index + 1}`,
+        kind: item.kind,
+        statement: item.statement.trim(),
+      })),
+      diagnostic: goalText.clipped
+        ? diagnostic(CRITERIA_STAGE, null, 'token-clipped', 'goal exceeded the prompt budget')
+        : null,
+    };
+  };
+}
