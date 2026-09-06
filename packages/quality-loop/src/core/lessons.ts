@@ -3,7 +3,7 @@
  * resolved, which criteria improved and which regressed. Derived from the
  * iteration history alone, so a dump can be re-read into lessons later.
  */
-import type { IterationTrace, Lesson } from './contracts';
+import type { IterationTrace, Lesson } from '@sysdesign/contracts';
 import { RESULT_WORST_FIRST } from './ordering';
 
 const judged = <T>(iteration: IterationTrace<T>): boolean =>

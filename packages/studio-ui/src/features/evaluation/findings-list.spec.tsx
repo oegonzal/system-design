@@ -1,9 +1,9 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { makeFinding } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { FindingsList } from './findings-list';
 
 const findings = [

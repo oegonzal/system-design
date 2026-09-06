@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EvaluationReport } from './contracts';
+import type { EvaluationReport } from '@sysdesign/contracts';
 import { decide } from './decide';
 import { findingKey, normalize, type NormalizeInput } from './normalize';
 import {

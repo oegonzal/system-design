@@ -4,11 +4,11 @@ import { Button, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/desi
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { api, ApiError, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
-import { useLatestRequest } from '../../hooks/use-latest-request';
 import { PromptPane } from './prompt-pane';
 import { AUTHORED_GENERATOR_VERSION, type PromptDto } from '@sysdesign/contracts';
+import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 
 export interface PromptDetailProps {
   promptId: string;

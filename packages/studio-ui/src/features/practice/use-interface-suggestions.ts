@@ -1,11 +1,11 @@
 'use client';
 
 import { narrationToProse } from '@sysdesign/contracts';
+import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import { useCallback, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import { useCanvasStoreApi } from '../canvas/canvas-store-context';
-import { useLatestRequest } from '../../hooks/use-latest-request';
 
 export interface InterfaceSuggestionsState {
   /** True while a request is in flight. */

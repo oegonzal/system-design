@@ -13,7 +13,7 @@ import type {
   ExperienceProfileDto,
   GeneratePromptRequest,
   ImprovementRunDto,
-  ImproverAvailabilityDto,
+  LlmAvailabilityDto,
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
@@ -25,114 +25,18 @@ import type {
   UpdatePromptRequest,
   UpdateSessionRequest,
 } from '@sysdesign/contracts';
+import { createRequest, query, unwrap, type GetOptions } from '@sysdesign/web-kit';
 
 /**
  * The one HTTP boundary. Components never call `fetch`; they call these
  * typed methods, which unwrap the `{ data }` / `{ data, meta }` envelopes so
  * the rest of the app works in plain DTOs (lists keep `meta` for paging).
+ * The request core itself is `@sysdesign/web-kit`; only the base URL and the
+ * endpoints are this app's.
  */
 
 const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000/api';
-
-/**
- * A non-2xx response, carrying the parsed error body. Errors are Nest-shaped
- * (`{ statusCode, message }`, message possibly an array of validation
- * strings) — `message` here is already flattened for display.
- */
-export class ApiError extends Error {
-  readonly status: number;
-  readonly body: unknown;
-
-  constructor(status: number, body: unknown) {
-    super(errorMessageFrom(status, body));
-    this.name = 'ApiError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
-function errorMessageFrom(status: number, body: unknown): string {
-  if (body !== null && typeof body === 'object' && 'message' in body) {
-    const message = (body as { message: unknown }).message;
-    if (typeof message === 'string' && message.length > 0) return message;
-    if (Array.isArray(message) && message.length > 0) return message.join('; ');
-  }
-  return `Request failed with status ${status}`;
-}
-
-/** Aborted fetches are lifecycle noise, not failures — callers branch on this. */
-export function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof DOMException && error.name === 'AbortError') ||
-    (error instanceof Error && error.name === 'AbortError')
-  );
-}
-
-/** The one place an unknown catch turns into copy a person can read. */
-export function toErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error && error.message.length > 0 && !isAbortError(error)) {
-    return error.message;
-  }
-  return fallback;
-}
-
-/** Builds `?a=1&b=two`, dropping undefined but keeping legitimate zeros. */
-export function query(params: Record<string, string | number | boolean | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) continue;
-    search.set(key, String(value));
-  }
-  const encoded = search.toString();
-  return encoded.length > 0 ? `?${encoded}` : '';
-}
-
-/**
- * Cancellation. Named for its first users — every GET — but a POST that a
- * component can outlive needs it just as much, and brief suggestions is the
- * first of those.
- */
-export interface GetOptions {
-  signal?: AbortSignal;
-}
-
-interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
-  body?: unknown;
-  signal?: AbortSignal;
-}
-
-async function request<T>(
-  path: string,
-  { method = 'GET', body, signal }: RequestOptions = {},
-): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    ...(signal ? { signal } : {}),
-    ...(body === undefined
-      ? {}
-      : {
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }),
-  });
-
-  if (!response.ok) {
-    let parsed: unknown;
-    try {
-      parsed = await response.json();
-    } catch {
-      parsed = undefined;
-    }
-    throw new ApiError(response.status, parsed);
-  }
-
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
-}
-
-const unwrap = <T>(envelope: ApiResponse<T>): T => envelope.data;
+const request = createRequest(BASE_URL);
 
 export const api = {
   // Experiences ------------------------------------------------------------
@@ -272,9 +176,9 @@ export const api = {
   },
 
   // Improvement runs (the AI coach) -----------------------------------------
-  async improverAvailability(opts: GetOptions = {}): Promise<ImproverAvailabilityDto> {
+  async improverAvailability(opts: GetOptions = {}): Promise<LlmAvailabilityDto> {
     return unwrap(
-      await request<ApiResponse<ImproverAvailabilityDto>>('/improvement-runs/availability', opts),
+      await request<ApiResponse<LlmAvailabilityDto>>('/improvement-runs/availability', opts),
     );
   },
 

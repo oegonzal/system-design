@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { isAbortError } from '../api/client';
+import { isAbortError } from '../http/request';
 
 export interface LatestRequest {
   /** Aborts any in-flight request and issues a new ticket. */

@@ -1,10 +1,9 @@
 'use client';
 
 import { realComponentNodes, type CanvasGraph, type PromptDto } from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
+import { Badge, Heading, Stack, Text, TextAreaField } from '@sysdesign/design-system';
 import { useMemo } from 'react';
 
-import { TextAreaField } from '../../components/fields';
 import { useCanvasStore } from '../canvas/canvas-store-context';
 import { toCanvasGraph } from '../canvas/graph-io';
 import { narrationSlotState, type NarrationSlotState } from '../canvas/narration-draft';

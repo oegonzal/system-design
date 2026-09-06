@@ -258,6 +258,43 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every quality-loop run writes a dump — goal verbatim, contract, pipeline summary, per-iteration evidence and decision, every exchange attributed by stage and sample under concurrent lenses, lessons — on the failure path too; the HTTP surface validates with zod and lists its pipelines.',
   },
+  {
+    id: 'QL-11',
+    statement:
+      "The service publishes a prompt library from markdown files behind GET /prompts and allows the web client's origin.",
+  },
+  {
+    id: 'QL-12',
+    statement:
+      'The run on the wire is the shared contract: every quality-loop wire type lives in contracts, GET /runs/:id summarises exchanges, and each iteration carries its rendered artifact.',
+  },
+  // Quality-loop web client (packages/quality-loop-ui)
+  {
+    id: 'QLU-1',
+    statement:
+      "The client lists the prompt library and the pipelines from the service and starts a run with the chosen prompt's markdown as the goal.",
+  },
+  {
+    id: 'QLU-2',
+    statement:
+      'A started run is polled by its own status until complete or failed; while running, progress shows the attributed model exchanges.',
+  },
+  {
+    id: 'QLU-3',
+    statement:
+      'Results render, per iteration and from the wire contract alone, the decision with gates and reason, per-dimension scores, criteria evidence joined to the contract, confirmed findings with their remediation notes, and the rendered artifact.',
+  },
+  // Shared web libraries (packages/web-kit, packages/web-testing)
+  {
+    id: 'WEB-1',
+    statement:
+      'The web apps share one HTTP request core and one status-driven polling hook; a resource is polled until its own status is terminal, backs off while unreachable, and stops only on a 404.',
+  },
+  {
+    id: 'WEB-2',
+    statement:
+      'Web specs mount through the theme and stub the API at the fetch boundary through the shared harness.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

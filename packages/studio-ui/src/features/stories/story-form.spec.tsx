@@ -1,9 +1,9 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { makeStory } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { StoryForm } from './story-form';
 
 describe('StoryForm', () => {

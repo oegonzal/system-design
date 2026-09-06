@@ -4,9 +4,10 @@
  * this contract's criteria. `samples` independent calls, each on its own
  * scoped client so the dump attributes every exchange.
  */
+import type { CriticReport, LensOutcome } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { CriticReport, LensOutcome, TaskSpec } from '../contracts';
+import type { TaskSpec } from '../contracts';
 import type { LensSpec } from '../pipeline';
 import type { Critic, LensContext } from '../ports';
 import {

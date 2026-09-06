@@ -3,8 +3,13 @@
  * the same charge order. Scales run from "against the claim" to "for it", which
  * is what lets one lower-middle median resolve every tie conservatively.
  */
-import { AXIS_FACTOR_LEVELS, FIXABILITIES, SEVERITIES } from './contracts';
-import type { AxisFactorLevel, ConfirmedFinding, CriterionResult, Severity } from './contracts';
+import { AXIS_FACTOR_LEVELS, FIXABILITIES, SEVERITIES } from '@sysdesign/contracts';
+import type {
+  AxisFactorLevel,
+  ConfirmedFinding,
+  CriterionResult,
+  Severity,
+} from '@sysdesign/contracts';
 
 /** info → critical. */
 export const SEVERITY_MILD_FIRST: readonly Severity[] = [...SEVERITIES].reverse();

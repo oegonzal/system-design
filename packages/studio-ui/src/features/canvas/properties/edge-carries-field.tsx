@@ -5,10 +5,9 @@ import {
   OPERATION_NAME_MAX_LENGTH,
   type NodeOperation,
 } from '@sysdesign/contracts';
-import { Badge, Stack, Text } from '@sysdesign/design-system';
+import { Badge, CheckboxField, Stack, Text, TextField } from '@sysdesign/design-system';
 import { useState } from 'react';
 
-import { CheckboxField, TextField } from '../../../components/fields';
 import { ChipRemoveButton } from './chip-remove-button';
 
 export interface EdgeCarriesFieldProps {

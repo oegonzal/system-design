@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { RunRecord } from '../../core/contracts';
+import type { QualityRunDto } from '@sysdesign/contracts';
 import { fakeLlm, result, tinyPipeline } from '../../core/testing';
 
 // A directory of this file's own, so the assertions never see another suite's dump.
@@ -13,6 +13,7 @@ const DUMP_DIR = join(tmpdir(), `sysdesign-quality-loop-dumps-${crypto.randomUUI
 process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
 
 const { AppModule } = await import('../app/app.module');
+const { configureApp } = await import('../app/configure-app');
 const { PIPELINES_TOKEN, QUALITY_LOOP_LLM } = await import('./tokens');
 
 type Envelope<T> = { data: T };
@@ -38,7 +39,7 @@ describe('the HTTP surface', () => {
       .overrideProvider(PIPELINES_TOKEN)
       .useValue(new Map([['tiny', tinyPipeline()]]))
       .compile();
-    app = moduleRef.createNestApplication();
+    app = configureApp(moduleRef.createNestApplication());
     await app.listen(0);
     url = await app.getUrl();
   });
@@ -62,10 +63,11 @@ describe('the HTTP surface', () => {
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ runId: string; status: string }>;
 
-    let record: RunRecord | null = null;
+    let record: QualityRunDto | null = null;
     for (let attempt = 0; attempt < 50 && record?.status !== 'complete'; attempt++) {
-      record = ((await (await fetch(`${url}/runs/${data.runId}`)).json()) as Envelope<RunRecord>)
-        .data;
+      record = (
+        (await (await fetch(`${url}/runs/${data.runId}`)).json()) as Envelope<QualityRunDto>
+      ).data;
       if (record.status === 'running') await new Promise((resolve) => setTimeout(resolve, 20));
     }
     if (!record) throw new Error('the run was never observed');
@@ -80,6 +82,16 @@ describe('the HTTP surface', () => {
       'critic.tiny.s1',
       'evaluator.tiny.s1',
     ]);
+    // [QL-12] the wire summarises each exchange and never carries git or prompts.
+    expect(record.exchanges[0]).toEqual({
+      scope: 'criteria',
+      ordinal: 1,
+      outcome: 'ok',
+      durationMs: expect.any(Number),
+      startedAt: expect.any(String),
+    });
+    expect(record).not.toHaveProperty('git');
+    expect(record.trace?.iterations[0]?.rendered).toBe('[text] made\n[part.1] one');
 
     const runDir = join(DUMP_DIR, data.runId);
     expect(existsSync(join(runDir, 'manifest.json'))).toBe(true);

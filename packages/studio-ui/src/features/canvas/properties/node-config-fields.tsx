@@ -6,8 +6,7 @@ import {
   type NodeConfig,
   type NodeKind,
 } from '@sysdesign/contracts';
-
-import { CheckboxField, SelectField, TextField } from '../../../components/fields';
+import { CheckboxField, SelectField, TextField } from '@sysdesign/design-system';
 
 export interface NodeConfigFieldsProps {
   kind: NodeKind;

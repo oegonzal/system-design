@@ -4,11 +4,11 @@ import {
   NODE_KIND_GUIDE,
   kindsInCategory,
 } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { renderWithTheme } from '../../../testing/render';
 import { createCanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
 import { Palette } from './palette';

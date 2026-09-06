@@ -1,0 +1,29 @@
+{
+  "name": "quality-loop-ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/quality-loop-ui/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": { "cwd": "packages/quality-loop-ui", "command": "next dev -p 4201" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": ["{projectRoot}/.next"],
+      "options": { "cwd": "packages/quality-loop-ui", "command": "next build" }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": { "cwd": "packages/quality-loop-ui", "command": "next start -p 4201" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": { "cwd": "packages/quality-loop-ui", "command": "tsc --noEmit -p tsconfig.json" }
+    }
+  }
+}

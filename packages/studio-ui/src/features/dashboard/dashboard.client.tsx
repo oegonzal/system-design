@@ -3,11 +3,12 @@
 import styled from '@emotion/styled';
 import type { DesignSessionDto, ExperienceProfileDto } from '@sysdesign/contracts';
 import { Badge, Button, Heading, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
+import { toErrorMessage } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 
 const Grid = styled.div`
   display: grid;

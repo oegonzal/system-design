@@ -1,12 +1,11 @@
 /**
- * The loop's closed vocabularies. `as const` tuples are the single source of
- * each: the zod builders in `../schemas.ts` enum-lock the model to them, the
- * policy prices them, and the trace records them. Ordinal levels and
- * severities are the repo's own (`@sysdesign/contracts`), so evidence from this
- * package speaks the same currency as the studio's grader.
+ * The quality loop's closed vocabularies. `as const` tuples are the single
+ * source of each: the loop's zod builders enum-lock the model to them, the
+ * policy prices them, the trace records them and the web client maps them to
+ * tones. Ordinal levels and severities are the repo's own (`eval-profile`,
+ * `evaluations`), so this evidence speaks the same currency as the studio's
+ * grader.
  */
-export { AXIS_FACTOR_LEVELS, SEVERITIES } from '@sysdesign/contracts';
-export type { AxisFactorLevel, Severity } from '@sysdesign/contracts';
 
 /** The controller's verdict on an artifact — the doctrine's ControllerDecision. */
 export const DECISIONS = ['accept', 'revise', 'retry', 'escalate', 'reject'] as const;

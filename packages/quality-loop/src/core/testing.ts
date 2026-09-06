@@ -4,20 +4,20 @@
  * `tinyPipeline` is also the standing proof that the core assumes nothing
  * about system design.
  */
-import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
-import { z } from 'zod';
-
 import type {
-  Criterion,
   CriticReport,
+  DecisionPolicy,
   EvaluationReport,
   EvidenceLedger,
   LensOutcome,
   RawCriterionResult,
   RawFinding,
-} from './contracts';
+  SuccessCriterion,
+} from '@sysdesign/contracts';
+import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
+import { z } from 'zod';
+
 import type { PipelineDefinition } from './pipeline';
-import type { DecisionPolicy } from './policy';
 import type { Critic, Evaluator, Producer } from './ports';
 
 /**
@@ -141,7 +141,11 @@ export function tinyPipeline(
   };
 }
 
-export const criterion = (id: string, kind = 'must', statement = `criterion ${id}`): Criterion => ({
+export const criterion = (
+  id: string,
+  kind = 'must',
+  statement = `criterion ${id}`,
+): SuccessCriterion => ({
   id,
   kind,
   statement,

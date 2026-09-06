@@ -4,8 +4,6 @@
  * with a reason the runner owns. `finalDecision` says what the artifact
  * deserves next; `stopReason` says why the loop ended. Both are recorded.
  */
-import type { LlmClient } from '@sysdesign/llm';
-
 import type {
   CriticReport,
   EvaluationReport,
@@ -16,9 +14,11 @@ import type {
   RemediationNote,
   RunTrace,
   StopReason,
-  TaskContract,
   ValidationReport,
-} from './contracts';
+} from '@sysdesign/contracts';
+import type { LlmClient } from '@sysdesign/llm';
+
+import type { TaskContract } from './contracts';
 import { decide } from './decide';
 import { deriveLessons } from './lessons';
 import { materialize } from './materialize';
@@ -100,6 +100,7 @@ export async function runLoop<T>(
     );
     const lensesRun = artifact !== null && !blocked && contract.criteria.length > 0;
     const locations = artifact !== null && !blocked ? task.output.locate(artifact) : [];
+    const rendered = artifact !== null && !blocked ? task.output.render(artifact) : null;
 
     let critics: LensOutcome<CriticReport>[] = [];
     let evaluators: LensOutcome<EvaluationReport>[] = [];
@@ -108,7 +109,7 @@ export async function runLoop<T>(
         contract,
         artifact: artifact as T,
         locations,
-        rendered: task.output.render(artifact as T),
+        rendered: rendered ?? '',
         validation,
       };
       const units: (() => Promise<LensResult>)[] = [
@@ -163,6 +164,7 @@ export async function runLoop<T>(
       mode,
       artifact,
       locations,
+      rendered,
       validation,
       critics,
       evaluators,

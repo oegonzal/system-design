@@ -4,9 +4,13 @@
  * the schema, be complete and concise — and renders the sections every stage
  * shares. The goal reaches the model verbatim from here and from nowhere else.
  */
+import type {
+  ArtifactLocation,
+  RemediationNote,
+  SuccessCriterion,
+  ValidationReport,
+} from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
-
-import type { Criterion, Location, RemediationNote, ValidationReport } from './contracts';
 
 /** Enough for any prompt a person would write; a larger goal is clipped and traced. */
 export const GOAL_MAX_BYTES = 64_000;
@@ -68,7 +72,7 @@ export function typesSection(types: Readonly<Record<string, string>>): string {
   ].join('\n');
 }
 
-export function criteriaSection(criteria: readonly Criterion[]): string {
+export function criteriaSection(criteria: readonly SuccessCriterion[]): string {
   const lines = criteria.map(
     (criterion) => `- ${criterion.id} [${criterion.kind}] ${criterion.statement}`,
   );
@@ -79,7 +83,7 @@ export function artifactSection(rendered: string): string {
   return ['# Artifact', '', rendered].join('\n');
 }
 
-export function locationsSection(locations: readonly Location[]): string {
+export function locationsSection(locations: readonly ArtifactLocation[]): string {
   return [
     '# Locations you may cite',
     '',

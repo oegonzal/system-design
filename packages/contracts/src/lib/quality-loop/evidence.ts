@@ -1,12 +1,25 @@
+import type { AxisFactorLevel } from '../eval-profile';
+import type { Severity } from '../evaluations';
 import type {
-  AxisFactorLevel,
   CriterionResult,
   Decision,
   DiagnosticReason,
   Fixability,
-  Severity,
   ValidatorGate,
 } from './vocab';
+
+/** An addressable part of an artifact — the only thing a lens may point at. */
+export interface ArtifactLocation {
+  id: string;
+  label: string;
+}
+
+/** One success criterion, derived from the goal. Ids are engine-assigned (`c1`…). */
+export interface SuccessCriterion {
+  id: string;
+  kind: string;
+  statement: string;
+}
 
 /** A stage that produced nothing, and why. Never evidence; always traced. */
 export interface Diagnostic {

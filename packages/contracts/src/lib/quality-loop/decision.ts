@@ -1,16 +1,16 @@
-import type { LlmAvailability, LlmExchange } from '@sysdesign/llm';
-import type { ErrorShape, GitContext } from '@sysdesign/run-dump';
-
+import type { AxisFactorLevel } from '../eval-profile';
+import type { Severity } from '../evaluations';
 import type {
+  ArtifactLocation,
   CriticReport,
   EvaluationReport,
   EvidenceLedger,
   EvidenceResult,
   LensOutcome,
+  SuccessCriterion,
   ValidationReport,
 } from './evidence';
-import type { Criterion, Location } from './task';
-import type { AxisFactorLevel, Decision, ProduceMode, Severity, StopReason } from './vocab';
+import type { Decision, ProduceMode, StopReason } from './vocab';
 
 /** What the producer is asked to act on. Chosen by the policy from the ledger. */
 export interface Remediation {
@@ -98,11 +98,13 @@ export interface QualityControlDecision {
   trace: DecisionTrace;
 }
 
-export interface IterationTrace<T> {
+export interface IterationTrace<T = unknown> {
   iteration: number;
   mode: ProduceMode | 'provided';
   artifact: T | null;
-  locations: Location[];
+  locations: ArtifactLocation[];
+  /** The text every judge read — `OutputShape.render(artifact)`; null when there was no artifact. */
+  rendered: string | null;
   validation: ValidationReport[];
   critics: LensOutcome<CriticReport>[];
   evaluators: LensOutcome<EvaluationReport>[];
@@ -119,34 +121,12 @@ export interface Lesson {
   detail: string;
 }
 
-export interface RunTrace<T> {
+export interface RunTrace<T = unknown> {
   pipeline: { id: string; version: string };
-  contract: { goal: string; criteria: readonly Criterion[] };
+  contract: { goal: string; criteria: readonly SuccessCriterion[] };
   iterations: IterationTrace<T>[];
   bestIteration: number;
   finalDecision: Decision;
   stopReason: StopReason;
   lessons: Lesson[];
-}
-
-export interface RunRequest {
-  pipeline: string;
-  goal: string;
-  output?: unknown;
-  maxIterations?: number;
-}
-
-/** One run, as the API reports it and the dump stores it. */
-export interface RunRecord {
-  runId: string;
-  pipeline: string;
-  status: 'running' | 'complete' | 'failed';
-  startedAt: string;
-  finishedAt: string | null;
-  llm: LlmAvailability;
-  git: GitContext;
-  request: { goal: string; outputProvided: boolean; maxIterations: number };
-  trace: RunTrace<unknown> | null;
-  exchanges: LlmExchange[];
-  error: ErrorShape | null;
 }

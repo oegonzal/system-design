@@ -15,7 +15,9 @@
     // @sysdesign/db and @sysdesign/llm cannot resolve from the UI at all.
     "paths": {
       "@sysdesign/contracts": ["../contracts/src/index.ts"],
-      "@sysdesign/design-system": ["../design-system/src/index.ts"]
+      "@sysdesign/design-system": ["../design-system/src/index.ts"],
+      "@sysdesign/web-kit": ["../web-kit/src/index.ts"],
+      "@sysdesign/web-testing": ["../web-testing/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ConfirmedFinding, CriterionEvidence } from './contracts';
+import type { ConfirmedFinding, CriterionEvidence } from '@sysdesign/contracts';
 import { decide } from './decide';
 import { ledger, tinyPolicy } from './testing';
 

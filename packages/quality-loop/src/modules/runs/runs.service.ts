@@ -1,14 +1,10 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { PipelineSummary, StartQualityRunRequest } from '@sysdesign/contracts';
 import { qualityLoopAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
 
-import type { RunRecord, RunRequest } from '../../core/contracts';
-import {
-  describePipeline,
-  validatePipeline,
-  type PipelineDefinition,
-  type PipelineSummary,
-} from '../../core/pipeline';
+import type { RunRecord } from '../../core/contracts';
+import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
 import type { TraceStore } from '../../core/ports';
 import { runPipeline } from '../../core/run-pipeline';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
@@ -42,7 +38,7 @@ export class RunsService {
   }
 
   /** Start in the background; the record is readable at once. */
-  start(request: RunRequest): RunRecord {
+  start(request: StartQualityRunRequest): RunRecord {
     const definition = this.resolve(request.pipeline);
     const record = this.open(request, definition);
     void this.perform(record, request, definition);
@@ -50,7 +46,7 @@ export class RunsService {
   }
 
   /** Run to completion — the CLI's path. */
-  async execute(request: RunRequest): Promise<RunRecord> {
+  async execute(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     const record = this.open(request, definition);
     await this.perform(record, request, definition);
@@ -63,7 +59,10 @@ export class RunsService {
     return definition;
   }
 
-  private open(request: RunRequest, definition: PipelineDefinition<unknown>): RunRecord {
+  private open(
+    request: StartQualityRunRequest,
+    definition: PipelineDefinition<unknown>,
+  ): RunRecord {
     const record: RunRecord = {
       runId: makeRunId(Date.now(), 'quality'),
       pipeline: request.pipeline,
@@ -93,7 +92,7 @@ export class RunsService {
 
   private async perform(
     record: RunRecord,
-    request: RunRequest,
+    request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
   ): Promise<void> {
     try {

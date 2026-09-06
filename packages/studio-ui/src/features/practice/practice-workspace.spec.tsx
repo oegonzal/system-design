@@ -1,9 +1,8 @@
+import { renderWithTheme, stubApi } from '@sysdesign/web-testing';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { renderWithTheme } from '../../testing/render';
-import { stubApi } from '../../testing/stub-api';
 import { PracticeWorkspace } from './practice-workspace';
 
 const SESSION = '00000000-0000-4000-8000-000000000000';

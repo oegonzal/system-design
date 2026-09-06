@@ -2,14 +2,21 @@
 
 import styled from '@emotion/styled';
 import type { StarStoryDto } from '@sysdesign/contracts';
-import { Badge, Heading, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  Heading,
+  Skeleton,
+  Stack,
+  Surface,
+  Text,
+  TextField,
+} from '@sysdesign/design-system';
+import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
-import { TextField } from '../../components/fields';
+import { api } from '../../api/client';
 import { useDebouncedValue } from '../../hooks/use-debounced-value';
-import { useLatestRequest } from '../../hooks/use-latest-request';
 
 const FilterRow = styled.div`
   display: flex;

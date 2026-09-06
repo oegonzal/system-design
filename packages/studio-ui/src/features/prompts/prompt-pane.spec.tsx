@@ -1,8 +1,8 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { makePrompt, makeWorkflowPrompt } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { PromptPane } from './prompt-pane';
 
 describe('PromptPane', () => {

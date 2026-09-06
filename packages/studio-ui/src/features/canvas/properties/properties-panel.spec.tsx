@@ -5,13 +5,13 @@ import {
   kindsInCategory,
   type CanvasGraph,
 } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import type { InterfaceSuggestionsState } from '../../practice/use-interface-suggestions';
 import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
-import { renderWithTheme } from '../../../testing/render';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
 import { PropertiesPanel } from './properties-panel';

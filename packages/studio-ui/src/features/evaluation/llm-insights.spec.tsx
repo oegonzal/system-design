@@ -1,8 +1,8 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { makeAxis, makeScenarioReport } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { LlmInsights } from './llm-insights';
 
 describe('LlmInsights', () => {

@@ -22,31 +22,54 @@ Everything under `src/core/` is pure: no Nest, no filesystem, no clock (`now` is
 
 ```bash
 # one run from the command line (builds first; the dump path is printed)
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/samples/order-history.prompt.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
 # judge a supplied artifact instead of producing one
 pnpm quality-loop:run --pipeline system-design --goal prompt.md --output answer.json --iterations 1
 
 # the HTTP surface on :3003
 pnpm quality-loop:serve
 curl -s localhost:3003/pipelines
+curl -s localhost:3003/prompts                               # the library: one md file per prompt
+curl -s localhost:3003/prompts/order-history                 # { id, title, markdown }
 curl -s -X POST localhost:3003/runs -H 'content-type: application/json' \
   -d '{"pipeline":"system-design","goal":"# Prompt …"}'     # 202 { runId }
 curl -s localhost:3003/runs/<runId>                          # poll until status is complete
+
+# the service and its web client together (:3003 + :4201)
+pnpm quality:start
 ```
 
-| Variable                     | Effect                                                                                          |
-| ---------------------------- | ----------------------------------------------------------------------------------------------- |
-| `QUALITY_LOOP_DETERMINISTIC` | `1` forces the no-op model. Falls back to `EVAL_DETERMINISTIC`; `0` overrides it for this loop. |
-| `ANTHROPIC_API_KEY`          | The API route (with `LLM_MODEL`). Wins over the subscription route.                             |
-| `QUALITY_LOOP_AUTH`          | `claude-code` runs the loop through this machine's Claude Code login via the Agent SDK.         |
-| `QUALITY_LOOP_PORT`          | HTTP port, default 3003.                                                                        |
-| `EVAL_DUMP_DIR`              | Where dumps go; default `./static/runs`.                                                        |
+| Variable                       | Effect                                                                                          |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `QUALITY_LOOP_DETERMINISTIC`   | `1` forces the no-op model. Falls back to `EVAL_DETERMINISTIC`; `0` overrides it for this loop. |
+| `ANTHROPIC_API_KEY`            | The API route (with `LLM_MODEL`). Wins over the subscription route.                             |
+| `QUALITY_LOOP_AUTH`            | `claude-code` runs the loop through this machine's Claude Code login via the Agent SDK.         |
+| `QUALITY_LOOP_PORT`            | HTTP port, default 3003.                                                                        |
+| `QUALITY_LOOP_CORS_ORIGIN`     | The browser origin allowed to call the service; default `http://localhost:4201`.                |
+| `QUALITY_LOOP_PROMPTS_DIR`     | The prompt library directory, read per request; default `<cwd>/packages/quality-loop/prompts`.  |
+| `EVAL_DUMP_DIR`                | Where dumps go; default `./static/runs`.                                                        |
+| `NEXT_PUBLIC_QUALITY_LOOP_URL` | (web client) the service's base URL; default `http://localhost:3003`.                           |
 
 Without a live model the loop is honest rather than empty: no criteria are derived, the producer cannot produce, the lenses are skipped, and the controller escalates with `llm-disabled` diagnostics and no invented number. The dump is still written.
 
+## The HTTP surface
+
+Every wire type lives in `@sysdesign/contracts` under `lib/quality-loop/`, so the service, the CLI and the web client share one definition; the app keeps only the zod-bound `OutputShape`/`TaskSpec` and its internal `RunRecord` (the wire run plus git context and the full exchanges).
+
+| Route              | Returns                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `GET /health`      | `{ status: 'ok' }`                                                                                              |
+| `GET /pipelines`   | `ListPipelinesResponse` — each `PipelineSummary` (task vocabulary, lens specs, the policy)                      |
+| `GET /prompts`     | `ListPromptLibraryResponse` — `{ id, title }` per markdown file, titled by its first H1, sorted by id           |
+| `GET /prompts/:id` | `GetPromptLibraryDocumentResponse` — the markdown verbatim; 404 when the file is not there                      |
+| `POST /runs`       | 202 `StartQualityRunResponse` — body `StartQualityRunRequest` (`pipeline`, `goal`, `output?`, `maxIterations?`) |
+| `GET /runs/:id`    | `GetQualityRunResponse` — `QualityRunDto`: status, availability, the trace once complete, exchanges summarised  |
+
+`GET /runs/:id` summarises each exchange to `{ scope, ordinal, outcome, durationMs, startedAt }`; the prompts and responses are only in the dump. The prompt library is a port (`PromptLibrary`) with a filesystem adapter — a database-backed one drops in behind the same routes.
+
 ## The dump
 
-`static/runs/<runId>-quality/`: `manifest.json`, `run.md` (the human entry point), `01-goal.md` (verbatim), `02-contract.json` (the derived criteria), `03-pipeline.json` (the definition as data), `04-iterations/NN/{iteration,artifact,validation,critics,evaluators,ledger,decision,remediations}.json`, `05-llm/NN.<stage>.<ordinal>.{system.txt,user.txt,response.json,meta.json}` (every exchange, attributed by lens and sample, prompts as text so `grep -r` works), `06-lessons.json`. One row per run in `index.jsonl` with `kind: 'quality'`.
+`static/runs/<runId>-quality/`: `manifest.json`, `run.md` (the human entry point), `01-goal.md` (verbatim), `02-contract.json` (the derived criteria), `03-pipeline.json` (the definition as data), `04-iterations/NN/{iteration,artifact,validation,critics,evaluators,ledger,decision,remediations}.json` plus `artifact.md` (the text every judge read, empty when no artifact was produced), `05-llm/NN.<stage>.<ordinal>.{system.txt,user.txt,response.json,meta.json}` (every exchange, attributed by lens and sample, prompts as text so `grep -r` works), `06-lessons.json`. One row per run in `index.jsonl` with `kind: 'quality'`.
 
 ## Declaring a pipeline
 
@@ -80,7 +103,18 @@ A folder beside `src/pipelines/system-design/` and one line in `src/pipelines/in
 | Gates are ordered and deterministic; a blocker never accepts                                             | `[QL-8]`                                             |
 | The loop revises against reasons, never a score; stops with a reason; escalates honestly without a model | `[QL-9]`                                             |
 | Every run writes an attributed dump, failures included; the HTTP surface validates with zod              | `[QL-10]`                                            |
+| The prompt library is served from markdown files and the web client's origin is allowed                  | `[QL-11]`                                            |
+| The run on the wire is the shared contract, exchanges summarised, each iteration carrying its artifact   | `[QL-12]`                                            |
+| The client lists the library and pipelines and starts a run from the chosen prompt                       | `[QLU-1]`                                            |
+| A run is followed by its own status; progress shows the attributed exchanges                             | `[QLU-2]`                                            |
+| Results render every part of the verdict from the wire contract alone                                    | `[QLU-3]`                                            |
 
 Deliberate deviations from the doctrine's literal shapes: severities are the repo's (`critical` is the doctrine's `fatal`); fixability has four values (no tools or backtracking exist); `suggestedFixType`, report-level confidence and `qualityEvidence` are omitted; constraints are criteria of a gated kind and failure modes are finding types the policy gates.
 
-Not built yet, by choice: response memoisation, persistence beyond the dump, Docker/Tilt/CI images for the service, a human review queue.
+## The web client (`packages/quality-loop-ui`)
+
+One screen on :4201 (`pnpm quality:start` serves both): pick a prompt from the library and a pipeline from `GET /pipelines`, choose the iterations (default 1 — a live iteration is minutes), run. While the loop runs the page follows `GET /runs/:id` by the run's own status and lists each model exchange as it is attributed; when it ends it shows, per iteration, the decision with its gates and reason, the overall and per-dimension scores, the criteria joined to the contract, the confirmed findings grouped by severity with the remediation notes the policy selected, how the policy decided step by step, and the rendered artifact with its `[component.N]` ids. The prompt and the artifact display as text — no markdown renderer, so the ids a finding points at stay visible.
+
+The client renders the wire contract and nothing else; it shares the request core and polling hook with the studio through `@sysdesign/web-kit` and the spec harness through `@sysdesign/web-testing`.
+
+Not built yet, by choice: response memoisation, persistence beyond the dump, per-iteration streaming to the client while the loop is running (the trace lands when it ends), Docker/Tilt/CI images for the service and the client, a human review queue.

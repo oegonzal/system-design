@@ -1,8 +1,8 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { Position, ReactFlow } from '@xyflow/react';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { renderWithTheme } from '../../../testing/render';
 import { SdNode } from '../nodes/sd-node';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
 import { SdEdge } from './sd-edge';

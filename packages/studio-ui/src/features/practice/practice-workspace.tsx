@@ -6,7 +6,7 @@ import type {
   DesignRevisionSummaryDto,
   DesignSessionDto,
   FindingDto,
-  ImproverAvailabilityDto,
+  LlmAvailabilityDto,
   PromptDto,
 } from '@sysdesign/contracts';
 import {
@@ -21,13 +21,13 @@ import {
   Tabs,
   Text,
 } from '@sysdesign/design-system';
+import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api, ApiError, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
-import { useLatestRequest } from '../../hooks/use-latest-request';
 import { CanvasStoreProvider, useCanvasStoreApi } from '../canvas/canvas-store-context';
 import { buildAndDownloadRunZip } from '../export/export-run';
 import { Palette } from '../canvas/palette/palette';
@@ -241,7 +241,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [tab, setTab] = useState('prompt');
   const [exporting, setExporting] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
-  const [availability, setAvailability] = useState<ImproverAvailabilityDto | null>(null);
+  const [availability, setAvailability] = useState<LlmAvailabilityDto | null>(null);
 
   const polling = useEvaluationPolling(feedback?.id ?? null);
   const improve = useImprovementRunPolling(activeRunId);

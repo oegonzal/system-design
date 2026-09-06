@@ -1,11 +1,11 @@
 import { NODE_MAX_OPERATIONS, type NodeOperation } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { makeWorkflowSpec } from '../../../testing/fixtures';
-import { renderWithTheme } from '../../../testing/render';
 import { OperationsEditor, type OperationsEditorProps } from './operations-editor';
 
 const NO_OPS: NodeOperation[] = [];

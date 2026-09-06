@@ -1,4 +1,4 @@
-import type { Diagnostic, DiagnosticReason, LensOutcome } from '../contracts';
+import type { Diagnostic, DiagnosticReason, LensOutcome } from '@sysdesign/contracts';
 
 export const CRITERIA_STAGE = 'criteria';
 export const PRODUCER_STAGE = 'producer';

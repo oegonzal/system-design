@@ -34,13 +34,14 @@ bash scripts/setup.sh   # verifies the toolchain, installs dependencies
 tilt up                 # postgres → migrations → seed → api → worker → web
 ```
 
-| Service     | Where                                                |
-| ----------- | ---------------------------------------------------- |
-| Frontend    | http://localhost:4200                                |
-| API         | http://localhost:3000/api                            |
-| Eval worker | http://localhost:3002/health                         |
-| Postgres    | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
-| Storybook   | `nx run storybook:storybook` → http://localhost:6006 |
+| Service         | Where                                                |
+| --------------- | ---------------------------------------------------- |
+| Frontend        | http://localhost:4200                                |
+| Quality loop UI | http://localhost:4201                                |
+| API             | http://localhost:3000/api                            |
+| Eval worker     | http://localhost:3002/health                         |
+| Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
+| Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
 Set `ANTHROPIC_API_KEY` to enable the LLM half of the pipeline (prompt-prose
 enrichment and the design critic). Without it — or with
@@ -68,21 +69,24 @@ how to bring your runs back in the future.
 Packages carry a `project.json` (no per-package `package.json`); every
 dependency is hoisted to the root and Nx is the single entry point.
 
-| Package                  | What it is                                                                 |
-| ------------------------ | -------------------------------------------------------------------------- |
-| `packages/contracts`     | Wire types + `as const` vocabularies every layer derives from              |
-| `packages/db`            | MikroORM entities, migrations, seed — shared by API and worker             |
-| `packages/llm`           | The one LLM seam: Claude via structured outputs, no-op without a key       |
-| `packages/design-system` | Emotion tokens → semantic roles → 14 primitives, contrast-asserted         |
-| `packages/studio-api`    | NestJS REST API: prompts, sessions, revisions, evaluations, stories        |
-| `packages/eval-worker`   | Postgres-queue poller + rules engine + LLM critic                          |
-| `packages/run-dump`      | Run-folder plumbing every pipeline dumps through (`static/runs`)           |
-| `packages/quality-loop`  | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI    |
-| `packages/studio-ui`     | Next.js app: canvas workspace, feedback loop, STAR repository              |
-| `packages/storybook`     | Catalog host globbing sibling stories                                      |
-| `packages/studio-e2e`    | Playwright: requirement specs + the full practice-loop journey             |
-| `packages/criteria`      | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles    |
-| `tooling/`               | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke |
+| Package                    | What it is                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| `packages/contracts`       | Wire types + `as const` vocabularies every layer derives from                    |
+| `packages/db`              | MikroORM entities, migrations, seed — shared by API and worker                   |
+| `packages/llm`             | The one LLM seam: Claude via structured outputs, no-op without a key             |
+| `packages/design-system`   | Emotion tokens → semantic roles → 18 primitives, contrast-asserted               |
+| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, evaluations, stories              |
+| `packages/eval-worker`     | Postgres-queue poller + rules engine + LLM critic                                |
+| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                 |
+| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI          |
+| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict |
+| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook       |
+| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                  |
+| `packages/studio-ui`       | Next.js app: canvas workspace, feedback loop, STAR repository                    |
+| `packages/storybook`       | Catalog host globbing sibling stories                                            |
+| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey                   |
+| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles          |
+| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke       |
 
 ## How grading works
 
@@ -106,7 +110,8 @@ pnpm db:migrate:check                                      # entities vs migrati
 pnpm exec nx run studio-e2e:e2e                            # end-to-end (servers auto-start)
 pnpm review:code --staged --profile=quick                  # what the pre-commit hook runs
 pnpm test:stories                                          # render every story, both modes
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/samples/order-history.prompt.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+pnpm quality:start                         # quality-loop on :3003 + its web client on :4201
 ```
 
 Git hooks live in `.githooks` (activated by `pnpm install` via the `prepare`

@@ -3,24 +3,22 @@
  * from a pipeline definition; specs hand in fakes. Nothing here knows about
  * Nest, the filesystem or a clock.
  */
-import type { LlmExchange } from '@sysdesign/llm';
-
-import type { PipelineSummary } from './pipeline';
-
 import type {
+  ArtifactLocation,
   CriticReport,
-  Criterion,
   Diagnostic,
   EvaluationReport,
   LensOutcome,
-  Location,
+  PipelineSummary,
   ProduceMode,
   RemediationNote,
-  RunRecord,
-  TaskContract,
+  SuccessCriterion,
   ValidationReport,
   ValidatorGate,
-} from './contracts';
+} from '@sysdesign/contracts';
+import type { LlmExchange } from '@sysdesign/llm';
+
+import type { RunRecord, TaskContract } from './contracts';
 
 export interface ProducerInput<T> {
   contract: TaskContract<T>;
@@ -50,7 +48,7 @@ export interface Validator<T> {
 export interface LensContext<T> {
   contract: TaskContract<T>;
   artifact: T;
-  locations: Location[];
+  locations: ArtifactLocation[];
   /** `output.render(artifact)`, computed once per iteration. */
   rendered: string;
   validation: ValidationReport[];
@@ -69,7 +67,7 @@ export interface Evaluator<T> {
 
 export type CriteriaDeriver = (
   goal: string,
-) => Promise<{ criteria: Criterion[] | null; diagnostic: Diagnostic | null }>;
+) => Promise<{ criteria: SuccessCriterion[] | null; diagnostic: Diagnostic | null }>;
 
 export interface Stages<T> {
   deriveCriteria: CriteriaDeriver;

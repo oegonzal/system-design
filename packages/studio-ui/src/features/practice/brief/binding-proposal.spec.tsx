@@ -1,11 +1,11 @@
 import type { BriefBindingProposal, CanvasGraph, PromptDto } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { createCanvasStore } from '../../canvas/canvas-store';
 import { CanvasStoreProvider } from '../../canvas/canvas-store-context';
-import { renderWithTheme } from '../../../testing/render';
 import { DesignBriefEditor } from './design-brief-editor';
 
 const graph: CanvasGraph = {

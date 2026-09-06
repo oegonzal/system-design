@@ -13,9 +13,15 @@ import {
   type OperationKind,
   type WorkflowSpec,
 } from '@sysdesign/contracts';
-import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
-
-import { CheckboxField, SelectField, TextField } from '../../../components/fields';
+import {
+  Button,
+  CheckboxField,
+  Heading,
+  SelectField,
+  Stack,
+  Text,
+  TextField,
+} from '@sysdesign/design-system';
 
 export interface OperationsEditorProps {
   operations: NodeOperation[];

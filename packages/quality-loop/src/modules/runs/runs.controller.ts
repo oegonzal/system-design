@@ -1,7 +1,11 @@
 import { Body, Controller, Get, HttpCode, NotFoundException, Param, Post } from '@nestjs/common';
-import type { ApiResponse } from '@sysdesign/contracts';
+import type {
+  GetQualityRunResponse,
+  StartQualityRunRequest,
+  StartQualityRunResponse,
+} from '@sysdesign/contracts';
 
-import type { RunRecord, RunRequest } from '../../core/contracts';
+import { toRunDto } from '../../core/contracts';
 import { runRequestSchema } from './run-request';
 import { RunsService } from './runs.service';
 import { ZodValidationPipe } from './zod.pipe';
@@ -14,16 +18,16 @@ export class RunsController {
   @Post()
   @HttpCode(202)
   start(
-    @Body(new ZodValidationPipe(runRequestSchema)) body: RunRequest,
-  ): ApiResponse<{ runId: string; status: RunRecord['status'] }> {
+    @Body(new ZodValidationPipe(runRequestSchema)) body: StartQualityRunRequest,
+  ): StartQualityRunResponse {
     const record = this.runs.start(body);
     return { data: { runId: record.runId, status: record.status } };
   }
 
   @Get(':id')
-  get(@Param('id') id: string): ApiResponse<RunRecord> {
+  get(@Param('id') id: string): GetQualityRunResponse {
     const record = this.runs.get(id);
     if (!record) throw new NotFoundException(`run ${id} not found`);
-    return { data: record };
+    return { data: toRunDto(record) };
   }
 }

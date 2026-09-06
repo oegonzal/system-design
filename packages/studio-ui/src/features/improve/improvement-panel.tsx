@@ -4,7 +4,7 @@ import styled from '@emotion/styled';
 import type {
   ImprovementIteration,
   ImprovementRunDto,
-  ImproverAvailabilityDto,
+  LlmAvailabilityDto,
 } from '@sysdesign/contracts';
 import { Badge, Button, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
@@ -16,7 +16,7 @@ export interface ImprovementPanelProps {
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
   message: string;
   /** null while loading; the idle copy explains a disabled coach honestly. */
-  availability: ImproverAvailabilityDto | null;
+  availability: LlmAvailabilityDto | null;
   onCancel: () => void;
   onLoadRevision: (revisionId: string) => void;
 }

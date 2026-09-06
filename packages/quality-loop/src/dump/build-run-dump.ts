@@ -5,6 +5,7 @@
  *
  * NOTE FOR READERS: these files contain the goal and the model's prose verbatim.
  */
+import type { IterationTrace, PipelineSummary } from '@sysdesign/contracts';
 import {
   capText,
   DUMP_SCHEMA_VERSION,
@@ -13,8 +14,7 @@ import {
   type DumpFile,
 } from '@sysdesign/run-dump';
 
-import type { IterationTrace, RunRecord } from '../core/contracts';
-import type { PipelineSummary } from '../core/pipeline';
+import type { RunRecord } from '../core/contracts';
 
 const json = (value: unknown): string => `${JSON.stringify(jsonSafe(value), null, 2)}\n`;
 const pad = (value: number): string => String(value).padStart(2, '0');
@@ -23,6 +23,10 @@ const withTruncationNote = (capped: ReturnType<typeof capText>): string =>
   capped.truncated
     ? `${capped.text}\n\n[truncated — original was ${capped.originalBytes} bytes]\n`
     : capped.text;
+
+/** Text files end in a newline so `cat` and diffs behave; empty stays empty. */
+const withNewline = (text: string): string =>
+  text.length === 0 || text.endsWith('\n') ? text : `${text}\n`;
 
 export function buildRunDump(record: RunRecord, pipeline: PipelineSummary | null): BuiltDump {
   const { trace } = record;
@@ -55,23 +59,28 @@ export function buildRunDump(record: RunRecord, pipeline: PipelineSummary | null
   const files: DumpFile[] = [
     { path: 'manifest.json', content: json(manifest) },
     { path: 'run.md', content: renderRunMarkdown(record, manifest) },
-    {
-      path: '01-goal.md',
-      content: record.request.goal.endsWith('\n')
-        ? record.request.goal
-        : `${record.request.goal}\n`,
-    },
+    { path: '01-goal.md', content: withNewline(record.request.goal) },
     { path: '02-contract.json', content: json(trace?.contract.criteria ?? null) },
     { path: '03-pipeline.json', content: json(pipeline) },
   ];
 
   for (const iteration of trace?.iterations ?? []) {
     const dir = `04-iterations/${pad(iteration.iteration)}`;
-    const { artifact, validation, critics, evaluators, ledger, decision, remediations, ...rest } =
-      iteration;
+    const {
+      artifact,
+      rendered,
+      validation,
+      critics,
+      evaluators,
+      ledger,
+      decision,
+      remediations,
+      ...rest
+    } = iteration;
     files.push(
       { path: `${dir}/iteration.json`, content: json(rest) },
       { path: `${dir}/artifact.json`, content: json(artifact) },
+      { path: `${dir}/artifact.md`, content: rendered === null ? '' : withNewline(rendered) },
       { path: `${dir}/validation.json`, content: json(validation) },
       { path: `${dir}/critics.json`, content: json(critics) },
       { path: `${dir}/evaluators.json`, content: json(evaluators) },

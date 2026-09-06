@@ -4,11 +4,12 @@
  * a decision. The only code a pipeline brings is its `OutputShape` (how to
  * parse, address and render the artifact) and any deterministic validators.
  */
+import type { DecisionPolicy, PipelineSummary } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import type { TaskSpec } from './contracts';
+import { validatePolicy } from './policy';
 import type { Validator } from './ports';
-import { validatePolicy, type DecisionPolicy } from './policy';
 
 export interface LensSpec {
   id: string;
@@ -100,27 +101,6 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
 }
 
 /** The serialisable projection: what `GET /pipelines` returns and the dump stores. */
-export interface PipelineSummary {
-  id: string;
-  version: string;
-  description: string;
-  task: {
-    criterionKinds: Record<string, string>;
-    findingTypes: Record<string, string>;
-    maxCriteria: number;
-  };
-  validators: { id: string; gate: string }[];
-  critics: { id: string; samples: number; maxItems: number; maxTokens: number }[];
-  evaluators: {
-    id: string;
-    samples: number;
-    maxItems: number;
-    maxTokens: number;
-    criterionKinds: string[];
-  }[];
-  policy: DecisionPolicy;
-}
-
 export function describePipeline(definition: PipelineDefinition<unknown>): PipelineSummary {
   const { task } = definition;
   return {

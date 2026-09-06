@@ -85,6 +85,7 @@ describe('buildRunDump', () => {
       '03-pipeline.json',
       '04-iterations/01/iteration.json',
       '04-iterations/01/artifact.json',
+      '04-iterations/01/artifact.md',
       '04-iterations/01/validation.json',
       '04-iterations/01/critics.json',
       '04-iterations/01/evaluators.json',

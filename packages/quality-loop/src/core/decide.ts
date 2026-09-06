@@ -6,18 +6,18 @@
  */
 import type {
   ConfirmedFinding,
+  Decision,
   DecisionFactor,
+  DecisionPolicy,
   DecisionStep,
   DimensionTrace,
   EvidenceLedger,
   Gates,
   QualityControlDecision,
   Remediation,
-  Decision,
   Severity,
-} from './contracts';
+} from '@sysdesign/contracts';
 import { compareFindings, compareStrings, severityRank } from './ordering';
-import type { DecisionPolicy } from './policy';
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
 const clamp = (value: number, low: number, high: number): number =>

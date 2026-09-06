@@ -3,11 +3,12 @@ import { NestFactory } from '@nestjs/core';
 
 import { runCli } from './cli';
 import { AppModule } from './modules/app/app.module';
+import { configureApp } from './modules/app/configure-app';
 
 /**
  * The quality loop, two ways: `main.js run …` runs one pipeline from the
  * command line and exits; anything else serves the HTTP surface (POST /runs,
- * GET /runs/:id, GET /pipelines, GET /health).
+ * GET /runs/:id, GET /pipelines, GET /prompts, GET /prompts/:id, GET /health).
  */
 async function bootstrap() {
   process.on('uncaughtException', (error) => {
@@ -19,7 +20,7 @@ async function bootstrap() {
     process.exit(await runCli(process.argv.slice(3)));
   }
 
-  const app = await NestFactory.create(AppModule);
+  const app = configureApp(await NestFactory.create(AppModule));
   const port = process.env['QUALITY_LOOP_PORT']
     ? parseInt(process.env['QUALITY_LOOP_PORT'], 10)
     : 3003;

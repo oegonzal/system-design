@@ -13,7 +13,7 @@ import {
   validateGraphReferences,
   validateNarration,
   validateWorkflowReferences,
-  type ImproverAvailabilityDto,
+  type LlmAvailabilityDto,
 } from '@sysdesign/contracts';
 import { createRevisionRecords, DesignSession, ImprovementRun } from '@sysdesign/db';
 import { improverAvailabilityFromEnv } from '@sysdesign/llm';
@@ -37,7 +37,7 @@ export class ImprovementRunsService {
    * Read per request rather than at boot so a spec (or an operator fixing
    * env) sees the truth without a process restart. Derived facts only.
    */
-  availability(): ImproverAvailabilityDto {
+  availability(): LlmAvailabilityDto {
     return improverAvailabilityFromEnv();
   }
 

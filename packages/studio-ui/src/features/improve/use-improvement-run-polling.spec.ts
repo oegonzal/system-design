@@ -1,8 +1,8 @@
+import { stubApi } from '@sysdesign/web-testing';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeImprovementRun } from '../../testing/fixtures';
-import { stubApi } from '../../testing/stub-api';
 import {
   IMPROVE_POLL_BACKOFF_MAX_MS,
   IMPROVE_POLL_INTERVAL_MS,

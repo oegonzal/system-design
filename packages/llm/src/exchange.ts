@@ -1,3 +1,5 @@
+import type { LlmExchangeOutcome } from '@sysdesign/contracts';
+
 import type { LlmClient } from './llm-client';
 
 /**
@@ -29,7 +31,7 @@ export interface LlmCall {
    * The distinction the port erases. `refusal` and `schema-miss` both came back
    * from a well-formed response; `error` never reached one.
    */
-  outcome: 'ok' | 'refusal' | 'schema-miss' | 'error';
+  outcome: LlmExchangeOutcome;
   stopReason: string | null;
   usage: { inputTokens: number; outputTokens: number } | null;
   requestId: string | null;

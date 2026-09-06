@@ -13,7 +13,9 @@
       "@sysdesign/db": ["./packages/db/src/index.ts"],
       "@sysdesign/design-system": ["./packages/design-system/src/index.ts"],
       "@sysdesign/llm": ["./packages/llm/src/index.ts"],
-      "@sysdesign/run-dump": ["./packages/run-dump/src/index.ts"]
+      "@sysdesign/run-dump": ["./packages/run-dump/src/index.ts"],
+      "@sysdesign/web-kit": ["./packages/web-kit/src/index.ts"],
+      "@sysdesign/web-testing": ["./packages/web-testing/src/index.ts"]
     },
     "skipDefaultLibCheck": true,
     "skipLibCheck": true,

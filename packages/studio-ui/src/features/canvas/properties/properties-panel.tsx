@@ -17,9 +17,8 @@ import {
   type EdgeIntent,
   type WorkflowSpec,
 } from '@sysdesign/contracts';
-import { Button, Heading, Stack, Text } from '@sysdesign/design-system';
+import { Button, Heading, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
 
-import { SelectField, TextField } from '../../../components/fields';
 import { useCanvasStore } from '../canvas-store-context';
 import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import type { InterfaceSuggestionsState } from '../../practice/use-interface-suggestions';

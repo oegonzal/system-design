@@ -12,7 +12,7 @@ import {
   DECISIONS,
   FIXABILITIES,
   SEVERITIES,
-} from './contracts';
+} from '@sysdesign/contracts';
 
 export type EnumTuple = [string, ...string[]];
 

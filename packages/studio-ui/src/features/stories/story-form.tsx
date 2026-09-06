@@ -9,10 +9,15 @@ import {
   type SaveStarStoryRequest,
   type StarStoryDto,
 } from '@sysdesign/contracts';
-import { Button, Stack, Text } from '@sysdesign/design-system';
+import {
+  Button,
+  SelectField,
+  Stack,
+  Text,
+  TextAreaField,
+  TextField,
+} from '@sysdesign/design-system';
 import { useState } from 'react';
-
-import { SelectField, TextAreaField, TextField } from '../../components/fields';
 
 export interface StoryFormProps {
   /** Existing story when editing; omit for a blank create form. */

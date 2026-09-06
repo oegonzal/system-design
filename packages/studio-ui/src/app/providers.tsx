@@ -1,12 +1,12 @@
 'use client';
 
 import { ThemeRoot } from '@sysdesign/design-system';
+import { EmotionRegistry } from '@sysdesign/web-kit';
 import type { ReactNode } from 'react';
 
 import { AppShell } from '../components/app-shell';
 import { useAppearance } from '../providers/appearance-context';
 import { AppearanceProvider } from '../providers/appearance-provider';
-import { EmotionRegistry } from './emotion-registry';
 
 /** Bridges the appearance context into the design system's ThemeRoot. */
 function ThemedShell({ children }: { children?: ReactNode }) {

@@ -1,8 +1,8 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { ReactFlow } from '@xyflow/react';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { renderWithTheme } from '../../../testing/render';
 import type { SdNode as SdNodeModel } from '../types';
 import { SdNode } from './sd-node';
 

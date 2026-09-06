@@ -14,10 +14,17 @@ import {
   type NfrItem,
   type NodeKind,
 } from '@sysdesign/contracts';
-import { Badge, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  CheckboxField,
+  SelectField,
+  Stack,
+  Surface,
+  Text,
+  TextField,
+} from '@sysdesign/design-system';
 import type { ReactNode } from 'react';
 
-import { CheckboxField, SelectField, TextField } from '../../../components/fields';
 import { eligibleNodes } from '../../canvas/brief-draft';
 import { MechanismVerdictChip } from './mechanism-verdict';
 

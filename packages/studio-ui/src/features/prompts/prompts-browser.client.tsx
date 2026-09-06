@@ -8,14 +8,22 @@ import {
   type PromptDifficulty,
   type PromptDto,
 } from '@sysdesign/contracts';
-import { Badge, Button, Heading, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  Button,
+  Heading,
+  SelectField,
+  Skeleton,
+  Stack,
+  Surface,
+  Text,
+} from '@sysdesign/design-system';
+import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
-import { SelectField } from '../../components/fields';
-import { useLatestRequest } from '../../hooks/use-latest-request';
+import { api } from '../../api/client';
 
 const PAGE_SIZE = DEFAULT_LIST_LIMIT;
 

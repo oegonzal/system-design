@@ -1,0 +1,9 @@
+{
+  "name": "web-testing",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/web-testing/src",
+  "projectType": "library",
+  "tags": ["type:ui", "scope:web"],
+  "// targets": "test and typecheck are inferred from vite.config.ts by @nx/vite/plugin",
+  "targets": {}
+}

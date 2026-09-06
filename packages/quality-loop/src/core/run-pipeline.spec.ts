@@ -1,7 +1,7 @@
 import { NoopLlmClient, type LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import type { Criterion } from './contracts';
+import type { SuccessCriterion } from '@sysdesign/contracts';
 import type { Producer, ProducerInput, Stages } from './ports';
 import { runLoop, runPipeline } from './run-pipeline';
 import {
@@ -17,7 +17,7 @@ import {
 } from './testing';
 
 const clock = () => 0;
-const deriver = (criteria: Criterion[] | null) => () =>
+const deriver = (criteria: SuccessCriterion[] | null) => () =>
   Promise.resolve({
     criteria,
     diagnostic: criteria

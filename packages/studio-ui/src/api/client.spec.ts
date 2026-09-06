@@ -1,9 +1,11 @@
+import { stubApi } from '@sysdesign/web-testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import { vi } from 'vitest';
 
+import { ApiError } from '@sysdesign/web-kit';
+
 import { makePrompt } from '../testing/fixtures';
-import { stubApi } from '../testing/stub-api';
-import { api, ApiError, isAbortError, query, toErrorMessage } from './client';
+import { api } from './client';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -42,11 +44,6 @@ describe('api client', () => {
     await api.listPrompts({ experienceId: 'exp 1', limit: 10, offset: 0 });
 
     expect(calls[0].url).toBe('/api/prompts?experienceId=exp+1&limit=10&offset=0');
-  });
-
-  it('query() drops only undefined values', () => {
-    expect(query({ a: 0, b: undefined, c: false, d: 'x y' })).toBe('?a=0&c=false&d=x+y');
-    expect(query({})).toBe('');
   });
 
   it('throws ApiError with status and flattened Nest message on non-ok', async () => {
@@ -105,17 +102,5 @@ describe('api client', () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
     expect(init.body).toBe(JSON.stringify({ promptId: 'prompt-1' }));
-  });
-
-  it('isAbortError recognizes AbortError and toErrorMessage prefers ApiError copy', () => {
-    const abort = new DOMException('The operation was aborted.', 'AbortError');
-    expect(isAbortError(abort)).toBe(true);
-    expect(isAbortError(new Error('boom'))).toBe(false);
-
-    expect(toErrorMessage(new ApiError(500, { statusCode: 500, message: 'DB down' }), 'x')).toBe(
-      'DB down',
-    );
-    expect(toErrorMessage('not-an-error', 'fallback copy')).toBe('fallback copy');
-    expect(toErrorMessage(abort, 'fallback copy')).toBe('fallback copy');
   });
 });

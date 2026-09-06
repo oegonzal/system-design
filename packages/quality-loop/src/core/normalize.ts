@@ -5,20 +5,22 @@
  * result carries ids, enums and counts only: the policy reads nothing else.
  */
 import type {
+  ArtifactLocation,
   ConfirmedFinding,
   CriterionEvidence,
   CriticReport,
+  DecisionPolicy,
   Diagnostic,
   DiscardedItem,
   EvaluationReport,
   EvidenceLedger,
   LensOutcome,
-  Location,
   RawCriterionResult,
   RawFinding,
-  TaskContract,
   ValidationReport,
-} from './contracts';
+} from '@sysdesign/contracts';
+
+import type { TaskContract } from './contracts';
 import {
   CONFIDENCE_LOW_FIRST,
   compareFindings,
@@ -29,12 +31,11 @@ import {
   SEVERITY_MILD_FIRST,
   unique,
 } from './ordering';
-import type { DecisionPolicy } from './policy';
 
 export interface NormalizeInput<T> {
   contract: TaskContract<T>;
   artifactPresent: boolean;
-  locations: readonly Location[];
+  locations: readonly ArtifactLocation[];
   validation: ValidationReport[];
   critics: LensOutcome<CriticReport>[];
   evaluators: LensOutcome<EvaluationReport>[];

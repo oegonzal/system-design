@@ -1,37 +1,11 @@
 /**
- * The decision policy: every number, threshold, gate and route the controller
- * uses. A pipeline declares one as data; `validatePolicy` refuses a malformed
- * one before it can grade anything.
+ * `validatePolicy` refuses a malformed decision policy (the shape lives in
+ * `@sysdesign/contracts`) before it can grade anything.
  */
-import { AXIS_FACTOR_LEVELS, SEVERITIES } from './contracts';
-import type { AxisFactorLevel, Severity, TaskSpec } from './contracts';
+import { AXIS_FACTOR_LEVELS, SEVERITIES } from '@sysdesign/contracts';
+import type { DecisionPolicy } from '@sysdesign/contracts';
 
-export interface DecisionPolicy {
-  version: string;
-  /** Dimensions ARE the keys; weights sum to 1. */
-  dimensionWeights: Readonly<Record<string, number>>;
-  /** Every task criterion kind: where its credit lands, how much it weighs, whether a fail blocks. */
-  criterionKinds: Readonly<Record<string, { dimension: string; weight: number; gate: boolean }>>;
-  /** Every task finding type: where its penalty lands, whether it is an unacceptable failure mode. */
-  findingTypes: Readonly<Record<string, { dimension: string; gate: boolean }>>;
-  resultValues: Readonly<Record<'pass' | 'partial' | 'fail', number>>;
-  confidenceWeights: Readonly<Record<AxisFactorLevel, number>>;
-  penalties: {
-    bySeverity: Readonly<Record<Severity, number>>;
-    /** Multiplier on each successive finding within a dimension, in (0, 1]. */
-    decay: number;
-    maxPerDimension: number;
-  };
-  blockingSeverities: readonly Severity[];
-  evidence: {
-    /** Samples an item must recur in to count. */
-    minHits: number;
-    /** Share of criteria that must be assessed before a score means anything. */
-    minAssessedShare: number;
-  };
-  thresholds: { acceptAt: number; rejectBelow: number };
-  loop: { maxIterations: number; plateauAfter: number; concurrency: number };
-}
+import type { TaskSpec } from './contracts';
 
 const inUnit = (value: number): boolean => value >= 0 && value <= 1;
 

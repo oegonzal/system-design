@@ -8,10 +8,9 @@ import {
   type NodeKind,
   type NodeKindCategoryId,
 } from '@sysdesign/contracts';
-import { Heading, Stack, Text, transient } from '@sysdesign/design-system';
+import { Heading, Stack, Text, TextField, transient } from '@sysdesign/design-system';
 import { useState, type DragEvent } from 'react';
 
-import { TextField } from '../../../components/fields';
 import { useCanvasStore } from '../canvas-store-context';
 import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import { NODE_ICONS } from '../nodes/node-icons';

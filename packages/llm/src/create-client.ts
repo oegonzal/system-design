@@ -1,3 +1,4 @@
+import type { LlmAvailabilityDto } from '@sysdesign/contracts';
 import { AnthropicLlmClient, DEFAULT_LLM_MODEL } from './anthropic-client';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
 import type { LlmClient } from './llm-client';
@@ -98,11 +99,8 @@ export function createRoleLlmFromEnv(
   return new NoopLlmClient();
 }
 
-export interface LlmAvailability {
-  enabled: boolean;
-  model: string | null;
-  reason: 'deterministic' | 'no-key' | null;
-}
+/** The wire shape (`contracts`) is the one definition; this is its node-side name. */
+export type LlmAvailability = LlmAvailabilityDto;
 
 /**
  * Derived facts only — never the key. Answers "would the role's factory yield

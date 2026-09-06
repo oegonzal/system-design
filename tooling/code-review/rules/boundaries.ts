@@ -17,7 +17,10 @@ import type { ChangedFile } from './index';
  *   llm            -> contracts         provider adapters
  *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
  *   design-system  -> contracts         tokens and domain-free primitives
- *   studio-ui      -> contracts, design-system
+ *   web-kit        -> contracts, design-system   the Next apps' runtime plumbing
+ *   web-testing    -> contracts, design-system   the web spec harness
+ *   studio-ui      -> contracts, design-system, web-kit, web-testing
+ *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
  *   studio-api     -> contracts, db, llm, criteria, run-dump
  *   eval-worker    -> contracts, db, llm, criteria, run-dump
  *   quality-loop   -> contracts, llm, run-dump
@@ -33,7 +36,10 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   llm: ['contracts'],
   'run-dump': [],
   'design-system': ['contracts'],
-  'studio-ui': ['contracts', 'design-system'],
+  'web-kit': ['contracts', 'design-system'],
+  'web-testing': ['contracts', 'design-system'],
+  'studio-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
+  'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'studio-api': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'quality-loop': ['contracts', 'llm', 'run-dump'],

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { PipelineSummary } from '@sysdesign/contracts';
 import { writeDump } from '@sysdesign/run-dump';
 
 import type { RunRecord } from '../../core/contracts';
-import type { PipelineSummary } from '../../core/pipeline';
 import type { TraceStore } from '../../core/ports';
 import { buildRunDump } from '../../dump/build-run-dump';
 

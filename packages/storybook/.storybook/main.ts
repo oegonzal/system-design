@@ -20,6 +20,7 @@ const config: StorybookConfig = {
   stories: [
     '../../design-system/src/**/*.stories.@(ts|tsx)',
     '../../studio-ui/src/**/*.stories.@(ts|tsx)',
+    '../../quality-loop-ui/src/**/*.stories.@(ts|tsx)',
   ],
 
   addons: ['@storybook/addon-docs', '@storybook/addon-a11y'],

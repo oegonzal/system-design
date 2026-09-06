@@ -1,9 +1,9 @@
 import { EVAL_DIMENSIONS } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { makeEvaluation } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { ScoreSummary } from './score-summary';
 
 describe('ScoreSummary', () => {

@@ -7,12 +7,12 @@ import type {
   StarStoryDto,
 } from '@sysdesign/contracts';
 import { Heading, LiveRegion, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
+import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { api, ApiError, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
-import { useLatestRequest } from '../../hooks/use-latest-request';
 import { StoryForm } from './story-form';
 
 export interface StoryDetailProps {

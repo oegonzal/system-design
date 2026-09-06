@@ -1,3 +1,4 @@
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -5,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { createCanvasStore } from '../canvas/canvas-store';
 import { CanvasStoreProvider } from '../canvas/canvas-store-context';
 import { makeGraph, makePrompt } from '../../testing/fixtures';
-import { renderWithTheme } from '../../testing/render';
 import { NarrativeEditor } from './narrative-editor';
 
 type Seed = (store: ReturnType<typeof createCanvasStore>) => void;

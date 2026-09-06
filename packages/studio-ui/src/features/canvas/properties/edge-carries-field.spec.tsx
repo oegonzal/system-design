@@ -1,10 +1,10 @@
 import { EDGE_MAX_CARRIES, type NodeOperation } from '@sysdesign/contracts';
+import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { renderWithTheme } from '../../../testing/render';
 import { EdgeCarriesField } from './edge-carries-field';
 
 const declaredOps: NodeOperation[] = [

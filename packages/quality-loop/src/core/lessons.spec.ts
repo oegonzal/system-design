@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { IterationTrace } from './contracts';
+import type { IterationTrace } from '@sysdesign/contracts';
 import { decide } from './decide';
 import { deriveLessons } from './lessons';
 import { normalize } from './normalize';
@@ -46,6 +46,7 @@ function iteration(
     mode: 'initial',
     artifact: { text: 't', parts: [] },
     locations: [],
+    rendered: null,
     validation: [],
     critics,
     evaluators,

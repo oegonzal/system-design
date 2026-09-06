@@ -2,10 +2,11 @@
 
 import type { ExperienceProfileDto, PromptDto, SaveStarStoryRequest } from '@sysdesign/contracts';
 import { Heading, Stack, Surface, Text } from '@sysdesign/design-system';
+import { toErrorMessage } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { api, toErrorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import { StoryForm } from './story-form';
 
 export function StoryNew() {

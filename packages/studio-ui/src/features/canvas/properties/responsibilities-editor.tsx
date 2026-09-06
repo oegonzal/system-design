@@ -1,10 +1,9 @@
 'use client';
 
 import { NODE_MAX_RESPONSIBILITIES, RESPONSIBILITY_MAX_LENGTH } from '@sysdesign/contracts';
-import { Badge, Stack, Text } from '@sysdesign/design-system';
+import { Badge, Stack, Text, TextField } from '@sysdesign/design-system';
 import { useState } from 'react';
 
-import { TextField } from '../../../components/fields';
 import { ChipRemoveButton } from './chip-remove-button';
 
 export interface ResponsibilitiesEditorProps {

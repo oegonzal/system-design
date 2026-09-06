@@ -4,9 +4,9 @@
  * criteria it is the sole judge of. Its advisory verdict is recorded and goes
  * no further.
  */
+import type { EvaluationReport, LensOutcome } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { EvaluationReport, LensOutcome } from '../contracts';
 import type { EvaluatorSpec } from '../pipeline';
 import type { Evaluator, LensContext } from '../ports';
 import {
