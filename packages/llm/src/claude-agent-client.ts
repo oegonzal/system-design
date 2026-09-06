@@ -76,28 +76,40 @@ function* braceObjects(text: string): Generator<string> {
 }
 
 /**
- * A `too_big` issue on a string or array is an overshoot, not a wrong answer:
- * with no server-side constraint the model writes past a `.max()` it was shown,
- * and rejecting a whole pass for a 900-character summary loses everything
- * grounded in it. Clamp each such value to its maximum and let the schema
- * judge again — schema-driven, so no caller knows a cap exists. Anything that
- * is not an overshoot is left for the schema to reject.
+ * Two kinds of schema issue are excess, not a wrong answer. A `too_big` on a
+ * string or array is an overshoot: with no server-side constraint the model
+ * writes past a `.max()` it was shown, and rejecting a whole pass for a
+ * 900-character summary loses everything grounded in it. An
+ * `unrecognized_keys` on a strict object is an aside: a `steps_note` beside
+ * the `steps` the schema asked for. Clamp the one, strip the other, and let
+ * the schema judge again — schema-driven, so no caller knows a cap or a key
+ * list exists. Anything else is left for the schema to reject.
  */
-function clampOvershoot(value: unknown, issues: readonly ZodIssue[]): unknown {
+const isRepairable = (issue: ZodIssue): boolean =>
+  issue.code === 'unrecognized_keys' ||
+  (issue.code === 'too_big' &&
+    typeof issue.maximum === 'number' &&
+    (issue.origin === 'string' || issue.origin === 'array'));
+
+function repairExcess(value: unknown, issues: readonly ZodIssue[]): unknown {
   let next = value;
   for (const issue of issues) {
-    if (issue.code !== 'too_big' || typeof issue.maximum !== 'number') continue;
-    if (issue.origin !== 'string' && issue.origin !== 'array') continue;
     const path = issue.path.filter(
       (key): key is string | number => typeof key === 'string' || typeof key === 'number',
     );
-    next = updateAt(next, path, (current) =>
-      typeof current === 'string'
-        ? current.slice(0, issue.maximum as number)
-        : Array.isArray(current)
-          ? current.slice(0, issue.maximum as number)
+    if (issue.code === 'too_big') {
+      const maximum = issue.maximum as number;
+      next = updateAt(next, path, (current) =>
+        typeof current === 'string' || Array.isArray(current) ? current.slice(0, maximum) : current,
+      );
+    } else if (issue.code === 'unrecognized_keys') {
+      const unwanted = new Set(issue.keys);
+      next = updateAt(next, path, (current) =>
+        current !== null && typeof current === 'object' && !Array.isArray(current)
+          ? Object.fromEntries(Object.entries(current).filter(([key]) => !unwanted.has(key)))
           : current,
-    );
+      );
+    }
   }
   return next;
 }
@@ -121,14 +133,14 @@ function updateAt(
   return value;
 }
 
-/** Overshoot clamps can cascade (an array trimmed, then a member's string); a few rounds settle it. */
-const CLAMP_ROUNDS = 3;
+/** Repairs can cascade (an array trimmed, then a member's string); a few rounds settle it. */
+const REPAIR_ROUNDS = 3;
 
 /**
  * Pull the one schema-valid JSON object out of an agent's final text.
  * Tries every fenced block, then every balanced brace span, returning the
  * first that both parses AND satisfies the schema — clamping length
- * overshoots on the way. Anything else is `null`, the port's deterministic
+ * overshoots and stripping unasked-for keys on the way. Anything else is `null`, the port's deterministic
  * path.
  */
 export function extractStructured<T>(text: string, schema: ZodType<T>): T | null {
@@ -144,12 +156,12 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
     } catch {
       continue;
     }
-    for (let round = 0; round <= CLAMP_ROUNDS; round++) {
+    for (let round = 0; round <= REPAIR_ROUNDS; round++) {
       const result = schema.safeParse(parsed);
       if (result.success) return result.data;
-      const overshoots = result.error.issues.filter((issue) => issue.code === 'too_big');
-      if (overshoots.length === 0 || overshoots.length !== result.error.issues.length) break;
-      parsed = clampOvershoot(parsed, overshoots);
+      const { issues } = result.error;
+      if (issues.length === 0 || !issues.every(isRepairable)) break;
+      parsed = repairExcess(parsed, issues);
     }
   }
   return null;

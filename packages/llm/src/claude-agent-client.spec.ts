@@ -56,6 +56,25 @@ describe('extractStructured', () => {
     });
   });
 
+  it('strips a key the schema never asked for instead of losing the whole answer', () => {
+    const schema = z.strictObject({
+      flows: z.array(z.strictObject({ name: z.string(), steps: z.array(z.string().max(20)) })),
+    });
+    const text = JSON.stringify({
+      flows: [
+        {
+          name: 'read',
+          steps: ['load the page', 'a step far longer than twenty chars'],
+          steps_note: 'aside',
+        },
+      ],
+    });
+
+    expect(extractStructured(text, schema)).toEqual({
+      flows: [{ name: 'read', steps: ['load the page', 'a step far longer th'] }],
+    });
+  });
+
   it('does not clamp its way past a real schema miss', () => {
     const capped = z.object({ summary: z.string().max(10), score: z.number() });
     expect(extractStructured('{"summary":"twelve chars","score":"nope"}', capped)).toBeNull();
