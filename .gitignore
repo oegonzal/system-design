@@ -57,3 +57,6 @@ playwright-report/
 
 # TypeScript incremental build state
 *.tsbuildinfo
+
+# Environment files
+.env

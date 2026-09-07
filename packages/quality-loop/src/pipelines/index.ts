@@ -3,9 +3,15 @@
  * beside `system-design` and one line here; the core never changes.
  */
 import type { PipelineDefinition } from '../core/pipeline';
+import { EXPERIENCE_DIGEST } from './experience-digest/definition';
+import { MEMORY_RECALL } from './memory-recall/definition';
 import { SYSTEM_DESIGN } from './system-design/definition';
 
-const declared: PipelineDefinition<unknown>[] = [SYSTEM_DESIGN as PipelineDefinition<unknown>];
+const declared: PipelineDefinition<unknown>[] = [
+  SYSTEM_DESIGN as PipelineDefinition<unknown>,
+  MEMORY_RECALL as PipelineDefinition<unknown>,
+  EXPERIENCE_DIGEST as PipelineDefinition<unknown>,
+];
 
 export const PIPELINES: ReadonlyMap<string, PipelineDefinition<unknown>> = new Map(
   declared.map((definition) => [definition.id, definition]),

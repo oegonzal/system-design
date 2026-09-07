@@ -273,6 +273,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, surviving a restart, and listing newest first.',
   },
+  {
+    id: 'QL-14',
+    statement:
+      'A pipeline that needs more than a prompt owns an input codec: the composed goal round-trips through it, its schema refuses a goal the engine would clip, and exact checks over its index are validators that block — no rule parses prose.',
+  },
+  {
+    id: 'QL-15',
+    statement:
+      'Experience is digested from facts the engine established — remediations selected, findings persisted or resolved, criteria improved or regressed, scores moved — never from an effect a model authored.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

@@ -87,6 +87,16 @@ A folder beside `src/pipelines/system-design/` and one line in `src/pipelines/in
 
 `validatePipeline` runs at boot and at every run: weights sum to 1, every kind and type is priced onto a known dimension, thresholds and decay are in range, every lens can reach `minHits`, every kind has exactly one evaluator, no reserved or duplicate ids, and the output schema converts to JSON Schema.
 
+Three instances exist, each a folder under `src/pipelines/`:
+
+| Pipeline            | Artifact           | Input                                                                            | Criterion kinds                               | Dimensions                                              |
+| ------------------- | ------------------ | -------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| `system-design`     | `DesignAnswer`     | a prompt md                                                                      | functional, non_functional, scale, constraint | completeness, quality_attributes, compliance, soundness |
+| `memory-recall`     | `MemoryPack`       | a prompt md plus candidate chunks recalled for it (`input.ts`)                   | need, admissibility                           | coverage, precision, fidelity                           |
+| `experience-digest` | `ExperienceDigest` | a finished run of any pipeline, composed from its `QualityRunDto` (`compose.ts`) | signal, transition                            | attribution, fidelity, reuse                            |
+
+A pipeline whose input is more than a prompt owns an **input codec** (`input.ts`): a typed input rendered to the goal markdown — the flexible md verbatim under its own heading, pipeline-owned sections around it, engine-assigned aliases (`m3`, `f4`, `r2`) — closing with `## Index`, a fenced JSON block the codec reads back with zod. The input schema refuses anything that would render beyond the goal budget. Every alias is a location the artifact must give a verdict to (`kept ∪ dropped`, `evidence ∪ unused`), so a finding about an item keeps its key across revisions and maps straight back to the source. **Exact checks are validators** (`validators.ts`): an alias the index does not hold, an alias placed twice, an item left without a verdict, a pack or digest over its limit — each blocks, none reads prose; both validators start from the output schema because the engine runs every validator on any artifact it has. What the goal does not state cannot become a criterion, so standing rules such as grounding and transfer are critic-checked finding types, and `experience-digest` records the engine's own facts — remediations selected, transitions from the lessons, score deltas — rather than letting a model author an effect.
+
 ## How evidence becomes a decision
 
 **Scores.** For each dimension: criteria of the kinds mapped to it earn `resultValues[result] × kindWeight` (`unassessed` earns nothing but keeps its weight); the base is 100 × earned / total. Confirmed, unreconciled findings mapped to the dimension subtract `bySeverity[severity] × confidenceWeights[confidence]`, worst first, each decayed by `decay^position`, the total clamped to `maxPerDimension` pro rata. A dimension with nothing mapped to it is `null` and renormalises out; one with findings but no criteria starts at 100. Overall is the weighted mean of assessed dimensions.
@@ -116,6 +126,8 @@ A folder beside `src/pipelines/system-design/` and one line in `src/pipelines/in
 | Results render every part of the verdict from the wire contract alone                                    | `[QLU-3]`                                            |
 | Runs persist in normalized tables, reassemble exactly, survive a restart, list newest first              | `[QL-13]`                                            |
 | The client lists recent runs, reopens one on click or from `?run=<id>`, refreshes when a run ends        | `[QLU-4]`                                            |
+| A composed goal round-trips through its pipeline's codec; exact checks are validators that block         | `[QL-14]`                                            |
+| Experience is digested from engine facts, never from an effect a model authored                          | `[QL-15]`                                            |
 
 Deliberate deviations from the doctrine's literal shapes: severities are the repo's (`critical` is the doctrine's `fatal`); fixability has four values (no tools or backtracking exist); `suggestedFixType`, report-level confidence and `qualityEvidence` are omitted; constraints are criteria of a gated kind and failure modes are finding types the policy gates.
 

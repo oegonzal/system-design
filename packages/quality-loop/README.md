@@ -8,7 +8,7 @@ pnpm quality-loop:serve          # POST /runs · GET /runs/:id · GET /pipelines
 pnpm exec nx test quality-loop
 ```
 
-Layout: `src/core` (pure engine), `src/pipelines/<id>` (one folder per pipeline), `src/dump` (the run-dump layout), `src/modules` (Nest wiring), `prompts/` (the library `GET /prompts` serves; one markdown file per prompt, titled by its H1).
+Layout: `src/core` (pure engine), `src/pipelines/<id>` (one folder per pipeline: `system-design`, `memory-recall`, `experience-digest`), `src/dump` (the run-dump layout), `src/modules` (Nest wiring), `prompts/` (the library `GET /prompts` serves; one markdown file per prompt, titled by its H1).
 
 How it works, the env variables, the dump layout and the guarantees: [docs/pipeline-best-practices/quality-loop.md](../../docs/pipeline-best-practices/quality-loop.md).
 
