@@ -44,7 +44,32 @@ a gated finding needs both samples of a critic to agree before it blocks;
 
 `system-design` is only the default target. `POST /memory-runs` takes a
 `pipeline` like `POST /runs` does, and the module refuses only the two memory
-roles as targets.
+roles as targets. The digest is target-agnostic by construction: `fromRun`
+reads `contract.criteria`, the iteration ledgers, `selectedRemediations` and
+`trace.lessons` — engine facts every pipeline produces — so a fourth pipeline
+becomes digestible the day it is registered, with no change here.
+
+**A declared weight is not an earned one.** Worth stating once, because the
+policy tables read as though every dimension is scored the same way. A
+dimension earns from the criterion kinds mapped to it, and loses from the
+finding types mapped to it. Where no kind is mapped, the dimension can only
+ever start at 100 and fall:
+
+| Pipeline            | Earns from criteria                          | Penalty-only                |
+| ------------------- | -------------------------------------------- | --------------------------- |
+| `system-design`     | completeness, quality_attributes, compliance | soundness (.20)             |
+| `memory-recall`     | coverage, fidelity                           | precision (.25)             |
+| `experience-digest` | attribution                                  | fidelity (.30), reuse (.30) |
+
+A dimension with neither criteria nor findings is `null` and renormalises out,
+so the divisor is the weight actually assessed. Both live scores fall straight
+out of that: recall `bc5085` scored coverage 66.7 and fidelity 100 with
+precision untouched, giving (66.7 × .40 + 100 × .35) / .75 = **82.2**; digest
+`bb3c39` scored attribution 92 and fidelity 96.7 with reuse untouched, giving
+(92 × .40 + 96.7 × .30) / .70 = **94.0**. It also explains a pattern visible in
+every `system-design` run recorded in §8: soundness sits at 40 while coverage
+sits at 100, because soundness has no criteria to earn from and the critics
+only ever subtract from it.
 
 ---
 
