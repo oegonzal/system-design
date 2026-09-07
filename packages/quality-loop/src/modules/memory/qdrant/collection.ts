@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
+import { EVIDENCE_KINDS } from '../../../pipelines/experience-digest/input';
 import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
 import type { MemoryChunk, MemoryHit } from '../ports';
 
@@ -27,9 +28,7 @@ const payloadSchema = chunkSourceSchema.extend({
   text: z.string().min(1),
   contentHash: z.string().length(64),
   model: z.string().min(1),
-  evidence: z.array(
-    z.strictObject({ kind: z.enum(['finding', 'criterion']), ref: z.string().min(1) }),
-  ),
+  evidence: z.array(z.strictObject({ kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) })),
   digestRunId: z.string().nullable(),
   storedAt: z.string(),
 });

@@ -17,7 +17,7 @@ import type {
 import type { EmbeddingClient } from '@sysdesign/llm';
 
 import type { EmbeddingCache, MemoryHit, MemoryStore, StoredChunk } from './ports';
-import { pointId } from './qdrant/collection';
+import { collectionName, pointId } from './qdrant/collection';
 
 export const FAKE_MODEL = 'fake-embedding';
 
@@ -62,11 +62,12 @@ export class InMemoryMemoryStore implements MemoryStore {
   ) {}
 
   verify(): Promise<MemoryStoreAvailabilityDto> {
-    const collection = this.model === null ? null : `memory__${this.model}__${this.dimensions}`;
+    const collection = this.model === null ? null : collectionName(this.model, this.dimensions);
     if (this.model === null) {
       return Promise.resolve({
         ready: false,
         reason: 'no-model',
+        note: null,
         model: null,
         collection,
         chunks: 0,
@@ -76,6 +77,7 @@ export class InMemoryMemoryStore implements MemoryStore {
       return Promise.resolve({
         ready: false,
         reason: 'unreachable',
+        note: 'store unreachable',
         model: this.model,
         collection,
         chunks: 0,
@@ -84,6 +86,7 @@ export class InMemoryMemoryStore implements MemoryStore {
     return Promise.resolve({
       ready: true,
       reason: null,
+      note: null,
       model: this.model,
       collection,
       chunks: this.points.size,

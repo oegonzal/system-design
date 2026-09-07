@@ -7,11 +7,12 @@
 import { Injectable } from '@nestjs/common';
 import type { FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { MemoryRunDto, MemoryStep, MemoryStepDto } from '@sysdesign/contracts';
+import type { MemoryRunDto } from '@sysdesign/contracts';
 import { MemoryRun, QualityRun } from '@sysdesign/db';
 
 import type { RunListQuery } from '../../../core/ports';
 import type { MemoryRunRepository } from '../ports';
+import { closeSteps } from '../steps';
 import { childIds, fromRow, toRow } from './memory-run-mapper';
 
 const INTERRUPTED = {
@@ -19,22 +20,6 @@ const INTERRUPTED = {
   message: 'the service restarted while the memory run was in flight',
   stack: null,
 };
-
-/** What the sweep leaves of a step: running → failed, pending → skipped, both `interrupted`. */
-export const sweepSteps = (
-  steps: Record<MemoryStep, MemoryStepDto>,
-  at: string,
-): Record<MemoryStep, MemoryStepDto> =>
-  Object.fromEntries(
-    Object.entries(steps).map(([step, dto]) => [
-      step,
-      dto.status === 'running'
-        ? { ...dto, status: 'failed', reason: 'interrupted', finishedAt: at }
-        : dto.status === 'pending'
-          ? { ...dto, status: 'skipped', reason: 'interrupted', finishedAt: at }
-          : dto,
-    ]),
-  ) as Record<MemoryStep, MemoryStepDto>;
 
 @Injectable()
 export class MikroOrmMemoryRunRepository implements MemoryRunRepository {
@@ -103,7 +88,7 @@ export class MikroOrmMemoryRunRepository implements MemoryRunRepository {
     for (const row of rows) {
       row.status = 'failed';
       row.error = INTERRUPTED;
-      row.steps = sweepSteps(row.steps, at.toISOString());
+      row.steps = closeSteps(row.steps, 'interrupted', null, at.toISOString());
       row.finishedAt = at;
     }
     await em.flush();

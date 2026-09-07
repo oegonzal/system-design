@@ -62,7 +62,7 @@ export interface UsableMemory {
   support: number;
 }
 
-const bestIteration = (trace: RunTrace) =>
+export const bestIteration = (trace: RunTrace) =>
   trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ?? null;
 
 export interface RecallReadout {
@@ -137,17 +137,23 @@ export interface MemoryToStore {
   evidence: EvidenceRef[];
 }
 
+export interface DigestReadout {
+  /** How many memories the digest proposed, faulted or not. */
+  proposed: number;
+  memories: MemoryToStore[];
+}
+
 /** What an accepted digest endorses: memories no confirmed finding names, with their evidence resolved. */
-export function memoriesToStore(trace: RunTrace): MemoryToStore[] {
-  if (trace.finalDecision !== 'accept') return [];
+export function memoriesToStore(trace: RunTrace): DigestReadout {
   const best = bestIteration(trace);
-  if (best === null) return [];
-  const digest = experienceDigestSchema.safeParse(best.artifact);
+  const digest = best === null ? null : experienceDigestSchema.safeParse(best.artifact);
+  if (best === null || !digest?.success) return { proposed: 0, memories: [] };
+  const proposed = digest.data.memories.length;
   const index = readDigestIndex(trace.contract.goal);
-  if (!digest.success || index === null) return [];
+  if (trace.finalDecision !== 'accept' || index === null) return { proposed, memories: [] };
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
-  return digest.data.memories.flatMap((memory, position) => {
+  const memories = digest.data.memories.flatMap((memory, position) => {
     const id = `memory.${position + 1}`;
     if (faulted.has(id)) return [];
     const evidence = memory.evidence.flatMap((name) => {
@@ -163,6 +169,7 @@ export function memoriesToStore(trace: RunTrace): MemoryToStore[] {
       },
     ];
   });
+  return { proposed, memories };
 }
 
 export const lessonText = (memory: MemoryToStore): string =>

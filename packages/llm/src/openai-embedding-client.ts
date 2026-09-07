@@ -14,6 +14,9 @@ export const OPENAI_EMBEDDINGS_URL = 'https://api.openai.com/v1/embeddings';
 export const MAX_INPUTS_PER_REQUEST = 100;
 const MAX_RETRY_AFTER_MS = 10_000;
 const DEFAULT_RETRY_AFTER_MS = 1_000;
+/** A stalled provider must not hold a memory step for undici's five-minute default. */
+const REQUEST_TIMEOUT_MS = 30_000;
+const ERROR_BODY_CHARS = 200;
 
 export type EmbeddingTransport = (input: string, init: RequestInit) => Promise<Response>;
 export type Sleep = (ms: number) => Promise<void>;
@@ -37,6 +40,16 @@ const retryAfterMs = (response: Response): number => {
   return Number.isFinite(seconds) && seconds > 0
     ? Math.min(seconds * 1000, MAX_RETRY_AFTER_MS)
     : DEFAULT_RETRY_AFTER_MS;
+};
+
+/** The provider's own words, bounded — a rejected `dimensions` or a bad key is otherwise a bare status. */
+const errorDetail = async (response: Response): Promise<string> => {
+  try {
+    const text = (await response.text()).replace(/\s+/g, ' ').trim();
+    return text.length > 0 ? ` — ${text.slice(0, ERROR_BODY_CHARS)}` : '';
+  } catch {
+    return '';
+  }
 };
 
 const warn = (detail: string): void => {
@@ -79,7 +92,7 @@ export class OpenAiEmbeddingClient implements EmbeddingClient {
         response = await this.request(batch);
       }
       if (!response.ok) {
-        warn(`status ${response.status}`);
+        warn(`status ${response.status}${await errorDetail(response)}`);
         return null;
       }
       return this.vectorsOf((await response.json()) as EmbeddingsResponse, batch.length);
@@ -97,6 +110,7 @@ export class OpenAiEmbeddingClient implements EmbeddingClient {
       headers: { authorization: `Bearer ${this.apiKey}`, 'content-type': 'application/json' },
       // `dimensions` is always sent, so any text-embedding-3 model fits the store's width.
       body: JSON.stringify({ model: this.model, input: batch, dimensions: this.dimensions }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   }
 

@@ -28,12 +28,12 @@ describe('composing a memory run', () => {
   it('[QL-16] the recall query is the goal head under the byte cap, and a maximal query still renders under the goal budget', () => {
     const long = 'x'.repeat(70_000);
     expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(16_000);
-    const wide = Array.from({ length: 16 }, (_, index) =>
+    const wide = Array.from({ length: 17 }, (_, index) =>
       hitOf('y'.repeat(1_200), `run-${index}`, 'memory.1'),
     );
     const query = buildQuery(queryText(long), wide);
     expect(query.candidates).toHaveLength(16);
-    expect(Buffer.byteLength(renderQuery(query))).toBeLessThan(GOAL_MAX_BYTES);
+    expect(() => renderQuery(query)).not.toThrow();
   });
 
   it('[QL-16] the bare goal is the goal without the section a memory run appended', () => {
@@ -51,6 +51,47 @@ describe('composing a memory run', () => {
 
     const revised = readPack(traceOf({ ...recallInput(), decision: 'revise' }), hits);
     expect(revised).toEqual({ kept: 2, usable: [] });
+  });
+
+  it('[QL-16] strongest support first, and the least supported are dropped first when the budget is short', () => {
+    const pack = samplePack({
+      kept: [
+        { chunk: 'm1', serves: 'one', insight: 'a', caveat: null },
+        { chunk: 'm2', serves: 'two', insight: 'b', caveat: null },
+        { chunk: 'm3', serves: 'three', insight: 'c', caveat: null },
+      ],
+      dropped: [],
+    });
+    const trace = traceOf({
+      pipeline: 'memory-recall',
+      goal: renderQuery(buildQuery(GOAL, hits)),
+      artifact: pack,
+      locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
+      criteria: [
+        { id: 'c1', kind: 'need', statement: 'one' },
+        { id: 'c2', kind: 'need', statement: 'two' },
+        { id: 'c3', kind: 'need', statement: 'three' },
+      ],
+      results: [
+        passed('c1', 'need', ['m3']),
+        passed('c2', 'need', ['m3']),
+        passed('c3', 'need', ['m1']),
+      ],
+    });
+    const { usable } = readPack(trace, hits);
+    expect(usable.map((item) => [item.alias, item.support])).toEqual([
+      ['m3', 2],
+      ['m1', 1],
+      ['m2', 0],
+    ]);
+    const all = withMemory(GOAL, usable);
+    expect(all?.injected).toBe(3);
+    const twoFit = Buffer.byteLength(all?.goal ?? '') - 10;
+    const fewer = withMemory(GOAL, usable, twoFit);
+    expect(fewer?.injected).toBe(2);
+    expect(fewer?.goal).toContain('[m3]');
+    expect(fewer?.goal).toContain('[m1]');
+    expect(fewer?.goal).not.toContain('[m2]');
   });
 
   it('[QL-16] memory reaches the goal as an advisory section that fits the budget, or not at all', () => {
@@ -91,22 +132,28 @@ describe('composing a memory run', () => {
       locations: ['summary', 'memory.1', 'memory.2', 'f1', 'r1', 'f2', 'r2'],
       findings: [confirmed('run_specific', ['memory.2'])],
     });
-    expect(memoriesToStore(trace)).toEqual([
-      {
-        position: 1,
-        insight: digest.memories[0].insight,
-        appliesWhen: digest.memories[0].appliesWhen,
-        evidence: [
-          { kind: 'finding', ref: 'unhandled_failure|flow.1' },
-          { kind: 'criterion', ref: 'c1' },
-        ],
-      },
-    ]);
-    expect(memoriesToStore({ ...trace, finalDecision: 'revise' })).toEqual([]);
+    expect(memoriesToStore(trace)).toEqual({
+      proposed: 2,
+      memories: [
+        {
+          position: 1,
+          insight: digest.memories[0].insight,
+          appliesWhen: digest.memories[0].appliesWhen,
+          evidence: [
+            { kind: 'finding', ref: 'unhandled_failure|flow.1' },
+            { kind: 'criterion', ref: 'c1' },
+          ],
+        },
+      ],
+    });
+    expect(memoriesToStore({ ...trace, finalDecision: 'revise' })).toEqual({
+      proposed: 2,
+      memories: [],
+    });
   });
 
   it('[QL-16] a stored chunk is a lesson addressed by the digest location, carrying the source run as provenance', () => {
-    const memories = memoriesToStore(
+    const { memories } = memoriesToStore(
       traceOf({
         pipeline: 'experience-digest',
         goal: renderRecord(

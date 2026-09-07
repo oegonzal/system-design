@@ -8,7 +8,6 @@ import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { LlmAvailabilityDto } from '../llm-availability';
 import type { IsoDateString, Uuid } from '../primitives';
 import type {
-  ListQualityRunsQuery,
   QualityRunRequestSummary,
   QualityRunStatus,
   RunErrorDto,
@@ -45,12 +44,9 @@ export const MEMORY_STEP_REASONS = [
   'digest-failed',
   'no-memories',
   'interrupted',
+  'errored',
 ] as const;
 export type MemoryStepReason = (typeof MEMORY_STEP_REASONS)[number];
-
-/** What a stored chunk came from — the memory-recall pipeline's own vocabulary. */
-export const MEMORY_CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
-export type MemoryChunkKind = (typeof MEMORY_CHUNK_KINDS)[number];
 
 export interface MemoryStepDto {
   status: MemoryStepStatus;
@@ -68,6 +64,8 @@ export interface MemoryStepDto {
 export interface MemoryStoreAvailabilityDto {
   ready: boolean;
   reason: 'unreachable' | 'no-model' | null;
+  /** The cause behind `unreachable`, for the boot log and the row — never a credential. */
+  note: string | null;
   model: string | null;
   collection: string | null;
   chunks: number;
@@ -100,8 +98,6 @@ export type StartMemoryRunRequest = StartQualityRunRequest;
 export interface DigestRunRequest {
   runId: string;
 }
-
-export type ListMemoryRunsQuery = ListQualityRunsQuery;
 
 export type StartMemoryRunResponse = ApiResponse<MemoryRunStartedDto>;
 export type GetMemoryRunResponse = ApiResponse<MemoryRunDto>;

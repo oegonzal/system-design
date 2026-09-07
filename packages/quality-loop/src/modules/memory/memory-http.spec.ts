@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
+import type { MemoryRunRepository } from './ports';
 import { CANNED, GOAL, InMemoryMemoryStore } from './testing';
 
 const DUMP_DIR = join(tmpdir(), `sysdesign-memory-http-dumps-${crypto.randomUUID()}`);
@@ -18,7 +19,7 @@ process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
 const { AppModule } = await import('../app/app.module');
 const { configureApp } = await import('../app/configure-app');
 const { QUALITY_LOOP_LLM } = await import('../runs/tokens');
-const { EMBEDDING_CLIENT, MEMORY_STORE } = await import('./tokens');
+const { EMBEDDING_CLIENT, MEMORY_RUN_REPOSITORY, MEMORY_STORE } = await import('./tokens');
 
 type Envelope<T> = { data: T };
 
@@ -93,8 +94,8 @@ describe('the memory-runs HTTP surface', () => {
     const record = await settle(data.memoryRunId);
 
     expect(record.status).toBe('complete');
-    // The reason comes from the environment (Nx loads `.env` for local tasks), the client is the fake: assert only what the fake fixes.
-    expect(record.embedding).toMatchObject({ enabled: false, model: null });
+    // The suite pins the loop deterministic, so the reason is exact whatever the developer's `.env` holds.
+    expect(record.embedding).toEqual({ enabled: false, model: null, reason: 'deterministic' });
     expect(record.store).toMatchObject({ ready: false, reason: 'no-model', chunks: 0 });
     expect(record.request.maxIterations).toBe(2);
     expect(record.steps.recall).toMatchObject({ status: 'skipped', reason: 'embeddings-disabled' });
@@ -103,6 +104,12 @@ describe('the memory-runs HTTP surface', () => {
     expect(record.steps.store).toMatchObject({ status: 'skipped', reason: 'embeddings-disabled' });
     targetRunId = record.steps.target.runId;
     expect(targetRunId).not.toBeNull();
+    const child = (
+      (await (await fetch(`${url}/runs/${targetRunId}`)).json()) as Envelope<{
+        request: { maxIterations: number; goal: string };
+      }>
+    ).data;
+    expect(child.request).toMatchObject({ maxIterations: 2, goal: GOAL });
   });
 
   it('[QL-16] validates the body at the edge and refuses a memory pipeline as the target', async () => {
@@ -120,6 +127,7 @@ describe('the memory-runs HTTP surface', () => {
       (await post(url, '/memory-runs', { pipeline: 'experience-digest', goal: GOAL })).status,
     ).toBe(400);
     expect((await post(url, '/memory-runs/digest', { runId: 'nope' })).status).toBe(404);
+    expect((await fetch(`${url}/memory-runs/not-a-uuid`)).status).toBe(404);
   });
 
   it('[QL-16] digests an already persisted run through the same ledger, with recall and target provided', async () => {
@@ -139,6 +147,7 @@ describe('the memory-runs HTTP surface', () => {
       reason: 'provided-run',
       runId: targetRunId,
     });
+    expect(record.request).toMatchObject({ goal: GOAL, outputProvided: false, maxIterations: 2 });
     expect(record.steps.digest).toMatchObject({ status: 'skipped', reason: 'embeddings-disabled' });
   });
 
@@ -208,6 +217,21 @@ describe('the memory-runs HTTP surface', () => {
       expect(swept.steps.target).toMatchObject({ status: 'failed', reason: 'interrupted' });
       expect(swept.steps.digest).toMatchObject({ status: 'skipped', reason: 'interrupted' });
       expect(swept.steps.store).toMatchObject({ status: 'skipped', reason: 'interrupted' });
+
+      // A late flush from the dead process must not resurrect the swept row.
+      const repository = second.app.get<MemoryRunRepository>(MEMORY_RUN_REPOSITORY);
+      await repository.update({
+        ...swept,
+        steps: { ...swept.steps, target: { ...swept.steps.target, status: 'running' } },
+      });
+      await repository.close({ ...swept, status: 'complete', error: null });
+      const after = (
+        (await (
+          await fetch(`${second.url}/memory-runs/${stale.id}`)
+        ).json()) as Envelope<MemoryRunDto>
+      ).data;
+      expect(after.status).toBe('failed');
+      expect(after.steps.target.status).toBe('failed');
     } finally {
       await second.app.close();
     }

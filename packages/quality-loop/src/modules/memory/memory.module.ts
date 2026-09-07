@@ -12,7 +12,7 @@ import { MemoryService } from './memory.service';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
 import { MikroOrmMemoryRunRepository } from './persistence/mikro-orm-memory-run-repository';
 import type { MemoryPipelines } from './ports';
-import { QdrantMemoryStore } from './qdrant/qdrant-memory-store';
+import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant/qdrant-memory-store';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
@@ -21,7 +21,8 @@ import {
   MEMORY_STORE,
 } from './tokens';
 
-export const DEFAULT_QDRANT_URL = 'http://localhost:6333';
+/** A stalled store must not hold a request or boot; a refused one is reported at once. */
+const QDRANT_TIMEOUT_MS = 5_000;
 
 /** The two memory roles, by registered pipeline id; a spec may override them. */
 const MEMORY_ROLES: MemoryPipelines = { recall: MEMORY_RECALL_ID, digest: EXPERIENCE_DIGEST_ID };
@@ -30,8 +31,9 @@ const MEMORY_ROLES: MemoryPipelines = { recall: MEMORY_RECALL_ID, digest: EXPERI
 const qdrantStore = (client: EmbeddingClient): QdrantMemoryStore =>
   new QdrantMemoryStore(
     new QdrantClient({
-      url: process.env['QDRANT_URL'] ?? DEFAULT_QDRANT_URL,
+      url: process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL,
       apiKey: process.env['QDRANT_API_KEY'] || undefined,
+      timeout: QDRANT_TIMEOUT_MS,
       checkCompatibility: false,
     }),
     client.model,

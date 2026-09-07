@@ -1,6 +1,6 @@
 /**
- * The embedding cache in Postgres: found by (model, text hash), written
- * `on conflict do nothing` so two runs embedding the same text at once both
+ * The embedding cache in Postgres: found by (model, text hash), written with
+ * the conflict ignored so two runs embedding the same text at once both
  * succeed. Vectors here are only ever read back whole, hence jsonb.
  */
 import { Injectable } from '@nestjs/common';
@@ -23,20 +23,17 @@ export class MikroOrmEmbeddingCache implements EmbeddingCache {
 
   async save(model: string, entries: readonly { hash: string; vector: number[] }[]): Promise<void> {
     if (entries.length === 0) return;
-    const table = this.em.getMetadata().get(MemoryEmbedding).tableName;
-    const values = entries.map(() => '(?, ?, ?, ?, now())').join(', ');
-    const params = entries.flatMap((entry) => [
-      crypto.randomUUID(),
-      model,
-      entry.hash,
-      JSON.stringify(entry.vector),
-    ]);
-    await this.em
-      .fork()
-      .getConnection()
-      .execute(
-        `insert into "${table}" ("id", "model", "content_hash", "embedding", "created_at") values ${values} on conflict ("model", "content_hash") do nothing`,
-        params,
-      );
+    await this.em.fork().upsertMany(
+      MemoryEmbedding,
+      // Raw data skips the entity's initializers: the id and stamp are supplied here.
+      entries.map((entry) => ({
+        id: crypto.randomUUID(),
+        model,
+        contentHash: entry.hash,
+        embedding: entry.vector,
+        createdAt: new Date(),
+      })),
+      { onConflictFields: ['model', 'contentHash'], onConflictAction: 'ignore' },
+    );
   }
 }

@@ -9,8 +9,13 @@ import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import type { MemoryHit, MemoryStore, StoredChunk } from '../ports';
 import { collectionName, fromPayload, INDEXED_FIELDS, pointId, toPayload } from './collection';
 
+export const DEFAULT_QDRANT_URL = 'http://localhost:6333';
+
 /** Over-fetch before deduping identical lessons from repeated runs of one prompt. */
 const DEDUPE_FACTOR = 3;
+
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export class QdrantMemoryStore implements MemoryStore {
   private readonly collection: string | null;
@@ -27,15 +32,23 @@ export class QdrantMemoryStore implements MemoryStore {
 
   async verify(): Promise<MemoryStoreAvailabilityDto> {
     const { model, collection } = this;
-    if (collection === null)
-      return { ready: false, reason: 'no-model', model, collection, chunks: 0 };
+    if (collection === null) {
+      return { ready: false, reason: 'no-model', note: null, model, collection, chunks: 0 };
+    }
     try {
       await this.ensure(collection);
       const { count } = await this.client.count(collection, { exact: true });
-      return { ready: true, reason: null, model, collection, chunks: count };
-    } catch {
+      return { ready: true, reason: null, note: null, model, collection, chunks: count };
+    } catch (error) {
       this.ensured = false;
-      return { ready: false, reason: 'unreachable', model, collection, chunks: 0 };
+      return {
+        ready: false,
+        reason: 'unreachable',
+        note: describe(error),
+        model,
+        collection,
+        chunks: 0,
+      };
     }
   }
 
@@ -87,9 +100,12 @@ export class QdrantMemoryStore implements MemoryStore {
     if (this.ensured) return;
     const { exists } = await this.client.collectionExists(collection);
     if (!exists) {
-      await this.client.createCollection(collection, {
-        vectors: { size: this.dimensions, distance: 'Cosine' },
-      });
+      // Two processes may boot at once: the loser of the create re-checks instead of failing.
+      await this.client
+        .createCollection(collection, { vectors: { size: this.dimensions, distance: 'Cosine' } })
+        .catch(async (error: unknown) => {
+          if (!(await this.client.collectionExists(collection)).exists) throw error;
+        });
       for (const field of INDEXED_FIELDS) {
         await this.client.createPayloadIndex(collection, {
           field_name: field,

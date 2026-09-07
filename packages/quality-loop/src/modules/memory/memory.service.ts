@@ -21,13 +21,14 @@ import type {
 } from '@sysdesign/contracts';
 import { embeddingAvailabilityFromEnv, type EmbeddingClient } from '@sysdesign/llm';
 import { describeError } from '@sysdesign/run-dump';
+import { z } from 'zod';
 
 import type { RunListQuery } from '../../core/ports';
 import { RunsService } from '../runs/runs.service';
 import { bareGoal } from './compose';
 import { CachedEmbeddings } from './embeddings';
 import type { EmbeddingCache, MemoryPipelines, MemoryRunRepository, MemoryStore } from './ports';
-import { digest, recall, StepLedger, store, target, type StepEnv } from './steps';
+import { closeSteps, digest, recall, StepLedger, store, target, type StepEnv } from './steps';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
@@ -35,6 +36,9 @@ import {
   MEMORY_RUN_REPOSITORY,
   MEMORY_STORE,
 } from './tokens';
+
+/** A memory run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
+const memoryRunId = z.uuid();
 
 const pending = (): MemoryStepDto => ({
   status: 'pending',
@@ -76,25 +80,19 @@ export class MemoryService implements OnModuleInit {
     }
   }
 
-  get(memoryRunId: string): Promise<MemoryRunDto | null> {
-    return this.repository.find(memoryRunId);
+  get(id: string): Promise<MemoryRunDto | null> {
+    return memoryRunId.safeParse(id).success ? this.repository.find(id) : Promise.resolve(null);
   }
 
   list(query: RunListQuery): Promise<[MemoryRunDto[], number]> {
     return this.repository.list(query);
   }
 
-  /** Start in the background; the row is readable at once. */
+  /** Start in the background; the row is readable at once. The goal is taken bare, once, for the record and every child. */
   async start(request: StartQualityRunRequest): Promise<MemoryRunDto> {
-    const record = await this.open(request, null);
-    void this.perform(record, request, null);
-    return record;
-  }
-
-  /** Run to completion. */
-  async execute(request: StartQualityRunRequest): Promise<MemoryRunDto> {
-    const record = await this.open(request, null);
-    await this.perform(record, request, null);
+    const bare = { ...request, goal: bareGoal(request.goal) };
+    const record = await this.open(bare, null);
+    void this.perform(record, bare, null);
     return record;
   }
 
@@ -102,7 +100,7 @@ export class MemoryService implements OnModuleInit {
   async startDigest(runId: string): Promise<MemoryRunDto> {
     const source = await this.runs.get(runId);
     if (source === null) throw new NotFoundException(`run ${runId} not found`);
-    const request = { pipeline: source.pipeline, goal: source.request.goal };
+    const request = { ...source.request, pipeline: source.pipeline };
     const record = await this.open(request, source);
     void this.perform(record, null, source);
     return record;
@@ -138,8 +136,11 @@ export class MemoryService implements OnModuleInit {
       finishedAt: null,
       request: {
         goal: bareGoal(request.goal),
-        outputProvided: request.output !== undefined,
-        maxIterations: request.maxIterations ?? summary.policy.loop.maxIterations,
+        outputProvided: provided?.request.outputProvided ?? request.output !== undefined,
+        maxIterations:
+          provided?.request.maxIterations ??
+          request.maxIterations ??
+          summary.policy.loop.maxIterations,
       },
       embedding: {
         enabled: this.embeddings.enabled,
@@ -168,6 +169,7 @@ export class MemoryService implements OnModuleInit {
       record,
       (current) => this.repository.update(current),
       () => new Date().toISOString(),
+      (message) => this.logger.warn(`memory run ${record.memoryRunId}: ${message}`),
     );
     const env: StepEnv = {
       runs: this.runs,
@@ -191,13 +193,16 @@ export class MemoryService implements OnModuleInit {
     } catch (error) {
       record.error = describeError(error);
       record.status = 'failed';
-      for (const step of Object.values(record.steps)) {
-        if (step.status === 'running')
-          Object.assign(step, { status: 'failed', note: record.error.message });
-      }
+      record.steps = closeSteps(
+        record.steps,
+        'errored',
+        record.error.message,
+        new Date().toISOString(),
+      );
       this.logger.error(`memory run ${record.memoryRunId} failed: ${record.error.message}`);
     } finally {
       record.finishedAt = new Date().toISOString();
+      await ledger.settled();
       try {
         await this.repository.close(record);
       } catch (error) {

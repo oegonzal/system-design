@@ -41,7 +41,6 @@ tilt up                 # postgres → migrations → seed → api → worker �
 | API             | http://localhost:3000/api                            |
 | Eval worker     | http://localhost:3002/health                         |
 | Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
-| Qdrant (memory) | localhost:6333 (`pnpm stack:db`, service `vectors`)  |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
 Set `ANTHROPIC_API_KEY` to enable the LLM half of the pipeline (prompt-prose
@@ -60,6 +59,9 @@ come back on the next `pnpm stack:up`):
 pnpm stack:up     # durable db + vector store → migrate → seed → api + worker + ui
 pnpm stack:down   # stop db + vector store (data persists in the named volumes)
 ```
+
+The compose stack also starts Qdrant (the quality loop's memory store, service
+`vectors`, `localhost:6333`) — compose only, not under Tilt.
 
 Past runs re-appear on the Dashboard, since every session/design/evaluation is
 a Postgres row. See **[RUNBOOK.md](./RUNBOOK.md)** for the persistence model and

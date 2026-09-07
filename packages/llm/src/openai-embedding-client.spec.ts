@@ -43,14 +43,22 @@ describe('OpenAiEmbeddingClient', () => {
 
   it('[QL-18] batches at the provider ceiling and concatenates in order', async () => {
     const inputs = Array.from({ length: 250 }, (_, index) => `t${index}`);
-    const sleep = vi.fn(async () => undefined);
+    const batches = [inputs.slice(0, 100), inputs.slice(100, 200), inputs.slice(200)];
+    const reply = (batch: string[], offset: number) => ({
+      status: 200,
+      body: { data: batch.map((_, index) => ({ index, embedding: vector(offset + index) })) },
+    });
     const { fetch, requests } = transport([
-      { status: 200, body: embeddingsOf(inputs.slice(0, 100)) },
+      reply(batches[0], 0),
+      reply(batches[1], 100),
+      reply(batches[2], 200),
     ]);
-    const client = new OpenAiEmbeddingClient({ apiKey: 'k', dimensions: 4, fetch, sleep });
-    // Every reply carries 100 vectors; the last batch has 50 inputs and must be rejected.
-    await expect(client.embed(inputs)).resolves.toBeNull();
-    expect(requests).toHaveLength(3);
+    const client = new OpenAiEmbeddingClient({ apiKey: 'k', dimensions: 4, fetch });
+    const vectors = await client.embed(inputs);
+    expect(vectors).toHaveLength(250);
+    expect(vectors?.[0]).toEqual(vector(0));
+    expect(vectors?.[100]).toEqual(vector(100));
+    expect(vectors?.[249]).toEqual(vector(249));
     expect(requests.map((request) => request.body.input.length)).toEqual([100, 100, 50]);
     expect(MAX_INPUTS_PER_REQUEST).toBe(100);
   });

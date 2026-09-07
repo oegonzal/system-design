@@ -2,10 +2,10 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { collectionName, pointId } from './collection';
-import { QdrantMemoryStore } from './qdrant-memory-store';
+import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
 import { hitOf, vectorOf } from '../testing';
 
-const url = process.env['QDRANT_URL'] ?? 'http://localhost:6333';
+const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const model = `spec-${crypto.randomUUID().slice(0, 8)}`;
 const DIMENSIONS = 4;
 
@@ -46,6 +46,7 @@ describe('the Qdrant memory store', () => {
     expect(await store.verify()).toEqual({
       ready: true,
       reason: null,
+      note: null,
       model,
       collection: collectionName(model, DIMENSIONS),
       chunks: 0,
@@ -87,11 +88,14 @@ describe('the Qdrant memory store', () => {
       model,
       DIMENSIONS,
     );
-    expect(await dark.verify()).toMatchObject({ ready: false, reason: 'unreachable', chunks: 0 });
+    const dark_ = await dark.verify();
+    expect(dark_).toMatchObject({ ready: false, reason: 'unreachable', chunks: 0 });
+    expect(dark_.note).toBeTruthy();
     const unbound = new QdrantMemoryStore(client, null, DIMENSIONS);
     expect(await unbound.verify()).toEqual({
       ready: false,
       reason: 'no-model',
+      note: null,
       model: null,
       collection: null,
       chunks: 0,

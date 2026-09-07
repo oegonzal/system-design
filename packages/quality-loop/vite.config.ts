@@ -21,6 +21,9 @@ export default defineConfig({
     env: {
       EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
       DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
+      // Specs inject fakes wherever a model matters; a developer's `.env` key
+      // (Nx loads it) must not make a suite reach OpenAI or bind the real store.
+      QUALITY_LOOP_DETERMINISTIC: '1',
     },
     fileParallelism: false,
 

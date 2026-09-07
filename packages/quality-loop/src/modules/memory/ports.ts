@@ -7,11 +7,12 @@
 import type { MemoryRunDto, MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 
 import type { RunListQuery } from '../../core/ports';
+import type { EVIDENCE_KINDS } from '../../pipelines/experience-digest/input';
 import type { ChunkSource } from '../../pipelines/memory-recall/input';
 
 /** The engine evidence a stored memory rests on — joinable to the source run's rows. */
 export interface EvidenceRef {
-  kind: 'finding' | 'criterion';
+  kind: (typeof EVIDENCE_KINDS)[number];
   ref: string;
 }
 

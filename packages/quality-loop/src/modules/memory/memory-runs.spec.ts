@@ -199,10 +199,49 @@ describe('a memory run over the three pipelines', () => {
     expect(await em.fork().count(MemoryEmbedding)).toBe(3);
   });
 
+  it('[QL-17] digesting a run again replaces its chunks under the same ids and embeds nothing new', async () => {
+    const first = (
+      (await (await fetch(`${url}/memory-runs?limit=10`)).json()) as Page<MemoryRunDto>
+    ).data.at(-1);
+    if (!first?.steps.target.runId) throw new Error('the first memory run must have a target');
+    const started = await fetch(`${url}/memory-runs/digest`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ runId: first.steps.target.runId }),
+    });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ memoryRunId: string }>;
+    const record = await settle(data.memoryRunId);
+    expect(record.status).toBe('complete');
+    expect(record.steps.recall).toMatchObject({ status: 'skipped', reason: 'provided-run' });
+    expect(record.steps.target).toMatchObject({
+      status: 'skipped',
+      reason: 'provided-run',
+      runId: first.steps.target.runId,
+    });
+    expect(record.steps.digest).toMatchObject({
+      status: 'complete',
+      counts: { memories: 2, kept: 2 },
+    });
+    expect(record.steps.store).toMatchObject({
+      status: 'complete',
+      counts: { chunks: 2, embedded: 0 },
+    });
+    expect(store.points.size).toBe(4);
+    expect(
+      [...store.points.values()].filter((chunk) => chunk.source.runId === first.steps.target.runId),
+    ).toHaveLength(2);
+    expect([...store.points.values()].every((chunk) => chunk.digestRunId !== null)).toBe(true);
+  });
+
   it('[QL-16] lists memory runs newest first with the shared meta, and 404s an unknown id', async () => {
     const page = (await (await fetch(`${url}/memory-runs?limit=10`)).json()) as Page<MemoryRunDto>;
-    expect(page.meta).toEqual({ total: 2, limit: 10, offset: 0 });
-    expect(page.data.map((item) => item.pipeline)).toEqual(['system-design', 'system-design']);
+    expect(page.meta).toEqual({ total: 3, limit: 10, offset: 0 });
+    expect(page.data.map((item) => item.pipeline)).toEqual([
+      'system-design',
+      'system-design',
+      'system-design',
+    ]);
     expect(page.data[0].startedAt >= page.data[1].startedAt).toBe(true);
     const filtered = (await (
       await fetch(`${url}/memory-runs?pipeline=memory-recall`)
