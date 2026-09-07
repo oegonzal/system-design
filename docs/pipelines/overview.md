@@ -272,19 +272,19 @@ convention.
 
 ## 7. What is shared
 
-| Component                                                                                                                                                                                               | Lives in                                                                                  | Used by                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `LlmClient` port; `AnthropicLlmClient`, `ClaudeAgentLlmClient`, `NoopLlmClient`; `LlmRecordable.withRecorder` + `asRecordable` for dump capture                                                         | `packages/llm/src/`                                                                       | all five                                                                     |
-| Four env factories: `createLlmClientFromEnv`, `createEvalLlmFromEnv`, `createImproverLlmFromEnv`, `improverAvailabilityFromEnv`                                                                         | `packages/llm/src/create-client.ts`                                                       | 1 → plain; 2 → eval; 3, 4, 5 → improver under two DI tokens                  |
-| Run-dump plumbing: `writeDump`, `makeRunId` + `RunKind`, `GIT_CONTEXT`, `capText` / `jsonSafe`                                                                                                          | `packages/run-dump/src/`                                                                  | all five, four kinds (`eval`, `prompt`, `suggestion`, `improve`)             |
-| Vocabularies: `EvalDimension`, `Archetype`, `FunctionalCapability`, `WorkflowSpec`, `AxisFactorLevel`; `mechanisms.ts`, `node-config-fields.ts`, `interfaces.ts`, `quality-areas.ts`, `design-brief.ts` | `packages/contracts/src/lib/`                                                             | all three apps; imported by neither `llm` nor `run-dump`                     |
-| Validators: `validateGraphReferences`, `validateWorkflowReferences`, `validateBriefReferences`, `validateNarration`; `projectNarration`                                                                 | `packages/contracts/src/lib/*-validator.ts`, `narration.ts`                               | submit (2), coach start and loop (3), both suggesters (4, 5)                 |
-| `createRevisionRecords`                                                                                                                                                                                 | `packages/db/src/revision-factory.ts`                                                     | submit (2), coach start (3, API), coach accept (3, worker)                   |
-| Entities: `Prompt`, `ExperienceProfile`, `DesignRevision`, `Evaluation`, `Finding`, `EvalJob`, `ImprovementRun`                                                                                         | `packages/db/src/entities/`                                                               | 1, 2, 3                                                                      |
-| `EvalQueue` seam                                                                                                                                                                                        | `studio-api/src/modules/sessions/eval-queue.ts`                                           | submit (2), coach start (3) — API side only; the worker writes rows directly |
-| `promptFactsFrom`                                                                                                                                                                                       | `eval-worker/src/modules/shared/prompt-facts.ts`                                          | eval runner (2), improver (3)                                                |
-| `gradedWeaknessShape` / `toGradedItem` / `admitGrounding`; `describeDesign`                                                                                                                             | `eval-worker/src/engine/passes/graded-grounding.ts`, `engine/serialization/graph-text.ts` | the five model passes inside (2)                                             |
-| `CRITERIA` registry (`[EVAL-n]`, `[GEN-n]`, `[UX-n]` ids tests claim)                                                                                                                                   | `packages/criteria/src/index.ts`                                                          | test suites across every pipeline                                            |
+| Component                                                                                                                                                                                               | Lives in                                                                                  | Used by                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `LlmClient` port; `AnthropicLlmClient`, `ClaudeAgentLlmClient`, `NoopLlmClient`; `LlmRecordable.withRecorder` + `asRecordable` for dump capture                                                         | `packages/llm/src/`                                                                       | all five                                                                                          |
+| Four env factories: `createLlmClientFromEnv`, `createEvalLlmFromEnv`, `createImproverLlmFromEnv`, `improverAvailabilityFromEnv`                                                                         | `packages/llm/src/create-client.ts`                                                       | 1 → plain; 2 → eval; 3, 4, 5 → improver under two DI tokens                                       |
+| Run-dump plumbing: `writeDump`, `makeRunId` + `RunKind`, `GIT_CONTEXT`, `capText` / `jsonSafe`                                                                                                          | `packages/run-dump/src/`                                                                  | all five plus the quality loop, five kinds (`eval`, `prompt`, `suggestion`, `improve`, `quality`) |
+| Vocabularies: `EvalDimension`, `Archetype`, `FunctionalCapability`, `WorkflowSpec`, `AxisFactorLevel`; `mechanisms.ts`, `node-config-fields.ts`, `interfaces.ts`, `quality-areas.ts`, `design-brief.ts` | `packages/contracts/src/lib/`                                                             | all three apps; imported by neither `llm` nor `run-dump`                                          |
+| Validators: `validateGraphReferences`, `validateWorkflowReferences`, `validateBriefReferences`, `validateNarration`; `projectNarration`                                                                 | `packages/contracts/src/lib/*-validator.ts`, `narration.ts`                               | submit (2), coach start and loop (3), both suggesters (4, 5)                                      |
+| `createRevisionRecords`                                                                                                                                                                                 | `packages/db/src/revision-factory.ts`                                                     | submit (2), coach start (3, API), coach accept (3, worker)                                        |
+| Entities: `Prompt`, `ExperienceProfile`, `DesignRevision`, `Evaluation`, `Finding`, `EvalJob`, `ImprovementRun`                                                                                         | `packages/db/src/entities/`                                                               | 1, 2, 3                                                                                           |
+| `EvalQueue` seam                                                                                                                                                                                        | `studio-api/src/modules/sessions/eval-queue.ts`                                           | submit (2), coach start (3) — API side only; the worker writes rows directly                      |
+| `promptFactsFrom`                                                                                                                                                                                       | `eval-worker/src/modules/shared/prompt-facts.ts`                                          | eval runner (2), improver (3)                                                                     |
+| `gradedWeaknessShape` / `toGradedItem` / `admitGrounding`; `describeDesign`                                                                                                                             | `eval-worker/src/engine/passes/graded-grounding.ts`, `engine/serialization/graph-text.ts` | the five model passes inside (2)                                                                  |
+| `CRITERIA` registry (`[EVAL-n]`, `[GEN-n]`, `[UX-n]` ids tests claim)                                                                                                                                   | `packages/criteria/src/index.ts`                                                          | test suites across every pipeline                                                                 |
 
 The pattern every pipeline repeats, without a shared base class: inject a
 client by token → wrap it with a dump recorder → make one structured call →
@@ -321,7 +321,8 @@ Code login. Prompt generation has no way onto a subscription; it needs a key.
 Notes, not fixes. None affects behaviour.
 
 - `packages/run-dump/src/write-dump.ts:2` says the plumbing is "shared by
-  the two pipelines that dump". `RunKind` now has four members.
+  the two pipelines that dump". `RunKind` now has five members; the note in an
+  earlier revision of this section said four, and was itself stale.
 - `suggestion-dump.ts:13` calls itself "the third pipeline that talks to a
   model". The coach's dump was added afterwards and is inlined in
   `improvement-runner.service.ts` rather than living in its own module.
@@ -333,6 +334,24 @@ Notes, not fixes. None affects behaviour.
 - how-it-works §4's known wrinkle still holds: when the critic ran, its prose
   summary is stored as the evaluation summary. The numbers are the engine's.
 
-## A sixth, standalone family: the quality loop
+---
 
-`packages/quality-loop` runs the generic doctrine from `docs/pipeline-best-practices/overview.md` over any task declared as data, starting with a system-design prompt held in a markdown file. It shares `@sysdesign/llm` (its own role: `QUALITY_LOOP_DETERMINISTIC` / `QUALITY_LOOP_AUTH`) and `@sysdesign/run-dump` (kind `quality`) with the five pipelines above, touches none of them, and has no database: the dump is its record. See [pipeline-best-practices/quality-loop.md](../pipeline-best-practices/quality-loop.md).
+## 10. A sixth, standalone family: the quality loop
+
+`packages/quality-loop` runs the generic doctrine from
+[`../pipeline-best-practices/overview.md`](../pipeline-best-practices/overview.md)
+over any task declared as data. Three such tasks now exist as sibling folders
+under `src/pipelines/` — `system-design`, `memory-recall` and
+`experience-digest` — and a fourth endpoint, `POST /memory-runs`, composes them
+so a run can recall what earlier runs learned and digest what it learned itself.
+It shares `@sysdesign/llm` (its own role: `QUALITY_LOOP_DETERMINISTIC` /
+`QUALITY_LOOP_AUTH`) and `@sysdesign/run-dump` (kind `quality`) with the five
+pipelines above and touches none of them. It has its own Postgres tables
+(`quality_run` and its children, plus `memory_run` and `memory_embedding`) and
+its own vector store (Qdrant, the `vectors` compose service); the dump remains
+the full audit trail beside them.
+
+How the loop works, its env variables and its guarantees:
+[`../pipeline-best-practices/quality-loop.md`](../pipeline-best-practices/quality-loop.md).
+How the three pipelines compose behind the memory API, how to operate it, and
+what the recent runs showed: [`./memory-runs.md`](./memory-runs.md).
