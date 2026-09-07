@@ -17,9 +17,12 @@ export interface OutputShape<T> {
 export interface TaskSpec<T> {
   /** Kind id → one-line meaning shown to the model. The policy prices kinds; the model only picks one. */
   readonly criterionKinds: Readonly<Record<string, string>>;
+
   /** Finding type → one-line meaning. The policy maps and gates types; the model only picks one. */
   readonly findingTypes: Readonly<Record<string, string>>;
+
   readonly maxCriteria: number;
+
   readonly output: OutputShape<T>;
 }
 
