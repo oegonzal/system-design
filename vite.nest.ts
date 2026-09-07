@@ -17,6 +17,9 @@ export const NEST_EXTERNALS = [
   // which an inlined copy under dist/ cannot do.
   /^@anthropic-ai\//,
   /^@mikro-orm\//,
+  // The Qdrant client rides on undici; both stay runtime requires.
+  /^@qdrant\//,
+  'undici',
   'reflect-metadata',
   'rxjs',
   /^rxjs\//,

@@ -29,20 +29,26 @@ pnpm stack:up
 
 This runs `scripts/stack.sh`, which:
 
-1. starts the durable Postgres (`docker compose up -d db`) — image
-   `postgres:16-alpine`, a **named volume** `sysdesign-pgdata`, `restart:
-unless-stopped`, on host port **5433**;
-2. waits for it to be healthy;
+1. starts the durable Postgres and the vector store (`docker compose up -d db
+vectors`) — Postgres image `postgres:16-alpine`, **named volume**
+   `sysdesign-pgdata`, host port **5433**; Qdrant image `qdrant/qdrant:v1.19.1`,
+   **named volume** `sysdesign-qdrant`, host port **6333** (`QDRANT_URL`); both
+   `restart: unless-stopped`;
+2. waits for both to be ready (`pg_isready`, then `GET /readyz` on Qdrant);
 3. applies any pending migrations (`pnpm db:migrate`, idempotent) and re-seeds
    the reference experiences (`pnpm db:seed`, idempotent — never touches your
    sessions);
 4. starts the API, eval worker, and UI with `DB_PORT=5433 EVAL_DETERMINISTIC=1`.
 
-`pnpm stack:down` stops the database container; the data stays in the named
-volume. `pnpm stack:db` brings up only the database (for tests/tools).
+`pnpm stack:down` stops both containers; the data stays in the named volumes.
+`pnpm stack:db` brings up only the database and the vector store (for
+tests/tools). The quality loop's memory runs need the vector store and, for
+live embeddings, `OPENAI_API_KEY` in `.env` (Node loads the file on `serve`
+and `quality-loop:run`); without either, memory steps skip with a stated
+reason and the target pipeline still runs.
 
-Because the volume is named and the container has `restart: unless-stopped`, the
-database returns on its own after a Docker or machine restart; `pnpm stack:up`
+Because the volumes are named and the containers have `restart: unless-stopped`,
+the database and the vector store return on their own after a Docker or machine restart; `pnpm stack:up`
 then just re-attaches the app. Your sessions are exactly where you left them.
 
 ## Author a prompt from your own assessment

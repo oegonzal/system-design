@@ -1,8 +1,14 @@
 import type { LlmAvailabilityDto } from '@sysdesign/contracts';
 import { AnthropicLlmClient, DEFAULT_LLM_MODEL } from './anthropic-client';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
+import {
+  DEFAULT_EMBEDDING_MODEL,
+  NoopEmbeddingClient,
+  type EmbeddingClient,
+} from './embedding-client';
 import type { LlmClient } from './llm-client';
 import { NoopLlmClient } from './noop-client';
+import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 /**
  * Environment-driven factory — the only place LLM env vars are read.
@@ -141,3 +147,36 @@ export const createQualityLoopLlmFromEnv = (env: NodeJS.ProcessEnv = process.env
 export const qualityLoopAvailabilityFromEnv = (
   env: NodeJS.ProcessEnv = process.env,
 ): LlmAvailability => roleAvailabilityFromEnv(QUALITY_LOOP_ROLE, env);
+
+/**
+ * The quality loop's embeddings: the loop's own determinism switch first, then
+ * `OPENAI_API_KEY`. `OPENAI_EMBEDDING_MODEL` picks the model; `OPENAI_MODEL`
+ * names a chat model and stays unread.
+ */
+export function createEmbeddingClientFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): EmbeddingClient {
+  const derived = roleEnv(env, QUALITY_LOOP_ROLE);
+  if (derived['EVAL_DETERMINISTIC'] === '1') return new NoopEmbeddingClient();
+  if (!derived['OPENAI_API_KEY']) return new NoopEmbeddingClient();
+  return new OpenAiEmbeddingClient({
+    apiKey: derived['OPENAI_API_KEY'],
+    model: derived['OPENAI_EMBEDDING_MODEL'] || undefined,
+  });
+}
+
+/** The embeddings factory's shadow: would it yield a live client, and why not. */
+export function embeddingAvailabilityFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): LlmAvailability {
+  const derived = roleEnv(env, QUALITY_LOOP_ROLE);
+  if (derived['EVAL_DETERMINISTIC'] === '1') {
+    return { enabled: false, model: null, reason: 'deterministic' };
+  }
+  if (!derived['OPENAI_API_KEY']) return { enabled: false, model: null, reason: 'no-key' };
+  return {
+    enabled: true,
+    model: derived['OPENAI_EMBEDDING_MODEL'] || DEFAULT_EMBEDDING_MODEL,
+    reason: null,
+  };
+}

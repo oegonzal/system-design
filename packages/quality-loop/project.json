@@ -11,11 +11,16 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "quality-loop:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "runtimeArgs": ["--env-file-if-exists=.env"]
       },
       "configurations": {
-        "development": { "buildTarget": "quality-loop:build:development" },
-        "production": { "buildTarget": "quality-loop:build:production" }
+        "development": {
+          "buildTarget": "quality-loop:build:development"
+        },
+        "production": {
+          "buildTarget": "quality-loop:build:production"
+        }
       }
     },
     "typecheck": {

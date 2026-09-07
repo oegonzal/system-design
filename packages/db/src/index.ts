@@ -5,6 +5,8 @@ export * from './entities/evaluation.entity';
 export * from './entities/experience-profile.entity';
 export * from './entities/finding.entity';
 export * from './entities/improvement-run.entity';
+export * from './entities/memory-embedding.entity';
+export * from './entities/memory-run.entity';
 export * from './entities/prompt.entity';
 export * from './entities/quality-run-criterion-result.entity';
 export * from './entities/quality-run-criterion.entity';

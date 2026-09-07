@@ -29,6 +29,10 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      qdrant:
+        image: qdrant/qdrant:v1.19.1
+        ports:
+          - 6333:6333
 
     env:
       DB_HOST: localhost
@@ -36,6 +40,7 @@ jobs:
       DB_USERNAME: admin
       DB_PASSWORD: admin
       DB_NAME: sysdesign
+      QDRANT_URL: http://localhost:6333
       # Evaluations must be byte-reproducible in CI even if a key is configured.
       EVAL_DETERMINISTIC: '1'
       NEXT_TELEMETRY_DISABLED: '1'

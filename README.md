@@ -41,6 +41,7 @@ tilt up                 # postgres → migrations → seed → api → worker �
 | API             | http://localhost:3000/api                            |
 | Eval worker     | http://localhost:3002/health                         |
 | Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
+| Qdrant (memory) | localhost:6333 (`pnpm stack:db`, service `vectors`)  |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
 Set `ANTHROPIC_API_KEY` to enable the LLM half of the pipeline (prompt-prose
@@ -56,8 +57,8 @@ with a named volume, so your practice runs survive a shutdown or reboot and
 come back on the next `pnpm stack:up`):
 
 ```bash
-pnpm stack:up     # durable db → migrate → seed → api + worker + ui
-pnpm stack:down   # stop the db (data persists in the named volume)
+pnpm stack:up     # durable db + vector store → migrate → seed → api + worker + ui
+pnpm stack:down   # stop db + vector store (data persists in the named volumes)
 ```
 
 Past runs re-appear on the Dashboard, since every session/design/evaluation is

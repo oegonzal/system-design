@@ -283,6 +283,21 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Experience is digested from facts the engine established — remediations selected, findings persisted or resolved, criteria improved or regressed, scores moved — never from an effect a model authored.',
   },
+  {
+    id: 'QL-16',
+    statement:
+      'A memory run composes recall, the target pipeline, digest and store through the existing runs service alone: usable memory — kept chunks no confirmed finding names — reaches the target goal as an advisory section within the goal budget, the digest sees the bare prompt, only accepted memories and the engine evidence they cite are stored, every skipped or failed step carries a closed reason, and an interrupted memory run is failed at boot.',
+  },
+  {
+    id: 'QL-17',
+    statement:
+      'Memory lives in a dedicated vector store started and stopped with the stack: chunks are upserted under deterministic ids per source run and ref so re-digesting replaces them, a collection is bound to one embedding model and dimension so a search never mixes models, the prompt embedding is cached by content hash and model in the run database, and store availability is verified at boot and reported as data.',
+  },
+  {
+    id: 'QL-18',
+    statement:
+      'Embeddings are a port beside the LLM client chosen from the environment — no key or deterministic mode yields a disabled client with a reason — reached over an injectable transport that batches, retries a rate limit once and refuses a vector of the wrong length.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

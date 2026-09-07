@@ -21,6 +21,8 @@ async function bootstrap() {
   }
 
   const app = configureApp(await NestFactory.create(AppModule));
+  // SIGTERM/SIGINT close the MikroORM pool instead of dropping connections.
+  app.enableShutdownHooks();
   const port = process.env['QUALITY_LOOP_PORT']
     ? parseInt(process.env['QUALITY_LOOP_PORT'], 10)
     : 3003;

@@ -62,10 +62,18 @@ export class RunsService implements OnModuleInit {
     return record;
   }
 
-  /** Run to completion — the CLI's path. */
-  async execute(request: StartQualityRunRequest): Promise<RunRecord> {
+  /**
+   * Run to completion — the CLI's path, and the memory module's. `onOpened`
+   * hands the record over as soon as its row exists, so a caller chaining runs
+   * can publish the child's id while it is still in flight.
+   */
+  async execute(
+    request: StartQualityRunRequest,
+    onOpened?: (record: RunRecord) => void,
+  ): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     const record = await this.open(request, definition);
+    onOpened?.(record);
     await this.perform(record, request, definition);
     return record;
   }
