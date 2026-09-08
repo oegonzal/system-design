@@ -53,17 +53,23 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       id: 'critic.attribution',
       persona: criticAttribution,
       samples: 2,
-      maxItems: 6,
-      maxTokens: 2000,
+      maxItems: 10,
+      maxTokens: 4000,
     },
     {
       id: 'critic.provenance',
       persona: criticProvenance,
       samples: 2,
-      maxItems: 6,
-      maxTokens: 2000,
+      maxItems: 10,
+      maxTokens: 4000,
     },
-    { id: 'critic.transfer', persona: criticTransfer, samples: 2, maxItems: 6, maxTokens: 2000 },
+    {
+      id: 'critic.transfer',
+      persona: criticTransfer,
+      samples: 2,
+      maxItems: 10,
+      maxTokens: 4000 
+    },
   ],
 
   evaluators: [

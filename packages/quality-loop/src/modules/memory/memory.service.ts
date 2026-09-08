@@ -305,6 +305,7 @@ export class MemoryService implements OnModuleInit {
       if (source === null) {
         record.status = 'failed';
       } else {
+        // BOOKMARK
         const digested = await digest(env, ledger, source);
         if (digested !== null) await store(env, ledger, source, digested);
         record.status = 'complete';

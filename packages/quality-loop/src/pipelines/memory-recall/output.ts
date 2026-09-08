@@ -42,7 +42,7 @@ export const memoryPackSchema = z.strictObject({
     .max(MAX_CANDIDATES),
   gaps: z
     .array(z.string().min(1).max(200))
-    .max(6)
+    .max(10)
     .describe('Needs of the query no candidate serves.'),
 });
 export type MemoryPack = z.infer<typeof memoryPackSchema>;

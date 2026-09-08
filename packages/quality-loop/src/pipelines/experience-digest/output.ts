@@ -24,19 +24,19 @@ export const experienceDigestSchema = z.strictObject({
         evidence: z
           .array(evidence)
           .min(1)
-          .max(4)
+          .max(8)
           .describe('The findings and criteria this memory rests on.'),
         insight: z
           .string()
           .min(1)
-          .max(400)
+          .max(1000)
           .describe(
             'What to do or avoid next time, as an instruction a different prompt could use.',
           ),
         appliesWhen: z
           .string()
           .min(1)
-          .max(200)
+          .max(500)
           .describe('The conditions under which the insight applies.'),
       }),
     )
