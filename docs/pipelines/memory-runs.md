@@ -985,12 +985,53 @@ locations_ before they count as the same finding. Two critics can agree
 perfectly about a defect and still be counted as two singletons because one
 listed five locations and the other four.
 
-That is a real effect, not a bug — the rule exists so one sample cannot block a
-run, and §1 argues the same case for the memory pipelines. But an 88% discard
-rate means the panel's evidence is mostly thrown away before the controller ever
-sees it, and the threshold was chosen by reasoning rather than measurement. It
-is the first thing to look at once the fifteen-prompt experiment has enough runs
-to say whether 88% is typical.
+It was a bug, and §12.4 is what it turned out to be.
+
+### 12.4 Agreement was testing the wrong thing
+
+The discard rate above is not a threshold that wanted tuning. A finding's
+identity was
+
+```ts
+findingKey = (type, locationRefs) => `${type}|${sorted(locationRefs).join(',')}`;
+```
+
+so two samples confirmed each other only by citing an **identical set** of
+locations. Findings cite four to six locations out of sixty. Two samples
+describing one defect routinely cite overlapping but different evidence — one
+listing five locations, the other four — and were counted as two unrelated
+singletons, each then discarded for want of a second hit. The panel could agree
+perfectly and register no agreement at all.
+
+Identity is now `sameDefect`: the same type, pointing at a common location, or
+neither pointing anywhere. Findings group into connected components, so
+agreement is transitive through shared evidence, and the input is sorted before
+grouping so a component is a function of the findings rather than of the order
+the lenses happened to return. Wording is still never compared — the change is
+from equality to overlap, not from structure to semantics.
+
+Replaying all 182 recorded panels in `static/runs/` through both versions:
+
+| pipeline            | before          | after     | findings kept |
+| ------------------- | --------------- | --------- | ------------- |
+| `agentic-design`    | 97.1% discarded | 55.3%     | 11 → 59       |
+| `experience-digest` | 82.8%           | 49.7%     | 192 → 313     |
+| `memory-recall`     | 76.6%           | 50.6%     | 131 → 203     |
+| `system-design`     | 0.0%            | 0.0%      | 717 → **351** |
+| **total**           | **62.0%**       | **38.9%** |               |
+
+The confirmation rule itself is unchanged: a defect is confirmed when one lens
+saw it in `minHits` of its own samples, and two lenses seeing it once each is
+still two opinions rather than agreement. Only what counts as "it" was relaxed.
+
+`system-design` shows the other half of the same bug and is the reason its row
+looks inert. It runs `minHits: 1`, so nothing was ever discarded — instead every
+raw finding became its own confirmed finding, and one defect cited five slightly
+different ways was priced five times over. Its kept count halves because those
+consolidate. **Scores under `system-design` move as a result, so every run
+recorded before this change is incomparable with any recorded after it** — which
+retires the score column of §8 as a baseline, though the retrieval measurements
+there are untouched.
 
 ### 12.2 One number to watch
 
