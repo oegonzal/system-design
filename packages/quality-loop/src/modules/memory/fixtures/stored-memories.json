@@ -1,0 +1,195 @@
+{
+  "note": "Live memory chunks captured before the named-vector migration. The migration re-embeds these deterministically; it must never be done by replaying a digest.",
+  "capturedAt": "2026-09-07",
+  "collection": "quality-memory__text-embedding-3-small__1536",
+  "chunks": [
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.1",
+      "text": "Do not claim the read path is vendor-free when every read enters through the vendor's proxy and takes its auth signal from that proxy's signature. Count each in-line hop as an availability and latency dependency: state availability as the product including the vendor, or give an off-proxy read path, before asserting 99.9% reads through a vendor outage. — applies when A design owns a local copy of vendor data but still serves reads inside a hosted storefront/app-proxy surface and claims outage-independent latency or availability.",
+      "contentHash": "23239877dba6fde5531a4d5268524210e35aeeee2e42656472edd6da3eb0a0ea",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "contradiction|assumption.1,capacity.3,capacity.8,component.2,flow.1,flow.5"
+        },
+        {
+          "kind": "finding",
+          "ref": "contradiction|capacity.3,capacity.8,component.1,component.2,flow.5,tradeoff.1"
+        },
+        {
+          "kind": "finding",
+          "ref": "unsupported_claim|assumption.1,capacity.8,component.2,flow.5"
+        },
+        {
+          "kind": "finding",
+          "ref": "unsupported_claim|assumption.8,capacity.8,component.1,component.2,flow.5"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    },
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.2",
+      "text": "Do not present replay-able signed URLs plus session-level RLS as defense in depth. Bind proxy HMAC auth to a checked timestamp window and a session, and set the RLS identity per transaction (SET LOCAL / set_config(...,true)) whenever connections pass through a transaction-pooling proxy such as PgBouncer, or the previous request's identity leaks. — applies when Per-user isolation (zero cross-customer reads) rests on vendor-signed request auth and/or Postgres RLS behind a connection pooler.",
+      "contentHash": "682c5ebdf482330baf9e43acdcceb8410c7e02adf5592bfb44d296977c087637",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "unhandled_failure|assumption.1,component.2,flow.4,tradeoff.6"
+        },
+        {
+          "kind": "finding",
+          "ref": "unhandled_failure|capacity.4,component.3,component.5,flow.4"
+        },
+        {
+          "kind": "finding",
+          "ref": "unsupported_claim|capacity.4,component.5,flow.4,risk.8"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c6"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    },
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.4",
+      "text": "Do not place the queue on the very store whose failover it is supposed to insulate you from. Either use an independent broker for that claim, or keep transactional enqueue and drop the no-loss claim, stating the loss window plus the reconcile sweep that bounds it. — applies when An ingest path uses an in-database queue (pg-boss/outbox) while promising that events survive a database failover under a freshness SLO.",
+      "contentHash": "e973cf3315b8907971602f23af521fe34d7c9f956b47353175f60613a909a34e",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "contradiction|component.6,component.9,flow.2,tradeoff.8"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c3"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c9"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    },
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.5",
+      "text": "Never derive a p99 by summing typical per-hop values; a chain's p99 is not the sum of medians, and a third-party hop's tail is not its median. Budget from per-hop tail assumptions on the cache-miss path, state the assumed vendor tail explicitly, and show headroom against the target. — applies when A latency budget must meet a p99 target and the request chain crosses a hop you do not control.",
+      "contentHash": "47f930f6a18810eaf925198382c2d9811d16199b4ee9026f401ac33b10f2a35b",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "scale_mismatch|capacity.3,flow.1"
+        },
+        {
+          "kind": "finding",
+          "ref": "scale_mismatch|capacity.1,capacity.3"
+        },
+        {
+          "kind": "finding",
+          "ref": "scale_mismatch|capacity.1,capacity.3,summary"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c7"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    },
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.6",
+      "text": "Derive every capacity number from the stated assumptions and reconcile the numbers against each other. A short-TTL per-customer cache hit rate must follow from the per-user request rate (0.07 req/s/user cannot yield 60% on a 30 s TTL), and ingest volume must match the assumed daily order count rather than contradicting it by orders of magnitude. — applies when A capacity section asserts cache hit rates or write throughput alongside separately stated per-user rates and data volumes.",
+      "contentHash": "12d9ba588eb096892d64a73e398372dea3c4ca33206a675f8fce271f0958b1fd",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "unsupported_claim|capacity.1,capacity.7,component.4,data.7"
+        },
+        {
+          "kind": "finding",
+          "ref": "contradiction|assumption.3,capacity.2,tradeoff.3"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c16"
+        },
+        {
+          "kind": "criterion",
+          "ref": "c17"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    },
+    {
+      "runId": "2026-09-06T22-43-36-266-a874eb-quality",
+      "pipeline": "system-design",
+      "decision": "revise",
+      "iteration": 1,
+      "when": "2026-09-06",
+      "kind": "lesson",
+      "ref": "memory.7",
+      "text": "Cross-check concrete identifiers and lifetimes across sections before submitting: cache keys must be spelled identically where written and where invalidated (or the delete is a no-op), query predicates must reference columns and states that actually exist in the data model, and nothing a forever-retention claim depends on may also be trimmed on a TTL. — applies when Components, flows and data model each restate the same keys, predicates or retention rules in an artifact with freshness or durability requirements.",
+      "contentHash": "60977ae269ee3a34c9f2c8bbfd07a334f49c882efbf2a4048592d5d193e5a565",
+      "model": "text-embedding-3-small",
+      "evidence": [
+        {
+          "kind": "finding",
+          "ref": "contradiction|component.8,data.4,flow.1"
+        },
+        {
+          "kind": "finding",
+          "ref": "contradiction|data.1,data.6,flow.6"
+        },
+        {
+          "kind": "finding",
+          "ref": "contradiction|component.4,data.7,flow.2"
+        },
+        {
+          "kind": "finding",
+          "ref": "unsupported_claim|component.4,data.7,flow.2,risk.5"
+        }
+      ],
+      "digestRunId": "2026-09-07T10-19-54-511-eff276-quality",
+      "storedAt": "2026-09-07T10:28:48.128Z"
+    }
+  ]
+}

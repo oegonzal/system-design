@@ -82,18 +82,18 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     dimensionWeights: {
       attribution: 0.4,
       fidelity: 0.3,
-      reuse: 0.3
+      reuse: 0.3,
     },
     criterionKinds: {
       signal: {
         dimension: 'attribution',
         weight: 1,
-        gate: false
+        gate: false,
       },
       transition: {
         dimension: 'attribution',
         weight: 1,
-        gate: false
+        gate: false,
       },
     },
     // `fidelity` and `reuse` are priced by findings alone: a digest with none
@@ -103,47 +103,52 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     findingTypes: {
       missed_signal: {
         dimension: 'attribution',
-        gate: false
+        gate: false,
       },
       unsupported_effect: {
         dimension: 'attribution',
-        gate: false
+        gate: false,
       },
       misattributed_evidence: {
         dimension: 'fidelity',
-        gate: true
+        gate: true,
       },
+      // Gated, unlike its two neighbours in `reuse`: a memory that holds only
+      // for this run's names and numbers is the one failure a later prompt
+      // cannot recover from, and pricing it cannot stop it being stored — a
+      // digest with `reuse` penalised to the cap still scores 82, over the
+      // bar. Vagueness and duplication cost a reader little and stay priced.
       run_specific: {
         dimension: 'reuse',
-        gate: false
+        gate: true,
       },
       vague_insight: {
         dimension: 'reuse',
-        gate: false
+        gate: false,
       },
       duplicate_memory: {
         dimension: 'reuse',
-        gate: false
+        gate: false,
       },
     },
-    resultValues: { 
+    resultValues: {
       pass: 1,
       partial: 0.5,
-      fail: 0
+      fail: 0,
     },
-    confidenceWeights: { 
+    confidenceWeights: {
       none: 0,
       low: 0.33,
       medium: 0.67,
-      high: 1
+      high: 1,
     },
     penalties: {
-      bySeverity: { 
+      bySeverity: {
         critical: 40,
         high: 25,
         medium: 12,
         low: 5,
-        info: 0
+        info: 0,
       },
       decay: 0.7,
       maxPerDimension: 60,

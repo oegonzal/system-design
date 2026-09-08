@@ -5,17 +5,21 @@
  */
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import { describeError } from '@sysdesign/run-dump';
 
-import type { MemoryHit, MemoryStore, StoredChunk } from '../ports';
+import {
+  VECTOR_NAMES,
+  type MemoryHit,
+  type MemoryProbe,
+  type MemoryStore,
+  type StoredChunk,
+} from '../ports';
 import { collectionName, fromPayload, INDEXED_FIELDS, pointId, toPayload } from './collection';
 
 export const DEFAULT_QDRANT_URL = 'http://localhost:6333';
 
 /** Over-fetch before deduping identical lessons from repeated runs of one prompt. */
 const DEDUPE_FACTOR = 3;
-
-const describe = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 export class QdrantMemoryStore implements MemoryStore {
   private readonly collection: string | null;
@@ -44,7 +48,7 @@ export class QdrantMemoryStore implements MemoryStore {
       return {
         ready: false,
         reason: 'unreachable',
-        note: describe(error),
+        note: describeError(error).message,
         model,
         collection,
         chunks: 0,
@@ -52,23 +56,29 @@ export class QdrantMemoryStore implements MemoryStore {
     }
   }
 
-  async search(vector: readonly number[], limit: number): Promise<MemoryHit[]> {
+  async searchMany(probes: readonly MemoryProbe[]): Promise<MemoryHit[][]> {
+    if (probes.length === 0) return [];
     const collection = await this.bound();
-    const response = await this.client.query(collection, {
-      query: [...vector],
-      limit: limit * DEDUPE_FACTOR,
-      with_payload: true,
+    const responses = await this.client.queryBatch(collection, {
+      searches: probes.map((probe) => ({
+        query: [...probe.vector],
+        using: probe.using,
+        limit: probe.limit * DEDUPE_FACTOR,
+        with_payload: true,
+      })),
     });
-    const seen = new Set<string>();
-    const hits: MemoryHit[] = [];
-    for (const point of response.points) {
-      const hit = fromPayload(point.payload, point.score);
-      if (hit === null || seen.has(hit.contentHash)) continue;
-      seen.add(hit.contentHash);
-      hits.push(hit);
-      if (hits.length === limit) break;
-    }
-    return hits;
+    return responses.map((response, index) => {
+      const seen = new Set<string>();
+      const hits: MemoryHit[] = [];
+      for (const point of response.points) {
+        const hit = fromPayload(point.payload, point.score);
+        if (hit === null || seen.has(hit.contentHash)) continue;
+        seen.add(hit.contentHash);
+        hits.push(hit);
+        if (hits.length === probes[index].limit) break;
+      }
+      return hits;
+    });
   }
 
   async replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number> {
@@ -83,7 +93,7 @@ export class QdrantMemoryStore implements MemoryStore {
       wait: true,
       points: chunks.map((chunk) => ({
         id: pointId(sourceRunId, chunk.source.ref),
-        vector: chunk.vector,
+        vector: chunk.vectors,
         payload: toPayload(chunk, storedAt),
       })),
     });
@@ -101,11 +111,12 @@ export class QdrantMemoryStore implements MemoryStore {
     const { exists } = await this.client.collectionExists(collection);
     if (!exists) {
       // Two processes may boot at once: the loser of the create re-checks instead of failing.
-      await this.client
-        .createCollection(collection, { vectors: { size: this.dimensions, distance: 'Cosine' } })
-        .catch(async (error: unknown) => {
-          if (!(await this.client.collectionExists(collection)).exists) throw error;
-        });
+      const vectors = Object.fromEntries(
+        VECTOR_NAMES.map((name) => [name, { size: this.dimensions, distance: 'Cosine' as const }]),
+      );
+      await this.client.createCollection(collection, { vectors }).catch(async (error: unknown) => {
+        if (!(await this.client.collectionExists(collection)).exists) throw error;
+      });
       for (const field of INDEXED_FIELDS) {
         await this.client.createPayloadIndex(collection, {
           field_name: field,

@@ -16,7 +16,21 @@ export interface EvidenceRef {
   ref: string;
 }
 
+/**
+ * A memory is indexed twice, because a prompt and a lesson are not written in
+ * the same register. `condition` carries the digest's `appliesWhen` — a
+ * situation, the same shape as the problem a goal states — and `lesson`
+ * carries the `insight`, the imperative half. A query compares against
+ * whichever it resembles; measured on the live corpus, comparing a prompt
+ * against the imperative half alone put every lesson further from the query
+ * than the lessons were from each other.
+ */
+export const VECTOR_NAMES = ['condition', 'lesson'] as const;
+
+export type VectorName = (typeof VECTOR_NAMES)[number];
+
 export interface MemoryChunk {
+  /** The whole lesson, as the curator reads it and as it reaches a goal. */
   text: string;
   /** sha256 hex of `text`; a search dedupes on it. */
   contentHash: string;
@@ -27,19 +41,37 @@ export interface MemoryChunk {
   model: string;
 }
 
-export interface StoredChunk extends MemoryChunk {
-  vector: number[];
+/** A chunk with the texts it is indexed by — one per name in the collection. */
+export interface IndexedChunk extends MemoryChunk {
+  keys: Record<VectorName, string>;
+}
+
+export interface StoredChunk extends IndexedChunk {
+  vectors: Record<VectorName, number[]>;
 }
 
 export interface MemoryHit extends MemoryChunk {
-  /** Cosine similarity, higher is closer. */
+  /** Cosine similarity against the probe that found it, higher is closer. */
   score: number;
+}
+
+/** One dense query: a vector, the named vector it is compared against, and its budget. */
+export interface MemoryProbe {
+  vector: readonly number[];
+  using: VectorName;
+  /** How many hits this probe may contribute before fusion. */
+  limit: number;
 }
 
 export interface MemoryStore {
   /** Reachable and bound to a model? Derived facts, reported as data. */
   verify(): Promise<MemoryStoreAvailabilityDto>;
-  search(vector: readonly number[], limit: number): Promise<MemoryHit[]>;
+  /**
+   * Every probe in one round trip, answered in probe order. One call so the
+   * failure is all-or-nothing: a partial ranking is worse than none, because
+   * nothing downstream could tell it had happened.
+   */
+  searchMany(probes: readonly MemoryProbe[]): Promise<MemoryHit[][]>;
   /** A source run's chunks become exactly these: stale ones go, the rest upsert. Returns how many stand. */
   replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number>;
 }

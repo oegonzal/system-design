@@ -38,7 +38,8 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from '
     { provide: TRACE_STORE, useClass: DumpTraceStore },
     { provide: RUN_REPOSITORY, useClass: MikroOrmRunRepository },
   ],
-  // The memory module composes pipelines through this one service.
-  exports: [RunsService],
+  // The memory module composes pipelines through this one service, and derives
+  // its retrieval probes with the same client the loop decided on at boot.
+  exports: [RunsService, QUALITY_LOOP_LLM],
 })
 export class RunsModule {}

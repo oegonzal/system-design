@@ -16,7 +16,8 @@ import type {
 } from '@sysdesign/contracts';
 import type { EmbeddingClient } from '@sysdesign/llm';
 
-import type { EmbeddingCache, MemoryHit, MemoryStore, StoredChunk } from './ports';
+import type { EmbeddingCache, MemoryHit, MemoryProbe, MemoryStore, StoredChunk } from './ports';
+import type { FusedHit } from './compose';
 import { collectionName, pointId } from './qdrant/collection';
 
 export const FAKE_MODEL = 'fake-embedding';
@@ -93,11 +94,16 @@ export class InMemoryMemoryStore implements MemoryStore {
     });
   }
 
-  search(vector: readonly number[], limit: number): Promise<MemoryHit[]> {
+  searchMany(probes: readonly MemoryProbe[]): Promise<MemoryHit[][]> {
+    // All-or-nothing, as the real batched call is: one bad probe loses them all.
     if (this.unreachable) return Promise.reject(new Error('store unreachable'));
+    return Promise.resolve(probes.map((probe) => this.rank(probe, probe.limit)));
+  }
+
+  private rank(probe: MemoryProbe, limit: number): MemoryHit[] {
     const seen = new Set<string>();
-    const hits = [...this.points.values()]
-      .map((chunk) => ({ chunk, score: cosine(vector, chunk.vector) }))
+    return [...this.points.values()]
+      .map((chunk) => ({ chunk, score: cosine(probe.vector, chunk.vectors[probe.using]) }))
       .sort((a, b) => b.score - a.score)
       .filter(({ chunk }) => !seen.has(chunk.contentHash) && seen.add(chunk.contentHash))
       .slice(0, limit)
@@ -110,7 +116,6 @@ export class InMemoryMemoryStore implements MemoryStore {
         model: chunk.model,
         score,
       }));
-    return Promise.resolve(hits);
   }
 
   replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number> {
@@ -251,6 +256,11 @@ export function traceOf(input: {
   results?: CriterionEvidence[];
   findings?: ConfirmedFinding[];
   decision?: Decision;
+  /** Defaults to 90 for an accept, 50 otherwise — override to sit either side of an accept bar. */
+  overall?: number;
+  /** False is what an open blocker looks like: the gate `admits` deliberately ignores. */
+  policyAllowed?: boolean;
+  validatorsPassed?: boolean;
 }): RunTrace {
   const decision = input.decision ?? 'accept';
   return {
@@ -278,11 +288,14 @@ export function traceOf(input: {
           finalDecision: decision,
           gates: {
             artifactPresent: true,
-            validatorsPassed: true,
+            validatorsPassed: input.validatorsPassed ?? true,
             evidenceSufficient: true,
-            policyAllowed: true,
+            policyAllowed: input.policyAllowed ?? true,
           },
-          scores: { dimensions: {}, overall: decision === 'accept' ? 90 : 50 },
+          scores: {
+            dimensions: {},
+            overall: input.overall ?? (decision === 'accept' ? 90 : 50),
+          },
           selectedRemediations: [],
           reason: 'spec',
           trace: { steps: [], dimensions: [], weightSum: 1, weightedTotal: 0 },
@@ -323,6 +336,10 @@ export const passed = (
   confidence: 'high',
   locationRefs,
 });
+
+/** Hits as fusion hands them on: retrieved under the prompt alone unless said otherwise. */
+export const fused = (hits: readonly MemoryHit[], probes: number[] = [0]): FusedHit[] =>
+  hits.map((hit) => ({ ...hit, probes }));
 
 export const hitOf = (
   text: string,

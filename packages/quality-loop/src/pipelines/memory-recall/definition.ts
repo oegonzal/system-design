@@ -79,45 +79,45 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       need: {
         dimension: 'coverage',
         weight: 1,
-        gate: false
+        gate: false,
       },
       admissibility: {
         dimension: 'fidelity',
         weight: 1,
-        gate: true
+        gate: true,
       },
     },
     findingTypes: {
       missed_chunk: {
         dimension: 'coverage',
-        gate: false
+        gate: false,
       },
       no_usable_memory: {
         dimension: 'coverage',
-        gate: true
+        gate: true,
       },
       irrelevant_chunk: {
         dimension: 'precision',
-        gate: false
+        gate: false,
       },
       redundant_chunk: {
         dimension: 'precision',
-        gate: false
+        gate: false,
       },
       // Priced, not gated: the producer that reads the pack sees the chunk's own
       // text beside the insight, so an over-reaching insight is a penalty,
       // not a reason to withhold the whole pack (the first live run blocked an 83 on one).
       unsupported_insight: {
         dimension: 'fidelity',
-        gate: false
+        gate: false,
       },
       misleading_chunk: {
         dimension: 'fidelity',
-        gate: false
+        gate: false,
       },
       stale_chunk: {
         dimension: 'fidelity',
-        gate: false
+        gate: false,
       },
     },
     resultValues: { pass: 1, partial: 0.5, fail: 0 },

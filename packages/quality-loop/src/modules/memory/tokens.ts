@@ -7,3 +7,4 @@ export const EMBEDDING_CACHE = Symbol('EMBEDDING_CACHE');
 export const MEMORY_STORE = Symbol('MEMORY_STORE');
 export const MEMORY_RUN_REPOSITORY = Symbol('MEMORY_RUN_REPOSITORY');
 export const MEMORY_PIPELINES = Symbol('MEMORY_PIPELINES');
+export const QUERY_PROBES = Symbol('QUERY_PROBES');

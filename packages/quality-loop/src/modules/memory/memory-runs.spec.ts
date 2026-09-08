@@ -121,10 +121,11 @@ describe('a memory run over the three pipelines', () => {
       reason: null,
       counts: { memories: 2, kept: 2 },
     });
+    // Two lessons, each indexed by its condition and its instruction.
     expect(record.steps.store).toMatchObject({
       status: 'complete',
       reason: null,
-      counts: { chunks: 2, embedded: 2 },
+      counts: { chunks: 2, embedded: 4 },
     });
 
     const target = await run(record.steps.target.runId);
@@ -159,7 +160,8 @@ describe('a memory run over the three pipelines', () => {
     ]);
     expect(chunks[0].evidence).toEqual([{ kind: 'criterion', ref: 'c1' }]);
     expect(chunks[0].digestRunId).toBe(digest.runId);
-    expect(await em.fork().count(MemoryEmbedding)).toBe(2);
+    // Two lessons, indexed by condition and by instruction: four texts, one point each.
+    expect(await em.fork().count(MemoryEmbedding)).toBe(4);
   });
 
   it('[QL-16] [QL-17] the next run on the goal recalls that memory, hands the endorsed chunk to the target, digests the bare prompt, and embeds only what the cache lacks', async () => {
@@ -196,7 +198,8 @@ describe('a memory run over the three pipelines', () => {
     expect(embeddings.calls.slice(callsBefore)).toEqual([
       [expect.stringContaining('# Prompt — Serve an order history')],
     ]);
-    expect(await em.fork().count(MemoryEmbedding)).toBe(3);
+    // Four indexed texts from the first run, plus this run's recall query.
+    expect(await em.fork().count(MemoryEmbedding)).toBe(5);
   });
 
   it('[QL-17] digesting a run again replaces its chunks under the same ids and embeds nothing new', async () => {

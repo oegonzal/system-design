@@ -10,9 +10,11 @@ import { samplePack } from '../../pipelines/memory-recall/testing';
 import type { RunsService } from '../runs/runs.service';
 import { bareGoal, buildQuery, MEMORY_HEADING } from './compose';
 import { CachedEmbeddings } from './embeddings';
+import { noQueryProbes } from './query-probes';
 import { closeSteps, digest, recall, StepLedger, store, target, type StepEnv } from './steps';
 import {
   confirmed,
+  fused,
   fakeEmbeddings,
   GOAL,
   hitOf,
@@ -23,7 +25,14 @@ import {
   vectorOf,
 } from './testing';
 
-const PIPELINES = [{ id: 'system-design' }, { id: 'memory-recall' }, { id: 'experience-digest' }];
+/** The accept bar both memory pipelines declare; the steps read it off the summary. */
+const ACCEPT_AT = 75;
+
+/** Only what the steps read off a summary: the id, and the pipeline's own bar. */
+const PIPELINES = ['system-design', 'memory-recall', 'experience-digest'].map((id) => ({
+  id,
+  policy: { thresholds: { acceptAt: ACCEPT_AT } },
+}));
 
 const pendingStep = () => ({
   status: 'pending' as const,
@@ -104,18 +113,26 @@ function env(
   const store = new InMemoryMemoryStore();
   void store.replaceRunChunks(
     'run-a',
-    hits.map((hit) => ({
-      text: hit.text,
-      contentHash: hit.contentHash,
-      source: hit.source,
-      evidence: hit.evidence,
-      digestRunId: hit.digestRunId,
-      model: hit.model,
-      vector: vectorOf(hit.text),
-    })),
+    hits.map((hit) => {
+      const keys = { condition: `when ${hit.text}`, lesson: hit.text };
+      return {
+        text: hit.text,
+        keys,
+        contentHash: hit.contentHash,
+        source: hit.source,
+        evidence: hit.evidence,
+        digestRunId: hit.digestRunId,
+        model: hit.model,
+        vectors: {
+          condition: vectorOf(keys.condition),
+          lesson: vectorOf(keys.lesson),
+        },
+      };
+    }),
   );
   return {
     executed,
+    probes: noQueryProbes,
     runs,
     embeddings: new CachedEmbeddings(fakeEmbeddings(), new InMemoryEmbeddingCache()),
     store,
@@ -134,7 +151,7 @@ const ledgerOf = (dto = record()) =>
 const recallTrace = (decision: RunTrace['finalDecision'] = 'accept', faulted = false) =>
   traceOf({
     pipeline: 'memory-recall',
-    goal: renderQuery(buildQuery(GOAL, hits)),
+    goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
     artifact: samplePack({ kept: samplePack().kept, dropped: [] }),
     locations: ['summary', 'm1', 'm2', 'gap.1'],
     criteria: [{ id: 'c1', kind: 'need', statement: 'x' }],
@@ -444,9 +461,11 @@ describe('the memory steps', () => {
       digestRunId: 'd',
       memories: digested?.memories ?? [],
     });
+    // One lesson, two vectors: `embedded` counts texts the provider was asked
+    // for, and a chunk is indexed by its condition and by its instruction.
     expect(dto.steps.store).toMatchObject({
       status: 'complete',
-      counts: { chunks: 1, embedded: 1 },
+      counts: { chunks: 1, embedded: 2 },
     });
     const stored = [...(written.store as InMemoryMemoryStore).points.values()].find(
       (chunk) => chunk.source.runId === source.runId,

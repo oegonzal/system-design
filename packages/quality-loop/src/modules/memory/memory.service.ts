@@ -16,6 +16,8 @@ import type {
   MemoryRunDto,
   MemoryStepDto,
   PipelineSummary,
+  RetrievalHitDto,
+  RetrievalReportDto,
   QualityRunDto,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
@@ -23,18 +25,37 @@ import { embeddingAvailabilityFromEnv, type EmbeddingClient } from '@sysdesign/l
 import { describeError } from '@sysdesign/run-dump';
 import { z } from 'zod';
 
+import { alias, MAX_CANDIDATES, probeAlias } from '../../pipelines/memory-recall/input';
 import type { RunListQuery } from '../../core/ports';
 import { RunsService } from '../runs/runs.service';
-import { bareGoal } from './compose';
+import { bareGoal, fuse, memoriesToStore, probesOf, probeTexts, queryText } from './compose';
 import { CachedEmbeddings } from './embeddings';
-import type { EmbeddingCache, MemoryPipelines, MemoryRunRepository, MemoryStore } from './ports';
-import { closeSteps, digest, recall, StepLedger, store, target, type StepEnv } from './steps';
+import {
+  VECTOR_NAMES,
+  type EmbeddingCache,
+  type MemoryHit,
+  type MemoryPipelines,
+  type MemoryRunRepository,
+  type MemoryStore,
+} from './ports';
+import type { QueryProbes } from './query-probes';
+import {
+  closeSteps,
+  digest,
+  indexMemories,
+  recall,
+  StepLedger,
+  store,
+  target,
+  type StepEnv,
+} from './steps';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
   MEMORY_PIPELINES,
   MEMORY_RUN_REPOSITORY,
   MEMORY_STORE,
+  QUERY_PROBES,
 } from './tokens';
 
 /** A memory run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
@@ -62,8 +83,9 @@ export class MemoryService implements OnModuleInit {
     @Inject(MEMORY_STORE) private readonly store: MemoryStore,
     @Inject(MEMORY_RUN_REPOSITORY) private readonly repository: MemoryRunRepository,
     @Inject(MEMORY_PIPELINES) private readonly pipelines: MemoryPipelines,
+    @Inject(QUERY_PROBES) private readonly probes: QueryProbes,
   ) {
-    this.embeddings = new CachedEmbeddings(client, cache);
+    this.embeddings = new CachedEmbeddings(client, cache, (message) => this.logger.warn(message));
   }
 
   /** Boot only: sweep runs the previous process never finished, and say what the store can do. */
@@ -96,10 +118,6 @@ export class MemoryService implements OnModuleInit {
     return record;
   }
 
-
-
-
-
   /** Learn from a run that already happened: digest and store, nothing else. */
   async startDigest(runId: string): Promise<MemoryRunDto> {
     const source = await this.runs.get(runId);
@@ -110,9 +128,107 @@ export class MemoryService implements OnModuleInit {
     return record;
   }
 
+  /**
+   * Re-index a memory run's lessons against the current index generation:
+   * the digest it already produced, embedded again. Deliberately not a
+   * re-digest — that asks a model to derive the lessons afresh, and
+   * `replaceRunChunks` deletes a run's chunks before it writes, so a replay
+   * that answers differently destroys what it was meant to migrate.
+   */
+  async reindex(id: string): Promise<MemoryStepDto> {
+    const record = await this.get(id);
+    if (record === null) throw new NotFoundException(`memory run ${id} not found`);
+    const { digest: digested, target: targeted } = record.steps;
+    if (digested.runId === null || targeted.runId === null) {
+      throw new BadRequestException(`memory run ${id} digested no run to re-index`);
+    }
+    const [digestRun, source] = await Promise.all([
+      this.runs.get(digested.runId),
+      this.runs.get(targeted.runId),
+    ]);
+    if (digestRun?.trace == null || source === null) {
+      throw new NotFoundException(`memory run ${id} refers to a run that is no longer stored`);
+    }
+    const model = this.embeddings.model;
+    if (model === null) throw new BadRequestException('embeddings are disabled');
 
+    const acceptAt = this.acceptAt(this.pipelines.digest);
+    const { memories } = memoriesToStore(digestRun.trace, acceptAt);
+    const at = new Date().toISOString();
+    const outcome = await indexMemories(
+      this.env(),
+      source,
+      { digestRunId: digestRun.runId, memories },
+      model,
+    );
+    this.logger.log(`memory run ${id} re-indexed: ${outcome.status}`);
+    return {
+      ...outcome,
+      reason: outcome.reason ?? null,
+      note: outcome.note ?? null,
+      counts: outcome.counts ?? {},
+      runId: digestRun.runId,
+      startedAt: at,
+      finishedAt: new Date().toISOString(),
+    };
+  }
 
+  /**
+   * What a recall would retrieve for a goal, without running a pipeline: the
+   * probes derived, each probe's own ranking, and the fused list. This is the
+   * measurement tool — a score floor is only defensible against it.
+   */
+  async retrievalReport(goal: string): Promise<RetrievalReportDto> {
+    const store = await this.store.verify();
+    const bare = bareGoal(goal);
+    const texts = probeTexts(bare, await this.probes.derive(queryText(bare)));
+    const embedded = await this.embeddings.embed(texts);
+    if (embedded === null) throw new BadRequestException('embeddings are unavailable');
+    const probes = probesOf(embedded.vectors, MAX_CANDIDATES);
+    const ranked = await this.store.searchMany(probes);
+    const asHit = (hit: MemoryHit): RetrievalHitDto => ({
+      runId: hit.source.runId,
+      ref: hit.source.ref,
+      score: hit.score,
+      text: hit.text,
+    });
+    return {
+      store,
+      probes: texts.map((text, position) => ({
+        alias: position === 0 ? 'prompt' : probeAlias(position - 1),
+        text,
+        found: probes
+          .map((probe, index) => ({ probe, index }))
+          .filter(({ index }) => Math.floor(index / VECTOR_NAMES.length) === position)
+          .map(({ probe, index }) => ({
+            using: probe.using,
+            hits: (ranked[index] ?? []).map(asHit),
+          })),
+      })),
+      candidates: fuse(ranked, MAX_CANDIDATES).map((hit, position) => ({
+        alias: alias(position),
+        ...asHit(hit),
+        matched: hit.probes.map((index) => (index === 0 ? 'prompt' : probeAlias(index - 1))),
+      })),
+    };
+  }
 
+  /** A registered pipeline's own accept bar; unreachable when it is not registered. */
+  private acceptAt(pipeline: string): number {
+    const summary = this.runs.list().find((candidate) => candidate.id === pipeline);
+    if (!summary) throw new NotFoundException(`unknown pipeline ${pipeline}`);
+    return summary.policy.thresholds.acceptAt;
+  }
+
+  private env(): StepEnv {
+    return {
+      runs: this.runs,
+      embeddings: this.embeddings,
+      store: this.store,
+      pipelines: this.pipelines,
+      probes: this.probes,
+    };
+  }
 
   private target(pipeline: string): PipelineSummary {
     const summary = this.runs.list().find((candidate) => candidate.id === pipeline);
@@ -122,11 +238,6 @@ export class MemoryService implements OnModuleInit {
     }
     return summary;
   }
-
-
-
-
-
 
   private async open(
     request: StartQualityRunRequest,
@@ -173,13 +284,6 @@ export class MemoryService implements OnModuleInit {
     return record;
   }
 
-
-
-
-
-
-  
-
   private async perform(
     record: MemoryRunDto,
     request: StartQualityRunRequest | null,
@@ -191,12 +295,7 @@ export class MemoryService implements OnModuleInit {
       () => new Date().toISOString(),
       (message) => this.logger.warn(`memory run ${record.memoryRunId}: ${message}`),
     );
-    const env: StepEnv = {
-      runs: this.runs,
-      embeddings: this.embeddings,
-      store: this.store,
-      pipelines: this.pipelines,
-    };
+    const env = this.env();
     try {
       let source = provided;
       if (request !== null) {

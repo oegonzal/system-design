@@ -6,7 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { RunTrace } from '@sysdesign/contracts';
+import type { IterationTrace, RunTrace } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
 import { GOAL_MAX_BYTES } from '../../core/prompting';
@@ -18,11 +18,19 @@ import {
   MAX_CANDIDATES,
   MAX_KEPT,
   memoryQuerySchema,
+  probeAlias,
   type ChunkSource,
   type MemoryQuery,
 } from '../../pipelines/memory-recall/input';
 import { memoryPackSchema, type MemoryPack } from '../../pipelines/memory-recall/output';
-import type { EvidenceRef, MemoryChunk, MemoryHit } from './ports';
+import { MAX_PROBES } from './query-probes';
+import {
+  VECTOR_NAMES,
+  type EvidenceRef,
+  type IndexedChunk,
+  type MemoryHit,
+  type MemoryProbe,
+} from './ports';
 
 /** The recall query is the goal's head: enough to embed and to judge candidates against. */
 export const QUERY_MAX_BYTES = 16_000;
@@ -43,15 +51,38 @@ export function bareGoal(goal: string): string {
   return marker < 0 ? goal : goal.slice(0, marker);
 }
 
-export function buildQuery(query: string, hits: readonly MemoryHit[]): MemoryQuery {
+/**
+ * The query the curator judges: the whole prompt, the candidates, and — for
+ * each — the derived conditions it was retrieved under. `probes[0]` is the
+ * prompt itself and is never listed, since "this came back on the prompt" is
+ * not information.
+ */
+export function buildQuery(
+  query: string,
+  probes: readonly string[],
+  hits: readonly FusedHit[],
+): MemoryQuery {
+  // `probes[0]` is the prompt; only the derived conditions are worth naming.
+  const derived = probes.slice(1);
   return memoryQuerySchema.parse({
     query,
     rules: [...DEFAULT_RULES],
+    probes: derived,
     maxKept: MAX_KEPT,
-    candidates: hits
-      .slice(0, MAX_CANDIDATES)
-      .map((hit) => ({ text: hit.text, source: hit.source })),
+    candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
+      text: hit.text,
+      source: hit.source,
+      matched: hit.probes.flatMap((index) =>
+        index === 0 || derived[index - 1] === undefined ? [] : [probeAlias(index - 1)],
+      ),
+    })),
   });
+}
+
+/** A hit after fusion, with the probes that surfaced it. */
+export interface FusedHit extends MemoryHit {
+  /** Indices into the probe texts; 0 is the prompt itself. */
+  probes: number[];
 }
 
 export interface UsableMemory {
@@ -65,22 +96,46 @@ export interface UsableMemory {
 export const bestIteration = (trace: RunTrace) =>
   trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ?? null;
 
+/**
+ * Whether a finished run's best iteration may be drawn on at all.
+ *
+ * An `accept` always may. Short of that, the loop's judgement is honoured
+ * where it is item-specific — a faulted item is excluded by the caller — but a
+ * run is not withheld wholesale merely because the iteration budget ran out
+ * before someone else's blocker closed. `policyAllowed` is the one gate
+ * deliberately not required: it is false whenever any blocker is open, and a
+ * blocker on the summary would otherwise veto every memory beneath it. The
+ * three gates that make the artifact and its score mean anything are required.
+ */
+export function admits(trace: RunTrace, best: IterationTrace, acceptAt: number): boolean {
+  if (trace.finalDecision === 'accept') return true;
+  const { gates, scores } = best.decision;
+  if (!gates.artifactPresent || !gates.validatorsPassed || !gates.evidenceSufficient) return false;
+  return scores.overall >= acceptAt;
+}
+
 export interface RecallReadout {
+  /** Whether the run cleared `admits` at all; false means nothing was even considered. */
+  admitted: boolean;
   /** How many chunks the pack kept, faulted or not. */
   kept: number;
   usable: UsableMemory[];
 }
 
 /**
- * What an accepted recall endorses: kept chunks no confirmed finding names,
- * strongest support first. Anything short of `accept` endorses nothing.
+ * What a recall endorses: kept chunks no confirmed finding names, strongest
+ * support first. A run the policy would not admit endorses nothing.
  */
-export function readPack(trace: RunTrace, hits: readonly MemoryHit[]): RecallReadout {
+export function readPack(
+  trace: RunTrace,
+  hits: readonly MemoryHit[],
+  acceptAt: number,
+): RecallReadout {
   const best = bestIteration(trace);
   const pack = best === null ? null : memoryPackSchema.safeParse(best.artifact);
-  if (best === null || !pack?.success) return { kept: 0, usable: [] };
+  if (best === null || !pack?.success) return { admitted: false, kept: 0, usable: [] };
   const kept = pack.data.kept.length;
-  if (trace.finalDecision !== 'accept') return { kept, usable: [] };
+  if (!admits(trace, best, acceptAt)) return { admitted: false, kept, usable: [] };
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const supportOf = (id: string): number =>
     best.ledger.criteria.filter(
@@ -94,7 +149,7 @@ export function readPack(trace: RunTrace, hits: readonly MemoryHit[]): RecallRea
       return hit ? [{ alias: item.chunk, kept: item, hit, support: supportOf(item.chunk) }] : [];
     })
     .sort((a, b) => b.support - a.support);
-  return { kept, usable };
+  return { admitted: true, kept, usable };
 }
 
 const rememberedLine = ({ alias: id, kept, hit }: UsableMemory): string => {
@@ -138,19 +193,23 @@ export interface MemoryToStore {
 }
 
 export interface DigestReadout {
+  /** Whether the run cleared `admits` at all; false means nothing was even considered. */
+  admitted: boolean;
   /** How many memories the digest proposed, faulted or not. */
   proposed: number;
   memories: MemoryToStore[];
 }
 
-/** What an accepted digest endorses: memories no confirmed finding names, with their evidence resolved. */
-export function memoriesToStore(trace: RunTrace): DigestReadout {
+/** What a digest endorses: memories no confirmed finding names, with their evidence resolved. */
+export function memoriesToStore(trace: RunTrace, acceptAt: number): DigestReadout {
   const best = bestIteration(trace);
   const digest = best === null ? null : experienceDigestSchema.safeParse(best.artifact);
-  if (best === null || !digest?.success) return { proposed: 0, memories: [] };
+  if (best === null || !digest?.success) return { admitted: false, proposed: 0, memories: [] };
   const proposed = digest.data.memories.length;
   const index = readDigestIndex(trace.contract.goal);
-  if (trace.finalDecision !== 'accept' || index === null) return { proposed, memories: [] };
+  if (index === null || !admits(trace, best, acceptAt)) {
+    return { admitted: false, proposed, memories: [] };
+  }
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
   const memories = digest.data.memories.flatMap((memory, position) => {
@@ -169,11 +228,78 @@ export function memoriesToStore(trace: RunTrace): DigestReadout {
       },
     ];
   });
-  return { proposed, memories };
+  return { admitted: true, proposed, memories };
 }
 
 export const lessonText = (memory: MemoryToStore): string =>
   `${memory.insight} — applies when ${memory.appliesWhen}`;
+
+/** How much a rank-k hit is worth; the constant of the standard RRF. */
+const RRF_K = 60;
+
+/**
+ * Reciprocal-rank fusion over the ranked lists a batch of probes came back
+ * with. Rank-based on purpose: the lists are answers to different questions
+ * against different named vectors, so their scores are not on one scale and
+ * comparing them directly would let whichever probe happens to score high
+ * decide the whole list. A chunk two probes both rank well beats one that a
+ * single probe ranks first. Deduped on `contentHash`, so the same lesson
+ * stored by two runs takes one slot, keeping its best-scoring copy.
+ */
+export function fuse(ranked: readonly (readonly MemoryHit[])[], limit: number): FusedHit[] {
+  const scores = new Map<string, number>();
+  const best = new Map<string, MemoryHit>();
+  const probes = new Map<string, Set<number>>();
+  ranked.forEach((list, listIndex) => {
+    // Every named vector of one probe is one question asked twice; the probe
+    // is what the reader is told about, so the lists collapse back to it.
+    const probe = Math.floor(listIndex / VECTOR_NAMES.length);
+    list.forEach((hit, rank) => {
+      scores.set(hit.contentHash, (scores.get(hit.contentHash) ?? 0) + 1 / (RRF_K + rank + 1));
+      const incumbent = best.get(hit.contentHash);
+      if (incumbent === undefined || hit.score > incumbent.score) best.set(hit.contentHash, hit);
+      (
+        probes.get(hit.contentHash) ?? probes.set(hit.contentHash, new Set()).get(hit.contentHash)
+      )?.add(probe);
+    });
+  });
+  return [...scores.entries()]
+    .sort(([leftHash, left], [rightHash, right]) =>
+      right === left ? leftHash.localeCompare(rightHash) : right - left,
+    )
+    .slice(0, limit)
+    .flatMap(([hash]) => {
+      const hit = best.get(hash);
+      return hit ? [{ ...hit, probes: [...(probes.get(hash) ?? [])].sort((a, b) => a - b) }] : [];
+    });
+}
+
+/**
+ * The texts a recall searches under: the goal first — so the fused list can
+ * only add to what a bare search would have found — then the derived
+ * conditions, stripped of blanks and repeats. An empty probe is not merely
+ * useless: the provider rejects it and the whole batch comes back null.
+ * Bounded by a slice, not by a greedy pack, so the count is exactly stated.
+ */
+export function probeTexts(goal: string, derived: readonly string[]): string[] {
+  const seen = new Set<string>();
+  return [queryText(goal), ...derived]
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0 && !seen.has(text) && seen.add(text))
+    .slice(0, MAX_PROBES + 1);
+}
+
+/**
+ * Every named vector asked of every probe, as one batch. The goal keeps the
+ * full candidate budget and the derived conditions share it, so widening the
+ * search does not multiply what comes back through a five-second timeout.
+ */
+export function probesOf(vectors: readonly (readonly number[])[], limit: number): MemoryProbe[] {
+  const share = Math.max(1, Math.ceil(limit / Math.max(1, vectors.length)));
+  return vectors.flatMap((vector, index) =>
+    VECTOR_NAMES.map((using) => ({ vector, using, limit: index === 0 ? limit : share })),
+  );
+}
 
 export interface ChunkOrigin {
   runId: string;
@@ -183,17 +309,22 @@ export interface ChunkOrigin {
   when: string;
 }
 
-/** One `lesson` chunk per memory, addressed by the digest's own location id. */
+/**
+ * One `lesson` chunk per memory, addressed by the digest's own location id and
+ * indexed by both halves the digest already separates: the condition it
+ * applies under, and the instruction itself.
+ */
 export function chunksOf(
   memories: readonly MemoryToStore[],
   origin: ChunkOrigin,
   digestRunId: string | null,
   model: string,
-): MemoryChunk[] {
+): IndexedChunk[] {
   return memories.map((memory) => {
     const text = lessonText(memory);
     return {
       text,
+      keys: { condition: memory.appliesWhen, lesson: memory.insight },
       contentHash: contentHash(text),
       source: { ...origin, kind: 'lesson', ref: `memory.${memory.position}` },
       evidence: memory.evidence,

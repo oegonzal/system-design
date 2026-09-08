@@ -18,6 +18,8 @@ const QUERY_MAX = 16_000;
 const CHUNK_MAX = 1_200;
 const RULE_MAX = 300;
 const MAX_RULES = 8;
+const PROBE_MAX = 240;
+const MAX_QUERY_PROBES = 6;
 
 export const CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
 
@@ -38,9 +40,23 @@ const queryShape = z.strictObject({
   query: z.string().min(1).max(QUERY_MAX),
   /** Prose rules about what may be kept; each derives an admissibility criterion. */
   rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
+  /** The conditions the retriever searched under, listed once and cited by alias. */
+  probes: z.array(z.string().min(1).max(PROBE_MAX)).max(MAX_QUERY_PROBES).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
   candidates: z
-    .array(z.strictObject({ text: z.string().min(1).max(CHUNK_MAX), source: chunkSourceSchema }))
+    .array(
+      z.strictObject({
+        text: z.string().min(1).max(CHUNK_MAX),
+        source: chunkSourceSchema,
+        /**
+         * Aliases of the probes that surfaced this chunk. Empty means it came
+         * back on the query as a whole. It says why the chunk is here, never
+         * that it is useful — that is the pipeline's judgement, and the
+         * retriever has no opinion worth deferring to.
+         */
+        matched: z.array(z.string().min(1).max(8)).max(MAX_QUERY_PROBES).default([]),
+      }),
+    )
     .min(1)
     .max(MAX_CANDIDATES),
 });
@@ -76,6 +92,9 @@ export type MemoryIndex = z.infer<typeof indexSchema>;
 /** Engine-assigned: the candidate's position, never anything the model wrote. */
 export const alias = (position: number): string => `m${position + 1}`;
 
+/** The same, for the conditions a search ran under. */
+export const probeAlias = (position: number): string => `p${position + 1}`;
+
 const FENCE_OPEN = '```json\n';
 const FENCE_CLOSE = '\n```';
 
@@ -103,7 +122,18 @@ export function renderGoal(input: MemoryQuery): string {
       '',
       candidate.text.trim(),
       '',
+      ...(candidate.matched.length > 0
+        ? [`Retrieved under ${candidate.matched.join(', ')}.`, '']
+        : []),
     ]),
+    ...(input.probes.length > 0
+      ? [
+          '## Retrieved under',
+          '',
+          ...input.probes.map((probe, position) => `- [${probeAlias(position)}] ${probe.trim()}`),
+          '',
+        ]
+      : []),
     '## Rules',
     '',
     ...(input.rules.length > 0 ? input.rules.map((rule) => `- ${rule}`) : ['(none)']),

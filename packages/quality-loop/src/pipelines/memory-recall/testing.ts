@@ -41,15 +41,18 @@ export const sampleQuery = (overrides: Partial<MemoryQuery> = {}): MemoryQuery =
     '| Reads/s | 150 |',
   ].join('\n'),
   rules: [...DEFAULT_RULES],
+  probes: ['a read path depends on one upstream that can go down'],
   maxKept: 2,
   candidates: [
     {
       text: 'The list read path served every request from the order store, so a POS outage took the page down.',
       source: source(),
+      matched: ['p1'],
     },
     {
       text: '[component.2] Order store — holds merged orders (Postgres)',
       source: source({ kind: 'section', ref: 'component.2', decision: 'accept', iteration: 2 }),
+      matched: [],
     },
     {
       text: 'A notification fan-out must dedupe by event id before delivery.',
@@ -60,6 +63,7 @@ export const sampleQuery = (overrides: Partial<MemoryQuery> = {}): MemoryQuery =
         decision: 'accept',
         iteration: 3,
       }),
+      matched: [],
     },
   ],
   ...overrides,
@@ -93,9 +97,11 @@ const fill = (length: number, char = 'x'): string => char.repeat(length);
 export const maximalQuery = (): MemoryQuery => ({
   query: fill(16_000),
   rules: Array.from({ length: 8 }, () => fill(300)),
+  probes: Array.from({ length: 6 }, () => fill(240)),
   maxKept: MAX_KEPT,
   candidates: Array.from({ length: MAX_CANDIDATES }, () => ({
     text: fill(1_200),
     source: source({ runId: fill(80), pipeline: fill(80), ref: fill(200), when: fill(40) }),
+    matched: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
   })),
 });

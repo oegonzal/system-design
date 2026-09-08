@@ -13,6 +13,8 @@ import type {
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
+import { describeError } from '@sysdesign/run-dump';
+
 import { toRunDto } from '../../core/contracts';
 import { fromRun } from '../../pipelines/experience-digest/compose';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
@@ -23,20 +25,25 @@ import {
   bestIteration,
   buildQuery,
   chunksOf,
+  fuse,
   memoriesToStore,
+  probesOf,
+  probeTexts,
   queryText,
   readPack,
   withMemory,
   type MemoryToStore,
 } from './compose';
 import type { CachedEmbeddings } from './embeddings';
-import type { MemoryPipelines, MemoryStore } from './ports';
+import { VECTOR_NAMES, type MemoryPipelines, type MemoryStore } from './ports';
+import type { QueryProbes } from './query-probes';
 
 export interface StepEnv {
   runs: RunsService;
   embeddings: CachedEmbeddings;
   store: MemoryStore;
   pipelines: MemoryPipelines;
+  probes: QueryProbes;
 }
 
 export interface Outcome {
@@ -111,16 +118,14 @@ export class StepLedger {
     this.record.steps[step] = { ...this.record.steps[step], ...patch };
     this.writes = this.writes
       .then(() => this.flush(this.record))
-      .catch((error: unknown) => this.warn(`step not flushed: ${describe(error)}`));
+      .catch((error: unknown) => this.warn(`step not flushed: ${describeError(error).message}`));
     return this.writes;
   }
 }
 
-const registered = (env: StepEnv, pipeline: string): boolean =>
-  env.runs.list().some((summary) => summary.id === pipeline);
-
-const describe = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+/** A registered pipeline's own accept bar; null when it is not registered at all. */
+const acceptAtOf = (env: StepEnv, pipeline: string): number | null =>
+  env.runs.list().find((summary) => summary.id === pipeline)?.policy.thresholds.acceptAt ?? null;
 
 /** Recall memory for the goal; returns the goal the target should run with. */
 export async function recall(env: StepEnv, ledger: StepLedger, goal: string): Promise<string> {
@@ -137,26 +142,34 @@ export async function recall(env: StepEnv, ledger: StepLedger, goal: string): Pr
     await ledger.skip('recall', 'store-empty');
     return goal;
   }
-  if (!registered(env, env.pipelines.recall)) {
+  const acceptAt = acceptAtOf(env, env.pipelines.recall);
+  if (acceptAt === null) {
     await ledger.skip('recall', 'pipeline-unavailable', env.pipelines.recall);
     return goal;
   }
 
   await ledger.begin('recall');
   const query = queryText(goal);
-  const embedded = await env.embeddings.embed([query]);
+  // The goal is always probe zero; derived conditions only widen the net.
+  const texts = probeTexts(goal, await env.probes.derive(query));
+  const embedded = await env.embeddings.embed(texts);
   if (embedded === null) {
-    await ledger.end('recall', { status: 'failed', reason: 'embedding-failed' });
+    await ledger.end('recall', {
+      status: 'failed',
+      reason: 'embedding-failed',
+      counts: { probes: texts.length },
+    });
     return goal;
   }
   let hits;
   try {
-    hits = await env.store.search(embedded.vectors[0], MAX_CANDIDATES);
+    const ranked = await env.store.searchMany(probesOf(embedded.vectors, MAX_CANDIDATES));
+    hits = fuse(ranked, MAX_CANDIDATES);
   } catch (error) {
     await ledger.end('recall', {
       status: 'failed',
       reason: 'store-unavailable',
-      note: describe(error),
+      note: describeError(error).message,
     });
     return goal;
   }
@@ -166,7 +179,7 @@ export async function recall(env: StepEnv, ledger: StepLedger, goal: string): Pr
   }
 
   const child = await env.runs.execute(
-    { pipeline: env.pipelines.recall, goal: renderQuery(buildQuery(query, hits)) },
+    { pipeline: env.pipelines.recall, goal: renderQuery(buildQuery(query, texts, hits)) },
     (opened) => void ledger.child('recall', opened.runId),
   );
   if (child.status === 'failed' || child.trace === null) {
@@ -177,14 +190,15 @@ export async function recall(env: StepEnv, ledger: StepLedger, goal: string): Pr
     });
     return goal;
   }
-  const readout = readPack(child.trace, hits);
+  const readout = readPack(child.trace, hits, acceptAt);
   const counts = {
+    probes: texts.length,
     candidates: hits.length,
     kept: readout.kept,
     usable: readout.usable.length,
     injected: 0,
   };
-  if (child.trace.finalDecision !== 'accept') {
+  if (!readout.admitted) {
     await ledger.end('recall', { status: 'complete', reason: 'not-accepted', counts });
     return goal;
   }
@@ -265,8 +279,8 @@ export async function digest(
   };
   if (!env.embeddings.enabled)
     return skipBoth('embeddings-disabled', ledger.record.embedding.reason);
-  if (!registered(env, env.pipelines.digest))
-    return skipBoth('pipeline-unavailable', env.pipelines.digest);
+  const acceptAt = acceptAtOf(env, env.pipelines.digest);
+  if (acceptAt === null) return skipBoth('pipeline-unavailable', env.pipelines.digest);
   // The digest judges the bare prompt: remembered evidence is never re-digested.
   const trace = source.trace;
   const record =
@@ -292,9 +306,9 @@ export async function digest(
     await ledger.skip('store', 'digest-failed');
     return null;
   }
-  const { proposed, memories } = memoriesToStore(child.trace);
+  const { admitted, proposed, memories } = memoriesToStore(child.trace, acceptAt);
   const counts = { memories: proposed, kept: memories.length };
-  if (child.trace.finalDecision !== 'accept') {
+  if (!admitted) {
     await ledger.end('digest', { status: 'complete', reason: 'not-accepted', counts });
     await ledger.skip('store', 'not-accepted');
     return null;
@@ -326,6 +340,23 @@ export async function store(
     return;
   }
   await ledger.begin('store');
+  await ledger.end('store', await indexMemories(env, source, digested, model));
+}
+
+/**
+ * Write a source run's memories to the store as exactly these chunks. Pure of
+ * the ledger, so re-indexing an already digested run — after the index
+ * generation moves, say — re-embeds the same engine facts rather than asking
+ * a model to derive them again.
+ */
+export async function indexMemories(
+  env: StepEnv,
+  source: QualityRunDto,
+  digested: Digested,
+  model: string,
+): Promise<Outcome> {
+  const trace = source.trace;
+  if (trace === null) return { status: 'skipped', reason: 'nothing-to-digest' };
   const chunks = chunksOf(
     digested.memories,
     {
@@ -338,25 +369,31 @@ export async function store(
     digested.digestRunId,
     model,
   );
-  const embedded = await env.embeddings.embed(chunks.map((chunk) => chunk.text));
-  if (embedded === null) {
-    await ledger.end('store', { status: 'failed', reason: 'embedding-failed' });
-    return;
-  }
+  // Both indexed texts of every chunk, in one batch: the cache dedupes, and
+  // the vectors come back in the order they were asked for.
+  const embedded = await env.embeddings.embed(
+    chunks.flatMap((chunk) => VECTOR_NAMES.map((name) => chunk.keys[name])),
+  );
+  if (embedded === null) return { status: 'failed', reason: 'embedding-failed' };
   try {
     const stored = await env.store.replaceRunChunks(
       source.runId,
-      chunks.map((chunk, index) => ({ ...chunk, vector: embedded.vectors[index] })),
+      chunks.map((chunk, index) => ({
+        ...chunk,
+        vectors: Object.fromEntries(
+          VECTOR_NAMES.map((name, offset) => [
+            name,
+            embedded.vectors[index * VECTOR_NAMES.length + offset],
+          ]),
+        ) as Record<(typeof VECTOR_NAMES)[number], number[]>,
+      })),
     );
-    await ledger.end('store', {
-      status: 'complete',
-      counts: { chunks: stored, embedded: embedded.misses },
-    });
+    return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
   } catch (error) {
-    await ledger.end('store', {
+    return {
       status: 'failed',
       reason: 'store-unavailable',
-      note: describe(error),
-    });
+      note: describeError(error).message,
+    };
   }
 }

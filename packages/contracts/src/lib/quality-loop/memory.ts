@@ -102,3 +102,41 @@ export interface DigestRunRequest {
 export type StartMemoryRunResponse = ApiResponse<MemoryRunStartedDto>;
 export type GetMemoryRunResponse = ApiResponse<MemoryRunDto>;
 export type ListMemoryRunsResponse = ApiListResponse<MemoryRunDto>;
+
+/**
+ * What a re-index did. It is a store step in every respect but persistence:
+ * the run it re-indexed is already closed, so this is reported rather than
+ * written back to that run's ledger.
+ */
+export type ReindexMemoryRunResponse = ApiResponse<MemoryStepDto>;
+
+/** One chunk as a search returned it. */
+export interface RetrievalHitDto {
+  runId: string;
+  ref: string;
+  /** Cosine against the probe that found it; comparable only within one list. */
+  score: number;
+  text: string;
+}
+
+/** What one probe found, per named vector it was compared against. */
+export interface RetrievalProbeDto {
+  alias: string;
+  text: string;
+  found: { using: string; hits: RetrievalHitDto[] }[];
+}
+
+/**
+ * What a recall would retrieve for a goal, without running any pipeline.
+ * The tool for deciding whether the probes discriminate and whether a score
+ * floor could ever be set: it reports every probe's own ranking beside the
+ * fused one, so a floor is chosen against measurements rather than guessed.
+ */
+export interface RetrievalReportDto {
+  store: MemoryStoreAvailabilityDto;
+  probes: RetrievalProbeDto[];
+  /** The fused list, in the order the curator would receive it. */
+  candidates: (RetrievalHitDto & { alias: string; matched: string[] })[];
+}
+
+export type RetrievalReportResponse = ApiResponse<RetrievalReportDto>;

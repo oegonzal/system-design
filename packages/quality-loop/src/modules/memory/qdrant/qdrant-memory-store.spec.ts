@@ -9,16 +9,22 @@ const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const model = `spec-${crypto.randomUUID().slice(0, 8)}`;
 const DIMENSIONS = 4;
 
+/** A lesson indexed both ways, as `chunksOf` produces it. */
 const chunk = (text: string, runId: string, ref: string) => {
   const hit = hitOf(text, runId, ref);
+  const keys = { condition: `when ${text}`, lesson: text };
   return {
     text: hit.text,
+    keys,
     contentHash: hit.contentHash,
     source: hit.source,
     evidence: hit.evidence,
     digestRunId: hit.digestRunId,
     model,
-    vector: vectorOf(text, DIMENSIONS),
+    vectors: {
+      condition: vectorOf(keys.condition, DIMENSIONS),
+      lesson: vectorOf(keys.lesson, DIMENSIONS),
+    },
   };
 };
 
@@ -61,7 +67,13 @@ describe('the Qdrant memory store', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/,
     );
 
-    const hits = await store.search(first.vector, 5);
+    const [byCondition, byLesson] = await store.searchMany([
+      { vector: first.vectors.condition, using: 'condition', limit: 5 },
+      { vector: first.vectors.lesson, using: 'lesson', limit: 5 },
+    ]);
+    // Each named vector is searched independently and answers in probe order.
+    expect(byCondition[0].contentHash).toBe(first.contentHash);
+    const hits = byLesson;
     expect(hits[0]).toMatchObject({
       text: first.text,
       contentHash: first.contentHash,
@@ -74,7 +86,9 @@ describe('the Qdrant memory store', () => {
 
     // The same lesson from another run is one candidate, not two.
     await store.replaceRunChunks('run-b', [chunk(first.text, 'run-b', 'memory.1')]);
-    const deduped = await store.search(first.vector, 5);
+    const [deduped] = await store.searchMany([
+      { vector: first.vectors.lesson, using: 'lesson', limit: 5 },
+    ]);
     expect(deduped.filter((hit) => hit.text === first.text)).toHaveLength(1);
     expect((await store.verify()).chunks).toBe(3);
 

@@ -10,13 +10,17 @@ import {
   bareGoal,
   buildQuery,
   chunksOf,
+  fuse,
   MEMORY_HEADING,
   memoriesToStore,
   queryText,
   readPack,
   withMemory,
 } from './compose';
-import { confirmed, GOAL, hitOf, passed, traceOf } from './testing';
+import { confirmed, fused, GOAL, hitOf, passed, traceOf } from './testing';
+
+/** Both memory pipelines set the same bar; the specs state it rather than import it. */
+const ACCEPT_AT = 75;
 
 const hits = [
   hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
@@ -31,26 +35,85 @@ describe('composing a memory run', () => {
     const wide = Array.from({ length: 17 }, (_, index) =>
       hitOf('y'.repeat(1_200), `run-${index}`, 'memory.1'),
     );
-    const query = buildQuery(queryText(long), wide);
+    const query = buildQuery(queryText(long), [queryText(long)], fused(wide));
     expect(query.candidates).toHaveLength(16);
     expect(() => renderQuery(query)).not.toThrow();
   });
 
   it('[QL-16] the bare goal is the goal without the section a memory run appended', () => {
-    const composed = withMemory(GOAL, readPack(acceptedRecall(), hits).usable);
+    const composed = withMemory(GOAL, readPack(acceptedRecall(), hits, ACCEPT_AT).usable);
     expect(composed).not.toBeNull();
     expect(bareGoal(composed?.goal ?? '')).toBe(GOAL);
     expect(bareGoal(GOAL)).toBe(GOAL);
   });
 
   it('[QL-16] an accepted pack endorses kept chunks no finding names, strongest support first; anything else endorses nothing', () => {
-    const { kept, usable } = readPack(acceptedRecall(), hits);
+    const { kept, usable } = readPack(acceptedRecall(), hits, ACCEPT_AT);
     expect(kept).toBe(2);
     expect(usable.map((item) => [item.alias, item.support])).toEqual([['m1', 1]]);
     expect(usable[0].hit.source.runId).toBe('run-a');
 
-    const revised = readPack(traceOf({ ...recallInput(), decision: 'revise' }), hits);
-    expect(revised).toEqual({ kept: 2, usable: [] });
+    const belowTheBar = readPack(
+      traceOf({ ...recallInput(), decision: 'revise', overall: 50 }),
+      hits,
+      ACCEPT_AT,
+    );
+    expect(belowTheBar).toEqual({ admitted: false, kept: 2, usable: [] });
+  });
+
+  it('[QL-16] a pack that cleared the bar is drawn on even though the loop ran out of iterations', () => {
+    // What a real recall looks like: scored past the bar, still `revise`
+    // because a blocker somewhere in the pack never closed inside two passes.
+    const outOfIterations = traceOf({
+      ...recallInput(),
+      decision: 'revise',
+      overall: 82,
+      policyAllowed: false,
+    });
+
+    const readout = readPack(outOfIterations, hits, ACCEPT_AT);
+
+    expect(readout.admitted).toBe(true);
+    // m2 is the one a finding names, and it is the only one withheld.
+    expect(readout.usable.map((item) => item.alias)).toEqual(['m1']);
+  });
+
+  it('[QL-16] a pack whose validators failed is withheld whole, however well it scored', () => {
+    const broken = traceOf({
+      ...recallInput(),
+      decision: 'revise',
+      overall: 99,
+      validatorsPassed: false,
+    });
+
+    expect(readPack(broken, hits, ACCEPT_AT)).toEqual({ admitted: false, kept: 2, usable: [] });
+  });
+
+  it("[QL-16] fusion rewards the chunk several probes agree on over one probe's favourite", () => {
+    const agreed = hitOf('agreed by two probes', 'run-a', 'memory.1');
+    const favourite = hitOf("one probe's top hit", 'run-b', 'memory.1');
+    const other = hitOf('also seen once', 'run-c', 'memory.1');
+
+    // `favourite` is rank 0 of the first list and scores highest; `agreed` is
+    // rank 1 of both. Rank-based fusion prefers the one both probes ranked.
+    const fused = fuse(
+      [
+        [
+          { ...favourite, score: 0.9 },
+          { ...agreed, score: 0.3 },
+        ],
+        [
+          { ...other, score: 0.4 },
+          { ...agreed, score: 0.35 },
+        ],
+      ],
+      3,
+    );
+
+    expect(fused[0].text).toBe(agreed.text);
+    // A chunk carried by two lists keeps its best-scoring copy.
+    expect(fused[0].score).toBe(0.35);
+    expect(fused).toHaveLength(3);
   });
 
   it('[QL-16] strongest support first, and the least supported are dropped first when the budget is short', () => {
@@ -64,7 +127,7 @@ describe('composing a memory run', () => {
     });
     const trace = traceOf({
       pipeline: 'memory-recall',
-      goal: renderQuery(buildQuery(GOAL, hits)),
+      goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
       artifact: pack,
       locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
       criteria: [
@@ -78,7 +141,7 @@ describe('composing a memory run', () => {
         passed('c3', 'need', ['m1']),
       ],
     });
-    const { usable } = readPack(trace, hits);
+    const { usable } = readPack(trace, hits, ACCEPT_AT);
     expect(usable.map((item) => [item.alias, item.support])).toEqual([
       ['m3', 2],
       ['m1', 1],
@@ -95,7 +158,7 @@ describe('composing a memory run', () => {
   });
 
   it('[QL-16] memory reaches the goal as an advisory section that fits the budget, or not at all', () => {
-    const { usable } = readPack(acceptedRecall(), hits);
+    const { usable } = readPack(acceptedRecall(), hits, ACCEPT_AT);
     const composed = withMemory(GOAL, usable);
     expect(composed?.injected).toBe(1);
     expect(composed?.goal.startsWith(GOAL)).toBe(true);
@@ -132,7 +195,8 @@ describe('composing a memory run', () => {
       locations: ['summary', 'memory.1', 'memory.2', 'f1', 'r1', 'f2', 'r2'],
       findings: [confirmed('run_specific', ['memory.2'])],
     });
-    expect(memoriesToStore(trace)).toEqual({
+    expect(memoriesToStore(trace, ACCEPT_AT)).toEqual({
+      admitted: true,
       proposed: 2,
       memories: [
         {
@@ -146,10 +210,33 @@ describe('composing a memory run', () => {
         },
       ],
     });
-    expect(memoriesToStore({ ...trace, finalDecision: 'revise' })).toEqual({
+    const belowTheBar = traceOf({ ...digestInput(digest, goal), decision: 'revise', overall: 50 });
+    expect(memoriesToStore(belowTheBar, ACCEPT_AT)).toEqual({
+      admitted: false,
       proposed: 2,
       memories: [],
     });
+  });
+
+  it('[QL-16] a blocker on the summary withholds the summary, not the memories under it', () => {
+    // The live failure this rule exists for: a digest scored 94, ended
+    // `revise` on an open `misattributed_evidence` naming only the summary,
+    // and eight clean memories were thrown away with it.
+    const record = fromRun(sampleRun());
+    if (record === null) throw new Error('the sample run must compose');
+    const digest = sampleDigest();
+    const faultedSummary = traceOf({
+      ...digestInput(digest, renderRecord(record)),
+      decision: 'revise',
+      overall: 94,
+      policyAllowed: false,
+      findings: [confirmed('misattributed_evidence', ['summary'])],
+    });
+
+    const readout = memoriesToStore(faultedSummary, ACCEPT_AT);
+
+    expect(readout.admitted).toBe(true);
+    expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
   });
 
   it('[QL-16] a stored chunk is a lesson addressed by the digest location, carrying the source run as provenance', () => {
@@ -165,6 +252,7 @@ describe('composing a memory run', () => {
         artifact: sampleDigest(),
         locations: ['summary', 'memory.1', 'f1', 'r1', 'f2', 'r2'],
       }),
+      ACCEPT_AT,
     );
     const [chunk] = chunksOf(
       memories,
@@ -199,7 +287,7 @@ function recallInput() {
   const pack = samplePack();
   return {
     pipeline: 'memory-recall',
-    goal: renderQuery(buildQuery(GOAL, hits)),
+    goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
     artifact: pack,
     locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
     criteria: [{ id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' }],
@@ -209,3 +297,12 @@ function recallInput() {
 }
 
 const acceptedRecall = () => traceOf(recallInput());
+
+function digestInput(digest: ReturnType<typeof sampleDigest>, goal: string) {
+  return {
+    pipeline: 'experience-digest',
+    goal,
+    artifact: digest,
+    locations: ['summary', 'memory.1', 'memory.2', 'f1', 'r1', 'f2', 'r2'],
+  };
+}
