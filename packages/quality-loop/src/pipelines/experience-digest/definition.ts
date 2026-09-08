@@ -79,26 +79,72 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
 
   policy: {
     version: '1',
-    dimensionWeights: { attribution: 0.4, fidelity: 0.3, reuse: 0.3 },
+    dimensionWeights: {
+      attribution: 0.4,
+      fidelity: 0.3,
+      reuse: 0.3
+    },
     criterionKinds: {
-      signal: { dimension: 'attribution', weight: 1, gate: false },
-      transition: { dimension: 'attribution', weight: 1, gate: false },
+      signal: {
+        dimension: 'attribution',
+        weight: 1,
+        gate: false
+      },
+      transition: {
+        dimension: 'attribution',
+        weight: 1,
+        gate: false
+      },
     },
     // `fidelity` and `reuse` are priced by findings alone: a digest with none
-    // of either starts them at 100, and a digest nobody faulted renormalises
+    // of either starts them at 100,
+    // and a digest nobody faulted renormalises
     // them out.
     findingTypes: {
-      missed_signal: { dimension: 'attribution', gate: false },
-      unsupported_effect: { dimension: 'attribution', gate: false },
-      misattributed_evidence: { dimension: 'fidelity', gate: true },
-      run_specific: { dimension: 'reuse', gate: false },
-      vague_insight: { dimension: 'reuse', gate: false },
-      duplicate_memory: { dimension: 'reuse', gate: false },
+      missed_signal: {
+        dimension: 'attribution',
+        gate: false
+      },
+      unsupported_effect: {
+        dimension: 'attribution',
+        gate: false
+      },
+      misattributed_evidence: {
+        dimension: 'fidelity',
+        gate: true
+      },
+      run_specific: {
+        dimension: 'reuse',
+        gate: false
+      },
+      vague_insight: {
+        dimension: 'reuse',
+        gate: false
+      },
+      duplicate_memory: {
+        dimension: 'reuse',
+        gate: false
+      },
     },
-    resultValues: { pass: 1, partial: 0.5, fail: 0 },
-    confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
+    resultValues: { 
+      pass: 1,
+      partial: 0.5,
+      fail: 0
+    },
+    confidenceWeights: { 
+      none: 0,
+      low: 0.33,
+      medium: 0.67,
+      high: 1
+    },
     penalties: {
-      bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
+      bySeverity: { 
+        critical: 40,
+        high: 25,
+        medium: 12,
+        low: 5,
+        info: 0
+      },
       decay: 0.7,
       maxPerDimension: 60,
     },

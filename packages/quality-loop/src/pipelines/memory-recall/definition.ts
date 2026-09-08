@@ -76,20 +76,49 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
     version: '1',
     dimensionWeights: { coverage: 0.4, precision: 0.25, fidelity: 0.35 },
     criterionKinds: {
-      need: { dimension: 'coverage', weight: 1, gate: false },
-      admissibility: { dimension: 'fidelity', weight: 1, gate: true },
+      need: {
+        dimension: 'coverage',
+        weight: 1,
+        gate: false
+      },
+      admissibility: {
+        dimension: 'fidelity',
+        weight: 1,
+        gate: true
+      },
     },
     findingTypes: {
-      missed_chunk: { dimension: 'coverage', gate: false },
-      no_usable_memory: { dimension: 'coverage', gate: true },
-      irrelevant_chunk: { dimension: 'precision', gate: false },
-      redundant_chunk: { dimension: 'precision', gate: false },
+      missed_chunk: {
+        dimension: 'coverage',
+        gate: false
+      },
+      no_usable_memory: {
+        dimension: 'coverage',
+        gate: true
+      },
+      irrelevant_chunk: {
+        dimension: 'precision',
+        gate: false
+      },
+      redundant_chunk: {
+        dimension: 'precision',
+        gate: false
+      },
       // Priced, not gated: the producer that reads the pack sees the chunk's own
-      // text beside the insight, so an over-reaching insight is a penalty, not a
-      // reason to withhold the whole pack (the first live run blocked an 83 on one).
-      unsupported_insight: { dimension: 'fidelity', gate: false },
-      misleading_chunk: { dimension: 'fidelity', gate: false },
-      stale_chunk: { dimension: 'fidelity', gate: false },
+      // text beside the insight, so an over-reaching insight is a penalty,
+      // not a reason to withhold the whole pack (the first live run blocked an 83 on one).
+      unsupported_insight: {
+        dimension: 'fidelity',
+        gate: false
+      },
+      misleading_chunk: {
+        dimension: 'fidelity',
+        gate: false
+      },
+      stale_chunk: {
+        dimension: 'fidelity',
+        gate: false
+      },
     },
     resultValues: { pass: 1, partial: 0.5, fail: 0 },
     confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },

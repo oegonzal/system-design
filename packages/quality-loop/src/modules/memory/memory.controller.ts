@@ -29,6 +29,10 @@ import { MemoryService } from './memory.service';
 export class MemoryController {
   constructor(private readonly memory: MemoryService) {}
 
+
+
+
+
   /** 202: three runs are many minutes on the subscription client; poll `GET /memory-runs/:id`. */
   @Post()
   @HttpCode(202)
@@ -39,6 +43,10 @@ export class MemoryController {
     return { data: { memoryRunId: record.memoryRunId, status: record.status } };
   }
 
+
+
+  
+
   /** 202: digest an already persisted run and store what it teaches. */
   @Post('digest')
   @HttpCode(202)
@@ -48,6 +56,8 @@ export class MemoryController {
     const record = await this.memory.startDigest(body.runId);
     return { data: { memoryRunId: record.memoryRunId, status: record.status } };
   }
+
+
 
   /** Newest first. Declared before `:id` so the bare collection never reads as an id. */
   @Get()

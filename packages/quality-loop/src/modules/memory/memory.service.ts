@@ -96,6 +96,10 @@ export class MemoryService implements OnModuleInit {
     return record;
   }
 
+
+
+
+
   /** Learn from a run that already happened: digest and store, nothing else. */
   async startDigest(runId: string): Promise<MemoryRunDto> {
     const source = await this.runs.get(runId);
@@ -106,6 +110,10 @@ export class MemoryService implements OnModuleInit {
     return record;
   }
 
+
+
+
+
   private target(pipeline: string): PipelineSummary {
     const summary = this.runs.list().find((candidate) => candidate.id === pipeline);
     if (!summary) throw new NotFoundException(`unknown pipeline ${pipeline}`);
@@ -114,6 +122,11 @@ export class MemoryService implements OnModuleInit {
     }
     return summary;
   }
+
+
+
+
+
 
   private async open(
     request: StartQualityRunRequest,
@@ -159,6 +172,13 @@ export class MemoryService implements OnModuleInit {
     await this.repository.open(record);
     return record;
   }
+
+
+
+
+
+
+  
 
   private async perform(
     record: MemoryRunDto,
