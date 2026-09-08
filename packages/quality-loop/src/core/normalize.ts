@@ -46,13 +46,83 @@ export interface NormalizeInput<T> {
 export const findingKey = (type: string, locationRefs: readonly string[]): string =>
   `${type}|${unique(locationRefs).sort(compareStrings).join(',')}`;
 
+/**
+ * Whether two findings describe one defect: the same type, pointing at a common
+ * location — or neither pointing anywhere.
+ *
+ * This is deliberately weaker than equal keys. Identity used to require the
+ * *same set* of locations, which made agreement almost unreachable: two samples
+ * describing one defect routinely cite overlapping but different evidence, so
+ * one listing five locations and another listing four counted as two unrelated
+ * singletons. Measured over 200 dumped iterations that discarded 60% of every
+ * panel's findings as unconfirmed, and 88-100% on a pipeline whose artifact
+ * exposes more locations to cite. Overlap is the honest test of "the same
+ * defect"; the wording is still never compared.
+ */
+export const sameDefect = (
+  a: { readonly type: string; readonly locationRefs: readonly string[] },
+  b: { readonly type: string; readonly locationRefs: readonly string[] },
+): boolean =>
+  a.type === b.type &&
+  (a.locationRefs.length === 0 || b.locationRefs.length === 0
+    ? a.locationRefs.length === b.locationRefs.length
+    : a.locationRefs.some((ref) => b.locationRefs.includes(ref)));
+
 /** Keep only refs that exist — the enum should already guarantee it; this is the re-check. */
 export const admitRefs = (refs: readonly string[], known: ReadonlySet<string>): string[] =>
   unique(refs.filter((ref) => known.has(ref))).sort(compareStrings);
 
-interface FindingBucket {
-  samples: Set<number>;
-  raws: RawFinding[];
+interface Admitted {
+  lens: string;
+  sample: number;
+  raw: RawFinding;
+}
+
+interface Defect {
+  type: string;
+  refs: Set<string>;
+  members: Admitted[];
+}
+
+/**
+ * Admitted findings grouped into defects by `sameDefect`, as connected
+ * components — so agreement is transitive through shared evidence. The input is
+ * sorted first, and components are merged into the earliest survivor, so the
+ * grouping is a function of the findings alone and not of the order lenses
+ * happened to return.
+ */
+function defectsOf(items: readonly Admitted[]): Defect[] {
+  const sorted = [...items].sort(
+    (a, b) =>
+      compareStrings(a.raw.type, b.raw.type) ||
+      compareStrings(a.raw.locationRefs.join(','), b.raw.locationRefs.join(',')) ||
+      compareStrings(a.lens, b.lens) ||
+      a.sample - b.sample,
+  );
+  const defects: Defect[] = [];
+  for (const item of sorted) {
+    const here = { type: item.raw.type, locationRefs: item.raw.locationRefs };
+    const touching = defects.filter((defect) =>
+      sameDefect({ type: defect.type, locationRefs: [...defect.refs] }, here),
+    );
+    if (touching.length === 0) {
+      defects.push({
+        type: item.raw.type,
+        refs: new Set(item.raw.locationRefs),
+        members: [item],
+      });
+      continue;
+    }
+    const [head, ...rest] = touching;
+    head.members.push(item);
+    for (const ref of item.raw.locationRefs) head.refs.add(ref);
+    for (const other of rest) {
+      head.members.push(...other.members);
+      for (const ref of other.refs) head.refs.add(ref);
+      defects.splice(defects.indexOf(other), 1);
+    }
+  }
+  return defects;
 }
 
 interface CriterionBucket {
@@ -68,13 +138,13 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
   const knownTypes = new Set(Object.keys(contract.findingTypes));
   const discarded: DiscardedItem[] = [];
 
-  // ---- findings: admit → key → agreement per lens → merge across lenses ----
-  const perLens = new Map<string, Map<string, FindingBucket>>();
+  // ---- findings: admit → group into defects → agreement per lens → merge ----
+  const admitted: Admitted[] = [];
+  const lensOrder = new Map<string, number>();
   for (const outcome of input.critics) {
     if (!outcome.report) continue;
     const { criticId, sample, findings } = outcome.report;
-    const buckets = perLens.get(criticId) ?? new Map<string, FindingBucket>();
-    perLens.set(criticId, buckets);
+    if (!lensOrder.has(criticId)) lensOrder.set(criticId, lensOrder.size);
     for (const raw of findings) {
       if (!knownTypes.has(raw.type)) {
         discarded.push({
@@ -85,37 +155,55 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
         });
         continue;
       }
-      const admitted: RawFinding = {
-        ...raw,
-        locationRefs: admitRefs(raw.locationRefs, knownLocations),
-        criterionIds: admitRefs(raw.criterionIds, knownCriteria),
-      };
-      const key = findingKey(admitted.type, admitted.locationRefs);
-      const bucket = buckets.get(key) ?? { samples: new Set<number>(), raws: [] };
-      buckets.set(key, bucket);
-      bucket.samples.add(sample);
-      bucket.raws.push(admitted);
+      admitted.push({
+        lens: criticId,
+        sample,
+        raw: {
+          ...raw,
+          locationRefs: admitRefs(raw.locationRefs, knownLocations),
+          criterionIds: admitRefs(raw.criterionIds, knownCriteria),
+        },
+      });
     }
   }
 
-  const merged = new Map<string, { raws: RawFinding[]; hits: number; lenses: string[] }>();
-  for (const [lens, buckets] of perLens) {
-    for (const [key, bucket] of buckets) {
-      if (bucket.samples.size < minHits) {
+  // A defect is confirmed when one lens saw it in `minHits` of its own samples.
+  // That rule is unchanged: two lenses seeing it once each is still two
+  // opinions, not agreement. Only what counts as "it" has been relaxed.
+  const merged = new Map<
+    string,
+    { raws: RawFinding[]; hits: number; lenses: string[]; refs: string[] }
+  >();
+  for (const defect of defectsOf(admitted)) {
+    const refs = [...defect.refs].sort(compareStrings);
+    const key = findingKey(defect.type, refs);
+    const samplesPerLens = new Map<string, Set<number>>();
+    for (const member of defect.members) {
+      const seen = samplesPerLens.get(member.lens) ?? new Set<number>();
+      samplesPerLens.set(member.lens, seen);
+      seen.add(member.sample);
+    }
+    const confirming = [...samplesPerLens]
+      .filter(([, seen]) => seen.size >= minHits)
+      .sort(([a], [b]) => (lensOrder.get(a) ?? 0) - (lensOrder.get(b) ?? 0));
+    if (confirming.length === 0) {
+      for (const [lens, seen] of samplesPerLens) {
         discarded.push({
           lens,
           key,
           reason: 'below-min-hits',
-          detail: `${bucket.samples.size} of ${minHits} samples`,
+          detail: `${seen.size} of ${minHits} samples`,
         });
-        continue;
       }
-      const entry = merged.get(key) ?? { raws: [], hits: 0, lenses: [] };
-      merged.set(key, entry);
-      entry.raws.push(...bucket.raws);
-      entry.hits += bucket.samples.size;
-      entry.lenses.push(lens);
+      continue;
     }
+    const lenses = confirming.map(([lens]) => lens);
+    merged.set(key, {
+      raws: defect.members.filter((m) => lenses.includes(m.lens)).map((m) => m.raw),
+      hits: confirming.reduce((total, [, seen]) => total + seen.size, 0),
+      lenses,
+      refs,
+    });
   }
 
   // ---- criteria: admit → agreement within the sole judge → conservative median
@@ -202,7 +290,7 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
           entry.raws.map((raw) => raw.fixability),
           FIXABILITY_LOCAL_FIRST,
         ),
-        locationRefs: first.locationRefs,
+        locationRefs: entry.refs,
         criterionIds,
         hits: entry.hits,
         lenses: entry.lenses,

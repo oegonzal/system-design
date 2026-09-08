@@ -161,6 +161,81 @@ describe('normalize', () => {
     ]);
   });
 
+  it('[QL-5] two samples that cite overlapping evidence confirm one defect, not two singletons', () => {
+    const policy = { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } };
+    const ledger = normalize(
+      input({
+        locations: [
+          { id: 'text', label: 'Text' },
+          { id: 'part.1', label: 'one' },
+          { id: 'part.2', label: 'two' },
+        ],
+        critics: [
+          critic(1, finding({ locationRefs: ['text', 'part.1'] })),
+          critic(2, finding({ locationRefs: ['part.1', 'part.2'] })),
+        ],
+      }),
+      policy,
+    );
+    // Identical sets were once required, so this pair used to be discarded twice.
+    expect(ledger.discarded).toEqual([]);
+    expect(ledger.findings).toHaveLength(1);
+    expect(ledger.findings[0]).toMatchObject({
+      hits: 2,
+      locationRefs: ['part.1', 'part.2', 'text'],
+    });
+  });
+
+  it('[QL-5] sharing a location is not enough: a different type is a different defect', () => {
+    const ledger = normalize(
+      input({
+        critics: [
+          critic(1, finding({ type: 'gap' }), finding({ type: 'wrong' })),
+          critic(2, finding({ type: 'gap' }), finding({ type: 'wrong' })),
+        ],
+      }),
+      { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } },
+    );
+    expect(ledger.findings.map((item) => item.type).sort()).toEqual(['gap', 'wrong']);
+  });
+
+  it('[QL-5] agreement is still within one lens: two lenses seeing it once each is not agreement', () => {
+    const ledger = normalize(
+      input({
+        critics: [
+          critic(1, finding()),
+          reported({ criticId: 'critic.other', sample: 1, findings: [finding()] }),
+        ],
+      }),
+      { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } },
+    );
+    expect(ledger.findings).toEqual([]);
+    expect(ledger.discarded.map((item) => item.lens).sort()).toEqual([
+      'critic.other',
+      'critic.tiny',
+    ]);
+  });
+
+  it('[QL-5] grouping is a function of the findings, not of the order they arrived in', () => {
+    const locations = [
+      { id: 'text', label: 'Text' },
+      { id: 'part.1', label: 'one' },
+      { id: 'part.2', label: 'two' },
+    ];
+    const one = finding({ locationRefs: ['text', 'part.1'] });
+    const two = finding({ locationRefs: ['part.1', 'part.2'] });
+    const three = finding({ locationRefs: ['part.2'] });
+    const forward = normalize(
+      input({ locations, critics: [critic(1, one, two), critic(2, three)] }),
+      tinyPolicy(),
+    );
+    const backward = normalize(
+      input({ locations, critics: [critic(2, three), critic(1, two, one)] }),
+      tinyPolicy(),
+    );
+    expect(forward.findings).toEqual(backward.findings);
+  });
+
   it('[QL-7] the advisory verdict never reaches the ledger, so flipping it cannot move the decision', () => {
     const results = [
       result({ criterionId: 'c1' }),

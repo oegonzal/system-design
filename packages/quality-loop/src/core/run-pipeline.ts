@@ -5,6 +5,7 @@
  * deserves next; `stopReason` says why the loop ended. Both are recorded.
  */
 import type {
+  ConfirmedFinding,
   CriticReport,
   EvaluationReport,
   IterationTrace,
@@ -22,7 +23,7 @@ import type { TaskContract } from './contracts';
 import { decide } from './decide';
 import { deriveLessons } from './lessons';
 import { materialize } from './materialize';
-import { admitRefs, findingKey, normalize } from './normalize';
+import { admitRefs, normalize, sameDefect } from './normalize';
 import { validatePipeline, type PipelineDefinition } from './pipeline';
 import type { ExchangeSink, LensContext, Stages } from './ports';
 import { mapConcurrent } from './scoped-llm';
@@ -153,6 +154,7 @@ export async function runLoop<T>(
     const decision = decide(ledger, policy);
     const remediations = hydrate(
       decision.selectedRemediations,
+      ledger.findings,
       contract,
       critics,
       evaluators,
@@ -219,19 +221,28 @@ export async function runLoop<T>(
  */
 function hydrate<T>(
   selected: readonly Remediation[],
+  confirmed: readonly ConfirmedFinding[],
   contract: TaskContract<T>,
   critics: readonly LensOutcome<CriticReport>[],
   evaluators: readonly LensOutcome<EvaluationReport>[],
   validation: readonly ValidationReport[],
   locations: readonly { id: string }[],
 ): RemediationNote[] {
+  // A confirmed finding is a group of raw ones, so its key is no longer any
+  // single raw finding's key. Resolve by membership instead: the first raw
+  // finding that describes the same defect supplies the words.
   const known = new Set(locations.map((location) => location.id));
+  const raws = critics.flatMap((outcome) =>
+    (outcome.report?.findings ?? []).map((raw) => ({
+      type: raw.type,
+      locationRefs: admitRefs(raw.locationRefs, known),
+      rationale: raw.rationale,
+    })),
+  );
   const findingNotes = new Map<string, string>();
-  for (const outcome of critics) {
-    for (const raw of outcome.report?.findings ?? []) {
-      const key = findingKey(raw.type, admitRefs(raw.locationRefs, known));
-      if (!findingNotes.has(key)) findingNotes.set(key, raw.rationale);
-    }
+  for (const finding of confirmed) {
+    const match = raws.find((raw) => sameDefect(finding, raw));
+    if (match) findingNotes.set(finding.key, match.rationale);
   }
   const criterionNotes = new Map<string, string>();
   for (const outcome of evaluators) {

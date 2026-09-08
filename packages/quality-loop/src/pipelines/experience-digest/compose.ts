@@ -15,7 +15,7 @@ import {
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
-import { admitRefs, findingKey } from '../../core/normalize';
+import { admitRefs, sameDefect } from '../../core/normalize';
 import { GOAL_MAX_BYTES } from '../../core/prompting';
 import {
   ARTIFACT_MAX,
@@ -78,14 +78,19 @@ function summarise(iterations: readonly IterationTrace[]): IterationSummary[] {
   });
 }
 
-/** The first rationale any critic gave for a confirmed finding, in that iteration. */
+/**
+ * The first rationale any critic gave for a confirmed finding, in that
+ * iteration. A confirmed finding groups several raw ones, so its key belongs to
+ * the group rather than to any member: match by membership, not by key.
+ */
 function rationaleFor(iteration: IterationTrace, key: string): string | null {
+  const confirmed = iteration.ledger.findings.find((finding) => finding.key === key);
+  if (!confirmed) return null;
   const known = new Set(iteration.locations.map((location) => location.id));
   for (const outcome of iteration.critics) {
     for (const raw of outcome.report?.findings ?? []) {
-      if (findingKey(raw.type, admitRefs(raw.locationRefs, known)) === key) {
-        return cap(raw.rationale, RATIONALE_MAX);
-      }
+      const here = { type: raw.type, locationRefs: admitRefs(raw.locationRefs, known) };
+      if (sameDefect(confirmed, here)) return cap(raw.rationale, RATIONALE_MAX);
     }
   }
   return null;
