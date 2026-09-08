@@ -1,12 +1,12 @@
 # Prompt — Decide what to retrieve for a brief you cannot anticipate
 
-**Archetype:** agentic-retrieval · **Difficulty:** hard
+**Archetype:** agentic-workflow · **Difficulty:** hard
 
 ## Scenario
 
 A team keeps a store of lessons learned from past agent runs, each filed under the condition it applies to. When a new brief arrives they want the relevant lessons put in front of the agent that will answer it. The obvious approach failed: embedding the whole brief as one query and taking the nearest lessons put the least relevant ones first, because a brief is a problem statement and a lesson is an instruction, and averaging every demand a brief makes into one point loses the demands. What is needed is a planner that works out what the brief is actually asking of a design, searches for each of those things separately, combines the results honestly, and is willing to conclude that the store holds nothing worth offering. Design that planner.
 
-## Functional requirements
+## Capabilities
 
 1. The planner takes an arbitrary input string as the brief and plans retrieval for it with no rule that splits it on formatting, keys off its headings, or assumes it follows a template.
 2. The brief is decomposed into several short statements of what it demands, each searched independently, so that a demand mentioned once is not drowned by the rest of the document.
@@ -18,22 +18,21 @@ A team keeps a store of lessons learned from past agent runs, each filed under t
 8. When the decomposition step is unavailable, retrieval still happens using the brief alone, and the result is never worse than doing nothing.
 9. For any request the planner can report what it searched for, what each query found, and why the final set was chosen.
 
-## Non-functional requirements
+## Interfaces that must hold
 
-| Kind         | Requirement                                                    | Target                    |
-| ------------ | -------------------------------------------------------------- | ------------------------- |
-| honesty      | An empty or irrelevant store yields nothing rather than filler | zero forced results       |
-| degradation  | A failure in planning falls back to the simplest search        | never worse than baseline |
-| auditability | Every offered item traces to the query that found it           | zero unexplained offers   |
-| isolation    | Advisory material can never become a requirement               | zero derived requirements |
+1. Whatever decomposes the brief hands the searcher short, self-contained statements, and the searcher may assume each stands alone without the brief around it.
+2. Each search returns items carrying the query that found them, so whatever fuses the results can combine rankings without assuming two queries' scores share a scale.
+3. What survives crosses to the consuming agent explicitly marked advisory, in a shape that cannot be read as part of the brief or turned into a requirement downstream.
+4. When decomposition is unavailable it hands on the brief itself as a single statement, leaving the searcher's contract unchanged — the degraded path differs in quality, never in shape.
 
-## Scale targets
+## Properties
 
-| Metric             | Target |
-| ------------------ | ------ |
-| Queries per brief  | 7      |
-| Candidates offered | 16     |
-| Indexed items      | 5,000  |
+| Property     | What it must mean here                                                                        |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| honesty      | An empty or irrelevant store yields nothing rather than filler                                |
+| degradation  | A failure in planning falls back to the simplest search and is never worse than doing nothing |
+| auditability | Every offered item traces to the query that found it                                          |
+| isolation    | Advisory material can never become a requirement, however it is worded                        |
 
 ## Constraints
 

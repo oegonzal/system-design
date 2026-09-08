@@ -1,12 +1,12 @@
 # Prompt — Improve an artifact until the checks pass or the budget ends
 
-**Archetype:** agentic-repair · **Difficulty:** hard
+**Archetype:** agentic-workflow · **Difficulty:** hard
 
 ## Scenario
 
 A team asks agents to produce artifacts — a design, a patch, a migration plan, a summary — and the first attempt is rarely good enough. What they have today is a loop that asks the model whether it is happy and stops when it says yes, which produces confident bad output and no record of why anything was accepted. They want the judgement taken away from the producer entirely: cheap deterministic checks first, then several critics looking for different classes of defect, then evaluators scoring against criteria derived from the brief itself, and finally a controller that applies stated thresholds and decides whether to revise, start over, hand to a person, or stop. The producer should be told what to fix in words, but nothing it says may move the decision. Design the loop.
 
-## Functional requirements
+## Capabilities
 
 1. The loop accepts an arbitrary input string as the brief, derives its own success criteria from that brief, and runs with no rule that parses the brief's prose or presumes a domain.
 2. Deterministic checks run before any judging agent, and a check that fails hard stops the iteration before a single judging call is paid for.
@@ -18,22 +18,21 @@ A team asks agents to produce artifacts — a design, a patch, a migration plan,
 8. The loop stops on acceptance, on exhausting its iterations, on ceasing to improve, or on a defect that needs a person, and it says which of those happened.
 9. Every iteration's evidence and decision are recorded so that the final outcome can be re-derived without rerunning anything.
 
-## Non-functional requirements
+## Interfaces that must hold
 
-| Kind         | Requirement                                                      | Target                  |
-| ------------ | ---------------------------------------------------------------- | ----------------------- |
-| determinism  | The same evidence and policy always produce the same decision    | identical decisions     |
-| auditability | Every number in the outcome is reproducible from the record      | zero unexplained scores |
-| honesty      | Without a working model the loop reports incapacity, not a score | zero invented numbers   |
-| degradation  | A failing judge reduces confidence rather than stopping the loop | zero aborts on one lens |
+1. The deterministic checks hand the loop a verdict before any judging call is made, and a hard failure crosses straight to the controller without critics or evaluators running at all.
+2. Critics return findings citing locations in the artifact, so the artifact must expose a naming scheme that both a critic and the producer can use to mean the same place.
+3. Evaluators consume criteria and return exactly one result per criterion, so whatever normalises the evidence may assume no criterion arrives judged twice.
+4. The controller consumes structured evidence only; the prose the judges wrote crosses to the producer as instructions on a separate path that never reaches the decision.
 
-## Scale targets
+## Properties
 
-| Metric               | Target |
-| -------------------- | ------ |
-| Iterations per run   | 3      |
-| Judges per iteration | 5      |
-| Samples per judge    | 2      |
+| Property     | What it must mean here                                                            |
+| ------------ | --------------------------------------------------------------------------------- |
+| determinism  | The same evidence and the same policy always produce the same decision            |
+| auditability | Every number in the outcome is reproducible from the record alone                 |
+| honesty      | Without a working model the loop reports incapacity rather than inventing a score |
+| degradation  | A failing judge reduces confidence rather than stopping the loop                  |
 
 ## Constraints
 

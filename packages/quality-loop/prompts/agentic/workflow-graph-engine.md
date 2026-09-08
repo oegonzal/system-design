@@ -1,12 +1,12 @@
 # Prompt — Run a declared graph of agents over a brief nobody anticipated
 
-**Archetype:** agentic-orchestration · **Difficulty:** hard
+**Archetype:** agentic-workflow · **Difficulty:** hard
 
 ## Scenario
 
 A team automates review, research and migration work by spawning Claude Code CLI processes, each a separate operating-system process that reads a prompt and returns text or a structured object. Today every piece of work is a bespoke script: someone writes a loop, hard-codes how many processes to start, and hand-rolls the collection of results. The scripts diverge, none of them resume after a crash, and nobody can say afterwards why a particular process ran. The team wants workflows expressed as data — a set of nodes and the edges between them — so that a new kind of work is a new declaration rather than new engine code, and so a run that dies halfway can continue without paying for the agents that already answered. Their house pattern is already fixed: something proposes, critics look for defects, evaluators measure against criteria, and a controller decides what happens next from stated rules. Design the engine that executes these graphs.
 
-## Functional requirements
+## Capabilities
 
 1. The engine accepts an arbitrary input string as the brief for a run — a markdown document nobody wrote the engine for — and executes the declared graph against it without any rule that inspects the brief's prose, branches on its subject, or requires it to match a known shape.
 2. A workflow is a declaration of nodes and edges, submitted as data; adding a new workflow requires no change to the engine.
@@ -18,22 +18,21 @@ A team automates review, research and migration work by spawning Claude Code CLI
 8. Every run produces a record from which the execution can be reconstructed: which nodes ran, in what order, with what inputs, and why the run ended.
 9. Progress is observable while the run is in flight, not only after it finishes.
 
-## Non-functional requirements
+## Interfaces that must hold
 
-| Kind         | Requirement                                                     | Target                      |
-| ------------ | --------------------------------------------------------------- | --------------------------- |
-| determinism  | The same declaration and inputs produce the same execution plan | identical node ordering     |
-| auditability | Any completed run can be explained from its record alone        | zero unexplained nodes      |
-| degradation  | One failing node never leaves the run unable to report          | zero silent abandonments    |
-| isolation    | One run's failure cannot affect another in flight               | zero cross-run interference |
+1. Whatever plans the work and whatever executes it agree on a node representation that survives a process restart, including what "already done" means for a node whose prompt has since changed.
+2. A node hands its result onward either as free text or as an instance of its declared schema; a non-conforming answer crosses the boundary as a failure carrying a stated reason, never as a value a dependent might use.
+3. A node that fails, is skipped or yields nothing reaches its dependents as a reason drawn from a closed vocabulary, so a dependent branches on the reason rather than on the absence of data.
+4. Whatever observes a run in flight consumes progress in the same shape the final record uses, so watching a run and reading it afterwards do not require two different readers.
 
-## Scale targets
+## Properties
 
-| Metric          | Target |
-| --------------- | ------ |
-| Agents per run  | 40     |
-| Graph depth     | 6      |
-| Concurrent runs | 8      |
+| Property     | What it must mean here                                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| determinism  | The same declaration and the same inputs produce the same execution plan, including the order nodes are considered in |
+| auditability | Any completed run can be explained from its record alone, with no node left unaccounted for                           |
+| degradation  | One failing node never leaves the run unable to report; the run still produces a result marked for what it is missing |
+| isolation    | One run's failure cannot affect another in flight, and neither can one node's                                         |
 
 ## Constraints
 

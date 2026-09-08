@@ -1,12 +1,12 @@
 # Prompt — Change a policy only when the evidence says to
 
-**Archetype:** agentic-tuning · **Difficulty:** hard
+**Archetype:** agentic-workflow · **Difficulty:** hard
 
 ## Scenario
 
 The behaviour of a team's agent workflows is governed by declarations: the personas their critics read, the weights their dimensions carry, the thresholds at which a controller accepts or escalates, the number of samples a judge takes. Every one of those numbers was chosen once by a person and has never been revisited, because nobody could show that a change was an improvement. The team wants a service that proposes changes, measures them against a corpus of past cases, and promotes one only when a stated rule says the evidence supports it — with the ability to put it back if production disagrees. The obvious danger is a service that tunes itself to the corpus and degrades on everything else, and the second is a service that lets a model decide its own thresholds. Design it.
 
-## Functional requirements
+## Capabilities
 
 1. The service proposes changes to declarations governing work over arbitrary input strings, with no rule specific to a domain and no assumption about which workflow it is tuning.
 2. A proposal is a complete candidate declaration, valid on its own, refused before evaluation if it is malformed rather than failing partway through a measurement.
@@ -18,22 +18,21 @@ The behaviour of a team's agent workflows is governed by declarations: the perso
 8. Two proposals that would change the same declaration cannot both be promoted without being re-measured against each other.
 9. The service reports which declarations have been tuned, which are still at their original hand-chosen values, and how much evidence stands behind each.
 
-## Non-functional requirements
+## Interfaces that must hold
 
-| Kind          | Requirement                                                         | Target                          |
-| ------------- | ------------------------------------------------------------------- | ------------------------------- |
-| determinism   | The same candidates and corpus always promote the same one          | identical promotions            |
-| reversibility | Any promotion can be undone to the exact prior state                | zero irreversible changes       |
-| honesty       | A candidate that only fits the corpus is refused                    | withheld-set regression bars it |
-| auditability  | Every promoted change resolves to the measurement that justified it | zero unexplained promotions     |
+1. A proposal crosses to whatever measures it as a complete declaration, and the measurer may assume it is structurally valid because validation refused it at the boundary otherwise.
+2. The measurer hands back per-case outcomes, and whatever promotes consumes those; there is no path by which a single aggregate reaches the promotion rule.
+3. A promotion crosses to production alongside the exact prior declaration, so reverting consumes a stored state rather than reconstructing one from a diff.
+4. Production outcomes return to whatever compares them in the same shape the corpus measurement produced, so predicted and observed are comparable without translation.
 
-## Scale targets
+## Properties
 
-| Metric               | Target |
-| -------------------- | ------ |
-| Candidates per round | 8      |
-| Corpus cases         | 2,000  |
-| Declarations tuned   | 30     |
+| Property      | What it must mean here                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| determinism   | The same candidates and the same corpus always promote the same one                         |
+| reversibility | Any promotion can be undone to the exact prior state                                        |
+| honesty       | A candidate that only fits the corpus is refused by the withheld set, however good it looks |
+| auditability  | Every promoted change resolves to the measurement that justified it                         |
 
 ## Constraints
 

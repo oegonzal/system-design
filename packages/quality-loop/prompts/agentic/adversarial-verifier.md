@@ -1,12 +1,12 @@
 # Prompt — Decide which claims survive being attacked
 
-**Archetype:** agentic-verification · **Difficulty:** standard
+**Archetype:** agentic-workflow · **Difficulty:** standard
 
 ## Scenario
 
 A fleet of finder agents produces claims about a body of work: this line has a race condition, this requirement is unmet, this number contradicts that one. Finders are productive and unreliable in a specific way — the claims read well, cite real locations, and are wrong perhaps a third of the time. Acting on a wrong claim is expensive, and reporting one destroys trust in the rest. The team's answer is to attack every claim before believing it: independent agents, each given a different angle and each instructed to refute rather than confirm, with a rule deciding what survives. Nobody wants the refuters to vote on the final answer themselves, because a majority of confident agents can be confidently wrong in the same direction. Design the service that takes claims and returns the ones worth acting on.
 
-## Functional requirements
+## Capabilities
 
 1. The service accepts claims about an arbitrary subject supplied as an opaque string, and verifies them with no rule that understands the subject, no per-domain checks, and no registry of claim kinds.
 2. Each claim is challenged by several independent agents that do not see each other's verdicts.
@@ -18,21 +18,21 @@ A fleet of finder agents produces claims about a body of work: this line has a r
 8. The output distinguishes claims that survived, claims that were refuted, and claims the process could not settle, and the third category is never silently merged into either of the others.
 9. For any claim, the record shows every challenge it received and the rule that decided its fate.
 
-## Non-functional requirements
+## Interfaces that must hold
 
-| Kind         | Requirement                                               | Target                     |
-| ------------ | --------------------------------------------------------- | -------------------------- |
-| independence | No challenger is influenced by another's verdict          | zero shared context        |
-| determinism  | The same verdicts always yield the same survival decision | identical outcomes         |
-| auditability | Every surviving claim can be traced to what upheld it     | zero unexplained survivals |
+1. Whatever produces claims and whatever challenges them agree on a claim's identity, so that the same claim worded two ways is one claim on both sides of the boundary and is challenged once.
+2. A challenger hands back a verdict the deciding rule can consume without reading prose; a challenger that fails or times out hands back a stated reason in that same shape, so a missing verdict is distinguishable from a negative one.
+3. Whatever decides survival consumes structured verdicts and deterministic results only, and hands each claim onward tagged survived, refuted or unsettled — with the third never collapsing into either of the others on the way out.
+4. Whatever records the run receives, for every claim, each challenge it drew and the rule that settled it, so the decision can be re-derived without re-running a challenger.
 
-## Scale targets
+## Properties
 
-| Metric                | Target |
-| --------------------- | ------ |
-| Claims per batch      | 60     |
-| Challengers per claim | 3      |
-| Distinct angles       | 6      |
+| Property     | What it must mean here                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| independence | No challenger is influenced by another's verdict, and nothing in the shared context leaks one     |
+| determinism  | The same verdicts always yield the same survival decision                                         |
+| auditability | Every surviving claim can be traced to what upheld it, and every discarded one to what refuted it |
+| degradation  | A challenger that dies still leaves the claim decidable or honestly reported as unsettled         |
 
 ## Constraints
 
