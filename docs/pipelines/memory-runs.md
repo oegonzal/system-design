@@ -1,4 +1,4 @@
-# Memory runs: three pipelines behind one endpoint, and what the recent runs showed
+# Memory runs: four pipelines behind one endpoint, and what the recent runs showed
 
 How the quality loop learned to read its own past. The step semantics, the
 closed reason vocabulary, the dump layout and the guarantees are owned by
@@ -18,8 +18,10 @@ Two facts organise everything below:
    `PipelineDefinition` is for. The edits to existing code elsewhere number
    five: exporting `RunsService` and `QUALITY_LOOP_LLM` from `RunsModule`, one
    optional callback on `RunsService.execute`, a module import, and
-   `enableShutdownHooks()`. That is why there are three pipelines and six
-   _endpoints_, not a fourth pipeline.
+   `enableShutdownHooks()`. That is why the composition cost six _endpoints_
+   and no new pipeline. A fourth was registered later — `agentic-design`, §1.1
+   — for a reason that has nothing to do with memory: a second judging domain.
+   It, too, left `core/` untouched.
 2. **The producer only ever sees the goal.** `core/stages/llm-producer.ts`
    assembles `# Goal` and `# Success criteria` and nothing else. Every design
    decision below follows from that one fact: the input codecs, the advisory
@@ -32,18 +34,19 @@ Two facts organise everything below:
 
 ---
 
-## 1. The three, at a glance
+## 1. The four, at a glance
 
-All three are instances of one `PipelineDefinition`, declared as data under
+All four are instances of one `PipelineDefinition`, declared as data under
 `packages/quality-loop/src/pipelines/`, registered by one line each in
 `index.ts`. Any of them can be a memory run's target; two of them also play a
 role inside one.
 
-| Pipeline            | Role in a memory run              | What it judges                                                         | Gates acceptance                          | Loop         |
-| ------------------- | --------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------- | ------------ |
-| `system-design`     | the target (the requested one)    | a design answer against criteria derived from the prompt               | `constraint` kind, `constraint_violation` | 3 iterations |
-| `memory-recall`     | step 1 — curates recalled chunks  | which chunks serve the query, and whether each insight is in its chunk | `admissibility` kind, `no_usable_memory`  | 2 iterations |
-| `experience-digest` | step 3 — distils the finished run | which evidence the record shows moved quality, stated to transfer      | `misattributed_evidence`, `run_specific`  | 2 iterations |
+| Pipeline            | Role in a memory run              | What it judges                                                         | Gates acceptance                                              | Loop         |
+| ------------------- | --------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------- | ------------ |
+| `system-design`     | the default target                | a design answer against criteria derived from the prompt               | `constraint` kind, `constraint_violation`                     | 3 iterations |
+| `agentic-design`    | a target, when asked for          | a workflow of agents, tools and rules — coverage, hand-offs, soundness | `constraint` kind, `constraint_violation`, `leaky_generality` | 3 iterations |
+| `memory-recall`     | step 1 — curates recalled chunks  | which chunks serve the query, and whether each insight is in its chunk | `admissibility` kind, `no_usable_memory`                      | 2 iterations |
+| `experience-digest` | step 3 — distils the finished run | which evidence the record shows moved quality, stated to transfer      | `misattributed_evidence`, `run_specific`                      | 2 iterations |
 
 The two memory pipelines share a policy shape: `minHits: 2` on every lens, so
 a gated finding needs both samples of a critic to agree before it blocks;
@@ -63,7 +66,9 @@ one failure a later prompt cannot recover from.
 roles as targets. The digest is target-agnostic by construction: `fromRun`
 reads `contract.criteria`, the iteration ledgers, `selectedRemediations` and
 `trace.lessons` — engine facts every pipeline produces — so a fourth pipeline
-becomes digestible the day it is registered, with no change here.
+becomes digestible the day it is registered, with no change here. That claim
+has since been cashed: `agentic-design` was added as a folder and one line in
+`index.ts`, and the digest needed nothing.
 
 **A declared weight is not an earned one.** Worth stating once, because the
 policy tables read as though every dimension is scored the same way. A
@@ -74,6 +79,7 @@ ever start at 100 and fall:
 | Pipeline            | Earns from criteria                          | Penalty-only                |
 | ------------------- | -------------------------------------------- | --------------------------- |
 | `system-design`     | completeness, quality_attributes, compliance | soundness (.20)             |
+| `agentic-design`    | all four                                     | none — deliberately         |
 | `memory-recall`     | coverage, fidelity                           | precision (.25)             |
 | `experience-digest` | attribution                                  | fidelity (.30), reuse (.30) |
 
@@ -85,7 +91,99 @@ precision untouched, giving (66.7 × .40 + 100 × .35) / .75 = **82.2**; digest
 (92 × .40 + 96.7 × .30) / .70 = **94.0**. It also explains a pattern visible in
 every `system-design` run recorded in §8: soundness sits at 40 while coverage
 sits at 100, because soundness has no criteria to earn from and the critics
-only ever subtract from it.
+only ever subtract from it. Not 40 on average — 40 exactly, in every run of a
+nine-hour experiment, because that is where `maxPerDimension: 60` stops the
+subtraction. A dimension pinned to its own floor carries .20 of the weight and
+none of the information. `agentic-design` maps a criterion kind to every
+dimension it declares, and `definition.spec.ts` asserts that property rather
+than the arithmetic that follows from it.
+
+---
+
+### 1.1 `agentic-design`, and why a second judge rather than a generic one
+
+`system-design` reads every brief as a distributed-systems problem, and the
+bias is structural rather than a matter of tone. Three places carry it:
+`scale` is one of its four criterion kinds — _"a stated load, volume or
+retention figure the design must be sized for"_ — so the deriver hunts for
+throughput targets in briefs that state none; `scale_mismatch` is a finding
+type priced onto `quality_attributes`, which carries .30; and
+`evaluator.quality.md` names capacity estimates as the evidence it cites for a
+pass. `output.ts` makes `capacity` a mandatory key. An empty array parses, so
+this is not schema-forced — it is policy-forced, which is worse, because it is
+invisible.
+
+The store measured it. Against a 97-lesson corpus built entirely by
+`system-design`, the ten agentic prompts reached a mean best match of
+**0.4986** — below even the held-out control at 0.5191, and far below the
+contributing prompts at ~0.70. A corpus grown by one judge had almost nothing
+an agentic brief could use.
+
+Three ways out were considered: make one pipeline generic over the problem,
+re-aim `system-design` at agentic work, or add a second judge. The second was
+chosen. `system-design` stays sharp for the ten briefs that genuinely do state
+p99 and availability targets, and `agentic-design` sits beside it — a folder
+and one line in `index.ts`, which is what open/closed means when criterion
+kinds, finding types and dimensions are open `Record<string, …>` in core. The
+cost, accepted knowingly, is two rubrics to maintain and a routing decision
+about which prompt uses which. Nothing routes automatically today: the caller
+names the pipeline, as it always has.
+
+**The vocabulary.** Four kinds, domain-neutral, with hand-offs first-class:
+
+| kind         | meaning                                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `capability` | Something the workflow must be able to do.                                                                             |
+| `contract`   | An interface between two roles — what one hands the next, and what the receiver may assume, including on failure.      |
+| `property`   | A property the design must hold rather than a thing it must do: determinism, auditability, degradation, extensibility. |
+| `constraint` | A hard rule the design may not break. Gated.                                                                           |
+
+Nine finding types. Five are inherited unchanged because they were already
+domain-neutral (`missing_requirement`, `constraint_violation`, `contradiction`,
+`unsupported_claim`, `unhandled_failure`); the four new ones are the point.
+`contract_mismatch` — what one role produces does not satisfy what the next
+consumes, or a hand-off names no producer or no consumer. `sequence_gap` — a
+step whose precondition no earlier step establishes. `authority_leak` — a
+model output decides an outcome the design says is decided by rules.
+`leaky_generality` — a mechanism that works only for the shape of input this
+brief describes.
+
+`leaky_generality` gates, alone among the reuse-shaped failures, on the same
+argument that gates `run_specific` in the digest: it is the one defect a
+later, unanticipated input cannot recover from, and every one of the ten
+agentic briefs asks explicitly for the opposite. `minHits: 2` with `samples: 2`
+everywhere means both samples of a critic must agree before it blocks.
+
+**The policy.**
+
+| dimension      | weight | earns from           | loses to                                                                                                |
+| -------------- | ------ | -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `completeness` | .30    | `capability`         | `missing_requirement`                                                                                   |
+| `interfaces`   | .30    | `contract`           | `contract_mismatch`, `sequence_gap`                                                                     |
+| `compliance`   | .15    | `constraint` (gated) | `constraint_violation` (gated)                                                                          |
+| `soundness`    | .25    | `property`           | `contradiction`, `unsupported_claim`, `unhandled_failure`, `authority_leak`, `leaky_generality` (gated) |
+
+**The artifact.** `output.ts` is a `z.strictObject` with `summary`,
+`assumptions`, `roles`, `contracts`, `flows`, `policies`, `memory`,
+`extensibility`, `tradeoffs` and `risks`. There is no `capacity` section, and
+nothing replaces it. `roles` declare what they `consume` and `produce` while
+`contracts` declare the edges between them, and that redundancy is deliberate:
+it is what makes "A's output does not fit B's input" a defect a critic can
+point at. The current shape cannot express that at all, because contracts are
+not modelled.
+
+No lens demands a section. Whether `memory` or `policies` is judged depends on
+whether the brief produced criteria of that kind; an unjudged dimension comes
+back `null` and renormalises out, which the engine already does. That is the
+genericity the ten prompts ask designs to have, applied to the judge.
+
+**Not yet validated.** The weights, `acceptAt: 75`, `rejectBelow: 30` and
+`minHits: 2` are starting values carried over from `system-design` and
+reasoned about, not calibrated against live runs. No `agentic-design` run had
+been executed at the time of writing: the experiment held the service at an
+older build, and rebuilding mid-experiment would have changed the pipeline
+under a running measurement. Treat every number in this subsection as a
+hypothesis.
 
 ---
 
