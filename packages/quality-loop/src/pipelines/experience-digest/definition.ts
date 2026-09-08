@@ -68,7 +68,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       persona: criticTransfer,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000 
+      maxTokens: 4000,
     },
   ],
 

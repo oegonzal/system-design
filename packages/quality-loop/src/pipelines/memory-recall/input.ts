@@ -150,15 +150,6 @@ export function renderGoal(input: MemoryQuery): string {
   ].join('\n');
 }
 
-
-
-
-
-
-
-
-
-
 /** The index this codec wrote, or null for a goal that is not a memory query. */
 export function readIndex(goal: string): MemoryIndex | null {
   const open = goal.lastIndexOf(FENCE_OPEN);

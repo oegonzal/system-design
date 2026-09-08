@@ -200,14 +200,6 @@ export interface DigestReadout {
   memories: MemoryToStore[];
 }
 
-
-
-
-
-
-
-
-
 /** What a digest endorses: memories no confirmed finding names, with their evidence resolved. */
 export function memoriesToStore(trace: RunTrace, acceptAt: number): DigestReadout {
   const best = bestIteration(trace);
@@ -238,17 +230,6 @@ export function memoriesToStore(trace: RunTrace, acceptAt: number): DigestReadou
   });
   return { admitted: true, proposed, memories };
 }
-
-
-
-
-
-
-
-
-
-
-
 
 export const lessonText = (memory: MemoryToStore): string =>
   `${memory.insight} — applies when ${memory.appliesWhen}`;

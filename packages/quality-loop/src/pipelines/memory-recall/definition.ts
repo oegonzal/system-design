@@ -54,14 +54,14 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: criticRelevance,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000 
+      maxTokens: 4000,
     },
     {
       id: 'critic.grounding',
       persona: criticGrounding,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000 
+      maxTokens: 4000,
     },
   ],
 

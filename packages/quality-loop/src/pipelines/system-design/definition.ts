@@ -80,14 +80,14 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: criticSoundness,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000 
+      maxTokens: 4000,
     },
     {
       id: 'critic.scale',
       persona: criticScale,
       samples: 1,
       maxItems: 10,
-      maxTokens: 4000 
+      maxTokens: 4000,
     },
   ],
 

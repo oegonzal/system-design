@@ -266,15 +266,6 @@ export interface Digested {
   memories: MemoryToStore[];
 }
 
-
-
-
-
-
-
-
-
-
 /** Digest the finished target; null means nothing to store, with both steps explained. */
 export async function digest(
   env: StepEnv,
@@ -331,13 +322,6 @@ export async function digest(
   return { digestRunId: child.runId, memories };
 }
 
-
-
-
-
-
-
-
 /** Store what the digest endorsed as this source run's memory. */
 export async function store(
   env: StepEnv,
@@ -358,14 +342,6 @@ export async function store(
   await ledger.begin('store');
   await ledger.end('store', await indexMemories(env, source, digested, model));
 }
-
-
-
-
-
-
-
-
 
 /**
  * Write a source run's memories to the store as exactly these chunks. Pure of
