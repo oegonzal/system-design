@@ -45,7 +45,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
   },
 
   deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
-  producer: { persona: producer, maxTokens: 4000 },
+  producer: { persona: producer, maxTokens: 16000 },
   validators: [referencesValidator, limitsValidator],
 
   critics: [
@@ -54,14 +54,14 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: criticRelevance,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.grounding',
       persona: criticGrounding,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
   ],
 
@@ -71,7 +71,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: evaluatorCoverage,
       samples: 2,
       maxItems: MAX_CRITERIA,
-      maxTokens: 4000,
+      maxTokens: 8000,
       criterionKinds: ['need'],
     },
     {
@@ -79,7 +79,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: evaluatorAdmissibility,
       samples: 2,
       maxItems: MAX_CRITERIA,
-      maxTokens: 4000,
+      maxTokens: 8000,
       criterionKinds: ['admissibility'],
     },
   ],

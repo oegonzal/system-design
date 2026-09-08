@@ -17,89 +17,89 @@ export const agenticDesignSchema = z.strictObject({
   summary: z
     .string()
     .min(1)
-    .max(600)
+    .max(1100)
     .describe(
       'The shape of the workflow in 3–5 sentences: the hardest thing about it and how the design meets it.',
     ),
   assumptions: z
-    .array(z.string().max(160))
-    .max(8)
+    .array(z.string().max(180))
+    .max(10)
     .describe('What the brief left unsaid and you decided.'),
   roles: z
     .array(
       z.strictObject({
         name: z.string().min(1).max(60),
-        responsibility: z.string().min(1).max(240).describe('The one thing this role owns.'),
-        consumes: z.string().max(200).describe('What it requires to do its work.'),
-        produces: z.string().max(200).describe('What it hands on, and in what shape.'),
+        responsibility: z.string().min(1).max(300).describe('The one thing this role owns.'),
+        consumes: z.string().max(240).describe('What it requires to do its work.'),
+        produces: z.string().max(240).describe('What it hands on, and in what shape.'),
       }),
     )
     .min(1)
-    .max(10)
+    .max(14)
     .describe('The agents, tools and services the workflow is made of.'),
   contracts: z
     .array(
       z.strictObject({
         from: z.string().min(1).max(60).describe('The role that produces. A named role.'),
         to: z.string().min(1).max(60).describe('The role that consumes. A named role.'),
-        payload: z.string().min(1).max(200).describe('What crosses the boundary.'),
+        payload: z.string().min(1).max(240).describe('What crosses the boundary.'),
         guarantee: z
           .string()
-          .max(200)
+          .max(240)
           .describe('What the receiver may assume, including on failure.'),
       }),
     )
-    .max(12)
+    .max(18)
     .describe('The hand-offs between roles, one per edge.'),
   flows: z
     .array(
       z.strictObject({
         name: z.string().min(1).max(120),
-        steps: z.array(z.string().max(200)).min(1).max(8),
+        steps: z.array(z.string().max(240)).min(1).max(10),
       }),
     )
-    .max(6)
+    .max(10)
     .describe('One per capability: the roles the work passes through, in order.'),
   policies: z
     .array(
       z.strictObject({
         name: z.string().min(1).max(80),
-        decides: z.string().min(1).max(200).describe('What this rule settles.'),
-        declaredAs: z.string().max(160).describe('Where it lives as data rather than code.'),
+        decides: z.string().min(1).max(240).describe('What this rule settles.'),
+        declaredAs: z.string().max(200).describe('Where it lives as data rather than code.'),
       }),
     )
-    .max(8)
+    .max(12)
     .describe('The thresholds, gates and routes a decision follows.'),
   memory: z
     .array(
       z.strictObject({
-        what: z.string().min(1).max(160).describe('What is kept or retrieved.'),
-        shape: z.string().max(200).describe('The form it is stored in.'),
-        usedBy: z.string().max(120).describe('Which role reads it, and when.'),
+        what: z.string().min(1).max(200).describe('What is kept or retrieved.'),
+        shape: z.string().max(240).describe('The form it is stored in.'),
+        usedBy: z.string().max(160).describe('Which role reads it, and when.'),
       }),
     )
-    .max(6)
+    .max(10)
     .describe('What the workflow learns or looks up, and in what form.'),
   extensibility: z
     .array(
       z.strictObject({
-        change: z.string().min(1).max(160).describe('A change someone will want.'),
-        requires: z.string().max(200).describe('What it costs — ideally data, not code.'),
+        change: z.string().min(1).max(200).describe('A change someone will want.'),
+        requires: z.string().max(240).describe('What it costs — ideally data, not code.'),
       }),
     )
-    .max(6),
+    .max(10),
   tradeoffs: z
     .array(
       z.strictObject({
-        decision: z.string().max(160),
-        rationale: z.string().max(300),
-        alternative: z.string().max(160).nullable(),
+        decision: z.string().max(200),
+        rationale: z.string().max(360),
+        alternative: z.string().max(200).nullable(),
       }),
     )
-    .max(8),
+    .max(10),
   risks: z
-    .array(z.strictObject({ risk: z.string().max(160), mitigation: z.string().max(300) }))
-    .max(8),
+    .array(z.strictObject({ risk: z.string().max(200), mitigation: z.string().max(360) }))
+    .max(10),
 });
 export type AgenticDesign = z.infer<typeof agenticDesignSchema>;
 

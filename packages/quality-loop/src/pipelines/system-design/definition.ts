@@ -57,12 +57,12 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
 
   deriveCriteria: {
     persona: deriveCriteria,
-    maxTokens: 2500,
+    maxTokens: 4000,
   },
 
   producer: {
     persona: producer,
-    maxTokens: 5000,
+    maxTokens: 16000,
   },
 
   validators: [],
@@ -73,21 +73,21 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: criticRequirements,
       samples: 1,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.soundness',
       persona: criticSoundness,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.scale',
       persona: criticScale,
       samples: 1,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
   ],
 
@@ -97,7 +97,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: evaluatorRequirements,
       samples: 1,
       maxItems: 20,
-      maxTokens: 4500,
+      maxTokens: 8000,
       criterionKinds: ['functional', 'constraint'],
     },
     {
@@ -105,7 +105,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: evaluatorQuality,
       samples: 2,
       maxItems: 20,
-      maxTokens: 4500,
+      maxTokens: 8000,
       criterionKinds: ['non_functional', 'scale'],
     },
   ],

@@ -77,12 +77,12 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
 
   deriveCriteria: {
     persona: deriveCriteria,
-    maxTokens: 2500,
+    maxTokens: 4000,
   },
 
   producer: {
     persona: producer,
-    maxTokens: 5000,
+    maxTokens: 16000,
   },
 
   validators: [],
@@ -93,28 +93,28 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       persona: criticRequirements,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.contracts',
       persona: criticContracts,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.soundness',
       persona: criticSoundness,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.generality',
       persona: criticGenerality,
       samples: 2,
       maxItems: 10,
-      maxTokens: 4000,
+      maxTokens: 12000,
     },
   ],
 
@@ -124,7 +124,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       persona: evaluatorRequirements,
       samples: 2,
       maxItems: MAX_CRITERIA,
-      maxTokens: 4500,
+      maxTokens: 8000,
       criterionKinds: ['capability', 'constraint'],
     },
     {
@@ -132,7 +132,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       persona: evaluatorInterfaces,
       samples: 2,
       maxItems: MAX_CRITERIA,
-      maxTokens: 4500,
+      maxTokens: 8000,
       criterionKinds: ['contract'],
     },
     {
@@ -140,7 +140,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       persona: evaluatorProperties,
       samples: 2,
       maxItems: MAX_CRITERIA,
-      maxTokens: 4500,
+      maxTokens: 8000,
       criterionKinds: ['property'],
     },
   ],
