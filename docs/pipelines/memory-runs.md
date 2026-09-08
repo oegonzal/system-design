@@ -502,8 +502,13 @@ pnpm stack:db
 pnpm db:migrate
 pnpm stack:down                                  # both, data stays in the named volumes
 
-# the service; Node loads .env, which is where OPENAI_API_KEY lives
-pnpm quality-loop:serve                          # or pnpm quality:start for :3003 + :4201
+# the service; Node loads .env, which is where OPENAI_API_KEY lives.
+# QUALITY_LOOP_AUTH is NOT in .env and NOT in any pnpm script, and without it
+# the loop degrades silently: every run "completes" in ~30s with no exchanges,
+# overall 0 and finalDecision escalate. Only GET /runs/<id>.llm says why —
+# {"enabled": false, "reason": "no-key"}. DB_PORT fails loudly; this fails quietly.
+env DB_PORT=5433 QUALITY_LOOP_AUTH=claude-code \
+  node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 
 # a memory run: the same body as POST /runs
 curl -s -X POST localhost:3003/memory-runs -H 'content-type: application/json' \
@@ -797,7 +802,13 @@ Notes, not fixes. None affects behaviour.
   separated by a wide gap. Any threshold low enough to fire here would delete
   lessons that genuinely differ. Worth re-measuring as the store grows; the
   script is trivial and the shape of the distribution is the thing to watch,
-  not any one number.
+  not any one number. **Re-measured twice since, and the answer held both
+  times.** At 92 lessons the top pair was 0.7527 with nothing above 0.80; at
+  145 lessons, 10,440 pairs, the top twelve ran 0.753, 0.697, 0.695, 0.690,
+  0.685 … — still a continuum, largest gap in the top twenty 0.0555, still
+  nothing at 0.80. Three measurements across a five-fold growth in the store,
+  and the distribution has not developed the cluster a suppression rule would
+  need.
 - Nothing prunes either store. `replaceRunChunks` deletes only by run id, and
   the embedding cache has no expiry.
 - The boot sweep runs in every process that boots `AppModule`, including the
@@ -823,3 +834,102 @@ the two memory pipelines' thresholds against a corpus. The corpus itself is no
 longer missing — §6 is what reading it produced — but nothing has been tuned
 because of it, and a floor set on six chunks would be a number invented to look
 like a measurement.
+
+---
+
+## 12. What the first `agentic-design` run exposed
+
+One live run against `workflow-graph-engine` was meant to confirm the new
+vocabulary. It confirmed that and found two defects the earlier nine hours of
+`system-design` runs had hidden.
+
+**The vocabulary works.** The deriver returned 20 criteria — 9 `capability`,
+6 `property`, 3 `contract`, 2 `constraint`, and no `scale`. The same brief
+under `system-design` had produced `scale` criteria from a table of three
+workflow rows. That is the whole point of the second pipeline, and it holds.
+
+**The run still scored 0, because declared limits were fiction.** The producer
+came back `schema-miss`, so `artifactPresent` was false, no critic or evaluator
+ran, and the controller escalated with every dimension at zero. There is no
+retry: `llm-producer.ts` returns `llm-failed` and the iteration is over. Two
+separate limits were wrong.
+
+`maxTokens`, measured over every exchange in `static/runs/`:
+
+| scope                 | declared | calls | max observed | over the cap |
+| --------------------- | -------- | ----- | ------------ | ------------ |
+| `producer`            | 5000     | 43    | 15,746       | **100%**     |
+| `critic.soundness`    | 2500     | 38    | 11,244       | **100%**     |
+| `critic.requirements` | 2500     | 38    | 7,773        | **100%**     |
+| `critic.provenance`   | 2000     | 63    | 11,136       | 98%          |
+| `evaluator.coverage`  | 2000     | 47    | 4,433        | 77%          |
+
+Nearly every lens in every pipeline overran the number beside it, and had done
+all along. It was invisible because the subscription client passes `maxTokens`
+to the Agent SDK, which does not enforce it — but `anthropic-client.ts` sets it
+as a hard `max_tokens`. The system would have appeared to work until the first
+run with an API key, at which point most lenses would truncate mid-JSON and
+fail their schema. Every cap now sits above its measured maximum: producer
+16000, critics 12000, evaluators 8000, `deriveCriteria` 4000, in all four
+pipelines.
+
+The `agentic-design` output schema was the second. The one real answer pressed
+against **five** caps simultaneously — contracts 12/12, policies 8/8, memory
+6/6, extensibility 6/6, roles 10/10 — and broke two: `summary` at 869 against a
+600 limit, `flows` at 7 against a max of 6. The schema was one size too small
+for a brief carrying nine requirements, and it was too small because it was
+copied from `system-design`, whose artifact has eight sections where this one
+has ten. Sizing is now taken from that answer rather than guessed again.
+
+The general lesson is worth stating once: **a declared limit is a contract with
+the model, not a comment.** `maxTokens` too low truncates; a schema bound too
+tight discards the artifact whole. Neither failure names itself — one surfaces
+as `schema-miss`, the other as a run that escalates with no artifact — so
+neither is discoverable without measuring against real runs. `CLAUDE.md` now
+carries this as a rule.
+
+### 12.1 The prompts were still shaped for the other pipeline
+
+The fifteen briefs in `prompts/agentic/` had been written to the `system-design`
+template: `## Functional requirements`, `## Non-functional requirements`,
+`## Scale targets`. That template feeds `system-design`'s kinds, `scale`
+included. Under `agentic-design` a whole section was seeding a kind that does
+not exist, while `contract` and `property` — the two kinds this pipeline is
+built around — had no section to come from.
+
+The sections now map one to one onto the kinds:
+
+| section                        | kind         |
+| ------------------------------ | ------------ |
+| `## Capabilities`              | `capability` |
+| `## Interfaces that must hold` | `contract`   |
+| `## Properties`                | `property`   |
+| `## Constraints`               | `constraint` |
+
+`## Interfaces that must hold` is the new one and the delicate one. It states
+the seams — what one part hands another and what the receiver may assume,
+including on failure — while naming no components, so the brief fixes the
+obligation without doing the design for the candidate. `## Scale targets` is
+gone.
+
+Five briefs were added, taking the corpus to fifteen: `tool-contract-broker`,
+`provenance-ledger`, `intake-normaliser`, `consensus-panel` and
+`workflow-composer`. Measured rather than asserted, the fifteen have mean
+pairwise cosine **0.6253** and max **0.7588**, against **0.5605** and **0.6388**
+for the existing ten system-design briefs. The agentic corpus is the tighter of
+the two, partly by construction — one domain, and now one section template.
+Nothing reaches 0.80; cross-corpus similarity is 0.5041. The held-out control is
+`intake-normaliser`, chosen on nearest-neighbour rather than mean similarity
+(0.6260, the loosest in the corpus), because a control is only clean if no close
+sibling can contribute lessons on its behalf.
+
+### 12.2 One number to watch
+
+The same verification run recalled 16 candidates, kept 8, and injected
+**nothing**. The store held 166 lessons at the time, every one of them written
+by a `system-design` run. That is the 0.4986 cross-domain baseline from §1.1
+showing up operationally rather than as a measurement: the curator looked at a
+store built by one judge, on behalf of a brief from another domain, and
+correctly concluded that none of it earned a place in the prompt. Whether that
+stays true as agentic runs contribute their own lessons is the question the next
+experiment exists to answer.
