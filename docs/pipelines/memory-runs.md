@@ -852,7 +852,7 @@ workflow rows. That is the whole point of the second pipeline, and it holds.
 came back `schema-miss`, so `artifactPresent` was false, no critic or evaluator
 ran, and the controller escalated with every dimension at zero. There is no
 retry: `llm-producer.ts` returns `llm-failed` and the iteration is over. Two
-separate limits were wrong.
+separate limits were wrong, and it took three runs to establish which.
 
 `maxTokens`, measured over every exchange in `static/runs/`:
 
@@ -873,20 +873,48 @@ fail their schema. Every cap now sits above its measured maximum: producer
 16000, critics 12000, evaluators 8000, `deriveCriteria` 4000, in all four
 pipelines.
 
-The `agentic-design` output schema was the second. The one real answer pressed
-against **five** caps simultaneously — contracts 12/12, policies 8/8, memory
-6/6, extensibility 6/6, roles 10/10 — and broke two: `summary` at 869 against a
-600 limit, `flows` at 7 against a max of 6. The schema was one size too small
-for a brief carrying nine requirements, and it was too small because it was
-copied from `system-design`, whose artifact has eight sections where this one
-has ten. Sizing is now taken from that answer rather than guessed again.
+The output schema was the second, and the first diagnosis of it was wrong in a
+way worth recording, because the wrong fix made things worse.
 
-The general lesson is worth stating once: **a declared limit is a contract with
-the model, not a comment.** `maxTokens` too low truncates; a schema bound too
-tight discards the artifact whole. Neither failure names itself — one surfaces
-as `schema-miss`, the other as a run that escalates with no artifact — so
-neither is discoverable without measuring against real runs. `CLAUDE.md` now
-carries this as a rule.
+The obvious reading of that first failure was that the schema was too small:
+the answer pressed against **five** caps simultaneously — contracts 12/12,
+policies 8/8, memory 6/6, extensibility 6/6, roles 10/10 — and broke two,
+`summary` at 869 against 600 and `flows` at 7 against 6. So the bounds were
+raised. That was wrong twice over.
+
+It was unnecessary, because `extractStructured` already repairs a `too_big`
+issue by clamping the string or array to its maximum, over three rounds. Both
+overshoots would have healed themselves. What actually discarded the artifact
+was `flows[6].name`: an empty string against `min(1)`. `too_small` is not
+repairable, so the repair loop broke out and a whole answer was thrown away
+over one absent label.
+
+And it was harmful, because the caps are what bound the answer's length. The
+enlarged schema produced **18,890** output tokens against
+`MAX_OUTPUT_TOKENS = '16000'` — the ceiling `claude-agent-client.ts` passes to
+the SDK as `CLAUDE_CODE_MAX_OUTPUT_TOKENS`. Past it the SDK returns a fragment:
+the recorded text began mid-sentence, and no JSON parsed at all. Not a bound
+violation the second time but a truncated response, which nothing can repair.
+
+The sizes are therefore back to what they were — measurably an 11k-token answer
+with 5k of headroom under the ceiling — and what changed instead is where a
+non-empty value is demanded. Only `roles[].name` and a contract's `from` and
+`to` keep `min(1)`, because those are the names other sections point at and a
+dangling reference is a broken artifact rather than a weak one. Everywhere else
+an empty value is now a defect for a critic to name.
+
+Three lessons, none of which were visible without measuring against real runs:
+
+- **A declared limit is a contract with the model, not a comment.** `maxTokens`
+  below what a lens emits truncates it; the client's own ceiling truncates it
+  regardless of what the pipeline declared.
+- **A schema bound is a length control, not just a validation.** Raising one
+  does not only permit a longer answer, it produces one.
+- **Refuse only what cannot be judged.** With no retry anywhere in the loop, a
+  `min` that fires discards everything. Emptiness that a critic can name should
+  reach the critic.
+
+`CLAUDE.md` carries the first as a rule.
 
 ### 12.1 The prompts were still shaped for the other pipeline
 
@@ -922,6 +950,47 @@ Nothing reaches 0.80; cross-corpus similarity is 0.5041. The held-out control is
 `intake-normaliser`, chosen on nearest-neighbour rather than mean similarity
 (0.6260, the loosest in the corpus), because a control is only clean if no close
 sibling can contribute lessons on its behalf.
+
+### 12.3 What a working run looks like, and the one number that surprised
+
+With the artifact returnable, two verification runs completed and the pipeline
+behaved as designed. Both derived the same balanced vocabulary from the
+re-templated briefs — `capability` 9, `contract` 4, `property` 4, `constraint`
+3 — which is the section-to-kind mapping of §12.1 showing up exactly.
+
+`workflow-graph-engine` scored 84.6 (completeness 100, compliance 100,
+soundness 86.3, interfaces 60) and ended `revise`: one `sequence_gap` came back
+`critical`, and `blockingSeverities: ['critical']` closed `policyAllowed`. The
+gate did its job on a run that would otherwise have passed its threshold.
+`tool-contract-broker` scored 100 on every dimension and ended `accept`, which
+is a calibration signal rather than a triumph — a rubric where a good answer
+tops out cannot rank good answers against each other.
+
+The number that surprised: **43 of 49 critic findings were discarded**, every
+one of them `below-min-hits`.
+
+|                                    |          |
+| ---------------------------------- | -------- |
+| raw findings across 8 critic calls | 49       |
+| discarded, `below-min-hits`        | 43 (88%) |
+| survived into the ledger           | 3        |
+
+The raw set was rich and used the new vocabulary heavily — `contract_mismatch`
+15, `unsupported_claim` 10, `leaky_generality` 8, `sequence_gap` 5,
+`contradiction` 4, `unhandled_failure` 4, `authority_leak` 2. So the critics are
+finding what the pipeline was built to find. What removes almost all of it is
+the interaction between `minHits: 2` and the identity a finding is deduplicated
+under: the key is `type|locationRefs`, so two samples must cite the _same set of
+locations_ before they count as the same finding. Two critics can agree
+perfectly about a defect and still be counted as two singletons because one
+listed five locations and the other four.
+
+That is a real effect, not a bug — the rule exists so one sample cannot block a
+run, and §1 argues the same case for the memory pipelines. But an 88% discard
+rate means the panel's evidence is mostly thrown away before the controller ever
+sees it, and the threshold was chosen by reasoning rather than measurement. It
+is the first thing to look at once the fifteen-prompt experiment has enough runs
+to say whether 88% is typical.
 
 ### 12.2 One number to watch
 
