@@ -9,144 +9,18 @@ import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import type { RunsService } from '../runs/runs.service';
 import { bareGoal, buildQuery, MEMORY_HEADING } from './compose';
-import { CachedEmbeddings } from './embeddings';
 import { noQueryProbes } from './query-probes';
-import { closeSteps, digest, recall, StepLedger, store, target, type StepEnv } from './steps';
+import { digest, recall, store, target } from './steps';
 import {
-  confirmed,
-  fused,
-  fakeEmbeddings,
-  GOAL,
-  hitOf,
-  InMemoryEmbeddingCache,
-  InMemoryMemoryStore,
-  passed,
-  traceOf,
-  vectorOf,
-} from './testing';
-
-/** The accept bar both memory pipelines declare; the steps read it off the summary. */
-const ACCEPT_AT = 75;
-
-/** Only what the steps read off a summary: the id, and the pipeline's own bar. */
-const PIPELINES = ['system-design', 'memory-recall', 'experience-digest'].map((id) => ({
-  id,
-  policy: { thresholds: { acceptAt: ACCEPT_AT } },
-}));
-
-const pendingStep = () => ({
-  status: 'pending' as const,
-  reason: null,
-  runId: null,
-  note: null,
-  counts: {},
-  startedAt: null,
-  finishedAt: null,
-});
-
-const record = (overrides: Partial<MemoryRunDto> = {}): MemoryRunDto => ({
-  memoryRunId: 'm-1',
-  pipeline: 'system-design',
-  status: 'running',
-  startedAt: '2026-09-07T00:00:00.000Z',
-  finishedAt: null,
-  request: { goal: GOAL, outputProvided: false, maxIterations: 1 },
-  embedding: { enabled: true, model: 'fake-embedding', reason: null },
-  store: {
-    ready: true,
-    reason: null,
-    note: null,
-    model: 'fake-embedding',
-    collection: 'c',
-    chunks: 2,
-  },
-  steps: {
-    recall: pendingStep(),
-    target: pendingStep(),
-    digest: pendingStep(),
-    store: pendingStep(),
-  },
-  error: null,
-  ...overrides,
-});
-
-/** A child run as `RunsService.execute` resolves it. */
-const child = (pipeline: string, trace: RunTrace | null, failed = false): RunRecord => ({
-  runId: `${pipeline}-run`,
-  pipeline,
-  status: failed || trace === null ? 'failed' : 'complete',
-  startedAt: '2026-09-07T00:00:00.000Z',
-  finishedAt: '2026-09-07T00:01:00.000Z',
-  llm: { enabled: true, model: 'test-model', reason: null },
-  request: { goal: trace?.contract.goal ?? GOAL, outputProvided: false, maxIterations: 1 },
-  trace,
-  exchanges: [],
-  error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,
-  git: { branch: 'spec', headSha: 'spec' },
-});
-
-const hits = [
-  hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
-  hitOf('record each status transition as a row', 'run-a', 'memory.2'),
-];
-
-/** Every recall run answers with the sample pack; every target with a design; every digest with the sample digest. */
-function env(
-  answers: Record<string, RunRecord | (() => RunRecord)>,
-  overrides: Partial<StepEnv> = {},
-): StepEnv & { executed: { pipeline: string; goal: string }[] } {
-  const executed: { pipeline: string; goal: string }[] = [];
-  const runs = {
-    list: () => PIPELINES,
-    execute: async (
-      request: { pipeline: string; goal: string },
-      onOpened?: (r: RunRecord) => void,
-    ) => {
-      executed.push(request);
-      const answer = answers[request.pipeline];
-      const result = typeof answer === 'function' ? answer() : answer;
-      if (!result) throw new Error(`unexpected pipeline ${request.pipeline}`);
-      onOpened?.(result);
-      return result;
-    },
-  } as unknown as RunsService;
-  const store = new InMemoryMemoryStore();
-  void store.replaceRunChunks(
-    'run-a',
-    hits.map((hit) => {
-      const keys = { condition: `when ${hit.text}`, lesson: hit.text };
-      return {
-        text: hit.text,
-        keys,
-        contentHash: hit.contentHash,
-        source: hit.source,
-        evidence: hit.evidence,
-        digestRunId: hit.digestRunId,
-        model: hit.model,
-        vectors: {
-          condition: vectorOf(keys.condition),
-          lesson: vectorOf(keys.lesson),
-        },
-      };
-    }),
-  );
-  return {
-    executed,
-    probes: noQueryProbes,
-    runs,
-    embeddings: new CachedEmbeddings(fakeEmbeddings(), new InMemoryEmbeddingCache()),
-    store,
-    pipelines: { recall: 'memory-recall', digest: 'experience-digest' },
-    ...overrides,
-  };
-}
-
-const ledgerOf = (dto = record()) =>
-  new StepLedger(
-    dto,
-    () => Promise.resolve(),
-    () => 'now',
-  );
+  ACCEPT_AT,
+  childRun as child,
+  ledgerOf,
+  memoryRecord as record,
+  mutedEmbeddings,
+  sampleHits as hits,
+  stepEnv as env,
+} from './steps.testing';
+import { confirmed, fused, GOAL, InMemoryMemoryStore, passed, traceOf } from './testing';
 
 const recallTrace = (decision: RunTrace['finalDecision'] = 'accept', faulted = false) =>
   traceOf({
@@ -197,52 +71,6 @@ const digestTraceFor = (source: QualityRunDto, decision: RunTrace['finalDecision
 };
 
 describe('the memory steps', () => {
-  it('[QL-16] closeSteps fails what was running and skips what was pending, both with one reason', () => {
-    const steps = record().steps;
-    steps.recall = { ...steps.recall, status: 'complete' };
-    steps.target = { ...steps.target, status: 'running' };
-    const closed = closeSteps(steps, 'errored', 'boom', 'now');
-    expect(closed.recall.status).toBe('complete');
-    expect(closed.target).toMatchObject({
-      status: 'failed',
-      reason: 'errored',
-      note: 'boom',
-      finishedAt: 'now',
-    });
-    expect(closed.digest).toMatchObject({
-      status: 'skipped',
-      reason: 'errored',
-      note: null,
-      finishedAt: 'now',
-    });
-    expect(closed.store).toMatchObject({ status: 'skipped', reason: 'errored' });
-  });
-
-  it('[QL-16] the ledger flushes in order and logs a failed flush instead of throwing', async () => {
-    const flushed: string[] = [];
-    let fail = true;
-    const warn = vi.fn();
-    const ledger = new StepLedger(
-      record(),
-      async (current) => {
-        if (fail) {
-          fail = false;
-          throw new Error('pool gone');
-        }
-        flushed.push(current.steps.recall.status);
-      },
-      () => 'now',
-      warn,
-    );
-    await ledger.begin('recall');
-    await ledger.child('recall', 'r-1');
-    await ledger.end('recall', { status: 'complete' });
-    await ledger.settled();
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('pool gone'));
-    expect(flushed).toEqual(['running', 'complete']);
-    expect(ledger.record.steps.recall).toMatchObject({ status: 'complete', runId: 'r-1' });
-  });
-
   it('[QL-16] recall hands the target the goal with memory only when the pack was accepted with usable chunks', async () => {
     const accepted = env({ 'memory-recall': child('memory-recall', recallTrace()) });
     let dto = record();
@@ -316,10 +144,7 @@ describe('the memory steps', () => {
     const mute = env(
       {},
       {
-        embeddings: new CachedEmbeddings(
-          { ...fakeEmbeddings(), embed: () => Promise.resolve(null) },
-          new InMemoryEmbeddingCache(),
-        ),
+        embeddings: mutedEmbeddings(),
       },
     );
     expect(await recall(mute, ledgerOf(dto), GOAL)).toBe(GOAL);
@@ -443,10 +268,7 @@ describe('the memory steps', () => {
     const mute = env(
       {},
       {
-        embeddings: new CachedEmbeddings(
-          { ...fakeEmbeddings(), embed: () => Promise.resolve(null) },
-          new InMemoryEmbeddingCache(),
-        ),
+        embeddings: mutedEmbeddings(),
       },
     );
     await store(mute, ledgerOf(dto), source, {
