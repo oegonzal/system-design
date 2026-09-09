@@ -1033,6 +1033,93 @@ recorded before this change is incomparable with any recorded after it** — whi
 retires the score column of §8 as a baseline, though the retrieval measurements
 there are untouched.
 
+### 12.5 The evaluators could not be told, and now can be
+
+Cycle 1's critics worked and its evaluators did not: **279 of 279 criteria
+passed**, and **544 of 544 criteria that a confirmed finding named were graded
+`pass`**. The evaluator that passed _determinism_ citing "temperature 0" could
+not be told that a `high` contradiction had been confirmed against the same
+mechanism, because nothing in the engine could tell it.
+
+**Why the lenses ran in parallel.** `run-pipeline.ts` put every critic and
+every evaluator into one `mapConcurrent` after the validators. That is not the
+doctrine. `../pipeline-best-practices/pipeline-data-flow.md` prescribes a
+_partially ordered DAG_ — validators, critics and direct evaluators fan out
+from the artifact; evidence-conditioned evaluators consume the normalised
+bundle; then the controller — with the rule that every step receives the
+artifact plus the upstream evidence it semantically depends on. The engine had
+tier one and no way to express tier two.
+
+**The audit.** Ports and adapters hold: `core/ports.ts` declares the ports,
+`materialize.ts` builds the model-backed adapters from a definition, specs hand
+in fakes. Constructor injection holds: `RunsService` receives the client, the
+registry, the trace store and the repository through `@Inject`, and the core is
+pure functions taking `RunDeps`. Per-pipeline configuration holds: personas,
+validators, output shape and policy live under `pipelines/<id>/`. The one axis
+on which the loop was not open for extension: a lens could not declare a
+dependency on upstream evidence, `LensContext` had no slot for it, and adding a
+tier-two lens meant editing the engine.
+
+**`consumes`.** A step declares what it consumes, and the declaration is the
+single source for both when it runs and what it is shown:
+
+```ts
+LensSpec.consumes:     ('findings' | 'results')[]   // ledger evidence from the wave before
+ProducerSpec.consumes: ('criteria')[]               // the derived checklist, or the goal alone
+```
+
+The runner schedules two waves. Lenses that consume nothing judge the artifact
+alone; `normalize` runs over their reports; lenses that consume something are
+then shown what it **confirmed** — each finding with the first sentence a
+critic gave for it, and criterion results that were actually settled — never a
+raw report. The deterministic normaliser is the boundary between tiers, so "the
+system owns what counts" holds between lenses exactly as it already did before
+the controller. `validatePipeline` refuses a consumer of evidence nothing
+produces before it; `describePipeline` projects every declaration, so
+`03-pipeline.json` says which wave each lens ran in.
+
+`agentic-design` declares all three evaluators as consuming findings and its
+producer as consuming nothing — the design this package grades for is a
+person's, and a person never sees the derived criteria. For that pipeline the
+flow now reads exactly as the doctrine states it: producer → critics →
+evaluators → controller, by declaration, with no special case in the engine.
+The other three pipelines declare today's behaviour explicitly; none is exempt.
+
+**Measured, like for like.** Six prompts ran under the flat fan-out in cycle 1
+and again under `consumes` — the same six, one iteration each, the control
+still held out. The user stopped the A/B at one batch; six was enough.
+
+|                                                  | cycle 1, flat fan-out        | `consumes`                       |
+| ------------------------------------------------ | ---------------------------- | -------------------------------- |
+| criteria graded `pass`                           | **119 / 119**                | **22 / 80** (57 partial, 1 fail) |
+| criteria a confirmed finding names, still `pass` | **249 / 249**                | **19 / 116**                     |
+| overall (runs that scored)                       | 84.6 mean, 78.6–88.3         | 62.6 mean, 53.3–67.5             |
+| dimensions below 100, per run                    | 2.2 of 4                     | **4.0 of 4**                     |
+| `compliance`                                     | 100, 100, 100, 100, 100, 100 | 83.3 · 66.7 · 66.7 · 50          |
+
+The evaluator column moved from a constant to a distribution, and every one of
+the four dimensions moves on every run. The shift is large — 20 points of
+overall — because nothing was being measured before: a criterion the panel had
+confirmed evidence against was passing 249 times out of 249.
+
+Two of the six runs escalated with no artifact, and neither is this change.
+One producer returned 12,329 tokens of JSON with a syntax error at character
+12,033 — a missing comma, which nothing can repair. The other hit the client's
+five-minute abort. Both are the pre-existing producer failure class (4
+schema-misses and 3 errors across 162 recorded calls), drawn unluckily. The
+evaluators returned 6 of 6 samples on every run that had an artifact.
+
+A caveat the numbers must carry: n = 4 scored runs, and the store had grown
+from 206 to 249 between the two cycles. The direction is not in doubt; the
+size of the effect is a first estimate.
+
+Two designs were considered and rejected on the way here. A deterministic rule
+in the normaliser that capped a criterion a confirmed finding named — thirteen
+files of plumbing to route evidence around a producer that was writing to the
+test. And blinding the producer alone — a one-line fix to the cause, but it
+leaves the evaluators unable to weigh a defect the critics had confirmed. The
+declared dependency does both, and is the doctrine's own shape.
+
 ### 12.2 One number to watch
 
 The same verification run recalled 16 candidates, kept 8, and injected
