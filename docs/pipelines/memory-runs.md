@@ -1259,7 +1259,11 @@ and the summary, so two memories were excluded for a gap the digest as a
 whole had. Unused slots are places and can still chain; the persona asks
 for the alias alone, and one of four samples did not comply. Admission is a
 per-memory rule again, and what is left is a persona compliance question,
-not a grouping one.
+not a grouping one. A second digest on a fresh
+target the same evening (workflow-graph-engine, orchestration `5d6c74c0`)
+accepted at 94.8 and kept 5 of 8 with the same shape: one `vague_insight` at
+`memory.7`, and one `missed_signal` that named `memory.5` and `memory.8`
+beside four unused aliases. Two digests, 10 of 16 kept, against 42% before.
 
 ## 13. The controller is a declared strategy
 
