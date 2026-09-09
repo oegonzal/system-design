@@ -45,7 +45,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   },
 
   deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
-  producer: { persona: producer, maxTokens: 16000 },
+  producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
 
   critics: [
@@ -53,6 +53,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       id: 'critic.attribution',
       persona: criticAttribution,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -60,6 +61,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       id: 'critic.provenance',
       persona: criticProvenance,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -67,6 +69,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       id: 'critic.transfer',
       persona: criticTransfer,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -77,6 +80,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       id: 'evaluator.attribution',
       persona: evaluatorAttribution,
       samples: 2,
+      consumes: [],
       maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['signal', 'transition'],

@@ -42,8 +42,9 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
     },
     maxCriteria: 20,
   },
+  producer: { consumes: ['criteria'] },
   validators: [{ id: 'schema', gate: 'block' }],
-  critics: [{ id: 'critic.requirements', samples: 1, maxItems: 12, maxTokens: 4000 }],
+  critics: [{ id: 'critic.requirements', samples: 1, maxItems: 12, maxTokens: 4000, consumes: [] }],
   evaluators: [
     {
       id: 'evaluator.requirements',
@@ -51,6 +52,7 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
       maxItems: 20,
       maxTokens: 4000,
       criterionKinds: ['functional', 'scale'],
+      consumes: [],
     },
   ],
   policy: {

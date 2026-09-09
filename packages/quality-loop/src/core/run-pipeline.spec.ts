@@ -2,7 +2,14 @@ import { NoopLlmClient, type LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import type { SuccessCriterion } from '@sysdesign/contracts';
-import type { Producer, ProducerInput, Stages } from './ports';
+import type {
+  Critic,
+  Evaluator,
+  Producer,
+  ProducerInput,
+  Stages,
+  UpstreamEvidenceBundle,
+} from './ports';
 import { runLoop, runPipeline } from './run-pipeline';
 import {
   criterion,
@@ -57,6 +64,58 @@ function stages(overrides: Partial<Stages<TinyOutput>> = {}): Stages<TinyOutput>
 }
 
 describe('runLoop', () => {
+  it('[QL-9] a lens that consumes findings runs after the first wave and is shown only what it confirmed', async () => {
+    const order: string[] = [];
+    const seen: UpstreamEvidenceBundle[] = [];
+    const critic = scriptedCritic('critic.tiny', [
+      [[finding({ criterionIds: ['c1'], rationale: 'the text is thin' })]],
+    ]);
+    const firstWave: Critic<TinyOutput> = {
+      ...critic,
+      run: (ctx) => {
+        order.push('critic');
+        seen.push(ctx.upstream);
+        return critic.run(ctx);
+      },
+    };
+    const later = scriptedEvaluator(
+      'evaluator.tiny',
+      [[[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]]],
+      null,
+      ['findings'],
+    );
+    const secondWave: Evaluator<TinyOutput> = {
+      ...later,
+      run: (ctx) => {
+        order.push('evaluator');
+        seen.push(ctx.upstream);
+        return later.run(ctx);
+      },
+    };
+    const trace = await runLoop(
+      stages({ critics: [firstWave], evaluators: [secondWave] }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+    expect(order).toEqual(['critic', 'evaluator']);
+    // the first wave is shown nothing
+    expect(seen[0]).toEqual({ findings: [], results: [] });
+    // the second is shown the CONFIRMED finding, with the critic's words, and no unsettled criteria
+    expect(seen[1].findings).toEqual([
+      expect.objectContaining({
+        key: 'gap|text',
+        criterionIds: ['c1'],
+        rationale: 'the text is thin',
+      }),
+    ]);
+    expect(seen[1].results).toEqual([]);
+    // and the final ledger holds both waves
+    const [only] = trace.iterations;
+    expect(only.ledger.findings).toHaveLength(1);
+    expect(only.ledger.criteria.map((evidence) => evidence.result)).toEqual(['partial', 'pass']);
+  });
+
   it('[QL-9] revises with the selected remediations, keeps the best by a strict-better gate, and stops on accept', async () => {
     const inputs: ProducerInput<TinyOutput>[] = [];
     const producer: Producer<TinyOutput> = {
@@ -208,8 +267,8 @@ describe('runPipeline', () => {
     );
     const definition = tinyPipeline({
       critics: [
-        { id: 'critic.a', persona: 'A', samples: 2, maxItems: 4, maxTokens: 100 },
-        { id: 'critic.b', persona: 'B', samples: 1, maxItems: 4, maxTokens: 100 },
+        { id: 'critic.a', persona: 'A', samples: 2, maxItems: 4, maxTokens: 100, consumes: [] },
+        { id: 'critic.b', persona: 'B', samples: 1, maxItems: 4, maxTokens: 100, consumes: [] },
       ],
       evaluators: [
         {
@@ -219,6 +278,7 @@ describe('runPipeline', () => {
           maxItems: 4,
           maxTokens: 100,
           criterionKinds: ['must'],
+          consumes: [],
         },
         {
           id: 'evaluator.nice',
@@ -227,6 +287,7 @@ describe('runPipeline', () => {
           maxItems: 4,
           maxTokens: 100,
           criterionKinds: ['nice'],
+          consumes: [],
         },
       ],
     });

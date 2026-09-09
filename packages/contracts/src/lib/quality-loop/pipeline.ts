@@ -44,14 +44,22 @@ export interface PipelineSummary {
     findingTypes: Record<string, string>;
     maxCriteria: number;
   };
+  producer: { consumes: string[] };
   validators: { id: string; gate: string }[];
-  critics: { id: string; samples: number; maxItems: number; maxTokens: number }[];
+  critics: {
+    id: string;
+    samples: number;
+    maxItems: number;
+    maxTokens: number;
+    consumes: string[];
+  }[];
   evaluators: {
     id: string;
     samples: number;
     maxItems: number;
     maxTokens: number;
     criterionKinds: string[];
+    consumes: string[];
   }[];
   policy: DecisionPolicy;
 }

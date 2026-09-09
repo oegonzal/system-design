@@ -8,8 +8,11 @@ import type {
   ArtifactLocation,
   RemediationNote,
   SuccessCriterion,
+  UpstreamEvidence,
   ValidationReport,
 } from '@sysdesign/contracts';
+
+import type { UpstreamEvidenceBundle } from './ports';
 import { capText } from '@sysdesign/run-dump';
 
 /** Enough for any prompt a person would write; a larger goal is clipped and traced. */
@@ -21,7 +24,7 @@ const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly s
     'Never invent a requirement the goal does not support; never merge two distinct requirements.',
   ],
   producer: [
-    'Produce the artifact in the required structure. Every field is read by expert judges against the listed criteria.',
+    'Produce the artifact in the required structure. Every field is read by expert judges against criteria derived from the goal.',
     'Be concrete and specific to the goal; state assumptions instead of hiding them.',
   ],
   critic: [
@@ -109,6 +112,47 @@ export function remediationsSection(heading: string, notes: readonly Remediation
       `- [${note.severity}] ${note.note}${note.targetRefs.length > 0 ? ` (at: ${note.targetRefs.join(', ')})` : ''}`,
   );
   return [`# ${heading}`, '', ...(lines.length > 0 ? lines : ['(none)'])].join('\n');
+}
+
+/**
+ * What the wave before confirmed, for a lens that declared it consumes it. The
+ * instruction travels with the evidence rather than living in a role rule, so
+ * a lens that consumes nothing is told nothing.
+ */
+export function upstreamSections(
+  bundle: UpstreamEvidenceBundle,
+  consumes: readonly UpstreamEvidence[],
+): string[] {
+  const sections: string[] = [];
+  if (consumes.includes('findings')) {
+    const lines = bundle.findings.map((finding) => {
+      const at = finding.locationRefs.length > 0 ? finding.locationRefs.join(', ') : '(unlocated)';
+      const names =
+        finding.criterionIds.length > 0 ? ` → criteria ${finding.criterionIds.join(', ')}` : '';
+      const why = finding.rationale ? `\n  ${finding.rationale}` : '';
+      return `- [${finding.severity}] ${finding.type} at ${at}${names}${why}`;
+    });
+    sections.push(
+      [
+        '# Confirmed upstream defects',
+        '',
+        'Independent samples agreed on each of these. A criterion one of them names is at most partial unless you show the defect does not touch it.',
+        '',
+        ...(lines.length > 0 ? lines : ['(none confirmed)']),
+      ].join('\n'),
+    );
+  }
+  if (consumes.includes('results')) {
+    const lines = bundle.results.map(
+      (evidence) => `- ${evidence.criterionId} [${evidence.kind}]: ${evidence.result}`,
+    );
+    sections.push(
+      ['# Upstream criterion results', '', ...(lines.length > 0 ? lines : ['(none yet)'])].join(
+        '\n',
+      ),
+    );
+  }
+  return sections;
 }
 
 export const joinSections = (...sections: readonly string[]): string => sections.join('\n\n');

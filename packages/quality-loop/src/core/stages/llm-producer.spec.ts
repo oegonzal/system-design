@@ -32,6 +32,19 @@ describe('createLlmProducer', () => {
     expect(calls[0].user).not.toMatch(/score|overall/);
   });
 
+  it('[QL-9] is briefed with the derived criteria only when it declares it consumes them', async () => {
+    const calls: LlmCall[] = [];
+    const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
+    const input = { contract, mode: 'initial' as const, prior: null, remediations: [] };
+    await createLlmProducer(definition.task, { ...definition.producer, consumes: [] }, llm).produce(
+      input,
+    );
+    expect(calls[0].user).toContain('# Goal');
+    expect(calls[0].user).not.toContain('# Success criteria');
+    await createLlmProducer(definition.task, definition.producer, llm).produce(input);
+    expect(calls[1].user).toContain('# Success criteria');
+  });
+
   it('[QL-9] a failed completion is a diagnostic', async () => {
     const produced = await createLlmProducer(
       definition.task,

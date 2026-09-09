@@ -5,6 +5,8 @@
  */
 import type {
   ArtifactLocation,
+  ConfirmedFinding,
+  CriterionEvidence,
   CriticReport,
   Diagnostic,
   EvaluationReport,
@@ -17,6 +19,7 @@ import type {
   QualityRunSummaryDto,
   RemediationNote,
   SuccessCriterion,
+  UpstreamEvidence,
   ValidationReport,
   ValidatorGate,
 } from '@sysdesign/contracts';
@@ -49,6 +52,22 @@ export interface Validator<T> {
   validate(artifact: T, contract: TaskContract<T>): ValidationReport;
 }
 
+/** A confirmed finding with the first sentence a critic gave for it — prose for a model, never for the decision. */
+export interface AnnotatedFinding extends ConfirmedFinding {
+  rationale: string | null;
+}
+
+/**
+ * What the normaliser confirmed from the wave before. A lens receives only the
+ * kinds it declared it consumes; a first-wave lens receives it empty.
+ */
+export interface UpstreamEvidenceBundle {
+  findings: AnnotatedFinding[];
+  results: CriterionEvidence[];
+}
+
+export const emptyUpstream = (): UpstreamEvidenceBundle => ({ findings: [], results: [] });
+
 export interface LensContext<T> {
   contract: TaskContract<T>;
   artifact: T;
@@ -56,16 +75,20 @@ export interface LensContext<T> {
   /** `output.render(artifact)`, computed once per iteration. */
   rendered: string;
   validation: ValidationReport[];
+  upstream: UpstreamEvidenceBundle;
 }
 
 /** One outcome per sample, in sample order. */
 export interface Critic<T> {
   readonly id: string;
+  /** Declared upstream evidence; the runner schedules the lens after it exists. */
+  readonly consumes: readonly UpstreamEvidence[];
   run(ctx: LensContext<T>): Promise<LensOutcome<CriticReport>[]>;
 }
 
 export interface Evaluator<T> {
   readonly id: string;
+  readonly consumes: readonly UpstreamEvidence[];
   run(ctx: LensContext<T>): Promise<LensOutcome<EvaluationReport>[]>;
 }
 

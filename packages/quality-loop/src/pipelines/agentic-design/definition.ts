@@ -80,9 +80,14 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
     maxTokens: 4000,
   },
 
+  // The design this package exists to grade — a person's — never sees the
+  // derived criteria. A producer that does writes one mechanism per line, and
+  // 279 of 279 criteria passed. Its evaluators consume the confirmed findings
+  // instead: producer → critics → evaluators → controller, by declaration.
   producer: {
     persona: producer,
     maxTokens: 16000,
+    consumes: [],
   },
 
   validators: [],
@@ -92,6 +97,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'critic.requirements',
       persona: criticRequirements,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -99,6 +105,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'critic.contracts',
       persona: criticContracts,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -106,6 +113,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'critic.soundness',
       persona: criticSoundness,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -113,6 +121,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'critic.generality',
       persona: criticGenerality,
       samples: 2,
+      consumes: [],
       maxItems: 10,
       maxTokens: 12000,
     },
@@ -123,6 +132,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'evaluator.requirements',
       persona: evaluatorRequirements,
       samples: 2,
+      consumes: ['findings'],
       maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['capability', 'constraint'],
@@ -131,6 +141,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'evaluator.interfaces',
       persona: evaluatorInterfaces,
       samples: 2,
+      consumes: ['findings'],
       maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['contract'],
@@ -139,6 +150,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       id: 'evaluator.properties',
       persona: evaluatorProperties,
       samples: 2,
+      consumes: ['findings'],
       maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['property'],

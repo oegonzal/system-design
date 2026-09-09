@@ -18,6 +18,7 @@ import {
   locationsSection,
   systemPrompt,
   typesSection,
+  upstreamSections,
   validationSection,
 } from '../prompting';
 import { enumTuple, findingsSchema } from '../schemas';
@@ -30,6 +31,7 @@ export function createLlmCritic<T>(
 ): Critic<T> {
   return {
     id: spec.id,
+    consumes: spec.consumes,
     async run(ctx: LensContext<T>) {
       const types = enumTuple(Object.keys(task.findingTypes));
       if (!types) return [skipped(spec.id, null, 'not-applicable', 'no finding types')];
@@ -43,6 +45,7 @@ export function createLlmCritic<T>(
           artifactSection(ctx.rendered),
           locationsSection(ctx.locations),
           validationSection(ctx.validation),
+          ...upstreamSections(ctx.upstream, spec.consumes),
         ),
         schema: findingsSchema(
           types,

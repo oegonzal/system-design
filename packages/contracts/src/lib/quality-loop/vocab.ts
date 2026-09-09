@@ -48,6 +48,18 @@ export type StopReason = (typeof STOP_REASONS)[number];
 export const PRODUCE_MODES = ['initial', 'revise', 'retry'] as const;
 export type ProduceMode = (typeof PRODUCE_MODES)[number];
 
+/**
+ * What a lens may declare it consumes from the wave before it: the findings
+ * the normaliser confirmed, or the criterion results it settled. Never a raw
+ * report — the deterministic normaliser is the boundary between tiers.
+ */
+export const UPSTREAM_EVIDENCE = ['findings', 'results'] as const;
+export type UpstreamEvidence = (typeof UPSTREAM_EVIDENCE)[number];
+
+/** What the producer is briefed with beyond the goal. Empty means the goal alone. */
+export const PRODUCER_BRIEFING = ['criteria'] as const;
+export type ProducerBriefing = (typeof PRODUCER_BRIEFING)[number];
+
 /** `block` stops the iteration before any model call; `warn` only informs. */
 export const VALIDATOR_GATES = ['block', 'warn'] as const;
 export type ValidatorGate = (typeof VALIDATOR_GATES)[number];

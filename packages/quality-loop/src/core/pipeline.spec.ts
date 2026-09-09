@@ -44,10 +44,46 @@ describe('validatePipeline', () => {
     ).toThrow(/unique/);
   });
 
-  it('[QL-1] describes a pipeline as plain data that round-trips through JSON', () => {
+  it('[QL-1] refuses a lens consuming evidence nothing produces before it, and evidence it does not know', () => {
+    const base = tinyPipeline();
+    expect(() =>
+      validatePipeline(
+        asAny(
+          tinyPipeline({
+            critics: [],
+            evaluators: [{ ...base.evaluators[0], consumes: ['findings'] }],
+          }),
+        ),
+      ),
+    ).toThrow(/consumes findings but no critic/);
+    expect(() =>
+      validatePipeline(
+        asAny(
+          tinyPipeline({
+            critics: [{ ...base.critics[0], consumes: ['results'] }],
+            evaluators: [{ ...base.evaluators[0], consumes: ['results'] }],
+          }),
+        ),
+      ),
+    ).toThrow(/consumes results but no evaluator/);
+    expect(() =>
+      validatePipeline(
+        asAny(tinyPipeline({ critics: [{ ...base.critics[0], consumes: ['vibes' as never] }] })),
+      ),
+    ).toThrow(/unknown evidence/);
+    expect(() =>
+      validatePipeline(
+        asAny(tinyPipeline({ producer: { ...base.producer, consumes: ['scores' as never] } })),
+      ),
+    ).toThrow(/unknown briefing/);
+  });
+
+  it('[QL-1] describes a pipeline as plain data that round-trips through JSON, declarations included', () => {
     const summary = describePipeline(asAny(tinyPipeline()));
     expect(JSON.parse(JSON.stringify(summary))).toEqual(summary);
     expect(summary.critics.map((lens) => lens.id)).toEqual(['critic.tiny']);
+    expect(summary.producer).toEqual({ consumes: ['criteria'] });
+    expect(summary.evaluators[0].consumes).toEqual([]);
     expect(JSON.stringify(summary)).not.toContain('persona');
   });
 });

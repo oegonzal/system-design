@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LensContext } from '../ports';
+import { emptyUpstream, type LensContext } from '../ports';
 import {
   criterion,
   disabledLlm,
@@ -19,6 +19,7 @@ const ctx: LensContext<TinyOutput> = {
   locations: definition.task.output.locate(artifact),
   rendered: definition.task.output.render(artifact),
   validation: [],
+  upstream: emptyUpstream(),
 };
 
 describe('createLlmCritic', () => {

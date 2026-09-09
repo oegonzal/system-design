@@ -13,6 +13,7 @@ import type {
   RawCriterionResult,
   RawFinding,
   SuccessCriterion,
+  UpstreamEvidence,
 } from '@sysdesign/contracts';
 import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
 import { z } from 'zod';
@@ -121,10 +122,17 @@ export function tinyPipeline(
       },
     },
     deriveCriteria: { persona: 'You extract requirements.', maxTokens: 500 },
-    producer: { persona: 'You write two-field artifacts.', maxTokens: 500 },
+    producer: { persona: 'You write two-field artifacts.', maxTokens: 500, consumes: ['criteria'] },
     validators: [],
     critics: [
-      { id: 'critic.tiny', persona: 'You find gaps.', samples: 1, maxItems: 4, maxTokens: 500 },
+      {
+        id: 'critic.tiny',
+        persona: 'You find gaps.',
+        samples: 1,
+        maxItems: 4,
+        maxTokens: 500,
+        consumes: [],
+      },
     ],
     evaluators: [
       {
@@ -134,6 +142,7 @@ export function tinyPipeline(
         maxItems: 8,
         maxTokens: 500,
         criterionKinds: ['must', 'nice'],
+        consumes: [],
       },
     ],
     policy: tinyPolicy(),
@@ -197,10 +206,12 @@ export const scriptedProducer = (outputs: readonly (TinyOutput | null)[]): Produ
 export const scriptedCritic = (
   id: string,
   perIteration: readonly (readonly RawFinding[][])[],
+  consumes: readonly UpstreamEvidence[] = [],
 ): Critic<TinyOutput> => {
   let call = 0;
   return {
     id,
+    consumes,
     run: () => {
       const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
       return Promise.resolve(
@@ -216,10 +227,12 @@ export const scriptedEvaluator = (
   id: string,
   perIteration: readonly (readonly RawCriterionResult[][])[],
   advisoryVerdict: EvaluationReport['advisoryVerdict'] = null,
+  consumes: readonly UpstreamEvidence[] = [],
 ): Evaluator<TinyOutput> => {
   let call = 0;
   return {
     id,
+    consumes,
     run: () => {
       const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
       return Promise.resolve(

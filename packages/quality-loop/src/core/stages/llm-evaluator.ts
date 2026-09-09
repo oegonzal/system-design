@@ -16,6 +16,7 @@ import {
   joinSections,
   locationsSection,
   systemPrompt,
+  upstreamSections,
 } from '../prompting';
 import { enumTuple, evaluationSchema } from '../schemas';
 import { skipped } from './shared';
@@ -26,6 +27,7 @@ export function createLlmEvaluator<T>(
 ): Evaluator<T> {
   return {
     id: spec.id,
+    consumes: spec.consumes,
     async run(ctx: LensContext<T>) {
       const criteria = ctx.contract.criteria.filter((criterion) =>
         spec.criterionKinds.includes(criterion.kind),
@@ -40,6 +42,7 @@ export function createLlmEvaluator<T>(
           criteriaSection(criteria),
           artifactSection(ctx.rendered),
           locationsSection(ctx.locations),
+          ...upstreamSections(ctx.upstream, spec.consumes),
         ),
         schema: evaluationSchema(
           ids,

@@ -41,7 +41,8 @@ export function createLlmProducer<T>(
       }
 
       const goal = goalSection(contract.goal);
-      const sections = [goal.text, criteriaSection(contract.criteria)];
+      const sections = [goal.text];
+      if (spec.consumes.includes('criteria')) sections.push(criteriaSection(contract.criteria));
       if (mode === 'revise' && prior !== null) {
         sections.push(
           ['# Your previous artifact', '', task.output.render(prior)].join('\n'),
