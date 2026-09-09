@@ -1,5 +1,7 @@
+import type { RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { outputsOf } from '../../core/outputs';
 import { GOAL_MAX_BYTES } from '../../core/prompting';
 import { fromRun } from '../../pipelines/experience-digest/compose';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
@@ -12,12 +14,19 @@ import {
   chunksOf,
   fuse,
   MEMORY_HEADING,
-  memoriesToStore,
+  memoriesToStore as memoriesOf,
   queryText,
-  readPack,
+  readPack as packOf,
   withMemory,
 } from './compose';
+import type { MemoryHit } from './ports';
 import { confirmed, fused, GOAL, hitOf, passed, traceOf } from './testing';
+
+// The readers take a run's outputs; these specs build traces, so read through the view.
+const readPack = (trace: RunTrace, hits: readonly MemoryHit[], acceptAt: number) =>
+  packOf(outputsOf(trace), hits, acceptAt);
+const memoriesToStore = (trace: RunTrace, acceptAt: number) =>
+  memoriesOf(outputsOf(trace), acceptAt);
 
 /** Both memory pipelines set the same bar; the specs state it rather than import it. */
 const ACCEPT_AT = 75;

@@ -125,6 +125,7 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
     }
     if (lens.consumes.includes('findings') && firstWaveCritics.length === 0)
       fail(`lens ${lens.id} consumes findings but no critic runs before it`);
+
     if (lens.consumes.includes('results') && firstWaveEvaluators.length === 0)
       fail(`lens ${lens.id} consumes results but no evaluator runs before it`);
   }

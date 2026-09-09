@@ -6,9 +6,9 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { IterationTrace, RunTrace } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
+import { admits, type RunOutputs } from '../../core/outputs';
 import { GOAL_MAX_BYTES } from '../../core/prompting';
 import { readIndex as readDigestIndex } from '../../pipelines/experience-digest/input';
 import { experienceDigestSchema } from '../../pipelines/experience-digest/output';
@@ -93,27 +93,6 @@ export interface UsableMemory {
   support: number;
 }
 
-export const bestIteration = (trace: RunTrace) =>
-  trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ?? null;
-
-/**
- * Whether a finished run's best iteration may be drawn on at all.
- *
- * An `accept` always may. Short of that, the loop's judgement is honoured
- * where it is item-specific — a faulted item is excluded by the caller — but a
- * run is not withheld wholesale merely because the iteration budget ran out
- * before someone else's blocker closed. `policyAllowed` is the one gate
- * deliberately not required: it is false whenever any blocker is open, and a
- * blocker on the summary would otherwise veto every memory beneath it. The
- * three gates that make the artifact and its score mean anything are required.
- */
-export function admits(trace: RunTrace, best: IterationTrace, acceptAt: number): boolean {
-  if (trace.finalDecision === 'accept') return true;
-  const { gates, scores } = best.decision;
-  if (!gates.artifactPresent || !gates.validatorsPassed || !gates.evidenceSufficient) return false;
-  return scores.overall >= acceptAt;
-}
-
 export interface RecallReadout {
   /** Whether the run cleared `admits` at all; false means nothing was even considered. */
   admitted: boolean;
@@ -127,15 +106,15 @@ export interface RecallReadout {
  * support first. A run the policy would not admit endorses nothing.
  */
 export function readPack(
-  trace: RunTrace,
+  outputs: RunOutputs,
   hits: readonly MemoryHit[],
   acceptAt: number,
 ): RecallReadout {
-  const best = bestIteration(trace);
+  const { best } = outputs;
   const pack = best === null ? null : memoryPackSchema.safeParse(best.artifact);
   if (best === null || !pack?.success) return { admitted: false, kept: 0, usable: [] };
   const kept = pack.data.kept.length;
-  if (!admits(trace, best, acceptAt)) return { admitted: false, kept, usable: [] };
+  if (!admits(outputs, acceptAt)) return { admitted: false, kept, usable: [] };
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const supportOf = (id: string): number =>
     best.ledger.criteria.filter(
@@ -201,13 +180,13 @@ export interface DigestReadout {
 }
 
 /** What a digest endorses: memories no confirmed finding names, with their evidence resolved. */
-export function memoriesToStore(trace: RunTrace, acceptAt: number): DigestReadout {
-  const best = bestIteration(trace);
+export function memoriesToStore(outputs: RunOutputs, acceptAt: number): DigestReadout {
+  const { best } = outputs;
   const digest = best === null ? null : experienceDigestSchema.safeParse(best.artifact);
   if (best === null || !digest?.success) return { admitted: false, proposed: 0, memories: [] };
   const proposed = digest.data.memories.length;
-  const index = readDigestIndex(trace.contract.goal);
-  if (index === null || !admits(trace, best, acceptAt)) {
+  const index = readDigestIndex(outputs.trace.contract.goal);
+  if (index === null || !admits(outputs, acceptAt)) {
     return { admitted: false, proposed, memories: [] };
   }
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));

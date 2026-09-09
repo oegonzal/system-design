@@ -4,9 +4,8 @@
  * The chunk vocabulary is the memory-recall pipeline's own `ChunkSource`, so
  * a stored chunk is a valid recall candidate without conversion.
  */
-import type { MemoryRunDto, MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 
-import type { RunListQuery } from '../../core/ports';
 import type { EVIDENCE_KINDS } from '../../pipelines/experience-digest/input';
 import type { ChunkSource } from '../../pipelines/memory-recall/input';
 
@@ -79,22 +78,4 @@ export interface MemoryStore {
 export interface EmbeddingCache {
   find(model: string, hashes: readonly string[]): Promise<Map<string, number[]>>;
   save(model: string, entries: readonly { hash: string; vector: number[] }[]): Promise<void>;
-}
-
-/** Where memory runs live between requests and across restarts. */
-export interface MemoryRunRepository {
-  open(record: MemoryRunDto): Promise<void>;
-  /** Steps and child ids, flushed at every transition; a swept row is never resurrected. */
-  update(record: MemoryRunDto): Promise<void>;
-  close(record: MemoryRunDto): Promise<void>;
-  find(memoryRunId: string): Promise<MemoryRunDto | null>;
-  list(query: RunListQuery): Promise<[MemoryRunDto[], number]>;
-  /** Rows still `running` from a previous process are failed; returns how many. */
-  failInterrupted(): Promise<number>;
-}
-
-/** Which registered pipelines play the two memory roles. */
-export interface MemoryPipelines {
-  recall: string;
-  digest: string;
 }

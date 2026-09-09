@@ -1,0 +1,252 @@
+import type {
+  OrchestrationRunDto,
+  PipelineSummary,
+  QualityRunDto,
+  StartQualityRunRequest,
+} from '@sysdesign/contracts';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { RunRecord } from '../core/contracts';
+import type { OrchestratorDefinition, StepResult } from './definition';
+import {
+  closeSteps,
+  openRecord,
+  pendingStep,
+  runOrchestration,
+  StepLedger,
+  type OrchestrationDeps,
+} from './run-orchestration';
+
+type Outputs = { a: string; b: string; c: undefined };
+type Ports = { log: string[] };
+
+const request: StartQualityRunRequest = { pipeline: 'tiny', goal: 'g' };
+
+const child = (runId = 'tiny-run', failed = false): RunRecord => ({
+  runId,
+  pipeline: 'tiny',
+  status: failed ? 'failed' : 'complete',
+  startedAt: '2026-09-09T00:00:00.000Z',
+  finishedAt: '2026-09-09T00:01:00.000Z',
+  llm: { enabled: true, model: 'test-model', reason: null },
+  request: { goal: 'g', outputProvided: false, maxIterations: 1 },
+  trace: null,
+  exchanges: [],
+  error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,
+  git: { branch: 'spec', headSha: 'spec' },
+});
+
+const stepA = (result: () => StepResult<string>) => ({
+  id: 'a' as const,
+  pipeline: 'tiny',
+  run: async (ctx: { execute: (input: { goal: string }) => Promise<QualityRunDto> }) => {
+    const run = await ctx.execute({ goal: 'from a' });
+    return { ...result(), runId: run.runId };
+  },
+  provided: (run: QualityRunDto): StepResult<string> => ({
+    status: 'skipped',
+    reason: 'provided-run',
+    runId: run.runId,
+    output: `provided:${run.runId}`,
+  }),
+});
+
+const definition = (
+  a: () => StepResult<string> = () => ({ status: 'complete', output: 'a!' }),
+): OrchestratorDefinition<Outputs, Ports> => ({
+  id: 'tiny',
+  version: '0.0.1',
+  description: 'three steps',
+  reasons: ['because'],
+  context: () => Promise.resolve({ seen: true }),
+  steps: [
+    stepA(a) as never,
+    {
+      id: 'b',
+      needs: ['a'],
+      run: (ctx) => Promise.resolve({ status: 'complete', output: `${ctx.outputs.a}+b` }),
+    },
+    { id: 'c', needs: ['b'], run: () => Promise.resolve({ status: 'skipped', reason: 'because' }) },
+  ],
+});
+
+function harness(execute: OrchestrationDeps<Ports>['execute'] = () => Promise.resolve(child())) {
+  const flushed: OrchestrationRunDto[] = [];
+  const deps: OrchestrationDeps<Ports> = {
+    ports: { log: [] },
+    pipelines: () => [{ id: 'tiny', policy: { thresholds: { acceptAt: 80 } } } as PipelineSummary],
+    execute,
+    flush: (record) => {
+      flushed.push(structuredClone(record));
+      return Promise.resolve();
+    },
+    now: () => 'now',
+    warn: () => undefined,
+  };
+  return { deps, flushed };
+}
+
+const open = (def: OrchestratorDefinition<Outputs, Ports>, provided: QualityRunDto | null = null) =>
+  openRecord(def, request, provided, { seen: true }, 1, () => 'now');
+
+describe('runOrchestration', () => {
+  it('[QL-18] runs the steps in declared order, hands outputs on, and records a child id as soon as it opens', async () => {
+    const def = definition();
+    const record = open(def);
+    const { deps, flushed } = harness((_, onOpened) => {
+      onOpened?.(child());
+      return Promise.resolve(child());
+    });
+    await runOrchestration(def, record, request, null, deps);
+
+    expect(record.status).toBe('complete');
+    expect(record.steps['a']).toMatchObject({ status: 'complete', runId: 'tiny-run' });
+    expect(record.steps['b']).toMatchObject({ status: 'complete', reason: null });
+    expect(record.steps['c']).toMatchObject({ status: 'skipped', reason: 'because' });
+    // The child id reached the ledger while a was still running.
+    expect(
+      flushed.some(
+        (snap) => snap.steps['a'].status === 'running' && snap.steps['a'].runId === 'tiny-run',
+      ),
+    ).toBe(true);
+    expect(flushed.map((snap) => snap.steps['b'].status)).toContain('running');
+  });
+
+  it('[QL-18] a step that yields nothing blocks what needs it, naming itself; a fatal failure fails the run', async () => {
+    const def = definition(() => ({
+      status: 'failed',
+      reason: 'run-failed',
+      error: { name: 'Boom', message: 'a died', stack: null },
+    }));
+    const record = open(def);
+    await runOrchestration(def, record, request, null, harness().deps);
+    expect(record.steps['a']).toMatchObject({ status: 'failed', reason: 'run-failed' });
+    expect(record.steps['b']).toMatchObject({
+      status: 'skipped',
+      reason: 'upstream-failed',
+      note: 'a',
+    });
+    expect(record.steps['c']).toMatchObject({
+      status: 'skipped',
+      reason: 'upstream-skipped',
+      note: 'b',
+    });
+    expect(record.status).toBe('failed');
+    expect(record.error?.message).toBe('a died');
+  });
+
+  it('[QL-18] a completed step with no output still blocks, and the run is complete', async () => {
+    const def = definition(() => ({ status: 'complete', reason: 'because' }));
+    const record = open(def);
+    await runOrchestration(def, record, request, null, harness().deps);
+    expect(record.steps['a']).toMatchObject({ status: 'complete', reason: 'because' });
+    expect(record.steps['b']).toMatchObject({
+      status: 'skipped',
+      reason: 'upstream-skipped',
+      note: 'a',
+    });
+    expect(record.status).toBe('complete');
+  });
+
+  it('[QL-18] an undeclared reason fails the step as errored; a missing pipeline skips it', async () => {
+    const def = definition(() => ({ status: 'complete', reason: 'made-up', output: 'a!' }));
+    const record = open(def);
+    await runOrchestration(def, record, request, null, harness().deps);
+    expect(record.steps['a']).toMatchObject({ status: 'failed', reason: 'errored' });
+    expect(record.steps['a'].note).toContain('made-up');
+
+    const gone = definition();
+    const { deps } = harness();
+    deps.pipelines = () => [];
+    const second = open(gone);
+    await runOrchestration(gone, second, request, null, deps);
+    expect(second.steps['a']).toMatchObject({
+      status: 'skipped',
+      reason: 'pipeline-unavailable',
+      note: 'tiny',
+    });
+  });
+
+  it('[QL-18] an error nobody expected closes the record: running failed, pending skipped, one reason', async () => {
+    const def = definition(() => {
+      throw new Error('kaboom');
+    });
+    const record = open(def);
+    await runOrchestration(def, record, request, null, harness().deps);
+    expect(record.status).toBe('failed');
+    expect(record.error?.message).toBe('kaboom');
+    expect(record.steps['a']).toMatchObject({
+      status: 'failed',
+      reason: 'errored',
+      note: 'kaboom',
+    });
+    expect(record.steps['b']).toMatchObject({ status: 'skipped', reason: 'errored' });
+    expect(record.finishedAt).toBe('now');
+  });
+
+  it('[QL-18] a provided run stands in for the steps that declare it, and its output feeds the rest', async () => {
+    const def = definition();
+    const provided: QualityRunDto = { ...child('given'), exchanges: [] };
+    const record = open(def, provided);
+    expect(record.steps['a']).toMatchObject({
+      status: 'skipped',
+      reason: 'provided-run',
+      runId: 'given',
+    });
+    const execute = vi.fn();
+    await runOrchestration(def, record, request, provided, harness(execute).deps);
+    expect(execute).not.toHaveBeenCalled();
+    expect(record.steps['b']).toMatchObject({ status: 'complete' });
+    expect(record.status).toBe('complete');
+  });
+});
+
+describe('the step ledger', () => {
+  it('[QL-16] closeSteps fails what was running and skips what was pending, both with one reason', () => {
+    const steps = {
+      a: { ...pendingStep(), status: 'complete' as const },
+      b: { ...pendingStep(), status: 'running' as const },
+      c: pendingStep(),
+    };
+    const closed = closeSteps(steps, 'errored', 'boom', 'now');
+    expect(closed['a'].status).toBe('complete');
+    expect(closed['b']).toMatchObject({
+      status: 'failed',
+      reason: 'errored',
+      note: 'boom',
+      finishedAt: 'now',
+    });
+    expect(closed['c']).toMatchObject({
+      status: 'skipped',
+      reason: 'errored',
+      note: null,
+      finishedAt: 'now',
+    });
+  });
+
+  it('[QL-16] the ledger flushes in order and logs a failed flush instead of throwing', async () => {
+    const flushed: string[] = [];
+    let fail = true;
+    const warn = vi.fn();
+    const record = open(definition());
+    const ledger = new StepLedger(
+      record,
+      async (current) => {
+        if (fail) {
+          fail = false;
+          throw new Error('pool gone');
+        }
+        flushed.push(current.steps['a'].status);
+      },
+      () => 'now',
+      warn,
+    );
+    await ledger.begin('a');
+    await ledger.child('a', 'r-1');
+    await ledger.end('a', { status: 'complete' });
+    await ledger.settled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('pool gone'));
+    expect(flushed).toEqual(['running', 'complete']);
+    expect(record.steps['a']).toMatchObject({ status: 'complete', runId: 'r-1' });
+  });
+});

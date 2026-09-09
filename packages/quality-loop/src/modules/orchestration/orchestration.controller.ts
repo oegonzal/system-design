@@ -1,0 +1,69 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import type {
+  GetOrchestrationRunResponse,
+  ListOrchestrationRunsResponse,
+  StartOrchestrationFromRunRequest,
+  StartOrchestrationRequest,
+  StartOrchestrationResponse,
+} from '@sysdesign/contracts';
+
+import { ZodValidationPipe } from '../runs/zod.pipe';
+import {
+  fromRunRequestSchema,
+  listOrchestrationsQuerySchema,
+  runRequestSchema,
+  type ListOrchestrationsQuery,
+} from './orchestration-request';
+import { OrchestrationService } from './orchestration.service';
+
+@Controller('orchestrations')
+export class OrchestrationController {
+  constructor(private readonly orchestrations: OrchestrationService) {}
+
+  /** 202: several chained runs are many minutes on the subscription client; poll `GET /orchestrations/:id`. */
+  @Post(':orchestrator')
+  @HttpCode(202)
+  async start(
+    @Param('orchestrator') orchestrator: string,
+    @Body(new ZodValidationPipe(runRequestSchema)) body: StartOrchestrationRequest,
+  ): Promise<StartOrchestrationResponse> {
+    const record = await this.orchestrations.start(orchestrator, body);
+    return { data: { orchestrationRunId: record.orchestrationRunId, status: record.status } };
+  }
+
+  /** 202: start from an already persisted run, for the steps the orchestrator lets it stand in for. */
+  @Post(':orchestrator/from-run')
+  @HttpCode(202)
+  async fromRun(
+    @Param('orchestrator') orchestrator: string,
+    @Body(new ZodValidationPipe(fromRunRequestSchema)) body: StartOrchestrationFromRunRequest,
+  ): Promise<StartOrchestrationResponse> {
+    const record = await this.orchestrations.startFromRun(orchestrator, body.runId);
+    return { data: { orchestrationRunId: record.orchestrationRunId, status: record.status } };
+  }
+
+  /** Newest first. Declared before `:id` so the bare collection never reads as an id. */
+  @Get()
+  async list(
+    @Query(new ZodValidationPipe(listOrchestrationsQuerySchema)) query: ListOrchestrationsQuery,
+  ): Promise<ListOrchestrationRunsResponse> {
+    const [data, total] = await this.orchestrations.list(query);
+    return { data, meta: { total, limit: query.limit, offset: query.offset } };
+  }
+
+  @Get(':id')
+  async get(@Param('id') id: string): Promise<GetOrchestrationRunResponse> {
+    const record = await this.orchestrations.get(id);
+    if (!record) throw new NotFoundException(`orchestration run ${id} not found`);
+    return { data: record };
+  }
+}

@@ -20,8 +20,10 @@ import type {
 import { compareFindings, compareStrings, severityRank } from './ordering';
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
+
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
+
 const sum = (values: readonly number[]): number =>
   values.reduce((total, value) => total + value, 0);
 

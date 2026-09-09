@@ -9,7 +9,8 @@ import { ExperienceProfile } from './entities/experience-profile.entity';
 import { Finding } from './entities/finding.entity';
 import { ImprovementRun } from './entities/improvement-run.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
-import { MemoryRun } from './entities/memory-run.entity';
+import { OrchestrationRun } from './entities/orchestration-run.entity';
+import { OrchestrationRunChild } from './entities/orchestration-run-child.entity';
 import { QualityRun } from './entities/quality-run.entity';
 import { QualityRunCriterion } from './entities/quality-run-criterion.entity';
 import { QualityRunCriterionResult } from './entities/quality-run-criterion-result.entity';
@@ -44,8 +45,9 @@ export const ormOptions = {
     Finding,
     EvalJob,
     ImprovementRun,
-    MemoryRun,
     MemoryEmbedding,
+    OrchestrationRun,
+    OrchestrationRunChild,
     QualityRun,
     QualityRunCriterion,
     QualityRunIteration,

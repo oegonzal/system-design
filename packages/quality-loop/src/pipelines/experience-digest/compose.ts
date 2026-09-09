@@ -16,6 +16,7 @@ import {
 import { capText } from '@sysdesign/run-dump';
 
 import { admitRefs, sameDefect } from '../../core/normalize';
+import { outputsOf } from '../../core/outputs';
 import { GOAL_MAX_BYTES } from '../../core/prompting';
 import {
   ARTIFACT_MAX,
@@ -213,9 +214,7 @@ export function fromRun(run: QualityRunDto, options: ComposeOptions = {}): Exper
   const criteria = collectCriteria(trace);
   const criterionAlias = new Map(criteria.map((criterion) => [criterion.id, criterion.alias]));
   const findings = collectFindings(trace, criterionAlias);
-  const best =
-    trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ??
-    trace.iterations[trace.iterations.length - 1];
+  const best = outputsOf(trace).best ?? trace.iterations[trace.iterations.length - 1];
 
   return fit({
     runId: run.runId,
