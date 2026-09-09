@@ -1,9 +1,20 @@
 /**
  * The experience digest: the memories a run is worth, each resting on the
  * findings and criteria that show it, and every other evidence alias under
- * `unused`. Evidence is addressed by its record alias, so a finding about a
- * piece of evidence keeps its key across revisions and maps straight back to
- * the run it came from.
+ * `unused`.
+ *
+ * A location is a PLACE in the digest — the summary, each memory, each unused
+ * slot — never a memory's citation. The citations used to be locations too
+ * ("evidence of memory.N"), and since critic refs are enum-locked to
+ * locations, every finding carried a memory plus the aliases it argued from.
+ * The normaliser groups findings of one type by overlapping refs, so two
+ * defects on two memories that both argued from `f5` chained into one 13-ref
+ * finding, and admission — which excludes every memory a confirmed finding
+ * names — dropped 7 of 8 memories. Measured over 50 digests, admission fell
+ * from ~59% to ~42% of proposed memories once overlap grouping landed. With
+ * places only, a finding is located at the memory it faults and names the
+ * aliases in its rationale; a memory is excluded only when a finding is
+ * located at it.
  */
 import { z } from 'zod';
 
@@ -59,9 +70,6 @@ export const experienceDigestOutput: OutputShape<ExperienceDigest> = {
       id: `memory.${index + 1}`,
       label: memory.insight,
     })),
-    ...digest.memories.flatMap((memory, index) =>
-      memory.evidence.map((id) => ({ id, label: `evidence of memory.${index + 1}` })),
-    ),
     ...digest.unused.map((id) => ({ id, label: 'unused' })),
   ],
 

@@ -201,7 +201,7 @@ describe('composing a memory run', () => {
       pipeline: 'experience-digest',
       goal,
       artifact: digest,
-      locations: ['summary', 'memory.1', 'memory.2', 'f1', 'r1', 'f2', 'r2'],
+      locations: ['summary', 'memory.1', 'memory.2', 'r2'],
       findings: [confirmed('run_specific', ['memory.2'])],
     });
     expect(memoriesToStore(trace, ACCEPT_AT)).toEqual({
@@ -259,7 +259,7 @@ describe('composing a memory run', () => {
             })(),
         ),
         artifact: sampleDigest(),
-        locations: ['summary', 'memory.1', 'f1', 'r1', 'f2', 'r2'],
+        locations: ['summary', 'memory.1', 'f2', 'r2'],
       }),
       ACCEPT_AT,
     );
@@ -312,6 +312,6 @@ function digestInput(digest: ReturnType<typeof sampleDigest>, goal: string) {
     pipeline: 'experience-digest',
     goal,
     artifact: digest,
-    locations: ['summary', 'memory.1', 'memory.2', 'f1', 'r1', 'f2', 'r2'],
+    locations: ['summary', 'memory.1', 'f2', 'r2'],
   };
 }

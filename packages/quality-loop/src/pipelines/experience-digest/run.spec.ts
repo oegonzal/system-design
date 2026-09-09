@@ -50,7 +50,7 @@ const canned = [
 ];
 
 describe('the experience-digest loop', () => {
-  it("[QL-9] evidence aliases keep a finding's key across revisions and every alias stays citable", async () => {
+  it('[QL-9] a finding is located at the memory it faults, and every unused alias stays citable', async () => {
     const record = fromRun(sampleRun());
     if (record === null) throw new Error('the sample run must compose');
     const trace = await runPipeline(
@@ -65,8 +65,6 @@ describe('the experience-digest loop', () => {
       expect(iteration.locations.map((location) => location.id)).toEqual([
         'summary',
         'memory.1',
-        'f1',
-        'r1',
         'f2',
         'r2',
       ]);

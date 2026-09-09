@@ -36,12 +36,33 @@ describe('the experience-digest pipeline', () => {
     expect(experienceDigestOutput.locate(digest).map((location) => location.id)).toEqual([
       'summary',
       'memory.1',
-      'f1',
-      'r1',
       'f2',
       'r2',
     ]);
     expect(experienceDigestOutput.schema.safeParse(digest).success).toBe(true);
+  });
+
+  it('[QL-4] a location is a place — the summary, a memory, an unused slot — never a memory’s citation', () => {
+    // Two memories arguing from different evidence share no location, so the
+    // normaliser cannot chain a finding on one to a finding on the other
+    // through a citation, and admission excludes only the memory a finding
+    // is located at.
+    const digest = sampleDigest({
+      memories: [
+        ...sampleDigest().memories,
+        {
+          evidence: ['f2'],
+          insight: 'Name the fix for a contradiction or escalate it.',
+          appliesWhen: 'a critic finds two parts that cannot both hold',
+        },
+      ],
+      unused: ['r2'],
+    });
+    const ids = experienceDigestOutput.locate(digest).map((location) => location.id);
+    expect(ids).toEqual(['summary', 'memory.1', 'memory.2', 'r2']);
+    for (const memory of digest.memories) {
+      for (const alias of memory.evidence) expect(ids).not.toContain(alias);
+    }
   });
 
   it('[QL-6] the digest a model answers with contains no number', () => {
