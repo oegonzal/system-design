@@ -1200,6 +1200,67 @@ experiment exists to answer.
 
 ---
 
+### 12.6 Admission was excluding memories a chained finding merely touched
+
+The last live run made it visible: a digest scored 95, ended `revise` on one
+gated `misattributed_evidence` finding spanning thirteen refs, and stored 1 of
+its 8 memories. The controller was right — iteration 2 had fixed three
+misattributions and one remained, both samples of the provenance critic agreed
+on it, and the gate exists for exactly that. What was wrong was the shape of
+the evidence the controller was handed.
+
+- `experienceDigestOutput.locate` listed every memory's cited alias (`f5`,
+  `r10` …) as a location, "evidence of memory.N". Critic refs are enum-locked
+  to locations, and the personas said "cite the memory and the aliases
+  involved", so every raw finding carried a memory plus the aliases it argued
+  from.
+- `normalize.ts#defectsOf` groups a type's findings by _overlapping_ refs, as
+  connected components (§12.4). Two different defects — memory.8
+  over-crediting `r10`, memory.4 restating the rule `f2` flagged — both cited
+  `f5`, so they chained into one 13-ref "defect". A `missed_signal` finding
+  chained the same way across memory.1/2/3/5/8.
+- `memoriesToStore` excludes every memory a confirmed finding names. The two
+  blobs plus a duplicate pair named seven of the eight.
+
+Measured over all 50 recorded digests: admission was ~59% of proposed
+memories before the overlap rule and ~42% after it, every one of the 12
+digests carrying a finding with eight or more refs postdates it, and
+`missed_signal` — a gap in the digest, not a fault of any memory — names
+memories in 9 of the 22 later runs.
+
+**The fix is in the pipeline folder, not in core** (`227f8f6`). A location
+is a _place_ in the digest: the summary, each memory, each unused slot. A
+memory's citations are its content. The enum lock then makes the rule
+deterministic — a critic can only locate a finding at a memory, an unused
+slot or the summary — and the personas say where a defect is: at the one
+memory it faults, one memory per finding; a signal left unused at its unused
+alias; a duplicate at the later memory of the pair, so the lesson is kept
+once. The aliases go in the rationale, which the producer still reads. The
+overlap rule is untouched: it is right for artifacts whose locations are
+parts, and the digest had declared citations as parts.
+
+What it cost: a finding's key no longer follows an alias across a revision
+that renumbers memories, so `lessons` on a two-iteration digest are coarser.
+What it did not touch: the gate on `misattributed_evidence` (the revise
+iteration measurably fixes citations), and the 18-ref `leaky_generality`
+finding the same chaining produced on the agentic-design target — a core
+question that needs its own replay before the rule moves.
+
+Like-for-like, same intake-normaliser target digested again after the change:
+`POST /orchestrations/memory/from-run` on `2026-09-09T03-25-22-528-2b92d4`
+(orchestration `80ad4603`) kept **5 of 8** where the run before the change
+kept 1 of 8. The largest confirmed finding fell from 13 refs to 6. In
+iteration 1 every `misattributed_evidence` finding was located at exactly
+one memory (`memory.4`, `memory.6`, `memory.7`) and the record's `reason`
+reads `misattributed_evidence|memory.6, …` instead of a 17-alias key. The
+remaining width is honest to name: in iteration 2 a `missed_signal` still
+named `memory.1` and `memory.8` beside the unused aliases `r11, r12, r14`
+and the summary, so two memories were excluded for a gap the digest as a
+whole had. Unused slots are places and can still chain; the persona asks
+for the alias alone, and one of four samples did not comply. Admission is a
+per-memory rule again, and what is left is a persona compliance question,
+not a grouping one.
+
 ## 13. The controller is a declared strategy
 
 `decide(ledger, policy)` was always the doctrine's controller — one pure
@@ -1253,3 +1314,32 @@ rules (`plateauAfter`, `maxIterations`, strict-better best) stay in `runLoop`,
 since `decide` sees one ledger; there is no rules DSL in policy JSON and no
 Nest token, because the controller is pure domain code whose composition root
 is the definition.
+
+**What the replay showed** (every complete run on the dev database, current
+policy):
+
+| pipeline            | runs | iterations | `standard` ≠ `dimension-floor` | lowest dimension among `standard` accepts |
+| ------------------- | ---- | ---------- | ------------------------------ | ----------------------------------------- |
+| `agentic-design`    | 39   | 39         | 0                              | soundness 85.7; the other three at 100    |
+| `memory-recall`     | 76   | 95         | 1                              | coverage 40.9, precision 75, fidelity 80  |
+| `experience-digest` | 77   | 134        | 0                              | attribution 85.7, reuse 86.3              |
+
+The one disagreement is a recall pack the standard order accepted at 75.5
+with coverage at 40.9; the floor holds it for a revise with ten remediations
+in hand. At 50 the floor is quiet everywhere else — it changes nothing on the
+two pipelines that declare `standard`, and one decision in 95 on the one that
+runs it. The `recorded` column matched `standard` on every iteration decided
+since the policy change of 2026-09-07 (three earlier ledgers replay under a
+policy they were not judged by), which is the move-verbatim guarantee checked
+on real evidence rather than on fixtures.
+
+**The live half.** The first recall to run under `dimension-floor`
+(`2026-09-09T04-28-14-876-293eda`, inside orchestration `5d6c74c0`) carries
+the step in its trace in the declared position, recorded `skipped`: the
+evidence gate settled first, because one of the coverage evaluator's two
+samples came back `schema-miss` and eleven of twelve criteria went
+unassessed. That is the known no-retry-on-schema-miss weakness of the
+subscription client, not the floor, and it escalated the pack exactly as
+`standard` would have. The plumbing is proven — `GET /pipelines`, the dump's
+`03-pipeline.json` and the trace all name `dimension-floor` — and the floor's
+first real verdict waits for a recall whose evidence clears the gate.
