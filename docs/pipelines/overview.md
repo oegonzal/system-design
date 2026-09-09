@@ -342,12 +342,12 @@ Notes, not fixes. None affects behaviour.
 [`../pipeline-best-practices/overview.md`](../pipeline-best-practices/overview.md)
 over any task declared as data. Three such tasks now exist as sibling folders
 under `src/pipelines/` — `system-design`, `memory-recall` and
-`experience-digest` — and a fourth endpoint, `POST /memory-runs`, composes them
+`experience-digest` — and an orchestrator, `POST /orchestrations/memory`, composes them
 so a run can recall what earlier runs learned and digest what it learned itself.
 It shares `@sysdesign/llm` (its own role: `QUALITY_LOOP_DETERMINISTIC` /
 `QUALITY_LOOP_AUTH`) and `@sysdesign/run-dump` (kind `quality`) with the five
 pipelines above and touches none of them. It has its own Postgres tables
-(`quality_run` and its children, plus `memory_run` and `memory_embedding`) and
+(`quality_run` and its children, plus `orchestration_run`, its children and `memory_embedding`) and
 its own vector store (Qdrant, the `vectors` compose service); the dump remains
 the full audit trail beside them.
 

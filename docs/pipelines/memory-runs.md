@@ -1,4 +1,4 @@
-# Memory runs: four pipelines behind one endpoint, and what the recent runs showed
+# Memory runs: an orchestrator over four pipelines, and what the recent runs showed
 
 How the quality loop learned to read its own past. The step semantics, the
 closed reason vocabulary, the dump layout and the guarantees are owned by
@@ -10,18 +10,17 @@ runs actually showed. For the five pipelines the rest of the app runs, see
 
 Two facts organise everything below:
 
-1. **The engine never changed.** `core/` has not been edited for any of this.
-   The composition is a module beside the pipelines (`src/modules/memory/`),
-   and what the two memory pipelines have gained since — a probe list in the
-   recall query, an alias space for it, a gated `run_specific` — lives inside
-   their own folders, which is exactly what being an instance of
-   `PipelineDefinition` is for. The edits to existing code elsewhere number
-   five: exporting `RunsService` and `QUALITY_LOOP_LLM` from `RunsModule`, one
-   optional callback on `RunsService.execute`, a module import, and
-   `enableShutdownHooks()`. That is why the composition cost six _endpoints_
-   and no new pipeline. A fourth was registered later — `agentic-design`, §1.1
-   — for a reason that has nothing to do with memory: a second judging domain.
-   It, too, left `core/` untouched.
+1. **The engine never changed.** `core/` gained one file for all of this —
+   `outputs.ts`, the standard view of what a run produced — and no edit. The
+   composition is an _orchestrator_: data under `src/orchestrators/memory/`
+   that maps three registered pipelines together, executed by one generic
+   runner beside it (§4), exactly as a pipeline is data under `src/pipelines/`
+   executed by the engine. What the two memory pipelines have gained since — a
+   probe list in the recall query, an alias space for it, a gated
+   `run_specific` — lives inside their own folders, which is what being an
+   instance of `PipelineDefinition` is for. A fourth pipeline was registered
+   later — `agentic-design`, §1.1 — for a reason that has nothing to do with
+   memory: a second judging domain.
 2. **The producer only ever sees the goal.** `core/stages/llm-producer.ts`
    assembles `# Goal` and `# Success criteria` and nothing else. Every design
    decision below follows from that one fact: the input codecs, the advisory
@@ -61,7 +60,7 @@ memory holds only for this run's names still scores 0.4 × 100 + 0.3 × 100 +
 reader loses little to either; a lesson that cannot leave its own run is the
 one failure a later prompt cannot recover from.
 
-`system-design` is only the default target. `POST /memory-runs` takes a
+`system-design` is only the default target. `POST /orchestrations/memory` takes a
 `pipeline` like `POST /runs` does, and the module refuses only the two memory
 roles as targets. The digest is target-agnostic by construction: `fromRun`
 reads `contract.criteria`, the iteration ledgers, `selectedRemediations` and
@@ -190,8 +189,8 @@ hypothesis.
 ## 2. The shape of a memory run
 
 ```
-POST /memory-runs ──► MemoryService.open ──► memory_run row ──► 202 { memoryRunId }
-{pipeline, goal,             │                                    (poll GET /memory-runs/:id)
+POST /orchestrations/memory ──► open ──► orchestration_run row ──► 202 { orchestrationRunId }
+{pipeline, goal,             │                                    (poll GET /orchestrations/:id)
  output?, maxIterations?}    │
                              │  1 recall   goal head ──► probes ──► 1 + up to 6 texts
                              │                │                            │
@@ -214,7 +213,7 @@ POST /memory-runs ──► MemoryService.open ──► memory_run row ──�
                              │                └──► Qdrant upsert, one point per memory,
                              │                     carrying a condition and a lesson vector
                              │
-                             └──► each step's status, reason, counts and child run id ──► memory_run.steps
+                             └──► each step's status, reason, counts and child run id ──► orchestration_run.steps
 ```
 
 Each of the three children is an **ordinary quality run**: its own
@@ -231,9 +230,11 @@ output is never trusted, only used to decide which candidates get offered to
 the pipeline that does the judging — but it does mean a memory run costs one
 more exchange than its three children account for.
 
-Recall is advisory: no outcome of step 1 stops step 2. The target is the
-deliverable; its failure ends the run and skips steps 3 and 4 with
-`target-failed`.
+Recall is advisory: `target` declares no `needs`, so no outcome of step 1
+stops step 2. The target is the deliverable: `digest` needs it and `store`
+needs the digest, so a target that fails skips both — `upstream-failed`, the
+note naming `target` — and its error is the run's. That cascade is the
+runner's, computed from the declaration; no step spells it out.
 
 ---
 
@@ -290,92 +291,153 @@ record. Standing rules that are not in any goal became finding types instead
 
 ---
 
-## 4. The composing module
+## 4. The orchestrator, the runner, and the record
 
-`packages/quality-loop/src/modules/memory/`. Six routes, hand-built
-envelopes, inline `ZodValidationPipe`, the same conventions as
-`runs.controller.ts`.
+Three things, in three places, each the smallest it can be.
 
-| Verb   | Path                            | Code | Body / query                  | Answers                                 |
-| ------ | ------------------------------- | ---- | ----------------------------- | --------------------------------------- |
-| `POST` | `/memory-runs`                  | 202  | the shared `runRequestSchema` | `{ data: { memoryRunId, status } }`     |
-| `POST` | `/memory-runs/digest`           | 202  | `{ runId }`                   | the same                                |
-| `POST` | `/memory-runs/:id/reindex`      | 200  | —                             | `{ data: MemoryStepDto }`               |
-| `POST` | `/memory-runs/retrieval-report` | 200  | `{ goal }`, up to 64,000 B    | `{ data: RetrievalReportDto }`          |
-| `GET`  | `/memory-runs`                  | 200  | the shared list query         | `{ data, meta }`, newest first          |
-| `GET`  | `/memory-runs/:id`              | 200  | —                             | `{ data: MemoryRunDto }`, 404 otherwise |
+**The orchestrator is data.** `src/orchestrators/memory/definition.ts` reads
+as the map it is:
 
-The body of a memory run is **exactly** the body of a quality run. `output`
-and `maxIterations` reach the target only; recall and digest run on their own
-policy loop, which the DTO comment states.
+```ts
+steps: [
+  {
+    id: 'recall',
+    pipeline: 'memory-recall',
+    run: recall,
+    provided: () => ({ status: 'skipped', reason: 'provided-run' }),
+  },
+  {
+    id: 'target',
+    pipeline: (r) => r.pipeline,
+    run: target,
+    provided: (run) => ({
+      status: 'skipped',
+      reason: 'provided-run',
+      runId: run.runId,
+      output: run,
+    }),
+  },
+  { id: 'digest', pipeline: 'experience-digest', run: digest, needs: ['target'] },
+  { id: 'store', run: store, needs: ['digest'] },
+];
+```
 
-The last two are the odd ones out and are the only synchronous routes: they
-run **no pipeline at all**, so they take neither `output` nor `maxIterations`
-and answer 200 rather than 202. `reindex` re-embeds a memory run's lessons
-from the digest artifact it already produced, which is what makes a generation
-bump survivable (§6). `retrieval-report` answers what a recall _would_ retrieve
-for a goal — the probes derived, each probe's own ranking, and the fused list —
-without running one, so a corpus can be swept cheaply.
+plus the reasons its steps may give (`MEMORY_STEP_REASONS`, closed), what it
+records at open (`context`: the embedding and store availability), a
+`normalize` that takes the goal bare, and a `refuse` that turns a memory
+pipeline named as the target into a 400. `steps.ts` beside it holds the four
+adapters — today's step functions with the ledger, the cascade and the child
+ids taken out of them. `validateOrchestrator` checks the structure at boot:
+unique ids, `needs` naming earlier steps, no runner reason redeclared. Whether
+a declared pipeline is registered is deliberately _not_ a boot failure — it is
+a deployment fact, and a step whose pipeline is missing is skipped
+`pipeline-unavailable` at run time rather than keeping the whole service from
+starting.
 
-Guards, before any row exists: a pipeline not in `RunsService.list()` is a 404,
-the same as `POST /runs`; either memory role as the target is a 400
-(`memory.service.ts:233-240`); an unknown source run for a digest is a 404
-(`:124`); an id that is not a uuid answers 404 rather than raising a database
-error (`:105-107`). The two new routes add four more: an unknown memory run is
-a 404, a memory run that digested nothing is a 400, a child run that is no
-longer stored is a 404, and embeddings being off or unavailable is a 400.
+**The runner is generic.** `src/orchestrators/run-orchestration.ts` executes
+any such map: it seeds the ledger from the declared ids, runs the steps in
+order, skips a step whose need yielded nothing (`upstream-failed` or
+`upstream-skipped`, the note naming the step that blocked), hands each step a
+context — the request, what earlier steps produced, the ports, an `execute`
+that runs the step's declared pipeline and records the child id as soon as it
+opens — refuses a reason the orchestrator did not declare, and closes the
+record on an error nobody expected. It knows no step by name. A provided run
+(`/from-run`) is handled by the steps that declare a stand-in: their result is
+written at open and their output seeded before anything runs.
 
-**The record.** `memory_run` (uuid primary key) holds the target pipeline, the
-status, the bare request summary, the embedding and store availability the run
-saw at open, the step ledger as jsonb, and three nullable references to
-`quality_run` with `on delete set null`. `memory_embedding` beside it is the
-cache. Both come from one migration.
+Every step reads a child run through one view, `core/outputs.ts`:
+`outputsOf(trace)` names the crowned iteration, its artifact, ledger,
+findings, criteria, decision, remediations and lessons once, and `admits`
+lives beside it. Nothing outside the engine re-derives "the best iteration".
 
-**The ledger.** `StepLedger` (`steps.ts:80`) mutates the record in memory and
-chains every flush onto one serial promise, so writes land in order and a
-failed flush is logged rather than thrown — the record in memory is the truth
-and `close()` writes it whole. Writes after `open` are guarded by `status:
-'running'`, so a late flush never resurrects a row the boot sweep already
-failed.
+**The record is one shape for every orchestrator.** `OrchestrationRunDto`:
+the orchestrator, the target pipeline the request named, the bare request
+summary, `context` as the orchestrator declared it, the step ledger under the
+declared ids, and the error. In Postgres, `orchestration_run` (uuid) plus one
+`orchestration_run_child` row per step that ran a pipeline — `on delete set
+null` toward `quality_run`, so a deleted child never takes the record with it.
+The migration that introduced them carried every `memory_run` across as
+orchestrator `memory`, with the two availability snapshots folded into
+`context` and the three fixed child columns unrolled into child rows — 76 runs
+and 225 children on the dev database — then dropped `memory_run`. jsonb keeps
+no key order, so the service returns steps in declared order: the declaration
+is the source of it.
 
-**The sweep.** `MemoryService.onModuleInit` fails every row still `running`
-from a dead process, closing its steps through the same `closeSteps` the error
-path uses, then verifies the store and logs what it found.
+**The routes.** `src/modules/orchestration/` serves the generic surface;
+`src/modules/memory/` keeps the adapters — embeddings, the vector store, the
+query probes — binds them into the memory orchestrator's ports for the
+orchestration module (which never imports Qdrant), and serves the two tools
+that need them without a run.
+
+| Verb   | Path                                     | Code | Body / query                                      | Answers                                        |
+| ------ | ---------------------------------------- | ---- | ------------------------------------------------- | ---------------------------------------------- |
+| `POST` | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                     | `{ data: { orchestrationRunId, status } }`     |
+| `POST` | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                       | the same; steps with a stand-in are provided   |
+| `GET`  | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging | `{ data, meta }`, newest first                 |
+| `GET`  | `/orchestrations/:id`                    | 200  | —                                                 | `{ data: OrchestrationRunDto }`, 404 otherwise |
+| `POST` | `/memory/:id/reindex`                    | 200  | —                                                 | `{ data: OrchestrationStepDto }`               |
+| `POST` | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                        | `{ data: RetrievalReportDto }`                 |
+
+`/memory-runs` is retired, not aliased. The body of a memory orchestration is
+**exactly** the body of a quality run; `output` and `maxIterations` reach the
+target only. The two `/memory` routes run **no pipeline at all**: `reindex`
+re-embeds a memory run's lessons from the digest artifact it already produced,
+which is what makes a generation bump survivable (§6); `retrieval-report`
+answers what a recall _would_ retrieve for a goal without running one.
+
+Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
+not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the
+orchestrator's `refuse` names is a 400 — for memory, either memory role as the
+target; an unknown source run for `/from-run` is a 404; an id that is not a
+uuid answers 404 rather than raising a database error. `reindex` adds three
+more: a memory run that digested nothing is a 400, a child run no longer
+stored is a 404, embeddings being off is a 400.
+
+**The ledger and the sweep.** `StepLedger` (in the runner) mutates the record
+in memory and chains every flush onto one serial promise, so writes land in
+order and a failed flush is logged rather than thrown — the record in memory
+is the truth and `close()` writes it whole. Writes after `open` are guarded by
+`status: 'running'`, so a late flush never resurrects a row the boot sweep
+already failed. `OrchestrationService.onModuleInit` fails every row still
+`running` from a dead process through the same `closeSteps` the error path
+uses; the memory module's own boot hook only verifies the store and logs.
 
 ---
 
 ## 5. Every closed reason, and what it means
 
-`MEMORY_STEP_REASONS` (in contracts) is closed at sixteen values, so a client
-maps a tone rather than parsing prose. A step is `pending`, `running`,
-`complete`, `skipped` or `failed`; `complete` with a reason means the step ran
-and had no effect. This is the whole failure map.
+Two closed vocabularies, so a client maps a tone rather than parsing prose.
+The runner's seven (`ORCHESTRATION_REASONS`) belong to every orchestrator; the
+memory orchestrator declares nine more (`MEMORY_STEP_REASONS`), and a step
+that gives any other reason is failed `errored` on the spot. A step is
+`pending`, `running`, `complete`, `skipped` or `failed`; `complete` with a
+reason means the step ran and had no effect.
 
-| Reason                 | Raised when                                                                      | What to do                                                          |
-| ---------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `embeddings-disabled`  | recall, digest, store — no `OPENAI_API_KEY`, or the loop is pinned deterministic | put the key in `.env`; the target still ran                         |
-| `store-unavailable`    | recall, store — `verify()` said not ready, or a call threw                       | `pnpm stack:db`; the row's `store.note` carries the cause           |
-| `store-empty`          | recall — the collection holds nothing, or the fused list came back empty         | seed past runs, or re-index them if the generation moved (§6)       |
-| `embedding-failed`     | recall, store — the provider returned nothing after one retry                    | check the `llm: embeddings request failed` line for status and body |
-| `pipeline-unavailable` | recall, digest — the role's id is not registered                                 | the registry lost an entry, or a spec overrode it                   |
-| `run-failed`           | any step whose child run ended `failed`                                          | read the child at `GET /runs/:id`; `note` carries its message       |
-| `not-accepted`         | recall, digest — `admits()` said no: a gate failed, or the score missed the bar  | read the child; the name predates the rule and now means unadmitted |
-| `no-usable-memory`     | recall — admitted, but nothing survived: no kept chunk, or a finding names each  | the pack faulted itself; better memory has to be stored first       |
-| `goal-at-budget`       | recall — the goal alone already fills the 64,000-byte budget                     | shorten the prompt if memory matters more than its tail             |
-| `provided-run`         | recall, target of a digest-only run                                              | expected; the target already happened                               |
-| `target-failed`        | digest, store — the target run failed                                            | fix the target, then `POST /memory-runs/digest` for the other half  |
-| `nothing-to-digest`    | digest, store — the source run has no trace                                      | it never produced one; nothing to learn                             |
-| `digest-failed`        | store — the digest run failed                                                    | as `run-failed`                                                     |
-| `no-memories`          | digest, store — admitted, but a finding names every memory                       | the digest faulted its own proposals                                |
-| `interrupted`          | any step, at boot — the process died mid-run                                     | re-run; completed children are still persisted                      |
-| `errored`              | any step — an unexpected throw closed the run                                    | `note` carries the message; this one is a bug                       |
+| Reason                 | Whose  | Raised when                                                                     | What to do                                                                         |
+| ---------------------- | ------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `upstream-failed`      | runner | a step this one `needs` failed; `note` names it                                 | fix the named step; for memory, a failed target ends the run                       |
+| `upstream-skipped`     | runner | a step this one `needs` yielded nothing — skipped, or complete with a reason    | read the named step's own reason; `store` after a `not-accepted` digest reads this |
+| `run-failed`           | runner | the step's child run ended `failed`                                             | read the child at `GET /runs/:id`; `note` carries its message                      |
+| `pipeline-unavailable` | runner | the step's declared pipeline is not registered                                  | the registry lost an entry, or a spec overrode it                                  |
+| `provided-run`         | runner | a `/from-run` start; the step's stand-in was written at open                    | expected; the run already happened                                                 |
+| `interrupted`          | runner | at boot — the process died mid-run                                              | re-run; completed children are still persisted                                     |
+| `errored`              | runner | an unexpected throw closed the run, or a step gave an undeclared reason         | `note` carries the message; this one is a bug                                      |
+| `embeddings-disabled`  | memory | recall, digest — no `OPENAI_API_KEY`, or the loop is pinned deterministic       | put the key in `.env`; the target still ran                                        |
+| `store-unavailable`    | memory | recall, store — `verify()` said not ready, or a call threw                      | `pnpm stack:db`; `context.store.note` carries the cause                            |
+| `store-empty`          | memory | recall — the collection holds nothing, or the fused list came back empty        | seed past runs, or re-index them if the generation moved (§6)                      |
+| `embedding-failed`     | memory | recall, store — the provider returned nothing after one retry                   | check the `llm: embeddings request failed` line for status and body                |
+| `not-accepted`         | memory | recall, digest — `admits()` said no: a gate failed, or the score missed the bar | read the child; the name predates the rule and now means unadmitted                |
+| `no-usable-memory`     | memory | recall — admitted, but nothing survived: no kept chunk, or a finding names each | the pack faulted itself; better memory has to be stored first                      |
+| `goal-at-budget`       | memory | recall — the goal alone already fills the 64,000-byte budget                    | shorten the prompt if memory matters more than its tail                            |
+| `nothing-to-digest`    | memory | digest — the source run has no trace                                            | it never produced one; nothing to learn                                            |
+| `no-memories`          | memory | digest — admitted, but a finding names every memory                             | the digest faulted its own proposals                                               |
 
 Two shapes are worth naming. **`skipped` is not failure** — the whole memory
-half is optional, and a run whose four steps read `embeddings-disabled` still
-produced its answer.
+half is optional, and a run whose memory steps read `embeddings-disabled` and
+`upstream-skipped` still produced its answer.
 
 And **`not-accepted` no longer means what its name says.** The rule it reports
-is `admits()` (`compose.ts:99-115`), and an `accept` is only one of the ways
+is `admits()` (`core/outputs.ts`), and an `accept` is only one of the ways
 past it. A run is drawn on when its best iteration cleared `artifactPresent`,
 `validatorsPassed` and `evidenceSufficient` and scored at or above that
 pipeline's own `acceptAt`. `policyAllowed` is deliberately **not** required,
@@ -385,8 +447,8 @@ case that forced this is in §8: a digest scored 94 with one open finding
 against its _summary_, which is never stored, and eight clean memories were
 thrown away with it. Item-level judgement is honoured; a whole run is no longer
 withheld because the iteration budget ran out before someone else's blocker
-closed. The reason keeps its name because the vocabulary is closed at sixteen
-values and renaming one would break every client that maps it.
+closed. The reason keeps its name because the vocabulary is closed and
+renaming one would break every client that maps it.
 
 ---
 
@@ -412,7 +474,7 @@ so the module never imports the client directly:
   is **re-indexing, not re-digesting**. Re-digesting asks a model to derive the
   lessons afresh, and `replaceRunChunks` deletes a run's chunks before it
   writes, so a replay that answers differently destroys exactly what it was
-  meant to migrate. `POST /memory-runs/:id/reindex` re-embeds the digest
+  meant to migrate. `POST /memory/:id/reindex` re-embeds the digest
   artifact that is already stored, which is deterministic.
 - **Two named vectors per point**, `condition` and `lesson`. A stored memory
   is two halves the digest already separates: `appliesWhen`, a situation, and
@@ -510,25 +572,25 @@ pnpm stack:down                                  # both, data stays in the named
 env DB_PORT=5433 QUALITY_LOOP_AUTH=claude-code \
   node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 
-# a memory run: the same body as POST /runs
-curl -s -X POST localhost:3003/memory-runs -H 'content-type: application/json' \
-  -d '{"pipeline":"system-design","goal":"# Prompt …","maxIterations":1}'   # 202 { memoryRunId }
-curl -s localhost:3003/memory-runs/<memoryRunId>       # poll; the ledger updates live
-curl -s 'localhost:3003/memory-runs?limit=10'          # newest first, with meta
+# a memory run: the memory orchestrator, with the same body as POST /runs
+curl -s -X POST localhost:3003/orchestrations/memory -H 'content-type: application/json' \
+  -d '{"pipeline":"system-design","goal":"# Prompt …","maxIterations":1}'   # 202 { orchestrationRunId }
+curl -s localhost:3003/orchestrations/<orchestrationRunId>        # poll; the ledger updates live
+curl -s 'localhost:3003/orchestrations?orchestrator=memory&limit=10'   # newest first, with meta
 
 # seed memory from runs that already happened, one call each
 curl -s "localhost:3003/runs?pipeline=system-design" | jq -r '.data[].runId' | while read -r id; do
-  curl -s -X POST localhost:3003/memory-runs/digest -H 'content-type: application/json' \
+  curl -s -X POST localhost:3003/orchestrations/memory/from-run -H 'content-type: application/json' \
     -d "{\"runId\":\"$id\"}"
 done
 
 # after a generation bump: re-embed what a memory run already digested.
 # never re-digest for this — a replay deletes before it writes.
-curl -s -X POST localhost:3003/memory-runs/<memoryRunId>/reindex   # 200 { chunks, embedded }
+curl -s -X POST localhost:3003/memory/<orchestrationRunId>/reindex   # 200 { chunks, embedded }
 
 # what a recall would retrieve for a goal, without running one:
 # every probe, its own ranking, and the fused list. the calibration tool.
-curl -s -X POST localhost:3003/memory-runs/retrieval-report -H 'content-type: application/json' \
+curl -s -X POST localhost:3003/memory/retrieval-report -H 'content-type: application/json' \
   -d '{"goal":"# Prompt …"}'
 
 # what the store holds
