@@ -4,6 +4,7 @@
  * data — vocabularies, md personas, samples and the policy — except the pack's
  * `OutputShape`, the input codec beside it and two exact validators.
  */
+import { DIMENSION_FLOOR } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { MEMORY_RECALL_ID } from './input';
 import criticGrounding from './lenses/critic.grounding.md?raw';
@@ -47,6 +48,10 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
   deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
   producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
+  // The floor, not the standard order: a pack accepted at 80.6 with coverage
+  // at 59.1 is the case it exists for, and this is the pipeline that runs it
+  // live against `standard` on the other three.
+  controller: DIMENSION_FLOOR,
 
   critics: [
     {

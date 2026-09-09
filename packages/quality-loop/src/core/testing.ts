@@ -5,6 +5,8 @@
  * about system design.
  */
 import type {
+  ConfirmedFinding,
+  CriterionEvidence,
   CriticReport,
   DecisionPolicy,
   EvaluationReport,
@@ -18,6 +20,7 @@ import type {
 import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
 import { z } from 'zod';
 
+import { STANDARD } from './controllers';
 import type { PipelineDefinition } from './pipeline';
 import type { Critic, Evaluator, Producer } from './ports';
 
@@ -124,6 +127,7 @@ export function tinyPipeline(
     deriveCriteria: { persona: 'You extract requirements.', maxTokens: 500 },
     producer: { persona: 'You write two-field artifacts.', maxTokens: 500, consumes: ['criteria'] },
     validators: [],
+    controller: STANDARD,
     critics: [
       {
         id: 'critic.tiny',
@@ -249,7 +253,33 @@ export const scriptedEvaluator = (
   };
 };
 
-/** A ledger with sensible defaults, for `decide` specs. */
+/** A settled criterion result, for controller specs. */
+export const evidence = (overrides: Partial<CriterionEvidence> = {}): CriterionEvidence => ({
+  criterionId: 'c1',
+  kind: 'must',
+  result: 'pass',
+  hits: 1,
+  confidence: 'high',
+  locationRefs: ['text'],
+  ...overrides,
+});
+
+/** A confirmed finding, for controller specs. */
+export const confirmed = (overrides: Partial<ConfirmedFinding> = {}): ConfirmedFinding => ({
+  key: 'gap|text',
+  type: 'gap',
+  severity: 'medium',
+  confidence: 'high',
+  fixability: 'fixable_local',
+  locationRefs: ['text'],
+  criterionIds: [],
+  hits: 1,
+  lenses: ['critic.tiny'],
+  reconciledTo: null,
+  ...overrides,
+});
+
+/** A ledger with sensible defaults, for controller specs. */
 export const ledger = (overrides: Partial<EvidenceLedger> = {}): EvidenceLedger => ({
   artifactPresent: true,
   validation: [{ validatorId: 'schema', gate: 'block', problems: [] }],

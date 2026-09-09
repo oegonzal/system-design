@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RunRecord } from '../core/contracts';
+import { STANDARD } from '../core/controllers';
 import { describePipeline } from '../core/pipeline';
 import { runLoop } from '../core/run-pipeline';
 import {
@@ -42,6 +43,7 @@ describe('buildRunDump', () => {
         deriveCriteria: () => Promise.resolve({ criteria: [criterion('c1')], diagnostic: null }),
         producer: scriptedProducer([{ text: 't', parts: [] }]),
         validators: [],
+        controller: STANDARD,
         critics: [scriptedCritic('critic.tiny', [[[finding({ criterionIds: ['c1'] })]]])],
         evaluators: [
           scriptedEvaluator('evaluator.tiny', [

@@ -78,12 +78,40 @@ describe('validatePipeline', () => {
     ).toThrow(/unknown briefing/);
   });
 
+  it('[QL-1] refuses a controller that consults nothing, a factor twice, or the engine’s factor', () => {
+    const base = tinyPipeline();
+    const withSteps = (steps: { factor: string }[]) =>
+      tinyPipeline({
+        controller: { ...base.controller, summary: { id: 'hand-written', steps } },
+      });
+    expect(() => validatePipeline(asAny(withSteps([])))).toThrow(/consults no factor/);
+    expect(() =>
+      validatePipeline(asAny(withSteps([{ factor: 'one' }, { factor: 'one' }]))),
+    ).toThrow(/consults a factor twice/);
+    expect(() => validatePipeline(asAny(withSteps([{ factor: 'scores' }])))).toThrow(
+      /engine's factor/,
+    );
+    expect(() =>
+      validatePipeline(asAny(withSteps([{ factor: 'artifact' }, { factor: 'route' }]))),
+    ).not.toThrow();
+  });
+
   it('[QL-1] describes a pipeline as plain data that round-trips through JSON, declarations included', () => {
     const summary = describePipeline(asAny(tinyPipeline()));
     expect(JSON.parse(JSON.stringify(summary))).toEqual(summary);
     expect(summary.critics.map((lens) => lens.id)).toEqual(['critic.tiny']);
     expect(summary.producer).toEqual({ consumes: ['criteria'] });
     expect(summary.evaluators[0].consumes).toEqual([]);
+    expect(summary.controller.id).toBe('standard');
+    expect(summary.controller.steps.map((step) => step.factor)).toEqual([
+      'artifact',
+      'validators',
+      'evidence',
+      'policy-allowed',
+      'accept-threshold',
+      'reject-floor',
+      'route',
+    ]);
     expect(JSON.stringify(summary)).not.toContain('persona');
   });
 });

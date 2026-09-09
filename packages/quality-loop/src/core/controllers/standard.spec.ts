@@ -1,43 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ConfirmedFinding, CriterionEvidence } from '@sysdesign/contracts';
-import { decide } from './decide';
-import { ledger, tinyPolicy } from './testing';
+import type { ConfirmedFinding, QualityControlDecision } from '@sysdesign/contracts';
+import { confirmed, evidence, ledger, tinyPolicy } from '../testing';
+import { STANDARD } from './index';
 
-const evidence = (overrides: Partial<CriterionEvidence>): CriterionEvidence => ({
-  criterionId: 'c1',
-  kind: 'must',
-  result: 'pass',
-  hits: 1,
-  confidence: 'high',
-  locationRefs: ['text'],
-  ...overrides,
-});
+const decide = STANDARD.decide;
 
-const confirmed = (overrides: Partial<ConfirmedFinding>): ConfirmedFinding => ({
-  key: 'gap|text',
-  type: 'gap',
-  severity: 'medium',
-  confidence: 'high',
-  fixability: 'fixable_local',
-  locationRefs: ['text'],
-  criterionIds: [],
-  hits: 1,
-  lenses: ['critic.tiny'],
-  reconciledTo: null,
-  ...overrides,
-});
-
-const dimensionOf = (decision: ReturnType<typeof decide>, name: string) => {
+const dimensionOf = (decision: QualityControlDecision, name: string) => {
   const trace = decision.trace.dimensions.find((candidate) => candidate.dimension === name);
   if (!trace) throw new Error(`no dimension ${name}`);
   return trace;
 };
 
-const steps = (decision: ReturnType<typeof decide>) =>
+const steps = (decision: QualityControlDecision) =>
   decision.trace.steps.map((step) => `${step.factor}:${step.outcome}`);
 
-describe('decide', () => {
+describe('the standard controller', () => {
+  it('[QL-8] consults the doctrine’s factors in the doctrine’s order, and says so', () => {
+    expect(STANDARD.summary).toEqual({
+      id: 'standard',
+      steps: [
+        { factor: 'artifact' },
+        { factor: 'validators' },
+        { factor: 'evidence' },
+        { factor: 'policy-allowed' },
+        { factor: 'accept-threshold' },
+        { factor: 'reject-floor' },
+        { factor: 'route' },
+      ],
+    });
+  });
+
   it('[QL-6] prices criteria and findings from the policy alone, renormalising unassessed dimensions out', () => {
     const decision = decide(
       ledger({

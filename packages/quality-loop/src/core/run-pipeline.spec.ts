@@ -10,6 +10,8 @@ import type {
   Stages,
   UpstreamEvidenceBundle,
 } from './ports';
+import { composeController, STANDARD } from './controllers';
+import { describePipeline } from './pipeline';
 import { runLoop, runPipeline } from './run-pipeline';
 import {
   criterion,
@@ -20,6 +22,7 @@ import {
   scriptedEvaluator,
   scriptedProducer,
   tinyPipeline,
+  tinyPolicy,
   type TinyOutput,
 } from './testing';
 
@@ -59,6 +62,7 @@ function stages(overrides: Partial<Stages<TinyOutput>> = {}): Stages<TinyOutput>
         [[result({ criterionId: 'c1' }), result({ criterionId: 'c2' })]],
       ]),
     ],
+    controller: STANDARD,
     ...overrides,
   };
 }
@@ -313,5 +317,35 @@ describe('runPipeline', () => {
     expect(exchanges.every((exchange) => exchange.outcome === 'ok')).toBe(true);
     expect(trace.iterations[0].ledger.criteria.map((c) => c.result)).toEqual(['pass', 'pass']);
     expect(trace.finalDecision).toBe('accept');
+  });
+});
+
+describe('the controller port', () => {
+  it('[QL-8] the loop consults the controller the definition declares, whatever it decides', async () => {
+    const alwaysRevise = composeController('always-revise', {
+      gates: [],
+      route: { factor: 'scripted', settle: () => ({ decision: 'revise', reason: 'scripted' }) },
+    });
+    const definition = tinyPipeline({
+      controller: alwaysRevise,
+      policy: { ...tinyPolicy(), loop: { maxIterations: 2, plateauAfter: 5, concurrency: 2 } },
+    });
+    const trace = await runLoop(
+      stages({ controller: alwaysRevise }),
+      definition,
+      { goal: 'goal' },
+      clock,
+    );
+    expect(trace.iterations.map((iteration) => iteration.decision.finalDecision)).toEqual([
+      'revise',
+      'revise',
+    ]);
+    expect(trace.iterations[0].decision.reason).toBe('scripted');
+    expect(trace.iterations[0].decision.trace.steps.map((step) => step.factor)).toEqual([
+      'scores',
+      'scripted',
+    ]);
+    expect(trace.stopReason).toBe('max-iterations');
+    expect(describePipeline(definition as never).controller.id).toBe('always-revise');
   });
 });

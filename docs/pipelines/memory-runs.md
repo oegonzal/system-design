@@ -595,6 +595,11 @@ curl -s -X POST localhost:3003/memory/retrieval-report -H 'content-type: applica
 
 # what the store holds
 curl -s localhost:6333/collections
+
+# two controllers on the same evidence, no model: every recorded iteration of a
+# pipeline decided again under each strategy in core/controllers (§13)
+env DB_PORT=5433 node --env-file-if-exists=.env packages/quality-loop/dist/main.js \
+  replay --pipeline memory-recall --limit 100
 ```
 
 A healthy run and a degraded one differ only in the ledger. Reading one:
@@ -1192,3 +1197,59 @@ store built by one judge, on behalf of a brief from another domain, and
 correctly concluded that none of it earned a place in the prompt. Whether that
 stays true as agentic runs contribute their own lessons is the question the next
 experiment exists to answer.
+
+---
+
+## 13. The controller is a declared strategy
+
+`decide(ledger, policy)` was always the doctrine's controller — one pure
+function of ids, enums and counts, no clock, no prose — but it was not a port:
+`runLoop` imported it directly and `Stages` had no slot for it, so no pipeline
+could choose a different decision strategy and no two strategies could be
+compared on the same evidence. Now:
+
+- **The port.** `Controller { id; summary; decide(ledger, policy) }` on
+  `core/ports.ts`, a slot on `Stages`, and `runLoop` consults
+  `stages.controller`. The signature is synchronous on purpose: nothing can
+  await a model inside a decision, so "the controller stays deterministic" is
+  held by the type.
+- **The unit of composition is the gate.** Today's controller is a context
+  computed once — scores, the four facts, the named blockers, the remediations
+  — then six gates and a route in a fixed order. `composeController(id,
+{ gates, route })` in `core/controllers/compose.ts` runs any such list:
+  first to settle wins, the rest are recorded `skipped`, the typed route
+  guarantees a decision. A gate is `{ factor, params?, check(ctx) }`; the
+  context is read-only.
+- **The library.** `core/controllers/gates.ts` holds the seven standard parts,
+  moved verbatim with their factor ids, so every recorded trace reads the
+  same. `STANDARD` is their declared order. `DIMENSION_FLOOR` is the same
+  order with `dimensionFloor(50)` before the accept threshold: a weighted
+  overall can clear 75 while one dimension sits at a failing grade — the last
+  recall accepted at 80.6 with coverage at 59.1 — and this gate keeps such an
+  artifact in the loop, routing it as the standard route would and naming the
+  dimension.
+- **Declared per pipeline.** `PipelineDefinition.controller`, beside
+  `validators`, with no default. `memory-recall` declares `DIMENSION_FLOOR`;
+  the other three declare `STANDARD`. A pipeline with a rule of its own keeps
+  the gate in its folder and composes it there. `GET /pipelines` and the
+  dump's `03-pipeline.json` carry `controller.steps`, so a record says which
+  controller decided and with what parameters.
+- **Open, closed.** `DecisionStep.factor` is an open string, like criterion
+  kinds and finding types; `Gates` stays a closed four-key record because
+  those are the engine's facts about the evidence, computed the same way
+  under every controller — which is what keeps `admits()` and the web
+  client's gate badges right whatever strategy decided.
+
+**A/B without a model.** A controller is a pure function of the ledger, so
+`main.js replay --pipeline <id>` decides every recorded iteration of a
+pipeline again under each controller in the library and prints where they
+disagree, why, and the lowest each dimension sat among iterations `standard`
+accepted — the number any other floor is read off. The live half of the A/B
+is `memory-recall` itself: its runs now carry the `dimension-floor` step.
+
+What stays where it was, on purpose: scoring and remediation selection are one
+engine function each, fully parameterised by policy already; the loop's stop
+rules (`plateauAfter`, `maxIterations`, strict-better best) stay in `runLoop`,
+since `decide` sees one ledger; there is no rules DSL in policy JSON and no
+Nest token, because the controller is pure domain code whose composition root
+is the definition.

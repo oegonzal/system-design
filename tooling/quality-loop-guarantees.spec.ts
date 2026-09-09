@@ -42,9 +42,13 @@ describe('quality-loop guarantees', () => {
     expect(offenders.map(relative)).toEqual([]);
   });
 
-  it('the policy and the normalizer never read prose, the goal or the advisory verdict', () => {
-    const guarded = files.filter((path) => /\/core\/(decide|normalize)\.ts$/.test(path));
-    expect(guarded).toHaveLength(2);
+  it('the normalizer and every controller never read prose, the goal or the advisory verdict', () => {
+    const guarded = files.filter(
+      (path) =>
+        /\/core\/(normalize|controllers\/[^/]+)\.ts$/.test(path) && !path.endsWith('.spec.ts'),
+    );
+    // the normaliser, then the controller library: context, composer, gates, floor, index
+    expect(guarded).toHaveLength(6);
     const offenders = guarded.filter((path) =>
       /\bgoal\b|rationale|statement|advisoryVerdict|render\(|\.message\b|\.note\b/.test(read(path)),
     );

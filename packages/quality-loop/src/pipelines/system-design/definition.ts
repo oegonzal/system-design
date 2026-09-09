@@ -3,6 +3,7 @@
  * a prompt held in a markdown file. Everything here is data — vocabularies,
  * md personas, samples and the policy — except the answer's `OutputShape`.
  */
+import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import criticRequirements from './lenses/critic.requirements.md?raw';
 import criticScale from './lenses/critic.scale.md?raw';
@@ -67,6 +68,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
   },
 
   validators: [],
+  controller: STANDARD,
 
   critics: [
     {

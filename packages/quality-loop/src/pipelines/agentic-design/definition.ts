@@ -15,6 +15,7 @@
  *    exactly 40, the penalty cap, in every run of a nine-hour experiment. A
  *    dimension that can only lose carries weight without carrying information.
  */
+import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import criticContracts from './lenses/critic.contracts.md?raw';
 import criticGenerality from './lenses/critic.generality.md?raw';
@@ -91,6 +92,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
   },
 
   validators: [],
+  controller: STANDARD,
 
   critics: [
     {

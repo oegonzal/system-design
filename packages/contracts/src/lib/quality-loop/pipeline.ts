@@ -34,6 +34,19 @@ export interface DecisionPolicy {
   loop: { maxIterations: number; plateauAfter: number; concurrency: number };
 }
 
+/** A gate's declared parameters, as data — the numbers a trace's details are measured against. */
+export type ControllerParams = Readonly<Record<string, number | string | boolean>>;
+
+/**
+ * The serialisable projection of a controller: which factors it consults, in
+ * order, with any parameters they were composed with. The pipeline summary
+ * carries it so a dump says which controller decided.
+ */
+export interface ControllerSummary {
+  id: string;
+  steps: { factor: string; params?: ControllerParams }[];
+}
+
 /** The serialisable projection of a pipeline: what `GET /pipelines` returns and the dump stores. */
 export interface PipelineSummary {
   id: string;
@@ -61,6 +74,7 @@ export interface PipelineSummary {
     criterionKinds: string[];
     consumes: string[];
   }[];
+  controller: ControllerSummary;
   policy: DecisionPolicy;
 }
 

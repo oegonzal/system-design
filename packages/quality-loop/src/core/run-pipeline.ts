@@ -20,7 +20,6 @@ import type {
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { TaskContract } from './contracts';
-import { decide } from './decide';
 import { deriveLessons } from './lessons';
 import { materialize } from './materialize';
 import { admitRefs, normalize, sameDefect } from './normalize';
@@ -191,7 +190,7 @@ export async function runLoop<T>(
       },
       policy,
     );
-    const decision = decide(ledger, policy);
+    const decision = stages.controller.decide(ledger, policy);
     const remediations = hydrate(
       decision.selectedRemediations,
       ledger.findings,

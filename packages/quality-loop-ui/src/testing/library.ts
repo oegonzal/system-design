@@ -43,6 +43,18 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
     maxCriteria: 20,
   },
   producer: { consumes: ['criteria'] },
+  controller: {
+    id: 'standard',
+    steps: [
+      { factor: 'artifact' },
+      { factor: 'validators' },
+      { factor: 'evidence' },
+      { factor: 'policy-allowed' },
+      { factor: 'accept-threshold' },
+      { factor: 'reject-floor' },
+      { factor: 'route' },
+    ],
+  },
   validators: [{ id: 'schema', gate: 'block' }],
   critics: [{ id: 'critic.requirements', samples: 1, maxItems: 12, maxTokens: 4000, consumes: [] }],
   evaluators: [

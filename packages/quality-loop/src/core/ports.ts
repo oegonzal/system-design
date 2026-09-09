@@ -6,15 +6,19 @@
 import type {
   ArtifactLocation,
   ConfirmedFinding,
+  ControllerSummary,
   CriterionEvidence,
   CriticReport,
+  DecisionPolicy,
   Diagnostic,
   EvaluationReport,
+  EvidenceLedger,
   LensOutcome,
   ListQualityRunsQuery,
   LlmExchangeSummaryDto,
   PipelineSummary,
   ProduceMode,
+  QualityControlDecision,
   QualityRunDto,
   QualityRunSummaryDto,
   RemediationNote,
@@ -96,12 +100,27 @@ export type CriteriaDeriver = (
   goal: string,
 ) => Promise<{ criteria: SuccessCriterion[] | null; diagnostic: Diagnostic | null }>;
 
+/**
+ * The controller: the ledger and the policy in, a decision out. Synchronous
+ * by contract — no model, clock or I/O can be awaited here, which is how the
+ * doctrine's "the controller stays deterministic" is held by the type rather
+ * than by review. A pipeline declares one the way it declares validators;
+ * `core/controllers` composes them from gates.
+ */
+export interface Controller {
+  readonly id: string;
+  /** What the controller consults, in order — projected into the pipeline summary. */
+  readonly summary: ControllerSummary;
+  decide(ledger: EvidenceLedger, policy: DecisionPolicy): QualityControlDecision;
+}
+
 export interface Stages<T> {
   deriveCriteria: CriteriaDeriver;
   producer: Producer<T>;
   validators: readonly Validator<T>[];
   critics: readonly Critic<T>[];
   evaluators: readonly Evaluator<T>[];
+  controller: Controller;
 }
 
 export interface TraceStore {

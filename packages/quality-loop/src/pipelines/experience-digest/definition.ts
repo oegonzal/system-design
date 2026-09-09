@@ -5,6 +5,7 @@
  * `OutputShape`, the record codec and composer beside it, and two exact
  * validators.
  */
+import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { EXPERIENCE_DIGEST_ID } from './input';
 import criticAttribution from './lenses/critic.attribution.md?raw';
@@ -47,6 +48,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
   producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
+  controller: STANDARD,
 
   critics: [
     {

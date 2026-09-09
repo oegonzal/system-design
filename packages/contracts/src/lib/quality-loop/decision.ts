@@ -63,21 +63,15 @@ export interface DimensionTrace {
   score: number | null;
 }
 
-export const DECISION_FACTORS = [
-  'scores',
-  'artifact',
-  'validators',
-  'evidence',
-  'policy-allowed',
-  'accept-threshold',
-  'reject-floor',
-  'route',
-] as const;
-export type DecisionFactor = (typeof DECISION_FACTORS)[number];
-
+/**
+ * One consulted factor of a decision. `factor` is open, like criterion kinds
+ * and finding types: a controller is composed of gates, and a pipeline may
+ * compose one from gates of its own. `scores` is the one reserved factor —
+ * the engine records it before any gate is consulted.
+ */
 export interface DecisionStep {
   order: number;
-  factor: DecisionFactor;
+  factor: string;
   outcome: 'computed' | 'passed' | 'decided' | 'skipped';
   detail: string;
 }

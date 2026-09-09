@@ -43,5 +43,7 @@ export function materialize<T>(
     ),
 
     evaluators: definition.evaluators.map((spec) => createLlmEvaluator<T>(spec, perSample(spec))),
+
+    controller: definition.controller,
   };
 }

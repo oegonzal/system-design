@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IterationTrace } from '@sysdesign/contracts';
-import { decide } from './decide';
+import { STANDARD } from './controllers';
 import { deriveLessons } from './lessons';
 import { normalize } from './normalize';
 import {
@@ -51,7 +51,7 @@ function iteration(
     critics,
     evaluators,
     ledger,
-    decision: decide(ledger, tinyPolicy()),
+    decision: STANDARD.decide(ledger, tinyPolicy()),
     remediations: [],
     durationMs: 0,
   };

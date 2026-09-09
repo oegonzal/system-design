@@ -351,6 +351,14 @@ pipelines above and touches none of them. It has its own Postgres tables
 its own vector store (Qdrant, the `vectors` compose service); the dump remains
 the full audit trail beside them.
 
+The controller that turns a ledger into a decision is itself declared per
+pipeline, by reference, from a small library under `src/core/controllers/`:
+`standard` (the doctrine's ordered gates, thresholds and route) and
+`dimension-floor` (the same with a floor under every assessed dimension, which
+`memory-recall` runs live). Both are pure functions of the ledger, so
+`main.js replay --pipeline <id>` compares them on every recorded run without a
+model call (`./memory-runs.md` §13).
+
 How the loop works, its env variables and its guarantees:
 [`../pipeline-best-practices/quality-loop.md`](../pipeline-best-practices/quality-loop.md).
 How the three pipelines compose behind the memory API, how to operate it, and

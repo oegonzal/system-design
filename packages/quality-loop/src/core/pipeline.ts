@@ -1,8 +1,10 @@
 /**
  * A pipeline is data: which kinds of criteria and findings exist, which lenses
- * look (each with an md persona), and the policy that turns their evidence into
- * a decision. The only code a pipeline brings is its `OutputShape` (how to
- * parse, address and render the artifact) and any deterministic validators.
+ * look (each with an md persona), the policy that prices their evidence, and
+ * the controller that turns the priced evidence into a decision. The only code
+ * a pipeline brings is its `OutputShape` (how to parse, address and render the
+ * artifact), any deterministic validators, and — by reference, like a
+ * validator — the controller it declares from `core/controllers`.
  */
 import type {
   DecisionPolicy,
@@ -13,9 +15,10 @@ import type {
 import { PRODUCER_BRIEFING, UPSTREAM_EVIDENCE } from '@sysdesign/contracts';
 import { z } from 'zod';
 
+import { SCORES_FACTOR } from './controllers/compose';
 import type { TaskSpec } from './contracts';
 import { validatePolicy } from './policy';
-import type { Validator } from './ports';
+import type { Controller, Validator } from './ports';
 
 export interface LensSpec {
   id: string;
@@ -65,6 +68,8 @@ export interface PipelineDefinition<T> {
   validators: readonly Validator<T>[];
   critics: readonly LensSpec[];
   evaluators: readonly EvaluatorSpec[];
+  /** The deterministic strategy that decides — declared by reference, composed in `core/controllers`. */
+  controller: Controller;
   policy: DecisionPolicy;
 }
 
@@ -138,6 +143,20 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
 
+  // The controller is declared by reference and composed elsewhere; what boot
+  // re-checks is its projection, since a hand-written controller never passed
+  // through `composeController`.
+  const { controller } = definition;
+  if (!controller || controller.id.trim().length === 0) fail('pipeline declares no controller');
+  const factors = controller.summary.steps.map((step) => step.factor);
+  if (factors.length === 0) fail(`controller ${controller.id} consults no factor`);
+  if (factors.includes(SCORES_FACTOR)) {
+    fail(`controller ${controller.id} takes the engine's factor ${SCORES_FACTOR}`);
+  }
+  if (new Set(factors).size !== factors.length) {
+    fail(`controller ${controller.id} consults a factor twice`);
+  }
+
   // Both clients turn the output schema into JSON Schema; an unsupported zod
   // type would otherwise surface as a null response mid-run.
   z.toJSONSchema(definition.task.output.schema);
@@ -174,6 +193,12 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
         consumes: [...consumes],
       }),
     ),
+    controller: {
+      id: definition.controller.summary.id,
+      steps: definition.controller.summary.steps.map(({ factor, params }) =>
+        params === undefined ? { factor } : { factor, params: { ...params } },
+      ),
+    },
     policy: definition.policy,
   };
 }

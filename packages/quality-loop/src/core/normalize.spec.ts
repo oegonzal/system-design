@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EvaluationReport } from '@sysdesign/contracts';
-import { decide } from './decide';
+import { STANDARD } from './controllers';
 import { findingKey, normalize, type NormalizeInput } from './normalize';
 import {
   criterion,
@@ -252,6 +252,6 @@ describe('normalize', () => {
     expect(JSON.stringify(accept)).not.toContain('advisoryVerdict');
     expect(JSON.stringify(accept)).not.toContain('rationale');
     expect(accept).toEqual(reject);
-    expect(decide(accept, tinyPolicy())).toEqual(decide(reject, tinyPolicy()));
+    expect(STANDARD.decide(accept, tinyPolicy())).toEqual(STANDARD.decide(reject, tinyPolicy()));
   });
 });
