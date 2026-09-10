@@ -1324,9 +1324,9 @@ policy):
 
 | pipeline            | runs | iterations | `standard` ≠ `dimension-floor` | lowest dimension among `standard` accepts |
 | ------------------- | ---- | ---------- | ------------------------------ | ----------------------------------------- |
-| `agentic-design`    | 39   | 39         | 0                              | soundness 85.7; the other three at 100    |
-| `memory-recall`     | 76   | 95         | 1                              | coverage 40.9, precision 75, fidelity 80  |
-| `experience-digest` | 77   | 134        | 0                              | attribution 85.7, reuse 86.3              |
+| `agentic-design`    | 40   | 40         | 0                              | soundness 85.7; the other three at 100    |
+| `memory-recall`     | 78   | 97         | 1                              | coverage 40.9, precision 75, fidelity 80  |
+| `experience-digest` | 79   | 137        | 0                              | attribution 85.7, reuse 86.3              |
 
 The one disagreement is a recall pack the standard order accepted at 75.5
 with coverage at 40.9; the floor holds it for a revise with ten remediations
@@ -1346,4 +1346,20 @@ unassessed. That is the known no-retry-on-schema-miss weakness of the
 subscription client, not the floor, and it escalated the pack exactly as
 `standard` would have. The plumbing is proven — `GET /pipelines`, the dump's
 `03-pipeline.json` and the trace all name `dimension-floor` — and the floor's
-first real verdict waits for a recall whose evidence clears the gate.
+first real verdict waited for a recall whose evidence cleared the gate.
+
+It came on the next run. `2026-09-10T03-40-20-054-1a67fa` (orchestration
+`b795092a`, the `workflow-composer` prompt, the least-run of the fifteen)
+reached every step: the evidence gate passed with all twelve criteria
+assessed, `dimension-floor` passed — coverage 60, fidelity 100, precision
+unassessed and so not counted — and the accept threshold decided at 78.7.
+`standard` decides the same pack the same way, so the first live verdict is an
+agreement, which is the expected shape: at 50 the floor is built to bite on
+packs like the recorded 40.9-coverage one and on nothing else. Three of the
+sixteen candidates were usable and all three were injected; the target scored
+67.5. Replayed afterwards, the table above gains the iteration and keeps its
+one disagreement. The digest of that run kept 2 of 7: two `duplicate_memory`
+findings were located at both memories of each pair, though the transfer
+persona asks for the later one alone, and that cost the two earlier memories
+— the same persona-compliance remainder §12.6 records for `missed_signal`,
+on a second finding type.
