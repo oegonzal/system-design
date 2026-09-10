@@ -4,6 +4,8 @@ A map of every path in this app that generates or grades something. The
 engine's internals — passes, aggregator, scoring math — are covered in
 [`../critic-eval-pipeline/how-it-works.md`](../critic-eval-pipeline/how-it-works.md);
 this page sits one level above it and links down rather than repeating it.
+Known issues and deferred improvements across every pipeline are tracked in
+[`../issues/README.md`](../issues/README.md).
 
 Two facts organise everything below:
 
