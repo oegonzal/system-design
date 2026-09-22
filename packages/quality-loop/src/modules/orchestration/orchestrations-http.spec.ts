@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { OrchestrationRunDto } from '@sysdesign/contracts';
+import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
 import { ensureDatabase, OrchestrationRun } from '@sysdesign/db';
 import { NoopEmbeddingClient } from '@sysdesign/llm';
 import { rmSync } from 'node:fs';
@@ -24,11 +24,14 @@ const { ORCHESTRATION_RUN_REPOSITORY } = await import('./tokens');
 
 type Envelope<T> = { data: T };
 
+/** What the fake answers the brief classifier with: the schema is locked to the registered routes. */
+const ROUTE = { pipeline: 'system-design', rationale: 'a system to design' };
+
 /** Without embeddings: the memory steps are honest about why they skipped, the target still runs. */
 async function boot(): Promise<{ app: INestApplication; url: string }> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(QUALITY_LOOP_LLM)
-    .useValue(fakeLlm(...CANNED))
+    .useValue(fakeLlm(...CANNED, ROUTE))
     .overrideProvider(EMBEDDING_CLIENT)
     .useValue(new NoopEmbeddingClient())
     .overrideProvider(MEMORY_STORE)
@@ -194,6 +197,120 @@ describe('the orchestrations HTTP surface', () => {
       status: 'skipped',
       reason: 'embeddings-disabled',
     });
+  });
+
+  it('[QL-19] the router refuses a named pipeline, reports the judge it would pick, and judges once with it', async () => {
+    const named = await post(url, '/orchestrations/router', {
+      pipeline: 'system-design',
+      goal: GOAL,
+    });
+    expect(named.status).toBe(400);
+    expect(((await named.json()) as { message: string }).message).toMatch(/chooses its own/);
+
+    const report = await post(url, '/router/report', { goal: GOAL });
+    expect(report.status).toBe(200);
+    expect(((await report.json()) as Envelope<RouteReportDto>).data).toEqual({
+      routes: [
+        { id: 'system-design', description: expect.any(String) },
+        { id: 'agentic-design', description: expect.any(String) },
+      ],
+      pipeline: 'system-design',
+      rationale: 'a system to design',
+    });
+
+    const started = await post(url, '/orchestrations/router', { goal: GOAL });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
+    const record = await settle(data.orchestrationRunId);
+    expect(record.status).toBe('complete');
+    expect(record.pipeline).toBeNull();
+    expect(record.request).toEqual({
+      goal: GOAL,
+      outputProvided: false,
+      maxIterations: 1,
+      samples: null,
+    });
+    expect(record.context).toEqual({
+      classifier: { enabled: true, model: 'test-model', reason: null },
+    });
+    expect(record.steps['classify']).toMatchObject({
+      status: 'complete',
+      note: 'a system to design',
+      counts: { routes: 2 },
+      runIds: [],
+    });
+    expect(record.steps['judge']).toMatchObject({ status: 'complete', counts: { iterations: 1 } });
+    const child = (
+      (await (await fetch(`${url}/runs/${record.steps['judge'].runIds[0]}`)).json()) as Envelope<{
+        pipeline: string;
+        request: { maxIterations: number };
+      }>
+    ).data;
+    expect(child.pipeline).toBe('system-design');
+    expect(child.request.maxIterations).toBe(1);
+  });
+
+  it('[QL-19] calibration runs a goal `samples` times and reconciles; second opinion judges a stored artifact again', async () => {
+    const calibration = await post(url, '/orchestrations/calibration', {
+      pipeline: 'system-design',
+      goal: GOAL,
+      samples: 2,
+      maxIterations: 1,
+    });
+    expect(calibration.status).toBe(202);
+    const calibrated = await settle(
+      ((await calibration.json()) as Envelope<{ orchestrationRunId: string }>).data
+        .orchestrationRunId,
+    );
+    expect(calibrated.status).toBe('complete');
+    expect(calibrated.request.samples).toBe(2);
+    expect(calibrated.steps['panel']).toMatchObject({
+      status: 'complete',
+      counts: { lenses: 1, samples: 2, completed: 2, failed: 0 },
+    });
+    expect(calibrated.steps['panel'].runIds).toHaveLength(2);
+    expect(calibrated.steps['reconcile']).toMatchObject({
+      status: 'complete',
+      runIds: [],
+      counts: { runs: 2, decisions: 1 },
+    });
+    expect(calibrated.steps['reconcile'].report).toMatchObject({
+      alignment: 'produced',
+      runs: 2,
+      overall: { n: 2, range: 0 },
+    });
+
+    const second = await post(url, '/orchestrations/second-opinion/from-run', {
+      runId: targetRunId,
+      samples: 2,
+    });
+    expect(second.status).toBe(202);
+    const judged = await settle(
+      ((await second.json()) as Envelope<{ orchestrationRunId: string }>).data.orchestrationRunId,
+    );
+    expect(judged.status).toBe('complete');
+    expect(judged.pipeline).toBe('system-design');
+    expect(judged.request.samples).toBe(2);
+    expect(judged.steps['first']).toMatchObject({
+      status: 'skipped',
+      reason: 'provided-run',
+      runIds: [targetRunId],
+    });
+    expect(judged.steps['panel']).toMatchObject({
+      status: 'complete',
+      counts: { completed: 2, failed: 0 },
+    });
+    expect(judged.steps['reconcile']).toMatchObject({
+      status: 'complete',
+      counts: { runs: 3 },
+    });
+    expect(judged.steps['reconcile'].report).toMatchObject({ alignment: 'provided', runs: 3 });
+    const opinion = (
+      (await (await fetch(`${url}/runs/${judged.steps['panel'].runIds[0]}`)).json()) as Envelope<{
+        request: { outputProvided: boolean; maxIterations: number };
+      }>
+    ).data;
+    expect(opinion.request).toMatchObject({ outputProvided: true, maxIterations: 1 });
   });
 
   // Last: booting another app sweeps every `running` row, so it must never overlap a live run.
