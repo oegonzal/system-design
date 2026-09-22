@@ -21,6 +21,7 @@ import { MEMORY_ORCHESTRATOR_ID } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { outputsOf } from '../../core/outputs';
+import { soleChild } from '../../orchestrators/common';
 import { indexMemories, type MemoryPorts } from '../../orchestrators/memory/steps';
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { alias, MAX_CANDIDATES, probeAlias } from '../../pipelines/memory-recall/input';
@@ -68,8 +69,8 @@ export class MemoryService implements OnModuleInit {
     if (record === null || record.orchestrator !== MEMORY_ORCHESTRATOR_ID) {
       throw new NotFoundException(`memory run ${id} not found`);
     }
-    const digested = record.steps['digest']?.runId ?? null;
-    const targeted = record.steps['target']?.runId ?? null;
+    const digested = soleChild(record.steps['digest']);
+    const targeted = soleChild(record.steps['target']);
     if (digested === null || targeted === null) {
       throw new BadRequestException(`memory run ${id} digested no run to re-index`);
     }
@@ -100,7 +101,8 @@ export class MemoryService implements OnModuleInit {
       reason: outcome.reason ?? null,
       note: outcome.note ?? null,
       counts: outcome.counts ?? {},
-      runId: digestRun.runId,
+      runIds: [digestRun.runId],
+      report: null,
       startedAt: at,
       finishedAt: new Date().toISOString(),
     };

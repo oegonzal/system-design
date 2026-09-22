@@ -9,13 +9,19 @@ import type {
   OrchestrationStepDto,
   PipelineSummary,
   QualityRunDto,
+  StartOrchestrationRequest,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import { ORCHESTRATION_REASONS } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import { toRunDto, type RunRecord } from '../core/contracts';
-import type { OrchestratorDefinition, StepContext, StepResult } from './definition';
+import {
+  pipelinesOf,
+  type OrchestratorDefinition,
+  type StepContext,
+  type StepResult,
+} from './definition';
 
 export interface OrchestrationDeps<P> {
   ports: P;
@@ -33,9 +39,10 @@ export interface OrchestrationDeps<P> {
 export const pendingStep = (): OrchestrationStepDto => ({
   status: 'pending',
   reason: null,
-  runId: null,
+  runIds: [],
   note: null,
   counts: {},
+  report: null,
   startedAt: null,
   finishedAt: null,
 });
@@ -78,17 +85,20 @@ export class StepLedger {
     return this.set(step, { status: 'running', startedAt: this.now() });
   }
 
+  /** A child opened: appended, so a step that runs several keeps every id in the order they opened. */
   child(step: string, runId: string): Promise<void> {
-    return this.set(step, { runId });
+    return this.set(step, { runIds: [...this.record.steps[step].runIds, runId] });
   }
 
   end(step: string, outcome: StepResult): Promise<void> {
+    const current = this.record.steps[step];
     return this.set(step, {
       status: outcome.status,
       reason: outcome.reason ?? null,
       note: outcome.note ?? null,
-      counts: outcome.counts ?? this.record.steps[step].counts,
-      ...(outcome.runId ? { runId: outcome.runId } : {}),
+      counts: outcome.counts ?? current.counts,
+      report: outcome.report ?? current.report,
+      ...(outcome.runIds ? { runIds: [...outcome.runIds] } : {}),
       finishedAt: this.now(),
     });
   }
@@ -114,7 +124,7 @@ export class StepLedger {
 /** The record as it opens: every declared step pending, or standing in for a provided run. */
 export function openRecord<O extends object, P>(
   definition: OrchestratorDefinition<O, P>,
-  request: StartQualityRunRequest,
+  request: StartOrchestrationRequest,
   provided: QualityRunDto | null,
   context: Record<string, unknown>,
   maxIterations: number,
@@ -131,9 +141,10 @@ export function openRecord<O extends object, P>(
             ...pendingStep(),
             status: stood.status,
             reason: stood.reason ?? null,
-            runId: stood.runId ?? null,
+            runIds: stood.runIds ? [...stood.runIds] : [],
             note: stood.note ?? null,
             counts: stood.counts ?? {},
+            report: stood.report ?? null,
             finishedAt: at,
           };
   }
@@ -148,11 +159,24 @@ export function openRecord<O extends object, P>(
       goal: request.goal,
       outputProvided: provided?.request.outputProvided ?? request.output !== undefined,
       maxIterations,
+      samples: request.samples ?? null,
     },
     context,
     steps,
     error: null,
   };
+}
+
+/** Which of a step's declared pipelines a call to `execute` runs; a throw here fails the step as `errored`. */
+function chosen(step: string, declared: readonly string[], named: string | undefined): string {
+  if (declared.length === 0) throw new Error(`step ${step} declares no pipeline to run`);
+  if (named !== undefined) {
+    if (!declared.includes(named))
+      throw new Error(`step ${step} may not run ${named}: not declared`);
+    return named;
+  }
+  if (declared.length === 1) return declared[0];
+  throw new Error(`step ${step} declares ${declared.length} pipelines; name one`);
 }
 
 /**
@@ -163,16 +187,16 @@ export function openRecord<O extends object, P>(
 export async function runOrchestration<O extends object, P>(
   definition: OrchestratorDefinition<O, P>,
   record: OrchestrationRunDto,
-  request: StartQualityRunRequest,
+  request: StartOrchestrationRequest,
   provided: QualityRunDto | null,
   deps: OrchestrationDeps<P>,
 ): Promise<void> {
   const ledger = new StepLedger(record, deps.flush, deps.now, deps.warn);
   const allowed = new Set<string>([...ORCHESTRATION_REASONS, ...definition.reasons]);
   const outputs: Partial<O> = {};
-  const summaries = deps.pipelines();
+  const registry = deps.pipelines();
   const acceptAtOf = (id: string): number | null =>
-    summaries.find((summary) => summary.id === id)?.policy.thresholds.acceptAt ?? null;
+    registry.find((summary) => summary.id === id)?.policy.thresholds.acceptAt ?? null;
 
   // A provided run's outputs are known before anything runs.
   if (provided !== null) {
@@ -199,9 +223,10 @@ export async function runOrchestration<O extends object, P>(
         continue;
       }
 
-      const pipeline = typeof step.pipeline === 'function' ? step.pipeline(request) : step.pipeline;
-      if (pipeline !== undefined && !summaries.some((summary) => summary.id === pipeline)) {
-        await ledger.skip(step.id, 'pipeline-unavailable', pipeline);
+      const declared = pipelinesOf(step, request, outputs);
+      const missing = declared.find((id) => !registry.some((summary) => summary.id === id));
+      if (missing !== undefined) {
+        await ledger.skip(step.id, 'pipeline-unavailable', missing);
         continue;
       }
 
@@ -211,13 +236,16 @@ export async function runOrchestration<O extends object, P>(
         context: record.context,
         outputs,
         ports: deps.ports,
+        pipelines: declared,
+        registry,
         acceptAtOf,
-        execute: async (input) => {
-          if (pipeline === undefined)
-            throw new Error(`step ${step.id} declares no pipeline to run`);
-          const child = await deps.execute({ ...input, pipeline }, (opened) => {
-            void ledger.child(step.id, opened.runId);
-          });
+        execute: async (input, pipeline) => {
+          const child = await deps.execute(
+            { ...input, pipeline: chosen(step.id, declared, pipeline) },
+            (opened) => {
+              void ledger.child(step.id, opened.runId);
+            },
+          );
           return toRunDto(child);
         },
       };

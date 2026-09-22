@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { CALIBRATION } from '../../orchestrators/calibration/definition';
 import { MEMORY } from '../../orchestrators/memory/definition';
 import type { MemoryPorts } from '../../orchestrators/memory/steps';
+import { SECOND_OPINION } from '../../orchestrators/second-opinion/definition';
 import { MemoryModule } from '../memory/memory.module';
 import { MEMORY_PORTS } from '../memory/tokens';
 import { RunsModule } from '../runs/runs.module';
@@ -11,11 +13,16 @@ import { OrchestrationService } from './orchestration.service';
 import type { OrchestratorHost } from './ports';
 import { ORCHESTRATOR_HOSTS } from './tokens';
 
+const host = (definition: unknown, ports: unknown): OrchestratorHost =>
+  ({ definition, ports }) as OrchestratorHost;
+
 /**
  * The runner, the record and every orchestrator bound to its ports. A
  * definition is data in `orchestrators/`; the ports are adapters owned by the
  * module that built them, so the binding — and only the binding — lives here.
- * Adding an orchestrator is one entry in this map and its module's ports.
+ * Adding an orchestrator is one entry in this map and its module's ports; the
+ * two panel orchestrators need none, since every step of theirs runs a
+ * registered pipeline or reads what one produced.
  */
 @Module({
   imports: [RunsModule, OrchestrationRecordModule, MemoryModule],
@@ -26,7 +33,9 @@ import { ORCHESTRATOR_HOSTS } from './tokens';
       provide: ORCHESTRATOR_HOSTS,
       useFactory: (memory: MemoryPorts): ReadonlyMap<string, OrchestratorHost> =>
         new Map<string, OrchestratorHost>([
-          [MEMORY.id, { definition: MEMORY, ports: memory } as unknown as OrchestratorHost],
+          [MEMORY.id, host(MEMORY, memory)],
+          [CALIBRATION.id, host(CALIBRATION, undefined)],
+          [SECOND_OPINION.id, host(SECOND_OPINION, undefined)],
         ]),
       inject: [MEMORY_PORTS],
     },

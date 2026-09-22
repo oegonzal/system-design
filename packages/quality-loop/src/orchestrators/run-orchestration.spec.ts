@@ -7,7 +7,7 @@ import type {
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RunRecord } from '../core/contracts';
-import type { OrchestratorDefinition, StepResult } from './definition';
+import type { OrchestratorDefinition, StepContext, StepResult } from './definition';
 import {
   closeSteps,
   openRecord,
@@ -41,12 +41,12 @@ const stepA = (result: () => StepResult<string>) => ({
   pipeline: 'tiny',
   run: async (ctx: { execute: (input: { goal: string }) => Promise<QualityRunDto> }) => {
     const run = await ctx.execute({ goal: 'from a' });
-    return { ...result(), runId: run.runId };
+    return { ...result(), runIds: [run.runId] };
   },
   provided: (run: QualityRunDto): StepResult<string> => ({
     status: 'skipped',
     reason: 'provided-run',
-    runId: run.runId,
+    runIds: [run.runId],
     output: `provided:${run.runId}`,
   }),
 });
@@ -57,6 +57,7 @@ const definition = (
   id: 'tiny',
   version: '0.0.1',
   description: 'three steps',
+  takesTarget: true,
   reasons: ['because'],
   context: () => Promise.resolve({ seen: true }),
   steps: [
@@ -100,13 +101,13 @@ describe('runOrchestration', () => {
     await runOrchestration(def, record, request, null, deps);
 
     expect(record.status).toBe('complete');
-    expect(record.steps['a']).toMatchObject({ status: 'complete', runId: 'tiny-run' });
+    expect(record.steps['a']).toMatchObject({ status: 'complete', runIds: ['tiny-run'] });
     expect(record.steps['b']).toMatchObject({ status: 'complete', reason: null });
     expect(record.steps['c']).toMatchObject({ status: 'skipped', reason: 'because' });
     // The child id reached the ledger while a was still running.
     expect(
       flushed.some(
-        (snap) => snap.steps['a'].status === 'running' && snap.steps['a'].runId === 'tiny-run',
+        (snap) => snap.steps['a'].status === 'running' && snap.steps['a'].runIds[0] === 'tiny-run',
       ),
     ).toBe(true);
     expect(flushed.map((snap) => snap.steps['b'].status)).toContain('running');
@@ -191,13 +192,159 @@ describe('runOrchestration', () => {
     expect(record.steps['a']).toMatchObject({
       status: 'skipped',
       reason: 'provided-run',
-      runId: 'given',
+      runIds: ['given'],
     });
     const execute = vi.fn();
     await runOrchestration(def, record, request, provided, harness(execute).deps);
     expect(execute).not.toHaveBeenCalled();
     expect(record.steps['b']).toMatchObject({ status: 'complete' });
     expect(record.status).toBe('complete');
+  });
+});
+
+describe('declared pipelines', () => {
+  const summaries = (...ids: string[]): PipelineSummary[] =>
+    ids.map((id) => ({ id, policy: { thresholds: { acceptAt: 80 } } }) as PipelineSummary);
+
+  it('[QL-19] a step that opens several children keeps every id, in the order they opened', async () => {
+    const def: OrchestratorDefinition<Outputs, Ports> = {
+      ...definition(),
+      steps: [
+        {
+          id: 'a',
+          pipeline: 'tiny',
+          run: async (ctx) => {
+            await ctx.execute({ goal: '1' });
+            await ctx.execute({ goal: '2' });
+            return { status: 'complete', output: 'a!' };
+          },
+        },
+      ],
+    };
+    let opened = 0;
+    const { deps, flushed } = harness((_, onOpened) => {
+      const run = child(`r-${++opened}`);
+      onOpened?.(run);
+      return Promise.resolve(run);
+    });
+    const record = open(def);
+    await runOrchestration(def, record, request, null, deps);
+    expect(record.steps['a'].runIds).toEqual(['r-1', 'r-2']);
+    expect(
+      flushed.some(
+        (snap) => snap.steps['a'].status === 'running' && snap.steps['a'].runIds.length === 1,
+      ),
+    ).toBe(true);
+  });
+
+  it('[QL-19] a chooser sees what earlier steps produced; an unregistered choice skips the step, naming it', async () => {
+    const chooser = (answer: string): OrchestratorDefinition<Outputs, Ports> => ({
+      ...definition(),
+      steps: [
+        { id: 'a', run: () => Promise.resolve({ status: 'complete', output: answer }) },
+        {
+          id: 'b',
+          needs: ['a'],
+          pipeline: (_, outputs) => (outputs.a === 'x' ? 'tiny' : 'other'),
+          run: async (ctx) => {
+            await ctx.execute({ goal: 'b' });
+            return { status: 'complete', output: 'b!' };
+          },
+        },
+      ],
+    });
+    const asked: string[] = [];
+    const { deps } = harness((req, onOpened) => {
+      asked.push(req.pipeline);
+      onOpened?.(child());
+      return Promise.resolve(child());
+    });
+
+    const routed = open(chooser('x'));
+    await runOrchestration(chooser('x'), routed, request, null, deps);
+    expect(asked).toEqual(['tiny']);
+    expect(routed.steps['b']).toMatchObject({ status: 'complete', runIds: ['tiny-run'] });
+
+    const unrouted = open(chooser('y'));
+    await runOrchestration(chooser('y'), unrouted, request, null, deps);
+    expect(unrouted.steps['b']).toMatchObject({
+      status: 'skipped',
+      reason: 'pipeline-unavailable',
+      note: 'other',
+    });
+    expect(asked).toEqual(['tiny']);
+  });
+
+  it('[QL-19] a step that declares several pipelines must name the one it runs, and only one it declared', async () => {
+    let seen: readonly string[] = [];
+    const withList = (
+      run: (ctx: StepContext<Outputs, Ports>) => Promise<StepResult<string>>,
+    ): OrchestratorDefinition<Outputs, Ports> => ({
+      ...definition(),
+      steps: [
+        {
+          id: 'a',
+          pipeline: ['tiny', 'other'],
+          run: (ctx) => {
+            seen = ctx.pipelines;
+            return run(ctx);
+          },
+        },
+      ],
+    });
+    const asked: string[] = [];
+    const { deps } = harness((req, onOpened) => {
+      asked.push(req.pipeline);
+      onOpened?.(child());
+      return Promise.resolve(child());
+    });
+    deps.pipelines = () => summaries('tiny', 'other');
+
+    const named = withList(async (ctx) => {
+      await ctx.execute({ goal: 'g' }, 'other');
+      return { status: 'complete', output: 'a!' };
+    });
+    const ok = open(named);
+    await runOrchestration(named, ok, request, null, deps);
+    expect(seen).toEqual(['tiny', 'other']);
+    expect(asked).toEqual(['other']);
+    expect(ok.steps['a']).toMatchObject({ status: 'complete', runIds: ['tiny-run'] });
+
+    const unnamed = withList(async (ctx) => {
+      await ctx.execute({ goal: 'g' });
+      return { status: 'complete', output: 'a!' };
+    });
+    const ambiguous = open(unnamed);
+    await runOrchestration(unnamed, ambiguous, request, null, deps);
+    expect(ambiguous.status).toBe('failed');
+    expect(ambiguous.steps['a']).toMatchObject({ status: 'failed', reason: 'errored' });
+    expect(ambiguous.error?.message).toContain('name one');
+
+    const undeclared = withList(async (ctx) => {
+      await ctx.execute({ goal: 'g' }, 'nope');
+      return { status: 'complete', output: 'a!' };
+    });
+    const refused = open(undeclared);
+    await runOrchestration(undeclared, refused, request, null, deps);
+    expect(refused.error?.message).toContain('not declared');
+    expect(asked).toEqual(['other']);
+  });
+
+  it('[QL-19] a step may report, and the report stays on its ledger entry', async () => {
+    const def: OrchestratorDefinition<Outputs, Ports> = {
+      ...definition(),
+      steps: [
+        {
+          id: 'a',
+          run: () => Promise.resolve({ status: 'complete', output: 'a!', report: { runs: 2 } }),
+        },
+      ],
+    };
+    const record = open(def);
+    await runOrchestration(def, record, request, null, harness().deps);
+    expect(record.steps['a'].report).toEqual({ runs: 2 });
+    expect(record.steps['a'].runIds).toEqual([]);
+    expect(pendingStep().report).toBeNull();
   });
 });
 
@@ -247,6 +394,6 @@ describe('the step ledger', () => {
     await ledger.settled();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('pool gone'));
     expect(flushed).toEqual(['running', 'complete']);
-    expect(record.steps['a']).toMatchObject({ status: 'complete', runId: 'r-1' });
+    expect(record.steps['a']).toMatchObject({ status: 'complete', runIds: ['r-1'] });
   });
 });

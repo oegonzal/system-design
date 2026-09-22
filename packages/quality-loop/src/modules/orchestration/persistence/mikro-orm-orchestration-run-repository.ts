@@ -3,8 +3,9 @@
  * EntityManager (the run performs in the background, outside any request
  * context); writes after `open` are guarded by `status: 'running'`, so a late
  * flush never resurrects a row the boot sweep already failed. Children are
- * one row per step with a run id, upserted as the ledger learns them and
- * never removed: a child id, once known, stays known.
+ * one row per run id a step opened, keyed by step and ordinal, upserted as
+ * the ledger learns them and never removed: a child id, once known, stays
+ * known.
  */
 import { Injectable } from '@nestjs/common';
 import type { FilterQuery } from '@mikro-orm/core';
@@ -29,10 +30,11 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
   async open(record: OrchestrationRunDto): Promise<void> {
     const em = this.em.fork();
     const row = em.create(OrchestrationRun, toRow(record));
-    for (const { step, runId } of childrenOf(record)) {
+    for (const { step, ordinal, runId } of childrenOf(record)) {
       em.create(OrchestrationRunChild, {
         run: row,
         step,
+        ordinal,
         qualityRun: em.getReference(QualityRun, runId),
       });
     }
@@ -108,13 +110,14 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
     record: OrchestrationRunDto,
   ): Promise<void> {
     const existing = await em.find(OrchestrationRunChild, { run: row.id });
-    const byStep = new Map(existing.map((child) => [child.step, child]));
-    for (const { step, runId } of childrenOf(record)) {
-      const child = byStep.get(step);
+    const known = new Map(existing.map((child) => [`${child.step}#${child.ordinal}`, child]));
+    for (const { step, ordinal, runId } of childrenOf(record)) {
+      const child = known.get(`${step}#${ordinal}`);
       if (child === undefined) {
         em.create(OrchestrationRunChild, {
           run: row,
           step,
+          ordinal,
           qualityRun: em.getReference(QualityRun, runId),
         });
       } else if (child.qualityRun?.id !== runId) {

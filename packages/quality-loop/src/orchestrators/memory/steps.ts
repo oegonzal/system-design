@@ -40,6 +40,7 @@ import {
   MEMORY_RECALL_ID,
   renderGoal as renderQuery,
 } from '../../pipelines/memory-recall/input';
+import { runTarget } from '../common';
 import type { StepContext, StepResult } from '../definition';
 
 /** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
@@ -130,34 +131,12 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
 }
 
 /** Run the target pipeline with whatever recall handed on; its failure is the run's. */
-export async function target(ctx: Ctx): Promise<StepResult<QualityRunDto>> {
-  const child = await ctx.execute({
+export const target = (ctx: Ctx): Promise<StepResult<QualityRunDto>> =>
+  runTarget(ctx, {
     goal: ctx.outputs.recall?.goal ?? ctx.request.goal,
     output: ctx.request.output,
     maxIterations: ctx.request.maxIterations,
   });
-  if (child.status === 'failed' || child.trace === null) {
-    return {
-      status: 'failed',
-      reason: 'run-failed',
-      note: child.error?.message ?? null,
-      error: child.error ?? {
-        name: 'RunFailed',
-        message: 'the target run produced no trace',
-        stack: null,
-      },
-    };
-  }
-  const outputs = outputsOf(child.trace);
-  return {
-    status: 'complete',
-    counts: {
-      iterations: child.trace.iterations.length,
-      overall: outputs.decision?.scores.overall ?? 0,
-    },
-    output: child,
-  };
-}
 
 /** Digest the finished target; yields what the digest endorsed, or nothing with the reason. */
 export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {

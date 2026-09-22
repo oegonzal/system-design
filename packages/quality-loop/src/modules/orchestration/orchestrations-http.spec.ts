@@ -122,7 +122,7 @@ describe('the orchestrations HTTP surface', () => {
       reason: 'upstream-skipped',
       note: 'digest',
     });
-    targetRunId = record.steps['target'].runId;
+    targetRunId = record.steps['target'].runIds[0] ?? null;
     expect(targetRunId).not.toBeNull();
     const child = (
       (await (await fetch(`${url}/runs/${targetRunId}`)).json()) as Envelope<{
@@ -138,7 +138,20 @@ describe('the orchestrations HTTP surface', () => {
     const issues = ((await empty.json()) as { issues: { path: string }[] }).issues.map(
       (i) => i.path,
     );
-    expect(issues).toEqual(expect.arrayContaining(['pipeline', 'goal']));
+    // The edge no longer demands a pipeline: whether one is named is the orchestrator's declaration.
+    expect(issues).toEqual(['goal']);
+    const unnamed = await post(url, '/orchestrations/memory', { goal: GOAL });
+    expect(unnamed.status).toBe(400);
+    expect(((await unnamed.json()) as { message: string }).message).toMatch(/takes a target/);
+    expect(
+      (
+        await post(url, '/orchestrations/memory', {
+          pipeline: 'system-design',
+          goal: GOAL,
+          samples: 9,
+        })
+      ).status,
+    ).toBe(400);
     expect(
       (await post(url, '/orchestrations/memory', { pipeline: 'nope', goal: GOAL })).status,
     ).toBe(404);
@@ -169,12 +182,12 @@ describe('the orchestrations HTTP surface', () => {
     expect(record.steps['recall']).toMatchObject({
       status: 'skipped',
       reason: 'provided-run',
-      runId: null,
+      runIds: [],
     });
     expect(record.steps['target']).toMatchObject({
       status: 'skipped',
       reason: 'provided-run',
-      runId: targetRunId,
+      runIds: [targetRunId],
     });
     expect(record.request).toMatchObject({ goal: GOAL, outputProvided: false, maxIterations: 2 });
     expect(record.steps['digest']).toMatchObject({
@@ -189,9 +202,10 @@ describe('the orchestrations HTTP surface', () => {
     const step = (status: 'complete' | 'running' | 'pending', reason: string | null = null) => ({
       status,
       reason,
-      runId: null,
+      runIds: [],
       note: null,
       counts: {},
+      report: null,
       startedAt: null,
       finishedAt: null,
     });
@@ -200,7 +214,7 @@ describe('the orchestrations HTTP surface', () => {
       orchestrator: 'memory',
       pipeline: 'system-design',
       status: 'running',
-      request: { goal: GOAL, outputProvided: false, maxIterations: 1 },
+      request: { goal: GOAL, outputProvided: false, maxIterations: 1, samples: null },
       context: {},
       steps: {
         recall: step('complete', 'store-empty'),

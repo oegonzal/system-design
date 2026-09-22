@@ -15,7 +15,8 @@ import {
 import type {
   OrchestrationRunDto,
   QualityRunDto,
-  StartQualityRunRequest,
+  StartOrchestrationFromRunRequest,
+  StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -80,7 +81,10 @@ export class OrchestrationService implements OnModuleInit {
   }
 
   /** Start in the background; the row is readable at once. */
-  async start(orchestrator: string, request: StartQualityRunRequest): Promise<OrchestrationRunDto> {
+  async start(
+    orchestrator: string,
+    request: StartOrchestrationRequest,
+  ): Promise<OrchestrationRunDto> {
     const host = this.host(orchestrator);
     const normalized = this.admit(host, request);
     const record = await this.open(host, normalized, null);
@@ -88,18 +92,30 @@ export class OrchestrationService implements OnModuleInit {
     return record;
   }
 
-  /** Start from a run that already happened, for the steps the orchestrator lets it stand in for. */
-  async startFromRun(orchestrator: string, runId: string): Promise<OrchestrationRunDto> {
+  /**
+   * Start from a run that already happened. Where a step declares a stand-in,
+   * the source stands in for it; otherwise the source is only the request's
+   * origin — its goal and budget — and the record says nothing of it, since
+   * every step then runs afresh over those inputs.
+   */
+  async startFromRun(
+    orchestrator: string,
+    body: StartOrchestrationFromRunRequest,
+  ): Promise<OrchestrationRunDto> {
     const host = this.host(orchestrator);
-    const source = await this.runs.get(runId);
-    if (source === null) throw new NotFoundException(`run ${runId} not found`);
+    const source = await this.runs.get(body.runId);
+    if (source === null) throw new NotFoundException(`run ${body.runId} not found`);
     const normalized = this.admit(host, {
-      pipeline: source.pipeline,
+      ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
       goal: source.request.goal,
       maxIterations: source.request.maxIterations,
+      ...(body.samples === undefined ? {} : { samples: body.samples }),
     });
-    const record = await this.open(host, normalized, source);
-    void this.perform(host, record, normalized, source);
+    const provided = host.definition.steps.some((step) => step.provided !== undefined)
+      ? source
+      : null;
+    const record = await this.open(host, normalized, provided);
+    void this.perform(host, record, normalized, provided);
     return record;
   }
 
@@ -109,11 +125,28 @@ export class OrchestrationService implements OnModuleInit {
     return host;
   }
 
-  /** The request as the orchestrator will see it, or the reason it will not. */
-  private admit(host: OrchestratorHost, request: StartQualityRunRequest): StartQualityRunRequest {
+  /**
+   * The request as the orchestrator will see it, or the reason it will not.
+   * The declaration decides whether a target is named at all; a named one
+   * must be registered; the orchestrator's own `refuse` says the rest.
+   */
+  private admit(
+    host: OrchestratorHost,
+    request: StartOrchestrationRequest,
+  ): StartOrchestrationRequest {
     const normalized = host.definition.normalize?.(request) ?? request;
+    const { id, takesTarget } = host.definition;
+    if (takesTarget && normalized.pipeline === undefined) {
+      throw new BadRequestException(`${id} takes a target pipeline; name one`);
+    }
+    if (!takesTarget && normalized.pipeline !== undefined) {
+      throw new BadRequestException(`${id} chooses its own pipeline; do not name one`);
+    }
     const summaries = this.runs.list();
-    if (!summaries.some((summary) => summary.id === normalized.pipeline)) {
+    if (
+      normalized.pipeline !== undefined &&
+      !summaries.some((summary) => summary.id === normalized.pipeline)
+    ) {
       throw new NotFoundException(`unknown pipeline ${normalized.pipeline}`);
     }
     const refusal = host.definition.refuse?.(normalized, summaries);
@@ -123,7 +156,7 @@ export class OrchestrationService implements OnModuleInit {
 
   private async open(
     host: OrchestratorHost,
-    request: StartQualityRunRequest,
+    request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<OrchestrationRunDto> {
     const summary = this.runs.list().find((candidate) => candidate.id === request.pipeline);
@@ -147,7 +180,7 @@ export class OrchestrationService implements OnModuleInit {
   private async perform(
     host: OrchestratorHost,
     record: OrchestrationRunDto,
-    request: StartQualityRunRequest,
+    request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<void> {
     const label = `${host.definition.id} run ${record.orchestrationRunId}`;

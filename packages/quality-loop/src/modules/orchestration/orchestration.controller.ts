@@ -20,7 +20,7 @@ import { ZodValidationPipe } from '../runs/zod.pipe';
 import {
   fromRunRequestSchema,
   listOrchestrationsQuerySchema,
-  runRequestSchema,
+  orchestrationRequestSchema,
   type ListOrchestrationsQuery,
 } from './orchestration-request';
 import { OrchestrationService } from './orchestration.service';
@@ -34,7 +34,7 @@ export class OrchestrationController {
   @HttpCode(202)
   async start(
     @Param('orchestrator') orchestrator: string,
-    @Body(new ZodValidationPipe(runRequestSchema)) body: StartOrchestrationRequest,
+    @Body(new ZodValidationPipe(orchestrationRequestSchema)) body: StartOrchestrationRequest,
   ): Promise<StartOrchestrationResponse> {
     const record = await this.orchestrations.start(orchestrator, body);
     return { data: { orchestrationRunId: record.orchestrationRunId, status: record.status } };
@@ -47,7 +47,7 @@ export class OrchestrationController {
     @Param('orchestrator') orchestrator: string,
     @Body(new ZodValidationPipe(fromRunRequestSchema)) body: StartOrchestrationFromRunRequest,
   ): Promise<StartOrchestrationResponse> {
-    const record = await this.orchestrations.startFromRun(orchestrator, body.runId);
+    const record = await this.orchestrations.startFromRun(orchestrator, body);
     return { data: { orchestrationRunId: record.orchestrationRunId, status: record.status } };
   }
 

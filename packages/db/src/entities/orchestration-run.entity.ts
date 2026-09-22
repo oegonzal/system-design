@@ -37,7 +37,7 @@ export class OrchestrationRun {
   status: Opt<Contracts.QualityRunStatus> = 'running';
 
   @Property({ type: 'json' })
-  request!: Contracts.QualityRunRequestSummary;
+  request!: Contracts.OrchestrationRequestSummary;
 
   @Property({ type: 'json' })
   context!: Record<string, unknown>;

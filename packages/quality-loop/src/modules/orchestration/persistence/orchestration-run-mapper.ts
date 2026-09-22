@@ -1,6 +1,7 @@
 /**
  * Row ⇄ `OrchestrationRunDto`, pure. The step ledger and the context are
- * jsonb as-is; the children are rows the dto carries as step run ids.
+ * jsonb as-is; the children are rows the dto carries as step run ids, one per
+ * id a step opened, in the order it opened them.
  */
 import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import type { OrchestrationRun } from '@sysdesign/db';
@@ -18,10 +19,17 @@ export interface OrchestrationRunRow {
   finishedAt: Date | null;
 }
 
-/** Every step that has a child run, in ledger order. */
-export const childrenOf = (record: OrchestrationRunDto): { step: string; runId: string }[] =>
+export interface ChildRef {
+  step: string;
+  /** The child's position among the step's children, from zero. */
+  ordinal: number;
+  runId: string;
+}
+
+/** Every child run every step opened, in ledger order. */
+export const childrenOf = (record: OrchestrationRunDto): ChildRef[] =>
   Object.entries(record.steps).flatMap(([step, dto]) =>
-    dto.runId === null ? [] : [{ step, runId: dto.runId }],
+    dto.runIds.map((runId, ordinal) => ({ step, ordinal, runId })),
   );
 
 export function toRow(record: OrchestrationRunDto): OrchestrationRunRow {

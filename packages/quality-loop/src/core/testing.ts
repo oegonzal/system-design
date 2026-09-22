@@ -12,14 +12,18 @@ import type {
   EvaluationReport,
   EvidenceLedger,
   LensOutcome,
+  QualityControlDecision,
+  QualityRunDto,
   RawCriterionResult,
   RawFinding,
+  RunTrace,
   SuccessCriterion,
   UpstreamEvidence,
 } from '@sysdesign/contracts';
 import type { LlmCallSink, LlmClient, LlmRecordable, StructuredRequest } from '@sysdesign/llm';
 import { z } from 'zod';
 
+import type { RunRecord } from './contracts';
 import { STANDARD } from './controllers';
 import type { PipelineDefinition } from './pipeline';
 import type { Critic, Evaluator, Producer } from './ports';
@@ -288,4 +292,89 @@ export const ledger = (overrides: Partial<EvidenceLedger> = {}): EvidenceLedger 
   discarded: [],
   diagnostics: [],
   ...overrides,
+});
+
+/** A decision with every gate open and the scores given, for specs that read runs rather than decide them. */
+export const decision = (
+  overrides: Partial<QualityControlDecision> = {},
+): QualityControlDecision => ({
+  finalDecision: 'accept',
+  gates: {
+    artifactPresent: true,
+    validatorsPassed: true,
+    evidenceSufficient: true,
+    policyAllowed: true,
+  },
+  scores: { dimensions: {}, overall: 80 },
+  selectedRemediations: [],
+  reason: 'spec',
+  trace: { steps: [], dimensions: [], weightSum: 1, weightedTotal: 80 },
+  ...overrides,
+});
+
+/** A trace of `iterations` alike iterations around one decision and ledger, the last one crowned. */
+export function traceOf<T = unknown>(
+  overrides: {
+    artifact?: T | null;
+    decision?: QualityControlDecision;
+    ledger?: EvidenceLedger;
+    stopReason?: RunTrace['stopReason'];
+    iterations?: number;
+    goal?: string;
+  } = {},
+): RunTrace<T> {
+  const judged = overrides.decision ?? decision();
+  const count = overrides.iterations ?? 1;
+  return {
+    pipeline: { id: 'tiny', version: '0.0.1' },
+    contract: { goal: overrides.goal ?? 'g', criteria: [] },
+    iterations: Array.from({ length: count }, (_, index) => ({
+      iteration: index + 1,
+      mode: index === 0 ? 'initial' : 'revise',
+      artifact: overrides.artifact ?? null,
+      locations: [],
+      rendered: null,
+      validation: [],
+      critics: [],
+      evaluators: [],
+      ledger: overrides.ledger ?? ledger(),
+      decision: judged,
+      remediations: [],
+      durationMs: 0,
+    })),
+    bestIteration: count,
+    finalDecision: judged.finalDecision,
+    stopReason: overrides.stopReason ?? 'accepted',
+    lessons: [],
+  };
+}
+
+/** A finished run as the service reports it, around a trace; no trace means it failed. */
+export const runDto = (
+  runId: string,
+  trace: RunTrace | null,
+  overrides: Partial<QualityRunDto> = {},
+): QualityRunDto => ({
+  runId,
+  pipeline: 'tiny',
+  status: trace === null ? 'failed' : 'complete',
+  startedAt: '2026-09-22T00:00:00.000Z',
+  finishedAt: '2026-09-22T00:01:00.000Z',
+  llm: { enabled: true, model: 'test-model', reason: null },
+  request: { goal: trace?.contract.goal ?? 'g', outputProvided: false, maxIterations: 1 },
+  trace,
+  exchanges: [],
+  error: trace === null ? { name: 'Boom', message: 'the model went away', stack: null } : null,
+  ...overrides,
+});
+
+/** A finished run as `RunsService.execute` resolves it: the dto plus what the dump records. */
+export const runRecord = (
+  runId: string,
+  trace: RunTrace | null,
+  overrides: Partial<QualityRunDto> = {},
+): RunRecord => ({
+  ...runDto(runId, trace, overrides),
+  exchanges: [],
+  git: { branch: 'spec', headSha: 'spec' },
 });

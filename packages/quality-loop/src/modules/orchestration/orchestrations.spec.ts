@@ -115,13 +115,18 @@ describe('the memory orchestration over the three pipelines', () => {
       reason: null,
     });
     expect(record.context['store']).toMatchObject({ ready: true, reason: null, chunks: 0 });
-    expect(record.request).toEqual({ goal: GOAL, outputProvided: false, maxIterations: 3 });
+    expect(record.request).toEqual({
+      goal: GOAL,
+      outputProvided: false,
+      maxIterations: 3,
+      samples: null,
+    });
     expect(Object.keys(record.steps)).toEqual(['recall', 'target', 'digest', 'store']);
 
     expect(record.steps['recall']).toMatchObject({
       status: 'skipped',
       reason: 'store-empty',
-      runId: null,
+      runIds: [],
     });
     expect(record.steps['target']).toMatchObject({
       status: 'complete',
@@ -140,11 +145,11 @@ describe('the memory orchestration over the three pipelines', () => {
       counts: { chunks: 2, embedded: 4 },
     });
 
-    const target = await run(record.steps['target'].runId);
+    const target = await run(record.steps['target'].runIds[0] ?? null);
     expect(target).toMatchObject({ pipeline: 'system-design', status: 'complete' });
     expect(target.trace?.finalDecision).toBe('accept');
     expect(target.request.goal).toBe(GOAL);
-    const digest = await run(record.steps['digest'].runId);
+    const digest = await run(record.steps['digest'].runIds[0] ?? null);
     expect(digest).toMatchObject({ pipeline: 'experience-digest', status: 'complete' });
 
     expect(store.points.size).toBe(2);
@@ -166,17 +171,17 @@ describe('the memory orchestration over the three pipelines', () => {
       counts: { candidates: 2, kept: 2, usable: 1, injected: 1 },
     });
 
-    const recall = await run(record.steps['recall'].runId);
+    const recall = await run(record.steps['recall'].runIds[0] ?? null);
     expect(recall).toMatchObject({ pipeline: 'memory-recall', status: 'complete' });
     expect(recall.request.goal).toContain('### [m1] lesson · run');
 
-    const target = await run(record.steps['target'].runId);
+    const target = await run(record.steps['target'].runIds[0] ?? null);
     expect(target.request.goal.startsWith(GOAL)).toBe(true);
     expect(target.request.goal).toContain(MEMORY_HEADING);
     expect(target.request.goal).toContain('- [m1] lesson · run');
     expect(target.request.goal).not.toContain('[m2]');
 
-    const digest = await run(record.steps['digest'].runId);
+    const digest = await run(record.steps['digest'].runIds[0] ?? null);
     expect(digest.request.goal).not.toContain(MEMORY_HEADING);
     expect(digest.request.goal).toContain(GOAL);
 
@@ -195,7 +200,7 @@ describe('the memory orchestration over the three pipelines', () => {
     const first = (
       (await (await fetch(`${url}/orchestrations?limit=10`)).json()) as Page<OrchestrationRunDto>
     ).data.at(-1);
-    const targetRunId = first?.steps['target'].runId;
+    const targetRunId = first?.steps['target'].runIds[0];
     if (!targetRunId) throw new Error('the first run must have a target');
     const started = await fetch(`${url}/orchestrations/memory/from-run`, {
       method: 'POST',
@@ -209,12 +214,12 @@ describe('the memory orchestration over the three pipelines', () => {
     expect(record.steps['recall']).toMatchObject({
       status: 'skipped',
       reason: 'provided-run',
-      runId: null,
+      runIds: [],
     });
     expect(record.steps['target']).toMatchObject({
       status: 'skipped',
       reason: 'provided-run',
-      runId: targetRunId,
+      runIds: [targetRunId],
     });
     expect(record.steps['digest']).toMatchObject({
       status: 'complete',

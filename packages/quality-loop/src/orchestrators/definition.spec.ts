@@ -11,6 +11,7 @@ const tiny = (
     id: 'tiny',
     version: '0.0.1',
     description: 'two steps',
+    takesTarget: true,
     reasons: ['because'],
     context: () => Promise.resolve({}),
     steps: [

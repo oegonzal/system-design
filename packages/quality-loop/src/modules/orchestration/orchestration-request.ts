@@ -1,11 +1,32 @@
-import { DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, QUALITY_RUN_STATUSES } from '@sysdesign/contracts';
+import {
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
+  MAX_PANEL_SAMPLES,
+  QUALITY_RUN_STATUSES,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
-/** The same inputs as `POST /runs`; which of them reach which step is the orchestrator's business. */
-export { runRequestSchema } from '../runs/run-request';
+import { runRequestSchema } from '../runs/run-request';
+
+const samples = z.number().int().min(1).max(MAX_PANEL_SAMPLES).optional();
+
+/**
+ * The same inputs as `POST /runs`, plus the two an orchestration decides for
+ * itself: the target is optional here because an orchestrator that chooses
+ * its own pipeline refuses one (and one that takes a target requires it —
+ * the service enforces the declaration), and `samples` sizes a panel step.
+ * Which of them reach which step is the orchestrator's business.
+ */
+export const orchestrationRequestSchema = runRequestSchema.extend({
+  pipeline: z.string().min(1).optional(),
+  samples,
+});
 
 /** The body of `POST /orchestrations/:orchestrator/from-run`: an already persisted run to start from. */
-export const fromRunRequestSchema = z.strictObject({ runId: z.string().min(1).max(80) });
+export const fromRunRequestSchema = z.strictObject({
+  runId: z.string().min(1).max(80),
+  samples,
+});
 
 /** The query of `GET /orchestrations`. Coercion belongs here, at the HTTP edge — never in core/. */
 export const listOrchestrationsQuerySchema = z.strictObject({

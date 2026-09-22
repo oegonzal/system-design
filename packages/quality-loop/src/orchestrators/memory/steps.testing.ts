@@ -113,6 +113,8 @@ export function stepContext(
     context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
     outputs: overrides.outputs ?? {},
     ports: memoryPorts(overrides.ports),
+    pipelines: ['system-design'],
+    registry: [],
     acceptAtOf: () => (overrides.acceptAt === undefined ? ACCEPT_AT : overrides.acceptAt),
     execute: (input): Promise<QualityRunDto> => {
       executed.push({ goal: input.goal });
