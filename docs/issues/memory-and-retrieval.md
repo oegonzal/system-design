@@ -60,6 +60,12 @@ a request flag to skip injection is one field), at least five runs per arm,
 compared on `overall` and per dimension. One script over the run rows; the
 result goes in memory-runs whichever way it points.
 
+**Progress (2026-09-22).** The variance half of the experiment now has a
+tool: `POST /orchestrations/calibration` runs the same goal k times and
+reports the spread per dimension, so an arm's noise floor is measured rather
+than assumed before the two arms are compared. The paired arms themselves are
+still to run.
+
 **Verify.** A table in memory-runs with n per arm, mean and spread per
 dimension, and the prompts used.
 

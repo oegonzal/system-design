@@ -293,7 +293,11 @@ record. Standing rules that are not in any goal became finding types instead
 
 ## 4. The orchestrator, the runner, and the record
 
-Three things, in three places, each the smallest it can be.
+Three things, in three places, each the smallest it can be. The layer has
+since grown three more instances and two abilities — a step keeps every child
+it opens, and may choose its pipeline from what ran before — which
+[`./orchestrators.md`](./orchestrators.md) owns; what follows is the memory
+instance as first built, still accurate for it.
 
 **The orchestrator is data.** `src/orchestrators/memory/definition.ts` reads
 as the map it is:

@@ -69,6 +69,16 @@ unassessed; the decision was `escalate` at "8% of criteria assessed"; the
 orchestration went on with 0 usable and 0 injected memories. The controller
 was right for the evidence it had. The loss was upstream.
 
+**Evidence, the other direction (2026-09-22).** Calibration `ff2ed9c9`
+(`docs/pipelines/orchestrators.md` §6.2) ran the `memory-curator` brief three
+times. In sample `2026-09-22T19-26-20-735-9c1b39` the generality critic's
+first sample was a `schema-miss`; its second raised three `leaky_generality`
+findings, all discarded `below-min-hits, 1 of 2 samples`. That type is gated,
+so the blocker vanished and the run **accepted** at 76 — the two samples with
+both critic answers confirmed it and were held for revise. A lost critic
+sample removes a blocker; a lost evaluator sample escalates. Same cause,
+opposite error.
+
 **Recommendation.** Two moves, either sufficient, both cheap. (a) Retry a
 schema miss once at the seam (SEAM-2), which removes the most common cause.
 (b) Give evaluators `samples: 3` while keeping `minHits: 2`, so one lost
@@ -100,6 +110,16 @@ places, memory-runs §12.6). The same rule produced an 18-ref
 where the locations are genuine sections. Since `650fb43` introduced the
 overlap rule, digest admission fell from ~59% to ~42% of proposed memories
 over 50 digests.
+
+**Evidence, at the reconcile (2026-09-22).** Second opinion `8fa058ee`
+(`docs/pipelines/orchestrators.md` §6.4) judged one fixed `agentic-design`
+artifact with three fresh panels. All four opinions confirmed
+`contract_mismatch`, `contradiction`, `leaky_generality` and
+`unsupported_claim`, yet of 26 finding keys none was unanimous and only one
+was shared by two panels: confirmed findings carried 8–33 refs each, so
+location sets differed by a ref or two and every key was unique. Key-level
+agreement between judges is unreadable on this pipeline until grouping is
+anchored; type-level agreement reads fine.
 
 **Recommendation.** Anchor-based grouping: a defect is keyed by one anchor
 location per finding (the most specific ref the persona locates it at, which

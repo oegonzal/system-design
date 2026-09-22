@@ -147,5 +147,12 @@ that alters what the normaliser confirms fails a spec. An opt-in live harness
 item variance and agreement with pinned expectations, so judge drift is a
 number.
 
+**Progress (2026-09-22).** The live half exists as two orchestrators over a
+shared panel (`docs/pipelines/orchestrators.md`): `calibration` runs one goal
+k times and reports the spread, `second-opinion` holds one artifact fixed and
+reports where fresh panels disagree with the recorded verdict and each other.
+Both write a `PanelReportDto` on the record; nothing yet turns it into a
+regression fixture or runs in CI.
+
 **Verify.** The regression suite runs in CI without a key; the live harness
 writes its table to `docs/pipelines`.
