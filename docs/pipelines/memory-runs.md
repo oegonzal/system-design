@@ -1367,3 +1367,69 @@ findings were located at both memories of each pair, though the transfer
 persona asks for the later one alone, and that cost the two earlier memories
 — the same persona-compliance remainder §12.6 records for `missed_signal`,
 on a second finding type.
+
+---
+
+## 14. The first full agentic cycle: fifteen memory runs, one per prompt
+
+On 2026-09-22/23 every agentic prompt went through the memory orchestrator
+once, one at a time, `maxIterations: 1` on the target: 15 orchestrations,
+333 minutes, 240 target exchanges with no schema miss and no escalation.
+The driver, its ledger and the per-run rows are in the job's tmp folder;
+the numbers below are read off the records.
+
+| prompt                | injected | target      | digest kept | stored | store     |
+| --------------------- | -------- | ----------- | ----------- | ------ | --------- |
+| adversarial-verifier  | 2        | revise 66.0 | 4 of 7      | 4      | 287 → 291 |
+| agent-router-profiles | 2        | revise 59.0 | 0 of 8 ①    | 0      | 291       |
+| budget-governor       | 4        | revise 63.4 | 6 of 8      | 6      | 291 → 297 |
+| consensus-panel       | 3        | revise 70.2 | 4 of 8      | 4      | 297 → 301 |
+| escalation-desk       | 2        | revise 64.6 | 5 of 8      | 5      | 301 → 306 |
+| eval-corpus-builder   | 6        | revise 59.0 | 5 of 8      | 5      | 306 → 311 |
+| intake-normaliser     | 1        | revise 56.3 | 5 of 8      | 5      | 311 → 316 |
+| memory-curator        | 4        | revise 65.2 | 5 of 8      | 5      | 316 → 321 |
+| policy-optimiser      | 0 ②      | revise 66.7 | 4 of 8      | 4      | 321 → 325 |
+| provenance-ledger     | 3        | revise 60.2 | 2 of 8      | 2      | 325 → 327 |
+| retrieval-planner     | 3        | revise 62.5 | 5 of 8      | 5      | 327 → 332 |
+| self-repair-loop      | 2        | revise 62.3 | 5 of 8      | 5      | 332 → 337 |
+| tool-contract-broker  | 2 ③      | revise 61.3 | 6 of 8      | 6      | 337 → 343 |
+| workflow-composer     | 4        | revise 70.2 | 4 of 7      | 4      | 343 → 347 |
+| workflow-graph-engine | 5        | revise 65.8 | 5 of 8      | 5      | 347 → 352 |
+
+① The digest producer placed one signal under two memories in both
+iterations (`f7`, then `f6`); the `references` validator holds that as
+critical, so the artifact never reached a judge and nothing could be
+admitted. ② The recall pack fell short of its accept bar; the target ran
+unaided. ③ Probe derivation returned nothing; recall searched on the goal
+alone and still found its sixteen candidates.
+
+**The store learned.** 65 memories admitted of 118 proposed (55%), 65
+chunks written, the collection from 287 to 352 points — and 65 points now
+carry one of the fifteen target run ids in their `runId` field, each with
+its condition and lesson texts, its digest run id and the decision it came
+from. Every digest that reached its judges stored something; the only blank
+was the validator-blocked one.
+
+**Recall drew on it as it grew.** 43 lessons were injected across the
+fifteen targets (0 to 6 per run, mean 2.9), from a store that was
+one-domain three weeks ago and now holds agentic lessons from this same
+cycle: a run late in the order could recall what a run early in it had just
+stored.
+
+**The targets did not score higher for it.** Cycle mean 63.5 (median 63.4,
+spread 3.9, range 56.3–70.2, fifteen revises, no accept). The like-for-like
+baseline — every post-two-wave `agentic-design` run before this cycle,
+2026-09-09 to 09-10, ten iterations — is 63.6 (median 65.1, spread 4.7).
+The pre-two-wave runs of 2026-09-08 sat at 83.5 and are not comparable
+(§12.5, and `orchestrators.md` §6.4). Within the cycle, injected count and
+overall are uncorrelated (r = 0.1): the six-lesson run scored 59, the
+zero-lesson run 66.7. So at this store size, on one iteration, memory
+neither raised nor lowered the verdict. That is MEM-2 measured at n = 15
+rather than n = 1; the paired arm — the same fifteen with recall skipped —
+is what would separate "memory is inert" from "memory is inert against
+these judges' gates", and the cycle's own spread of 3.9 says how small a
+difference it could detect.
+
+**Dimensions.** Means across the fifteen: compliance 71.7, interfaces
+63.3, completeness 63.2, soundness 59.2. Soundness is where the gated
+`leaky_generality` lives, and it held every run for revise.

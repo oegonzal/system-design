@@ -66,6 +66,12 @@ reports the spread per dimension, so an arm's noise floor is measured rather
 than assumed before the two arms are compared. The paired arms themselves are
 still to run.
 
+**Evidence (2026-09-23).** memory-runs §14: fifteen agentic memory runs,
+43 lessons injected, cycle mean 63.5 against a like-for-like baseline of
+63.6 (post-two-wave runs before the cycle); injected count and overall
+uncorrelated (r = 0.1). Memory is measured inert at this store size on one
+iteration; the paired arm without recall is what remains.
+
 **Verify.** A table in memory-runs with n per arm, mean and spread per
 dimension, and the prompts used.
 
@@ -110,6 +116,10 @@ runs contribute their own lessons the number moves.
 
 **Evidence.** §12.2 (0 injected at 166 lessons); orchestration `b795092a`
 on 2026-09-10 injected 3 of 16 at 287 points.
+
+**Evidence (2026-09-23).** With agentic lessons accumulating in the same
+cycle, injection rose to 43 across 15 runs (mean 2.9, max 6) at 287 → 352
+points; one run's pack fell short of the accept bar and injected nothing.
 
 **What to watch.** `steps.recall.counts.usable` and `.injected` per memory
 run, against the store size at the time.
