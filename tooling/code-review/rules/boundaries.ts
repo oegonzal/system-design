@@ -21,6 +21,7 @@ import type { ChangedFile } from './index';
  *   web-testing    -> contracts, design-system   the web spec harness
  *   studio-ui      -> contracts, design-system, web-kit, web-testing
  *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
+ *   govcon-ui      -> contracts, design-system, web-kit, web-testing
  *   studio-api     -> contracts, db, llm, criteria, run-dump
  *   eval-worker    -> contracts, db, llm, criteria, run-dump
  *   quality-loop   -> contracts, db, llm, run-dump
@@ -41,6 +42,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'web-testing': ['contracts', 'design-system'],
   'studio-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
+  'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'studio-api': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump'],

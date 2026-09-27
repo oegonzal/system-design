@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "plugins": [{ "name": "next" }],
+    "types": ["node"],
+    // Redeclared app-locally, as in studio-ui: extends-inherited paths, being
+    // relative to the base file, don't reach Next's resolver. Only the
+    // browser-safe packages, so nothing node-scoped can resolve from here.
+    "paths": {
+      "@sysdesign/contracts": ["../contracts/src/index.ts"],
+      "@sysdesign/design-system": ["../design-system/src/index.ts"],
+      "@sysdesign/web-kit": ["../web-kit/src/index.ts"],
+      "@sysdesign/web-testing": ["../web-testing/src/index.ts"]
+    }
+  },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

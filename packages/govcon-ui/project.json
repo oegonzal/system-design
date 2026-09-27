@@ -1,0 +1,29 @@
+{
+  "name": "govcon-ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/govcon-ui/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": { "cwd": "packages/govcon-ui", "command": "next dev -p 4202" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": ["{projectRoot}/.next"],
+      "options": { "cwd": "packages/govcon-ui", "command": "next build" }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": { "cwd": "packages/govcon-ui", "command": "next start -p 4202" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": { "cwd": "packages/govcon-ui", "command": "tsc --noEmit -p tsconfig.json" }
+    }
+  }
+}

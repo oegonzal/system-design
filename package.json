@@ -17,6 +17,8 @@
     "quality-loop-ui:serve": "nx run quality-loop-ui:serve",
     "govcon": "DB_PORT=\"${DB_PORT:-5433}\" nx build govcon && DB_PORT=\"${DB_PORT:-5433}\" node --env-file-if-exists=.env packages/govcon/dist/main.js",
     "govcon:serve": "DB_PORT=\"${DB_PORT:-5433}\" nx run govcon:serve",
+    "govcon-ui:serve": "nx run govcon-ui:serve",
+    "govcon:start": "DB_PORT=\"${DB_PORT:-5433}\" concurrently --kill-others \"pnpm govcon:serve\" \"pnpm govcon-ui:serve\"",
     "quality:start": "DB_PORT=\"${DB_PORT:-5433}\" concurrently --kill-others \"pnpm quality-loop:serve\" \"pnpm quality-loop-ui:serve\"",
     "start": "concurrently --kill-others \"pnpm studio-api:serve\" \"pnpm eval-worker:serve\" \"pnpm studio-ui:serve\"",
     "stack:up": "bash scripts/stack.sh up",

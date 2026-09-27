@@ -45,7 +45,12 @@ anything the map already generates is deliberately absent, because a second copy
   the `next/navigation` mock and the jsdom shims. Imported only by specs and `vitest.setup.ts`.
 - `quality-loop-ui` — the Next.js client for the quality loop: pick a prompt from the library, run a
   pipeline, watch the exchanges, read the verdict. Renders the wire contract and nothing else.
-- `storybook` — the catalog host. It owns no stories; it globs the three projects that do.
+- `govcon` — SAM.gov contract opportunities for one company as a NestJS CLI and HTTP surface: a
+  pure core (ports, a budgeted source, a validated profile, a traced deterministic scorer), the
+  SAM.gov adapter, MikroORM adapters. The environment is read only at the edge.
+- `govcon-ui` — the Next.js client for govcon: pull inside the budget, rank the store, read a lead's
+  trace and description, watch the ledger. Renders the wire contract and nothing else.
+- `storybook` — the catalog host. It owns no stories; it globs the four projects that do.
 - `studio-e2e` — Playwright, driving a real browser against the real API.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it
   appears in no map entry and has no `project.json`.

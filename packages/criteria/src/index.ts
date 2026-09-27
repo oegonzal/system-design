@@ -319,6 +319,27 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The client lists recent runs, reopens one on click or from ?run=<id>, and refreshes the list when a run ends.',
   },
+  // Govcon web client (packages/govcon-ui)
+  {
+    id: 'GOVU-1',
+    statement:
+      'The client lists the profiles and the source status from the service, and a pull with a window shows the slice report and the budget it left.',
+  },
+  {
+    id: 'GOVU-2',
+    statement:
+      'The client lists leads over the score, tier and limit filters; a selected notice deep-links as ?notice=<id> and shows its factor trace.',
+  },
+  {
+    id: 'GOVU-3',
+    statement:
+      'A notice description is fetched on demand from the detail view and its outcome shown — the text, or that the budget is spent, or the failure.',
+  },
+  {
+    id: 'GOVU-4',
+    statement:
+      'The client shows the source ledger newest first: every call, its operation, outcome and size.',
+  },
   // Shared web libraries (packages/web-kit, packages/web-testing)
   {
     id: 'WEB-1',

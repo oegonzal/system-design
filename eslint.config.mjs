@@ -147,6 +147,8 @@ export default [
       'packages/web-testing/**/*.tsx',
       'packages/quality-loop-ui/**/*.ts',
       'packages/quality-loop-ui/**/*.tsx',
+      'packages/govcon-ui/**/*.ts',
+      'packages/govcon-ui/**/*.tsx',
     ],
     ...eslintReact.configs.recommended,
   },
