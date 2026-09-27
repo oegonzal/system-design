@@ -20,10 +20,10 @@ import {
  *   SAM_GOV_API_KEY           the account's public API key; absent → disabled source
  *   SAM_GOV_BASE_URL          the search URL (default production; alpha for testing)
  *   SAM_GOV_DESCRIPTION_URL   the notice description URL (default production)
- *   SAM_GOV_DAILY_BUDGET      attempts per rolling day (default 10 — a personal key's commonly reported quota)
+ *   SAM_GOV_DAILY_BUDGET      attempts per rolling day (default 1000, this key's quota; a personal key is commonly 10)
  *   SAM_GOV_CACHE_TTL_HOURS   how long a pulled query is not pulled again (default 24; 0 disables)
  */
-export const DEFAULT_DAILY_BUDGET = 10;
+export const DEFAULT_DAILY_BUDGET = 1000;
 export const DEFAULT_CACHE_TTL_HOURS = 24;
 
 export interface SamGovSettings extends BudgetPolicy {

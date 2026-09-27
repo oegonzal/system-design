@@ -10,8 +10,9 @@ client `packages/govcon-ui` operates.
 
 ## Why it is shaped this way
 
-A personal SAM.gov key is commonly reported to allow about ten requests a day,
-and every search page spends one. So the tool never re-fetches what it has
+Every search page and every description fetch spends one SAM.gov request, and
+a key has a daily quota (this key: 1,000 a day; a personal key is commonly
+reported at about ten). So the tool never re-fetches what it has
 (the call log doubles as a short-lived cache), refuses to call once the rolling
 day's budget is spent, never retries a 429, and does all ranking offline from
 Postgres. You pull once a day and search the store as often as you like.
@@ -98,7 +99,7 @@ script).
 | `SAM_GOV_API_KEY`                                         | The SAM.gov account's public API key. Without it the source is disabled and `pull` says so instead of failing. Read once, in the source factory; never logged. |
 | `SAM_GOV_BASE_URL`                                        | The search URL; default production, `https://api-alpha.sam.gov/opportunities/v2/search` for the alpha environment (its own key).                               |
 | `SAM_GOV_DESCRIPTION_URL`                                 | The notice description URL; default `https://api.sam.gov/prod/opportunities/v1/noticedesc`.                                                                    |
-| `SAM_GOV_DAILY_BUDGET`                                    | Attempts allowed per rolling 24 hours, every outcome counted; default 10. Raise it once the key's real quota is known.                                         |
+| `SAM_GOV_DAILY_BUDGET`                                    | Attempts allowed per rolling 24 hours, every outcome counted; default 1000 (this key's quota). Lower it for a personal key, commonly limited to about 10.      |
 | `SAM_GOV_CACHE_TTL_HOURS`                                 | How long a pulled query is not pulled again; default 24, `0` disables the cache.                                                                               |
 | `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME` | Postgres for `govcon_opportunity` and `govcon_source_call`; the `govcon` script defaults `DB_PORT` to 5433 (`pnpm stack:db`).                                  |
 | `GOVCON_PORT`                                             | HTTP port of `serve`, default 3004.                                                                                                                            |
