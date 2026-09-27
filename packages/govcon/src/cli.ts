@@ -31,7 +31,8 @@ export const USAGE = `usage: govcon <command> [options]
   leads   [--profile <id>] [--min-score <n>] [--tier high|medium|low] [--limit <n>] [--json]
   search  pull, then leads (either command's options)
   show    <noticeId> [--profile <id>] [--describe] [--json]
-          --describe fetches the notice text once (one request); later shows are free`;
+          --describe fetches the notice text once (one request); later shows are free
+  serve   the same service over HTTP (GOVCON_PORT, default 3004) for the web client`;
 
 const COMMANDS = ['pull', 'leads', 'search', 'show'] as const;
 type Command = (typeof COMMANDS)[number];

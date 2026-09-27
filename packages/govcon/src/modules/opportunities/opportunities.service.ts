@@ -72,6 +72,11 @@ export class OpportunitiesService {
     for (const profile of profiles.values()) validateProfile(profile, this.factorIds);
   }
 
+  /** The registry as data — what `GET /profiles` returns. */
+  listProfiles(): SearchProfile[] {
+    return [...this.profiles.values()];
+  }
+
   profile(id: string): SearchProfile {
     const profile = this.profiles.get(id);
     if (!profile) {

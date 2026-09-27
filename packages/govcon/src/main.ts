@@ -1,19 +1,37 @@
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+
 import { cli } from './cli';
+import { AppModule } from './modules/app/app.module';
+import { configureApp } from './modules/app/configure-app';
 
 /**
- * govcon: SAM.gov contract opportunities for one company, from the command
- * line. `main.js pull` fetches the profile's slices inside the daily budget
- * and stores them; `leads` ranks what is stored without spending a request;
- * `search` does both; `show` prints one notice with its factor trace. Every
- * command boots the same Nest context and exits by its result — there is no
- * HTTP surface.
+ * govcon, two ways. `main.js pull | leads | search | show` runs one command
+ * over the Nest context and exits by its result; `main.js serve` serves the
+ * same service over HTTP (GET /profiles, GET /source, GET /source/calls,
+ * POST /pulls, GET /leads, GET /opportunities/:id,
+ * POST /opportunities/:id/description, GET /health) for the web client.
  */
 async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {
     console.error(error);
     process.exit(1);
   });
+
+  if (process.argv[2] === 'serve') {
+    await serve();
+    return;
+  }
   process.exit(await cli(process.argv.slice(2)));
+}
+
+async function serve(): Promise<void> {
+  const app = configureApp(await NestFactory.create(AppModule));
+  // SIGTERM/SIGINT close the MikroORM pool instead of dropping connections.
+  app.enableShutdownHooks();
+  const port = process.env['GOVCON_PORT'] ? parseInt(process.env['GOVCON_PORT'], 10) : 3004;
+  await app.listen(port);
+  Logger.log(`govcon listening on http://localhost:${port}/health`);
 }
 
 bootstrap();

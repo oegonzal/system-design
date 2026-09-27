@@ -23,6 +23,9 @@ describe('htmlToText', () => {
     expect(htmlToText('a &unknownthing; b &#xZZ; c')).toBe('a &unknownthing; b &#xZZ; c');
     expect(htmlToText('&#65;&#x42;')).toBe('AB');
     expect(htmlToText('a &lt;b&gt; c')).toBe('a <b> c');
+    expect(htmlToText('CONTACT|4|N743\rITEM UNIQUE\r\nWARRANTY')).toBe(
+      'CONTACT|4|N743\nITEM UNIQUE\nWARRANTY',
+    );
     expect(htmlToText('<table><tr><td>a</td><td>b</td></tr></table>')).toBe('a b');
     expect(htmlToText('')).toBe('');
   });

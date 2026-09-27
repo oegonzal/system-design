@@ -78,6 +78,7 @@ const decodeEntity = (match: string, body: string): string => {
  */
 export function htmlToText(html: string): string {
   return html
+    .replace(/\r\n?/g, '\n')
     .replace(DROPPED_ELEMENTS, ' ')
     .replace(BLOCK_BOUNDARY, '\n')
     .replace(CELL_BOUNDARY, ' ')

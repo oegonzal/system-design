@@ -13,3 +13,5 @@ pnpm exec nx test govcon             # DB_PORT=5433 for the Postgres specs
 Layout: `src/core` (pure — ports, the budgeted source, the profile schema, the pull plan, scoring), `src/profiles` (one file per company; `enfav.ts` ships), `src/modules/opportunities` (Nest wiring, the SAM.gov adapter, the MikroORM adapters), `src/cli.ts` + `src/render.ts` (the command line).
 
 How it works, the environment variables, the budget semantics and the live sequence: [docs/govcon/overview.md](../../docs/govcon/overview.md). Tables live in `packages/db` (`govcon_opportunity`, `govcon_source_call`); `pnpm stack:db` then `DB_PORT=5433 pnpm db:migrate` before the first pull.
+
+The same service over HTTP for the web client: `pnpm govcon:serve` (`:3004`; `GET /health`, `GET /profiles`, `GET /source`, `GET /source/calls`, `POST /pulls`, `GET /leads`, `GET /opportunities/:noticeId`, `POST /opportunities/:noticeId/description`). Every wire type is in `@sysdesign/contracts` under `lib/govcon`.

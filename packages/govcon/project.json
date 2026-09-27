@@ -5,6 +5,25 @@
   "projectType": "application",
   "tags": ["type:app", "scope:node"],
   "targets": {
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "govcon:build",
+        "runBuildTargetDependencies": false,
+        "runtimeArgs": ["--env-file-if-exists=.env"],
+        "args": ["serve"]
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "govcon:build:development"
+        },
+        "production": {
+          "buildTarget": "govcon:build:production"
+        }
+      }
+    },
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,

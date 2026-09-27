@@ -5,10 +5,15 @@ import { GovconOpportunity, GovconSourceCall } from '@sysdesign/db';
 import { BudgetedSource, type BudgetPolicy } from '../../core/budgeted-source';
 import type { SourceCallLog } from '../../core/ports';
 import { PROFILES } from '../../profiles';
+import { LeadsController } from './leads.controller';
+import { OpportunitiesController } from './opportunities.controller';
 import { OpportunitiesService } from './opportunities.service';
 import { MikroOrmOpportunityRepository } from './persistence/mikro-orm-opportunity-repository';
 import { MikroOrmSourceCallLog } from './persistence/mikro-orm-source-call-log';
+import { ProfilesController } from './profiles.controller';
+import { PullsController } from './pulls.controller';
 import { createSamGovSourceFromEnv, samGovSettingsFromEnv } from './sam-gov/create-source';
+import { SourceController } from './source.controller';
 import {
   BUDGET_POLICY,
   CLOCK,
@@ -35,6 +40,13 @@ const budgetPolicy = (): BudgetPolicy => {
  */
 @Module({
   imports: [MikroOrmModule.forFeature([GovconOpportunity, GovconSourceCall])],
+  controllers: [
+    ProfilesController,
+    SourceController,
+    PullsController,
+    LeadsController,
+    OpportunitiesController,
+  ],
   providers: [
     OpportunitiesService,
     { provide: SOURCE_CALL_LOG, useClass: MikroOrmSourceCallLog },
