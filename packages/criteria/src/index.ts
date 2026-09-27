@@ -357,6 +357,11 @@ export const CRITERIA: readonly Criterion[] = [
       'The search profile is validated data: factor weights name exactly the factor table and sum to one, codes, bands and tiers are checked when it loads, so a malformed profile fails at boot before any request.',
   },
   {
+    id: 'GOV-6',
+    statement:
+      'Re-pulling upserts by notice id: no duplicate rows, last_seen_at advances, changed fields update, first_seen_at holds, and duplicates within one batch are tolerated.',
+  },
+  {
     id: 'GOV-7',
     statement:
       'The SAM.gov key is read only by the environment factory; the request URL carries it and nothing else does — not a stored query, a query key, a warning or an error message.',
