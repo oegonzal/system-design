@@ -330,6 +330,32 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Web specs mount through the theme and stub the API at the fetch boundary through the shared harness.',
   },
+  // Government contracting: SAM.gov opportunities (packages/govcon)
+  {
+    id: 'GOV-2',
+    statement:
+      'A query already pulled inside the cache window is answered from the call log and spends no upstream request; a log that cannot answer degrades to the call with a warning.',
+  },
+  {
+    id: 'GOV-3',
+    statement:
+      'Upstream calls stop at the declared daily budget over a rolling day and the pull report names every slice it skipped; every attempt counts, and a rate-limited reply is recorded and never retried.',
+  },
+  {
+    id: 'GOV-4',
+    statement:
+      "A lead's score is a traced weighted sum of declared factors whose points sum to the score; an ineligible set-aside, an excluded notice type, a passed deadline or an inactive notice is a gate, never a weight; ranking is deterministic.",
+  },
+  {
+    id: 'GOV-5',
+    statement:
+      'The search profile is validated data: factor weights name exactly the factor table and sum to one, codes, bands and tiers are checked when it loads, so a malformed profile fails at boot before any request.',
+  },
+  {
+    id: 'GOV-7',
+    statement:
+      'The SAM.gov key is read only by the environment factory; the request URL carries it and nothing else does — not a stored query, a query key, a warning or an error message.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);
