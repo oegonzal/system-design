@@ -39,3 +39,4 @@ export * from './lib/evaluations';
 export * from './lib/eval-profile';
 export * from './lib/star-stories';
 export * from './lib/quality-loop';
+export * from './lib/govcon';
