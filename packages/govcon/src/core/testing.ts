@@ -108,6 +108,7 @@ export class InMemorySourceCallLog implements SourceCallLog {
       .filter(
         (call) =>
           call.source === source &&
+          call.operation === 'search' &&
           call.queryKey === queryKey &&
           call.outcome === 'ok' &&
           call.requestedAt.getTime() >= notBefore.getTime(),

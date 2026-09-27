@@ -9,6 +9,9 @@ const OUTCOMES = [
   'invalid-response',
 ] as const satisfies ContractOutcomes;
 
+type ContractOperations = (typeof Contracts)['SOURCE_OPERATIONS'];
+const OPERATIONS = ['search', 'description'] as const satisfies ContractOperations;
+
 /**
  * One request the govcon package made to an upstream source. The row is both
  * the short-lived cache (a fresh `ok` row for the same query key means the
@@ -24,12 +27,20 @@ const OUTCOMES = [
   name: 'govcon_source_call_outcome_check',
   expression: `outcome in (${OUTCOMES.map((o) => `'${o}'`).join(', ')})`,
 })
+@Check({
+  name: 'govcon_source_call_operation_check',
+  expression: `operation in (${OPERATIONS.map((o) => `'${o}'`).join(', ')})`,
+})
 export class GovconSourceCall {
   @PrimaryKey({ type: 'uuid' })
   id: string = crypto.randomUUID();
 
   @Property({ type: 'varchar', length: 40 })
   source!: string;
+
+  /** A search page or a notice description; both spend the budget, only searches feed the cache. */
+  @Property({ type: 'varchar', length: 20 })
+  operation!: Contracts.SourceOperation;
 
   /** sha256 hex of the canonical query. */
   @Property({ type: 'varchar', length: 64 })

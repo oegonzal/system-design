@@ -109,4 +109,19 @@ export class GovconOpportunity {
 
   @Property({ type: 'timestamptz' })
   lastSeenAt!: Date;
+
+  /**
+   * The notice description as text, once fetched: one budgeted request, kept
+   * for good. A pull never writes these three columns — the row mapper leaves
+   * them out, so an upsert cannot clear them.
+   */
+  @Property({ type: 'text', nullable: true })
+  descriptionText!: string | null;
+
+  /** The description response as received. */
+  @Property({ type: 'json', nullable: true })
+  descriptionRaw!: unknown;
+
+  @Property({ type: 'timestamptz', nullable: true })
+  descriptionFetchedAt!: Date | null;
 }

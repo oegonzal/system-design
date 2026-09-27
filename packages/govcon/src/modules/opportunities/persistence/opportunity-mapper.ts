@@ -12,7 +12,13 @@ import type { FetchedOpportunity } from '../../../core/ports';
 const date = (iso: string | null): Date | null => (iso === null ? null : new Date(iso));
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
 
-export function toRow(fetched: FetchedOpportunity, seenAt: Date): GovconOpportunity {
+/** Everything a pull writes. The description columns are deliberately absent: an upsert must never clear them. */
+export type OpportunityRow = Omit<
+  GovconOpportunity,
+  'descriptionText' | 'descriptionRaw' | 'descriptionFetchedAt'
+>;
+
+export function toRow(fetched: FetchedOpportunity, seenAt: Date): OpportunityRow {
   const o = fetched.opportunity;
   return {
     noticeId: o.noticeId,
@@ -48,7 +54,7 @@ export function toRow(fetched: FetchedOpportunity, seenAt: Date): GovconOpportun
   };
 }
 
-export function fromRow(row: GovconOpportunity): Opportunity {
+export function fromRow(row: OpportunityRow): Opportunity {
   return {
     noticeId: row.noticeId,
     title: row.title,

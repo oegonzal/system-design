@@ -4,7 +4,13 @@
  * hand in the fakes from `./testing`. Nothing here knows about Nest, the
  * filesystem, the environment, `fetch` or a clock.
  */
-import type { Opportunity, SourceAvailability, SourceCallOutcome } from '@sysdesign/contracts';
+import type {
+  DescriptionRequest,
+  Opportunity,
+  SourceAvailability,
+  SourceCallOutcome,
+  SourceOperation,
+} from '@sysdesign/contracts';
 
 import type { OpportunityQuery } from './query';
 
@@ -56,8 +62,10 @@ export interface OpportunitySource {
 /** One upstream request as the ledger keeps it. */
 export interface SourceCall {
   source: string;
+  /** A search page or a notice description; every operation spends the budget. */
+  operation: SourceOperation;
   queryKey: string;
-  query: OpportunityQuery;
+  query: OpportunityQuery | DescriptionRequest;
   requestedAt: Date;
   durationMs: number;
   status: number | null;

@@ -8,8 +8,8 @@ import type { FreshCall, SourceCall, SourceCallLog } from '../../../core/ports';
 
 /**
  * The call ledger in Postgres: append-only rows, read two ways — the latest
- * successful call for a query key inside the cache window, and the count of
- * every attempt inside the budget window.
+ * successful search for a query key inside the cache window, and the count of
+ * every attempt, whatever its operation, inside the budget window.
  */
 @Injectable()
 export class MikroOrmSourceCallLog implements SourceCallLog {
@@ -26,7 +26,7 @@ export class MikroOrmSourceCallLog implements SourceCallLog {
       .fork()
       .findOne(
         GovconSourceCall,
-        { source, queryKey, outcome: 'ok', requestedAt: { $gte: notBefore } },
+        { source, operation: 'search', queryKey, outcome: 'ok', requestedAt: { $gte: notBefore } },
         { orderBy: { requestedAt: 'desc' } },
       );
     return row

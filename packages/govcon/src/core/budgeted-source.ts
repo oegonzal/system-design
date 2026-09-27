@@ -113,6 +113,7 @@ export class BudgetedSource implements OpportunitySource {
     try {
       await this.log.record({
         source: this.id,
+        operation: 'search',
         queryKey: key,
         query,
         requestedAt,

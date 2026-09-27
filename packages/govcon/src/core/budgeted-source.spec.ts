@@ -36,6 +36,7 @@ describe('the budgeted source', () => {
     expect(inner.queries).toHaveLength(1);
     expect(log.calls).toHaveLength(1);
     expect(log.calls[0]).toMatchObject({
+      operation: 'search',
       outcome: 'ok',
       status: 200,
       totalRecords: 2,
