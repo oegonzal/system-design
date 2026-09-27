@@ -5,6 +5,8 @@ It pulls SAM.gov's Contract Opportunities feed a slice at a time inside a
 daily request budget, stores every record it can normalize, and ranks what is
 stored against a declarative profile — codes, phrases, prices, bands and
 thresholds are data, the engine is deterministic and every point is traced.
+It is one Nest context two ways: a command line, and an HTTP surface the web
+client `packages/govcon-ui` operates.
 
 ## Why it is shaped this way
 
@@ -29,6 +31,44 @@ nothing fetched), `budget-exhausted` (the budget stopped it), `error`, or
 received, inserted, updated and rejected, then a budget line: attempts in the
 last 24 hours against the budget. Exit code 2 is a usage problem, 1 a pull that
 stored nothing, 0 otherwise. `--json` prints the report objects.
+
+## The HTTP surface (`pnpm govcon:serve`, `:3004`)
+
+The same service the CLI runs, for the web client. Every wire type is in
+`@sysdesign/contracts` under `lib/govcon`; bodies are `{ data }` or
+`{ data, meta }`, errors keep Nest's shape (400 with named `issues` on a bad
+body or query, 404 on an unknown notice or profile).
+
+| Route                                                 | Returns                                                                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                                         | `{ status: 'ok' }`                                                                                                  |
+| `GET /profiles`                                       | `SearchProfile[]` — the registry as data, read-only                                                                 |
+| `GET /source`                                         | `SourceStatusDto` — availability, the rolling-day budget as the ledger counts it, the cache window                  |
+| `GET /source/calls?limit&offset`                      | `SourceCallDto[]` with `meta` — the ledger newest first                                                             |
+| `POST /pulls` `{ profile?, days? }` or `{ from, to }` | `PullReport` — synchronous, 200: a pull is seconds and bounds itself (30 s per request, one retry, the budget)      |
+| `GET /leads?profile&minScore&tier&limit`              | `LeadsReport` — ranked from the store, never a request upstream                                                     |
+| `GET /opportunities/:noticeId?profile`                | `LeadDetailDto` — the lead with its trace and its description when fetched                                          |
+| `POST /opportunities/:noticeId/description`           | `DescriptionResultDto` — `ok` (from the row when stored, else one budgeted request), `budget-exhausted`, or `error` |
+
+```
+curl -s localhost:3004/source | jq .data
+curl -s -X POST localhost:3004/pulls -H 'content-type: application/json' -d '{"days":3}' | jq '.data.slices[]|[.outcome,.received]'
+curl -s 'localhost:3004/leads?limit=5' | jq '.data.leads[]|[.score,.tier,.opportunity.title]'
+curl -s -X POST localhost:3004/opportunities/<noticeId>/description | jq .data.status
+```
+
+## The web client (`packages/govcon-ui`, `pnpm govcon:start`, `:4202`)
+
+One screen over the HTTP surface, in the shape of `quality-loop-ui`: the
+source and its budget as a meter; a pull (profile, days, one button) with
+its slice report; the leads over score, tier and limit filters; one lead in
+full — facts, contacts, the score as a meter, every factor's points and
+evidence, and the description, fetched on demand by one click that spends
+one request and is then kept; the ledger newest first; the profile as data.
+The open lead is remembered in the URL as `?notice=<id>`. Pure components
+carry stories and specs; the workspace and the client are tested against a
+stubbed API. `NEXT_PUBLIC_GOVCON_URL` names the service (default
+`http://localhost:3004`).
 
 ## The profile (`packages/govcon/src/profiles/enfav.ts`)
 
@@ -57,9 +97,13 @@ script).
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SAM_GOV_API_KEY`                                         | The SAM.gov account's public API key. Without it the source is disabled and `pull` says so instead of failing. Read once, in the source factory; never logged. |
 | `SAM_GOV_BASE_URL`                                        | The search URL; default production, `https://api-alpha.sam.gov/opportunities/v2/search` for the alpha environment (its own key).                               |
+| `SAM_GOV_DESCRIPTION_URL`                                 | The notice description URL; default `https://api.sam.gov/prod/opportunities/v1/noticedesc`.                                                                    |
 | `SAM_GOV_DAILY_BUDGET`                                    | Attempts allowed per rolling 24 hours, every outcome counted; default 10. Raise it once the key's real quota is known.                                         |
 | `SAM_GOV_CACHE_TTL_HOURS`                                 | How long a pulled query is not pulled again; default 24, `0` disables the cache.                                                                               |
 | `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME` | Postgres for `govcon_opportunity` and `govcon_source_call`; the `govcon` script defaults `DB_PORT` to 5433 (`pnpm stack:db`).                                  |
+| `GOVCON_PORT`                                             | HTTP port of `serve`, default 3004.                                                                                                                            |
+| `GOVCON_CORS_ORIGIN`                                      | The browser origin allowed to call the service; default `http://localhost:4202`.                                                                               |
+| `NEXT_PUBLIC_GOVCON_URL`                                  | (web client) the service's base URL; default `http://localhost:3004`.                                                                                          |
 
 ## Budget semantics
 
@@ -74,6 +118,12 @@ and ends the pull. A log that cannot be read falls through to the call with a
 warning: the cache is an optimisation, never a dependency. A crash between
 the request and its ledger row under-counts by one; accepted.
 
+A notice description is one more budgeted request, recorded with
+`operation = 'description'` in its own key namespace so it never reads as a
+fresh search; the stored row, not the ledger, is its cache — a description
+already on the row answers without a request, and a pull's upsert never
+touches the description columns.
+
 ## Layout
 
 | Where                                                       | What                                                                                                                                                                                                            |
@@ -81,13 +131,15 @@ the request and its ledger row under-counts by one; accepted.
 | `packages/govcon/src/core/`                                 | Pure: `ports.ts`, `query.ts` (canonical query + key), `budgeted-source.ts`, `profile.ts`, `plan.ts`, `scoring.ts`. A spec pins that nothing here reads a clock, the environment, the filesystem or the network. |
 | `packages/govcon/src/modules/opportunities/sam-gov/`        | The adapter: zod `looseObject` schemas, the normalizer (three date spellings, nothing else), the source over injectable `fetch`, the env factory.                                                               |
 | `packages/govcon/src/modules/opportunities/persistence/`    | Row mapper and the two MikroORM adapters.                                                                                                                                                                       |
-| `packages/govcon/src/modules/opportunities/opportunities.*` | The composition root and the service (`pull`, `leads`, `show`).                                                                                                                                                 |
+| `packages/govcon/src/modules/opportunities/opportunities.*` | The composition root and the service (`pull`, `leads`, `show`, `describe`, `status`, `calls`).                                                                                                                  |
+| `packages/govcon/src/modules/opportunities/*.controller.ts` | The HTTP surface: five thin controllers, zod schemas beside them, one `ZodValidationPipe` under `modules/app/`.                                                                                                 |
+| `packages/govcon-ui/src/`                                   | The web client: `api/client.ts` (the one HTTP boundary), `features/*` (pure components with stories), `features/workspace/`.                                                                                    |
 | `packages/contracts/src/lib/govcon/`                        | `Opportunity` and the documented request vocabularies.                                                                                                                                                          |
 | `packages/db/src/entities/govcon-*.entity.ts`               | The two tables; migration `Migration20260926100001_create_govcon`.                                                                                                                                              |
 
 Criteria `GOV-1..7` in `packages/criteria`; every spec title claims one.
 
-## First run
+## First run (CLI)
 
 ```
 pnpm stack:db && DB_PORT=5433 pnpm db:migrate
@@ -104,6 +156,7 @@ data change.
 
 ## Not in v1
 
-USAspending enrichment (an award-history port and factor), the notice
-description text (a request per notice), semantic relevance through the
-embedding client, an HTTP surface, scheduled pulls.
+USAspending enrichment (an award-history port and factor), semantic
+relevance through the embedding client, editable profiles in the browser,
+scheduled pulls, a Playwright journey for the client (quality-loop-ui has
+none either), Docker or Tilt manifests for the pair.
