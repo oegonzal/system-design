@@ -4,6 +4,8 @@ export * from './entities/eval-job.entity';
 export * from './entities/evaluation.entity';
 export * from './entities/experience-profile.entity';
 export * from './entities/finding.entity';
+export * from './entities/govcon-opportunity.entity';
+export * from './entities/govcon-source-call.entity';
 export * from './entities/improvement-run.entity';
 export * from './entities/memory-embedding.entity';
 export * from './entities/orchestration-run-child.entity';

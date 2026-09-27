@@ -7,6 +7,8 @@ import { EvalJob } from './entities/eval-job.entity';
 import { Evaluation } from './entities/evaluation.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
 import { Finding } from './entities/finding.entity';
+import { GovconOpportunity } from './entities/govcon-opportunity.entity';
+import { GovconSourceCall } from './entities/govcon-source-call.entity';
 import { ImprovementRun } from './entities/improvement-run.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -54,6 +56,8 @@ export const ormOptions = {
     QualityRunFinding,
     QualityRunCriterionResult,
     StarStory,
+    GovconOpportunity,
+    GovconSourceCall,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,
