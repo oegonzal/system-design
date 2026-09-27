@@ -1,31 +1,10 @@
 'use client';
 
-import styled from '@emotion/styled';
 import type { QualityRunDto } from '@sysdesign/contracts';
-import { Badge, Heading, Spinner, Stack, Text } from '@sysdesign/design-system';
+import { Badge, Heading, Spinner, Stack, Table, Text } from '@sysdesign/design-system';
 import { useEffect, useState } from 'react';
 
 import { OUTCOME_TONE, STATUS_TONE } from '../results/tones';
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-family: ${({ theme }) => theme.font.family.base};
-  font-size: ${({ theme }) => theme.font.size.sm};
-
-  th,
-  td {
-    text-align: left;
-    padding: ${({ theme }) => `${theme.space[2]}px ${theme.space[3]}px`};
-    border-bottom: 1px solid ${({ theme }) => theme.color.border.subtle};
-    vertical-align: top;
-  }
-
-  th {
-    color: ${({ theme }) => theme.color.text.secondary};
-    font-weight: ${({ theme }) => theme.font.weight.semibold};
-  }
-`;
 
 /** `m:ss` — long enough for a loop of several model calls, never wider. */
 export function formatElapsed(ms: number): string {

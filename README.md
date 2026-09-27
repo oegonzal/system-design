@@ -77,7 +77,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/contracts`       | Wire types + `as const` vocabularies every layer derives from                            |
 | `packages/db`              | MikroORM entities, migrations, seed — shared by API and worker                           |
 | `packages/llm`             | The one LLM seam: Claude via structured outputs, no-op without a key                     |
-| `packages/design-system`   | Emotion tokens → semantic roles → 18 primitives, contrast-asserted                       |
+| `packages/design-system`   | Emotion tokens → semantic roles → 19 primitives, contrast-asserted                       |
 | `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, evaluations, stories                      |
 | `packages/eval-worker`     | Postgres-queue poller + rules engine + LLM critic                                        |
 | `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                         |

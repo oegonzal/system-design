@@ -1,29 +1,9 @@
 import styled from '@emotion/styled';
 import type { Diagnostic, RemediationNote } from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
+import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { subjectLabel, type CriterionRow, type FindingGroup } from './select';
 import { RESULT_TONE } from './tones';
-
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-family: ${({ theme }) => theme.font.family.base};
-  font-size: ${({ theme }) => theme.font.size.sm};
-
-  th,
-  td {
-    text-align: left;
-    padding: ${({ theme }) => `${theme.space[2]}px ${theme.space[3]}px`};
-    border-bottom: 1px solid ${({ theme }) => theme.color.border.subtle};
-    vertical-align: top;
-  }
-
-  th {
-    color: ${({ theme }) => theme.color.text.secondary};
-    font-weight: ${({ theme }) => theme.font.weight.semibold};
-  }
-`;
 
 const Item = styled.li`
   list-style: none;
