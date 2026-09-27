@@ -21,7 +21,13 @@ export interface SourceAvailability {
  * called). One union, so a consumer handles every case once.
  */
 export type SourceResult =
-  | { kind: 'ok'; records: unknown[]; totalRecords: number }
+  | {
+      kind: 'ok';
+      opportunities: FetchedOpportunity[];
+      /** Records the source returned that did not normalize — counted, never stored. */
+      rejected: RejectedRecord[];
+      totalRecords: number;
+    }
   | { kind: 'cached'; requestedAt: string; recordCount: number | null }
   | { kind: 'budget-exhausted'; spent: number; budget: number }
   | {
@@ -31,6 +37,17 @@ export type SourceResult =
       /** Provider detail, bounded, never the request URL. */
       message: string;
     };
+
+/** A normalized record together with the record as the source returned it. */
+export interface FetchedOpportunity {
+  opportunity: Opportunity;
+  raw: unknown;
+}
+
+export interface RejectedRecord {
+  noticeId: string | null;
+  issues: string[];
+}
 
 export interface OpportunitySource {
   /** Names the source in the call log and the stored records, e.g. `sam.gov`. */
@@ -82,7 +99,7 @@ export interface UpsertSummary {
 
 export interface OpportunityRepository {
   /** Insert or refresh by notice id; `seenAt` becomes `lastSeenAt`, and `firstSeenAt` for new rows. */
-  upsertMany(items: readonly Opportunity[], seenAt: Date): Promise<UpsertSummary>;
+  upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary>;
   findCandidates(filter: CandidateFilter): Promise<Opportunity[]>;
   findOne(noticeId: string): Promise<Opportunity | null>;
 }

@@ -1,7 +1,7 @@
 import { BUDGET_WINDOW_MS, BudgetedSource } from './budgeted-source';
 import type { SourceResult } from './ports';
 import type { OpportunityQuery } from './query';
-import { InMemorySourceCallLog, okResult, scriptedSource } from './testing';
+import { fetched, InMemorySourceCallLog, okResult, scriptedSource } from './testing';
 
 const query: OpportunityQuery = {
   postedFrom: '2026-09-20',
@@ -29,11 +29,10 @@ function harness(replies: readonly SourceResult[], policy = { ttlMs: 24 * HOUR, 
 
 describe('the budgeted source', () => {
   it('[GOV-2] answers a query pulled inside the cache window from the log, calling nothing', async () => {
-    const { inner, log, source, advance } = harness([
-      okResult([{ noticeId: 'a' }, { noticeId: 'b' }]),
-    ]);
+    const page = okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })]);
+    const { inner, log, source, advance } = harness([page]);
 
-    expect(await source.search(query)).toEqual(okResult([{ noticeId: 'a' }, { noticeId: 'b' }]));
+    expect(await source.search(query)).toEqual(page);
     expect(inner.queries).toHaveLength(1);
     expect(log.calls).toHaveLength(1);
     expect(log.calls[0]).toMatchObject({
@@ -96,7 +95,7 @@ describe('the budgeted source', () => {
   });
 
   it('[GOV-2] treats a log that cannot answer as empty: the source is called and the failure is a warning', async () => {
-    const { inner, log, source, warnings } = harness([okResult([{ noticeId: 'a' }])]);
+    const { inner, log, source, warnings } = harness([okResult([fetched({ noticeId: 'a' })])]);
     log.failing = new Error('connection refused');
 
     const result = await source.search(query);

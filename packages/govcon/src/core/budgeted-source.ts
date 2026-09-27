@@ -100,7 +100,7 @@ export class BudgetedSource implements OpportunitySource {
             status: 200,
             outcome: 'ok' as const,
             totalRecords: result.totalRecords,
-            recordCount: result.records.length,
+            recordCount: result.opportunities.length + result.rejected.length,
             error: null,
           }
         : {

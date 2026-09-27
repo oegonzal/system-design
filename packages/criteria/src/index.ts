@@ -332,6 +332,11 @@ export const CRITERIA: readonly Criterion[] = [
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
+    id: 'GOV-1',
+    statement:
+      'Every SAM.gov record is schema-validated and normalized before it is stored — unknown fields tolerated, known fields typed, dates read in every spelling the provider uses; a record that cannot become a lead is counted and reported, never persisted.',
+  },
+  {
     id: 'GOV-2',
     statement:
       'A query already pulled inside the cache window is answered from the call log and spends no upstream request; a log that cannot answer degrades to the call with a warning.',

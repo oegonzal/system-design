@@ -6,9 +6,11 @@ import type { Opportunity } from '@sysdesign/contracts';
 
 import type {
   CandidateFilter,
+  FetchedOpportunity,
   FreshCall,
   OpportunityRepository,
   OpportunitySource,
+  RejectedRecord,
   SourceCall,
   SourceCallLog,
   SourceResult,
@@ -154,11 +156,16 @@ export function scriptedSource(
   };
 }
 
-export const okResult = (records: unknown[], totalRecords = records.length): SourceResult => ({
-  kind: 'ok',
-  records,
-  totalRecords,
-});
+export const fetched = (overrides: Partial<Opportunity> = {}): FetchedOpportunity => {
+  const opportunity = opportunityOf(overrides);
+  return { opportunity, raw: { noticeId: opportunity.noticeId, title: opportunity.title } };
+};
+
+export const okResult = (
+  opportunities: FetchedOpportunity[],
+  totalRecords = opportunities.length,
+  rejected: RejectedRecord[] = [],
+): SourceResult => ({ kind: 'ok', opportunities, rejected, totalRecords });
 
 export class InMemoryOpportunityRepository implements OpportunityRepository {
   readonly rows = new Map<
@@ -166,10 +173,10 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
     { opportunity: Opportunity; firstSeenAt: Date; lastSeenAt: Date }
   >();
 
-  async upsertMany(items: readonly Opportunity[], seenAt: Date): Promise<UpsertSummary> {
+  async upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary> {
     let inserted = 0;
     let updated = 0;
-    for (const item of items) {
+    for (const { opportunity: item } of items) {
       const existing = this.rows.get(item.noticeId);
       if (existing) {
         this.rows.set(item.noticeId, { ...existing, opportunity: item, lastSeenAt: seenAt });
