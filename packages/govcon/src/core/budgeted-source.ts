@@ -1,11 +1,15 @@
 import type {
+  BudgetExhausted,
+  DescribeResult,
   FreshCall,
   OpportunitySource,
   SourceAvailability,
+  SourceCall,
   SourceCallLog,
+  SourceFailure,
   SourceResult,
 } from './ports';
-import { queryKey, type OpportunityQuery } from './query';
+import { descriptionKey, queryKey, type OpportunityQuery } from './query';
 
 /** The budget's window: strictly at least as strict as any calendar-day quota with the same count. */
 export const BUDGET_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -22,6 +26,8 @@ export interface BudgetPolicy {
  * fresh `ok` call for the same key answers `cached` (the records are already
  * stored); a spent budget answers `budget-exhausted` without calling; otherwise
  * the inner source is called and the attempt recorded, whatever it returned.
+ * A description skips the cache question — the store is its cache — and is
+ * otherwise budgeted and recorded the same way.
  *
  * The log is an optimisation, never a dependency: a read that fails falls
  * through to the call with a warning, a write that fails loses one ledger row
@@ -60,6 +66,60 @@ export class BudgetedSource implements OpportunitySource {
       }
     }
 
+    const exhausted = await this.exhausted(at);
+    if (exhausted) return exhausted;
+
+    const started = this.now();
+    const result = await this.inner.search(query);
+    const durationMs = Math.max(0, this.now().getTime() - started.getTime());
+    if (result.kind === 'ok' || result.kind === 'error') {
+      await this.record({
+        operation: 'search',
+        queryKey: key,
+        query,
+        requestedAt: started,
+        durationMs,
+        ...(result.kind === 'ok'
+          ? {
+              status: 200,
+              outcome: 'ok',
+              totalRecords: result.totalRecords,
+              recordCount: result.opportunities.length + result.rejected.length,
+              error: null,
+            }
+          : failure(result)),
+      });
+    }
+    return result;
+  }
+
+  /**
+   * A description spends the budget like a page but is never cached here: the
+   * stored row is its cache, and the service asks the store before asking us.
+   */
+  async describe(noticeId: string): Promise<DescribeResult> {
+    const exhausted = await this.exhausted(this.now());
+    if (exhausted) return exhausted;
+
+    const started = this.now();
+    const result = await this.inner.describe(noticeId);
+    const durationMs = Math.max(0, this.now().getTime() - started.getTime());
+    if (result.kind === 'ok' || result.kind === 'error') {
+      await this.record({
+        operation: 'description',
+        queryKey: descriptionKey(this.id, noticeId),
+        query: { noticeId },
+        requestedAt: started,
+        durationMs,
+        ...(result.kind === 'ok'
+          ? { status: 200, outcome: 'ok', totalRecords: null, recordCount: 1, error: null }
+          : failure(result)),
+      });
+    }
+    return result;
+  }
+
+  private async exhausted(at: Date): Promise<BudgetExhausted | null> {
     const spent = await this.read(
       () => this.log.countSince(this.id, new Date(at.getTime() - BUDGET_WINDOW_MS)),
       'call count',
@@ -67,12 +127,7 @@ export class BudgetedSource implements OpportunitySource {
     if (spent !== null && spent >= this.policy.dailyBudget) {
       return { kind: 'budget-exhausted', spent, budget: this.policy.dailyBudget };
     }
-
-    const started = this.now();
-    const result = await this.inner.search(query);
-    const durationMs = Math.max(0, this.now().getTime() - started.getTime());
-    await this.record(key, query, started, durationMs, result);
-    return result;
+    return null;
   }
 
   private async read<T>(fn: () => Promise<T>, what: string): Promise<T | null> {
@@ -84,47 +139,25 @@ export class BudgetedSource implements OpportunitySource {
     }
   }
 
-  private async record(
-    key: string,
-    query: OpportunityQuery,
-    requestedAt: Date,
-    durationMs: number,
-    result: SourceResult,
-  ): Promise<void> {
-    // Only what the inner source did is a call; a stacked decorator's own
-    // answers are not attempts and are not counted twice.
-    if (result.kind !== 'ok' && result.kind !== 'error') return;
-    const call =
-      result.kind === 'ok'
-        ? {
-            status: 200,
-            outcome: 'ok' as const,
-            totalRecords: result.totalRecords,
-            recordCount: result.opportunities.length + result.rejected.length,
-            error: null,
-          }
-        : {
-            status: result.status,
-            outcome: result.outcome,
-            totalRecords: null,
-            recordCount: null,
-            error: result.message,
-          };
+  private async record(call: Omit<SourceCall, 'source'>): Promise<void> {
     try {
-      await this.log.record({
-        source: this.id,
-        operation: 'search',
-        queryKey: key,
-        query,
-        requestedAt,
-        durationMs,
-        ...call,
-      });
+      await this.log.record({ source: this.id, ...call });
     } catch (error) {
       this.warn(`call log not written: ${messageOf(error)}`);
     }
   }
 }
+
+/** The ledger columns of a failed attempt. */
+const failure = (
+  result: SourceFailure,
+): Pick<SourceCall, 'status' | 'outcome' | 'totalRecords' | 'recordCount' | 'error'> => ({
+  status: result.status,
+  outcome: result.outcome,
+  totalRecords: null,
+  recordCount: null,
+  error: result.message,
+});
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);

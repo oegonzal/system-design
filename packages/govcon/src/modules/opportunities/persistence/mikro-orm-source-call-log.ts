@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { GovconSourceCall } from '@sysdesign/db';
 
-import type { FreshCall, SourceCall, SourceCallLog } from '../../../core/ports';
+import type { FreshCall, SourceCall, SourceCallLog, SourceCallRecord } from '../../../core/ports';
 
 /**
  * The call ledger in Postgres: append-only rows, read two ways — the latest
@@ -40,5 +40,32 @@ export class MikroOrmSourceCallLog implements SourceCallLog {
 
   countSince(source: string, since: Date): Promise<number> {
     return this.em.fork().count(GovconSourceCall, { source, requestedAt: { $gte: since } });
+  }
+
+  async list(limit: number, offset: number): Promise<[SourceCallRecord[], number]> {
+    const [rows, total] = await this.em
+      .fork()
+      .findAndCount(
+        GovconSourceCall,
+        {},
+        { orderBy: { requestedAt: 'desc', id: 'asc' }, limit, offset },
+      );
+    return [
+      rows.map((row) => ({
+        id: row.id,
+        source: row.source,
+        operation: row.operation,
+        queryKey: row.queryKey,
+        query: row.query as SourceCallRecord['query'],
+        requestedAt: row.requestedAt,
+        durationMs: row.durationMs,
+        status: row.status,
+        outcome: row.outcome,
+        totalRecords: row.totalRecords,
+        recordCount: row.recordCount,
+        error: row.error,
+      })),
+      total,
+    ];
   }
 }

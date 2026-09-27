@@ -109,6 +109,47 @@ describe('the budgeted source', () => {
     ]);
   });
 
+  it('[GOV-9] budgets a description like a page, records it as one, and never consults the search cache', async () => {
+    const { inner, log, source } = harness([okResult([])], { ttlMs: 24 * HOUR, dailyBudget: 2 });
+    await source.search(query);
+    const first = await source.describe('n-7');
+    expect(first).toEqual({
+      kind: 'ok',
+      text: 'Description of n-7',
+      raw: { description: '<p>Description of n-7</p>' },
+    });
+    expect(inner.described).toEqual(['n-7']);
+    expect(log.calls[1]).toMatchObject({
+      operation: 'description',
+      query: { noticeId: 'n-7' },
+      outcome: 'ok',
+      status: 200,
+      recordCount: 1,
+      totalRecords: null,
+    });
+    expect(log.calls[1]?.queryKey).not.toBe(log.calls[0]?.queryKey);
+
+    // The same notice again inside the ttl is still a call — the store, not the ledger, is its cache.
+    const refused = await source.describe('n-7');
+    expect(refused).toEqual({ kind: 'budget-exhausted', spent: 2, budget: 2 });
+    expect(inner.described).toEqual(['n-7']);
+  });
+
+  it('[GOV-9] records a failed description with its outcome', async () => {
+    const inner = scriptedSource('sam.gov', [], true, [
+      { kind: 'error', outcome: 'rate-limited', status: 429, message: 'over quota' },
+    ]);
+    const log = new InMemorySourceCallLog();
+    const source = new BudgetedSource(inner, log, { ttlMs: 0, dailyBudget: 5 }, () => new Date(0));
+    expect((await source.describe('n-1')).kind).toBe('error');
+    expect(log.calls[0]).toMatchObject({
+      operation: 'description',
+      outcome: 'rate-limited',
+      status: 429,
+      error: 'over quota',
+    });
+  });
+
   it('carries the inner source identity and availability', () => {
     const { source } = harness([]);
     expect(source.id).toBe('sam.gov');

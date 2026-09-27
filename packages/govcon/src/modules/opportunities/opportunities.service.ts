@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   describeQuery,
-  type Lead,
+  type DescriptionDto,
+  type DescriptionResultDto,
+  type LeadDetailDto,
   type LeadsReport,
   type LeadTier,
   type OpportunityQuery,
@@ -10,11 +12,18 @@ import {
   type SearchProfile,
   type SliceOutcome,
   type SliceReport,
+  type SourceCallDto,
+  type SourceStatusDto,
 } from '@sysdesign/contracts';
 
 import { BUDGET_WINDOW_MS, type BudgetPolicy } from '../../core/budgeted-source';
 import { planPulls } from '../../core/plan';
-import type { OpportunityRepository, OpportunitySource, SourceCallLog } from '../../core/ports';
+import type {
+  OpportunityRepository,
+  OpportunitySource,
+  SourceCallLog,
+  StoredDescription,
+} from '../../core/ports';
 import { validateProfile } from '../../core/profile';
 import { nextPage } from '../../core/query';
 import { FACTORS, rankLeads, scoreLead } from '../../core/scoring';
@@ -33,11 +42,19 @@ export interface LeadsOptions {
   limit: number;
 }
 
+export interface CallsOptions {
+  limit: number;
+  offset: number;
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
 /**
- * The three things the CLI does, over the ports. A pull runs the profile's
- * plan through the budgeted source and stores what normalized; ranking reads
- * the repository and never the source; every profile is validated at boot so
- * a malformed one fails before any request.
+ * Everything the CLI and the HTTP surface do, over the ports. A pull runs the
+ * profile's plan through the budgeted source and stores what normalized;
+ * ranking reads the repository and never the source; a description is one
+ * budgeted request per notice that the row then remembers; every profile is
+ * validated at boot so a malformed one fails before any request.
  */
 @Injectable()
 export class OpportunitiesService {
@@ -158,10 +175,64 @@ export class OpportunitiesService {
     };
   }
 
-  async show(noticeId: string, profileId: string): Promise<Lead | null> {
+  async show(noticeId: string, profileId: string): Promise<LeadDetailDto | null> {
     const profile = this.profile(profileId);
     const opportunity = await this.repository.findOne(noticeId);
-    return opportunity ? scoreLead(opportunity, profile, this.now().getTime()) : null;
+    if (!opportunity) return null;
+    const stored = await this.repository.findDescription(noticeId);
+    return {
+      ...scoreLead(opportunity, profile, this.now().getTime()),
+      description: stored ? toDescriptionDto(stored) : null,
+    };
+  }
+
+  /** The upstream and how much of the rolling day's budget is left. */
+  async status(): Promise<SourceStatusDto> {
+    return {
+      id: this.source.id,
+      availability: this.source.availability,
+      budget: {
+        spent: await this.spent(),
+        limit: this.budget.dailyBudget,
+        windowHours: BUDGET_WINDOW_MS / HOUR_MS,
+      },
+      cacheTtlHours: this.budget.ttlMs / HOUR_MS,
+    };
+  }
+
+  /**
+   * A notice's description: from the row when it was fetched before, else one
+   * budgeted request, then stored. An unknown notice is refused before any
+   * request is spent.
+   */
+  async describe(noticeId: string): Promise<DescriptionResultDto> {
+    if ((await this.repository.findOne(noticeId)) === null) {
+      throw new NotFoundException(`no stored notice ${noticeId}`);
+    }
+    const stored = await this.repository.findDescription(noticeId);
+    if (stored) return { status: 'ok', description: toDescriptionDto(stored) };
+
+    const result = await this.source.describe(noticeId);
+    if (result.kind === 'ok') {
+      const description: StoredDescription = {
+        text: result.text,
+        raw: result.raw,
+        fetchedAt: this.now(),
+      };
+      await this.repository.saveDescription(noticeId, description);
+      return { status: 'ok', description: toDescriptionDto(description) };
+    }
+    if (result.kind === 'budget-exhausted') {
+      return { status: 'budget-exhausted', spent: result.spent, budget: result.budget };
+    }
+    this.logger.warn(`description ${noticeId} failed — ${result.outcome}: ${result.message}`);
+    return { status: 'error', message: `${result.outcome}: ${result.message}` };
+  }
+
+  /** The ledger, newest first. */
+  async calls(options: CallsOptions): Promise<[SourceCallDto[], number]> {
+    const [rows, total] = await this.log.list(options.limit, options.offset);
+    return [rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() })), total];
   }
 
   private slice(
@@ -196,3 +267,8 @@ export class OpportunitiesService {
     }
   }
 }
+
+const toDescriptionDto = (stored: StoredDescription): DescriptionDto => ({
+  text: stored.text,
+  fetchedAt: stored.fetchedAt.toISOString(),
+});

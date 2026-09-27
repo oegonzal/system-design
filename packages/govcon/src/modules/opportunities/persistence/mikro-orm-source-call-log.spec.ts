@@ -68,6 +68,35 @@ describe('the source call log in Postgres', () => {
 
     const stored = await orm.em.fork().findOne(GovconSourceCall, { outcome: 'error' });
     expect(stored?.query).toEqual(call({}).query);
+    expect(stored?.operation).toBe('search');
     expect(JSON.stringify(stored?.query)).not.toContain('api_key');
+  });
+
+  it('[GOV-9] lists newest first with the total, and a description row never answers a fresh search', async () => {
+    const log = new MikroOrmSourceCallLog(orm.em);
+    await log.record(
+      call({
+        requestedAt: at(5),
+        operation: 'description',
+        queryKey: 'k1',
+        query: { noticeId: 'n-1' },
+        totalRecords: null,
+        recordCount: 1,
+      }),
+    );
+    // Same key and window as the fresh search above, but a description: not a search hit.
+    expect(await log.findFresh('sam.gov', 'k1', at(4))).toBeNull();
+
+    const [page, total] = await log.list(2, 0);
+    expect(total).toBe(6);
+    expect(page.map((row) => [row.operation, row.requestedAt])).toEqual([
+      ['description', at(5)],
+      ['search', at(3)],
+    ]);
+    expect(page[0]).toMatchObject({ query: { noticeId: 'n-1' }, outcome: 'ok', recordCount: 1 });
+    expect(page[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
+    const [rest, sameTotal] = await log.list(10, 2);
+    expect(sameTotal).toBe(6);
+    expect(rest).toHaveLength(4);
   });
 });

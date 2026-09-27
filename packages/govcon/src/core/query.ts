@@ -24,6 +24,11 @@ export function queryKey(source: string, query: OpportunityQuery): string {
     .digest('hex');
 }
 
+/** The ledger key of a description call — its own namespace, so it can never read as a fresh search. */
+export function descriptionKey(source: string, noticeId: string): string {
+  return createHash('sha256').update(`${source}\ndescription\n${noticeId}`).digest('hex');
+}
+
 /** The following page of the same search. */
 export const nextPage = (query: OpportunityQuery): OpportunityQuery => ({
   ...query,

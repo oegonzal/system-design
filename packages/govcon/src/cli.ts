@@ -2,7 +2,7 @@
  * `main.js pull [--profile <id>] [--days <n> | --from <YYYY-MM-DD> --to <YYYY-MM-DD>]`
  * `main.js leads [--profile <id>] [--min-score <n>] [--tier high|medium|low] [--limit <n>] [--json]`
  * `main.js search …` — pull, then leads, either command's options
- * `main.js show <noticeId> [--profile <id>] [--json]`
+ * `main.js show <noticeId> [--profile <id>] [--describe] [--json]`
  *
  * Boots the Nest context the module wires, runs, prints and exits by the
  * result: 2 for a usage problem or an unknown profile, 1 when a pull stored
@@ -30,7 +30,8 @@ export const USAGE = `usage: govcon <command> [options]
   pull    [--profile <id>] [--days <n> | --from <YYYY-MM-DD> --to <YYYY-MM-DD>]
   leads   [--profile <id>] [--min-score <n>] [--tier high|medium|low] [--limit <n>] [--json]
   search  pull, then leads (either command's options)
-  show    <noticeId> [--profile <id>] [--json]`;
+  show    <noticeId> [--profile <id>] [--describe] [--json]
+          --describe fetches the notice text once (one request); later shows are free`;
 
 const COMMANDS = ['pull', 'leads', 'search', 'show'] as const;
 type Command = (typeof COMMANDS)[number];
@@ -44,6 +45,7 @@ interface Options {
   tier: LeadTier | null;
   limit: number;
   json: boolean;
+  describe: boolean;
 }
 
 const isCommand = (value: string | undefined): value is Command =>
@@ -74,6 +76,7 @@ export function parseOptions(argv: readonly string[], now: Date): Options | Erro
         tier: { type: 'string' },
         limit: { type: 'string' },
         json: { type: 'boolean' },
+        describe: { type: 'boolean' },
       },
     });
     if ((values.from === undefined) !== (values.to === undefined)) {
@@ -100,6 +103,7 @@ export function parseOptions(argv: readonly string[], now: Date): Options | Erro
       tier: (values.tier as LeadTier | undefined) ?? null,
       limit: Math.max(1, integer(values.limit, DEFAULT_LEAD_LIMIT, 'limit')),
       json: values.json ?? false,
+      describe: values.describe ?? false,
     };
   } catch (error) {
     return error instanceof Error ? error : new Error(String(error));
@@ -137,6 +141,16 @@ export async function cli(argv: readonly string[]): Promise<number> {
     }
     if (options.command === 'show') {
       const noticeId = options.positional[0] ?? '';
+      if (options.describe) {
+        const fetched = await service.describe(noticeId);
+        if (fetched.status !== 'ok') {
+          console.error(
+            fetched.status === 'budget-exhausted'
+              ? `description not fetched — budget ${fetched.spent}/${fetched.budget} spent`
+              : `description not fetched — ${fetched.message}`,
+          );
+        }
+      }
       const lead = await service.show(noticeId, options.profile);
       if (lead === null) {
         console.error(`no stored notice ${noticeId} — pull first`);

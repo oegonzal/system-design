@@ -182,13 +182,98 @@ describe('the opportunities service', () => {
     expect(strict.matching).toBe(1);
   });
 
-  it('shows one stored notice with its trace, or nothing', async () => {
+  it('shows one stored notice with its trace and its description when fetched, or nothing', async () => {
     const { repository, service } = harness([]);
     await repository.upsertMany([fetched({ noticeId: 'n-9' })], NOW);
     const lead = await service.show('n-9', 'tiny');
     expect(lead?.opportunity.noticeId).toBe('n-9');
     expect(lead?.factors).toHaveLength(6);
+    expect(lead?.description).toBeNull();
     expect(await service.show('missing', 'tiny')).toBeNull();
+
+    await service.describe('n-9');
+    expect((await service.show('n-9', 'tiny'))?.description).toEqual({
+      text: 'Description of n-9',
+      fetchedAt: NOW.toISOString(),
+    });
+  });
+
+  it('[GOV-9] fetches a description once: the store answers afterwards without a request, an unknown notice is refused before any', async () => {
+    const { inner, log, repository, service } = harness([]);
+    await repository.upsertMany([fetched({ noticeId: 'n-1' })], NOW);
+
+    const first = await service.describe('n-1');
+    expect(first).toEqual({
+      status: 'ok',
+      description: { text: 'Description of n-1', fetchedAt: NOW.toISOString() },
+    });
+    expect(inner.described).toEqual(['n-1']);
+    expect(log.calls.map((call) => call.operation)).toEqual(['description']);
+
+    expect(await service.describe('n-1')).toEqual(first);
+    expect(inner.described).toEqual(['n-1']);
+    expect(log.calls).toHaveLength(1);
+
+    await expect(service.describe('nope')).rejects.toBeInstanceOf(NotFoundException);
+    expect(inner.described).toEqual(['n-1']);
+  });
+
+  it('[GOV-9] reports a spent budget and a failed fetch as outcomes, storing nothing', async () => {
+    const spent = harness([], { dailyBudget: 0 });
+    await spent.repository.upsertMany([fetched({ noticeId: 'n-1' })], NOW);
+    expect(await spent.service.describe('n-1')).toEqual({
+      status: 'budget-exhausted',
+      spent: 0,
+      budget: 0,
+    });
+    expect(await spent.repository.findDescription('n-1')).toBeNull();
+
+    const failing = scriptedSource('sam.gov', [], true, [
+      { kind: 'error', outcome: 'invalid-response', status: 200, message: 'body is not JSON' },
+    ]);
+    const log = new InMemorySourceCallLog();
+    const repository = new InMemoryOpportunityRepository();
+    await repository.upsertMany([fetched({ noticeId: 'n-2' })], NOW);
+    const policy = { dailyBudget: 5, ttlMs: 0 };
+    const service = new OpportunitiesService(
+      new BudgetedSource(failing, log, policy, () => NOW),
+      repository,
+      log,
+      new Map([['tiny', tinyProfile()]]),
+      policy,
+      () => NOW,
+    );
+    expect(await service.describe('n-2')).toEqual({
+      status: 'error',
+      message: 'invalid-response: body is not JSON',
+    });
+    expect(await repository.findDescription('n-2')).toBeNull();
+    expect(log.calls[0]).toMatchObject({ operation: 'description', outcome: 'invalid-response' });
+  });
+
+  it('reports the source status with the budget as the ledger counts it, and lists the ledger newest first', async () => {
+    const { service, log } = harness([okResult([fetched()])], {
+      dailyBudget: 4,
+      ttlMs: 6 * 60 * 60 * 1000,
+    });
+    expect(await service.status()).toEqual({
+      id: 'sam.gov',
+      availability: { enabled: true, reason: null },
+      budget: { spent: 0, limit: 4, windowHours: 24 },
+      cacheTtlHours: 6,
+    });
+    await service.pull('tiny', window);
+    expect((await service.status()).budget.spent).toBe(2);
+
+    const [calls, total] = await service.calls({ limit: 1, offset: 0 });
+    expect(total).toBe(2);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      operation: 'search',
+      outcome: 'ok',
+      requestedAt: NOW.toISOString(),
+    });
+    expect(log.calls).toHaveLength(2);
   });
 
   it('[GOV-5] refuses to boot on a malformed profile, and names an unknown one', async () => {

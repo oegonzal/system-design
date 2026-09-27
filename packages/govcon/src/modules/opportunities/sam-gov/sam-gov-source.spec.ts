@@ -1,6 +1,12 @@
 import type { OpportunityQuery } from '../../../core/query';
 import fixture from './fixtures/search-response.json';
-import { SAM_GOV_SEARCH_URL, SamGovSource, toSamParams } from './sam-gov-source';
+import fixtureDescription from './fixtures/notice-description.json';
+import {
+  SAM_GOV_DESCRIPTION_URL,
+  SAM_GOV_SEARCH_URL,
+  SamGovSource,
+  toSamParams,
+} from './sam-gov-source';
 
 const KEY = 'secret-key-1234567890';
 const query: OpportunityQuery = {
@@ -163,6 +169,48 @@ describe('the SAM.gov source', () => {
     const long = harness([{ status: 400, text: 'x'.repeat(1000) }]);
     const result = await long.source.search(query);
     expect(result.kind === 'error' && result.message.length).toBeLessThan(220);
+  });
+});
+
+describe('the SAM.gov description', () => {
+  it('[GOV-9] asks noticedesc for the notice with the key, and answers text with the body as received', async () => {
+    const { source, urls } = harness([{ body: fixtureDescription }]);
+    const result = await source.describe('abc123');
+    const url = new URL(urls[0] ?? '');
+    expect(`${url.origin}${url.pathname}`).toBe(SAM_GOV_DESCRIPTION_URL);
+    expect(url.searchParams.get('noticeid')).toBe('abc123');
+    expect(url.searchParams.get('api_key')).toBe(KEY);
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') throw new Error('expected ok');
+    expect(result.text.startsWith('Combined Synopsis/Solicitation\n')).toBe(true);
+    expect(result.text).not.toMatch(/<[a-z/][^>]*>/i);
+    expect(result.raw).toEqual(fixtureDescription);
+    expect(JSON.stringify(result)).not.toContain(KEY);
+  });
+
+  it('[GOV-3] never retries a rate-limited description, and reports a body without a description as invalid', async () => {
+    const limited = harness([{ status: 429, body: { error: 'OVER_RATE_LIMIT' } }]);
+    expect(await limited.source.describe('x')).toMatchObject({
+      kind: 'error',
+      outcome: 'rate-limited',
+    });
+    expect(limited.urls).toHaveLength(1);
+
+    const odd = harness([{ body: { something: 'else' } }]);
+    expect(await odd.source.describe('x')).toMatchObject({
+      kind: 'error',
+      outcome: 'invalid-response',
+      message: expect.stringContaining('description: description'),
+    });
+
+    const missing = harness([
+      { status: 404, body: { error: { message: 'Description Not Found' } } },
+    ]);
+    expect(await missing.source.describe('x')).toMatchObject({
+      kind: 'error',
+      outcome: 'error',
+      status: 404,
+    });
   });
 });
 

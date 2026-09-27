@@ -1,4 +1,9 @@
-import { describeQuery, type Lead, type LeadsReport, type PullReport } from '@sysdesign/contracts';
+import {
+  describeQuery,
+  type LeadDetailDto,
+  type LeadsReport,
+  type PullReport,
+} from '@sysdesign/contracts';
 
 /**
  * stdout for humans. Fixed-width tables built with padEnd — no dependency, and
@@ -83,7 +88,7 @@ export function renderLeads(report: LeadsReport): string {
   ].join('\n');
 }
 
-export function renderLead(lead: Lead): string {
+export function renderLead(lead: LeadDetailDto): string {
   const o = lead.opportunity;
   const head = [
     `${o.title}`,
@@ -104,6 +109,9 @@ export function renderLead(lead: Lead): string {
       ? `EXCLUDED by ${lead.excluded.factor}: ${lead.excluded.reason}`
       : `score ${lead.score.toFixed(1)} · tier ${lead.tier}`,
   ];
+  const description = lead.description
+    ? [`description (fetched ${day(lead.description.fetchedAt)})`, lead.description.text]
+    : ['description not fetched — `show <noticeId> --describe` spends one request'];
   const trace = table(
     ['factor', 'value', 'weight', 'points', 'evidence'],
     lead.factors.map((f) => [
@@ -114,5 +122,5 @@ export function renderLead(lead: Lead): string {
       f.evidence.join('; '),
     ]),
   );
-  return [...head, '', trace].join('\n');
+  return [...head, '', trace, '', ...description].join('\n');
 }

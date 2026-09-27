@@ -32,14 +32,32 @@ export type SourceResult =
       totalRecords: number;
     }
   | { kind: 'cached'; requestedAt: string; recordCount: number | null }
-  | { kind: 'budget-exhausted'; spent: number; budget: number }
-  | {
-      kind: 'error';
-      outcome: Exclude<SourceCallOutcome, 'ok'>;
-      status: number | null;
-      /** Provider detail, bounded, never the request URL. */
-      message: string;
-    };
+  | BudgetExhausted
+  | SourceFailure;
+
+/** The rolling-day budget is spent; nothing was called. */
+export interface BudgetExhausted {
+  kind: 'budget-exhausted';
+  spent: number;
+  budget: number;
+}
+
+/** The upstream answered with something other than a page or a description. */
+export interface SourceFailure {
+  kind: 'error';
+  outcome: Exclude<SourceCallOutcome, 'ok'>;
+  status: number | null;
+  /** Provider detail, bounded, never the request URL. */
+  message: string;
+}
+
+/**
+ * A notice's description: the adapter normalizes the provider's markup to
+ * text at fetch time and hands the body as received along, so the row can
+ * keep both and nothing downstream ever renders HTML.
+ */
+export type DescribeResult =
+  { kind: 'ok'; text: string; raw: unknown } | BudgetExhausted | SourceFailure;
 
 /** A normalized record together with the record as the source returned it. */
 export interface FetchedOpportunity {
@@ -57,6 +75,8 @@ export interface OpportunitySource {
   readonly id: string;
   readonly availability: SourceAvailability;
   search(query: OpportunityQuery): Promise<SourceResult>;
+  /** One request per notice; the store, not the source, remembers the answer. */
+  describe(noticeId: string): Promise<DescribeResult>;
 }
 
 /** One upstream request as the ledger keeps it. */
@@ -75,6 +95,11 @@ export interface SourceCall {
   error: string | null;
 }
 
+/** A ledger row as stored: the call plus the id the row was given. */
+export interface SourceCallRecord extends SourceCall {
+  id: string;
+}
+
 /** A successful call inside the cache window. */
 export interface FreshCall {
   requestedAt: Date;
@@ -86,8 +111,17 @@ export interface SourceCallLog {
   record(call: SourceCall): Promise<void>;
   /** The latest `ok` call for the key made at or after `notBefore`, if any. */
   findFresh(source: string, queryKey: string, notBefore: Date): Promise<FreshCall | null>;
-  /** Every attempt since `since`, whatever its outcome. */
+  /** Every attempt since `since`, whatever its outcome or operation. */
   countSince(source: string, since: Date): Promise<number>;
+  /** Newest first, with the total. */
+  list(limit: number, offset: number): Promise<[SourceCallRecord[], number]>;
+}
+
+/** A description once fetched; the row keeps it for good. */
+export interface StoredDescription {
+  text: string;
+  raw: unknown;
+  fetchedAt: Date;
 }
 
 export interface CandidateFilter {
@@ -107,4 +141,7 @@ export interface OpportunityRepository {
   upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary>;
   findCandidates(filter: CandidateFilter): Promise<Opportunity[]>;
   findOne(noticeId: string): Promise<Opportunity | null>;
+  findDescription(noticeId: string): Promise<StoredDescription | null>;
+  /** Only ever written here — a pull's upsert leaves the description columns alone. */
+  saveDescription(noticeId: string, description: StoredDescription): Promise<void>;
 }

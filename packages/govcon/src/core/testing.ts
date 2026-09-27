@@ -6,6 +6,7 @@ import type { Opportunity } from '@sysdesign/contracts';
 
 import type {
   CandidateFilter,
+  DescribeResult,
   FetchedOpportunity,
   FreshCall,
   OpportunityRepository,
@@ -13,7 +14,9 @@ import type {
   RejectedRecord,
   SourceCall,
   SourceCallLog,
+  SourceCallRecord,
   SourceResult,
+  StoredDescription,
   UpsertSummary,
 } from './ports';
 import type { SearchProfile } from './profile';
@@ -93,13 +96,21 @@ export const tinyProfile = (overrides: Partial<SearchProfile> = {}): SearchProfi
 });
 
 export class InMemorySourceCallLog implements SourceCallLog {
-  readonly calls: SourceCall[] = [];
+  readonly calls: SourceCallRecord[] = [];
   /** When set, every method throws — the "log unavailable" branch. */
   failing: Error | null = null;
 
   async record(call: SourceCall): Promise<void> {
     this.fail();
-    this.calls.push(call);
+    this.calls.push({ id: `call-${this.calls.length + 1}`, ...call });
+  }
+
+  async list(limit: number, offset: number): Promise<[SourceCallRecord[], number]> {
+    this.fail();
+    const newestFirst = [...this.calls].sort(
+      (a, b) => b.requestedAt.getTime() - a.requestedAt.getTime(),
+    );
+    return [newestFirst.slice(offset, offset + limit), this.calls.length];
   }
 
   async findFresh(source: string, queryKey: string, notBefore: Date): Promise<FreshCall | null> {
@@ -135,24 +146,45 @@ export class InMemorySourceCallLog implements SourceCallLog {
   }
 }
 
-/** A source that answers the scripted results in order, repeating the last, and remembers what it was asked. */
+/**
+ * A source that answers the scripted results in order, repeating the last, and
+ * remembers what it was asked — searches in `queries`, descriptions in
+ * `described`. Without scripted descriptions, `describe` answers a text built
+ * from the notice id.
+ */
 export function scriptedSource(
   id: string,
   replies: readonly SourceResult[],
   enabled = true,
-): OpportunitySource & { queries: OpportunityQuery[] } {
+  descriptions: readonly DescribeResult[] = [],
+): OpportunitySource & { queries: OpportunityQuery[]; described: string[] } {
   const queries: OpportunityQuery[] = [];
+  const described: string[] = [];
   let call = 0;
+  let describeCall = 0;
   return {
     id,
     availability: { enabled, reason: enabled ? null : 'no-key' },
     queries,
+    described,
     async search(query) {
       queries.push(query);
       const reply = replies[Math.min(call, replies.length - 1)];
       call += 1;
       if (!reply) throw new Error('scriptedSource: no replies');
       return reply;
+    },
+    async describe(noticeId) {
+      described.push(noticeId);
+      const reply = descriptions[Math.min(describeCall, descriptions.length - 1)];
+      describeCall += 1;
+      return (
+        reply ?? {
+          kind: 'ok',
+          text: `Description of ${noticeId}`,
+          raw: { description: `<p>Description of ${noticeId}</p>` },
+        }
+      );
     },
   };
 }
@@ -173,6 +205,7 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
     string,
     { opportunity: Opportunity; firstSeenAt: Date; lastSeenAt: Date }
   >();
+  readonly descriptions = new Map<string, StoredDescription>();
 
   async upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary> {
     let inserted = 0;
@@ -208,5 +241,13 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
 
   async findOne(noticeId: string): Promise<Opportunity | null> {
     return this.rows.get(noticeId)?.opportunity ?? null;
+  }
+
+  async findDescription(noticeId: string): Promise<StoredDescription | null> {
+    return this.descriptions.get(noticeId) ?? null;
+  }
+
+  async saveDescription(noticeId: string, description: StoredDescription): Promise<void> {
+    this.descriptions.set(noticeId, description);
   }
 }

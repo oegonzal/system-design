@@ -55,6 +55,30 @@ describe('the opportunity repository in Postgres', () => {
     expect(await repository.findOne('zzz')).toBeNull();
   });
 
+  it('[GOV-9] [GOV-6] stores a description once, finds it back, and keeps it through a re-pull', async () => {
+    const repository = new MikroOrmOpportunityRepository(orm.em);
+    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await repository.upsertMany([fetched({ noticeId: 'd' })], t1);
+    expect(await repository.findDescription('d')).toBeNull();
+    expect(await repository.findDescription('missing')).toBeNull();
+
+    const fetchedAt = new Date('2026-09-26T15:00:00Z');
+    await repository.saveDescription('d', {
+      text: 'Bracket, 400 each',
+      raw: { description: '<p>Bracket</p>' },
+      fetchedAt,
+    });
+    expect(await repository.findDescription('d')).toEqual({
+      text: 'Bracket, 400 each',
+      raw: { description: '<p>Bracket</p>' },
+      fetchedAt,
+    });
+
+    await repository.upsertMany([fetched({ noticeId: 'd', title: 'Re-pulled' })], t2);
+    expect(await repository.findOne('d')).toMatchObject({ title: 'Re-pulled' });
+    expect(await repository.findDescription('d')).toMatchObject({ text: 'Bracket, 400 each' });
+  });
+
   it('[GOV-6] finds candidates by activity and deadline, unknowns kept, newest first', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
     await orm.em.fork().nativeDelete(GovconOpportunity, {});

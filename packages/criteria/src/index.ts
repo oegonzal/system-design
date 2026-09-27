@@ -362,6 +362,11 @@ export const CRITERIA: readonly Criterion[] = [
       'Re-pulling upserts by notice id: no duplicate rows, last_seen_at advances, changed fields update, first_seen_at holds, and duplicates within one batch are tolerated.',
   },
   {
+    id: 'GOV-9',
+    statement:
+      'A notice description is fetched at most once: a stored text answers without a request, a fetch is budgeted and recorded as a description call that never reads as a fresh search, the text carries no markup, and a re-pull keeps it.',
+  },
+  {
     id: 'GOV-7',
     statement:
       'The SAM.gov key is read only by the environment factory; the request URL carries it and nothing else does — not a stored query, a query key, a warning or an error message.',

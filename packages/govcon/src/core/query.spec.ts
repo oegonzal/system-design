@@ -1,4 +1,4 @@
-import { canonicalQuery, nextPage, queryKey, type OpportunityQuery } from './query';
+import { canonicalQuery, descriptionKey, nextPage, queryKey, type OpportunityQuery } from './query';
 
 const base: OpportunityQuery = {
   postedFrom: '2026-09-20',
@@ -28,6 +28,16 @@ describe('the query key', () => {
       'postedFrom',
       'postedTo',
     ]);
+  });
+
+  it('[GOV-9] keys a description call in its own namespace, so it can never read as a fresh search', () => {
+    expect(descriptionKey('sam.gov', 'n-1')).toMatch(/^[0-9a-f]{64}$/);
+    expect(descriptionKey('sam.gov', 'n-1')).toBe(descriptionKey('sam.gov', 'n-1'));
+    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(descriptionKey('sam.gov', 'n-2'));
+    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(descriptionKey('other', 'n-1'));
+    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(
+      queryKey('sam.gov', { ...base, noticeId: 'n-1' }),
+    );
   });
 
   it('differs by source, by filter and by page', () => {

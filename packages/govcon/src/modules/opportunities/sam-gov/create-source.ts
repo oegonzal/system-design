@@ -1,6 +1,13 @@
 import type { BudgetPolicy } from '../../../core/budgeted-source';
-import type { OpportunitySource, SourceAvailability, SourceResult } from '../../../core/ports';
+import type {
+  DescribeResult,
+  OpportunitySource,
+  SourceAvailability,
+  SourceFailure,
+  SourceResult,
+} from '../../../core/ports';
 import {
+  SAM_GOV_DESCRIPTION_URL,
   SAM_GOV_SEARCH_URL,
   SAM_GOV_SOURCE_ID,
   SamGovSource,
@@ -12,6 +19,7 @@ import {
  *
  *   SAM_GOV_API_KEY           the account's public API key; absent → disabled source
  *   SAM_GOV_BASE_URL          the search URL (default production; alpha for testing)
+ *   SAM_GOV_DESCRIPTION_URL   the notice description URL (default production)
  *   SAM_GOV_DAILY_BUDGET      attempts per rolling day (default 10 — a personal key's commonly reported quota)
  *   SAM_GOV_CACHE_TTL_HOURS   how long a pulled query is not pulled again (default 24; 0 disables)
  */
@@ -21,6 +29,7 @@ export const DEFAULT_CACHE_TTL_HOURS = 24;
 export interface SamGovSettings extends BudgetPolicy {
   apiKey: string | null;
   baseUrl: string;
+  descriptionUrl: string;
 }
 
 const numberOr = (value: string | undefined, fallback: number): number => {
@@ -34,6 +43,7 @@ export function samGovSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Sam
   return {
     apiKey: key ? key : null,
     baseUrl: env['SAM_GOV_BASE_URL']?.trim() || SAM_GOV_SEARCH_URL,
+    descriptionUrl: env['SAM_GOV_DESCRIPTION_URL']?.trim() || SAM_GOV_DESCRIPTION_URL,
     dailyBudget: Math.floor(numberOr(env['SAM_GOV_DAILY_BUDGET'], DEFAULT_DAILY_BUDGET)),
     ttlMs: numberOr(env['SAM_GOV_CACHE_TTL_HOURS'], DEFAULT_CACHE_TTL_HOURS) * 60 * 60 * 1000,
   };
@@ -45,22 +55,33 @@ export class DisabledSource implements OpportunitySource {
   readonly availability: SourceAvailability = { enabled: false, reason: 'no-key' };
 
   async search(): Promise<SourceResult> {
-    return {
-      kind: 'error',
-      outcome: 'error',
-      status: null,
-      message: 'SAM_GOV_API_KEY is not set — generate one on your SAM.gov account page',
-    };
+    return NO_KEY;
+  }
+
+  async describe(): Promise<DescribeResult> {
+    return NO_KEY;
   }
 }
 
+const NO_KEY: SourceFailure = {
+  kind: 'error',
+  outcome: 'error',
+  status: null,
+  message: 'SAM_GOV_API_KEY is not set — generate one on your SAM.gov account page',
+};
+
 export function createSamGovSourceFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  options: Omit<SamGovSourceOptions, 'apiKey' | 'baseUrl'> = {},
+  options: Omit<SamGovSourceOptions, 'apiKey' | 'baseUrl' | 'descriptionUrl'> = {},
 ): OpportunitySource {
   const settings = samGovSettingsFromEnv(env);
   if (settings.apiKey === null) return new DisabledSource();
-  return new SamGovSource({ ...options, apiKey: settings.apiKey, baseUrl: settings.baseUrl });
+  return new SamGovSource({
+    ...options,
+    apiKey: settings.apiKey,
+    baseUrl: settings.baseUrl,
+    descriptionUrl: settings.descriptionUrl,
+  });
 }
 
 /** Derived facts only — never the key. */

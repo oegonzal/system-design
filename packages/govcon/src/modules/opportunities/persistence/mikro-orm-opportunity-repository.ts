@@ -7,6 +7,7 @@ import type {
   CandidateFilter,
   FetchedOpportunity,
   OpportunityRepository,
+  StoredDescription,
   UpsertSummary,
 } from '../../../core/ports';
 import { fromRow, toRow } from './opportunity-mapper';
@@ -70,5 +71,31 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
   async findOne(noticeId: string): Promise<Opportunity | null> {
     const row = await this.em.fork().findOne(GovconOpportunity, { noticeId });
     return row ? fromRow(row) : null;
+  }
+
+  async findDescription(noticeId: string): Promise<StoredDescription | null> {
+    const row = await this.em
+      .fork()
+      .findOne(
+        GovconOpportunity,
+        { noticeId },
+        { fields: ['descriptionText', 'descriptionRaw', 'descriptionFetchedAt'] },
+      );
+    return row && row.descriptionText !== null && row.descriptionFetchedAt !== null
+      ? { text: row.descriptionText, raw: row.descriptionRaw, fetchedAt: row.descriptionFetchedAt }
+      : null;
+  }
+
+  /** The one writer of the description columns; the pull's upsert never names them. */
+  async saveDescription(noticeId: string, description: StoredDescription): Promise<void> {
+    await this.em.fork().nativeUpdate(
+      GovconOpportunity,
+      { noticeId },
+      {
+        descriptionText: description.text,
+        descriptionRaw: description.raw,
+        descriptionFetchedAt: description.fetchedAt,
+      },
+    );
   }
 }
