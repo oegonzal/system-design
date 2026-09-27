@@ -18,6 +18,7 @@ import { capText } from '@sysdesign/run-dump';
 /** Enough for any prompt a person would write; a larger goal is clipped and traced. */
 export const GOAL_MAX_BYTES = 64_000;
 
+
 const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly string[]> = {
   criteria: [
     'Extract the success criteria the goal states or clearly implies. Classify each by the listed kinds.',
@@ -38,9 +39,11 @@ const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly s
   ],
 };
 
+
 const OUTPUT_RULE =
   'Reply with ONE complete JSON object that satisfies the schema — nothing else. Keep every string short; an over-long reply is truncated and discarded.';
 
+  
 export function systemPrompt(role: keyof typeof RULES, persona: string): string {
   return [persona.trim(), '', ...RULES[role], OUTPUT_RULE].join('\n');
 }

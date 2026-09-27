@@ -25,7 +25,10 @@ export function dimensionFloor(floor: number): Gate {
         (entry) => entry.score !== null && entry.score < floor,
       );
       if (below.length === 0) {
-        return { ok: true, detail: `every assessed dimension at or above ${floor}` };
+        return {
+          ok: true, 
+          detail: `every assessed dimension at or above ${floor}` 
+        };
       }
       const named = below.map((entry) => `${entry.dimension} ${entry.score}`).join(', ');
       const routed = settleByRemediations(ctx);
