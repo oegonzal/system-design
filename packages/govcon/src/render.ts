@@ -1,6 +1,4 @@
-import type { Lead } from './core/scoring';
-import type { LeadsReport, PullReport } from './modules/opportunities/opportunities.service';
-import { describeQuery } from './modules/opportunities/opportunities.service';
+import { describeQuery, type Lead, type LeadsReport, type PullReport } from '@sysdesign/contracts';
 
 /**
  * stdout for humans. Fixed-width tables built with padEnd — no dependency, and

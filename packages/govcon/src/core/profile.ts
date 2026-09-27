@@ -1,17 +1,18 @@
-import { NOTICE_TYPES, type NoticeTypeCode } from '@sysdesign/contracts';
+import { NOTICE_TYPES, type NoticeTypeCode, type SearchProfile } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 /**
- * The search profile: everything the pull plan and the scorer read about one
- * company, as validated data. Codes are the company's NAICS and PSC families,
- * interests are declared phrases, `pull.slices` are the queries a pull runs in
- * priority order, and `scoring` prices every factor — through open maps
- * wherever an external vocabulary appears, so an unlisted set-aside or notice
- * type is priced by the profile's defaults and gates, never by code.
+ * The search profile's validator. The shape is the wire type `SearchProfile`
+ * in contracts (the web client reads it too); this schema is checked against
+ * it in both directions — `satisfies` here, `expectTypeOf` in the spec — so
+ * the two cannot drift. Prices are open maps wherever an external vocabulary
+ * appears: an unlisted set-aside or notice type is priced by the profile's
+ * defaults and gates, never by code.
  *
  * `validateProfile` runs at boot, like `validatePipeline` in quality-loop: a
  * malformed profile fails before any request is spent.
  */
+export type { SearchProfile };
 
 const unit = z.number().min(0).max(1);
 const noticeTypeCodes = Object.keys(NOTICE_TYPES) as [NoticeTypeCode, ...NoticeTypeCode[]];
@@ -22,7 +23,6 @@ export const interestSchema = z.strictObject({
   /** How much a match is worth; matched weights add up and cap at 1. */
   weight: z.number().gt(0).max(1),
 });
-export type Interest = z.infer<typeof interestSchema>;
 
 /** One query a pull runs — the API's filters, minus the window and paging. */
 export const sliceSchema = z.strictObject({
@@ -52,7 +52,6 @@ export const sliceSchema = z.strictObject({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
 });
-export type PullSlice = z.infer<typeof sliceSchema>;
 
 export const searchProfileSchema = z
   .strictObject({
@@ -121,9 +120,7 @@ export const searchProfileSchema = z
         message: 'high must be above medium',
       });
     }
-  });
-
-export type SearchProfile = z.infer<typeof searchProfileSchema>;
+  }) satisfies z.ZodType<SearchProfile>;
 
 /**
  * The profile as validated data, or an error naming every problem. `factorIds`

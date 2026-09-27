@@ -1,7 +1,15 @@
-import type { LeadTier, Opportunity } from '@sysdesign/contracts';
+import type {
+  FactorTrace,
+  Interest,
+  Lead,
+  LeadTier,
+  Opportunity,
+  SearchProfile,
+} from '@sysdesign/contracts';
 
-import type { Interest, SearchProfile } from './profile';
 import { containsPhrase, tokenize } from './text';
+
+export type { FactorTrace, Lead };
 
 /**
  * Deterministic ranking. Each factor reads the opportunity and the profile and
@@ -148,24 +156,6 @@ export const FACTORS: readonly Factor[] = [
     },
   },
 ];
-
-export interface FactorTrace {
-  id: string;
-  value: number;
-  weight: number;
-  /** `100 × weight × value`, one decimal; the traces sum to the score. */
-  points: number;
-  evidence: string[];
-}
-
-export interface Lead {
-  opportunity: Opportunity;
-  /** 0–100, one decimal; 0 when excluded. */
-  score: number;
-  tier: LeadTier | null;
-  factors: FactorTrace[];
-  excluded: { factor: string; reason: string } | null;
-}
 
 const tenth = (value: number): number => Math.round(value * 10) / 10;
 

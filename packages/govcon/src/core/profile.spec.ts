@@ -1,11 +1,18 @@
+import type { SearchProfile } from '@sysdesign/contracts';
+import type { z } from 'zod';
+
 import { ENFAV } from '../profiles/enfav';
-import { validateProfile } from './profile';
+import { searchProfileSchema, validateProfile } from './profile';
 import { FACTORS } from './scoring';
 import { tinyProfile } from './testing';
 
 const ids = FACTORS.map((factor) => factor.id);
 
 describe('the search profile', () => {
+  it('[GOV-5] validates exactly the wire contract — the schema output and SearchProfile are one type', () => {
+    expectTypeOf<z.output<typeof searchProfileSchema>>().toEqualTypeOf<SearchProfile>();
+  });
+
   it('[GOV-5] accepts the tiny profile and the shipped Enfav profile', () => {
     expect(() => validateProfile(tinyProfile(), ids)).not.toThrow();
     expect(validateProfile(ENFAV, ids).id).toBe('enfav');

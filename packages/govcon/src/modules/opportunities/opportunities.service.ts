@@ -1,17 +1,23 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { LeadTier } from '@sysdesign/contracts';
+import {
+  describeQuery,
+  type Lead,
+  type LeadsReport,
+  type LeadTier,
+  type OpportunityQuery,
+  type PullReport,
+  type PullWindow,
+  type SearchProfile,
+  type SliceOutcome,
+  type SliceReport,
+} from '@sysdesign/contracts';
 
 import { BUDGET_WINDOW_MS, type BudgetPolicy } from '../../core/budgeted-source';
-import { planPulls, type PullWindow } from '../../core/plan';
-import type {
-  OpportunityRepository,
-  OpportunitySource,
-  SourceAvailability,
-  SourceCallLog,
-} from '../../core/ports';
-import { validateProfile, type SearchProfile } from '../../core/profile';
-import { nextPage, type OpportunityQuery } from '../../core/query';
-import { FACTORS, rankLeads, scoreLead, type Lead } from '../../core/scoring';
+import { planPulls } from '../../core/plan';
+import type { OpportunityRepository, OpportunitySource, SourceCallLog } from '../../core/ports';
+import { validateProfile } from '../../core/profile';
+import { nextPage } from '../../core/query';
+import { FACTORS, rankLeads, scoreLead } from '../../core/scoring';
 import {
   BUDGET_POLICY,
   CLOCK,
@@ -21,47 +27,10 @@ import {
   SOURCE_CALL_LOG,
 } from './tokens';
 
-export type SliceOutcome = 'ok' | 'cached' | 'budget-exhausted' | 'error' | 'skipped';
-
-export interface SliceReport {
-  query: OpportunityQuery;
-  outcome: SliceOutcome;
-  pages: number;
-  /** Records the source returned across the pages fetched. */
-  received: number;
-  inserted: number;
-  updated: number;
-  rejected: number;
-  /** More records matched than the pages fetched carried. */
-  truncated: boolean;
-  detail: string | null;
-}
-
-export interface PullReport {
-  profile: string;
-  window: PullWindow;
-  source: { id: string; availability: SourceAvailability };
-  slices: SliceReport[];
-  /** Attempts inside the budget window after this pull, as the ledger counts them; null when it could not be read. */
-  spent: number | null;
-  budget: number;
-  stoppedBy: 'budget' | 'rate-limited' | null;
-}
-
 export interface LeadsOptions {
   minScore: number;
   tier: LeadTier | null;
   limit: number;
-}
-
-export interface LeadsReport {
-  profile: string;
-  /** Stored records that were active with an open (or unstated) deadline. */
-  candidates: number;
-  excluded: number;
-  /** Leads over the score and tier filters, before the limit. */
-  matching: number;
-  leads: Lead[];
 }
 
 /**
@@ -226,13 +195,4 @@ export class OpportunitiesService {
       return null;
     }
   }
-}
-
-/** The filters of a query, for a log line or a report row. */
-export function describeQuery(query: OpportunityQuery): string {
-  const filters = Object.entries(query)
-    .filter(([key]) => !['postedFrom', 'postedTo', 'limit', 'offset'].includes(key))
-    .map(([key, value]) => `${key}=${String(value)}`);
-  const page = query.offset > 0 ? ` page ${Math.floor(query.offset / query.limit) + 1}` : '';
-  return `${filters.length > 0 ? filters.join(' ') : 'all notices'}${page}`;
 }

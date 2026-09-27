@@ -1,11 +1,8 @@
-import type { SearchProfile } from './profile';
+import type { PullWindow, SearchProfile } from '@sysdesign/contracts';
+
 import { canonicalQuery, type OpportunityQuery } from './query';
 
-/** Inclusive ISO dates the source is asked for. */
-export interface PullWindow {
-  from: string;
-  to: string;
-}
+export type { PullWindow };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** SAM.gov rejects a wider posted-date range. */

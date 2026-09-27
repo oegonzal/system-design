@@ -4,14 +4,11 @@
  * hand in the fakes from `./testing`. Nothing here knows about Nest, the
  * filesystem, the environment, `fetch` or a clock.
  */
-import type { Opportunity, SourceCallOutcome } from '@sysdesign/contracts';
+import type { Opportunity, SourceAvailability, SourceCallOutcome } from '@sysdesign/contracts';
 
 import type { OpportunityQuery } from './query';
 
-export interface SourceAvailability {
-  enabled: boolean;
-  reason: 'no-key' | null;
-}
+export type { SourceAvailability };
 
 /**
  * What one search came back as. A raw adapter only ever answers `ok` or

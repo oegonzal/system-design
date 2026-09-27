@@ -12,10 +12,15 @@ import { parseArgs } from 'node:util';
 
 import { NotFoundException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import type { LeadTier } from '@sysdesign/contracts';
-import { LEAD_TIERS } from '@sysdesign/contracts';
+import {
+  DEFAULT_LEAD_LIMIT,
+  DEFAULT_PULL_DAYS,
+  LEAD_TIERS,
+  type LeadTier,
+  type PullWindow,
+} from '@sysdesign/contracts';
 
-import { validateWindow, windowEndingAt, type PullWindow } from './core/plan';
+import { validateWindow, windowEndingAt } from './core/plan';
 import { AppModule } from './modules/app/app.module';
 import { OpportunitiesService } from './modules/opportunities/opportunities.service';
 import { DEFAULT_PROFILE_ID } from './profiles';
@@ -29,8 +34,6 @@ export const USAGE = `usage: govcon <command> [options]
 
 const COMMANDS = ['pull', 'leads', 'search', 'show'] as const;
 type Command = (typeof COMMANDS)[number];
-const DEFAULT_DAYS = 3;
-const DEFAULT_LIMIT = 25;
 
 interface Options {
   command: Command;
@@ -82,7 +85,7 @@ export function parseOptions(argv: readonly string[], now: Date): Options | Erro
     const window =
       values.from !== undefined && values.to !== undefined
         ? validateWindow({ from: values.from, to: values.to })
-        : windowEndingAt(now, integer(values.days, DEFAULT_DAYS, 'days'));
+        : windowEndingAt(now, integer(values.days, DEFAULT_PULL_DAYS, 'days'));
     if (values.tier !== undefined && !LEAD_TIERS.includes(values.tier as LeadTier)) {
       return new Error(`--tier must be one of ${LEAD_TIERS.join(', ')}`);
     }
@@ -95,7 +98,7 @@ export function parseOptions(argv: readonly string[], now: Date): Options | Erro
       window,
       minScore: integer(values['min-score'], 0, 'min-score'),
       tier: (values.tier as LeadTier | undefined) ?? null,
-      limit: Math.max(1, integer(values.limit, DEFAULT_LIMIT, 'limit')),
+      limit: Math.max(1, integer(values.limit, DEFAULT_LEAD_LIMIT, 'limit')),
       json: values.json ?? false,
     };
   } catch (error) {

@@ -51,3 +51,11 @@ export type SourceCallOutcome = (typeof SOURCE_CALL_OUTCOMES)[number];
 /** A ranked lead's band, cut by the profile's thresholds. */
 export const LEAD_TIERS = ['high', 'medium', 'low'] as const;
 export type LeadTier = (typeof LEAD_TIERS)[number];
+
+/** What one ledger row was: a search page or a notice description. */
+export const SOURCE_OPERATIONS = ['search', 'description'] as const;
+export type SourceOperation = (typeof SOURCE_OPERATIONS)[number];
+
+/** How one slice of a pull ended, as the report rows it. */
+export const SLICE_OUTCOMES = ['ok', 'cached', 'budget-exhausted', 'error', 'skipped'] as const;
+export type SliceOutcome = (typeof SLICE_OUTCOMES)[number];
