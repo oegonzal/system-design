@@ -1,0 +1,17 @@
+{
+  "name": "govcon",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/govcon/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/govcon",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

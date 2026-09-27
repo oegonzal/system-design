@@ -24,6 +24,7 @@ import type { ChangedFile } from './index';
  *   studio-api     -> contracts, db, llm, criteria, run-dump
  *   eval-worker    -> contracts, db, llm, criteria, run-dump
  *   quality-loop   -> contracts, db, llm, run-dump
+ *   govcon         -> contracts, db         SAM.gov opportunities: search, store, rank
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -43,6 +44,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'studio-api': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump'],
+  govcon: ['contracts', 'db'],
   storybook: null,
   'studio-e2e': null,
 };
