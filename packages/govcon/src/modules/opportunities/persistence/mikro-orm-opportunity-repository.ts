@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { EntityManager, FilterQuery } from '@mikro-orm/postgresql';
+import { EntityManager, type FilterQuery } from '@mikro-orm/postgresql';
 import type { Opportunity } from '@sysdesign/contracts';
 import { GovconOpportunity } from '@sysdesign/db';
 

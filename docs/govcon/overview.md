@@ -1,0 +1,109 @@
+# govcon — SAM.gov contract opportunities
+
+`packages/govcon` finds federal contract opportunities that fit one company.
+It pulls SAM.gov's Contract Opportunities feed a slice at a time inside a
+daily request budget, stores every record it can normalize, and ranks what is
+stored against a declarative profile — codes, phrases, prices, bands and
+thresholds are data, the engine is deterministic and every point is traced.
+
+## Why it is shaped this way
+
+A personal SAM.gov key is commonly reported to allow about ten requests a day,
+and every search page spends one. So the tool never re-fetches what it has
+(the call log doubles as a short-lived cache), refuses to call once the rolling
+day's budget is spent, never retries a 429, and does all ranking offline from
+Postgres. You pull once a day and search the store as often as you like.
+
+## Commands
+
+```
+pnpm govcon pull    [--profile enfav] [--days 3 | --from YYYY-MM-DD --to YYYY-MM-DD]
+pnpm govcon leads   [--profile enfav] [--min-score n] [--tier high|medium|low] [--limit 25] [--json]
+pnpm govcon search  …  # pull, then leads
+pnpm govcon show <noticeId> [--profile enfav] [--json]
+```
+
+`pull` prints one row per slice — `ok`, `cached` (pulled inside the window,
+nothing fetched), `budget-exhausted` (the budget stopped it), `error`, or
+`skipped` (a later slice after the pull stopped) — with pages, records
+received, inserted, updated and rejected, then a budget line: attempts in the
+last 24 hours against the budget. Exit code 2 is a usage problem, 1 a pull that
+stored nothing, 0 otherwise. `--json` prints the report objects.
+
+## The profile (`packages/govcon/src/profiles/enfav.ts`)
+
+| Field                | What it drives                                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `naics`, `psc`       | Code families. A shorter code is the whole family under it — a code system is hierarchical, so a six-digit NAICS matched exactly scores 1, a four-digit family 4/6.             |
+| `interests`          | Declared phrases with aliases and weights, matched as whole tokens in the title. Low weight by design: titles are thin.                                                         |
+| `pull.slices`        | The queries a pull runs, in priority order — one request each per page. `pageSize` (≤ 1000) and `maxPagesPerSlice` bound the spend; what remains is reported as truncated.      |
+| `scoring.weights`    | One weight per factor (`naics psc interests setAside noticeType deadline`), summing to 1. A weight for a factor that does not exist, or a factor with no weight, fails at boot. |
+| `scoring.setAside`   | Prices by code (`SBA: 1, SBP: 0.8`) and for unrestricted notices; a non-null code not in the map **excludes** the notice — the company cannot bid.                              |
+| `scoring.noticeType` | Prices by SAM.gov's label, a default for unlisted labels, and an exclude list (an award already made is not a lead).                                                            |
+| `scoring.deadline`   | Ascending bands by days left, a value beyond the last band and one for no deadline; a passed deadline or an inactive notice **excludes**.                                       |
+| `scoring.tiers`      | Score thresholds for `high` and `medium`.                                                                                                                                       |
+
+A lead's score is `100 × Σ weight × value` over the factors, one decimal; the
+`show` trace lists each factor's value, weight, points and evidence, and the
+points sum to the score. Gates run first: an excluded notice scores nothing
+and says why.
+
+## Environment
+
+Loaded by Node from `.env` (`--env-file-if-exists=.env` in the `govcon`
+script).
+
+| Variable                                                  | Effect                                                                                                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SAM_GOV_API_KEY`                                         | The SAM.gov account's public API key. Without it the source is disabled and `pull` says so instead of failing. Read once, in the source factory; never logged. |
+| `SAM_GOV_BASE_URL`                                        | The search URL; default production, `https://api-alpha.sam.gov/opportunities/v2/search` for the alpha environment (its own key).                               |
+| `SAM_GOV_DAILY_BUDGET`                                    | Attempts allowed per rolling 24 hours, every outcome counted; default 10. Raise it once the key's real quota is known.                                         |
+| `SAM_GOV_CACHE_TTL_HOURS`                                 | How long a pulled query is not pulled again; default 24, `0` disables the cache.                                                                               |
+| `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME` | Postgres for `govcon_opportunity` and `govcon_source_call`; the `govcon` script defaults `DB_PORT` to 5433 (`pnpm stack:db`).                                  |
+
+## Budget semantics
+
+The call log records every attempt with its outcome. Before each request the
+budgeted source asks the log two questions: is there a successful call for
+this exact query (same filters, window and page) inside the cache window —
+then the slice is `cached` and nothing is fetched; and how many attempts in
+the last 24 hours — at the budget, the slice is `budget-exhausted` and the
+rest of the pull is `skipped`. A rolling day is at least as strict as any
+calendar-day quota with the same count. A 429 is recorded as `rate-limited`
+and ends the pull. A log that cannot be read falls through to the call with a
+warning: the cache is an optimisation, never a dependency. A crash between
+the request and its ledger row under-counts by one; accepted.
+
+## Layout
+
+| Where                                                       | What                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/govcon/src/core/`                                 | Pure: `ports.ts`, `query.ts` (canonical query + key), `budgeted-source.ts`, `profile.ts`, `plan.ts`, `scoring.ts`. A spec pins that nothing here reads a clock, the environment, the filesystem or the network. |
+| `packages/govcon/src/modules/opportunities/sam-gov/`        | The adapter: zod `looseObject` schemas, the normalizer (three date spellings, nothing else), the source over injectable `fetch`, the env factory.                                                               |
+| `packages/govcon/src/modules/opportunities/persistence/`    | Row mapper and the two MikroORM adapters.                                                                                                                                                                       |
+| `packages/govcon/src/modules/opportunities/opportunities.*` | The composition root and the service (`pull`, `leads`, `show`).                                                                                                                                                 |
+| `packages/contracts/src/lib/govcon/`                        | `Opportunity` and the documented request vocabularies.                                                                                                                                                          |
+| `packages/db/src/entities/govcon-*.entity.ts`               | The two tables; migration `Migration20260926100001_create_govcon`.                                                                                                                                              |
+
+Criteria `GOV-1..7` in `packages/criteria`; every spec title claims one.
+
+## First run
+
+```
+pnpm stack:db && DB_PORT=5433 pnpm db:migrate
+SAM_GOV_DAILY_BUDGET=2 pnpm govcon pull --days 2      # two slices from the source, six skipped — 2 requests
+SAM_GOV_DAILY_BUDGET=2 pnpm govcon pull --days 2      # both cached, 0 requests
+pnpm govcon leads --min-score 40 --limit 10
+pnpm govcon show <noticeId>
+```
+
+From the next day `pnpm govcon search --days 3` (eight requests with the
+shipped profile) is the routine. If SAM.gov proves to match `ncode` by prefix,
+six four-digit families in `pull.slices` replace the eight six-digit codes — a
+data change.
+
+## Not in v1
+
+USAspending enrichment (an award-history port and factor), the notice
+description text (a request per notice), semantic relevance through the
+embedding client, an HTTP surface, scheduled pulls.

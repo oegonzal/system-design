@@ -72,24 +72,25 @@ how to bring your runs back in the future.
 Packages carry a `project.json` (no per-package `package.json`); every
 dependency is hoisted to the root and Nx is the single entry point.
 
-| Package                    | What it is                                                                       |
-| -------------------------- | -------------------------------------------------------------------------------- |
-| `packages/contracts`       | Wire types + `as const` vocabularies every layer derives from                    |
-| `packages/db`              | MikroORM entities, migrations, seed — shared by API and worker                   |
-| `packages/llm`             | The one LLM seam: Claude via structured outputs, no-op without a key             |
-| `packages/design-system`   | Emotion tokens → semantic roles → 18 primitives, contrast-asserted               |
-| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, evaluations, stories              |
-| `packages/eval-worker`     | Postgres-queue poller + rules engine + LLM critic                                |
-| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                 |
-| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI          |
-| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict |
-| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook       |
-| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                  |
-| `packages/studio-ui`       | Next.js app: canvas workspace, feedback loop, STAR repository                    |
-| `packages/storybook`       | Catalog host globbing sibling stories                                            |
-| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey                   |
-| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles          |
-| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke       |
+| Package                    | What it is                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| `packages/contracts`       | Wire types + `as const` vocabularies every layer derives from                            |
+| `packages/db`              | MikroORM entities, migrations, seed — shared by API and worker                           |
+| `packages/llm`             | The one LLM seam: Claude via structured outputs, no-op without a key                     |
+| `packages/design-system`   | Emotion tokens → semantic roles → 18 primitives, contrast-asserted                       |
+| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, evaluations, stories                      |
+| `packages/eval-worker`     | Postgres-queue poller + rules engine + LLM critic                                        |
+| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                         |
+| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI                  |
+| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict         |
+| `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI) |
+| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook               |
+| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                          |
+| `packages/studio-ui`       | Next.js app: canvas workspace, feedback loop, STAR repository                            |
+| `packages/storybook`       | Catalog host globbing sibling stories                                                    |
+| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey                           |
+| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles                  |
+| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke               |
 
 ## How grading works
 

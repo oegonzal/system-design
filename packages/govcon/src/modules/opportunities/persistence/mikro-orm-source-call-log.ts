@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
-import type { EntityManager } from '@mikro-orm/postgresql';
+import { EntityManager } from '@mikro-orm/postgresql';
 import { GovconSourceCall } from '@sysdesign/db';
 
 import type { FreshCall, SourceCall, SourceCallLog } from '../../../core/ports';
