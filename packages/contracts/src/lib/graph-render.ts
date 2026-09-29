@@ -1,19 +1,14 @@
-import type { CanvasGraph, NodeOperation } from './canvas';
+import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
 
 /**
- * One text rendering of a canvas, for every conversation the product has with a
- * model.
- *
- * It lives in contracts because more than one app now has such a conversation:
- * the eval worker's critic, depth and scenario passes, and the API's binding
- * suggestions. Two renderings would mean a node described one way to the critic
- * and another way to the suggester — and the whole point is that node ids and
- * config knobs read identically wherever a model is asked about them, so its
- * answers can be quoted back against the same graph.
- *
- * These are the per-element halves only. Assembling a whole document — which
- * prompt facts to include, what the token budget is — stays with each caller,
- * because those genuinely differ.
+ * One text rendering of a canvas, for every conversation the product has with
+ * a model. It lives in contracts because more than one thing reads it — the
+ * quality loop's canvas pipeline renders the artifact its lenses judge with
+ * these lines, and any future model-facing text does too — and the whole
+ * point is that node ids and config entries read identically wherever a model
+ * is asked about them, so its answers can be quoted back against the same
+ * graph. These are the per-element halves only; assembling a document is the
+ * caller's.
  */
 
 /** Budget per node line: enough to judge an interface, not enough to drown the prompt. */
@@ -22,18 +17,14 @@ export const MAX_SERIALIZED_OPS = 8;
 export const MAX_SERIALIZED_NOTE_LENGTH = 60;
 
 /**
- * `command placeOrder idem (Validates inventory first)` — kind, name, an
- * idempotency marker only when the author stated one either way, clipped
- * notes in parens.
+ * `command placeOrder idem (Validates inventory first)` — kind when stated,
+ * name, an idempotency marker only when the author stated one either way,
+ * clipped notes in parens.
  */
 function renderOperation(operation: NodeOperation): string {
+  const kind = operation.kind !== undefined ? `${operation.kind} ` : '';
   const idempotency =
     typeof operation.idempotent === 'boolean' ? (operation.idempotent ? ' idem' : ' non-idem') : '';
-  const fulfills = operation.fulfills !== undefined ? ` fulfills=${operation.fulfills}` : '';
-  const emits =
-    operation.emits !== undefined && operation.emits.length > 0
-      ? ` emits=[${operation.emits.join(',')}]`
-      : '';
   const notes =
     operation.notes !== undefined && operation.notes.length > 0
       ? ` (${
@@ -42,11 +33,14 @@ function renderOperation(operation: NodeOperation): string {
             : operation.notes
         })`
       : '';
-  return `${operation.kind} ${operation.name}${idempotency}${fulfills}${emits}${notes}`;
+  return `${kind}${operation.name}${idempotency}${notes}`;
 }
 
-export function renderNodeLine(node: CanvasGraph['nodes'][number]): string {
-  const config = node.config ? ` config=${JSON.stringify(node.config)}` : '';
+export function renderNodeLine(node: CanvasNode): string {
+  const config =
+    node.config && node.config.length > 0
+      ? ` config=${JSON.stringify(Object.fromEntries(node.config.map((entry) => [entry.key, entry.value])))}`
+      : '';
   const roles =
     node.responsibilities && node.responsibilities.length > 0
       ? ` roles=[${node.responsibilities.join('|')}]`
@@ -61,8 +55,8 @@ export function renderNodeLine(node: CanvasGraph['nodes'][number]): string {
   return `  node ${node.id} kind=${node.kind} label=${JSON.stringify(node.label)}${config}${roles}${ops}`;
 }
 
-export function renderEdgeLine(edge: CanvasGraph['edges'][number]): string {
-  return `  edge ${edge.id}: ${edge.source} -> ${edge.target} (${edge.kind ?? 'sync'})${
+export function renderEdgeLine(edge: CanvasEdge): string {
+  return `  edge ${edge.id}: ${edge.source} -> ${edge.target} (${edge.kind})${
     edge.label ? ` label=${JSON.stringify(edge.label)}` : ''
   }${edge.carries && edge.carries.length > 0 ? ` carries=[${edge.carries.join(',')}]` : ''}`;
 }

@@ -6,6 +6,7 @@ export * from './evidence';
 export * from './decision';
 export * from './pipeline';
 export * from './runs';
+export * from './criteria';
 export * from './prompt-library';
 export * from './orchestration';
 export * from './memory';

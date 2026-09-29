@@ -1,35 +1,35 @@
-import { CANVAS_MAX_TOTAL_OPERATIONS, type CanvasGraph } from './canvas';
-import { configVocabularyProblems } from './node-config-fields';
+import { CANVAS_MAX_TOTAL_OPERATIONS } from './canvas';
+import type { CanvasGraph } from './canvas.schema';
 
 /**
- * Referential validation of a graph whose *shape* already passed the DTO
- * layer. Pure and total: collects every problem rather than failing fast, so
- * the 422 the service raises lists all of them in one round trip. Shared here
- * because everything that persists a revision — the API's submit path and the
- * eval-worker's improvement loop — must hold the same line.
+ * Referential validation of a graph whose *shape* already passed the schema.
+ * Pure and total: collects every problem rather than failing fast, so the 422
+ * the service raises lists all of them in one round trip.
  *
- * A config key its node kind does not offer, or a value outside the field's
- * domain, is IMPOSSIBLE the same way an unknown edge target is: the editor
- * renders only `NODE_CONFIG_FIELDS`, so a stranger knob is a hand-crafted
- * payload — and one nothing grades, which is exactly why it must not be
- * silently stored. Callers that would rather discard than reject (a model
- * proposal, a stored design from before a knob was retired) run
- * `canonicalizeGraphConfig` first.
- *
- * Deliberately NOT a 422: a `carries` entry referencing a name its interface
- * owner never declared. That graph is semantically incomplete, not
- * impossible — an eval lesson for the critic to teach, never a save blocker.
+ * The line this file holds: it rejects what is IMPOSSIBLE — an edge to a node
+ * that is not there, a carry naming an operation neither endpoint declares,
+ * two entries under one config key — and says nothing about what is merely
+ * unwise. Whether the design is any good is the quality loop's to judge.
  */
 export function validateGraphReferences(graph: CanvasGraph): string[] {
-  const problems: string[] = [...configVocabularyProblems(graph)];
+  const problems: string[] = [];
 
   const nodeIds = new Set<string>();
+  const operationsByNode = new Map<string, Set<string>>();
   let totalOperations = 0;
   for (const node of graph.nodes) {
     if (nodeIds.has(node.id)) {
       problems.push(`duplicate node id: ${node.id}`);
     }
     nodeIds.add(node.id);
+
+    const configKeys = new Set<string>();
+    for (const entry of node.config ?? []) {
+      if (configKeys.has(entry.key)) {
+        problems.push(`node ${node.id} sets config key ${entry.key} twice`);
+      }
+      configKeys.add(entry.key);
+    }
 
     const operations = node.operations ?? [];
     totalOperations += operations.length;
@@ -40,6 +40,7 @@ export function validateGraphReferences(graph: CanvasGraph): string[] {
       }
       operationNames.add(operation.name);
     }
+    operationsByNode.set(node.id, operationNames);
   }
 
   if (totalOperations > CANVAS_MAX_TOTAL_OPERATIONS) {
@@ -65,12 +66,21 @@ export function validateGraphReferences(graph: CanvasGraph): string[] {
       problems.push(`edge ${edge.id} is a self-loop on node: ${edge.source}`);
     }
 
+    const declaredAtEitherEnd = new Set([
+      ...(operationsByNode.get(edge.source) ?? []),
+      ...(operationsByNode.get(edge.target) ?? []),
+    ]);
     const carrySeen = new Set<string>();
     for (const carry of edge.carries ?? []) {
       if (carrySeen.has(carry)) {
         problems.push(`edge ${edge.id} lists duplicate carries entry: ${carry}`);
       }
       carrySeen.add(carry);
+      if (!declaredAtEitherEnd.has(carry)) {
+        problems.push(
+          `edge ${edge.id} carries ${carry}, which neither ${edge.source} nor ${edge.target} declares`,
+        );
+      }
     }
   }
 

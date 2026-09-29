@@ -1,98 +1,64 @@
-import type { CapAppliedDto, EvalAxisDto, ScenarioReportDto } from './eval-profile';
 import type { ApiResponse } from './envelope';
-import type { GraphPatch } from './patches';
-import type { IsoDateString, Uuid } from './primitives';
-
-export const EVAL_STATUSES = ['queued', 'running', 'complete', 'failed'] as const;
-export type EvalStatus = (typeof EVAL_STATUSES)[number];
-
-/**
- * The rubric. Scores and findings are grouped by these. `explanation` is
- * earned only when a design narrative is submitted — without one it scores
- * null ("Not assessed") and carries no weight. `product` grades business
- * workability — API contracts, event flows, lifecycles — and is assessed only
- * when the prompt carries a workflow spec; on such a prompt silence scores 0,
- * on any other prompt the dimension is null and renormalizes away.
- */
-export const EVAL_DIMENSIONS = [
-  'reliability',
-  'scalability',
-  'performance',
-  'data',
-  'messaging',
-  'security',
-  'hygiene',
-  'explanation',
-  'product',
-] as const;
-export type EvalDimension = (typeof EVAL_DIMENSIONS)[number];
-
-export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
-export type Severity = (typeof SEVERITIES)[number];
-
-/** rule = deterministic violation · expectation = unmet coverage · llm = advisory annotation. */
-export const FINDING_SOURCES = ['rule', 'expectation', 'llm'] as const;
-export type FindingSource = (typeof FINDING_SOURCES)[number];
-
-export const GRADES = ['A', 'B', 'C', 'D', 'F'] as const;
-export type Grade = (typeof GRADES)[number];
+import type { LlmAvailabilityDto } from './llm-availability';
+import type { EvidenceResult } from './quality-loop/evidence';
+import type { QualityRunStatus } from './quality-loop/runs';
+import type {
+  AxisFactorLevel,
+  Decision,
+  Fixability,
+  Severity,
+  StopReason,
+} from './quality-loop/vocab';
 
 /**
- * 0–100 per dimension; null when nothing examined the dimension — no
- * applicable expectation and no violation — so it carries no weight in the
- * overall score and renders as "not assessed" rather than a free 100.
+ * What the studio shows for a graded revision: the quality loop's run, read
+ * for one iteration and grounded back onto the canvas. The studio holds no
+ * rubric of its own — every number here is the loop's controller's, every
+ * finding a lens's, and the only thing the studio adds is the mapping from
+ * the loop's positional location ids back to the author's node and edge ids.
  */
-export type DimensionScores = Record<EvalDimension, number | null>;
 
-export interface FindingDto {
-  id: Uuid;
-  source: FindingSource;
-  /** Stable rule id (`reliability.single-db-no-replica`) — set only for rule findings. */
-  ruleId: string | null;
-  /** Stable expectation id (`exp.fst.db-failover`) — set only for coverage findings. */
-  expectationId: string | null;
-  /** The prompt NFR this finding proves unmet, when one motivated it. */
-  nfrId: string | null;
-  /** The adversarial scenario that produced this failure story, when one did. */
-  scenarioId: string | null;
-  dimension: EvalDimension;
+export interface EvaluationFindingDto {
+  /** The loop's structural key for the defect — stable across polls. */
+  id: string;
+  /** Every lens that confirmed it. */
+  lenses: string[];
+  type: string;
   severity: Severity;
-  title: string;
-  /** The lesson: why this matters at the prompt's scale, not just what to change. */
-  message: string;
-  affectedNodeIds: string[];
-  affectedEdgeIds: string[];
-  suggestion: GraphPatch | null;
+  confidence: AxisFactorLevel;
+  fixability: Fixability;
+  criterionIds: string[];
+  /** `node.N` / `edge.N` refs resolved to the canvas ids they name. */
+  nodeIds: string[];
+  edgeIds: string[];
+  /** Every location the lens cited, verbatim — including refs into the brief and narrative. */
+  locationRefs: string[];
+  rationale: string | null;
+  /** A criterion already charging this lesson; a reconciled finding was not priced twice. */
+  reconciledTo: string | null;
+}
+
+export interface CriterionResultDto {
+  criterionId: string;
+  result: EvidenceResult;
+  confidence: AxisFactorLevel | null;
+  rationale: string | null;
 }
 
 export interface EvaluationDto {
-  id: Uuid;
-  revisionId: Uuid;
-  status: EvalStatus;
-  /** 0–100; null until complete. */
-  overallScore: number | null;
-  grade: Grade | null;
-  dimensionScores: DimensionScores | null;
-  summary: string | null;
-  engineVersion: string | null;
-  /** The rubric that produced this grade, for audit across profile evolution. */
-  profileId: string | null;
-  profileVersion: string | null;
-  /** Set when critical findings lowered the letter below its numeric band. */
-  capApplied: CapAppliedDto | null;
-  /** Which model critiqued, or null when the deterministic engine ran alone. */
-  criticModel: string | null;
+  runId: string;
+  /** Which iteration of the run this revision is: 1 for a submission, k for a coach revision. */
+  iteration: number;
+  status: QualityRunStatus;
+  llm: LlmAvailabilityDto;
+  overall: number | null;
+  decision: Decision | null;
+  /** Keyed by the pipeline's own dimension names; null means the dimension was not assessed. */
+  dimensions: Record<string, number | null>;
+  findings: EvaluationFindingDto[];
+  criterionResults: CriterionResultDto[];
+  stopReason: StopReason | null;
   error: string | null;
-  findings: FindingDto[];
-  /** LLM-scored axes displayed beside the deterministic score, never merged into it. */
-  axes: EvalAxisDto[];
-  /** Adversarial scenario narrations; empty until the scenario pass runs. */
-  scenarios: ScenarioReportDto[];
-  startedAt: IsoDateString | null;
-  completedAt: IsoDateString | null;
-  createdAt: IsoDateString;
-  updatedAt: IsoDateString;
 }
 
 export type GetEvaluationResponse = ApiResponse<EvaluationDto>;
-export type RetryEvaluationResponse = ApiResponse<EvaluationDto>;

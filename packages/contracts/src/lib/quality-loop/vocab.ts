@@ -2,10 +2,16 @@
  * The quality loop's closed vocabularies. `as const` tuples are the single
  * source of each: the loop's zod builders enum-lock the model to them, the
  * policy prices them, the trace records them and the web client maps them to
- * tones. Ordinal levels and severities are the repo's own (`eval-profile`,
- * `evaluations`), so this evidence speaks the same currency as the studio's
- * grader.
+ * tones.
  */
+
+/** How bad a defect is. `critical` alone can block a decision; `info` is never priced. */
+export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
+export type Severity = (typeof SEVERITIES)[number];
+
+/** Ordinal levels — what the evidence implies, not a false-precision number. */
+export const AXIS_FACTOR_LEVELS = ['none', 'low', 'medium', 'high'] as const;
+export type AxisFactorLevel = (typeof AXIS_FACTOR_LEVELS)[number];
 
 /** The controller's verdict on an artifact — the doctrine's ControllerDecision. */
 export const DECISIONS = ['accept', 'revise', 'retry', 'escalate', 'reject'] as const;

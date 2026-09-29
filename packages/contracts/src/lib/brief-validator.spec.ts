@@ -1,115 +1,78 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateBriefReferences, type BriefPromptRefs } from './brief-validator';
-import type { CanvasGraph } from './canvas';
-import type { DesignBrief } from './design-brief';
+import { validateBriefReferences } from './brief-validator';
+import type { CanvasGraph, DesignBrief } from './canvas.schema';
 
 const graph: CanvasGraph = {
   nodes: [
-    { id: 'n-1', kind: 'client', label: 'Client' },
-    { id: 'n-2', kind: 'service', label: 'Service' },
-    { id: 'n-3', kind: 'database', label: 'Database' },
+    { id: 'n-1', kind: 'client', label: '' },
+    { id: 'n-2', kind: 'service', label: '' },
+    { id: 'n-3', kind: 'database', label: '' },
   ],
   edges: [
-    { id: 'e-1', source: 'n-1', target: 'n-2' },
-    { id: 'e-2', source: 'n-2', target: 'n-3' },
+    { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+    { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync' },
   ],
 };
-
-const prompt: BriefPromptRefs = {
-  nonFunctionalRequirements: [{ id: 'fst-avail-sale-window' }, { id: 'fst-lat-read-spike' }],
-  functionalRequirements: ['browse events', 'check out'],
-};
-
-const brief = (partial: Partial<DesignBrief> = {}): DesignBrief => ({
-  version: 1,
-  nfrBindings: [],
-  flows: [],
-  ...partial,
-});
+const criteria = [{ id: 'c1' }, { id: 'c2' }];
+const brief = (bindings: DesignBrief['bindings']): DesignBrief => ({ version: 1, bindings });
 
 describe('validateBriefReferences', () => {
-  it('accepts a brief whose every reference resolves', () => {
-    const problems = validateBriefReferences(
-      graph,
-      brief({
-        nfrBindings: [{ nfrId: 'fst-avail-sale-window', nodeIds: ['n-3'], mechanism: 'backups' }],
-        flows: [{ id: 'f-1', requirementIndex: 0, path: ['e-1', 'e-2'] }],
-      }),
-      prompt,
-    );
-    expect(problems).toEqual([]);
+  it('[DEL-5] accepts a binding to known criteria and nodes with a connected path', () => {
+    expect(
+      validateBriefReferences(
+        graph,
+        brief([
+          {
+            criterionId: 'c1',
+            nodeIds: ['n-2', 'n-3'],
+            path: ['e-1', 'e-2'],
+            claim: 'the API writes',
+          },
+        ]),
+        criteria,
+      ),
+    ).toEqual([]);
   });
 
-  it('rejects references the graph and prompt cannot resolve', () => {
+  it('[DEL-5] rejects only the impossible: an unknown criterion, a second binding of one criterion, unknown or repeated nodes', () => {
     const problems = validateBriefReferences(
       graph,
-      brief({
-        nfrBindings: [{ nfrId: 'nope', nodeIds: ['n-9'], mechanism: 'backups' }],
-        flows: [{ id: 'f-1', requirementIndex: 7, path: ['e-9'] }],
-      }),
-      prompt,
+      brief([
+        { criterionId: 'c9', nodeIds: ['n-2'], claim: 'x' },
+        { criterionId: 'c1', nodeIds: ['n-2', 'n-2', 'ghost'], claim: 'x' },
+        { criterionId: 'c1', nodeIds: ['n-3'], claim: 'y' },
+      ]),
+      criteria,
     );
-    expect(problems).toContain('binding references unknown requirement: nope');
-    expect(problems).toContain('binding references unknown node: n-9');
-    expect(problems).toContain('flow f-1 references unknown edge: e-9');
-    expect(problems.some((problem) => problem.includes('claims requirement #7'))).toBe(true);
+    expect(problems).toEqual([
+      'binding references unknown criterion: c9',
+      'binding of c1 lists node n-2 twice',
+      'binding of c1 references unknown node: ghost',
+      'criterion c1 is bound twice',
+    ]);
   });
 
-  it('rejects a mechanism the bound kind could never provide', () => {
+  it('rejects a path that names an edge not on the canvas or does not continue the walk', () => {
     const problems = validateBriefReferences(
       graph,
-      brief({ nfrBindings: [{ nfrId: 'fst-lat-read-spike', nodeIds: ['n-1'], mechanism: 'dlq' }] }),
-      prompt,
+      brief([{ criterionId: 'c2', nodeIds: ['n-2'], path: ['e-2', 'e-1', 'e-9'], claim: 'x' }]),
+      criteria,
     );
-    expect(problems).toEqual(['a client cannot provide dlq (node n-1)']);
+    expect(problems).toEqual([
+      'path of c2 breaks at edge e-1 — it does not continue the walk',
+      'path of c2 references unknown edge: e-9',
+    ]);
   });
 
-  it('rejects a flow whose hops do not join up', () => {
-    const problems = validateBriefReferences(
-      graph,
-      brief({ flows: [{ id: 'f-1', requirementIndex: 0, path: ['e-2', 'e-1'] }] }),
-      prompt,
-    );
-    expect(problems).toEqual(['flow f-1 breaks at edge e-1 — it does not continue the path']);
-  });
-
-  it('rejects the same mechanism bound twice to one requirement', () => {
-    const problems = validateBriefReferences(
-      graph,
-      brief({
-        nfrBindings: [
-          { nfrId: 'fst-avail-sale-window', nodeIds: ['n-3'], mechanism: 'backups' },
-          { nfrId: 'fst-avail-sale-window', nodeIds: ['n-3'], mechanism: 'backups' },
-        ],
-      }),
-      prompt,
-    );
-    expect(problems).toEqual(['duplicate binding of backups to requirement fst-avail-sale-window']);
-  });
-
-  it('says nothing about a claim the diagram simply fails to support', () => {
-    // n-3 has no `backups` knob, so this binding is unsupported — that is a
-    // grade the author must see as a finding, never a save blocker.
-    const problems = validateBriefReferences(
-      graph,
-      brief({
-        nfrBindings: [{ nfrId: 'fst-lat-read-spike', nodeIds: ['n-3'], mechanism: 'backups' }],
-      }),
-      prompt,
-    );
-    expect(problems).toEqual([]);
-  });
-
-  it('collects every problem in one pass rather than failing fast', () => {
-    const problems = validateBriefReferences(
-      graph,
-      brief({
-        nfrBindings: [{ nfrId: 'nope', nodeIds: ['n-9', 'n-1'], mechanism: 'dlq' }],
-        flows: [{ id: 'f-1', requirementIndex: 0, path: [] }],
-      }),
-      prompt,
-    );
-    expect(problems.length).toBeGreaterThanOrEqual(4);
+  it('says nothing about a claim the design merely fails to back', () => {
+    // A client "holding" a criterion is a bad answer, not an impossible one.
+    expect(
+      validateBriefReferences(
+        graph,
+        brief([{ criterionId: 'c1', nodeIds: ['n-1'], claim: 'the browser caches it' }]),
+        criteria,
+      ),
+    ).toEqual([]);
   });
 });

@@ -1,6 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type { AxisFactorLevel } from '../eval-profile';
-import type { Severity } from '../evaluations';
+import type { AxisFactorLevel, Severity } from './vocab';
 
 /**
  * The decision policy: every number, threshold, gate and route the controller

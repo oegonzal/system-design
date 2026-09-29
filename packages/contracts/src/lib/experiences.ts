@@ -2,38 +2,18 @@ import type { ApiListResponse, ApiResponse } from './envelope';
 import type { IsoDateString, Uuid } from './primitives';
 
 /**
- * The archetype decides which prompt-template family an experience feeds.
- * Seeded reference data only — the app never writes experiences.
+ * A professional experience the practice prompts are drawn from. Seeded
+ * reference data only — the app never writes experiences. Everything a prompt
+ * needs is in the prose: the summary, the stack and the highlights (which
+ * carry the numbers) are rendered as the goal the prompt pipeline writes from.
  */
-export const ARCHETYPES = [
-  'flash-sale-ticketing',
-  'media-streaming-pipeline',
-  'workflow-automation',
-  'realtime-analytics',
-  'dag-orchestration',
-  'order-history-integration',
-] as const;
-export type Archetype = (typeof ARCHETYPES)[number];
-
-/** Concrete numbers lifted from the experience, used to scale prompt targets. */
-export interface ScaleFacts {
-  concurrentUsers?: number;
-  requestsPerSecond?: number;
-  dailyEvents?: number;
-  dataVolumeGb?: number;
-  peakMultiplier?: number;
-  notes?: string;
-}
-
 export interface ExperienceProfileDto {
   id: Uuid;
   slug: string;
   companyLabel: string;
   title: string;
   summary: string;
-  archetype: Archetype;
   techStack: string[];
-  scaleFacts: ScaleFacts;
   highlights: string[];
   createdAt: IsoDateString;
 }

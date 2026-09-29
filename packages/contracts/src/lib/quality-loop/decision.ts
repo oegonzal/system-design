@@ -1,5 +1,4 @@
-import type { AxisFactorLevel } from '../eval-profile';
-import type { Severity } from '../evaluations';
+import type { AxisFactorLevel, Severity } from './vocab';
 import type {
   ArtifactLocation,
   CriticReport,

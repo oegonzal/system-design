@@ -2,6 +2,7 @@ import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { LlmAvailabilityDto } from '../llm-availability';
 import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
+import type { SuccessCriterion } from './evidence';
 import type { Decision, StopReason } from './vocab';
 
 export const QUALITY_RUN_STATUSES = ['running', 'complete', 'failed'] as const;
@@ -29,6 +30,8 @@ export interface RunErrorDto {
 export interface QualityRunRequestSummary {
   goal: string;
   outputProvided: boolean;
+  /** True when the caller supplied the rubric; false when it was derived from the goal. */
+  criteriaProvided: boolean;
   maxIterations: number;
 }
 
@@ -57,7 +60,16 @@ export interface StartQualityRunRequest {
   goal: string;
   output?: unknown;
   maxIterations?: number;
+  /**
+   * A fixed rubric. When present the pipeline's derive-criteria stage is
+   * skipped and these ids are the ones every lens cites — how a caller that
+   * stores a rubric once keeps `c3` meaning `c3` across runs.
+   */
+  criteria?: SuccessCriterion[];
 }
+
+/** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */
+export const MAX_PROVIDED_CRITERIA = 64;
 
 export const DEFAULT_QUALITY_RUN_ITERATIONS = 1;
 /** A request may shorten a pipeline's loop, never lengthen it past this. */

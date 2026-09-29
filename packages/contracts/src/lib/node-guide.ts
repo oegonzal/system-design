@@ -1,13 +1,10 @@
-import { INTERFACE_CAPABILITIES } from './interfaces';
-import type { NodeKind, OperationKind } from './canvas';
+import type { NodeKind } from './canvas';
 
 /**
  * The in-app teaching guide: what each block kind is and when to reach for
  * it. Shown in the properties panel when a block is selected and as the
  * palette hover text — the product explains its own vocabulary instead of
- * assuming it. Interface facts are deliberately NOT here: derive them with
- * `interfaceSummary`, which reads `INTERFACE_CAPABILITIES` so the two can
- * never disagree.
+ * assuming it.
  */
 export interface NodeKindGuide {
   /** What the block is, present tense, one sentence. */
@@ -221,41 +218,3 @@ export const NODE_KIND_GUIDE = {
     whenToUse: 'Checkout flows: keep it off the hot path and make the charge idempotent.',
   },
 } satisfies Record<NodeKind, NodeKindGuide>;
-
-const OPERATION_KIND_PLURALS: Record<OperationKind, string> = {
-  command: 'commands',
-  query: 'queries',
-  event: 'events',
-  stream: 'streams',
-};
-
-/**
- * One derived sentence about a kind's interface, straight from
- * `INTERFACE_CAPABILITIES` so the guide can never drift from what the
- * editors and the eval rules actually allow. Null when the kind has nothing
- * interface-shaped to say (routing infrastructure, observability).
- */
-export function interfaceSummary(kind: NodeKind): string | null {
-  const capability = INTERFACE_CAPABILITIES[kind];
-  switch (capability.role) {
-    // An event-handler declares operations exactly like an api; they are
-    // exercised by the message flow rather than by a caller, but the guide copy
-    // is the same "declare X on its interface" sentence.
-    case 'event-handler':
-    case 'api': {
-      const plurals = capability.operationKinds.map((op) => OPERATION_KIND_PLURALS[op]);
-      if (plurals.length === 0) return null;
-      const list =
-        plurals.length > 1
-          ? `${plurals.slice(0, -1).join(', ')} and ${plurals[plurals.length - 1]}`
-          : plurals[0];
-      return `Can declare ${list} on its interface; connections carry them.`;
-    }
-    case 'channel':
-      return 'Declares the message or event types it transports between producers and consumers.';
-    case 'storage':
-      return 'Passive storage — callers own the operations against it.';
-    default:
-      return null;
-  }
-}

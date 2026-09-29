@@ -1,20 +1,34 @@
-import type { CanvasGraph } from './canvas';
-import type { DesignBrief } from './design-brief';
-import type { DesignNarrative } from './narration';
+import type { DesignBrief, DesignNarrative, DesignSubmission, CanvasGraph } from './canvas.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
-import type { EvalStatus, EvaluationDto, Grade } from './evaluations';
+import type { LlmAvailabilityDto } from './llm-availability';
 import type { IsoDateString, Uuid } from './primitives';
+import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
+import type { Decision, ProduceMode, StopReason } from './quality-loop/vocab';
 
 export const SESSION_STATUSES = ['in-progress', 'completed', 'abandoned'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
 /**
- * Who authored a revision: the practising user, or the AI coach's improvement
- * run. The timeline renders assistant revisions with an explicit badge so a
- * machine-made grade is never mistaken for the author's own.
+ * Who authored a revision: the practising user, or the coach — a quality-loop
+ * revise iteration imported as its own revision. The timeline renders
+ * assistant revisions with an explicit badge so a machine-made design is
+ * never mistaken for the author's own.
  */
 export const REVISION_ORIGINS = ['user', 'assistant'] as const;
 export type RevisionOrigin = (typeof REVISION_ORIGINS)[number];
+
+/**
+ * Where a revision's grade lives: one iteration of one quality-loop run. The
+ * scalars beside the pointer are a cache of the last terminal read, so lists
+ * and timelines never fetch the loop.
+ */
+export interface RevisionEvaluationRef {
+  runId: string;
+  iteration: number;
+  status: QualityRunStatus;
+  overall: number | null;
+  decision: Decision | null;
+}
 
 export interface DesignSessionDto {
   id: Uuid;
@@ -22,7 +36,9 @@ export interface DesignSessionDto {
   status: SessionStatus;
   revisionCount: number;
   latestRevisionNumber: number | null;
-  latestGrade: Grade | null;
+  latestOverall: number | null;
+  latestDecision: Decision | null;
+  latestEvaluationStatus: QualityRunStatus | null;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
 }
@@ -34,29 +50,19 @@ export interface DesignRevisionDto {
   revisionNumber: number;
   origin: RevisionOrigin;
   graph: CanvasGraph;
-  /**
-   * The walkthrough: reference-anchored prose explaining why each component is
-   * there and how each requirement's flow travels. Graded — a substantive,
-   * aligned narrative is required for a top grade; see {@link DesignNarrative}.
-   */
-  narrative: DesignNarrative | null;
-  /** The graded explanation: requirement bindings and traced flows. */
   brief: DesignBrief | null;
-  /** Embedded so one GET answers "what did I submit and how did it do". */
-  evaluation: EvaluationDto | null;
+  narrative: DesignNarrative | null;
+  /** Null only for revisions stored before grading was delegated. */
+  evaluation: RevisionEvaluationRef | null;
   createdAt: IsoDateString;
 }
 
-/** List projection: everything but the graph, which can be large. */
+/** List projection: the header and the grade, never the design itself. */
 export interface DesignRevisionSummaryDto {
   id: Uuid;
   revisionNumber: number;
   origin: RevisionOrigin;
-  /** See `DesignRevisionDto.narrative`. */
-  narrative: DesignNarrative | null;
-  evaluationStatus: EvalStatus | null;
-  overallScore: number | null;
-  grade: Grade | null;
+  evaluation: RevisionEvaluationRef | null;
   createdAt: IsoDateString;
 }
 
@@ -68,21 +74,8 @@ export interface UpdateSessionRequest {
   status: SessionStatus;
 }
 
-export interface SubmitRevisionRequest {
-  graph: CanvasGraph;
-  /**
-   * The graded explanation: which components hold each requirement, and how a
-   * request travels. Optional — a diagram may be submitted without one, and
-   * that absence is itself graded.
-   */
-  brief?: DesignBrief;
-  /**
-   * The design narrative — reference-anchored prose explaining what each
-   * component is for and how the requirements' flows travel. Optional to
-   * submit, but its absence is graded and caps the grade below a top mark.
-   */
-  narrative?: DesignNarrative;
-}
+/** `POST /sessions/:id/revisions` — the design as drawn; graded by one quality-loop run. */
+export type SubmitRevisionRequest = DesignSubmission;
 
 export interface ListSessionsQuery {
   promptId?: Uuid;
@@ -90,9 +83,48 @@ export interface ListSessionsQuery {
   offset?: number;
 }
 
-export const NARRATIVE_MAX_LENGTH = 4000;
+/**
+ * `POST /sessions/:id/improve` — hand the draft to the coach. The draft is
+ * persisted first as the author's own revision, then the loop revises it up
+ * to `maxIterations` times; every strictly better iteration becomes an
+ * assistant revision.
+ */
+export interface StartImproveRequest extends DesignSubmission {
+  maxIterations?: number;
+}
+
+export const DEFAULT_IMPROVE_ITERATIONS = 3;
+export const MAX_IMPROVE_ITERATIONS = MAX_QUALITY_RUN_ITERATIONS;
+
+export interface ImproveIterationDto {
+  iteration: number;
+  mode: ProduceMode | 'provided';
+  overall: number | null;
+  decision: Decision | null;
+  /** The revision this iteration was imported as; null when it was not better than every earlier one. */
+  revisionId: Uuid | null;
+}
+
+export interface ImproveRunDto {
+  runId: string;
+  sessionId: Uuid;
+  status: QualityRunStatus;
+  llm: LlmAvailabilityDto;
+  /** Model calls made so far — the only live signal while the loop runs. */
+  exchangeCount: number;
+  iterations: ImproveIterationDto[];
+  stopReason: StopReason | null;
+  error: string | null;
+}
+
+export interface StartImproveDto {
+  runId: string;
+  revision: DesignRevisionDto;
+}
 
 export type ListSessionsResponse = ApiListResponse<DesignSessionDto>;
 export type GetSessionResponse = ApiResponse<DesignSessionDto>;
 export type ListRevisionsResponse = ApiListResponse<DesignRevisionSummaryDto>;
 export type GetRevisionResponse = ApiResponse<DesignRevisionDto>;
+export type StartImproveResponse = ApiResponse<StartImproveDto>;
+export type GetImproveRunResponse = ApiResponse<ImproveRunDto>;

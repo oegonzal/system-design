@@ -1,17 +1,18 @@
 /**
- * The canvas graph — the wire shape of a design. Framework-agnostic on
- * purpose: React Flow's node/edge types never appear here; the UI keeps a
- * single mapping module (`graph-io`) that translates between the two.
+ * The diagram's notation: which blocks the palette offers, how they are
+ * shelved, the two kinds of connection and the four kinds of operation, plus
+ * the size limits every side enforces. Nothing here grades a design — the
+ * vocabulary is what the author draws with, and the quality loop's lenses
+ * judge whatever they drew. The shapes themselves are the zod schema in
+ * `canvas.schema.ts`.
  */
 
 /**
  * Every building block the palette offers. The single source of the
- * vocabulary: the DTO validates against it (`@IsIn([...NODE_KINDS])`), the
- * eval engine's rules match on it, the category map below is
- * `satisfies Record<NodeKind, NodeKindCategoryId>`, and the design system's
- * color/icon tables — including the per-category color table — are
- * `satisfies Record<NodeKind | NodeKindCategoryId, ...>` — so adding a kind
- * here refuses to compile until every consumer has caught up.
+ * vocabulary: the submission schema enum-locks to it, the category map below
+ * is `satisfies Record<NodeKind, NodeKindCategoryId>`, and the design system's
+ * color/icon tables are `satisfies Record<NodeKind | NodeKindCategoryId, …>` —
+ * so adding a kind here refuses to compile until every consumer has caught up.
  */
 export const NODE_KINDS = [
   // ── Clients & Edge
@@ -21,180 +22,50 @@ export const NODE_KINDS = [
   // ── Traffic & Routing
   'gateway',
   'load-balancer',
-  /**
-   * Terminates long-lived WebSocket/SSE connections for push traffic. Rule
-   * hooks: presence for realtime/chat/live prompts; misuse: plain LB fanning
-   * realtime out of a service with no connection tier; knobs maxConnections,
-   * sticky
-   */
   'websocket-gateway',
-  /**
-   * Sidecar layer for east-west traffic: mTLS, retries, discovery. Rule
-   * hooks: presence in many-service graphs w/ security NFR; misuse: mesh in a
-   * 2-service design (overengineering); knob mtls
-   */
   'service-mesh',
   // ── Compute
   'service',
   'worker',
-  /**
-   * Event-triggered ephemeral compute (FaaS), scales to zero. Rule hooks:
-   * presence for spiky/low-duty workloads; misuse: latency-critical sync path
-   * (cold starts), unpooled DB connections at fan-out; knobs memoryMb,
-   * timeoutSeconds, provisionedConcurrency
-   */
   'serverless-function',
-  /**
-   * Scheduled/bulk offline processing (ETL, reports). Rule hooks: misuse:
-   * reading the OLTP primary instead of replica/warehouse; no
-   * scheduler/workflow-engine trigger; knobs schedule, idempotent
-   */
   'batch-job',
   // ── Data Stores
   'database',
   'replica',
   'object-store',
   'search-index',
-  /**
-   * Key-value store for sessions, counters, simple lookups. Rule hooks:
-   * presence: session state when services scale out; misuse: relational
-   * workloads on KV, session data with no TTL; knobs replicas, consistency,
-   * ttlSeconds
-   */
   'kv-store',
-  /**
-   * Timestamped metrics/events store with retention/downsampling. Rule hooks:
-   * presence for metrics/IoT prompts; misuse: high-rate time-series in the
-   * OLTP database; knobs retentionDays, downsampling
-   */
   'time-series-db',
-  /**
-   * Embedding store for similarity search (RAG, recommendations). Rule hooks:
-   * presence for AI/semantic-search prompts; misuse: no embedding pipeline
-   * feeding it; knobs dimensions, indexType
-   */
   'vector-db',
   // ── Caching
   'cache',
   // ── Messaging & Streaming
   'queue',
   'event-stream',
-  /**
-   * Fan-out topic: one publish, N independent subscribers. Rule hooks:
-   * presence for notification fan-out; misuse: single subscriber (a queue
-   * would do), no DLQ path; knobs delivery, fanout
-   */
   'pub-sub',
-  /**
-   * Change-data-capture / outbox relay: DB commits become stream events.
-   * Rule hooks: presence: fixes dual-write when a service writes DB and
-   * publishes events; misuse: no source database in-edge or no sink stream
-   * out-edge; knob mode (log-based|outbox)
-   */
   'cdc-connector',
-  /**
-   * Dispatches push/email/SMS via providers. Rule hooks: misuse: called
-   * synchronously on the request path (belongs behind queue/pub-sub), no
-   * retry/DLQ semantics; knobs channels, rateLimit
-   */
   'notification-service',
   // ── Analytics & ML
-  /**
-   * Continuous computation over streams (aggregation, windowing). Rule
-   * hooks: presence for realtime analytics; misuse: no inbound event-stream,
-   * writing aggregates to the OLTP primary under load; knobs parallelism,
-   * checkpointing
-   */
   'stream-processor',
-  /**
-   * Columnar OLAP store for BI/reporting. Rule hooks: misuse: BI queries on
-   * the OLTP database when a warehouse exists, warehouse fed synchronously
-   * from request path; knob loadMode (batch|streaming)
-   */
   'data-warehouse',
-  /**
-   * Schema-on-read storage of raw events for later processing. Rule hooks:
-   * misuse: serving user-facing queries directly from the lake; knob format
-   * (parquet|json|raw)
-   */
   'data-lake',
-  /**
-   * Model-serving endpoint (recommendations, moderation, LLM). Rule hooks:
-   * misuse: sync inference on the critical path with no timeout/fallback;
-   * knobs replicas, gpu, timeoutMs, fallback
-   */
   'ml-inference',
   // ── Coordination & Config
   'scheduler',
-  /**
-   * Orchestrates multi-step/saga processes with state + compensation. Rule
-   * hooks: presence: multi-service transactions with no saga; misuse: fewer
-   * than 2 downstream steps; knob mode (orchestration|choreography)
-   */
   'workflow-engine',
-  /**
-   * Mutual exclusion across instances (leader election, unique jobs). Rule
-   * hooks: misuse: lock on the hot request path, lock guarding work that
-   * could be idempotent; knob ttlSeconds
-   */
   'distributed-lock',
-  /**
-   * Distributed unique-ID service for orderable ids at scale. Rule hooks:
-   * presence: sharded writes needing global ids; knob strategy
-   * (snowflake|uuid|ticket)
-   */
   'id-generator',
-  /**
-   * Dynamic configuration + feature flags read at runtime. Rule hooks:
-   * presence for gradual-rollout prompts; misuse: synchronous per-request
-   * config fetches; knob dynamic
-   */
   'config-service',
   // ── Identity & Security
-  /**
-   * Issues/validates identities and tokens (sessions, OAuth/OIDC). Rule
-   * hooks: presence: any user-facing design with auth requirement; misuse:
-   * token validation deep in the stack instead of at the gateway; knobs
-   * tokenType (jwt|opaque), mfa
-   */
   'auth-service',
-  /**
-   * Central store for credentials/keys with rotation. Rule hooks:
-   * presence-graded for security/compliance NFRs; knob rotation
-   */
   'secrets-manager',
-  /**
-   * Web application firewall filtering hostile traffic at the edge. Rule
-   * hooks: misuse: placed behind the LB/gateway instead of in front (in-edge
-   * from anything but client/cdn/dns); knob mode (block|monitor)
-   */
   'waf',
   // ── Observability
-  /**
-   * Metrics collection, dashboards and alerting. ANNOTATION NODE:
-   * presence-graded, never a traffic hop — path rules must not count it.
-   * Knob alerting
-   */
   'monitoring',
-  /**
-   * Centralized structured log collection/search. ANNOTATION NODE,
-   * presence-graded. Knob retentionDays
-   */
   'logging',
-  /**
-   * Distributed request tracing across services. ANNOTATION NODE,
-   * presence-graded (expected once graphs have ≥4 compute nodes). Knob
-   * sampling (0-100 %)
-   */
   'tracing',
   // ── External & SaaS
   'external-api',
-  /**
-   * External payment processor; PCI boundary. Rule hooks: misuse: sync
-   * charge on request path without idempotency, webhook callbacks not
-   * landing on a queue, card data in own database; knobs idempotencyKeys,
-   * webhooks
-   */
   'payment-provider',
 ] as const;
 
@@ -205,10 +76,9 @@ export type NodeKind = (typeof NODE_KINDS)[number];
  * UI — so the palette's sections, the properties panel's optgroups and the
  * design system's per-category colors all read one ordering.
  *
- * Every category now holds at least one kind (`canvas.spec` asserts it), but
- * a category may again be declared ahead of its members, so every consumer
- * must still render "category with no kinds" as nothing rather than assuming
- * at least one member.
+ * Every category holds at least one kind (`canvas.spec` asserts it), but a
+ * category may again be declared ahead of its members, so every consumer
+ * must still render "category with no kinds" as nothing.
  */
 export const NODE_KIND_CATEGORIES = [
   { id: 'clients-edge', label: 'Clients & Edge' },
@@ -285,102 +155,12 @@ export const EDGE_KINDS = ['sync', 'async'] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];
 
 /**
- * What a connection is FOR, as opposed to how it is called.
- *
- * `kind` says sync or async; this says read or write. The engine used to
- * presume the difference from the endpoints — a service touching a database
- * was a writer — which made an honest diagram worse than a vague one: draw the
- * read path and the write path separately and you were flagged for two writers
- * racing on a store only one of them mutates.
- *
- * Optional on purpose. A design that says nothing is read exactly as it was
- * before; declaring intent can only ever clarify, never newly incriminate.
- */
-export const EDGE_INTENTS = ['read', 'write', 'replicate', 'publish', 'consume', 'batch'] as const;
-export type EdgeIntent = (typeof EDGE_INTENTS)[number];
-
-/**
- * Per-node knobs some eval rules read (`replicas`, `dlq`, `rateLimit`, …).
- * A flat scalar record rather than per-kind shapes: the canvas edits it
- * generically and rules read specific keys defensively.
- */
-export type NodeConfig = Record<string, string | number | boolean>;
-
-/**
  * The verb an operation exposes. `command` mutates, `query` reads,
  * `event` is a fact published after something happened, `stream` is a
  * continuous flow (subscription, tail, changefeed).
  */
 export const OPERATION_KINDS = ['command', 'query', 'event', 'stream'] as const;
 export type OperationKind = (typeof OPERATION_KINDS)[number];
-
-/**
- * One entry in a node's declared interface. What it *means* depends on the
- * node's interface role (see `interfaces.ts`): for api-role kinds an
- * operation is an endpoint the node SERVES; for channel kinds it is a
- * message/event type the channel CARRIES. Names are matched exactly and
- * case-sensitively by edge `carries` references — there is no normalization.
- */
-export interface NodeOperation {
-  name: string;
-  kind: OperationKind;
-  idempotent?: boolean;
-  notes?: string;
-  /**
-   * Id of the prompt workflow-spec item this operation realizes (see
-   * `workflow-spec.ts`). A reference, never a name to match: the evaluation
-   * corroborates the claim structurally, and an id the prompt never declared
-   * is rejected at submit. Absent on prompts without a workflow spec.
-   */
-  fulfills?: string;
-  /**
-   * Workflow-spec event ids this operation publishes when it runs. Only
-   * meaningful on command-kind operations of api-role nodes — the producer
-   * half of a domain event's producer→consumer story.
-   */
-  emits?: string[];
-}
-
-export interface CanvasNode {
-  id: string;
-  kind: NodeKind;
-  label: string;
-  config?: NodeConfig;
-  /** Short role statements — "owns order lifecycle", one clause each. */
-  responsibilities?: string[];
-  /**
-   * The node's declared interface. Only kinds whose capability row (see
-   * `interfaces.ts`) lists operation kinds meaningfully declare these;
-   * storage/edge-infra/passive kinds leave it out.
-   */
-  operations?: NodeOperation[];
-  /** Canvas layout, so a stored revision re-renders where the author left it. */
-  position?: { x: number; y: number };
-}
-
-export interface CanvasEdge {
-  id: string;
-  source: string;
-  target: string;
-  /** Defaults to `sync` when omitted. */
-  kind?: EdgeKind;
-  /** What the connection is for. Undeclared means the engine presumes nothing. */
-  intent?: EdgeIntent;
-  label?: string;
-  /**
-   * Operation names this edge exercises, resolved against the edge's
-   * interface owner (`resolveInterfaceOwner` in `interfaces.ts` — the one
-   * ownership rule). Plain strings by design: protocol modeling (paths,
-   * schemas, content types) is deferred, so a carry is just an exact,
-   * case-sensitive reference to an owner-declared operation name.
-   */
-  carries?: string[];
-}
-
-export interface CanvasGraph {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
-}
 
 export const CANVAS_MAX_NODES = 100;
 export const CANVAS_MAX_EDGES = 300;
@@ -394,9 +174,19 @@ export const NODE_MAX_OPERATIONS = 12;
 export const OPERATION_NAME_MAX_LENGTH = 60;
 export const OPERATION_NOTES_MAX_LENGTH = 140;
 export const EDGE_MAX_CARRIES = 8;
-/** Whole-graph operation budget, enforced by the API's graph validator. */
+/** Whole-graph operation budget, enforced by the graph validator. */
 export const CANVAS_MAX_TOTAL_OPERATIONS = 400;
 
 export const NODE_CONFIG_MAX_KEYS = 20;
 export const NODE_CONFIG_KEY_MAX_LENGTH = 40;
 export const NODE_CONFIG_STRING_VALUE_MAX_LENGTH = 120;
+
+export const BRIEF_MAX_BINDINGS = 24;
+export const BINDING_MAX_NODES = 12;
+export const FLOW_MAX_STEPS = 24;
+export const BINDING_CLAIM_MAX_LENGTH = 200;
+
+export const NARRATION_PROSE_MAX_LENGTH = 600;
+export const NARRATION_OVERVIEW_MAX_LENGTH = 1200;
+export const NARRATION_MAX_COMPONENT_RATIONALES = 40;
+export const NARRATION_MAX_CRITERION_NARRATIONS = 24;

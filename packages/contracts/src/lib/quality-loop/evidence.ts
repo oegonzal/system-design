@@ -1,10 +1,10 @@
-import type { AxisFactorLevel } from '../eval-profile';
-import type { Severity } from '../evaluations';
 import type {
+  AxisFactorLevel,
   CriterionResult,
   Decision,
   DiagnosticReason,
   Fixability,
+  Severity,
   ValidatorGate,
 } from './vocab';
 
@@ -14,12 +14,20 @@ export interface ArtifactLocation {
   label: string;
 }
 
-/** One success criterion, derived from the goal. Ids are engine-assigned (`c1`…). */
+/**
+ * One success criterion — derived from the goal, or supplied with the run by
+ * a caller that stored a rubric once and cites its ids across runs. The
+ * limits are the persisted row's, so a supplied criterion is one the run can
+ * record.
+ */
 export interface SuccessCriterion {
   id: string;
   kind: string;
   statement: string;
 }
+export const CRITERION_ID_MAX_LENGTH = 20;
+export const CRITERION_KIND_MAX_LENGTH = 60;
+export const CRITERION_STATEMENT_MAX_LENGTH = 300;
 
 /** A stage that produced nothing, and why. Never evidence; always traced. */
 export interface Diagnostic {
@@ -103,6 +111,8 @@ export interface ConfirmedFinding {
   criterionIds: string[];
   hits: number;
   lenses: string[];
+  /** The first rationale a confirming lens gave — prose for a reader, never for the policy. */
+  rationale: string | null;
   /** A failed or partial criterion already charging this lesson; a reconciled finding is never priced. */
   reconciledTo: string | null;
 }

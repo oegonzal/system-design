@@ -1,6 +1,7 @@
-// Wire contracts shared by every layer: API DTO classes `implement` these
-// interfaces, the eval engine's rules read them, and the canvas UI renders
-// them. The `as const` tuples are the single source of each vocabulary — a
+// Wire contracts shared by every layer: the studio API validates against
+// them, the quality loop's pipelines declare their artifacts with them, and
+// the canvas UI renders them. The `as const` tuples are the single source of
+// each vocabulary, and the zod schemas the single source of each shape — a
 // value added here fails compilation everywhere a `satisfies Record<...>`
 // table has not caught up.
 //
@@ -12,31 +13,20 @@ export * from './lib/primitives';
 export * from './lib/constants';
 export * from './lib/envelope';
 export * from './lib/appearance';
-export * from './lib/brief-suggestions';
-export * from './lib/interface-suggestions';
 export * from './lib/canvas';
-export * from './lib/interfaces';
-export * from './lib/patches';
+export * from './lib/canvas.schema';
+export * from './lib/design-prompt.schema';
 export * from './lib/experiences';
 export * from './lib/prompts';
-export * from './lib/workflow-spec';
-export * from './lib/quality-areas';
 export * from './lib/sessions';
+export * from './lib/evaluations';
 export * from './lib/llm-availability';
-export * from './lib/improvement';
 export * from './lib/graph-render';
 export * from './lib/graph-validator';
-export * from './lib/workflow-validator';
 export * from './lib/brief-validator';
 export * from './lib/narration-validator';
-export * from './lib/patch-apply';
-export * from './lib/mechanisms';
-export * from './lib/design-brief';
-export * from './lib/narration';
 export * from './lib/node-guide';
-export * from './lib/node-config-fields';
-export * from './lib/evaluations';
-export * from './lib/eval-profile';
 export * from './lib/star-stories';
+export * from './lib/studio-pipelines';
 export * from './lib/quality-loop';
 export * from './lib/govcon';
