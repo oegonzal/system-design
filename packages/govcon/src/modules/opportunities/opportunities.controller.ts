@@ -1,7 +1,7 @@
 import { Controller, Get, HttpCode, NotFoundException, Param, Post, Query } from '@nestjs/common';
 import type { FetchDescriptionResponse, GetLeadResponse } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../app/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { OpportunitiesService } from './opportunities.service';
 import { profileQuerySchema, type ProfileQuery } from './profile-query';
 

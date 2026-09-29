@@ -16,7 +16,7 @@ import type {
   StartOrchestrationResponse,
 } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../runs/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import {
   fromRunRequestSchema,
   listOrchestrationsQuerySchema,

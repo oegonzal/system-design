@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, HttpCode, Inject, Post } from '@
 import { DEFAULT_PULL_DAYS, type StartPullResponse } from '@sysdesign/contracts';
 
 import { validateWindow, windowEndingAt } from '../../core/plan';
-import { ZodValidationPipe } from '../app/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { OpportunitiesService } from './opportunities.service';
 import { startPullRequestSchema, type StartPullBody } from './start-pull-request';
 import { CLOCK } from './tokens';

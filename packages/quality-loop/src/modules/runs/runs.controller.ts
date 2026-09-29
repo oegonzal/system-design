@@ -18,7 +18,7 @@ import type {
 import { listRunsQuerySchema, type ListRunsQuery } from './list-runs-query';
 import { runRequestSchema } from './run-request';
 import { RunsService } from './runs.service';
-import { ZodValidationPipe } from './zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
 @Controller('runs')
 export class RunsController {

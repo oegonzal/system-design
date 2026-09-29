@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import type { GetSourceResponse, ListSourceCallsResponse } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../app/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { listCallsQuerySchema, type ListCallsQueryInput } from './list-calls-query';
 import { OpportunitiesService } from './opportunities.service';
 

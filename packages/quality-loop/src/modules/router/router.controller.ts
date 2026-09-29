@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import type { RouteReportRequest, RouteReportResponse } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../runs/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { routeReportRequestSchema } from './router-request';
 import { RouterService } from './router.service';
 

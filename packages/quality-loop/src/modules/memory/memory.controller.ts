@@ -1,7 +1,7 @@
 import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
 import type { ReindexMemoryRunResponse, RetrievalReportResponse } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../runs/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { reportRequestSchema } from './memory-request';
 import { MemoryService } from './memory.service';
 

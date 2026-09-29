@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import type { ListLeadsResponse } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '../app/zod.pipe';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { listLeadsQuerySchema, type ListLeadsQueryInput } from './list-leads-query';
 import { OpportunitiesService } from './opportunities.service';
 

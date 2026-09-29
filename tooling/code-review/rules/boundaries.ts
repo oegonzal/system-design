@@ -16,16 +16,17 @@ import type { ChangedFile } from './index';
  *   db             -> contracts         MikroORM entities and migrations
  *   llm            -> contracts         provider adapters
  *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
+ *   nest-kit       -> contracts         the Nest apps' shared plumbing (zod pipe)
  *   design-system  -> contracts         tokens and domain-free primitives
  *   web-kit        -> contracts, design-system   the Next apps' runtime plumbing
  *   web-testing    -> contracts, design-system   the web spec harness
  *   studio-ui      -> contracts, design-system, web-kit, web-testing
  *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
  *   govcon-ui      -> contracts, design-system, web-kit, web-testing
- *   studio-api     -> contracts, db, llm, criteria, run-dump
+ *   studio-api     -> contracts, db, nest-kit
  *   eval-worker    -> contracts, db, llm, criteria, run-dump
- *   quality-loop   -> contracts, db, llm, run-dump
- *   govcon         -> contracts, db         SAM.gov opportunities: search, store, rank
+ *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
+ *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -37,16 +38,17 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   db: ['contracts'],
   llm: ['contracts'],
   'run-dump': [],
+  'nest-kit': ['contracts'],
   'design-system': ['contracts'],
   'web-kit': ['contracts', 'design-system'],
   'web-testing': ['contracts', 'design-system'],
   'studio-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
-  'studio-api': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
+  'studio-api': ['contracts', 'db', 'nest-kit'],
   'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
-  'quality-loop': ['contracts', 'db', 'llm', 'run-dump'],
-  govcon: ['contracts', 'db'],
+  'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
+  govcon: ['contracts', 'db', 'nest-kit'],
   storybook: null,
   'studio-e2e': null,
 };

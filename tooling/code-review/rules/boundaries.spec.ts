@@ -25,16 +25,17 @@ describe('the dependency matrix', () => {
     ['db', ['contracts']],
     ['llm', ['contracts']],
     ['run-dump', []],
+    ['nest-kit', ['contracts']],
     ['design-system', ['contracts']],
     ['web-kit', ['contracts', 'design-system']],
     ['web-testing', ['contracts', 'design-system']],
     ['studio-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['quality-loop-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['govcon-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
-    ['studio-api', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
+    ['studio-api', ['contracts', 'db', 'nest-kit']],
     ['eval-worker', ['contracts', 'db', 'llm', 'criteria', 'run-dump']],
-    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump']],
-    ['govcon', ['contracts', 'db']],
+    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit']],
+    ['govcon', ['contracts', 'db', 'nest-kit']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
     expect(ALLOWED[pkg]).toEqual(allowed);
   });
