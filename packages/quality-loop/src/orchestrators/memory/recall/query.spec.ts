@@ -1,44 +1,20 @@
-import type { LlmClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import { probesOf, probeTexts, queryText } from './compose';
-import { LlmQueryProbes, MAX_PROBES, noQueryProbes } from './query-probes';
+import { renderGoal as renderQuery } from '../../../pipelines/memory-recall/input';
+import { MAX_PROBES } from '../ports';
+import { fused, hitOf } from '../testing';
+import { buildQuery, probesOf, probeTexts, queryText } from './query';
 
-const client = (
-  completeStructured: LlmClient['completeStructured'],
-  enabled = true,
-): LlmClient => ({ enabled, model: 'fake', completeStructured });
-
-describe('deriving what to search under', () => {
-  it('never lets a probe failure cost the recall, whatever the client does', async () => {
-    const refused = new LlmQueryProbes(client(() => Promise.resolve(null)));
-    const threw = new LlmQueryProbes(
-      client(() => Promise.reject(new Error('rate limited'))),
-      () => undefined,
+describe('the recall query', () => {
+  it('[QL-16] is the goal head under the byte cap, and a maximal query still renders under the goal budget', () => {
+    const long = 'x'.repeat(70_000);
+    expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(16_000);
+    const wide = Array.from({ length: 17 }, (_, index) =>
+      hitOf('y'.repeat(1_200), `run-${index}`, 'memory.1'),
     );
-    const off = new LlmQueryProbes(client(() => Promise.resolve(null), false));
-
-    expect(await refused.derive('a goal')).toEqual([]);
-    expect(await threw.derive('a goal')).toEqual([]);
-    expect(await off.derive('a goal')).toEqual([]);
-    expect(await noQueryProbes.derive('a goal')).toEqual([]);
-  });
-
-  it('passes the goal as the task and the conditions back', async () => {
-    const seen: string[] = [];
-    const probes = new LlmQueryProbes(
-      client((request) => {
-        seen.push(request.user);
-        return Promise.resolve({
-          probes: ['a p99 target crosses a hop you do not control'],
-        } as never);
-      }),
-    );
-
-    expect(await probes.derive('# Prompt')).toEqual([
-      'a p99 target crosses a hop you do not control',
-    ]);
-    expect(seen).toEqual(['# Prompt']);
+    const query = buildQuery(queryText(long), [queryText(long)], fused(wide));
+    expect(query.candidates).toHaveLength(16);
+    expect(() => renderQuery(query)).not.toThrow();
   });
 });
 

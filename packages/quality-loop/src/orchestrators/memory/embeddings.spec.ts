@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CachedEmbeddings } from './embeddings';
 import type { EmbeddingCache } from './ports';
-import { fakeEmbeddings, InMemoryEmbeddingCache, vectorOf } from './testing';
+import { fakeEmbeddings, InMemoryEmbeddingCache, vectorOf } from '../../modules/memory/testing';
 
 /** A cache that is present but broken — the case a run must survive. */
 const brokenCache = (broken: 'find' | 'save'): EmbeddingCache => {

@@ -11,8 +11,7 @@
 import type { EmbeddingClient } from '@sysdesign/llm';
 import { describeError } from '@sysdesign/run-dump';
 
-import { contentHash } from './compose';
-import type { EmbeddingCache } from './ports';
+import { contentHash, type EmbeddingCache } from './ports';
 
 export interface Embedded {
   vectors: number[][];

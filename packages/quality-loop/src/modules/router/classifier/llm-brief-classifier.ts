@@ -1,29 +1,20 @@
 /**
- * The brief classifier: one structured model call that says which registered
- * judge a brief belongs to. Not a child run, on the query-probes precedent:
- * its answer is never a verdict, only what dispatches, and the schema is
- * locked to the ids the registry offers, so the model cannot name a judge
- * that does not exist. Null on a miss; the step says `unclassified`.
+ * The brief classifier over a model: one structured call that says which
+ * registered judge a brief belongs to. Not a child run, on the query-probes
+ * precedent: its answer is never a verdict, only what dispatches, and the
+ * schema is locked to the ids the registry offers, so the model cannot name a
+ * judge that does not exist. Null on a miss; the step says `unclassified`.
  */
 import type { RouteDto } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
+import type { BriefClassifier, Classification } from '../../../orchestrators/router/ports';
 import persona from './classifier.md?raw';
 
-export interface Classification {
-  pipeline: string;
-  rationale: string;
-}
-
-export interface BriefClassifier {
-  readonly enabled: boolean;
-  readonly model: string | null;
-  /** One of the routes' ids and why, or null when the model could not say. */
-  classify(goal: string, routes: readonly RouteDto[]): Promise<Classification | null>;
-}
-
 const RATIONALE_MAX = 400;
+/** Room for the id and one short reason, no more. */
+const CLASSIFY_MAX_TOKENS = 600;
 
 /** The judges as the model reads them: id and what it grades, one per line. */
 export const renderRoutes = (routes: readonly RouteDto[]): string =>
@@ -57,7 +48,7 @@ export class LlmBriefClassifier implements BriefClassifier {
           pipeline: z.enum(ids),
           rationale: z.string().min(1).max(RATIONALE_MAX),
         }),
-        maxTokens: 600,
+        maxTokens: CLASSIFY_MAX_TOKENS,
       });
     } catch (error) {
       // The client's contract is null on failure; a throw here must not take the run down.
@@ -66,10 +57,3 @@ export class LlmBriefClassifier implements BriefClassifier {
     }
   }
 }
-
-/** No model: every brief is unclassified, and the step says why. */
-export const noClassifier: BriefClassifier = {
-  enabled: false,
-  model: null,
-  classify: () => Promise.resolve(null),
-};

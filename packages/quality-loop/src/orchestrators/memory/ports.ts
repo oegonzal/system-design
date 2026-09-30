@@ -1,13 +1,17 @@
 /**
- * The ports the memory module runs over. Adapters: Qdrant for the store,
- * MikroORM for the cache and the run record; specs hand in in-memory fakes.
- * The chunk vocabulary is the memory-recall pipeline's own `ChunkSource`, so
- * a stored chunk is a valid recall candidate without conversion.
+ * The ports the memory orchestrator runs over. Adapters live in the memory
+ * module — Qdrant for the store, MikroORM for the cache, a model for the
+ * probes — and specs hand in in-memory fakes. The chunk vocabulary is the
+ * memory-recall pipeline's own `ChunkSource`, so a stored chunk is a valid
+ * recall candidate without conversion.
  */
-import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import { createHash } from 'node:crypto';
+
+import type { LlmAvailabilityDto, MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 
 import type { EVIDENCE_KINDS } from '../../pipelines/experience-digest/input';
 import type { ChunkSource } from '../../pipelines/memory-recall/input';
+import type { CachedEmbeddings } from './embeddings';
 
 /** The engine evidence a stored memory rests on — joinable to the source run's rows. */
 export interface EvidenceRef {
@@ -27,6 +31,10 @@ export interface EvidenceRef {
 export const VECTOR_NAMES = ['condition', 'lesson'] as const;
 
 export type VectorName = (typeof VECTOR_NAMES)[number];
+
+/** How a text is identified wherever it is stored or cached: sha256 hex of the text itself. */
+export const contentHash = (text: string): string =>
+  createHash('sha256').update(text, 'utf8').digest('hex');
 
 export interface MemoryChunk {
   /** The whole lesson, as the curator reads it and as it reaches a goal. */
@@ -78,4 +86,28 @@ export interface MemoryStore {
 export interface EmbeddingCache {
   find(model: string, hashes: readonly string[]): Promise<Map<string, number[]>>;
   save(model: string, entries: readonly { hash: string; vector: number[] }[]): Promise<void>;
+}
+
+/** Probes past this add candidates without adding coverage; the goal is extra. */
+export const MAX_PROBES = 6;
+
+/** What a recall asks for the conditions of the goal it is about to answer. */
+export interface QueryProbes {
+  /**
+   * Conditions to search under, beyond the goal itself. Empty is a valid
+   * answer and the only failure mode: a recall with no derived probes is a
+   * recall over the goal alone, which is what it did before there were any.
+   */
+  derive(goal: string): Promise<string[]>;
+}
+
+/** Derives nothing; recall falls back to the goal. Used when no model is configured. */
+export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
+
+/** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
+export interface MemoryPorts {
+  embedding: LlmAvailabilityDto;
+  embeddings: CachedEmbeddings;
+  store: MemoryStore;
+  probes: QueryProbes;
 }

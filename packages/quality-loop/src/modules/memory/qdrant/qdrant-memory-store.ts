@@ -13,7 +13,7 @@ import {
   type MemoryProbe,
   type MemoryStore,
   type StoredChunk,
-} from '../ports';
+} from '../../../orchestrators/memory/ports';
 import { collectionName, fromPayload, INDEXED_FIELDS, pointId, toPayload } from './collection';
 
 export const DEFAULT_QDRANT_URL = 'http://localhost:6333';

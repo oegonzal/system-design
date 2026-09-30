@@ -22,14 +22,17 @@ import { z } from 'zod';
 
 import { outputsOf } from '../../core/outputs';
 import { digestedChildren } from '../../orchestrators/memory/definition';
-import { indexMemories, type MemoryPorts } from '../../orchestrators/memory/steps';
+import { memoriesToStore } from '../../orchestrators/memory/digest/read-digest';
+import type { MemoryHit, MemoryPorts } from '../../orchestrators/memory/ports';
+import { fuse } from '../../orchestrators/memory/recall/fusion';
+import { bareGoal } from '../../orchestrators/memory/recall/inject';
+import { probeOf, probesOf, probeTexts, queryText } from '../../orchestrators/memory/recall/query';
+import { indexMemories } from '../../orchestrators/memory/store/index-memories';
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { alias, MAX_CANDIDATES, probeAlias } from '../../pipelines/memory-recall/input';
 import type { OrchestrationRunRepository } from '../orchestration/ports';
 import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
 import { RunsService } from '../runs/runs.service';
-import { bareGoal, fuse, memoriesToStore, probesOf, probeTexts, queryText } from './compose';
-import { VECTOR_NAMES, type MemoryHit } from './ports';
 import { MEMORY_PORTS } from './tokens';
 
 /** An orchestration run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
@@ -134,7 +137,7 @@ export class MemoryService implements OnModuleInit {
         text,
         found: probes
           .map((probe, index) => ({ probe, index }))
-          .filter(({ index }) => Math.floor(index / VECTOR_NAMES.length) === position)
+          .filter(({ index }) => probeOf(index) === position)
           .map(({ probe, index }) => ({
             using: probe.using,
             hits: (ranked[index] ?? []).map(asHit),

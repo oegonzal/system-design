@@ -9,17 +9,21 @@ import {
   type LlmClient,
 } from '@sysdesign/llm';
 
-import type { MemoryPorts } from '../../orchestrators/memory/steps';
+import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
+import {
+  noQueryProbes,
+  type EmbeddingCache,
+  type MemoryPorts,
+  type MemoryStore,
+  type QueryProbes,
+} from '../../orchestrators/memory/ports';
 import { OrchestrationRecordModule } from '../orchestration/orchestration-record.module';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
-import { CachedEmbeddings } from './embeddings';
 import { MemoryController } from './memory.controller';
 import { MemoryService } from './memory.service';
-import { LlmQueryProbes, noQueryProbes } from './query-probes';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
-import type { EmbeddingCache, MemoryStore } from './ports';
-import type { QueryProbes } from './query-probes';
+import { LlmQueryProbes } from './query-probes/llm-query-probes';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant/qdrant-memory-store';
 import {
   EMBEDDING_CACHE,

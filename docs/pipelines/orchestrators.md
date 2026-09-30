@@ -167,7 +167,7 @@ with nothing judged would be a lie.
 
 The routes are never listed. They are every registered pipeline that takes a
 brief, read from the registry at run time, so a fifth judge is a route the
-day it is registered. The classifier (`modules/router/classifier.ts`, persona
+day it is registered. The classifier (`modules/router/classifier/llm-brief-classifier.ts`, persona
 in `classifier.md`) is one structured model call on the query-probes
 precedent: not a child run, never a verdict, and **schema-locked to the
 registered ids** — the model cannot name a judge that does not exist. It

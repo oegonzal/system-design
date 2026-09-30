@@ -1,10 +1,14 @@
 import { Logger, Module } from '@nestjs/common';
 import { qualityLoopAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
 
-import type { RouterPorts } from '../../orchestrators/router/steps';
+import {
+  noClassifier,
+  type BriefClassifier,
+  type RouterPorts,
+} from '../../orchestrators/router/ports';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
-import { LlmBriefClassifier, noClassifier, type BriefClassifier } from './classifier';
+import { LlmBriefClassifier } from './classifier/llm-brief-classifier';
 import { RouterController } from './router.controller';
 import { RouterService } from './router.service';
 import { BRIEF_CLASSIFIER, ROUTER_PORTS } from './tokens';

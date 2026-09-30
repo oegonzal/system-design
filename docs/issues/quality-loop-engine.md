@@ -156,7 +156,7 @@ cost with no reader.
 
 ### ENG-5 · Memory reaches the producer only through the goal
 
-**Status** accepted · **Where** `modules/memory/steps.ts`, `core/loop/materialize.ts`
+**Status** accepted · **Where** `orchestrators/memory/steps.ts`, `core/loop/materialize.ts`
 
 **What.** `LensContext` and `ProducerInput` are closed; `materialize` always
 builds an LLM producer; no stage takes a parameter a pipeline can supply.

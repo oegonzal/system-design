@@ -1,30 +1,20 @@
 import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { bareGoal, buildQuery, MEMORY_HEADING } from '../../modules/memory/compose';
-import {
-  confirmed,
-  fused,
-  GOAL,
-  InMemoryMemoryStore,
-  passed,
-  traceOf,
-} from '../../modules/memory/testing';
+import { InMemoryMemoryStore, mutedEmbeddings } from '../../modules/memory/testing';
 import { fromRun } from '../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
 import { sampleDigest } from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { samplePack } from '../../pipelines/memory-recall/testing';
+import { bareGoal, MEMORY_HEADING } from './recall/inject';
+import { buildQuery } from './recall/query';
 import { digest, recall, store, target } from './steps';
-import {
-  childRun as child,
-  mutedEmbeddings,
-  sampleHits as hits,
-  stepContext as ctx,
-} from './steps.testing';
+import { childRun as child, sampleHits as hits, stepContext as ctx } from './steps.testing';
+import { faulting, fused, GOAL, passed, readoutTrace } from './testing';
 
 const recallTrace = (decision: RunTrace['finalDecision'] = 'accept', faulted = false) =>
-  traceOf({
+  readoutTrace({
     pipeline: 'memory-recall',
     goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
     artifact: samplePack({ kept: samplePack().kept, dropped: [] }),
@@ -32,13 +22,13 @@ const recallTrace = (decision: RunTrace['finalDecision'] = 'accept', faulted = f
     criteria: [{ id: 'c1', kind: 'need', statement: 'x' }],
     results: [passed('c1', 'need', ['m1'])],
     findings: faulted
-      ? [confirmed('irrelevant_chunk', ['m1']), confirmed('irrelevant_chunk', ['m2'])]
+      ? [faulting('irrelevant_chunk', ['m1']), faulting('irrelevant_chunk', ['m2'])]
       : [],
     decision,
   });
 
 const targetTrace = (decision: RunTrace['finalDecision'] = 'accept') =>
-  traceOf({
+  readoutTrace({
     pipeline: 'system-design',
     goal: GOAL,
     artifact: { summary: 'a design' },
@@ -57,7 +47,7 @@ const digestTraceFor = (source: QualityRunDto, decision: RunTrace['finalDecision
     trace: { ...trace, contract: { ...trace.contract, goal: bareGoal(trace.contract.goal) } },
   });
   if (record === null) throw new Error('the source must compose');
-  return traceOf({
+  return readoutTrace({
     pipeline: 'experience-digest',
     goal: renderRecord(record),
     artifact: sampleDigest({

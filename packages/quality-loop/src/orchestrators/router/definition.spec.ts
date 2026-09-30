@@ -2,11 +2,10 @@ import type { PipelineSummary, StartOrchestrationRequest } from '@sysdesign/cont
 import { describe, expect, it } from 'vitest';
 
 import { decision, runRecord, traceOf } from '../../core/testing';
-import type { BriefClassifier, Classification } from '../../modules/router/classifier';
 import { validateOrchestrator } from '../runner/definition';
 import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
 import { ROUTER } from './definition';
-import type { RouterPorts } from './steps';
+import type { BriefClassifier, Classification, RouterPorts } from './ports';
 
 const summaries = (...ids: string[]): PipelineSummary[] => ids.map((id) => summaryOf(id));
 

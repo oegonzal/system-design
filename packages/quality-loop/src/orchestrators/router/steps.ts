@@ -6,23 +6,12 @@
  * declared-pipeline check, not the classifier, is what dispatches: the judge
  * step's pipeline is whatever `classify` produced, and only that.
  */
-import type {
-  LlmAvailabilityDto,
-  QualityRunDto,
-  RouterContextDto,
-  RouterStepReason,
-} from '@sysdesign/contracts';
+import type { QualityRunDto, RouterContextDto, RouterStepReason } from '@sysdesign/contracts';
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
 
-import type { BriefClassifier } from '../../modules/router/classifier';
 import { briefRoutes, requestInput, runTarget } from '../common';
 import type { StepContext, StepResult } from '../runner/definition';
-
-/** The ports the router runs over; the module that owns the classifier binds them. */
-export interface RouterPorts {
-  classifier: BriefClassifier;
-  llm: LlmAvailabilityDto;
-}
+import type { RouterPorts } from './ports';
 
 export interface RouterOutputs {
   classify: { pipeline: string };

@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { collectionName, pointId } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
-import { hitOf, vectorOf } from '../testing';
+import { hitOf } from '../../../orchestrators/memory/testing';
+import { vectorOf } from '../testing';
 
 const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const model = `spec-${crypto.randomUUID().slice(0, 8)}`;

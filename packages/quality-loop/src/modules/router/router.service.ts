@@ -7,8 +7,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { RouteReportDto } from '@sysdesign/contracts';
 
 import { briefRoutes } from '../../orchestrators/common';
-import type { RouterPorts } from '../../orchestrators/router/steps';
-import { bareGoal } from '../memory/compose';
+import { bareGoal } from '../../orchestrators/memory/recall/inject';
+import type { RouterPorts } from '../../orchestrators/router/ports';
 import { RunsService } from '../runs/runs.service';
 import { ROUTER_PORTS } from './tokens';
 

@@ -1,5 +1,5 @@
 /**
- * Turning a goal into what to search for.
+ * Turning a goal into what to search for, with a model.
  *
  * A goal is a problem statement; a stored lesson is filed under the condition
  * it applies to. Embedding the whole goal once compares a problem against a
@@ -20,12 +20,12 @@
 import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
+import { MAX_PROBES, type QueryProbes } from '../../../orchestrators/memory/ports';
 import persona from './probes.md?raw';
 
-/** Probes past this add candidates without adding coverage; the goal is extra. */
-export const MAX_PROBES = 6;
-
 const PROBE_MAX = 240;
+/** Six short conditions, with room to spare. */
+const PROBES_MAX_TOKENS = 1000;
 
 const probesSchema = z.strictObject({
   probes: z
@@ -33,19 +33,6 @@ const probesSchema = z.strictObject({
     .max(MAX_PROBES)
     .describe('One condition per demand the goal makes, in the register of a stored condition.'),
 });
-
-/** What a recall asks for the conditions of the goal it is about to answer. */
-export interface QueryProbes {
-  /**
-   * Conditions to search under, beyond the goal itself. Empty is a valid
-   * answer and the only failure mode: a recall with no derived probes is a
-   * recall over the goal alone, which is what it did before there were any.
-   */
-  derive(goal: string): Promise<string[]>;
-}
-
-/** Derives nothing; recall falls back to the goal. Used when no model is configured. */
-export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
 
 export class LlmQueryProbes implements QueryProbes {
   constructor(
@@ -60,7 +47,7 @@ export class LlmQueryProbes implements QueryProbes {
         system: persona,
         user: goal,
         schema: probesSchema,
-        maxTokens: 1000,
+        maxTokens: PROBES_MAX_TOKENS,
       });
       return answer?.probes ?? [];
     } catch (error) {

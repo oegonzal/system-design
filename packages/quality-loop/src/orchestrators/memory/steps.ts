@@ -4,34 +4,10 @@
  * runner owns the ledger, the cascade and the child ids. Recall never blocks
  * the target; the target's failure is the one that ends the run.
  */
-import type {
-  LlmAvailabilityDto,
-  MemoryContextDto,
-  MemoryStepReason,
-  QualityRunDto,
-  RunTrace,
-} from '@sysdesign/contracts';
+import type { MemoryContextDto, MemoryStepReason, QualityRunDto } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import { outputsOf } from '../../core/outputs';
-import {
-  bareGoal,
-  buildQuery,
-  chunksOf,
-  fuse,
-  memoriesToStore,
-  probesOf,
-  probeTexts,
-  queryText,
-  readPack,
-  withMemory,
-  type ChunkOrigin,
-  type FusedHit,
-  type MemoryToStore,
-} from '../../modules/memory/compose';
-import type { CachedEmbeddings } from '../../modules/memory/embeddings';
-import { VECTOR_NAMES, type MemoryStore } from '../../modules/memory/ports';
-import type { QueryProbes } from '../../modules/memory/query-probes';
 import { fromRun } from '../../pipelines/experience-digest/from-run';
 import {
   EXPERIENCE_DIGEST_ID,
@@ -44,19 +20,13 @@ import {
 } from '../../pipelines/memory-recall/input';
 import { completed, requestInput, runFailed, runTarget, skipped } from '../common';
 import type { StepContext, StepResult } from '../runner/definition';
-
-/** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
-export interface MemoryPorts {
-  embedding: LlmAvailabilityDto;
-  embeddings: CachedEmbeddings;
-  store: MemoryStore;
-  probes: QueryProbes;
-}
-
-export interface Digested {
-  digestRunId: string;
-  memories: MemoryToStore[];
-}
+import { memoriesToStore, type Digested } from './digest/read-digest';
+import type { MemoryPorts } from './ports';
+import { fuse } from './recall/fusion';
+import { bareGoal, withMemory } from './recall/inject';
+import { buildQuery, probesOf, probeTexts, queryText, type FusedHit } from './recall/query';
+import { readPack } from './recall/read-pack';
+import { indexMemories } from './store/index-memories';
 
 /** What each step hands on. `store` yields nothing: it is the end of the line. */
 export interface MemoryOutputs {
@@ -180,57 +150,4 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
     return skip('store-unavailable', context.store.note ?? context.store.reason);
   }
   return indexMemories(ctx.ports, source, digested, model);
-}
-
-/** Where a memory came from, as every chunk of it says: the run, its pipeline, how it ended, and the day. */
-const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => ({
-  runId: source.runId,
-  pipeline: trace.pipeline.id,
-  decision: trace.finalDecision,
-  iteration: trace.bestIteration,
-  when: dayOf(source.startedAt),
-});
-
-/** The calendar day of an ISO timestamp. */
-const dayOf = (iso: string): string => iso.slice(0, 10);
-
-/** The named vectors of chunk `index` out of one batch that asked every name of every chunk in order. */
-const vectorsFor = (
-  index: number,
-  vectors: readonly (readonly number[])[],
-): Record<(typeof VECTOR_NAMES)[number], number[]> =>
-  Object.fromEntries(
-    VECTOR_NAMES.map((name, offset) => [name, vectors[index * VECTOR_NAMES.length + offset]]),
-  ) as Record<(typeof VECTOR_NAMES)[number], number[]>;
-
-/**
- * Write a source run's memories to the store as exactly these chunks. Pure of
- * the ledger, so re-indexing an already digested run — after the index
- * generation moves, say — re-embeds the same engine facts rather than asking
- * a model to derive them again.
- */
-export async function indexMemories(
-  ports: Pick<MemoryPorts, 'embeddings' | 'store'>,
-  source: QualityRunDto,
-  digested: Digested,
-  model: string,
-): Promise<StepResult<undefined>> {
-  const trace = source.trace;
-  if (trace === null) return skip('nothing-to-digest');
-  const chunks = chunksOf(digested.memories, originOf(source, trace), digested.digestRunId, model);
-  // Both indexed texts of every chunk, in one batch: the cache dedupes, and
-  // the vectors come back in the order they were asked for.
-  const embedded = await ports.embeddings.embed(
-    chunks.flatMap((chunk) => VECTOR_NAMES.map((name) => chunk.keys[name])),
-  );
-  if (embedded === null) return { status: 'failed', reason: 'embedding-failed' };
-  try {
-    const stored = await ports.store.replaceRunChunks(
-      source.runId,
-      chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
-    );
-    return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
-  } catch (error) {
-    return { status: 'failed', reason: 'store-unavailable', note: describeError(error).message };
-  }
 }

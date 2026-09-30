@@ -7,19 +7,18 @@
 import type { MemoryContextDto, QualityRunDto, RunTrace } from '@sysdesign/contracts';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
-import { CachedEmbeddings } from '../../modules/memory/embeddings';
-import { noQueryProbes } from '../../modules/memory/query-probes';
 import {
   fakeEmbeddings,
-  GOAL,
-  hitOf,
   InMemoryEmbeddingCache,
   InMemoryMemoryStore,
   vectorOf,
 } from '../../modules/memory/testing';
 import type { StepContext } from '../runner/definition';
 import { fakeStepContext } from '../runner/testing';
-import type { MemoryOutputs, MemoryPorts } from './steps';
+import { CachedEmbeddings } from './embeddings';
+import { noQueryProbes, type MemoryPorts } from './ports';
+import type { MemoryOutputs } from './steps';
+import { GOAL, hitOf } from './testing';
 
 /** The accept bar both memory pipelines declare; the steps read it off the summary. */
 export const ACCEPT_AT = 75;
@@ -89,13 +88,6 @@ export function memoryPorts(overrides: Partial<MemoryPorts> = {}): MemoryPorts {
     ...overrides,
   };
 }
-
-/** Embeddings whose provider answers nothing — the `embedding-failed` path. */
-export const mutedEmbeddings = (): CachedEmbeddings =>
-  new CachedEmbeddings(
-    { ...fakeEmbeddings(), embed: () => Promise.resolve(null) },
-    new InMemoryEmbeddingCache(),
-  );
 
 export type MemoryStepContext = StepContext<MemoryOutputs, MemoryPorts> & {
   executed: { goal: string }[];

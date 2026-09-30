@@ -10,7 +10,9 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
-import { CANNED, GOAL, InMemoryMemoryStore } from '../memory/testing';
+import { GOAL } from '../../orchestrators/memory/testing';
+import { InMemoryMemoryStore } from '../memory/testing';
+import { CANNED } from './testing';
 import type { OrchestrationRunRepository } from './ports';
 
 const DUMP_DIR = join(tmpdir(), `sysdesign-orchestration-http-dumps-${crypto.randomUUID()}`);

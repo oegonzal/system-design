@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { disabledLlm, fakeLlm } from '../../core/testing';
-import { LlmBriefClassifier, noClassifier, renderRoutes } from './classifier';
+import { disabledLlm, fakeLlm } from '../../../core/testing';
+import { noClassifier } from '../../../orchestrators/router/ports';
+import { LlmBriefClassifier, renderRoutes } from './llm-brief-classifier';
 
 const routes = [
   { id: 'system-design', description: 'A system, judged for coverage and scale.' },

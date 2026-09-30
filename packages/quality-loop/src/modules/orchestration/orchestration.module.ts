@@ -3,8 +3,8 @@ import { Module } from '@nestjs/common';
 import { MEMORY_ORCHESTRATOR_ID, ROUTER_ORCHESTRATOR_ID } from '@sysdesign/contracts';
 
 import { ORCHESTRATORS } from '../../orchestrators';
-import type { MemoryPorts } from '../../orchestrators/memory/steps';
-import type { RouterPorts } from '../../orchestrators/router/steps';
+import type { MemoryPorts } from '../../orchestrators/memory/ports';
+import type { RouterPorts } from '../../orchestrators/router/ports';
 import { MemoryModule } from '../memory/memory.module';
 import { MEMORY_PORTS } from '../memory/tokens';
 import { RouterModule } from '../router/router.module';

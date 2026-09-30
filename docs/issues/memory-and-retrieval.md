@@ -9,7 +9,7 @@ these entries cite most is [../pipelines/memory-runs.md](../pipelines/memory-run
 
 ### MEM-1 · Persona compliance still costs admission
 
-**Status** open · **Severity** medium · **Where** `modules/memory/compose.ts#memoriesToStore`, `pipelines/experience-digest/lenses/*.md`
+**Status** open · **Severity** medium · **Where** `orchestrators/memory/digest/read-digest.ts#memoriesToStore`, `pipelines/experience-digest/lenses/*.md`
 
 **What.** A memory is excluded from the store when a confirmed finding is
 located at it. `227f8f6` made locations places (the summary, each memory,
@@ -79,7 +79,7 @@ dimension, and the prompts used.
 
 ### MEM-3 · No retrieval score floor; RRF trades sharpness for breadth
 
-**Status** open (was blocked on data) · **Severity** medium · **Where** `modules/memory/qdrant`, `query-probes.ts`, the fusion in `compose.ts`
+**Status** open (was blocked on data) · **Severity** medium · **Where** `modules/memory/qdrant`, `modules/memory/query-probes/`, the fusion in `orchestrators/memory/recall/fusion.ts`
 
 **What.** Retrieval returns the top candidates by reciprocal-rank fusion
 over the goal and up to six model-derived probes, with no score floor.
@@ -128,7 +128,7 @@ run, against the store size at the time.
 
 ### MEM-5 · Write-time deduplication, measured and not built
 
-**Status** accepted · **Where** `modules/memory/store`
+**Status** accepted · **Where** `modules/memory/qdrant`
 
 **What.** The store dedupes only on exact `contentHash`, so two runs that
 learn the same lesson in different words both persist.
@@ -146,7 +146,7 @@ the shape of the distribution is the thing to watch, not any one number.
 
 ### MEM-6 · Nothing prunes either store; the embedding cache never expires
 
-**Status** open · **Severity** low · **Where** `modules/memory/store`, the embedding cache table
+**Status** open · **Severity** low · **Where** `modules/memory/qdrant`, the embedding cache table
 
 **What.** `replaceRunChunks` deletes only by run id; no retention rule exists
 for lessons or for cached embeddings.
@@ -229,7 +229,7 @@ is not recommended.
 
 ### MEM-11 · `MemoryStepDto.counts` keys are a convention, not a vocabulary
 
-**Status** open · **Severity** low · **Where** `packages/contracts`, `modules/memory/steps.ts`
+**Status** open · **Severity** low · **Where** `packages/contracts`, `orchestrators/memory/steps.ts`
 
 **What.** The step reasons are a closed vocabulary; the count keys
 (`probes`, `candidates`, `kept`, `usable`, `injected`, `iterations`,

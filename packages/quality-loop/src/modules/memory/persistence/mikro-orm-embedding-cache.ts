@@ -7,7 +7,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { MemoryEmbedding } from '@sysdesign/db';
 
-import type { EmbeddingCache } from '../ports';
+import type { EmbeddingCache } from '../../../orchestrators/memory/ports';
 
 @Injectable()
 export class MikroOrmEmbeddingCache implements EmbeddingCache {

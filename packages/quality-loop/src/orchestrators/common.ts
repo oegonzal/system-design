@@ -17,7 +17,7 @@ import {
 
 import { outputsOf } from '../core/outputs';
 import type { RunInput } from '../core/loop/run-pipeline';
-import { bareGoal } from '../modules/memory/compose';
+import { bareGoal } from './memory/recall/inject';
 import { EXPERIENCE_DIGEST_ID } from '../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../pipelines/memory-recall/input';
 import type { StepContext, StepResult } from './runner/definition';

@@ -1,26 +1,23 @@
 /**
- * Builders the memory specs share. Pure helpers only — no vitest imports.
- * The canned answers are one object per pipeline per stage: `fakeLlm` answers
- * by schema, and every pipeline's criteria, artifact and evaluation schemas
- * differ in their enums, so nothing here cross-matches.
+ * In-memory stand-ins for the memory module's adapters: an embedding client
+ * with deterministic vectors, a store that ranks by cosine the way Qdrant
+ * does, and a cache. Pure helpers only — no vitest imports.
  */
 import { createHash } from 'node:crypto';
 
-import type {
-  ConfirmedFinding,
-  CriterionEvidence,
-  Decision,
-  MemoryStoreAvailabilityDto,
-  RunTrace,
-  SuccessCriterion,
-} from '@sysdesign/contracts';
+import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import type { EmbeddingClient } from '@sysdesign/llm';
 
-import type { EmbeddingCache, MemoryHit, MemoryProbe, MemoryStore, StoredChunk } from './ports';
-import type { FusedHit } from './compose';
+import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
+import type {
+  EmbeddingCache,
+  MemoryHit,
+  MemoryProbe,
+  MemoryStore,
+  StoredChunk,
+} from '../../orchestrators/memory/ports';
+import { FAKE_MODEL } from '../../orchestrators/memory/testing';
 import { collectionName, pointId } from './qdrant/collection';
-
-export const FAKE_MODEL = 'fake-embedding';
 
 /** Deterministic vectors from the text's hash: equal texts embed equally, others differ. */
 export function fakeEmbeddings(
@@ -48,6 +45,13 @@ export function vectorOf(text: string, dimensions = 8): number[] {
   const norm = Math.hypot(...raw) || 1;
   return raw.map((value) => value / norm);
 }
+
+/** Embeddings whose provider answers nothing — the `embedding-failed` path. */
+export const mutedEmbeddings = (): CachedEmbeddings =>
+  new CachedEmbeddings(
+    { ...fakeEmbeddings(), embed: () => Promise.resolve(null) },
+    new InMemoryEmbeddingCache(),
+  );
 
 const cosine = (a: readonly number[], b: readonly number[]): number =>
   a.reduce((sum, value, index) => sum + value * (b[index] ?? 0), 0) /
@@ -100,22 +104,26 @@ export class InMemoryMemoryStore implements MemoryStore {
     return Promise.resolve(probes.map((probe) => this.rank(probe, probe.limit)));
   }
 
+  /** The closest chunks first, one per content hash, up to the probe's limit. */
   private rank(probe: MemoryProbe, limit: number): MemoryHit[] {
-    const seen = new Set<string>();
-    return [...this.points.values()]
+    const scored = [...this.points.values()]
       .map((chunk) => ({ chunk, score: cosine(probe.vector, chunk.vectors[probe.using]) }))
-      .sort((a, b) => b.score - a.score)
-      .filter(({ chunk }) => !seen.has(chunk.contentHash) && seen.add(chunk.contentHash))
-      .slice(0, limit)
-      .map(({ chunk, score }) => ({
-        text: chunk.text,
-        contentHash: chunk.contentHash,
-        source: chunk.source,
-        evidence: chunk.evidence,
-        digestRunId: chunk.digestRunId,
-        model: chunk.model,
-        score,
-      }));
+      .sort((a, b) => b.score - a.score);
+    const seen = new Set<string>();
+    const distinct = scored.filter(({ chunk }) => {
+      if (seen.has(chunk.contentHash)) return false;
+      seen.add(chunk.contentHash);
+      return true;
+    });
+    return distinct.slice(0, limit).map(({ chunk, score }) => ({
+      text: chunk.text,
+      contentHash: chunk.contentHash,
+      source: chunk.source,
+      evidence: chunk.evidence,
+      digestRunId: chunk.digestRunId,
+      model: chunk.model,
+      score,
+    }));
   }
 
   replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number> {
@@ -145,222 +153,3 @@ export class InMemoryEmbeddingCache implements EmbeddingCache {
     return Promise.resolve();
   }
 }
-
-export const GOAL = [
-  '# Prompt — Serve an order history',
-  '',
-  '## Scenario',
-  '',
-  "A storefront lists each customer's past orders, merged from a POS that sends nothing.",
-  '',
-  '## Functional requirements',
-  '',
-  '1. List orders newest first.',
-  '2. Show each order status.',
-].join('\n');
-
-const result = (criterionId: string, locationRefs: string[]) => ({
-  criterionId,
-  result: 'pass',
-  confidence: 'high',
-  locationRefs,
-  rationale: 'shown by a named mechanism',
-});
-
-/** One canned reply per pipeline per stage, in the order `fakeLlm` tries them. */
-export const CANNED: readonly unknown[] = [
-  {
-    criteria: [
-      { kind: 'functional', statement: 'List orders newest first.' },
-      { kind: 'functional', statement: 'Show each order status.' },
-    ],
-  },
-  {
-    criteria: [
-      { kind: 'need', statement: 'Evidence on serving a list from an unreliable upstream.' },
-    ],
-  },
-  { criteria: [{ kind: 'signal', statement: 'Accounts for r1 and r2 passing at i1.' }] },
-  {
-    summary: 'A read-optimised history service fed from a store the page owns.',
-    assumptions: [],
-    components: [{ name: 'History API', responsibility: 'serves the list', technology: null }],
-    flows: [{ name: 'view history', steps: ['History API'] }],
-    dataModel: [],
-    tradeoffs: [],
-    risks: [],
-    capacity: [],
-  },
-  {
-    summary: 'Two lessons from an earlier order-history run; both bear on the read path.',
-    kept: [
-      {
-        chunk: 'm1',
-        serves: 'the list read',
-        insight: 'serve the list from a store the page owns',
-        caveat: null,
-      },
-      {
-        chunk: 'm2',
-        serves: 'order status',
-        insight: 'record each status transition as a row',
-        caveat: null,
-      },
-    ],
-    dropped: [],
-    gaps: [],
-  },
-  {
-    summary: 'Both criteria passed at the first iteration; the design owned its read store.',
-    memories: [
-      {
-        evidence: ['r1'],
-        insight:
-          'Serve the list from a store the page owns, never from the POS on the request path.',
-        appliesWhen: 'a read path depends on an upstream that may be down',
-      },
-      {
-        evidence: ['r2'],
-        insight: 'Record each order status transition as its own row.',
-        appliesWhen: 'a status must be shown per channel or per step',
-      },
-    ],
-    unused: [],
-  },
-  {
-    findings: [
-      {
-        type: 'irrelevant_chunk',
-        severity: 'medium',
-        confidence: 'high',
-        fixability: 'fixable_local',
-        locationRefs: ['m2'],
-        criterionIds: [],
-        rationale: 'status rows inform no need of this query',
-      },
-    ],
-  },
-  { findings: [] },
-  { results: [result('c1', ['component.1']), result('c2', ['flow.1'])], advisoryVerdict: null },
-  { results: [result('c1', ['m1'])], advisoryVerdict: null },
-  { results: [result('c1', ['memory.1'])], advisoryVerdict: null },
-];
-
-/** A one-iteration trace around an artifact, for the pure read-outs. */
-export function traceOf(input: {
-  pipeline: string;
-  goal: string;
-  artifact: unknown;
-  locations: string[];
-  criteria?: SuccessCriterion[];
-  results?: CriterionEvidence[];
-  findings?: ConfirmedFinding[];
-  decision?: Decision;
-  /** Defaults to 90 for an accept, 50 otherwise — override to sit either side of an accept bar. */
-  overall?: number;
-  /** False is what an open blocker looks like: the gate `admits` deliberately ignores. */
-  policyAllowed?: boolean;
-  validatorsPassed?: boolean;
-}): RunTrace {
-  const decision = input.decision ?? 'accept';
-  return {
-    pipeline: { id: input.pipeline, version: '1.0.0' },
-    contract: { goal: input.goal, criteria: input.criteria ?? [] },
-    iterations: [
-      {
-        iteration: 1,
-        mode: 'initial',
-        artifact: input.artifact,
-        locations: input.locations.map((id) => ({ id, label: id })),
-        rendered: '',
-        validation: [],
-        critics: [],
-        evaluators: [],
-        ledger: {
-          artifactPresent: true,
-          validation: [],
-          criteria: input.results ?? [],
-          findings: input.findings ?? [],
-          discarded: [],
-          diagnostics: [],
-        },
-        decision: {
-          finalDecision: decision,
-          gates: {
-            artifactPresent: true,
-            validatorsPassed: input.validatorsPassed ?? true,
-            evidenceSufficient: true,
-            policyAllowed: input.policyAllowed ?? true,
-          },
-          scores: {
-            dimensions: {},
-            overall: input.overall ?? (decision === 'accept' ? 90 : 50),
-          },
-          selectedRemediations: [],
-          reason: 'spec',
-          trace: { steps: [], dimensions: [], weightSum: 1, weightedTotal: 0 },
-        },
-        remediations: [],
-        durationMs: 1,
-      },
-    ],
-    bestIteration: 1,
-    finalDecision: decision,
-    stopReason: decision === 'accept' ? 'accepted' : 'max-iterations',
-    lessons: [],
-  };
-}
-
-export const confirmed = (type: string, locationRefs: string[]): ConfirmedFinding => ({
-  key: `${type}|${[...locationRefs].sort().join(',')}`,
-  type,
-  severity: 'medium',
-  confidence: 'high',
-  fixability: 'fixable_local',
-  locationRefs,
-  criterionIds: [],
-  hits: 2,
-  lenses: ['critic.spec'],
-  rationale: null,
-  reconciledTo: null,
-});
-
-export const passed = (
-  criterionId: string,
-  kind: string,
-  locationRefs: string[],
-): CriterionEvidence => ({
-  criterionId,
-  kind,
-  result: 'pass',
-  hits: 2,
-  confidence: 'high',
-  locationRefs,
-});
-
-/** Hits as fusion hands them on: retrieved under the prompt alone unless said otherwise. */
-export const fused = (hits: readonly MemoryHit[], probes: number[] = [0]): FusedHit[] =>
-  hits.map((hit) => ({ ...hit, probes }));
-
-export const hitOf = (
-  text: string,
-  runId: string,
-  ref: string,
-  when = '2026-09-06',
-): MemoryHit => ({
-  text,
-  contentHash: createHash('sha256').update(text, 'utf8').digest('hex'),
-  source: {
-    runId,
-    pipeline: 'system-design',
-    kind: 'lesson',
-    ref,
-    decision: 'accept',
-    iteration: 1,
-    when,
-  },
-  evidence: [{ kind: 'criterion', ref: 'c1' }],
-  digestRunId: null,
-  model: FAKE_MODEL,
-  score: 0.9,
-});

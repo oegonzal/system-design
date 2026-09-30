@@ -9,8 +9,10 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
-import { MEMORY_HEADING } from '../memory/compose';
-import { CANNED, fakeEmbeddings, GOAL, InMemoryMemoryStore } from '../memory/testing';
+import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
+import { GOAL } from '../../orchestrators/memory/testing';
+import { fakeEmbeddings, InMemoryMemoryStore } from '../memory/testing';
+import { CANNED } from './testing';
 
 const DUMP_DIR = join(tmpdir(), `sysdesign-orchestration-dumps-${crypto.randomUUID()}`);
 process.env['EVAL_DUMP_DIR'] = DUMP_DIR;

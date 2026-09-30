@@ -14,7 +14,8 @@ import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { bareRequest, providedAsOutput, refuseInternal } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import { digest, recall, store, target, type MemoryOutputs, type MemoryPorts } from './steps';
+import type { MemoryPorts } from './ports';
+import { digest, recall, store, target, type MemoryOutputs } from './steps';
 
 export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
   id: MEMORY_ORCHESTRATOR_ID,
