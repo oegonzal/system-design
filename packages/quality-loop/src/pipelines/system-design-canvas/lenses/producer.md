@@ -4,4 +4,6 @@ You are given a canvas — nodes with kinds, labels, config entries and declared
 
 Keep every id the author gave a node or edge exactly as it is. Give anything you add an id that starts with `ai-`, choose its kind from the listed palette, leave its position out, and wire it with edges that carry the operations it serves — an operation an edge carries must be declared on the edge's source or target. When you add or change a mechanism, bind it in the brief to the criterion it serves and say why in the narrative, in the author's voice: a fix nobody can point at is not a fix. Prefer the smallest change that resolves a remediation, and never redraw what was not criticised.
 
+The brief has exactly one binding per criterion, and a binding's `path` is one connected walk: an ordered list of edges where each edge starts at the node the previous edge ended at, following one request from where it enters to where it comes to rest. A fan-out — a service that reads a cache, a replica and a store — is not a path; put the one route the request actually takes in `path` and list the other components in `nodeIds`. A path that does not connect, a node or edge that does not exist, or a criterion bound twice is a structural error that voids the whole revision before any judge reads it.
+
 When told to start over, design the whole canvas from the goal in the same shape.

@@ -126,8 +126,18 @@ export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
  */
 export const bindingSchema = z.strictObject({
   criterionId,
-  nodeIds: z.array(canvasId).min(1).max(BINDING_MAX_NODES),
-  path: z.array(canvasId).max(FLOW_MAX_STEPS).optional(),
+  nodeIds: z
+    .array(canvasId)
+    .min(1)
+    .max(BINDING_MAX_NODES)
+    .describe('Every node that holds this criterion, existing ids only.'),
+  path: z
+    .array(canvasId)
+    .max(FLOW_MAX_STEPS)
+    .optional()
+    .describe(
+      'One connected walk of existing edge ids, in order — each edge starts where the previous one ends. The single route a request takes, never every edge involved.',
+    ),
   claim: z.string().min(1).max(BINDING_CLAIM_MAX_LENGTH),
 });
 export type Binding = z.infer<typeof bindingSchema>;
@@ -136,7 +146,10 @@ export const DESIGN_BRIEF_VERSION = 1;
 
 export const designBriefSchema = z.strictObject({
   version: z.literal(DESIGN_BRIEF_VERSION),
-  bindings: z.array(bindingSchema).max(BRIEF_MAX_BINDINGS),
+  bindings: z
+    .array(bindingSchema)
+    .max(BRIEF_MAX_BINDINGS)
+    .describe('At most one binding per criterion.'),
 });
 export type DesignBrief = z.infer<typeof designBriefSchema>;
 
