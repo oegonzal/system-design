@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
+import { DbModule } from '@sysdesign/nest-kit';
 
-import { DbModule } from '../database/db.module';
 import { MemoryModule } from '../memory/memory.module';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { PromptsModule } from '../prompts/prompts.module';

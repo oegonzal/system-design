@@ -25,7 +25,7 @@ describe('the dependency matrix', () => {
     ['db', ['contracts']],
     ['llm', ['contracts']],
     ['run-dump', []],
-    ['nest-kit', ['contracts']],
+    ['nest-kit', ['contracts', 'db']],
     ['design-system', ['contracts']],
     ['web-kit', ['contracts', 'design-system']],
     ['web-testing', ['contracts', 'design-system']],

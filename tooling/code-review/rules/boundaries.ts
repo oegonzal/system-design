@@ -16,7 +16,7 @@ import type { ChangedFile } from './index';
  *   db             -> contracts         MikroORM entities and migrations
  *   llm            -> contracts         provider adapters
  *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
- *   nest-kit       -> contracts         the Nest apps' shared plumbing (zod pipe)
+ *   nest-kit       -> contracts, db     the Nest apps' shared plumbing (zod pipe, db root, cors, health)
  *   design-system  -> contracts         tokens and domain-free primitives
  *   web-kit        -> contracts, design-system   the Next apps' runtime plumbing
  *   web-testing    -> contracts, design-system   the web spec harness
@@ -38,7 +38,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   db: ['contracts'],
   llm: ['contracts'],
   'run-dump': [],
-  'nest-kit': ['contracts'],
+  'nest-kit': ['contracts', 'db'],
   'design-system': ['contracts'],
   'web-kit': ['contracts', 'design-system'],
   'web-testing': ['contracts', 'design-system'],
