@@ -23,7 +23,8 @@ import type { ChangedFile } from './index';
  *   studio-ui      -> contracts, design-system, web-kit, web-testing
  *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
  *   govcon-ui      -> contracts, design-system, web-kit, web-testing
- *   studio-api     -> contracts, db, nest-kit
+ *   studio-testing -> contracts         the quality loop as a scriptable fake, shared by studio-api's specs and the e2e stub
+ *   studio-api     -> contracts, db, nest-kit, studio-testing (specs and the test folder only)
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
@@ -44,7 +45,8 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'studio-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
-  'studio-api': ['contracts', 'db', 'nest-kit'],
+  'studio-testing': ['contracts'],
+  'studio-api': ['contracts', 'db', 'nest-kit', 'studio-testing'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
   govcon: ['contracts', 'db', 'nest-kit'],
   storybook: null,

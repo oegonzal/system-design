@@ -54,6 +54,10 @@ anything the map already generates is deliberately absent, because a second copy
   searches, track bids, read a notice with its awards, fetch intel, edit profiles. Renders the wire
   contract and nothing else; every button that spends a request says so.
 - `storybook` — the catalog host. It owns no stories; it globs the four projects that do.
+- `studio-testing` — the quality loop as a scriptable fake: one state machine (`FakeLoop`) that
+  the studio API's in-process client fake calls directly and the e2e stub routes HTTP onto, so a
+  spec and a browser run grade the same markdown the same way. Depends on contracts only; imported
+  by specs, the API's test folder and the stub, never by a runtime file.
 - `studio-e2e` — Playwright, driving a real browser against the real API.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it
   appears in no map entry and has no `project.json`.

@@ -1,6 +1,7 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
 import type {
   AuthorPromptRequest,
+  DesignRevisionSummaryDto,
   DesignSessionDto,
   ExperienceProfileDto,
   PromptDto,
@@ -145,10 +146,14 @@ export async function generatePrompt(
     );
     if (generation.status === 'complete' && generation.prompt) return generation.prompt;
     if (generation.status !== 'running') {
-      throw new Error(`prompt generation ${started.runId} ${generation.status}: ${generation.error}`);
+      throw new Error(
+        `prompt generation ${started.runId} ${generation.status}: ${generation.error}`,
+      );
     }
     if (Date.now() > deadline) {
-      throw new Error(`prompt generation ${started.runId} still running after ${GENERATION_TIMEOUT_MS} ms`);
+      throw new Error(
+        `prompt generation ${started.runId} still running after ${GENERATION_TIMEOUT_MS} ms`,
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, GENERATION_POLL_MS));
   }
@@ -166,6 +171,16 @@ export async function derivePromptCriteria(
   return unwrap(await request.post(`${API_URL}/prompts/${promptId}/criteria`));
 }
 
+/** Retire a prompt; its sessions stay readable, and the studio refuses new work on them. */
+export async function archivePrompt(
+  request: APIRequestContext,
+  promptId: string,
+): Promise<PromptDto> {
+  return unwrap(
+    await request.patch(`${API_URL}/prompts/${promptId}`, { data: { status: 'archived' } }),
+  );
+}
+
 // ---- sessions ---------------------------------------------------------------
 
 /** A session on the given prompt, or on a freshly authored one (`c1…c5`). */
@@ -178,6 +193,21 @@ export async function createPracticeSession(
     await request.post(`${API_URL}/sessions`, { data: { promptId: target.id } }),
   );
   return { prompt: target, session };
+}
+
+export async function getSession(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<DesignSessionDto> {
+  return unwrap(await request.get(`${API_URL}/sessions/${sessionId}`));
+}
+
+/** Every revision of a session, newest first, as the timeline lists them. */
+export async function listRevisions(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<DesignRevisionSummaryDto[]> {
+  return unwrap(await request.get(`${API_URL}/sessions/${sessionId}/revisions`));
 }
 
 // ---- stories ----------------------------------------------------------------

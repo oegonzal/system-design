@@ -270,6 +270,36 @@ export class CanvasPage {
     await this.page.getByTestId('submit-revision').click();
   }
 
+  /** What the workspace says when a submit never became a revision. */
+  get submitError(): Locator {
+    return this.page.getByTestId('submit-error');
+  }
+
+  async expectSubmitDisabled(): Promise<void> {
+    await expect(this.page.getByTestId('submit-revision')).toBeDisabled();
+  }
+
+  /**
+   * The toolbar's badge for a run the loop lost, plus the feedback dock's
+   * explanation with its resubmit control. The badge is the authoritative
+   * signal that *this* revision failed.
+   */
+  async expectEvaluationFailed(revisionNumber: number, message: string): Promise<void> {
+    await expect(this.page.getByText(`rev #${revisionNumber} · grading failed`)).toBeVisible({
+      timeout: EVAL_TIMEOUT,
+    });
+    await this.feedbackTab.click();
+    await expect(this.page.getByTestId('evaluation-error')).toContainText(message, {
+      timeout: EVAL_TIMEOUT,
+    });
+  }
+
+  /** The feedback dock's way back from a failed grade: the same design, as a new revision. */
+  async retryEvaluation(): Promise<void> {
+    await this.feedbackTab.click();
+    await this.page.getByTestId('retry-evaluation').click();
+  }
+
   /** One click, one download: the run as a zip. */
   async exportRun(): Promise<string> {
     const [download] = await Promise.all([
@@ -478,6 +508,17 @@ export class CanvasPage {
 
   coachIteration(iteration: number): Locator {
     return this.page.getByTestId(`improve-iteration-${iteration}`);
+  }
+
+  /** The coach panel's reason for a disabled control. */
+  get coachUnavailable(): Locator {
+    return this.page.getByTestId('improver-unavailable');
+  }
+
+  async expectCoachDisabled(reason: RegExp): Promise<void> {
+    await this.coachTab.click();
+    await expect(this.page.getByTestId('improve-run')).toBeDisabled();
+    await expect(this.coachUnavailable).toHaveText(reason);
   }
 
   async expectCoachStopped(): Promise<void> {

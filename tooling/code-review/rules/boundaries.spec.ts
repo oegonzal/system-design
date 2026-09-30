@@ -32,7 +32,8 @@ describe('the dependency matrix', () => {
     ['studio-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['quality-loop-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['govcon-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
-    ['studio-api', ['contracts', 'db', 'nest-kit']],
+    ['studio-testing', ['contracts']],
+    ['studio-api', ['contracts', 'db', 'nest-kit', 'studio-testing']],
     ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit']],
     ['govcon', ['contracts', 'db', 'nest-kit']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
@@ -76,6 +77,23 @@ describe('boundaries', () => {
       file('packages/db/src/y.ts', "import { client } from '@sysdesign/llm';"),
     ]);
     expect(both.map((f) => f.severity)).toEqual(['high', 'high']);
+  });
+
+  /** The fake loop is node-side test tooling: the API's specs may script it, a web app may not. */
+  it('keeps the fake quality loop out of the web apps', () => {
+    const [found] = boundaries([
+      file('packages/studio-ui/src/x.ts', "import { FakeLoop } from '@sysdesign/studio-testing';"),
+    ]);
+    expect(found?.severity).toBe('high');
+    expect(found?.category).toBe('boundary-violation');
+    expect(
+      boundaries([
+        file(
+          'packages/studio-api/src/test/fake.ts',
+          "import { FakeLoop } from '@sysdesign/studio-testing';",
+        ),
+      ]),
+    ).toEqual([]);
   });
 
   it('flags a deep import into an allowed package at medium', () => {

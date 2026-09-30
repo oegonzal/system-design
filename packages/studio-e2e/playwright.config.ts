@@ -39,6 +39,9 @@ const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
 const QUALITY_LOOP_STUB_PORT = process.env['QUALITY_LOOP_STUB_PORT'] ?? '3103';
 const QUALITY_LOOP_URL = `http://127.0.0.1:${QUALITY_LOOP_STUB_PORT}`;
 
+/** The one spec that takes the stub grader down; it must never share a phase with the others. */
+const GRADER_DOWN = /grader-down\.spec\.ts$/;
+
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
 
@@ -112,20 +115,48 @@ export default defineConfig({
     },
   ],
 
+  /*
+   * The browser projects share one stub process and run their files in
+   * parallel; a spec that flips the stub's global health switch would race
+   * them. `grader-down` therefore runs alone: `dependencies` places it in the
+   * phase after every dependency-free project (phases run one after another,
+   * and a dependent project is never selected implicitly — CI names it), and
+   * one worker keeps its own files serial. `narrow` is the same browser at a
+   * width under the dock's breakpoint, for the specs that assert the
+   * single-column layout.
+   */
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: GRADER_DOWN,
     },
 
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
+      testIgnore: GRADER_DOWN,
     },
 
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
+      testIgnore: GRADER_DOWN,
+    },
+
+    {
+      name: 'narrow',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 700, height: 900 } },
+      testMatch: /narrow-viewport\.spec\.ts$/,
+    },
+
+    {
+      name: 'grader-down',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: GRADER_DOWN,
+      dependencies: ['chromium'],
+      fullyParallel: false,
+      workers: 1,
     },
   ],
 });

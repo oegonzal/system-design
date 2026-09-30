@@ -7,6 +7,7 @@ import {
   NAIVE_DESIGN_SCORE,
   openPracticeSession,
 } from '../support/canvas.page';
+import { keyedPrompt, scenarioFor } from '../support/grader';
 import { PromptsPage } from '../support/prompts.page';
 
 /**
@@ -83,6 +84,38 @@ test.describe('the grading feedback', () => {
     // `edge.1` likewise: the client → service connection.
     await canvas.clickFinding('unbacked_claim|edge.1');
     await canvas.expectEdgeHighlighted('e-1', 'medium');
-    await expect(canvas.finding('unbacked_claim|edge.1').getByTestId('finding-explanation')).toBeVisible();
+    await expect(
+      canvas.finding('unbacked_claim|edge.1').getByTestId('finding-explanation'),
+    ).toBeVisible();
+  });
+
+  test('[EVAL-1] a run that fails is reported with its error, and resubmitting grades a fresh revision', async ({
+    page,
+    request,
+  }) => {
+    // The stub fails exactly this test's first run: the scenario is keyed by
+    // the prompt's markdown, unique to the test through its title.
+    const prompt = await keyedPrompt(request, 'grade fails');
+    await scenarioFor(request, prompt.markdown, {
+      outcome: 'fail',
+      message: 'the model went away',
+      once: true,
+    });
+
+    const { canvas } = await openPracticeSession(page, request, prompt);
+    await buildNaiveDesign(canvas);
+    await canvas.submit();
+    await canvas.expectEvaluationFailed(1, 'the model went away');
+
+    // There is no retry endpoint: the way back is the same design as a new revision.
+    await canvas.retryEvaluation();
+    await canvas.expectEvaluationComplete(2);
+    await canvas.expectOverall(NAIVE_DESIGN_SCORE);
+
+    await canvas.revisionsTab.click();
+    await expect(canvas.revisionChip(1)).toContainText('failed');
+    await expect(canvas.revisionChip(2).getByTestId('revision-score')).toHaveText(
+      String(NAIVE_DESIGN_SCORE),
+    );
   });
 });
