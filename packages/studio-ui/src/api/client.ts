@@ -22,6 +22,7 @@ import type {
   PromptLibraryEntryDto,
   QualityRunStartedDto,
   SaveStarStoryRequest,
+  SessionDraft,
   StarStoryDto,
   StartImproveDto,
   StartImproveRequest,
@@ -159,6 +160,15 @@ export const api = {
         body,
       }),
     );
+  },
+
+  /** Keeps the unsubmitted canvas with the session (204); shape-checked only, cleared by a submit. */
+  async saveSessionDraft(
+    sessionId: string,
+    body: SessionDraft,
+    opts: GetOptions = {},
+  ): Promise<void> {
+    await request<void>(`/sessions/${sessionId}/draft`, { method: 'PUT', body, ...opts });
   },
 
   // Revisions --------------------------------------------------------------

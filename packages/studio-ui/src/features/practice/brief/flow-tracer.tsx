@@ -9,6 +9,8 @@ export interface FlowTracerProps {
   criterionId: string;
   graph: CanvasGraph;
   path: string[];
+  /** Shown, never edited — no hop can be added, undone or cleared. */
+  disabled?: boolean;
   onChange: (path: string[]) => void;
 }
 
@@ -22,7 +24,13 @@ export interface FlowTracerProps {
  * control. Where a walk should start or end is the evaluators' judgement, not
  * a form rule.
  */
-export function FlowTracer({ criterionId, graph, path, onChange }: FlowTracerProps) {
+export function FlowTracer({
+  criterionId,
+  graph,
+  path,
+  disabled = false,
+  onChange,
+}: FlowTracerProps) {
   const hops = nextHops(graph, path);
   const visited = walkNodes(graph, path);
   const labelOf = (id: string) => graph.nodes.find((node) => node.id === id)?.label ?? id;
@@ -77,6 +85,7 @@ export function FlowTracer({ criterionId, graph, path, onChange }: FlowTracerPro
                 size="sm"
                 variant="subtle"
                 data-testid={`flow-hop-${criterionId}-${edge.id}`}
+                disabled={disabled}
                 onClick={() => onChange([...path, edge.id])}
               >
                 {labelOf(edge.source)} → {labelOf(edge.target)}
@@ -98,6 +107,7 @@ export function FlowTracer({ criterionId, graph, path, onChange }: FlowTracerPro
             size="sm"
             variant="ghost"
             data-testid={`flow-undo-${criterionId}`}
+            disabled={disabled}
             onClick={() => onChange(path.slice(0, -1))}
           >
             Undo hop
@@ -106,6 +116,7 @@ export function FlowTracer({ criterionId, graph, path, onChange }: FlowTracerPro
             size="sm"
             variant="ghost"
             data-testid={`flow-clear-${criterionId}`}
+            disabled={disabled}
             onClick={() => onChange([])}
           >
             Clear path

@@ -2,6 +2,7 @@
 
 import styled from '@emotion/styled';
 import { SkipLink } from '@sysdesign/design-system';
+import { useConfirmLeave } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -74,6 +75,7 @@ export interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const mainRef = useRef<HTMLElement>(null);
   const pathname = usePathname();
+  const confirmLeave = useConfirmLeave();
 
   // The router resets *document* scroll on navigation, but the document no
   // longer scrolls — Main does, and it persists across client navigations.
@@ -85,7 +87,12 @@ export function AppShell({ children }: AppShellProps) {
     <Shell>
       <SkipLink href="#main">Skip to main content</SkipLink>
       <Header>
-        <Brand href="/">
+        <Brand
+          href="/"
+          onNavigate={(event) => {
+            if (!confirmLeave()) event.preventDefault();
+          }}
+        >
           <BrandMark>▦</BrandMark> System Design Studio
         </Brand>
         <PrimaryNav />

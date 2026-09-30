@@ -24,6 +24,7 @@ const AVAILABILITY = {
 
 /** A session with one graded revision, and whatever the case adds. */
 function sessionRoutes(overrides: {
+  session?: Partial<ReturnType<typeof makeSession>>;
   revisions?: ReturnType<typeof makeRevisionSummary>[];
   coachingRuns?: {
     runId: string;
@@ -35,13 +36,17 @@ function sessionRoutes(overrides: {
 }): StubRoute[] {
   const revisions = overrides.revisions ?? [makeRevisionSummary()];
   return [
-    { path: SESSION_PATH, body: { data: makeSession({ id: SESSION }) } },
+    {
+      path: SESSION_PATH,
+      body: { data: makeSession({ id: SESSION, ...overrides.session }) },
+    },
     { path: '/api/prompts/prompt-1', body: { data: makePrompt() } },
     {
       path: `/api/sessions/${SESSION}/revisions`,
       body: { data: revisions, meta: { total: revisions.length, limit: 50, offset: 0 } },
     },
     { path: `/api/sessions/${SESSION}/improve`, body: { data: overrides.coachingRuns ?? [] } },
+    { method: 'PUT', path: `/api/sessions/${SESSION}/draft`, status: 204 },
     { path: /^\/api\/revisions\/[^/]+$/, body: { data: makeRevision() } },
     { path: /^\/api\/revisions\/[^/]+\/evaluation$/, body: { data: makeEvaluation() } },
     AVAILABILITY,
@@ -54,6 +59,84 @@ afterEach(() => {
 });
 
 describe('PracticeWorkspace on open', () => {
+  it('[UX-15] restores a saved draft ahead of the latest user revision on open, and loads the latest user revision — never an assistant one — when there is none', async () => {
+    const revisions = [
+      makeRevisionSummary({ id: 'rev-3', revisionNumber: 3, origin: 'assistant' }),
+      makeRevisionSummary({ id: 'rev-2', revisionNumber: 2, origin: 'user' }),
+    ];
+    const draft = {
+      graph: {
+        nodes: [
+          { id: 'd-1', kind: 'client' as const, label: 'Draft client' },
+          { id: 'd-2', kind: 'cache' as const, label: 'Draft cache' },
+        ],
+        edges: [],
+      },
+      brief: null,
+      narrative: null,
+    };
+    const withDraft = stubApi(sessionRoutes({ session: { draft }, revisions }));
+    const first = renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Narrative' }));
+    expect(screen.getByTestId('narrative-rationale-d-1')).toBeTruthy();
+    expect(screen.getByTestId('narrative-rationale-d-2')).toBeTruthy();
+    expect(screen.queryByTestId('narrative-rationale-n-1')).toBeNull();
+    expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
+    expect(screen.queryByTestId('readonly-banner')).toBeNull();
+    expect(screen.getByText(/rev #2 · graded/)).toBeTruthy();
+    // The draft is the canvas; no revision body is fetched (its grade still is).
+    expect(withDraft.calls.some((call) => /^\/api\/revisions\/[^/]+$/.test(call.url))).toBe(false);
+    first.unmount();
+    vi.unstubAllGlobals();
+
+    const withoutDraft = stubApi(sessionRoutes({ session: { draft: null }, revisions }));
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Narrative' }));
+    expect(screen.getByTestId('narrative-rationale-n-1')).toBeTruthy();
+    expect(screen.queryByTestId('draft-status')).toBeNull();
+    expect(withoutDraft.calls.some((call) => call.url === '/api/revisions/rev-2')).toBe(true);
+    expect(withoutDraft.calls.some((call) => call.url === '/api/revisions/rev-3')).toBe(false);
+  });
+
+  it('[DEL-4] a legacy latest revision shows the notice and fetches no evaluation', async () => {
+    const { calls } = stubApi(
+      sessionRoutes({
+        revisions: [makeRevisionSummary({ evaluation: null })],
+        extra: [],
+      }),
+    );
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
+    expect(screen.getByTestId('evaluation-legacy')).toBeTruthy();
+    expect(screen.getByTestId('retry-evaluation')).toBeTruthy();
+    expect(calls.some((call) => call.url.endsWith('/evaluation'))).toBe(false);
+  });
+
+  it('[UX-15] a revision on screen is read-only until it is restored as the draft', async () => {
+    stubApi(sessionRoutes({}));
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Revisions' }));
+    await userEvent.click(screen.getByTestId('revision-chip-1'));
+
+    expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
+    expect((screen.getByTestId('submit-revision') as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole('tab', { name: 'Brief' }));
+    expect((screen.getByTestId('binding-claim-c1') as HTMLInputElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole('tab', { name: 'Narrative' }));
+    expect((screen.getByTestId('narrative-overview') as HTMLTextAreaElement).disabled).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    expect(screen.queryByTestId('readonly-banner')).toBeNull();
+    expect((screen.getByTestId('submit-revision') as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId('narrative-overview') as HTMLTextAreaElement).disabled).toBe(false);
+    expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
+  });
+
   it('[UX-11] seeds the coach panel from the session’s newest coaching run on open', async () => {
     const { calls } = stubApi(
       sessionRoutes({

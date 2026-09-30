@@ -10,9 +10,16 @@ import type {
   NodeConfigEntry,
   NodeKind,
   NodeOperation,
+  SessionDraft,
   Severity,
 } from '@sysdesign/contracts';
-import { BINDING_MAX_NODES, reconcileBrief, reconcileNarration } from '@sysdesign/contracts';
+import {
+  BINDING_MAX_NODES,
+  DESIGN_BRIEF_VERSION,
+  NARRATION_VERSION,
+  reconcileBrief,
+  reconcileNarration,
+} from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -147,6 +154,18 @@ export interface CanvasState {
   loadBrief(brief: DesignBrief | null): void;
   markClean(): void;
   markDirty(): void;
+  /**
+   * Restores an unsubmitted draft — graph, brief and narrative together. The
+   * canvas is dirty afterwards, unlike `setGraph`: a draft is unsubmitted
+   * work, and the toolbar should say so.
+   */
+  loadDraft(draft: SessionDraft): void;
+  /**
+   * The draft as the server keeps it: the graph, the bindings exactly as
+   * typed (half-finished is fine, nothing is reconciled) and the narrative
+   * slots; null halves when nothing was written.
+   */
+  serializeDraft(): SessionDraft;
   serialize(): CanvasGraph;
   /** The brief as a payload, reconciled against the live graph and rubric, or null. */
   serializeBrief(criteria: readonly CriterionRef[]): DesignBrief | null;
@@ -471,6 +490,54 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
 
     markDirty() {
       set({ dirty: true });
+    },
+
+    loadDraft(draft) {
+      const { nodes, edges } = fromCanvasGraph(draft.graph);
+      set({
+        nodes,
+        edges,
+        selectedId: null,
+        highlight: null,
+        dirty: true,
+        bindings: draft.brief?.bindings.map((binding) => ({ ...binding })) ?? [],
+        narrativeOverview: draft.narrative?.overview ?? '',
+        componentRationales: draft.narrative?.componentRationales ?? [],
+        criterionNarrations: draft.narrative?.criterionNarrations ?? [],
+      });
+    },
+
+    serializeDraft() {
+      const {
+        nodes,
+        edges,
+        bindings,
+        narrativeOverview,
+        componentRationales,
+        criterionNarrations,
+      } = get();
+      const narrativeEmpty =
+        narrativeOverview.length === 0 &&
+        componentRationales.length === 0 &&
+        criterionNarrations.length === 0;
+      return {
+        graph: toCanvasGraph(nodes, edges),
+        brief:
+          bindings.length === 0
+            ? null
+            : {
+                version: DESIGN_BRIEF_VERSION,
+                bindings: bindings.map((binding) => ({ ...binding })),
+              },
+        narrative: narrativeEmpty
+          ? null
+          : {
+              version: NARRATION_VERSION,
+              ...(narrativeOverview.length > 0 ? { overview: narrativeOverview } : {}),
+              componentRationales: [...componentRationales],
+              criterionNarrations: [...criterionNarrations],
+            },
+      };
     },
 
     serialize() {

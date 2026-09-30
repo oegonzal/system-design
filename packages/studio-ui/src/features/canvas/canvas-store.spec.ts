@@ -156,6 +156,62 @@ describe('canvas-store', () => {
     expect(store.getState().serialize()).toEqual(makeGraph());
   });
 
+  describe('session draft', () => {
+    it('[UX-15] serializeDraft keeps the bindings exactly as typed and nulls an unwritten half', () => {
+      const store = createCanvasStore(makeGraph());
+      expect(store.getState().serializeDraft()).toEqual({
+        graph: makeGraph(),
+        brief: null,
+        narrative: null,
+      });
+
+      // Half-typed: a claim with no component yet, which a submission would drop.
+      store.getState().setBindingClaim('c3', 'The database holds it');
+      store.getState().setNarrativeOverview('Reads and writes are split.');
+      expect(store.getState().serializeDraft()).toEqual({
+        graph: makeGraph(),
+        brief: {
+          version: 1,
+          bindings: [{ criterionId: 'c3', nodeIds: [], claim: 'The database holds it' }],
+        },
+        narrative: {
+          version: 1,
+          overview: 'Reads and writes are split.',
+          componentRationales: [],
+          criterionNarrations: [],
+        },
+      });
+    });
+
+    it('[UX-15] loadDraft restores every half and leaves the canvas dirty — a draft is unsubmitted work', () => {
+      const store = createCanvasStore();
+      store.getState().loadDraft({
+        graph: makeGraph(),
+        brief: { version: 1, bindings: [{ criterionId: 'c1', nodeIds: ['n-3'], claim: '' }] },
+        narrative: {
+          version: 1,
+          componentRationales: [{ nodeId: 'n-3', prose: 'Persists every order.' }],
+          criterionNarrations: [],
+        },
+      });
+
+      expect(store.getState().nodes.map((node) => node.id)).toEqual(['n-1', 'n-2', 'n-3']);
+      expect(store.getState().bindings).toEqual([
+        { criterionId: 'c1', nodeIds: ['n-3'], claim: '' },
+      ]);
+      expect(store.getState().componentRationales).toEqual([
+        { nodeId: 'n-3', prose: 'Persists every order.' },
+      ]);
+      expect(store.getState().narrativeOverview).toBe('');
+      expect(store.getState().dirty).toBe(true);
+      // Round trip: what was restored is what would be saved again.
+      expect(store.getState().serializeDraft().brief).toEqual({
+        version: 1,
+        bindings: [{ criterionId: 'c1', nodeIds: ['n-3'], claim: '' }],
+      });
+    });
+  });
+
   describe('narrative', () => {
     it('setNarrativeOverview stores the overview and dirties the draft', () => {
       const store = createCanvasStore();

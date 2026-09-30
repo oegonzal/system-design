@@ -15,6 +15,8 @@ export interface DesignBriefEditorProps {
   criteria: SuccessCriterion[];
   /** True while the quality loop is still deriving it. */
   deriving?: boolean;
+  /** A revision is on screen: shown, never edited. */
+  readOnly?: boolean;
 }
 
 /**
@@ -30,7 +32,11 @@ export interface DesignBriefEditorProps {
  * presentational and controlled, so this is the only component that needs to
  * know where the draft lives.
  */
-export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEditorProps) {
+export function DesignBriefEditor({
+  criteria,
+  deriving = false,
+  readOnly = false,
+}: DesignBriefEditorProps) {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const bindings = useCanvasStore((state) => state.bindings);
@@ -74,6 +80,7 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
                 criterion={criterion}
                 graph={graph}
                 binding={bindings.find((binding) => binding.criterionId === criterion.id) ?? null}
+                disabled={readOnly}
                 onClaim={(claim) => setBindingClaim(criterion.id, claim)}
                 onToggleNode={(nodeId) => toggleBindingNode(criterion.id, nodeId)}
                 onPath={(path) => setBindingPath(criterion.id, path)}

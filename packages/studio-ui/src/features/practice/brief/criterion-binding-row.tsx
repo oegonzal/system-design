@@ -33,6 +33,8 @@ export interface CriterionBindingRowProps {
   criterion: SuccessCriterion;
   graph: CanvasGraph;
   binding: Binding | null;
+  /** Shown, never edited — every control is off. */
+  disabled?: boolean;
   onClaim: (claim: string) => void;
   onToggleNode: (nodeId: string) => void;
   onPath: (path: string[]) => void;
@@ -50,6 +52,7 @@ export function CriterionBindingRow({
   criterion,
   graph,
   binding,
+  disabled = false,
   onClaim,
   onToggleNode,
   onPath,
@@ -86,6 +89,7 @@ export function CriterionBindingRow({
           value={binding?.claim ?? ''}
           maxLength={BINDING_CLAIM_MAX_LENGTH}
           placeholder="e.g. the cache absorbs repeat reads"
+          disabled={disabled}
           onChange={(event) => onClaim(event.target.value)}
         />
 
@@ -102,7 +106,7 @@ export function CriterionBindingRow({
                   label={`${node.label} · ${node.kind}`}
                   data-testid={`binding-node-${criterion.id}-${node.id}`}
                   checked={checked}
-                  disabled={!checked && atCap}
+                  disabled={disabled || (!checked && atCap)}
                   onChange={() => onToggleNode(node.id)}
                 />
               );
@@ -115,13 +119,20 @@ export function CriterionBindingRow({
         )}
 
         {showTracer ? (
-          <FlowTracer criterionId={criterion.id} graph={graph} path={path} onChange={onPath} />
+          <FlowTracer
+            criterionId={criterion.id}
+            graph={graph}
+            path={path}
+            disabled={disabled}
+            onChange={onPath}
+          />
         ) : (
           <div>
             <Button
               size="sm"
               variant="subtle"
               onClick={() => setTracing(true)}
+              disabled={disabled}
               data-testid={`flow-open-${criterion.id}`}
             >
               Trace the request path
@@ -135,6 +146,7 @@ export function CriterionBindingRow({
               size="sm"
               variant="ghost"
               onClick={onClear}
+              disabled={disabled}
               data-testid={`binding-clear-${criterion.id}`}
             >
               Clear binding

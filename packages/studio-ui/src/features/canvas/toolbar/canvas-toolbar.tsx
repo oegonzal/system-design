@@ -1,10 +1,11 @@
 'use client';
 
 import type { QualityRunStatus } from '@sysdesign/contracts';
-import { Badge, Button, Toolbar } from '@sysdesign/design-system';
+import { Badge, type BadgeTone, Button, Toolbar } from '@sysdesign/design-system';
 import { useReactFlow } from '@xyflow/react';
 
 import { useCanvasStore } from '../canvas-store-context';
+import type { DraftSaveStatus } from '../draft-status';
 
 export interface CanvasToolbarProps {
   onSubmit: () => void;
@@ -12,6 +13,10 @@ export interface CanvasToolbarProps {
   submitting: boolean;
   revisionStatus: QualityRunStatus | null;
   revisionNumber: number | null;
+  /** A revision is on screen: nothing here may change or submit it. */
+  readOnly?: boolean;
+  /** Where the unsubmitted draft stands against the server. */
+  draftStatus?: DraftSaveStatus;
   /** Download the run (diagram PDF + per-artifact Markdown) as one zip. */
   onExport: () => void;
   exporting: boolean;
@@ -23,17 +28,30 @@ const STATUS_LABEL: Record<QualityRunStatus, string> = {
   failed: 'grading failed',
 };
 
+/** The draft badge per status; null shows nothing — a clean canvas has no draft to report. */
+const DRAFT_BADGE: Record<DraftSaveStatus, { tone: BadgeTone; label: string } | null> = {
+  clean: null,
+  unsaved: { tone: 'accent', label: 'unsaved draft' },
+  saving: { tone: 'neutral', label: 'saving draft…' },
+  saved: { tone: 'success', label: 'draft saved' },
+  failed: { tone: 'critical', label: 'draft not saved' },
+};
+
 /**
  * The canvas instrument panel. Submit is the page's one solid button; Clear
  * confirms through `window.confirm` — the design system has no Dialog
  * primitive yet, and a native confirm beats a hand-rolled half-modal. The
- * coach has its own dock tab, so no Improve button lives here.
+ * coach has its own dock tab, so no Improve button lives here. The draft
+ * badge reports the autosave; without one the canvas's own dirty flag
+ * stands in.
  */
 export function CanvasToolbar({
   onSubmit,
   submitting,
   revisionStatus,
   revisionNumber,
+  readOnly = false,
+  draftStatus,
   onExport,
   exporting,
 }: CanvasToolbarProps) {
@@ -44,6 +62,7 @@ export function CanvasToolbar({
   const { fitView } = useReactFlow();
 
   const gradingInFlight = submitting || revisionStatus === 'running';
+  const draftBadge = DRAFT_BADGE[draftStatus ?? (dirty ? 'unsaved' : 'clean')];
 
   const handleClear = () => {
     if (isEmpty) return;
@@ -57,12 +76,12 @@ export function CanvasToolbar({
       <Button
         variant="solid"
         onClick={onSubmit}
-        disabled={gradingInFlight || isEmpty}
+        disabled={gradingInFlight || isEmpty || readOnly}
         data-testid="submit-revision"
       >
         Submit for grading
       </Button>
-      <Button variant="subtle" onClick={handleClear} disabled={isEmpty}>
+      <Button variant="subtle" onClick={handleClear} disabled={isEmpty || readOnly}>
         Clear
       </Button>
       <Button variant="subtle" onClick={() => void fitView({ padding: 0.2 })}>
@@ -76,7 +95,11 @@ export function CanvasToolbar({
       >
         {exporting ? 'Exporting…' : 'Export'}
       </Button>
-      {dirty ? <Badge tone="accent">unsaved draft</Badge> : null}
+      {draftBadge !== null ? (
+        <Badge tone={draftBadge.tone} data-testid="draft-status" data-status={draftStatus}>
+          {draftBadge.label}
+        </Badge>
+      ) : null}
       {revisionStatus && revisionNumber !== null ? (
         <Badge tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}>
           {`rev #${revisionNumber} · ${STATUS_LABEL[revisionStatus]}`}

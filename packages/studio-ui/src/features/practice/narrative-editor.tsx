@@ -28,6 +28,8 @@ function SlotChip({ prose }: { prose: string }) {
 export interface NarrativeEditorProps {
   /** The prompt's rubric, as resolved by `usePromptCriteria`. */
   criteria: SuccessCriterion[];
+  /** A revision is on screen: shown, never edited. */
+  readOnly?: boolean;
 }
 
 /**
@@ -40,7 +42,7 @@ export interface NarrativeEditorProps {
  * explained" and "this requirement is walked" as references rather than
  * guessing which paragraph was about what.
  */
-export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
+export function NarrativeEditor({ criteria, readOnly = false }: NarrativeEditorProps) {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const overview = useCanvasStore((state) => state.narrativeOverview);
@@ -82,6 +84,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
           data-testid="narrative-overview"
           rows={4}
           value={overview}
+          disabled={readOnly}
           onChange={(event) => setOverview(event.target.value)}
           placeholder="e.g. Reads and writes are split so a spike in order lookups never…"
         />
@@ -108,6 +111,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                   data-testid={`narrative-rationale-${node.id}`}
                   rows={3}
                   value={prose}
+                  disabled={readOnly}
                   onChange={(event) => setRationale(node.id, event.target.value)}
                   placeholder="What this component does for the design, and why it earns its place."
                 />
@@ -143,6 +147,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                       data-testid={`narrative-narration-${criterion.id}`}
                       rows={3}
                       value={prose}
+                      disabled={readOnly}
                       onChange={(event) => setNarration(criterion.id, event.target.value)}
                       placeholder="Trace the request in words — which components it touches, in order, and why."
                     />

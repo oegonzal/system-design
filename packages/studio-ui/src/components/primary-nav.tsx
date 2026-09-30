@@ -2,6 +2,7 @@
 
 import styled from '@emotion/styled';
 import { transient } from '@sysdesign/design-system';
+import { useConfirmLeave } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -41,8 +42,10 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** The app's routes. A page with unsaved work is asked before a link leaves it. */
 export function PrimaryNav() {
   const pathname = usePathname();
+  const confirmLeave = useConfirmLeave();
 
   return (
     <Nav aria-label="Primary">
@@ -54,6 +57,9 @@ export function PrimaryNav() {
             href={item.href}
             $active={active}
             aria-current={active ? 'page' : undefined}
+            onNavigate={(event) => {
+              if (!confirmLeave()) event.preventDefault();
+            }}
           >
             {item.label}
           </NavLink>
