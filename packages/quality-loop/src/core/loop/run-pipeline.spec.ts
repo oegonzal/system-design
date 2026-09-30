@@ -163,6 +163,89 @@ describe('runLoop', () => {
     expect(trace.stopReason).toBe('producer-unavailable');
   });
 
+  it('[QL-25] a produced artifact is normalized before the validators; a provided one never is', async () => {
+    const seenByNormalize: TinyOutput[] = [];
+    const seenByValidator: unknown[] = [];
+    const tiny = tinyPipeline();
+    const normalizing = tinyPipeline({
+      task: {
+        ...tiny.task,
+        output: {
+          ...tiny.task.output,
+          normalize: (output) => {
+            seenByNormalize.push(output);
+            return { ...output, parts: [...new Set(output.parts)] };
+          },
+        },
+      },
+    });
+    const validators = scriptedStages().validators.map((validator) => ({
+      ...validator,
+      validate: (artifact: TinyOutput, contract: Parameters<typeof validator.validate>[1]) => {
+        seenByValidator.push(artifact);
+        return validator.validate(artifact, contract);
+      },
+    }));
+    const duplicated: TinyOutput = { text: 'x', parts: ['a', 'a'] };
+
+    const produced = await runLoop(
+      scriptedStages({ validators, producer: scriptedProducer([duplicated]) }),
+      normalizing,
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+    expect(produced.iterations[0].artifact).toEqual({ text: 'x', parts: ['a'] });
+    expect(seenByNormalize).toEqual([duplicated]);
+    // The validators, the lenses and the trace all see the normalized value.
+    expect(seenByValidator).toEqual([{ text: 'x', parts: ['a'] }]);
+
+    seenByNormalize.length = 0;
+    const provided = await runLoop(
+      scriptedStages(),
+      normalizing,
+      { goal: 'g', output: duplicated, maxIterations: 1 },
+      clock,
+    );
+    expect(provided.iterations[0].artifact).toEqual(duplicated);
+    expect(seenByNormalize).toEqual([]);
+  });
+
+  it('[QL-25] a revision a validator blocked never becomes best, and the next produce is told why it was refused', async () => {
+    const inputs: ProducerInput<TinyOutput>[] = [];
+    const scripted = scriptedProducer([DRAFT_1, { text: 2 } as never, DRAFT_2]);
+    const producer: Producer<TinyOutput> = {
+      enabled: true,
+      produce: (input) => {
+        inputs.push(input);
+        return scripted.produce(input);
+      },
+    };
+    const trace = await runLoop(
+      scriptedStages({ producer }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 3 },
+      clock,
+    );
+
+    expect(trace.iterations.map((iteration) => iteration.decision.finalDecision)).toEqual([
+      'revise',
+      'retry',
+      'accept',
+    ]);
+    expect(trace.iterations[1].decision.scores.overall).toBe(0);
+    expect(trace.bestIteration).toBe(3);
+    // Iterations 1 and 2 had nothing refused before them.
+    expect(inputs[0].refusals).toEqual([]);
+    expect(inputs[1].refusals).toEqual([]);
+    // Iteration 3 revises the best (iteration 1) with its remediations — and is
+    // told what the schema validator refused in iteration 2.
+    expect(inputs[2].mode).toBe('retry');
+    expect(inputs[2].remediations).toEqual(trace.iterations[0].remediations);
+    expect(inputs[2].refusals).toEqual([
+      expect.objectContaining({ subject: { validator: 'schema' }, note: 'not the shape' }),
+    ]);
+  });
+
   it('[QL-9] stops on a plateau when revisions stop improving', async () => {
     const flat = scriptedEvaluator('evaluator.tiny', [
       [[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]],

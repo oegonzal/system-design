@@ -22,7 +22,12 @@
  * to keep the author's ids and to prefix anything it adds with `ai-` so the
  * studio can tell the two apart.
  */
-import { CANVAS_PIPELINE_ID } from '@sysdesign/contracts';
+import {
+  CANVAS_CRITERION_KINDS,
+  CANVAS_MAX_CRITERIA,
+  CANVAS_PIPELINE_ID,
+  type CanvasCriterionKind,
+} from '@sysdesign/contracts';
 
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
@@ -39,8 +44,6 @@ import { REVISE_ONLY } from './controller';
 import { canvasOutput, type CanvasSubmission } from './output';
 import { referencesValidator, structureValidator } from './validators';
 
-const MAX_CRITERIA = 24;
-
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
@@ -54,6 +57,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     'A canvas drawn in the studio — nodes, edges, the brief binding each requirement to the parts that hold it, and the narrative — judged against the prompt it answers, and coached when asked.',
 
   task: {
+    // The kinds are the contract's declaration (`CANVAS_CRITERION_KINDS`),
+    // which a generated prompt's rubric is built from; `satisfies` keeps the
+    // two from drifting while the record stays open to the engine.
     criterionKinds: {
       functional:
         'A capability the system must provide: a request it serves, data it ingests, a job it runs.',
@@ -66,7 +72,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       constraint:
         'A hard rule the design may not break: an imposed platform, a data boundary, a compliance rule, a vendor that only behaves one way.',
-    },
+    } satisfies Record<CanvasCriterionKind, string>,
     findingTypes: {
       missing_requirement: 'A stated requirement nothing in the diagram delivers.',
 
@@ -102,7 +108,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       bad_assumption:
         'A design decision resting on something the goal does not say and would not grant.',
     },
-    maxCriteria: MAX_CRITERIA,
+    maxCriteria: CANVAS_MAX_CRITERIA,
     output: canvasOutput,
   },
 
@@ -111,16 +117,17 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     maxTokens: 4000,
   },
 
-  // The coach. Withholding the criteria is deliberate: it revises against the
-  // remediations the panel selected, in the author's shape, never against
-  // the checklist the canvas is graded on. 14000 keeps a full canvas under
-  // the subscription client's output cap. Lens caps are sized from a live
-  // run of the sample canvas: critics answered in 2.5–5.1k output tokens,
-  // evaluators in 0.4–0.7k.
+  // The coach. It sees the criteria WITH their ids: a binding names a
+  // criterion by id, and the author may have left one unbound — without the
+  // ids the coach can only guess, and `references` refuses a guess. It still
+  // revises against the remediations the panel selected, never against a
+  // score. 14000 keeps a full canvas under the subscription client's output
+  // cap. Lens caps are sized from a live run of the sample canvas: critics
+  // answered in 2.5–5.1k output tokens, evaluators in 0.4–0.7k.
   producer: {
     persona: producer,
     maxTokens: 14000,
-    consumes: [],
+    consumes: ['criteria'],
   },
 
   validators: [referencesValidator, structureValidator],
@@ -175,7 +182,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: evaluatorRequirements,
       samples: 2,
       consumes: ['findings'],
-      maxItems: MAX_CRITERIA,
+      maxItems: CANVAS_MAX_CRITERIA,
       maxTokens: 4000,
       criterionKinds: ['functional', 'constraint'],
     },
@@ -184,7 +191,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: evaluatorQuality,
       samples: 2,
       consumes: ['findings'],
-      maxItems: MAX_CRITERIA,
+      maxItems: CANVAS_MAX_CRITERIA,
       maxTokens: 4000,
       criterionKinds: ['non_functional', 'scale'],
     },
@@ -208,7 +215,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       // prompt lists several of them.
       scale: { dimension: 'quality_attributes', weight: 0.5, gate: false },
       constraint: { dimension: 'compliance', weight: 1, gate: true },
-    },
+    } satisfies Record<CanvasCriterionKind, { dimension: string; weight: number; gate: boolean }>,
 
     findingTypes: {
       missing_requirement: { dimension: 'coverage', gate: false },

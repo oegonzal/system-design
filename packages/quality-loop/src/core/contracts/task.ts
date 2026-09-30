@@ -18,6 +18,15 @@ export interface OutputShape<T> {
   locate(output: T): ArtifactLocation[];
   /** The text every judge reads. Must print every location id verbatim. */
   render(output: T): string;
+  /**
+   * Optional. A deterministic repair the loop applies to a PRODUCED artifact
+   * before any validator runs — never to a provided or adopted one, which are
+   * judged exactly as handed in. Total over whatever the model returned: when
+   * the value would not parse, return it untouched and let the schema
+   * validator report it. Idempotent, so a consumer re-running it on the
+   * stored artifact changes nothing — what is judged is what is stored.
+   */
+  normalize?(output: T, contract: TaskContract<T>): T;
 }
 
 export interface TaskSpec<T> {

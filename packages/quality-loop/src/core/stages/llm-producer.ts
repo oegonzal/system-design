@@ -1,7 +1,8 @@
 /**
  * The generator. It sees the goal, the criteria and — on a revise or retry —
- * the remediations the policy selected, in the lenses' own words. It never
- * sees a score: the producer improves against reasons, not against a number.
+ * the remediations the policy selected, in the lenses' own words, and why a
+ * validator refused its last attempt, when one did. It never sees a score:
+ * the producer improves against reasons, not against a number.
  */
 import type { ProduceMode, RemediationNote } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
@@ -17,6 +18,9 @@ import {
   systemPrompt,
 } from './prompting';
 import { PRODUCER_STAGE, stageDiagnostic } from './shared';
+
+const REFUSALS_HEADING =
+  'Why your previous revision was refused before any judge read it — do not repeat these';
 
 const INSTRUCTIONS = {
   initial: 'Produce the artifact for this goal, addressing every success criterion.',
@@ -37,6 +41,7 @@ function briefing<T>(
   mode: ProduceMode,
   prior: T | null,
   remediations: readonly RemediationNote[],
+  refusals: readonly RemediationNote[],
 ): { sections: string[]; clipped: boolean } {
   const goal = goalSection(contract.goal);
   const sections = [goal.text];
@@ -49,6 +54,7 @@ function briefing<T>(
   } else if (mode === 'retry') {
     sections.push(remediationsSection('Pitfalls of the discarded attempt', remediations));
   }
+  if (refusals.length > 0) sections.push(remediationsSection(REFUSALS_HEADING, refusals));
   sections.push(['# Instructions', '', INSTRUCTIONS[mode]].join('\n'));
   return { sections, clipped: goal.clipped };
 }
@@ -60,7 +66,7 @@ export function createLlmProducer<T>(
 ): Producer<T> {
   return {
     enabled: llm.enabled,
-    async produce({ contract, mode, prior, remediations }) {
+    async produce({ contract, mode, prior, remediations, refusals }) {
       if (!llm.enabled) {
         return {
           output: null,
@@ -69,7 +75,7 @@ export function createLlmProducer<T>(
         };
       }
 
-      const briefed = briefing(task, spec, contract, mode, prior, remediations);
+      const briefed = briefing(task, spec, contract, mode, prior, remediations, refusals);
       const output = await llm.completeStructured({
         system: systemPrompt('producer', spec.persona),
         user: joinSections(...briefed.sections),

@@ -25,6 +25,7 @@ describe('createLlmProducer', () => {
           note: 'say more',
         },
       ],
+      refusals: [],
     });
     expect(produced.output).toEqual({ text: 'new', parts: [] });
     expect(calls[0].user).toContain('[text] old');
@@ -35,7 +36,13 @@ describe('createLlmProducer', () => {
   it('[QL-9] is briefed with the derived criteria only when it declares it consumes them', async () => {
     const calls: LlmCall[] = [];
     const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
-    const input = { contract, mode: 'initial' as const, prior: null, remediations: [] };
+    const input = {
+      contract,
+      mode: 'initial' as const,
+      prior: null,
+      remediations: [],
+      refusals: [],
+    };
     await createLlmProducer(definition.task, { ...definition.producer, consumes: [] }, llm).produce(
       input,
     );
@@ -55,6 +62,7 @@ describe('createLlmProducer', () => {
       mode: 'initial',
       prior: null,
       remediations: [],
+      refusals: [],
     });
     expect(produced).toEqual({
       output: null,

@@ -6,4 +6,6 @@ Keep every id the author gave a node or edge exactly as it is. Give anything you
 
 The brief has exactly one binding per criterion, and a binding's `path` is one connected walk: an ordered list of edges where each edge starts at the node the previous edge ended at, following one request from where it enters to where it comes to rest. A fan-out — a service that reads a cache, a replica and a store — is not a path; put the one route the request actually takes in `path` and list the other components in `nodeIds`. A path that does not connect, a node or edge that does not exist, or a criterion bound twice is a structural error that voids the whole revision before any judge reads it.
 
+The success criteria are listed with their ids. When a remediation asks for a requirement nothing binds, bind it by the listed id — never an invented one — to the nodes that hold it. A refusal note tells you why a previous revision was thrown out before any judge read it; do not repeat that mistake.
+
 When told to start over, design the whole canvas from the goal in the same shape.

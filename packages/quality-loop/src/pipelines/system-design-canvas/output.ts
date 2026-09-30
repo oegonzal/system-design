@@ -9,16 +9,19 @@
  * Location ids are positional (`node.3`, `binding.1`), never the author's own
  * canvas ids: a lens may cite only what the render printed, and the render
  * prints the author's id beside every positional one so a reader can join
- * them. The studio maps `node.N` / `edge.N` back by array position.
+ * them. The numbering is the contract's `submissionLocations`, so the studio
+ * joins a finding back onto the stored revision with the same function.
  */
 import {
   designSubmissionSchema,
   renderEdgeLine,
   renderNodeLine,
+  repairSubmission,
+  submissionLocations,
   type DesignSubmission,
 } from '@sysdesign/contracts';
 
-import { numbered, type OutputShape } from '../../core/contracts';
+import type { OutputShape } from '../../core/contracts';
 
 export type CanvasSubmission = DesignSubmission;
 
@@ -34,25 +37,20 @@ function positional<I extends { id: string }>(items: readonly I[], prefix: strin
 export const canvasOutput: OutputShape<CanvasSubmission> = {
   schema: designSubmissionSchema,
 
-  locate: (submission) => {
-    const { graph, brief, narrative } = submission;
-    const overview = narrative?.overview?.trim() ?? '';
-    return [
-      ...numbered('node', graph.nodes, (node) => `${node.id} · ${node.kind} · ${node.label}`),
-      ...numbered(
-        'edge',
-        graph.edges,
-        (edge) => `${edge.id} · ${edge.source} → ${edge.target} (${edge.kind})`,
-      ),
-      ...numbered(
-        'binding',
-        brief?.bindings ?? [],
-        (binding) => `${binding.criterionId} ← ${binding.nodeIds.join(', ')}`,
-      ),
-      ...(overview.length > 0 ? [{ id: 'overview', label: 'Overview' }] : []),
-      ...numbered('rationale', narrative?.componentRationales ?? [], (item) => item.nodeId),
-      ...numbered('narration', narrative?.criterionNarrations ?? [], (item) => item.criterionId),
-    ];
+  /** The contract's one numbering, projected to what a lens may cite; the studio joins on the same ids. */
+  locate: (submission) => submissionLocations(submission).map(({ id, label }) => ({ id, label })),
+
+  /**
+   * A coach revision is repaired the way the editor repairs a draft — a
+   * binding to a criterion the rubric never listed, a duplicate, a broken
+   * path are dropped, not refused — before `references` reads it. The graph
+   * is never touched: an edge to nowhere stays a refusal. The studio stores
+   * what was judged and repairs nothing; a value that would not parse is
+   * returned as it came, for the schema validator to report.
+   */
+  normalize: (submission, contract) => {
+    const parsed = designSubmissionSchema.safeParse(submission);
+    return parsed.success ? repairSubmission(parsed.data, contract.criteria) : submission;
   },
 
   render: (submission) => {

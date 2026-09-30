@@ -11,6 +11,7 @@ import type {
   IterationTrace,
   LensOutcome,
   ProduceMode,
+  RemediationNote,
   RunTrace,
   StopReason,
   SuccessCriterion,
@@ -107,7 +108,8 @@ export async function runLoop<T>(
   let stop: StopReason | null = null;
 
   for (let iteration = 1; iteration <= maxIterations && stop === null; iteration++) {
-    const entry: IterationTrace<T> = await runIteration(loop, iteration, mode, best);
+    const previous = iterations[iterations.length - 1] ?? null;
+    const entry: IterationTrace<T> = await runIteration(loop, iteration, mode, best, previous);
     iterations.push(entry);
 
     if (beats(entry, best)) {
@@ -158,13 +160,14 @@ async function runIteration<T>(
   iteration: number,
   mode: ProduceMode | 'provided',
   best: IterationTrace<T> | null,
+  previous: IterationTrace<T> | null,
 ): Promise<IterationTrace<T>> {
   const { stages, contract, now } = loop;
   const { policy, task } = loop.definition;
   const startedAt = now();
   const diagnostics = [...loop.baseDiagnostics];
 
-  const produced = await produceOrAdopt(loop, mode, best);
+  const produced = await produceOrAdopt(loop, mode, best, previous);
   const { artifact } = produced;
   if (produced.diagnostic) diagnostics.push(produced.diagnostic);
 
@@ -240,11 +243,17 @@ async function runIteration<T>(
   };
 }
 
-/** Iteration 1 adopts a provided artifact; every other iteration asks the producer. */
+/**
+ * Iteration 1 adopts a provided artifact exactly as handed in; every other
+ * iteration asks the producer, and what it produced passes through the
+ * output shape's `normalize` (when declared) before any validator sees it —
+ * the normalized value is what the lenses judge and the trace stores.
+ */
 async function produceOrAdopt<T>(
   loop: Loop<T>,
   mode: ProduceMode | 'provided',
   best: IterationTrace<T> | null,
+  previous: IterationTrace<T> | null,
 ): Promise<{ artifact: T | null; diagnostic: Diagnostic | null }> {
   if (mode === 'provided') return { artifact: loop.input.output as T, diagnostic: null };
   const produced = await loop.stages.producer.produce({
@@ -252,9 +261,32 @@ async function produceOrAdopt<T>(
     mode,
     prior: mode === 'revise' ? (best?.artifact ?? null) : null,
     remediations: best?.remediations ?? [],
+    refusals: refusalsOf(previous, best),
   });
-  return { artifact: produced.output, diagnostic: produced.diagnostic };
+  const { output } = loop.definition.task;
+  const artifact =
+    produced.output !== null && output.normalize
+      ? output.normalize(produced.output, loop.contract)
+      : produced.output;
+  return { artifact, diagnostic: produced.diagnostic };
 }
+
+const wasBlocked = <T>(entry: IterationTrace<T>): boolean =>
+  entry.validation.some((report) => report.gate === 'block' && report.problems.length > 0);
+
+/**
+ * The validator notes of the iteration just before, when a validator blocked
+ * it and it never became best: the producer revises the best artifact with
+ * the best remediations, so nothing else would tell it why its last attempt
+ * was refused.
+ */
+const refusalsOf = <T>(
+  previous: IterationTrace<T> | null,
+  best: IterationTrace<T> | null,
+): RemediationNote[] =>
+  previous !== null && previous !== best && wasBlocked(previous)
+    ? previous.remediations.filter((note) => 'validator' in note.subject)
+    : [];
 
 const notApplicableDetail = (artifact: unknown, blocked: boolean): string =>
   artifact === null ? 'no artifact' : blocked ? 'blocked by a validator' : 'no criteria derived';

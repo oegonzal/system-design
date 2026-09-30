@@ -36,6 +36,12 @@ export interface ProducerInput<T> {
   mode: ProduceMode;
   prior: T | null;
   remediations: RemediationNote[];
+  /**
+   * Why the latest revision was thrown out before any judge read it — the
+   * validator notes of an iteration a validator blocked and that never
+   * became best. `remediations` are the best iteration's and cannot say it.
+   */
+  refusals: RemediationNote[];
 }
 
 export interface Produced<T> {

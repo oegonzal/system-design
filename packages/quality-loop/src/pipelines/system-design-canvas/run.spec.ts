@@ -1,8 +1,10 @@
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
+import { repairSubmission, type CanvasEdge, type DesignSubmission } from '@sysdesign/contracts';
+
 import { runPipeline } from '../../core/loop/run-pipeline';
-import { fakeLlm } from '../../core/testing';
+import { fakeLlm, sequencedLlm } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import { coachedSubmission, sampleCriteria, sampleSubmission } from './testing';
 
@@ -81,6 +83,45 @@ const qualityResults = {
 
 const canned = [findings, requirementResults, qualityResults, coachedSubmission()];
 
+/** What a coach might return: a criterion it invented, a criterion bound twice, and a path that fans out. */
+const sloppyCoached = (): DesignSubmission => {
+  const coached = coachedSubmission();
+  const first = coached.brief?.bindings[0];
+  if (!first || !coached.brief) throw new Error('the fixture binds c1');
+  return {
+    ...coached,
+    brief: {
+      version: 1,
+      bindings: [
+        ...coached.brief.bindings.map((binding) =>
+          binding.criterionId === 'c2'
+            ? // edge-1 does not start where edge-9 ends: a fan-out tacked onto the walk.
+              { ...binding, path: [...(binding.path ?? []), 'edge-1'] }
+            : binding,
+        ),
+        {
+          criterionId: 'c99',
+          nodeIds: ['service-1'],
+          claim: 'a criterion the rubric never listed',
+        },
+        { ...first, claim: 'bound twice' },
+      ],
+    },
+  };
+};
+
+/** A coach revision the repair cannot save: an edge to a node that is not drawn. */
+const brokenCoached = (): DesignSubmission => {
+  const coached = coachedSubmission();
+  const dangling: CanvasEdge = {
+    id: 'ai-edge-9',
+    source: 'service-1',
+    target: 'nowhere',
+    kind: 'sync',
+  };
+  return { ...coached, graph: { ...coached.graph, edges: [...coached.graph.edges, dangling] } };
+};
+
 describe('the system-design-canvas loop', () => {
   it('[QL-21] a provided canvas is judged in one iteration against the supplied rubric, and nothing is derived', async () => {
     const exchanges: LlmExchange[] = [];
@@ -152,5 +193,87 @@ describe('the system-design-canvas loop', () => {
     for (const part of added) expect(part.id.startsWith('ai-')).toBe(true);
     // The added replica is one more location the panel can cite.
     expect(trace.iterations[1].locations.map((location) => location.id)).toContain('node.14');
+  });
+
+  it('[QL-25] a coach revision that binds an unlisted criterion, binds one twice or breaks a path is repaired before judging — the author’s own submission never is', async () => {
+    const exchanges: LlmExchange[] = [];
+    const trace = await runPipeline(
+      SYSTEM_DESIGN_CANVAS,
+      { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
+      {
+        llm: fakeLlm(findings, requirementResults, qualityResults, sloppyCoached()),
+        sink: (exchange) => exchanges.push(exchange),
+        now: () => 0,
+      },
+    );
+
+    const [, revised] = trace.iterations;
+    expect(revised.validation.every((report) => report.problems.length === 0)).toBe(true);
+    expect(revised.decision.reason).not.toContain('blocked');
+    expect(revised.locations.length).toBeGreaterThan(0);
+    const artifact = revised.artifact;
+    if (artifact === null || artifact.brief === null) throw new Error('the coach must answer');
+    const bound = artifact.brief.bindings.map((binding) => binding.criterionId);
+    expect(bound).not.toContain('c99');
+    expect(bound.filter((id) => id === 'c1')).toHaveLength(1);
+    expect(artifact.brief.bindings.find((b) => b.criterionId === 'c2')?.path).toEqual([
+      'edge-4',
+      'edge-5',
+      'edge-8',
+      'edge-9',
+    ]);
+    // What is judged is what is stored: the repair is idempotent on it.
+    expect(repairSubmission(artifact, sampleCriteria())).toEqual(artifact);
+    // The coach was briefed with the criteria and their ids.
+    const briefing = exchanges.find((exchange) => exchange.scope === 'producer');
+    expect(briefing?.user).toContain('# Success criteria');
+    expect(briefing?.user).toContain('- c1 [functional]');
+
+    const author = sampleSubmission();
+    author.brief?.bindings.push({ criterionId: 'c99', nodeIds: ['service-1'], claim: 'mine' });
+    const judged = await runPipeline(
+      SYSTEM_DESIGN_CANVAS,
+      { goal: GOAL, output: author, criteria: sampleCriteria(), maxIterations: 1 },
+      { llm: fakeLlm(...canned), sink: () => undefined, now: () => 0 },
+    );
+    expect(judged.iterations[0].artifact).toEqual(author);
+    expect(
+      judged.iterations[0].validation.find((report) => report.validatorId === 'references')
+        ?.problems,
+    ).toEqual([expect.objectContaining({ message: 'binding references unknown criterion: c99' })]);
+  });
+
+  it('[QL-25] after a revision `references` refused, the coach is told why before it revises again', async () => {
+    const exchanges: LlmExchange[] = [];
+    const trace = await runPipeline(
+      SYSTEM_DESIGN_CANVAS,
+      { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 3 },
+      {
+        llm: sequencedLlm(
+          findings,
+          requirementResults,
+          qualityResults,
+          brokenCoached(),
+          coachedSubmission(),
+        ),
+        sink: (exchange) => exchanges.push(exchange),
+        now: () => 0,
+      },
+    );
+
+    expect(trace.iterations.map((iteration) => iteration.decision.finalDecision)).toEqual([
+      'revise',
+      'revise',
+      'revise',
+    ]);
+    expect(trace.iterations[1].decision.reason).toContain('blocked by validator(s) references');
+    expect(trace.iterations[2].validation.every((report) => report.problems.length === 0)).toBe(
+      true,
+    );
+    const briefings = exchanges.filter((exchange) => exchange.scope === 'producer');
+    expect(briefings).toHaveLength(2);
+    expect(briefings[0].user).not.toContain('refused before any judge');
+    expect(briefings[1].user).toContain('refused before any judge');
+    expect(briefings[1].user).toContain('nowhere');
   });
 });
