@@ -194,7 +194,7 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkTask(definition, fail);
   checkController(definition, fail);
 
-  // Both clients turn the output schema into JSON Schema; an unsupported zod
+  // The client turns the output schema into JSON Schema; an unsupported zod
   // type would otherwise surface as a null response mid-run.
   z.toJSONSchema(definition.task.output.schema);
 }

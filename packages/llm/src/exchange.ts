@@ -12,8 +12,8 @@ import type { LlmClient } from './llm-client';
  * adapter and die there.
  *
  * So recording is a SEPARATE capability an adapter may offer. `LlmClient` stays
- * one method wide, every hand-rolled test double keeps compiling, and the no-op
- * client simply does not implement it.
+ * one method wide, and every hand-rolled test double keeps compiling without
+ * implementing it.
  */
 export interface LlmCall {
   model: string;

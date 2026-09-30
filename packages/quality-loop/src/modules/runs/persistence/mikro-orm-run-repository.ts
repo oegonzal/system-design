@@ -25,11 +25,12 @@ import { toSummary } from './to-summary';
 /**
  * Runs in Postgres through MikroORM. Every method forks the root
  * EntityManager: the loop runs in the background (and the CLI outside any
- * request), so there is no request context to lean on — the eval worker's
- * discipline. `nativeUpdate` writes without loading; `close` is one
- * transaction, so a run is either fully recorded or still `running` for the
- * boot sweep. The `status: 'running'` guards keep a late finish from
- * overwriting a row the sweep already failed.
+ * request), so there is no request context to lean on. `nativeUpdate` writes
+ * without loading; `close` is one transaction, so a run is either fully
+ * recorded or still `running`, for the janitor to fail once its heartbeat is
+ * stale. The `status: 'running'` guards keep exchanges and heartbeats off a
+ * row the janitor failed; only the owner's late close reclaims it, with the
+ * true outcome.
  */
 @Injectable()
 export class MikroOrmRunRepository implements RunRepository {

@@ -130,11 +130,6 @@ if [ -n "${SKIP_REVIEW:-}" ]; then
   exit 0
 fi
 
-if [ ! -f tooling/code-review/review.ts ]; then
-  # Early history: the hook lands before the review tooling does.
-  exit 0
-fi
-
 echo "  → code review (quick profile)"
 if ! pnpm review:code --staged; then
   echo "  Commit refused by code review."

@@ -2,8 +2,8 @@ import type { ZodType } from 'zod';
 
 /**
  * The one seam every model call goes through. Callers never construct an SDK
- * client or read env vars; they receive an `LlmClient` and behave identically
- * on either provider route.
+ * client or read env vars; they receive an `LlmClient` and never learn what
+ * backs it — today one provider, Claude Code on the subscription login.
  *
  * The contract is deliberately narrow: one structured call, `null` on any
  * failure — a refusal, a parse miss, an API error. A caller records that as

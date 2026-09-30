@@ -19,7 +19,7 @@ const traceOf = (run: ReturnType<typeof makeRun>) => {
 /** One iteration the controller sent back for revision. */
 export const Revised: Story = { args: { trace: traceOf(makeRun()) } };
 
-/** The deterministic route: no model, no artifact, an honest escalation. */
+/** Every model call failed: no criteria, no artifact, an honest escalation. */
 export const Escalated: Story = { args: { trace: traceOf(makeEscalatedRun()) } };
 
 /** Revise, then accept — with the lessons the loop drew across the two. */

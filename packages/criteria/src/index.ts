@@ -4,7 +4,8 @@
  * Tests claim a criterion by putting its id in the title — `it('[EVAL-1] …')`,
  * `test('[UX-2] …')` — which is the one marker both Vitest and Playwright can
  * carry. A coverage spec (tooling) fails when any id below has no test, so a
- * requirement cannot silently lose its proof.
+ * requirement cannot silently lose its proof, and when a test claims an id
+ * that is not below, so a proof cannot point at nothing.
  */
 export interface Criterion {
   id: string;
@@ -232,6 +233,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'QL-18',
     statement:
       'Embeddings are a port beside the LLM client chosen from the environment — no OPENAI_API_KEY yields a disabled client that carries its reason, the memory tier being optional — reached over an injectable transport that batches, retries a rate limit once and refuses a vector of the wrong length.',
+  },
+  {
+    id: 'QL-19',
+    statement:
+      'An orchestrator is data over registered pipelines: a step runs only a registered pipeline its declaration names — an unregistered choice skips the step, naming it — and keeps every child it opens; calibration runs one goal samples times and second opinion judges a first artifact again, judge-only, each through a panel that counts and leaves out a failed sample; the router offers every brief-taking pipeline as a route, runs the one its classifier chose from a schema locked to them, refuses a named pipeline and fails a brief it cannot place; and a reconcile reports where two or more runs disagree — decisions, gates, score spreads, finding types — without judging it.',
   },
   {
     id: 'QL-20',
