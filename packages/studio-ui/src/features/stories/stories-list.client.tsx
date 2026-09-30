@@ -11,12 +11,11 @@ import {
   Text,
   TextField,
 } from '@sysdesign/design-system';
-import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import { toErrorMessage, useDebouncedValue, useLatestRequest } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { api } from '../../api/client';
-import { useDebouncedValue } from '../../hooks/use-debounced-value';
 
 const FilterRow = styled.div`
   display: flex;
