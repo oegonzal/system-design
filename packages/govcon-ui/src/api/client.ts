@@ -1,5 +1,4 @@
 import type {
-  Award,
   AwardsQuery,
   AwardsSummary,
   Bid,
@@ -61,9 +60,6 @@ export const api = {
   // Profiles and their saved searches.
   async listProfiles(opts: GetOptions = {}): Promise<StoredProfile[]> {
     return unwrap(await request<ListProfilesResponse>('/profiles', opts));
-  },
-  async getProfile(id: string, opts: GetOptions = {}): Promise<StoredProfile> {
-    return unwrap(await request<GetProfileResponse>(`/profiles/${encode(id)}`, opts));
   },
   async createProfile(document: SearchProfile): Promise<StoredProfile> {
     return unwrap(
@@ -198,9 +194,6 @@ export const api = {
   },
 
   // Registrants.
-  async getEntity(uei: string, opts: GetOptions = {}): Promise<Entity | null> {
-    return unwrap(await request<GetEntityResponse>(`/entities/${encode(uei)}`, opts));
-  },
   async getOwnEntity(profile?: string, opts: GetOptions = {}): Promise<Entity | null> {
     return unwrap(
       await request<GetEntityResponse>(`/entities/own${toQueryString({ profile })}`, opts),
@@ -212,6 +205,3 @@ export const api = {
     );
   },
 };
-
-export type Api = typeof api;
-export type { Award, Entity };

@@ -14,12 +14,6 @@
 // consumed only by `ThemeRoot`. `theme/contrast` is likewise absent — it is a
 // QA utility for the specs and the Colors story, not part of the public
 // surface.
-export type { IntentPair, SpaceIndex } from './theme/tokens';
-export type { SemanticColors } from './theme/semantic';
-
-/** The animation vocabulary components compose with; the scale is theme-internal. */
-export { fadeInUp, pop, shimmer, slideInUp, slideInDown, spin } from './theme/motion';
-export type { MotionTokens } from './theme/motion';
 
 /*
  * `export *`, and it must stay that way: `theme/theme` carries the

@@ -49,23 +49,6 @@ export const rangeLabel = (offset: number, count: number, total: number): string
 export const daysLeftLabel = (days: number | null): string =>
   days === null ? DASH : days < 0 ? `${-days} day(s) ago` : days === 0 ? 'today' : `${days} day(s)`;
 
-/** The file name at the end of an attachment URL's path, decoded; the URL itself when the path has none. */
-export const attachmentName = (url: string): string => {
-  let pathname: string;
-  try {
-    pathname = new URL(url).pathname;
-  } catch {
-    pathname = url.split('?')[0] ?? url;
-  }
-  const last = pathname.split('/').filter(Boolean).pop();
-  if (!last) return url;
-  try {
-    return decodeURIComponent(last);
-  } catch {
-    return last;
-  }
-};
-
 /** The pull's budget line, as the CLI prints it and the client shows it. */
 export function summarizePull(report: PullReport): string {
   const stored = report.slices.reduce((total, slice) => total + slice.inserted + slice.updated, 0);

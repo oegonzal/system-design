@@ -18,11 +18,8 @@ import {
   validators,
 } from './gates';
 
-export type { Gate, Route, Settled, Verdict, ControllerParts } from './compose';
-export { composeController, SCORES_FACTOR } from './compose';
-export type { GateContext, Scored } from './context';
-export { buildContext } from './context';
-export { dimensionFloor, DIMENSION_FLOOR_FACTOR } from './dimension-floor';
+export type { Gate, Route } from './compose';
+export { composeController } from './compose';
 export {
   acceptThreshold,
   artifact,
@@ -30,7 +27,6 @@ export {
   evidence,
   policyAllowed,
   rejectFloor,
-  settleByRemediations,
   validators,
 } from './gates';
 

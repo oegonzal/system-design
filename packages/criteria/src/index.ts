@@ -443,5 +443,3 @@ export const CRITERIA: readonly Criterion[] = [
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',
   },
 ] as const;
-
-export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

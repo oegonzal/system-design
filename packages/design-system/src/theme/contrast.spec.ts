@@ -97,10 +97,6 @@ const TEXT_PAIRS: readonly (readonly [ColorPath, ColorPath])[] = [
     ['bg', 'selected'],
   ],
   [
-    ['text', 'inverse'],
-    ['bg', 'inverse'],
-  ],
-  [
     ['accent', 'fg'],
     ['accent', 'default'],
   ],
@@ -188,8 +184,6 @@ const UI_PAIRS: readonly (readonly [ColorPath, ColorPath])[] = [
  *   are the accent ramp's solid. The focus ring clears contrast only because
  *   `theme/global.ts` gives it `outline-offset: 2px`, placing it on the page
  *   background.
- * - Anything involving `border.none`, which is `transparent`. The parser
- *   throws on it by design.
  */
 
 describe.each(COLOR_MODES)('%s mode', (colorMode) => {

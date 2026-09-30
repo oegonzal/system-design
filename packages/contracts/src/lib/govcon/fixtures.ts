@@ -1,5 +1,5 @@
 import type { Award, AwardsSummary } from './award';
-import type { Bid, PipelineRow, BidPipelineSummary } from './bid';
+import type { Bid, BidPipelineSummary } from './bid';
 import type { Entity } from './entity';
 import type { Lead, LeadsReport } from './lead';
 import type { NoticeDto } from './notice';
@@ -255,12 +255,6 @@ export const bidOf = (overrides: Partial<Bid> = {}): Bid => ({
   stageChangedAt: '2026-09-27T03:00:00.000Z',
   createdAt: '2026-09-27T03:00:00.000Z',
   updatedAt: '2026-09-27T03:00:00.000Z',
-  ...overrides,
-});
-
-export const pipelineRowOf = (overrides: Partial<PipelineRow> = {}): PipelineRow => ({
-  bid: bidOf(),
-  lead: leadOf(),
   ...overrides,
 });
 

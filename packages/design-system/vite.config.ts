@@ -29,8 +29,7 @@ export default defineConfig({
     watch: false,
     globals: true,
     environment: 'jsdom',
-    // jsdom lacks matchMedia, ResizeObserver and scrollIntoView; see the file
-    // for why the matchMedia stub is controllable rather than a constant.
+    // jsdom lacks matchMedia, ResizeObserver and scrollIntoView; the file stubs them.
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     reporters: ['default'],

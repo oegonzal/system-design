@@ -29,7 +29,6 @@ export const SET_ASIDE_CODES = [
   'VSA',
   'VSS',
 ] as const;
-export type SetAsideCode = (typeof SET_ASIDE_CODES)[number];
 
 /** `ptype` request codes and the notice-type label each stands for. */
 export const NOTICE_TYPES = {

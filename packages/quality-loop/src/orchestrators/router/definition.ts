@@ -5,7 +5,11 @@
  * fifth judge is a route the day it is registered. The classifier's answer
  * is evidence; the runner's declared-pipeline check is what dispatches.
  */
-import { ROUTER_ORCHESTRATOR_ID, ROUTER_STEP_REASONS } from '@sysdesign/contracts';
+import {
+  ROUTER_ORCHESTRATOR_ID,
+  ROUTER_STEP_REASONS,
+  type RouterContextDto,
+} from '@sysdesign/contracts';
 
 import { bareRequest } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
@@ -20,7 +24,7 @@ export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {
   takesTarget: false,
   reasons: ROUTER_STEP_REASONS,
   normalize: bareRequest,
-  context: (ports) => Promise.resolve({ classifier: ports.model }),
+  context: (ports) => Promise.resolve({ classifier: ports.model } satisfies RouterContextDto),
   steps: [
     { id: 'classify', run: classify },
     {

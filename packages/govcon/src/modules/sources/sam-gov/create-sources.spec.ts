@@ -4,14 +4,13 @@ import {
   DEFAULT_CACHE_TTL_HOURS,
   DEFAULT_DAILY_BUDGET,
   DEFAULT_PULL_DEADLINE_SECONDS,
-  samGovAvailabilityFromEnv,
   samGovCredentialsFromEnv,
 } from './create-sources';
 import { SAM_GOV_AWARDS_URL, SamGovAwards } from './awards';
 import { SAM_GOV_DESCRIPTION_URL, SamGovDescriptions } from './descriptions';
 import { DisabledDescriptions, DisabledSearch } from './disabled';
 import { SAM_GOV_ENTITIES_URL, SamGovEntities } from './entities';
-import { SAM_GOV_ALPHA_SEARCH_URL, SAM_GOV_SEARCH_URL, SamGovSearch } from './search';
+import { SAM_GOV_SEARCH_URL, SamGovSearch } from './search';
 
 describe('the SAM.gov environment factory', () => {
   it('[GOV-7] is the only reader of the key, and yields disabled sources that explain themselves without one', async () => {
@@ -19,11 +18,8 @@ describe('the SAM.gov environment factory', () => {
     expect(search).toBeInstanceOf(DisabledSearch);
     expect(descriptions).toBeInstanceOf(DisabledDescriptions);
     expect(search.availability).toEqual({ enabled: false, reason: 'no-key' });
-    expect(samGovAvailabilityFromEnv({ SAM_GOV_API_KEY: '   ' })).toEqual({
-      enabled: false,
-      reason: 'no-key',
-    });
     expect(samGovCredentialsFromEnv({})).toBeNull();
+    expect(samGovCredentialsFromEnv({ SAM_GOV_API_KEY: '   ' })).toBeNull();
     const { attempts, result } = await search.search({
       postedFrom: '2026-01-01',
       postedTo: '2026-01-02',
@@ -42,10 +38,6 @@ describe('the SAM.gov environment factory', () => {
     expect(live.descriptions).toBeInstanceOf(SamGovDescriptions);
     expect(live.awards).toBeInstanceOf(SamGovAwards);
     expect(live.entities).toBeInstanceOf(SamGovEntities);
-    expect(samGovAvailabilityFromEnv({ SAM_GOV_API_KEY: 'k' })).toEqual({
-      enabled: true,
-      reason: null,
-    });
     expect(samGovCredentialsFromEnv({ SAM_GOV_API_KEY: 'k' })).toEqual({
       apiKey: 'k',
       searchUrl: SAM_GOV_SEARCH_URL,
@@ -56,12 +48,12 @@ describe('the SAM.gov environment factory', () => {
     expect(
       samGovCredentialsFromEnv({
         SAM_GOV_API_KEY: 'k',
-        SAM_GOV_BASE_URL: SAM_GOV_ALPHA_SEARCH_URL,
+        SAM_GOV_BASE_URL: 'https://api-alpha.sam.gov/opportunities/v2/search',
         SAM_GOV_DESCRIPTION_URL: 'https://api-alpha.sam.gov/prod/opportunities/v1/noticedesc',
       }),
     ).toEqual({
       apiKey: 'k',
-      searchUrl: SAM_GOV_ALPHA_SEARCH_URL,
+      searchUrl: 'https://api-alpha.sam.gov/opportunities/v2/search',
       descriptionUrl: 'https://api-alpha.sam.gov/prod/opportunities/v1/noticedesc',
       awardsUrl: SAM_GOV_AWARDS_URL,
       entitiesUrl: SAM_GOV_ENTITIES_URL,

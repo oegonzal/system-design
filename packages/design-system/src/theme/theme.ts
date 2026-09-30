@@ -25,7 +25,6 @@ export interface FontTokens {
 }
 
 export interface MediaQueries {
-  sm: string;
   md: string;
   lg: string;
   /**
@@ -60,7 +59,6 @@ export interface AppTheme {
   shadow: ShadowScale;
   font: FontTokens;
   zIndex: typeof zIndex;
-  breakpoint: typeof breakpoint;
   media: MediaQueries;
 }
 
@@ -76,9 +74,7 @@ export function createTheme(settings: AppearanceSettings): AppTheme {
     shadow: SHADOWS[colorMode],
     font: { family: fontFamily, size: fontSize, weight: fontWeight, lineHeight },
     zIndex,
-    breakpoint,
     media: {
-      sm: `@media (min-width: ${breakpoint.sm})`,
       md: `@media (min-width: ${breakpoint.md})`,
       lg: `@media (min-width: ${breakpoint.lg})`,
       reducedMotion: '@media (prefers-reduced-motion: reduce)',

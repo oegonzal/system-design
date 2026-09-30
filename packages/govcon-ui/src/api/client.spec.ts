@@ -103,7 +103,6 @@ describe('govcon api client', () => {
         body: { data: { slices: [], spent: 1, budget: 1000 } },
       },
       { path: '/entities/own', body: { data: ENTITY } },
-      { path: '/entities/ABC123DEF456', body: { data: ENTITY } },
       {
         method: 'POST',
         path: '/entities/lookup',
@@ -138,7 +137,6 @@ describe('govcon api client', () => {
       ).spent,
     ).toBe(1);
     expect(await api.getOwnEntity('enfav')).toEqual(ENTITY);
-    expect(await api.getEntity('ABC123DEF456')).toEqual(ENTITY);
     expect((await api.lookupEntities({ ueis: ['ABC123DEF456'] })).entities).toEqual([ENTITY]);
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
@@ -160,7 +158,6 @@ describe('govcon api client', () => {
       'GET /awards/summary?naics=332710',
       'POST /awards/fetch',
       'GET /entities/own?profile=enfav',
-      'GET /entities/ABC123DEF456',
       'POST /entities/lookup',
     ]);
     const saved = fetchMock.mock.calls.find(

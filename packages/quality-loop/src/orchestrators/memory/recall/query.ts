@@ -6,7 +6,6 @@
 import { capText } from '@sysdesign/run-dump';
 
 import {
-  alias,
   MAX_CANDIDATES,
   MAX_KEPT,
   memoryQuerySchema,
@@ -85,5 +84,3 @@ export function buildQuery(
     })),
   });
 }
-
-export { alias };

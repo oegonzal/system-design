@@ -104,9 +104,6 @@ export const documentOf = ({
   ...document
 }: StoredProfile): SearchProfile => document;
 
-/** `POST /profiles` and `PUT /profiles/:id` take the whole document; the service validates it. */
-export type SaveProfileRequest = SearchProfile;
-
 export type ListProfilesResponse = ApiResponse<StoredProfile[]>;
 export type GetProfileResponse = ApiResponse<StoredProfile>;
 export type SaveProfileResponse = ApiResponse<StoredProfile>;

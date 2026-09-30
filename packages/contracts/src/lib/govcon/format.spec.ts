@@ -1,6 +1,5 @@
 import {
   agencyOf,
-  attachmentName,
   clip,
   day,
   daysLeftLabel,
@@ -46,18 +45,6 @@ describe('govcon formatting', () => {
     expect(rangeLabel(20, 4, 24)).toBe('21–24 of 24');
     expect(rangeLabel(0, 0, 0)).toBe('0 of 0');
     expect([null, -2, 0, 5].map(daysLeftLabel)).toEqual(['—', '2 day(s) ago', 'today', '5 day(s)']);
-  });
-
-  it('names an attachment by the last path segment, decoded', () => {
-    expect(
-      attachmentName(
-        'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/abc/download?api_key=x',
-      ),
-    ).toBe('download');
-    expect(attachmentName('https://x.gov/files/Drawing%2012345678.pdf')).toBe(
-      'Drawing 12345678.pdf',
-    );
-    expect(attachmentName('https://x.gov/')).toBe('https://x.gov/');
   });
 
   it('summarizes a pull the way the CLI and the client both print it', () => {

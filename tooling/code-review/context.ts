@@ -43,8 +43,6 @@ const IGNORED = [
 
 const notIgnored = (file: string): boolean => !IGNORED.some((pattern) => pattern.test(file));
 
-export const isReviewable = (file: string): boolean => REVIEWABLE.test(file) && notIgnored(file);
-
 /**
  * NUL-delimited, because `--name-only` alone makes git *quote* any path holding
  * non-ASCII bytes. `-z` disables the quoting entirely.

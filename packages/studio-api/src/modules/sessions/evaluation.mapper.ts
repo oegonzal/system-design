@@ -1,7 +1,6 @@
 import {
   submissionLocations,
   type ConfirmedFinding,
-  type CriterionResultDto,
   type CriticReport,
   type DesignSubmission,
   type EvaluationDto,
@@ -137,6 +136,3 @@ function firstRationale(
   }
   return null;
 }
-
-/** A criterion result's projection alone, for callers that already hold the iteration. */
-export type { CriterionResultDto };

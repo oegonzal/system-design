@@ -111,44 +111,19 @@ export function createMotion(level: MotionLevel): MotionTokens {
 /**
  * Shared keyframes.
  *
- * Interpolate these (``animation: ${fadeInUp} …``), never stringify them: a
+ * Interpolate these (``animation: ${spin} …``), never stringify them: a
  * stringified `Keyframes` skips Emotion's registration step and the animation
  * silently does nothing.
  *
- * The translating ones read `var(--motion-distance)` rather than taking a
- * parameter, so the motion level reaches them through the same channel as the
+ * A keyframe that translates reads `var(--motion-distance)` rather than taking
+ * a parameter, so the motion level reaches it through the same channel as the
  * durations.
  */
-
-/** List entry — a finding arriving in the evaluation panel. Stagger with `animation-delay`, capped. */
-export const fadeInUp = keyframes`
-  from { opacity: 0; transform: translateY(var(--motion-distance, 12px)); }
-  to   { opacity: 1; transform: none; }
-`;
-
-/** Selection feedback — a node dropped on the canvas, a score chip updating. */
-export const pop = keyframes`
-  0%   { transform: scale(1); }
-  45%  { transform: scale(1.05); }
-  100% { transform: scale(1); }
-`;
 
 /** Skeleton placeholder. Infinite — see the reduced-motion note in `global.ts`. */
 export const shimmer = keyframes`
   from { background-position: 200% 0; }
   to   { background-position: -200% 0; }
-`;
-
-/** A bottom panel arriving — the evaluation drawer. */
-export const slideInUp = keyframes`
-  from { opacity: 0; transform: translateY(calc(var(--motion-distance, 12px) * 1.5)); }
-  to   { opacity: 1; transform: none; }
-`;
-
-/** A dropdown or palette flyout opening. */
-export const slideInDown = keyframes`
-  from { opacity: 0; transform: translateY(calc(var(--motion-distance, 12px) * -0.5)); }
-  to   { opacity: 1; transform: none; }
 `;
 
 /** Spinner. Infinite, and stopped rather than sped up under reduced motion. */

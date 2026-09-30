@@ -18,10 +18,7 @@ import { fakeStepContext } from '../runner/testing';
 import { CachedEmbeddings } from './embeddings';
 import type { MemoryPorts, QueryProbes } from './ports';
 import type { MemoryOutputs } from './steps';
-import { GOAL, hitOf } from './testing';
-
-/** The accept bar both memory pipelines declare; the steps read it off the summary. */
-export const ACCEPT_AT = 75;
+import { ACCEPT_AT, GOAL, hitOf } from './testing';
 
 export const sampleHits = [
   hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),

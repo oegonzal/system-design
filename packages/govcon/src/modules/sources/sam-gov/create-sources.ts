@@ -1,5 +1,3 @@
-import type { SourceAvailability } from '@sysdesign/contracts';
-
 import type { BudgetPolicy } from '../../../core/budget';
 import type {
   ContractAwards,
@@ -73,14 +71,6 @@ export function budgetPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): Budge
     },
   };
 }
-
-/** Derived facts only — never the key. */
-export const samGovAvailabilityFromEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): SourceAvailability =>
-  samGovCredentialsFromEnv(env) === null
-    ? { enabled: false, reason: 'no-key' }
-    : { enabled: true, reason: null };
 
 export interface SamGovSources {
   search: OpportunitySearch;

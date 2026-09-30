@@ -1,7 +1,7 @@
 import { AttemptedHttp, type AttemptedHttpOptions } from '../http';
 
-export { issuesOf, RETRY_POLICY, REQUEST_TIMEOUT_MS } from '../http';
-export type { Sleep, Transport as SamGovTransport } from '../http';
+export { issuesOf, RETRY_POLICY } from '../http';
+export type { Sleep } from '../http';
 
 export const SAM_GOV_SOURCE_ID = 'sam.gov';
 

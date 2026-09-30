@@ -62,7 +62,6 @@ export const samEnvelopeSchema = z.looseObject({
   /** Records stay unknown here: each is parsed on its own by the normalizer. */
   opportunitiesData: z.array(z.unknown()).nullish(),
 });
-export type SamEnvelope = z.infer<typeof samEnvelopeSchema>;
 
 /** `noticedesc`: the description as the provider formats it — HTML in practice. */
 export const samDescriptionSchema = z.looseObject({ description: z.string() });

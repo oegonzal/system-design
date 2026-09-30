@@ -55,7 +55,7 @@ import type {
   StoredDescription,
   UpsertSummary,
 } from './ports';
-import { NO_HISTORY, type ScoringContext } from './scoring';
+import type { HistoryIndex, ScoringContext } from './scoring';
 import type { OpportunityQuery } from './query';
 
 export { opportunityOf } from '@sysdesign/contracts';
@@ -80,6 +80,9 @@ export function must<T>(value: T | null | undefined | 'conflict'): T {
 
 /** The fixed instant the fakes stamp attempts with. */
 export const T0 = new Date('2026-09-26T12:00:00.000Z');
+
+/** No stored awards — the context of a ranking before any award was fetched. */
+const NO_HISTORY: HistoryIndex = { countFor: () => ({ same: 0, agency: 0 }) };
 
 /** A scoring context at `T0` with no stored awards. */
 export const contextAt = (nowMs = T0.getTime()): ScoringContext => ({ nowMs, history: NO_HISTORY });

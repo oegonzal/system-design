@@ -198,13 +198,11 @@ export const bindingDraftSchema = bindingSchema.extend({
   nodeIds: z.array(canvasId).max(BINDING_MAX_NODES),
   claim: z.string().max(BINDING_CLAIM_MAX_LENGTH),
 });
-export type BindingDraft = z.infer<typeof bindingDraftSchema>;
 
 export const designBriefDraftSchema = z.strictObject({
   version: z.literal(DESIGN_BRIEF_VERSION),
   bindings: z.array(bindingDraftSchema).max(BRIEF_MAX_BINDINGS),
 });
-export type DesignBriefDraft = z.infer<typeof designBriefDraftSchema>;
 
 /** The unsubmitted canvas, as `PUT /sessions/:id/draft` stores it and the workspace restores it. */
 export const sessionDraftSchema = z.strictObject({

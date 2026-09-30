@@ -6,9 +6,8 @@ import { issuesOf, SAM_GOV_SOURCE_ID, type SamGovHttp } from './http';
 import { normalizePage } from './normalize';
 import { samEnvelopeSchema } from './schemas';
 
-/** The Contract Opportunities search; the alpha environment answers a prodlike key for testing. */
+/** The Contract Opportunities search; `SAM_GOV_BASE_URL` points it at the alpha environment for testing. */
 export const SAM_GOV_SEARCH_URL = 'https://api.sam.gov/opportunities/v2/search';
-export const SAM_GOV_ALPHA_SEARCH_URL = 'https://api-alpha.sam.gov/opportunities/v2/search';
 
 /** `2026-09-20` → `09/20/2026`, the only date spelling the API accepts. */
 export const toSamDate = (iso: string): string => {

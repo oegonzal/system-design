@@ -58,7 +58,6 @@ export function criteriaSchema(kinds: EnumTuple, maxCriteria: number) {
       .describe('Every distinct requirement the goal states, most important first.'),
   });
 }
-export type CriteriaResponse = z.infer<ReturnType<typeof criteriaSchema>>;
 
 export function findingsSchema(
   findingTypes: EnumTuple,
@@ -103,7 +102,6 @@ export function findingsSchema(
       .describe('Distinct defects only, worst first. Never restate a known validation problem.'),
   });
 }
-export type FindingsResponse = z.infer<ReturnType<typeof findingsSchema>>;
 
 export function evaluationSchema(
   criterionIds: EnumTuple,
@@ -137,4 +135,3 @@ export function evaluationSchema(
       .describe('Your overall recommendation. Advisory only: the policy decides.'),
   });
 }
-export type EvaluationResponse = z.infer<ReturnType<typeof evaluationSchema>>;

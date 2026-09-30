@@ -1,4 +1,4 @@
-import { canonicalQuery, descriptionKey, nextPage, queryKey, type OpportunityQuery } from './query';
+import { callKey, canonicalQuery, nextPage, type OpportunityQuery } from './query';
 
 const base: OpportunityQuery = {
   postedFrom: '2026-09-20',
@@ -18,9 +18,9 @@ describe('the query key', () => {
       postedFrom: '2026-09-20',
     };
     const withUndefined = { ...base, psc: undefined };
-    expect(queryKey('sam.gov', reordered)).toBe(queryKey('sam.gov', base));
-    expect(queryKey('sam.gov', withUndefined)).toBe(queryKey('sam.gov', base));
-    expect(queryKey('sam.gov', base)).toMatch(/^[0-9a-f]{64}$/);
+    expect(callKey('sam.gov', 'search', reordered)).toBe(callKey('sam.gov', 'search', base));
+    expect(callKey('sam.gov', 'search', withUndefined)).toBe(callKey('sam.gov', 'search', base));
+    expect(callKey('sam.gov', 'search', base)).toMatch(/^[0-9a-f]{64}$/);
     expect(Object.keys(canonicalQuery(withUndefined))).toEqual([
       'limit',
       'naics',
@@ -31,20 +31,19 @@ describe('the query key', () => {
   });
 
   it('[GOV-9] keys a description call in its own namespace, so it can never read as a fresh search', () => {
-    expect(descriptionKey('sam.gov', 'n-1')).toMatch(/^[0-9a-f]{64}$/);
-    expect(descriptionKey('sam.gov', 'n-1')).toBe(descriptionKey('sam.gov', 'n-1'));
-    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(descriptionKey('sam.gov', 'n-2'));
-    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(descriptionKey('other', 'n-1'));
-    expect(descriptionKey('sam.gov', 'n-1')).not.toBe(
-      queryKey('sam.gov', { ...base, noticeId: 'n-1' }),
-    );
+    const key = callKey('sam.gov', 'description', { noticeId: 'n-1' });
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(callKey('sam.gov', 'description', { noticeId: 'n-1' })).toBe(key);
+    expect(callKey('sam.gov', 'description', { noticeId: 'n-2' })).not.toBe(key);
+    expect(callKey('other', 'description', { noticeId: 'n-1' })).not.toBe(key);
+    expect(callKey('sam.gov', 'search', { ...base, noticeId: 'n-1' })).not.toBe(key);
   });
 
   it('differs by source, by filter and by page', () => {
-    const key = queryKey('sam.gov', base);
-    expect(queryKey('other', base)).not.toBe(key);
-    expect(queryKey('sam.gov', { ...base, naics: '541511' })).not.toBe(key);
-    expect(queryKey('sam.gov', nextPage(base))).not.toBe(key);
+    const key = callKey('sam.gov', 'search', base);
+    expect(callKey('other', 'search', base)).not.toBe(key);
+    expect(callKey('sam.gov', 'search', { ...base, naics: '541511' })).not.toBe(key);
+    expect(callKey('sam.gov', 'search', nextPage(base))).not.toBe(key);
     expect(nextPage(base).offset).toBe(1000);
   });
 });

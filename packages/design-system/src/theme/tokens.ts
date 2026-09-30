@@ -21,7 +21,6 @@ import type { ColorMode, Severity } from '@sysdesign/contracts';
  */
 export const palette = {
   white: '#ffffff',
-  transparent: 'transparent',
 
   neutral: {
     50: '#f3f6fa', // light app background
@@ -61,11 +60,9 @@ export interface NeutralRoles {
   appBg: string;
   surfaceBg: string;
   subtleBg: string;
-  inverseBg: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
-  textInverse: string;
   borderSubtle: string;
   borderDefault: string;
   disabledFill: string;
@@ -76,11 +73,9 @@ export const MODE_NEUTRALS = {
     appBg: palette.neutral[50],
     surfaceBg: palette.white,
     subtleBg: palette.neutral[100],
-    inverseBg: palette.neutral[900],
     textPrimary: palette.neutral[900],
     textSecondary: palette.neutral[700],
     textMuted: palette.neutral[600],
-    textInverse: palette.white,
     borderSubtle: palette.neutral[200],
     borderDefault: palette.neutral[500],
     disabledFill: palette.neutral[400],
@@ -89,11 +84,9 @@ export const MODE_NEUTRALS = {
     appBg: palette.ink[900],
     surfaceBg: palette.ink[800],
     subtleBg: palette.ink[700],
-    inverseBg: palette.ink[50],
     textPrimary: palette.ink[50],
     textSecondary: palette.ink[100],
     textMuted: palette.ink[200],
-    textInverse: palette.ink[900],
     borderSubtle: palette.ink[600],
     borderDefault: palette.ink[300],
     disabledFill: palette.ink[400],

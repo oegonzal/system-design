@@ -23,8 +23,6 @@ import {
   type QualityLoopHealth,
 } from '../modules/quality-loop/quality-loop.client';
 
-export { criteriaFromMarkdown, type FakeIteration } from '@sysdesign/studio-testing';
-
 /**
  * The quality loop as the studio's specs see it: `@sysdesign/studio-testing`'s
  * fake loop behind the client port. Runs start `running` and finish when the

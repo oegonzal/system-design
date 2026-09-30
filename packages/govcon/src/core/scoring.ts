@@ -45,9 +45,6 @@ export interface ScoringContext {
   history: HistoryIndex;
 }
 
-/** No stored awards — the context of a ranking before any award was fetched. */
-export const NO_HISTORY: HistoryIndex = { countFor: () => ({ same: 0, agency: 0 }) };
-
 export interface Factor {
   assess(
     opportunity: Opportunity,

@@ -33,14 +33,11 @@ export interface SemanticColors {
     surface: string;
     subtle: string;
     selected: string;
-    inverse: string;
   };
   text: {
     primary: string;
     secondary: string;
     muted: string;
-    inverse: string;
-    onAccent: string;
     onSelected: string;
   };
   border: {
@@ -48,7 +45,6 @@ export interface SemanticColors {
     default: string;
     accent: string;
     focus: string;
-    none: string;
   };
   accent: {
     default: string;
@@ -154,15 +150,12 @@ export function createSemanticColors({ mode, accent }: SemanticColorInput): Sema
       surface: neutral.surfaceBg,
       subtle: neutral.subtleBg,
       selected: ramp.tint,
-      inverse: neutral.inverseBg,
     },
 
     text: {
       primary: neutral.textPrimary,
       secondary: neutral.textSecondary,
       muted: neutral.textMuted,
-      inverse: neutral.textInverse,
-      onAccent: ramp.onSolid,
       // Secondary text on a selection tint. `text.muted` clears 4.5:1 there
       // too, but only just; this role exists so a component that needs
       // headroom has somewhere legitimate to go.
@@ -174,7 +167,6 @@ export function createSemanticColors({ mode, accent }: SemanticColorInput): Sema
       default: neutral.borderDefault,
       accent: ramp.solid,
       focus: ramp.ring,
-      none: palette.transparent,
     },
 
     accent: {

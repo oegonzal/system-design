@@ -23,7 +23,6 @@
  * studio can tell the two apart.
  */
 import {
-  CANVAS_CRITERION_KINDS,
   CANVAS_MAX_CRITERIA,
   CANVAS_PIPELINE_ID,
   type CanvasCriterionKind,

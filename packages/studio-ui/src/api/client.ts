@@ -28,7 +28,6 @@ import type {
   StartImproveRequest,
   SubmitRevisionRequest,
   UpdatePromptRequest,
-  UpdateSessionRequest,
 } from '@sysdesign/contracts';
 import { createRequest, query, unwrap, type GetOptions } from '@sysdesign/web-kit';
 
@@ -56,10 +55,6 @@ export const api = {
   // Experiences ------------------------------------------------------------
   async listExperiences(opts: GetOptions = {}): Promise<ApiListResponse<ExperienceProfileDto>> {
     return request<ApiListResponse<ExperienceProfileDto>>('/experiences', opts);
-  },
-
-  async getExperience(id: string, opts: GetOptions = {}): Promise<ExperienceProfileDto> {
-    return unwrap(await request<ApiResponse<ExperienceProfileDto>>(`/experiences/${id}`, opts));
   },
 
   // Prompts ----------------------------------------------------------------
@@ -151,15 +146,6 @@ export const api = {
 
   async getSession(id: string, opts: GetOptions = {}): Promise<DesignSessionDto> {
     return unwrap(await request<ApiResponse<DesignSessionDto>>(`/sessions/${id}`, opts));
-  },
-
-  async updateSession(id: string, body: UpdateSessionRequest): Promise<DesignSessionDto> {
-    return unwrap(
-      await request<ApiResponse<DesignSessionDto>>(`/sessions/${id}`, {
-        method: 'PATCH',
-        body,
-      }),
-    );
   },
 
   /** Keeps the unsubmitted canvas with the session (204); shape-checked only, cleared by a submit. */
