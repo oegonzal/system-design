@@ -1,17 +1,17 @@
 # govcon
 
-SAM.gov contract opportunities for one company, from the command line: pull the profile's slices inside a daily request budget, store them in Postgres, rank what is stored against a declarative profile, and print the leads. No HTTP surface.
+SAM.gov contract opportunities for one company, as a NestJS service with a command line and an HTTP surface: pull the profile's saved searches inside a daily request budget, store what normalizes in Postgres, rank the store against a declarative profile, keep bids per notice, and read the awards and registrants the same key reaches.
 
 ```bash
-pnpm govcon search --days 3          # pull, then rank — the daily routine (8 requests with the shipped profile)
-pnpm govcon pull --days 3            # pull only; a slice pulled inside the cache window costs nothing
-pnpm govcon leads --min-score 40     # rank what is stored; no request is ever made
-pnpm govcon show <noticeId>          # one notice with its factor trace
-pnpm exec nx test govcon             # DB_PORT=5433 for the Postgres specs
+pnpm govcon search --days 3                 # pull, then rank — the daily routine (8 requests with the shipped searches)
+pnpm govcon leads --min-score 40            # rank what is stored; no request is ever made
+pnpm govcon show <noticeId> --description   # one notice with its trace; the text costs one request once
+pnpm govcon awards fetch --naics 332710 --from 2026-06-01 --to 2026-09-29
+pnpm govcon entities lookup <uei>
+pnpm govcon:serve                           # the HTTP surface on :3004 for packages/govcon-ui
+DB_PORT=5433 pnpm exec nx test govcon       # the pure suites in parallel, the Postgres suites in one lane
 ```
 
-Layout: `src/core` (pure — ports, the budgeted source, the profile schema, the pull plan, scoring), `src/profiles` (one file per company; `enfav.ts` ships), `src/modules/opportunities` (Nest wiring, the SAM.gov adapter, the MikroORM adapters), `src/cli.ts` + `src/render.ts` (the command line).
+Layout: `src/core` (pure — the budget gate, the ports, the profile schema, the pull plan and run, the candidate filter, scoring, award intel), `src/modules/sources` (SAM.gov and USAspending adapters over one attempt-reporting transport, the ledger), `src/modules/{profiles,pulls,opportunities,bids,awards,entities}` (one concern each), `src/profiles/enfav.ts` (the seed), `src/cli.ts` + `src/render.ts`.
 
-How it works, the environment variables, the budget semantics and the live sequence: [docs/govcon/overview.md](../../docs/govcon/overview.md). Tables live in `packages/db` (`govcon_opportunity`, `govcon_source_call`); `pnpm stack:db` then `DB_PORT=5433 pnpm db:migrate` before the first pull.
-
-The same service over HTTP for the web client: `pnpm govcon:serve` (`:3004`; `GET /health`, `GET /profiles`, `GET /source`, `GET /source/calls`, `POST /pulls`, `GET /leads`, `GET /opportunities/:noticeId`, `POST /opportunities/:noticeId/description`). Every wire type is in `@sysdesign/contracts` under `lib/govcon`.
+How it works, every route, the environment and the budget semantics: [docs/govcon/overview.md](../../docs/govcon/overview.md). Tables live in `packages/db`; `pnpm stack:db` then `DB_PORT=5433 pnpm db:migrate` before the first pull. Every wire type is in `@sysdesign/contracts` under `lib/govcon`.

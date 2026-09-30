@@ -46,10 +46,13 @@ anything the map already generates is deliberately absent, because a second copy
 - `quality-loop-ui` — the Next.js client for the quality loop: pick a prompt from the library, run a
   pipeline, watch the exchanges, read the verdict. Renders the wire contract and nothing else.
 - `govcon` — SAM.gov contract opportunities for one company as a NestJS CLI and HTTP surface: a
-  pure core (ports, a budgeted source, a validated profile, a traced deterministic scorer), the
-  SAM.gov adapter, MikroORM adapters. The environment is read only at the edge.
-- `govcon-ui` — the Next.js client for govcon: pull inside the budget, rank the store, read a lead's
-  trace and description, watch the ledger. Renders the wire contract and nothing else.
+  pure core (one request gate every upstream call spends through, ports per capability, a validated
+  profile, a traced deterministic scorer, award intel), SAM.gov and USAspending adapters over one
+  attempt-reporting transport, MikroORM adapters, one module per concern. The environment is read
+  only at the edge.
+- `govcon-ui` — the Next.js client for govcon: six routes under one shell — pull, search and save
+  searches, track bids, read a notice with its awards, fetch intel, edit profiles. Renders the wire
+  contract and nothing else; every button that spends a request says so.
 - `storybook` — the catalog host. It owns no stories; it globs the four projects that do.
 - `studio-e2e` — Playwright, driving a real browser against the real API.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it
@@ -87,7 +90,7 @@ inventing something; code that breaks one is a finding.
 - **`contracts` and `design-system` are consumed as TypeScript source** through `tsconfig.base.json`
   path aliases and inlined by each app's build. The absent build step is the design, not an
   omission.
-- **Migrations are hand-written, one table per file**, so every DDL statement is reviewable;
+- **Migrations are hand-written, one concern per file** (a table, or the alters one change needs), so every DDL statement is reviewable;
   `migration:check` proves the entities and the schema still agree.
 
 ## What you are working from
