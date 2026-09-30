@@ -10,6 +10,7 @@ describe('the pipeline registry', () => {
       'agentic-design',
       'memory-recall',
       'experience-digest',
+      'system-design-canvas',
     ]);
     for (const definition of PIPELINES.values()) {
       expect(() => validatePipeline(definition)).not.toThrow();

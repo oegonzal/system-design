@@ -5,12 +5,14 @@
  * brief may be dispatched to. Each orchestrator names which of these it uses;
  * the runner applies none of them.
  */
-import type {
-  OrchestrationStepDto,
-  PipelineSummary,
-  QualityRunDto,
-  RouteDto,
-  StartOrchestrationRequest,
+import {
+  CANVAS_PIPELINE_ID,
+  PROMPT_PIPELINE_ID,
+  type OrchestrationStepDto,
+  type PipelineSummary,
+  type QualityRunDto,
+  type RouteDto,
+  type StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 
 import { outputsOf } from '../core/outputs';
@@ -21,15 +23,21 @@ import { MEMORY_RECALL_ID } from '../pipelines/memory-recall/input';
 import type { StepContext, StepResult } from './definition';
 
 /**
- * Pipelines that take a goal another step composed, never a brief. No
- * orchestrator accepts one as a target, and no router offers one as a route.
+ * Pipelines that take a goal another program composed — a memory step, or
+ * the studio — never a brief a person typed. No orchestrator accepts one as
+ * a target, and no router offers one as a route.
  */
-const INTERNAL_PIPELINES: readonly string[] = [MEMORY_RECALL_ID, EXPERIENCE_DIGEST_ID];
+const INTERNAL_PIPELINES: readonly string[] = [
+  MEMORY_RECALL_ID,
+  EXPERIENCE_DIGEST_ID,
+  CANVAS_PIPELINE_ID,
+  PROMPT_PIPELINE_ID,
+];
 
 /** The `refuse` of every orchestrator that takes a target: an internal pipeline is not one. */
 export const refuseInternal = (request: StartOrchestrationRequest): string | null =>
   request.pipeline !== undefined && INTERNAL_PIPELINES.includes(request.pipeline)
-    ? `${request.pipeline} is a memory pipeline, not a target`
+    ? `${request.pipeline} is not a target: it takes a composed goal, not a brief`
     : null;
 
 /**

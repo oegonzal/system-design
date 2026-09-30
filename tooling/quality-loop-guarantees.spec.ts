@@ -45,11 +45,12 @@ describe('quality-loop guarantees', () => {
   it('the normalizer, every controller and the reconcile never read prose, the goal or the advisory verdict', () => {
     const guarded = files.filter(
       (path) =>
-        /\/core\/(evidence\/normalize|outputs\/reconcile|controllers\/[^/]+)\.ts$/.test(path) &&
-        !path.endsWith('.spec.ts'),
+        /\/core\/(evidence\/normalize|outputs\/reconcile|loop\/rubric|controllers\/[^/]+)\.ts$/.test(
+          path,
+        ) && !path.endsWith('.spec.ts'),
     );
-    // the normaliser, the reconcile, then the controller library: context, composer, gates, floor, index
-    expect(guarded).toHaveLength(7);
+    // the normaliser, the reconcile, the rubric check, then the controller library: context, composer, gates, floor, index
+    expect(guarded).toHaveLength(8);
     const offenders = guarded.filter((path) =>
       /\bgoal\b|rationale|statement|advisoryVerdict|render\(|\.message\b|\.note\b/.test(read(path)),
     );

@@ -1,0 +1,64 @@
+import { describe, expect, it } from 'vitest';
+
+import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { SYSTEM_DESIGN_CANVAS } from './definition';
+import { canvasOutput } from './output';
+import { sampleSubmission } from './testing';
+
+describe('the system-design-canvas pipeline', () => {
+  it('[QL-1] is valid data with md personas loaded beside it', () => {
+    expect(() => validatePipeline(SYSTEM_DESIGN_CANVAS as never)).not.toThrow();
+    const summary = describePipeline(SYSTEM_DESIGN_CANVAS as never);
+    expect(JSON.parse(JSON.stringify(summary))).toEqual(summary);
+    for (const lens of [...SYSTEM_DESIGN_CANVAS.critics, ...SYSTEM_DESIGN_CANVAS.evaluators]) {
+      expect(lens.persona.length).toBeGreaterThan(80);
+    }
+    expect(SYSTEM_DESIGN_CANVAS.id).toBe('system-design-canvas');
+    expect(SYSTEM_DESIGN_CANVAS.producer.persona).toContain('system-design-canvas');
+    expect(SYSTEM_DESIGN_CANVAS.producer.persona).toContain('`ai-`');
+  });
+
+  it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {
+    const earning = new Set(
+      Object.values(SYSTEM_DESIGN_CANVAS.policy.criterionKinds).map((kind) => kind.dimension),
+    );
+    for (const dimension of Object.keys(SYSTEM_DESIGN_CANVAS.policy.dimensionWeights)) {
+      expect(earning).toContain(dimension);
+    }
+  });
+
+  it('[QL-21] locations are positional, and each is printed verbatim beside the author’s own id', () => {
+    const submission = sampleSubmission();
+    const rendered = canvasOutput.render(submission);
+    const ids = canvasOutput.locate(submission).map((location) => location.id);
+    for (const id of ids) expect(rendered).toContain(`[${id}]`);
+    expect(ids).toEqual([
+      ...submission.graph.nodes.map((_, index) => `node.${index + 1}`),
+      ...submission.graph.edges.map((_, index) => `edge.${index + 1}`),
+      ...Array.from({ length: 6 }, (_, index) => `binding.${index + 1}`),
+      'overview',
+      ...Array.from({ length: 4 }, (_, index) => `rationale.${index + 1}`),
+      ...Array.from({ length: 3 }, (_, index) => `narration.${index + 1}`),
+    ]);
+    // The author's ids ride beside the positional ones wherever the brief and
+    // narrative refer to them, so a reader can join the two.
+    expect(rendered).toContain('[node.3] node service-1 kind=service');
+    expect(rendered).toContain(
+      '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11)',
+    );
+    expect(rendered).toContain('path edge-1 (edge.1) → edge-2 (edge.2) → edge-3 (edge.3)');
+    expect(rendered).toContain('[rationale.1] service-1 (node.3):');
+    expect(rendered).toContain('[narration.1] c1:');
+    expect(canvasOutput.schema.safeParse(submission).success).toBe(true);
+  });
+
+  it('[QL-21] a submission without a brief or a narrative says so, and exposes nothing to cite there', () => {
+    const bare = sampleSubmission({ brief: null, narrative: null });
+    const rendered = canvasOutput.render(bare);
+    expect(rendered.match(/\(none submitted\)/g)).toHaveLength(2);
+    const ids = canvasOutput.locate(bare).map((location) => location.id);
+    expect(ids.some((id) => /^(binding|rationale|narration)\./.test(id) || id === 'overview')).toBe(
+      false,
+    );
+  });
+});

@@ -298,6 +298,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Embeddings are a port beside the LLM client chosen from the environment — no key or deterministic mode yields a disabled client with a reason — reached over an injectable transport that batches, retries a rate limit once and refuses a vector of the wrong length.',
   },
+  {
+    id: 'QL-20',
+    statement:
+      'A run may carry its rubric: supplied criteria are used verbatim and the deriver is never asked, a rubric that does not fit the pipeline is refused before any row exists, POST /criteria derives a rubric from a goal alone and never invents one without a model, and the health report says which model backs the loop.',
+  },
+  {
+    id: 'QL-21',
+    statement:
+      "The studio's two pipelines are ordinary registered pipelines: a canvas is judged as a provided artifact whose locations are positional with the author's ids printed beside them, the coach keeps every author id and prefixes what it adds with ai-, and a prompt drafted from an experience renders through the one markdown convention the studio stores — both pipelines being internal to the orchestrators, never routes for a brief.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
