@@ -196,7 +196,7 @@ recorded run against the same model re-bills every pass, and no experiment
 can hold the judges fixed while varying the policy.
 
 **Evidence.** No `cache` or memo in `packages/llm/src`; quality-loop.md lists
-memoisation as not built; gap-analysis §3.3 asked for it.
+memoisation as not built; the retired gap analysis (§3.3) asked for it.
 
 **Recommendation.** A content-hash memo keyed by prompt hash, model, lens id
 and sample index, stored beside the embedding cache (which already has the
@@ -229,13 +229,13 @@ with the disagreement count it produces.
 
 ### ENG-9 · `replay` reads one page and does not say so
 
-**Status** open · **Severity** low · **Where** `cli.ts`, `replayCli`
+**Status** open · **Severity** low · **Where** `cli/replay.ts`, `replayCli`
 
 **What.** The replay lists complete runs with `limit: REPLAY_LIMIT, offset: 0`
 and decides what comes back. Once a pipeline has more complete runs than the
 page, the table is silently partial.
 
-**Evidence.** `cli.ts` — one `repository.list` call; `experience-digest` is
+**Evidence.** `cli/replay.ts` — one `repository.list` call; `experience-digest` is
 at 79 runs.
 
 **Recommendation.** Page until the repository returns fewer than the page

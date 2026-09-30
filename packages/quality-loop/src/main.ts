@@ -1,16 +1,19 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
-import { replayCli, runCli } from './cli';
+import { replayCli } from './cli/replay';
+import { runCli } from './cli/run';
 import { AppModule } from './modules/app/app.module';
 import { configureApp } from './modules/app/configure-app';
+
+const DEFAULT_PORT = 3003;
 
 /**
  * The quality loop, three ways: `main.js run …` runs one pipeline from the
  * command line and exits; `main.js replay …` decides every recorded iteration
  * of a pipeline again under each controller and exits; anything else serves
- * the HTTP surface (POST /runs, GET /runs/:id, POST /criteria, GET /pipelines,
- * GET /prompts, GET /prompts/:id, GET /health).
+ * the HTTP surface — runs, pipelines, criteria, prompts, orchestrations, the
+ * memory and router tools, and `/health` (the README lists the routes).
  */
 async function bootstrap() {
   process.on('uncaughtException', (error) => {
@@ -30,7 +33,7 @@ async function bootstrap() {
   app.enableShutdownHooks();
   const port = process.env['QUALITY_LOOP_PORT']
     ? parseInt(process.env['QUALITY_LOOP_PORT'], 10)
-    : 3003;
+    : DEFAULT_PORT;
   await app.listen(port);
   Logger.log(`quality-loop listening on http://localhost:${port}/health`);
 }
