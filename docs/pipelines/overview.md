@@ -1,367 +1,200 @@
 # The pipelines: how many there are, where the model sits, where the engine sits
 
 A map of every path in this app that generates or grades something. The
-engine's internals — passes, aggregator, scoring math — are covered in
-[`../critic-eval-pipeline/how-it-works.md`](../critic-eval-pipeline/how-it-works.md);
+engine's internals — stages, normaliser, policy, controller — are covered in
+[`../pipeline-best-practices/quality-loop.md`](../pipeline-best-practices/quality-loop.md);
 this page sits one level above it and links down rather than repeating it.
 Known issues and deferred improvements across every pipeline are tracked in
 [`../issues/README.md`](../issues/README.md).
 
 Two facts organise everything below:
 
-1. **There are five pipelines, and they are more different than alike.** Two
-   run in the background off a job table in Postgres; three are synchronous
-   HTTP requests. Two touch the deterministic engine; three never do.
-2. **The model is called from nine places, and none of them can author a
-   number.** Every call goes through one port, one structured request, `null`
-   on any failure. What the model returns is either display prose, a bounded
-   ordinal the engine prices, or a proposal that a validator and a human stand
-   between and the grade.
+1. **Every model call in the studio is a quality-loop run.** The studio API
+   holds no rubric, no rule, no critic and no client of its own: it validates
+   structure, starts runs, stores what comes back, and maps the loop's ids onto
+   the canvas. Three of its paths start runs; nothing else in it talks to a
+   model.
+2. **The model never authors a number.** Every lens answers in a schema of
+   categories and ordinals locked to the ids on the page, two samples must
+   agree, and the loop's deterministic controller prices and decides. What the
+   studio shows is the decision and its trace.
 
 ---
 
-## 1. The five, at a glance
+## 1. The studio's three paths, at a glance
 
-| #   | Pipeline              | Trigger                                                         | Runs where                                | Model client (DI token)                       | Engine?                                                           | Dump kind    |
-| --- | --------------------- | --------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------- | ------------ |
-| 1   | Prompt generation     | `POST /prompts/generate`, `POST /prompts/:id/regenerate`        | studio-api, one request                   | `createLlmClientFromEnv` (`LLM_CLIENT`)       | No                                                                | `prompt`     |
-| 2   | Submit for evaluation | `POST /sessions/:id/revisions` → `eval_job` row → worker poller | studio-api enqueues, eval-worker grades   | `createEvalLlmFromEnv` (`LLM_CLIENT`)         | **Is** the engine — `runEvaluation`, 7 passes, aggregator         | `eval`       |
-| 3   | AI coach              | `POST /sessions/:id/improvement-runs` → `improvement_run` row   | studio-api persists the ask, worker loops | `createImproverLlmFromEnv` (`IMPROVER_LLM`)   | Yes — `runEngine` is the accept gate; accepted steps re-enter (2) | `improve`    |
-| 4   | Binding suggestions   | `POST /sessions/:id/brief-suggestions` (the brief editor's Ask) | studio-api, one request                   | `createImproverLlmFromEnv` (`SUGGESTION_LLM`) | No — `validateBriefReferences` per item                           | `suggestion` |
-| 5   | Interface suggestions | `POST /sessions/:id/interface-suggestions` (properties panel)   | studio-api, one request                   | same as 4                                     | No — graph + workflow validators per item                         | `suggestion` |
+| #   | Path              | Trigger                                                                         | Pipeline               | Iterations           | What the studio stores                                                              |
+| --- | ----------------- | ------------------------------------------------------------------------------- | ---------------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| 1   | Prompt generation | `POST /prompts/generate` → 202; `GET /prompts/generate/:runId` claims the draft | `design-prompt`        | 2                    | a `prompt_generation` row keyed by the run; the claimed `prompt`                    |
+| 2   | Grade             | `POST /sessions/:id/revisions` → 201; `GET /revisions/:id/evaluation` polls     | `system-design-canvas` | 1                    | the revision, pointing at `(runId, 1)`; the terminal score and decision, cached     |
+| 3   | Coach             | `POST /sessions/:id/improve` → 202; `GET /sessions/:id/improve/:runId` imports  | `system-design-canvas` | `maxIterations` ≤ 10 | the draft as revision `(runId, 1)`; every strictly better iteration as `(runId, k)` |
 
-Not pipelines, for completeness: STAR stories CRUD, the read endpoints for
-sessions, experiences and evaluations, and `POST /prompts` (the author path —
-a caller's own requirements stored verbatim, no draw, no model; see §2).
+Beside them, without a run: `POST /prompts` stores markdown the author wrote,
+`POST /prompts/import` copies a document from the loop's library, and both —
+like every prompt the first time it is read — derive their criteria through
+`POST /criteria`, one model call and no run.
 
 ```
-studio-ui ──HTTP──► studio-api ──────────────────────────► Postgres ◄──poll── eval-worker
-                      │                                        │                 │
-   (1) generate ──────┤ generatePrompt → enrichPrompt → Prompt  │                 │
-   (4) suggest ───────┤ suggestBindings ──► proposals (200)     │                 │
-   (5) suggest ───────┤ suggestInterface ─► proposals (200)     │                 │
-   (2) submit ────────┤ revision + evaluation + eval_job ───────┤── claim ──► runEvaluation ──► grade
-   (3) coach ─────────┤ base revision + improvement_run ────────┤── claim ──► propose → runEngine gate
-                      │                                        │                 └─► accepted revision + eval_job ──► (2)
+studio-ui ──HTTP──► studio-api ──── QualityLoopClient (port) ──► quality-loop :3003 ──► Postgres
+                       │                                              │                  quality_run*
+   prompt (write/import/generate) ─ POST /criteria ─────────────────►│ derive stage
+   (1) generate ─────── POST /runs { design-prompt, goal: experience }►│ writer → critics → evaluator → controller
+   (2) submit ────────── POST /runs { system-design-canvas, output, criteria, 1 }
+   (3) coach ─────────── POST /runs { system-design-canvas, output, criteria, n }
+                       ◄──── GET /runs/:id ── the trace: iterations, ledger, decision, remediations
 ```
 
 ---
 
-## 2. Prompt generation
+## 2. Prompts
 
-`packages/studio-api/src/modules/prompts/`. A request-scoped service, not a
-job: deterministic templating, one optional prose-polish model call, one
-insert — all inside the HTTP request, answered with `201` and the row.
+`packages/studio-api/src/modules/prompts/`. A prompt is one markdown document
+and the criteria the loop derived from it. Three sources, one row:
 
-`createPrompt` (`prompts.service.ts:201`) in order:
+- **Written** — `POST /prompts { title, markdown, experienceId? }` stores the
+  text verbatim after deriving its criteria; a grader without a model answers
+  503 and nothing is written.
+- **Imported** — `POST /prompts/import { libraryId }` copies one of the loop's
+  library documents (`GET /prompts/library`, `GET /prompts/library/*id` are
+  proxies).
+- **Generated** — `POST /prompts/generate { experienceId? }` renders the
+  experience (title, company label, summary, stack, highlights — the label is
+  there so the fidelity critic can catch it leaking) as the goal of a
+  `design-prompt` run and remembers the run in `prompt_generation`. Reading
+  the run once it is complete parses its best artifact with
+  `designPromptDraftSchema`, renders it to the house markdown with
+  `renderDesignPromptMarkdown`, and claims it into a prompt with a
+  conditional update, so two concurrent polls create one prompt. Omitting the
+  experience picks the least practised one.
 
-1. **Resolve an experience.** The one named, or `leastPracticedExperience()`
-   (`prompts.service.ts:178`) — rotates by how often each has been practised.
-   Experiences are the résumé link: six seeded `ExperienceProfile` rows in
-   `packages/db/src/seed/experiences.fixture.json`, each hand-transcribed
-   from a résumé bullet into an archetype plus concrete `scaleFacts`. There is
-   no runtime résumé or PDF parsing anywhere; personalisation is offline data.
-2. **Draw a seed.** `noveltySeed()` (`prompts.service.ts:152`) redraws while
-   the candidate title collides with one of the last three prompts for that
-   experience. Titles are generator-owned, so the comparison is stable.
-3. **Generate, deterministically.** `generatePrompt` in
-   `generator/prompt-generator.ts` is pure: one seeded PRNG (`mulberry32`,
-   `generator/rng.ts:22`) consumed in a fixed order over three tables —
-   archetype templates, requirement banks, workflow specs. The same input is
-   deep-equal byte for byte. `GENERATOR_VERSION = '2.3.0'`
-   (`prompt-generator.ts:22`) is stamped on every row for provenance. Unlike
-   `ENGINE_VERSION`, nothing pins a seed to a fixed output across code
-   changes; `[GEN-2]` only proves same-seed reproducibility.
-4. **Enrich, optionally.** `enrichPrompt` (`generator/enrich-prompt.ts`) is
-   the pipeline's single model call (`enrich-prompt.ts:55`). Its schema
-   (`enrich-prompt.ts:17`) holds only `scenario` and up to two extra
-   functional-requirement strings. The service then takes the NFR list, scale
-   targets, functional capabilities, workflow spec and title **from the
-   generator, never from the enriched result** (`prompts.service.ts:235`), so
-   the polish cannot switch an eval rule on or off. No model, refusal, or
-   schema miss → the generated prose stands with `llmEnriched: false`.
-5. **Persist and dump.** `PromptDump` written in a `finally`, kind `prompt`,
-   carrying `promptId` as the join key a later eval dump cites.
-
-`author()` (`prompts.service.ts:58`) is the non-generative branch: `POST
-/prompts` stores a caller's requirement set verbatim after referential
-validation, with `seed: 0`, `generatorVersion: 'authored'`, `llmEnriched:
-false`. It touches neither the RNG nor the model. It exists because an
-assessment's exact requirement set cannot be reproduced losslessly by the
-generator.
-
-**Model client:** `createLlmClientFromEnv` (`packages/llm/src/create-client.ts:13`)
-— API key or nothing. This is the one pipeline with no Claude Code
-subscription route, on purpose: a subscription round-trip on every
-generation would be too slow.
+Criteria are `c1…cN` with kinds `functional`, `non_functional`, `scale`,
+`constraint`; they are stable for the prompt's life and can be re-derived
+(`POST /prompts/:id/criteria`) only while no session has been graded against
+them. A rewrite of the markdown clears and re-derives them under the same
+rule.
 
 ---
 
-## 3. Submit for evaluation
+## 3. Grade
 
-The graded path. Fully diagrammed in how-it-works §1; the shape that matters
-here:
+`packages/studio-api/src/modules/sessions/`. Submitting a revision:
 
-- **API half** (`sessions.service.ts:286 submitRevision`): DTO shape errors
-  are `400`, referential errors from the contracts validators are `422`, and
-  one transaction writes `design_revision`, `evaluation (queued)` and
-  `eval_job (queued)`. The job goes through the `EvalQueue` seam
-  (`sessions/eval-queue.ts:11`), an abstract class with one Postgres
-  implementation — the BullMQ swap point.
-- **Worker half** (`eval-worker/src/modules/poller/`): `PollerService`
-  claims with `SKIP LOCKED`, reaps stale `running` rows, and hands one job to
-  `EvalRunnerService`, which builds `PromptFacts`, calls `runEvaluation`
-  (`eval-runner.service.ts:107`), and persists findings (source `rule`,
-  `expectation`, or `llm`), axes, scenarios, the full artifact list and the
-  scoring trace. The lock is heartbeated at every pass boundary so a
-  multi-minute deep eval is never mistaken for a dead worker.
-- **UI half:** polls `GET /revisions/:id/evaluation` until `complete`.
+1. **Validate structure.** Shape errors from `designSubmissionSchema` are
+   `400`; referential problems are one `422` listing every one — an edge to a
+   node that is not there, a carry neither endpoint declares, a binding to a
+   criterion the prompt never derived or a node the canvas does not hold, a
+   path that does not connect, a rationale for a node that is not drawn
+   (`submission.ts`). Nothing here says whether the design is any good.
+2. **Start the run before writing.** `startRun({ pipeline: 'system-design-canvas',
+goal: prompt.markdown, output: { graph, brief, narrative }, criteria:
+prompt.criteria, maxIterations: 1 })`; a loop that refuses leaves no
+   half-graded row behind.
+3. **Store the revision** pointing at iteration 1 of that run
+   (`createRevision`, one transaction, dense numbering).
+4. **Read the grade back.** `GET /revisions/:id/evaluation` fetches the run
+   and maps its iteration (`evaluation.mapper.ts`): score, decision and
+   dimensions from the controller; findings from the ledger with `node.N` /
+   `edge.N` refs resolved by position onto the graded graph and the lens's
+   rationale beside them; a result per criterion. The terminal score, decision
+   and status are written back onto the revision so lists and timelines never
+   fetch the loop.
 
-This is the only pipeline where **all seven passes** run. The five model
-passes — critic, depth, narrative, workability, scenarios — are the call
-sites at `critic/anthropic-critic.ts:26`, `passes/depth/depth.pass.ts:53`,
-`passes/narrative/narrative.pass.ts:129`,
-`passes/workability/workability.pass.ts:121` and
-`passes/scenarios/scenarios.pass.ts:60`. Each is an `EvalPass` with
-`mode: 'llm'`, reached only through `ctx.llm`; how their output is admitted,
-bounded and priced is how-it-works §3–4.
-
-Iteration here is human: the author edits, submits again, and a new revision
-gets a new job. Nothing loops on its own.
-
-**Model client:** `createEvalLlmFromEnv` (`create-client.ts:34`), which reads
-the raw `EVAL_DETERMINISTIC` with no override fork — grading determinism is
-never switchable — then an API key, then `EVAL_AUTH=claude-code`.
+Inside the run, the canvas pipeline's `references` validator repeats the
+studio's three checks (so what the studio refuses and what the loop blocks
+cannot differ), five critics — requirements, architecture, capacity,
+explanation, failure scenarios — and two evaluators judge with two samples
+each, and the standard controller decides.
 
 ---
 
-## 4. The AI coach (improvement runs)
+## 4. Coach
 
-A separate pipeline that borrows the engine. It has its own table, its own
-poller, its own client factory, and its own loop; what it shares with
-submit-for-evaluation is the scoring function and the revision records.
-
-- **API half** (`improvement-runs.service.ts:51 start`): refuses unless the
-  improver is enabled (`improverAvailabilityFromEnv`), validates the posted
-  draft with all four contracts validators, and in one transaction persists
-  the draft as a `user`-origin base revision via `createRevisionRecords`,
-  enqueues an `EvalJob` for that base through the same `EvalQueue` seam
-  (`improvement-runs.service.ts:92`), and inserts a queued `improvement_run`.
-  This service never proposes, never scores, never calls a model.
-- **Worker half** (`eval-worker/src/modules/improver/`):
-  `ImprovementPollerService` polls `improvement_run` on its own interval,
-  deliberately not the eval loop — one run takes minutes and would starve
-  every eval job behind it, including the ones the run itself enqueues.
-  `ImprovementRunnerService` then iterates up to `maxIterations`:
-
-  ```
-  proposeImprovement(llm, best design + its findings)      llm-proposer.ts:255
-     → canonicalizeGraphConfig        (off-vocabulary knobs quietly dropped)
-     → validateGraphReferences + validateWorkflowReferences   → invalid graph: hard reject
-     → validateBriefReferences / validateNarration            → invalid doc: drop that doc, keep the graph
-     → runEngine(candidate)                                    improvement-runner.service.ts:95
-     → accepted iff overallScore strictly rises                improvement-runner.service.ts:214
-     → persistAccepted: assistant-origin revision + its own EvalJob row   :288, :301
-  ```
-
-  `runEngine` (`engine/engine.ts:17`) is the pure synchronous façade: the
-  two deterministic passes plus the same aggregator, no model. So a live
-  coach never touches a grade directly — it proposes, the deterministic
-  engine judges, and every accepted revision then rides pipeline 2 as a
-  normal `EvalJob` (written directly, since the worker owns the job table).
-  Rejected candidates and every model exchange live only in the run dump
-  (`writeRunDump`, kind `improve`).
-
-- **UI half:** `GET /improvement-runs/:id` for the trajectory,
-  `POST /improvement-runs/:id/cancel` to stop.
-
-**Model client:** `createImproverLlmFromEnv` (`create-client.ts:70`), which
-reads `IMPROVER_DETERMINISTIC` falling back to `EVAL_DETERMINISTIC`, then an
-API key, then `IMPROVER_AUTH=claude-code`. A dev stack can therefore run
-deterministic grades with a live coach.
+The same run with more iterations. `POST /sessions/:id/improve` validates the
+draft exactly as a submission, starts the run with `maxIterations`
+(default 3, at most 10), and stores the draft as the author's own revision
+`(runId, 1)`. From iteration 2 on the loop's producer — the canvas pipeline's
+coach persona — revises against the remediations the controller selected,
+keeping every author id and prefixing what it adds with `ai-`. Reading the run
+(`GET /sessions/:id/improve/:runId`) imports every iteration whose score beat
+all before it as an `assistant` revision `(runId, k)`, once — the unique pair
+on the row makes a concurrent poll harmless — after parsing its artifact with
+the same schema and validators a submission passes; an artifact the studio
+would refuse is logged and skipped. The response lists every iteration with
+its score, decision and the revision it became, if any.
 
 ---
 
-## 5. The two suggestion pipelines
+## 5. Where the model is called
 
-Both are synchronous computes that answer `200`, store nothing, and reason
-about the **unsubmitted on-screen draft** posted in the request body — not a
-persisted revision. Neither imports the engine; neither can. A proposal
-reaches a grade only when a human accepts it into the canvas or brief and
-later submits.
+Nowhere in the studio. `studio-ui` depends on `contracts`, `design-system` and
+the web kits; `studio-api` on `contracts`, `db` and `nest-kit` — neither may
+import `@sysdesign/llm`
+(`tooling/code-review/rules/boundaries.ts`). The one seam is the
+`QualityLoopClient` port (`packages/studio-api/src/modules/quality-loop/`),
+an abstract class with one HTTP adapter that maps the loop's failures to
+`502` / `503` / `504`, a fake bound in the API's specs, and a stub server the
+e2e suite starts on `:3103`. Availability is a proxy of the loop's own
+(`GET /grading/availability`), so the UI can disable a control with an
+honest reason instead of failing.
 
-|                         | Binding suggestions (4)                                                                                                               | Interface suggestions (5)                                                                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Route                   | `POST /sessions/:id/brief-suggestions` (`sessions.controller.ts:82`)                                                                  | `POST /sessions/:id/interface-suggestions` (`sessions.controller.ts:92`)                                                                                                                 |
-| UI entry                | the Ask button in the design-brief editor, whole draft at once                                                                        | the properties panel, one selected node                                                                                                                                                  |
-| Service                 | `sessions.service.ts:83 suggestBrief` → `suggest-bindings.ts:38`                                                                      | `sessions.service.ts:145 suggestInterface` → `suggest-interface.ts:51`                                                                                                                   |
-| Model call              | `suggest-bindings.ts:53`                                                                                                              | `suggest-interface.ts:70`                                                                                                                                                                |
-| Enum-locked per request | `nfrId` (this prompt's NFRs), `mechanism` (the 18 `MECHANISM_CLAIMS`), `nodeIds` (this canvas)                                        | op kinds (`INTERFACE_CAPABILITIES[kind]`), fulfills (`fulfillableItems`), events the prompt declares, config knobs (`NODE_CONFIG_FIELDS[kind]`) with value domains                       |
-| Free text allowed       | none                                                                                                                                  | operation names and responsibility text only                                                                                                                                             |
-| Post-validation         | `admissible` (`suggest-bindings.ts:139`): eligible kinds, then `validateBriefReferences` on a one-binding brief (`:166`), one per NFR | `admissible` (`suggest-interface.ts:288`): each operation applied **alone** to a graph copy, kept only if `validateGraphReferences` + `validateWorkflowReferences` pass (`:305`, `:333`) |
-| Withheld from the model | `MECHANISM_GUIDE[claim].proof` — labels only, so it cannot propose only what is guaranteed to corroborate                             | the same; both pinned by their specs                                                                                                                                                     |
-
-The option space the interface suggester offers is **finite and declared in
-`packages/contracts`**, not generated: `INTERFACE_CAPABILITIES` fixes role
-and operation kinds per node kind, `NODE_CONFIG_FIELDS` fixes knobs and
-their domains per node kind, and `fulfillableItems` reads the prompt's
-workflow spec. The model ranks and names within that vocabulary; it cannot
-mint a knob the engine could not read.
-
-Both share one dump module, `suggestion-dump.ts` (kind `suggestion`, scope
-`brief.suggest`, `suggestion-dump.ts:28`), which tells the two apart by the
-proposal payload type rather than by run kind.
-
-**Model client:** the same `createImproverLlmFromEnv` as the coach, bound to a
-second token `SUGGESTION_LLM` in `studio-api/src/modules/llm/llm.module.ts`.
-The reasoning in `llm.token.ts`: nothing a suggester returns reaches a grade,
-so it may share the coach's determinism switch and subscription route, which a
-button press can afford and prompt generation cannot.
+Every model call lives in `packages/quality-loop`: the derive stage, the
+producer, and each lens sample, all through `@sysdesign/llm`'s one port under
+the loop's role (`QUALITY_LOOP_DETERMINISTIC` / `QUALITY_LOOP_AUTH` /
+`ANTHROPIC_API_KEY`).
 
 ---
 
-## 6. The questions this page exists to answer
+## 6. What is shared
 
-**Is the coach a different pipeline from submit-for-evaluation?** Yes.
-Different table (`improvement_run` vs `eval_job`), different poller,
-different client factory and env switch, and a loop versus a single pass.
-They meet in two places: the coach calls the engine's sync façade as its
-accept gate, and every revision it accepts is graded by submit's pipeline
-through an ordinary `EvalJob` row. The coach is a producer of revisions;
-submit is the consumer.
-
-**Are the suggestion pipelines different from both?** Yes, and further apart.
-No job table, no poller, no engine, no persistence — a request in, a list of
-enum-locked, validator-filtered proposals out. What they share with the coach
-is the client factory and the contracts validators; what they share with
-submit is nothing but the validators.
-
-**Is the prompt generator a different pipeline from the "iterative
-critic-eval"?** Yes. The generator runs once per request in studio-api,
-produces the prompt, and its model call is prose polish structurally unable
-to reach a graded field. Evaluation runs in the background per revision in
-eval-worker and consumes prompts. "Iterative" means two different things:
-the human loop (submit again → new revision → new job) and the automated
-loop (the coach, §4). Neither iterates inside the generator.
-
-**Where exactly are models used?** Nine call sites, one port:
-
-| Pipeline | Call site                                                           |
-| -------- | ------------------------------------------------------------------- |
-| 1        | `studio-api/.../prompts/generator/enrich-prompt.ts:55`              |
-| 2        | `eval-worker/src/critic/anthropic-critic.ts:26`                     |
-| 2        | `eval-worker/src/engine/passes/depth/depth.pass.ts:53`              |
-| 2        | `eval-worker/src/engine/passes/narrative/narrative.pass.ts:129`     |
-| 2        | `eval-worker/src/engine/passes/workability/workability.pass.ts:121` |
-| 2        | `eval-worker/src/engine/passes/scenarios/scenarios.pass.ts:60`      |
-| 3        | `eval-worker/src/modules/improver/proposers/llm-proposer.ts:255`    |
-| 4        | `studio-api/.../sessions/suggestions/suggest-bindings.ts:53`        |
-| 5        | `studio-api/.../sessions/suggestions/suggest-interface.ts:70`       |
-
-studio-ui calls no model: it depends on `contracts` and `design-system` only
-(`tooling/code-review/rules/boundaries.ts:28`).
-
-**Where does the deterministic engine fit?** Only in
-`packages/eval-worker/src/engine/`, with two entry points over one scoring
-implementation: `runEvaluation` (`engine/core/orchestrator.ts:72`, async, all
-passes, used by submit) and `runEngine` (`engine/engine.ts:17`, sync,
-deterministic passes only, used by the coach). The boundaries matrix grants
-`studio-api` and `eval-worker` no import of each other in either direction,
-so the engine is unreachable from the API by construction, not by
-convention.
+| Component                                                                                        | Lives in                                         | Used by                                                       |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------- |
+| `designSubmissionSchema` and its parts; `designPromptDraftSchema` + `renderDesignPromptMarkdown` | `packages/contracts/src/lib/*.schema.ts`         | studio-api validation, the loop's artifacts, the UI's store   |
+| `validateGraphReferences`, `validateBriefReferences`, `validateNarration`                        | `packages/contracts/src/lib/*-validator.ts`      | studio-api submit and import; the canvas pipeline's validator |
+| `renderNodeLine`, `renderEdgeLine`                                                               | `packages/contracts/src/lib/graph-render.ts`     | the canvas pipeline's render                                  |
+| The quality-loop wire types (`QualityRunDto`, `SuccessCriterion`, `ConfirmedFinding`, …)         | `packages/contracts/src/lib/quality-loop/`       | the loop, studio-api's client and mapper, both web clients    |
+| `CANVAS_PIPELINE_ID`, `PROMPT_PIPELINE_ID`                                                       | `packages/contracts/src/lib/studio-pipelines.ts` | the pipeline definitions, studio-api, the e2e stub            |
+| `createRevision`                                                                                 | `packages/db/src/revision-factory.ts`            | submit, coach start, coach import                             |
+| `ZodValidationPipe`, `DbModule`, `HealthController`, `configureCors`                             | `packages/nest-kit`                              | studio-api, quality-loop, govcon                              |
+| `CRITERIA` registry (`[DEL-n]`, `[EVAL-n]`, `[GEN-n]`, `[UX-n]`, `[QL-n]` ids tests claim)       | `packages/criteria/src/index.ts`                 | test suites across every pipeline                             |
 
 ---
 
-## 7. What is shared
+## 7. Which switches gate what
 
-| Component                                                                                                                                                                                               | Lives in                                                                                  | Used by                                                                                           |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `LlmClient` port; `AnthropicLlmClient`, `ClaudeAgentLlmClient`, `NoopLlmClient`; `LlmRecordable.withRecorder` + `asRecordable` for dump capture                                                         | `packages/llm/src/`                                                                       | all five                                                                                          |
-| Four env factories: `createLlmClientFromEnv`, `createEvalLlmFromEnv`, `createImproverLlmFromEnv`, `improverAvailabilityFromEnv`                                                                         | `packages/llm/src/create-client.ts`                                                       | 1 → plain; 2 → eval; 3, 4, 5 → improver under two DI tokens                                       |
-| Run-dump plumbing: `writeDump`, `makeRunId` + `RunKind`, `GIT_CONTEXT`, `capText` / `jsonSafe`                                                                                                          | `packages/run-dump/src/`                                                                  | all five plus the quality loop, five kinds (`eval`, `prompt`, `suggestion`, `improve`, `quality`) |
-| Vocabularies: `EvalDimension`, `Archetype`, `FunctionalCapability`, `WorkflowSpec`, `AxisFactorLevel`; `mechanisms.ts`, `node-config-fields.ts`, `interfaces.ts`, `quality-areas.ts`, `design-brief.ts` | `packages/contracts/src/lib/`                                                             | all three apps; imported by neither `llm` nor `run-dump`                                          |
-| Validators: `validateGraphReferences`, `validateWorkflowReferences`, `validateBriefReferences`, `validateNarration`; `projectNarration`                                                                 | `packages/contracts/src/lib/*-validator.ts`, `narration.ts`                               | submit (2), coach start and loop (3), both suggesters (4, 5)                                      |
-| `createRevisionRecords`                                                                                                                                                                                 | `packages/db/src/revision-factory.ts`                                                     | submit (2), coach start (3, API), coach accept (3, worker)                                        |
-| Entities: `Prompt`, `ExperienceProfile`, `DesignRevision`, `Evaluation`, `Finding`, `EvalJob`, `ImprovementRun`                                                                                         | `packages/db/src/entities/`                                                               | 1, 2, 3                                                                                           |
-| `EvalQueue` seam                                                                                                                                                                                        | `studio-api/src/modules/sessions/eval-queue.ts`                                           | submit (2), coach start (3) — API side only; the worker writes rows directly                      |
-| `promptFactsFrom`                                                                                                                                                                                       | `eval-worker/src/modules/shared/prompt-facts.ts`                                          | eval runner (2), improver (3)                                                                     |
-| `gradedWeaknessShape` / `toGradedItem` / `admitGrounding`; `describeDesign`                                                                                                                             | `eval-worker/src/engine/passes/graded-grounding.ts`, `engine/serialization/graph-text.ts` | the five model passes inside (2)                                                                  |
-| `CRITERIA` registry (`[EVAL-n]`, `[GEN-n]`, `[UX-n]` ids tests claim)                                                                                                                                   | `packages/criteria/src/index.ts`                                                          | test suites across every pipeline                                                                 |
-
-The pattern every pipeline repeats, without a shared base class: inject a
-client by token → wrap it with a dump recorder → make one structured call →
-treat `null` as the deterministic path → write the dump in a `finally`.
+| Switch                          | Effect                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ANTHROPIC_API_KEY`             | the loop grades on the API; outranks the subscription route                                                  |
+| `QUALITY_LOOP_AUTH=claude-code` | the loop grades through this machine's Claude Code login (the local stack's default)                         |
+| `QUALITY_LOOP_DETERMINISTIC=1`  | no model at all: `POST /criteria` is 503, a run escalates with no score; what CI and the Tilt deployment set |
+| `QUALITY_LOOP_URL`              | where studio-api finds the loop; default `http://localhost:3003`                                             |
+| `LLM_MODEL`                     | the model id on either route                                                                                 |
+| `EVAL_DUMP_DIR`                 | where the loop's run dumps go; the specs point it at a temp directory                                        |
 
 ---
 
-## 8. Which flags gate which pipeline
-
-| Flag                                             | 1 generate | 2 evaluate     | 3 coach             | 4 / 5 suggest       |
-| ------------------------------------------------ | ---------- | -------------- | ------------------- | ------------------- |
-| `EVAL_DETERMINISTIC=1`                           | model off  | model off      | off unless below    | off unless below    |
-| `IMPROVER_DETERMINISTIC=0`                       | —          | —              | overrides the above | overrides the above |
-| `ANTHROPIC_API_KEY`                              | enables    | enables        | enables             | enables             |
-| `EVAL_AUTH=claude-code`                          | —          | subscription   | —                   | —                   |
-| `IMPROVER_AUTH=claude-code`                      | —          | —              | subscription        | subscription        |
-| `LLM_MODEL`                                      | model id   | model id       | model id            | model id            |
-| `EVAL_POLL_INTERVAL_MS`, `EVAL_STALE_RUNNING_MS` | —          | poller         | reaper window       | —                   |
-| `IMPROVE_POLL_INTERVAL_MS`                       | —          | —              | poller              | —                   |
-| `EVAL_POLLER_DISABLED=1`                         | —          | poller stopped | poller stopped      | —                   |
-| `EVAL_DUMP_DIR`                                  | dump       | dump           | dump                | dump                |
-
-Two consequences worth stating. CI and the e2e suite set only
-`EVAL_DETERMINISTIC=1`, which silences every model call in the app.
-`pnpm stack:up` (`scripts/stack.sh:19`) sets `EVAL_DETERMINISTIC=1` **and**
-`IMPROVER_DETERMINISTIC=0 IMPROVER_AUTH=claude-code`, so the local stack grades
-deterministically while the coach and both suggesters run live on the Claude
-Code login. Prompt generation has no way onto a subscription; it needs a key.
-
----
-
-## 9. Discrepancies noticed while mapping
-
-Notes, not fixes. None affects behaviour.
-
-- `packages/run-dump/src/write-dump.ts:2` says the plumbing is "shared by
-  the two pipelines that dump". `RunKind` now has five members; the note in an
-  earlier revision of this section said four, and was itself stale.
-- `suggestion-dump.ts:13` calls itself "the third pipeline that talks to a
-  model". The coach's dump was added afterwards and is inlined in
-  `improvement-runner.service.ts` rather than living in its own module.
-- how-it-works §6 counts "four call sites". The coach's proposer is a fifth
-  caller of the port, outside the engine.
-- how-it-works §6 describes the interface suggester's apply-alone check. The
-  binding suggester's equivalent is `validateBriefReferences` over a
-  one-binding brief, which the doc does not mention. A gap, not an error.
-- how-it-works §4's known wrinkle still holds: when the critic ran, its prose
-  summary is stored as the evaluation summary. The numbers are the engine's.
-
----
-
-## 10. A sixth, standalone family: the quality loop
+## 8. The quality loop itself
 
 `packages/quality-loop` runs the generic doctrine from
 [`../pipeline-best-practices/overview.md`](../pipeline-best-practices/overview.md)
-over any task declared as data. Three such tasks now exist as sibling folders
-under `src/pipelines/` — `system-design`, `memory-recall` and
-`experience-digest` — and an orchestrator, `POST /orchestrations/memory`, composes them
-so a run can recall what earlier runs learned and digest what it learned itself.
-It shares `@sysdesign/llm` (its own role: `QUALITY_LOOP_DETERMINISTIC` /
-`QUALITY_LOOP_AUTH`) and `@sysdesign/run-dump` (kind `quality`) with the five
-pipelines above and touches none of them. It has its own Postgres tables
-(`quality_run` and its children, plus `orchestration_run`, its children and `memory_embedding`) and
-its own vector store (Qdrant, the `vectors` compose service); the dump remains
-the full audit trail beside them.
+over any task declared as data. Six pipelines live as sibling folders under
+`src/pipelines/`: `system-design` and `agentic-design` judge a text brief;
+`memory-recall` and `experience-digest` are the memory tier's, composed by
+`POST /orchestrations/memory` so a run can recall what earlier runs learned
+and digest what it learned itself; `system-design-canvas` and
+`design-prompt` are the studio's, and take a goal the studio composed — never
+a brief a person types into the router. It has its own Postgres tables
+(`quality_run` and its children, `orchestration_run` and its children,
+`memory_embedding`) and its own vector store (Qdrant, the `vectors` compose
+service); the dump remains the full audit trail beside them.
 
-The controller that turns a ledger into a decision is itself declared per
-pipeline, by reference, from a small library under `src/core/controllers/`:
-`standard` (the doctrine's ordered gates, thresholds and route) and
-`dimension-floor` (the same with a floor under every assessed dimension, which
-`memory-recall` runs live). Both are pure functions of the ledger, so
-`main.js replay --pipeline <id>` compares them on every recorded run without a
-model call (`./memory-runs.md` §13).
+The controller that turns a ledger into a decision is declared per pipeline,
+by reference, from a small library under `src/core/controllers/`: `standard`
+(the doctrine's ordered gates, thresholds and route) and `dimension-floor`
+(the same with a floor under every assessed dimension). Both are pure
+functions of the ledger, so `main.js replay --pipeline <id>` compares them on
+every recorded run without a model call (`./memory-runs.md` §13).
 
 How the loop works, its env variables and its guarantees:
 [`../pipeline-best-practices/quality-loop.md`](../pipeline-best-practices/quality-loop.md).
-How the three pipelines compose behind the memory API, how to operate it, and
-what the recent runs showed: [`./memory-runs.md`](./memory-runs.md).
+How the memory pipelines compose, how to operate them, and what the recent
+runs showed: [`./memory-runs.md`](./memory-runs.md).

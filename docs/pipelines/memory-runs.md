@@ -887,16 +887,14 @@ Notes, not fixes. None affects behaviour.
   CLI. Running `pnpm quality-loop:run` while the server has a memory run in
   flight will fail that run as `interrupted`. Quality runs have carried the
   same property since `d0c92e3`.
-- `overview.md`'s two organising counts — five pipelines, nine model call
-  sites — predate the quality loop entirely and now understate both further,
-  since probe derivation is a tenth call site. Correcting them means rewriting
-  that page's premise, which is a separate change.
+- `overview.md` has since been rewritten around the studio's three
+  quality-loop paths; the studio itself no longer calls a model, and probe
+  derivation is one of the loop's call sites like any lens.
 
-The doctrine's last stage — "system stores trace + lessons", which
-[`../pipeline-best-practices/gap-analysis.md`](../pipeline-best-practices/gap-analysis.md)
-§2.7 records as a missing memory tier — is what this work built. The incident
-loop that section also asks for, where a production failure becomes a
-regression fixture, is not.
+The doctrine's last stage — "system stores trace + lessons", which the
+retired gap analysis (§2.7) recorded as a missing memory tier — is what this
+work built. The incident loop that section also asked for, where a production
+failure becomes a regression fixture, is not (STUDIO-7).
 
 Not built yet, by choice: filtered or per-project search, pruning and expiry,
 storing findings and sections as chunks rather than only lessons (the kinds

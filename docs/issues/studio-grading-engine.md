@@ -1,171 +1,105 @@
 # The studio grading engine — `STUDIO`
 
-Scope: the studio's grader — the rules engine and critic in
-`packages/eval-worker`, the prompt generator in `packages/studio-api` — held
-against the doctrine in
-[../pipeline-best-practices/overview.md](../pipeline-best-practices/overview.md)
-and the gap analysis in
-[../pipeline-best-practices/gap-analysis.md](../pipeline-best-practices/gap-analysis.md).
-The quality loop (`packages/quality-loop`) was built as the doctrine-shaped
-answer to most of these; the studio does not yet use it. Conventions and the
+Scope: the studio's grader, held against the doctrine in
+[../pipeline-best-practices/overview.md](../pipeline-best-practices/overview.md).
+Every entry below is closed by one change: the studio's own engine
+(`packages/eval-worker`) and prompt generator were deleted, and grading,
+coaching and prompt generation became runs of the quality loop
+(`packages/quality-loop`, pipelines `system-design-canvas` and
+`design-prompt`) reached from `packages/studio-api` through one client port.
+The entries are kept so the reasoning stays findable; conventions and the
 index are in [README.md](./README.md).
 
 ---
 
 ### STUDIO-1 · Archetypes still drive prompt generation and coverage
 
-**Status** open · **Severity** high · **Where** `packages/studio-api/src/modules/prompts/generator/{archetype-templates,requirement-banks,prompt-generator,enrich-prompt}.ts`, `modules/experiences`, `packages/eval-worker/src/engine/passes/expectations/banks`
+**Status** closed · **Closed by** the delegation commits (contracts, db, quality-loop `design-prompt` and `system-design-canvas`, studio-api)
 
-**What.** Coverage expectations come from archetype banks, and an authored
-prompt inherits a rubric by picking an experience. The requirement Oscar
-wrote into
-[../review-carefully-and-complete-with-refinement.md](../review-carefully-and-complete-with-refinement.md)
-is stronger than the gap analysis's "make archetype optional": remove it
-entirely, and derive coverage from the prompt's own requirements, because a
-prompt can represent any archetype through what it demands.
+**What.** Coverage expectations came from archetype banks, and an authored
+prompt inherited a rubric by picking an experience.
 
-**Evidence.** Gap-analysis §2.1: of 95 registered expectations, 65 are
-pinned to exactly one archetype; only two apply to every prompt. Sixteen
-non-spec files across `studio-api`, `criteria`, `contracts` and `studio-ui`
-still name the concept. The quality loop's `deriveCriteria` step is the
-working counter-example: one model call turns any goal into enum-locked
-criteria with no archetype anywhere.
+**How it closed.** There is no archetype anywhere: a prompt is markdown, its
+criteria are derived from its own text by the loop's derive stage, and every
+lens judges against those criteria. An experience is prose the `design-prompt`
+pipeline writes from; the generator's banks are gone with the worker.
 
-**Recommendation.** Requirement-derived coverage first (gap-analysis §3.1:
-per-requirement expectation generators driven by each requirement and its
-target, stable per-bullet ids), then delete the banks. What remains of
-archetype is prompt flavour text in the generator, not a key anything
-branches on.
-
-**Verify.** `grep -ri archetype packages/*/src` returns only prompt-text
-fixtures; an authored prompt with no experience selected is graded on the
-same coverage as a generated one.
+**Verify.** `git grep -i archetype packages` returns nothing outside the
+migration that dropped the column.
 
 ---
 
 ### STUDIO-2 · Two grading engines coexist
 
-**Status** open · **Severity** high · **Where** `packages/eval-worker` and `packages/quality-loop/src/pipelines/system-design`
+**Status** closed · **Closed by** `feat(studio-api): grading, coaching and prompt generation are quality-loop runs`
 
-**What.** The studio grades through the eval worker: nineteen deterministic
-rules decide the grade, one LLM critic annotates, caps apply by severity
-count, and the output is score, letter, `capApplied` and findings. The
-quality loop's `system-design` pipeline grades the same kind of artifact
-through validators, critics, evaluators and a deterministic controller that
-decides accept / revise / retry / escalate / reject with a factor trace.
-Nothing outside `packages/quality-loop` imports it. Two vocabularies, two
-dump formats, two places a threshold lives.
+**What.** The studio graded through the eval worker; the quality loop graded
+the same kind of artifact through validators, critics, evaluators and a
+deterministic controller, and nothing outside it imported it.
 
-**Evidence.** `packages/eval-worker/src/engine/core/aggregator.ts`
-(`capApplied`, `applyGradeCaps`); no import of `quality-loop` from
-`eval-worker`, `studio-api` or `studio-ui`; the README's "Rules alone decide
-the grade; critic findings annotate".
+**How it closed.** One path. A submission is one `system-design-canvas` run
+on the prompt's fixed criteria; the revision points at the run's iteration;
+the studio reads the run back and grounds it onto the canvas. The worker's
+rules were not ported as validators: what they encoded is now in the lens
+personas, and the deterministic validators check references only.
 
-**Recommendation.** Decide the seam once. The cheaper direction is to route
-studio evaluations through `RunsService.execute` on the `system-design`
-pipeline and keep the worker's rules as that pipeline's validators — the
-`validators` slot exists for exactly this, and the rules are already pure.
-The alternative, retiring the quality loop for the studio, gives up the
-controller, the trace and the memory tier. Either way STUDIO-3, -4 and -6
-close with it.
-
-**Verify.** One evaluation path in the studio; a submitted revision produces
-a `QualityControlDecision` the client renders; the worker's rules appear as
-validator reports in the trace.
+**Verify.** `packages/eval-worker` does not exist; `EvaluationDto` is built
+from a `QualityRunDto` alone (`packages/studio-api/src/modules/sessions/evaluation.mapper.ts`).
 
 ---
 
 ### STUDIO-3 · Critic and evaluator collapse into one weakness ordinal; no controller
 
-**Status** open · **Severity** medium · **Where** `packages/eval-worker/src/engine`
+**Status** closed · **Closed by** STUDIO-2
 
-**What.** Every lens emits the same graded-weakness shape, so the
-deterministic rubric is the sole source of credit and also defines the
-ceiling. There is no accept / revise / escalate; confidence discounts a
-penalty and is dropped at persistence, so the UI cannot show an uncertain
-grade.
-
-**Evidence.** Gap-analysis §2.2 and §2.3 with file and line references.
-
-**Recommendation.** Resolved by STUDIO-2; the quality loop carries the
-critic report, the criterion-shaped evaluator report and the controller
-already. Not worth building a second time in the worker.
+**How it closed.** Inherited: critics report defects, evaluators report a
+result per criterion, the controller decides accept / revise / retry /
+escalate / reject with a factor trace, and the studio shows the decision.
 
 ---
 
 ### STUDIO-4 · Judge robustness is containment, not measurement
 
-**Status** open · **Severity** medium · **Where** `packages/eval-worker`, `packages/llm`
+**Status** closed · **Closed by** STUDIO-2
 
-**What.** One sample per lens, no retry on `null`, no temperature, no
-memoisation, no agreement tracking, and a critic re-raising a fired rule
-double-charges.
-
-**Evidence.** Gap-analysis §2.4; SEAM-3 for the seam half.
-
-**Recommendation.** The quality loop's n-sample agreement (`samples`,
-`minHits`) is the model; SEAM-2 and SEAM-3 cover the seam. The
-rule-to-lens reconciliation in gap-analysis §3.4 ports the pattern from
-`tooling/code-review/evaluator.ts`.
+**How it closed.** Inherited: every lens of the canvas pipeline runs two
+samples and an item needs two hits to count; a finding reconciled to a failed
+criterion is never priced twice.
 
 ---
 
 ### STUDIO-5 · A thin finding contract and two display leaks
 
-**Status** open · **Severity** medium · **Where** `packages/contracts` (studio findings), `packages/eval-worker/src/modules/poller/eval-runner.service.ts`
+**Status** closed · **Closed by** STUDIO-2
 
-**What.** No defect-type taxonomy, no fixability, no stable artifact ids, no
-schema version on persisted evidence. Two leaks let the model author what
-the reader takes for the engine's: the critic's graded summary is stored as
-the evaluation's summary when the critic ran (how-it-works §"known
-wrinkle"), and the depth and narrative numbers are model-authored rather
-than ordinals rendered through `LEVEL_SCORE`.
-
-**Evidence.** Gap-analysis §2.5;
-[../critic-eval-pipeline/how-it-works.md](../critic-eval-pipeline/how-it-works.md)
-line "Known wrinkle".
-
-**Recommendation.** Gap-analysis §3.5: a lens-chosen `type` enum,
-`fixability`, stable ids, `schemaVersion`; show the engine summary and the
-critic summary side by side; convert depth and narrative to ordinals the way
-workability already is. Or, with STUDIO-2, inherit the quality loop's finding
-contract, which has all of it.
+**How it closed.** Inherited: the confirmed finding carries a type from a
+declared taxonomy, fixability, stable structural keys, the lenses that
+confirmed it and its rationale; the studio adds only the node and edge ids it
+resolves by position. Nothing model-authored is shown as the engine's.
 
 ---
 
 ### STUDIO-6 · Lenses are code, not records, and run serially
 
-**Status** open · **Severity** medium · **Where** `packages/eval-worker/src/engine/passes/index.ts`
+**Status** closed · **Closed by** STUDIO-2
 
-**What.** `EvalPass` is a function; the registry is a hand-written list; the
-profile can only toggle a pass and hand it untyped options; dimension
-mapping is hardcoded per lens; passes run one after another without needing
-to.
-
-**Evidence.** Gap-analysis §2.6.
-
-**Recommendation.** The quality loop's lens records — id, persona as
-markdown, criterion kinds, samples, `consumes` — are the template; with
-STUDIO-2 this is inherited rather than rebuilt.
+**How it closed.** Inherited: the canvas pipeline's lenses are records — id,
+markdown persona, samples, `consumes` — and run concurrently within a wave.
 
 ---
 
 ### STUDIO-7 · Dumps are read by nothing; no incident loop
 
-**Status** open · **Severity** medium · **Where** `packages/run-dump`, `static/runs`
+**Status** open · **Severity** medium · **Where** `packages/run-dump`, `static/runs`, `packages/quality-loop`
 
-**What.** Every run, failures included, is dumped, and nothing reads the
-dumps: no dump-to-fixture script, no outcome labels, no author feedback on a
-finding, no aggregate over `index.jsonl`. The doctrine's loop ends in a
-regression dataset; this one ends in a gitignored folder. The memory tier the
-same section asked for now exists in the quality loop; the regression half
-does not.
+**What.** Every run is dumped and persisted, and nothing turns a run into a
+regression fixture or records an author's verdict on a finding. Unchanged by
+the delegation: the studio now produces `quality` runs, so the loop's dump and
+`quality_run*` rows are the material.
 
-**Evidence.** Gap-analysis §2.7; memory-runs §11, last paragraphs.
-
-**Recommendation.** A dump-to-fixture script that turns a chosen run into a
-recorded-response spec (SEAM-6 needs the same thing); an author-outcome
-label on findings (wrong / helpful) persisted as the seed of a golden set.
+**Recommendation.** A dump-to-fixture command that turns a chosen run into a
+recorded-response spec; an author-outcome label on findings persisted as the
+seed of a golden set.
 
 **Verify.** A production failure becomes a spec in one command, and the spec
 fails before the fix and passes after.
@@ -174,20 +108,17 @@ fails before the fix and passes after.
 
 ### STUDIO-8 · `EVAL_DETERMINISTIC` grades with rules alone
 
-**Status** open · **Severity** high · **Where** `packages/llm/src/create-client.ts`, `packages/studio-e2e/playwright.config.ts` and four requirement specs
+**Status** closed · **Closed by** `refactor: delete eval-worker; quality-loop replaces the worker in every environment`
 
-**What.** With the flag set, or with no key, the studio grades with the
-rules engine alone and byte-reproducible output; the README presents this as
-a feature. Oscar's requirement is the opposite: evidence comes from a model
-or the pipeline fails. The Playwright suite is built on the deterministic
-path.
+**What.** With the flag set, or with no key, the studio graded with rules
+alone and presented byte-reproducible output as a feature.
 
-**Evidence.** `create-client.ts` line 21; `EVAL_DETERMINISTIC` in
-`playwright.config.ts` and `src/requirements/{graded-narrative,ai-coach,evaluation-feedback,export}.spec.ts`.
+**How it closed.** The flag and the rules are gone. `QUALITY_LOOP_DETERMINISTIC`
+is the one switch left, and it turns the model off honestly: a run escalates
+with `llm-disabled` diagnostics and no score, the studio's `POST /criteria`
+proxy answers 503, and the UI says the grader is unavailable. No test reaches a
+model: studio-api binds a fake client, the loop's specs a fake model, and the
+e2e suite a stub quality-loop server.
 
-**Recommendation.** Same move as SEAM-1, sequenced: first recorded responses
-for the four journeys so the browser suite no longer needs the flag, then
-remove the flag and the no-op path.
-
-**Verify.** `grep -r EVAL_DETERMINISTIC packages` is empty; the e2e suite
-passes against recorded responses.
+**Verify.** `git grep EVAL_DETERMINISTIC packages` returns only the llm spec
+that proves the variable is no longer read.

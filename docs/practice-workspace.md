@@ -1,9 +1,11 @@
 # The practice workspace: tabs and how grading works
 
 A plain-language guide to the practice screen — what each dock tab is for, how
-the Brief and Narrative differ, and what the scoring actually reads. For the
+the Brief and Narrative differ, and what the grader actually reads. For the
 engineering detail behind the grade, see
-[`critic-eval-pipeline/how-it-works.md`](./critic-eval-pipeline/how-it-works.md).
+[`pipeline-best-practices/quality-loop.md`](./pipeline-best-practices/quality-loop.md)
+and the canvas pipeline itself,
+`packages/quality-loop/src/pipelines/system-design-canvas/`.
 
 ## The six tabs
 
@@ -12,179 +14,129 @@ and **see results / iterate**.
 
 ### Read the challenge
 
-- **Prompt** — the challenge, read-only. The scenario, functional requirements,
-  the non-functional requirements (kind · statement · target), scale targets
-  (users, RPS, read:write, p99, availability, retention), and — on order-history
-  prompts — the business workflow spec. This is _what you're asked to design_;
-  you never edit it.
+- **Prompt** — the challenge, read-only: its markdown as written, and its
+  **criteria** as chips grouped by kind — functional, non-functional, scale,
+  constraint — each with an id (`c1`, `c2`, …) and the statement the grader
+  derived from the text. The criteria are derived once, the first time the
+  prompt is opened ("normalising requirements…" while the grader answers), and
+  stay fixed for the prompt's life; they can be re-derived until a session has
+  been graded against them. This is _what you're asked to design_; you never
+  edit it here.
 
 ### Author your answer (these, plus the canvas, are your submission)
 
-- **Brief** — the _structured_ explanation, graded. Two parts: **NFR bindings**
-  (for each non-functional requirement, pick which components hold it and by what
-  mechanism, with a live chip showing whether the diagram actually backs the
-  claim) and **traced flows** (for each functional requirement, walk a connected
-  path of edges through the design).
-- **Narrative** — the _prose_ walkthrough, graded. An **overview**, a
-  **rationale per component**, and a **flow narration per requirement**, with
-  live checklists of what isn't explained yet.
+- **Brief** — the _structured_ explanation. One row per criterion: the
+  **components** that hold it (any nodes on the canvas), a **claim** in your
+  own words, and — where a request travels — a **traced path** of connected
+  edges. A row is `bound` once it has a claim and at least one component;
+  nothing else is checked here. Whether the claim holds is the grader's call.
+- **Narrative** — the _prose_ walkthrough: an **overview**, a **rationale per
+  component**, and a **narration per criterion**, keyed to the node and
+  criterion they explain.
 
 ### See results / iterate
 
-- **Feedback** — the graded result of the current revision: overall **score +
-  letter grade** (and any grade cap), **per-dimension scores** (reliability,
-  scalability, performance, data, messaging, security, hygiene, explanation,
-  product — "Not assessed" when a dimension doesn't apply), a summary, and the
-  **findings list** (each with severity, the affected components, and often a
-  one-click "Preview fix"). Advisory AI notes appear below the graded result.
-- **Coach** — the AI coach's live improvement run. The **trajectory streams in**
-  — iteration 0 (your baseline) then each proposal with its score and an
-  **accepted / rejected** verdict and a one-line lesson — with a Stop button
-  while it runs and **Load improved design** when it finishes. Explains itself if
-  no model is available.
-- **Revisions** — the version history: one chip per submitted revision, newest
-  first, as `#n grade score`, with an **AI** badge on coach-authored revisions.
-  Click a chip to load that revision onto the canvas read-only.
+- **Feedback** — the graded result of the current revision, straight from the
+  quality loop: the **overall score** and the controller's **decision**
+  (accept / revise / retry / escalate / reject), one **meter per dimension**
+  the pipeline declares (coverage, quality attributes, compliance — "Not
+  assessed" when nothing earned it), a **result per criterion** (pass /
+  partial / fail), and the **findings**: each with its severity, the lenses
+  that confirmed it, its type, the criteria it names, the lens's rationale,
+  and the components it points at — click one and they highlight on the
+  canvas. While the run is in flight the tab polls; without a model it says so.
+- **Coach** — hand the current draft to the loop with a number of iterations.
+  The draft is stored as your revision; progress shows the model calls as they
+  happen; every iteration that scored strictly higher than all before it
+  arrives in the timeline as an **AI** revision, and **Load best** puts it on
+  the canvas read-only. Disabled, with the reason, when no model is available.
+- **Revisions** — the version history: one chip per revision, newest first,
+  with its score, decision and status, and an **AI** badge on coach-authored
+  ones. Click a chip to load that revision onto the canvas read-only.
 
 _(Above the canvas, the toolbar holds the actions: **Submit for evaluation**,
-**Clear**, **Fit view**, **Export** (a zip of the diagram PDF + per-artifact
-Markdown), and **Improve with AI**, which starts a Coach run.)_
+**Clear**, **Fit view** and **Export** — a zip of the diagram PDF plus
+per-artifact Markdown.)_
 
-## The Properties panel: why a component shows what it shows
+## The Properties panel
 
-Select a block and the panel shows, in order: **Label**, **Kind** (with a
-one-line guide: what the kind is, when to use it, and what interface it has),
-**Configuration**, **Interface**, then the block's suggestions. **Nothing here
-is global** — every section is gated by a table the grader also reads, and the
-panel now says so in a caption under each heading:
+Select a block and the panel shows, in order: **Kind** (grouped by category,
+with a one-line guide: what the kind is and when to use it), **Label**,
+**Configuration**, **Responsibilities** and **Operations**. Select an edge and
+it shows the edge's **kind** (sync or async), a label, and what it **carries**.
 
-- **Configuration** — the knobs the grader reads _for this kind_ (a database
-  offers `sharding`; a queue offers `dlq`; a vector store offers none). Each knob
-  changes a verdict or is reserved with a stated reason; a knob the grader cannot
-  read cannot be set.
-- **Interface** — only for kinds whose role declares operations (services and
-  workers _serve_ commands/queries; queues and streams _carry_ message types;
-  storage and edge infrastructure declare none). **Responsibilities** appear only
-  for api-like roles. Inside an operation row, **Fulfills** offers only the
-  prompt's workflow items that this role and this op kind may legally realize,
-  and **Emits** only the prompt's declared events, on commands — both are claims
-  by reference that the grader corroborates against your connections, never by
-  matching names.
-- **Suggest for this component** — the model proposes best-fit operations,
-  workflow groundings, knobs and responsibilities _from that same vocabulary_;
-  the validators submit runs verify each item before it is offered; you accept
-  them **one at a time** (there is deliberately no accept-all). With no model
-  configured the panel says so plainly.
-
-Why two tiers? The grader reads typed facts — kinds, knobs, ids, connections —
-never prose, so the vocabulary it grades is closed on purpose. Your open-ended
-intent lives in operation names, responsibilities, the brief and the narrative,
-which the AI critics judge.
+- **Configuration** is free-form: any key, with a value typed as you enter it
+  — `true`/`false` become flags, a number stays a number, anything else is
+  text. There is no vocabulary to learn; the grader reads whatever you wrote,
+  and a critic will say when a value contradicts a claim.
+- **Operations** are the component's declared interface — a name, a kind
+  (command, query, event, stream), whether it is idempotent, a note. An edge
+  may **carry** any operation declared on either of its endpoints; the panel
+  offers exactly those.
 
 ## Brief vs Narrative
 
 They explain the **same** design in two different forms:
 
-|         | **Brief**                                                                   | **Narrative**                                            |
-| ------- | --------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Form    | **structured** (references, dropdowns)                                      | **prose** (sentences)                                    |
-| Answers | _Which_ component holds each requirement, and the _path_ each request takes | _Why_ each component is there, and _how_ each flow works |
-| Made of | NFR bindings + traced flows                                                 | overview + component rationales + flow narrations        |
+|         | **Brief**                                                              | **Narrative**                                                    |
+| ------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Form    | **structured** (a row per criterion)                                   | **prose** (sentences)                                            |
+| Answers | _Which_ components hold each criterion, and the _path_ a request takes | _Why_ each component is there, and _how_ each requirement is met |
+| Made of | claim + components + traced path, per criterion                        | overview + rationale per component + narration per criterion     |
 
-Both point at the same anchors (node ids, requirement numbers), and both feed the
-one **explanation** score — the Brief is the structured half, the Narrative is
-the story half. Think of it as a **labelled legend** (Brief) versus the **spoken
+Both point at the same anchors — the canvas's node and edge ids, the prompt's
+criterion ids — and one critic, the explanation critic, reads them against the
+diagram. Think of it as a **labelled legend** (Brief) versus the **spoken
 walkthrough** (Narrative).
 
-## What the scoring reads
+## What the grader reads
 
-You author three things; the prompt is the answer key it's all measured against:
+You author three things; the prompt's criteria are the answer key it's all
+measured against:
 
-| Input                | What's in it                                                                                   | Mainly scores                                                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Diagram** (canvas) | nodes (kind, config knobs, responsibilities, operations) + edges (sync/async, what they carry) | every technical dimension — reliability, scalability, performance, data, messaging, security, hygiene, product |
-| **Brief**            | bindings + traced flows                                                                        | explanation (structured)                                                                                       |
-| **Narrative**        | overview + component rationales + flow narrations                                              | explanation (prose)                                                                                            |
-| **Prompt**           | scale targets, NFRs, functional requirements, workflow spec                                    | the _reference_ everything is judged against — you don't author it                                             |
+| Input                | What's in it                                                                             | Read by                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Diagram** (canvas) | nodes (kind, config, responsibilities, operations) + edges (sync/async, what they carry) | every lens — requirements, architecture, capacity, scenarios           |
+| **Brief**            | a claim, components and a path per criterion                                             | the explanation critic; both evaluators, as the evidence for a pass    |
+| **Narrative**        | overview + rationales + narrations                                                       | the explanation critic                                                 |
+| **Prompt**           | its markdown and its criteria                                                            | the goal every lens reads, and the rubric the evaluators grade against |
 
 Two rules keep the grade honest:
 
-- **Grounded in the diagram.** A Brief or Narrative claim only earns points if the
-  diagram actually backs it — a binding counts only if those components really
-  provide that mechanism. You can't talk your way to a score the design doesn't
-  support.
-- **No keyword gaming.** Prose is judged by its references plus a "reads-as-prose"
-  check, never by matching words. On the default stack the AI critic only adds
-  advisory notes and the deterministic engine sets the number. Under the opt-in
-  **deep eval** (RUNBOOK: `EVAL_DETERMINISTIC=0`), the critic and workability
-  evaluator can also _lower_ the score by finding **grounded weaknesses** —
-  each tied to a specific requirement and components, expressed as an ordinal
-  magnitude and confidence that the engine turns into a bounded, downward-only
-  deduction. The AI still never picks the number and can never trip a letter cap;
-  it only supplies grounded evidence for the engine to price.
+- **Explanation earns coverage.** A functional criterion passes only through a
+  binding whose path the diagram actually contains; a claim the diagram does
+  not back, a load-bearing component nobody explains, and a narration that
+  contradicts the drawing are findings priced onto the same dimension the
+  criterion earned on. You can't talk your way to a score the design doesn't
+  support — and a box with the right label and no story is worth as much as no
+  box.
+- **The model never picks the number.** Every lens answers in a schema of
+  categories and ordinals (severity, confidence, pass / partial / fail) locked
+  to the ids on the page; two independent samples must agree before an item
+  counts; the deterministic controller prices what they agreed on and decides.
 
 ## How the score is built
 
-Four steps turn your submission into a grade (rubric `default@3.3.0`):
+The canvas pipeline's policy — in
+`packages/quality-loop/src/pipelines/system-design-canvas/definition.ts`, data
+the engine validates at boot — says how:
 
-1. **Each dimension gets 0–100, or "Not assessed."** A dimension is _earned_ by
-   meeting the prompt's expectations for it, then **violations subtract** points.
-   A dimension the prompt never exercises (and that has no violations) is "Not
-   assessed" and simply drops out.
-2. **Overall = a weighted average of the assessed dimensions.** Dropped
-   dimensions don't count; the remaining weights are rescaled to fill the gap, so
-   the ratios below always hold among whatever applies.
-3. **A letter grade comes from the score:** **A ≥ 92, B ≥ 82, C ≥ 68, D ≥ 50**,
-   otherwise F.
-4. **Grade caps can lower the letter** — see below.
+1. **Each criterion is judged** pass, partial or fail by the evaluator that
+   owns its kind (functional and constraint → the requirements evaluator;
+   non-functional and scale → the quality evaluator), weighted by confidence.
+2. **Each dimension is earned by its criteria** — functional criteria earn
+   `coverage`, non-functional and scale earn `quality_attributes` (scale at
+   half weight), constraints earn `compliance` — then **confirmed findings
+   subtract**: a priced penalty per severity, decaying with each further
+   finding on the same dimension, clamped at a per-dimension cap.
+3. **Overall is the weighted average** of the assessed dimensions
+   (`coverage` 0.4, `quality_attributes` 0.4, `compliance` 0.2); a dimension
+   nothing earned drops out and the rest rescale.
+4. **Gates come before the number.** A `critical` finding, a confirmed
+   constraint violation or a failed constraint criterion blocks an accept
+   however high the score; at or above the accept threshold the decision is
+   `accept`, below the reject floor `retry`, and in between `revise` with the
+   remediations the coach would apply.
 
-### The weights (what counts most)
-
-The nine dimensions carry these shares of the final score (they sum to 1.0):
-
-| Dimension       | Weight     | Roughly |
-| --------------- | ---------- | ------- |
-| **Scalability** | **0.1825** | ~18%    |
-| **Explanation** | **0.17**   | ~17%    |
-| Reliability     | 0.142      | ~14%    |
-| Performance     | 0.1115     | ~11%    |
-| Data            | 0.1115     | ~11%    |
-| Product\*       | 0.10       | ~10%    |
-| Messaging       | 0.071      | ~7%     |
-| Security        | 0.071      | ~7%     |
-| Hygiene         | 0.0405     | ~4%     |
-
-\* Product only applies to prompts with a business workflow spec (e.g.
-order-history); on other prompts it is "Not assessed" and its share is
-redistributed.
-
-**Explanation is now a major factor** (~17%, second only to scalability): the two
-authoring tabs — Brief and Narrative — share this dimension, so _how well you
-explain your design_ is worth nearly a fifth of the grade. A weak or missing
-brief/narrative now costs you a lot; a strong one is worth real points. The
-technical side still leads — scalability is heaviest and the "does it work at
-scale" group (scalability + reliability + performance + data ≈ 55%) is the
-largest block — but the explanation is no longer a rounding error.
-
-### What's actually most important: the caps
-
-Two things override the number and cap your **letter grade** no matter how high
-the score:
-
-- **A critical finding caps you at C** (two or more → D). One critical
-  reliability or data hole means a 95/100 design is still a C.
-- **No narrative caps you at C.** A missing or thin walkthrough (`exp.nar.present`
-  unmet) can't earn better than C, however good the diagram — this is the
-  deterministic teeth behind "the narrative is required."
-
-So in practice: **avoid critical findings and always write a real narrative**
-matters more to your final grade than squeezing points anywhere else — and among
-the point-scoring dimensions, **scalability and now explanation move the number
-the most**, so a well-argued brief and narrative are worth genuinely investing in.
-
-### How violations subtract
-
-Within a dimension, each finding deducts by severity — **critical 35, high 22,
-medium 10, low 4, info 0** — and repeats **decay ×0.7** each time, so the first
-(worst) finding in a dimension hurts most and a pile-up of minor ones can't sink
-it past reason. "info" findings never cost points; they're advice.
+There is no letter grade and no cap the studio adds: what you see is the
+loop's decision and its trace.

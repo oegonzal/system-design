@@ -11,17 +11,18 @@ pre-commit hook and CI. Conventions and the index are in
 **Status** open · **Severity** high · **Where** `packages/llm/src/create-client.ts`, `packages/quality-loop/src/modules/runs/runs.module.ts`
 
 **What.** `create-client.ts` returns `NoopLlmClient` when `ANTHROPIC_API_KEY`
-is missing or `EVAL_DETERMINISTIC=1`, and `NoopEmbeddingClient` when
+is missing or `QUALITY_LOOP_DETERMINISTIC=1`, and `NoopEmbeddingClient` when
 `OPENAI_API_KEY` is missing. The quality loop's runs module resolves its
 client the same way: a key, the subscription route under
 `QUALITY_LOOP_AUTH=claude-code`, else no-op — silently, with the run
 recording `llm-disabled` diagnostics and the controller escalating for lack
 of criteria. The README describes the studio as "no-op without a key".
 
-The requirement says otherwise. Oscar's notes in
-[../review-carefully-and-complete-with-refinement.md](../review-carefully-and-complete-with-refinement.md):
-the assumption is that a model is available; if it is not, the pipeline
-fails at its precondition, because the only evidence wanted is a model's.
+The requirement says otherwise: the assumption is that a model is
+available; if it is not, the pipeline fails at its precondition, because the
+only evidence wanted is a model's. (The studio's half of this — a rules engine
+grading in the model's place — closed with STUDIO-8; the loop's silent no-op
+path is what remains.)
 
 **Evidence.** `create-client.ts` lines 21–22, 42, 52, 100, 105, 160–161;
 the boot comment at `runs.module.ts` lines 33–35; the escalation path in
@@ -77,8 +78,8 @@ records two exchanges and one report.
 cannot set temperature at all; the API client could. No response is
 memoised (ENG-7), so no experiment can hold the judges fixed.
 
-**Evidence.** `grep -ri temperature packages/llm/src` is empty;
-gap-analysis §2.4 and §3.3.
+**Evidence.** `grep -ri temperature packages/llm/src` is empty; the retired
+gap analysis, §2.4 and §3.3.
 
 **Recommendation.** Temperature 0 where the transport allows and record the
 setting on the exchange; memoisation per ENG-7; persist the per-lens model
@@ -138,7 +139,7 @@ the studio's Playwright journey. No stage calls a model, and no harness
 measures whether the lenses still find what they found — a prompt or model
 change is verified by hand, if at all.
 
-**Evidence.** `ci.yml`; gap-analysis §2.4 and §3.8.
+**Evidence.** `ci.yml`; the retired gap analysis, §2.4 and §3.8.
 
 **Recommendation.** Two layers. Recorded-response regression through
 `fakeLlm`: each persona's canned reports become fixtures, and a prompt change

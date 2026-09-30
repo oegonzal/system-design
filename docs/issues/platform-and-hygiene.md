@@ -85,17 +85,16 @@ verdict — against a server backed by `fakeLlm`, in the existing e2e project.
 
 ### PLAT-5 · Stale counts in four places
 
-**Status** open · **Severity** low · **Where** `docs/pipelines/overview.md`, `docs/critic-eval-pipeline/how-it-works.md` §6, `packages/run-dump/src/write-dump.ts:2`, `suggestion-dump.ts:13`
+**Status** closed · **Closed by** the delegation commits · **Where** `docs/pipelines/overview.md`, `packages/run-dump/src/write-dump.ts:2`
 
 **What.** The overview's organising counts — five pipelines, nine model call
-sites — predate the quality loop and now understate both. how-it-works §6
-counts four call sites; `write-dump.ts` says two pipelines dump;
-`suggestion-dump.ts` calls itself the third pipeline that talks to a model.
+sites — predated the quality loop and understated both; two dump modules
+counted pipelines that no longer exist.
 
-**Evidence.** memory-runs §11; pipelines/overview.md §9.
-
-**Recommendation.** Fix each when its page or file is next touched. The
-overview's premise needs a rewrite rather than a number change.
+**How it closed.** `pipelines/overview.md` was rewritten around the studio's
+three quality-loop paths and the loop's six pipelines; the how-it-works page
+and the suggestion dump were deleted with the studio's engine. What remains is
+the comment at `write-dump.ts:2`, fixed when that file is next touched.
 
 ---
 
@@ -149,7 +148,7 @@ tripwire grep over every commit since `origin/main` finds nothing.
 
 A human review queue, online monitors on a telemetry stack, and canary
 deployment infrastructure are explicitly not recommended at this scale
-(gap-analysis §4). The shadow-profile flag and a dump aggregation script
+(the retired gap analysis, §4). The shadow-profile flag and a dump aggregation script
 cover the doctrine's intent without the machinery; PLAT-1 gives the monitors
 a place to land if that changes.
 
@@ -160,12 +159,8 @@ a place to land if that changes.
 **Status** open · **Severity** low · **Where** `docs/`
 
 **What.** `docs/` mixes live references (`pipelines/`,
-`pipeline-best-practices/`, `critic-eval-pipeline/`, `practice-workspace.md`),
-archived material, and a prompt log
-(`review-carefully-and-complete-with-refinement.md`) that reads as a
-specification because nothing says otherwise. There is no map.
+`pipeline-best-practices/`, `practice-workspace.md`, `govcon/`) with archived
+material, and nothing says which is which. There is no map.
 
 **Recommendation.** A `docs/README.md` that lists each page, what it is for,
-and whether it is current; move the prompt log under `archived/` with a line
-saying which of its requirements are tracked here (SEAM-1, STUDIO-1,
-STUDIO-8).
+and whether it is current.

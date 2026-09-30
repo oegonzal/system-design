@@ -6,13 +6,13 @@ someone would otherwise rediscover. Each carries the evidence it was verified
 on and what would close it, so the next piece of work can cite an id instead
 of re-deriving the problem.
 
-| File                                                   | Area                                                       | Prefix   |
-| ------------------------------------------------------ | ---------------------------------------------------------- | -------- |
-| [quality-loop-engine.md](./quality-loop-engine.md)     | the generic loop: normaliser, scoring, controller, replay  | `ENG`    |
-| [memory-and-retrieval.md](./memory-and-retrieval.md)   | recall, digest, admission, the vector store                | `MEM`    |
-| [llm-seam-and-runtime.md](./llm-seam-and-runtime.md)   | `packages/llm`, boot, the hook, CI                         | `SEAM`   |
-| [studio-grading-engine.md](./studio-grading-engine.md) | the studio's rules-plus-critic grader against the doctrine | `STUDIO` |
-| [platform-and-hygiene.md](./platform-and-hygiene.md)   | observability, hosting, Tilt, docs, repo hygiene           | `PLAT`   |
+| File                                                   | Area                                                           | Prefix   |
+| ------------------------------------------------------ | -------------------------------------------------------------- | -------- |
+| [quality-loop-engine.md](./quality-loop-engine.md)     | the generic loop: normaliser, scoring, controller, replay      | `ENG`    |
+| [memory-and-retrieval.md](./memory-and-retrieval.md)   | recall, digest, admission, the vector store                    | `MEM`    |
+| [llm-seam-and-runtime.md](./llm-seam-and-runtime.md)   | `packages/llm`, boot, the hook, CI                             | `SEAM`   |
+| [studio-grading-engine.md](./studio-grading-engine.md) | the studio's grader, now the quality loop; closed entries kept | `STUDIO` |
+| [platform-and-hygiene.md](./platform-and-hygiene.md)   | observability, hosting, Tilt, docs, repo hygiene               | `PLAT`   |
 
 ## Conventions
 
@@ -60,14 +60,14 @@ of re-deriving the problem.
 | SEAM-4   | The boot sweep interrupts in-flight runs from any process                | open     | medium   |
 | SEAM-5   | The pre-commit review runs no critics on the subscription route          | open     | medium   |
 | SEAM-6   | CI never calls a model; no judge-regression harness                      | open     | medium   |
-| STUDIO-1 | Archetypes still drive prompt generation and coverage                    | open     | high     |
-| STUDIO-2 | Two grading engines coexist                                              | open     | high     |
-| STUDIO-3 | Critic and evaluator collapse into one weakness ordinal; no controller   | open     | medium   |
-| STUDIO-4 | Judge robustness is containment, not measurement                         | open     | medium   |
-| STUDIO-5 | A thin finding contract and two display leaks                            | open     | medium   |
-| STUDIO-6 | Lenses are code, not records, and run serially                           | open     | medium   |
+| STUDIO-1 | Archetypes still drive prompt generation and coverage                    | closed   | —        |
+| STUDIO-2 | Two grading engines coexist                                              | closed   | —        |
+| STUDIO-3 | Critic and evaluator collapse into one weakness ordinal; no controller   | closed   | —        |
+| STUDIO-4 | Judge robustness is containment, not measurement                         | closed   | —        |
+| STUDIO-5 | A thin finding contract and two display leaks                            | closed   | —        |
+| STUDIO-6 | Lenses are code, not records, and run serially                           | closed   | —        |
 | STUDIO-7 | Dumps are read by nothing; no incident loop                              | open     | medium   |
-| STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                             | open     | high     |
+| STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                             | closed   | —        |
 | PLAT-1   | No observability integration                                             | open     | high     |
 | PLAT-2   | Nothing declared or deployed on AWS                                      | open     | medium   |
 | PLAT-3   | Tilt covers the studio but not the vector store or the quality loop      | open     | medium   |
@@ -83,9 +83,11 @@ of re-deriving the problem.
 Ordered by how much of what the system reports would change meaning if the
 entry were closed, then by cost. Each points at the entry that specifies it.
 
-1. **Fail fast without a model** — SEAM-1, STUDIO-8. Every downstream number
-   is only as honest as the client that produced it; a silent no-op makes a
-   run look graded when it was not.
+1. **Fail fast without a model** — SEAM-1. Every downstream number is only
+   as honest as the client that produced it; a silent no-op makes a run look
+   graded when it was not. (STUDIO-8 closed with the studio's rules engine:
+   the loop is the studio's only grader now, and its no-op path escalates
+   with no score.)
 2. **Retry a schema miss once** — SEAM-2, ENG-2. One lost sample currently
    escalates a whole run and withholds every memory it would have injected.
 3. **Every declared dimension earns** — ENG-1. Twenty-three points of every
@@ -93,8 +95,8 @@ entry were closed, then by cost. Each points at the entry that specifies it.
    free.
 4. **Prove memory improves answers** — MEM-2. Transfer is measured; benefit
    is not. A paired experiment is one script and ten runs.
-5. **One grading engine** — STUDIO-2, with STUDIO-3, -4, -6 folding into it.
-   The doctrine-shaped loop exists; the studio does not use it.
+5. **One grading engine** — closed: STUDIO-2 and the entries that folded
+   into it. The studio grades, coaches and drafts prompts through the loop.
 6. **OpenTelemetry, then a vendor** — PLAT-1. The metrics worth a dashboard
    (schema-miss rate, escalation rate, admission ratio) are already in the
    records; nothing exports them.
