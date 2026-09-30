@@ -12,7 +12,7 @@ import {
 import { useState } from 'react';
 
 import { SLICE_OUTCOME_TONE } from '../tones';
-import { AWARD_SOURCE_COST, AWARD_SOURCE_LABEL, AWARD_SOURCE_OPTIONS } from './costs';
+import { AWARD_SOURCE_COST, AWARD_SOURCE_LABEL, AWARD_SOURCE_OPTIONS, FETCH_COST } from './costs';
 
 export interface FetchAwardsFormProps {
   /** The codes the form starts with — the active profile's. */
@@ -118,9 +118,7 @@ export function FetchAwardsForm({
           {pending ? 'Fetching…' : 'Fetch'}
         </Button>
         <Text tone="secondary" size="sm">
-          {sources.includes('sam.gov')
-            ? `Spends up to ${codes.length + pscCodes.length} × 3 SAM.gov requests; USAspending is free.`
-            : 'Spends nothing: USAspending only.'}
+          {sources.includes('sam.gov') ? FETCH_COST.budgeted : FETCH_COST.free}
         </Text>
       </Stack>
       {report ? <FetchReport report={report} /> : null}

@@ -1,4 +1,4 @@
-import { agencyOf, clip, money, type Award } from '@sysdesign/contracts';
+import { agencyOf, type Award, clip, money, rangeLabel } from '@sysdesign/contracts';
 import { Badge, Button, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { AWARD_SOURCE_TONE } from '../tones';
@@ -13,13 +13,14 @@ export interface AwardTableProps {
 
 /** The stored awards over the filters, newest signed first, one page at a time. */
 export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableProps) {
-  const last = Math.min(total, offset + awards.length);
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={4} align="center" wrap justify="between">
         <Heading level={3}>Awards</Heading>
         <Text tone="secondary" size="sm">
-          {total === 0 ? 'none stored over these filters' : `${offset + 1}–${last} of ${total}`}
+          {total === 0
+            ? 'none stored over these filters'
+            : rangeLabel(offset, awards.length, total)}
         </Text>
       </Stack>
       {awards.length === 0 ? (
@@ -77,7 +78,7 @@ export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableP
             type="button"
             variant="subtle"
             size="sm"
-            disabled={last >= total}
+            disabled={offset + awards.length >= total}
             onClick={() => onPage(offset + limit)}
           >
             Next

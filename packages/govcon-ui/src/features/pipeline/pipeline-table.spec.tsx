@@ -37,7 +37,7 @@ describe('PipelineTable', () => {
   it('[GOVU-7] pages a longer pipeline and waits while a stage is written', () => {
     const onPage = fn();
     renderWithTheme(<Paged onPage={onPage} />);
-    expect(screen.getByText('120 tracked · showing 3 from 50')).toBeTruthy();
+    expect(screen.getByText('120 tracked · showing 51–53 of 120')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(onPage).toHaveBeenCalledWith(100);
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));

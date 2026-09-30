@@ -7,6 +7,7 @@ import {
   daysUntil,
   minute,
   money,
+  rangeLabel,
   summarizePull,
 } from './format';
 import { pullReportOf, sliceReportOf } from './fixtures';
@@ -41,6 +42,9 @@ describe('govcon formatting', () => {
     expect(daysUntil('2026-09-19T00:00:00Z', now)).toBe(-1);
     expect(daysUntil(null, now)).toBeNull();
     expect(daysUntil('not a date', now)).toBeNull();
+    expect(rangeLabel(0, 10, 24)).toBe('1–10 of 24');
+    expect(rangeLabel(20, 4, 24)).toBe('21–24 of 24');
+    expect(rangeLabel(0, 0, 0)).toBe('0 of 0');
     expect([null, -2, 0, 5].map(daysLeftLabel)).toEqual(['—', '2 day(s) ago', 'today', '5 day(s)']);
   });
 

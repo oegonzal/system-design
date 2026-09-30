@@ -41,6 +41,10 @@ export const daysUntil = (iso: string | null, nowMs: number): number | null => {
   return Number.isNaN(at) ? null : Math.ceil((at - nowMs) / DAY_MS);
 };
 
+/** Which rows a page shows of the whole: `1–10 of 24`, or `0 of 0` for an empty page. */
+export const rangeLabel = (offset: number, count: number, total: number): string =>
+  count === 0 ? `0 of ${total}` : `${offset + 1}–${offset + count} of ${total}`;
+
 /** Whole days until a mark, as a cell reads it: `3 day(s)`, `today`, `2 day(s) ago`, or a dash. */
 export const daysLeftLabel = (days: number | null): string =>
   days === null ? DASH : days < 0 ? `${-days} day(s) ago` : days === 0 ? 'today' : `${days} day(s)`;

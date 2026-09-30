@@ -6,6 +6,7 @@ import {
   daysLeftLabel,
   daysUntil,
   DUE_SOON_DAYS,
+  rangeLabel,
   type BidStage,
   type PipelineRow,
 } from '@sysdesign/contracts';
@@ -42,7 +43,7 @@ export function PipelineTable({
   return (
     <Stack gap={3}>
       <Text tone="secondary" size="sm">
-        {total} tracked · showing {rows.length} from {offset}
+        {total} tracked · showing {rangeLabel(offset, rows.length, total)}
       </Text>
       {rows.length === 0 ? (
         <Text tone="muted" size="sm">

@@ -1,6 +1,6 @@
 'use client';
 
-import type { SearchProfile, SourceOperation } from '@sysdesign/contracts';
+import { documentOf, type SearchProfile, type SourceOperation } from '@sysdesign/contracts';
 import { Alert, Heading, LiveRegion, Spinner, Stack, Surface } from '@sysdesign/design-system';
 import { ApiError, toErrorMessage, useResource } from '@sysdesign/web-kit';
 import { useState } from 'react';
@@ -141,7 +141,7 @@ export function SettingsClient() {
             onNew={() => setEditing({ kind: 'create', draft: PROFILE_TEMPLATE })}
             onCopy={(id) => {
               const from = profiles.find((profile) => profile.id === id);
-              if (from) setEditing({ kind: 'create', draft: copyOf(from) });
+              if (from) setEditing({ kind: 'create', draft: copyOf(documentOf(from)) });
             }}
             onSetDefault={(id) =>
               void act(`Profile ${id} is now the default.`, () => api.setDefaultProfile(id))
@@ -168,7 +168,7 @@ export function SettingsClient() {
         ) : active ? (
           <EditorPanel
             key={`edit:${active.id}:${active.updatedAt}`}
-            initial={active}
+            initial={documentOf(active)}
             mode="edit"
             onSaved={onSaved}
           />

@@ -32,6 +32,12 @@ export default [
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {
+      // A rest destructure that drops fields (`const { stored, ...document } = row`)
+      // is the idiom for a projection; the dropped names are not unused work.
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@nx/enforce-module-boundaries': [
         'error',
         {

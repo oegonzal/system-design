@@ -1,4 +1,4 @@
-import { agencyOf, clip, day, type LeadsReport } from '@sysdesign/contracts';
+import { agencyOf, clip, day, rangeLabel, type LeadsReport } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
@@ -30,8 +30,8 @@ export function LeadTable({
       <Heading level={2}>{heading}</Heading>
       <Text tone="secondary" size="sm">
         {report.candidates} candidate(s){report.capped ? ' (capped — narrow the filters)' : ''} ·{' '}
-        {report.excluded} excluded by a gate · {report.matching} over the filters ·{' '}
-        {report.leads.length} shown from {report.offset}
+        {report.excluded} excluded by a gate · {report.matching} over the filters · showing{' '}
+        {rangeLabel(report.offset, report.leads.length, report.matching)}
       </Text>
       {report.leads.length === 0 ? (
         <Text tone="muted" size="sm">

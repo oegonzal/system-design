@@ -26,12 +26,12 @@ export function useAction<A extends unknown[], R>(
   const latest = useRef(action);
   latest.current = action;
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
       mounted.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const run = useCallback(async (...args: A): Promise<R | null> => {
     setPending(true);

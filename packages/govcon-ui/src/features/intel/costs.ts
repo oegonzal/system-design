@@ -11,6 +11,12 @@ export const AWARD_SOURCE_COST: Record<AwardSource, string> = {
   usaspending: 'free — no key, no budget',
 };
 
+/** What one Fetch click spends, by whether SAM.gov is among the sources. */
+export const FETCH_COST = {
+  budgeted: `Spends up to ${MAX_AWARD_PAGES} SAM.gov requests (one per page, every code in one request); USAspending is free.`,
+  free: 'Spends nothing: USAspending only.',
+} as const;
+
 export const AWARD_SOURCE_LABEL: Record<AwardSource, string> = {
   'sam.gov': 'SAM.gov Contract Awards',
   usaspending: 'USAspending',

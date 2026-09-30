@@ -26,7 +26,7 @@ describe('FetchAwardsForm', () => {
     fireEvent.change(screen.getByLabelText('Signed from'), { target: { value: '2026-01-01' } });
     fireEvent.change(screen.getByLabelText('Signed to'), { target: { value: '2026-09-29' } });
     fireEvent.click(screen.getByLabelText(/USAspending — free/));
-    expect(screen.getByText(/Spends up to 3 × 3 SAM\.gov requests/)).toBeTruthy();
+    expect(screen.getByText(/Spends up to 3 SAM\.gov requests \(one per page/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Fetch' }));
     expect(onFetch).toHaveBeenCalledWith({
       naics: ['332710', '541511'],

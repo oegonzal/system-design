@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { useAction } from './use-action';
@@ -33,6 +34,15 @@ describe('useAction', () => {
     expect(answer).toBeNull();
     expect(result.current.error).toBe('409: already exists');
     act(() => result.current.reset());
+    expect(result.current.error).toBeNull();
+  });
+
+  it('settles pending after the write even when the effects ran twice, as StrictMode runs them', async () => {
+    const { result } = renderHook(() => useAction(async () => 'done'), { wrapper: StrictMode });
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(result.current.pending).toBe(false);
     expect(result.current.error).toBeNull();
   });
 });

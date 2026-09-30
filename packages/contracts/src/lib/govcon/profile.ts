@@ -96,6 +96,14 @@ export interface StoredProfile extends SearchProfile {
   updatedAt: string;
 }
 
+/** The document inside a stored profile — what an editor starts from and a save sends back. */
+export const documentOf = ({
+  isDefault: _isDefault,
+  createdAt: _createdAt,
+  updatedAt: _updatedAt,
+  ...document
+}: StoredProfile): SearchProfile => document;
+
 /** `POST /profiles` and `PUT /profiles/:id` take the whole document; the service validates it. */
 export type SaveProfileRequest = SearchProfile;
 

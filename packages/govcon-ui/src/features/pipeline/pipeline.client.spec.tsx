@@ -46,16 +46,16 @@ describe('PipelineClient', () => {
     await screen.findByRole('table', { name: 'Pipeline' });
     expect(screen.getByRole('list', { name: 'Pipeline summary' })).toBeTruthy();
     expect(calls.map((call) => call.url)).toContain('/pipeline?profile=enfav&limit=50&offset=0');
-    expect(screen.getByText('3 tracked · showing 3 from 0')).toBeTruthy();
+    expect(screen.getByText('3 tracked · showing 1–3 of 3')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('tab', { name: 'submitted' }));
-    await screen.findByText('1 tracked · showing 1 from 0');
+    await screen.findByText('1 tracked · showing 1–1 of 1');
     expect(calls.map((call) => call.url)).toContain(
       '/pipeline?profile=enfav&stage=submitted&limit=50&offset=0',
     );
 
     fireEvent.click(screen.getByRole('tab', { name: 'all' }));
-    await screen.findByText('3 tracked · showing 3 from 0');
+    await screen.findByText('3 tracked · showing 1–3 of 3');
     const before = calls.length;
     fireEvent.change(screen.getAllByLabelText(/^Stage of/)[0] as HTMLSelectElement, {
       target: { value: 'preparing' },

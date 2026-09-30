@@ -66,10 +66,13 @@ describe('SettingsClient', () => {
     expect(issue.getAttribute('data-path')).toBe('scoring.weights');
     expect(screen.getByText(/1 issue\(s\) — nothing was saved/)).toBeTruthy();
     const put = fetchMock.mock.calls.find((call) => String(call[0]).endsWith('/profiles/enfav'));
-    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toMatchObject({
+    const body = JSON.parse(String((put?.[1] as RequestInit).body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
       id: 'enfav',
       scoring: expect.objectContaining({ weights: expect.objectContaining({ naics: 0.5 }) }),
     });
+    expect(body).not.toHaveProperty('isDefault');
+    expect(body).not.toHaveProperty('updatedAt');
 
     fireEvent.change(screen.getByLabelText('Weight naics'), { target: { value: '0.3' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));

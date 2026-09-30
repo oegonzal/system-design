@@ -35,7 +35,7 @@ describe('LeadTable', () => {
     ).toBe('_blank');
     expect(
       screen.getByText(
-        /4 candidate\(s\) · 1 excluded by a gate · 3 over the filters · 3 shown from 0/,
+        /4 candidate\(s\) · 1 excluded by a gate · 3 over the filters · showing 1–3 of 3/,
       ),
     ).toBeTruthy();
   });
