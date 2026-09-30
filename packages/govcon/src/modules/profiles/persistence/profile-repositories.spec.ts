@@ -73,11 +73,13 @@ describe('the profile and saved-search repositories in Postgres', () => {
     expect(first).toMatchObject({ profileId: 'tiny', ...input, lastRunAt: null, createdAt: t1 });
     expect(first.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(await searches.insert('tiny', input, t1)).toBeNull();
-    const second = must(await searches.insert(
-      'tiny',
-      { ...input, name: 'Software', filter: { naics: '541511', status: 'active' }, pullOrder: 0 },
-      t1,
-    ));
+    const second = must(
+      await searches.insert(
+        'tiny',
+        { ...input, name: 'Software', filter: { naics: '541511', status: 'active' }, pullOrder: 0 },
+        t1,
+      ),
+    );
 
     expect((await searches.listByProfile('tiny')).map((s) => s.name)).toEqual([
       'Software',

@@ -2,9 +2,12 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
+  Bid,
+  BidPipelineSummary,
   DescriptionFetch,
   LeadsReport,
   NoticeDto,
+  PipelineRow,
   PullReport,
   SavedSearch,
   SourceCall,
@@ -13,6 +16,7 @@ import type {
 } from '@sysdesign/contracts';
 import {
   ensureDatabase,
+  GovconBid,
   GovconOpportunity,
   GovconSavedSearch,
   GovconSearchProfile,
@@ -88,6 +92,7 @@ async function boot() {
 
 const truncate = async (em: EntityManager) => {
   await em.fork().nativeDelete(GovconSourceCall, {});
+  await em.fork().nativeDelete(GovconBid, {});
   await em.fork().nativeDelete(GovconOpportunity, {});
   await em.fork().nativeDelete(GovconSavedSearch, {});
   await em.fork().nativeDelete(GovconSearchProfile, {});
@@ -342,6 +347,7 @@ describe('the govcon HTTP surface', () => {
     expect(detail.data.opportunity.noticeId).toBe('a');
     expect(detail.data.factors).toHaveLength(8);
     expect(detail.data.description).toBeNull();
+    expect(detail.data.bid).toBeNull();
     expect((await fetch(`${url}/notices/nope?profile=tiny`)).status).toBe(404);
     expect((await post(url, '/notices/nope/description', {})).status).toBe(404);
 
@@ -389,5 +395,46 @@ describe('the govcon HTTP surface', () => {
     ).toEqual(['a', 'c']);
     expect(JSON.stringify(calls)).not.toContain('api_key');
     expect((await fetch(`${url}/source/calls?limit=0`)).status).toBe(400);
+  });
+
+  it('[GOV-8] [GOV-12] puts a bid on a stored notice, shows it on the notice, lists the pipeline, and removes it', async () => {
+    await pulled();
+    expect((await send(url, 'PUT', '/notices/nope/bid', { stage: 'watching' })).status).toBe(404);
+    const bad = await send(url, 'PUT', '/notices/a/bid', { stage: 'dreaming' });
+    expect(bad.status).toBe(400);
+    expect((await json<Issues>(bad)).issues[0]?.path).toBe('stage');
+
+    const saved = await send(url, 'PUT', '/notices/a/bid', {
+      stage: 'qualifying',
+      notes: 'Ask for the drawing',
+      reminderAt: '2026-09-29T09:00:00.000Z',
+      estimatedValue: 48000,
+    });
+    expect(saved.status).toBe(200);
+    expect((await json<Envelope<Bid>>(saved)).data).toMatchObject({
+      noticeId: 'a',
+      stage: 'qualifying',
+      notes: 'Ask for the drawing',
+      reminderAt: '2026-09-29T09:00:00.000Z',
+      estimatedValue: 48000,
+      stageChangedAt: NOW.toISOString(),
+    });
+    expect((await get<Envelope<NoticeDto>>(url, '/notices/a')).data.bid?.stage).toBe('qualifying');
+    await send(url, 'PUT', '/notices/c/bid', { stage: 'passed' });
+
+    const pipeline = await get<Page<PipelineRow>>(url, '/pipeline?stage=qualifying');
+    expect(pipeline.meta).toEqual({ total: 1, limit: 50, offset: 0 });
+    expect(pipeline.data.map((row) => [row.bid.noticeId, row.lead.tier])).toEqual([['a', 'high']]);
+    expect((await get<Page<PipelineRow>>(url, '/pipeline')).meta.total).toBe(2);
+    expect((await fetch(`${url}/pipeline?stage=dreaming`)).status).toBe(400);
+    expect((await get<Envelope<BidPipelineSummary>>(url, '/pipeline/summary')).data).toMatchObject({
+      byStage: { qualifying: 1, passed: 1, watching: 0 },
+      dueSoon: 1,
+      total: 2,
+    });
+
+    expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(204);
+    expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(404);
+    expect((await get<Envelope<NoticeDto>>(url, '/notices/a')).data.bid).toBeNull();
   });
 });

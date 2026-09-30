@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
+  Bid,
   Description,
   DescriptionFetch,
   LeadsReport,
@@ -10,6 +11,8 @@ import type {
 import type { RequestGate } from '../../core/budget';
 import { candidateFilterOf, type LeadFilters } from '../../core/candidates';
 import type {
+  BidRecord,
+  BidRepository,
   NoticeDescriptions,
   OpportunityRepository,
   StoredDescription,
@@ -17,7 +20,7 @@ import type {
 import { NO_HISTORY, rankLeads, scoreLead, type ScoringContext } from '../../core/scoring';
 import { ProfilesService } from '../profiles/profiles.service';
 import { CLOCK, NOTICE_DESCRIPTIONS, REQUEST_GATE } from '../sources/tokens';
-import { OPPORTUNITY_REPOSITORY } from './tokens';
+import { BID_REPOSITORY, OPPORTUNITY_REPOSITORY } from './tokens';
 
 /** Everything `GET /leads` may ask: store-side filters, the score cut, the page. */
 export interface LeadsOptions extends LeadFilters {
@@ -38,6 +41,7 @@ export class OpportunitiesService {
 
   constructor(
     @Inject(OPPORTUNITY_REPOSITORY) private readonly repository: OpportunityRepository,
+    @Inject(BID_REPOSITORY) private readonly bids: BidRepository,
     @Inject(NOTICE_DESCRIPTIONS) private readonly descriptions: NoticeDescriptions,
     @Inject(REQUEST_GATE) private readonly gate: RequestGate,
     private readonly profiles: ProfilesService,
@@ -72,10 +76,14 @@ export class OpportunitiesService {
     const profile = await this.profiles.resolve(profileId);
     const opportunity = await this.repository.findOne(noticeId);
     if (!opportunity) return null;
-    const stored = await this.repository.findDescription(noticeId);
+    const [stored, bid] = await Promise.all([
+      this.repository.findDescription(noticeId),
+      this.bids.find(noticeId),
+    ]);
     return {
       ...scoreLead(opportunity, profile, this.context(this.now())),
       description: stored ? toDescription(stored) : null,
+      bid: bid ? toBid(bid) : null,
     };
   }
 
@@ -122,6 +130,18 @@ export class OpportunitiesService {
     return { nowMs: now.getTime(), history: NO_HISTORY };
   }
 }
+
+/** The wire shape of a stored bid; the bids module's service is the other user. */
+export const toBid = (record: BidRecord): Bid => ({
+  noticeId: record.noticeId,
+  stage: record.stage,
+  notes: record.notes,
+  reminderAt: record.reminderAt === null ? null : record.reminderAt.toISOString(),
+  estimatedValue: record.estimatedValue,
+  stageChangedAt: record.stageChangedAt.toISOString(),
+  createdAt: record.createdAt.toISOString(),
+  updatedAt: record.updatedAt.toISOString(),
+});
 
 const toDescription = (stored: StoredDescription): Description => ({
   text: stored.text,

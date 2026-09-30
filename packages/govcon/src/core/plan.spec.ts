@@ -17,10 +17,14 @@ describe('the pull plan', () => {
         pullOrder: -1,
       },
     ];
-    const plan = planPulls(tinyProfile(), [pick(searches, 1), pick(searches, 2), pick(searches, 0)], {
-      from: '2026-09-20',
-      to: '2026-09-26',
-    });
+    const plan = planPulls(
+      tinyProfile(),
+      [pick(searches, 1), pick(searches, 2), pick(searches, 0)],
+      {
+        from: '2026-09-20',
+        to: '2026-09-26',
+      },
+    );
     expect(plan).toEqual([
       {
         name: 'Machine shops',

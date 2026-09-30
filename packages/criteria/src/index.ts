@@ -23,7 +23,8 @@ export const CRITERIA: readonly Criterion[] = [
   },
   {
     id: 'UX-5',
-    statement: 'Components declare operations and responsibilities, and a connection carries an operation declared on either of its endpoints.',
+    statement:
+      'Components declare operations and responsibilities, and a connection carries an operation declared on either of its endpoints.',
   },
   {
     id: 'UX-6',
@@ -60,24 +61,36 @@ export const CRITERIA: readonly Criterion[] = [
       'A practice URL for a session that no longer exists shows a graceful not-found with a way back to the dashboard, never a raw server error; a transient load failure offers a retry instead.',
   },
   // Prompt generation from experience
-  { id: 'GEN-1', statement: "A design prompt can be generated from an experience by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated." },
+  {
+    id: 'GEN-1',
+    statement:
+      "A design prompt can be generated from an experience by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated.",
+  },
   {
     id: 'GEN-2',
-    statement: 'A prompt can be written by hand as markdown and is stored verbatim with the rubric the grader derives from it.',
+    statement:
+      'A prompt can be written by hand as markdown and is stored verbatim with the rubric the grader derives from it.',
   },
   {
     id: 'GEN-3',
-    statement: "A prompt can be imported from the grader's library and is stored with the rubric the grader derives from it.",
+    statement:
+      "A prompt can be imported from the grader's library and is stored with the rubric the grader derives from it.",
   },
   // Critic / eval pipeline
-  { id: 'EVAL-1', statement: "A submitted revision is graded by the quality loop: the feedback shows the run's overall score, decision, one meter per dimension the pipeline declares, and a result per criterion." },
+  {
+    id: 'EVAL-1',
+    statement:
+      "A submitted revision is graded by the quality loop: the feedback shows the run's overall score, decision, one meter per dimension the pipeline declares, and a result per criterion.",
+  },
   {
     id: 'EVAL-2',
-    statement: "Findings teach: each carries the lens's rationale and is grounded onto the canvas — the nodes and edges it names highlight when selected.",
+    statement:
+      "Findings teach: each carries the lens's rationale and is grounded onto the canvas — the nodes and edges it names highlight when selected.",
   },
   {
     id: 'EVAL-3',
-    statement: 'A design improved along a finding, resubmitted, is graded higher, and the timeline shows the rising trend.',
+    statement:
+      'A design improved along a finding, resubmitted, is graded higher, and the timeline shows the rising trend.',
   },
   {
     id: 'UX-14',
@@ -117,7 +130,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-6',
     statement:
-      "Three prompt sources — authored, imported, generated — yield one shape, and a grader without a model answers 503 with its availability rather than an invented rubric.",
+      'Three prompt sources — authored, imported, generated — yield one shape, and a grader without a model answers 503 with its availability rather than an invented rubric.',
   },
   {
     id: 'DEL-7',
@@ -338,6 +351,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'GOV-15',
     statement:
       "A ranking loads only what a gate would not exclude — active, open, a biddable set-aside or none, no excluded type — plus the request's filters, in SQL, bounded by MAX_CANDIDATES with the report saying when the bound cut; leads are ranked deterministically and paged.",
+  },
+  {
+    id: 'GOV-12',
+    statement:
+      'A bid is one row per stored notice, keyed by it and gone with it: the stage comes from the package vocabulary, an unknown notice is refused before any write, omitted fields keep their value, the stage timestamp moves only with the stage, and the pipeline lists tracked notices scored with their counts and what is due soon.',
   },
   {
     id: 'GOV-13',

@@ -1,3 +1,4 @@
+import { PrimaryKeyProp } from '@mikro-orm/core';
 import { Entity, Index, PrimaryKey, Property } from '@mikro-orm/decorators/legacy';
 import type * as Contracts from '@sysdesign/contracts';
 
@@ -21,6 +22,9 @@ import type * as Contracts from '@sysdesign/contracts';
     'create index "govcon_opportunity_open_index" on "govcon_opportunity" ("posted_at" desc) where active is distinct from false',
 })
 export class GovconOpportunity {
+  /** Tells MikroORM's types which property is the key, so a relation filter takes the notice id. */
+  [PrimaryKeyProp]?: 'noticeId';
+
   @PrimaryKey({ type: 'varchar', length: 80 })
   noticeId!: string;
 

@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { RequestGate, type BudgetPolicy } from '../../core/budget';
 import {
   failure,
+  InMemoryBidRepository,
   InMemoryOpportunityRepository,
   InMemoryProfileRepository,
   InMemorySavedSearchRepository,
@@ -35,14 +36,16 @@ async function harness(
     new InMemorySavedSearchRepository(),
     () => NOW,
   );
+  const bids = new InMemoryBidRepository(repository);
   const service = new OpportunitiesService(
     repository,
+    bids,
     descriptions,
     new RequestGate(log, policy, () => NOW),
     profiles,
     () => NOW,
   );
-  return { descriptions, log, repository, service };
+  return { bids, descriptions, log, repository, service };
 }
 
 const page = { minScore: 0, tier: null, limit: 25, offset: 0 } as const;
@@ -113,6 +116,7 @@ describe('the opportunities service', () => {
     expect(notice?.opportunity.noticeId).toBe('n-9');
     expect(notice?.factors).toHaveLength(8);
     expect(notice?.description).toBeNull();
+    expect(notice?.bid).toBeNull();
     expect(await service.notice('missing', 'tiny')).toBeNull();
 
     await service.fetchDescription('n-9');

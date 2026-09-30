@@ -4,6 +4,7 @@
  * the ledger are MikroORM; specs hand in the fakes from `../testing`. Nothing
  * here knows about Nest, the filesystem, the environment, `fetch` or a clock.
  */
+export * from './bids';
 export * from './description';
 export * from './ledger';
 export * from './profiles';
