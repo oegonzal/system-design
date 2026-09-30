@@ -1,14 +1,14 @@
 import {
   NARRATION_MAX_COMPONENT_RATIONALES,
-  NARRATION_MAX_FLOW_NARRATIONS,
+  NARRATION_MAX_CRITERION_NARRATIONS,
   NARRATION_OVERVIEW_MAX_LENGTH,
   NARRATION_PROSE_MAX_LENGTH,
   NARRATION_VERSION,
-  readsAsProse,
   type CanvasGraph,
   type ComponentRationale,
+  type CriterionNarration,
+  type CriterionRef,
   type DesignNarrative,
-  type FlowNarration,
 } from '@sysdesign/contracts';
 
 /**
@@ -16,49 +16,39 @@ import {
  * `brief-draft.ts`.
  *
  * The narrative is authored as reference-anchored slots: an overview, a
- * rationale per component (keyed to a node id) and a narration per functional
- * requirement (keyed to an ordinal). `reconcileNarration` is the one place a
- * draft becomes a payload — dropping a rationale for a node the canvas no longer
- * has, exactly as `reconcileBrief` drops a binding whose node was deleted,
- * because a canvas edit must never make the API reject what the author wrote.
+ * rationale per component (keyed to a node id) and a narration per criterion
+ * (keyed to its id). `reconcileNarration` is the one place a draft becomes a
+ * payload — dropping a rationale for a node the canvas no longer has and a
+ * narration for a criterion the prompt never derived, exactly as
+ * `reconcileBrief` drops a binding whose node was deleted, because a canvas
+ * edit must never make the API reject what the author wrote.
  *
- * Thinness is never dropped here. A two-word rationale is a real slot that
- * grades poorly, not an empty one — the grade decides substance (via
- * `readsAsProse`), the editor only strips slots with no prose at all.
+ * Thinness is never judged here. Whether a rationale explains anything is the
+ * explanation critic's call; the editor only knows written from unwritten.
  */
 
-/** How a slot reads to the grade, computed live so the author sees what it will earn. */
-export type NarrationSlotState = 'empty' | 'thin' | 'explained';
+export type NarrationSlotState = 'empty' | 'filled';
 
-/**
- * The live verdict on one slot's prose. `explained` is exactly what
- * `projectNarration` will count; `thin` is present-but-insubstantial (written,
- * but below the prose gate); `empty` is nothing typed.
- */
 export function narrationSlotState(prose: string): NarrationSlotState {
-  if (prose.trim().length === 0) return 'empty';
-  return readsAsProse(prose) ? 'explained' : 'thin';
+  return prose.trim().length === 0 ? 'empty' : 'filled';
 }
 
 /**
- * The draft as a payload, or `null` when there is nothing worth sending.
+ * The draft as a payload, or `null` when nothing is written.
  *
- * Null rather than an empty narrative on purpose: `narrationHasClaims` treats a
- * narrative with no substantive slot as no claims at all, so submitting one
- * would grade exactly like silence but leave a stored artifact implying
- * otherwise — the same trap `reconcileBrief` avoids.
- *
- * Everything here is a DROP, never a rejection: a rationale for a deleted node
- * stops existing, an empty-prose slot is left out, and the caps mirror the DTO's
- * so a draft can never grow into a shape the API would refuse.
+ * Null rather than an empty narrative on purpose: the lenses read "no
+ * narrative" as exactly that, while a stored empty one would imply the author
+ * chose to explain nothing — the same trap `reconcileBrief` avoids.
  */
 export function reconcileNarration(
   overview: string,
   rationales: readonly ComponentRationale[],
-  flows: readonly FlowNarration[],
+  narrations: readonly CriterionNarration[],
   graph: CanvasGraph,
+  criteria: readonly CriterionRef[],
 ): DesignNarrative | null {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const criterionIds = new Set(criteria.map((criterion) => criterion.id));
 
   const seenNodes = new Set<string>();
   const componentRationales = rationales
@@ -74,26 +64,26 @@ export function reconcileNarration(
     })
     .slice(0, NARRATION_MAX_COMPONENT_RATIONALES);
 
-  const seenRequirements = new Set<number>();
-  const flowNarrations = flows
-    .map((flow) => ({
-      requirementIndex: flow.requirementIndex,
-      prose: flow.prose.trim().slice(0, NARRATION_PROSE_MAX_LENGTH),
+  const seenCriteria = new Set<string>();
+  const criterionNarrations = narrations
+    .map((narration) => ({
+      criterionId: narration.criterionId,
+      prose: narration.prose.trim().slice(0, NARRATION_PROSE_MAX_LENGTH),
     }))
-    .filter((flow) => {
-      if (flow.prose.length === 0 || flow.requirementIndex < 0) return false;
-      if (seenRequirements.has(flow.requirementIndex)) return false;
-      seenRequirements.add(flow.requirementIndex);
+    .filter((narration) => {
+      if (narration.prose.length === 0 || !criterionIds.has(narration.criterionId)) return false;
+      if (seenCriteria.has(narration.criterionId)) return false;
+      seenCriteria.add(narration.criterionId);
       return true;
     })
-    .slice(0, NARRATION_MAX_FLOW_NARRATIONS);
+    .slice(0, NARRATION_MAX_CRITERION_NARRATIONS);
 
   const trimmedOverview = overview.trim().slice(0, NARRATION_OVERVIEW_MAX_LENGTH);
 
   if (
     trimmedOverview.length === 0 &&
     componentRationales.length === 0 &&
-    flowNarrations.length === 0
+    criterionNarrations.length === 0
   ) {
     return null;
   }
@@ -102,6 +92,6 @@ export function reconcileNarration(
     version: NARRATION_VERSION,
     ...(trimmedOverview.length > 0 ? { overview: trimmedOverview } : {}),
     componentRationales,
-    flowNarrations,
+    criterionNarrations,
   };
 }

@@ -1,37 +1,45 @@
-import { EDGE_MAX_CARRIES, type NodeOperation } from '@sysdesign/contracts';
+import { EDGE_MAX_CARRIES } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { EdgeCarriesField } from './edge-carries-field';
+import { EdgeCarriesField, type CarriesEndpoint } from './edge-carries-field';
 
-const declaredOps: NodeOperation[] = [
-  { name: 'placeOrder', kind: 'command' },
-  { name: 'getOrder', kind: 'query', idempotent: true },
-];
+const client: CarriesEndpoint = { label: 'Client', operations: [] };
+const service: CarriesEndpoint = {
+  label: 'Order Service',
+  operations: [
+    { name: 'placeOrder', kind: 'command' },
+    { name: 'getOrder', kind: 'query', idempotent: true },
+  ],
+};
+const queue: CarriesEndpoint = {
+  label: 'Order Queue',
+  operations: [{ name: 'OrderPlaced', kind: 'event' }],
+};
 
 const NONE: string[] = [];
 const noop = () => undefined;
 
 function Harness({
   initial = NONE,
-  ownerLabel = 'Order Service',
-  ops = declaredOps,
+  source = client,
+  target = service,
   onChange = noop,
 }: {
   initial?: string[];
-  ownerLabel?: string;
-  ops?: NodeOperation[];
+  source?: CarriesEndpoint;
+  target?: CarriesEndpoint;
   onChange?: (next: string[]) => void;
 }) {
   const [carries, setCarries] = useState(initial);
   return (
     <EdgeCarriesField
       carries={carries}
-      ownerLabel={ownerLabel}
-      declaredOps={ops}
+      source={source}
+      target={target}
       onChange={(next) => {
         setCarries(next);
         onChange(next);
@@ -41,77 +49,70 @@ function Harness({
 }
 
 describe('EdgeCarriesField', () => {
-  it('renders one checkbox per declared operation, labelled name · kind', () => {
+  it('renders one checkbox per operation the target declares, labelled name · kind · owner', () => {
     renderWithTheme(<Harness initial={['getOrder']} />);
 
-    const place = screen.getByLabelText('placeOrder · command') as HTMLInputElement;
-    const get = screen.getByLabelText('getOrder · query') as HTMLInputElement;
+    const place = screen.getByLabelText('placeOrder · command · Order Service') as HTMLInputElement;
+    const get = screen.getByLabelText('getOrder · query · Order Service') as HTMLInputElement;
     expect(place.checked).toBe(false);
     expect(get.checked).toBe(true);
   });
 
-  it('checking and unchecking a declared operation round-trips onChange', async () => {
+  it('[UX-5] offers the source’s declarations too — a queue’s event on its consume edge', () => {
+    renderWithTheme(<Harness source={queue} target={{ label: 'Worker', operations: [] }} />);
+    expect(screen.getByLabelText('OrderPlaced · event · Order Queue')).toBeTruthy();
+  });
+
+  it('merges a name both ends declare into one candidate owned by both', () => {
+    renderWithTheme(
+      <Harness
+        source={{ label: 'Gateway', operations: [{ name: 'placeOrder', kind: 'command' }] }}
+        target={service}
+      />,
+    );
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.getByLabelText('placeOrder · command · Gateway, Order Service')).toBeTruthy();
+  });
+
+  it('checking and unchecking round-trips onChange', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderWithTheme(<Harness initial={['getOrder']} onChange={onChange} />);
 
-    await user.click(screen.getByLabelText('placeOrder · command'));
+    await user.click(screen.getByLabelText('placeOrder · command · Order Service'));
     expect(onChange).toHaveBeenLastCalledWith(['getOrder', 'placeOrder']);
 
-    await user.click(screen.getByLabelText('getOrder · query'));
+    await user.click(screen.getByLabelText('getOrder · query · Order Service'));
     expect(onChange).toHaveBeenLastCalledWith(['placeOrder']);
   });
 
-  it('flags a carry the owner never declared, with a removable warning chip', async () => {
+  it('shows a carry neither end declares any more as a stale chip that can only be removed', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     renderWithTheme(<Harness initial={['mysteryCall']} onChange={onChange} />);
 
-    expect(screen.getByText('mysteryCall')).toBeTruthy();
-    expect(screen.getByText('not declared on Order Service')).toBeTruthy();
+    expect(screen.getByTestId('carry-stale-mysteryCall').textContent).toContain('mysteryCall');
+    expect(screen.queryByRole('textbox')).toBeNull(); // no free-add
 
     await user.click(screen.getByRole('button', { name: 'Remove carry mysteryCall' }));
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  it('free-adds an undeclared carry on Enter — allowed, the eval grades it', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    renderWithTheme(<Harness onChange={onChange} />);
+  it(`caps carries at the DTO's ${EDGE_MAX_CARRIES}: unchecked boxes disable`, () => {
+    const full = Array.from({ length: EDGE_MAX_CARRIES - 1 }, (_, index) => `call-${index}`);
+    renderWithTheme(<Harness initial={[...full, 'getOrder']} />);
 
-    const input = screen.getByLabelText('Carry an undeclared operation') as HTMLInputElement;
-    await user.type(input, '  chargeCard  {Enter}');
-
-    expect(onChange).toHaveBeenCalledWith(['chargeCard']);
-    expect(input.value).toBe('');
-    expect(screen.getByText('not declared on Order Service')).toBeTruthy();
-  });
-
-  it('dedupes the free-add against carries already listed', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    renderWithTheme(<Harness initial={['placeOrder']} onChange={onChange} />);
-
-    await user.type(screen.getByLabelText('Carry an undeclared operation'), 'placeOrder{Enter}');
-
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it(`caps carries at the DTO's ${EDGE_MAX_CARRIES}: unchecked boxes and the free-add disable`, () => {
-    const full = Array.from({ length: EDGE_MAX_CARRIES }, (_, index) => `call-${index}`);
-    renderWithTheme(<Harness initial={[...full.slice(0, EDGE_MAX_CARRIES - 1), 'getOrder']} />);
-
-    expect((screen.getByLabelText('placeOrder · command') as HTMLInputElement).disabled).toBe(true);
-    // A checked box stays operable — removing must always be possible.
-    expect((screen.getByLabelText('getOrder · query') as HTMLInputElement).disabled).toBe(false);
     expect(
-      (screen.getByLabelText('Carry an undeclared operation') as HTMLInputElement).disabled,
+      (screen.getByLabelText('placeOrder · command · Order Service') as HTMLInputElement).disabled,
     ).toBe(true);
+    // A checked box stays operable — removing must always be possible.
+    expect(
+      (screen.getByLabelText('getOrder · query · Order Service') as HTMLInputElement).disabled,
+    ).toBe(false);
   });
 
-  it('says so when the owner declares nothing yet', () => {
-    renderWithTheme(<Harness ops={[]} ownerLabel="Order Queue" />);
-
-    expect(screen.getByText('No operations declared on Order Queue yet.')).toBeTruthy();
+  it('says so when neither end declares anything yet', () => {
+    renderWithTheme(<Harness source={client} target={{ label: 'Orders DB', operations: [] }} />);
+    expect(screen.getByText(/Neither Client nor Orders DB declares an operation yet/)).toBeTruthy();
   });
 });

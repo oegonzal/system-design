@@ -1,9 +1,8 @@
 import styled from '@emotion/styled';
 import type { Diagnostic, RemediationNote } from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
+import { Badge, Heading, RESULT_TONE, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { subjectLabel, type CriterionRow, type FindingGroup } from './select';
-import { RESULT_TONE } from './tones';
 
 const Item = styled.li`
   list-style: none;

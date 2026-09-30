@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeFinding, makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
+import { makeCriteria, makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
 import { createCanvasStore } from './canvas-store';
+
+const criteria = makeCriteria();
 
 describe('canvas-store', () => {
   it('[UX-2] adds a node with a sequential id, default label, selection and dirty flag', () => {
@@ -38,17 +40,25 @@ describe('canvas-store', () => {
     expect(store.getState().edges).toHaveLength(1);
   });
 
-  it('[UX-2] updates node label, kind and config', () => {
+  it('[UX-2] updates node label, kind and typed config entries', () => {
     const store = createCanvasStore(makeGraph());
 
     store.getState().updateNode('n-2', { label: 'Checkout Service', kind: 'worker' });
-    store.getState().updateNode('n-3', { config: { replicas: 3 } });
+    store.getState().updateNode('n-3', {
+      config: [
+        { key: 'replicas', value: 3 },
+        { key: 'backups', value: true },
+      ],
+    });
 
     const n2 = store.getState().nodes.find((node) => node.id === 'n-2');
     const n3 = store.getState().nodes.find((node) => node.id === 'n-3');
     expect(n2?.data.label).toBe('Checkout Service');
     expect(n2?.data.kind).toBe('worker');
-    expect(n3?.data.config).toEqual({ replicas: 3 });
+    expect(n3?.data.config).toEqual([
+      { key: 'replicas', value: 3 },
+      { key: 'backups', value: true },
+    ]);
     expect(store.getState().dirty).toBe(true);
   });
 
@@ -80,20 +90,6 @@ describe('canvas-store', () => {
         .serialize()
         .edges.find((edge) => edge.id === 'e-2'),
     ).not.toHaveProperty('carries');
-  });
-
-  it('updateNode carries responsibilities and operations through serialize', () => {
-    const store = createCanvasStore(makeGraph());
-
-    store.getState().updateNode('n-2', {
-      responsibilities: ['Owns checkout'],
-      operations: [{ name: 'Checkout', kind: 'command' }],
-    });
-
-    const serialized = store.getState().serialize();
-    const node = serialized.nodes.find((candidate) => candidate.id === 'n-2');
-    expect(node?.responsibilities).toEqual(['Owns checkout']);
-    expect(node?.operations).toEqual([{ name: 'Checkout', kind: 'command' }]);
   });
 
   it('serialize round-trips the interface fixture unchanged', () => {
@@ -141,45 +137,7 @@ describe('canvas-store', () => {
     expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.severity).toBeNull();
   });
 
-  it('[UX-2] previewPatch overlays ghosts and acceptGhost merges them into a dirty draft', () => {
-    const store = createCanvasStore(makeGraph());
-    store.getState().markClean();
-    const finding = makeFinding();
-    const suggestion = finding.suggestion;
-    if (!suggestion) throw new Error('fixture should carry a suggestion');
-
-    store.getState().previewPatch(suggestion, finding.id);
-
-    const ghosts = store.getState().nodes.filter((node) => node.data.ghost);
-    expect(ghosts.map((node) => node.id)).toEqual(['suggested-replica-1']);
-    expect(store.getState().ghost?.findingId).toBe(finding.id);
-    // Preview alone does not dirty the draft.
-    expect(store.getState().dirty).toBe(false);
-
-    store.getState().acceptGhost();
-
-    const merged = store.getState();
-    expect(merged.ghost).toBeNull();
-    expect(merged.nodes.some((node) => node.data.ghost)).toBe(false);
-    expect(merged.nodes.map((node) => node.id)).toContain('suggested-replica-1');
-    expect(merged.edges.map((edge) => edge.id)).toContain('suggested-edge-1');
-    expect(merged.dirty).toBe(true);
-  });
-
-  it('clearGhost removes the overlay without touching the real graph', () => {
-    const store = createCanvasStore(makeGraph());
-    const suggestion = makeFinding().suggestion;
-    if (!suggestion) throw new Error('fixture should carry a suggestion');
-
-    store.getState().previewPatch(suggestion, 'finding-1');
-    store.getState().clearGhost();
-
-    expect(store.getState().ghost).toBeNull();
-    expect(store.getState().nodes).toHaveLength(3);
-    expect(store.getState().edges).toHaveLength(2);
-  });
-
-  it('setGraph resets selection, dirty, ghost and highlight', () => {
+  it('setGraph resets selection, dirty and highlight', () => {
     const store = createCanvasStore();
     store.getState().addNode('cache');
     store.getState().setHighlight({ nodeIds: ['n-1'], edgeIds: [], severity: 'low' });
@@ -190,7 +148,6 @@ describe('canvas-store', () => {
     expect(state.nodes).toHaveLength(3);
     expect(state.selectedId).toBeNull();
     expect(state.dirty).toBe(false);
-    expect(state.ghost).toBeNull();
     expect(state.highlight).toBeNull();
   });
 
@@ -199,83 +156,89 @@ describe('canvas-store', () => {
     expect(store.getState().serialize()).toEqual(makeGraph());
   });
 
-  it('setNarrativeOverview stores the overview and dirties the draft', () => {
-    const store = createCanvasStore();
-
-    store.getState().setNarrativeOverview('Reads and writes are split.');
-
-    expect(store.getState().narrativeOverview).toBe('Reads and writes are split.');
-    expect(store.getState().dirty).toBe(true);
-  });
-
-  it('setComponentRationale upserts a slot by node id and clears it on empty prose', () => {
-    const store = createCanvasStore();
-
-    store.getState().setComponentRationale('n-3', 'The Orders DB persists every order.');
-    expect(store.getState().componentRationales).toEqual([
-      { nodeId: 'n-3', prose: 'The Orders DB persists every order.' },
-    ]);
-
-    store.getState().setComponentRationale('n-3', '   ');
-    expect(store.getState().componentRationales).toEqual([]);
-  });
-
-  it('setFlowNarration upserts by ordinal, keeps them sorted, and clears on empty prose', () => {
-    const store = createCanvasStore();
-
-    store.getState().setFlowNarration(1, 'Second flow.');
-    store.getState().setFlowNarration(0, 'First flow.');
-    expect(store.getState().flowNarrations.map((flow) => flow.requirementIndex)).toEqual([0, 1]);
-
-    store.getState().setFlowNarration(0, '');
-    expect(store.getState().flowNarrations.map((flow) => flow.requirementIndex)).toEqual([1]);
-  });
-
-  it('loadNarrative replaces the draft without touching dirty, mapping null to empty', () => {
-    const store = createCanvasStore();
-
-    store.getState().loadNarrative({
-      version: 1,
-      overview: 'Loaded overview.',
-      componentRationales: [{ nodeId: 'n-3', prose: 'Loaded rationale.' }],
-      flowNarrations: [],
+  describe('narrative', () => {
+    it('setNarrativeOverview stores the overview and dirties the draft', () => {
+      const store = createCanvasStore();
+      store.getState().setNarrativeOverview('Reads and writes are split.');
+      expect(store.getState().narrativeOverview).toBe('Reads and writes are split.');
+      expect(store.getState().dirty).toBe(true);
     });
-    expect(store.getState().narrativeOverview).toBe('Loaded overview.');
-    expect(store.getState().componentRationales).toEqual([
-      { nodeId: 'n-3', prose: 'Loaded rationale.' },
-    ]);
-    expect(store.getState().dirty).toBe(false);
 
-    // …and it never cleans an already-dirty draft either.
-    store.getState().setNarrativeOverview('edited');
-    store.getState().loadNarrative(null);
-    expect(store.getState().narrativeOverview).toBe('');
-    expect(store.getState().componentRationales).toEqual([]);
-    expect(store.getState().dirty).toBe(true);
-  });
+    it('setComponentRationale upserts a slot by node id and clears it on empty prose', () => {
+      const store = createCanvasStore();
 
-  it('setGraph leaves the narrative alone — loading a revision pairs it with loadNarrative', () => {
-    const store = createCanvasStore();
-    store.getState().setNarrativeOverview('Prose that outlives a graph swap.');
+      store.getState().setComponentRationale('n-3', 'The Orders DB persists every order.');
+      expect(store.getState().componentRationales).toEqual([
+        { nodeId: 'n-3', prose: 'The Orders DB persists every order.' },
+      ]);
 
-    store.getState().setGraph(makeGraph());
+      store.getState().setComponentRationale('n-3', '   ');
+      expect(store.getState().componentRationales).toEqual([]);
+    });
 
-    expect(store.getState().narrativeOverview).toBe('Prose that outlives a graph swap.');
-    expect(store.getState().dirty).toBe(false);
-  });
+    it('setCriterionNarration upserts by criterion id and clears on empty prose', () => {
+      const store = createCanvasStore();
 
-  it('serializeNarrative reconciles against the live graph, dropping stale slots', () => {
-    const store = createCanvasStore(makeGraph()); // n-1 → n-2 → n-3
-    const prose = 'The Orders DB persists every order and serves point reads for status lookups.';
-    store.getState().setNarrativeOverview('A read/write split keeps lookups fast under spikes.');
-    store.getState().setComponentRationale('n-3', prose);
-    store.getState().setComponentRationale('ghost', prose); // no such node
+      store.getState().setCriterionNarration('c2', 'Second.');
+      store.getState().setCriterionNarration('c1', 'First.');
+      store.getState().setCriterionNarration('c2', 'Second, revised.');
+      expect(store.getState().criterionNarrations).toEqual([
+        { criterionId: 'c1', prose: 'First.' },
+        { criterionId: 'c2', prose: 'Second, revised.' },
+      ]);
 
-    expect(store.getState().serializeNarrative()).toEqual({
-      version: 1,
-      overview: 'A read/write split keeps lookups fast under spikes.',
-      componentRationales: [{ nodeId: 'n-3', prose }],
-      flowNarrations: [],
+      store.getState().setCriterionNarration('c1', '');
+      expect(store.getState().criterionNarrations.map((n) => n.criterionId)).toEqual(['c2']);
+    });
+
+    it('loadNarrative replaces the draft without touching dirty, mapping null to empty', () => {
+      const store = createCanvasStore();
+
+      store.getState().loadNarrative({
+        version: 1,
+        overview: 'Loaded overview.',
+        componentRationales: [{ nodeId: 'n-3', prose: 'Loaded rationale.' }],
+        criterionNarrations: [{ criterionId: 'c1', prose: 'Loaded narration.' }],
+      });
+      expect(store.getState().narrativeOverview).toBe('Loaded overview.');
+      expect(store.getState().criterionNarrations).toEqual([
+        { criterionId: 'c1', prose: 'Loaded narration.' },
+      ]);
+      expect(store.getState().dirty).toBe(false);
+
+      // …and it never cleans an already-dirty draft either.
+      store.getState().setNarrativeOverview('edited');
+      store.getState().loadNarrative(null);
+      expect(store.getState().narrativeOverview).toBe('');
+      expect(store.getState().componentRationales).toEqual([]);
+      expect(store.getState().dirty).toBe(true);
+    });
+
+    it('setGraph leaves the narrative alone — loading a revision pairs it with loadNarrative', () => {
+      const store = createCanvasStore();
+      store.getState().setNarrativeOverview('Prose that outlives a graph swap.');
+
+      store.getState().setGraph(makeGraph());
+
+      expect(store.getState().narrativeOverview).toBe('Prose that outlives a graph swap.');
+      expect(store.getState().dirty).toBe(false);
+    });
+
+    it('serializeNarrative reconciles against the live graph and rubric, dropping stale slots', () => {
+      const store = createCanvasStore(makeGraph()); // n-1 → n-2 → n-3
+      store.getState().setNarrativeOverview('A read/write split keeps lookups fast.');
+      store.getState().setComponentRationale('n-3', 'Persists every order.');
+      store.getState().setComponentRationale('ghost', 'No such node.');
+      store.getState().setCriterionNarration('c1', 'Client → service → database.');
+      store.getState().setCriterionNarration('c99', 'No such criterion.');
+
+      expect(store.getState().serializeNarrative(criteria)).toEqual({
+        version: 1,
+        overview: 'A read/write split keeps lookups fast.',
+        componentRationales: [{ nodeId: 'n-3', prose: 'Persists every order.' }],
+        criterionNarrations: [{ criterionId: 'c1', prose: 'Client → service → database.' }],
+      });
+      expect(createCanvasStore().getState().serializeNarrative(criteria)).toBeNull();
     });
   });
 
@@ -285,59 +248,58 @@ describe('canvas-store', () => {
    * author's own edits dirty the draft.
    */
   describe('design brief', () => {
-    /** makeGraph is client n-1 → service n-2 → database n-3. */
-    const seedBinding = (store: ReturnType<typeof createCanvasStore>) => {
-      store.getState().setGraph(makeGraph());
-      store.getState().setBindingMechanism('nfr-1', 'backups');
-      store.getState().toggleBindingNode('nfr-1', 'n-3');
-    };
+    it('setBindingClaim creates the binding on first use and dirties the draft', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().markClean();
 
-    it('binds a requirement to a component and dirties the draft', () => {
-      const store = createCanvasStore();
-      seedBinding(store);
+      store.getState().setBindingClaim('c3', 'A replica keeps reads fast');
 
-      expect(store.getState().briefBindings).toEqual([
-        { nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] },
+      expect(store.getState().bindings).toEqual([
+        { criterionId: 'c3', nodeIds: [], claim: 'A replica keeps reads fast' },
       ]);
       expect(store.getState().dirty).toBe(true);
     });
 
-    it('toggles a component off again', () => {
-      const store = createCanvasStore();
-      seedBinding(store);
-      store.getState().toggleBindingNode('nfr-1', 'n-3');
-      expect(store.getState().briefBindings[0]?.nodeIds).toEqual([]);
-    });
+    it('toggleBindingNode adds and removes components, capped at the contract', () => {
+      const store = createCanvasStore(makeGraph());
 
-    it('drops components the new mechanism cannot carry when the claim changes', () => {
-      const store = createCanvasStore();
-      seedBinding(store);
-      // A database can hold backups; it cannot hold rate limiting.
-      store.getState().setBindingMechanism('nfr-1', 'rate-limit');
-      expect(store.getState().briefBindings[0]).toMatchObject({
-        mechanism: 'rate-limit',
-        nodeIds: [],
+      store.getState().toggleBindingNode('c3', 'n-3');
+      expect(store.getState().bindings[0]).toEqual({
+        criterionId: 'c3',
+        nodeIds: ['n-3'],
+        claim: '',
       });
+
+      store.getState().toggleBindingNode('c3', 'n-2');
+      store.getState().toggleBindingNode('c3', 'n-3');
+      expect(store.getState().bindings[0]?.nodeIds).toEqual(['n-2']);
+
+      // Untoggling the last component with no claim empties the binding entirely.
+      store.getState().toggleBindingNode('c3', 'n-2');
+      expect(store.getState().bindings).toEqual([]);
     });
 
-    it('keeps one flow per functional requirement, so a duplicate id is unreachable', () => {
-      const store = createCanvasStore();
-      store.getState().setGraph(makeGraph());
+    it('setBindingPath replaces the walk and an empty path removes the key', () => {
+      const store = createCanvasStore(makeGraph());
 
-      store.getState().setFlowPath(0, ['e-1']);
-      store.getState().setFlowPath(0, ['e-1', 'e-2']);
+      store.getState().setBindingPath('c1', ['e-1']);
+      store.getState().setBindingPath('c1', ['e-1', 'e-2']);
+      expect(store.getState().bindings).toEqual([
+        { criterionId: 'c1', nodeIds: [], claim: '', path: ['e-1', 'e-2'] },
+      ]);
 
-      expect(store.getState().briefFlows).toEqual([
-        { id: 'flow-0', requirementIndex: 0, path: ['e-1', 'e-2'] },
+      store.getState().setBindingClaim('c1', 'kept');
+      store.getState().setBindingPath('c1', []);
+      expect(store.getState().bindings).toEqual([
+        { criterionId: 'c1', nodeIds: [], claim: 'kept' },
       ]);
     });
 
-    it('clears a flow when its path empties', () => {
-      const store = createCanvasStore();
-      store.getState().setGraph(makeGraph());
-      store.getState().setFlowPath(0, ['e-1']);
-      store.getState().setFlowPath(0, []);
-      expect(store.getState().briefFlows).toEqual([]);
+    it('clearBinding drops the whole binding', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().setBindingClaim('c1', 'x');
+      store.getState().clearBinding('c1');
+      expect(store.getState().bindings).toEqual([]);
     });
 
     it('loadBrief replaces the brief without touching dirty, mapping null to empty', () => {
@@ -345,43 +307,52 @@ describe('canvas-store', () => {
 
       store.getState().loadBrief({
         version: 1,
-        nfrBindings: [{ nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] }],
-        flows: [],
+        bindings: [{ criterionId: 'c1', nodeIds: ['n-3'], claim: 'loaded' }],
       });
-      expect(store.getState().briefBindings).toHaveLength(1);
+      expect(store.getState().bindings).toHaveLength(1);
       expect(store.getState().dirty).toBe(false);
 
       store.getState().loadBrief(null);
-      expect(store.getState().briefBindings).toEqual([]);
-      expect(store.getState().briefFlows).toEqual([]);
+      expect(store.getState().bindings).toEqual([]);
     });
 
     it('setGraph leaves the brief alone — loading a revision pairs it with loadBrief', () => {
-      const store = createCanvasStore();
-      seedBinding(store);
+      const store = createCanvasStore(makeGraph());
+      store.getState().setBindingClaim('c1', 'kept');
 
       store.getState().setGraph(makeGraph());
 
-      expect(store.getState().briefBindings).toHaveLength(1);
+      expect(store.getState().bindings).toHaveLength(1);
       expect(store.getState().dirty).toBe(false);
     });
 
-    it('serializeBrief reconciles against the live graph and is null when nothing is claimed', () => {
-      const store = createCanvasStore();
-      expect(store.getState().serializeBrief()).toBeNull();
+    it('serializeBrief reconciles against the live graph and rubric, null when nothing is bound', () => {
+      const store = createCanvasStore(makeGraph());
+      expect(store.getState().serializeBrief(criteria)).toBeNull();
 
-      seedBinding(store);
-      expect(store.getState().serializeBrief()).toEqual({
+      store.getState().setBindingClaim('c3', 'The database holds it');
+      // A claim with no component is incomplete: still nothing to send.
+      expect(store.getState().serializeBrief(criteria)).toBeNull();
+
+      store.getState().toggleBindingNode('c3', 'n-3');
+      store.getState().setBindingPath('c3', ['e-1', 'e-2']);
+      expect(store.getState().serializeBrief(criteria)).toEqual({
         version: 1,
-        nfrBindings: [{ nfrId: 'nfr-1', mechanism: 'backups', nodeIds: ['n-3'] }],
-        flows: [],
+        bindings: [
+          {
+            criterionId: 'c3',
+            nodeIds: ['n-3'],
+            path: ['e-1', 'e-2'],
+            claim: 'The database holds it',
+          },
+        ],
       });
 
       // Deleting the bound component drops the claim rather than sending a
       // reference the API would reject.
       store.getState().select('n-3');
       store.getState().removeSelected();
-      expect(store.getState().serializeBrief()).toBeNull();
+      expect(store.getState().serializeBrief(criteria)).toBeNull();
     });
   });
 });

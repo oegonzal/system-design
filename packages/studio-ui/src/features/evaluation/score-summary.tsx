@@ -1,16 +1,15 @@
 'use client';
 
 import styled from '@emotion/styled';
-import {
-  EVAL_DIMENSIONS,
-  UNMODELLED_QUALITY_AREAS,
-  type EvaluationDto,
-} from '@sysdesign/contracts';
-import { Badge, Meter, Stack, Text } from '@sysdesign/design-system';
+import type { EvaluationDto } from '@sysdesign/contracts';
+import { Badge, DECISION_TONE, Meter, Stack, Text } from '@sysdesign/design-system';
+
+import { humanizeToken } from './humanize';
 
 const ScoreRow = styled.div`
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: ${({ theme }) => theme.space[4]}px;
 `;
 
@@ -35,66 +34,52 @@ export interface ScoreSummaryProps {
 }
 
 /**
- * The headline: overall score, grade, and one meter per rubric dimension in
- * the contract's canonical order. Purely presentational — Storybook-safe.
+ * The headline: the controller's overall score, its decision, why the loop
+ * stopped, and one meter per dimension the pipeline declared. The dimension
+ * names are the pipeline's own — whatever keys arrive are what render, in the
+ * order the loop reported them. Purely presentational — Storybook-safe.
  */
 export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
-  const scores = evaluation.dimensionScores;
+  const dimensions = Object.entries(evaluation.dimensions);
 
   return (
     <Stack gap={5} data-testid="score-summary">
       <ScoreRow>
-        <BigScore data-testid="overall-score">{evaluation.overallScore ?? '—'}</BigScore>
+        <BigScore data-testid="overall-score">{evaluation.overall ?? '—'}</BigScore>
         <Text as="span" size="sm" tone="muted">
           / 100
         </Text>
-        {evaluation.grade ? <Badge tone="accent">{`grade ${evaluation.grade}`}</Badge> : null}
-        {evaluation.capApplied ? (
-          <Badge tone="critical" data-testid="grade-cap">
-            {`capped at ${evaluation.capApplied.maxGrade} · ${
-              evaluation.capApplied.expectationId !== undefined
-                ? 'no walkthrough'
-                : `${evaluation.capApplied.count} critical`
-            }`}
+        {evaluation.decision ? (
+          <Badge tone={DECISION_TONE[evaluation.decision]} data-testid="decision-badge">
+            {evaluation.decision}
+          </Badge>
+        ) : null}
+        {evaluation.stopReason ? (
+          <Badge tone="neutral" data-testid="stop-reason">
+            {humanizeToken(evaluation.stopReason)}
           </Badge>
         ) : null}
       </ScoreRow>
-      {evaluation.summary ? <Text size="sm">{evaluation.summary}</Text> : null}
-      {scores ? (
+      {dimensions.length > 0 ? (
         <Stack gap={3}>
-          {EVAL_DIMENSIONS.map((dimension) => {
-            // `?? null`: an evaluation stored before a dimension existed has
-            // no key for it at all — that is "not assessed", never a NaN
-            // meter. Null = the rubric never examined this dimension — no
-            // meter, no value, so a screen reader hears nothing measurable.
-            const value = scores[dimension] ?? null;
-            return value === null ? (
-              <NotAssessedRow key={dimension} data-testid={`not-assessed-${dimension}`}>
+          {dimensions.map(([key, value]) =>
+            // Null = the loop never assessed this dimension — no meter, no
+            // value, so a screen reader hears nothing measurable.
+            value === null ? (
+              <NotAssessedRow key={key} data-testid={`not-assessed-${key}`}>
                 <Text as="span" size="sm" tone="muted">
-                  {dimension}
+                  {humanizeToken(key)}
                 </Text>
                 <Text as="span" size="sm" tone="muted">
                   Not assessed
                 </Text>
               </NotAssessedRow>
             ) : (
-              <Meter key={dimension} label={dimension} value={value} />
-            );
-          })}
+              <Meter key={key} label={humanizeToken(key)} value={value} data-dimension={key} />
+            ),
+          )}
         </Stack>
       ) : null}
-
-      {/*
-        The edge of the map. A score out of 100 invites the reading that 100
-        means the design is good, rather than that nothing the engine knows how
-        to check is missing — and the gap between those is where a reviewer's
-        first questions live. Naming it costs one line and stops the number
-        teaching the wrong lesson.
-      */}
-      <Text size="sm" tone="muted" data-testid="unassessed-areas">
-        Outside this rubric:{' '}
-        {UNMODELLED_QUALITY_AREAS.map((area) => area.label.toLowerCase()).join(', ')}.
-      </Text>
     </Stack>
   );
 }

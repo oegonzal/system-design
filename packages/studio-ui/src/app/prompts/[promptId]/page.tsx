@@ -4,7 +4,7 @@ import { PromptDetail } from '../../../features/prompts/prompt-detail.client';
 
 export const metadata: Metadata = {
   title: 'Prompt',
-  description: 'Scenario, requirements and scale targets for one design prompt.',
+  description: 'The markdown and the derived criteria of one design prompt.',
 };
 
 export default async function PromptDetailPage({

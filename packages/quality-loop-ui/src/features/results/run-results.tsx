@@ -3,6 +3,7 @@
 import type { RunTrace } from '@sysdesign/contracts';
 import {
   Badge,
+  DECISION_TONE,
   Heading,
   Stack,
   Tab,
@@ -14,7 +15,6 @@ import {
 import { useState } from 'react';
 
 import { IterationPanel } from './iteration-panel';
-import { DECISION_TONE } from './tones';
 
 export interface RunResultsProps {
   trace: RunTrace;

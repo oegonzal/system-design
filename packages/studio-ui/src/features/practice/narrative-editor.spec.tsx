@@ -3,17 +3,12 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import { makeCriteria, makeGraph } from '../../testing/fixtures';
 import { createCanvasStore } from '../canvas/canvas-store';
 import { CanvasStoreProvider } from '../canvas/canvas-store-context';
-import { makeGraph, makePrompt } from '../../testing/fixtures';
 import { NarrativeEditor } from './narrative-editor';
 
 type Seed = (store: ReturnType<typeof createCanvasStore>) => void;
-
-/** Two real sentences with ample connectives — clears the prose gate. */
-const PROSE =
-  'The Orders DB persists every order and owns the write path for order state. ' +
-  'It is the source of truth that every read is reconciled against.';
 
 function renderEditor(seed?: Seed) {
   const store = createCanvasStore();
@@ -21,7 +16,7 @@ function renderEditor(seed?: Seed) {
   seed?.(store);
   renderWithTheme(
     <CanvasStoreProvider store={store}>
-      <NarrativeEditor prompt={makePrompt()} />
+      <NarrativeEditor criteria={makeCriteria()} />
     </CanvasStoreProvider>,
   );
   return store;
@@ -46,44 +41,47 @@ describe('NarrativeEditor', () => {
     ]);
   });
 
-  it('writes a flow narration keyed to the requirement ordinal', async () => {
+  it('[UX-8] writes a narration keyed to the criterion id', async () => {
     const store = renderEditor();
-    await userEvent.type(screen.getByTestId('narrative-flow-0'), 'The client reads availability.');
+    await userEvent.type(screen.getByTestId('narrative-narration-c1'), 'The client reads it.');
 
-    expect(store.getState().flowNarrations).toEqual([
-      { requirementIndex: 0, prose: 'The client reads availability.' },
+    expect(store.getState().criterionNarrations).toEqual([
+      { criterionId: 'c1', prose: 'The client reads it.' },
     ]);
   });
 
-  it('shows the live verdict the grade will use — thin vs explained', () => {
+  it('shows written vs not-written per slot, and lists the components still unexplained', () => {
     renderEditor((store) => {
-      store.getState().setComponentRationale('n-3', 'too short');
       store.getState().loadNarrative({
         version: 1,
-        overview: PROSE,
-        componentRationales: [{ nodeId: 'n-3', prose: 'too short' }],
-        flowNarrations: [],
+        overview: 'A split.',
+        componentRationales: [{ nodeId: 'n-3', prose: 'short' }],
+        criterionNarrations: [],
       });
     });
 
-    const overviewState = screen
+    const states = screen
       .getAllByTestId('narrative-slot-state')
       .map((chip) => chip.getAttribute('data-state'));
-    // The overview reads as prose; the n-3 rationale is present but thin.
-    expect(overviewState).toContain('explained');
-    expect(overviewState).toContain('thin');
+    expect(states).toContain('filled');
+    expect(states).toContain('empty');
+    // Thin prose is still written — substance is the explanation critic's call.
+    expect(states).not.toContain('thin');
+    const unexplained = screen.getByTestId('narrative-unexplained').textContent ?? '';
+    expect(unexplained).toContain('Client');
+    expect(unexplained).not.toContain('Orders DB');
   });
 
   /**
-   * The reference-anchored, graded editor UX-8 now describes. An author reading
-   * this must understand the walkthrough earns the grade, not that it is ignored.
+   * The reference-anchored editor UX-8 describes: a slot per component and
+   * per criterion, never one free-text box.
    */
-  it('[UX-8] presents the walkthrough as graded, reference-anchored slots', () => {
+  it('[UX-8] presents the walkthrough as reference-anchored slots for every node and criterion', () => {
     renderEditor();
-    // A slot per component and per requirement, not one free-text box.
     expect(screen.getByTestId('narrative-rationale-n-1')).toBeTruthy();
     expect(screen.getByTestId('narrative-rationale-n-3')).toBeTruthy();
-    expect(screen.getByTestId('narrative-flow-0')).toBeTruthy();
-    expect(screen.queryByTestId('narrative-advisory')).toBeNull();
+    for (const criterion of makeCriteria()) {
+      expect(screen.getByTestId(`narrative-narration-${criterion.id}`)).toBeTruthy();
+    }
   });
 });

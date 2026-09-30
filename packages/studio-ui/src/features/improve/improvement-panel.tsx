@@ -1,29 +1,47 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type {
-  ImprovementIteration,
-  ImprovementRunDto,
-  LlmAvailabilityDto,
+import {
+  DEFAULT_IMPROVE_ITERATIONS,
+  MAX_IMPROVE_ITERATIONS,
+  type ImproveIterationDto,
+  type ImproveRunDto,
+  type LlmAvailabilityDto,
+  type StopReason,
 } from '@sysdesign/contracts';
-import { Badge, Button, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  Button,
+  DECISION_TONE,
+  LiveRegion,
+  SelectField,
+  Spinner,
+  Stack,
+  Text,
+} from '@sysdesign/design-system';
+import { useState } from 'react';
 
 export interface ImprovementPanelProps {
-  /** Output of `useImprovementRunPolling` — the workspace owns the hook. */
-  run: ImprovementRunDto | null;
+  /** Output of `useImproveRunPolling` — the workspace owns the hook. */
+  run: ImproveRunDto | null;
   error: string | null;
   isPolling: boolean;
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
   message: string;
   /** null while loading; the idle copy explains a disabled coach honestly. */
   availability: LlmAvailabilityDto | null;
-  onCancel: () => void;
+  /** True while the draft is being posted, before a run id exists. */
+  starting?: boolean;
+  /** Nothing on the canvas — there is nothing to coach. */
+  canvasEmpty?: boolean;
+  onStart: (maxIterations: number) => void;
   onLoadRevision: (revisionId: string) => void;
 }
 
 const IterationRow = styled.li`
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: ${({ theme }) => theme.space[3]}px;
   padding: ${({ theme }) => theme.space[2]}px 0;
   border-bottom: 1px solid ${({ theme }) => theme.color.border.subtle};
@@ -35,34 +53,51 @@ const IterationList = styled.ul`
   padding: 0;
 `;
 
-const ScoreCell = styled.span<{ $accepted: boolean }>`
+const ScoreCell = styled.span`
   font-variant-numeric: tabular-nums;
   font-weight: ${({ theme }) => theme.font.weight.semibold};
-  color: ${({ theme, $accepted }) =>
-    $accepted ? theme.color.text.primary : theme.color.text.muted};
+  color: ${({ theme }) => theme.color.text.primary};
   min-width: 3.5em;
 `;
 
-const STOPPED_COPY: Record<string, string> = {
-  perfect: 'The coach reached a perfect score.',
-  plateau: 'The coach plateaued — its last proposals stopped improving the score.',
+/** Why the loop stopped, in the author's terms. Every reason the contract names. */
+const STOPPED_COPY: Record<StopReason, string> = {
+  accepted: 'The coach reached a design the loop accepts.',
+  rejected: 'The coach rejected the design outright — its revisions could not lift it.',
+  escalated: 'The coach escalated — the loop could not score this design.',
+  plateau: 'The coach plateaued — its last revisions stopped improving the score.',
   'max-iterations': 'The coach used its iteration budget.',
-  cancelled: 'You stopped the coach. Accepted improvements are kept.',
-  'already-clean': 'Nothing above info-level to fix — this design is already clean.',
-  'llm-unavailable': 'The coach lost its model mid-run. Check the worker environment.',
+  'producer-unavailable': 'The coach has no model to revise with.',
 };
 
-function bestAccepted(run: ImprovementRunDto): ImprovementIteration | null {
-  const accepted = run.iterations.filter((iteration) => iteration.accepted);
-  return accepted.length > 0 ? accepted[accepted.length - 1] : null;
+function unavailableCopy(availability: LlmAvailabilityDto): string {
+  if (availability.reason === 'deterministic') {
+    return 'The coach is off in deterministic mode — set QUALITY_LOOP_DETERMINISTIC=0 to enable it.';
+  }
+  if (availability.reason === 'no-key') {
+    return 'The coach needs a live model — set ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code to use your Claude login.';
+  }
+  return 'The coach cannot reach the quality loop right now.';
 }
 
+/** The strictly-better iteration that was imported with the highest score — the one worth loading. */
+function bestImported(run: ImproveRunDto): ImproveIterationDto | null {
+  let best: ImproveIterationDto | null = null;
+  for (const iteration of run.iterations) {
+    if (iteration.iteration === 1 || iteration.revisionId === null) continue;
+    if (best === null || (iteration.overall ?? -1) > (best.overall ?? -1)) best = iteration;
+  }
+  return best;
+}
+
+const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, index) => index + 1);
+
 /**
- * The coach dock: the live trajectory of a background improvement run.
- * Iteration 0 is the author's own baseline; every later row is one proposal —
- * accepted rows carry the score they were persisted at, rejected rows show
- * why they never became revisions. Pure props, Storybook-safe; the workspace
- * owns polling and the load-revision flow.
+ * The coach dock: choose how many times the loop may revise, hand it the
+ * draft, and watch the iterations arrive. Iteration 1 is the author's own
+ * draft, graded; every later row is one of the coach's revisions, imported
+ * into the timeline when it beat everything before it. Pure props,
+ * Storybook-safe; the workspace owns polling and the load-revision flow.
  */
 export function ImprovementPanel({
   run,
@@ -70,46 +105,66 @@ export function ImprovementPanel({
   isPolling,
   message,
   availability,
-  onCancel,
+  starting = false,
+  canvasEmpty = false,
+  onStart,
   onLoadRevision,
 }: ImprovementPanelProps) {
-  const active = run !== null && (run.status === 'queued' || run.status === 'running');
-  const best = run ? bestAccepted(run) : null;
-  const improved = best !== null && best.revisionId !== null && best.iteration > 0;
+  const [iterations, setIterations] = useState(DEFAULT_IMPROVE_ITERATIONS);
+  const active = starting || isPolling || (run !== null && run.status === 'running');
+  const unavailable = availability !== null && !availability.enabled;
+  const best = run ? bestImported(run) : null;
 
   return (
     <Stack gap={5} data-testid="improvement-panel">
       <LiveRegion message={message} />
 
-      {run === null && error === null && !isPolling ? (
-        <Stack gap={3}>
-          <Text size="sm" tone="muted">
-            Stuck, or curious how a model would take this further? Improve with AI hands your
-            current canvas to a background coach: it proposes one change at a time, re-grades every
-            candidate with the same deterministic engine, and keeps only strict improvements — each
-            one lands in your timeline as an AI revision.
-          </Text>
-          {availability !== null && !availability.enabled ? (
-            <Text size="sm" tone="muted" data-testid="improver-unavailable">
-              {availability.reason === 'deterministic'
-                ? 'The coach is off in deterministic mode — set IMPROVER_DETERMINISTIC=0 to enable it.'
-                : 'The coach needs a live model — set ANTHROPIC_API_KEY, or IMPROVER_AUTH=claude-code to use your Claude login.'}
-            </Text>
-          ) : null}
+      <Stack gap={3}>
+        <Text size="sm" tone="muted">
+          Stuck, or curious how a staff engineer would take this further? The coach hands your
+          canvas to the quality loop for a few revise iterations: each one is graded by the same
+          lenses, and every revision that beats the last lands in your timeline as an AI revision.
+          Your current draft is submitted as a revision first.
+        </Text>
+        <Stack direction="row" gap={3} align="end" wrap>
+          <SelectField
+            label="Iterations"
+            value={String(iterations)}
+            onChange={(event) => setIterations(Number(event.target.value))}
+            disabled={active}
+            data-testid="improve-iterations"
+          >
+            {ITERATION_OPTIONS.map((count) => (
+              <option key={count} value={count}>
+                {count}
+              </option>
+            ))}
+          </SelectField>
+          <Button
+            variant="solid"
+            onClick={() => onStart(iterations)}
+            disabled={active || unavailable || canvasEmpty}
+            title={unavailable && availability ? unavailableCopy(availability) : undefined}
+            data-testid="improve-run"
+          >
+            {active ? 'Coaching…' : 'Improve with the coach'}
+          </Button>
         </Stack>
-      ) : null}
+        {unavailable && availability ? (
+          <Text size="sm" tone="muted" data-testid="improver-unavailable">
+            {unavailableCopy(availability)}
+          </Text>
+        ) : null}
+      </Stack>
 
       {active ? (
         <Stack direction="row" gap={3} align="center">
           <Spinner label="" />
           <Text size="sm" tone="secondary">
-            {run.status === 'running'
-              ? `Coaching — iteration ${run.iterations[run.iterations.length - 1]?.iteration ?? 0} of ${run.maxIterations}…`
-              : 'Waiting for the improvement worker…'}
+            {run !== null
+              ? `Coaching — ${run.exchangeCount} model ${run.exchangeCount === 1 ? 'call' : 'calls'} so far…`
+              : 'Submitting your draft to the coach…'}
           </Text>
-          <Button variant="subtle" onClick={onCancel} data-testid="cancel-improvement">
-            Stop
-          </Button>
         </Stack>
       ) : null}
 
@@ -126,38 +181,33 @@ export function ImprovementPanel({
               key={iteration.iteration}
               data-testid={`improve-iteration-${iteration.iteration}`}
             >
-              <ScoreCell $accepted={iteration.accepted}>{iteration.score}</ScoreCell>
-              <Text size="sm" tone={iteration.accepted ? 'primary' : 'muted'}>
-                {iteration.description}
+              <Text as="span" size="sm" tone="muted">
+                #{iteration.iteration}
               </Text>
-              {iteration.accepted ? (
-                iteration.iteration === 0 ? (
-                  <Badge tone="neutral">baseline</Badge>
-                ) : (
-                  <Badge tone="success">accepted</Badge>
-                )
+              <ScoreCell>{iteration.overall ?? '—'}</ScoreCell>
+              {iteration.decision ? (
+                <Badge tone={DECISION_TONE[iteration.decision]}>{iteration.decision}</Badge>
+              ) : null}
+              {iteration.iteration === 1 ? (
+                <Badge tone="neutral">your draft</Badge>
+              ) : iteration.revisionId !== null ? (
+                <Badge tone="success">imported</Badge>
               ) : (
-                <Badge tone="neutral">
-                  {iteration.rejectedReason === 'not-better'
-                    ? 'not better'
-                    : iteration.rejectedReason === 'invalid'
-                      ? 'invalid'
-                      : 'no proposal'}
-                </Badge>
+                <Badge tone="neutral">not better</Badge>
               )}
             </IterationRow>
           ))}
         </IterationList>
       ) : null}
 
-      {run !== null && !active ? (
+      {run !== null && run.status !== 'running' ? (
         <Stack gap={3}>
-          {run.stoppedReason ? (
+          {run.stopReason ? (
             <Text size="sm" tone="secondary" data-testid="improvement-stopped">
-              {STOPPED_COPY[run.stoppedReason] ?? run.stoppedReason}
+              {STOPPED_COPY[run.stopReason]}
             </Text>
           ) : null}
-          {improved && best.revisionId !== null ? (
+          {best !== null && best.revisionId !== null ? (
             <div>
               <Button
                 variant="solid"

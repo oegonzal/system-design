@@ -1,14 +1,15 @@
 'use client';
 
+import type { PromptDto } from '@sysdesign/contracts';
 import { Button, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/design-system';
+import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
 import { PromptPane } from './prompt-pane';
-import { AUTHORED_GENERATOR_VERSION, type PromptDto } from '@sysdesign/contracts';
-import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import { usePromptCriteria } from './use-prompt-criteria';
 
 export interface PromptDetailProps {
   promptId: string;
@@ -22,7 +23,8 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<'start' | 'regenerate' | 'archive' | null>(null);
+  const [busy, setBusy] = useState<'start' | 'archive' | null>(null);
+  const criteria = usePromptCriteria(prompt);
 
   useEffect(() => {
     const { id, signal } = loader.begin();
@@ -51,18 +53,6 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
       router.push(`/practice/${session.id}`);
     } catch (caught) {
       setError(toErrorMessage(caught, 'Could not start a practice session.'));
-      setBusy(null);
-    }
-  };
-
-  const handleRegenerate = async () => {
-    setBusy('regenerate');
-    setError(null);
-    try {
-      const regenerated = await api.regeneratePrompt(promptId);
-      router.push(`/prompts/${regenerated.id}`);
-    } catch (caught) {
-      setError(toErrorMessage(caught, 'Could not regenerate the prompt.'));
       setBusy(null);
     }
   };
@@ -117,11 +107,16 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
         >
           {busy === 'start' ? 'Starting…' : 'Start practice'}
         </Button>
-        {/* Regenerate re-runs the generator; on an authored prompt it would
-            replace the assessment's own requirements with a drawn set. */}
-        {prompt.generatorVersion !== AUTHORED_GENERATOR_VERSION ? (
-          <Button variant="subtle" onClick={() => void handleRegenerate()} disabled={busy !== null}>
-            {busy === 'regenerate' ? 'Regenerating…' : 'Regenerate'}
+        {/* Re-deriving is refused once sessions cite these ids; the pane's own
+            button covers the case where there are no criteria at all yet. */}
+        {criteria.criteria.length > 0 ? (
+          <Button
+            variant="subtle"
+            onClick={criteria.derive}
+            disabled={busy !== null || criteria.deriving}
+            data-testid="rederive-criteria"
+          >
+            {criteria.deriving ? 'Deriving…' : 'Re-derive criteria'}
           </Button>
         ) : null}
         <Button variant="ghost" onClick={() => void handleToggleArchive()} disabled={busy !== null}>
@@ -130,9 +125,20 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
       </Toolbar>
 
       {error !== null ? <Text tone="secondary">{error}</Text> : null}
+      {criteria.error !== null && criteria.criteria.length > 0 ? (
+        <Text tone="secondary" data-testid="criteria-error">
+          {criteria.error}
+        </Text>
+      ) : null}
 
       <Surface padding={6}>
-        <PromptPane prompt={prompt} />
+        <PromptPane
+          prompt={prompt}
+          criteria={criteria.criteria}
+          deriving={criteria.deriving}
+          deriveError={criteria.error}
+          onDerive={criteria.derive}
+        />
       </Surface>
     </Stack>
   );

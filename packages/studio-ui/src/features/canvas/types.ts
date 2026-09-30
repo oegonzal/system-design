@@ -1,7 +1,6 @@
 import type {
-  EdgeIntent,
   EdgeKind,
-  NodeConfig,
+  NodeConfigEntry,
   NodeKind,
   NodeOperation,
   Severity,
@@ -19,11 +18,9 @@ import type { Edge, Node } from '@xyflow/react';
 export type SdNodeData = {
   kind: NodeKind;
   label: string;
-  config?: NodeConfig;
+  config?: NodeConfigEntry[];
   responsibilities?: string[];
   operations?: NodeOperation[];
-  /** A suggestion overlay element — stripped before serialization. */
-  ghost?: boolean;
   /** Set while a finding highlights this element; drives the outline color. */
   severity?: Severity | null;
 };
@@ -32,9 +29,7 @@ export type SdNode = Node<SdNodeData, 'sd'>;
 
 export type SdEdgeData = {
   kind: EdgeKind;
-  intent?: EdgeIntent;
   carries?: string[];
-  ghost?: boolean;
   severity?: Severity | null;
 };
 

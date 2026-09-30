@@ -38,20 +38,21 @@ describe('SdNode', () => {
     expect(root.getAttribute('data-severity')).toBe('critical');
   });
 
-  it('marks ghost nodes and shows the config knob count', async () => {
+  it('shows the config entry count', async () => {
     renderNode({
       kind: 'cache',
       label: 'Hot Cache',
-      ghost: true,
-      config: { strategy: 'cache-aside', ttlSeconds: 60 },
+      config: [
+        { key: 'strategy', value: 'cache-aside' },
+        { key: 'ttlSeconds', value: 60 },
+      ],
     });
 
     const root = await screen.findByTestId('node-n-1');
-    expect(root.getAttribute('data-ghost')).toBe('true');
-    expect(root.textContent).toContain('2 knobs');
+    expect(root.textContent).toContain('cache · 2 config');
   });
 
-  it('summarizes a service’s declared interface: ops, then roles, knobs last', async () => {
+  it('summarizes what any node declares: ops, then roles, config last', async () => {
     renderNode({
       kind: 'service',
       label: 'Order Service',
@@ -60,15 +61,15 @@ describe('SdNode', () => {
         { name: 'getOrder', kind: 'query' },
       ],
       responsibilities: ['owns orders'],
-      config: { replicas: 3 },
+      config: [{ key: 'replicas', value: 3 }],
     });
 
     const root = await screen.findByTestId('node-n-1');
-    expect(root.textContent).toContain('service · 2 ops · 1 roles · 1 knob');
+    expect(root.textContent).toContain('service · 2 ops · 1 roles · 1 config');
     expect(root.getAttribute('data-op-count')).toBe('2');
   });
 
-  it('counts a channel’s operations as types', async () => {
+  it('counts a queue’s declared event the same way — no kind decides what may declare', async () => {
     renderNode({
       kind: 'queue',
       label: 'Order Queue',
@@ -76,19 +77,6 @@ describe('SdNode', () => {
     });
 
     const root = await screen.findByTestId('node-n-1');
-    expect(root.textContent).toContain('queue · 1 types');
-  });
-
-  it('never counts ops on a role that declares none, even with stale data', async () => {
-    renderNode({
-      kind: 'database',
-      label: 'Orders DB',
-      // Leftover from before the node was re-shelved to storage.
-      operations: [{ name: 'placeOrder', kind: 'command' }],
-    });
-
-    const root = await screen.findByTestId('node-n-1');
-    expect(root.textContent).not.toContain('ops');
-    expect(root.textContent).not.toContain('types');
+    expect(root.textContent).toContain('queue · 1 ops');
   });
 });

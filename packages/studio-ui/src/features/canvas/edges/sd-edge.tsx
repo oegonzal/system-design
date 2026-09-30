@@ -24,23 +24,16 @@ const still = css`
 
 const EdgeGroup = styled('g', transient)<{
   $kind: EdgeKind;
-  $ghost: boolean;
   $severity: Severity | null;
 }>`
   .react-flow__edge-path {
-    stroke: ${({ theme, $ghost, $severity }) =>
-      $severity
-        ? theme.color.severity[$severity].fg
-        : $ghost
-          ? theme.color.text.muted
-          : theme.color.border.default};
+    stroke: ${({ theme, $severity }) =>
+      $severity ? theme.color.severity[$severity].fg : theme.color.border.default};
     stroke-width: ${({ $severity }) => ($severity ? 2.5 : 1.5)};
     ${({ $kind }) => ($kind === 'async' ? 'stroke-dasharray: 7 5;' : '')}
-    ${({ $ghost }) => ($ghost ? 'stroke-dasharray: 3 4; opacity: 0.6;' : '')}
     /* Infinite animation, so the motion level gates it on/off rather than by
        duration — same policy as Spinner. The OS preference wins in CSS too. */
-    ${({ theme, $kind, $ghost }) =>
-      $kind === 'async' && !$ghost && theme.motion.level === 'full' ? flowing : still}
+    ${({ theme, $kind }) => ($kind === 'async' && theme.motion.level === 'full' ? flowing : still)}
   }
 
   ${({ theme }) => theme.media.reducedMotion} {
@@ -86,7 +79,6 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   });
 
   const kind = data?.kind ?? 'sync';
-  const ghost = data?.ghost ?? false;
   const severity = data?.severity ?? null;
 
   // The pill: carries win, the prose label is the fallback — a structured
@@ -103,12 +95,10 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   return (
     <EdgeGroup
       $kind={kind}
-      $ghost={ghost}
       $severity={severity}
       data-testid={`edge-${id}`}
       data-kind={kind}
       {...(severity ? { 'data-severity': severity } : {})}
-      {...(ghost ? { 'data-ghost': 'true' } : {})}
     >
       <BaseEdge id={id} path={path} markerEnd={markerEnd} />
       {pill !== null ? (

@@ -11,71 +11,51 @@ export default meta;
 
 type Story = StoryObj<typeof ScoreSummary>;
 
-/** A middling grade — the meters show the auto danger/warn/success bands. */
-export const GradeB: Story = { args: { evaluation: makeEvaluation() } };
+/** A middling revise — the meters show the auto danger/warn/success bands. */
+export const Revise: Story = { args: { evaluation: makeEvaluation() } };
 
-/** A strong pass. */
-export const GradeA: Story = {
+/** An accepted design. */
+export const Accept: Story = {
   args: {
     evaluation: makeEvaluation({
-      overallScore: 93,
-      grade: 'A',
-      summary: 'Well-balanced design; minor hygiene nits only.',
-      dimensionScores: {
-        reliability: 95,
-        scalability: 92,
-        performance: 90,
-        data: 94,
-        messaging: 91,
-        security: 96,
-        hygiene: 88,
-        explanation: 90,
-        product: 94,
-      },
+      overall: 91,
+      decision: 'accept',
+      stopReason: 'accepted',
+      dimensions: { coverage: 95, quality_attributes: 88, compliance: 100 },
     }),
   },
 };
 
-/** A prompt that never examined security or messaging — those rows read "Not assessed". */
+/** A dimension the loop never assessed reads "Not assessed". */
 export const NotAssessed: Story = {
   args: {
     evaluation: makeEvaluation({
-      overallScore: 81,
-      grade: 'B',
-      summary: 'Strong core; this prompt put nothing on security or messaging.',
-      dimensionScores: {
-        reliability: 84,
-        scalability: 79,
-        performance: 82,
-        data: 80,
-        messaging: null,
-        security: null,
-        hygiene: 90,
-        explanation: null,
-        product: null,
-      },
+      overall: 81,
+      dimensions: { coverage: 84, quality_attributes: null, compliance: 79 },
     }),
   },
 };
 
-/** A failing design — every meter in the danger band. */
-export const GradeF: Story = {
+/** The loop escalated without a score — no meters, no number. */
+export const Escalated: Story = {
   args: {
     evaluation: makeEvaluation({
-      overallScore: 22,
-      grade: 'F',
-      summary: 'A single box called "backend" is a wish, not a design.',
-      dimensionScores: {
-        reliability: 15,
-        scalability: 20,
-        performance: 30,
-        data: 25,
-        messaging: 10,
-        security: 28,
-        hygiene: 35,
-        explanation: 18,
-        product: 12,
-      },
+      overall: null,
+      decision: 'escalate',
+      stopReason: 'escalated',
+      dimensions: {},
+    }),
+  },
+};
+
+/** A rejected design — every meter in the danger band. */
+export const Reject: Story = {
+  args: {
+    evaluation: makeEvaluation({
+      overall: 22,
+      decision: 'reject',
+      stopReason: 'rejected',
+      dimensions: { coverage: 15, quality_attributes: 20, compliance: 30 },
     }),
   },
 };

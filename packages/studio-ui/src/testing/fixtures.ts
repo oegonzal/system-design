@@ -1,16 +1,21 @@
 import type {
+  Binding,
   CanvasGraph,
+  CriterionResultDto,
+  DesignBrief,
+  DesignNarrative,
+  DesignRevisionDto,
   DesignRevisionSummaryDto,
   DesignSessionDto,
-  EvalAxisDto,
   EvaluationDto,
+  EvaluationFindingDto,
   ExperienceProfileDto,
-  FindingDto,
-  ImprovementRunDto,
+  ImproveRunDto,
   PromptDto,
-  ScenarioReportDto,
+  PromptGenerationDto,
+  PromptLibraryDocumentDto,
   StarStoryDto,
-  WorkflowSpec,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
 
 /**
@@ -21,6 +26,82 @@ import type {
 
 const AT = '2026-08-20T12:00:00.000Z';
 
+/** The rubric every fixture cites: two functional, one quality, one scale, one constraint. */
+export function makeCriteria(): SuccessCriterion[] {
+  return [
+    { id: 'c1', kind: 'functional', statement: 'A shopper reads their merged order history' },
+    { id: 'c2', kind: 'functional', statement: 'An online order is visible within a minute' },
+    { id: 'c3', kind: 'non_functional', statement: 'p99 read latency stays under 200 ms' },
+    { id: 'c4', kind: 'scale', statement: '2,000 reads per second at peak' },
+    { id: 'c5', kind: 'constraint', statement: 'The storefront only delivers orders by webhook' },
+  ];
+}
+
+export const PROMPT_MARKDOWN = [
+  '# Design an order-history service',
+  '',
+  '## Scenario',
+  'Online orders live in a hosted storefront that pushes webhooks; in-store orders live in a POS that only answers polling. Merge both into one per-customer history.',
+  '',
+  '## Functional requirements',
+  '1. A shopper reads their merged order history',
+  '2. An online order is visible within a minute',
+  '',
+  '## Non-functional requirements',
+  '| Kind | Requirement | Target |',
+  '| --- | --- | --- |',
+  '| latency | Reads stay fast under load | p99 ≤ 200 ms |',
+  '',
+  '## Scale targets',
+  '| Metric | Target |',
+  '| --- | --- |',
+  '| Peak reads | 2,000 rps |',
+  '',
+  '## Constraints',
+  '- The storefront only delivers orders by webhook',
+].join('\n');
+
+export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
+  return {
+    id: 'prompt-1',
+    experienceId: 'exp-1',
+    title: 'Design an order-history service',
+    markdown: PROMPT_MARKDOWN,
+    criteria: makeCriteria(),
+    source: 'authored',
+    status: 'active',
+    createdAt: AT,
+    updatedAt: AT,
+    ...overrides,
+  };
+}
+
+export function makePromptGeneration(
+  overrides: Partial<PromptGenerationDto> = {},
+): PromptGenerationDto {
+  return {
+    runId: 'gen-run-1',
+    status: 'running',
+    decision: null,
+    overall: null,
+    prompt: null,
+    error: null,
+    ...overrides,
+  };
+}
+
+export function makeLibraryDocument(
+  overrides: Partial<PromptLibraryDocumentDto> = {},
+): PromptLibraryDocumentDto {
+  return {
+    id: 'order-history',
+    title: 'Order history integration',
+    markdown: PROMPT_MARKDOWN,
+    ...overrides,
+  };
+}
+
+/** client → service → database; the database carries one typed config entry. */
 export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
   return {
     nodes: [
@@ -30,7 +111,7 @@ export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
         id: 'n-3',
         kind: 'database',
         label: 'Orders DB',
-        config: { replicas: 1 },
+        config: [{ key: 'replicas', value: 1 }],
         position: { x: 40, y: 360 },
       },
     ],
@@ -44,8 +125,8 @@ export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
 
 /**
  * A graph exercising the interface layer: declared operations on the
- * gateway/service, responsibilities on the service, message types on the
- * queue, and carries on the call and produce/consume edges.
+ * gateway/service, responsibilities on the service, an event on the queue,
+ * and carries on the call and produce/consume edges.
  */
 export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
   return {
@@ -55,6 +136,7 @@ export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): Canvas
         id: 'n-2',
         kind: 'gateway',
         label: 'API Gateway',
+        config: [{ key: 'rateLimit', value: true }],
         operations: [
           { name: 'PlaceOrder', kind: 'command' },
           { name: 'GetOrder', kind: 'query', idempotent: true },
@@ -82,7 +164,7 @@ export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): Canvas
       { id: 'n-5', kind: 'worker', label: 'Fulfillment Worker', position: { x: 40, y: 680 } },
     ],
     edges: [
-      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync', carries: ['PlaceOrder'] },
       {
         id: 'e-2',
         source: 'n-2',
@@ -111,6 +193,50 @@ export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): Canvas
   };
 }
 
+export function makeBinding(overrides: Partial<Binding> = {}): Binding {
+  return {
+    criterionId: 'c1',
+    nodeIds: ['n-2', 'n-3'],
+    path: ['e-1', 'e-2'],
+    claim: 'The service reads the history from the orders database',
+    ...overrides,
+  };
+}
+
+/** Against `makeGraph`: c1 traced end to end, c3 held by the database. */
+export function makeBrief(overrides: Partial<DesignBrief> = {}): DesignBrief {
+  return {
+    version: 1,
+    bindings: [
+      makeBinding(),
+      makeBinding({
+        criterionId: 'c3',
+        nodeIds: ['n-3'],
+        path: undefined,
+        claim: 'A replica keeps point reads under the budget',
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+export function makeNarrative(overrides: Partial<DesignNarrative> = {}): DesignNarrative {
+  return {
+    version: 1,
+    overview: 'A read/write split keeps order lookups fast while writes stay strongly ordered.',
+    componentRationales: [
+      {
+        nodeId: 'n-3',
+        prose: 'The Orders DB is the source of truth every read reconciles against.',
+      },
+    ],
+    criterionNarrations: [
+      { criterionId: 'c1', prose: 'The client asks the service, which reads the orders database.' },
+    ],
+    ...overrides,
+  };
+}
+
 export function makeExperience(
   overrides: Partial<ExperienceProfileDto> = {},
 ): ExperienceProfileDto {
@@ -120,235 +246,13 @@ export function makeExperience(
     companyLabel: 'TicketWave',
     title: 'Flash-sale ticketing platform',
     summary: 'Survived on-sale spikes of 40x baseline traffic.',
-    archetype: 'flash-sale-ticketing',
     techStack: ['node', 'postgres', 'redis'],
-    scaleFacts: { concurrentUsers: 120_000, requestsPerSecond: 15_000, peakMultiplier: 40 },
-    highlights: ['Queue-based checkout', 'Read-replica fanout'],
+    highlights: [
+      'Queue-based checkout',
+      'Read-replica fanout',
+      '15,000 requests per second at peak',
+    ],
     createdAt: AT,
-    ...overrides,
-  };
-}
-
-export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
-  return {
-    id: 'prompt-1',
-    experienceId: 'exp-1',
-    archetype: 'flash-sale-ticketing',
-    title: 'Design the on-sale checkout path',
-    scenario:
-      'A ticketing platform announces a stadium tour. At on-sale time, traffic spikes to 40x baseline within 90 seconds.',
-    functionalCapabilities: [],
-    functionalRequirements: [
-      'Users can view seat availability in near-real time',
-      'Users can hold seats for a bounded window',
-      'Confirmed orders are never double-sold',
-    ],
-    nonFunctionalRequirements: [
-      {
-        id: 'fst-lat-read-spike',
-        kind: 'latency',
-        statement: 'Reads stay fast under the spike',
-        target: 'p99 ≤ 200ms',
-        targetSpec: { metric: 'p99_latency_ms', op: '<=', value: 200, unit: 'ms' },
-      },
-      {
-        id: 'fst-avail-sale-window',
-        kind: 'availability',
-        statement: 'Checkout stays up during on-sale',
-        target: '99.95%',
-        targetSpec: { metric: 'availability_pct', op: '>=', value: 99.95, unit: '%' },
-      },
-      { id: 'fst-con-oversell', kind: 'consistency', statement: 'No double-sold seats' },
-    ],
-    scaleTargets: {
-      concurrentUsers: 120_000,
-      requestsPerSecond: 15_000,
-      readWriteRatio: '95:5',
-      p99LatencyMs: 200,
-      availabilityPct: '99.95',
-      dataRetention: '7 years',
-    },
-    workflowSpec: null,
-    difficulty: 'standard',
-    status: 'active',
-    seed: 42,
-    generatorVersion: '2.0.0',
-    llmEnriched: false,
-    createdAt: AT,
-    updatedAt: AT,
-    ...overrides,
-  };
-}
-
-/** A compact order-history business layer for workflow-aware surfaces. */
-export function makeWorkflowSpec(overrides: Partial<WorkflowSpec> = {}): WorkflowSpec {
-  return {
-    version: 1,
-    entities: [
-      {
-        id: 'ent-order',
-        name: 'Order',
-        states: ['received', 'indexed'],
-        transitions: [
-          { from: null, to: 'received', via: 'ing-webhooks' },
-          { from: 'received', to: 'indexed', via: 'op-ingest-index' },
-        ],
-      },
-    ],
-    operations: [
-      {
-        id: 'op-list-orders',
-        kind: 'query',
-        statement: 'Return the customer’s merged order history',
-      },
-      {
-        id: 'op-ingest-index',
-        kind: 'command',
-        statement: 'Normalize an incoming order into the read model',
-        consumes: ['evt-order-received'],
-        emits: ['evt-order-indexed'],
-        onFailureEmits: ['evt-ingest-failed'],
-      },
-    ],
-    events: [
-      { id: 'evt-order-received', statement: 'A new order arrived from a source' },
-      { id: 'evt-order-indexed', statement: 'An order became queryable' },
-      { id: 'evt-ingest-failed', statement: 'An order failed normalization' },
-    ],
-    aggregations: [
-      {
-        id: 'agg-spend-summary',
-        statement: 'A spend summary tile totals purchases',
-        sourceEventIds: ['evt-order-indexed'],
-      },
-    ],
-    ingests: [
-      {
-        id: 'ing-webhooks',
-        mode: 'push',
-        statement: 'The storefront pushes order webhooks',
-        nfrId: 'ohi-fresh-online',
-        emits: ['evt-order-received'],
-      },
-      {
-        id: 'ing-pos-import',
-        mode: 'pull',
-        statement: 'Poll the POS for new orders',
-        nfrId: 'ohi-fresh-offline',
-        emits: ['evt-order-received'],
-      },
-    ],
-    ...overrides,
-  };
-}
-
-/** A prompt whose archetype carries the business layer above. */
-export function makeWorkflowPrompt(overrides: Partial<PromptDto> = {}): PromptDto {
-  return makePrompt({
-    id: 'prompt-ohi-1',
-    archetype: 'order-history-integration',
-    title: 'Design an Order History Integration Service',
-    scenario:
-      'Online orders live in a hosted storefront (GraphQL plus webhooks), in-store orders in a Retail POS that only answers REST; merge both into one per-customer history.',
-    functionalCapabilities: ['analytics', 'scheduled-work'],
-    nonFunctionalRequirements: [
-      {
-        id: 'ohi-fresh-online',
-        kind: 'consistency',
-        statement: 'An online order is visible within a minute',
-        target: 'visible ≤ 60s after purchase',
-        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
-      },
-      {
-        id: 'ohi-fresh-offline',
-        kind: 'consistency',
-        statement: 'An in-store sale is visible within five minutes',
-        target: 'visible ≤ 300s after sale',
-        targetSpec: { metric: 'freshness_seconds', op: '<=', value: 300, unit: 's' },
-      },
-      {
-        id: 'ohi-sec-own-orders',
-        kind: 'security',
-        statement: 'A customer reads only their own orders; guests read none',
-      },
-    ],
-    workflowSpec: makeWorkflowSpec(),
-    ...overrides,
-  });
-}
-
-/** A graph with workflow claims: a serving query, a webhook intake, a wired channel. */
-export function makeOrderHistoryGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
-  return {
-    nodes: [
-      { id: 'n-1', kind: 'client', label: 'Shopper', position: { x: 40, y: 40 } },
-      {
-        id: 'n-2',
-        kind: 'gateway',
-        label: 'API Gateway',
-        config: { authMode: 'jwt' },
-        position: { x: 40, y: 180 },
-      },
-      {
-        id: 'n-3',
-        kind: 'service',
-        label: 'History service',
-        operations: [{ name: 'listOrders', kind: 'query', fulfills: 'op-list-orders' }],
-        position: { x: 40, y: 320 },
-      },
-      {
-        id: 'n-4',
-        kind: 'service',
-        label: 'Webhook receiver',
-        operations: [
-          {
-            name: 'receiveWebhook',
-            kind: 'command',
-            fulfills: 'ing-webhooks',
-            emits: ['evt-order-received'],
-          },
-        ],
-        position: { x: 320, y: 40 },
-      },
-      {
-        id: 'n-5',
-        kind: 'queue',
-        label: 'Orders queue',
-        operations: [{ name: 'OrderReceived', kind: 'event', fulfills: 'evt-order-received' }],
-        position: { x: 320, y: 180 },
-      },
-      {
-        id: 'n-6',
-        kind: 'worker',
-        label: 'Indexer',
-        operations: [
-          {
-            name: 'ingestIndex',
-            kind: 'command',
-            fulfills: 'op-ingest-index',
-            emits: ['evt-order-indexed'],
-          },
-        ],
-        position: { x: 320, y: 320 },
-      },
-      {
-        id: 'n-7',
-        kind: 'external-api',
-        label: 'Storefront',
-        config: { webhooks: true },
-        position: { x: 600, y: 40 },
-      },
-      { id: 'n-8', kind: 'database', label: 'History DB', position: { x: 600, y: 320 } },
-    ],
-    edges: [
-      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
-      { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync', carries: ['listOrders'] },
-      { id: 'e-3', source: 'n-7', target: 'n-4', kind: 'async', carries: ['receiveWebhook'] },
-      { id: 'e-4', source: 'n-4', target: 'n-5', kind: 'async', carries: ['OrderReceived'] },
-      { id: 'e-5', source: 'n-5', target: 'n-6', kind: 'async', carries: ['OrderReceived'] },
-      { id: 'e-6', source: 'n-6', target: 'n-8', kind: 'sync', intent: 'write' },
-      { id: 'e-7', source: 'n-3', target: 'n-8', kind: 'sync', intent: 'read' },
-    ],
     ...overrides,
   };
 }
@@ -360,7 +264,9 @@ export function makeSession(overrides: Partial<DesignSessionDto> = {}): DesignSe
     status: 'in-progress',
     revisionCount: 1,
     latestRevisionNumber: 1,
-    latestGrade: 'B',
+    latestOverall: 72,
+    latestDecision: 'revise',
+    latestEvaluationStatus: 'complete',
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
@@ -374,145 +280,110 @@ export function makeRevisionSummary(
     id: 'rev-1',
     revisionNumber: 1,
     origin: 'user',
-    narrative: null,
-    evaluationStatus: 'complete',
-    overallScore: 72,
-    grade: 'B',
+    evaluation: {
+      runId: 'run-1',
+      iteration: 1,
+      status: 'complete',
+      overall: 72,
+      decision: 'revise',
+    },
     createdAt: AT,
     ...overrides,
   };
 }
 
-export function makeFinding(overrides: Partial<FindingDto> = {}): FindingDto {
+export function makeRevision(overrides: Partial<DesignRevisionDto> = {}): DesignRevisionDto {
   return {
-    id: 'finding-1',
-    source: 'rule',
-    ruleId: 'reliability.single-db-no-replica',
-    expectationId: null,
-    nfrId: null,
-    scenarioId: null,
-    dimension: 'reliability',
+    id: 'rev-1',
+    sessionId: 'session-1',
+    revisionNumber: 1,
+    origin: 'user',
+    graph: makeGraph(),
+    brief: makeBrief(),
+    narrative: makeNarrative(),
+    evaluation: {
+      runId: 'run-1',
+      iteration: 1,
+      status: 'complete',
+      overall: 72,
+      decision: 'revise',
+    },
+    createdAt: AT,
+    ...overrides,
+  };
+}
+
+export function makeFinding(overrides: Partial<EvaluationFindingDto> = {}): EvaluationFindingDto {
+  return {
+    id: 'unhandled_failure|node.3',
+    lenses: ['critic.architecture'],
+    type: 'unhandled_failure',
     severity: 'high',
-    title: 'Single database with no replica',
-    message:
-      'At 15k rps a single primary is both the bottleneck and the single point of failure; one replica buys read fanout and a failover target.',
-    affectedNodeIds: ['n-3'],
-    affectedEdgeIds: [],
-    suggestion: {
-      description: 'Add a read replica and route reads to it.',
-      ops: [
-        {
-          op: 'add-node',
-          node: {
-            id: 'suggested-replica-1',
-            kind: 'replica',
-            label: 'Read Replica',
-            position: { x: 280, y: 360 },
-          },
-        },
-        {
-          op: 'add-edge',
-          edge: {
-            id: 'suggested-edge-1',
-            source: 'n-3',
-            target: 'suggested-replica-1',
-            kind: 'async',
-            label: 'replication',
-          },
-        },
-      ],
-    },
+    confidence: 'high',
+    fixability: 'fixable_local',
+    criterionIds: ['c3'],
+    nodeIds: ['n-3'],
+    edgeIds: [],
+    locationRefs: ['node.3'],
+    rationale:
+      'A single primary is both the read bottleneck and the single point of failure; one replica buys read fanout and a failover target.',
+    reconciledTo: null,
     ...overrides,
   };
 }
 
-export function makeAxis(overrides: Partial<EvalAxisDto> = {}): EvalAxisDto {
+export function makeCriterionResult(
+  overrides: Partial<CriterionResultDto> = {},
+): CriterionResultDto {
   return {
-    id: 'depth',
-    label: 'Depth & justification',
-    score: 61,
-    subScores: {
-      tradeoffArticulation: 55,
-      bottleneckAwareness: 70,
-      failureDesign: 50,
-      dataFlowClarity: 68,
-    },
-    factors: null,
-    summary: 'Mechanisms are named but capacities are defaulted.',
-    model: 'claude-sonnet-5',
-    ...overrides,
-  };
-}
-
-export function makeScenarioReport(overrides: Partial<ScenarioReportDto> = {}): ScenarioReportDto {
-  return {
-    scenarioId: 'thundering-herd',
-    title: 'The on-sale thundering herd',
-    verdict: 'degrades',
-    story: 'The cache absorbs the read storm, but checkout latency triples while the queue drains.',
-    weakestNodeIds: ['n-3'],
+    criterionId: 'c1',
+    result: 'pass',
+    confidence: 'high',
+    rationale: 'The binding traces the read from the client to the orders database.',
     ...overrides,
   };
 }
 
 export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): EvaluationDto {
   return {
-    id: 'eval-1',
-    revisionId: 'rev-1',
+    runId: 'run-1',
+    iteration: 1,
     status: 'complete',
-    overallScore: 72,
-    grade: 'B',
-    dimensionScores: {
-      reliability: 55,
-      scalability: 70,
-      performance: 78,
-      data: 80,
-      messaging: 66,
-      security: 74,
-      hygiene: 82,
-      explanation: 76,
-      product: 64,
-    },
-    summary: 'Solid read path; reliability is the weak dimension.',
-    engineVersion: '2.0.0',
-    profileId: 'default',
-    profileVersion: '2.2.0',
-    capApplied: null,
-    criticModel: null,
-    error: null,
+    llm: { enabled: true, model: 'test-model', reason: null },
+    overall: 72,
+    decision: 'revise',
+    dimensions: { coverage: 80, quality_attributes: 60, compliance: 90 },
     findings: [makeFinding()],
-    axes: [],
-    scenarios: [],
-    startedAt: AT,
-    completedAt: AT,
-    createdAt: AT,
-    updatedAt: AT,
+    criterionResults: [
+      makeCriterionResult(),
+      makeCriterionResult({ criterionId: 'c2', result: 'partial', confidence: 'medium' }),
+      makeCriterionResult({
+        criterionId: 'c3',
+        result: 'fail',
+        confidence: 'high',
+        rationale: 'A single primary cannot hold the latency target under the stated load.',
+      }),
+      makeCriterionResult({ criterionId: 'c4', result: 'partial', confidence: 'low' }),
+      makeCriterionResult({ criterionId: 'c5', result: 'pass', confidence: 'high' }),
+    ],
+    stopReason: 'max-iterations',
+    error: null,
     ...overrides,
   };
 }
 
-export function makeImprovementRun(overrides: Partial<ImprovementRunDto> = {}): ImprovementRunDto {
+export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveRunDto {
   return {
-    id: 'run-1',
+    runId: 'run-2',
     sessionId: 'session-1',
-    baseRevisionId: 'rev-1',
-    bestRevisionId: null,
     status: 'running',
-    maxIterations: 6,
+    llm: { enabled: true, model: 'test-model', reason: null },
+    exchangeCount: 4,
     iterations: [
-      {
-        iteration: 0,
-        proposer: 'baseline',
-        description: 'The design as submitted.',
-        score: 41,
-        accepted: true,
-        revisionId: 'rev-1',
-      },
+      { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
     ],
-    stoppedReason: null,
+    stopReason: null,
     error: null,
-    createdAt: AT,
-    updatedAt: AT,
     ...overrides,
   };
 }

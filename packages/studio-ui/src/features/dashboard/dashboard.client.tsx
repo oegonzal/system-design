@@ -2,13 +2,25 @@
 
 import styled from '@emotion/styled';
 import type { DesignSessionDto, ExperienceProfileDto } from '@sysdesign/contracts';
-import { Badge, Button, Heading, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  Button,
+  DECISION_TONE,
+  Heading,
+  LiveRegion,
+  Skeleton,
+  Spinner,
+  Stack,
+  Surface,
+  Text,
+} from '@sysdesign/design-system';
 import { toErrorMessage } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api } from '../../api/client';
+import { usePromptGeneration } from '../prompts/use-prompt-generation';
 
 const Grid = styled.div`
   display: grid;
@@ -29,6 +41,7 @@ const SessionLink = styled(Link)`
 
 export function Dashboard() {
   const router = useRouter();
+  const generation = usePromptGeneration((prompt) => router.push(`/prompts/${prompt.id}`));
 
   const [experiences, setExperiences] = useState<ExperienceProfileDto[] | null>(null);
   const [sessions, setSessions] = useState<DesignSessionDto[] | null>(null);
@@ -44,19 +57,13 @@ export function Dashboard() {
       .catch((caught) => setError(toErrorMessage(caught, 'Could not load the dashboard.')));
   }, []);
 
-  // No experienceId = "surprise me": the API rotates to the least-practiced
-  // experience, so repeated practice covers every archetype.
-  const handleGenerate = async (experienceId?: string) => {
+  // No experienceId = "surprise me": the API picks the least-practised
+  // experience, so repeated practice covers every experience.
+  const handleGenerate = (experienceId?: string) => {
     setGeneratingFor(experienceId ?? 'surprise');
-    setError(null);
-    try {
-      const prompt = await api.generatePrompt(experienceId ? { experienceId } : {});
-      router.push(`/prompts/${prompt.id}`);
-    } catch (caught) {
-      setError(toErrorMessage(caught, 'Could not generate a prompt.'));
-      setGeneratingFor(null);
-    }
+    void generation.start(experienceId ? { experienceId } : {});
   };
+  const busy = generation.generating;
 
   return (
     <Stack gap={7}>
@@ -69,18 +76,32 @@ export function Dashboard() {
       </Stack>
 
       {error !== null ? <Text tone="secondary">{error}</Text> : null}
+      <LiveRegion message={generation.message} />
+      {busy ? (
+        <Stack direction="row" gap={3} align="center" data-testid="prompt-generation-progress">
+          <Spinner label="" />
+          <Text size="sm" tone="secondary">
+            {generation.message}
+          </Text>
+        </Stack>
+      ) : null}
+      {generation.error !== null ? (
+        <Text tone="secondary" data-testid="prompt-generation-error">
+          {generation.error}
+        </Text>
+      ) : null}
 
       <Stack gap={4}>
         <Stack direction="row" gap={4} align="center" justify="between">
           <Heading level={2}>Experiences</Heading>
           <Button
             variant="subtle"
-            onClick={() => void handleGenerate()}
-            disabled={generatingFor !== null}
+            onClick={() => handleGenerate()}
+            disabled={busy}
             data-testid="surprise-me"
-            title="Generate a prompt from your least-practiced experience"
+            title="Write a prompt from your least-practised experience"
           >
-            {generatingFor === 'surprise' ? 'Generating…' : 'Surprise me'}
+            {busy && generatingFor === 'surprise' ? 'Writing…' : 'Surprise me'}
           </Button>
         </Stack>
         {experiences === null ? (
@@ -112,11 +133,11 @@ export function Dashboard() {
                   <div>
                     <Button
                       variant="subtle"
-                      onClick={() => void handleGenerate(experience.id)}
-                      disabled={generatingFor !== null}
+                      onClick={() => handleGenerate(experience.id)}
+                      disabled={busy}
                       data-testid={`generate-${experience.slug}`}
                     >
-                      {generatingFor === experience.id ? 'Generating…' : 'Generate prompt'}
+                      {busy && generatingFor === experience.id ? 'Writing…' : 'Generate prompt'}
                     </Button>
                   </div>
                 </Stack>
@@ -143,8 +164,20 @@ export function Dashboard() {
                   <Stack gap={2}>
                     <Stack direction="row" gap={2} align="center" wrap>
                       <Badge tone="neutral">{session.status}</Badge>
-                      {session.latestGrade ? (
-                        <Badge tone="accent">{`grade ${session.latestGrade}`}</Badge>
+                      {session.latestOverall !== null ? (
+                        <Badge tone="accent" data-testid="session-score">
+                          {`${session.latestOverall}/100`}
+                        </Badge>
+                      ) : null}
+                      {session.latestDecision ? (
+                        <Badge
+                          tone={DECISION_TONE[session.latestDecision]}
+                          data-testid="session-decision"
+                        >
+                          {session.latestDecision}
+                        </Badge>
+                      ) : session.latestEvaluationStatus === 'running' ? (
+                        <Badge tone="neutral">grading…</Badge>
                       ) : null}
                     </Stack>
                     <Text size="sm" tone="secondary">

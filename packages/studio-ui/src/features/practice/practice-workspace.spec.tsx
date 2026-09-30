@@ -1,7 +1,7 @@
 import { renderWithTheme, stubApi } from '@sysdesign/web-testing';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PracticeWorkspace } from './practice-workspace';
 
@@ -9,12 +9,12 @@ const SESSION = '00000000-0000-4000-8000-000000000000';
 const SESSION_PATH = new RegExp(`^/api/sessions/${SESSION}$`);
 const AVAILABILITY = {
   method: 'GET',
-  path: '/api/improvement-runs/availability',
+  path: '/api/grading/availability',
   body: { data: { enabled: false, model: null, reason: 'no-key' } },
 };
 
 afterEach(() => {
-  // stub-api installs a global fetch; a leaked mock would break the next spec.
+  vi.unstubAllGlobals();
 });
 
 describe('PracticeWorkspace load failures', () => {
@@ -32,9 +32,7 @@ describe('PracticeWorkspace load failures', () => {
 
     expect(await screen.findByRole('heading', { name: 'Session not found' })).toBeTruthy();
     expect(screen.getByTestId('notice-back').getAttribute('href')).toBe('/');
-    // The raw Nest message is never surfaced as the screen.
     expect(screen.queryByText(`Session ${SESSION} not found`)).toBeNull();
-    // A 404 will not change on retry, so no Retry button.
     expect(screen.queryByTestId('notice-retry')).toBeNull();
   });
 
@@ -42,7 +40,6 @@ describe('PracticeWorkspace load failures', () => {
     const { calls } = stubApi([
       {
         path: SESSION_PATH,
-        // 500 first, 500 again after Retry — assert the load re-runs.
         sequence: [
           { statusCode: 500, message: 'boom' },
           { statusCode: 500, message: 'boom' },
@@ -61,7 +58,6 @@ describe('PracticeWorkspace load failures', () => {
     await userEvent.click(screen.getByTestId('notice-retry'));
 
     await waitFor(() => expect(sessionCalls()).toBe(2));
-    // Still failing, so the retryable error persists.
     expect(screen.getByRole('heading', { name: "Couldn't load this session" })).toBeTruthy();
   });
 });

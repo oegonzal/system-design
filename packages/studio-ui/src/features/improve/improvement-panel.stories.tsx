@@ -1,0 +1,70 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+
+import { makeImproveRun } from '../../testing/fixtures';
+import { ImprovementPanel } from './improvement-panel';
+
+const meta: Meta<typeof ImprovementPanel> = {
+  title: 'Studio/Coach/ImprovementPanel',
+  component: ImprovementPanel,
+  args: {
+    run: null,
+    error: null,
+    isPolling: false,
+    message: '',
+    availability: { enabled: true, model: 'claude', reason: null },
+    onStart: () => undefined,
+    onLoadRevision: () => undefined,
+  },
+};
+export default meta;
+
+type Story = StoryObj<typeof ImprovementPanel>;
+
+/** Idle, a model available: pick the iterations and hand over the draft. */
+export const Idle: Story = {};
+
+/** No model configured — the button is off and says why. */
+export const Unavailable: Story = {
+  args: { availability: { enabled: false, model: null, reason: 'no-key' } },
+};
+
+/** Mid-run: model calls ticking up, one iteration already imported. */
+export const Running: Story = {
+  args: {
+    run: makeImproveRun({
+      exchangeCount: 9,
+      iterations: [
+        { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
+        { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
+      ],
+    }),
+    isPolling: true,
+    message: 'Coaching — 9 model calls so far.',
+  },
+};
+
+/** Stopped on a plateau with an accepted design to load. */
+export const Stopped: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'plateau',
+      exchangeCount: 22,
+      iterations: [
+        { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
+        { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
+        { iteration: 3, mode: 'revise', overall: 70, decision: 'revise', revisionId: null },
+      ],
+    }),
+    message: 'Coach finished — best score 72.',
+  },
+};
+
+/** The run failed outright. */
+export const Failed: Story = {
+  args: {
+    run: makeImproveRun({ status: 'failed', error: 'the producer refused', iterations: [] }),
+    error: 'the producer refused',
+    message: 'Coach problem: the producer refused',
+  },
+};

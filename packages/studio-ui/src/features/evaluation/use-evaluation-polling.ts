@@ -13,12 +13,12 @@ export const UNREACHABLE_AFTER = 3;
 
 export interface EvaluationPollingResult {
   evaluation: EvaluationDto | null;
-  /** A TERMINAL problem — the evaluation failed, or cannot exist. Never a transient outage. */
+  /** A TERMINAL problem — the run failed, or cannot exist. Never a transient outage. */
   error: string | null;
   isPolling: boolean;
   /** For a LiveRegion — the consumer renders it so announcements have a home. */
   message: string;
-  /** Re-run the poll cycle from scratch (after a retry POST). */
+  /** Re-run the poll cycle from scratch. */
   restart(): void;
 }
 
@@ -32,12 +32,13 @@ function describe(
   if (unreachable) return 'Cannot reach the API — retrying…';
   if (evaluation === null) return isPolling ? 'Checking evaluation status…' : '';
   switch (evaluation.status) {
-    case 'queued':
-      return 'Evaluation queued.';
     case 'running':
       return 'Evaluation running…';
-    case 'complete':
-      return `Evaluation complete${evaluation.grade ? ` — grade ${evaluation.grade}` : ''}.`;
+    case 'complete': {
+      const score = evaluation.overall !== null ? ` — ${evaluation.overall}/100` : '';
+      const decision = evaluation.decision ? ` · ${evaluation.decision}` : '';
+      return `Evaluation complete${score}${decision}.`;
+    }
     case 'failed':
       return 'Evaluation failed.';
   }
@@ -51,10 +52,10 @@ const terminalError = (evaluation: EvaluationDto) =>
   evaluation.status === 'failed' ? (evaluation.error ?? 'Evaluation failed.') : null;
 
 /**
- * Polls the evaluation for a revision until it reaches a terminal status —
+ * Polls the grade for a revision until the run reaches a terminal status —
  * `usePolledResource` with this domain's copy. Status-driven, not
- * clock-capped: only the server knows how long a grade takes, and `error`
- * (with the Retry button it drives) is reserved for an evaluation that
+ * clock-capped: only the quality loop knows how long its lenses take, and
+ * `error` (with the resubmit button it drives) is reserved for a run that
  * actually failed, never for an unreachable API.
  */
 export function useEvaluationPolling(revisionId: string | null): EvaluationPollingResult {

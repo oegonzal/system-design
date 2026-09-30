@@ -1,6 +1,6 @@
 import {
   kindsInCategory,
-  type NodeConfig,
+  type NodeConfigEntry,
   type NodeKind,
   type NodeKindCategoryId,
 } from '@sysdesign/contracts';
@@ -26,41 +26,44 @@ function node(
   return { id, type: 'sd', position, data, selected };
 }
 
+const entries = (record: Record<string, string | number | boolean>): NodeConfigEntry[] =>
+  Object.entries(record).map(([key, value]) => ({ key, value }));
+
 /**
- * Representative labels — and configs where a knob count makes the meta line
- * interesting — for the category catalogs below. Anything not listed renders
- * under its palette default.
+ * Representative labels — and configs where an entry count makes the meta
+ * line interesting — for the category catalogs below. Anything not listed
+ * renders under its palette default.
  */
-const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfig }>> = {
+const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfigEntry[] }>> = {
   client: { label: 'Web + Mobile' },
-  gateway: { config: { rateLimit: true } },
-  'websocket-gateway': { label: 'Live Updates', config: { maxConnections: 50_000, sticky: true } },
-  service: { label: 'Order Service', config: { replicas: 3 } },
-  'serverless-function': { label: 'Thumbnailer', config: { memoryMb: 512, timeoutSeconds: 30 } },
-  'batch-job': { label: 'Nightly ETL', config: { schedule: '0 2 * * *', idempotent: true } },
-  database: { label: 'Orders DB', config: { replicas: 2 } },
-  'kv-store': { label: 'Session Store', config: { ttlSeconds: 1800 } },
-  'time-series-db': { label: 'Metrics DB', config: { retentionDays: 30 } },
-  'vector-db': { label: 'Embeddings', config: { dimensions: 1536 } },
-  cache: { label: 'Hot Cache', config: { strategy: 'cache-aside', ttlSeconds: 60 } },
-  queue: { label: 'Jobs', config: { dlq: true } },
+  gateway: { config: entries({ rateLimit: true }) },
+  'websocket-gateway': { label: 'Live Updates', config: entries({ maxConnections: 50_000 }) },
+  service: { label: 'Order Service', config: entries({ replicas: 3 }) },
+  'serverless-function': { label: 'Thumbnailer', config: entries({ memoryMb: 512 }) },
+  'batch-job': { label: 'Nightly ETL', config: entries({ schedule: '0 2 * * *' }) },
+  database: { label: 'Orders DB', config: entries({ replicas: 2 }) },
+  'kv-store': { label: 'Session Store', config: entries({ ttlSeconds: 1800 }) },
+  'time-series-db': { label: 'Metrics DB', config: entries({ retentionDays: 30 }) },
+  'vector-db': { label: 'Embeddings', config: entries({ dimensions: 1536 }) },
+  cache: { label: 'Hot Cache', config: entries({ strategy: 'cache-aside', ttlSeconds: 60 }) },
+  queue: { label: 'Jobs', config: entries({ dlq: true }) },
   'event-stream': { label: 'Order Events' },
-  'pub-sub': { label: 'Order Fan-out', config: { delivery: 'at-least-once', fanout: 3 } },
-  'cdc-connector': { label: 'Outbox Relay', config: { mode: 'outbox' } },
-  'notification-service': { label: 'Notifier', config: { channels: 'push,email' } },
-  'stream-processor': { label: 'Sales Aggregator', config: { parallelism: 4 } },
-  'data-warehouse': { label: 'BI Warehouse', config: { loadMode: 'batch' } },
+  'pub-sub': { label: 'Order Fan-out', config: entries({ delivery: 'at-least-once' }) },
+  'cdc-connector': { label: 'Outbox Relay' },
+  'notification-service': { label: 'Notifier' },
+  'stream-processor': { label: 'Sales Aggregator', config: entries({ parallelism: 4 }) },
+  'data-warehouse': { label: 'BI Warehouse' },
   'data-lake': { label: 'Raw Events' },
-  'ml-inference': { label: 'Recs Model', config: { gpu: true, timeoutMs: 250 } },
+  'ml-inference': { label: 'Recs Model', config: entries({ gpu: true, timeoutMs: 250 }) },
   scheduler: { label: 'Cron' },
-  'workflow-engine': { label: 'Checkout Saga', config: { mode: 'orchestration' } },
-  'distributed-lock': { label: 'Job Lock', config: { ttlSeconds: 30 } },
-  'id-generator': { config: { strategy: 'snowflake' } },
-  'auth-service': { label: 'Identity', config: { tokenType: 'jwt', mfa: true } },
-  waf: { config: { mode: 'block' } },
-  monitoring: { config: { alerting: true } },
-  tracing: { config: { sampling: 10 } },
-  'payment-provider': { label: 'Card Processor', config: { idempotencyKeys: true } },
+  'workflow-engine': { label: 'Checkout Saga' },
+  'distributed-lock': { label: 'Job Lock', config: entries({ ttlSeconds: 30 }) },
+  'id-generator': { config: entries({ strategy: 'snowflake' }) },
+  'auth-service': { label: 'Identity', config: entries({ tokenType: 'jwt', mfa: true }) },
+  waf: { config: entries({ mode: 'block' }) },
+  monitoring: { config: entries({ alerting: true }) },
+  tracing: { config: entries({ sampling: 10 }) },
+  'payment-provider': { label: 'Card Processor', config: entries({ idempotencyKeys: true }) },
 };
 
 /**
@@ -172,7 +175,7 @@ export const SecurityCategory: Story = {
   args: { nodes: categoryNodes('security') },
 };
 
-/** Plum — the annotation shelf: watching, never a traffic hop. */
+/** Plum — the observability shelf: watching, never a traffic hop. */
 export const ObservabilityCategory: Story = {
   args: { nodes: categoryNodes('observability') },
 };
@@ -189,21 +192,7 @@ export const Selected: Story = {
   },
 };
 
-/** A suggestion overlay element: dashed, 60% opacity. */
-export const Ghost: Story = {
-  args: {
-    nodes: [
-      node('n-1', { kind: 'database', label: 'Orders DB' }, { x: 0, y: 40 }),
-      node(
-        'suggested-replica-1',
-        { kind: 'replica', label: 'Read Replica', ghost: true },
-        { x: 220, y: 40 },
-      ),
-    ],
-  },
-};
-
-/** Declared interfaces on the meta line: ops and roles for a service, types for a channel. */
+/** Declared interfaces on the meta line: ops, roles and config for a service; an event on a queue. */
 export const WithDeclaredInterface: Story = {
   args: {
     nodes: [
@@ -217,7 +206,7 @@ export const WithDeclaredInterface: Story = {
             { name: 'getOrder', kind: 'query', idempotent: true },
           ],
           responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
-          config: { replicas: 3 },
+          config: entries({ replicas: 3 }),
         },
         { x: 0, y: 0 },
       ),

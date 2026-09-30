@@ -86,6 +86,43 @@ describe('api client', () => {
     expect((thrown as ApiError).message).toBe('title must not be empty; tags too long');
   });
 
+  it('encodes a library id segment by segment, keeping the slashes the proxy route matches', async () => {
+    const { calls } = stubApi([
+      {
+        path: '/api/prompts/library/interviews/order%20history',
+        body: { data: { id: 'interviews/order history', title: 'x', markdown: '# x' } },
+      },
+    ]);
+
+    await api.getPromptLibraryDocument('interviews/order history');
+
+    expect(calls[0].url).toBe('/api/prompts/library/interviews/order%20history');
+  });
+
+  it('posts a submission with both brief and narrative keys, null when nothing was claimed', async () => {
+    const { fetchMock } = stubApi([
+      {
+        method: 'POST',
+        path: '/api/sessions/session-1/revisions',
+        status: 201,
+        body: { data: {} },
+      },
+    ]);
+
+    await api.submitRevision('session-1', {
+      graph: { nodes: [], edges: [] },
+      brief: null,
+      narrative: null,
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      graph: { nodes: [], edges: [] },
+      brief: null,
+      narrative: null,
+    });
+  });
+
   it('treats 204 responses as void', async () => {
     stubApi([{ method: 'DELETE', path: '/api/star-stories/story-1', status: 204 }]);
 

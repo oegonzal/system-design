@@ -113,6 +113,7 @@ export const makeIteration = (overrides: Partial<IterationTrace> = {}): Iteratio
         criterionIds: ['c2'],
         hits: 1,
         lenses: ['critic.requirements'],
+        rationale: 'The retention target the goal states is met by nothing in the design.',
         reconciledTo: 'c2',
       },
       {
@@ -125,6 +126,7 @@ export const makeIteration = (overrides: Partial<IterationTrace> = {}): Iteratio
         criterionIds: [],
         hits: 1,
         lenses: ['critic.requirements'],
+        rationale: 'The summary claims a cache no component provides.',
         reconciledTo: null,
       },
     ],

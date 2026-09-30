@@ -1,12 +1,16 @@
 'use client';
 
-import type { EvaluationDto, FindingDto } from '@sysdesign/contracts';
-import { Button, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
+import type {
+  EvaluationDto,
+  EvaluationFindingDto,
+  LlmAvailabilityDto,
+  SuccessCriterion,
+} from '@sysdesign/contracts';
+import { Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
+import { CriterionResultsTable } from './criterion-results-table';
 import { FindingsList } from './findings-list';
-import { LlmInsights } from './llm-insights';
 import { ScoreSummary } from './score-summary';
-import { SuggestionControls } from './suggestion-controls';
 
 export interface EvaluationPanelProps {
   /** Output of `useEvaluationPolling` — the workspace owns the hook. */
@@ -15,26 +19,46 @@ export interface EvaluationPanelProps {
   isPolling: boolean;
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
   message: string;
+  /** The prompt's rubric, so criterion ids read as statements. */
+  criteria: SuccessCriterion[];
+  /** There is no retry endpoint: retrying a failed grade is resubmitting the draft. */
   onRetry: () => void;
-  onSelectFinding: (finding: FindingDto) => void;
-  onPreviewFix: (finding: FindingDto) => void;
+  onSelectFinding: (finding: EvaluationFindingDto) => void;
+}
+
+/** Why the loop could not score — from the run's own model report. */
+function escalationCopy(llm: LlmAvailabilityDto): string {
+  if (llm.reason === 'deterministic') {
+    return 'The quality loop ran without a model (deterministic mode), so it escalated instead of scoring this design. Set QUALITY_LOOP_DETERMINISTIC=0 to grade for real.';
+  }
+  if (llm.reason === 'no-key') {
+    return 'The quality loop has no model to grade with, so it escalated instead of scoring this design. Set ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code to use your Claude login.';
+  }
+  return 'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
 }
 
 /**
- * The feedback dock: queued/running → spinner, failed → error + retry,
- * complete → score summary and the findings list. The LiveRegion is mounted
- * unconditionally so status changes are announced, not just rendered.
+ * The feedback dock: running → spinner, failed → error + resubmit, complete →
+ * the score summary, the criterion results and the findings. An escalation
+ * with no score says why before showing what the lenses did find. The
+ * LiveRegion is mounted unconditionally so status changes are announced,
+ * not just rendered.
  */
 export function EvaluationPanel({
   evaluation,
   error,
   isPolling,
   message,
+  criteria,
   onRetry,
   onSelectFinding,
-  onPreviewFix,
 }: EvaluationPanelProps) {
   const status = evaluation?.status ?? null;
+  const escalated =
+    evaluation !== null &&
+    evaluation.status === 'complete' &&
+    evaluation.decision === 'escalate' &&
+    evaluation.overall === null;
 
   return (
     <Stack gap={5} data-testid="evaluation-panel">
@@ -42,18 +66,15 @@ export function EvaluationPanel({
 
       {evaluation === null && error === null && !isPolling ? (
         <Text size="sm" tone="muted">
-          Submit your design to get graded feedback.
+          Submit your design to have the quality loop grade it.
         </Text>
       ) : null}
 
-      {(status === 'queued' || status === 'running' || (evaluation === null && isPolling)) &&
-      error === null ? (
+      {(status === 'running' || (evaluation === null && isPolling)) && error === null ? (
         <Stack direction="row" gap={3} align="center">
           <Spinner label="" />
           <Text size="sm" tone="secondary">
-            {status === 'running'
-              ? 'The critic pipeline is grading your design…'
-              : 'Waiting for the evaluation worker…'}
+            The lenses are reading your design…
           </Text>
         </Stack>
       ) : null}
@@ -63,7 +84,7 @@ export function EvaluationPanel({
           <Text size="sm">{error}</Text>
           <div>
             <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
-              Retry evaluation
+              Resubmit for grading
             </Button>
           </div>
         </Stack>
@@ -71,14 +92,24 @@ export function EvaluationPanel({
 
       {status === 'complete' && evaluation ? (
         <>
+          {escalated ? (
+            <Text size="sm" tone="secondary" data-testid="evaluation-escalated">
+              {escalationCopy(evaluation.llm)}
+            </Text>
+          ) : null}
           <ScoreSummary evaluation={evaluation} />
-          <SuggestionControls />
-          <FindingsList
-            findings={evaluation.findings}
-            onSelect={onSelectFinding}
-            onPreviewFix={onPreviewFix}
-          />
-          <LlmInsights axes={evaluation.axes} scenarios={evaluation.scenarios} />
+          <Stack gap={2}>
+            <Heading level={3}>Criteria</Heading>
+            <CriterionResultsTable results={evaluation.criterionResults} criteria={criteria} />
+          </Stack>
+          <Stack gap={2}>
+            <Heading level={3}>Findings</Heading>
+            <FindingsList
+              findings={evaluation.findings}
+              criteria={criteria}
+              onSelect={onSelectFinding}
+            />
+          </Stack>
         </>
       ) : null}
     </Stack>

@@ -1,10 +1,7 @@
 import type {
   ApiListResponse,
-  BriefSuggestionsDto,
-  BriefSuggestionsRequest,
-  InterfaceSuggestionsDto,
-  InterfaceSuggestionsRequest,
   ApiResponse,
+  AuthorPromptRequest,
   CreateSessionRequest,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
@@ -12,15 +9,21 @@ import type {
   EvaluationDto,
   ExperienceProfileDto,
   GeneratePromptRequest,
-  ImprovementRunDto,
-  LlmAvailabilityDto,
+  ImportPromptRequest,
+  ImproveRunDto,
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
+  LlmAvailabilityDto,
   PromptDto,
+  PromptGenerationDto,
+  PromptLibraryDocumentDto,
+  PromptLibraryEntryDto,
+  QualityRunStartedDto,
   SaveStarStoryRequest,
   StarStoryDto,
-  StartImprovementRunRequest,
+  StartImproveDto,
+  StartImproveRequest,
   SubmitRevisionRequest,
   UpdatePromptRequest,
   UpdateSessionRequest,
@@ -38,6 +41,15 @@ import { createRequest, query, unwrap, type GetOptions } from '@sysdesign/web-ki
 const BASE_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3000/api';
 const request = createRequest(BASE_URL);
 
+/**
+ * A library id is a path in the quality loop's prompt folder (`a/b.md`), so
+ * each segment is encoded on its own — encoding the slash would turn one
+ * document into a name the proxy route never matches.
+ */
+function encodeLibraryId(id: string): string {
+  return id.split('/').map(encodeURIComponent).join('/');
+}
+
 export const api = {
   // Experiences ------------------------------------------------------------
   async listExperiences(opts: GetOptions = {}): Promise<ApiListResponse<ExperienceProfileDto>> {
@@ -49,15 +61,58 @@ export const api = {
   },
 
   // Prompts ----------------------------------------------------------------
-  async generatePrompt(body: GeneratePromptRequest): Promise<PromptDto> {
+  async listPromptLibrary(opts: GetOptions = {}): Promise<PromptLibraryEntryDto[]> {
+    return unwrap(await request<ApiResponse<PromptLibraryEntryDto[]>>('/prompts/library', opts));
+  },
+
+  async getPromptLibraryDocument(
+    id: string,
+    opts: GetOptions = {},
+  ): Promise<PromptLibraryDocumentDto> {
     return unwrap(
-      await request<ApiResponse<PromptDto>>('/prompts/generate', { method: 'POST', body }),
+      await request<ApiResponse<PromptLibraryDocumentDto>>(
+        `/prompts/library/${encodeLibraryId(id)}`,
+        opts,
+      ),
     );
   },
 
-  async regeneratePrompt(id: string): Promise<PromptDto> {
+  async authorPrompt(body: AuthorPromptRequest): Promise<PromptDto> {
+    return unwrap(await request<ApiResponse<PromptDto>>('/prompts', { method: 'POST', body }));
+  },
+
+  async importPrompt(body: ImportPromptRequest): Promise<PromptDto> {
     return unwrap(
-      await request<ApiResponse<PromptDto>>(`/prompts/${id}/regenerate`, { method: 'POST' }),
+      await request<ApiResponse<PromptDto>>('/prompts/import', { method: 'POST', body }),
+    );
+  },
+
+  /** 202: the draft is written by a background run; poll `getPromptGeneration`. */
+  async startPromptGeneration(body: GeneratePromptRequest): Promise<QualityRunStartedDto> {
+    return unwrap(
+      await request<ApiResponse<QualityRunStartedDto>>('/prompts/generate', {
+        method: 'POST',
+        body,
+      }),
+    );
+  },
+
+  async getPromptGeneration(runId: string, opts: GetOptions = {}): Promise<PromptGenerationDto> {
+    return unwrap(
+      await request<ApiResponse<PromptGenerationDto>>(
+        `/prompts/generate/${encodeURIComponent(runId)}`,
+        opts,
+      ),
+    );
+  },
+
+  /** Re-derive the rubric. 502/503 when the grader is unavailable; 409 once sessions exist. */
+  async derivePromptCriteria(id: string, opts: GetOptions = {}): Promise<PromptDto> {
+    return unwrap(
+      await request<ApiResponse<PromptDto>>(`/prompts/${id}/criteria`, {
+        method: 'POST',
+        ...opts,
+      }),
     );
   },
 
@@ -115,38 +170,6 @@ export const api = {
     );
   },
 
-  /**
-   * Candidate bindings for the draft in the body — the canvas being worked on,
-   * not the last one submitted. Cancellable: the author can switch tabs or edit
-   * the diagram out from under a request that is still in flight.
-   */
-  async briefSuggestions(
-    sessionId: string,
-    body: BriefSuggestionsRequest,
-    opts: GetOptions = {},
-  ): Promise<BriefSuggestionsDto> {
-    return unwrap(
-      await request<ApiResponse<BriefSuggestionsDto>>(`/sessions/${sessionId}/brief-suggestions`, {
-        method: 'POST',
-        body,
-        ...opts,
-      }),
-    );
-  },
-
-  async interfaceSuggestions(
-    sessionId: string,
-    body: InterfaceSuggestionsRequest,
-    opts: GetOptions = {},
-  ): Promise<InterfaceSuggestionsDto> {
-    return unwrap(
-      await request<ApiResponse<InterfaceSuggestionsDto>>(
-        `/sessions/${sessionId}/interface-suggestions`,
-        { method: 'POST', body, ...opts },
-      ),
-    );
-  },
-
   async listRevisions(
     sessionId: string,
     opts: GetOptions = {},
@@ -161,49 +184,39 @@ export const api = {
     return unwrap(await request<ApiResponse<DesignRevisionDto>>(`/revisions/${id}`, opts));
   },
 
+  /** The revision's grade — one iteration of one quality-loop run; poll while `running`. */
   async getEvaluation(revisionId: string, opts: GetOptions = {}): Promise<EvaluationDto> {
     return unwrap(
       await request<ApiResponse<EvaluationDto>>(`/revisions/${revisionId}/evaluation`, opts),
     );
   },
 
-  async retryEvaluation(revisionId: string): Promise<EvaluationDto> {
-    return unwrap(
-      await request<ApiResponse<EvaluationDto>>(`/revisions/${revisionId}/evaluation/retry`, {
-        method: 'POST',
-      }),
-    );
+  // Grading and the coach ---------------------------------------------------
+  /** 503 when the grader is unreachable — callers treat a throw as unavailable. */
+  async gradingAvailability(opts: GetOptions = {}): Promise<LlmAvailabilityDto> {
+    return unwrap(await request<ApiResponse<LlmAvailabilityDto>>('/grading/availability', opts));
   },
 
-  // Improvement runs (the AI coach) -----------------------------------------
-  async improverAvailability(opts: GetOptions = {}): Promise<LlmAvailabilityDto> {
+  /** Persists the draft as a revision and starts the coach (202). */
+  async startImprove(sessionId: string, body: StartImproveRequest): Promise<StartImproveDto> {
     return unwrap(
-      await request<ApiResponse<LlmAvailabilityDto>>('/improvement-runs/availability', opts),
-    );
-  },
-
-  /** Submits the current canvas as a base revision and queues the run (202). */
-  async startImprovementRun(
-    sessionId: string,
-    body: StartImprovementRunRequest,
-  ): Promise<ImprovementRunDto> {
-    return unwrap(
-      await request<ApiResponse<ImprovementRunDto>>(`/sessions/${sessionId}/improvement-runs`, {
+      await request<ApiResponse<StartImproveDto>>(`/sessions/${sessionId}/improve`, {
         method: 'POST',
         body,
       }),
     );
   },
 
-  async getImprovementRun(id: string, opts: GetOptions = {}): Promise<ImprovementRunDto> {
-    return unwrap(await request<ApiResponse<ImprovementRunDto>>(`/improvement-runs/${id}`, opts));
-  },
-
-  async cancelImprovementRun(id: string): Promise<ImprovementRunDto> {
+  async getImprove(
+    sessionId: string,
+    runId: string,
+    opts: GetOptions = {},
+  ): Promise<ImproveRunDto> {
     return unwrap(
-      await request<ApiResponse<ImprovementRunDto>>(`/improvement-runs/${id}/cancel`, {
-        method: 'POST',
-      }),
+      await request<ApiResponse<ImproveRunDto>>(
+        `/sessions/${sessionId}/improve/${encodeURIComponent(runId)}`,
+        opts,
+      ),
     );
   },
 

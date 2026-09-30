@@ -10,7 +10,6 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import type { InterfaceSuggestionsState } from '../../practice/use-interface-suggestions';
 import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
@@ -33,18 +32,17 @@ describe('PropertiesPanel', () => {
     expect(screen.getByText(/select a block or connection/i)).toBeTruthy();
   });
 
-  it('[UX-7] teaches what the selected kind is, and swaps when the kind changes', async () => {
+  it('[UX-7] teaches what the selected kind is and when to use it, and swaps when the kind changes', async () => {
     const user = userEvent.setup();
     renderPanel((seeded) => seeded.getState().select('n-3')); // n-3 is a database
 
     const guide = screen.getByTestId('kind-guide');
     expect(guide.textContent).toContain(NODE_KIND_GUIDE.database.what);
-    expect(guide.textContent).toContain('Passive storage');
+    expect(guide.textContent).toContain(NODE_KIND_GUIDE.database.whenToUse);
 
     await user.selectOptions(screen.getByRole('combobox', { name: /kind/i }), 'queue');
 
     expect(screen.getByTestId('kind-guide').textContent).toContain(NODE_KIND_GUIDE.queue.what);
-    expect(screen.getByTestId('kind-guide').textContent).toContain('producers and consumers');
   });
 
   it('edits the selected node label straight into the store', async () => {
@@ -60,15 +58,6 @@ describe('PropertiesPanel', () => {
       'Order Service!',
     );
     expect(store.getState().dirty).toBe(true);
-  });
-
-  it('changes the node kind through the kind select', async () => {
-    const user = userEvent.setup();
-    const store = renderPanel((seeded) => seeded.getState().select('n-2'));
-
-    await user.selectOptions(screen.getByLabelText('Kind'), 'worker');
-
-    expect(store.getState().nodes.find((node) => node.id === 'n-2')?.data.kind).toBe('worker');
   });
 
   it('[UX-4] groups the kind select into one optgroup per non-empty category', () => {
@@ -89,46 +78,28 @@ describe('PropertiesPanel', () => {
     expect(loadBalancer?.closest('optgroup')?.label).toBe('Traffic & Routing');
   });
 
-  it('writes kind-specific config keys the eval rules read', async () => {
+  it('[UX-9] writes free-form typed config through the store for any kind', async () => {
+    const user = userEvent.setup();
+    const store = renderPanel((seeded) => seeded.getState().select('n-1')); // a client
+
+    expect(screen.getByTestId('config-section')).toBeTruthy();
+    await user.type(screen.getByTestId('config-key'), 'sessions');
+    await user.type(screen.getByTestId('config-value'), '120000{Enter}');
+
+    expect(store.getState().nodes.find((node) => node.id === 'n-1')?.data.config).toEqual([
+      { key: 'sessions', value: 120_000 },
+    ]);
+    expect(screen.getByTestId('config-type-sessions').textContent).toContain('number');
+  });
+
+  it('shows the database’s stored entries and removes one through the store', async () => {
     const user = userEvent.setup();
     const store = renderPanel((seeded) => seeded.getState().select('n-3'));
 
-    const replicas = screen.getByLabelText('Replicas') as HTMLInputElement;
-    expect(replicas.value).toBe('1');
+    expect(screen.getByTestId('config-row-replicas')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Remove config replicas' }));
 
-    await user.clear(replicas);
-    await user.type(replicas, '3');
-
-    expect(
-      store.getState().nodes.find((node) => node.id === 'n-3')?.data.config?.['replicas'],
-    ).toBe(3);
-  });
-
-  it('renders a new-catalog kind’s config form as soon as the kind switches', async () => {
-    const user = userEvent.setup();
-    renderPanel((seeded) => seeded.getState().select('n-2'));
-
-    await user.selectOptions(screen.getByLabelText('Kind'), 'pub-sub');
-
-    expect(screen.getByLabelText('Delivery')).toBeTruthy();
-    expect(screen.getByLabelText('Fan-out (subscribers)')).toBeTruthy();
-  });
-
-  it('round-trips a new-catalog knob edit through the store', async () => {
-    const user = userEvent.setup();
-    const store = renderPanel((seeded) => {
-      seeded.getState().updateNode('n-2', { kind: 'pub-sub', label: 'Order Fan-out' });
-      seeded.getState().select('n-2');
-    });
-
-    await user.selectOptions(screen.getByLabelText('Delivery'), 'exactly-once');
-    const fanout = screen.getByLabelText('Fan-out (subscribers)');
-    await user.clear(fanout);
-    await user.type(fanout, '3');
-
-    const config = store.getState().nodes.find((node) => node.id === 'n-2')?.data.config;
-    expect(config?.['delivery']).toBe('exactly-once');
-    expect(config?.['fanout']).toBe(3);
+    expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.config).toEqual([]);
   });
 
   it('edits the selected edge: kind toggle and label', async () => {
@@ -152,57 +123,29 @@ describe('PropertiesPanel', () => {
 });
 
 /**
- * The interface block: driven entirely by the contract's capability table —
- * which kinds declare, what the section is called, whose declarations an
- * edge's carries resolve against.
+ * The interface block applies to every kind: what the author declares is data
+ * for the lenses, and no capability table decides who may declare.
  */
 describe('PropertiesPanel · interface contracts', () => {
   const renderInterfacePanel = (seed: (store: CanvasStore) => void) =>
     renderPanel(seed, makeInterfaceGraph());
 
-  it('shows a service’s Operations limited to command/query, plus its responsibility chips', () => {
+  it('shows a service’s Operations and its responsibility chips', () => {
     renderInterfacePanel((seeded) => seeded.getState().select('n-3'));
 
     expect(screen.getByRole('heading', { level: 3, name: 'Interface' })).toBeTruthy();
     expect(screen.getByRole('heading', { level: 4, name: 'Operations' })).toBeTruthy();
-
-    const kindSelect = within(screen.getByTestId('operation-row-0')).getByRole('combobox', {
-      name: 'Kind',
-    });
-    const kinds = Array.from(kindSelect.querySelectorAll('option')).map((option) => option.value);
-    expect(kinds).toEqual(['command', 'query']);
-
     expect(screen.getByText('Owns the order lifecycle')).toBeTruthy();
     expect(screen.getByLabelText('Add responsibility')).toBeTruthy();
   });
 
-  it('shows a queue’s Message types (command/event) and no responsibilities editor', () => {
-    renderInterfacePanel((seeded) => seeded.getState().select('n-4'));
-
-    expect(screen.getByRole('heading', { level: 4, name: 'Message types' })).toBeTruthy();
-    expect(screen.queryByTestId('responsibilities-editor')).toBeNull();
-
-    const kindSelect = within(screen.getByTestId('operation-row-0')).getByRole('combobox', {
-      name: 'Kind',
-    });
-    const kinds = Array.from(kindSelect.querySelectorAll('option')).map((option) => option.value);
-    expect(kinds).toEqual(['command', 'event']);
-  });
-
-  it('renders no Interface block for storage kinds', () => {
+  it('renders the same Interface block for a database — nothing is gated by kind', () => {
     renderPanel((seeded) => seeded.getState().select('n-3')); // makeGraph's database
-
-    expect(screen.queryByTestId('interface-section')).toBeNull();
-
-    // Same node re-shelved as a cache — still storage, still no block.
-    renderPanel((seeded) => {
-      seeded.getState().updateNode('n-3', { kind: 'cache' });
-      seeded.getState().select('n-3');
-    });
-    expect(screen.queryByTestId('interface-section')).toBeNull();
+    expect(screen.getByTestId('interface-section')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add operation' })).toBeTruthy();
   });
 
-  it('resolves a call edge’s carries against the callee’s declared operations', async () => {
+  it('[UX-5] resolves a call edge’s carries against the callee’s declared operations', async () => {
     const user = userEvent.setup();
     const store = renderPanel((seeded) => {
       seeded.getState().updateNode('n-2', {
@@ -214,7 +157,9 @@ describe('PropertiesPanel · interface contracts', () => {
       seeded.getState().select('e-1'); // client → service
     });
 
-    const checkbox = screen.getByLabelText('placeOrder · command') as HTMLInputElement;
+    const checkbox = screen.getByLabelText(
+      'placeOrder · command · Order Service',
+    ) as HTMLInputElement;
     expect(checkbox.checked).toBe(false);
 
     await user.click(checkbox);
@@ -224,40 +169,27 @@ describe('PropertiesPanel · interface contracts', () => {
     ]);
   });
 
-  it('resolves produce and consume edges against the queue’s message types', () => {
-    renderInterfacePanel((seeded) => seeded.getState().select('e-3')); // service → queue
-
-    const produced = screen.getByLabelText('OrderPlaced · event') as HTMLInputElement;
-    expect(produced.checked).toBe(true);
-  });
-
-  it('resolves a consume edge against its source queue’s message types', () => {
+  it('[UX-5] resolves a consume edge against its source queue’s declared event', () => {
     renderInterfacePanel((seeded) => seeded.getState().select('e-4')); // queue → worker
 
-    const consumed = screen.getByLabelText('OrderPlaced · event') as HTMLInputElement;
+    const consumed = screen.getByLabelText('OrderPlaced · event · Order Queue') as HTMLInputElement;
     expect(consumed.checked).toBe(true);
   });
 
-  it('hides the carries field on edges with no interface owner', () => {
+  it('always offers the carries field on an edge, saying so when nothing is declared', () => {
     renderPanel((seeded) => seeded.getState().select('e-2')); // service → database
 
-    expect(screen.queryByTestId('edge-carries-field')).toBeNull();
-    // The label helper still explains when the prose label shows.
-    expect(
-      screen.getByText('Shown on the connection when no operations are carried.'),
-    ).toBeTruthy();
+    expect(screen.getByTestId('edge-carries-field')).toBeTruthy();
+    expect(screen.getByText(/Neither Order Service nor Orders DB declares/)).toBeTruthy();
   });
 
-  it('flags a free-added carry the owner never declared', async () => {
-    const user = userEvent.setup();
-    const store = renderInterfacePanel((seeded) => seeded.getState().select('e-1')); // client → gateway
+  it('shows a carry the endpoints no longer declare as a stale chip', () => {
+    renderInterfacePanel((seeded) => {
+      seeded.getState().updateEdge('e-1', { carries: ['PlaceOrder', 'mysteryCall'] });
+      seeded.getState().select('e-1');
+    });
 
-    await user.type(screen.getByLabelText('Carry an undeclared operation'), 'mysteryCall{Enter}');
-
-    expect(store.getState().edges.find((edge) => edge.id === 'e-1')?.data?.carries).toEqual([
-      'mysteryCall',
-    ]);
-    expect(screen.getByText('not declared on API Gateway')).toBeTruthy();
+    expect(screen.getByTestId('carry-stale-mysteryCall')).toBeTruthy();
   });
 
   it('[UX-5] declared operations and responsibilities round-trip through the store', async () => {
@@ -278,111 +210,13 @@ describe('PropertiesPanel · interface contracts', () => {
     ]);
     expect(store.getState().dirty).toBe(true);
   });
-});
 
-/**
- * The panel says why each section applies, and the propose→verify seam for a
- * component: proposals sit beside the node, never on it, until taken one at a
- * time. [UX-14]
- */
-describe('PropertiesPanel · sections explain themselves, suggestions are taken one at a time', () => {
-  function renderWithSuggestions(
-    seed: (store: CanvasStore) => void,
-    state: Partial<InterfaceSuggestionsState> = {},
-  ) {
-    const store = createCanvasStore(makeInterfaceGraph());
-    seed(store);
-    const suggestions: InterfaceSuggestionsState = {
-      asking: false,
-      error: null,
-      askedAndEmptyFor: null,
-      ask: () => undefined,
-      ...state,
-    };
-    renderWithTheme(
-      <CanvasStoreProvider store={store}>
-        <PropertiesPanel interfaceSuggestions={suggestions} />
-      </CanvasStoreProvider>,
-    );
-    return store;
-  }
-
-  it('captions the config and interface sections from the tables that gate them', () => {
-    renderWithSuggestions((seeded) => seeded.getState().select('n-3')); // service
-    expect(screen.getByTestId('config-guide').textContent).toContain('knobs the grader reads');
-    expect(screen.getByTestId('interface-guide').textContent).toContain('operations it serves');
+  it('captions every section from the same text for every kind', () => {
+    renderInterfacePanel((seeded) => seeded.getState().select('n-4')); // queue
+    expect(screen.getByTestId('config-guide').textContent).toContain('lenses read them');
+    expect(screen.getByTestId('interface-guide').textContent).toContain('serves or publishes');
     expect(screen.getByTestId('responsibilities-guide').textContent).toContain(
       'what this component owns',
     );
-  });
-
-  it('offers no Suggest button where nothing could be suggested', () => {
-    renderWithSuggestions((seeded) => seeded.getState().select('n-1')); // client: no knobs, no interface
-    expect(screen.queryByTestId('suggest-interface')).toBeNull();
-  });
-
-  it('[UX-14] accepting a proposal writes it through the node; dismissing drops it', async () => {
-    const user = userEvent.setup();
-    const store = renderWithSuggestions((seeded) => {
-      seeded.getState().select('n-3');
-      seeded.getState().loadInterfaceProposals('n-3', [
-        {
-          id: 'proposal-0',
-          kind: 'operation',
-          operation: { name: 'GetOrder', kind: 'query', idempotent: true },
-          rationale: 'The client reads single orders.',
-        },
-        { id: 'proposal-1', kind: 'config', key: 'autoscaling', value: true, rationale: 'Bursty.' },
-        {
-          id: 'proposal-2',
-          kind: 'responsibility',
-          text: 'Serves order reads',
-          rationale: 'It is the read side.',
-        },
-      ]);
-    });
-    expect(screen.getByTestId('interface-proposals-pending').textContent).toContain(
-      '3 suggestions',
-    );
-
-    await user.click(screen.getByTestId('accept-interface-proposal-proposal-0'));
-    await user.click(screen.getByTestId('accept-interface-proposal-proposal-1'));
-    await user.click(
-      within(screen.getByTestId('interface-proposal-proposal-2')).getByRole('button', {
-        name: 'Dismiss',
-      }),
-    );
-
-    const node = store.getState().nodes.find((candidate) => candidate.id === 'n-3');
-    expect(node?.data.operations?.at(-1)).toEqual({
-      name: 'GetOrder',
-      kind: 'query',
-      idempotent: true,
-    });
-    expect(node?.data.config?.['autoscaling']).toBe(true);
-    // Dismissed, so never written — and the rationale is never stored anywhere.
-    expect(node?.data.responsibilities).not.toContain('Serves order reads');
-    expect(store.getState().interfaceProposals?.items).toEqual([]);
-    expect(store.getState().dirty).toBe(true);
-  });
-
-  it('proposals belong to the node they were computed for — selecting another drops them', () => {
-    const store = renderWithSuggestions((seeded) => {
-      seeded.getState().select('n-3');
-      seeded
-        .getState()
-        .loadInterfaceProposals('n-3', [
-          { id: 'proposal-0', kind: 'config', key: 'autoscaling', value: true, rationale: 'x' },
-        ]);
-    });
-    store.getState().select('n-4');
-    expect(store.getState().interfaceProposals).toBeNull();
-  });
-
-  it('says plainly when the model had nothing for this component', () => {
-    renderWithSuggestions((seeded) => seeded.getState().select('n-3'), {
-      askedAndEmptyFor: 'n-3',
-    });
-    expect(screen.getByTestId('interface-proposals-empty')).toBeTruthy();
   });
 });

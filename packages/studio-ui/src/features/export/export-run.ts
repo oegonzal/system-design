@@ -7,6 +7,7 @@ import type {
   DesignRevisionSummaryDto,
   EvaluationDto,
   PromptDto,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
 import type { Node } from '@xyflow/react';
 
@@ -21,6 +22,8 @@ import {
 
 export interface RunExportInput {
   prompt: PromptDto;
+  /** The rubric in force — the prompt's own, or the one derived on this screen. */
+  criteria: SuccessCriterion[];
   graph: CanvasGraph;
   narrative: DesignNarrative | null;
   brief: DesignBrief | null;
@@ -62,10 +65,13 @@ export async function buildAndDownloadRunZip(input: RunExportInput): Promise<voi
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
 
-  zip.file('prompt.md', promptMarkdown(input.prompt));
-  zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.prompt));
-  zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.prompt));
-  zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.graph, input.revisionNumber));
+  zip.file('prompt.md', promptMarkdown(input.prompt, input.criteria));
+  zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
+  zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
+  zip.file(
+    'feedback.md',
+    feedbackMarkdown(input.evaluation, input.graph, input.criteria, input.revisionNumber),
+  );
   zip.file('revisions.md', revisionsMarkdown(input.revisions));
 
   // Best-effort: a diagram-capture hiccup must never cost the Markdown export.

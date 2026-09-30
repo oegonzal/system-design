@@ -1,220 +1,105 @@
 'use client';
 
-import styled from '@emotion/styled';
-import { AUTHORED_GENERATOR_VERSION, type PromptDto } from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Surface, Text } from '@sysdesign/design-system';
+import type { PromptDto, SuccessCriterion } from '@sysdesign/contracts';
+import {
+  Badge,
+  Button,
+  Heading,
+  PreformattedText,
+  Spinner,
+  Stack,
+  Text,
+} from '@sysdesign/design-system';
+
+import { groupCriteriaByKind, humanizeKind } from './criteria';
 
 export interface PromptPaneProps {
   prompt: PromptDto;
+  /** The rubric as resolved by `usePromptCriteria`; defaults to the prompt's own. */
+  criteria?: SuccessCriterion[];
+  /** True while the quality loop is deriving the rubric. */
+  deriving?: boolean;
+  /** Why the last derivation failed — the grader was unavailable. */
+  deriveError?: string | null;
+  /** Ask for the rubric (again). Absent → no button. */
+  onDerive?: () => void;
 }
 
-const Checklist = styled.ul`
-  margin: 0;
-  padding-left: ${({ theme }) => theme.space[6]}px;
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space[2]}px;
-  color: ${({ theme }) => theme.color.text.primary};
-  font-size: ${({ theme }) => theme.font.size.md};
-`;
-
-const TargetGrid = styled.dl`
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: ${({ theme }) => `${theme.space[2]}px ${theme.space[5]}px`};
-
-  dt {
-    font-size: ${({ theme }) => theme.font.size.sm};
-    color: ${({ theme }) => theme.color.text.muted};
-  }
-
-  dd {
-    margin: 0;
-    font-size: ${({ theme }) => theme.font.size.sm};
-    font-weight: ${({ theme }) => theme.font.weight.semibold};
-    color: ${({ theme }) => theme.color.text.primary};
-    font-variant-numeric: tabular-nums;
-  }
-`;
-
 /**
- * The prompt, readable at a glance while designing: scenario, functional
- * requirements as a checklist, NFRs with their measurable targets, and the
- * scale targets the eval engine grades against. Pure props — Storybook-safe.
+ * The prompt, readable at a glance while designing: its markdown exactly as
+ * written, and the criteria the quality loop derived from it, grouped by
+ * kind — the same ids the brief binds and the feedback cites. Pure props —
+ * Storybook-safe.
  */
-export function PromptPane({ prompt }: PromptPaneProps) {
-  const targets = prompt.scaleTargets;
+export function PromptPane({
+  prompt,
+  criteria = prompt.criteria,
+  deriving = false,
+  deriveError = null,
+  onDerive,
+}: PromptPaneProps) {
+  const groups = groupCriteriaByKind(criteria);
 
   return (
     <Stack gap={5} data-testid="prompt-pane">
       <Stack gap={2}>
         <Heading level={2}>{prompt.title}</Heading>
         <Stack direction="row" gap={2} wrap>
-          <Badge tone="accent">{prompt.archetype}</Badge>
-          <Badge tone="neutral">{prompt.difficulty}</Badge>
-          {prompt.llmEnriched ? <Badge tone="neutral">ai-enriched</Badge> : null}
-          {prompt.generatorVersion === AUTHORED_GENERATOR_VERSION ? (
-            <Badge tone="neutral" data-testid="prompt-authored">
-              authored
-            </Badge>
-          ) : null}
+          <Badge tone="neutral" data-testid="prompt-source">
+            {prompt.source}
+          </Badge>
+          {prompt.status === 'archived' ? <Badge tone="neutral">archived</Badge> : null}
         </Stack>
       </Stack>
 
-      <Text size="sm">{prompt.scenario}</Text>
+      <PreformattedText label="Prompt" text={prompt.markdown} data-testid="prompt-markdown" />
 
-      <Stack gap={2}>
-        <Heading level={3}>Functional requirements</Heading>
-        <Checklist>
-          {prompt.functionalRequirements.map((requirement) => (
-            <li key={requirement}>{requirement}</li>
-          ))}
-        </Checklist>
-      </Stack>
-
-      <Stack gap={2}>
-        <Heading level={3}>Non-functional requirements</Heading>
-        <Stack as="ul" gap={2}>
-          {prompt.nonFunctionalRequirements.map((nfr) => (
-            <li key={`${nfr.kind}-${nfr.statement}`}>
-              <Stack direction="row" gap={2} align="baseline" wrap>
-                <Badge tone="neutral">{nfr.kind}</Badge>
-                <Text as="span" size="sm">
-                  {nfr.statement}
-                </Text>
-                {nfr.target ? (
-                  <Text as="span" size="sm" tone="muted">
-                    ({nfr.target})
-                  </Text>
-                ) : null}
-              </Stack>
-            </li>
-          ))}
-        </Stack>
-      </Stack>
-
-      {prompt.workflowSpec ? (
-        <Stack gap={3} data-testid="prompt-workflow">
-          <Heading level={3}>Business workflow</Heading>
-          <Text size="sm" tone="muted">
-            The graded business layer: cover each item by linking your operations to it (Fulfills)
-            and wiring the events. The Brief tab shows live coverage.
-          </Text>
-
-          <Stack gap={2}>
-            <Heading level={4}>API contract</Heading>
-            <Checklist>
-              {prompt.workflowSpec.operations.map((op) => (
-                <li key={op.id}>
-                  <Badge tone="neutral">{op.kind}</Badge> {op.statement}
-                  {op.emits?.length ? (
-                    <Text as="span" size="sm" tone="muted">
-                      {' '}
-                      → {op.emits.join(', ')}
-                    </Text>
-                  ) : null}
-                  {op.onFailureEmits?.length ? (
-                    <Text as="span" size="sm" tone="muted">
-                      {' '}
-                      · on failure → {op.onFailureEmits.join(', ')}
-                    </Text>
-                  ) : null}
-                </li>
-              ))}
-            </Checklist>
+      <Stack gap={3}>
+        <Heading level={3}>Criteria</Heading>
+        {deriving ? (
+          <Stack direction="row" gap={3} align="center" data-testid="prompt-criteria-normalizing">
+            <Spinner label="" />
+            <Text size="sm" tone="secondary">
+              Normalizing the requirements into criteria…
+            </Text>
           </Stack>
-
-          <Stack gap={2}>
-            <Heading level={4}>Events</Heading>
-            <Checklist>
-              {prompt.workflowSpec.events.map((event) => (
-                <li key={event.id}>{event.statement}</li>
-              ))}
-            </Checklist>
+        ) : groups.length === 0 ? (
+          <Stack gap={3} data-testid="prompt-criteria-empty">
+            <Text size="sm" tone="muted">
+              {deriveError !== null
+                ? `The grader is unavailable, so the requirements could not be normalized. ${deriveError}`
+                : 'The requirements have not been normalized into criteria yet.'}
+            </Text>
+            {onDerive ? (
+              <div>
+                <Button variant="subtle" onClick={onDerive} data-testid="derive-criteria">
+                  Derive criteria
+                </Button>
+              </div>
+            ) : null}
           </Stack>
-
-          <Stack gap={2}>
-            <Heading level={4}>Ingest SLAs</Heading>
-            <Checklist>
-              {prompt.workflowSpec.ingests.map((ingest) => {
-                const nfr = prompt.nonFunctionalRequirements.find(
-                  (candidate) => candidate.id === ingest.nfrId,
-                );
-                return (
-                  <li key={ingest.id}>
-                    <Badge tone="neutral">{ingest.mode}</Badge> {ingest.statement}
-                    {nfr?.target ? (
-                      <Text as="span" size="sm" tone="muted">
-                        {' '}
-                        ({nfr.target})
+        ) : (
+          groups.map((group) => (
+            <Stack key={group.kind} gap={2} data-testid={`criteria-group-${group.kind}`}>
+              <Heading level={4}>{humanizeKind(group.kind)}</Heading>
+              <Stack as="ul" gap={2}>
+                {group.criteria.map((criterion) => (
+                  <li key={criterion.id} data-testid={`criterion-${criterion.id}`}>
+                    <Stack direction="row" gap={2} align="baseline" wrap>
+                      <Badge tone="accent" data-testid="criterion-chip">
+                        {criterion.id}
+                      </Badge>
+                      <Text as="span" size="sm">
+                        {criterion.statement}
                       </Text>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </Checklist>
-          </Stack>
-
-          {prompt.workflowSpec.entities.length > 0 ? (
-            <Stack gap={2}>
-              <Heading level={4}>Lifecycle</Heading>
-              <Checklist>
-                {prompt.workflowSpec.entities.flatMap((entity) =>
-                  entity.transitions.map((transition, index) => (
-                    <li key={`${entity.id}-${index}`}>
-                      {transition.from ?? '·'} → {transition.to}{' '}
-                      <Text as="span" size="sm" tone="muted">
-                        (via {transition.via})
-                      </Text>
-                    </li>
-                  )),
-                )}
-              </Checklist>
-            </Stack>
-          ) : null}
-
-          {prompt.workflowSpec.aggregations.length > 0 ? (
-            <Stack gap={2}>
-              <Heading level={4}>Aggregations</Heading>
-              <Checklist>
-                {prompt.workflowSpec.aggregations.map((agg) => (
-                  <li key={agg.id}>
-                    {agg.statement}{' '}
-                    <Text as="span" size="sm" tone="muted">
-                      (fed by {agg.sourceEventIds.join(', ')})
-                    </Text>
+                    </Stack>
                   </li>
                 ))}
-              </Checklist>
+              </Stack>
             </Stack>
-          ) : null}
-        </Stack>
-      ) : null}
-
-      <Surface padding={4}>
-        <Stack gap={3}>
-          <Heading level={3}>Scale targets</Heading>
-          <TargetGrid>
-            <dt>Concurrent users</dt>
-            <dd>{targets.concurrentUsers.toLocaleString('en-US')}</dd>
-            <dt>Requests / second</dt>
-            <dd>{targets.requestsPerSecond.toLocaleString('en-US')}</dd>
-            <dt>Read : write</dt>
-            <dd>{targets.readWriteRatio}</dd>
-            <dt>p99 latency</dt>
-            <dd>{targets.p99LatencyMs} ms</dd>
-            <dt>Availability</dt>
-            <dd>{targets.availabilityPct}%</dd>
-            {targets.dataRetention ? (
-              <>
-                <dt>Data retention</dt>
-                <dd>{targets.dataRetention}</dd>
-              </>
-            ) : null}
-          </TargetGrid>
-        </Stack>
-      </Surface>
+          ))
+        )}
+      </Stack>
     </Stack>
   );
 }

@@ -2,7 +2,7 @@
 
 import styled from '@emotion/styled';
 import type { DesignRevisionSummaryDto } from '@sysdesign/contracts';
-import { Badge, Stack, Text, transient } from '@sysdesign/design-system';
+import { Badge, DECISION_TONE, Stack, Text, transient } from '@sysdesign/design-system';
 
 export interface RevisionTimelineProps {
   revisions: DesignRevisionSummaryDto[];
@@ -40,12 +40,14 @@ const Chip = styled('button', transient)<{ $active: boolean }>`
 const Score = styled.span`
   color: ${({ theme }) => theme.color.text.muted};
   font-weight: ${({ theme }) => theme.font.weight.regular};
+  font-variant-numeric: tabular-nums;
 `;
 
 /**
- * One chip per submitted revision — `#n grade` — newest first. Selecting a
- * chip loads that revision read-only; the workspace owns that flow, this
- * component only reports the click. Presentational — Storybook-safe.
+ * One chip per revision — `#n score decision` — newest first, an AI badge on
+ * every revision the coach wrote. Selecting a chip loads that revision
+ * read-only; the workspace owns that flow, this component only reports the
+ * click. Presentational — Storybook-safe.
  */
 export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: RevisionTimelineProps) {
   if (revisions.length === 0) {
@@ -60,21 +62,33 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
 
   return (
     <Stack direction="row" gap={2} wrap data-testid="revision-timeline">
-      {ordered.map((revision) => (
-        <Chip
-          key={revision.id}
-          type="button"
-          $active={revision.id === activeRevisionId}
-          onClick={() => onSelect(revision)}
-          data-testid={`revision-chip-${revision.revisionNumber}`}
-        >
-          #{revision.revisionNumber} {revision.grade ?? '·'}
-          {revision.overallScore !== null ? (
-            <Score data-testid="revision-score">{revision.overallScore}</Score>
-          ) : null}
-          {revision.origin === 'assistant' ? <Badge tone="accent">AI</Badge> : null}
-        </Chip>
-      ))}
+      {ordered.map((revision) => {
+        const grade = revision.evaluation;
+        return (
+          <Chip
+            key={revision.id}
+            type="button"
+            $active={revision.id === activeRevisionId}
+            onClick={() => onSelect(revision)}
+            data-testid={`revision-chip-${revision.revisionNumber}`}
+          >
+            #{revision.revisionNumber}
+            {grade?.overall !== null && grade?.overall !== undefined ? (
+              <Score data-testid="revision-score">{grade.overall}</Score>
+            ) : null}
+            {grade?.decision ? (
+              <Badge tone={DECISION_TONE[grade.decision]} data-testid="revision-decision">
+                {grade.decision}
+              </Badge>
+            ) : grade?.status === 'running' ? (
+              <Badge tone="neutral">grading…</Badge>
+            ) : grade?.status === 'failed' ? (
+              <Badge tone="critical">failed</Badge>
+            ) : null}
+            {revision.origin === 'assistant' ? <Badge tone="accent">AI</Badge> : null}
+          </Chip>
+        );
+      })}
     </Stack>
   );
 }

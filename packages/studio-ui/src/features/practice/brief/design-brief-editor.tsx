@@ -1,161 +1,99 @@
 'use client';
 
-import {
-  ANNOTATION_KINDS,
-  canvasMechanismGraph,
-  type CanvasGraph,
-  type PromptDto,
-} from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
+import type { CanvasGraph, SuccessCriterion } from '@sysdesign/contracts';
+import { Badge, Heading, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useMemo } from 'react';
 
-import { accountedNodeIds, reconcileBrief } from '../../canvas/brief-draft';
+import { accountedNodeIds } from '../../canvas/brief-draft';
 import { useCanvasStore } from '../../canvas/canvas-store-context';
 import { toCanvasGraph } from '../../canvas/graph-io';
-import { BindingProposal } from './binding-proposal';
-import { FlowTracer } from './flow-tracer';
-import { NfrBindingRow } from './nfr-binding-row';
-import { SuggestionsPanel } from './suggestions-panel';
-import type { BriefSuggestionsState } from './use-brief-suggestions';
-import { WorkflowCoverage } from './workflow-coverage';
+import { groupCriteriaByKind, humanizeKind } from '../../prompts/criteria';
+import { CriterionBindingRow } from './criterion-binding-row';
 
 export interface DesignBriefEditorProps {
-  prompt: PromptDto;
-  /**
-   * Output of `useBriefSuggestions` — the workspace owns the hook, as it owns
-   * evaluation polling. Keeping the fetch out of this component is what lets it
-   * appear in the catalog at all: the API client reads `process.env` at module
-   * scope, which does not exist under the catalog's bundler.
-   */
-  suggestions?: BriefSuggestionsState;
+  /** The prompt's rubric, as resolved by `usePromptCriteria`. */
+  criteria: SuccessCriterion[];
+  /** True while the quality loop is still deriving it. */
+  deriving?: boolean;
 }
 
 /**
- * The graded half of explaining a design.
+ * The grounding half of explaining a design.
  *
  * A diagram is a set of promises, and this is where an author says which box
- * keeps which one — bound to a requirement from the prompt and to components on
- * their own canvas, never as prose. Everything is a reference the engine can
- * check, which is what makes the grade stable under renaming a box and unstable
- * under claiming something the canvas does not do.
+ * keeps which one — bound to a criterion from the prompt and to components on
+ * their own canvas, with a claim in their own words. Every reference is one
+ * the lenses can check, which is what makes the grade stable under renaming a
+ * box and unstable under claiming something the canvas does not do.
  *
  * Reads the store directly rather than taking a brief prop: the rows below are
  * presentational and controlled, so this is the only component that needs to
  * know where the draft lives.
  */
-export function DesignBriefEditor({ prompt, suggestions }: DesignBriefEditorProps) {
+export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEditorProps) {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
-  const bindings = useCanvasStore((state) => state.briefBindings);
-  const flows = useCanvasStore((state) => state.briefFlows);
-  const setBindingMechanism = useCanvasStore((state) => state.setBindingMechanism);
+  const bindings = useCanvasStore((state) => state.bindings);
+  const setBindingClaim = useCanvasStore((state) => state.setBindingClaim);
   const toggleBindingNode = useCanvasStore((state) => state.toggleBindingNode);
-  const setBindingNote = useCanvasStore((state) => state.setBindingNote);
+  const setBindingPath = useCanvasStore((state) => state.setBindingPath);
   const clearBinding = useCanvasStore((state) => state.clearBinding);
-  const setFlowPath = useCanvasStore((state) => state.setFlowPath);
-  const proposals = useCanvasStore((state) => state.briefProposals);
-  const acceptProposal = useCanvasStore((state) => state.acceptProposal);
-  const dismissProposal = useCanvasStore((state) => state.dismissProposal);
 
   const graph: CanvasGraph = useMemo(() => toCanvasGraph(nodes, edges), [nodes, edges]);
-  // Built once per graph, not once per row: the adapter rebuilds its adjacency
-  // map and drops its memoized closures on every call.
-  const mechanismGraph = useMemo(() => canvasMechanismGraph(graph), [graph]);
+  const groups = useMemo(() => groupCriteriaByKind(criteria), [criteria]);
 
   const unaccounted = useMemo(() => {
-    const accounted = accountedNodeIds(reconcileBrief(bindings, flows, graph), graph);
-    return graph.nodes.filter(
-      (node) =>
-        !accounted.has(node.id) &&
-        !ANNOTATION_KINDS.includes(node.kind) &&
-        (node.responsibilities ?? []).length === 0,
-    );
-  }, [bindings, flows, graph]);
-
-  const renderProposal = (nfrId: string) => {
-    const proposal = proposals.find((candidate) => candidate.nfrId === nfrId);
-    if (!proposal) return null;
-    return (
-      <BindingProposal
-        proposal={proposal}
-        graph={graph}
-        mechanismGraph={mechanismGraph}
-        replaces={bindings.find((candidate) => candidate.nfrId === nfrId) ?? null}
-        onAccept={() => acceptProposal(nfrId)}
-        onDismiss={() => dismissProposal(nfrId)}
-      />
-    );
-  };
+    const accounted = accountedNodeIds(bindings, graph);
+    return graph.nodes.filter((node) => !accounted.has(node.id));
+  }, [bindings, graph]);
 
   return (
     <Stack gap={5}>
       <Text size="sm" tone="muted">
-        Say which components hold each requirement, and trace how a request travels. Every claim is
-        checked against your diagram as you make it — an unsupported one is allowed, and graded.
+        For each criterion, say which components hold it, in one sentence, and trace how the request
+        travels. Every claim is checked against your diagram by the grader — an unsupported one is
+        allowed, and graded.
       </Text>
 
-      {suggestions ? (
-        <SuggestionsPanel
-          asking={suggestions.asking}
-          error={suggestions.error}
-          askedAndEmpty={suggestions.askedAndEmpty}
-          pending={proposals.length}
-          canAsk={graph.nodes.length > 0}
-          onAsk={suggestions.ask}
-        />
-      ) : null}
-
-      <Stack gap={3}>
-        <Heading level={3}>Requirements</Heading>
-        {prompt.nonFunctionalRequirements.map((nfr) => (
-          <NfrBindingRow
-            key={nfr.id}
-            nfr={nfr}
-            graph={graph}
-            mechanismGraph={mechanismGraph}
-            binding={bindings.find((binding) => binding.nfrId === nfr.id) ?? null}
-            onSelectMechanism={(mechanism) => setBindingMechanism(nfr.id, mechanism)}
-            onToggleNode={(nodeId) => toggleBindingNode(nfr.id, nodeId)}
-            onNote={(note) => setBindingNote(nfr.id, note)}
-            onClear={() => clearBinding(nfr.id)}
-            proposal={renderProposal(nfr.id)}
-          />
-        ))}
-      </Stack>
-
-      {prompt.workflowSpec ? (
-        <WorkflowCoverage
-          spec={prompt.workflowSpec}
-          mechanismGraph={mechanismGraph}
-          nfrs={prompt.nonFunctionalRequirements}
-        />
-      ) : null}
-
-      <Stack gap={3}>
-        <Heading level={3}>Flows</Heading>
-        {prompt.functionalRequirements.map((requirement, index) => (
-          <FlowTracer
-            key={requirement}
-            requirementIndex={index}
-            requirement={requirement}
-            graph={graph}
-            path={flows.find((flow) => flow.requirementIndex === index)?.path ?? []}
-            onChange={(path) => setFlowPath(index, path)}
-          />
-        ))}
-      </Stack>
+      {criteria.length === 0 ? (
+        <Stack direction="row" gap={3} align="center" data-testid="criteria-normalizing">
+          {deriving ? <Spinner label="" /> : null}
+          <Text size="sm" tone="secondary">
+            {deriving
+              ? 'The requirements are being normalized into criteria…'
+              : 'No criteria yet — derive them from the Prompt tab to bind against them.'}
+          </Text>
+        </Stack>
+      ) : (
+        groups.map((group) => (
+          <Stack key={group.kind} gap={3}>
+            <Heading level={3}>{humanizeKind(group.kind)}</Heading>
+            {group.criteria.map((criterion) => (
+              <CriterionBindingRow
+                key={criterion.id}
+                criterion={criterion}
+                graph={graph}
+                binding={bindings.find((binding) => binding.criterionId === criterion.id) ?? null}
+                onClaim={(claim) => setBindingClaim(criterion.id, claim)}
+                onToggleNode={(nodeId) => toggleBindingNode(criterion.id, nodeId)}
+                onPath={(path) => setBindingPath(criterion.id, path)}
+                onClear={() => clearBinding(criterion.id)}
+              />
+            ))}
+          </Stack>
+        ))
+      )}
 
       {/*
-        The same question `exp.brf.components-accounted` asks, asked before it
-        costs anything: a box no flow reaches, no corroborated binding names and
-        no responsibility describes is either unexplained thinking or an
-        unnecessary box, and a reader cannot tell which.
+        The same question the explanation critic asks, asked before it costs
+        anything: a box no binding names and no path reaches is either
+        unexplained thinking or an unnecessary box, and a reader cannot tell which.
       */}
       {unaccounted.length > 0 ? (
         <Stack gap={2} data-testid="brief-unaccounted">
           <Text size="sm" tone="secondary">
-            Nothing accounts for {unaccounted.length === 1 ? 'this component' : 'these components'}{' '}
-            yet
+            No binding accounts for{' '}
+            {unaccounted.length === 1 ? 'this component' : 'these components'} yet
           </Text>
           <Stack direction="row" gap={2} wrap>
             {unaccounted.map((node) => (
@@ -165,8 +103,7 @@ export function DesignBriefEditor({ prompt, suggestions }: DesignBriefEditorProp
             ))}
           </Stack>
           <Text size="sm" tone="muted">
-            Bind one to the requirement it holds, route a flow through it, give it a responsibility,
-            or remove it.
+            Bind one to the criterion it holds, route a path through it, or remove it.
           </Text>
         </Stack>
       ) : null}

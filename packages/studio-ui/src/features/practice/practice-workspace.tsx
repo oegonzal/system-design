@@ -5,7 +5,7 @@ import type {
   DesignRevisionDto,
   DesignRevisionSummaryDto,
   DesignSessionDto,
-  FindingDto,
+  EvaluationFindingDto,
   LlmAvailabilityDto,
   PromptDto,
 } from '@sysdesign/contracts';
@@ -29,19 +29,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
 import { CanvasStoreProvider, useCanvasStoreApi } from '../canvas/canvas-store-context';
-import { buildAndDownloadRunZip } from '../export/export-run';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
 import { EvaluationPanel } from '../evaluation/evaluation-panel';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
+import { buildAndDownloadRunZip } from '../export/export-run';
 import { ImprovementPanel } from '../improve/improvement-panel';
-import { useImprovementRunPolling } from '../improve/use-improvement-run-polling';
+import { useImproveRunPolling } from '../improve/use-improve-run-polling';
 import { PromptPane } from '../prompts/prompt-pane';
+import { usePromptCriteria } from '../prompts/use-prompt-criteria';
 import { DesignBriefEditor } from './brief/design-brief-editor';
-import { useBriefSuggestions } from './brief/use-brief-suggestions';
-import { useInterfaceSuggestions } from './use-interface-suggestions';
 import { NarrativeEditor } from './narrative-editor';
 
 function CanvasSkeleton() {
@@ -64,6 +63,9 @@ const DOCK_COLUMN_WIDTH = { md: '320px', lg: '380px' };
 const WORKSPACE_MIN_HEIGHT = '640px';
 /** A tall node editor may not evict the palette from the side column. */
 const PROPERTIES_MAX_SHARE = '45%';
+
+/** The grader could not even be asked — the coach reads it as off, without a reason. */
+const UNREACHABLE: LlmAvailabilityDto = { enabled: false, model: null, reason: null };
 
 /**
  * Fills the shell's Main (a flex column with a definite height): shrinkable
@@ -215,13 +217,13 @@ function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
     id: revision.id,
     revisionNumber: revision.revisionNumber,
     origin: revision.origin,
-    narrative: revision.narrative,
-    evaluationStatus: revision.evaluation?.status ?? 'queued',
-    overallScore: revision.evaluation?.overallScore ?? null,
-    grade: revision.evaluation?.grade ?? null,
+    evaluation: revision.evaluation,
     createdAt: revision.createdAt,
   };
 }
+
+const byNewest = (a: DesignRevisionSummaryDto, b: DesignRevisionSummaryDto) =>
+  b.revisionNumber - a.revisionNumber;
 
 function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const storeApi = useCanvasStoreApi();
@@ -241,12 +243,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [tab, setTab] = useState('prompt');
   const [exporting, setExporting] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [startingImprove, setStartingImprove] = useState(false);
   const [availability, setAvailability] = useState<LlmAvailabilityDto | null>(null);
 
+  const promptCriteria = usePromptCriteria(prompt);
+  const { criteria } = promptCriteria;
   const polling = useEvaluationPolling(feedback?.id ?? null);
-  const improve = useImprovementRunPolling(activeRunId);
-  const suggestions = useBriefSuggestions(sessionId);
-  const interfaceSuggestions = useInterfaceSuggestions(sessionId);
+  const improve = useImproveRunPolling(sessionId, activeRunId);
   const { getNodes } = useReactFlow();
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
@@ -261,9 +264,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           api.getPrompt(loadedSession.promptId, { signal }),
           api.listRevisions(sessionId, { signal }),
         ]);
-        const sorted = [...loadedRevisions.data].sort(
-          (a, b) => b.revisionNumber - a.revisionNumber,
-        );
+        const sorted = [...loadedRevisions.data].sort(byNewest);
         const latest = sorted[0];
         const latestFull = latest ? await api.getRevision(latest.id, { signal }) : null;
         if (!loader.isCurrent(id)) return;
@@ -299,63 +300,65 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     setReloadKey((key) => key + 1);
   }, []);
 
-  // Whether the AI coach can run at all — the button explains itself when not.
+  // Whether the grader — and so the coach — can run at all. A 503 (or no
+  // answer) is "unreachable", which the coach panel explains without a reason.
   useEffect(() => {
     let disposed = false;
     void api
-      .improverAvailability()
+      .gradingAvailability()
       .then((loaded) => {
         if (!disposed) setAvailability(loaded);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!disposed) setAvailability(UNREACHABLE);
+      });
     return () => {
       disposed = true;
     };
   }, []);
 
-  // Every accepted coach iteration is a new revision the timeline should show
-  // as soon as its trajectory entry appears — not minutes later at run end.
+  const refreshRevisions = useCallback(() => {
+    void api
+      .listRevisions(sessionId)
+      .then((refreshed) => setRevisions([...refreshed.data].sort(byNewest)))
+      .catch(() => undefined);
+  }, [sessionId]);
+
+  // Every coach iteration imported as a revision should show in the timeline
+  // as soon as the poll reports it — not minutes later at run end.
   useEffect(() => {
     if (improve.acceptedCount <= acceptedSeen.current) return;
     acceptedSeen.current = improve.acceptedCount;
-    void api
-      .listRevisions(sessionId)
-      .then((refreshed) =>
-        setRevisions([...refreshed.data].sort((a, b) => b.revisionNumber - a.revisionNumber)),
-      )
-      .catch(() => undefined);
-  }, [improve.acceptedCount, sessionId]);
+    refreshRevisions();
+  }, [improve.acceptedCount, refreshRevisions]);
 
-  // When the evaluation for the submitted draft completes, the draft is no
-  // longer "unsaved work" — and the timeline needs the fresh grade.
+  // When the grade for the submitted draft lands, the draft is no longer
+  // "unsaved work" — and the timeline needs the fresh score.
   useEffect(() => {
     const evaluation = polling.evaluation;
     if (!evaluation || evaluation.status !== 'complete') return;
-    if (completedFor.current === evaluation.id) return;
-    completedFor.current = evaluation.id;
+    const key = `${evaluation.runId}:${evaluation.iteration}`;
+    if (completedFor.current === key) return;
+    completedFor.current = key;
     if (viewingRevision === null) storeApi.getState().markClean();
-    void api
-      .listRevisions(sessionId)
-      .then((refreshed) =>
-        setRevisions([...refreshed.data].sort((a, b) => b.revisionNumber - a.revisionNumber)),
-      )
-      .catch(() => undefined);
-  }, [polling.evaluation, sessionId, viewingRevision]);
+    refreshRevisions();
+  }, [polling.evaluation, refreshRevisions, viewingRevision, storeApi]);
+
+  /** The draft as the API takes it: graph plus brief and narrative, null when nothing is claimed. */
+  const readDraft = useCallback(() => {
+    const state = storeApi.getState();
+    return {
+      graph: state.serialize(),
+      brief: state.serializeBrief(criteria),
+      narrative: state.serializeNarrative(criteria),
+    };
+  }, [storeApi, criteria]);
 
   const handleSubmit = useCallback(async () => {
-    const graph = storeApi.getState().serialize();
-    // null when nothing is claimed — an empty brief or narrative would be
-    // stored as an artifact while grading exactly like silence.
-    const brief = storeApi.getState().serializeBrief() ?? undefined;
-    const narrative = storeApi.getState().serializeNarrative() ?? undefined;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const revision = await api.submitRevision(sessionId, {
-        graph,
-        narrative,
-        brief,
-      });
+      const revision = await api.submitRevision(sessionId, readDraft());
       setFeedback({ id: revision.id, revisionNumber: revision.revisionNumber });
       setViewingRevision(null);
       setRevisions((current) => [
@@ -368,7 +371,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId]);
+  }, [sessionId, readDraft]);
 
   // Export the run as one zip: the diagram as a PDF plus prompt/narrative/brief/
   // feedback/revisions each as a separate .md. Reads whatever revision is on
@@ -380,9 +383,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     try {
       await buildAndDownloadRunZip({
         prompt,
-        graph: storeApi.getState().serialize(),
-        narrative: storeApi.getState().serializeNarrative(),
-        brief: storeApi.getState().serializeBrief(),
+        criteria,
+        ...readDraft(),
         evaluation: polling.evaluation,
         revisions,
         revisionNumber: (viewingRevision ?? feedback)?.revisionNumber ?? null,
@@ -393,67 +395,58 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     } finally {
       setExporting(false);
     }
-  }, [prompt, revisions, polling.evaluation, viewingRevision, feedback, getNodes, storeApi]);
+  }, [
+    prompt,
+    criteria,
+    readDraft,
+    revisions,
+    polling.evaluation,
+    viewingRevision,
+    feedback,
+    getNodes,
+  ]);
 
-  const handleRetry = useCallback(() => {
-    if (!feedback) return;
-    void api
-      .retryEvaluation(feedback.id)
-      .then(() => polling.restart())
-      .catch((error) => setSubmitError(toErrorMessage(error, 'Could not retry the evaluation.')));
-  }, [feedback, polling]);
-
-  // Hand the current canvas to the AI coach: the draft is submitted as a base
-  // revision (so what the coach improved is on the record), then a background
-  // run iterates — the coach tab streams its trajectory.
-  const handleImprove = useCallback(async () => {
-    if (
-      !window.confirm(
-        'Hand this design to the AI coach? Your current draft is submitted as a revision first.',
-      )
-    ) {
-      return;
-    }
-    const graph = storeApi.getState().serialize();
-    const brief = storeApi.getState().serializeBrief() ?? undefined;
-    const narrative = storeApi.getState().serializeNarrative() ?? undefined;
-    setSubmitError(null);
-    try {
-      const run = await api.startImprovementRun(sessionId, { graph, narrative, brief });
-      acceptedSeen.current = 0;
-      setActiveRunId(run.id);
-      setFeedback(null);
-      setViewingRevision(null);
-      storeApi.getState().markClean();
-      setTab('coach');
-    } catch (error) {
-      setSubmitError(toErrorMessage(error, 'Could not start the improvement run.'));
-    }
-  }, [sessionId, storeApi]);
-
-  const handleCancelImprove = useCallback(() => {
-    if (activeRunId === null) return;
-    // The poll observes the cancelled status on its next tick and stops.
-    void api
-      .cancelImprovementRun(activeRunId)
-      .catch((error) => setSubmitError(toErrorMessage(error, 'Could not stop the coach.')));
-  }, [activeRunId]);
-
-  const handleSelectFinding = useCallback(
-    (finding: FindingDto) => {
-      storeApi.getState().setHighlight({
-        nodeIds: finding.affectedNodeIds,
-        edgeIds: finding.affectedEdgeIds,
-        severity: finding.severity,
-      });
+  // Hand the current canvas to the coach: the draft is persisted as the base
+  // revision (so what the coach improved is on the record), then the loop
+  // revises it in the background — the coach tab follows the iterations.
+  const handleStartImprove = useCallback(
+    async (maxIterations: number) => {
+      if (
+        !window.confirm(
+          'Hand this design to the coach? Your current draft is submitted as a revision first.',
+        )
+      ) {
+        return;
+      }
+      setStartingImprove(true);
+      setSubmitError(null);
+      try {
+        const started = await api.startImprove(sessionId, { ...readDraft(), maxIterations });
+        acceptedSeen.current = 0;
+        setActiveRunId(started.runId);
+        setFeedback({ id: started.revision.id, revisionNumber: started.revision.revisionNumber });
+        setViewingRevision(null);
+        setRevisions((current) => [
+          toSummary(started.revision),
+          ...current.filter((candidate) => candidate.id !== started.revision.id),
+        ]);
+        storeApi.getState().markClean();
+      } catch (error) {
+        setSubmitError(toErrorMessage(error, 'Could not start the coach.'));
+      } finally {
+        setStartingImprove(false);
+      }
     },
-    [storeApi],
+    [sessionId, readDraft, storeApi],
   );
 
-  const handlePreviewFix = useCallback(
-    (finding: FindingDto) => {
-      if (!finding.suggestion) return;
-      storeApi.getState().previewPatch(finding.suggestion, finding.id);
+  const handleSelectFinding = useCallback(
+    (finding: EvaluationFindingDto) => {
+      storeApi.getState().setHighlight({
+        nodeIds: finding.nodeIds,
+        edgeIds: finding.edgeIds,
+        severity: finding.severity,
+      });
     },
     [storeApi],
   );
@@ -518,7 +511,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
 
   const revisionStatus = feedback
     ? (polling.evaluation?.status ??
-      revisions.find((candidate) => candidate.id === feedback.id)?.evaluationStatus ??
+      revisions.find((candidate) => candidate.id === feedback.id)?.evaluation?.status ??
       null)
     : null;
 
@@ -528,10 +521,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       <Layout>
         <SideColumn>
           <WorkspacePalette />
-          <WorkspaceProperties
-            workflowSpec={prompt?.workflowSpec ?? null}
-            interfaceSuggestions={interfaceSuggestions}
-          />
+          <WorkspaceProperties />
         </SideColumn>
 
         <CanvasColumn>
@@ -542,15 +532,6 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             revisionNumber={feedback?.revisionNumber ?? null}
             onExport={() => void handleExport()}
             exporting={exporting}
-            onImprove={() => void handleImprove()}
-            improving={improve.isPolling}
-            improveDisabledReason={
-              availability !== null && !availability.enabled
-                ? availability.reason === 'deterministic'
-                  ? 'The AI coach is off in deterministic mode.'
-                  : 'The AI coach needs an ANTHROPIC_API_KEY or IMPROVER_AUTH=claude-code.'
-                : null
-            }
           />
           {submitError !== null ? (
             <Text size="sm" tone="secondary" data-testid="submit-error">
@@ -582,7 +563,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             </TabList>
             <DockPanel value="prompt">
               {prompt ? (
-                <PromptPane prompt={prompt} />
+                <PromptPane
+                  prompt={prompt}
+                  criteria={criteria}
+                  deriving={promptCriteria.deriving}
+                  deriveError={promptCriteria.error}
+                  onDerive={promptCriteria.derive}
+                />
               ) : (
                 <Text size="sm" tone="muted">
                   Prompt unavailable.
@@ -590,22 +577,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               )}
             </DockPanel>
             <DockPanel value="brief">
-              {prompt ? (
-                <DesignBriefEditor prompt={prompt} suggestions={suggestions} />
-              ) : (
-                <Text size="sm" tone="muted">
-                  Prompt unavailable.
-                </Text>
-              )}
+              <DesignBriefEditor criteria={criteria} deriving={promptCriteria.deriving} />
             </DockPanel>
             <DockPanel value="narrative">
-              {prompt ? (
-                <NarrativeEditor prompt={prompt} />
-              ) : (
-                <Text size="sm" tone="muted">
-                  Prompt unavailable.
-                </Text>
-              )}
+              <NarrativeEditor criteria={criteria} />
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel
@@ -613,9 +588,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 error={polling.error}
                 isPolling={polling.isPolling}
                 message={polling.message}
-                onRetry={handleRetry}
+                criteria={criteria}
+                onRetry={() => void handleSubmit()}
                 onSelectFinding={handleSelectFinding}
-                onPreviewFix={handlePreviewFix}
               />
             </DockPanel>
             <DockPanel value="coach">
@@ -625,7 +600,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 isPolling={improve.isPolling}
                 message={improve.message}
                 availability={availability}
-                onCancel={handleCancelImprove}
+                starting={startingImprove}
+                onStart={(maxIterations) => void handleStartImprove(maxIterations)}
                 onLoadRevision={(revisionId) => void handleSelectRevision({ id: revisionId })}
               />
             </DockPanel>

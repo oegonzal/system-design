@@ -1,29 +1,10 @@
-import type {
-  Decision,
-  DecisionStep,
-  EvidenceResult,
-  LlmExchangeOutcome,
-  QualityRunStatus,
-} from '@sysdesign/contracts';
+import type { DecisionStep, LlmExchangeOutcome, QualityRunStatus } from '@sysdesign/contracts';
 import type { BadgeTone } from '@sysdesign/design-system';
 
-/** Vocabulary → badge tone, as data. Severity is itself a badge tone, so findings need no map. */
-
-export const DECISION_TONE: Record<Decision, BadgeTone> = {
-  accept: 'success',
-  revise: 'medium',
-  retry: 'high',
-  escalate: 'critical',
-  reject: 'critical',
-};
-
-export const RESULT_TONE: Record<EvidenceResult, BadgeTone> = {
-  pass: 'success',
-  partial: 'medium',
-  fail: 'critical',
-  not_applicable: 'neutral',
-  unassessed: 'neutral',
-};
+/**
+ * This app's own vocabularies → badge tone, as data. The verdict maps every
+ * app shares (`DECISION_TONE`, `RESULT_TONE`) live in the design system.
+ */
 
 export const STATUS_TONE: Record<QualityRunStatus, BadgeTone> = {
   running: 'accent',

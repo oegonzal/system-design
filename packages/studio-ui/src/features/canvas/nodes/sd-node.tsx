@@ -1,12 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import {
-  INTERFACE_CAPABILITIES,
-  isApiLikeRole,
-  type NodeKind,
-  type Severity,
-} from '@sysdesign/contracts';
+import type { NodeKind, Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
@@ -16,7 +11,6 @@ import { NODE_ICONS } from './node-icons';
 
 const Root = styled('div', transient)<{
   $kind: NodeKind;
-  $ghost: boolean;
   $selected: boolean;
   $severity: Severity | null;
 }>`
@@ -43,11 +37,6 @@ const Root = styled('div', transient)<{
         ? `2px solid ${theme.color.border.focus}`
         : 'none'};
   outline-offset: 2px;
-
-  ${({ $ghost, theme }) =>
-    $ghost
-      ? `opacity: 0.6; border-style: dashed; border-left-style: solid; background: ${theme.color.bg.subtle};`
-      : ''}
 `;
 
 const IconChip = styled('span', transient)<{ $kind: NodeKind }>`
@@ -89,31 +78,20 @@ const Meta = styled.span`
 `;
 
 function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
-  const configCount = data.config ? Object.keys(data.config).length : 0;
   const severity = data.severity ?? null;
-
-  // Declared interface, summarized in the role's own vocabulary: an api or
-  // event-handler node serves ops, a channel carries types; other roles declare
-  // nothing worth counting even if stale data lingers after a kind switch.
-  const role = INTERFACE_CAPABILITIES[data.kind].role;
   const opCount = data.operations?.length ?? 0;
   const roleCount = data.responsibilities?.length ?? 0;
-  const opsSegment =
-    opCount > 0 && (isApiLikeRole(role) || role === 'channel')
-      ? ` · ${opCount} ${isApiLikeRole(role) ? 'ops' : 'types'}`
-      : '';
+  const configCount = data.config?.length ?? 0;
 
   return (
     <Root
       $kind={data.kind}
-      $ghost={data.ghost ?? false}
       $selected={selected ?? false}
       $severity={severity}
       data-testid={`node-${id}`}
       data-kind={data.kind}
       {...(opCount > 0 ? { 'data-op-count': opCount } : {})}
       {...(severity ? { 'data-severity': severity } : {})}
-      {...(data.ghost ? { 'data-ghost': 'true' } : {})}
     >
       <Handle type="target" position={Position.Top} />
       <IconChip $kind={data.kind}>{NODE_ICONS[data.kind]}</IconChip>
@@ -121,9 +99,9 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
         <Label title={data.label}>{data.label}</Label>
         <Meta>
           {data.kind}
-          {opsSegment}
+          {opCount > 0 ? ` · ${opCount} ops` : ''}
           {roleCount > 0 ? ` · ${roleCount} roles` : ''}
-          {configCount > 0 ? ` · ${configCount} ${configCount === 1 ? 'knob' : 'knobs'}` : ''}
+          {configCount > 0 ? ` · ${configCount} config` : ''}
         </Meta>
       </Body>
       <Handle type="source" position={Position.Bottom} />

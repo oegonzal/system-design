@@ -1,23 +1,23 @@
-import {
-  EVAL_DIMENSIONS,
-  narrationToProse,
-  type CanvasGraph,
-  type DesignBrief,
-  type DesignNarrative,
-  type DesignRevisionSummaryDto,
-  type EvaluationDto,
-  type PromptDto,
+import type {
+  CanvasGraph,
+  DesignBrief,
+  DesignNarrative,
+  DesignRevisionSummaryDto,
+  EvaluationDto,
+  PromptDto,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
+
+import { humanizeToken } from '../evaluation/humanize';
 
 /**
  * Pure Markdown serializers for a practice run — one per artifact, each a
  * total function of DTOs (no DOM, no I/O), so they are unit-testable and the
  * export is a copy of a run that lives entirely outside the database.
  *
- * Style mirrors the server-side run-dump (`eval-dump.ts renderRunMarkdown`):
  * `#`/`##` headings, blank-line spacing, GitHub `| --- |` tables, `**bold**`,
- * `` `code` ``. Every id (node, edge, requirement) is resolved to the label the
- * author actually reads.
+ * `` `code` ``. Every id (node, edge, criterion) is resolved to the label or
+ * statement the author actually reads.
  */
 
 const NONE = '_None._';
@@ -31,7 +31,7 @@ function nodeLabels(graph: CanvasGraph): Map<string, string> {
   return new Map(graph.nodes.map((node) => [node.id, node.label]));
 }
 
-/** Edge id → "SourceLabel → TargetLabel", for rendering a traced flow path. */
+/** Edge id → "SourceLabel → TargetLabel", for rendering a traced path. */
 function edgeHops(graph: CanvasGraph): Map<string, string> {
   const labels = nodeLabels(graph);
   return new Map(
@@ -42,59 +42,55 @@ function edgeHops(graph: CanvasGraph): Map<string, string> {
   );
 }
 
-export function promptMarkdown(prompt: PromptDto): string {
-  const lines: string[] = [
-    `# Prompt — ${prompt.title}`,
-    ``,
-    `**Archetype:** ${prompt.archetype} · **Difficulty:** ${prompt.difficulty}`,
-    ``,
-    `## Scenario`,
-    ``,
-    prompt.scenario,
-    ``,
-    `## Functional requirements`,
-    ``,
-    ...(prompt.functionalRequirements.length > 0
-      ? prompt.functionalRequirements.map((req, i) => `${i + 1}. ${req}`)
-      : [NONE]),
-    ``,
-    `## Non-functional requirements`,
-    ``,
-  ];
-  if (prompt.nonFunctionalRequirements.length > 0) {
+function criterionStatements(criteria: readonly SuccessCriterion[]): Map<string, string> {
+  return new Map(criteria.map((criterion) => [criterion.id, criterion.statement]));
+}
+
+/** A table cell: pipes would break the row. */
+function cell(text: string): string {
+  return text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+}
+
+export function promptMarkdown(prompt: PromptDto, criteria: readonly SuccessCriterion[]): string {
+  const lines: string[] = [prompt.markdown.trimEnd(), ``, `## Criteria`, ``];
+  if (criteria.length > 0) {
     lines.push(
-      `| Kind | Requirement | Target |`,
+      `| Id | Kind | Statement |`,
       `| --- | --- | --- |`,
-      ...prompt.nonFunctionalRequirements.map(
-        (nfr) => `| ${nfr.kind} | ${nfr.statement} | ${nfr.target ?? '—'} |`,
+      ...criteria.map(
+        (criterion) =>
+          `| ${criterion.id} | ${cell(criterion.kind)} | ${cell(criterion.statement)} |`,
       ),
     );
   } else {
     lines.push(NONE);
   }
-  lines.push(``, `## Scale targets`, ``);
-  const s = prompt.scaleTargets;
-  lines.push(
-    `| Metric | Target |`,
-    `| --- | --- |`,
-    `| Concurrent users | ${s.concurrentUsers} |`,
-    `| Requests/sec | ${s.requestsPerSecond} |`,
-    `| Read:write | ${s.readWriteRatio} |`,
-    `| p99 latency | ${s.p99LatencyMs} ms |`,
-    `| Availability | ${s.availabilityPct} |`,
-    ...(s.dataRetention ? [`| Data retention | ${s.dataRetention} |`] : []),
-  );
-  if (prompt.workflowSpec) {
-    const w = prompt.workflowSpec;
-    lines.push(
-      ``,
-      `## Business workflow`,
-      ``,
-      `- **Operations:** ${w.operations.map((o) => o.id).join(', ') || '—'}`,
-      `- **Events:** ${w.events.map((e) => e.id).join(', ') || '—'}`,
-      `- **Ingests:** ${w.ingests.map((i) => i.id).join(', ') || '—'}`,
-      `- **Aggregations:** ${w.aggregations.map((a) => a.id).join(', ') || '—'}`,
-    );
+  return joinLines(lines);
+}
+
+export function briefMarkdown(
+  brief: DesignBrief | null,
+  graph: CanvasGraph,
+  criteria: readonly SuccessCriterion[],
+): string {
+  const lines: string[] = [`# Brief — how the design meets each criterion`, ``];
+  if (!brief || brief.bindings.length === 0) {
+    lines.push(NONE);
+    return joinLines(lines);
+  }
+  const labels = nodeLabels(graph);
+  const hops = edgeHops(graph);
+  const statements = criterionStatements(criteria);
+
+  lines.push(`| Criterion | Claim | Components | Path |`, `| --- | --- | --- | --- |`);
+  for (const binding of brief.bindings) {
+    const statement = statements.get(binding.criterionId);
+    const criterion = statement
+      ? `${binding.criterionId} — ${cell(statement)}`
+      : binding.criterionId;
+    const components = binding.nodeIds.map((id) => labels.get(id) ?? id).join(', ') || '—';
+    const path = (binding.path ?? []).map((edgeId) => hops.get(edgeId) ?? edgeId).join(', then ');
+    lines.push(`| ${criterion} | ${cell(binding.claim)} | ${components} | ${path || '—'} |`);
   }
   return joinLines(lines);
 }
@@ -102,14 +98,15 @@ export function promptMarkdown(prompt: PromptDto): string {
 export function narrativeMarkdown(
   narrative: DesignNarrative | null,
   graph: CanvasGraph,
-  prompt: PromptDto,
+  criteria: readonly SuccessCriterion[],
 ): string {
   const lines: string[] = [`# Narrative — the design walkthrough`, ``];
-  if (!narrative || narrationToProse(narrative) === null) {
+  if (!narrative) {
     lines.push(NONE);
     return joinLines(lines);
   }
   const labels = nodeLabels(graph);
+  const statements = criterionStatements(criteria);
   if (narrative.overview && narrative.overview.trim().length > 0) {
     lines.push(`## Overview`, ``, narrative.overview.trim(), ``);
   }
@@ -126,55 +123,16 @@ export function narrativeMarkdown(
   } else {
     lines.push(NONE, ``);
   }
-  lines.push(`## How each requirement is served`, ``);
-  if (narrative.flowNarrations.length > 0) {
-    for (const flow of narrative.flowNarrations) {
-      const req =
-        prompt.functionalRequirements[flow.requirementIndex] ??
-        `requirement #${flow.requirementIndex}`;
-      lines.push(`### ${req}`, ``, flow.prose.trim(), ``);
-    }
-  } else {
-    lines.push(NONE);
-  }
-  return joinLines(lines);
-}
-
-export function briefMarkdown(
-  brief: DesignBrief | null,
-  graph: CanvasGraph,
-  prompt: PromptDto,
-): string {
-  const lines: string[] = [`# Brief — the graded explanation`, ``];
-  if (!brief || (brief.nfrBindings.length === 0 && brief.flows.length === 0)) {
-    lines.push(NONE);
-    return joinLines(lines);
-  }
-  const labels = nodeLabels(graph);
-  const hops = edgeHops(graph);
-  const nfrStatement = new Map(
-    prompt.nonFunctionalRequirements.map((nfr) => [nfr.id, nfr.statement]),
-  );
-
-  lines.push(`## Requirement bindings`, ``);
-  if (brief.nfrBindings.length > 0) {
-    lines.push(`| Requirement | Mechanism | Components | Note |`, `| --- | --- | --- | --- |`);
-    for (const binding of brief.nfrBindings) {
-      const req = nfrStatement.get(binding.nfrId) ?? binding.nfrId;
-      const nodes = binding.nodeIds.map((id) => labels.get(id) ?? id).join(', ') || '—';
-      lines.push(`| ${req} | \`${binding.mechanism}\` | ${nodes} | ${binding.note ?? ''} |`);
-    }
-  } else {
-    lines.push(NONE);
-  }
-  lines.push(``, `## Traced flows`, ``);
-  if (brief.flows.length > 0) {
-    for (const flow of brief.flows) {
-      const req =
-        prompt.functionalRequirements[flow.requirementIndex] ??
-        `requirement #${flow.requirementIndex}`;
-      const path = flow.path.map((edgeId) => hops.get(edgeId) ?? edgeId).join(', then ');
-      lines.push(`- **${req}:** ${path || '—'}${flow.note ? ` — ${flow.note}` : ''}`);
+  lines.push(`## How each criterion is met`, ``);
+  if (narrative.criterionNarrations.length > 0) {
+    for (const narration of narrative.criterionNarrations) {
+      const statement = statements.get(narration.criterionId);
+      lines.push(
+        `### ${narration.criterionId}${statement ? ` — ${statement}` : ''}`,
+        ``,
+        narration.prose.trim(),
+        ``,
+      );
     }
   } else {
     lines.push(NONE);
@@ -185,63 +143,63 @@ export function briefMarkdown(
 export function feedbackMarkdown(
   evaluation: EvaluationDto | null,
   graph: CanvasGraph,
+  criteria: readonly SuccessCriterion[],
   revisionNumber: number | null,
 ): string {
   const heading = revisionNumber !== null ? ` — revision #${revisionNumber}` : '';
   const lines: string[] = [`# Feedback${heading}`, ``];
   if (!evaluation || evaluation.status !== 'complete') {
-    lines.push(`_Not evaluated yet (status: ${evaluation?.status ?? 'none'})._`);
+    lines.push(`_Not graded yet (status: ${evaluation?.status ?? 'none'})._`);
     return joinLines(lines);
   }
-  lines.push(`**${evaluation.grade ?? '—'} · ${evaluation.overallScore ?? '—'}/100**`, ``);
-  if (evaluation.capApplied) {
-    const cap = evaluation.capApplied;
-    const reason =
-      cap.expectationId !== undefined
-        ? `unmet ${cap.expectationId}`
-        : `${cap.count} ${cap.severity} finding(s)`;
-    lines.push(`> Grade capped at **${cap.maxGrade}** by ${reason}.`, ``);
+  lines.push(`**${evaluation.overall ?? '—'}/100 · ${evaluation.decision ?? '—'}**`, ``);
+  if (evaluation.stopReason) {
+    lines.push(`_Stopped: ${humanizeToken(evaluation.stopReason).toLowerCase()}._`, ``);
   }
-  lines.push(`## Dimension scores`, ``, `| Dimension | Score |`, `| --- | --- |`);
-  const scores = evaluation.dimensionScores;
-  for (const dim of EVAL_DIMENSIONS) {
-    const value = scores?.[dim];
-    lines.push(`| ${dim} | ${value === null || value === undefined ? 'n/a' : value} |`);
+
+  lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);
+  for (const [key, value] of Object.entries(evaluation.dimensions)) {
+    lines.push(`| ${key} | ${value === null ? 'n/a' : value} |`);
   }
-  if (evaluation.summary) {
-    lines.push(``, `## Summary`, ``, evaluation.summary);
-  }
-  const labels = nodeLabels(graph);
-  lines.push(``, `## Findings`, ``);
-  if (evaluation.findings.length > 0) {
-    for (const finding of evaluation.findings) {
-      const where = finding.affectedNodeIds.map((id) => labels.get(id) ?? id).join(', ');
+
+  const statements = criterionStatements(criteria);
+  lines.push(``, `## Criteria`, ``);
+  if (evaluation.criterionResults.length > 0) {
+    lines.push(`| Criterion | Result | Confidence | Rationale |`, `| --- | --- | --- | --- |`);
+    for (const row of evaluation.criterionResults) {
+      const statement = statements.get(row.criterionId);
       lines.push(
-        `- **[${finding.severity}·${finding.dimension}] ${finding.title}**${where ? ` (${where})` : ''}`,
-        `  ${finding.message}`,
+        `| ${row.criterionId}${statement ? ` — ${cell(statement)}` : ''} | ${row.result} | ${
+          row.confidence ?? '—'
+        } | ${row.rationale ? cell(row.rationale) : '—'} |`,
       );
     }
   } else {
     lines.push(NONE);
   }
-  if (evaluation.axes.length > 0) {
-    lines.push(``, `## Advisory (AI axes)`, ``);
-    for (const axis of evaluation.axes) {
+
+  const labels = nodeLabels(graph);
+  lines.push(``, `## Findings`, ``);
+  if (evaluation.findings.length > 0) {
+    for (const finding of evaluation.findings) {
+      const where = finding.nodeIds.map((id) => labels.get(id) ?? id).join(', ');
+      const criteriaCited = finding.criterionIds.join(', ');
       lines.push(
-        `- **${axis.label}:** ${axis.score ?? '—'}${axis.summary ? ` — ${axis.summary}` : ''}`,
+        `- **[${finding.severity} · ${finding.lenses.join(', ')} · ${humanizeToken(finding.type)}]**${
+          where ? ` (${where})` : ''
+        }${criteriaCited ? ` — ${criteriaCited}` : ''}`,
+        ...(finding.rationale ? [`  ${finding.rationale}`] : []),
       );
     }
-  }
-  if (evaluation.scenarios.length > 0) {
-    lines.push(``, `## Stress scenarios`, ``);
-    for (const scenario of evaluation.scenarios) {
-      lines.push(`- **${scenario.title} — ${scenario.verdict}:** ${scenario.story}`);
-    }
+  } else {
+    lines.push(NONE);
   }
   lines.push(
     ``,
     `---`,
-    `_engine ${evaluation.engineVersion} · profile ${evaluation.profileId}@${evaluation.profileVersion}${evaluation.criticModel ? ` · critic ${evaluation.criticModel}` : ' · deterministic'}_`,
+    `_run ${evaluation.runId} · iteration ${evaluation.iteration}${
+      evaluation.llm.model ? ` · model ${evaluation.llm.model}` : ' · no model'
+    }_`,
   );
   return joinLines(lines);
 }
@@ -252,10 +210,13 @@ export function revisionsMarkdown(revisions: DesignRevisionSummaryDto[]): string
     lines.push(NONE);
     return joinLines(lines);
   }
-  lines.push(`| Rev | Grade | Score | Status | Submitted |`, `| --- | --- | --- | --- | --- |`);
+  lines.push(`| Rev | Score | Decision | Status |`, `| --- | --- | --- | --- |`);
   for (const rev of [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)) {
+    const grade = rev.evaluation;
     lines.push(
-      `| ${rev.revisionNumber} | ${rev.grade ?? '—'} | ${rev.overallScore ?? '—'} | ${rev.evaluationStatus ?? '—'} | ${rev.createdAt} |`,
+      `| ${rev.revisionNumber}${rev.origin === 'assistant' ? ' (AI)' : ''} | ${
+        grade?.overall ?? '—'
+      } | ${grade?.decision ?? '—'} | ${grade?.status ?? '—'} |`,
     );
   }
   return joinLines(lines);

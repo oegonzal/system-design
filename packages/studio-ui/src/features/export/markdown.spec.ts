@@ -1,12 +1,15 @@
-import type { DesignBrief, DesignNarrative } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  makeBrief,
+  makeCriteria,
   makeEvaluation,
   makeFinding,
   makeGraph,
+  makeNarrative,
   makePrompt,
   makeRevisionSummary,
+  PROMPT_MARKDOWN,
 } from '../../testing/fixtures';
 import {
   briefMarkdown,
@@ -19,83 +22,74 @@ import {
 // makeGraph: n-1 Client → n-2 Order Service → n-3 Orders DB (edges e-1, e-2).
 const graph = makeGraph();
 const prompt = makePrompt();
+const criteria = makeCriteria();
 
 describe('promptMarkdown', () => {
-  it('renders title, scenario, requirements, NFR table and scale targets', () => {
-    const md = promptMarkdown(prompt);
-    expect(md).toContain(`# Prompt — ${prompt.title}`);
-    expect(md).toContain(prompt.scenario);
-    expect(md).toContain(prompt.functionalRequirements[0]);
-    expect(md).toContain('| Kind | Requirement | Target |');
-    expect(md).toContain(prompt.nonFunctionalRequirements[0].statement);
-    expect(md).toContain('| Concurrent users |');
+  it('[UX-10] renders the markdown verbatim followed by the criteria table', () => {
+    const md = promptMarkdown(prompt, criteria);
+    expect(md.startsWith(PROMPT_MARKDOWN)).toBe(true);
+    expect(md).toContain('## Criteria');
+    expect(md).toContain('| Id | Kind | Statement |');
+    expect(md).toContain('| c3 | non_functional | p99 read latency stays under 200 ms |');
+  });
+
+  it('says None when no criteria were derived', () => {
+    expect(promptMarkdown(prompt, [])).toContain('_None._');
   });
 });
 
 describe('narrativeMarkdown', () => {
-  it('resolves node ids to labels and requirement ordinals to text', () => {
-    const narrative: DesignNarrative = {
-      version: 1,
-      overview: 'Reads and writes are split.',
-      componentRationales: [{ nodeId: 'n-3', prose: 'The database is the source of truth.' }],
-      flowNarrations: [{ requirementIndex: 0, prose: 'The client reads availability.' }],
-    };
-    const md = narrativeMarkdown(narrative, graph, prompt);
-    expect(md).toContain('Reads and writes are split.');
-    expect(md).toContain('### Orders DB'); // n-3 resolved to its label
+  it('resolves node ids to labels and criterion ids to statements', () => {
+    const md = narrativeMarkdown(makeNarrative(), graph, criteria);
+    expect(md).toContain('A read/write split');
+    expect(md).toContain('### Orders DB');
     expect(md).not.toContain('n-3');
-    expect(md).toContain(`### ${prompt.functionalRequirements[0]}`);
-    expect(md).toContain('The database is the source of truth.');
+    expect(md).toContain('### c1 — A shopper reads their merged order history');
+    expect(md).toContain('The client asks the service');
   });
 
   it('says None when there is no narrative', () => {
-    expect(narrativeMarkdown(null, graph, prompt)).toContain('_None._');
+    expect(narrativeMarkdown(null, graph, criteria)).toContain('_None._');
   });
 });
 
 describe('briefMarkdown', () => {
-  it('resolves bindings and flow paths to labels', () => {
-    const brief: DesignBrief = {
-      version: 1,
-      nfrBindings: [
-        {
-          nfrId: prompt.nonFunctionalRequirements[0].id,
-          nodeIds: ['n-3'],
-          mechanism: 'read-cache',
-        },
-      ],
-      flows: [{ id: 'f-0', requirementIndex: 0, path: ['e-1', 'e-2'] }],
-    };
-    const md = briefMarkdown(brief, graph, prompt);
-    expect(md).toContain(prompt.nonFunctionalRequirements[0].statement); // nfrId → statement
-    expect(md).toContain('`read-cache`');
-    expect(md).toContain('Orders DB'); // node label
-    expect(md).toContain('Client → Order Service'); // e-1 hop resolved
+  it('renders one table row per binding with its claim, components and resolved path', () => {
+    const md = briefMarkdown(makeBrief(), graph, criteria);
+    expect(md).toContain('| Criterion | Claim | Components | Path |');
+    expect(md).toContain('c1 — A shopper reads their merged order history');
+    expect(md).toContain('The service reads the history from the orders database');
+    expect(md).toContain('Order Service, Orders DB');
+    expect(md).toContain('Client → Order Service, then Order Service → Orders DB');
+    // A binding with no path shows a dash, never an empty cell.
+    expect(md).toMatch(/A replica keeps point reads under the budget \| Orders DB \| — \|/);
   });
 
   it('says None when there is no brief', () => {
-    expect(briefMarkdown(null, graph, prompt)).toContain('_None._');
+    expect(briefMarkdown(null, graph, criteria)).toContain('_None._');
   });
 });
 
 describe('feedbackMarkdown', () => {
-  it('renders grade, dimension table, findings by label', () => {
+  it('[UX-10] renders the score line, dimensions, criteria and findings by label', () => {
     const evaluation = makeEvaluation({
-      findings: [
-        makeFinding({ title: 'Single database with no replica', affectedNodeIds: ['n-3'] }),
-      ],
+      findings: [makeFinding({ lenses: ['critic.architecture'], nodeIds: ['n-3'] })],
     });
-    const md = feedbackMarkdown(evaluation, graph, 2);
+    const md = feedbackMarkdown(evaluation, graph, criteria, 2);
     expect(md).toContain('# Feedback — revision #2');
-    expect(md).toContain('| Dimension | Score |');
-    expect(md).toContain('Single database with no replica');
-    expect(md).toContain('Orders DB'); // affected node resolved
+    expect(md).toContain('**72/100 · revise**');
+    expect(md).toContain('## Dimensions');
+    expect(md).toContain('| quality_attributes | 60 |');
+    expect(md).toContain('## Criteria');
+    expect(md).toContain('| c3 — p99 read latency stays under 200 ms | fail | high |');
+    expect(md).toContain('## Findings');
+    expect(md).toContain('- **[high · critic.architecture · Unhandled failure]** (Orders DB) — c3');
   });
 
-  it('says not-evaluated when the evaluation is absent or incomplete', () => {
-    expect(feedbackMarkdown(null, graph, 1)).toContain('Not evaluated yet');
-    expect(feedbackMarkdown(makeEvaluation({ status: 'queued' }), graph, 1)).toContain(
-      'Not evaluated yet',
+  it('says not-graded when the evaluation is absent or still running', () => {
+    expect(feedbackMarkdown(null, graph, criteria, 1)).toContain('Not graded yet');
+    expect(feedbackMarkdown(makeEvaluation({ status: 'running' }), graph, criteria, 1)).toContain(
+      'Not graded yet',
     );
   });
 });
@@ -103,15 +97,32 @@ describe('feedbackMarkdown', () => {
 describe('revisionsMarkdown', () => {
   it('renders a sorted timeline table', () => {
     const md = revisionsMarkdown([
-      makeRevisionSummary({ revisionNumber: 2, grade: 'B', overallScore: 80 }),
-      makeRevisionSummary({ revisionNumber: 1, grade: 'F', overallScore: 20 }),
+      makeRevisionSummary({
+        revisionNumber: 2,
+        origin: 'assistant',
+        evaluation: {
+          runId: 'r',
+          iteration: 2,
+          status: 'complete',
+          overall: 80,
+          decision: 'accept',
+        },
+      }),
+      makeRevisionSummary({
+        revisionNumber: 1,
+        evaluation: {
+          runId: 'r',
+          iteration: 1,
+          status: 'complete',
+          overall: 20,
+          decision: 'reject',
+        },
+      }),
     ]);
-    expect(md).toContain('| Rev | Grade | Score | Status | Submitted |');
-    const rows = md
-      .split('\n')
-      .filter((line) => line.startsWith('| 1 |') || line.startsWith('| 2 |'));
-    expect(rows[0]).toContain('| 1 |'); // sorted ascending
-    expect(rows[1]).toContain('| 2 |');
+    expect(md).toContain('| Rev | Score | Decision | Status |');
+    const rows = md.split('\n').filter((line) => /^\| \d/.test(line));
+    expect(rows[0]).toBe('| 1 | 20 | reject | complete |');
+    expect(rows[1]).toBe('| 2 (AI) | 80 | accept | complete |');
   });
 
   it('says None with no revisions', () => {

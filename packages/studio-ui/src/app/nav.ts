@@ -21,7 +21,7 @@ export const NAV_ITEMS = [
   {
     href: '/prompts',
     label: 'Prompts',
-    description: 'Generate and browse system-design prompts.',
+    description: 'Write, import, generate and browse system-design prompts.',
   },
   {
     href: '/stories',
@@ -38,9 +38,14 @@ export const NAV_ITEMS = [
 /** Routes with metadata but no nav entry. */
 const EXTRA_PAGES: readonly NavItem[] = [
   {
+    href: '/prompts/new',
+    label: 'New prompt',
+    description: 'Write a prompt as markdown, or import one from the library.',
+  },
+  {
     href: '/practice',
     label: 'Practice',
-    description: 'Design on the canvas and submit revisions for evaluation.',
+    description: 'Design on the canvas and submit revisions for grading.',
   },
   {
     href: '/stories/new',

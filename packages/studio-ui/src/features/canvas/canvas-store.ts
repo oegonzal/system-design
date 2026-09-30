@@ -1,29 +1,18 @@
 import type {
-  BriefBindingProposal,
+  Binding,
   CanvasGraph,
   ComponentRationale,
+  CriterionNarration,
+  CriterionRef,
   DesignBrief,
   DesignNarrative,
-  EdgeIntent,
   EdgeKind,
-  FlowBinding,
-  FlowNarration,
-  GraphPatch,
-  InterfaceProposal,
-  MechanismClaim,
-  NfrBinding,
-  NodeConfig,
+  NodeConfigEntry,
   NodeKind,
   NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
-import {
-  BINDING_MAX_NODES,
-  canonicalizeGraphConfig,
-  MECHANISM_KINDS,
-  NODE_MAX_OPERATIONS,
-  NODE_MAX_RESPONSIBILITIES,
-} from '@sysdesign/contracts';
+import { BINDING_MAX_NODES } from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -34,8 +23,8 @@ import {
 } from '@xyflow/react';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import { flowIdFor, reconcileBrief } from './brief-draft';
-import { applySuggestionPatch, fromCanvasGraph, toCanvasGraph, toGhostElements } from './graph-io';
+import { reconcileBrief } from './brief-draft';
+import { fromCanvasGraph, toCanvasGraph } from './graph-io';
 import { reconcileNarration } from './narration-draft';
 import type { SdEdge, SdNode } from './types';
 
@@ -90,11 +79,6 @@ export interface HighlightState {
   severity: Severity;
 }
 
-export interface GhostState {
-  patch: GraphPatch;
-  findingId: string;
-}
-
 export interface CanvasState {
   nodes: SdNode[];
   edges: SdEdge[];
@@ -102,10 +86,10 @@ export interface CanvasState {
   /** Unsaved-draft flag: set by edits, cleared by setGraph/markClean. */
   dirty: boolean;
   /**
-   * The design-narrative draft submitted alongside the graph — reference-
-   * anchored prose held as three slot groups (an overview, a rationale per
-   * node id, a narration per functional-requirement ordinal), the shape
-   * `serializeNarrative` reconciles into a `DesignNarrative`.
+   * The narrative draft submitted alongside the graph — reference-anchored
+   * prose held as three slot groups (an overview, a rationale per node id, a
+   * narration per criterion id), the shape `serializeNarrative` reconciles
+   * into a `DesignNarrative`.
    *
    * Deliberately orthogonal to the graph, exactly as the brief is: `setGraph`
    * never touches these and `serialize` never includes them — loading a
@@ -115,41 +99,16 @@ export interface CanvasState {
    */
   narrativeOverview: string;
   componentRationales: ComponentRationale[];
-  flowNarrations: FlowNarration[];
+  criterionNarrations: CriterionNarration[];
   /**
-   * The design brief being drafted — the GRADED half of explaining a design,
-   * beside the unscored walkthrough. Orthogonal to the graph exactly as the
-   * narrative is: `setGraph` never touches it, `serialize` never includes it.
-   *
-   * Held as the draft the editor edits, not as a payload. Stale references are
-   * tolerated here (a bound node can be deleted afterwards) and resolved once,
-   * at `serializeBrief`, because a canvas edit must never silently rewrite what
+   * The brief being drafted: at most one binding per criterion, held in the
+   * schema's own shape but allowed to be incomplete while it is typed — an
+   * empty claim or no component yet. Stale references are tolerated here (a
+   * bound node can be deleted afterwards) and resolved once, at
+   * `serializeBrief`, because a canvas edit must never silently rewrite what
    * the author wrote.
-   *
-   * At most one binding per requirement and one flow per functional
-   * requirement, which is what makes the API's uniqueness rules unreachable
-   * rather than merely respected.
    */
-  briefBindings: NfrBinding[];
-  briefFlows: FlowBinding[];
-  /**
-   * Machine proposals awaiting a human answer. A SEPARATE slice, not a flag on
-   * a binding, so `serializeBrief` structurally cannot reach them — the ghost
-   * overlay solves the same problem by filtering at the serialization boundary,
-   * but a brief payload is validated field by field (`forbidNonWhitelisted`),
-   * so an extra marker parked on a binding would reject the whole submission.
-   * Keeping proposals out of `briefBindings` makes "unaccepted work is never
-   * submitted" a property of the shape rather than of remembering to strip.
-   */
-  briefProposals: BriefBindingProposal[];
-  /**
-   * Machine-proposed interface items for ONE node, held apart from the node
-   * for the same reason brief proposals are held apart from bindings: an
-   * unaccepted item must be structurally unable to reach `serialize`. Tied to
-   * the node they were computed for — selecting another node discards them.
-   */
-  interfaceProposals: { nodeId: string; items: InterfaceProposal[] } | null;
-  ghost: GhostState | null;
+  bindings: Binding[];
   highlight: HighlightState | null;
 
   setGraph(graph: CanvasGraph): void;
@@ -162,60 +121,39 @@ export interface CanvasState {
     patch: {
       label?: string;
       kind?: NodeKind;
-      config?: NodeConfig;
+      config?: NodeConfigEntry[];
       responsibilities?: string[];
       operations?: NodeOperation[];
     },
   ): void;
-  updateEdge(
-    id: string,
-    patch: { kind?: EdgeKind; intent?: EdgeIntent; label?: string; carries?: string[] },
-  ): void;
+  updateEdge(id: string, patch: { kind?: EdgeKind; label?: string; carries?: string[] }): void;
   removeSelected(): void;
   select(id: string | null): void;
   setHighlight(highlight: HighlightState): void;
   clearHighlight(): void;
-  previewPatch(patch: GraphPatch, findingId: string): void;
-  clearGhost(): void;
-  acceptGhost(): void;
   /** Author edit — sets the big-picture overview and dirties the draft. */
   setNarrativeOverview(text: string): void;
   /** Author edit — sets one component's rationale; empty prose clears the slot. */
   setComponentRationale(nodeId: string, prose: string): void;
-  /** Author edit — sets one requirement's flow narration; empty prose clears it. */
-  setFlowNarration(requirementIndex: number, prose: string): void;
+  /** Author edit — sets one criterion's narration; empty prose clears it. */
+  setCriterionNarration(criterionId: string, prose: string): void;
   /** Revision load — replaces the narrative draft without touching `dirty`. */
   loadNarrative(narrative: DesignNarrative | null): void;
-  /**
-   * Claim a requirement is held by this mechanism. Changing the mechanism
-   * drops nodes the new one cannot legally carry, so the picker and the
-   * binding can never disagree about eligibility.
-   */
-  setBindingMechanism(nfrId: string, mechanism: MechanismClaim): void;
-  toggleBindingNode(nfrId: string, nodeId: string): void;
-  setBindingNote(nfrId: string, note: string): void;
-  clearBinding(nfrId: string): void;
-  /** Replace the walk for one functional requirement; an empty path clears it. */
-  setFlowPath(requirementIndex: number, path: string[]): void;
+  /** Author edit — the claim in the author's words; creates the binding on first use. */
+  setBindingClaim(criterionId: string, claim: string): void;
+  toggleBindingNode(criterionId: string, nodeId: string): void;
+  /** Replace the walk for one criterion; an empty path removes it. */
+  setBindingPath(criterionId: string, path: string[]): void;
+  clearBinding(criterionId: string): void;
   /** Revision load — replaces the brief without touching `dirty`. */
   loadBrief(brief: DesignBrief | null): void;
-  /** Fresh proposals from the model. Never dirties: nobody has decided yet. */
-  loadProposals(proposals: BriefBindingProposal[]): void;
-  /** Take the proposal for this requirement, replacing any binding there. */
-  acceptProposal(nfrId: string): void;
-  dismissProposal(nfrId: string): void;
-  /** Fresh interface proposals for a node. Never dirties: nobody has decided yet. */
-  loadInterfaceProposals(nodeId: string, items: InterfaceProposal[]): void;
-  /** Take one item into the node it was proposed for — an author edit, so it dirties. */
-  acceptInterfaceProposal(id: string): void;
-  dismissInterfaceProposal(id: string): void;
   markClean(): void;
   markDirty(): void;
   serialize(): CanvasGraph;
-  /** The brief as a payload, reconciled against the live graph, or null. */
-  serializeBrief(): DesignBrief | null;
-  /** The narrative as a payload, reconciled against the live graph, or null. */
-  serializeNarrative(): DesignNarrative | null;
+  /** The brief as a payload, reconciled against the live graph and rubric, or null. */
+  serializeBrief(criteria: readonly CriterionRef[]): DesignBrief | null;
+  /** The narrative as a payload, reconciled against the live graph and rubric, or null. */
+  serializeNarrative(criteria: readonly CriterionRef[]): DesignNarrative | null;
 }
 
 export type CanvasStore = StoreApi<CanvasState>;
@@ -251,6 +189,30 @@ function paintSeverity<T extends SdNode | SdEdge>(
   });
 }
 
+/** A binding with nothing in it is not kept — the row reads `empty` again. */
+function isBlank(binding: Binding): boolean {
+  return (
+    binding.claim.trim().length === 0 &&
+    binding.nodeIds.length === 0 &&
+    (binding.path ?? []).length === 0
+  );
+}
+
+/** Upsert one criterion's binding, dropping it when the edit emptied it. */
+function upsert(
+  bindings: Binding[],
+  criterionId: string,
+  patch: (current: Binding) => Binding,
+): Binding[] {
+  const existing = bindings.find((binding) => binding.criterionId === criterionId);
+  const next = patch(existing ?? { criterionId, nodeIds: [], claim: '' });
+  const others = bindings.filter((binding) => binding.criterionId !== criterionId);
+  if (isBlank(next)) return others;
+  return existing
+    ? bindings.map((binding) => (binding.criterionId === criterionId ? next : binding))
+    : [...others, next];
+}
+
 /**
  * A factory, deliberately — no module-level store instance. Each practice
  * workspace mounts its own store, so two sessions in one browser tab
@@ -263,44 +225,26 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     dirty: false,
     narrativeOverview: '',
     componentRationales: [],
-    flowNarrations: [],
-    briefBindings: [],
-    briefFlows: [],
-    briefProposals: [],
-    interfaceProposals: null,
-    ghost: null,
+    criterionNarrations: [],
+    bindings: [],
     highlight: null,
 
     setGraph(graph) {
-      // A stored design may carry a knob its kind no longer offers (retired
-      // since it was saved). The panel could not show it and the grader never
-      // read it, so dropping it here loses nothing visible — and keeps a
-      // resubmit from being refused for a key the author never chose.
-      const { nodes, edges } = fromCanvasGraph(canonicalizeGraphConfig(graph));
-      // Proposals are cleared with the ghost and for the same reason: both were
-      // computed against the design being replaced, and a stale one would
-      // invite the author to accept a claim about a diagram they no longer have.
-      set({
-        nodes,
-        edges,
-        selectedId: null,
-        dirty: false,
-        ghost: null,
-        highlight: null,
-        briefProposals: [],
-        interfaceProposals: null,
-      });
+      const { nodes, edges } = fromCanvasGraph(graph);
+      set({ nodes, edges, selectedId: null, dirty: false, highlight: null });
     },
 
     addNode(kind, position) {
       const { nodes } = get();
-      const realCount = nodes.filter((node) => !node.data.ghost).length;
       const node: SdNode = {
         id: nextId('n', nodes),
         type: 'sd',
         // Drops give an exact position; keyboard-adds stagger from the count
         // so consecutive adds never stack invisibly on one spot.
-        position: position ?? { x: 240 + (realCount % 5) * 48, y: 160 + (realCount % 5) * 48 },
+        position: position ?? {
+          x: 240 + (nodes.length % 5) * 48,
+          y: 160 + (nodes.length % 5) * 48,
+        },
         data: { kind, label: DEFAULT_NODE_LABELS[kind] },
       };
       set({ nodes: [...nodes, node], selectedId: node.id, dirty: true });
@@ -341,10 +285,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       // Self-loops model nothing at this altitude; exact duplicates add noise.
       if (connection.source === connection.target) return;
       const duplicate = edges.some(
-        (edge) =>
-          !edge.data?.ghost &&
-          edge.source === connection.source &&
-          edge.target === connection.target,
+        (edge) => edge.source === connection.source && edge.target === connection.target,
       );
       if (duplicate) return;
 
@@ -380,11 +321,6 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
                 ...(patch.label !== undefined ? { label: patch.label } : {}),
                 data: {
                   kind: patch.kind ?? edge.data?.kind ?? 'sync',
-                  ...(patch.intent !== undefined
-                    ? { intent: patch.intent }
-                    : edge.data?.intent !== undefined
-                      ? { intent: edge.data.intent }
-                      : {}),
                   // The rebuilt literal must pass carries through: a kind-only
                   // patch keeps the existing list, and `carries: []` clears it
                   // (serialization omits empty lists).
@@ -393,7 +329,6 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
                     : edge.data?.carries !== undefined
                       ? { carries: edge.data.carries }
                       : {}),
-                  ...(edge.data?.ghost ? { ghost: edge.data.ghost } : {}),
                   severity: edge.data?.severity ?? null,
                 },
               }
@@ -425,14 +360,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     },
 
     select(id) {
-      const { interfaceProposals } = get();
-      // Proposals were computed for one node; they do not follow the selection.
-      set({
-        selectedId: id,
-        ...(interfaceProposals !== null && interfaceProposals.nodeId !== id
-          ? { interfaceProposals: null }
-          : {}),
-      });
+      set({ selectedId: id });
     },
 
     setHighlight(highlight) {
@@ -454,48 +382,6 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       });
     },
 
-    previewPatch(patch, findingId) {
-      const { nodes, edges } = get();
-      const real = {
-        nodes: nodes.filter((node) => !node.data.ghost),
-        edges: edges.filter((edge) => !edge.data?.ghost),
-      };
-      const overlay = toGhostElements(patch, toCanvasGraph(real.nodes, real.edges));
-      set({
-        nodes: [...real.nodes, ...overlay.nodes],
-        edges: [...real.edges, ...overlay.edges],
-        ghost: { patch, findingId },
-      });
-    },
-
-    clearGhost() {
-      const { nodes, edges, ghost } = get();
-      if (!ghost) return;
-      set({
-        nodes: nodes.filter((node) => !node.data.ghost),
-        edges: edges.filter((edge) => !edge.data?.ghost),
-        ghost: null,
-      });
-    },
-
-    acceptGhost() {
-      const { nodes, edges, ghost } = get();
-      if (!ghost) return;
-      const real = toCanvasGraph(
-        nodes.filter((node) => !node.data.ghost),
-        edges.filter((edge) => !edge.data?.ghost),
-      );
-      const merged = applySuggestionPatch(real, ghost.patch);
-      const hydrated = fromCanvasGraph(merged);
-      set({
-        nodes: hydrated.nodes,
-        edges: hydrated.edges,
-        ghost: null,
-        highlight: null,
-        dirty: true,
-      });
-    },
-
     setNarrativeOverview(text) {
       set({ narrativeOverview: text, dirty: true });
     },
@@ -503,24 +389,20 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
     setComponentRationale(nodeId, prose) {
       const { componentRationales } = get();
       const others = componentRationales.filter((rationale) => rationale.nodeId !== nodeId);
-      // Empty prose is a cleared slot, not a stored empty one — mirrors how a
-      // flow with an empty path clears rather than persists.
+      // Empty prose is a cleared slot, not a stored empty one.
       set({
         componentRationales: prose.trim() === '' ? others : [...others, { nodeId, prose }],
         dirty: true,
       });
     },
 
-    setFlowNarration(requirementIndex, prose) {
-      const { flowNarrations } = get();
-      const others = flowNarrations.filter((flow) => flow.requirementIndex !== requirementIndex);
+    setCriterionNarration(criterionId, prose) {
+      const { criterionNarrations } = get();
+      const others = criterionNarrations.filter(
+        (narration) => narration.criterionId !== criterionId,
+      );
       set({
-        flowNarrations:
-          prose.trim() === ''
-            ? others
-            : [...others, { requirementIndex, prose }].sort(
-                (a, b) => a.requirementIndex - b.requirementIndex,
-              ),
+        criterionNarrations: prose.trim() === '' ? others : [...others, { criterionId, prose }],
         dirty: true,
       });
     },
@@ -529,180 +411,60 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       set({
         narrativeOverview: narrative?.overview ?? '',
         componentRationales: narrative?.componentRationales ?? [],
-        flowNarrations: narrative?.flowNarrations ?? [],
+        criterionNarrations: narrative?.criterionNarrations ?? [],
       });
     },
 
-    setBindingMechanism(nfrId, mechanism) {
-      const { briefBindings, nodes } = get();
-      const existing = briefBindings.find((binding) => binding.nfrId === nfrId);
-      // Re-filter rather than clear: switching from `backups` to `sharding`
-      // keeps the databases already picked and drops anything else, because
-      // the API refuses a kind that cannot carry the claim.
-      const kinds: readonly NodeKind[] = MECHANISM_KINDS[mechanism];
-      const nodeIds = (existing?.nodeIds ?? []).filter((id) =>
-        nodes.some((node) => node.id === id && kinds.includes(node.data.kind)),
-      );
-      const next: NfrBinding = {
-        nfrId,
-        mechanism,
-        nodeIds,
-        ...(existing?.note !== undefined ? { note: existing.note } : {}),
-      };
+    setBindingClaim(criterionId, claim) {
       set({
-        briefBindings: existing
-          ? briefBindings.map((binding) => (binding.nfrId === nfrId ? next : binding))
-          : [...briefBindings, next],
+        bindings: upsert(get().bindings, criterionId, (current) => ({ ...current, claim })),
         dirty: true,
       });
     },
 
-    toggleBindingNode(nfrId, nodeId) {
-      const { briefBindings } = get();
-      const existing = briefBindings.find((binding) => binding.nfrId === nfrId);
-      if (!existing) return;
-      const has = existing.nodeIds.includes(nodeId);
+    toggleBindingNode(criterionId, nodeId) {
+      const { bindings } = get();
+      const existing = bindings.find((binding) => binding.criterionId === criterionId);
+      const has = existing?.nodeIds.includes(nodeId) ?? false;
       // Capped here as well as in the payload, so the checkbox that would
       // exceed the limit is simply inert rather than silently dropped later.
-      if (!has && existing.nodeIds.length >= BINDING_MAX_NODES) return;
-      const nodeIds = has
-        ? existing.nodeIds.filter((id) => id !== nodeId)
-        : [...existing.nodeIds, nodeId];
+      if (!has && (existing?.nodeIds.length ?? 0) >= BINDING_MAX_NODES) return;
       set({
-        briefBindings: briefBindings.map((binding) =>
-          binding.nfrId === nfrId ? { ...binding, nodeIds } : binding,
-        ),
+        bindings: upsert(bindings, criterionId, (current) => ({
+          ...current,
+          nodeIds: has
+            ? current.nodeIds.filter((id) => id !== nodeId)
+            : [...current.nodeIds, nodeId],
+        })),
         dirty: true,
       });
     },
 
-    setBindingNote(nfrId, note) {
-      const { briefBindings } = get();
+    setBindingPath(criterionId, path) {
       set({
-        briefBindings: briefBindings.map((binding) =>
-          binding.nfrId === nfrId ? { ...binding, note } : binding,
-        ),
+        bindings: upsert(get().bindings, criterionId, (current) => {
+          const rest: Binding = {
+            criterionId: current.criterionId,
+            nodeIds: current.nodeIds,
+            claim: current.claim,
+          };
+          return path.length === 0 ? rest : { ...rest, path };
+        }),
         dirty: true,
       });
     },
 
-    clearBinding(nfrId) {
-      const { briefBindings } = get();
-      if (!briefBindings.some((binding) => binding.nfrId === nfrId)) return;
+    clearBinding(criterionId) {
+      const { bindings } = get();
+      if (!bindings.some((binding) => binding.criterionId === criterionId)) return;
       set({
-        briefBindings: briefBindings.filter((binding) => binding.nfrId !== nfrId),
-        dirty: true,
-      });
-    },
-
-    setFlowPath(requirementIndex, path) {
-      const { briefFlows } = get();
-      const others = briefFlows.filter((flow) => flow.requirementIndex !== requirementIndex);
-      set({
-        briefFlows:
-          path.length === 0
-            ? others
-            : [...others, { id: flowIdFor(requirementIndex), requirementIndex, path }].sort(
-                (a, b) => a.requirementIndex - b.requirementIndex,
-              ),
+        bindings: bindings.filter((binding) => binding.criterionId !== criterionId),
         dirty: true,
       });
     },
 
     loadBrief(brief) {
-      set({ briefBindings: brief?.nfrBindings ?? [], briefFlows: brief?.flows ?? [] });
-    },
-
-    loadProposals(proposals) {
-      set({ briefProposals: proposals });
-    },
-
-    acceptProposal(nfrId) {
-      const { briefProposals, briefBindings } = get();
-      const proposal = briefProposals.find((candidate) => candidate.nfrId === nfrId);
-      if (!proposal) return;
-
-      // Accepting is an author edit, so it dirties — matching `acceptGhost`.
-      // The rationale is deliberately NOT carried into `note`: that field is
-      // the author's own reasoning, and storing model prose there would be a
-      // lie about who wrote it.
-      const binding: NfrBinding = {
-        nfrId: proposal.nfrId,
-        mechanism: proposal.mechanism,
-        nodeIds: [...proposal.nodeIds],
-      };
-      const existing = briefBindings.some((candidate) => candidate.nfrId === nfrId);
-      set({
-        briefBindings: existing
-          ? briefBindings.map((candidate) => (candidate.nfrId === nfrId ? binding : candidate))
-          : [...briefBindings, binding],
-        briefProposals: briefProposals.filter((candidate) => candidate.nfrId !== nfrId),
-        dirty: true,
-      });
-    },
-
-    dismissProposal(nfrId) {
-      const { briefProposals } = get();
-      if (!briefProposals.some((candidate) => candidate.nfrId === nfrId)) return;
-      set({ briefProposals: briefProposals.filter((candidate) => candidate.nfrId !== nfrId) });
-    },
-
-    loadInterfaceProposals(nodeId, items) {
-      set({ interfaceProposals: { nodeId, items } });
-    },
-
-    acceptInterfaceProposal(id) {
-      const { interfaceProposals, nodes } = get();
-      const proposal = interfaceProposals?.items.find((candidate) => candidate.id === id);
-      const node = nodes.find((candidate) => candidate.id === interfaceProposals?.nodeId);
-      if (!interfaceProposals || !proposal || !node) return;
-
-      // Each kind lands through the same field the editor writes, under the
-      // same caps — an accepted proposal is indistinguishable from a typed one.
-      // The rationale is display only, never stored (see acceptProposal).
-      const patch = ((): Partial<SdNode['data']> | null => {
-        switch (proposal.kind) {
-          case 'operation': {
-            const operations = node.data.operations ?? [];
-            if (operations.length >= NODE_MAX_OPERATIONS) return null;
-            if (operations.some((op) => op.name === proposal.operation.name)) return null;
-            return { operations: [...operations, proposal.operation] };
-          }
-          case 'config':
-            return { config: { ...(node.data.config ?? {}), [proposal.key]: proposal.value } };
-          case 'responsibility': {
-            const responsibilities = node.data.responsibilities ?? [];
-            if (responsibilities.length >= NODE_MAX_RESPONSIBILITIES) return null;
-            if (responsibilities.includes(proposal.text)) return null;
-            return { responsibilities: [...responsibilities, proposal.text] };
-          }
-        }
-      })();
-      const remaining = interfaceProposals.items.filter((candidate) => candidate.id !== id);
-      if (patch === null) {
-        set({ interfaceProposals: { ...interfaceProposals, items: remaining } });
-        return;
-      }
-      set({
-        nodes: nodes.map((candidate) =>
-          candidate.id === node.id
-            ? { ...candidate, data: { ...candidate.data, ...patch } }
-            : candidate,
-        ),
-        interfaceProposals: { ...interfaceProposals, items: remaining },
-        dirty: true,
-      });
-    },
-
-    dismissInterfaceProposal(id) {
-      const { interfaceProposals } = get();
-      if (!interfaceProposals?.items.some((candidate) => candidate.id === id)) return;
-      set({
-        interfaceProposals: {
-          ...interfaceProposals,
-          items: interfaceProposals.items.filter((candidate) => candidate.id !== id),
-        },
-      });
+      set({ bindings: brief?.bindings.map((binding) => ({ ...binding })) ?? [] });
     },
 
     markClean() {
@@ -718,18 +480,19 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       return toCanvasGraph(nodes, edges);
     },
 
-    serializeBrief() {
-      const { nodes, edges, briefBindings, briefFlows } = get();
-      return reconcileBrief(briefBindings, briefFlows, toCanvasGraph(nodes, edges));
+    serializeBrief(criteria) {
+      const { nodes, edges, bindings } = get();
+      return reconcileBrief(bindings, toCanvasGraph(nodes, edges), criteria);
     },
 
-    serializeNarrative() {
-      const { nodes, edges, narrativeOverview, componentRationales, flowNarrations } = get();
+    serializeNarrative(criteria) {
+      const { nodes, edges, narrativeOverview, componentRationales, criterionNarrations } = get();
       return reconcileNarration(
         narrativeOverview,
         componentRationales,
-        flowNarrations,
+        criterionNarrations,
         toCanvasGraph(nodes, edges),
+        criteria,
       );
     },
   }));

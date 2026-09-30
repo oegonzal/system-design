@@ -1,8 +1,8 @@
 import styled from '@emotion/styled';
 import type { QualityRunSummaryDto } from '@sysdesign/contracts';
-import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
+import { Badge, DECISION_TONE, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
-import { DECISION_TONE, STATUS_TONE } from '../results/tones';
+import { STATUS_TONE } from '../results/tones';
 
 const RowButton = styled.button`
   all: unset;

@@ -1,117 +1,112 @@
+import { DEFAULT_IMPROVE_ITERATIONS, MAX_IMPROVE_ITERATIONS } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { makeImprovementRun } from '../../testing/fixtures';
-import { ImprovementPanel } from './improvement-panel';
+import { makeImproveRun } from '../../testing/fixtures';
+import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
+const LIVE = { enabled: true, model: 'claude', reason: null } as const;
+
+function renderPanel(overrides: Partial<ImprovementPanelProps> = {}) {
+  renderWithTheme(
+    <ImprovementPanel
+      run={null}
+      error={null}
+      isPolling={false}
+      message=""
+      availability={LIVE}
+      onStart={noop}
+      onLoadRevision={noop}
+      {...overrides}
+    />,
+  );
+}
 
 describe('ImprovementPanel', () => {
-  it('explains the coach when idle, including an honest disabled reason', () => {
-    renderWithTheme(
-      <ImprovementPanel
-        run={null}
-        error={null}
-        isPolling={false}
-        message=""
-        availability={{ enabled: false, model: null, reason: 'no-key' }}
-        onCancel={noop}
-        onLoadRevision={noop}
-      />,
+  it('[UX-11] offers 1..MAX iterations, defaulting to the contract default, and starts with the chosen count', async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderPanel({ onStart });
+
+    const select = screen.getByTestId('improve-iterations') as HTMLSelectElement;
+    expect([...select.options].map((option) => option.value)).toEqual(
+      Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, index) => String(index + 1)),
     );
+    expect(select.value).toBe(String(DEFAULT_IMPROVE_ITERATIONS));
+
+    await user.selectOptions(select, '2');
+    await user.click(screen.getByTestId('improve-run'));
+    expect(onStart).toHaveBeenCalledWith(2);
+  });
+
+  it('disables the coach with an honest reason when the grader is off', () => {
+    renderPanel({ availability: { enabled: false, model: null, reason: 'no-key' } });
+    expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('improver-unavailable').textContent).toContain('ANTHROPIC_API_KEY');
   });
 
-  it('renders the live trajectory with accepted/rejected verdicts and a stop control', () => {
-    renderWithTheme(
-      <ImprovementPanel
-        run={makeImprovementRun({
-          status: 'running',
-          iterations: [
-            {
-              iteration: 0,
-              proposer: 'baseline',
-              description: 'The design as submitted.',
-              score: 41,
-              accepted: true,
-              revisionId: 'rev-1',
-            },
-            {
-              iteration: 1,
-              proposer: 'llm',
-              description: 'Add a read replica.',
-              score: 55,
-              accepted: true,
-              revisionId: 'rev-2',
-            },
-            {
-              iteration: 2,
-              proposer: 'llm',
-              description: 'Rename a label.',
-              score: 55,
-              accepted: false,
-              revisionId: null,
-              rejectedReason: 'not-better',
-            },
-          ],
-        })}
-        error={null}
-        isPolling
-        message="Coach iteration 2 of 6 — score 55."
-        availability={{ enabled: true, model: 'claude', reason: null }}
-        onCancel={noop}
-        onLoadRevision={noop}
-      />,
-    );
+  it('says so when the quality loop cannot even be reached', () => {
+    renderPanel({ availability: { enabled: false, model: null, reason: null } });
+    expect(screen.getByTestId('improver-unavailable').textContent).toContain('cannot reach');
+  });
 
-    expect(screen.getByTestId('improve-iteration-0').textContent).toContain('baseline');
-    expect(screen.getByTestId('improve-iteration-1').textContent).toContain('accepted');
-    expect(screen.getByTestId('improve-iteration-2').textContent).toContain('not better');
-    expect(screen.getByTestId('cancel-improvement')).toBeTruthy();
-    // No load button while the run is still active.
+  it('[UX-11] renders the live run: model calls so far and one row per iteration', () => {
+    renderPanel({
+      run: makeImproveRun({
+        exchangeCount: 7,
+        iterations: [
+          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
+          { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
+          { iteration: 3, mode: 'revise', overall: 70, decision: 'revise', revisionId: null },
+        ],
+      }),
+      isPolling: true,
+      message: 'Coaching — 7 model calls so far.',
+    });
+
+    expect(screen.getByText('Coaching — 7 model calls so far…')).toBeTruthy();
+    expect(screen.getByTestId('improve-iteration-1').textContent).toContain('your draft');
+    expect(screen.getByTestId('improve-iteration-2').textContent).toContain('imported');
+    expect(screen.getByTestId('improve-iteration-3').textContent).toContain('not better');
+    expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByTestId('load-best-revision')).toBeNull();
   });
 
-  it('offers to load the best revision once completed, wired to its id', async () => {
+  it('[UX-11] once stopped, explains why and offers the best imported revision', async () => {
     const onLoadRevision = vi.fn();
-    renderWithTheme(
-      <ImprovementPanel
-        run={makeImprovementRun({
-          status: 'completed',
-          stoppedReason: 'plateau',
-          bestRevisionId: 'rev-9',
-          iterations: [
-            {
-              iteration: 0,
-              proposer: 'baseline',
-              description: 'The design as submitted.',
-              score: 41,
-              accepted: true,
-              revisionId: 'rev-1',
-            },
-            {
-              iteration: 1,
-              proposer: 'llm',
-              description: 'Add a walkthrough.',
-              score: 72,
-              accepted: true,
-              revisionId: 'rev-9',
-            },
-          ],
-        })}
-        error={null}
-        isPolling={false}
-        message="Coach finished."
-        availability={{ enabled: true, model: 'claude', reason: null }}
-        onCancel={noop}
-        onLoadRevision={onLoadRevision}
-      />,
-    );
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'plateau',
+        iterations: [
+          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
+          { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
+          { iteration: 3, mode: 'revise', overall: 80, decision: 'accept', revisionId: 'rev-3' },
+        ],
+      }),
+      onLoadRevision,
+    });
 
     expect(screen.getByTestId('improvement-stopped').textContent).toContain('plateaued');
     await userEvent.click(screen.getByTestId('load-best-revision'));
-    expect(onLoadRevision).toHaveBeenCalledWith('rev-9');
+    expect(onLoadRevision).toHaveBeenCalledWith('rev-3');
+  });
+
+  it('offers nothing to load when no iteration beat the draft', () => {
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'max-iterations',
+        iterations: [
+          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
+          { iteration: 2, mode: 'revise', overall: 60, decision: 'revise', revisionId: null },
+        ],
+      }),
+    });
+    expect(screen.getByTestId('improvement-stopped').textContent).toContain('iteration budget');
+    expect(screen.queryByTestId('load-best-revision')).toBeNull();
   });
 });

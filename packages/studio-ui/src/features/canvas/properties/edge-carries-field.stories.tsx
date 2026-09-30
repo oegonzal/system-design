@@ -19,30 +19,45 @@ function Controlled({
   return <EdgeCarriesField {...props} carries={carries} onChange={setCarries} />;
 }
 
-const orderServiceOps = [
-  { name: 'placeOrder', kind: 'command' as const },
-  { name: 'getOrder', kind: 'query' as const, idempotent: true },
-];
+const client = { label: 'Client', operations: [] };
+const orderService = {
+  label: 'Order Service',
+  operations: [
+    { name: 'placeOrder', kind: 'command' as const },
+    { name: 'getOrder', kind: 'query' as const, idempotent: true },
+  ],
+};
+const orderQueue = {
+  label: 'Order Queue',
+  operations: [{ name: 'OrderPlaced', kind: 'event' as const }],
+};
 
 /** A call edge exercising one of the callee's two declared endpoints. */
 export const DeclaredAndCarried: Story = {
-  render: () => (
-    <Controlled ownerLabel="Order Service" declaredOps={orderServiceOps} initial={['placeOrder']} />
-  ),
+  render: () => <Controlled source={client} target={orderService} initial={['placeOrder']} />,
 };
 
-/** A carry the owner never declared: warning chip, hint, still removable. */
-export const UndeclaredCarry: Story = {
+/** A consume edge: the queue is the source, and its event is the candidate. */
+export const FromTheSource: Story = {
   render: () => (
     <Controlled
-      ownerLabel="Order Service"
-      declaredOps={orderServiceOps}
-      initial={['placeOrder', 'chargeCard']}
+      source={orderQueue}
+      target={{ label: 'Fulfillment Worker', operations: [] }}
+      initial={['OrderPlaced']}
     />
   ),
 };
 
-/** The owner declares nothing yet — the field says so instead of going blank. */
-export const OwnerUndeclared: Story = {
-  render: () => <Controlled ownerLabel="Order Queue" declaredOps={[]} initial={[]} />,
+/** A carry that outlived its declaration: a stale chip, removable and nothing more. */
+export const StaleCarry: Story = {
+  render: () => (
+    <Controlled source={client} target={orderService} initial={['placeOrder', 'chargeCard']} />
+  ),
+};
+
+/** Neither end declares anything yet — the field says so instead of going blank. */
+export const NothingDeclared: Story = {
+  render: () => (
+    <Controlled source={client} target={{ label: 'Orders DB', operations: [] }} initial={[]} />
+  ),
 };

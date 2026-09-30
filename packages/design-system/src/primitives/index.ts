@@ -1,4 +1,5 @@
 export * from './badge/badge';
+export * from './badge/tones';
 export * from './button/button';
 export * from './field/checkbox-field';
 export * from './field/select-field';
@@ -7,6 +8,7 @@ export * from './field/text-field';
 export * from './heading/heading';
 export * from './live-region/live-region';
 export * from './meter/meter';
+export * from './preformatted-text/preformatted-text';
 export * from './skeleton/skeleton';
 export * from './skip-link/skip-link';
 export * from './spinner/spinner';

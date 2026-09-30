@@ -26,7 +26,12 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:05:17.000Z',
   llm: { enabled: true, model: 'test-model', reason: null },
-  request: { goal: PROMPT_MARKDOWN, outputProvided: false, maxIterations: 1 },
+  request: {
+    goal: PROMPT_MARKDOWN,
+    outputProvided: false,
+    criteriaProvided: false,
+    maxIterations: 1,
+  },
   trace: makeTrace(),
   exchanges: [
     {
@@ -196,7 +201,12 @@ export const makeTwoIterationRun = (): QualityRunDto => {
   });
   return makeRun({
     finishedAt: '2026-09-06T00:10:30.000Z',
-    request: { goal: PROMPT_MARKDOWN, outputProvided: false, maxIterations: 3 },
+    request: {
+      goal: PROMPT_MARKDOWN,
+      outputProvided: false,
+      criteriaProvided: false,
+      maxIterations: 3,
+    },
     trace: makeTrace({
       iterations: [first, second],
       bestIteration: 2,

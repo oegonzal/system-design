@@ -6,13 +6,20 @@ import type {
   PromptLibraryEntryDto,
   QualityRunSummaryDto,
 } from '@sysdesign/contracts';
-import { Heading, LiveRegion, Spinner, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Heading,
+  LiveRegion,
+  PreformattedText,
+  Spinner,
+  Stack,
+  Surface,
+  Text,
+} from '@sysdesign/design-system';
 import { isAbortError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
-import { PrewrapText } from '../../components/prewrap-text';
 import { RunResults } from '../results/run-results';
 import { RecentRuns } from './recent-runs';
 import { RunControls } from './run-controls';
@@ -154,7 +161,7 @@ export function RunWorkspace() {
       {documentError && <Text tone="secondary">{documentError}</Text>}
       {document && (
         <Surface as="section">
-          <PrewrapText label={document.title} text={document.markdown} />
+          <PreformattedText label={document.title} text={document.markdown} />
         </Surface>
       )}
 

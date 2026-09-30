@@ -1,4 +1,3 @@
-import { EVAL_DIMENSIONS } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -7,77 +6,65 @@ import { makeEvaluation } from '../../testing/fixtures';
 import { ScoreSummary } from './score-summary';
 
 describe('ScoreSummary', () => {
-  it('shows the overall score, grade badge and summary', () => {
+  it('[EVAL-1] shows the overall score, the decision and why the loop stopped', () => {
     renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
 
     expect(screen.getByTestId('overall-score').textContent).toBe('72');
-    expect(screen.getByText('grade B')).toBeTruthy();
-    expect(screen.getByText(/reliability is the weak dimension/i)).toBeTruthy();
+    expect(screen.getByTestId('decision-badge').textContent).toBe('revise');
+    expect(screen.getByTestId('stop-reason').textContent).toBe('Max iterations');
   });
 
-  it('renders one meter per rubric dimension, in contract order', () => {
+  it('[EVAL-1] renders one meter per dimension the pipeline reported, keyed by its own name', () => {
     renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
 
     const meters = screen.getAllByRole('meter');
-    expect(meters).toHaveLength(EVAL_DIMENSIONS.length);
+    expect(meters).toHaveLength(3);
+    expect(meters.map((meter) => meter.getAttribute('aria-valuenow'))).toEqual(['80', '60', '90']);
+    // The key is stamped verbatim; the label reads as words.
+    expect(document.querySelector('[data-dimension="quality_attributes"]')).toBeTruthy();
+    expect(screen.getByText('Quality attributes')).toBeTruthy();
+  });
 
-    const evaluation = makeEvaluation();
-    EVAL_DIMENSIONS.forEach((dimension, index) => {
-      expect(meters[index].getAttribute('aria-valuenow')).toBe(
-        String(evaluation.dimensionScores?.[dimension]),
-      );
-    });
-    // Order follows the contract tuple, not insertion order.
-    expect(
-      screen.getByText('reliability').compareDocumentPosition(screen.getByText('hygiene')),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  it('renders whatever dimensions arrive — a pipeline with other names needs no edit here', () => {
+    renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({ dimensions: { fidelity: 40, gradeability: 55, scope: 100 } })}
+      />,
+    );
+    expect(screen.getAllByRole('meter')).toHaveLength(3);
+    expect(document.querySelector('[data-dimension="fidelity"]')).toBeTruthy();
   });
 
   it('renders a null dimension as "Not assessed" with no meter', () => {
-    const evaluation = makeEvaluation();
     renderWithTheme(
       <ScoreSummary
         evaluation={makeEvaluation({
-          dimensionScores: { ...evaluation.dimensionScores!, security: null },
+          dimensions: { coverage: 80, quality_attributes: null, compliance: 90 },
         })}
       />,
     );
 
-    expect(screen.getAllByRole('meter')).toHaveLength(EVAL_DIMENSIONS.length - 1);
-    const row = screen.getByTestId('not-assessed-security');
-    expect(row.textContent).toContain('security');
+    expect(screen.getAllByRole('meter')).toHaveLength(2);
+    const row = screen.getByTestId('not-assessed-quality_attributes');
+    expect(row.textContent).toContain('Quality attributes');
     expect(row.textContent).toContain('Not assessed');
-    // No measurement is exposed for the unassessed dimension.
     expect(row.querySelector('[aria-valuenow]')).toBeNull();
   });
 
-  it('renders a placeholder when scores are not present yet', () => {
+  it('renders a placeholder when the loop escalated without a score', () => {
     renderWithTheme(
       <ScoreSummary
         evaluation={makeEvaluation({
-          overallScore: null,
-          grade: null,
-          dimensionScores: null,
-          summary: null,
+          overall: null,
+          decision: 'escalate',
+          stopReason: 'escalated',
+          dimensions: {},
         })}
       />,
     );
 
     expect(screen.getByTestId('overall-score').textContent).toBe('—');
+    expect(screen.getByTestId('decision-badge').textContent).toBe('escalate');
     expect(screen.queryAllByRole('meter')).toHaveLength(0);
-  });
-});
-
-/**
- * A score out of 100 invites the reading that 100 means the design is good,
- * rather than that nothing the engine checks is missing. The gap is where a
- * reviewer's first questions live, so the panel names it.
- */
-describe('ScoreSummary — the edge of the rubric', () => {
-  it('names what it does not assess at all', () => {
-    renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
-    const text = screen.getByTestId('unassessed-areas').textContent ?? '';
-    expect(text).toContain('cost');
-    expect(text).toContain('migration and rollout');
   });
 });

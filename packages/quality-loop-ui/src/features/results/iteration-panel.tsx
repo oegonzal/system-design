@@ -1,10 +1,17 @@
 import type { IterationTrace, SuccessCriterion } from '@sysdesign/contracts';
-import { Badge, Heading, Meter, Stack, Text } from '@sysdesign/design-system';
+import {
+  Badge,
+  DECISION_TONE,
+  Heading,
+  Meter,
+  PreformattedText,
+  Stack,
+  Text,
+} from '@sysdesign/design-system';
 
-import { PrewrapText } from '../../components/prewrap-text';
 import { EvidencePanel } from './evidence-panel';
 import { criteriaRows, dimensionRows, findingGroups, GATE_ORDER } from './select';
-import { DECISION_TONE, GATE_TONE, STEP_TONE } from './tones';
+import { GATE_TONE, STEP_TONE } from './tones';
 
 export interface IterationPanelProps {
   iteration: IterationTrace;
@@ -84,7 +91,7 @@ export function IterationPanel({ iteration, criteria }: IterationPanelProps) {
         diagnostics={ledger.diagnostics}
       />
 
-      <PrewrapText
+      <PreformattedText
         label="Rendered artifact"
         text={iteration.rendered ?? 'No artifact was produced.'}
       />

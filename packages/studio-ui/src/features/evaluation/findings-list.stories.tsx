@@ -1,16 +1,13 @@
 import { SEVERITIES } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeFinding } from '../../testing/fixtures';
+import { makeCriteria, makeFinding } from '../../testing/fixtures';
 import { FindingsList } from './findings-list';
 
 const meta: Meta<typeof FindingsList> = {
   title: 'Studio/Evaluation/FindingsList',
   component: FindingsList,
-  args: {
-    onSelect: () => undefined,
-    onPreviewFix: () => undefined,
-  },
+  args: { criteria: makeCriteria(), onSelect: () => undefined },
 };
 export default meta;
 
@@ -19,30 +16,32 @@ type Story = StoryObj<typeof FindingsList>;
 /** A clean sheet. */
 export const Empty: Story = { args: { findings: [] } };
 
-/** The common case: a mix of rule and AI findings, one with a suggested fix. */
+/** The common case: defects from several lenses, one about the story rather than the boxes. */
 export const CompleteWithFindings: Story = {
   args: {
     findings: [
-      makeFinding(),
+      makeFinding({ lenses: ['critic.architecture', 'critic.scenarios'] }),
       makeFinding({
-        id: 'finding-2',
-        source: 'llm',
-        ruleId: null,
-        dimension: 'messaging',
+        id: 'unbacked_claim|binding.2',
+        lenses: ['critic.explanation'],
+        type: 'unbacked_claim',
         severity: 'medium',
-        title: 'Order events fan out synchronously',
-        message:
-          'Every downstream consumer extends checkout latency; an event stream decouples them.',
-        suggestion: null,
+        criterionIds: ['c3'],
+        nodeIds: ['n-3'],
+        locationRefs: ['binding.2', 'node.3'],
+        rationale:
+          'The brief says a replica keeps reads under budget, but the canvas draws no replica.',
+        reconciledTo: 'c3',
       }),
       makeFinding({
-        id: 'finding-3',
-        dimension: 'hygiene',
+        id: 'operability_gap|node.2',
+        lenses: ['critic.architecture'],
+        type: 'operability_gap',
         severity: 'info',
-        ruleId: 'hygiene.unlabeled-edges',
-        title: 'Unlabeled connections',
-        message: 'Labels turn a diagram into an argument.',
-        suggestion: null,
+        criterionIds: [],
+        nodeIds: ['n-2'],
+        locationRefs: ['node.2'],
+        rationale: 'Nothing watches the service; the goal asks for observability.',
       }),
     ],
   },
@@ -51,13 +50,8 @@ export const CompleteWithFindings: Story = {
 /** One finding per severity, proving the urgency ordering and chip colors. */
 export const AllSeverities: Story = {
   args: {
-    findings: SEVERITIES.map((severity, index) =>
-      makeFinding({
-        id: `finding-${severity}`,
-        severity,
-        title: `A ${severity} finding`,
-        suggestion: index === 0 ? makeFinding().suggestion : null,
-      }),
+    findings: SEVERITIES.map((severity) =>
+      makeFinding({ id: `finding-${severity}`, severity, locationRefs: ['node.3'] }),
     ),
   },
 };

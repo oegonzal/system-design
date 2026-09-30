@@ -3,20 +3,15 @@
 import styled from '@emotion/styled';
 import {
   NODE_MAX_OPERATIONS,
-  OPERATION_MAX_EMITS,
+  OPERATION_KINDS,
   OPERATION_NAME_MAX_LENGTH,
   OPERATION_NOTES_MAX_LENGTH,
-  fulfillableItems,
-  isApiLikeRole,
-  type InterfaceRole,
   type NodeOperation,
   type OperationKind,
-  type WorkflowSpec,
 } from '@sysdesign/contracts';
 import {
   Button,
   CheckboxField,
-  Heading,
   SelectField,
   Stack,
   Text,
@@ -25,20 +20,7 @@ import {
 
 export interface OperationsEditorProps {
   operations: NodeOperation[];
-  /** The kinds this node's capability row allows — the select offers nothing else. */
-  allowedKinds: readonly OperationKind[];
-  /** "Operations" for api-role kinds, "Message types" for channels. */
-  heading: string;
   onChange: (operations: NodeOperation[]) => void;
-  /**
-   * The prompt's business layer plus this node's interface role, when the
-   * session's prompt carries a workflow spec. Absent (the default) the
-   * workflow controls render nothing and every existing call site is
-   * untouched. The select offers only ids the spec declares for this role
-   * and the row's kind — an ineligible pick is unrepresentable here; a
-   * hand-crafted payload is the API validator's business.
-   */
-  workflow?: { spec: WorkflowSpec; role: InterfaceRole } | null;
 }
 
 const Row = styled.div`
@@ -73,70 +55,35 @@ function duplicateIndexes(operations: NodeOperation[]): Set<number> {
   return duplicates;
 }
 
-/**
- * The declared-interface list: one row per operation (endpoint or message
- * type, depending on the node's role). Purely controlled — every keystroke
- * flows through `onChange`, so the canvas store stays the source of truth.
- */
-export function OperationsEditor({
-  operations,
-  allowedKinds,
-  heading,
-  onChange,
-  workflow = null,
-}: OperationsEditorProps) {
-  if (allowedKinds.length === 0) return null;
+/** The row with its verb set, or with the key removed when the author leaves it unstated. */
+function withKind(operation: NodeOperation, value: string): NodeOperation {
+  const next: NodeOperation = { ...operation };
+  if (value.length > 0) next.kind = value as OperationKind;
+  else delete next.kind;
+  return next;
+}
 
+/**
+ * The declared-interface list: one row per operation — name, verb,
+ * idempotency, a note. Any kind may declare any operation; whether a queue
+ * should serve a query is the architecture critic's call, not a form rule.
+ * Purely controlled — every keystroke flows through `onChange`, so the canvas
+ * store stays the source of truth.
+ */
+export function OperationsEditor({ operations, onChange }: OperationsEditorProps) {
   const duplicates = duplicateIndexes(operations);
   const atCap = operations.length >= NODE_MAX_OPERATIONS;
 
-  const patchRow = (index: number, patch: Partial<NodeOperation>) => {
-    onChange(
-      operations.map((operation, current) =>
-        current === index ? { ...operation, ...patch } : operation,
-      ),
-    );
+  const replaceRow = (index: number, next: NodeOperation) => {
+    onChange(operations.map((operation, current) => (current === index ? next : operation)));
   };
-
-  /** What THIS row may claim, given its current kind. */
-  const fulfillableFor = (operation: NodeOperation) =>
-    workflow === null ? [] : fulfillableItems(workflow.spec, workflow.role, operation.kind);
-
-  /**
-   * A kind flip after a Fulfills pick, emissions left on an ineligible row,
-   * or two rows claiming the same item. The first two are warned, never
-   * cleared or blocked: silently deleting a claim is hostile, the API
-   * accepts both shapes, and the evaluation grades them — this ink previews
-   * the finding. The duplicate is warned because the API would 422 it, the
-   * same posture as the duplicate-name warning below.
-   */
-  const workflowWarning = (operation: NodeOperation): string | null => {
-    if (workflow === null) return null;
-    if (
-      operation.fulfills !== undefined &&
-      operations.filter((sibling) => sibling.fulfills === operation.fulfills).length > 1
-    ) {
-      return 'Two rows on this component fulfil the same requirement — the save would be rejected. Keep one claim.';
-    }
-    if (
-      operation.fulfills !== undefined &&
-      !fulfillableFor(operation).some((item) => item.id === operation.fulfills)
-    ) {
-      return `This row's kind no longer matches the linked requirement (${operation.fulfills}) — the evaluation will grade the mismatch.`;
-    }
-    if (
-      (operation.emits ?? []).length > 0 &&
-      (operation.kind !== 'command' || !isApiLikeRole(workflow.role))
-    ) {
-      return 'Only commands on api or event-driven components produce events — untick these emissions or move them to the command that causes them.';
-    }
-    return null;
+  const patchRow = (index: number, patch: Partial<NodeOperation>) => {
+    const operation = operations[index];
+    if (operation) replaceRow(index, { ...operation, ...patch });
   };
 
   return (
     <Stack gap={3} data-testid="operations-editor">
-      <Heading level={4}>{heading}</Heading>
-
       {operations.map((operation, index) => {
         // Screen readers and tests name a row by what it declares; a row
         // still being typed falls back to its 1-based position.
@@ -157,10 +104,15 @@ export function OperationsEditor({
             />
             <SelectField
               label="Kind"
-              value={operation.kind}
-              onChange={(event) => patchRow(index, { kind: event.target.value as OperationKind })}
+              value={operation.kind ?? ''}
+              onChange={(event) =>
+                // "Not stated" deletes the key: the schema's kind is optional,
+                // and an empty string is not one of its values.
+                replaceRow(index, withKind(operation, event.target.value))
+              }
             >
-              {allowedKinds.map((kind) => (
+              <option value="">Not stated</option>
+              {OPERATION_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
                   {kind}
                 </option>
@@ -177,83 +129,6 @@ export function OperationsEditor({
               maxLength={OPERATION_NOTES_MAX_LENGTH}
               onChange={(event) => patchRow(index, { notes: event.target.value })}
             />
-            {workflow !== null && fulfillableFor(operation).length > 0 ? (
-              <SelectField
-                label="Fulfills"
-                data-testid={`operation-fulfills-${index}`}
-                value={operation.fulfills ?? ''}
-                onChange={(event) =>
-                  // "Not linked" DELETES the claim: an empty string would
-                  // parse at the DTO and then 422 as an unknown id.
-                  patchRow(index, {
-                    fulfills: event.target.value.length > 0 ? event.target.value : undefined,
-                  })
-                }
-              >
-                <option value="">Not linked</option>
-                {fulfillableFor(operation).map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
-                ))}
-              </SelectField>
-            ) : null}
-            {workflow !== null && fulfillableFor(operation).length > 0 ? (
-              <Text size="sm" tone="muted" data-testid={`fulfills-guide-${index}`}>
-                Which item of the prompt&apos;s workflow this operation realizes — claimed by
-                reference and corroborated by the connections that exercise it, never by name.
-              </Text>
-            ) : null}
-            {workflow !== null
-              ? (() => {
-                  const emits = operation.emits ?? [];
-                  const emitsAtCap = emits.length >= OPERATION_MAX_EMITS;
-                  const mayEmit = isApiLikeRole(workflow.role) && operation.kind === 'command';
-                  // Rendered for eligible rows, and ALSO whenever emissions
-                  // already exist: a kind or role flip must never strand
-                  // claims behind vanished checkboxes the author cannot
-                  // untick (the API rejects ineligible emissions).
-                  if (!mayEmit && emits.length === 0) return null;
-                  const shown = mayEmit
-                    ? workflow.spec.events
-                    : workflow.spec.events.filter((event) => emits.includes(event.id));
-                  return shown.length > 0 ? (
-                    <Stack gap={2} role="group" aria-label={`Emits for ${displayName}`}>
-                      <Text as="span" size="sm" tone="muted">
-                        Emits ({emits.length} of {OPERATION_MAX_EMITS}) — the prompt&apos;s events
-                        this command publishes when it runs; the producer half of each event&apos;s
-                        story.
-                      </Text>
-                      {shown.map((event) => {
-                        const checked = emits.includes(event.id);
-                        return (
-                          <CheckboxField
-                            key={event.id}
-                            label={event.statement}
-                            data-testid={`operation-emit-${index}-${event.id}`}
-                            checked={checked}
-                            // Inert at the cap, the EdgeCarriesField pattern.
-                            disabled={!checked && emitsAtCap}
-                            onChange={(changeEvent) => {
-                              const next = changeEvent.target.checked
-                                ? [...emits, event.id]
-                                : emits.filter((id) => id !== event.id);
-                              patchRow(index, {
-                                emits: next.length > 0 ? next : undefined,
-                              });
-                            }}
-                          />
-                        );
-                      })}
-                    </Stack>
-                  ) : null;
-                })()
-              : null}
-            {workflowWarning(operation) !== null ? (
-              <DuplicateWarning size="sm" data-testid={`operation-workflow-warning-${index}`}>
-                {workflowWarning(operation)}
-              </DuplicateWarning>
-            ) : null}
             {duplicates.has(index) ? (
               // UI guard for the API's 422: the save would be rejected anyway,
               // so say it here, next to the offending name.
@@ -275,7 +150,7 @@ export function OperationsEditor({
       <Stack direction="row" align="center" justify="between">
         <Button
           disabled={atCap}
-          onClick={() => onChange([...operations, { name: '', kind: allowedKinds[0] }])}
+          onClick={() => onChange([...operations, { name: '', kind: OPERATION_KINDS[0] }])}
         >
           Add operation
         </Button>
