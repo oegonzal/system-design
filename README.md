@@ -33,7 +33,7 @@ Kubernetes enabled, [Tilt](https://docs.tilt.dev/install.html).
 
 ```bash
 bash scripts/setup.sh   # verifies the toolchain, installs dependencies
-tilt up                 # postgres → migrations → seed → api → quality loop → web
+tilt up                 # stores → migrations → seed → api, quality loop, govcon → web apps
 ```
 
 | Service         | Where                                                |
@@ -43,7 +43,9 @@ tilt up                 # postgres → migrations → seed → api → quality l
 | Govcon UI       | http://localhost:4202                                |
 | API             | http://localhost:3000/api                            |
 | Quality loop    | http://localhost:3003/health                         |
-| Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
+| Govcon          | http://localhost:3004/health                         |
+| Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
+| Qdrant          | http://localhost:6333                                |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
 Grading needs a model, and the quality loop runs only on a Claude Code
@@ -57,20 +59,20 @@ none ran. An API key in the environment is never used. No test calls a model:
 the loop's specs script a fake client, and the studio's specs and the e2e stub
 share one fake loop (`packages/studio-testing`).
 
-### Without Kubernetes — durable local stack
+### Without Kubernetes — the same stack as local processes
 
-If you're not running Tilt/k8s, `pnpm stack:up` brings the whole stack up
-against a **durable** Postgres (a `docker-compose` service on port **5433**
-with a named volume, so your practice runs survive a shutdown or reboot and
-come back on the next `pnpm stack:up`):
+If you're not running Tilt/k8s, `pnpm stack:up` brings the same stack up with
+the backends as processes on this machine. Both launchers use one **durable**
+Postgres and Qdrant (the quality loop's memory store): the `docker-compose`
+services on ports **5433** and **6333**, with named volumes, so your practice
+runs survive a shutdown or reboot and either launcher shows the same ones.
+`tilt up` starts them through `pnpm stack:db` and `tilt down` leaves them
+running.
 
 ```bash
 pnpm stack:up     # durable db + vector store → migrate → seed → api + quality loop + ui
 pnpm stack:down   # stop db + vector store (data persists in the named volumes)
 ```
-
-The compose stack also starts Qdrant (the quality loop's memory store, service
-`vectors`, `localhost:6333`) — compose only, not under Tilt.
 
 Past runs re-appear on the Dashboard, since every session, design and grading
 run is a Postgres row. See **[RUNBOOK.md](./RUNBOOK.md)** for the persistence

@@ -1,0 +1,35 @@
+load('../../tilt/dotenv.Tiltfile', 'env_secret')
+
+docker_build(
+    'govcon',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'govcon'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './packages/contracts',
+        './packages/db',
+        './packages/nest-kit',
+        './packages/govcon',
+    ],
+)
+
+# SAM.gov's key, when there is one. Without it govcon still serves, with its
+# SAM.gov sources disabled and saying why.
+k8s_yaml(env_secret('govcon-sam', ['SAM_GOV_API_KEY']))
+
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+k8s_resource(
+    'govcon',
+    objects=['govcon-sam:secret'],
+    port_forwards=3004,
+    resource_deps=['db: migration:up'],
+    labels=['backend'],
+    links=['http://localhost:3004/health']
+)

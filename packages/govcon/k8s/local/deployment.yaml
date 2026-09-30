@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: govcon
+  labels:
+    app: govcon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: govcon
+  template:
+    metadata:
+      labels:
+        app: govcon
+    spec:
+      containers:
+        - name: govcon
+          image: govcon
+          # The HTTP surface. Without a command govcon prints its usage and
+          # exits 2.
+          args: ['serve']
+          ports:
+            - containerPort: 3004
+          # Everything else is a code default: the stores are on the host, and
+          # the SAM.gov key comes from the Secret the Tiltfile builds.
+          envFrom:
+            - configMapRef:
+                name: local-stores
+            - secretRef:
+                name: govcon-sam
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: govcon-service
+spec:
+  selector:
+    app: govcon
+  ports:
+    - protocol: TCP
+      port: 3004
+      targetPort: 3004
+  # In-cluster only: the host reaches it through Tilt's port-forward.
+  type: ClusterIP

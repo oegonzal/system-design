@@ -19,19 +19,12 @@ spec:
           image: studio-api
           ports:
             - containerPort: 3000
+          # Everything else is a code default: the stores are on the host, and
+          # the grader is the loop's Service rather than localhost.
+          envFrom:
+            - configMapRef:
+                name: local-stores
           env:
-            - name: DB_HOST
-              value: sysdesign-postgres-service
-            - name: DB_PORT
-              value: '5432'
-            - name: DB_USERNAME
-              value: admin
-            - name: DB_PASSWORD
-              value: admin
-            - name: DB_NAME
-              value: sysdesign
-            - name: CORS_ORIGIN
-              value: http://localhost:4200
             - name: QUALITY_LOOP_URL
               value: http://quality-loop-service:3003
 ---

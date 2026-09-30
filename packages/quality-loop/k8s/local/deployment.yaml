@@ -19,36 +19,26 @@ spec:
           image: quality-loop
           ports:
             - containerPort: 3003
-          env:
-            - name: DB_HOST
-              value: sysdesign-postgres-service
-            - name: DB_PORT
-              value: '5432'
-            - name: DB_USERNAME
-              value: admin
-            - name: DB_PASSWORD
-              value: admin
-            - name: DB_NAME
-              value: sysdesign
-            - name: QUALITY_LOOP_PORT
-              value: '3003'
-            - name: QUALITY_LOOP_CORS_ORIGIN
-              value: http://localhost:4201
-            # The loop runs only on a Claude Code subscription login. A pod has
-            # no `claude login`, so it signs in with the long-lived token that
-            # `claude setup-token` prints, from the Secret the Tiltfile builds.
-            # Without it the pod exits at boot with the loop's own message.
-            - name: CLAUDE_CODE_OAUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: quality-loop-model
-                  key: CLAUDE_CODE_OAUTH_TOKEN
-            - name: LLM_MODEL
-              valueFrom:
-                secretKeyRef:
-                  name: quality-loop-model
-                  key: LLM_MODEL
-                  optional: true
+          # Everything else is a code default. The stores are on the host; the
+          # model settings come from the Secret the Tiltfile builds. The loop
+          # runs only on a Claude Code subscription login, and a pod has no
+          # `claude login`, so it signs in with the CLAUDE_CODE_OAUTH_TOKEN
+          # that `claude setup-token` prints; without it the pod exits at boot
+          # with the loop's own message.
+          envFrom:
+            - configMapRef:
+                name: local-stores
+            - secretRef:
+                name: quality-loop-model
+          # The dump directory's default, `<cwd>/static/runs`, on a volume so
+          # the dumps outlive the pod.
+          volumeMounts:
+            - name: runs
+              mountPath: /app/static/runs
+      volumes:
+        - name: runs
+          persistentVolumeClaim:
+            claimName: quality-loop-runs
 ---
 apiVersion: v1
 kind: Service
@@ -65,3 +55,17 @@ spec:
   # LoadBalancer here makes Docker Desktop's Kubernetes publish 0.0.0.0:3003
   # too, and the two race for the port.
   type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quality-loop-runs
+  annotations:
+    # `tilt down` keeps the dumps, as it keeps the stores.
+    tilt.dev/down-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

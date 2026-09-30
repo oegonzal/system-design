@@ -1,0 +1,9 @@
+load('../../tilt/toolchain.Tiltfile', 'tool_env')
+
+local_resource(
+    'govcon-ui: serve',
+    serve_cmd='nx run govcon-ui:serve',
+    serve_env=tool_env(),
+    links=['http://localhost:4202'],
+    labels=['frontend']
+)

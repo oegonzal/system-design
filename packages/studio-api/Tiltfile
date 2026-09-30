@@ -1,5 +1,3 @@
-load('../../tilt/toolchain.Tiltfile', 'tool_env')
-
 docker_build(
     'studio-api',
     '../../',
@@ -12,12 +10,8 @@ docker_build(
         './nx.json',
         './tsconfig.base.json',
         './vite.nest.ts',
-        './docker',
         './packages/contracts',
-        './packages/criteria',
         './packages/db',
-        './packages/llm',
-        './packages/run-dump',
         './packages/nest-kit',
         './packages/studio-api',
     ],

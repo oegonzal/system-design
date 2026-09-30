@@ -1,4 +1,4 @@
-load('../../tilt/toolchain.Tiltfile', 'tool_env')
+load('../../tilt/dotenv.Tiltfile', 'env_secret', 'env_value')
 
 docker_build(
     'quality-loop',
@@ -12,53 +12,22 @@ docker_build(
         './nx.json',
         './tsconfig.base.json',
         './vite.nest.ts',
-        './docker',
         './packages/contracts',
-        './packages/criteria',
         './packages/db',
         './packages/llm',
-        './packages/run-dump',
         './packages/nest-kit',
+        './packages/run-dump',
         './packages/quality-loop',
     ],
 )
 
 # The model. The loop runs only on a Claude Code subscription login, and a
 # pod has no `claude login` — so it signs in with the long-lived token
-# `claude setup-token` prints. The token comes from the shell that ran
-# `tilt up`, else from the repo's gitignored `.env` (read here, never
-# printed). The Secret is always built: with no token the pod starts and
-# exits 1 with the loop's own message, instead of hanging on a Secret that
-# does not exist. Warn here, because that exit is easy to misread.
-def _dotenv_value(raw):
-    """One value the way Node's --env-file reads it: a matched quote pair, or an unquoted value up to a `#`."""
-    raw = raw.strip()
-    if len(raw) >= 2 and raw[0] in ('"', "'"):
-        closing = raw.find(raw[0], 1)
-        if closing > 0:
-            return raw[1:closing]
-    if '#' in raw:
-        return raw[:raw.index('#')].strip()
-    return raw
-
-def _dotenv(path):
-    values = {}
-    for line in str(read_file(path, '')).splitlines():
-        line = line.strip()
-        if not line or line.startswith('#') or '=' not in line:
-            continue
-        key, value = line.split('=', 1)
-        key = key.strip()
-        if key.startswith('export '):
-            key = key[len('export '):].strip()
-        values[key] = _dotenv_value(value)
-    return values
-
-_ENV_FILE = _dotenv(config.main_dir + '/.env')
-_TOKEN_VAR = 'CLAUDE_CODE_OAUTH_TOKEN'
-_TOKEN = os.getenv(_TOKEN_VAR, '') or _ENV_FILE.get(_TOKEN_VAR, '')
-
-if not _TOKEN:
+# `claude setup-token` prints. With no token the pod starts and exits 1 with
+# the loop's own message, instead of hanging on a Secret that does not exist.
+# Warn here, because that exit is easy to misread. The embedding settings ride
+# along, so memory works in the pod as it does on this machine.
+if not env_value('CLAUDE_CODE_OAUTH_TOKEN'):
     warn(
         'quality-loop: no CLAUDE_CODE_OAUTH_TOKEN in this shell or in .env.\n'
         + '  The pod signs in to Claude Code with that token (a pod has no `claude login`),\n'
@@ -67,22 +36,18 @@ if not _TOKEN:
         + '  Fix: run `claude setup-token`, put CLAUDE_CODE_OAUTH_TOKEN=<token> in .env, then `tilt up`.'
     )
 
-k8s_yaml(encode_yaml({
-    'apiVersion': 'v1',
-    'kind': 'Secret',
-    'metadata': {'name': 'quality-loop-model'},
-    'type': 'Opaque',
-    'stringData': {
-        _TOKEN_VAR: _TOKEN,
-        'LLM_MODEL': os.getenv('LLM_MODEL', '') or _ENV_FILE.get('LLM_MODEL', ''),
-    },
-}))
+k8s_yaml(env_secret('quality-loop-model', [
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'LLM_MODEL',
+    'OPENAI_API_KEY',
+    'OPENAI_EMBEDDING_MODEL',
+]))
 
 k8s_yaml(['./k8s/local/deployment.yaml'])
 
 k8s_resource(
     'quality-loop',
-    objects=['quality-loop-model:secret'],
+    objects=['quality-loop-model:secret', 'quality-loop-runs:persistentvolumeclaim'],
     port_forwards=3003,
     resource_deps=['db: migration:up'],
     labels=['backend'],

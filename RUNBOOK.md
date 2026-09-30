@@ -46,10 +46,12 @@ vectors`) — Postgres image `postgres:16-alpine`, **named volume**
 
 `pnpm stack:down` stops both containers; the data stays in the named volumes.
 `pnpm stack:db` brings up only the database and the vector store (for
-tests/tools). The quality loop's memory runs need the vector store and, for
-live embeddings, `OPENAI_API_KEY` in `.env` (Node loads the file on `serve`
-and `quality-loop:run`); without either, memory steps skip with a stated
-reason and the target pipeline still runs.
+tests/tools). `tilt up` brings the same runs back: its `stores` resource runs
+`pnpm stack:db`, and its pods use these containers. The quality loop's memory
+runs need the vector store and, for live embeddings, `OPENAI_API_KEY` in
+`.env` (Node loads the file on `serve` and `quality-loop:run`); without
+either, memory steps skip with a stated reason and the target pipeline still
+runs.
 
 Because the volumes are named and the containers have `restart: unless-stopped`,
 the database and the vector store return on their own after a Docker or machine
@@ -212,16 +214,24 @@ stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
 - Port **5433** is the app's default (`packages/db/src/connection.ts`) and
   avoids a stale `:5432` container that may exist on a dev machine. Only CI
   sets `DB_PORT`, to its service's 5432.
-- This durable `docker-compose` stack is the canonical **local** database. The
-  committed Tilt/Kubernetes path (`tilt up`, `tilt/postgres/*`) is a separate,
-  independent database — don't mix them, or each will show only its own runs.
-  Under Tilt the loop signs in with `CLAUDE_CODE_OAUTH_TOKEN` from the Secret
+- This durable `docker-compose` stack is the one **local** database, whichever
+  launcher runs the apps. Under Tilt the pods reach Postgres and Qdrant on the
+  host through `host.docker.internal` (the `local-stores` ConfigMap in
+  `tilt/stores/`), and `tilt down` never stops them.
+- Under Tilt the loop signs in with `CLAUDE_CODE_OAUTH_TOKEN` from the Secret
   `quality-loop-model`, which `packages/quality-loop/Tiltfile` builds at
-  `tilt up` from the shell's variable, else from the repo's `.env` (a pod has
-  no `claude login`; `claude setup-token` prints the token). With neither Tilt
-  warns and the pod exits at boot with the loop's own message.
-- Under Tilt the host reaches the API (3000), the loop (3003) and Postgres
-  (5432) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+  `tilt up` from the shell's variables, else from the repo's `.env` (a pod has
+  no `claude login`; `claude setup-token` prints the token). `OPENAI_API_KEY`
+  and `OPENAI_EMBEDDING_MODEL` ride in the same Secret, so memory runs in the
+  pod as on this machine, and govcon's `SAM_GOV_API_KEY` reaches its pod the
+  same way, through the Secret `govcon-sam`. With no token Tilt warns and the
+  loop's pod exits at boot with the loop's own message.
+- Under Tilt the loop's audit dumps land on the volume claim
+  `quality-loop-runs`, mounted at its default `static/runs`, which outlives
+  restarts and `tilt down`. Copy them out with
+  `kubectl cp <quality-loop pod>:/app/static/runs <dir>`.
+- Under Tilt the host reaches the API (3000), the loop (3003) and govcon
+  (3004) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
   host-published container on the same port, racing Tilt's forward. A cluster
   that ran the old manifests may keep a Service stuck deleting, and then Tilt

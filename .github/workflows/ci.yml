@@ -114,13 +114,13 @@ jobs:
 
   images:
     # Regression guard for the "builds from a bare checkout" guarantee: no
-    # host-side dist/, no lockfile drift, both images always constructible.
+    # host-side dist/, no lockfile drift, every image always constructible.
     name: Docker images
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       matrix:
-        app: [studio-api, quality-loop]
+        app: [studio-api, quality-loop, govcon]
     steps:
       - uses: actions/checkout@v4
 

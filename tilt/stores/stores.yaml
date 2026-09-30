@@ -1,0 +1,11 @@
+# Where a pod reaches the stores: the docker-compose Postgres and Qdrant on the
+# host, through Docker Desktop's host.docker.internal. Only the host differs
+# from a process on this machine; the DB port, user, password and name are the
+# code defaults (packages/db/src/connection.ts).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-stores
+data:
+  DB_HOST: host.docker.internal
+  QDRANT_URL: http://host.docker.internal:6333

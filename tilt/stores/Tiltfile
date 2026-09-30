@@ -1,0 +1,22 @@
+load('../toolchain.Tiltfile', 'tool_env')
+
+# The stores are the docker-compose services, the one definition of Postgres
+# and Qdrant: `tilt up` and `pnpm stack:up` share the same containers, volumes
+# and data. Tilt only brings them up (a no-op when they already run) and waits
+# until both answer; a local_resource leaves nothing for `tilt down` to stop.
+local_resource(
+    'stores',
+    cmd='bash scripts/stack.sh db',
+    dir=config.main_dir,
+    env=tool_env(),
+    labels=['database']
+)
+
+# Where a pod finds them.
+k8s_yaml(['./stores.yaml'])
+
+k8s_resource(
+    new_name='stores: config',
+    objects=['local-stores:configmap'],
+    labels=['database']
+)

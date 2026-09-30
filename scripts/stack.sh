@@ -4,7 +4,7 @@
 # docker-compose Postgres. Brings runs back after any shutdown:
 #   pnpm stack:up     # db (durable) -> migrate -> seed -> api + quality loop + ui
 #   pnpm stack:down   # stop the db + vectors containers (data persists in the named volumes)
-#   pnpm stack:db     # database + vector store, ready for tests/tools
+#   pnpm stack:db     # database + vector store, ready for tests/tools (and `tilt up`)
 #
 # Grading, coaching and prompt generation are runs of the quality loop, which
 # runs on this machine's Claude Code subscription login and nothing else. It

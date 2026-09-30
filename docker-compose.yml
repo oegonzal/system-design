@@ -1,7 +1,8 @@
 # Canonical local-dev database for System Design Studio.
 #
 # Durable and self-restarting, so practice runs (sessions, designs, evaluations)
-# survive a shutdown or reboot and come back with `pnpm stack:up`:
+# survive a shutdown or reboot and come back with `pnpm stack:up` or `tilt up`,
+# which both start these same services:
 #   - a NAMED volume (`sysdesign-pgdata`) keeps the data on disk, reproducibly
 #     from this repo — unlike an ad-hoc container's anonymous volume;
 #   - `restart: unless-stopped` brings the server back after a Docker/machine

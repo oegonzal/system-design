@@ -2,11 +2,14 @@ node_modules
 **/node_modules
 **/dist
 **/.next
+**/.next-dev
 .nx
 .git
-storybook-static
-test-output
-playwright-report
+.env
+**/storybook-static
+**/test-output
+**/playwright-report
+**/*.tsbuildinfo
 .code-review
 static/runs
 CLAUDE.md
