@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { AnthropicLlmClient } from './anthropic-client';
+import { signedIn, subscriptionEnv, type ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
 import {
+  assertSubscriptionLogin,
   createEmbeddingClientFromEnv,
   createQualityLoopLlmFromEnv,
   describeModelProvider,
@@ -11,104 +12,68 @@ import {
 import { DisabledEmbeddingClient, embeddingAvailability } from './embedding-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
-describe("the quality loop's model client", () => {
-  it('[QL-22] refuses to build a client when nothing is configured, naming both variables', () => {
-    expect(() => createQualityLoopLlmFromEnv({})).toThrow(MissingModelProviderError);
-    expect(() => createQualityLoopLlmFromEnv({})).toThrow(/ANTHROPIC_API_KEY/);
-    expect(() => createQualityLoopLlmFromEnv({})).toThrow(/QUALITY_LOOP_AUTH=claude-code/);
-    expect(() => describeModelProvider({})).toThrow(MissingModelProviderError);
-  });
+const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
+  subscriptionType: null,
+  tokenSource: null,
+  ...overrides,
+});
 
-  it('[QL-22] no longer reads a determinism switch: a key with it set still builds the real client', () => {
-    expect(
-      createQualityLoopLlmFromEnv({
-        QUALITY_LOOP_DETERMINISTIC: '1',
-        ANTHROPIC_API_KEY: 'sk-test',
-      }),
-    ).toBeInstanceOf(AnthropicLlmClient);
-    expect(
-      createQualityLoopLlmFromEnv({
-        QUALITY_LOOP_DETERMINISTIC: '1',
-        QUALITY_LOOP_AUTH: 'claude-code',
-      }),
-    ).toBeInstanceOf(ClaudeAgentLlmClient);
-  });
-
-  it('a key builds the real client with the default model, honours LLM_MODEL, and outranks claude-code', () => {
-    const client = createQualityLoopLlmFromEnv({
-      ANTHROPIC_API_KEY: 'sk-test',
-      QUALITY_LOOP_AUTH: 'claude-code',
-    });
-    expect(client).toBeInstanceOf(AnthropicLlmClient);
-    expect(client.model).toBe('claude-sonnet-5');
-    expect(
-      createQualityLoopLlmFromEnv({ ANTHROPIC_API_KEY: 'sk-test', LLM_MODEL: 'claude-opus-5' })
-        .model,
-    ).toBe('claude-opus-5');
-  });
-
-  it('QUALITY_LOOP_AUTH=claude-code enables the subscription client with no key', () => {
-    expect(createQualityLoopLlmFromEnv({ QUALITY_LOOP_AUTH: 'claude-code' })).toBeInstanceOf(
-      ClaudeAgentLlmClient,
-    );
-  });
-
-  it("reads only its own switches: another role's variables are not its business", () => {
-    expect(
-      createQualityLoopLlmFromEnv({ EVAL_DETERMINISTIC: '1', QUALITY_LOOP_AUTH: 'claude-code' }),
-    ).toBeInstanceOf(ClaudeAgentLlmClient);
-    expect(() =>
-      createQualityLoopLlmFromEnv({ OTHER_DETERMINISTIC: '0', OTHER_AUTH: 'claude-code' }),
-    ).toThrow(MissingModelProviderError);
-  });
-
-  it('[QL-22] the model report names the model a boot would announce, never the key', () => {
-    expect(describeModelProvider({ QUALITY_LOOP_AUTH: 'claude-code' })).toEqual({
+describe('the quality loop runs on the Claude Code subscription only', () => {
+  it('[QL-22] every environment gets the subscription client, and an API key changes nothing', () => {
+    expect(createQualityLoopLlmFromEnv({})).toBeInstanceOf(ClaudeAgentLlmClient);
+    const withKey = createQualityLoopLlmFromEnv({ ANTHROPIC_API_KEY: 'sk-test' });
+    expect(withKey).toBeInstanceOf(ClaudeAgentLlmClient);
+    expect(withKey.model).toBe('claude-code/subscription');
+    expect(describeModelProvider({ ANTHROPIC_API_KEY: 'sk-test' })).toEqual({
       model: 'claude-code/subscription',
     });
-    expect(describeModelProvider({ ANTHROPIC_API_KEY: 'sk-test' })).toEqual({
-      model: 'claude-sonnet-5',
+  });
+
+  it('[QL-22] LLM_MODEL pins the model and the report; nothing else is read', () => {
+    const env = { LLM_MODEL: 'claude-opus-5' };
+    expect(createQualityLoopLlmFromEnv(env).model).toBe('claude-opus-5');
+    expect(describeModelProvider(env)).toEqual({ model: 'claude-opus-5' });
+  });
+
+  it('[QL-22] an API key never reaches the CLI; everything else does', () => {
+    const env = subscriptionEnv({
+      ANTHROPIC_API_KEY: 'sk-test',
+      HOME: '/h',
+      CLAUDE_CODE_OAUTH_TOKEN: 't',
     });
-    expect(
-      describeModelProvider({ ANTHROPIC_API_KEY: 'sk-test', LLM_MODEL: 'claude-opus-5' }),
-    ).toEqual({
-      model: 'claude-opus-5',
-    });
-    expect(JSON.stringify(describeModelProvider({ ANTHROPIC_API_KEY: 'sk-test' }))).not.toContain(
-      'sk-test',
-    );
+    expect(env).toEqual({ HOME: '/h', CLAUDE_CODE_OAUTH_TOKEN: 't' });
+  });
+
+  it('[QL-22] a machine login or an OAuth token counts as signed in; the source "none" does not', () => {
+    expect(signedIn(account({ subscriptionType: 'Claude Max' }))).toBe(true);
+    expect(signedIn(account({ tokenSource: 'CLAUDE_CODE_OAUTH_TOKEN' }))).toBe(true);
+    expect(signedIn(account({ tokenSource: 'none' }))).toBe(false);
+    expect(signedIn(account({}))).toBe(false);
+  });
+
+  it('[QL-22] the login check refuses with how to get a login, and a check that cannot finish is a refusal too', async () => {
+    await expect(
+      assertSubscriptionLogin(() => Promise.resolve(account({ subscriptionType: 'Claude Max' }))),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertSubscriptionLogin(() => Promise.resolve(account({ tokenSource: 'none' }))),
+    ).rejects.toThrow(MissingModelProviderError);
+    await expect(
+      assertSubscriptionLogin(() => Promise.resolve(account({ tokenSource: 'none' }))),
+    ).rejects.toThrow(/claude login.*claude setup-token/);
+    await expect(
+      assertSubscriptionLogin(() => Promise.reject(new Error('CLI exited'))),
+    ).rejects.toThrow(/the login check failed: CLI exited/);
   });
 });
 
-describe('createEmbeddingClientFromEnv', () => {
-  it('[QL-18] no key yields a disabled client that carries its reason; a key yields OpenAI — never reading OPENAI_MODEL', () => {
-    const off = createEmbeddingClientFromEnv({ OPENAI_MODEL: 'gpt-x' });
-    expect(off).toBeInstanceOf(DisabledEmbeddingClient);
-    expect(off.enabled).toBe(false);
-    expect(off.reason).toBe('no-key');
-    expect(off.dimensions).toBe(0);
-    expect(embeddingAvailability(off)).toEqual({ enabled: false, model: null, reason: 'no-key' });
-
-    const on = createEmbeddingClientFromEnv({ OPENAI_API_KEY: 'k', OPENAI_MODEL: 'gpt-x' });
-    expect(on).toBeInstanceOf(OpenAiEmbeddingClient);
-    expect(on.model).toBe('text-embedding-3-small');
-    expect(on.dimensions).toBe(1536);
-    expect(embeddingAvailability(on)).toEqual({
-      enabled: true,
-      model: 'text-embedding-3-small',
-      reason: null,
-    });
-
-    const custom = createEmbeddingClientFromEnv({
-      OPENAI_API_KEY: 'k',
-      OPENAI_EMBEDDING_MODEL: 'text-embedding-3-large',
-    });
-    expect(custom.model).toBe('text-embedding-3-large');
-  });
-
-  it('[QL-18] no longer follows a determinism switch: a key with it set still builds OpenAI', () => {
-    expect(
-      createEmbeddingClientFromEnv({ OPENAI_API_KEY: 'k', QUALITY_LOOP_DETERMINISTIC: '1' }),
-    ).toBeInstanceOf(OpenAiEmbeddingClient);
+describe('embeddings stay optional', () => {
+  it('an OpenAI key enables them; without one they are disabled with the reason', () => {
+    expect(createEmbeddingClientFromEnv({ OPENAI_API_KEY: 'k' })).toBeInstanceOf(
+      OpenAiEmbeddingClient,
+    );
+    const disabled = createEmbeddingClientFromEnv({});
+    expect(disabled).toBeInstanceOf(DisabledEmbeddingClient);
+    expect(embeddingAvailability(disabled)).toMatchObject({ enabled: false, reason: 'no-key' });
   });
 });

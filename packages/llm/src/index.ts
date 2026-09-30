@@ -1,4 +1,4 @@
-export * from './anthropic-client';
+export * from './claude-account';
 export * from './claude-agent-client';
 export * from './create-client';
 export * from './embedding-client';

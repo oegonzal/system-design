@@ -7,18 +7,15 @@
 #   pnpm stack:db     # database + vector store, ready for tests/tools
 #
 # Grading, coaching and prompt generation are runs of the quality loop, which
-# runs on a model or not at all: an exported ANTHROPIC_API_KEY wins; otherwise
-# QUALITY_LOOP_AUTH=claude-code (the default here) runs it through this
-# machine's Claude Code login (subscription). Without either the loop exits
-# at boot with its own message naming both — there is no switch that runs it
-# without a model.
+# runs on this machine's Claude Code subscription login and nothing else. It
+# checks the login at boot and exits with its own message when there is none
+# (`claude login` fixes it). No API key is read.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export DB_PORT="${DB_PORT:-5433}"
 export QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 export QUALITY_LOOP_URL="${QUALITY_LOOP_URL:-http://localhost:3003}"
-export QUALITY_LOOP_AUTH="${QUALITY_LOOP_AUTH:-claude-code}"
 
 wait_db() {
   echo "waiting for postgres on :${DB_PORT} ..."
@@ -59,10 +56,7 @@ case "${1:-up}" in
     pnpm db:migrate
     echo "seeding reference data ..."
     pnpm db:seed
-    # Which route the loop will boot on — never the key itself.
-    model_route="QUALITY_LOOP_AUTH=${QUALITY_LOOP_AUTH}"
-    if [ -n "${ANTHROPIC_API_KEY:-}" ]; then model_route="ANTHROPIC_API_KEY"; fi
-    echo "starting api + quality loop + ui (DB_PORT=${DB_PORT}, model via ${model_route}) — Ctrl-C to stop"
+    echo "starting api + quality loop + ui (DB_PORT=${DB_PORT}, model via the Claude Code login) — Ctrl-C to stop"
     pnpm start
     ;;
   down)

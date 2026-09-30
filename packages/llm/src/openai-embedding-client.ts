@@ -1,7 +1,7 @@
 /**
  * OpenAI embeddings over plain `fetch`: no SDK, because the endpoint is one
- * POST. The transport and the clock are injectable — the same seam as
- * `AnthropicLlmClient({ client })` — so a spec never touches the network.
+ * POST. The transport and the clock are injectable, so a spec never touches
+ * the network.
  */
 import {
   DEFAULT_EMBEDDING_MODEL,

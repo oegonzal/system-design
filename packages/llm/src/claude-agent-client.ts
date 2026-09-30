@@ -1,7 +1,11 @@
 import { z, type ZodIssue, type ZodType } from 'zod';
 
+import { subscriptionEnv } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import type { LlmClient, StructuredRequest } from './llm-client';
+
+/** The model report when no model is pinned: the subscription's own choice. */
+export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
 
 /** A subscription call spawns a local agent turn — minutes, not milliseconds. */
 export const CLAUDE_AGENT_TIMEOUT_MS = 300_000;
@@ -168,19 +172,18 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
 }
 
 /**
- * Structured calls through the local Claude Code login — the supported way to
- * run the coach on a Claude SUBSCRIPTION instead of an API key. The Agent SDK
- * spawns a tool-less, settings-less, single-turn agent using the credentials
- * `claude login` stored; no key ever enters this codebase or its env.
+ * Structured calls through the Claude Code subscription login — the loop's
+ * one model route. The Agent SDK spawns a tool-less, settings-less,
+ * single-turn agent using the credentials `claude login` stored, or the
+ * `CLAUDE_CODE_OAUTH_TOKEN` a container is given; an API key in the
+ * environment is withheld from it, so nothing is ever billed outside the
+ * subscription.
  *
- * Unlike `AnthropicLlmClient` there is no server-side output constraint, so the
- * schema rides in the prompt as JSON Schema and `extractStructured` enforces it
- * on the way out — a miss is `null`, exactly the contract every caller already
- * handles. The improver additionally re-validates and re-scores every proposal,
- * so a malformed answer costs an iteration, never correctness.
+ * There is no server-side output constraint, so the schema rides in the
+ * prompt as JSON Schema and `extractStructured` enforces it on the way out —
+ * a miss is `null`, exactly the contract every caller already handles.
  *
- * Implements `LlmRecordable` so a run dump captures the exchange, same as the
- * API-key client.
+ * Implements `LlmRecordable` so a run dump captures the exchange.
  */
 export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   readonly model: string;
@@ -191,7 +194,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
 
   constructor(options: { model?: string; sink?: LlmCallSink } = {}) {
     this.requestedModel = options.model;
-    this.model = options.model ?? 'claude-code/subscription';
+    this.model = options.model ?? SUBSCRIPTION_MODEL_LABEL;
     this.sink = options.sink ?? null;
   }
 
@@ -267,7 +270,10 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
           // `env` REPLACES the subprocess environment, so spread the current
           // one and only raise the output cap — the login credentials the SDK
           // reads live in process.env / the config dir and must be preserved.
-          env: { ...process.env, CLAUDE_CODE_MAX_OUTPUT_TOKENS: MAX_OUTPUT_TOKENS },
+          env: {
+            ...subscriptionEnv(process.env),
+            CLAUDE_CODE_MAX_OUTPUT_TOKENS: MAX_OUTPUT_TOKENS,
+          },
         },
       });
 

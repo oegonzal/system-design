@@ -1,4 +1,4 @@
-import { describeModelProvider } from '@sysdesign/llm';
+import { assertSubscriptionLogin, describeModelProvider } from '@sysdesign/llm';
 import type { LlmModelDto } from '@sysdesign/contracts';
 
 import { runStaleAfterMs } from './modules/janitor/stale-after';
@@ -17,14 +17,19 @@ export const commandOf = (argv: readonly string[]): Command =>
 
 /**
  * What a process must have before Nest boots. `serve` and `run` call a
- * model, so they need a provider and a valid stale threshold — refused here
- * with the variables named, never surfaced as a dependency-injection stack
- * halfway through boot. `replay` reads recorded runs and needs neither.
+ * model, so they need a valid stale threshold and a Claude Code subscription
+ * login — refused here, saying how to get one, never surfaced as a failed
+ * call minutes into a run. `replay` reads recorded runs and needs neither.
+ * The login check is injectable so a spec never spawns the CLI.
  */
-export function preflight(argv: readonly string[], env: NodeJS.ProcessEnv): Preflight {
+export async function preflight(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  checkLogin: () => Promise<void> = () => assertSubscriptionLogin(),
+): Promise<Preflight> {
   const command = commandOf(argv);
   if (command === 'replay') return { command, model: null };
-  const model = describeModelProvider(env);
   runStaleAfterMs(env);
-  return { command, model };
+  await checkLogin();
+  return { command, model: describeModelProvider(env) };
 }

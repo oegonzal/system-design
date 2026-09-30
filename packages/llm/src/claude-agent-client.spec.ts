@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ClaudeAgentLlmClient, extractStructured } from './claude-agent-client';
-import { createQualityLoopLlmFromEnv, describeModelProvider } from './create-client';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
 
@@ -90,29 +89,5 @@ describe('extractStructured', () => {
       answer: 'has } and { braces',
       score: 1,
     });
-  });
-});
-
-describe('claude-code subscription auth for the quality loop', () => {
-  it('QUALITY_LOOP_AUTH=claude-code enables the agent client without any key', () => {
-    const env = { QUALITY_LOOP_AUTH: 'claude-code' };
-    const client = createQualityLoopLlmFromEnv(env);
-    expect(client).toBeInstanceOf(ClaudeAgentLlmClient);
-    expect(describeModelProvider(env)).toEqual({ model: 'claude-code/subscription' });
-  });
-
-  it('an explicit API key outranks claude-code auth', () => {
-    const withKey = createQualityLoopLlmFromEnv({
-      QUALITY_LOOP_AUTH: 'claude-code',
-      ANTHROPIC_API_KEY: 'sk-test',
-    });
-    expect(withKey).not.toBeInstanceOf(ClaudeAgentLlmClient);
-    expect(withKey.model).toBe('claude-sonnet-5');
-  });
-
-  it('LLM_MODEL pins the agent model and the availability label', () => {
-    const env = { QUALITY_LOOP_AUTH: 'claude-code', LLM_MODEL: 'claude-opus-5' };
-    expect(createQualityLoopLlmFromEnv(env).model).toBe('claude-opus-5');
-    expect(describeModelProvider(env).model).toBe('claude-opus-5');
   });
 });

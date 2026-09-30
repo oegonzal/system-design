@@ -7,7 +7,7 @@ import { RunJanitor } from '../janitor/run-janitor';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY } from '../runs/tokens';
 import { ReplayModule } from './replay.module';
 
-const PROVIDER_VARS = ['ANTHROPIC_API_KEY', 'QUALITY_LOOP_AUTH'] as const;
+const PROVIDER_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'] as const;
 
 describe('the replay module', () => {
   const saved = new Map<string, string | undefined>();

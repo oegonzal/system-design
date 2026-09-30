@@ -16,9 +16,8 @@ import { QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
   controllers: [RunsController, PipelinesController, CriteriaController],
   providers: [
     RunsService,
-    // The environment decides once, at boot: a key, or the subscription route
-    // under QUALITY_LOOP_AUTH=claude-code — main.ts already refused to start
-    // without either, and this factory refuses too.
+    // The subscription client, once, at boot — main.ts already refused to
+    // start without a Claude Code login.
     { provide: QUALITY_LOOP_LLM, useFactory: createQualityLoopLlmFromEnv },
     { provide: TRACE_STORE, useClass: DumpTraceStore },
   ],

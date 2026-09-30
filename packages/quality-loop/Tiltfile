@@ -23,19 +23,34 @@ docker_build(
     ],
 )
 
-# The model. The loop boots only with a provider, and a pod has no Claude Code
-# login, so the key is the one exported by the shell that ran `tilt up`. The
-# Secret is always built: with the key empty the pod starts and exits 1 with
-# the loop's own message naming the variable, instead of hanging on a Secret
-# that does not exist. Warn here, because that exit is easy to misread.
-_MODEL_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+# The model. The loop runs only on a Claude Code subscription login, and a
+# pod has no `claude login` — so it signs in with the long-lived token
+# `claude setup-token` prints. The token comes from the shell that ran
+# `tilt up`, else from the repo's gitignored `.env` (read here, never
+# printed). The Secret is always built: with no token the pod starts and
+# exits 1 with the loop's own message, instead of hanging on a Secret that
+# does not exist. Warn here, because that exit is easy to misread.
+def _dotenv(path):
+    values = {}
+    for line in str(read_file(path, '')).splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
-if not _MODEL_KEY:
+_ENV_FILE = _dotenv(config.main_dir + '/.env')
+_TOKEN_VAR = 'CLAUDE_CODE_OAUTH_TOKEN'
+_TOKEN = os.getenv(_TOKEN_VAR, '') or _ENV_FILE.get(_TOKEN_VAR, '')
+
+if not _TOKEN:
     warn(
-        'quality-loop: ANTHROPIC_API_KEY is not exported in this shell.\n'
-        + '  The quality-loop pod will exit at boot naming the variable, and grading,\n'
-        + '  coaching and prompt generation stay unavailable until it is.\n'
-        + '  Fix: export ANTHROPIC_API_KEY=… then run `tilt up` from that same terminal.'
+        'quality-loop: no CLAUDE_CODE_OAUTH_TOKEN in this shell or in .env.\n'
+        + '  The pod signs in to Claude Code with that token (a pod has no `claude login`),\n'
+        + '  so it will exit at boot and grading, coaching and prompt generation stay\n'
+        + '  unavailable until it has one.\n'
+        + '  Fix: run `claude setup-token`, put CLAUDE_CODE_OAUTH_TOKEN=<token> in .env, then `tilt up`.'
     )
 
 k8s_yaml(encode_yaml({
@@ -44,8 +59,8 @@ k8s_yaml(encode_yaml({
     'metadata': {'name': 'quality-loop-model'},
     'type': 'Opaque',
     'stringData': {
-        'ANTHROPIC_API_KEY': _MODEL_KEY,
-        'LLM_MODEL': os.getenv('LLM_MODEL', ''),
+        _TOKEN_VAR: _TOKEN,
+        'LLM_MODEL': os.getenv('LLM_MODEL', '') or _ENV_FILE.get('LLM_MODEL', ''),
     },
 }))
 

@@ -16,9 +16,9 @@ const DEFAULT_PORT = 3003;
  * the HTTP surface — runs, pipelines, criteria, prompts, orchestrations, the
  * memory and router tools, and `/health` (the README lists the routes).
  *
- * `serve` and `run` refuse to start without a model provider — exit 1 with
- * both variables named, before any module boots. `replay` calls no model and
- * boots a slimmer context.
+ * `serve` and `run` refuse to start without a Claude Code subscription login —
+ * exit 1 saying how to get one, before any module boots. `replay` calls no
+ * model and boots a slimmer context.
  */
 async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {
@@ -27,9 +27,9 @@ async function bootstrap(): Promise<void> {
   });
 
   const argv = process.argv.slice(2);
-  let checked: ReturnType<typeof preflight>;
+  let checked: Awaited<ReturnType<typeof preflight>>;
   try {
-    checked = preflight(argv, process.env);
+    checked = await preflight(argv, process.env);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

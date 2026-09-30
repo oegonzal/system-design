@@ -34,15 +34,15 @@ spec:
               value: '3003'
             - name: QUALITY_LOOP_CORS_ORIGIN
               value: http://localhost:4201
-            # The loop boots only with a model, and a pod has no Claude Code
-            # login, so the key comes from the Secret the Tiltfile builds from
-            # the shell's ANTHROPIC_API_KEY. With it empty the pod exits 1 with
-            # the loop's own message naming the variable.
-            - name: ANTHROPIC_API_KEY
+            # The loop runs only on a Claude Code subscription login. A pod has
+            # no `claude login`, so it signs in with the long-lived token that
+            # `claude setup-token` prints, from the Secret the Tiltfile builds.
+            # Without it the pod exits at boot with the loop's own message.
+            - name: CLAUDE_CODE_OAUTH_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: quality-loop-model
-                  key: ANTHROPIC_API_KEY
+                  key: CLAUDE_CODE_OAUTH_TOKEN
             - name: LLM_MODEL
               valueFrom:
                 secretKeyRef:
