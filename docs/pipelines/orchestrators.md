@@ -12,7 +12,7 @@ Two facts organise everything below:
 
 1. **A step's whole job is to turn what came before into a run and read the
    run back.** Every pipeline eats a markdown goal, and every finished run is
-   read through one view, `core/outputs.ts`. That is why any pipeline can feed
+   read through one view, `core/outputs/`. That is why any pipeline can feed
    any other, and why a pipeline can be a judged subroutine rather than only
    a stage: memory-recall curates, experience-digest extracts, and a judge
    judges an artifact it did not produce.
@@ -92,7 +92,7 @@ the definition names through `outputsOf`, skips as `too-few-runs` below two
 (one run cannot disagree with itself, and a report saying everything agreed
 would be a lie), and otherwise writes the report and its headline counts.
 
-**`core/reconcile.ts`.** Pure of everything but ids, enums and numbers, and
+**`core/outputs/reconcile.ts`.** Pure of everything but ids, enums and numbers, and
 guarded exactly as the normaliser and the controllers are (the tooling spec
 that forbids prose, the goal and the advisory verdict in those files now
 lists seven). It compares:

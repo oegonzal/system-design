@@ -25,7 +25,7 @@ export function medianLevel<L extends string>(values: readonly L[], scale: reado
 }
 
 export const severityRank = (severity: Severity): number => SEVERITIES.indexOf(severity);
-export const confidenceRank = (level: AxisFactorLevel): number => AXIS_FACTOR_LEVELS.indexOf(level);
+const confidenceRank = (level: AxisFactorLevel): number => AXIS_FACTOR_LEVELS.indexOf(level);
 
 export const compareStrings = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 

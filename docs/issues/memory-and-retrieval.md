@@ -184,8 +184,9 @@ not type-linked and is worth a `satisfies` when contracts next changes.
 migration, `retrieval-report` produced the §6 numbers — and nothing in the
 suite covers them.
 
-**Evidence.** memory-runs §11; `fixtures/stored-memories.json` is the store
-captured before the generation bump, kept for exactly this.
+**Evidence.** memory-runs §11; the `fixtures/stored-memories.json` capture of
+the pre-bump store was removed in the cleanup as dead, so the next bump
+needs its own fixture.
 
 **Recommendation.** A spec each against a fake store: `reindex` migrates the
 fixture and the result round-trips; `retrieval-report` over a seeded store

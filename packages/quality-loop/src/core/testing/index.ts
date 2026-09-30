@@ -1,0 +1,7 @@
+/**
+ * Builders the specs share. Pure helpers only — no vitest imports, so these
+ * files compile under the app tsconfig even though only specs use them.
+ */
+export * from './llm';
+export * from './pipeline';
+export * from './trace';

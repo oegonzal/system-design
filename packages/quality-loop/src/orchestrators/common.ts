@@ -14,7 +14,7 @@ import type {
 } from '@sysdesign/contracts';
 
 import { outputsOf } from '../core/outputs';
-import type { RunInput } from '../core/run-pipeline';
+import type { RunInput } from '../core/loop/run-pipeline';
 import { bareGoal } from '../modules/memory/compose';
 import { EXPERIENCE_DIGEST_ID } from '../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../pipelines/memory-recall/input';
@@ -24,7 +24,7 @@ import type { StepContext, StepResult } from './definition';
  * Pipelines that take a goal another step composed, never a brief. No
  * orchestrator accepts one as a target, and no router offers one as a route.
  */
-export const INTERNAL_PIPELINES: readonly string[] = [MEMORY_RECALL_ID, EXPERIENCE_DIGEST_ID];
+const INTERNAL_PIPELINES: readonly string[] = [MEMORY_RECALL_ID, EXPERIENCE_DIGEST_ID];
 
 /** The `refuse` of every orchestrator that takes a target: an internal pipeline is not one. */
 export const refuseInternal = (request: StartOrchestrationRequest): string | null =>

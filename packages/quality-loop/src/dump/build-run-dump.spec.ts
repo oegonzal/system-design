@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { RunRecord } from '../core/contracts';
 import { STANDARD } from '../core/controllers';
 import { describePipeline } from '../core/pipeline';
-import { runLoop } from '../core/run-pipeline';
+import { runLoop } from '../core/loop/run-pipeline';
 import {
   criterion,
   finding,

@@ -14,7 +14,7 @@ import {
   joinSections,
   remediationsSection,
   systemPrompt,
-} from '../prompting';
+} from './prompting';
 import { diagnostic, PRODUCER_STAGE } from './shared';
 
 const INSTRUCTIONS = {

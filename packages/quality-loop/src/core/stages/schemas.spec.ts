@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { criteriaSchema, evaluationSchema, findingsSchema } from './schemas';
-import { finding, result } from './testing';
+import { finding, result } from '../testing';
 
 const walk = (node: unknown, visit: (value: Record<string, unknown>) => void): void => {
   if (Array.isArray(node)) return node.forEach((item) => walk(item, visit));

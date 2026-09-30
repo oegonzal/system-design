@@ -5,7 +5,7 @@ import type {
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import type { RunInput } from '../../core/run-pipeline';
+import type { RunInput } from '../../core/loop/run-pipeline';
 import { confirmed, decision, ledger, runRecord, traceOf } from '../../core/testing';
 import { validateOrchestrator } from '../definition';
 import { openRecord, runOrchestration, type OrchestrationDeps } from '../run-orchestration';

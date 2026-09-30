@@ -30,7 +30,7 @@ in a record.
 
 **Recommendation.** A boot precondition that throws, naming the variable it
 wanted, in every process that will call a model — server, worker, CLI.
-Fakes stay where they belong: `fakeLlm` in `core/testing.ts` already covers
+Fakes stay where they belong: `fakeLlm` in `core/testing/` already covers
 the loop's specs. The deterministic-only grading path is STUDIO-8; the
 Playwright suite depends on it and needs recorded responses before the flag
 can go.
@@ -131,7 +131,7 @@ design smell is refused by the critic, not only by the rule.
 
 ### SEAM-6 · CI never calls a model; no judge-regression harness
 
-**Status** open · **Severity** medium · **Where** `.github/workflows/ci.yml`, `core/testing.ts`
+**Status** open · **Severity** medium · **Where** `.github/workflows/ci.yml`, `core/testing/`
 
 **What.** CI runs lint, typecheck, unit, tooling, build, Storybook smoke and
 the studio's Playwright journey. No stage calls a model, and no harness

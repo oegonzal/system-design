@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runPipeline } from '../../core/run-pipeline';
+import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm } from '../../core/testing';
 import { fromRun } from './compose';
 import { EXPERIENCE_DIGEST } from './definition';

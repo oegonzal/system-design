@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EvaluationReport } from '@sysdesign/contracts';
-import { STANDARD } from './controllers';
+import { STANDARD } from '../controllers';
 import { findingKey, normalize, type NormalizeInput } from './normalize';
 import {
   criterion,
@@ -11,7 +11,7 @@ import {
   tinyPipeline,
   tinyPolicy,
   type TinyOutput,
-} from './testing';
+} from '../testing';
 
 const contract = {
   ...tinyPipeline().task,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { runPipeline } from '../../core/run-pipeline';
+import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { renderGoal } from './input';

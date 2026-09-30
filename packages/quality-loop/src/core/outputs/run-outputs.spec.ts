@@ -1,8 +1,8 @@
 import type { RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL, passed, traceOf } from '../modules/memory/testing';
-import { admits, outputsOf } from './outputs';
+import { GOAL, passed, traceOf } from '../../modules/memory/testing';
+import { admits, outputsOf } from './run-outputs';
 
 const trace = (decision: RunTrace['finalDecision'], overall = 90) =>
   traceOf({

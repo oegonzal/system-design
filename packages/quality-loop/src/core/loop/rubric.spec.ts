@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { rubricProblems } from './rubric';
-import { criterion, tinyPipeline } from './testing';
+import { criterion, tinyPipeline } from '../testing';
 
 describe('rubricProblems', () => {
   const task = tinyPipeline().task;

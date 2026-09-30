@@ -74,9 +74,9 @@ export interface PipelineDefinition<T> {
 }
 
 /** Stage ids the engine owns; a lens may not take one. */
-export const RESERVED_STAGE_IDS = ['producer', 'criteria', 'lenses'] as const;
+const RESERVED_STAGE_IDS = ['producer', 'criteria', 'lenses'] as const;
 
-export const describePipelineId = (definition: PipelineDefinition<unknown>): string =>
+const describePipelineId = (definition: PipelineDefinition<unknown>): string =>
   `${definition.id}@${definition.version}`;
 
 /** Fails fast on a malformed pipeline — before boot completes, never mid-run. */

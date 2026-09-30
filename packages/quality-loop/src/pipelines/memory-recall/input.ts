@@ -7,7 +7,7 @@
 import { DECISIONS } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { GOAL_MAX_BYTES } from '../../core/prompting';
+import { GOAL_MAX_BYTES } from '../../core/contracts';
 
 export const MEMORY_RECALL_ID = 'memory-recall';
 

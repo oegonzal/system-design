@@ -9,9 +9,8 @@
 import type { PanelAlignment, PanelReportDto, QualityRunDto } from '@sysdesign/contracts';
 import { DEFAULT_PANEL_SAMPLES } from '@sysdesign/contracts';
 
-import { outputsOf } from '../../core/outputs';
-import { reconcile } from '../../core/reconcile';
-import type { RunInput } from '../../core/run-pipeline';
+import { outputsOf, reconcile } from '../../core/outputs';
+import type { RunInput } from '../../core/loop/run-pipeline';
 import type { StepContext, StepResult } from '../definition';
 
 /** What every sample runs on, or the declared reason the panel cannot run at all. */

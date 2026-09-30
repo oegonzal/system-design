@@ -20,8 +20,8 @@ import {
   typesSection,
   upstreamSections,
   validationSection,
-} from '../prompting';
-import { enumTuple, findingsSchema } from '../schemas';
+} from './prompting';
+import { enumTuple, findingsSchema } from './schemas';
 import { skipped } from './shared';
 
 export function createLlmCritic<T>(

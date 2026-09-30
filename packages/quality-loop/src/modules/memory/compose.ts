@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { capText } from '@sysdesign/run-dump';
 
 import { admits, type RunOutputs } from '../../core/outputs';
-import { GOAL_MAX_BYTES } from '../../core/prompting';
+import { GOAL_MAX_BYTES } from '../../core/contracts';
 import { readIndex as readDigestIndex } from '../../pipelines/experience-digest/input';
 import { experienceDigestSchema } from '../../pipelines/experience-digest/output';
 import {
@@ -33,7 +33,7 @@ import {
 } from './ports';
 
 /** The recall query is the goal's head: enough to embed and to judge candidates against. */
-export const QUERY_MAX_BYTES = 16_000;
+const QUERY_MAX_BYTES = 16_000;
 
 /** The marker the module writes; `bareGoal` strips from it, so nothing parses prose. */
 export const MEMORY_HEADING = '## Remembered evidence (advisory)';
@@ -210,7 +210,7 @@ export function memoriesToStore(outputs: RunOutputs, acceptAt: number): DigestRe
   return { admitted: true, proposed, memories };
 }
 
-export const lessonText = (memory: MemoryToStore): string =>
+const lessonText = (memory: MemoryToStore): string =>
   `${memory.insight} — applies when ${memory.appliesWhen}`;
 
 /** How much a rank-k hit is worth; the constant of the standard RRF. */

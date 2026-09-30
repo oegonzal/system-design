@@ -1,6 +1,9 @@
 import type { ArtifactLocation, SuccessCriterion } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
+/** Enough for any prompt a person would write; a larger goal is clipped and traced. */
+export const GOAL_MAX_BYTES = 64_000;
+
 /**
  * The pipeline's code half: how an output is parsed, addressed and shown to a
  * judge. Everything else about a task is data, and every wire type lives in

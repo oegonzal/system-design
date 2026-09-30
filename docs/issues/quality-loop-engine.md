@@ -54,7 +54,7 @@ memory-runs, not judged by feel.
 
 ### ENG-2 · One lost sample voids a whole lens
 
-**Status** open · **Severity** high · **Where** `core/normalize.ts` (criteria agreement), the `evidence` policy of `memory-recall`, `experience-digest`, `agentic-design`
+**Status** open · **Severity** high · **Where** `core/evidence/normalize.ts` (criteria agreement), the `evidence` policy of `memory-recall`, `experience-digest`, `agentic-design`
 
 **What.** Evaluators run `samples: 2` and the policy demands `minHits: 2`
 for a criterion to count as assessed. That is zero slack: if either sample
@@ -93,7 +93,7 @@ after (`main.js replay` prints the gate's reason per iteration). The
 
 ### ENG-3 · Defect grouping chains through shared refs
 
-**Status** open · **Severity** medium · **Where** `core/normalize.ts#defectsOf`
+**Status** open · **Severity** medium · **Where** `core/evidence/normalize.ts#defectsOf`
 
 **What.** Findings of one type are grouped into defects as connected
 components over overlapping `locationRefs`, so agreement is transitive
@@ -156,7 +156,7 @@ cost with no reader.
 
 ### ENG-5 · Memory reaches the producer only through the goal
 
-**Status** accepted · **Where** `modules/memory/steps.ts`, `core/materialize.ts`
+**Status** accepted · **Where** `modules/memory/steps.ts`, `core/loop/materialize.ts`
 
 **What.** `LensContext` and `ProducerInput` are closed; `materialize` always
 builds an LLM producer; no stage takes a parameter a pipeline can supply.
@@ -175,7 +175,7 @@ does, a typed `context` slot on `ProducerInput` beats a second heading.
 
 ### ENG-6 · The trace lands only when the loop ends
 
-**Status** accepted · **Where** `core/run-pipeline.ts`, the `sink`
+**Status** accepted · **Where** `core/loop/run-pipeline.ts`, the `sink`
 
 **What.** The client polls the run row; per-iteration progress is not
 streamed. A 20-minute run shows its verdict at the end.

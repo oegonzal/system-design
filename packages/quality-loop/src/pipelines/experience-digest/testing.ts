@@ -15,7 +15,6 @@ import type {
 } from '@sysdesign/contracts';
 
 import {
-  DEFAULT_RULES,
   MAX_CRITERIA_ITEMS,
   MAX_FINDINGS,
   MAX_MEMORIES,
@@ -331,5 +330,3 @@ export const maximalRecord = (): ExperienceRecord => ({
   rules: Array.from({ length: 8 }, () => fill(300)),
   maxMemories: MAX_MEMORIES,
 });
-
-export { DEFAULT_RULES };

@@ -17,7 +17,7 @@ import type {
   ValidationReport,
 } from '@sysdesign/contracts';
 
-import { compareFindings, compareStrings, severityRank } from '../ordering';
+import { compareFindings, compareStrings, severityRank } from '../evidence/ordering';
 
 export const round1 = (value: number): number => Math.round(value * 10) / 10;
 

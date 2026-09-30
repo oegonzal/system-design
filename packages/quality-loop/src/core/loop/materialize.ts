@@ -5,17 +5,17 @@
  */
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { LensSpec, PipelineDefinition } from './pipeline';
-import type { CriteriaDeriver, ExchangeSink, Stages } from './ports';
+import type { LensSpec, PipelineDefinition } from '../pipeline';
+import type { CriteriaDeriver, ExchangeSink, Stages } from '../ports';
 import { scopeLlm } from './scoped-llm';
-import { createCriteriaDeriver } from './stages/derive-criteria';
-import { createLlmCritic } from './stages/llm-critic';
-import { createLlmEvaluator } from './stages/llm-evaluator';
-import { createLlmProducer } from './stages/llm-producer';
-import { schemaValidator } from './stages/schema-validator';
-import { CRITERIA_STAGE, PRODUCER_STAGE } from './stages/shared';
+import { createCriteriaDeriver } from '../stages/derive-criteria';
+import { createLlmCritic } from '../stages/llm-critic';
+import { createLlmEvaluator } from '../stages/llm-evaluator';
+import { createLlmProducer } from '../stages/llm-producer';
+import { schemaValidator } from '../stages/schema-validator';
+import { CRITERIA_STAGE, PRODUCER_STAGE } from '../stages/shared';
 
-export const sampleScope = (lensId: string, sample: number): string => `${lensId}.s${sample}`;
+const sampleScope = (lensId: string, sample: number): string => `${lensId}.s${sample}`;
 
 /** The derive-criteria stage alone — what `POST /criteria` runs, scoped like the loop's own. */
 export function materializeCriteria<T>(

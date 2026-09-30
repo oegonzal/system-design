@@ -17,8 +17,8 @@ import {
   locationsSection,
   systemPrompt,
   upstreamSections,
-} from '../prompting';
-import { enumTuple, evaluationSchema } from '../schemas';
+} from './prompting';
+import { enumTuple, evaluationSchema } from './schemas';
 import { skipped } from './shared';
 
 export function createLlmEvaluator<T>(

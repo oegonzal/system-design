@@ -267,10 +267,10 @@ this work.
   verdicts, an item left without one, a pack or digest over its limit. Both
   start with `contract.output.schema.safeParse`, because the engine runs every
   validator on any non-null artifact before it computes the block flag
-  (`core/run-pipeline.ts`).
+  (`core/loop/run-pipeline.ts`).
 - **Aliases as location ids.** `locate` returns the candidate's alias (`m3`,
   `f4`, `r2`) rather than a position. A finding's identity is
-  `${type}|${sorted locationRefs}` (`core/normalize.ts`), so an alias keeps a
+  `${type}|${sorted locationRefs}` (`core/evidence/normalize.ts`), so an alias keeps a
   finding's key stable across a revision, makes cross-iteration lessons
   comparable, and lets the orchestrator map a finding straight back to its
   source. Free-text items stay positional (`gap.N`, `memory.N`).
@@ -349,7 +349,7 @@ record on an error nobody expected. It knows no step by name. A provided run
 (`/from-run`) is handled by the steps that declare a stand-in: their result is
 written at open and their output seeded before anything runs.
 
-Every step reads a child run through one view, `core/outputs.ts`:
+Every step reads a child run through one view, `core/outputs/`:
 `outputsOf(trace)` names the crowned iteration, its artifact, ledger,
 findings, criteria, decision, remediations and lessons once, and `admits`
 lives beside it. Nothing outside the engine re-derives "the best iteration".
@@ -441,7 +441,7 @@ half is optional, and a run whose memory steps read `embeddings-disabled` and
 `upstream-skipped` still produced its answer.
 
 And **`not-accepted` no longer means what its name says.** The rule it reports
-is `admits()` (`core/outputs.ts`), and an `accept` is only one of the ways
+is `admits()` (`core/outputs/`), and an `accept` is only one of the ways
 past it. A run is drawn on when its best iteration cleared `artifactPresent`,
 `validatorsPassed` and `evidenceSufficient` and scored at or above that
 pipeline's own `acceptAt`. `policyAllowed` is deliberately **not** required,
@@ -850,9 +850,10 @@ Notes, not fixes. None affects behaviour.
 - Neither `reindex` nor `retrieval-report` has a spec. Both were exercised
   live — `reindex` performed the v1 to v2 migration and `retrieval-report`
   produced the numbers in §6 — but nothing in the suite covers them.
-- `fixtures/stored-memories.json` is referenced by no code. It is the store
-  captured before the generation bump, kept because a migration that cannot be
-  checked against the thing it migrated is not a migration.
+- `fixtures/stored-memories.json`, the store captured before the generation
+  bump, was referenced by no code and was removed in the cleanup; a migration
+  that cannot be checked against the thing it migrated is still not a
+  migration, so the next generation bump should capture its own fixture.
 - `RetrievalProbeDto.found[].using` is typed `string` rather than a union,
   because `contracts` cannot import the module's `VECTOR_NAMES`. It is the one
   place the named-vector vocabulary is not type-linked; `collection.ts` keeps

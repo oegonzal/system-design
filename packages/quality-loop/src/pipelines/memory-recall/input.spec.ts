@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES } from '../../core/prompting';
+import { GOAL_MAX_BYTES } from '../../core/contracts';
 import { goalBytes, memoryQuerySchema, readIndex, renderGoal } from './input';
 import { maximalQuery, sampleQuery } from './testing';
 

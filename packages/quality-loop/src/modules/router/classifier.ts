@@ -29,10 +29,8 @@ const RATIONALE_MAX = 400;
 export const renderRoutes = (routes: readonly RouteDto[]): string =>
   routes.map((route) => `- ${route.id}: ${route.description}`).join('\n');
 
-
-export const renderBrief = (goal: string, routes: readonly RouteDto[]): string =>
+const renderBrief = (goal: string, routes: readonly RouteDto[]): string =>
   `## Judges\n${renderRoutes(routes)}\n\n## Brief\n${goal}`;
-
 
 export class LlmBriefClassifier implements BriefClassifier {
   constructor(

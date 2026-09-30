@@ -18,11 +18,11 @@ import { qualityLoopAvailabilityFromEnv, type LlmClient, type LlmExchange } from
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
 
 import { summariseExchange, type RunRecord } from '../../core/contracts';
-import { materializeCriteria } from '../../core/materialize';
+import { materializeCriteria } from '../../core/loop/materialize';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
 import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
-import { rubricProblems } from '../../core/rubric';
-import { runPipeline } from '../../core/run-pipeline';
+import { rubricProblems } from '../../core/loop/rubric';
+import { runPipeline } from '../../core/loop/run-pipeline';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
 /**

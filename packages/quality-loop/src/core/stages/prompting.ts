@@ -12,12 +12,10 @@ import type {
   ValidationReport,
 } from '@sysdesign/contracts';
 
-import type { UpstreamEvidenceBundle } from './ports';
 import { capText } from '@sysdesign/run-dump';
 
-/** Enough for any prompt a person would write; a larger goal is clipped and traced. */
-export const GOAL_MAX_BYTES = 64_000;
-
+import { GOAL_MAX_BYTES } from '../contracts';
+import type { UpstreamEvidenceBundle } from '../ports';
 
 const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly string[]> = {
   criteria: [
@@ -39,11 +37,9 @@ const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly s
   ],
 };
 
-
 const OUTPUT_RULE =
   'Reply with ONE complete JSON object that satisfies the schema — nothing else. Keep every string short; an over-long reply is truncated and discarded.';
 
-  
 export function systemPrompt(role: keyof typeof RULES, persona: string): string {
   return [persona.trim(), '', ...RULES[role], OUTPUT_RULE].join('\n');
 }

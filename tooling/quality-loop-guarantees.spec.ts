@@ -45,7 +45,7 @@ describe('quality-loop guarantees', () => {
   it('the normalizer, every controller and the reconcile never read prose, the goal or the advisory verdict', () => {
     const guarded = files.filter(
       (path) =>
-        /\/core\/(normalize|reconcile|controllers\/[^/]+)\.ts$/.test(path) &&
+        /\/core\/(evidence\/normalize|outputs\/reconcile|controllers\/[^/]+)\.ts$/.test(path) &&
         !path.endsWith('.spec.ts'),
     );
     // the normaliser, the reconcile, then the controller library: context, composer, gates, floor, index

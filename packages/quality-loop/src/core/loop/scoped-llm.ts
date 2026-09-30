@@ -5,7 +5,7 @@
  */
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 
-import type { ExchangeSink } from './ports';
+import type { ExchangeSink } from '../ports';
 
 export function scopeLlm(llm: LlmClient, scope: string, sink: ExchangeSink): LlmClient {
   let ordinal = 0;

@@ -5,7 +5,7 @@
  */
 import type { Validator } from '../ports';
 
-export const SCHEMA_VALIDATOR_ID = 'schema';
+const SCHEMA_VALIDATOR_ID = 'schema';
 
 export function schemaValidator<T>(): Validator<T> {
   return {

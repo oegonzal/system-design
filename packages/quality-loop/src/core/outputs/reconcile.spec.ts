@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { outputsOf, type RunOutputs } from './outputs';
+import { outputsOf, type RunOutputs } from './run-outputs';
 import { reconcile, spread } from './reconcile';
-import { confirmed, decision, ledger, traceOf } from './testing';
+import { confirmed, decision, ledger, traceOf } from '../testing';
 
 const run = (
   overrides: {

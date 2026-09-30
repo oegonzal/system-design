@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IterationTrace } from '@sysdesign/contracts';
-import { STANDARD } from './controllers';
+import { STANDARD } from '../controllers';
 import { deriveLessons } from './lessons';
 import { normalize } from './normalize';
 import {
@@ -12,7 +12,7 @@ import {
   tinyPipeline,
   tinyPolicy,
   type TinyOutput,
-} from './testing';
+} from '../testing';
 
 const contract = {
   ...tinyPipeline().task,

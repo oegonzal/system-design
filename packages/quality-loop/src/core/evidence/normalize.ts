@@ -20,7 +20,7 @@ import type {
   ValidationReport,
 } from '@sysdesign/contracts';
 
-import type { TaskContract } from './contracts';
+import type { TaskContract } from '../contracts';
 import {
   CONFIDENCE_LOW_FIRST,
   compareFindings,

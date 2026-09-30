@@ -6,7 +6,7 @@
  */
 import type { SuccessCriterion } from '@sysdesign/contracts';
 
-import type { TaskSpec } from './contracts';
+import type { TaskSpec } from '../contracts';
 
 export function rubricProblems(
   criteria: readonly SuccessCriterion[],

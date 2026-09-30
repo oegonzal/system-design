@@ -9,8 +9,8 @@ import type { LlmClient } from '@sysdesign/llm';
 import type { TaskSpec } from '../contracts';
 import type { StageSpec } from '../pipeline';
 import type { CriteriaDeriver } from '../ports';
-import { goalSection, joinSections, kindsSection, systemPrompt } from '../prompting';
-import { criteriaSchema, enumTuple } from '../schemas';
+import { goalSection, joinSections, kindsSection, systemPrompt } from './prompting';
+import { criteriaSchema, enumTuple } from './schemas';
 import { CRITERIA_STAGE, diagnostic } from './shared';
 
 export function createCriteriaDeriver<T>(

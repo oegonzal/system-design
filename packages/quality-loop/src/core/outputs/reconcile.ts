@@ -13,7 +13,7 @@ import type {
   SpreadDto,
 } from '@sysdesign/contracts';
 
-import type { RunOutputs } from './outputs';
+import type { RunOutputs } from './run-outputs';
 
 const round = (value: number): number => Math.round(value * 10) / 10;
 

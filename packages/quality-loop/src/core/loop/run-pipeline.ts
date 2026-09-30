@@ -20,12 +20,12 @@ import type {
 } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
-import { annotate } from './annotate';
-import type { TaskContract } from './contracts';
-import { deriveLessons } from './lessons';
+import { annotate } from '../evidence/annotate';
+import type { TaskContract } from '../contracts';
+import { deriveLessons } from '../evidence/lessons';
 import { materialize } from './materialize';
-import { normalize } from './normalize';
-import { validatePipeline, type PipelineDefinition } from './pipeline';
+import { normalize } from '../evidence/normalize';
+import { validatePipeline, type PipelineDefinition } from '../pipeline';
 import {
   emptyUpstream,
   type Critic,
@@ -33,10 +33,10 @@ import {
   type ExchangeSink,
   type LensContext,
   type Stages,
-} from './ports';
+} from '../ports';
 import { rubricProblems } from './rubric';
 import { mapConcurrent } from './scoped-llm';
-import { diagnostic, LENSES_STAGE } from './stages/shared';
+import { diagnostic, LENSES_STAGE } from '../stages/shared';
 
 export interface RunInput {
   goal: string;

@@ -2,7 +2,7 @@ import type { RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../core/outputs';
-import { GOAL_MAX_BYTES } from '../../core/prompting';
+import { GOAL_MAX_BYTES } from '../../core/contracts';
 import { fromRun } from '../../pipelines/experience-digest/compose';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
 import { sampleDigest, sampleRun } from '../../pipelines/experience-digest/testing';

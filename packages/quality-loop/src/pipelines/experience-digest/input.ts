@@ -17,7 +17,7 @@ import {
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { GOAL_MAX_BYTES } from '../../core/prompting';
+import { GOAL_MAX_BYTES } from '../../core/contracts';
 
 export const EXPERIENCE_DIGEST_ID = 'experience-digest';
 
@@ -35,7 +35,7 @@ const RULE_MAX = 300;
 const MAX_RULES = 8;
 
 export const EVIDENCE_KINDS = ['finding', 'criterion'] as const;
-export const TRANSITION_KINDS = ['persisted', 'resolved', 'improved', 'regressed'] as const;
+const TRANSITION_KINDS = ['persisted', 'resolved', 'improved', 'regressed'] as const;
 
 const alias = z.string().min(1).max(8);
 const iteration = z.number().int().min(1);
@@ -48,7 +48,7 @@ const transitionSchema = z.strictObject({
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
-export const iterationSummarySchema = z.strictObject({
+const iterationSummarySchema = z.strictObject({
   iteration,
   mode: z.enum([...PRODUCE_MODES, 'provided'] as const),
   decision: z.enum(DECISIONS),

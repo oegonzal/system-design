@@ -9,9 +9,9 @@ import type {
   ProducerInput,
   Stages,
   UpstreamEvidenceBundle,
-} from './ports';
-import { composeController, STANDARD } from './controllers';
-import { describePipeline } from './pipeline';
+} from '../ports';
+import { composeController, STANDARD } from '../controllers';
+import { describePipeline } from '../pipeline';
 import { runLoop, runPipeline } from './run-pipeline';
 import {
   criterion,
@@ -24,7 +24,7 @@ import {
   tinyPipeline,
   tinyPolicy,
   type TinyOutput,
-} from './testing';
+} from '../testing';
 
 const clock = () => 0;
 const deriver = (criteria: SuccessCriterion[] | null) => () =>

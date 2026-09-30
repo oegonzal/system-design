@@ -11,10 +11,10 @@ The generic quality-control loop from [overview.md](./overview.md), as a NestJS 
 | Deterministic validators      | `core/stages/schema-validator.ts` always first, plus any `Validator<T>` a pipeline brings. A `block` failure skips every lens.                                                        |
 | Critics                       | `core/stages/llm-critic.ts`: defects with type, severity, confidence, fixability, location refs and criterion refs — all enum-locked per request.                                     |
 | Evaluators                    | `core/stages/llm-evaluator.ts`: `pass                                                                                                                                                 | partial | fail  | not_applicable` per criterion of its kinds. Each kind has exactly one judge. |
-| Evidence normalizer           | `core/normalize.ts`: admission, structural keys, agreement across samples, lower-middle medians, cross-lens merge, reconciliation.                                                    |
-| Deterministic decision policy | `core/decide.ts`: scores, then gates in a fixed order, every step traced.                                                                                                             |
+| Evidence normalizer           | `core/evidence/normalize.ts`: admission, structural keys, agreement across samples, lower-middle medians, cross-lens merge, reconciliation.                                                    |
+| Deterministic decision policy | `core/controllers/`: scores, then gates in a fixed order, every step traced.                                                                                                             |
 | Controller decision           | `accept                                                                                                                                                                               | revise  | retry | escalate                                                                     | reject`, plus the runner's stop reason. |
-| Trace + lessons               | `core/run-pipeline.ts` returns a `RunTrace`; `dump/build-run-dump.ts` lays it out; `@sysdesign/run-dump` writes it under `static/runs`.                                               |
+| Trace + lessons               | `core/loop/run-pipeline.ts` returns a `RunTrace`; `dump/build-run-dump.ts` lays it out; `@sysdesign/run-dump` writes it under `static/runs`.                                               |
 
 Everything under `src/core/` is pure: no Nest, no filesystem, no clock (`now` is injected). The Nest layer (`src/modules/`) binds the model client, the pipeline registry and the trace store.
 

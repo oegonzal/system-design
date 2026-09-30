@@ -241,8 +241,13 @@ export async function runOrchestration<O extends object, P>(
         registry,
         acceptAtOf,
         execute: async (input, pipeline) => {
+          const { criteria, ...rest } = input;
           const child = await deps.execute(
-            { ...input, pipeline: chosen(step.id, declared, pipeline) },
+            {
+              ...rest,
+              ...(criteria === undefined ? {} : { criteria: [...criteria] }),
+              pipeline: chosen(step.id, declared, pipeline),
+            },
             (opened) => {
               void ledger.child(step.id, opened.runId);
             },
