@@ -61,4 +61,7 @@ spec:
     - protocol: TCP
       port: 3003
       targetPort: 3003
-  type: LoadBalancer
+  # In-cluster only: the host reaches it through Tilt's port-forward. A
+  # LoadBalancer here makes Docker Desktop's Kubernetes publish 0.0.0.0:3003
+  # too, and the two race for the port.
+  type: ClusterIP

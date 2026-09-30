@@ -208,6 +208,14 @@ stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
   `packages/quality-loop/Tiltfile` builds from the shell's `ANTHROPIC_API_KEY`
   at `tilt up` (a pod has no Claude Code login). With it unset Tilt warns and
   the pod exits at boot with the loop's own message.
+- Under Tilt the host reaches the API (3000), the loop (3003) and Postgres
+  (5432) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+  used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
+  host-published container on the same port, racing Tilt's forward. A cluster
+  that ran the old manifests may keep a Service stuck deleting, and then Tilt
+  reports `timeout waiting for delete`. Clear it once:
+  `kubectl patch svc <name> --type=merge -p '{"metadata":{"finalizers":null}}'`,
+  then `tilt trigger <resource>`.
 - One-time migration of pre-existing runs into the named volume:
   `docker exec <old-container> pg_dump -U admin -d sysdesign --clean --if-exists`
   piped into `psql postgresql://admin:admin@localhost:5433/sysdesign`.
