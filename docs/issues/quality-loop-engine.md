@@ -248,7 +248,7 @@ runs than the page size is read in full.
 
 ### ENG-10 · A boot sweep fails another process's live run, and its close cannot undo it
 
-**Status** open · **Severity** medium · **Where** `modules/runs/persistence/mikro-orm-run-repository.ts` (`failInterrupted`, `close`), `modules/orchestration/persistence/mikro-orm-orchestration-run-repository.ts` (the same pair)
+**Status** closed · **Closed by** `0c36180 feat(db,quality-loop): a running row is alive while its heartbeat is fresh; a late close tells the truth` · **Where** `modules/runs/persistence/mikro-orm-run-repository.ts` (`failStale`, `heartbeat`, `close`), `modules/orchestration/persistence/mikro-orm-orchestration-run-repository.ts` (the same), `modules/janitor/`
 
 **What.** `failInterrupted` marks every row still `running` as failed with
 an `Interrupted` error, on the assumption that the only process that could
@@ -279,6 +279,25 @@ complete → anything. (a) keeps the sweep honest for concurrent processes;
 (b) keeps a swept row from lying once the truth arrives. Until one lands,
 never boot a second process against the same database while a run is live.
 
-**Verify.** Two repositories over one database: the first opens a run, the
-second boots and sweeps, the first closes — the row ends in the first's
-terminal state, its children under a header that agrees with them.
+**How it closed.** Both halves of the recommendation. (a) A heartbeat:
+`heartbeat_at` on both run tables (migration `Migration20260929300001_run_heartbeat`,
+backfilled from `updated_at`), set at `open`, refreshed by every exchange
+write and by an unref'd ticker in `perform` every `staleAfterMs / 3`;
+`failInterrupted` became `failStale(before)`, which fails only `running` rows
+whose heartbeat is older than the threshold, and the orchestration sweep
+skips a stale row whose child run still heartbeats. The sweep lives in one
+`RunJanitor` (boot + interval, from `QUALITY_LOOP_RUN_STALE_AFTER_MS`,
+default 600000) that only model-running processes import; `replay` never
+sweeps. (b) `close()` locks the row and returns `closed | reclaimed |
+refused`: it writes the header where the row is `running` or `failed` with
+`error.name === 'Interrupted'`, inserts the children only when it writes the
+header, and refuses anything else — so a row can go running → interrupted →
+its true outcome and never complete → anything. The interruption message now
+says why: "the run's heartbeat went stale — its process died or stalled".
+
+**Verify.** `[QL-13]` in `modules/runs/runs.spec.ts` (a stale row is failed
+at boot, a heartbeating one left alone; two instances over one database
+with a gated fake model — the late close is `reclaimed`, its children sit
+under a complete header, a second close is `refused`) and `[QL-16]` in
+`modules/orchestration/orchestrations-http.spec.ts`; `stale-after.spec.ts`
+for the threshold.

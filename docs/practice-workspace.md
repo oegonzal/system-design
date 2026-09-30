@@ -14,14 +14,18 @@ and **see results / iterate**.
 
 ### Read the challenge
 
-- **Prompt** — the challenge, read-only: its markdown as written, and its
-  **criteria** as chips grouped by kind — functional, non-functional, scale,
-  constraint — each with an id (`c1`, `c2`, …) and the statement the grader
-  derived from the text. The criteria are derived once, the first time the
-  prompt is opened ("normalising requirements…" while the grader answers), and
-  stay fixed for the prompt's life; they can be re-derived until a session has
-  been graded against them. This is _what you're asked to design_; you never
-  edit it here.
+- **Prompt** — the challenge, read-only: its markdown rendered (tables and
+  lists as written; its headings demoted so the document's own title never
+  competes with the page's), and its **criteria** as chips grouped by kind —
+  functional, non-functional, scale, constraint — each with an id (`c1`,
+  `c2`, …) and its statement. For a written or imported prompt the criteria
+  are derived once by the grader, the first time the prompt is opened
+  ("normalising requirements…" while it answers), and can be re-derived until
+  a session has been graded against them; a generated prompt's criteria are
+  its draft's own rows and are never re-derived. Either way they stay fixed
+  for the prompt's life. This is _what you're asked to design_; you never
+  edit it here. If the prompt was archived meanwhile, the tab says so, and
+  Submit and the coach stay disabled until it is reactivated.
 
 ### Author your answer (these, plus the canvas, are your submission)
 
@@ -37,26 +41,44 @@ and **see results / iterate**.
 ### See results / iterate
 
 - **Feedback** — the graded result of the current revision, straight from the
-  quality loop: the **overall score** and the controller's **decision**
-  (accept / revise / retry / escalate / reject), one **meter per dimension**
-  the pipeline declares (coverage, quality attributes, compliance — "Not
-  assessed" when nothing earned it), a **result per criterion** (pass /
-  partial / fail), and the **findings**: each with its severity, the lenses
-  that confirmed it, its type, the criteria it names, the lens's rationale,
-  and the components it points at — click one and they highlight on the
-  canvas. While the run is in flight the tab polls; without a model it says so.
-- **Coach** — hand the current draft to the loop with a number of iterations.
-  The draft is stored as your revision; progress shows the model calls as they
-  happen; every iteration that scored strictly higher than all before it
-  arrives in the timeline as an **AI** revision, and **Load best** puts it on
-  the canvas read-only. Disabled, with the reason, when no model is available.
+  quality loop: the **overall score** with the controller's **decision**
+  (accept / revise / retry / escalate / reject) and its own **reason**, one
+  **meter per dimension** the pipeline declares (coverage, quality attributes,
+  compliance — "Not assessed" when nothing earned it, and the overall stays
+  empty rather than zero when nothing was assessed at all), a **result per
+  criterion** (pass / partial / fail, a stacked list), and the **findings**:
+  each with its severity, the lenses that confirmed it, its type, the criteria
+  it names, the lens's rationale, and the places it points at, **labelled** —
+  `api · service · API`, `c1 ← api`, a narration's criterion — with the same
+  labels substituted into the rationale; click one and its nodes and edges
+  highlight on the canvas. While the run is in flight the tab polls; while the
+  loop is unreachable it says so. A revision graded before grading moved to
+  the loop has no evaluation: the tab says so and offers a resubmit instead
+  of asking for one.
+- **Coach** — hand your design to the loop with a number of iterations. From
+  the draft: it is stored as your revision and graded as the starting point.
+  From a graded revision — when the canvas is clean and the loaded revision's
+  grade is complete — the loop reuses that grade as the starting point instead
+  of grading it again, and nothing is stored twice. Progress shows the model
+  calls as they happen; the newest coaching run is restored when the page
+  reloads. Each row is the **starting point**, **imported** (it beat every
+  earlier one and landed in the timeline as an **AI** revision), **not
+  better**, or **refused** with the problems the studio found — every row
+  with the controller's reason. **Load best** puts the best import on the
+  canvas read-only. Disabled, with the reason, while the loop is unreachable.
 - **Revisions** — the version history: one chip per revision, newest first,
   with its score, decision and status, and an **AI** badge on coach-authored
-  ones. Click a chip to load that revision onto the canvas read-only.
+  ones. Click a chip to load that revision onto the canvas read-only: Submit,
+  Clear and the Brief and Narrative editors lock until **Restore as draft**
+  puts it back as your own.
 
 _(Above the canvas, the toolbar holds the actions: **Submit for evaluation**,
 **Clear**, **Fit view** and **Export** — a zip of the diagram PDF plus
-per-artifact Markdown.)_
+per-artifact Markdown — and the **draft badge**: unsaved, saving draft…,
+draft saved, draft not saved. The canvas autosaves to the session a moment
+after you stop editing, is restored ahead of the latest revision when the
+workspace opens, and is cleared by the submit or coach start it became; a
+navigation while a save is still pending asks first.)_
 
 ## The Properties panel
 

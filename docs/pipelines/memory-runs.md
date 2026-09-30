@@ -426,7 +426,7 @@ reason means the step ran and had no effect.
 | `provided-run`         | runner | a `/from-run` start; the step's stand-in was written at open                    | expected; the run already happened                                                 |
 | `interrupted`          | runner | at boot — the process died mid-run                                              | re-run; completed children are still persisted                                     |
 | `errored`              | runner | an unexpected throw closed the run, or a step gave an undeclared reason         | `note` carries the message; this one is a bug                                      |
-| `embeddings-disabled`  | memory | recall, digest — no `OPENAI_API_KEY`, or the loop is pinned deterministic       | put the key in `.env`; the target still ran                                        |
+| `embeddings-disabled`  | memory | recall, digest — no `OPENAI_API_KEY` (the embedding client carries `no-key`)    | put the key in `.env`; the target still ran                                        |
 | `store-unavailable`    | memory | recall, store — `verify()` said not ready, or a call threw                      | `pnpm stack:db`; `context.store.note` carries the cause                            |
 | `store-empty`          | memory | recall — the collection holds nothing, or the fused list came back empty        | seed past runs, or re-index them if the generation moved (§6)                      |
 | `embedding-failed`     | memory | recall, store — the provider returned nothing after one retry                   | check the `llm: embeddings request failed` line for status and body                |
@@ -492,8 +492,8 @@ so the module never imports the client directly:
   the loop chose at boot, with the persona in `probes.md`. The goal itself is
   always probe zero, so every candidate a bare search would have found is in
   the pool fusion ranks — the ordering can still differ, but nothing is lost
-  before it — and a model that refuses, errors or is disabled costs exactly
-  the probes and nothing else. Probes are never derived from the prompt's
+  before it — and a model that refuses or errors costs exactly the probes and
+  nothing else. Probes are never derived from the prompt's
   typography: splitting on blank lines or headings is a rule that parses prose
   the module did not write, and on this repo's own prompts it yields as many
   bare section headings as content.
@@ -518,7 +518,7 @@ reason, note, model, collection, chunks }`, which is logged at boot and
   cause, never a 503 and never a failed boot.
 
 Embeddings are a port beside the LLM client in `packages/llm`:
-`EmbeddingClient` with `enabled`, `model`, `dimensions` and one `embed` method
+`EmbeddingClient` with `enabled`, `model`, `dimensions`, `reason` and one `embed` method
 that answers `null` on any failure, exactly as `LlmClient` does. The OpenAI
 adapter batches at the provider's ceiling of 100 inputs, always sends
 `dimensions` so any `text-embedding-3` model fits the collection, retries a
@@ -569,10 +569,11 @@ pnpm db:migrate
 pnpm stack:down                                  # both, data stays in the named volumes
 
 # the service; Node loads .env, which is where OPENAI_API_KEY lives.
-# QUALITY_LOOP_AUTH is NOT in .env and NOT in any pnpm script, and without it
-# the loop degrades silently: every run "completes" in ~30s with no exchanges,
-# overall 0 and finalDecision escalate. Only GET /runs/<id>.llm says why —
-# {"enabled": false, "reason": "no-key"}. DB_PORT fails loudly; this fails quietly.
+# QUALITY_LOOP_AUTH is NOT in .env and NOT in any pnpm script. The loop boots
+# only with a model provider — this, or ANTHROPIC_API_KEY — and without either
+# it exits 1 naming both before Nest boots, so a run can never "complete" with
+# nothing judged. Embeddings stay optional: without OPENAI_API_KEY the memory
+# steps skip with embeddings-disabled and the target still runs.
 env DB_PORT=5433 QUALITY_LOOP_AUTH=claude-code \
   node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 

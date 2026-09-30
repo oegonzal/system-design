@@ -8,7 +8,7 @@ pre-commit hook and CI. Conventions and the index are in
 
 ### SEAM-1 · The no-op client is still wired in
 
-**Status** open · **Severity** high · **Where** `packages/llm/src/create-client.ts`, `packages/quality-loop/src/modules/runs/runs.module.ts`
+**Status** closed · **Closed by** `17f9e8a feat(llm,quality-loop): the loop boots only with a model provider` · **Where** `packages/llm/src/create-client.ts`, `packages/quality-loop/src/boot.ts`
 
 **What.** `create-client.ts` returns `NoopLlmClient` when `ANTHROPIC_API_KEY`
 is missing or `QUALITY_LOOP_DETERMINISTIC=1`, and `NoopEmbeddingClient` when
@@ -36,9 +36,26 @@ the loop's specs. The deterministic-only grading path is STUDIO-8; the
 Playwright suite depends on it and needs recorded responses before the flag
 can go.
 
-**Verify.** Booting the quality loop without `QUALITY_LOOP_AUTH` or a key
-exits non-zero with the variable named; no `NoopLlmClient` is constructed
-outside a spec.
+**How it closed.** `NoopLlmClient`, `LlmClient.enabled`, `QUALITY_LOOP_DETERMINISTIC`
+and every `!enabled` branch (`llm-disabled`, `producer-unavailable`,
+`classifier-disabled`) are gone. `resolveQualityLoopProvider` returns the
+API-key or Claude Code route or throws `MissingModelProviderError`, whose
+message names both variables; `main.ts` runs `preflight(argv, env)` before
+`NestFactory` for `serve` and `run` and exits 1 with that message, and
+`replay` boots a `ReplayModule` with no client and no janitor. Availability
+is read from the constructed client (`LlmModelDto { model }` on `/health`
+and every run), never re-derived from the environment; `POST /criteria` is
+503 whenever derivation yields no criteria. The embeddings tier stays
+optional (`DisabledEmbeddingClient('no-key')`), and `LlmAvailabilityDto`
+describes only it. Fakes stay in specs: `fakeLlm` for the loop, and one
+`FakeLoop` (`packages/studio-testing`) behind the studio API's client fake
+and the e2e stub.
+
+**Verify.** `[QL-22]` in `packages/llm/src/create-client.spec.ts`,
+`packages/quality-loop/src/boot.spec.ts` and `replay.module.spec.ts`;
+`git grep NoopLlmClient packages` returns nothing; the only mention of
+`QUALITY_LOOP_DETERMINISTIC` in `packages/` is the spec proving it is no
+longer read.
 
 ---
 
@@ -89,7 +106,7 @@ id on the report so a judge change is visible in the record.
 
 ### SEAM-4 · The boot sweep interrupts in-flight runs from any process
 
-**Status** open · **Severity** medium · **Where** `AppModule` boot, the `running` sweep
+**Status** closed · **Closed by** `0c36180 feat(db,quality-loop): a running row is alive while its heartbeat is fresh; a late close tells the truth` (the fix is ENG-10's) · **Where** `modules/janitor/`, `modules/runs/runs.service.ts`
 
 **What.** Every process that boots `AppModule` sweeps `running` rows to
 `interrupted`, the CLI included. Running `pnpm quality-loop:run` while the
@@ -103,8 +120,18 @@ sweep with a heartbeat lease (`lastSeenAt` on the run row, renewed by the
 owning process) and sweep only expired leases. The second also survives two
 servers.
 
-**Verify.** A CLI run started while a server run is in flight leaves it
-`running`; a killed server's run is swept once its lease expires.
+**How it closed.** The second option: `heartbeat_at` on `quality_run` and
+`orchestration_run`, written at open, on every exchange and by a ticker
+every `staleAfterMs / 3` while `perform` runs; `RunJanitor` sweeps at boot
+and on an interval only rows whose heartbeat is older than
+`QUALITY_LOOP_RUN_STALE_AFTER_MS` (default 600000), and only in processes
+that run models — `replay` boots without it. A CLI run beside the server
+leaves the server's run `running`.
+
+**Verify.** `[QL-13]` "a run whose heartbeat went stale is failed at boot;
+one still heartbeating is left alone" (`modules/runs/runs.spec.ts`) and
+`[QL-16]` in `orchestrations-http.spec.ts`; `[QL-22]` on the replay module
+never sweeping.
 
 ---
 

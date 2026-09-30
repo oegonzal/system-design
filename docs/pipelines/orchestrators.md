@@ -72,14 +72,16 @@ should see it), `refuse` (what the orchestrator will not run), and `context`
 Three files carry what more than one orchestrator declares. They are
 declared, not applied: the runner knows none of them.
 
-**`orchestrators/common.ts`.** `INTERNAL_PIPELINES` — the two that take a
-goal another step composed, never a brief; no orchestrator accepts one as a
-target and the router never offers one as a route. `refuseInternal`,
+**`orchestrators/common.ts`.** `refuseInternal` — a pipeline whose definition
+says `goalSource: 'composed'` takes a goal another step composed, never a
+brief; no orchestrator accepts one as a target and the router never offers
+one as a route, read from the registry's summaries rather than a list kept
+here. Beside it:
 `bareRequest` (a stored goal may carry what a memory run appended, and no
 step should read that as part of the brief), `runTarget` (run a declared
 pipeline as the run's own deliverable: its failure is the orchestration's),
 `providedAsOutput` (the stand-in a provided run makes), `briefRoutes` (the
-registry minus the internal pipelines, as `{ id, description }`), and the
+registry's `brief` pipelines, as `{ id, description }`), and the
 shapes every step adapter writes: `requestInput` (the request's own run
 inputs), `skipped`, `completed` (a child that ran to a trace) and
 `runFailed` (the step's failure in the child's words). The runner itself is
@@ -161,9 +163,9 @@ judge      needs: [classify]           pipeline: whatever classify produced; jud
 ```
 
 `takesTarget: false` — the router chooses; a request that names a pipeline
-is refused — reasons `classifier-disabled`, `no-routes`, `unclassified`. All
-three fail the run: dispatch is the deliverable, and a record that completed
-with nothing judged would be a lie.
+is refused — reasons `no-routes`, `unclassified`. Both fail the run: dispatch
+is the deliverable, and a record that completed with nothing judged would be
+a lie. (There is no disabled classifier: the loop boots only with a model.)
 
 The routes are never listed. They are every registered pipeline that takes a
 brief, read from the registry at run time, so a fifth judge is a route the

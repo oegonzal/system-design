@@ -23,16 +23,17 @@ Two facts organise everything below:
 
 ## 1. The studio's three paths, at a glance
 
-| #   | Path              | Trigger                                                                         | Pipeline               | Iterations           | What the studio stores                                                              |
-| --- | ----------------- | ------------------------------------------------------------------------------- | ---------------------- | -------------------- | ----------------------------------------------------------------------------------- |
-| 1   | Prompt generation | `POST /prompts/generate` → 202; `GET /prompts/generate/:runId` claims the draft | `design-prompt`        | 2                    | a `prompt_generation` row keyed by the run; the claimed `prompt`                    |
-| 2   | Grade             | `POST /sessions/:id/revisions` → 201; `GET /revisions/:id/evaluation` polls     | `system-design-canvas` | 1                    | the revision, pointing at `(runId, 1)`; the terminal score and decision, cached     |
-| 3   | Coach             | `POST /sessions/:id/improve` → 202; `GET /sessions/:id/improve/:runId` imports  | `system-design-canvas` | `maxIterations` ≤ 10 | the draft as revision `(runId, 1)`; every strictly better iteration as `(runId, k)` |
+| #   | Path              | Trigger                                                                                                                                                               | Pipeline               | Iterations           | What the studio stores                                                                                                                       |
+| --- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Prompt generation | `POST /prompts/generate` → 202; `GET /prompts/generate/:runId` claims the draft                                                                                       | `design-prompt`        | 2                    | a `prompt_generation` row keyed by the run; the claimed `prompt`                                                                             |
+| 2   | Grade             | `POST /sessions/:id/revisions` → 201; `GET /revisions/:id/evaluation` polls                                                                                           | `system-design-canvas` | 1                    | the revision, pointing at `(runId, 1)`; the terminal score and decision, cached                                                              |
+| 3   | Coach             | `POST /sessions/:id/improve` → 202 (the draft, or `{ baseRevisionId }` to adopt a graded revision); `GET /sessions/:id/improve` lists; `GET …/improve/:runId` imports | `system-design-canvas` | `maxIterations` ≤ 10 | a `coaching_run` row; the draft as revision `(runId, 1)` or nothing new for an adopted base; every strictly better iteration as `(runId, k)` |
 
 Beside them, without a run: `POST /prompts` stores markdown the author wrote,
 `POST /prompts/import` copies a document from the loop's library, and both —
-like every prompt the first time it is read — derive their criteria through
-`POST /criteria`, one model call and no run.
+like every written or imported prompt the first time it is read — derive
+their criteria through `POST /criteria`, one model call and no run. A
+generated prompt's criteria are its draft's own rows and need no call.
 
 ```
 studio-ui ──HTTP──► studio-api ──── QualityLoopClient (port) ──► quality-loop :3003 ──► Postgres
@@ -40,7 +41,7 @@ studio-ui ──HTTP──► studio-api ──── QualityLoopClient (port) �
    prompt (write/import/generate) ─ POST /criteria ─────────────────►│ derive stage
    (1) generate ─────── POST /runs { design-prompt, goal: experience }►│ writer → critics → evaluator → controller
    (2) submit ────────── POST /runs { system-design-canvas, output, criteria, 1 }
-   (3) coach ─────────── POST /runs { system-design-canvas, output, criteria, n }
+   (3) coach ─────────── POST /runs { system-design-canvas, output | adopt, criteria, n }
                        ◄──── GET /runs/:id ── the trace: iterations, ledger, decision, remediations
 ```
 
@@ -64,14 +65,19 @@ and the criteria the loop derived from it. Three sources, one row:
   the run once it is complete parses its best artifact with
   `designPromptDraftSchema`, renders it to the house markdown with
   `renderDesignPromptMarkdown`, and claims it into a prompt with a
-  conditional update, so two concurrent polls create one prompt. Omitting the
-  experience picks the least practised one.
+  conditional update, so two concurrent polls create one prompt. Its rubric is
+  `criteriaFromDraft` (contracts): one criterion per row of the draft, in
+  render order — the draft was judged row by row, so no second derivation.
+  Omitting the experience picks the least practised one, in fixture order.
 
 Criteria are `c1…cN` with kinds `functional`, `non_functional`, `scale`,
 `constraint`; they are stable for the prompt's life and can be re-derived
 (`POST /prompts/:id/criteria`) only while no session has been graded against
-them. A rewrite of the markdown clears and re-derives them under the same
-rule.
+them and the prompt is not generated (409 either way). A rewrite of the
+markdown derives the new rubric before anything is written — a grader that
+cannot derive leaves the prompt exactly as it was — and makes the prompt
+`authored`, since what it was generated or imported from no longer describes
+it.
 
 ---
 
@@ -85,23 +91,38 @@ rule.
    criterion the prompt never derived or a node the canvas does not hold, a
    path that does not connect, a rationale for a node that is not drawn
    (`submission.ts`). Nothing here says whether the design is any good.
-2. **Start the run before writing.** `startRun({ pipeline: 'system-design-canvas',
-goal: prompt.markdown, output: { graph, brief, narrative }, criteria:
-prompt.criteria, maxIterations: 1 })`; a loop that refuses leaves no
-   half-graded row behind.
+2. **Lock the session, then start the run before writing.** The rubric is
+   made sure of first (a derivation can take minutes and must not hold the
+   row); then, under a write lock on the session row (`withSessionLock`): the
+   session is open and its prompt not archived (422), no earlier grade is
+   still in flight (409 naming the revision — the cache says `running` until
+   read, so the loop is asked first), and only then
+   `startRun({ pipeline: 'system-design-canvas', goal: prompt.markdown,
+output: { graph, brief, narrative }, criteria: prompt.criteria,
+maxIterations: 1 })`. A loop that refuses rolls the transaction back.
 3. **Store the revision** pointing at iteration 1 of that run
-   (`createRevision`, one transaction, dense numbering).
+   (`createRevision`, dense numbering) and clear the session's draft, in the
+   same transaction.
 4. **Read the grade back.** `GET /revisions/:id/evaluation` fetches the run
-   and maps its iteration (`evaluation.mapper.ts`): score, decision and
-   dimensions from the controller; findings from the ledger with `node.N` /
-   `edge.N` refs resolved by position onto the graded graph and the lens's
-   rationale beside them; a result per criterion. The terminal score, decision
-   and status are written back onto the revision so lists and timelines never
-   fetch the loop.
+   and maps its iteration (`evaluation.mapper.ts`): score, decision, its
+   reason and dimensions from the controller — `overall` null when no
+   dimension was assessed, never the controller's zero; findings from the
+   ledger with every `locationRef` grounded onto the graded submission by
+   `submissionLocations` (contracts) as a label, a part and a key, and the
+   lens's rationale beside them; a result per criterion. The terminal score,
+   decision and status are written back onto the revision so lists and
+   timelines never fetch the loop. A revision graded before delegation has
+   no run pointer and no evaluation; the client shows a notice instead of
+   asking.
 
 Inside the run, the canvas pipeline's `references` validator repeats the
-studio's three checks (so what the studio refuses and what the loop blocks
-cannot differ), five critics — requirements, architecture, capacity,
+studio's three checks, so what the studio refuses and what the loop blocks
+cannot differ. A produced artifact — the coach's — passes the output shape's
+`normalize` before any validator: `repairSubmission` drops the bindings and
+narrations that name nothing on the graph, so a fan-out never blocks on a
+stale reference; a provided artifact is never repaired. When an iteration is
+still blocked, its validator notes reach the next produce as a refusals
+section of the briefing. Five critics — requirements, architecture, capacity,
 explanation, failure scenarios — and two evaluators judge with two samples
 each, and the standard controller decides.
 
@@ -109,18 +130,35 @@ each, and the standard controller decides.
 
 ## 4. Coach
 
-The same run with more iterations. `POST /sessions/:id/improve` validates the
-draft exactly as a submission, starts the run with `maxIterations`
-(default 3, at most 10), and stores the draft as the author's own revision
-`(runId, 1)`. From iteration 2 on the loop's producer — the canvas pipeline's
-coach persona — revises against the remediations the controller selected,
-keeping every author id and prefixing what it adds with `ai-`. Reading the run
-(`GET /sessions/:id/improve/:runId`) imports every iteration whose score beat
-all before it as an `assistant` revision `(runId, k)`, once — the unique pair
-on the row makes a concurrent poll harmless — after parsing its artifact with
-the same schema and validators a submission passes; an artifact the studio
-would refuse is logged and skipped. The response lists every iteration with
-its score, decision and the revision it became, if any.
+The same run with more iterations, and every run recorded on its session in
+`coaching_run` (`GET /sessions/:id/improve` lists them newest first — what a
+reloaded workspace resumes polling). `POST /sessions/:id/improve` starts one
+of two ways, both under the session lock and the same guards as a submit:
+
+- **From the draft:** validated exactly as a submission, started with
+  `output` and `maxIterations` (default 3, at most 10), the draft stored as
+  the author's own revision `(runId, 1)` and the session's draft cleared.
+- **From a graded revision** (`{ baseRevisionId }`): the revision must be
+  this session's, hold a run pointer, and its grade must be `complete` —
+  asked of the loop first — else 404 / 422 / 409 while still running. The run
+  is started with `adopt: { runId, iteration }` instead of `output`; the loop
+  copies that recorded iteration verbatim as iteration 1 in mode `adopted`,
+  so nothing is graded or stored twice, and the draft is untouched.
+
+From iteration 2 on the loop's producer — the canvas pipeline's coach
+persona, briefed with the criteria ids so it can bind an unbound one —
+revises against the remediations the controller selected, keeping every
+author id and prefixing what it adds with `ai-`. Reading the run
+(`GET /sessions/:id/improve/:runId`) resolves it through the `coaching_run`
+row (an adopting run has no revision at `(runId, 1)`) and imports every
+iteration whose score beat all before it as an `assistant` revision
+`(runId, k)`, once — the unique pair on the row makes a concurrent poll
+harmless — after parsing its artifact with the same schema and validators a
+submission passes. Every iteration is reported with its score, decision, the
+controller's reason and an outcome: `base`, `imported`, `not-better`, or
+`refused` with the problems the studio found (logged, never repaired, never
+stored). A failed run marks the base revision failed only when the base is
+its own — an adopted base keeps the grade of the run it came from.
 
 ---
 
@@ -133,14 +171,16 @@ import `@sysdesign/llm`
 `QualityLoopClient` port (`packages/studio-api/src/modules/quality-loop/`),
 an abstract class with one HTTP adapter that maps the loop's failures to
 `502` / `503` / `504`, a fake bound in the API's specs, and a stub server the
-e2e suite starts on `:3103`. Availability is a proxy of the loop's own
-(`GET /grading/availability`), so the UI can disable a control with an
-honest reason instead of failing.
+e2e suite starts on `:3103` — both over the one `FakeLoop` in
+`packages/studio-testing`. Availability is a proxy of the loop's own
+(`GET /grading/availability`): a booted loop always has a model, so the
+answer names it or is 503 because the loop is unreachable, and the UI
+disables a control with that reason instead of failing.
 
 Every model call lives in `packages/quality-loop`: the derive stage, the
-producer, and each lens sample, all through `@sysdesign/llm`'s one port under
-the loop's role (`QUALITY_LOOP_DETERMINISTIC` / `QUALITY_LOOP_AUTH` /
-`ANTHROPIC_API_KEY`).
+producer, and each lens sample, all through `@sysdesign/llm`'s one port on
+the provider the environment names (`ANTHROPIC_API_KEY`, else
+`QUALITY_LOOP_AUTH=claude-code`; neither, and the process refuses to boot).
 
 ---
 
@@ -161,14 +201,15 @@ the loop's role (`QUALITY_LOOP_DETERMINISTIC` / `QUALITY_LOOP_AUTH` /
 
 ## 7. Which switches gate what
 
-| Switch                          | Effect                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `ANTHROPIC_API_KEY`             | the loop grades on the API; outranks the subscription route                                                  |
-| `QUALITY_LOOP_AUTH=claude-code` | the loop grades through this machine's Claude Code login (the local stack's default)                         |
-| `QUALITY_LOOP_DETERMINISTIC=1`  | no model at all: `POST /criteria` is 503, a run escalates with no score; what CI and the Tilt deployment set |
-| `QUALITY_LOOP_URL`              | where studio-api finds the loop; default `http://localhost:3003`                                             |
-| `LLM_MODEL`                     | the model id on either route                                                                                 |
-| `EVAL_DUMP_DIR`                 | where the loop's run dumps go; the specs point it at a temp directory                                        |
+| Switch                            | Effect                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`               | the loop grades on the API; outranks the subscription route. Under Tilt, from the Secret `quality-loop-model`                   |
+| `QUALITY_LOOP_AUTH=claude-code`   | the loop grades through this machine's Claude Code login (the local stack's default)                                            |
+| neither                           | `serve` and `run` exit 1 at boot naming both; `replay` boots without a model. There is no switch that runs the loop without one |
+| `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                                |
+| `LLM_MODEL`                       | the model id on either route                                                                                                    |
+| `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `600000`                                 |
+| `EVAL_DUMP_DIR`                   | where the loop's run dumps go; the specs point it at a temp directory                                                           |
 
 ---
 
@@ -182,10 +223,22 @@ over any task declared as data. Six pipelines live as sibling folders under
 `POST /orchestrations/memory` so a run can recall what earlier runs learned
 and digest what it learned itself; `system-design-canvas` and
 `design-prompt` are the studio's, and take a goal the studio composed — never
-a brief a person types into the router. It has its own Postgres tables
-(`quality_run` and its children, `orchestration_run` and its children,
-`memory_embedding`) and its own vector store (Qdrant, the `vectors` compose
-service); the dump remains the full audit trail beside them.
+a brief a person types into the router. Every definition says which it is:
+`goalSource: 'brief' | 'composed'`, validated at boot and carried on the
+pipeline summary, so the loop UI offers only `brief` pipelines, the router
+never routes to a composed one, and no orchestrator takes one as a target. It
+has its own Postgres tables (`quality_run` and its children, `orchestration_run`
+and its children, `memory_embedding`) and its own vector store (Qdrant, the
+`vectors` compose service); the dump remains the full audit trail beside them.
+
+A run may adopt a recorded iteration of an earlier run:
+`POST /runs { adopt: { runId, iteration }, criteria, … }`, exclusive with
+`output`. The adopted run must be the same pipeline at the same version and
+the rubric must equal the one it was judged against; the iteration is copied
+verbatim as iteration 1 in mode `adopted`, no stage runs for it, and the
+record says which run it came from. A running row heartbeats, and the served
+loop's janitor fails only rows whose heartbeat went stale; a swept row is
+reclaimed by its owner's late close, so the record ends in the truth.
 
 The controller that turns a ledger into a decision is declared per pipeline,
 by reference, from a small library under `src/core/controllers/`: `standard`

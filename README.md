@@ -46,12 +46,14 @@ tilt up                 # postgres → migrations → seed → api → quality l
 | Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
-Grading needs a model. The quality loop runs on `ANTHROPIC_API_KEY`, or —
-with `QUALITY_LOOP_AUTH=claude-code`, the local stack's default — through
-this machine's Claude Code login. With `QUALITY_LOOP_DETERMINISTIC=1` (what
-CI sets) no model is ever called: the loop's specs use fakes, the studio's
-specs a fake client, the e2e suite a stub server, and a live run escalates
-honestly with no score.
+Grading needs a model. The quality loop boots only with one: `ANTHROPIC_API_KEY`,
+or — with `QUALITY_LOOP_AUTH=claude-code`, the local stack's default — this
+machine's Claude Code login. Without either, `serve` and `run` exit at boot
+naming both variables; there is no switch that runs the loop without a model,
+so a run never looks graded when none ran. Under Tilt the key comes from a
+Secret built from the shell's `ANTHROPIC_API_KEY`. No test calls a model: the
+loop's specs script a fake client, and the studio's specs and the e2e stub
+share one fake loop (`packages/studio-testing`).
 
 ### Without Kubernetes — durable local stack
 
@@ -77,46 +79,52 @@ model and how to bring your runs back in the future.
 Packages carry a `project.json` (no per-package `package.json`); every
 dependency is hoisted to the root and Nx is the single entry point.
 
-| Package                    | What it is                                                                                      |
-| -------------------------- | ----------------------------------------------------------------------------------------------- |
-| `packages/contracts`       | Wire types, `as const` vocabularies and the zod schemas every layer derives from                |
-| `packages/db`              | MikroORM entities, migrations, seed — shared by the API and the quality loop                    |
-| `packages/llm`             | The one LLM seam: Claude via structured outputs, the subscription route, no-op without either   |
-| `packages/nest-kit`        | Shared Nest plumbing: the zod validation pipe, the MikroORM root module, health, CORS           |
-| `packages/design-system`   | Emotion tokens → semantic roles → primitives, contrast-asserted                                 |
-| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop   |
-| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                                |
-| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI — grades the studio     |
-| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                |
-| `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP) |
-| `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger    |
-| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook                      |
-| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                 |
-| `packages/studio-ui`       | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository            |
-| `packages/storybook`       | Catalog host globbing sibling stories                                                           |
-| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey, against a stub quality loop     |
-| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles                         |
-| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke + repo gates         |
+| Package                    | What it is                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `packages/contracts`       | Wire types, `as const` vocabularies and the zod schemas every layer derives from                  |
+| `packages/db`              | MikroORM entities, migrations, seed — shared by the API and the quality loop                      |
+| `packages/llm`             | The one LLM seam: Claude via structured outputs on a key or the subscription route; none, no boot |
+| `packages/nest-kit`        | Shared Nest plumbing: the zod validation pipe, the MikroORM root module, health, CORS             |
+| `packages/design-system`   | Emotion tokens → semantic roles → primitives, contrast-asserted                                   |
+| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop     |
+| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                                  |
+| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI — grades the studio       |
+| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                  |
+| `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)   |
+| `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger      |
+| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook                        |
+| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                   |
+| `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub           |
+| `packages/studio-ui`       | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository              |
+| `packages/storybook`       | Catalog host globbing sibling stories                                                             |
+| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey, against a stub quality loop       |
+| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles                           |
+| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke + repo gates           |
 
 ## How grading works
 
 The studio holds no rubric of its own. A prompt is one markdown document plus
 the criteria the quality loop derived from it once (`POST /criteria`) — stable
 ids for the prompt's life, so a brief written against `c3` still means `c3`
-on the next revision. Submitting a revision checks structure only (every
-reference must resolve: edges to nodes, bindings to criteria, paths that
-connect) and starts one `system-design-canvas` run on those criteria with
-the canvas, brief and narrative as the artifact; the revision row points at
-that run's iteration. Five critic personas (requirements, architecture,
-capacity, explanation, failure scenarios) and two evaluators judge it with
-two samples each; the deterministic controller prices what they agreed on
-into coverage, quality attributes and compliance, and decides. The studio
-reads the run back, grounds each finding onto the author's node and edge
-ids by position, and caches the terminal score. The coach is the same run
-with more iterations: every iteration that beat the ones before it is
-imported once as an assistant revision. Prompt generation is the loop's
-`design-prompt` pipeline over a rendered experience. Every run persists in
-`quality_run*` and writes a full dump under `static/runs/`.
+on the next revision; a generated prompt's rubric is its draft's own rows.
+Submitting a revision checks structure only (every reference must resolve:
+edges to nodes, bindings to criteria, paths that connect), waits for no
+earlier grade of the session to still be in flight, and starts one
+`system-design-canvas` run on those criteria with the canvas, brief and
+narrative as the artifact; the revision row points at that run's iteration.
+Five critic personas (requirements, architecture, capacity, explanation,
+failure scenarios) and two evaluators judge it with two samples each; the
+deterministic controller prices what they agreed on into coverage, quality
+attributes and compliance, and decides. The studio reads the run back,
+grounds each finding onto the canvas by label and part, keeps the
+controller's reason, and caches the terminal score. The coach is the same
+run with more iterations, started from the draft or from a graded revision
+whose recorded grade the loop adopts as iteration 1; every iteration that
+beat the ones before it is imported once as an assistant revision, and
+every coaching run is recorded on its session. Prompt generation is the
+loop's `design-prompt` pipeline over a rendered experience. Every run
+persists in `quality_run*`, heartbeats while it runs, and writes a full
+dump under `static/runs/`.
 
 ## Everyday commands
 
@@ -131,6 +139,11 @@ pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prom
 pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
 ```
+
+The dev servers need no Nx daemon: `nx run studio-api:serve` and
+`quality-loop:serve` are two plain processes, `vite build --watch` writing
+`dist/main.js` and `node --watch` restarting on it; `next dev` builds into
+`.next-dev`, so a `next build` never clobbers a running dev server.
 
 Git hooks live in `.githooks` (activated by `pnpm install` via the `prepare`
 script): format staged files, lint/typecheck affected projects, then a quick

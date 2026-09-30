@@ -43,7 +43,7 @@ of re-deriving the problem.
 | ENG-7    | No response memoisation; a re-grade re-bills                             | open     | medium   |
 | ENG-8    | `agentic-design` accepts 6 of 40 iterations                              | watch    | —        |
 | ENG-9    | `replay` reads one page and does not say so                              | open     | low      |
-| ENG-10   | A boot sweep fails another process's live run; its close cannot undo it  | open     | medium   |
+| ENG-10   | A boot sweep fails another process's live run; its close cannot undo it  | closed   | —        |
 | MEM-1    | Persona compliance still costs admission                                 | open     | medium   |
 | MEM-2    | Memory transfers, but improving answers is unproven                      | open     | high     |
 | MEM-3    | No retrieval score floor; RRF trades sharpness for breadth               | open     | medium   |
@@ -55,10 +55,10 @@ of re-deriving the problem.
 | MEM-9    | Not built by choice, listed so nobody rediscovers them                   | accepted | —        |
 | MEM-10   | The digest routinely ends `revise` at its iteration cap                  | watch    | —        |
 | MEM-11   | `MemoryStepDto.counts` keys are a convention, not a vocabulary           | open     | low      |
-| SEAM-1   | The no-op client is still wired in                                       | open     | high     |
+| SEAM-1   | The no-op client is still wired in                                       | closed   | —        |
 | SEAM-2   | No retry on a schema miss                                                | open     | high     |
 | SEAM-3   | No temperature, seed or memoisation at the seam                          | open     | medium   |
-| SEAM-4   | The boot sweep interrupts in-flight runs from any process                | open     | medium   |
+| SEAM-4   | The boot sweep interrupts in-flight runs from any process                | closed   | —        |
 | SEAM-5   | The pre-commit review runs no critics on the subscription route          | open     | medium   |
 | SEAM-6   | CI never calls a model; no judge-regression harness                      | open     | medium   |
 | STUDIO-1 | Archetypes still drive prompt generation and coverage                    | closed   | —        |
@@ -84,11 +84,11 @@ of re-deriving the problem.
 Ordered by how much of what the system reports would change meaning if the
 entry were closed, then by cost. Each points at the entry that specifies it.
 
-1. **Fail fast without a model** — SEAM-1. Every downstream number is only
-   as honest as the client that produced it; a silent no-op makes a run look
-   graded when it was not. (STUDIO-8 closed with the studio's rules engine:
-   the loop is the studio's only grader now, and its no-op path escalates
-   with no score.)
+1. **Fail fast without a model** — closed: SEAM-1, and STUDIO-8 before it.
+   The loop boots only with a model provider and exits naming both variables
+   otherwise; the no-op client is gone, so no run can look graded when it was
+   not. ENG-10 and SEAM-4 closed beside it: a running row heartbeats, only a
+   stale one is swept, and a late close reclaims a swept row with the truth.
 2. **Retry a schema miss once** — SEAM-2, ENG-2. One lost sample currently
    escalates a whole run and withholds every memory it would have injected.
 3. **Every declared dimension earns** — ENG-1. Twenty-three points of every

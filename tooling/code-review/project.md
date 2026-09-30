@@ -6,14 +6,14 @@ prompt. It describes the repository, not the change you are reviewing — the us
 ## The product
 
 A System Design Studio: an interactive diagramming app for practising distributed-systems design.
-A seeded experience profile generates a design prompt (scenario, functional requirements, NFRs,
-scale targets); the user draws an architecture on a canvas — nodes for the system-design vocabulary,
-edges distinguishing sync from async — and an evaluation pipeline scores the design: a deterministic
-rules engine in the worker first, LLM critics behind an adapter second. A Next.js single-page
-canvas talks to a NestJS API across a shared TypeScript contract; a NestJS worker consumes eval
-jobs; Postgres holds sessions, revisions and evaluations through MikroORM migrations. It is one
-repository, organised as a monorepo so that the wire format and the UI vocabulary each have exactly
-one definition.
+A prompt is written, imported, or drafted from a seeded experience profile by the quality loop; the
+user draws an architecture on a canvas — nodes for the system-design vocabulary, edges distinguishing
+sync from async — and the quality loop grades the design: deterministic validators first, LLM critics
+and evaluators behind one model seam, a deterministic controller deciding. A Next.js single-page
+canvas talks to a NestJS API across a shared TypeScript contract; the API starts quality-loop runs
+through one client port; Postgres holds sessions, revisions, coaching runs and the loop's own runs
+through MikroORM migrations. It is one repository, organised as a monorepo so that the wire format
+and the UI vocabulary each have exactly one definition.
 
 ## What each project is for
 
@@ -26,8 +26,10 @@ anything the map already generates is deliberately absent, because a second copy
   validates against and the design system maps to tokens.
 - `criteria` — the brief's completion criteria as data, each claimed by a tagged test title.
 - `db` — the MikroORM entities, the hand-written migrations, and the seed.
-- `llm` — the model-client abstraction: one interface, a real provider adapter, a no-op fallback.
-  Knows nothing about HTTP or the canvas.
+- `llm` — the model-client abstraction: one interface, two provider adapters (the API key, the
+  Claude Code subscription), and a factory that throws naming both variables when neither is
+  configured — a process that needs a model and has none fails at boot. Knows nothing about HTTP or
+  the canvas.
 - `design-system` — the token layer plus domain-free primitives. Knows nothing about designs,
   sessions or evaluations.
 - `studio-ui` — the app: routes, the canvas, the feature components that _do_ know the domain, the
@@ -85,12 +87,15 @@ inventing something; code that breaks one is a finding.
   `[EVAL-3]` claims a criterion owned by `packages/criteria`, whose coverage check fails if any
   criterion has no test. The tag is read statically across two test runners: a machine-checked
   reference, not decoration.
-- **Deterministic before probabilistic.** The eval engine runs its rule checks before any model is
-  consulted, and a model's output never overrides a rule's. The same shape governs this review
-  pipeline. Code that lets a model decide what a deterministic check already decided is a finding.
+- **Deterministic before probabilistic.** The quality loop runs its validators before any lens is
+  consulted, and a model's output never overrides a validator's or the controller's. The same shape
+  governs this review pipeline. Code that lets a model decide what a deterministic check already
+  decided is a finding.
 - **The LLM sits behind `llm`'s client interface.** Feature code depends on the interface; the
-  provider adapter is chosen at the edge, and the no-op client keeps every path testable without a
-  key.
+  provider adapter is chosen at the edge, and fakes keep every path testable without a key:
+  `fakeLlm` in the loop's specs, and `@sysdesign/studio-testing`'s `FakeLoop` behind the studio
+  API's client fake and the e2e stub. There is no deterministic runtime mode and no no-op client — a
+  process without a provider fails at boot, so a fake that leaks into a runtime file is a finding.
 - **`contracts` and `design-system` are consumed as TypeScript source** through `tsconfig.base.json`
   path aliases and inlined by each app's build. The absent build step is the design, not an
   omission.

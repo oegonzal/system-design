@@ -67,13 +67,25 @@ run needs a model. Two routes, in order of precedence:
   runs every model call through this machine's Claude Code login via the Agent
   SDK — if `claude` is logged in, grading just works. No key is read or stored.
 
-`QUALITY_LOOP_DETERMINISTIC=1` turns the model off whatever else is set — what
-CI does. Without a model the loop derives no criteria (`POST /criteria`
-answers 503 with the reason, and the studio shows the prompt's criteria as
-unavailable), refuses nothing else, and a run that is started escalates
-honestly with `llm-disabled` diagnostics and no score. `GET
-/api/grading/availability` reports which case you are in; the UI reads it to
-explain a disabled control instead of failing.
+There is no way to run the loop without a model. `serve` and `run` check for
+a provider before anything boots and exit 1 naming both variables; `replay`
+reads recorded runs and needs none. A booted loop always has a model, so
+`GET /api/grading/availability` (the loop's `GET /health`, proxied) either
+names it or answers 503 because the loop is unreachable, and the UI reads it
+to explain a disabled control instead of failing. `POST /criteria` answers
+503 when the model derives no criteria, so a prompt is never stored without a
+rubric, and a rewrite that cannot be derived leaves the prompt as it was.
+
+A running run heartbeats its row, and the served loop's janitor sweeps at boot
+and on an interval, failing as `Interrupted` only rows whose heartbeat is older
+than `QUALITY_LOOP_RUN_STALE_AFTER_MS` (default `600000`, ten minutes; the
+heartbeat is written every third of it). A run another process is still
+driving is left alone, so `pnpm quality-loop:run` beside the service is safe.
+A loop restarted mid-run leaves its row `running` until the threshold passes;
+then the row is failed and the revision shows failed — and if the original
+process does finish later, its close reclaims the swept row with the real
+outcome. A value that is not a positive integer of milliseconds refuses to
+boot, by name.
 
 A grade is slow on purpose: seven lenses, two samples each, serially on a
 subscription — minutes per submission. The feedback tab polls the run and
@@ -99,28 +111,65 @@ other sources yield the same shape: `POST /api/prompts/import { libraryId }`
 copies one of the loop's library documents (`GET /api/prompts/library`), and
 `POST /api/prompts/generate { experienceId? }` starts a `design-prompt` run
 over an experience (202; poll `GET /api/prompts/generate/:runId` until the
-draft is claimed into a prompt). Re-derive the criteria with
-`POST /api/prompts/:id/criteria` while no session has been graded against
-them; afterwards the ids are frozen (409).
+draft is claimed into a prompt — omitting the experience draws the least
+practised one, in fixture order). A generated prompt's criteria are its
+draft's own rows, one each, and are never re-derived (409). Re-derive a
+written or imported prompt's with `POST /api/prompts/:id/criteria` while no
+session has been graded against them; afterwards the ids are frozen (409).
+Rewriting the markdown derives once, before anything is written, and makes
+the prompt authored.
 
 ## Re-grading a stored design
 
-A **failed** run (the loop lost the model mid-way, or was restarted) shows as
-failed on the revision; the UI's retry resubmits the same design as a new
-revision with a new run. A **complete** grade is immutable — iterate by
+A **failed** run (the loop lost the model mid-way, or its heartbeat went stale
+after a restart) shows as failed on the revision; the UI's retry resubmits the
+same design as a new revision with a new run. A **complete** grade is immutable — iterate by
 submitting the next revision.
 
 ## The AI coach
 
-Stuck, or curious how a model would improve your current design? **Improve**
-posts the draft to `POST /api/sessions/:id/improve`: the draft is stored as
-your own revision (iteration 1 of the run), then the loop revises it up to
-`maxIterations` times against the remediations its panel selected. Reading
-the run (`GET /api/sessions/:id/improve/:runId`, which the coach tab polls)
-imports every iteration that scored strictly higher than all before it as an
+Stuck, or curious how a model would improve your current design? The coach
+posts to `POST /api/sessions/:id/improve`, two ways:
+
+- **From the draft** (the body is the submission plus `maxIterations`): the
+  draft is stored as your own revision, iteration 1 of the run, and the saved
+  draft is cleared.
+- **From a graded revision** (`{ baseRevisionId, maxIterations? }` — what the
+  workspace sends when the canvas is clean and the loaded revision's grade is
+  complete): the loop adopts that revision's recorded grade verbatim as
+  iteration 1, so nothing is graded or stored twice, and the draft is
+  untouched. Only a completed grade of this session qualifies: 404 for another
+  session's revision, 409 while it is still being graded, 422 when its run
+  failed or it was graded before delegation.
+
+Either way the loop then revises up to `maxIterations` times (default 3, at
+most 10) against the remediations its panel selected. Every coaching run is
+recorded on the session — `GET /api/sessions/:id/improve` lists them newest
+first, which is what a reloaded workspace resumes polling. Reading a run
+(`GET /api/sessions/:id/improve/:runId`, which the coach tab polls) imports
+every iteration that scored strictly higher than all before it as an
 **AI-badged assistant revision** in your timeline, each with its own grade,
-once. The coach uses the same model switches as grading; without a model the
+once; an artifact the studio would refuse is reported `refused` with its
+problems and never stored, and every row carries the controller's reason. A
+coaching run that fails marks the draft revision failed only when the draft
+was its base; an adopted revision keeps the grade of the run it came from.
+The coach reaches the same loop as grading; while the loop is unreachable the
 button explains why it is disabled.
+
+## The draft, and one grade at a time
+
+The unsubmitted canvas is a draft kept with the session: the workspace
+autosaves it to `PUT /api/sessions/:id/draft` (shape-checked only — an empty
+binding or a blank claim is fine), `GET /api/sessions/:id/draft` returns it,
+and it is restored ahead of the latest revision when the workspace opens. It
+is cleared by the submit or coach start it became; a closed session keeps
+none (422).
+
+Submits serialise on the session row: a second submit while the latest
+revision is still being graded is 409 naming that revision (a grade that
+finished unread is asked of the loop first, not refused), and a submit or
+coach start on a session whose prompt was archived is 422 until the prompt is
+reactivated — the session itself still reads.
 
 ## Export a run as portable files
 
@@ -143,7 +192,10 @@ a fake model, and Playwright starts a stub quality-loop server on :3103.
 One caveat: Playwright reuses already-running dev servers locally. A reused dev
 API points at `sysdesign` while the suite prepared `sysdesign_test`, so specs
 may fail confusingly (your data still safe — nothing truncates `sysdesign`).
-Stop the dev stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
+The `serve` targets are two plain processes (`vite build --watch` and
+`node --watch`) that need no Nx daemon, so a dev API you left running is
+rebuilt on every edit — and is still the one Playwright reuses. Stop the dev
+stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
 
 ## Notes / gotchas
 
@@ -152,8 +204,10 @@ Stop the dev stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
 - This durable `docker-compose` stack is the canonical **local** database. The
   committed Tilt/Kubernetes path (`tilt up`, `tilt/postgres/*`) is a separate,
   independent database — don't mix them, or each will show only its own runs.
-  Under Tilt the loop runs with `QUALITY_LOOP_DETERMINISTIC=1` unless you set
-  an auth route in its deployment.
+  Under Tilt the loop's key comes from the Secret `quality-loop-model`, which
+  `packages/quality-loop/Tiltfile` builds from the shell's `ANTHROPIC_API_KEY`
+  at `tilt up` (a pod has no Claude Code login). With it unset Tilt warns and
+  the pod exits at boot with the loop's own message.
 - One-time migration of pre-existing runs into the named volume:
   `docker exec <old-container> pg_dump -U admin -d sysdesign --clean --if-exists`
   piped into `psql postgresql://admin:admin@localhost:5433/sysdesign`.

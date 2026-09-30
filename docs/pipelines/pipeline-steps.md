@@ -54,7 +54,7 @@ What the engine owns
 
 - Ids. c1…cN are assigned positionally after the fact. The model never authors an identifier, so the policy can price a kind without trusting a name.
 - The cap. Anything past maxCriteria is sliced off.
-- Failure. No live model → llm-disabled diagnostic and no criteria, which the controller then escalates as "no criteria to judge against" rather than inventing a score. Same for a schema miss.
+- Failure. A derivation the model fails → `llm-failed` diagnostic and no criteria, which the controller then escalates as "no criteria to judge against" rather than inventing a score. Same for a schema miss. There is no disabled model to fall through to: a process without a provider never boots.
 
 Why this is the right split. The model does the one thing only a model can — read prose and say what it demands. Everything that matters downstream is deterministic: the kinds it may choose from are the pipeline's declaration, the ids are the engine's, and the count is capped. That's why the re-templated prompts landed so cleanly — each section maps onto one kind, so the deriver's job became classification rather than interpretation (cycle 1: 124 / 56 / 56 / 43, zero old-vocabulary kinds, stable across all 14 runs).
 

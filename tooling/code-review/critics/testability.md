@@ -24,10 +24,13 @@ name is judged exactly as before: the purpose raises the floor, it does not excu
 never a reason to report that behaviour should not have been built.
 
 Use the repository map to judge which project a test belongs in and at what level. A domain-free
-primitive is unit-tested in its own project against its own stories; the eval engine's rules are
-unit-tested as pure functions in the worker; behaviour that only exists once the app and the API are
-both running belongs in the browser suite. Code that reaches for the model client where the no-op
-client would do makes every downstream test need a key — that is a hidden dependency.
+primitive is unit-tested in its own project against its own stories; the quality loop's core is
+unit-tested as pure functions with scripted fakes; behaviour that only exists once the app and the
+API are both running belongs in the browser suite. Fakes keep every path testable without a key —
+`fakeLlm` in the loop, `@sysdesign/studio-testing`'s `FakeLoop` behind the studio API's client fake
+and the e2e stub — and there is no no-op client to fall back on: code that reaches for a live model
+client where one of those fakes would do makes every downstream test need a key, and that is a hidden
+dependency.
 
 Report concrete findings only. Every finding must quote the evidence it rests on, taken verbatim from
 the supplied diff or context. A missing test is the one finding whose subject is an absence — quote

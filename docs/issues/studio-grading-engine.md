@@ -44,7 +44,10 @@ rules were not ported as validators: what they encoded is now in the lens
 personas, and the deterministic validators check references only.
 
 **Verify.** `packages/eval-worker` does not exist; `EvaluationDto` is built
-from a `QualityRunDto` alone (`packages/studio-api/src/modules/sessions/evaluation.mapper.ts`).
+from a `QualityRunDto` and the graded submission alone — the run for the
+verdict, the submission for the labelled locations
+(`packages/studio-api/src/modules/sessions/evaluation.mapper.ts`,
+`submissionLocations` in contracts).
 
 ---
 
@@ -113,12 +116,12 @@ fails before the fix and passes after.
 **What.** With the flag set, or with no key, the studio graded with rules
 alone and presented byte-reproducible output as a feature.
 
-**How it closed.** The flag and the rules are gone. `QUALITY_LOOP_DETERMINISTIC`
-is the one switch left, and it turns the model off honestly: a run escalates
-with `llm-disabled` diagnostics and no score, the studio's `POST /criteria`
-proxy answers 503, and the UI says the grader is unavailable. No test reaches a
-model: studio-api binds a fake client, the loop's specs a fake model, and the
-e2e suite a stub quality-loop server.
+**How it closed.** The flag and the rules are gone. The loop was left with one
+switch of its own, `QUALITY_LOOP_DETERMINISTIC`, which turned the model off
+honestly — a run escalated with no score and the UI said the grader was
+unavailable; that went with SEAM-1, and the loop now boots only with a model.
+No test reaches a model: the loop's specs script a fake client, and studio-api's
+client fake and the e2e stub share one `FakeLoop` (`packages/studio-testing`).
 
-**Verify.** `git grep EVAL_DETERMINISTIC packages` returns only the llm spec
-that proves the variable is no longer read.
+**Verify.** `git grep -E "EVAL_DETERMINISTIC|QUALITY_LOOP_DETERMINISTIC" packages`
+returns only the llm spec that proves neither variable is read.
