@@ -64,7 +64,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'GEN-1',
     statement:
-      "A design prompt can be generated from an experience by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated.",
+      "A design prompt can be generated from an experience — the named one, or the least practised in fixture order — by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated whose rubric is the draft's own rows, one criterion each, never a second derivation.",
   },
   {
     id: 'GEN-2',
@@ -95,7 +95,12 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-14',
     statement:
-      'A prompt shows its markdown and its criteria as chips grouped by kind; the criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been graded against them.',
+      'A prompt shows its markdown rendered and its criteria as chips grouped by kind; a written or imported prompt’s criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been graded against them, while a generated prompt’s are its draft’s and are never re-derived; a rewrite derives once and makes the prompt authored; a session whose prompt was archived still reads but takes no submit and no coach until the prompt is back.',
+  },
+  {
+    id: 'UX-15',
+    statement:
+      'The unsubmitted canvas is a draft kept with the session: it autosaves shape-checked only, is restored ahead of the latest revision when the workspace opens, is cleared by the submit or coach start it became, and the workspace asks before a pending save is lost.',
   },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
@@ -115,7 +120,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-3',
     statement:
-      "The coach is a revise run: the draft is stored as the author's revision, and every iteration that beat the ones before it is imported once as an assistant revision with its own grade.",
+      "The coach is a revise run recorded on its session: it starts from the draft, stored as the author's revision, or from a graded revision whose recorded grade the loop adopts verbatim; every iteration that beat the ones before it is imported once as an assistant revision with its own grade, and one the studio would refuse is reported refused with its problems and never stored.",
   },
   {
     id: 'DEL-4',
