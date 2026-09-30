@@ -1,20 +1,27 @@
 /**
  * The orchestration-run record in Postgres. Every method forks the root
  * EntityManager (the run performs in the background, outside any request
- * context); writes after `open` are guarded by `status: 'running'`, so a late
- * flush never resurrects a row the boot sweep already failed. Children are
- * one row per run id a step opened, keyed by step and ordinal, upserted as
- * the ledger learns them and never removed: a child id, once known, stays
- * known.
+ * context); every flush refreshes the heartbeat, and writes after `open` are
+ * guarded by `status: 'running'`, so a late flush never resurrects a row the
+ * janitor failed — except the terminal one: a row failed as Interrupted is
+ * the owning process's to reclaim with the truth. Children are one row per
+ * run id a step opened, keyed by step and ordinal, upserted as the ledger
+ * learns them and never removed: a child id, once known, stays known.
  */
 import { Injectable } from '@nestjs/common';
-import type { FilterQuery } from '@mikro-orm/core';
+import { LockMode, type FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import { OrchestrationRun, OrchestrationRunChild, QualityRun } from '@sysdesign/db';
 
+import type { CloseOutcome } from '../../../core/ports';
 import { closeSteps } from '../../../orchestrators/runner/record';
-import { interruptedError, NEWEST_FIRST, presentFilters } from '../../runs/persistence/conventions';
+import {
+  INTERRUPTED,
+  interruptedError,
+  NEWEST_FIRST,
+  presentFilters,
+} from '../../runs/persistence/conventions';
 import type { OrchestrationListQuery, OrchestrationRunRepository } from '../ports';
 import { childrenOf, fromRow, toRow, type ChildRef } from './orchestration-run-mapper';
 
@@ -24,7 +31,7 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
 
   async open(record: OrchestrationRunDto): Promise<void> {
     const em = this.em.fork();
-    const row = em.create(OrchestrationRun, toRow(record));
+    const row = em.create(OrchestrationRun, { ...toRow(record), heartbeatAt: new Date() });
     for (const child of childrenOf(record)) addChild(em, row, child);
     await em.flush();
   }
@@ -33,24 +40,43 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
     const em = this.em.fork();
     const row = await running(em, record.orchestrationRunId);
     if (row === null) return;
+    const now = new Date();
     row.steps = record.steps;
-    row.updatedAt = new Date();
+    row.heartbeatAt = now;
+    row.updatedAt = now;
     await this.syncChildren(em, row, record);
     await em.flush();
   }
 
-  async close(record: OrchestrationRunDto): Promise<void> {
-    const em = this.em.fork();
-    const row = await running(em, record.orchestrationRunId);
-    if (row === null) return;
-    const next = toRow(record);
-    row.status = next.status;
-    row.steps = next.steps;
-    row.error = next.error;
-    row.finishedAt = next.finishedAt;
-    row.updatedAt = new Date();
-    await this.syncChildren(em, row, record);
-    await em.flush();
+  async heartbeat(orchestrationRunId: string): Promise<void> {
+    await this.em
+      .fork()
+      .nativeUpdate(
+        OrchestrationRun,
+        { id: orchestrationRunId, status: 'running' },
+        { heartbeatAt: new Date() },
+      );
+  }
+
+  async close(record: OrchestrationRunDto): Promise<CloseOutcome> {
+    return this.em.fork().transactional(async (em) => {
+      const row = await em.findOne(
+        OrchestrationRun,
+        { id: record.orchestrationRunId },
+        { lockMode: LockMode.PESSIMISTIC_WRITE },
+      );
+      if (row === null) return 'refused';
+      const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
+      if (row.status !== 'running' && !reclaimable) return 'refused';
+      const next = toRow(record);
+      row.status = next.status;
+      row.steps = next.steps;
+      row.error = next.error;
+      row.finishedAt = next.finishedAt;
+      row.updatedAt = new Date();
+      await this.syncChildren(em, row, record);
+      return reclaimable ? 'reclaimed' : 'closed';
+    });
   }
 
   async find(orchestrationRunId: string): Promise<OrchestrationRunDto | null> {
@@ -72,18 +98,31 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
     return [rows.map(fromRow), total];
   }
 
-  async failInterrupted(): Promise<number> {
+  async failStale(before: Date): Promise<number> {
     const em = this.em.fork();
-    const rows = await em.find(OrchestrationRun, { status: 'running' });
+    const stale = await em.find(OrchestrationRun, {
+      status: 'running',
+      heartbeatAt: { $lt: before },
+    });
     const at = new Date();
-    for (const row of rows) {
+    let failed = 0;
+    for (const row of stale) {
+      // The row itself moves only on step transitions; a child run still
+      // heartbeating proves the orchestration is alive.
+      const alive = await em.count(OrchestrationRunChild, {
+        run: row.id,
+        qualityRun: { status: 'running', heartbeatAt: { $gte: before } },
+      });
+      if (alive > 0) continue;
       row.status = 'failed';
       row.error = interruptedError('orchestration run');
       row.steps = closeSteps(row.steps, 'interrupted', null, at.toISOString());
       row.finishedAt = at;
+      row.updatedAt = at;
+      failed += 1;
     }
     await em.flush();
-    return rows.length;
+    return failed;
   }
 
   private async syncChildren(

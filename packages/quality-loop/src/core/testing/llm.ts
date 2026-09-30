@@ -75,3 +75,31 @@ export const disabledLlm = (): LlmClient => ({
   model: null,
   completeStructured: () => Promise.resolve(null),
 });
+
+/**
+ * A model that waits: every call blocks until `release()` — so a spec can
+ * hold a run in flight while it boots a second instance beside it. Recording
+ * passes through to the inner client.
+ */
+export function gatedLlm(
+  inner: LlmClient & LlmRecordable,
+): LlmClient & LlmRecordable & { release(): void } {
+  let open: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  const build = (
+    client: LlmClient & LlmRecordable,
+  ): LlmClient & LlmRecordable & { release(): void } => ({
+    enabled: client.enabled,
+    model: client.model,
+    async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+      await gate;
+      return client.completeStructured(request);
+    },
+    // A recorded twin of the inner client shares the gate: `fakeLlm` twins are recordable too.
+    withRecorder: (next) => build(client.withRecorder(next) as LlmClient & LlmRecordable),
+    release: () => open(),
+  });
+  return build(inner);
+}

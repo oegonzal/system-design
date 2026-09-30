@@ -5,6 +5,7 @@ import { MEMORY_ORCHESTRATOR_ID, ROUTER_ORCHESTRATOR_ID } from '@sysdesign/contr
 import { ORCHESTRATORS } from '../../orchestrators';
 import type { MemoryPorts } from '../../orchestrators/memory/ports';
 import type { RouterPorts } from '../../orchestrators/router/ports';
+import { JanitorModule } from '../janitor/janitor.module';
 import { MemoryModule } from '../memory/memory.module';
 import { MEMORY_PORTS } from '../memory/tokens';
 import { RouterModule } from '../router/router.module';
@@ -27,7 +28,7 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
  * declares none, like the two panels, is bound to nothing.
  */
 @Module({
-  imports: [RunsModule, OrchestrationRecordModule, MemoryModule, RouterModule],
+  imports: [RunsModule, OrchestrationRecordModule, MemoryModule, RouterModule, JanitorModule],
   controllers: [OrchestrationController],
   providers: [
     OrchestrationService,

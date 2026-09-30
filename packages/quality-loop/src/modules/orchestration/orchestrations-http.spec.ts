@@ -285,8 +285,7 @@ describe('the orchestrations HTTP surface', () => {
     });
   });
 
-  // Last: booting another app sweeps every `running` row, so it must never overlap a live run.
-  it('[QL-16] a run left running by a dead process is failed at boot, its steps marked interrupted', async () => {
+  it('[QL-16] a run whose heartbeat went stale is failed at boot with its steps interrupted, a live one is left alone, and the owner’s late close reclaims the swept one', async () => {
     const fork = em.fork();
     const step = (status: 'complete' | 'running' | 'pending', reason: string | null = null) => ({
       status,
@@ -298,58 +297,75 @@ describe('the orchestrations HTTP surface', () => {
       startedAt: null,
       finishedAt: null,
     });
-    fork.create(OrchestrationRun, {
-      id: crypto.randomUUID(),
-      orchestrator: 'memory',
-      pipeline: 'system-design',
-      status: 'running',
-      request: {
-        goal: GOAL,
-        outputProvided: false,
-        criteriaProvided: false,
-        maxIterations: 1,
-        samples: null,
-      },
-      context: {},
-      steps: {
-        recall: step('complete', 'store-empty'),
-        target: step('running'),
-        digest: step('pending'),
-        store: step('pending'),
-      },
-      startedAt: new Date(),
-    });
+    const header = (heartbeatAt: Date) =>
+      fork.create(OrchestrationRun, {
+        id: crypto.randomUUID(),
+        orchestrator: 'memory',
+        pipeline: 'system-design',
+        status: 'running',
+        request: {
+          goal: GOAL,
+          outputProvided: false,
+          criteriaProvided: false,
+          maxIterations: 1,
+          samples: null,
+        },
+        context: {},
+        steps: {
+          recall: step('complete', 'store-empty'),
+          target: step('running'),
+          digest: step('pending'),
+          store: step('pending'),
+        },
+        startedAt: new Date(),
+        heartbeatAt,
+      });
+    const stale = header(new Date(Date.now() - 2 * 60 * 60 * 1000));
+    const live = header(new Date());
     await fork.flush();
-    const stale = (await fork.find(OrchestrationRun, { status: 'running' }))[0];
 
     const second = await boot();
     try {
-      const swept = (
-        (await (
-          await fetch(`${second.url}/orchestrations/${stale.id}`)
-        ).json()) as Envelope<OrchestrationRunDto>
-      ).data;
+      const read = async (id: string) =>
+        (
+          (await (
+            await fetch(`${second.url}/orchestrations/${id}`)
+          ).json()) as Envelope<OrchestrationRunDto>
+        ).data;
+      const swept = await read(stale.id);
       expect(swept.status).toBe('failed');
       expect(swept.error?.name).toBe('Interrupted');
       expect(swept.steps['recall'].status).toBe('complete');
       expect(swept.steps['target']).toMatchObject({ status: 'failed', reason: 'interrupted' });
       expect(swept.steps['digest']).toMatchObject({ status: 'skipped', reason: 'interrupted' });
       expect(swept.steps['store']).toMatchObject({ status: 'skipped', reason: 'interrupted' });
+      expect((await read(live.id)).status).toBe('running');
 
-      // A late flush from the dead process must not resurrect the swept row.
+      // A late flush from the owner never resurrects a swept row …
       const repository = second.app.get<OrchestrationRunRepository>(ORCHESTRATION_RUN_REPOSITORY);
       await repository.update({
         ...swept,
         steps: { ...swept.steps, target: { ...swept.steps['target'], status: 'running' } },
       });
-      await repository.close({ ...swept, status: 'complete', error: null });
-      const after = (
-        (await (
-          await fetch(`${second.url}/orchestrations/${stale.id}`)
-        ).json()) as Envelope<OrchestrationRunDto>
-      ).data;
-      expect(after.status).toBe('failed');
-      expect(after.steps['target'].status).toBe('failed');
+      expect((await read(stale.id)).status).toBe('failed');
+      // … but its close does: the owner knows how the run actually ended.
+      const outcome = await repository.close({
+        ...swept,
+        status: 'complete',
+        error: null,
+        steps: {
+          ...swept.steps,
+          target: { ...swept.steps['target'], status: 'complete', reason: null },
+        },
+      });
+      expect(outcome).toBe('reclaimed');
+      const after = await read(stale.id);
+      expect(after.status).toBe('complete');
+      expect(after.error).toBeNull();
+      expect(after.steps['target'].status).toBe('complete');
+      // And a terminal row is never written again.
+      expect(await repository.close({ ...after, status: 'failed' })).toBe('refused');
+      expect((await read(stale.id)).status).toBe('complete');
     } finally {
       await second.app.close();
     }

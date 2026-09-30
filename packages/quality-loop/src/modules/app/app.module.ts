@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DbModule } from '@sysdesign/nest-kit';
 
+import { JanitorModule } from '../janitor/janitor.module';
 import { MemoryModule } from '../memory/memory.module';
 import { OrchestrationModule } from '../orchestration/orchestration.module';
 import { PromptsModule } from '../prompts/prompts.module';
@@ -9,7 +10,15 @@ import { RunsModule } from '../runs/runs.module';
 import { HealthController } from './health.controller';
 
 @Module({
-  imports: [DbModule, RunsModule, PromptsModule, MemoryModule, RouterModule, OrchestrationModule],
+  imports: [
+    DbModule,
+    JanitorModule,
+    RunsModule,
+    PromptsModule,
+    MemoryModule,
+    RouterModule,
+    OrchestrationModule,
+  ],
   controllers: [HealthController],
 })
 export class AppModule {}

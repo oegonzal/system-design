@@ -4,7 +4,7 @@
  * step. The engine and the pipelines are consumed, never changed: every child
  * goes through `RunsService.execute`.
  */
-import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   OrchestrationRunDto,
   QualityRunDto,
@@ -17,28 +17,25 @@ import { validateOrchestrator } from '../../orchestrators/runner/definition';
 import { openRecord } from '../../orchestrators/runner/record';
 import { runOrchestration } from '../../orchestrators/runner/run-orchestration';
 import { orNotFound } from '../http/or-not-found';
-import { RunsService } from '../runs/runs.service';
+import type { RunJanitorOptions } from '../janitor/stale-after';
+import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
+import { heartbeatTicker, RunsService } from '../runs/runs.service';
 import { isOrchestrationRunId } from './orchestration-request';
 import type { OrchestrationListQuery, OrchestrationRunRepository, OrchestratorHost } from './ports';
 import { ORCHESTRATION_RUN_REPOSITORY, ORCHESTRATOR_HOSTS } from './tokens';
 
 @Injectable()
-export class OrchestrationService implements OnModuleInit {
+export class OrchestrationService {
   private readonly logger = new Logger(OrchestrationService.name);
 
   constructor(
     private readonly runs: RunsService,
     @Inject(ORCHESTRATION_RUN_REPOSITORY) private readonly repository: OrchestrationRunRepository,
     @Inject(ORCHESTRATOR_HOSTS) private readonly hosts: ReadonlyMap<string, OrchestratorHost>,
+    @Inject(RUN_JANITOR_OPTIONS) private readonly janitor: RunJanitorOptions,
   ) {
     // A malformed orchestrator fails boot, never a run.
     for (const host of hosts.values()) validateOrchestrator(host.definition);
-  }
-
-  /** Boot only: sweep runs the previous process never finished. */
-  async onModuleInit(): Promise<void> {
-    const failed = await this.repository.failInterrupted();
-    if (failed > 0) this.logger.warn(`marked ${failed} interrupted orchestration run(s) failed`);
   }
 
   async get(id: string): Promise<OrchestrationRunDto | null> {
@@ -169,6 +166,11 @@ export class OrchestrationService implements OnModuleInit {
     provided: QualityRunDto | null,
   ): Promise<void> {
     const label = `${host.definition.id} run ${record.orchestrationRunId}`;
+    const ticker = heartbeatTicker(
+      () => this.repository.heartbeat(record.orchestrationRunId),
+      this.janitor.staleAfterMs,
+      (error) => this.logger.warn(`${label}: heartbeat not written: ${String(error)}`),
+    );
     try {
       await runOrchestration(host.definition, record, request, provided, {
         ports: host.ports,
@@ -179,8 +181,16 @@ export class OrchestrationService implements OnModuleInit {
         warn: (message) => this.logger.warn(`${label}: ${message}`),
       });
     } finally {
+      ticker.stop();
       try {
-        await this.repository.close(record);
+        const outcome = await this.repository.close(record);
+        if (outcome === 'reclaimed') {
+          this.logger.warn(
+            `${label}: the janitor had failed this row as interrupted; overwrote it with the true outcome`,
+          );
+        } else if (outcome === 'refused') {
+          this.logger.error(`${label}: not persisted: the row is already terminal`);
+        }
       } catch (error) {
         this.logger.error(`${label}: not persisted: ${String(error)}`);
       }

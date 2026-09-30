@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
@@ -17,6 +17,8 @@ import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
+import type { RunJanitorOptions } from '../janitor/stale-after';
+import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import { availabilityOf } from './llm-backed';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
@@ -28,7 +30,7 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from '
  * loop, sinking exchanges as they are attributed.
  */
 @Injectable()
-export class RunsService implements OnModuleInit {
+export class RunsService {
   private readonly logger = new Logger(RunsService.name);
 
   constructor(
@@ -37,15 +39,10 @@ export class RunsService implements OnModuleInit {
     private readonly registry: ReadonlyMap<string, PipelineDefinition<unknown>>,
     @Inject(TRACE_STORE) private readonly traces: TraceStore,
     @Inject(RUN_REPOSITORY) private readonly repository: RunRepository,
+    @Inject(RUN_JANITOR_OPTIONS) private readonly janitor: RunJanitorOptions,
   ) {
     // A malformed pipeline fails boot, never a run.
     for (const definition of registry.values()) validatePipeline(definition);
-  }
-
-  /** Boot only: a run still `running` that this process never saw died with the previous one. */
-  async onModuleInit(): Promise<void> {
-    const failed = await this.repository.failInterrupted();
-    if (failed > 0) this.logger.warn(`marked ${failed} interrupted run(s) failed`);
   }
 
   /** Every registered pipeline as the wire describes it. */
@@ -169,6 +166,13 @@ export class RunsService implements OnModuleInit {
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
   ): Promise<void> {
+    // The row is alive while this process says so: a model call can run for
+    // minutes with no exchange to record, so the heartbeat ticks on its own.
+    const ticker = heartbeatTicker(
+      () => this.repository.heartbeat(record.runId),
+      this.janitor.staleAfterMs,
+      (error) => this.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
+    );
     // Exchange writes are chained, never awaited by the loop: order is kept,
     // a slow database never stalls a model call, and a failed write is logged.
     let writes: Promise<void> = Promise.resolve();
@@ -198,14 +202,37 @@ export class RunsService implements OnModuleInit {
       record.status = 'failed';
       this.logger.error(`run ${record.runId} failed: ${record.error.message}`);
     } finally {
+      ticker.stop();
       record.finishedAt = new Date().toISOString();
       this.traces.save(record, describePipeline(definition));
       await writes;
       try {
-        await this.repository.close(record);
+        const outcome = await this.repository.close(record);
+        if (outcome === 'reclaimed') {
+          this.logger.warn(
+            `run ${record.runId}: the janitor had failed this row as interrupted; overwrote it with the true outcome`,
+          );
+        } else if (outcome === 'refused') {
+          this.logger.error(`run ${record.runId}: not persisted: the row is already terminal`);
+        }
       } catch (error) {
         this.logger.error(`run ${record.runId}: not persisted: ${String(error)}`);
       }
     }
   }
+}
+
+/**
+ * An unref'd interval that refreshes a running row's heartbeat a few times
+ * per stale threshold, so a long model call never lets the janitor mistake a
+ * live run for a dead one. Never awaited; a failed write is only logged.
+ */
+export function heartbeatTicker(
+  beat: () => Promise<void>,
+  staleAfterMs: number,
+  warn: (error: unknown) => void,
+): { stop(): void } {
+  const timer = setInterval(() => void beat().catch(warn), Math.max(1000, staleAfterMs / 3));
+  timer.unref();
+  return { stop: () => clearInterval(timer) };
 }

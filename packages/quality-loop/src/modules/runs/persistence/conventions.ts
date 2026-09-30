@@ -1,8 +1,8 @@
 /**
  * What every table of the quality loop keeps the same way: timestamps as
  * `Date` in a row and ISO on the wire, newest rows first, filters only for
- * what a query names, and the error a boot sweep writes on a row the previous
- * process left running.
+ * what a query names, and the error the janitor writes on a row whose
+ * heartbeat went stale.
  */
 import type { RunErrorDto } from '@sysdesign/contracts';
 
@@ -24,9 +24,12 @@ export const presentFilters = <T extends Record<string, string | undefined>>(
     [K in keyof T]?: NonNullable<T[K]>;
   };
 
-/** The error a run carries when the service restarted with it in flight. */
+/** The name a swept row's error carries — what `close` looks for to reclaim it. */
+export const INTERRUPTED = 'Interrupted';
+
+/** The error a run carries when its heartbeat went stale: the process that owned it died or stalled. */
 export const interruptedError = (what: string): RunErrorDto => ({
-  name: 'Interrupted',
-  message: `the service restarted while the ${what} was in flight`,
+  name: INTERRUPTED,
+  message: `the ${what}'s heartbeat went stale — the process that owned it died or stalled`,
   stack: null,
 });

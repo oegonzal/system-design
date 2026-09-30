@@ -11,6 +11,8 @@ import type { EntityManager } from '@mikro-orm/postgresql';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
+
 export type Envelope<T> = { data: T };
 export type Page<T> = { data: T[]; meta: { total: number; limit: number; offset: number } };
 
@@ -23,6 +25,15 @@ export function claimDumpDir(label: string): string {
 
 export type ProviderOverride = readonly [token: unknown, value: unknown];
 
+/**
+ * What every suite gets unless it says otherwise: a janitor that sweeps at
+ * boot with the production threshold and never on a timer — a suite that
+ * tests the sweep ages rows or calls it by hand.
+ */
+const DEFAULT_OVERRIDES = (): ProviderOverride[] => [
+  [RUN_JANITOR_OPTIONS, { staleAfterMs: 600_000, intervalMs: null }],
+];
+
 /** The real modules over real HTTP; a fresh instance shares nothing but the database. */
 export async function bootApp(
   overrides: readonly ProviderOverride[],
@@ -31,7 +42,9 @@ export async function bootApp(
   const { AppModule } = await import('../app/app.module');
   const { configureApp } = await import('../app/configure-app');
   let builder = Test.createTestingModule({ imports: [AppModule] });
-  for (const [token, value] of overrides) builder = builder.overrideProvider(token).useValue(value);
+  // A suite's override wins over the default for the same token.
+  const merged = new Map<unknown, unknown>([...DEFAULT_OVERRIDES(), ...overrides]);
+  for (const [token, value] of merged) builder = builder.overrideProvider(token).useValue(value);
   const moduleRef = await builder.compile();
   const app = configureApp(moduleRef.createNestApplication(), env);
   await app.listen(0);

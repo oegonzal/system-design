@@ -135,6 +135,13 @@ export type ExchangeSink = (exchange: LlmExchange) => void;
 export type RunListQuery = ListQualityRunsQuery & { limit: number; offset: number };
 
 /**
+ * What the terminal write found: `closed` a running row; `reclaimed` a row
+ * the janitor had failed as Interrupted, now overwritten with the truth;
+ * `refused` a row already terminal, which is never written again.
+ */
+export type CloseOutcome = 'closed' | 'reclaimed' | 'refused';
+
+/**
  * Where runs live between requests and across restarts — Postgres, in
  * production. The dump (`TraceStore`) stays the full audit trail; this is the
  * record of truth the HTTP surface answers from.
@@ -144,10 +151,12 @@ export interface RunRepository {
   open(record: RunRecord, pipelineVersion: string): Promise<void>;
   /** The live exchange log — a fresh snapshot each time, in the caller's order. */
   recordExchange(runId: string, exchanges: LlmExchangeSummaryDto[]): Promise<void>;
+  /** Refresh the running row's heartbeat: the process is still here. */
+  heartbeat(runId: string): Promise<void>;
   /** The terminal write: the header plus every child row, in one transaction. */
-  close(record: RunRecord): Promise<void>;
+  close(record: RunRecord): Promise<CloseOutcome>;
   find(runId: string): Promise<QualityRunDto | null>;
   list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]>;
-  /** Rows still `running` from a previous process are failed; returns how many. */
-  failInterrupted(): Promise<number>;
+  /** Fail every `running` row whose heartbeat is older than `before`; returns how many. */
+  failStale(before: Date): Promise<number>;
 }

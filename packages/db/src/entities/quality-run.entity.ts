@@ -115,6 +115,15 @@ export class QualityRun {
   @Property({ type: 'timestamptz', nullable: true })
   finishedAt: Date | null = null;
 
+  /**
+   * Liveness (ENG-10): written at open and refreshed while the run is in
+   * flight. The janitor fails a `running` row only once this is older than
+   * the stale threshold, so a row is another process's until it says nothing
+   * for that long — and a late close from that process reclaims it.
+   */
+  @Property({ type: 'timestamptz' })
+  heartbeatAt!: Date;
+
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();
 

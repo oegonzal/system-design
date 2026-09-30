@@ -17,7 +17,7 @@ import type { QualityControlDecision } from '@sysdesign/contracts';
 import { CONTROLLERS } from '../core/controllers';
 import type { PipelineDefinition } from '../core/pipeline';
 import type { Controller, RunRepository } from '../core/ports';
-import { AppModule } from '../modules/app/app.module';
+import { ReplayModule } from '../modules/app/replay.module';
 import { PIPELINES_TOKEN, RUN_REPOSITORY } from '../modules/runs/tokens';
 import { intOr } from './args';
 
@@ -132,7 +132,7 @@ export async function replayCli(argv: readonly string[]): Promise<number> {
   }
   const limit = intOr(values.limit, REPLAY_LIMIT) ?? REPLAY_LIMIT;
 
-  const app = await NestFactory.createApplicationContext(AppModule, {
+  const app = await NestFactory.createApplicationContext(ReplayModule, {
     logger: ['error', 'warn'],
   });
   try {

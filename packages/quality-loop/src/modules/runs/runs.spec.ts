@@ -13,7 +13,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { disabledLlm, fakeLlm, result, tinyPipeline } from '../../core/testing';
+import type { RunRepository } from '../../core/ports';
+import { disabledLlm, fakeLlm, gatedLlm, result, tinyPipeline } from '../../core/testing';
 import {
   bootApp,
   claimDumpDir,
@@ -23,30 +24,30 @@ import {
   type Envelope,
   type Page,
 } from '../http/testing';
-import { PIPELINES_TOKEN, QUALITY_LOOP_LLM } from './tokens';
+import { RunJanitor } from '../janitor/run-janitor';
+import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY } from './tokens';
 
 const DUMP_DIR = claimDumpDir('quality-loop');
 const TABLES = ['quality_run'];
 
 const tinyOnly = () => [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])] as const;
 
+/** The fake model every boot here answers with: a rubric, an artifact, no findings, one pass. */
+const canned = () =>
+  fakeLlm(
+    { criteria: [{ kind: 'must', statement: 'has text' }] },
+    { text: 'made', parts: ['one'] },
+    { findings: [] },
+    {
+      results: [result({ criterionId: 'c1', locationRefs: ['text'] })],
+      advisoryVerdict: null,
+    },
+  );
+
 /** The real module over real HTTP; a fresh instance shares nothing but the database. */
-const boot = () =>
-  bootApp([
-    [
-      QUALITY_LOOP_LLM,
-      fakeLlm(
-        { criteria: [{ kind: 'must', statement: 'has text' }] },
-        { text: 'made', parts: ['one'] },
-        { findings: [] },
-        {
-          results: [result({ criterionId: 'c1', locationRefs: ['text'] })],
-          advisoryVerdict: null,
-        },
-      ),
-    ],
-    tinyOnly(),
-  ]);
+const boot = () => bootApp([[QUALITY_LOOP_LLM, canned()], tinyOnly()]);
+
+const HOURS = 60 * 60 * 1000;
 
 describe('the HTTP surface', () => {
   let app: INestApplication;
@@ -272,33 +273,105 @@ describe('the HTTP surface', () => {
     }
   });
 
-  // Last: booting another app sweeps every `running` row, so it must never overlap a live run.
-  it('[QL-13] a run left running by a previous process is failed at boot', async () => {
+  it('[QL-13] a run whose heartbeat went stale is failed at boot; one still heartbeating is left alone', async () => {
     const fork = em.fork();
-    fork.create(QualityRun, {
-      id: 'stale-quality',
-      pipeline: 'tiny',
-      pipelineVersion: tinyPipeline().version,
-      llm: { enabled: true, model: 'test-model', reason: null },
-      request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
-      git: { branch: '', headSha: '' },
-      startedAt: new Date(),
-    });
+    const header = (id: string, heartbeatAt: Date) =>
+      fork.create(QualityRun, {
+        id,
+        pipeline: 'tiny',
+        pipelineVersion: tinyPipeline().version,
+        llm: { enabled: true, model: 'test-model', reason: null },
+        request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
+        git: { branch: '', headSha: '' },
+        startedAt: new Date(),
+        heartbeatAt,
+      });
+    header('stale-quality', new Date(Date.now() - 2 * HOURS));
+    header('live-quality', new Date());
     await fork.flush();
 
     const third = await boot();
     try {
-      const { data } = (await (
-        await fetch(`${third.url}/runs/stale-quality`)
-      ).json()) as Envelope<QualityRunDto>;
-      expect(data).toMatchObject({
+      const read = async (id: string) =>
+        (await getJson<Envelope<QualityRunDto>>(third.url, `/runs/${id}`)).data;
+      expect(await read('stale-quality')).toMatchObject({
         status: 'failed',
         trace: null,
         error: { name: 'Interrupted', stack: null },
         finishedAt: expect.any(String),
       });
+      expect(await read('live-quality')).toMatchObject({ status: 'running', error: null });
+
+      // The janitor sweeps again on its interval; asked by hand, it fails what went stale since.
+      await fork.nativeUpdate(
+        QualityRun,
+        { id: 'live-quality' },
+        { heartbeatAt: new Date(Date.now() - 2 * HOURS) },
+      );
+      expect(await third.app.get(RunJanitor).sweep()).toEqual({ runs: 1, orchestrations: 0 });
+      expect((await read('live-quality')).status).toBe('failed');
     } finally {
       await third.app.close();
+    }
+  });
+
+  it('[QL-13] a second instance leaves a live run alone, and the owner’s late close reclaims a swept row with the truth (ENG-10)', async () => {
+    // The owner's model waits at the gate, so its run stays in flight for as long as this spec needs.
+    const gated = gatedLlm(canned());
+    const owner = await bootApp([[QUALITY_LOOP_LLM, gated], tinyOnly()]);
+    try {
+      const started = await postJson(owner.url, '/runs', { pipeline: 'tiny', goal: '# Goal' });
+      expect(started.status).toBe(202);
+      const { runId: id } = ((await started.json()) as Envelope<{ runId: string }>).data;
+
+      const other = await boot();
+      try {
+        const read = async () =>
+          (await getJson<Envelope<QualityRunDto>>(other.url, `/runs/${id}`)).data;
+        // Booting beside a live run fails nothing: the row's heartbeat is fresh.
+        expect((await read()).status).toBe('running');
+
+        // Once the heartbeat is stale, the sweep calls the run dead.
+        await em
+          .fork()
+          .nativeUpdate(QualityRun, { id }, { heartbeatAt: new Date(Date.now() - 2 * HOURS) });
+        await other.app.get(RunJanitor).sweep();
+        expect(await read()).toMatchObject({
+          status: 'failed',
+          error: { name: 'Interrupted' },
+          trace: null,
+        });
+
+        // The owner was alive all along; when it finishes, the truth overwrites the sweep.
+        gated.release();
+        let run = await read();
+        for (let attempt = 0; attempt < 100 && run.status !== 'complete'; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          run = await read();
+        }
+        expect(run).toMatchObject({
+          status: 'complete',
+          error: null,
+          finishedAt: expect.any(String),
+        });
+        expect(run.trace?.iterations).toHaveLength(1);
+        const rows = await em.fork().find(QualityRunIteration, { run: id });
+        expect(rows).toHaveLength(1);
+
+        // A row that is terminal is never written again — a second close inserts nothing.
+        const repository = owner.app.get<RunRepository>(RUN_REPOSITORY);
+        const again = await repository.close({
+          ...run,
+          exchanges: [],
+          git: { branch: 'spec', headSha: 'spec' },
+        });
+        expect(again).toBe('refused');
+        expect(await em.fork().find(QualityRunIteration, { run: id })).toHaveLength(1);
+      } finally {
+        await other.app.close();
+      }
+    } finally {
+      await owner.app.close();
     }
   });
 });

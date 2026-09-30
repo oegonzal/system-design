@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { LockMode } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
   LlmExchangeSummaryDto,
@@ -14,8 +15,8 @@ import {
 } from '@sysdesign/db';
 
 import type { RunRecord } from '../../../core/contracts';
-import type { RunListQuery, RunRepository } from '../../../core/ports';
-import { interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
+import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/ports';
+import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
 import type { RunRows } from './rows';
 import { toRows } from './to-rows';
@@ -36,34 +37,41 @@ export class MikroOrmRunRepository implements RunRepository {
 
   async open(record: RunRecord, pipelineVersion: string): Promise<void> {
     const em = this.em.fork();
-    em.create(QualityRun, { ...toRows(record).run, pipelineVersion });
+    em.create(QualityRun, { ...toRows(record).run, pipelineVersion, heartbeatAt: new Date() });
     await em.flush();
   }
 
   async recordExchange(runId: string, exchanges: LlmExchangeSummaryDto[]): Promise<void> {
+    const now = new Date();
     await this.em
       .fork()
       .nativeUpdate(
         QualityRun,
         { id: runId, status: 'running' },
-        { exchanges, exchangeCount: exchanges.length, updatedAt: new Date() },
+        { exchanges, exchangeCount: exchanges.length, heartbeatAt: now, updatedAt: now },
       );
   }
 
-  async close(record: RunRecord): Promise<void> {
+  async heartbeat(runId: string): Promise<void> {
+    await this.em
+      .fork()
+      .nativeUpdate(QualityRun, { id: runId, status: 'running' }, { heartbeatAt: new Date() });
+  }
+
+  async close(record: RunRecord): Promise<CloseOutcome> {
     const rows = toRows(record);
-    await this.em.fork().transactional(async (tem) => {
+    return this.em.fork().transactional(async (tem) => {
       const { id, ...header } = rows.run;
-      await tem.nativeUpdate(
-        QualityRun,
-        { id, status: 'running' },
-        { ...header, updatedAt: new Date() },
-      );
-      const run = tem.getReference(QualityRun, id);
+      const row = await tem.findOne(QualityRun, { id }, { lockMode: LockMode.PESSIMISTIC_WRITE });
+      if (row === null) return 'refused';
+      const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
+      if (row.status !== 'running' && !reclaimable) return 'refused';
+      tem.assign(row, { ...header, updatedAt: new Date() });
       for (const criterion of rows.criteria) {
-        tem.create(QualityRunCriterion, { ...withoutRunId(criterion), run });
+        tem.create(QualityRunCriterion, { ...withoutRunId(criterion), run: row });
       }
-      for (const iteration of rows.iterations) insertIteration(tem, run, iteration);
+      for (const iteration of rows.iterations) insertIteration(tem, row, iteration);
+      return reclaimable ? 'reclaimed' : 'closed';
     });
   }
 
@@ -100,17 +108,15 @@ export class MikroOrmRunRepository implements RunRepository {
     return [runs.map((run) => toSummary(run, counts(run.id))), total];
   }
 
-  async failInterrupted(): Promise<number> {
-    return this.em.fork().nativeUpdate(
-      QualityRun,
-      { status: 'running' },
-      {
-        status: 'failed',
-        finishedAt: new Date(),
-        error: interruptedError('run'),
-        updatedAt: new Date(),
-      },
-    );
+  async failStale(before: Date): Promise<number> {
+    const now = new Date();
+    return this.em
+      .fork()
+      .nativeUpdate(
+        QualityRun,
+        { status: 'running', heartbeatAt: { $lt: before } },
+        { status: 'failed', finishedAt: now, error: interruptedError('run'), updatedAt: now },
+      );
   }
 }
 
