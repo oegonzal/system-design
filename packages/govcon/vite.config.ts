@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 import { nestBuildConfig } from '../../vite.nest';
 
 /** The specs that need Postgres: the persistence adapters and the HTTP surface. */
-const DB_SPECS = ['src/**/persistence/*.spec.ts', 'src/**/*.http.spec.ts'];
+const DB_SPECS = ['src/**/persistence/*.spec.ts', 'src/modules/app/http.spec.ts'];
 
 const env = {
   DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',

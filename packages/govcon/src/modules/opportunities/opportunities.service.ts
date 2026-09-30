@@ -1,26 +1,35 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type {
-  Bid,
-  Description,
-  DescriptionFetch,
-  LeadsReport,
-  LeadTier,
-  NoticeDto,
+import {
+  MAX_AWARD_LIMIT,
+  type Bid,
+  type Description,
+  type DescriptionFetch,
+  type LeadsReport,
+  type LeadTier,
+  type NoticeAwards,
+  type NoticeDto,
+  type Opportunity,
+  type SearchProfile,
 } from '@sysdesign/contracts';
 
 import type { RequestGate } from '../../core/budget';
 import { candidateFilterOf, type LeadFilters } from '../../core/candidates';
+import { awardHistoryOf, summarizeAwards } from '../../core/intel';
 import type {
+  AwardRepository,
   BidRecord,
   BidRepository,
   NoticeDescriptions,
   OpportunityRepository,
   StoredDescription,
 } from '../../core/ports';
-import { NO_HISTORY, rankLeads, scoreLead, type ScoringContext } from '../../core/scoring';
+import { rankLeads, scoreLead, type ScoringContext } from '../../core/scoring';
+import { AWARD_REPOSITORY } from '../awards/tokens';
 import { ProfilesService } from '../profiles/profiles.service';
 import { CLOCK, NOTICE_DESCRIPTIONS, REQUEST_GATE } from '../sources/tokens';
 import { BID_REPOSITORY, OPPORTUNITY_REPOSITORY } from './tokens';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Everything `GET /leads` may ask: store-side filters, the score cut, the page. */
 export interface LeadsOptions extends LeadFilters {
@@ -42,6 +51,7 @@ export class OpportunitiesService {
   constructor(
     @Inject(OPPORTUNITY_REPOSITORY) private readonly repository: OpportunityRepository,
     @Inject(BID_REPOSITORY) private readonly bids: BidRepository,
+    @Inject(AWARD_REPOSITORY) private readonly awards: AwardRepository,
     @Inject(NOTICE_DESCRIPTIONS) private readonly descriptions: NoticeDescriptions,
     @Inject(REQUEST_GATE) private readonly gate: RequestGate,
     private readonly profiles: ProfilesService,
@@ -54,7 +64,7 @@ export class OpportunitiesService {
     const { opportunities, capped } = await this.repository.findCandidates(
       candidateFilterOf(profile, options, now),
     );
-    const ranked = rankLeads(opportunities, profile, this.context(now));
+    const ranked = rankLeads(opportunities, profile, await this.context(profile, now));
     const matching = ranked.leads.filter(
       (lead) =>
         lead.score >= options.minScore && (options.tier === null || lead.tier === options.tier),
@@ -76,15 +86,19 @@ export class OpportunitiesService {
     const profile = await this.profiles.resolve(profileId);
     const opportunity = await this.repository.findOne(noticeId);
     if (!opportunity) return null;
-    const [stored, bid] = await Promise.all([
+    const now = this.now();
+    const [stored, bid, context, awards] = await Promise.all([
       this.repository.findDescription(noticeId),
       this.bids.find(noticeId),
+      this.context(profile, now),
+      this.noticeAwards(opportunity, profile, now),
     ]);
     return {
-      ...scoreLead(opportunity, profile, this.context(this.now())),
+      ...scoreLead(opportunity, profile, context),
       description: stored ? toDescription(stored) : null,
       attachments: opportunity.resourceLinks.map((url, ordinal) => ({ ordinal, url })),
       bid: bid ? toBid(bid) : null,
+      awards,
     };
   }
 
@@ -126,9 +140,51 @@ export class OpportunitiesService {
     }
   }
 
-  /** No awards are stored yet; the history factor prices at nothing until they are. */
-  private context(now: Date): ScoringContext {
-    return { nowMs: now.getTime(), history: NO_HISTORY };
+  /** The instant and the stored awards inside the profile's history window, indexed for the history factor. */
+  private async context(profile: SearchProfile, now: Date): Promise<ScoringContext> {
+    const since = new Date(now.getTime() - profile.scoring.history.days * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+    return {
+      nowMs: now.getTime(),
+      history: awardHistoryOf(await this.awards.history(since), now.getTime()),
+    };
+  }
+
+  /** The awards of the notice's own solicitation, then the summary of its NAICS inside the history window. */
+  private async noticeAwards(
+    opportunity: Opportunity,
+    profile: SearchProfile,
+    now: Date,
+  ): Promise<NoticeAwards> {
+    const none = {
+      naicsPrefix: null,
+      pscPrefix: null,
+      agencyContains: null,
+      solicitationNumber: null,
+      awardeeUei: null,
+      signedFrom: null,
+      signedTo: null,
+      source: null,
+    };
+    const since = new Date(now.getTime() - profile.scoring.history.days * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+    const [bySolicitation, related] = await Promise.all([
+      opportunity.solicitationNumber === null
+        ? Promise.resolve([])
+        : this.awards.findMatching(
+            { ...none, solicitationNumber: opportunity.solicitationNumber },
+            MAX_AWARD_LIMIT,
+          ),
+      opportunity.naicsCode === null
+        ? Promise.resolve([])
+        : this.awards.findMatching(
+            { ...none, naicsPrefix: opportunity.naicsCode, signedFrom: since },
+            MAX_AWARD_LIMIT,
+          ),
+    ]);
+    return { bySolicitation, related: summarizeAwards(related) };
   }
 }
 

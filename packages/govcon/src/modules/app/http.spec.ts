@@ -2,9 +2,12 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
+  Award,
+  AwardsSummary,
   Bid,
   BidPipelineSummary,
   DescriptionFetch,
+  FetchAwardsReport,
   LeadsReport,
   NoticeDto,
   PipelineRow,
@@ -16,6 +19,7 @@ import type {
 } from '@sysdesign/contracts';
 import {
   ensureDatabase,
+  GovconAward,
   GovconBid,
   GovconOpportunity,
   GovconSavedSearch,
@@ -31,8 +35,19 @@ import {
   pick,
   scriptedSearch,
   tinyProfile,
+  awardDraftOf,
+  awardPageOf,
+  scriptedContractAwards,
+  scriptedSpendingAwards,
 } from '../../core/testing';
-import { BUDGET_POLICY, CLOCK, NOTICE_DESCRIPTIONS, OPPORTUNITY_SEARCH } from '../sources/tokens';
+import {
+  BUDGET_POLICY,
+  CLOCK,
+  CONTRACT_AWARDS,
+  NOTICE_DESCRIPTIONS,
+  OPPORTUNITY_SEARCH,
+  SPENDING_AWARDS,
+} from '../sources/tokens';
 import { AppModule } from './app.module';
 import { configureApp } from './configure-app';
 
@@ -69,8 +84,14 @@ const SEARCHES = [
  * the budget are exercised for real) and the clock is fixed. Every test
  * seeds what it reads through the API itself.
  */
+const AWARD = awardDraftOf({ externalId: 'SPE4A726P0123-0' });
+
 async function boot() {
   const scripted = scriptedSearch('sam.gov', PAGES);
+  const contractAwards = scriptedContractAwards([awardPageOf([AWARD])]);
+  const spendingAwards = scriptedSpendingAwards([
+    awardPageOf([{ ...AWARD, source: 'usaspending', externalId: 'CONT_1' }]),
+  ]);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CLOCK)
     .useValue(() => NOW)
@@ -84,6 +105,10 @@ async function boot() {
     .useValue(scripted)
     .overrideProvider(NOTICE_DESCRIPTIONS)
     .useValue(scriptedDescriptions('sam.gov'))
+    .overrideProvider(CONTRACT_AWARDS)
+    .useValue(contractAwards)
+    .overrideProvider(SPENDING_AWARDS)
+    .useValue(spendingAwards)
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);
@@ -92,6 +117,7 @@ async function boot() {
 
 const truncate = async (em: EntityManager) => {
   await em.fork().nativeDelete(GovconSourceCall, {});
+  await em.fork().nativeDelete(GovconAward, {});
   await em.fork().nativeDelete(GovconBid, {});
   await em.fork().nativeDelete(GovconOpportunity, {});
   await em.fork().nativeDelete(GovconSavedSearch, {});
@@ -437,5 +463,57 @@ describe('the govcon HTTP surface', () => {
     expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(204);
     expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(404);
     expect((await get<Envelope<NoticeDto>>(url, '/notices/a')).data.bid).toBeNull();
+  });
+
+  it('[GOV-8] [GOV-17] fetches awards from both sources through the gate, then lists and summarizes them, and the notice sees its solicitation', async () => {
+    const bad = await post(url, '/awards/fetch', {
+      from: '2026-06-01',
+      to: '2026-01-01',
+      sources: ['sam.gov'],
+    });
+    expect(bad.status).toBe(400);
+    expect((await json<Issues>(bad)).issues.map((i) => i.path).sort()).toEqual(['naics', 'to']);
+
+    const fetched = await post(url, '/awards/fetch', {
+      naics: ['332710'],
+      from: '2026-06-01',
+      to: '2026-09-29',
+      sources: ['sam.gov', 'usaspending'],
+    });
+    expect(fetched.status).toBe(200);
+    const report = (await json<Envelope<FetchAwardsReport>>(fetched)).data;
+    expect(report.slices.map((s) => [s.source, s.outcome, s.inserted])).toEqual([
+      ['sam.gov', 'ok', 1],
+      ['usaspending', 'ok', 1],
+    ]);
+    expect(report).toMatchObject({ spent: 1, budget: 4 });
+    const calls = await get<Page<SourceCall>>(url, '/source/calls?limit=10');
+    expect(calls.data.map((call) => [call.source, call.operation]).sort()).toEqual([
+      ['sam.gov', 'awards'],
+      ['usaspending', 'spending'],
+    ]);
+
+    const list = await get<Page<Award>>(url, '/awards?naics=3327&source=sam.gov');
+    expect(list.meta).toEqual({ total: 1, limit: 50, offset: 0 });
+    expect(list.data[0]).toMatchObject({ externalId: 'SPE4A726P0123-0', amount: 52000 });
+    expect((await get<Page<Award>>(url, '/awards')).meta.total).toBe(2);
+    expect((await fetch(`${url}/awards?source=other`)).status).toBe(400);
+    const summary = await get<Envelope<AwardsSummary>>(url, '/awards/summary?naics=332710');
+    expect(summary.data).toMatchObject({
+      count: 2,
+      total: 104000,
+      bySource: { 'sam.gov': 1, usaspending: 1 },
+    });
+
+    await pulled();
+    const notice = await get<Envelope<NoticeDto>>(url, '/notices/a');
+    expect(notice.data.awards.bySolicitation.map((a) => a.externalId).sort()).toEqual([
+      'CONT_1',
+      'SPE4A726P0123-0',
+    ]);
+    expect(notice.data.awards.related.count).toBe(2);
+    expect(notice.data.factors.find((f) => f.id === 'history')?.evidence[0]).toBe(
+      '2 stored award(s) in naics 332710 in the last 365 day(s)',
+    );
   });
 });

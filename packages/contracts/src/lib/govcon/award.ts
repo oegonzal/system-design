@@ -14,7 +14,9 @@ export interface Award {
   solicitationNumber: string | null;
   naicsCode: string | null;
   pscCode: string | null;
+  /** `department.subtier.office` names, as a notice spells its path. */
   agencyPath: string | null;
+  /** `department.subtier.office` codes; the subtier is what relates an award to a notice's agency. */
   agencyCode: string | null;
   awardeeName: string | null;
   awardeeUei: string | null;

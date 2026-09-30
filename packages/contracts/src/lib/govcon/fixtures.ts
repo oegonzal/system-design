@@ -163,6 +163,7 @@ export const noticeOf = (overrides: Partial<NoticeDto> = {}): NoticeDto => ({
   description: null,
   attachments: [],
   bid: null,
+  awards: { bySolicitation: [], related: emptyAwardsSummary() },
   ...overrides,
 });
 
@@ -289,6 +290,17 @@ export const awardOf = (overrides: Partial<Award> = {}): Award => ({
   placeOfPerformance: { city: 'Richmond', state: 'VA', zip: '23297', country: 'USA' },
   fetchedAt: '2026-09-27T04:00:00.000Z',
   ...overrides,
+});
+
+/** The summary of no awards at all. */
+export const emptyAwardsSummary = (): AwardsSummary => ({
+  count: 0,
+  total: 0,
+  median: null,
+  offers: { one: 0, few: 0, many: 0, unknown: 0 },
+  topAwardees: [],
+  setAsideMix: {},
+  bySource: { 'sam.gov': 0, usaspending: 0 },
 });
 
 export const awardsSummaryOf = (overrides: Partial<AwardsSummary> = {}): AwardsSummary => ({

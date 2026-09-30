@@ -1,0 +1,277 @@
+{
+  "awardSummary": [
+    {
+      "contractId": {
+        "subtier": {
+          "code": "9700",
+          "name": "DEPT OF DEFENSE"
+        },
+        "piid": "SPE4A526P6036",
+        "modificationNumber": "0",
+        "transactionNumber": "0"
+      },
+      "coreData": {
+        "solicitationId": "SPE4A626T74X8",
+        "awardOrIDV": "AWARD",
+        "awardOrIDVType": {
+          "code": "B",
+          "name": "PURCHASE ORDER"
+        },
+        "federalOrganization": {
+          "contractingInformation": {
+            "contractingDepartment": {
+              "code": "9700",
+              "name": "DEPT OF DEFENSE"
+            },
+            "contractingSubtier": {
+              "code": "97AS",
+              "name": "DEFENSE LOGISTICS AGENCY"
+            },
+            "contractingOffice": {
+              "code": "SPE4A5",
+              "name": "DLA AVIATION",
+              "country": "USA"
+            }
+          }
+        },
+        "principalPlaceOfPerformance": {
+          "city": {
+            "name": "SOLON"
+          },
+          "state": {
+            "code": "OH",
+            "name": "OHIO"
+          },
+          "zipCode": "441393940",
+          "country": {
+            "code": "USA",
+            "name": "UNITED STATES"
+          }
+        },
+        "productOrServiceInformation": {
+          "productOrService": {
+            "type": "PRODUCT",
+            "code": "4920",
+            "name": "AIRCRAFT MAINTENANCE AND REPAIR SHOP SPECIALIZED EQUIPMENT"
+          },
+          "principalNaics": [
+            {
+              "code": "332710",
+              "name": "MACHINE SHOPS"
+            }
+          ]
+        },
+        "competitionInformation": {
+          "extentCompeted": {
+            "code": "G",
+            "name": "NOT COMPETED UNDER SAP"
+          },
+          "typeOfSetAside": {
+            "code": "NONE",
+            "name": "NO SET ASIDE USED."
+          },
+          "solicitationProcedures": {
+            "code": "SP1",
+            "name": "SIMPLIFIED ACQUISITION"
+          }
+        }
+      },
+      "awardDetails": {
+        "dates": {
+          "dateSigned": "2026-06-25T00:00:00",
+          "periodOfPerformanceStartDate": "2026-06-25 00:00:00.000",
+          "currentCompletionDate": "2026-09-18 00:00:00.000",
+          "ultimateCompletionDate": "2026-09-18 00:00:00.000",
+          "fiscalYear": "2026"
+        },
+        "dollars": {
+          "actionObligation": 220.15,
+          "baseDollarsObligated": 220.15,
+          "baseAndExercisedOptionsValue": 220.15,
+          "baseAndAllOptionsValue": 220.15,
+          "feePaidForUseOfService": 0
+        },
+        "totalContractDollars": {
+          "totalActionObligation": 220.15,
+          "totalBaseAndExercisedOptionsValue": 220.15,
+          "totalBaseAndAllOptionsValue": 220.15
+        },
+        "competitionInformation": {
+          "numberOfOffersReceived": "1",
+          "evaluatedPreference": {
+            "code": "NONE",
+            "name": "NO PREFERENCE USED"
+          }
+        },
+        "productOrServiceInformation": {
+          "descriptionOfContractRequirement": "8512180276!LATCH,AIRCRAFT,MATE"
+        },
+        "awardeeData": {
+          "awardeeHeader": {
+            "awardeeName": "R. L. MORRISSEY & ASSOCIATES, INC",
+            "legalBusinessName": "R. L. MORRISSEY & ASSOCIATES, INC"
+          },
+          "awardeeUEIInformation": {
+            "uniqueEntityId": "JYKDMRSL7U65",
+            "cageCode": "8U976",
+            "awardeeUltimateParentUniqueEntityId": "JYKDMRSL7U65",
+            "awardeeUltimateParentName": "R. L. MORRISSEY & ASSOCIATES  INC"
+          }
+        },
+        "preferenceProgramsInformation": {
+          "contractingOfficerBusinessSizeDetermination": [
+            {
+              "code": "S",
+              "name": "SMALL BUSINESS"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "contractId": {
+        "subtier": {
+          "code": "1422",
+          "name": "BUREAU OF LAND MANAGEMENT"
+        },
+        "piid": "140L3726P0139",
+        "modificationNumber": "0",
+        "transactionNumber": "0"
+      },
+      "coreData": {
+        "solicitationId": null,
+        "awardOrIDV": "AWARD",
+        "awardOrIDVType": {
+          "code": "B",
+          "name": "PURCHASE ORDER"
+        },
+        "federalOrganization": {
+          "contractingInformation": {
+            "contractingDepartment": {
+              "code": "1400",
+              "name": "INTERIOR, DEPARTMENT OF THE"
+            },
+            "contractingSubtier": {
+              "code": "1422",
+              "name": "BUREAU OF LAND MANAGEMENT"
+            },
+            "contractingOffice": {
+              "code": "140L37",
+              "name": "NATIONAL INTERAGENCY FIRE CENTER",
+              "country": "USA",
+              "regionCode": "ID"
+            }
+          }
+        },
+        "principalPlaceOfPerformance": {
+          "city": {
+            "name": "GRAND PRAIRIE"
+          },
+          "state": {
+            "code": "TX",
+            "name": "TEXAS"
+          },
+          "zipCode": "750507227",
+          "country": {
+            "code": "USA",
+            "name": "UNITED STATES"
+          }
+        },
+        "productOrServiceInformation": {
+          "productOrService": {
+            "type": "PRODUCT",
+            "code": "3419",
+            "name": "MISCELLANEOUS MACHINE TOOLS"
+          },
+          "principalNaics": [
+            {
+              "code": "332710",
+              "name": "MACHINE SHOPS"
+            }
+          ]
+        },
+        "competitionInformation": {
+          "extentCompeted": {
+            "code": "G",
+            "name": "NOT COMPETED UNDER SAP"
+          },
+          "typeOfSetAside": {
+            "code": "NONE",
+            "name": "NO SET ASIDE USED."
+          },
+          "solicitationProcedures": {
+            "code": "SP1",
+            "name": "SIMPLIFIED ACQUISITION"
+          }
+        }
+      },
+      "awardDetails": {
+        "dates": {
+          "dateSigned": "2026-09-25T00:00:00",
+          "periodOfPerformanceStartDate": "2026-09-25 00:00:00.000",
+          "currentCompletionDate": "2026-12-31 00:00:00.000",
+          "ultimateCompletionDate": "2026-12-31 00:00:00.000",
+          "fiscalYear": "2026"
+        },
+        "dollars": {
+          "actionObligation": 31874.0,
+          "baseDollarsObligated": 31874,
+          "baseAndExercisedOptionsValue": 31874,
+          "baseAndAllOptionsValue": 31874,
+          "feePaidForUseOfService": 0
+        },
+        "totalContractDollars": {
+          "totalActionObligation": 31874.0,
+          "totalBaseAndExercisedOptionsValue": 31874.0,
+          "totalBaseAndAllOptionsValue": 31874.0
+        },
+        "competitionInformation": {
+          "numberOfOffersReceived": "1",
+          "evaluatedPreference": {
+            "code": "NONE",
+            "name": "NO PREFERENCE USED"
+          }
+        },
+        "productOrServiceInformation": {
+          "descriptionOfContractRequirement": "CO2 LASER CUTTER FOR ALASKA FIRE SERVICE"
+        },
+        "awardeeData": {
+          "awardeeHeader": {
+            "awardeeName": "LAGUNA TOOLS, INC.",
+            "awardeeAlternateName": "LAGUNA TOOLS",
+            "legalBusinessName": "LAGUNA TOOLS, INC."
+          },
+          "awardeeUEIInformation": {
+            "uniqueEntityId": "PX34A2KFA2K7",
+            "cageCode": "0XEJ8",
+            "awardeeUltimateParentUniqueEntityId": "PX34A2KFA2K7",
+            "awardeeUltimateParentName": "LAGUNA TOOLS  INC."
+          }
+        },
+        "preferenceProgramsInformation": {
+          "contractingOfficerBusinessSizeDetermination": [
+            {
+              "code": "O",
+              "name": "OTHER THAN SMALL BUSINESS"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "contractId": {
+        "piid": "BROKEN1",
+        "modificationNumber": "0"
+      },
+      "coreData": {},
+      "awardDetails": {
+        "dollars": {
+          "actionObligation": 5
+        }
+      }
+    }
+  ],
+  "totalRecords": "207",
+  "limit": "5",
+  "offset": "0"
+}

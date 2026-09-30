@@ -11,12 +11,12 @@ import { samRecordSchema, type SamRecord } from './schemas';
  */
 
 const DATE_ONLY = /^(\d{4}-\d{2}-\d{2})$/;
-const SPACE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/;
+const SPACE_DATETIME = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?)$/;
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
 /**
- * SAM.gov spells dates three ways: `2026-09-20`, `2026-09-20 14:03:11` and
- * ISO 8601 with an offset. The first two carry no zone; they are read as UTC,
+ * SAM.gov spells dates three ways: `2026-09-20`, `2026-09-20 14:03:11` (the
+ * awards API adds milliseconds) and ISO 8601 with or without an offset. The first two carry no zone; they are read as UTC,
  * which orders records correctly and is at most a few hours off the Eastern
  * clock the provider actually keeps. Nothing else is read: the runtime's
  * fallback parser would take `09/20/2026` in the machine's zone, and a

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { GovconBid, GovconOpportunity } from '@sysdesign/db';
 
+import { AwardsModule } from '../awards/awards.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { SourcesModule } from '../sources/sources.module';
 import { LeadsController } from './leads.controller';
@@ -17,6 +18,7 @@ import { BID_REPOSITORY, OPPORTUNITY_REPOSITORY } from './tokens';
     MikroOrmModule.forFeature([GovconOpportunity, GovconBid]),
     SourcesModule,
     ProfilesModule,
+    AwardsModule,
   ],
   controllers: [LeadsController, NoticesController],
   providers: [

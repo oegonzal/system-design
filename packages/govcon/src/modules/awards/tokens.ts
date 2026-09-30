@@ -1,0 +1,1 @@
+export const AWARD_REPOSITORY = Symbol('AWARD_REPOSITORY');

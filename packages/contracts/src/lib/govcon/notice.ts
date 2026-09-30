@@ -1,4 +1,5 @@
 import type { ApiResponse } from '../envelope';
+import type { Award, AwardsSummary } from './award';
 import type { Bid } from './bid';
 import type { Lead } from './lead';
 import type { Description } from './source';
@@ -20,6 +21,13 @@ export interface NoticeDto extends Lead {
   attachments: Attachment[];
   /** The notice's place in the pipeline, when it has one. */
   bid: Bid | null;
+  awards: NoticeAwards;
+}
+
+/** What the stored awards say about a notice: its own solicitation, then its NAICS inside the profile's history window. */
+export interface NoticeAwards {
+  bySolicitation: Award[];
+  related: AwardsSummary;
 }
 
 export type GetNoticeResponse = ApiResponse<NoticeDto>;

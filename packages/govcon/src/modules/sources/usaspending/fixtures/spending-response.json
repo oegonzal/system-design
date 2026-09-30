@@ -1,0 +1,88 @@
+{
+  "spending_level": "awards",
+  "limit": 3,
+  "results": [
+    {
+      "internal_id": 298576622,
+      "Award ID": "FA865021C5000",
+      "Recipient Name": "GLOBE MACHINE MANUFACTURING COMPANY",
+      "Recipient UEI": "VADFZLHBJDJ9",
+      "Award Amount": 17152539.0,
+      "Awarding Agency": "Department of Defense",
+      "Awarding Sub Agency": "Department of the Air Force",
+      "Start Date": "2021-08-03",
+      "End Date": "2026-08-16",
+      "NAICS": {
+        "code": "332710",
+        "description": "MACHINE SHOPS"
+      },
+      "PSC": {
+        "code": "AC13",
+        "description": "NATIONAL DEFENSE R&D SERVICES; DEPARTMENT OF DEFENSE - MILITARY; EXPERIMENTAL DEVELOPMENT"
+      },
+      "Place of Performance State Code": "WA",
+      "Place of Performance City Name": null,
+      "Description": "TECHNOLOGY FOR AGILE RAPID MANUFACTURING OF AEROSPACE COMPOSITE STRUCTURES (TARMACS)",
+      "generated_internal_id": "CONT_AWD_FA865021C5000_9700_-NONE-_-NONE-",
+      "awarding_agency_id": 1173,
+      "agency_slug": "department-of-defense"
+    },
+    {
+      "internal_id": 333931508,
+      "Award ID": "SPE4A820C0003",
+      "Recipient Name": "BYERS AND ASSOCIATES, LLC",
+      "Recipient UEI": "MXZVH48YELL3",
+      "Award Amount": 12058104.73,
+      "Awarding Agency": "Department of Defense",
+      "Awarding Sub Agency": "Defense Logistics Agency",
+      "Start Date": "2020-03-27",
+      "End Date": "2026-04-01",
+      "NAICS": {
+        "code": "332710",
+        "description": "MACHINE SHOPS"
+      },
+      "PSC": {
+        "code": "3408",
+        "description": "MACHINING CENTERS AND WAY-TYPE MACHINES"
+      },
+      "Place of Performance State Code": "GA",
+      "Place of Performance City Name": null,
+      "Description": "8507265841!IPE - MILLING EQUIPMENT",
+      "generated_internal_id": "CONT_AWD_SPE4A820C0003_9700_-NONE-_-NONE-",
+      "awarding_agency_id": 1173,
+      "agency_slug": "department-of-defense"
+    },
+    {
+      "internal_id": 354669274,
+      "Award ID": "N6893626C0001",
+      "Recipient Name": "GENERAL DYNAMICS INFORMATION TECHNOLOGY, INC.",
+      "Recipient UEI": "SMNWM6HN79X5",
+      "Award Amount": 3277442.0,
+      "Awarding Agency": "Department of Defense",
+      "Awarding Sub Agency": "Department of the Navy",
+      "Start Date": "2025-10-28",
+      "End Date": "2027-03-28",
+      "NAICS": {
+        "code": "332710",
+        "description": "MACHINE SHOPS"
+      },
+      "PSC": {
+        "code": "5995",
+        "description": "CABLE, CORD, AND WIRE ASSEMBLIES: COMMUNICATION EQUIPMENT"
+      },
+      "Place of Performance State Code": "VA",
+      "Place of Performance City Name": null,
+      "Description": "AVIONICS TEST SET CABLE ASSEMBLIES",
+      "generated_internal_id": "CONT_AWD_N6893626C0001_9700_-NONE-_-NONE-",
+      "awarding_agency_id": 1173,
+      "agency_slug": "department-of-defense"
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": true,
+    "last_record_unique_id": 354669274,
+    "last_record_sort_value": "327744200"
+  },
+  "messages": []
+}

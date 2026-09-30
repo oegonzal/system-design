@@ -373,6 +373,11 @@ export const CRITERIA: readonly Criterion[] = [
       "A notice's attachments are listed from the stored record with their public SAM.gov links, in order; the client links to them directly — no key is ever appended, nothing is proxied, and nothing is spent.",
   },
   {
+    id: 'GOV-17',
+    statement:
+      "Awards from SAM.gov's Contract Awards API and from USAspending are normalized to one shape, fetched one gated page at a time up to a bound, upserted by source and id, listed and summarized deterministically from the store, and read by the scorer's history factor and by a notice's own solicitation.",
+  },
+  {
     id: 'GOV-19',
     statement:
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',

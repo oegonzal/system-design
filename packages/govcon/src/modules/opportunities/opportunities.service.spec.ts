@@ -1,8 +1,10 @@
 import { NotFoundException } from '@nestjs/common';
+import { awardOf } from '@sysdesign/contracts';
 
 import { RequestGate, type BudgetPolicy } from '../../core/budget';
 import {
   failure,
+  InMemoryAwardRepository,
   InMemoryBidRepository,
   InMemoryOpportunityRepository,
   InMemoryProfileRepository,
@@ -37,15 +39,17 @@ async function harness(
     () => NOW,
   );
   const bids = new InMemoryBidRepository(repository);
+  const awards = new InMemoryAwardRepository();
   const service = new OpportunitiesService(
     repository,
     bids,
+    awards,
     descriptions,
     new RequestGate(log, policy, () => NOW),
     profiles,
     () => NOW,
   );
-  return { bids, descriptions, log, repository, service };
+  return { awards, bids, descriptions, log, repository, service };
 }
 
 const page = { minScore: 0, tier: null, limit: 25, offset: 0 } as const;
@@ -118,6 +122,10 @@ describe('the opportunities service', () => {
     expect(notice?.description).toBeNull();
     expect(notice?.bid).toBeNull();
     expect(notice?.attachments).toEqual([]);
+    expect(notice?.awards).toEqual({
+      bySolicitation: [],
+      related: expect.objectContaining({ count: 0 }),
+    });
     await repository.upsertMany(
       [
         opportunityOf({
@@ -184,5 +192,34 @@ describe('the opportunities service', () => {
     });
     expect(await repository.findDescription('n-2')).toBeNull();
     expect(log.calls[0]).toMatchObject({ operation: 'description', outcome: 'invalid-response' });
+  });
+
+  it('[GOV-17] shows a notice with the awards of its solicitation and the summary of its NAICS, and the history factor sees them', async () => {
+    const { awards, repository, service } = await harness();
+    await repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
+    await awards.upsertMany([
+      awardOf({
+        externalId: 'same',
+        solicitationNumber: 'SPE4A7-26-Q-0001',
+        signedAt: '2026-06-12',
+      }),
+      awardOf({
+        externalId: 'related',
+        solicitationNumber: 'OTHER',
+        signedAt: '2026-08-01',
+        amount: 1000,
+      }),
+      awardOf({ externalId: 'old', solicitationNumber: 'OTHER', signedAt: '2024-01-01' }),
+    ]);
+    const notice = await service.notice('n-1', undefined);
+    expect(notice?.awards.bySolicitation.map((a) => a.externalId)).toEqual(['same']);
+    expect(notice?.awards.related).toMatchObject({ count: 2, total: 53000 });
+    expect(notice?.factors.find((f) => f.id === 'history')).toMatchObject({
+      value: 0.4,
+      evidence: [
+        '2 stored award(s) in naics 332710 in the last 365 day(s)',
+        '2 of them at this agency',
+      ],
+    });
   });
 });

@@ -4,6 +4,7 @@ import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
+import { GovconAward } from './entities/govcon-award.entity';
 import { GovconBid } from './entities/govcon-bid.entity';
 import { GovconOpportunity } from './entities/govcon-opportunity.entity';
 import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
@@ -58,6 +59,7 @@ export const ormOptions = {
     GovconSearchProfile,
     GovconSavedSearch,
     GovconBid,
+    GovconAward,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

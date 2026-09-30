@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 
 import {
+  InMemoryAwardRepository,
   InMemoryBidRepository,
   InMemoryOpportunityRepository,
   InMemoryProfileRepository,
@@ -30,6 +31,7 @@ async function harness() {
   const service = new BidsService(
     bids,
     notices,
+    new InMemoryAwardRepository(),
     new ProfilesService(profiles, new InMemorySavedSearchRepository(), () => now),
     () => now,
   );

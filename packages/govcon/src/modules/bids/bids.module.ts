@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AwardsModule } from '../awards/awards.module';
 import { OpportunitiesModule } from '../opportunities/opportunities.module';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { SourcesModule } from '../sources/sources.module';
@@ -8,7 +9,7 @@ import { BidsService } from './bids.service';
 
 /** The bid pipeline over the stored notices. */
 @Module({
-  imports: [SourcesModule, ProfilesModule, OpportunitiesModule],
+  imports: [SourcesModule, ProfilesModule, OpportunitiesModule, AwardsModule],
   controllers: [BidsController, PipelineController],
   providers: [BidsService],
   exports: [BidsService],

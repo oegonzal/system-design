@@ -7,9 +7,11 @@ import type {
   SaveBidRequest,
 } from '@sysdesign/contracts';
 
+import { awardHistoryOf } from '../../core/intel';
 import { summarizePipeline } from '../../core/pipeline';
-import type { BidRepository, OpportunityRepository } from '../../core/ports';
-import { NO_HISTORY, scoreLead } from '../../core/scoring';
+import type { AwardRepository, BidRepository, OpportunityRepository } from '../../core/ports';
+import { scoreLead } from '../../core/scoring';
+import { AWARD_REPOSITORY } from '../awards/tokens';
 import { toBid } from '../opportunities/opportunities.service';
 import { BID_REPOSITORY, OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { ProfilesService } from '../profiles/profiles.service';
@@ -31,6 +33,7 @@ export class BidsService {
   constructor(
     @Inject(BID_REPOSITORY) private readonly bids: BidRepository,
     @Inject(OPPORTUNITY_REPOSITORY) private readonly notices: OpportunityRepository,
+    @Inject(AWARD_REPOSITORY) private readonly awards: AwardRepository,
     private readonly profiles: ProfilesService,
     @Inject(CLOCK) private readonly now: () => Date,
   ) {}
@@ -72,7 +75,14 @@ export class BidsService {
     options: PipelineOptions,
   ): Promise<[PipelineRow[], number]> {
     const profile = await this.profiles.resolve(profileId);
-    const context = { nowMs: this.now().getTime(), history: NO_HISTORY };
+    const now = this.now();
+    const since = new Date(now.getTime() - profile.scoring.history.days * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const context = {
+      nowMs: now.getTime(),
+      history: awardHistoryOf(await this.awards.history(since), now.getTime()),
+    };
     const [rows, total] = await this.bids.list(options);
     return [
       rows.map(({ bid, opportunity }) => ({
