@@ -7,13 +7,16 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import type {
   CreateSessionRequest,
   GetImproveRunResponse,
   GetRevisionResponse,
+  GetSessionDraftResponse,
   GetSessionResponse,
+  PutSessionDraftRequest,
   ListRevisionsResponse,
   ListSessionsResponse,
   StartImproveRequest,
@@ -29,6 +32,7 @@ import {
   createSessionSchema,
   listRevisionsQuerySchema,
   listSessionsQuerySchema,
+  putSessionDraftSchema,
   startImproveSchema,
   submitRevisionSchema,
   updateSessionSchema,
@@ -73,6 +77,21 @@ export class SessionsController {
     @Body(new ZodValidationPipe(updateSessionSchema)) body: UpdateSessionRequest,
   ): Promise<GetSessionResponse> {
     return ok(toSessionDto(await this.sessions.updateStatus(id, body.status)));
+  }
+
+  @Get(':id/draft')
+  async getDraft(@Param('id', ParseUUIDPipe) id: string): Promise<GetSessionDraftResponse> {
+    return ok(await this.sessions.getDraft(id));
+  }
+
+  /** 204: the unsubmitted canvas, kept with the session until it is submitted. */
+  @Put(':id/draft')
+  @HttpCode(204)
+  async saveDraft(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(putSessionDraftSchema)) body: PutSessionDraftRequest,
+  ): Promise<void> {
+    await this.sessions.saveDraft(id, body);
   }
 
   /** 201 with the revision; its grade is running — poll `GET /revisions/:id/evaluation`. */

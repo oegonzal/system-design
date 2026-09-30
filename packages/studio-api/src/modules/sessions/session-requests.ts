@@ -2,6 +2,7 @@ import {
   designSubmissionSchema,
   MAX_IMPROVE_ITERATIONS,
   SESSION_STATUSES,
+  sessionDraftSchema,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
@@ -23,6 +24,9 @@ export const listRevisionsQuerySchema = z.strictObject({ ...listQueryShape });
 export type ListRevisionsQueryInput = z.infer<typeof listRevisionsQuerySchema>;
 
 export const submitRevisionSchema = designSubmissionSchema;
+
+/** The unsubmitted canvas: the contracts' draft schema, shape only. */
+export const putSessionDraftSchema = sessionDraftSchema;
 
 export const startImproveSchema = z.strictObject({
   ...designSubmissionSchema.shape,

@@ -146,6 +146,11 @@ export interface StartImproveDto {
   revision: DesignRevisionDto;
 }
 
+/** `PUT /sessions/:id/draft` — the unsubmitted canvas, shape-checked only; 204. */
+export type PutSessionDraftRequest = SessionDraft;
+/** `GET /sessions/:id/draft` — the saved draft, or null. */
+export type GetSessionDraftResponse = ApiResponse<SessionDraft | null>;
+
 export type ListSessionsResponse = ApiListResponse<DesignSessionDto>;
 export type GetSessionResponse = ApiResponse<DesignSessionDto>;
 export type ListRevisionsResponse = ApiListResponse<DesignRevisionSummaryDto>;

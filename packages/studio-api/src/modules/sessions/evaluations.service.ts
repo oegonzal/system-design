@@ -34,7 +34,10 @@ export class EvaluationsService {
    * it differs — the one place the cache is refreshed, shared with whoever
    * must know whether a grade is still in flight before acting on it.
    */
-  async syncRevision(revision: DesignRevision): Promise<EvaluationDto> {
+  async syncRevision(
+    revision: DesignRevision,
+    em: EntityManager = this.em,
+  ): Promise<EvaluationDto> {
     if (revision.qualityRunId === null || revision.qualityIteration === null) {
       throw new NotFoundException(`Revision ${revision.id} has no evaluation`);
     }
@@ -55,7 +58,7 @@ export class EvaluationsService {
       revision.evaluationStatus = dto.status;
       revision.overall = dto.overall;
       revision.decision = dto.decision;
-      await this.em.flush();
+      await em.flush();
     }
     return dto;
   }

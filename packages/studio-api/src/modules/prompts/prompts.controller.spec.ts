@@ -312,6 +312,22 @@ describe('prompts', () => {
       expect(body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2']);
       expect(h.loop.criteriaRequests).toHaveLength(2);
     });
+
+    it('[DEL-6] a rewrite whose rubric the grader cannot derive is 503 and leaves the prompt exactly as it was', async () => {
+      const { body: created } = await author(authoredPrompt());
+      h.loop.derivationFails = true;
+
+      const { status } = await call<ApiErrorResponse>(`${h.url}/prompts/${created.data.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: 'Renamed', markdown: '# Renamed\n\n- one thing' }),
+      });
+      expect(status).toBe(503);
+
+      const { body } = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`);
+      expect(body.data.title).toBe(created.data.title);
+      expect(body.data.markdown).toBe(created.data.markdown);
+      expect(body.data.criteria).toEqual(created.data.criteria);
+    });
   });
 
   describe('GET /api/prompts', () => {

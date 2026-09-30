@@ -5,15 +5,18 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { UniqueConstraintViolationException } from '@mikro-orm/core';
+import { LockMode, UniqueConstraintViolationException } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
+  type AdoptedIterationRef,
   type Decision,
   type DesignSubmission,
   type QualityRunStartedDto,
   type QualityRunStatus,
+  type SessionDraft,
   type SessionStatus,
+  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
   createRevision,
@@ -25,6 +28,7 @@ import {
 
 import { PromptsService } from '../prompts/prompts.service';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { EvaluationsService } from './evaluations.service';
 import type { ListRevisionsQueryInput, ListSessionsQueryInput } from './session-requests';
 import type { SessionWithLatest } from './sessions.mapper';
 import { submissionProblems } from './submission';
@@ -36,18 +40,24 @@ export interface RevisionCache {
   decision: Decision | null;
 }
 
-/** A submission checked and ready to grade: the session it belongs to and the prompt it answers. */
-export interface PreparedSubmission {
-  session: DesignSession;
-  prompt: Prompt;
-}
+/** What a grading run is started over: the submission itself, or a recorded iteration to adopt. */
+export type RunSource = { output: DesignSubmission } | { adopt: AdoptedIterationRef };
+
+/** What every write under the session lock receives: the transaction's manager, the row, its prompt. */
+export type LockedWork<T> = (
+  em: EntityManager,
+  session: DesignSession,
+  prompt: Prompt,
+) => Promise<T>;
 
 /**
  * Sessions and the revisions under them. A revision is graded by the quality
  * loop: submitting one starts a `system-design-canvas` run over the drawing,
  * the brief and the narrative, against the prompt's own criteria, and the
  * row stores the run's id. The studio checks structure and stores; the loop
- * judges.
+ * judges. Every write that starts a run happens under a lock on the session
+ * row, so two submits (or a submit and a coach start) on one session are
+ * serialised: the second sees the first's running grade and is refused.
  */
 @Injectable()
 export class SessionsService {
@@ -55,6 +65,7 @@ export class SessionsService {
     private readonly em: EntityManager,
     private readonly loop: QualityLoopClient,
     private readonly prompts: PromptsService,
+    private readonly evaluations: EvaluationsService,
   ) {}
 
   async create(promptId: string): Promise<DesignSession> {
@@ -102,46 +113,99 @@ export class SessionsService {
   }
 
   /**
-   * Grade a design: the run starts before anything is written, so a loop
-   * that refuses leaves no half-graded revision behind; then the revision is
-   * stored pointing at iteration 1 of its own run.
+   * Grade a design. The rubric is made sure of first — a derivation can take
+   * minutes and must not hold the row — then, under the session lock: the
+   * session is open, the submission refers only to what exists, no earlier
+   * grade is still in flight, the run starts, the revision is stored pointing
+   * at iteration 1 of it, and the saved draft (now submitted) is cleared. A
+   * loop that refuses leaves nothing behind: the transaction rolls back.
    */
   async submitRevision(sessionId: string, submission: DesignSubmission): Promise<DesignRevision> {
-    const { prompt } = await this.prepareSubmission(sessionId, submission);
-    const started = await this.startGradingRun(prompt, submission, 1);
-    return this.persistRevision(sessionId, submission, 'user', {
-      runId: started.runId,
-      iteration: 1,
+    await this.ensureRubric(sessionId);
+    return this.withSessionLock(sessionId, async (em, session, prompt) => {
+      this.assertSessionOpen(session, prompt);
+      this.assertSubmission(submission, prompt.criteria);
+      await this.assertNoGradeInFlight(em, session);
+      const started = await this.startGradingRun(prompt, { output: submission }, 1);
+      const revision = await createRevision(em, sessionId, submission, 'user', {
+        runId: started.runId,
+        iteration: 1,
+      });
+      session.draft = null;
+      return revision;
     });
   }
 
-  /**
-   * Everything a submission must pass before a run is started, shared with the
-   * coach: the session exists and is open, the prompt has its rubric, and the
-   * graph, brief and narrative refer only to what exists. Every referential
-   * problem is reported at once.
-   */
-  async prepareSubmission(
-    sessionId: string,
-    submission: DesignSubmission,
-  ): Promise<PreparedSubmission> {
+  /** The prompt's rubric, derived if it is still empty — outside any lock. */
+  async ensureRubric(sessionId: string): Promise<Prompt> {
     const session = await this.em.findOne(DesignSession, sessionId, { populate: ['prompt'] });
     if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    return this.prompts.ensureCriteria(session.prompt);
+  }
+
+  /**
+   * One transaction holding a write lock on the session row for the whole of
+   * `work`. The bare row is locked and the prompt loaded beside it: Postgres
+   * refuses `FOR UPDATE` on the outer-joined side of a populate.
+   */
+  withSessionLock<T>(sessionId: string, work: LockedWork<T>): Promise<T> {
+    return this.em.transactional(async (em) => {
+      const session = await em.findOne(DesignSession, sessionId, {
+        lockMode: LockMode.PESSIMISTIC_WRITE,
+      });
+      if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+      const prompt = await em.findOneOrFail(Prompt, session.prompt.id);
+      return work(em, session, prompt);
+    });
+  }
+
+  /** An in-progress session over a prompt that is not archived — the same rule `create` applies. */
+  assertSessionOpen(session: DesignSession, prompt: Prompt): void {
     if (session.status !== 'in-progress') {
       throw new UnprocessableEntityException(
         `session is ${session.status} — only an in-progress session accepts revisions`,
       );
     }
-    const prompt = await this.prompts.ensureCriteria(session.prompt);
-    const problems = submissionProblems(submission, prompt.criteria);
-    if (problems.length > 0) throw new UnprocessableEntityException(problems);
-    return { session, prompt };
+    if (prompt.status === 'archived') {
+      throw new UnprocessableEntityException('prompt is archived — reactivate it first');
+    }
   }
 
-  /** One `system-design-canvas` run over the submission, on the prompt's fixed rubric. */
+  /**
+   * The graph, brief and narrative refer only to what exists, against the
+   * prompt's rubric. Every referential problem is reported at once; nothing
+   * here says whether the design is any good.
+   */
+  assertSubmission(submission: DesignSubmission, criteria: readonly SuccessCriterion[]): void {
+    const problems = submissionProblems(submission, criteria);
+    if (problems.length > 0) throw new UnprocessableEntityException(problems);
+  }
+
+  /**
+   * One grade at a time per session. The cache says `running` until someone
+   * reads the evaluation, so a latest revision that says so is asked of the
+   * loop first — a grade that finished unread is not in flight.
+   */
+  async assertNoGradeInFlight(em: EntityManager, session: DesignSession): Promise<void> {
+    const latest = await em.findOne(
+      DesignRevision,
+      { session: session.id },
+      { orderBy: { revisionNumber: 'desc' } },
+    );
+    if (latest === null || latest.evaluationStatus !== 'running') return;
+    if (latest.qualityRunId === null) return;
+    const grade = await this.evaluations.syncRevision(latest, em);
+    if (grade.status === 'running') {
+      throw new ConflictException(
+        `revision #${latest.revisionNumber} is still being graded — wait for its verdict`,
+      );
+    }
+  }
+
+  /** One `system-design-canvas` run on the prompt's fixed rubric: over a submission, or from a recorded iteration. */
   startGradingRun(
     prompt: Prompt,
-    submission: DesignSubmission,
+    source: RunSource,
     maxIterations: number,
   ): Promise<QualityRunStartedDto> {
     if (prompt.criteria.length === 0) {
@@ -152,16 +216,35 @@ export class SessionsService {
     return this.loop.startRun({
       pipeline: CANVAS_PIPELINE_ID,
       goal: prompt.markdown,
-      output: submission,
       criteria: prompt.criteria,
       maxIterations,
+      ...source,
     });
   }
 
+  async getDraft(sessionId: string): Promise<SessionDraft | null> {
+    const session = await this.em.findOne(DesignSession, sessionId);
+    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    return session.draft;
+  }
+
+  /** The unsubmitted canvas, shape-checked by the pipe; only an open session keeps one. */
+  async saveDraft(sessionId: string, draft: SessionDraft): Promise<void> {
+    const session = await this.em.findOne(DesignSession, sessionId);
+    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (session.status !== 'in-progress') {
+      throw new UnprocessableEntityException(
+        `session is ${session.status} — only an in-progress session keeps a draft`,
+      );
+    }
+    session.draft = draft;
+    await this.em.flush();
+  }
+
   /**
-   * The one write of a revision row, in its own transaction. The unique
-   * (session, revision_number) and (run, iteration) constraints arbitrate
-   * concurrent writers; a loser gets 409 and may retry or re-read.
+   * A revision row written outside the session lock — the coach's imports,
+   * which race only with each other. The unique (session, revision_number)
+   * and (run, iteration) constraints arbitrate; a loser gets 409 and re-reads.
    */
   async persistRevision(
     sessionId: string,

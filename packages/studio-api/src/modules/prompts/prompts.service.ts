@@ -212,8 +212,11 @@ export class PromptsService {
       await this.assertNoSessions(prompt, 'be rewritten');
       if (request.title !== undefined) prompt.title = request.title;
       if (request.markdown !== undefined && request.markdown !== prompt.markdown) {
+        // Derived before anything is written: a grader that cannot derive
+        // leaves the prompt exactly as it was, never rewritten without a rubric.
+        const criteria = await this.rubricFor(request.markdown);
         prompt.markdown = request.markdown;
-        prompt.criteria = [];
+        prompt.criteria = criteria;
       }
     }
     await this.em.flush();

@@ -13,7 +13,7 @@ import {
   type StartImproveRequest,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
-import { DesignRevision } from '@sysdesign/db';
+import { createRevision, DesignRevision } from '@sysdesign/db';
 
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { toRevisionDto } from './sessions.mapper';
@@ -39,17 +39,31 @@ export class ImproveService {
 
   async start(sessionId: string, request: StartImproveRequest): Promise<StartImproveDto> {
     const { maxIterations, ...submission } = request;
-    const { prompt } = await this.sessions.prepareSubmission(sessionId, submission);
     const iterations = Math.min(
       maxIterations ?? DEFAULT_IMPROVE_ITERATIONS,
       MAX_IMPROVE_ITERATIONS,
     );
-    const started = await this.sessions.startGradingRun(prompt, submission, iterations);
-    const base = await this.sessions.persistRevision(sessionId, submission, 'user', {
-      runId: started.runId,
-      iteration: 1,
-    });
-    return { runId: started.runId, revision: toRevisionDto(base) };
+    await this.sessions.ensureRubric(sessionId);
+    const { runId, base } = await this.sessions.withSessionLock(
+      sessionId,
+      async (em, session, prompt) => {
+        this.sessions.assertSessionOpen(session, prompt);
+        this.sessions.assertSubmission(submission, prompt.criteria);
+        await this.sessions.assertNoGradeInFlight(em, session);
+        const started = await this.sessions.startGradingRun(
+          prompt,
+          { output: submission },
+          iterations,
+        );
+        const revision = await createRevision(em, sessionId, submission, 'user', {
+          runId: started.runId,
+          iteration: 1,
+        });
+        session.draft = null;
+        return { runId: started.runId, base: revision };
+      },
+    );
+    return { runId, revision: toRevisionDto(base) };
   }
 
   async get(sessionId: string, runId: string): Promise<ImproveRunDto> {

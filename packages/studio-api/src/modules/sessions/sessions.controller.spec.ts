@@ -8,9 +8,11 @@ import {
   type DesignNarrative,
   type DesignSubmission,
   type GetEvaluationResponse,
+  type SessionDraft,
   type GetImproveRunResponse,
   type GetPromptResponse,
   type GetRevisionResponse,
+  type GetSessionDraftResponse,
   type GetSessionResponse,
   type ListRevisionsResponse,
   type ListSessionsResponse,
@@ -66,6 +68,13 @@ const submission = (
   brief: DesignBrief | null = validBrief(),
   narrative: DesignNarrative | null = validNarrative(),
 ): DesignSubmission => ({ graph, brief, narrative });
+
+/** An unsubmitted canvas: a binding still empty and a claim not yet written — shape only. */
+const draft = (): SessionDraft => ({
+  graph: validGraph(),
+  brief: { version: 1, bindings: [{ criterionId: 'c2', nodeIds: [], claim: '' }] },
+  narrative: null,
+});
 
 /** The coach's second iteration: the author's graph plus a read replica, ids prefixed ai-. */
 const coached = (): DesignSubmission => {
@@ -189,7 +198,9 @@ describe('sessions', () => {
         },
       ]);
 
-      // Dense numbering, one run per submission.
+      // Dense numbering, one run per submission. The first grade finished unread:
+      // the studio asks the loop before refusing, and lets the second through.
+      h.loop.complete('fake-run-1');
       const second = await submit(sessionId, submission(validGraph(), null, null));
       expect(second.body.data.revisionNumber).toBe(2);
       expect(second.body.data.evaluation?.runId).toBe('fake-run-2');
@@ -281,6 +292,61 @@ describe('sessions', () => {
 
       expect((await submit(sessionId, submission())).status).toBe(503);
       expect(h.loop.startRequests).toEqual([]);
+    });
+
+    it('[DEL-1] two submits at once are one grade: the second is refused while the first is in flight, and numbering stays dense', async () => {
+      const { sessionId } = await startSession();
+
+      const results = await Promise.all([
+        submit(sessionId, submission()),
+        submit(sessionId, submission(validGraph(), null, null)),
+      ]);
+      expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+      expect(h.loop.startRequests).toHaveLength(1);
+      const winner = results.find((r) => r.status === 201);
+      expect(winner?.body.data.revisionNumber).toBe(1);
+
+      const third = await submit(sessionId, submission());
+      expect(third.status).toBe(409);
+      expect(JSON.stringify((third.body as unknown as ApiErrorResponse).message)).toContain(
+        'revision #1 is still being graded',
+      );
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(1);
+
+      h.loop.complete('fake-run-1');
+      const next = await submit(sessionId, submission());
+      expect(next.status).toBe(201);
+      expect(next.body.data.revisionNumber).toBe(2);
+      expect(h.loop.startRequests).toHaveLength(2);
+    });
+
+    it('[DEL-5] a session whose prompt was archived still reads, but takes no submit and no coach until the prompt is back', async () => {
+      const { prompt, sessionId } = await startSession();
+      await call(`${h.url}/prompts/${prompt.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
+      });
+
+      expect((await call(`${h.url}/sessions/${sessionId}`)).status).toBe(200);
+      const refused = await submit(sessionId, submission());
+      expect(refused.status).toBe(422);
+      expect(JSON.stringify((refused.body as unknown as ApiErrorResponse).message)).toMatch(
+        /archived/,
+      );
+      const coach = await call<ApiErrorResponse>(`${h.url}/sessions/${sessionId}/improve`, {
+        method: 'POST',
+        body: JSON.stringify(submission()),
+      });
+      expect(coach.status).toBe(422);
+      expect(JSON.stringify(coach.body.message)).toMatch(/archived/);
+      expect(h.loop.startRequests).toEqual([]);
+
+      await call(`${h.url}/prompts/${prompt.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'active' }),
+      });
+      expect((await submit(sessionId, submission())).status).toBe(201);
     });
 
     it('rejects a revision against a closed session with 422 and an unknown session with 404', async () => {
@@ -583,10 +649,57 @@ describe('sessions', () => {
     });
   });
 
+  describe('the draft', () => {
+    const putDraft = (sessionId: string, body: unknown) =>
+      call(`${h.url}/sessions/${sessionId}/draft`, { method: 'PUT', body: JSON.stringify(body) });
+    const getDraft = (sessionId: string) =>
+      call<GetSessionDraftResponse>(`${h.url}/sessions/${sessionId}/draft`);
+
+    it('[UX-15] the unsubmitted canvas is kept with the session, shape-checked only, and cleared by the submit it became', async () => {
+      const { sessionId } = await startSession();
+      expect((await getDraft(sessionId)).body.data).toBeNull();
+
+      expect((await putDraft(sessionId, draft())).status).toBe(204);
+      expect((await getDraft(sessionId)).body.data).toEqual(draft());
+      const session = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(session.body.data.draft).toEqual(draft());
+
+      await submit(sessionId, submission());
+      expect((await getDraft(sessionId)).body.data).toBeNull();
+    });
+
+    it('[UX-15] a coach started from the draft clears it; a closed session keeps none; the shape is still the canvas’s', async () => {
+      const { sessionId } = await startSession();
+      await putDraft(sessionId, draft());
+      const coach = await call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
+        method: 'POST',
+        body: JSON.stringify(submission()),
+      });
+      expect(coach.status).toBe(202);
+      expect((await getDraft(sessionId)).body.data).toBeNull();
+
+      const malformed = {
+        ...draft(),
+        graph: { nodes: [{ id: 'x', kind: 'teapot', label: 'x' }], edges: [] },
+      };
+      expect((await putDraft(sessionId, malformed)).status).toBe(400);
+      expect((await putDraft(sessionId, { ...draft(), extra: 1 })).status).toBe(400);
+
+      await call(`${h.url}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      expect((await putDraft(sessionId, draft())).status).toBe(422);
+      expect((await putDraft(UNKNOWN_UUID, draft())).status).toBe(404);
+      expect((await getDraft(UNKNOWN_UUID)).status).toBe(404);
+    });
+  });
+
   describe('lists and status', () => {
     it('lists graph-free summaries newest first, and summarises the newest revision on the session', async () => {
       const { sessionId } = await startSession();
       await submit(sessionId, submission(validGraph(), null, validNarrative('v1')));
+      h.loop.complete('fake-run-1');
       await submit(sessionId, submission(validGraph(), null, validNarrative('v2')));
 
       const { status, body } = await call<ListRevisionsResponse>(
