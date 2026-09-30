@@ -40,7 +40,11 @@ export function PromptPane({
           <Badge tone="neutral" data-testid="prompt-source">
             {prompt.source}
           </Badge>
-          {prompt.status === 'archived' ? <Badge tone="neutral">archived</Badge> : null}
+          {prompt.status === 'archived' ? (
+            <Badge tone="neutral" data-testid="prompt-archived">
+              archived
+            </Badge>
+          ) : null}
         </Stack>
       </Stack>
 

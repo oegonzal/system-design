@@ -15,6 +15,8 @@ export interface CanvasToolbarProps {
   revisionNumber: number | null;
   /** A revision is on screen: nothing here may change or submit it. */
   readOnly?: boolean;
+  /** The session's prompt is archived: the studio refuses a submit until it is back. */
+  promptArchived?: boolean;
   /** Where the unsubmitted draft stands against the server. */
   draftStatus?: DraftSaveStatus;
   /** Download the run (diagram PDF + per-artifact Markdown) as one zip. */
@@ -27,6 +29,8 @@ const STATUS_LABEL: Record<QualityRunStatus, string> = {
   complete: 'graded',
   failed: 'grading failed',
 };
+
+const ARCHIVED_TITLE = 'This prompt is archived — reactivate it to submit.';
 
 /** The draft badge per status; null shows nothing — a clean canvas has no draft to report. */
 const DRAFT_BADGE: Record<DraftSaveStatus, { tone: BadgeTone; label: string } | null> = {
@@ -51,6 +55,7 @@ export function CanvasToolbar({
   revisionStatus,
   revisionNumber,
   readOnly = false,
+  promptArchived = false,
   draftStatus,
   onExport,
   exporting,
@@ -76,7 +81,8 @@ export function CanvasToolbar({
       <Button
         variant="solid"
         onClick={onSubmit}
-        disabled={gradingInFlight || isEmpty || readOnly}
+        disabled={gradingInFlight || isEmpty || readOnly || promptArchived}
+        title={promptArchived ? ARCHIVED_TITLE : undefined}
         data-testid="submit-revision"
       >
         Submit for grading

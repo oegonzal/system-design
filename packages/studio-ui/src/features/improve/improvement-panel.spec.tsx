@@ -53,6 +53,12 @@ describe('ImprovementPanel', () => {
     expect(screen.queryByTestId('improver-unavailable')).toBeNull();
   });
 
+  it('[UX-14] is off with the reason while the session’s prompt is archived, whatever the grader says', () => {
+    renderPanel({ promptArchived: true });
+    expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('improver-unavailable').textContent).toContain('archived');
+  });
+
   it('[UX-11] renders the live run: model calls so far and one badge per outcome — starting point, imported, not better, refused with its problems', () => {
     renderPanel({
       run: makeImproveRun({

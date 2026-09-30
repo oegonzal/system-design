@@ -38,6 +38,11 @@ describe('PromptPane', () => {
     expect(row.textContent).toContain('p99 read latency stays under 200 ms');
   });
 
+  it('[UX-14] badges an archived prompt', () => {
+    renderWithTheme(<PromptPane prompt={makePrompt({ status: 'archived' })} />);
+    expect(screen.getByTestId('prompt-archived').textContent).toBe('archived');
+  });
+
   it('[UX-14] shows the normalizing state while the rubric is derived', () => {
     renderWithTheme(<PromptPane prompt={makePrompt({ criteria: [] })} deriving />);
     expect(screen.getByTestId('prompt-criteria-normalizing')).toBeTruthy();

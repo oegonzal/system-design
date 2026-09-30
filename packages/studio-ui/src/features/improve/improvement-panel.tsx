@@ -37,6 +37,8 @@ export interface ImprovementPanelProps {
   starting?: boolean;
   /** Nothing on the canvas — there is nothing to coach. */
   canvasEmpty?: boolean;
+  /** The session's prompt is archived: the studio refuses new work on it until it is back. */
+  promptArchived?: boolean;
   onStart: (maxIterations: number) => void;
   onLoadRevision: (revisionId: string) => void;
 }
@@ -78,8 +80,9 @@ const STOPPED_COPY: Record<StopReason, string> = {
   'max-iterations': 'The coach used its iteration budget.',
 };
 
-/** The one way the coach can be unavailable: a booted loop always has a model, so only "unreachable" remains. */
+/** A booted loop always has a model, so the grader is only ever "unreachable"; the prompt may also be archived. */
 const UNREACHABLE_COPY = 'The coach cannot reach the quality loop right now.';
+const ARCHIVED_COPY = 'This prompt is archived — reactivate it to keep practising.';
 
 /** What became of each iteration in the studio, as a chip. Every outcome the contract names. */
 const OUTCOME_CHIP: Record<ImproveIterationOutcome, { tone: BadgeTone; label: string }> = {
@@ -119,13 +122,19 @@ export function ImprovementPanel({
   availability,
   starting = false,
   canvasEmpty = false,
+  promptArchived = false,
   onStart,
   onLoadRevision,
 }: ImprovementPanelProps) {
   const [iterations, setIterations] = useState(DEFAULT_IMPROVE_ITERATIONS);
   const active = starting || isPolling || (run !== null && run.status === 'running');
-  const unavailable = availability.status !== 'reachable';
-  const unreachable = availability.status === 'unreachable';
+  const unavailable = availability.status !== 'reachable' || promptArchived;
+  const whyUnavailable =
+    availability.status === 'unreachable'
+      ? UNREACHABLE_COPY
+      : promptArchived
+        ? ARCHIVED_COPY
+        : null;
   const best = run ? bestImported(run) : null;
 
   return (
@@ -158,15 +167,15 @@ export function ImprovementPanel({
             variant="solid"
             onClick={() => onStart(iterations)}
             disabled={active || unavailable || canvasEmpty}
-            title={unreachable ? UNREACHABLE_COPY : undefined}
+            title={whyUnavailable ?? undefined}
             data-testid="improve-run"
           >
             {active ? 'Coaching…' : 'Improve with the coach'}
           </Button>
         </Stack>
-        {unreachable ? (
+        {whyUnavailable !== null ? (
           <Text size="sm" tone="muted" data-testid="improver-unavailable">
-            {UNREACHABLE_COPY}
+            {whyUnavailable}
           </Text>
         ) : null}
       </Stack>

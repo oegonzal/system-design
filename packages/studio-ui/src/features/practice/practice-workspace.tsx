@@ -281,6 +281,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
   const readOnly = viewingRevision !== null;
+  const promptArchived = prompt?.status === 'archived';
   // The draft is the author's only while it is on screen and the page is up.
   const autosave = useDraftAutosave(sessionId, storeApi, !readOnly && !loading);
   useLeaveGuard(autosave.pending, LEAVE_WHILE_SAVING);
@@ -587,6 +588,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             revisionStatus={revisionStatus}
             revisionNumber={feedback?.revisionNumber ?? null}
             readOnly={readOnly}
+            promptArchived={promptArchived}
             draftStatus={autosave.status}
             onExport={() => void handleExport()}
             exporting={exporting}
@@ -665,6 +667,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 availability={availability}
                 starting={startingImprove}
                 canvasEmpty={canvasEmpty}
+                promptArchived={promptArchived}
                 onStart={(maxIterations) => void handleStartImprove(maxIterations)}
                 onLoadRevision={(revisionId) => void handleSelectRevision({ id: revisionId })}
               />
