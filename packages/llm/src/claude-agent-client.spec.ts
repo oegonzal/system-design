@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ClaudeAgentLlmClient, extractStructured } from './claude-agent-client';
-import { createImproverLlmFromEnv, improverAvailabilityFromEnv } from './create-client';
+import { createQualityLoopLlmFromEnv, qualityLoopAvailabilityFromEnv } from './create-client';
 import { NoopLlmClient } from './noop-client';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
@@ -94,13 +94,13 @@ describe('extractStructured', () => {
   });
 });
 
-describe('claude-code subscription auth for the improver', () => {
-  it('IMPROVER_AUTH=claude-code enables the agent client without any key', () => {
-    const env = { IMPROVER_DETERMINISTIC: '0', IMPROVER_AUTH: 'claude-code' };
-    const client = createImproverLlmFromEnv(env);
+describe('claude-code subscription auth for the quality loop', () => {
+  it('QUALITY_LOOP_AUTH=claude-code enables the agent client without any key', () => {
+    const env = { QUALITY_LOOP_AUTH: 'claude-code' };
+    const client = createQualityLoopLlmFromEnv(env);
     expect(client).toBeInstanceOf(ClaudeAgentLlmClient);
     expect(client.enabled).toBe(true);
-    expect(improverAvailabilityFromEnv(env)).toEqual({
+    expect(qualityLoopAvailabilityFromEnv(env)).toEqual({
       enabled: true,
       model: 'claude-code/subscription',
       reason: null,
@@ -108,28 +108,23 @@ describe('claude-code subscription auth for the improver', () => {
   });
 
   it('an explicit API key outranks claude-code auth; determinism outranks both', () => {
-    const withKey = createImproverLlmFromEnv({
-      IMPROVER_DETERMINISTIC: '0',
-      IMPROVER_AUTH: 'claude-code',
+    const withKey = createQualityLoopLlmFromEnv({
+      QUALITY_LOOP_AUTH: 'claude-code',
       ANTHROPIC_API_KEY: 'sk-test',
     });
     expect(withKey).not.toBeInstanceOf(ClaudeAgentLlmClient);
     expect(withKey.enabled).toBe(true);
 
-    const deterministic = createImproverLlmFromEnv({
-      EVAL_DETERMINISTIC: '1',
-      IMPROVER_AUTH: 'claude-code',
+    const deterministic = createQualityLoopLlmFromEnv({
+      QUALITY_LOOP_DETERMINISTIC: '1',
+      QUALITY_LOOP_AUTH: 'claude-code',
     });
     expect(deterministic).toBeInstanceOf(NoopLlmClient);
   });
 
   it('LLM_MODEL pins the agent model and the availability label', () => {
-    const env = {
-      IMPROVER_DETERMINISTIC: '0',
-      IMPROVER_AUTH: 'claude-code',
-      LLM_MODEL: 'claude-opus-5',
-    };
-    expect(createImproverLlmFromEnv(env).model).toBe('claude-opus-5');
-    expect(improverAvailabilityFromEnv(env).model).toBe('claude-opus-5');
+    const env = { QUALITY_LOOP_AUTH: 'claude-code', LLM_MODEL: 'claude-opus-5' };
+    expect(createQualityLoopLlmFromEnv(env).model).toBe('claude-opus-5');
+    expect(qualityLoopAvailabilityFromEnv(env).model).toBe('claude-opus-5');
   });
 });

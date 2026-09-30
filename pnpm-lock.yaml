@@ -56,12 +56,6 @@ importers:
       '@xyflow/react':
         specifier: ^12.3.0
         version: 12.11.5(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      class-transformer:
-        specifier: ^0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: ^0.15.1
-        version: 0.15.1
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13
@@ -9869,7 +9863,8 @@ snapshots:
 
   '@types/resolve@1.20.6': {}
 
-  '@types/validator@13.15.10': {}
+  '@types/validator@13.15.10':
+    optional: true
 
   '@typescript-eslint/eslint-plugin@8.68.0(@typescript-eslint/parser@8.68.0(eslint@10.9.1(jiti@2.4.2))(typescript@6.0.3))(eslint@10.9.1(jiti@2.4.2))(typescript@6.0.3)':
     dependencies:
@@ -10558,13 +10553,15 @@ snapshots:
 
   chrome-trace-event@1.0.4: {}
 
-  class-transformer@0.5.1: {}
+  class-transformer@0.5.1:
+    optional: true
 
   class-validator@0.15.1:
     dependencies:
       '@types/validator': 13.15.10
       libphonenumber-js: 1.13.12
       validator: 13.15.35
+    optional: true
 
   classcat@5.0.5: {}
 
@@ -12169,7 +12166,8 @@ snapshots:
       prelude-ls: 1.2.1
       type-check: 0.4.0
 
-  libphonenumber-js@1.13.12: {}
+  libphonenumber-js@1.13.12:
+    optional: true
 
   lie@3.3.0:
     dependencies:
@@ -13839,7 +13837,8 @@ snapshots:
       base64-arraybuffer: 1.0.2
     optional: true
 
-  validator@13.15.35: {}
+  validator@13.15.35:
+    optional: true
 
   vary@1.1.2: {}
 

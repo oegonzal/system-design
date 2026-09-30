@@ -1,11 +1,11 @@
 /**
- * Run-folder plumbing, shared by the two pipelines that dump.
+ * Run-folder plumbing, shared by every pipeline that dumps.
  *
  * What is shared is deliberately only the payload-AGNOSTIC half: a run id, a
  * list of files, one index line. The records themselves stay in the apps that
- * own their types — an evaluation dump is written against `EvidenceArtifact`
- * and `AggregateResult`, a prompt dump against the generator's output, and
- * neither vocabulary belongs in a package the other has to depend on.
+ * own their types — a quality run's dump is written against the loop's trace,
+ * a govcon pull's against its ledger — and neither vocabulary belongs in a
+ * package the other has to depend on.
  *
  * Three rules here, each earned:
  *

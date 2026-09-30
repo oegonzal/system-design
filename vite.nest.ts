@@ -1,7 +1,7 @@
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 
 /**
- * Shared Vite build shape for the NestJS apps (studio-api, eval-worker).
+ * Shared Vite build shape for the NestJS apps (studio-api, quality-loop, govcon).
  *
  * One externals list, maintained once: everything here stays a runtime
  * `require` in the bundled `dist/main.js` and is provided by `node_modules`
@@ -25,8 +25,6 @@ export const NEST_EXTERNALS = [
   /^rxjs\//,
   'pg',
   'pg-native',
-  /^class-validator/,
-  /^class-transformer/,
   'express',
   /^node:.*/,
   'tslib',

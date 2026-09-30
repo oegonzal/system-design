@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quality-loop
+  labels:
+    app: quality-loop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quality-loop
+  template:
+    metadata:
+      labels:
+        app: quality-loop
+    spec:
+      containers:
+        - name: quality-loop
+          image: quality-loop
+          ports:
+            - containerPort: 3003
+          env:
+            - name: DB_HOST
+              value: sysdesign-postgres-service
+            - name: DB_PORT
+              value: '5432'
+            - name: DB_USERNAME
+              value: admin
+            - name: DB_PASSWORD
+              value: admin
+            - name: DB_NAME
+              value: sysdesign
+            - name: QUALITY_LOOP_PORT
+              value: '3003'
+            - name: QUALITY_LOOP_CORS_ORIGIN
+              value: http://localhost:4201
+            # No model in the cluster by default: every run escalates honestly.
+            # Set QUALITY_LOOP_AUTH=claude-code or mount ANTHROPIC_API_KEY to grade live.
+            - name: QUALITY_LOOP_DETERMINISTIC
+              value: '1'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quality-loop-service
+spec:
+  selector:
+    app: quality-loop
+  ports:
+    - protocol: TCP
+      port: 3003
+      targetPort: 3003
+  type: LoadBalancer

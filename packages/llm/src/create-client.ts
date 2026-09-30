@@ -11,96 +11,42 @@ import { NoopLlmClient } from './noop-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 /**
- * Environment-driven factory — the only place LLM env vars are read.
+ * Environment-driven factories — the only place LLM env vars are read.
  *
- * EVAL_DETERMINISTIC=1 outranks a present API key: CI and the e2e suite set
- * it so evaluations are byte-reproducible even on machines where a developer
- * has a key exported.
+ * A model-consuming ROLE names its own determinism switch and its own
+ * subscription opt-in. Determinism outranks everything: CI and the e2e suite
+ * set it so nothing a test reads depends on a model, even on a machine where
+ * a developer has a key exported. An explicit API key wins over the
+ * subscription route, and `<authVar>=claude-code` runs the role through this
+ * machine's Claude Code login via the Agent SDK — no API key required, none
+ * ever read.
  */
-export function createLlmClientFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  if (env['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
-  if (!env['ANTHROPIC_API_KEY']) return new NoopLlmClient();
-
-  return new AnthropicLlmClient({
-    apiKey: env['ANTHROPIC_API_KEY'],
-    model: env['LLM_MODEL'] || undefined,
-  });
+export interface LlmRole {
+  /** `<var>=1` yields the no-op client whatever else is set. */
+  deterministicVar: string;
+  /** `<var>=claude-code` routes through the Agent SDK. */
+  authVar: string;
 }
 
-/**
- * The eval critic's client. Same determinism-first ordering as
- * `createLlmClientFromEnv`, plus one opt-in route: `EVAL_AUTH=claude-code` runs
- * the eval passes through the machine's Claude Code login (a subscription) via
- * the Agent SDK — for a developer with no API key who wants the graded critic
- * live. Unlike the improver, eval reads the RAW `EVAL_DETERMINISTIC` with no
- * override fork: eval determinism protects grading reproducibility and must
- * never be switchable, so CI/e2e/calibration (which set `EVAL_DETERMINISTIC=1`)
- * stay byte-identical, and the subscription route is inert unless explicitly
- * opted into.
- */
-export function createEvalLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  if (env['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
+/** The quality loop's producer and lenses — the one model-consuming role the stack runs. */
+export const QUALITY_LOOP_ROLE: LlmRole = {
+  deterministicVar: 'QUALITY_LOOP_DETERMINISTIC',
+  authVar: 'QUALITY_LOOP_AUTH',
+};
+
+export function createRoleLlmFromEnv(
+  role: LlmRole,
+  env: NodeJS.ProcessEnv = process.env,
+): LlmClient {
+  if (env[role.deterministicVar] === '1') return new NoopLlmClient();
   if (env['ANTHROPIC_API_KEY']) {
     return new AnthropicLlmClient({
       apiKey: env['ANTHROPIC_API_KEY'],
       model: env['LLM_MODEL'] || undefined,
     });
   }
-  if (env['EVAL_AUTH'] === 'claude-code') {
+  if (env[role.authVar] === 'claude-code') {
     return new ClaudeAgentLlmClient({ model: env['LLM_MODEL'] || undefined });
-  }
-  return new NoopLlmClient();
-}
-
-/**
- * A model-consuming ROLE that only proposes or judges — never grades — gets its
- * own determinism switch (falling back to `EVAL_DETERMINISTIC`) and its own
- * subscription opt-in. `EVAL_DETERMINISTIC` protects GRADING reproducibility;
- * a role whose every output is re-scored or re-decided by deterministic code
- * can go live without touching a grade, so a dev stack can run
- * `EVAL_DETERMINISTIC=1 IMPROVER_DETERMINISTIC=0` and get deterministic grades
- * with a live coach. CI and e2e set neither override and stay fully
- * deterministic.
- */
-export interface LlmRole {
-  /** The role's determinism switch; `EVAL_DETERMINISTIC` applies when unset. */
-  deterministicVar: string;
-  /** The role's auth opt-in: `claude-code` routes through the Agent SDK. */
-  authVar: string;
-}
-
-/** The improver (AI coach). */
-export const IMPROVER_ROLE: LlmRole = {
-  deterministicVar: 'IMPROVER_DETERMINISTIC',
-  authVar: 'IMPROVER_AUTH',
-};
-
-/** The quality loop's producer and lenses. */
-export const QUALITY_LOOP_ROLE: LlmRole = {
-  deterministicVar: 'QUALITY_LOOP_DETERMINISTIC',
-  authVar: 'QUALITY_LOOP_AUTH',
-};
-
-const roleEnv = (env: NodeJS.ProcessEnv, role: LlmRole): NodeJS.ProcessEnv => ({
-  ...env,
-  EVAL_DETERMINISTIC: env[role.deterministicVar] ?? env['EVAL_DETERMINISTIC'],
-});
-
-/**
- * The role's client. Determinism outranks everything; an explicit API key wins
- * over the subscription route; `<authVar>=claude-code` runs the role through
- * this machine's Claude Code login via the Agent SDK — no API key required,
- * none ever read.
- */
-export function createRoleLlmFromEnv(
-  role: LlmRole,
-  env: NodeJS.ProcessEnv = process.env,
-): LlmClient {
-  const derived = roleEnv(env, role);
-  if (derived['EVAL_DETERMINISTIC'] === '1') return new NoopLlmClient();
-  if (derived['ANTHROPIC_API_KEY']) return createLlmClientFromEnv(derived);
-  if (derived[role.authVar] === 'claude-code') {
-    return new ClaudeAgentLlmClient({ model: derived['LLM_MODEL'] || undefined });
   }
   return new NoopLlmClient();
 }
@@ -117,29 +63,17 @@ export function roleAvailabilityFromEnv(
   role: LlmRole,
   env: NodeJS.ProcessEnv = process.env,
 ): LlmAvailability {
-  const derived = roleEnv(env, role);
-  if (derived['EVAL_DETERMINISTIC'] === '1') {
+  if (env[role.deterministicVar] === '1') {
     return { enabled: false, model: null, reason: 'deterministic' };
   }
-  if (derived['ANTHROPIC_API_KEY']) {
-    return { enabled: true, model: derived['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
+  if (env['ANTHROPIC_API_KEY']) {
+    return { enabled: true, model: env['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
   }
-  if (derived[role.authVar] === 'claude-code') {
-    return {
-      enabled: true,
-      model: derived['LLM_MODEL'] || 'claude-code/subscription',
-      reason: null,
-    };
+  if (env[role.authVar] === 'claude-code') {
+    return { enabled: true, model: env['LLM_MODEL'] || 'claude-code/subscription', reason: null };
   }
   return { enabled: false, model: null, reason: 'no-key' };
 }
-
-export const createImproverLlmFromEnv = (env: NodeJS.ProcessEnv = process.env): LlmClient =>
-  createRoleLlmFromEnv(IMPROVER_ROLE, env);
-
-export const improverAvailabilityFromEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): LlmAvailability => roleAvailabilityFromEnv(IMPROVER_ROLE, env);
 
 export const createQualityLoopLlmFromEnv = (env: NodeJS.ProcessEnv = process.env): LlmClient =>
   createRoleLlmFromEnv(QUALITY_LOOP_ROLE, env);
@@ -156,12 +90,11 @@ export const qualityLoopAvailabilityFromEnv = (
 export function createEmbeddingClientFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): EmbeddingClient {
-  const derived = roleEnv(env, QUALITY_LOOP_ROLE);
-  if (derived['EVAL_DETERMINISTIC'] === '1') return new NoopEmbeddingClient();
-  if (!derived['OPENAI_API_KEY']) return new NoopEmbeddingClient();
+  if (env[QUALITY_LOOP_ROLE.deterministicVar] === '1') return new NoopEmbeddingClient();
+  if (!env['OPENAI_API_KEY']) return new NoopEmbeddingClient();
   return new OpenAiEmbeddingClient({
-    apiKey: derived['OPENAI_API_KEY'],
-    model: derived['OPENAI_EMBEDDING_MODEL'] || undefined,
+    apiKey: env['OPENAI_API_KEY'],
+    model: env['OPENAI_EMBEDDING_MODEL'] || undefined,
   });
 }
 
@@ -169,14 +102,13 @@ export function createEmbeddingClientFromEnv(
 export function embeddingAvailabilityFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): LlmAvailability {
-  const derived = roleEnv(env, QUALITY_LOOP_ROLE);
-  if (derived['EVAL_DETERMINISTIC'] === '1') {
+  if (env[QUALITY_LOOP_ROLE.deterministicVar] === '1') {
     return { enabled: false, model: null, reason: 'deterministic' };
   }
-  if (!derived['OPENAI_API_KEY']) return { enabled: false, model: null, reason: 'no-key' };
+  if (!env['OPENAI_API_KEY']) return { enabled: false, model: null, reason: 'no-key' };
   return {
     enabled: true,
-    model: derived['OPENAI_EMBEDDING_MODEL'] || DEFAULT_EMBEDDING_MODEL,
+    model: env['OPENAI_EMBEDDING_MODEL'] || DEFAULT_EMBEDDING_MODEL,
     reason: null,
   };
 }

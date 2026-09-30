@@ -32,9 +32,9 @@ anything the map already generates is deliberately absent, because a second copy
   sessions or evaluations.
 - `studio-ui` — the app: routes, the canvas, the feature components that _do_ know the domain, the
   API client, and their stories.
-- `studio-api` — the NestJS API: DTO validation, services, the response envelope.
-- `eval-worker` — the NestJS worker: polls eval jobs, runs the deterministic engine, then the
-  critics, and writes findings back.
+- `studio-api` — the NestJS API: zod validation per route, services, the response envelope. It
+  judges nothing: grading, coaching and prompt generation are quality-loop runs reached through
+  one client port.
 - `quality-loop` — the generic quality-control loop as a NestJS starter: a pipeline is data (task
   vocabulary, md lens personas, a decision policy); producer → deterministic validators → critic
   and evaluator lenses → evidence normalizer → deterministic policy, and every run writes a dump.

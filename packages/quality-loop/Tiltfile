@@ -1,10 +1,10 @@
 load('../../tilt/toolchain.Tiltfile', 'tool_env')
 
 docker_build(
-    'eval-worker',
+    'quality-loop',
     '../../',
     dockerfile='../../docker/nest-app.Dockerfile',
-    build_args={'APP': 'eval-worker'},
+    build_args={'APP': 'quality-loop'},
     only=[
         './package.json',
         './pnpm-lock.yaml',
@@ -17,16 +17,18 @@ docker_build(
         './packages/criteria',
         './packages/db',
         './packages/llm',
-        './packages/eval-worker',
+        './packages/run-dump',
+        './packages/nest-kit',
+        './packages/quality-loop',
     ],
 )
 
 k8s_yaml(['./k8s/local/deployment.yaml'])
 
 k8s_resource(
-    'eval-worker',
-    port_forwards='3002:3002',
+    'quality-loop',
+    port_forwards=3003,
     resource_deps=['db: migration:up'],
     labels=['backend'],
-    links=['http://localhost:3002/health']
+    links=['http://localhost:3003/health']
 )

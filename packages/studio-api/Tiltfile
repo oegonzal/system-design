@@ -17,6 +17,8 @@ docker_build(
         './packages/criteria',
         './packages/db',
         './packages/llm',
+        './packages/run-dump',
+        './packages/nest-kit',
         './packages/studio-api',
     ],
 )

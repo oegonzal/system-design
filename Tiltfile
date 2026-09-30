@@ -11,7 +11,7 @@
 # Services:
 #   Postgres     → localhost:5432  (admin/admin, db: sysdesign)  [k8s]
 #   API          → localhost:3000/api                            [k8s + docker]
-#   Eval worker  → localhost:3002/health                         [k8s + docker]
+#   Quality loop → localhost:3003/health                         [k8s + docker]
 #   Frontend     → localhost:4200                                [local next dev]
 
 load('./tilt/toolchain.Tiltfile', 'tool_env')
@@ -20,7 +20,7 @@ watch_settings(ignore=['.nx/**', '**/.next/**', 'packages/**/vite.config.ts.time
 
 include('./tilt/postgres/Tiltfile')
 include('./packages/studio-api/Tiltfile')
-include('./packages/eval-worker/Tiltfile')
+include('./packages/quality-loop/Tiltfile')
 include('./packages/studio-ui/Tiltfile')
 
 # Root scripts rather than `pnpm mikro-orm` from a package dir: pnpm resolves

@@ -24,7 +24,6 @@ import type { ChangedFile } from './index';
  *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
  *   govcon-ui      -> contracts, design-system, web-kit, web-testing
  *   studio-api     -> contracts, db, nest-kit
- *   eval-worker    -> contracts, db, llm, criteria, run-dump
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
@@ -46,7 +45,6 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'studio-api': ['contracts', 'db', 'nest-kit'],
-  'eval-worker': ['contracts', 'db', 'llm', 'criteria', 'run-dump'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
   govcon: ['contracts', 'db', 'nest-kit'],
   storybook: null,

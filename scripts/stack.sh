@@ -2,27 +2,23 @@
 #
 # One-command local stack for System Design Studio, backed by the durable
 # docker-compose Postgres. Brings runs back after any shutdown:
-#   pnpm stack:up     # db (durable) -> migrate -> seed -> api + worker + ui
+#   pnpm stack:up     # db (durable) -> migrate -> seed -> api + quality loop + ui
 #   pnpm stack:down   # stop the db + vectors containers (data persists in the named volumes)
 #   pnpm stack:db     # database + vector store, ready for tests/tools
 #
-# Grading is deterministic: with no ANTHROPIC_API_KEY the app uses the no-op LLM,
-# and EVAL_DETERMINISTIC=1 pins it, so re-evaluating a stored revision reproduces
-# its score. The AI coach (improvement runs) is the exception by design: it only
-# PROPOSES — the deterministic engine re-scores every candidate — so
-# IMPROVER_DETERMINISTIC=0 lets it go live when ANTHROPIC_API_KEY is exported,
-# without touching grade reproducibility.
+# Grading, coaching and prompt generation are runs of the quality loop, which
+# needs a model: an exported ANTHROPIC_API_KEY wins; otherwise
+# QUALITY_LOOP_AUTH=claude-code runs it through this machine's Claude Code
+# login (subscription). QUALITY_LOOP_DETERMINISTIC=1 turns the model off, and
+# then every run escalates honestly with no score — what CI does.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export DB_PORT="${DB_PORT:-5433}"
 export QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-export EVAL_DETERMINISTIC="${EVAL_DETERMINISTIC:-1}"
-export IMPROVER_DETERMINISTIC="${IMPROVER_DETERMINISTIC:-0}"
-# The coach's auth: an exported ANTHROPIC_API_KEY wins; otherwise claude-code
-# runs it through this machine's Claude Code login (subscription) — set
-# IMPROVER_AUTH=off to disable.
-export IMPROVER_AUTH="${IMPROVER_AUTH:-claude-code}"
+export QUALITY_LOOP_URL="${QUALITY_LOOP_URL:-http://localhost:3003}"
+export QUALITY_LOOP_DETERMINISTIC="${QUALITY_LOOP_DETERMINISTIC:-0}"
+export QUALITY_LOOP_AUTH="${QUALITY_LOOP_AUTH:-claude-code}"
 
 wait_db() {
   echo "waiting for postgres on :${DB_PORT} ..."
@@ -63,7 +59,7 @@ case "${1:-up}" in
     pnpm db:migrate
     echo "seeding reference data ..."
     pnpm db:seed
-    echo "starting api + worker + ui (DB_PORT=${DB_PORT}, EVAL_DETERMINISTIC=${EVAL_DETERMINISTIC}) — Ctrl-C to stop"
+    echo "starting api + quality loop + ui (DB_PORT=${DB_PORT}, QUALITY_LOOP_AUTH=${QUALITY_LOOP_AUTH}, QUALITY_LOOP_DETERMINISTIC=${QUALITY_LOOP_DETERMINISTIC}) — Ctrl-C to stop"
     pnpm start
     ;;
   down)

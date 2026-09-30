@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 #
-# One parametrized image for both Nest apps:
+# One parametrized image for every Nest app:
 #
 #   docker build -f docker/nest-app.Dockerfile --build-arg APP=studio-api .
-#   docker build -f docker/nest-app.Dockerfile --build-arg APP=eval-worker .
+#   docker build -f docker/nest-app.Dockerfile --build-arg APP=quality-loop .
 #
 # The image builds the app itself — deterministic from a bare checkout, never
 # dependent on a host-side dist/ that a fresh clone does not have. Layer
@@ -27,6 +27,8 @@ COPY packages/contracts ./packages/contracts
 COPY packages/criteria ./packages/criteria
 COPY packages/db ./packages/db
 COPY packages/llm ./packages/llm
+COPY packages/run-dump ./packages/run-dump
+COPY packages/nest-kit ./packages/nest-kit
 COPY packages/${APP} ./packages/${APP}
 # The vite binary directly rather than nx: no daemon, no graph, no cache
 # server inside a container build.

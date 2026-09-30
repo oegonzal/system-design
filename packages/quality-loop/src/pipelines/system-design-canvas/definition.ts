@@ -108,7 +108,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // The coach. Withholding the criteria is deliberate: it revises against the
   // remediations the panel selected, in the author's shape, never against
   // the checklist the canvas is graded on. 14000 keeps a full canvas under
-  // the subscription client's output cap.
+  // the subscription client's output cap. Lens caps are sized from a live
+  // run of the sample canvas: critics answered in 2.5–5.1k output tokens,
+  // evaluators in 0.4–0.7k.
   producer: {
     persona: producer,
     maxTokens: 14000,
@@ -168,7 +170,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: ['findings'],
       maxItems: MAX_CRITERIA,
-      maxTokens: 8000,
+      maxTokens: 4000,
       criterionKinds: ['functional', 'constraint'],
     },
     {
@@ -177,7 +179,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: ['findings'],
       maxItems: MAX_CRITERIA,
-      maxTokens: 8000,
+      maxTokens: 4000,
       criterionKinds: ['non_functional', 'scale'],
     },
   ],
