@@ -3,9 +3,9 @@ import {
   describeQuery,
   type Description,
   type DescriptionFetch,
-  type NoticeDto,
   type LeadsReport,
   type LeadTier,
+  type NoticeDto,
   type OpportunityQuery,
   type PullReport,
   type PullWindow,
@@ -16,11 +16,19 @@ import {
   type SourceStatus,
 } from '@sysdesign/contracts';
 
-import { BUDGET_WINDOW_MS, type BudgetPolicy } from '../../core/budgeted-source';
+import {
+  BUDGET_WINDOW_MS,
+  bucketOf,
+  type BudgetPolicy,
+  type Gated,
+  type RequestGate,
+} from '../../core/budget';
 import { planPulls } from '../../core/plan';
 import type {
+  NoticeDescriptions,
   OpportunityRepository,
-  OpportunitySource,
+  OpportunitySearch,
+  SearchPage,
   SourceCallLog,
   StoredDescription,
 } from '../../core/ports';
@@ -30,8 +38,10 @@ import { FACTORS, rankLeads, scoreLead } from '../../core/scoring';
 import {
   BUDGET_POLICY,
   CLOCK,
+  NOTICE_DESCRIPTIONS,
   OPPORTUNITY_REPOSITORY,
-  OPPORTUNITY_SOURCE,
+  OPPORTUNITY_SEARCH,
+  REQUEST_GATE,
   SEARCH_PROFILES,
   SOURCE_CALL_LOG,
 } from './tokens';
@@ -51,10 +61,10 @@ const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * Everything the CLI and the HTTP surface do, over the ports. A pull runs the
- * profile's plan through the budgeted source and stores what normalized;
- * ranking reads the repository and never the source; a description is one
- * budgeted request per notice that the row then remembers; every profile is
- * validated at boot so a malformed one fails before any request.
+ * profile's plan through the gate and stores what normalized; ranking reads
+ * the repository and never a source; a description is one gated request per
+ * notice that the row then remembers; every profile is validated at boot so
+ * a malformed one fails before any request.
  */
 @Injectable()
 export class OpportunitiesService {
@@ -62,11 +72,13 @@ export class OpportunitiesService {
   private readonly factorIds = FACTORS.map((factor) => factor.id);
 
   constructor(
-    @Inject(OPPORTUNITY_SOURCE) private readonly source: OpportunitySource,
+    @Inject(OPPORTUNITY_SEARCH) private readonly search: OpportunitySearch,
+    @Inject(NOTICE_DESCRIPTIONS) private readonly descriptions: NoticeDescriptions,
     @Inject(OPPORTUNITY_REPOSITORY) private readonly repository: OpportunityRepository,
     @Inject(SOURCE_CALL_LOG) private readonly log: SourceCallLog,
     @Inject(SEARCH_PROFILES) private readonly profiles: ReadonlyMap<string, SearchProfile>,
     @Inject(BUDGET_POLICY) private readonly budget: BudgetPolicy,
+    @Inject(REQUEST_GATE) private readonly gate: RequestGate,
     @Inject(CLOCK) private readonly now: () => Date,
   ) {
     for (const profile of profiles.values()) validateProfile(profile, this.factorIds);
@@ -102,27 +114,23 @@ export class OpportunitiesService {
       const report = this.slice(first, 'ok', null);
       let query = first;
       for (let page = 0; page < profile.pull.maxPagesPerSlice; page += 1) {
-        const result = await this.source.search(query);
+        const result = await this.searchPage(query);
         if (result.kind === 'ok') {
+          const { opportunities, rejected, totalRecords } = result.value;
           report.pages += 1;
-          report.received += result.opportunities.length + result.rejected.length;
-          report.rejected += result.rejected.length;
-          const summary = await this.repository.upsertMany(result.opportunities, seenAt);
+          report.received += opportunities.length + rejected.length;
+          report.rejected += rejected.length;
+          const summary = await this.repository.upsertMany(opportunities, seenAt);
           report.inserted += summary.inserted;
           report.updated += summary.updated;
-          const fetched = query.offset + result.opportunities.length + result.rejected.length;
-          if (
-            fetched >= result.totalRecords ||
-            result.opportunities.length + result.rejected.length === 0
-          ) {
-            break;
-          }
+          const fetched = query.offset + opportunities.length + rejected.length;
+          if (fetched >= totalRecords || opportunities.length + rejected.length === 0) break;
           if (page + 1 < profile.pull.maxPagesPerSlice) {
             query = nextPage(query);
             continue;
           }
           report.truncated = true;
-          report.detail = `${result.totalRecords - fetched} more record(s) beyond maxPagesPerSlice`;
+          report.detail = `${totalRecords - fetched} more record(s) beyond maxPagesPerSlice`;
           break;
         }
         if (result.kind === 'cached') {
@@ -151,10 +159,10 @@ export class OpportunitiesService {
     return {
       profile: profile.id,
       window,
-      source: { id: this.source.id, availability: this.source.availability },
+      source: { id: this.search.id, availability: this.search.availability },
       slices,
-      spent: await this.spent(),
-      budget: this.budget.dailyBudget,
+      spent: await this.gate.spent(this.search.id),
+      budget: this.dailyBudget(),
       stoppedBy,
     };
   }
@@ -187,18 +195,18 @@ export class OpportunitiesService {
     const stored = await this.repository.findDescription(noticeId);
     return {
       ...scoreLead(opportunity, profile, this.now().getTime()),
-      description: stored ? toDescriptionDto(stored) : null,
+      description: stored ? toDescription(stored) : null,
     };
   }
 
   /** The upstream and how much of the rolling day's budget is left. */
   async status(): Promise<SourceStatus> {
     return {
-      id: this.source.id,
-      availability: this.source.availability,
+      id: this.search.id,
+      availability: this.search.availability,
       budget: {
-        spent: await this.spent(),
-        limit: this.budget.dailyBudget,
+        spent: await this.gate.spent(this.search.id),
+        limit: this.dailyBudget(),
         windowHours: BUDGET_WINDOW_MS / HOUR_MS,
       },
       cacheTtlHours: this.budget.ttlMs / HOUR_MS,
@@ -207,7 +215,7 @@ export class OpportunitiesService {
 
   /**
    * A notice's description: from the row when it was fetched before, else one
-   * budgeted request, then stored. An unknown notice is refused before any
+   * gated request, then stored. An unknown notice is refused before any
    * request is spent.
    */
   async describe(noticeId: string): Promise<DescriptionFetch> {
@@ -215,16 +223,28 @@ export class OpportunitiesService {
       throw new NotFoundException(`no stored notice ${noticeId}`);
     }
     const stored = await this.repository.findDescription(noticeId);
-    if (stored) return { status: 'ok', description: toDescriptionDto(stored) };
+    if (stored) return { status: 'ok', description: toDescription(stored) };
 
-    const result = await this.source.describe(noticeId);
+    const result = await this.gate.spend(
+      {
+        source: this.descriptions.id,
+        operation: 'description',
+        query: { noticeId },
+        cacheable: false,
+      },
+      () => this.descriptions.get(noticeId),
+    );
     if (result.kind === 'ok') {
-      const description: StoredDescription = { text: result.text, fetchedAt: this.now() };
+      const description: StoredDescription = { text: result.value, fetchedAt: this.now() };
       await this.repository.saveDescription(noticeId, description);
-      return { status: 'ok', description: toDescriptionDto(description) };
+      return { status: 'ok', description: toDescription(description) };
     }
     if (result.kind === 'budget-exhausted') {
       return { status: 'budget-exhausted', spent: result.spent, budget: result.budget };
+    }
+    if (result.kind === 'cached') {
+      // A description is never cacheable; the gate cannot answer this, and the row is the cache.
+      return { status: 'error', message: 'unexpected cached description' };
     }
     this.logger.warn(`description ${noticeId} failed — ${result.outcome}: ${result.message}`);
     return { status: 'error', message: `${result.outcome}: ${result.message}` };
@@ -234,9 +254,20 @@ export class OpportunitiesService {
   async calls(options: CallsOptions): Promise<[SourceCall[], number]> {
     const [rows, total] = await this.log.list(options.limit, options.offset);
     return [
-      rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() }) as SourceCall),
+      rows.map(({ requestedAt, ...row }) => ({ ...row, requestedAt: requestedAt.toISOString() })),
       total,
     ];
+  }
+
+  private searchPage(query: OpportunityQuery): Promise<Gated<SearchPage>> {
+    return this.gate.spend(
+      { source: this.search.id, operation: 'search', query, cacheable: true },
+      () => this.search.search(query),
+    );
+  }
+
+  private dailyBudget(): number {
+    return bucketOf(this.budget, this.search.id)?.dailyBudget ?? 0;
   }
 
   private slice(
@@ -257,23 +288,9 @@ export class OpportunitiesService {
       detail,
     };
   }
-
-  private async spent(): Promise<number | null> {
-    try {
-      return await this.log.countSince(
-        this.source.id,
-        new Date(this.now().getTime() - BUDGET_WINDOW_MS),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `budget not read: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return null;
-    }
-  }
 }
 
-const toDescriptionDto = (stored: StoredDescription): Description => ({
+const toDescription = (stored: StoredDescription): Description => ({
   text: stored.text,
   fetchedAt: stored.fetchedAt.toISOString(),
 });

@@ -22,3 +22,7 @@ export function containsPhrase(tokens: readonly string[], phrase: readonly strin
   }
   return false;
 }
+
+/** An error's message, or the thrown value spelled out — for a warning, never for control flow. */
+export const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);

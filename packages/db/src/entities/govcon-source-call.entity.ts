@@ -1,3 +1,4 @@
+import type { Opt } from '@mikro-orm/core';
 import { Check, Entity, Index, PrimaryKey, Property } from '@mikro-orm/decorators/legacy';
 import type * as Contracts from '@sysdesign/contracts';
 
@@ -56,7 +57,7 @@ export class GovconSourceCall {
 
   /** Insertion order, for a stable page when timestamps tie. Assigned by the database. */
   @Property({ type: 'bigint', autoincrement: true, unique: true })
-  seq!: string;
+  seq!: string & Opt;
 
   @Property({ type: 'varchar', length: 40 })
   source!: string;

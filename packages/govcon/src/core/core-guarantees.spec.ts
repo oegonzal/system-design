@@ -1,10 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 /**
  * The core is pure by construction, and this pins it: no clock, no environment,
  * no filesystem, no network. Time reaches the core as a parameter and the
- * environment is read once, in the SAM.gov factory.
+ * environment is read once, in the sources' factory.
  */
 const FORBIDDEN: readonly [string, RegExp][] = [
   ['a clock read', /Date\.now\(|new Date\(\)/],
@@ -14,16 +14,26 @@ const FORBIDDEN: readonly [string, RegExp][] = [
   ['Nest', /@nestjs\//],
 ];
 
-const sources = readdirSync(__dirname)
-  .filter((name) => name.endsWith('.ts') && !name.endsWith('.spec.ts'))
-  .map((name) => [name, readFileSync(join(__dirname, name), 'utf8')] as const);
+function walk(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const file = join(dir, name);
+    if (statSync(file).isDirectory()) return walk(file);
+    return name.endsWith('.ts') && !name.endsWith('.spec.ts') ? [file] : [];
+  });
+}
+
+const sources = walk(__dirname).map(
+  (file) => [relative(__dirname, file), readFileSync(file, 'utf8')] as const,
+);
 
 describe('the core', () => {
   it('has source files to guard', () => {
     expect(sources.map(([name]) => name)).toEqual(
       expect.arrayContaining([
-        'ports.ts',
-        'budgeted-source.ts',
+        'ports/index.ts',
+        'ports/ledger.ts',
+        'budget/gate.ts',
+        'budget/policy.ts',
         'scoring.ts',
         'profile.ts',
         'plan.ts',

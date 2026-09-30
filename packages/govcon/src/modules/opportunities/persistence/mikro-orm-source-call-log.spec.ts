@@ -1,7 +1,7 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { ensureDatabase, GovconSourceCall, ormOptions } from '@sysdesign/db';
 
-import type { SourceCall } from '../../../core/ports';
+import type { LedgerEntry } from '../../../core/ports';
 import { MikroOrmSourceCallLog } from './mikro-orm-source-call-log';
 
 describe('the source call log in Postgres', () => {
@@ -10,7 +10,7 @@ describe('the source call log in Postgres', () => {
   const hour = 60 * 60 * 1000;
   const at = (hours: number) => new Date(t0.getTime() + hours * hour);
 
-  const call = (overrides: Partial<SourceCall>): SourceCall => ({
+  const call = (overrides: Partial<LedgerEntry>): LedgerEntry => ({
     source: 'sam.gov',
     operation: 'search',
     attempt: 1,
@@ -54,14 +54,15 @@ describe('the source call log in Postgres', () => {
     await log.record(call({ requestedAt: at(3), queryKey: 'k2' }));
     await log.record(call({ requestedAt: at(3), source: 'other' }));
 
-    expect(await log.findFresh('sam.gov', 'k1', at(-1))).toEqual({
+    expect(await log.findFresh('sam.gov', 'search', 'k1', at(-1))).toEqual({
       requestedAt: at(2),
-      totalRecords: 15,
       recordCount: 15,
     });
-    expect(await log.findFresh('sam.gov', 'k1', at(2.5))).toBeNull();
-    expect(await log.findFresh('sam.gov', 'k9', at(-1))).toBeNull();
-    expect(await log.findFresh('other', 'k1', at(-1))).toMatchObject({ requestedAt: at(3) });
+    expect(await log.findFresh('sam.gov', 'search', 'k1', at(2.5))).toBeNull();
+    expect(await log.findFresh('sam.gov', 'search', 'k9', at(-1))).toBeNull();
+    expect(await log.findFresh('other', 'search', 'k1', at(-1))).toMatchObject({
+      requestedAt: at(3),
+    });
 
     expect(await log.countSince('sam.gov', at(-1))).toBe(4);
     expect(await log.countSince('sam.gov', at(1))).toBe(3);
@@ -86,7 +87,10 @@ describe('the source call log in Postgres', () => {
       }),
     );
     // Same key and window as the fresh search above, but a description: not a search hit.
-    expect(await log.findFresh('sam.gov', 'k1', at(4))).toBeNull();
+    expect(await log.findFresh('sam.gov', 'search', 'k1', at(4))).toBeNull();
+    expect(await log.findFresh('sam.gov', 'description', 'k1', at(4))).toMatchObject({
+      recordCount: 1,
+    });
 
     const [page, total] = await log.list(2, 0);
     expect(total).toBe(6);

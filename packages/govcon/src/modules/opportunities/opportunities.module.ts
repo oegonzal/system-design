@@ -2,9 +2,10 @@ import { Logger, Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { GovconOpportunity, GovconSourceCall } from '@sysdesign/db';
 
-import { BudgetedSource, type BudgetPolicy } from '../../core/budgeted-source';
+import { RequestGate, type BudgetPolicy } from '../../core/budget';
 import type { SourceCallLog } from '../../core/ports';
 import { PROFILES } from '../../profiles';
+import { budgetPolicyFromEnv, createSamGovSources } from '../sources/sam-gov/create-sources';
 import { LeadsController } from './leads.controller';
 import { OpportunitiesController } from './opportunities.controller';
 import { OpportunitiesService } from './opportunities.service';
@@ -12,13 +13,14 @@ import { MikroOrmOpportunityRepository } from './persistence/mikro-orm-opportuni
 import { MikroOrmSourceCallLog } from './persistence/mikro-orm-source-call-log';
 import { ProfilesController } from './profiles.controller';
 import { PullsController } from './pulls.controller';
-import { createSamGovSourceFromEnv, samGovSettingsFromEnv } from './sam-gov/create-source';
 import { SourceController } from './source.controller';
 import {
   BUDGET_POLICY,
   CLOCK,
+  NOTICE_DESCRIPTIONS,
   OPPORTUNITY_REPOSITORY,
-  OPPORTUNITY_SOURCE,
+  OPPORTUNITY_SEARCH,
+  REQUEST_GATE,
   SEARCH_PROFILES,
   SOURCE_CALL_LOG,
 } from './tokens';
@@ -26,17 +28,13 @@ import {
 const logger = new Logger('Govcon');
 const warn = (message: string): void => logger.warn(message);
 
-/** The budget alone — the key stays inside the source factory. */
-const budgetPolicy = (): BudgetPolicy => {
-  const { dailyBudget, ttlMs } = samGovSettingsFromEnv();
-  return { dailyBudget, ttlMs };
-};
+/** The environment is read once, here, and nowhere below. */
+const sources = createSamGovSources(process.env, { warn });
 
 /**
- * The composition root: SAM.gov behind the budgeted decorator over the
- * Postgres ledger, the Postgres repository, the profile registry and a real
- * clock. The environment is read once here (through the source factory) and
- * nowhere below.
+ * The composition root: the SAM.gov adapters behind the request gate over
+ * the Postgres ledger, the Postgres repository, the profile registry and a
+ * real clock.
  */
 @Module({
   imports: [MikroOrmModule.forFeature([GovconOpportunity, GovconSourceCall])],
@@ -53,17 +51,13 @@ const budgetPolicy = (): BudgetPolicy => {
     { provide: OPPORTUNITY_REPOSITORY, useClass: MikroOrmOpportunityRepository },
     { provide: SEARCH_PROFILES, useValue: PROFILES },
     { provide: CLOCK, useValue: () => new Date() },
-    { provide: BUDGET_POLICY, useFactory: budgetPolicy },
+    { provide: BUDGET_POLICY, useFactory: () => budgetPolicyFromEnv(process.env) },
+    { provide: OPPORTUNITY_SEARCH, useValue: sources.search },
+    { provide: NOTICE_DESCRIPTIONS, useValue: sources.descriptions },
     {
-      provide: OPPORTUNITY_SOURCE,
+      provide: REQUEST_GATE,
       useFactory: (log: SourceCallLog, policy: BudgetPolicy, now: () => Date) =>
-        new BudgetedSource(
-          createSamGovSourceFromEnv(process.env, { warn }),
-          log,
-          policy,
-          now,
-          warn,
-        ),
+        new RequestGate(log, policy, now, warn),
       inject: [SOURCE_CALL_LOG, BUDGET_POLICY, CLOCK],
     },
   ],

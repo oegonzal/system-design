@@ -12,17 +12,22 @@ import type {
 } from '@sysdesign/contracts';
 import { ensureDatabase, GovconOpportunity, GovconSourceCall } from '@sysdesign/db';
 
-import { BudgetedSource, type BudgetPolicy } from '../../core/budgeted-source';
-import type { SourceCallLog } from '../../core/ports';
-import { opportunityOf, okResult, scriptedSource, tinyProfile } from '../../core/testing';
+import type { BudgetPolicy } from '../../core/budget';
+import {
+  okPage,
+  opportunityOf,
+  scriptedDescriptions,
+  scriptedSearch,
+  tinyProfile,
+} from '../../core/testing';
 import { AppModule } from '../app/app.module';
 import { configureApp } from '../app/configure-app';
 import {
   BUDGET_POLICY,
   CLOCK,
-  OPPORTUNITY_SOURCE,
+  NOTICE_DESCRIPTIONS,
+  OPPORTUNITY_SEARCH,
   SEARCH_PROFILES,
-  SOURCE_CALL_LOG,
 } from './tokens';
 
 type Envelope<T> = { data: T };
@@ -32,31 +37,33 @@ const NOW = new Date('2026-09-26T12:00:00Z');
 
 /**
  * The real module over real HTTP and the real Postgres ledger; only the
- * upstream is scripted (wrapped in the real budgeted source, so the ledger and
+ * upstream adapters are scripted (behind the real gate, so the ledger and
  * the budget are exercised for real), the clock is fixed and the registry is
  * the tiny profile with two slices.
  */
 async function boot(): Promise<{ app: INestApplication; url: string }> {
-  const scripted = scriptedSource('sam.gov', [
-    okResult([
+  const scripted = scriptedSearch('sam.gov', [
+    okPage([
       opportunityOf({ noticeId: 'a' }),
       opportunityOf({ noticeId: 'b', setAsideCode: '8A' }),
     ]),
-    okResult([opportunityOf({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
+    okPage([opportunityOf({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
   ]);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CLOCK)
     .useValue(() => NOW)
     .overrideProvider(BUDGET_POLICY)
-    .useValue({ dailyBudget: 4, ttlMs: 0 } satisfies BudgetPolicy)
+    .useValue({
+      ttlMs: 0,
+      pullDeadlineMs: 120_000,
+      buckets: { 'sam.gov': { dailyBudget: 4 } },
+    } satisfies BudgetPolicy)
     .overrideProvider(SEARCH_PROFILES)
     .useValue(new Map([['tiny', tinyProfile()]]))
-    .overrideProvider(OPPORTUNITY_SOURCE)
-    .useFactory({
-      factory: (log: SourceCallLog, policy: BudgetPolicy, now: () => Date) =>
-        new BudgetedSource(scripted, log, policy, now),
-      inject: [SOURCE_CALL_LOG, BUDGET_POLICY, CLOCK],
-    })
+    .overrideProvider(OPPORTUNITY_SEARCH)
+    .useValue(scripted)
+    .overrideProvider(NOTICE_DESCRIPTIONS)
+    .useValue(scriptedDescriptions('sam.gov'))
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);

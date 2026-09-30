@@ -1,15 +1,18 @@
 import { NotFoundException } from '@nestjs/common';
 
-import { BudgetedSource } from '../../core/budgeted-source';
-import type { SourceResult } from '../../core/ports';
+import { RequestGate, type BudgetPolicy } from '../../core/budget';
+import type { SearchPage } from '../../core/ports';
 import type { SearchProfile } from '../../core/profile';
 import {
-  opportunityOf,
+  failure,
   InMemoryOpportunityRepository,
   InMemorySourceCallLog,
-  okResult,
-  scriptedSource,
+  okPage,
+  opportunityOf,
+  scriptedDescriptions,
+  scriptedSearch,
   tinyProfile,
+  type Scripted,
 } from '../../core/testing';
 import { OpportunitiesService } from './opportunities.service';
 
@@ -17,32 +20,43 @@ const NOW = new Date('2026-09-26T12:00:00Z');
 const window = { from: '2026-09-23', to: '2026-09-26' };
 
 function harness(
-  replies: readonly SourceResult[],
-  options: { profile?: SearchProfile; dailyBudget?: number; ttlMs?: number } = {},
+  replies: readonly Scripted<SearchPage>[],
+  options: {
+    profile?: SearchProfile;
+    dailyBudget?: number;
+    ttlMs?: number;
+    descriptions?: readonly Scripted<string>[];
+  } = {},
 ) {
-  const inner = scriptedSource('sam.gov', replies);
+  const inner = scriptedSearch('sam.gov', replies);
+  const descriptions = scriptedDescriptions('sam.gov', options.descriptions);
   const log = new InMemorySourceCallLog();
   const repository = new InMemoryOpportunityRepository();
-  const policy = { dailyBudget: options.dailyBudget ?? 10, ttlMs: options.ttlMs ?? 0 };
-  const source = new BudgetedSource(inner, log, policy, () => NOW);
+  const policy: BudgetPolicy = {
+    ttlMs: options.ttlMs ?? 0,
+    pullDeadlineMs: 120_000,
+    buckets: { 'sam.gov': { dailyBudget: options.dailyBudget ?? 10 } },
+  };
   const profile = options.profile ?? tinyProfile();
   const service = new OpportunitiesService(
-    source,
+    inner,
+    descriptions,
     repository,
     log,
     new Map([[profile.id, profile]]),
     policy,
+    new RequestGate(log, policy, () => NOW),
     () => NOW,
   );
-  return { inner, log, repository, service, profile };
+  return { inner, descriptions, log, repository, service, profile };
 }
 
 describe('the opportunities service', () => {
   it('[GOV-1] pulls every slice, stores what normalized and reports what did not, per slice', async () => {
     const rejected = [{ noticeId: null, issues: ['noticeId: missing'] }];
     const { inner, repository, service } = harness([
-      okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3, rejected),
-      okResult([opportunityOf({ noticeId: 'b', title: 'seen twice' })]),
+      okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3, rejected),
+      okPage([opportunityOf({ noticeId: 'b', title: 'seen twice' })]),
     ]);
 
     const report = await service.pull('tiny', window);
@@ -73,7 +87,7 @@ describe('the opportunities service', () => {
         maxPagesPerSlice: 1,
       },
     });
-    const { inner, service } = harness([okResult([opportunityOf()])], { profile, dailyBudget: 1 });
+    const { inner, service } = harness([okPage([opportunityOf()])], { profile, dailyBudget: 1 });
 
     const report = await service.pull('tiny', window);
     expect(report.slices.map((s) => s.outcome)).toEqual(['ok', 'budget-exhausted', 'skipped']);
@@ -85,13 +99,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-3] a rate-limited reply ends the pull and is never retried', async () => {
-    const limited: SourceResult = {
-      kind: 'error',
-      outcome: 'rate-limited',
-      status: 429,
-      message: 'over quota',
-    };
-    const { inner, service } = harness([limited]);
+    const { inner, service } = harness([failure('rate-limited', 429, 'over quota')]);
     const report = await service.pull('tiny', window);
     expect(report.slices.map((s) => s.outcome)).toEqual(['error', 'skipped']);
     expect(report.slices[0]?.detail).toBe('rate-limited: over quota');
@@ -100,7 +108,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-2] reports a slice pulled inside the cache window as cached and stores nothing again', async () => {
-    const { service, repository } = harness([okResult([opportunityOf()])], { ttlMs: 60_000 });
+    const { service, repository } = harness([okPage([opportunityOf()])], { ttlMs: 60_000 });
     const first = await service.pull('tiny', window);
     expect(first.slices.map((s) => s.outcome)).toEqual(['ok', 'ok']);
     expect(first.spent).toBe(2);
@@ -116,8 +124,8 @@ describe('the opportunities service', () => {
     const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 2 } });
     const { inner, service } = harness(
       [
-        okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 5),
-        okResult([opportunityOf({ noticeId: 'c' }), opportunityOf({ noticeId: 'd' })], 5),
+        okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 5),
+        okPage([opportunityOf({ noticeId: 'c' }), opportunityOf({ noticeId: 'd' })], 5),
       ],
       { profile },
     );
@@ -137,8 +145,8 @@ describe('the opportunities service', () => {
     const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 5 } });
     const { inner, service } = harness(
       [
-        okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3),
-        okResult([opportunityOf({ noticeId: 'c' })], 3),
+        okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3),
+        okPage([opportunityOf({ noticeId: 'c' })], 3),
       ],
       { profile },
     );
@@ -199,7 +207,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-9] fetches a description once: the store answers afterwards without a request, an unknown notice is refused before any', async () => {
-    const { inner, log, repository, service } = harness([]);
+    const { descriptions, log, repository, service } = harness([]);
     await repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
 
     const first = await service.describe('n-1');
@@ -207,15 +215,15 @@ describe('the opportunities service', () => {
       status: 'ok',
       description: { text: 'Description of n-1', fetchedAt: NOW.toISOString() },
     });
-    expect(inner.described).toEqual(['n-1']);
+    expect(descriptions.fetched).toEqual(['n-1']);
     expect(log.calls.map((call) => call.operation)).toEqual(['description']);
 
     expect(await service.describe('n-1')).toEqual(first);
-    expect(inner.described).toEqual(['n-1']);
+    expect(descriptions.fetched).toEqual(['n-1']);
     expect(log.calls).toHaveLength(1);
 
     await expect(service.describe('nope')).rejects.toBeInstanceOf(NotFoundException);
-    expect(inner.described).toEqual(['n-1']);
+    expect(descriptions.fetched).toEqual(['n-1']);
   });
 
   it('[GOV-9] reports a spent budget and a failed fetch as outcomes, storing nothing', async () => {
@@ -228,21 +236,10 @@ describe('the opportunities service', () => {
     });
     expect(await spent.repository.findDescription('n-1')).toBeNull();
 
-    const failing = scriptedSource('sam.gov', [], true, [
-      { kind: 'error', outcome: 'invalid-response', status: 200, message: 'body is not JSON' },
-    ]);
-    const log = new InMemorySourceCallLog();
-    const repository = new InMemoryOpportunityRepository();
+    const { log, repository, service } = harness([], {
+      descriptions: [failure('invalid-response', 200, 'body is not JSON')],
+    });
     await repository.upsertMany([opportunityOf({ noticeId: 'n-2' })], NOW);
-    const policy = { dailyBudget: 5, ttlMs: 0 };
-    const service = new OpportunitiesService(
-      new BudgetedSource(failing, log, policy, () => NOW),
-      repository,
-      log,
-      new Map([['tiny', tinyProfile()]]),
-      policy,
-      () => NOW,
-    );
     expect(await service.describe('n-2')).toEqual({
       status: 'error',
       message: 'invalid-response: body is not JSON',
@@ -252,7 +249,7 @@ describe('the opportunities service', () => {
   });
 
   it('reports the source status with the budget as the ledger counts it, and lists the ledger newest first', async () => {
-    const { service, log } = harness([okResult([opportunityOf()])], {
+    const { service, log } = harness([okPage([opportunityOf()])], {
       dailyBudget: 4,
       ttlMs: 6 * 60 * 60 * 1000,
     });
