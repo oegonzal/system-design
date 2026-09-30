@@ -184,7 +184,6 @@ describe('the SAM.gov description', () => {
     if (result.kind !== 'ok') throw new Error('expected ok');
     expect(result.text.startsWith('Combined Synopsis/Solicitation\n')).toBe(true);
     expect(result.text).not.toMatch(/<[a-z/][^>]*>/i);
-    expect(result.raw).toEqual(fixtureDescription);
     expect(JSON.stringify(result)).not.toContain(KEY);
   });
 

@@ -48,13 +48,14 @@ export class MikroOrmSourceCallLog implements SourceCallLog {
       .findAndCount(
         GovconSourceCall,
         {},
-        { orderBy: { requestedAt: 'desc', id: 'asc' }, limit, offset },
+        { orderBy: { requestedAt: 'desc', seq: 'desc' }, limit, offset },
       );
     return [
       rows.map((row) => ({
         id: row.id,
         source: row.source,
         operation: row.operation,
+        attempt: row.attempt,
         queryKey: row.queryKey,
         query: row.query as SourceCallRecord['query'],
         requestedAt: row.requestedAt,

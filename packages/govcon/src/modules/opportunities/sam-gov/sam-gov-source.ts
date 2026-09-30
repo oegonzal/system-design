@@ -130,7 +130,7 @@ export class SamGovSource implements OpportunitySource {
     if (body instanceof Error) return this.invalid(`body is not JSON: ${body.message}`);
     const parsed = samDescriptionSchema.safeParse(body);
     if (!parsed.success) return this.invalid(`description: ${issuesOf(parsed.error.issues)}`);
-    return { kind: 'ok', text: htmlToText(parsed.data.description), raw: body };
+    return { kind: 'ok', text: htmlToText(parsed.data.description) };
   }
 
   /** The response, after at most one retry on a server error or a dropped connection. */

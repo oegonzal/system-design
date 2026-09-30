@@ -5,7 +5,6 @@ import { GovconOpportunity } from '@sysdesign/db';
 
 import type {
   CandidateFilter,
-  FetchedOpportunity,
   OpportunityRepository,
   StoredDescription,
   UpsertSummary,
@@ -26,9 +25,9 @@ const BATCH = 250;
 export class MikroOrmOpportunityRepository implements OpportunityRepository {
   constructor(private readonly em: EntityManager) {}
 
-  async upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary> {
-    const byId = new Map<string, FetchedOpportunity>();
-    for (const item of items) byId.set(item.opportunity.noticeId, item);
+  async upsertMany(items: readonly Opportunity[], seenAt: Date): Promise<UpsertSummary> {
+    const byId = new Map<string, Opportunity>();
+    for (const item of items) byId.set(item.noticeId, item);
     const ids = [...byId.keys()];
     if (ids.length === 0) return { inserted: 0, updated: 0 };
 
@@ -79,10 +78,10 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
       .findOne(
         GovconOpportunity,
         { noticeId },
-        { fields: ['descriptionText', 'descriptionRaw', 'descriptionFetchedAt'] },
+        { fields: ['descriptionText', 'descriptionFetchedAt'] },
       );
     return row && row.descriptionText !== null && row.descriptionFetchedAt !== null
-      ? { text: row.descriptionText, raw: row.descriptionRaw, fetchedAt: row.descriptionFetchedAt }
+      ? { text: row.descriptionText, fetchedAt: row.descriptionFetchedAt }
       : null;
   }
 
@@ -93,7 +92,6 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
       { noticeId },
       {
         descriptionText: description.text,
-        descriptionRaw: description.raw,
         descriptionFetchedAt: description.fetchedAt,
       },
     );

@@ -2,9 +2,8 @@ import { Entity, Index, PrimaryKey, Property } from '@mikro-orm/decorators/legac
 import type * as Contracts from '@sysdesign/contracts';
 
 /**
- * One SAM.gov contract opportunity: `Contracts.Opportunity` normalized, plus
- * the record as received (`raw`) so a later normalizer can re-read it without
- * spending a request. The primary key is SAM.gov's own notice id, so a
+ * One SAM.gov contract opportunity: `Contracts.Opportunity` normalized, and
+ * nothing the layers above never read. The primary key is SAM.gov's own notice id, so a
  * re-pull upserts instead of duplicating; `first_seen_at` holds across upserts
  * while `last_seen_at` advances — the two timestamps the pull report reads.
  *
@@ -15,9 +14,12 @@ import type * as Contracts from '@sysdesign/contracts';
  */
 @Entity()
 @Index({ properties: ['postedAt'] })
-@Index({ properties: ['naicsCode'] })
-@Index({ properties: ['setAsideCode'] })
 @Index({ properties: ['responseDeadlineAt'] })
+@Index({
+  name: 'govcon_opportunity_open_index',
+  expression:
+    'create index "govcon_opportunity_open_index" on "govcon_opportunity" ("posted_at" desc) where active is distinct from false',
+})
 export class GovconOpportunity {
   @PrimaryKey({ type: 'varchar', length: 80 })
   noticeId!: string;
@@ -97,10 +99,6 @@ export class GovconOpportunity {
   @Property({ type: 'json', nullable: true })
   award!: Contracts.OpportunityAward | null;
 
-  /** The record exactly as the source returned it. */
-  @Property({ type: 'json' })
-  raw!: unknown;
-
   @Property({ type: 'varchar', length: 40 })
   source!: string;
 
@@ -112,15 +110,11 @@ export class GovconOpportunity {
 
   /**
    * The notice description as text, once fetched: one budgeted request, kept
-   * for good. A pull never writes these three columns — the row mapper leaves
+   * for good. A pull never writes these two columns — the row mapper leaves
    * them out, so an upsert cannot clear them.
    */
   @Property({ type: 'text', nullable: true })
   descriptionText!: string | null;
-
-  /** The description response as received. */
-  @Property({ type: 'json', nullable: true })
-  descriptionRaw!: unknown;
 
   @Property({ type: 'timestamptz', nullable: true })
   descriptionFetchedAt!: Date | null;

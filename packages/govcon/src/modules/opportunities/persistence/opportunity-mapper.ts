@@ -1,8 +1,6 @@
 import type { Opportunity } from '@sysdesign/contracts';
 import type { GovconOpportunity } from '@sysdesign/db';
 
-import type { FetchedOpportunity } from '../../../core/ports';
-
 /**
  * Row ⇄ `Opportunity`, pure so the round trip is unit-tested without a
  * database. ISO strings become Dates on the way in and back on the way out;
@@ -13,13 +11,9 @@ const date = (iso: string | null): Date | null => (iso === null ? null : new Dat
 const iso = (value: Date | null): string | null => (value === null ? null : value.toISOString());
 
 /** Everything a pull writes. The description columns are deliberately absent: an upsert must never clear them. */
-export type OpportunityRow = Omit<
-  GovconOpportunity,
-  'descriptionText' | 'descriptionRaw' | 'descriptionFetchedAt'
->;
+export type OpportunityRow = Omit<GovconOpportunity, 'descriptionText' | 'descriptionFetchedAt'>;
 
-export function toRow(fetched: FetchedOpportunity, seenAt: Date): OpportunityRow {
-  const o = fetched.opportunity;
+export function toRow(o: Opportunity, seenAt: Date): OpportunityRow {
   return {
     noticeId: o.noticeId,
     title: o.title,
@@ -47,7 +41,6 @@ export function toRow(fetched: FetchedOpportunity, seenAt: Date): OpportunityRow
     additionalInfoLink: o.additionalInfoLink,
     resourceLinks: [...o.resourceLinks],
     award: o.award ? { ...o.award } : null,
-    raw: fetched.raw,
     source: o.source,
     firstSeenAt: seenAt,
     lastSeenAt: seenAt,

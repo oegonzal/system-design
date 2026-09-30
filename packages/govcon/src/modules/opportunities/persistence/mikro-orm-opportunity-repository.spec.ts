@@ -1,7 +1,7 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { ensureDatabase, GovconOpportunity, ormOptions } from '@sysdesign/db';
 
-import { fetched } from '../../../core/testing';
+import { opportunityOf } from '../../../core/testing';
 import { MikroOrmOpportunityRepository } from './mikro-orm-opportunity-repository';
 
 describe('the opportunity repository in Postgres', () => {
@@ -24,7 +24,10 @@ describe('the opportunity repository in Postgres', () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
 
     expect(
-      await repository.upsertMany([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })], t1),
+      await repository.upsertMany(
+        [opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })],
+        t1,
+      ),
     ).toEqual({
       inserted: 2,
       updated: 0,
@@ -32,9 +35,9 @@ describe('the opportunity repository in Postgres', () => {
 
     const second = await repository.upsertMany(
       [
-        fetched({ noticeId: 'a', title: 'Renamed' }),
-        fetched({ noticeId: 'c' }),
-        fetched({ noticeId: 'a', title: 'Renamed twice' }),
+        opportunityOf({ noticeId: 'a', title: 'Renamed' }),
+        opportunityOf({ noticeId: 'c' }),
+        opportunityOf({ noticeId: 'a', title: 'Renamed twice' }),
       ],
       t2,
     );
@@ -48,7 +51,6 @@ describe('the opportunity repository in Postgres', () => {
     expect(a?.lastSeenAt).toEqual(t2);
     expect(rows[1]?.lastSeenAt).toEqual(t1);
     expect(rows[2]?.firstSeenAt).toEqual(t2);
-    expect(a?.raw).toEqual({ noticeId: 'a', title: 'Renamed twice' });
 
     expect(await repository.upsertMany([], t2)).toEqual({ inserted: 0, updated: 0 });
     expect(await repository.findOne('a')).toMatchObject({ noticeId: 'a', title: 'Renamed twice' });
@@ -58,23 +60,15 @@ describe('the opportunity repository in Postgres', () => {
   it('[GOV-9] [GOV-6] stores a description once, finds it back, and keeps it through a re-pull', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
     await orm.em.fork().nativeDelete(GovconOpportunity, {});
-    await repository.upsertMany([fetched({ noticeId: 'd' })], t1);
+    await repository.upsertMany([opportunityOf({ noticeId: 'd' })], t1);
     expect(await repository.findDescription('d')).toBeNull();
     expect(await repository.findDescription('missing')).toBeNull();
 
     const fetchedAt = new Date('2026-09-26T15:00:00Z');
-    await repository.saveDescription('d', {
-      text: 'Bracket, 400 each',
-      raw: { description: '<p>Bracket</p>' },
-      fetchedAt,
-    });
-    expect(await repository.findDescription('d')).toEqual({
-      text: 'Bracket, 400 each',
-      raw: { description: '<p>Bracket</p>' },
-      fetchedAt,
-    });
+    await repository.saveDescription('d', { text: 'Bracket, 400 each', fetchedAt });
+    expect(await repository.findDescription('d')).toEqual({ text: 'Bracket, 400 each', fetchedAt });
 
-    await repository.upsertMany([fetched({ noticeId: 'd', title: 'Re-pulled' })], t2);
+    await repository.upsertMany([opportunityOf({ noticeId: 'd', title: 'Re-pulled' })], t2);
     expect(await repository.findOne('d')).toMatchObject({ title: 'Re-pulled' });
     expect(await repository.findDescription('d')).toMatchObject({ text: 'Bracket, 400 each' });
   });
@@ -84,15 +78,19 @@ describe('the opportunity repository in Postgres', () => {
     await orm.em.fork().nativeDelete(GovconOpportunity, {});
     await repository.upsertMany(
       [
-        fetched({ noticeId: 'open', postedAt: '2026-09-20T00:00:00.000Z' }),
-        fetched({
+        opportunityOf({ noticeId: 'open', postedAt: '2026-09-20T00:00:00.000Z' }),
+        opportunityOf({
           noticeId: 'unknown',
           active: null,
           responseDeadlineAt: null,
           postedAt: '2026-09-21T00:00:00.000Z',
         }),
-        fetched({ noticeId: 'inactive', active: false, postedAt: '2026-09-22T00:00:00.000Z' }),
-        fetched({
+        opportunityOf({
+          noticeId: 'inactive',
+          active: false,
+          postedAt: '2026-09-22T00:00:00.000Z',
+        }),
+        opportunityOf({
           noticeId: 'closed',
           responseDeadlineAt: '2026-09-01T00:00:00.000Z',
           postedAt: '2026-09-23T00:00:00.000Z',

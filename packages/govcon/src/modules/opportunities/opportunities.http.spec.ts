@@ -14,7 +14,7 @@ import { ensureDatabase, GovconOpportunity, GovconSourceCall } from '@sysdesign/
 
 import { BudgetedSource, type BudgetPolicy } from '../../core/budgeted-source';
 import type { SourceCallLog } from '../../core/ports';
-import { fetched, okResult, scriptedSource, tinyProfile } from '../../core/testing';
+import { opportunityOf, okResult, scriptedSource, tinyProfile } from '../../core/testing';
 import { AppModule } from '../app/app.module';
 import { configureApp } from '../app/configure-app';
 import {
@@ -38,8 +38,11 @@ const NOW = new Date('2026-09-26T12:00:00Z');
  */
 async function boot(): Promise<{ app: INestApplication; url: string }> {
   const scripted = scriptedSource('sam.gov', [
-    okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b', setAsideCode: '8A' })]),
-    okResult([fetched({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
+    okResult([
+      opportunityOf({ noticeId: 'a' }),
+      opportunityOf({ noticeId: 'b', setAsideCode: '8A' }),
+    ]),
+    okResult([opportunityOf({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
   ]);
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CLOCK)

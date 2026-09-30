@@ -4,7 +4,7 @@ import { BudgetedSource } from '../../core/budgeted-source';
 import type { SourceResult } from '../../core/ports';
 import type { SearchProfile } from '../../core/profile';
 import {
-  fetched,
+  opportunityOf,
   InMemoryOpportunityRepository,
   InMemorySourceCallLog,
   okResult,
@@ -41,8 +41,8 @@ describe('the opportunities service', () => {
   it('[GOV-1] pulls every slice, stores what normalized and reports what did not, per slice', async () => {
     const rejected = [{ noticeId: null, issues: ['noticeId: missing'] }];
     const { inner, repository, service } = harness([
-      okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })], 3, rejected),
-      okResult([fetched({ noticeId: 'b', title: 'seen twice' })]),
+      okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3, rejected),
+      okResult([opportunityOf({ noticeId: 'b', title: 'seen twice' })]),
     ]);
 
     const report = await service.pull('tiny', window);
@@ -73,7 +73,7 @@ describe('the opportunities service', () => {
         maxPagesPerSlice: 1,
       },
     });
-    const { inner, service } = harness([okResult([fetched()])], { profile, dailyBudget: 1 });
+    const { inner, service } = harness([okResult([opportunityOf()])], { profile, dailyBudget: 1 });
 
     const report = await service.pull('tiny', window);
     expect(report.slices.map((s) => s.outcome)).toEqual(['ok', 'budget-exhausted', 'skipped']);
@@ -100,7 +100,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-2] reports a slice pulled inside the cache window as cached and stores nothing again', async () => {
-    const { service, repository } = harness([okResult([fetched()])], { ttlMs: 60_000 });
+    const { service, repository } = harness([okResult([opportunityOf()])], { ttlMs: 60_000 });
     const first = await service.pull('tiny', window);
     expect(first.slices.map((s) => s.outcome)).toEqual(['ok', 'ok']);
     expect(first.spent).toBe(2);
@@ -116,8 +116,8 @@ describe('the opportunities service', () => {
     const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 2 } });
     const { inner, service } = harness(
       [
-        okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })], 5),
-        okResult([fetched({ noticeId: 'c' }), fetched({ noticeId: 'd' })], 5),
+        okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 5),
+        okResult([opportunityOf({ noticeId: 'c' }), opportunityOf({ noticeId: 'd' })], 5),
       ],
       { profile },
     );
@@ -137,8 +137,8 @@ describe('the opportunities service', () => {
     const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 5 } });
     const { inner, service } = harness(
       [
-        okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })], 3),
-        okResult([fetched({ noticeId: 'c' })], 3),
+        okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3),
+        okResult([opportunityOf({ noticeId: 'c' })], 3),
       ],
       { profile },
     );
@@ -151,16 +151,16 @@ describe('the opportunities service', () => {
     const { inner, repository, service } = harness([]);
     await repository.upsertMany(
       [
-        fetched({ noticeId: 'best' }),
-        fetched({
+        opportunityOf({ noticeId: 'best' }),
+        opportunityOf({
           noticeId: 'weak',
           naicsCode: '722511',
           naicsCodes: [],
           classificationCode: null,
           title: 'Lawn care',
         }),
-        fetched({ noticeId: 'gone', setAsideCode: 'HZC' }),
-        fetched({ noticeId: 'closed', responseDeadlineAt: '2026-09-01T00:00:00.000Z' }),
+        opportunityOf({ noticeId: 'gone', setAsideCode: 'HZC' }),
+        opportunityOf({ noticeId: 'closed', responseDeadlineAt: '2026-09-01T00:00:00.000Z' }),
       ],
       NOW,
     );
@@ -184,7 +184,7 @@ describe('the opportunities service', () => {
 
   it('shows one stored notice with its trace and its description when fetched, or nothing', async () => {
     const { repository, service } = harness([]);
-    await repository.upsertMany([fetched({ noticeId: 'n-9' })], NOW);
+    await repository.upsertMany([opportunityOf({ noticeId: 'n-9' })], NOW);
     const lead = await service.show('n-9', 'tiny');
     expect(lead?.opportunity.noticeId).toBe('n-9');
     expect(lead?.factors).toHaveLength(6);
@@ -200,7 +200,7 @@ describe('the opportunities service', () => {
 
   it('[GOV-9] fetches a description once: the store answers afterwards without a request, an unknown notice is refused before any', async () => {
     const { inner, log, repository, service } = harness([]);
-    await repository.upsertMany([fetched({ noticeId: 'n-1' })], NOW);
+    await repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
 
     const first = await service.describe('n-1');
     expect(first).toEqual({
@@ -220,7 +220,7 @@ describe('the opportunities service', () => {
 
   it('[GOV-9] reports a spent budget and a failed fetch as outcomes, storing nothing', async () => {
     const spent = harness([], { dailyBudget: 0 });
-    await spent.repository.upsertMany([fetched({ noticeId: 'n-1' })], NOW);
+    await spent.repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
     expect(await spent.service.describe('n-1')).toEqual({
       status: 'budget-exhausted',
       spent: 0,
@@ -233,7 +233,7 @@ describe('the opportunities service', () => {
     ]);
     const log = new InMemorySourceCallLog();
     const repository = new InMemoryOpportunityRepository();
-    await repository.upsertMany([fetched({ noticeId: 'n-2' })], NOW);
+    await repository.upsertMany([opportunityOf({ noticeId: 'n-2' })], NOW);
     const policy = { dailyBudget: 5, ttlMs: 0 };
     const service = new OpportunitiesService(
       new BudgetedSource(failing, log, policy, () => NOW),
@@ -252,7 +252,7 @@ describe('the opportunities service', () => {
   });
 
   it('reports the source status with the budget as the ledger counts it, and lists the ledger newest first', async () => {
-    const { service, log } = harness([okResult([fetched()])], {
+    const { service, log } = harness([okResult([opportunityOf()])], {
       dailyBudget: 4,
       ttlMs: 6 * 60 * 60 * 1000,
     });

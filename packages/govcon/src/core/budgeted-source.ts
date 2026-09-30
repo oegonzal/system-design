@@ -75,6 +75,7 @@ export class BudgetedSource implements OpportunitySource {
     if (result.kind === 'ok' || result.kind === 'error') {
       await this.record({
         operation: 'search',
+        attempt: 1,
         queryKey: key,
         query,
         requestedAt: started,
@@ -107,6 +108,7 @@ export class BudgetedSource implements OpportunitySource {
     if (result.kind === 'ok' || result.kind === 'error') {
       await this.record({
         operation: 'description',
+        attempt: 1,
         queryKey: descriptionKey(this.id, noticeId),
         query: { noticeId },
         requestedAt: started,

@@ -13,6 +13,7 @@ describe('the source call log in Postgres', () => {
   const call = (overrides: Partial<SourceCall>): SourceCall => ({
     source: 'sam.gov',
     operation: 'search',
+    attempt: 1,
     queryKey: 'k1',
     query: { postedFrom: '2026-09-20', postedTo: '2026-09-26', limit: 1000, offset: 0 },
     requestedAt: t0,

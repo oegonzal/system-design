@@ -6,20 +6,18 @@ const records = fixture.opportunitiesData as unknown[];
 describe('normalizing SAM.gov records', () => {
   it('[GOV-1] keeps every record that can be a lead and counts the one that cannot, with reasons', () => {
     const { opportunities, rejected } = normalizePage(records, 'sam.gov');
-    expect(opportunities.map((f) => f.opportunity.noticeId)).toEqual([
+    expect(opportunities.map((o) => o.noticeId)).toEqual([
       'a1b2c3d4e5f60718293a4b5c6d7e8f90',
       '0f1e2d3c4b5a69788796a5b4c3d2e1f0',
       'ffeeddccbbaa99887766554433221100',
     ]);
     expect(rejected).toEqual([{ noticeId: null, issues: [expect.stringMatching(/^noticeId: /)] }]);
-    // The record as received rides along for the row's `raw` column.
-    expect(opportunities[0]?.raw).toBe(records[0]);
   });
 
   it('[GOV-1] reads the provider fields into the contract shape, unknown keys tolerated', () => {
     const first = normalizeRecord(records[0], 'sam.gov');
     if (!first.ok) throw new Error('expected ok');
-    expect(first.fetched.opportunity).toEqual({
+    expect(first.opportunity).toEqual({
       noticeId: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
       title: 'Additive Manufacturing of Replacement Brackets, Qty 400',
       solicitationNumber: 'SPE4A7-26-Q-0001',
@@ -64,7 +62,7 @@ describe('normalizing SAM.gov records', () => {
   it('[GOV-1] falls back across the provider spellings: naicsCodes without naicsCode, space-separated dates, empty lists', () => {
     const second = normalizeRecord(records[1], 'sam.gov');
     if (!second.ok) throw new Error('expected ok');
-    expect(second.fetched.opportunity).toMatchObject({
+    expect(second.opportunity).toMatchObject({
       postedAt: '2026-09-21T14:03:11.000Z',
       responseDeadlineAt: null,
       naicsCode: '541511',
@@ -81,7 +79,7 @@ describe('normalizing SAM.gov records', () => {
   it('[GOV-1] reads awards, numeric strings and partial places', () => {
     const third = normalizeRecord(records[2], 'sam.gov');
     if (!third.ok) throw new Error('expected ok');
-    expect(third.fetched.opportunity).toMatchObject({
+    expect(third.opportunity).toMatchObject({
       postedAt: '2026-09-22T13:15:00.000Z',
       active: false,
       award: {
@@ -126,8 +124,8 @@ describe('normalizing SAM.gov records', () => {
       'sam.gov',
     );
     const bare = normalizeRecord({ noticeId: 'n', postedDate: '2026-01-01' }, 'sam.gov');
-    expect(untitled.ok && untitled.fetched.opportunity.title).toBe('S-1');
-    expect(bare.ok && bare.fetched.opportunity.title).toBe('n');
+    expect(untitled.ok && untitled.opportunity.title).toBe('S-1');
+    expect(bare.ok && bare.opportunity.title).toBe('n');
   });
 });
 

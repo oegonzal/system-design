@@ -7,7 +7,6 @@ import { profileOf, opportunityOf, type Opportunity } from '@sysdesign/contracts
 import type {
   CandidateFilter,
   DescribeResult,
-  FetchedOpportunity,
   FreshCall,
   OpportunityRepository,
   OpportunitySource,
@@ -111,24 +110,13 @@ export function scriptedSource(
       described.push(noticeId);
       const reply = descriptions[Math.min(describeCall, descriptions.length - 1)];
       describeCall += 1;
-      return (
-        reply ?? {
-          kind: 'ok',
-          text: `Description of ${noticeId}`,
-          raw: { description: `<p>Description of ${noticeId}</p>` },
-        }
-      );
+      return reply ?? { kind: 'ok', text: `Description of ${noticeId}` };
     },
   };
 }
 
-export const fetched = (overrides: Partial<Opportunity> = {}): FetchedOpportunity => {
-  const opportunity = opportunityOf(overrides);
-  return { opportunity, raw: { noticeId: opportunity.noticeId, title: opportunity.title } };
-};
-
 export const okResult = (
-  opportunities: FetchedOpportunity[],
+  opportunities: Opportunity[],
   totalRecords = opportunities.length,
   rejected: RejectedRecord[] = [],
 ): SourceResult => ({ kind: 'ok', opportunities, rejected, totalRecords });
@@ -140,10 +128,10 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
   >();
   readonly descriptions = new Map<string, StoredDescription>();
 
-  async upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary> {
+  async upsertMany(items: readonly Opportunity[], seenAt: Date): Promise<UpsertSummary> {
     let inserted = 0;
     let updated = 0;
-    for (const { opportunity: item } of items) {
+    for (const item of items) {
       const existing = this.rows.get(item.noticeId);
       if (existing) {
         this.rows.set(item.noticeId, { ...existing, opportunity: item, lastSeenAt: seenAt });

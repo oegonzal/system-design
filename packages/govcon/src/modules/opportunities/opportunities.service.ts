@@ -219,11 +219,7 @@ export class OpportunitiesService {
 
     const result = await this.source.describe(noticeId);
     if (result.kind === 'ok') {
-      const description: StoredDescription = {
-        text: result.text,
-        raw: result.raw,
-        fetchedAt: this.now(),
-      };
+      const description: StoredDescription = { text: result.text, fetchedAt: this.now() };
       await this.repository.saveDescription(noticeId, description);
       return { status: 'ok', description: toDescriptionDto(description) };
     }

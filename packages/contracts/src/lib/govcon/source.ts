@@ -40,6 +40,8 @@ export type DescriptionFetch =
 export type SourceCall = OperationQuery & {
   id: string;
   source: string;
+  /** 1 for the first HTTP attempt of a call, 2 for its retry — each is a row. */
+  attempt: number;
   queryKey: string;
   /** ISO 8601. */
   requestedAt: string;

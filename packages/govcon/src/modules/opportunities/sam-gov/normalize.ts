@@ -1,6 +1,6 @@
 import type { Opportunity } from '@sysdesign/contracts';
 
-import type { FetchedOpportunity, RejectedRecord } from '../../../core/ports';
+import type { RejectedRecord } from '../../../core/ports';
 import { samRecordSchema, type SamRecord } from './schemas';
 
 /**
@@ -129,7 +129,7 @@ function shape(record: SamRecord, postedAt: string, source: string): Opportunity
 }
 
 export type Normalized =
-  { ok: true; fetched: FetchedOpportunity } | { ok: false; rejected: RejectedRecord };
+  { ok: true; opportunity: Opportunity } | { ok: false; rejected: RejectedRecord };
 
 export function normalizeRecord(raw: unknown, source: string): Normalized {
   const parsed = samRecordSchema.safeParse(raw);
@@ -152,19 +152,19 @@ export function normalizeRecord(raw: unknown, source: string): Normalized {
       rejected: { noticeId: parsed.data.noticeId, issues: ['postedDate: missing or unreadable'] },
     };
   }
-  return { ok: true, fetched: { opportunity: shape(parsed.data, postedAt, source), raw } };
+  return { ok: true, opportunity: shape(parsed.data, postedAt, source) };
 }
 
 /** Every record on a page, split into what normalized and what did not. */
 export function normalizePage(
   records: readonly unknown[],
   source: string,
-): { opportunities: FetchedOpportunity[]; rejected: RejectedRecord[] } {
-  const opportunities: FetchedOpportunity[] = [];
+): { opportunities: Opportunity[]; rejected: RejectedRecord[] } {
+  const opportunities: Opportunity[] = [];
   const rejected: RejectedRecord[] = [];
   for (const raw of records) {
     const result = normalizeRecord(raw, source);
-    if (result.ok) opportunities.push(result.fetched);
+    if (result.ok) opportunities.push(result.opportunity);
     else rejected.push(result.rejected);
   }
   return { opportunities, rejected };

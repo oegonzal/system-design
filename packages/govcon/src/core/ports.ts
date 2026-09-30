@@ -26,7 +26,7 @@ export type { SourceAvailability };
 export type SourceResult =
   | {
       kind: 'ok';
-      opportunities: FetchedOpportunity[];
+      opportunities: Opportunity[];
       /** Records the source returned that did not normalize — counted, never stored. */
       rejected: RejectedRecord[];
       totalRecords: number;
@@ -53,17 +53,9 @@ export interface SourceFailure {
 
 /**
  * A notice's description: the adapter normalizes the provider's markup to
- * text at fetch time and hands the body as received along, so the row can
- * keep both and nothing downstream ever renders HTML.
+ * text at fetch time, so nothing downstream ever renders HTML.
  */
-export type DescribeResult =
-  { kind: 'ok'; text: string; raw: unknown } | BudgetExhausted | SourceFailure;
-
-/** A normalized record together with the record as the source returned it. */
-export interface FetchedOpportunity {
-  opportunity: Opportunity;
-  raw: unknown;
-}
+export type DescribeResult = { kind: 'ok'; text: string } | BudgetExhausted | SourceFailure;
 
 export interface RejectedRecord {
   noticeId: string | null;
@@ -84,6 +76,8 @@ export interface SourceCall {
   source: string;
   /** A search page or a notice description; every operation spends the budget. */
   operation: SourceOperation;
+  /** 1 for the first HTTP attempt of a call, 2 for its retry. */
+  attempt: number;
   queryKey: string;
   query: OpportunityQuery | DescriptionRequest;
   requestedAt: Date;
@@ -120,7 +114,6 @@ export interface SourceCallLog {
 /** A description once fetched; the row keeps it for good. */
 export interface StoredDescription {
   text: string;
-  raw: unknown;
   fetchedAt: Date;
 }
 
@@ -138,7 +131,7 @@ export interface UpsertSummary {
 
 export interface OpportunityRepository {
   /** Insert or refresh by notice id; `seenAt` becomes `lastSeenAt`, and `firstSeenAt` for new rows. */
-  upsertMany(items: readonly FetchedOpportunity[], seenAt: Date): Promise<UpsertSummary>;
+  upsertMany(items: readonly Opportunity[], seenAt: Date): Promise<UpsertSummary>;
   findCandidates(filter: CandidateFilter): Promise<Opportunity[]>;
   findOne(noticeId: string): Promise<Opportunity | null>;
   findDescription(noticeId: string): Promise<StoredDescription | null>;

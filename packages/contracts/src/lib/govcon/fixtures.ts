@@ -177,6 +177,7 @@ export const sourceCallOf = (overrides: Partial<SourceCall> = {}): SourceCall =>
     id: 'c1',
     source: 'sam.gov',
     operation: 'search',
+    attempt: 1,
     queryKey: 'a'.repeat(64),
     query: {
       postedFrom: '2026-09-25',

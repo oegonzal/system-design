@@ -1,7 +1,7 @@
 import { BUDGET_WINDOW_MS, BudgetedSource } from './budgeted-source';
 import type { SourceResult } from './ports';
 import type { OpportunityQuery } from './query';
-import { fetched, InMemorySourceCallLog, okResult, scriptedSource } from './testing';
+import { opportunityOf, InMemorySourceCallLog, okResult, scriptedSource } from './testing';
 
 const query: OpportunityQuery = {
   postedFrom: '2026-09-20',
@@ -29,7 +29,7 @@ function harness(replies: readonly SourceResult[], policy = { ttlMs: 24 * HOUR, 
 
 describe('the budgeted source', () => {
   it('[GOV-2] answers a query pulled inside the cache window from the log, calling nothing', async () => {
-    const page = okResult([fetched({ noticeId: 'a' }), fetched({ noticeId: 'b' })]);
+    const page = okResult([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })]);
     const { inner, log, source, advance } = harness([page]);
 
     expect(await source.search(query)).toEqual(page);
@@ -96,7 +96,9 @@ describe('the budgeted source', () => {
   });
 
   it('[GOV-2] treats a log that cannot answer as empty: the source is called and the failure is a warning', async () => {
-    const { inner, log, source, warnings } = harness([okResult([fetched({ noticeId: 'a' })])]);
+    const { inner, log, source, warnings } = harness([
+      okResult([opportunityOf({ noticeId: 'a' })]),
+    ]);
     log.failing = new Error('connection refused');
 
     const result = await source.search(query);
@@ -113,11 +115,7 @@ describe('the budgeted source', () => {
     const { inner, log, source } = harness([okResult([])], { ttlMs: 24 * HOUR, dailyBudget: 2 });
     await source.search(query);
     const first = await source.describe('n-7');
-    expect(first).toEqual({
-      kind: 'ok',
-      text: 'Description of n-7',
-      raw: { description: '<p>Description of n-7</p>' },
-    });
+    expect(first).toEqual({ kind: 'ok', text: 'Description of n-7' });
     expect(inner.described).toEqual(['n-7']);
     expect(log.calls[1]).toMatchObject({
       operation: 'description',
