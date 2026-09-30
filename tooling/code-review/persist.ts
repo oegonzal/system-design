@@ -22,6 +22,14 @@ export interface CriticOutcome {
   error?: string;
 }
 
+/** Where the run happened, as the CI platform reports it; `config.ts` reads it. */
+export interface CiProvenance {
+  isCi: boolean;
+  provider?: string;
+  runId?: string;
+  ref?: string;
+}
+
 export interface RunInput {
   runId: string;
   startedAt: number;
@@ -48,6 +56,7 @@ export interface RunInput {
   intentSource: 'env' | 'commits' | 'none';
   truncated: boolean;
   evaluatorRan: boolean;
+  ci: CiProvenance;
 }
 
 export interface RunRecord extends Omit<RunInput, 'startedAt' | 'finishedAt'> {
@@ -56,7 +65,6 @@ export interface RunRecord extends Omit<RunInput, 'startedAt' | 'finishedAt'> {
   finishedAt: string;
   durationMs: number;
   git: { branch: string; headSha: string; headSubject: string };
-  ci: { isCi: boolean; provider?: string; runId?: string; ref?: string };
   counts: {
     total: number;
     high: number;
@@ -99,7 +107,6 @@ export function buildRunRecord(input: RunInput): RunRecord {
     finishedAt: new Date(finishedAt).toISOString(),
     durationMs: finishedAt - startedAt,
     git: readGit(),
-    ci: readCi(),
     counts,
   };
 }
@@ -191,17 +198,4 @@ function readGit(): RunRecord['git'] {
     headSha: run(['rev-parse', 'HEAD']),
     headSubject: run(['log', '-1', '--format=%s']),
   };
-}
-
-function readCi(): RunRecord['ci'] {
-  const env = process.env;
-  if (env['GITHUB_ACTIONS'] === 'true') {
-    return {
-      isCi: true,
-      provider: 'github-actions',
-      runId: env['GITHUB_RUN_ID'],
-      ref: env['GITHUB_REF'],
-    };
-  }
-  return { isCi: Boolean(env['CI']) };
 }

@@ -507,23 +507,6 @@ export function packDiff(segments: FileDiff[], options: PackOptions): PackedDiff
   };
 }
 
-/**
- * Diff budgets, set from wall clock rather than from context-window maths.
- *
- * The window is not the binding constraint — a diff this size is a fraction of
- * the model's context. **Latency is**: a single schema-enforced critic call
- * over tens of thousands of characters already takes minutes, and doubling the
- * diff pushes every critic into the CLI's timeout, where the review correctly
- * reports that nothing ran — a working fail-safe and a useless review. Packing
- * whole files smallest-first buys far more coverage at a fixed budget than
- * raising the budget does. Override with `CODE_REVIEW_MAX_DIFF_CHARS` on a
- * machine that can hold a longer call open.
- */
-export const MAX_DIFF_CHARS = { quick: 50_000, full: 60_000 } as const;
-
-/** A guard rail, not a routine path: no single file here should come close. */
-export const MAX_FILE_CHARS = { quick: 12_000, full: 30_000 } as const;
-
 // ---------------------------------------------------------------------------
 // Assembly
 // ---------------------------------------------------------------------------

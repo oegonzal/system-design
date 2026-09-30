@@ -21,7 +21,7 @@ import { OpenAiEmbeddingClient } from './openai-embedding-client';
  * the first call instead, and the exchange records the CLI's own reason.
  */
 export const MODEL_PROVIDER_HELP =
-  'the quality loop runs only on a Claude Code subscription login: run `claude login` on this machine, or give a container the CLAUDE_CODE_OAUTH_TOKEN that `claude setup-token` prints';
+  'Claude Code is used here only through a subscription login: run `claude login` on this machine, or give a container or CI runner the CLAUDE_CODE_OAUTH_TOKEN that `claude setup-token` prints';
 
 export class MissingModelProviderError extends Error {
   override readonly name = 'MissingModelProvider';

@@ -50,6 +50,7 @@ const input = (over: Partial<RunInput> = {}): RunInput => ({
   diffChars: 1234,
   truncated: false,
   evaluatorRan: false,
+  ci: { isCi: false },
   ...over,
 });
 
@@ -98,7 +99,9 @@ describe('buildRunRecord', () => {
 
   it('carries the critics-skipped reason so a rules-only run is legible later', () => {
     const record = buildRunRecord(
-      input({ criticsSkipped: 'critics skipped: ANTHROPIC_API_KEY is not set' }),
+      input({
+        criticsSkipped: 'critics skipped: found no subscription login — deterministic rules only',
+      }),
     );
     expect(record.criticsSkipped).toContain('critics skipped');
   });

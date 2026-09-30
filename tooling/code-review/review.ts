@@ -1,33 +1,26 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 
 import {
-  claudeAvailable,
   criticGate,
+  defaultRuntime,
   readPrompt,
   readSchema,
   runClaude,
   ReviewUnavailableError,
+  subscriptionProblem,
 } from './claude';
+import { loadReviewConfig } from './config';
 import {
   buildReviewContext,
   readChangedFile,
-  MAX_DIFF_CHARS,
-  MAX_FILE_CHARS,
   type PackedFile,
   type ReviewContext,
-  type Scope,
 } from './context';
-import { CRITICS, PROFILES, type CriticName, type ProfileName } from './critics';
+import { CRITICS, type CriticName } from './critics';
 import { sanitise, type CriticReport, type Finding } from './policy';
 import { decide, defaultSummary, mergeFindings, worseOf, type SourcedFinding } from './evaluator';
 import { runRules, type ChangedFile } from './rules/index';
-import {
-  buildRunRecord,
-  DEFAULT_RUNS_DIR,
-  makeRunId,
-  writeRunRecord,
-  type CriticOutcome,
-} from './persist';
+import { buildRunRecord, makeRunId, writeRunRecord, type CriticOutcome } from './persist';
 import { buildRepoMap, type RepoMap } from './repo-map';
 import { toMarkdown, toTerminal, type ReviewOutcome } from './report';
 
@@ -43,43 +36,6 @@ interface Evaluation {
   /** Surviving `low` findings. Without this channel they would be silently lost. */
   informational: EvaluationRef[];
   summary: string;
-}
-
-interface Args {
-  scope: Scope;
-  profile: ProfileName;
-  markdownOut?: string;
-  runsDir: string;
-  /** `--no-record` opts a run out of leaving a file behind. */
-  record: boolean;
-}
-
-function parseArgs(argv: string[]): Args {
-  const staged = argv.includes('--staged');
-  const base = argv.find((a) => a.startsWith('--base='))?.slice('--base='.length);
-  const profile = (argv.find((a) => a.startsWith('--profile='))?.slice('--profile='.length) ??
-    (staged ? 'quick' : 'full')) as ProfileName;
-  const markdownOut = argv.find((a) => a.startsWith('--markdown='))?.slice('--markdown='.length);
-  const runsDir =
-    argv.find((a) => a.startsWith('--runs-dir='))?.slice('--runs-dir='.length) ??
-    process.env['CODE_REVIEW_RUNS_DIR'] ??
-    DEFAULT_RUNS_DIR;
-  const record = !argv.includes('--no-record');
-
-  if (!staged && !base) {
-    throw new Error('specify --staged or --base=<ref>');
-  }
-  if (!(profile in PROFILES)) {
-    throw new Error(`unknown profile "${profile}" — expected quick or full`);
-  }
-
-  return {
-    scope: staged ? { kind: 'staged' } : { kind: 'base', ref: base! },
-    profile,
-    markdownOut,
-    runsDir,
-    record,
-  };
 }
 
 /**
@@ -261,20 +217,17 @@ export function criticSchemaFor(name: CriticName, intentAvailable = true): Recor
 async function main(): Promise<number> {
   const startedAt = Date.now();
   const runId = makeRunId(startedAt);
-  const { scope, profile, markdownOut, runsDir, record } = parseArgs(process.argv.slice(2));
-  const settings = PROFILES[profile];
+  // The one read of argv and the environment; everything below receives it.
+  const config = loadReviewConfig(process.argv.slice(2), process.env);
+  const { scope, profile, settings, markdownOut, runsDir, record } = config;
+  const runtime = defaultRuntime(config.claudeEnv);
 
-  // Overridable so the budget can be re-measured rather than argued about; the
-  // recorded runs carry `diffBudgetChars`, so a sweep is readable afterwards.
-  const budgetOverride = Number(process.env['CODE_REVIEW_MAX_DIFF_CHARS']);
-
+  // The recorded runs carry `diffBudgetChars`, so a sweep of the override is
+  // readable afterwards.
   const context = buildReviewContext(scope, {
-    budgetChars:
-      Number.isFinite(budgetOverride) && budgetOverride > 0
-        ? budgetOverride
-        : MAX_DIFF_CHARS[profile],
-    maxFileChars: MAX_FILE_CHARS[profile],
-    intentOverride: process.env['REVIEW_INTENT'],
+    budgetChars: settings.diffBudgetChars,
+    maxFileChars: settings.maxFileChars,
+    intentOverride: config.intent,
   });
 
   if (context.allFiles.length === 0) {
@@ -286,7 +239,7 @@ async function main(): Promise<number> {
    * The deterministic rules, before anything that needs a network.
    *
    * Every changed file is read once, at the review's scope, and the same
-   * snapshot goes to every rule — so a rules-only run (no key, fork PR,
+   * snapshot goes to every rule — so a rules-only run (no login, fork PR,
    * offline laptop) is the same computation CI performs, minus the critics.
    */
   const changed: ChangedFile[] = context.allFiles.map((file) => ({
@@ -298,24 +251,23 @@ async function main(): Promise<number> {
   const intentAvailable = context.intent.text.length > 0;
 
   /**
-   * `warn` by default, deliberately.
+   * `warn` by default (see `config.ts`), deliberately.
    *
    * Dropping a true finding is worse than keeping an unsupported one: the
    * developer never learns the pipeline had something to say, and the record
    * shows a clean pass. In `warn` the line is still recorded, so a matcher
    * regression is diagnosable from run history before the guard is enforced.
    */
-  const evidenceGuard = (process.env['CODE_REVIEW_EVIDENCE_GUARD'] ?? 'warn') as
-    'enforce' | 'warn' | 'off';
+  const { evidenceGuard } = config;
 
-  // A fork PR cannot read secrets, and a laptop may not have the CLI. Failing
-  // there would be indistinguishable from finding a real problem, so the
-  // review says plainly that the critics did not look and lets the rules
-  // decide the exit code alone.
+  // A fork PR has no secrets, and a laptop may not be logged in. Failing there
+  // would be indistinguishable from finding a real problem, so the review says
+  // plainly that the critics did not look and lets the rules decide the exit
+  // code alone. Only the reviewable-files check is free, so it goes first.
   const criticsSkipped = criticGate({
     reviewableFiles: context.files.length,
-    keyPresent: Boolean(process.env['ANTHROPIC_API_KEY']),
-    cliAvailable: await claudeAvailable(),
+    subscriptionProblem:
+      context.files.length === 0 ? undefined : await subscriptionProblem(runtime),
   });
 
   const criticOutcomes: CriticOutcome[] = [];
@@ -351,13 +303,17 @@ async function main(): Promise<number> {
       settings.critics.map(async (name): Promise<CriticReport> => {
         const prompt = criticPrompt(context, repoMap);
 
-        const { data, costUsd: cost } = await runClaude<CriticReport>({
-          systemPrompt: systemPrompt(CRITICS[name].promptFile),
-          userPrompt: prompt,
-          schema: criticSchemaFor(name, intentAvailable),
-          model: settings.model,
-          budgetUsd: settings.budgetUsd,
-        });
+        const { data, costUsd: cost } = await runClaude<CriticReport>(
+          {
+            systemPrompt: systemPrompt(CRITICS[name].promptFile),
+            userPrompt: prompt,
+            schema: criticSchemaFor(name, intentAvailable),
+            model: settings.model,
+            budgetUsd: settings.budgetUsd,
+            timeoutMs: settings.timeoutMs,
+          },
+          runtime,
+        );
         costUsd += cost;
 
         const clean = sanitise(
@@ -401,13 +357,17 @@ async function main(): Promise<number> {
     // argued away by a model would make the rules engine advisory.
     if (settings.critics.length > 1 && all.length > 0) {
       try {
-        const evaluation = await runClaude<Evaluation>({
-          systemPrompt: systemPrompt('evaluator.md'),
-          userPrompt: evaluatorPrompt(context, reports),
-          schema: readSchema('schemas/evaluation.schema.json'),
-          model: settings.model,
-          budgetUsd: settings.budgetUsd,
-        });
+        const evaluation = await runClaude<Evaluation>(
+          {
+            systemPrompt: systemPrompt('evaluator.md'),
+            userPrompt: evaluatorPrompt(context, reports),
+            schema: readSchema('schemas/evaluation.schema.json'),
+            model: settings.model,
+            budgetUsd: settings.budgetUsd,
+            timeoutMs: settings.timeoutMs,
+          },
+          runtime,
+        );
         costUsd += evaluation.costUsd;
         evaluatorRan = true;
 
@@ -462,8 +422,8 @@ async function main(): Promise<number> {
 
   const markdown = toMarkdown(outcome);
   if (markdownOut) writeFileSync(markdownOut, markdown);
-  if (process.env['GITHUB_STEP_SUMMARY']) {
-    appendFileSync(process.env['GITHUB_STEP_SUMMARY'], `${markdown}\n`);
+  if (config.stepSummaryPath) {
+    appendFileSync(config.stepSummaryPath, `${markdown}\n`);
   }
 
   // Every completed run leaves a record, whatever the verdict — a history of
@@ -497,6 +457,7 @@ async function main(): Promise<number> {
         intentSource: context.intent.source,
         truncated: context.truncated,
         evaluatorRan,
+        ci: config.ci,
       }),
       runsDir,
     );

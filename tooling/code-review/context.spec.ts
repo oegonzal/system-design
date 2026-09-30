@@ -6,8 +6,6 @@ import {
   bundleKey,
   codeReviewExpectations,
   deriveIntent,
-  MAX_DIFF_CHARS,
-  MAX_FILE_CHARS,
   packDiff,
   splitDiffByFile,
   truncateAtHunkBoundary,
@@ -324,18 +322,5 @@ describe('deriveIntent', () => {
   it('treats a substance-free purpose as absent', () => {
     expect(deriveIntent(['wip', 'wip', 'wip']).source).toBe('none');
     expect(deriveIntent([], 'wip').source).toBe('none');
-  });
-});
-
-describe('budgets', () => {
-  it('gives the pull-request profile more room than the pre-commit one', () => {
-    expect(MAX_DIFF_CHARS.quick).toBeLessThan(MAX_DIFF_CHARS.full);
-  });
-
-  /** Guards against a transposed edit making the per-file cap the larger number. */
-  it('keeps the per-file cap inside the total budget', () => {
-    for (const profile of ['quick', 'full'] as const) {
-      expect(MAX_FILE_CHARS[profile]).toBeLessThanOrEqual(MAX_DIFF_CHARS[profile]);
-    }
   });
 });

@@ -84,6 +84,30 @@ export const CRITICS: Record<CriticName, Critic> = {
  * and `persist.ts` records the literal string, so an aliased run record cannot
  * be reproduced later.
  */
+/** Everything one review profile decides: who looks, with which model, within which limits. */
+export interface ProfileSettings {
+  critics: readonly CriticName[];
+  model: string;
+  /** A cap per Claude Code call, not per run. */
+  budgetUsd: number;
+  /**
+   * Diff budget, set from wall clock rather than from context-window maths.
+   * The window is not the binding constraint — a diff this size is a fraction
+   * of the model's context. **Latency is**: a single schema-enforced critic
+   * call over tens of thousands of characters already takes minutes, and
+   * doubling the diff pushes every critic into the timeout, where the review
+   * correctly reports that nothing ran — a working fail-safe and a useless
+   * review. Packing whole files smallest-first buys far more coverage at a
+   * fixed budget than raising the budget does. `CODE_REVIEW_MAX_DIFF_CHARS`
+   * overrides it (see `config.ts`) on a machine that can hold a longer call open.
+   */
+  diffBudgetChars: number;
+  /** A guard rail, not a routine path: no single file here should come close. */
+  maxFileChars: number;
+  /** How long one Claude Code call may run before the review stands aside. */
+  timeoutMs: number;
+}
+
 export const PROFILES = {
   /**
    * Pre-commit. One critic, no LLM evaluator pass: with a single critic there
@@ -95,9 +119,12 @@ export const PROFILES = {
    * cover boundaries and structure without spending a token.
    */
   quick: {
-    critics: ['readability'] as CriticName[],
+    critics: ['readability'],
     model: 'claude-haiku-4-5-20251001',
     budgetUsd: 0.25,
+    diffBudgetChars: 50_000,
+    maxFileChars: 12_000,
+    timeoutMs: 900_000,
   },
 
   /**
@@ -109,7 +136,14 @@ export const PROFILES = {
    * "did not run", and the incomplete-review rule then means every pull request
    * warns — a quality regression that looks like a code problem.
    */
-  full: { critics: [...CRITIC_NAMES] as CriticName[], model: 'claude-sonnet-5', budgetUsd: 1.0 },
-} as const;
+  full: {
+    critics: [...CRITIC_NAMES],
+    model: 'claude-sonnet-5',
+    budgetUsd: 1.0,
+    diffBudgetChars: 60_000,
+    maxFileChars: 30_000,
+    timeoutMs: 900_000,
+  },
+} satisfies Record<string, ProfileSettings>;
 
 export type ProfileName = keyof typeof PROFILES;

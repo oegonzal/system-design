@@ -7,6 +7,7 @@
 #   2. branding tripwire            instant
 #   3. lint + typecheck affected    seconds, no tokens
 #   4. code review (quick)          one critic, budget-capped; rules always run
+#                                   (critics on this machine's Claude Code login)
 #
 # Escape hatches:
 #   SKIP_REVIEW=1 git commit   skip step 4 only
@@ -14,6 +15,9 @@
 #
 # A staged review has no commit message to read a purpose from; to supply one:
 #   REVIEW_INTENT="tighten the eval polling loop" git commit
+#
+# Every variable named in this file is declared in tooling/code-review/config.ts,
+# the review's one configuration; its spec fails on any that is not.
 #
 # bash rather than sh, and every path list read NUL-delimited, because both
 # alternatives lose files silently: newline-delimited output makes git *quote*
@@ -132,7 +136,7 @@ if [ ! -f tooling/code-review/review.ts ]; then
 fi
 
 echo "  → code review (quick profile)"
-if ! pnpm exec tsx tooling/code-review/review.ts --staged --profile=quick; then
+if ! pnpm review:code --staged --profile=quick; then
   echo "  Commit refused by code review."
   echo "  Re-run with SKIP_REVIEW=1 git commit … to bypass the review only,"
   echo "  or git commit --no-verify to bypass every check."

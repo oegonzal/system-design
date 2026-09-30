@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -12,6 +13,9 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   root: __dirname,
+  // The review reaches Claude Code through `@sysdesign/llm`, so workspace
+  // aliases resolve here the way they do in every package.
+  plugins: [nxViteTsPaths()],
   cacheDir: join(__dirname, 'node_modules/.vite'),
   test: {
     watch: false,

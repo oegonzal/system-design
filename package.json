@@ -27,7 +27,7 @@
     "db:migrate:check": "SWC_NODE_PROJECT=packages/db/tsconfig.lib.json mikro-orm migration:check --config packages/db/mikro-orm.config.ts",
     "db:migrate:create": "SWC_NODE_PROJECT=packages/db/tsconfig.lib.json mikro-orm migration:create --config packages/db/mikro-orm.config.ts",
     "db:seed": "SWC_NODE_PROJECT=packages/db/tsconfig.lib.json node -r @swc-node/register packages/db/scripts/seed.ts",
-    "review:code": "tsx tooling/code-review/review.ts",
+    "review:code": "tsx --tsconfig tooling/tsconfig.json tooling/code-review/review.ts",
     "typecheck:tooling": "tsc --noEmit -p tooling/tsconfig.json",
     "test:tooling": "vitest run --config tooling/vite.config.ts",
     "test:stories": "tsx tooling/storybook-smoke/smoke.ts",

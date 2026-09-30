@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import type { ClaudeQuery } from '@sysdesign/llm';
 
-import { classifyFailure, criticGate, ReviewUnavailableError } from './claude';
+import {
+  classifyResult,
+  criticGate,
+  ReviewUnavailableError,
+  runClaude,
+  subscriptionProblem,
+  type ClaudeCall,
+  type TurnResult,
+} from './claude';
 
-const envelope = (over: Record<string, unknown>) =>
-  JSON.stringify({ is_error: true, result: '', total_cost_usd: 0, ...over });
+const success = (over: Partial<TurnResult> = {}): TurnResult => ({
+  subtype: 'success',
+  is_error: false,
+  total_cost_usd: 0.01,
+  ...over,
+});
 
 /**
  * This decides whether a failed call *blocks* a change or merely stands aside,
@@ -11,98 +24,165 @@ const envelope = (over: Record<string, unknown>) =>
  * either direction is bad: a budget stop that blocks refuses a commit over cost,
  * and a genuine failure that stands aside lets an unreviewed change through.
  */
-describe('classifyFailure', () => {
-  it('reads the reason from the envelope the CLI writes to stdout on a non-zero exit', () => {
-    const error = classifyFailure(
-      { stdout: envelope({ result: 'model unavailable' }), code: 1 },
-      0.25,
-      1000,
+describe('classifyResult', () => {
+  it('returns the API-enforced structured output and the cost', () => {
+    expect(classifyResult(success({ structured_output: { findings: [] } }), null, 0.25)).toEqual({
+      data: { findings: [] },
+      costUsd: 0.01,
+    });
+  });
+
+  it('falls back to a JSON result string, and refuses a success with neither', () => {
+    expect(classifyResult(success({ result: '{"ok":true}' }), null, 0.25).data).toEqual({
+      ok: true,
+    });
+    expect(() => classifyResult(success({ result: 'prose' }), null, 0.25)).toThrow(
+      /no structured output despite a schema/,
     );
-    expect(error).not.toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('model unavailable');
   });
 
   it('treats reaching the spend cap as "not reviewed", not as a failure', () => {
-    const error = classifyFailure(
-      { stdout: envelope({ total_cost_usd: 0.31 }), code: 1 },
-      0.25,
-      1000,
-    );
-    expect(error).toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('budget was reached');
-    expect(error.message).toContain('0.3100');
+    const run = () =>
+      classifyResult(
+        { subtype: 'error_max_budget_usd', is_error: true, total_cost_usd: 0.31, errors: [] },
+        null,
+        0.25,
+      );
+    expect(run).toThrow(ReviewUnavailableError);
+    expect(run).toThrow(/\$0\.25 budget was reached \(\$0\.3100 spent\)/);
   });
 
-  it('does not mistake a cheap genuine error for a budget stop', () => {
-    // Same shape, but the spend is nowhere near the cap — this must block.
-    const error = classifyFailure(
-      { stdout: envelope({ total_cost_usd: 0.01, result: 'invalid schema' }), code: 1 },
-      0.25,
-      1000,
-    );
-    expect(error).not.toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('invalid schema');
+  it('surfaces an API error with the CLI\'s own reason — never as "not reviewed"', () => {
+    const run = () =>
+      classifyResult(
+        success({ is_error: true, result: 'Invalid bearer token' }),
+        'authentication_failed',
+        0.25,
+      );
+    expect(run).toThrow(/claude reported an error: authentication_failed: Invalid bearer token/);
+    expect(run).not.toThrow(ReviewUnavailableError);
   });
 
-  it('treats a timeout as "not reviewed"', () => {
-    const error = classifyFailure({ killed: true, signal: 'SIGTERM' }, 0.25, 600_000);
-    expect(error).toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('600000ms');
-  });
-
-  it('surfaces stderr when there is no envelope to read', () => {
-    const error = classifyFailure({ stderr: 'command not found', code: 127 }, 0.25, 1000);
-    expect(error).not.toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('exit 127');
-    expect(error.message).toContain('command not found');
-  });
-
-  it('survives stdout that is not JSON at all', () => {
-    const error = classifyFailure({ stdout: '<html>502</html>', code: 1 }, 0.25, 1000);
-    expect(error).not.toBeInstanceOf(ReviewUnavailableError);
-    expect(error.message).toContain('exit 1');
-  });
-
-  it('says something useful when the envelope carries no detail', () => {
-    const error = classifyFailure({ stdout: envelope({}), code: 1 }, 0.25, 1000);
-    expect(error.message).toContain('no detail supplied');
+  it('surfaces every other stop with its errors, and a turn with no result at all', () => {
+    expect(() =>
+      classifyResult(
+        {
+          subtype: 'error_max_structured_output_retries',
+          is_error: true,
+          errors: ['schema never met'],
+        },
+        null,
+        0.25,
+      ),
+    ).toThrow(/schema never met/);
+    expect(() => classifyResult(null, null, 0.25)).toThrow(/without a result/);
   });
 });
 
-/**
- * The rules-only fallback hangs off these messages: CI prints them into the
- * job log, and a fork PR's contributor reads them to learn why no critic
- * commented. Each reason is a different fix, so each gets its own words.
- */
-describe('criticGate', () => {
-  const open = { reviewableFiles: 3, keyPresent: true, cliAvailable: true };
+const call: ClaudeCall = {
+  systemPrompt: 'system',
+  userPrompt: 'the diff',
+  schema: { type: 'object' },
+  model: 'claude-haiku-4-5-20251001',
+  budgetUsd: 0.25,
+  timeoutMs: 1_000,
+};
 
-  it('lets the critics run when everything is in place', () => {
-    expect(criticGate(open)).toBeUndefined();
+/** A stand-in for the SDK's `query`: records what it was given, then replays messages or hangs until aborted. */
+function scripted(messages: readonly unknown[] | 'hang') {
+  const seen: { prompt?: unknown; options?: Record<string, unknown> } = {};
+  const query = ((params: { prompt: unknown; options: Record<string, unknown> }) => {
+    seen.prompt = params.prompt;
+    seen.options = params.options;
+    const abort = params.options['abortController'] as AbortController;
+    return (async function* () {
+      if (messages === 'hang') {
+        await new Promise((_, reject) =>
+          abort.signal.addEventListener('abort', () => reject(new Error('aborted'))),
+        );
+      } else {
+        yield* messages;
+      }
+    })();
+  }) as unknown as ClaudeQuery;
+  return { query, seen };
+}
+
+describe('runClaude', () => {
+  it('runs one bounded, tool-less turn with the schema enforced, the budget capped and no API key in its environment', async () => {
+    const { query, seen } = scripted([
+      { type: 'result', ...success({ structured_output: { ok: 1 } }) },
+    ]);
+    const env = { ANTHROPIC_API_KEY: 'sk-test', CODE_REVIEW_RUNNING: '1', HOME: '/h' };
+
+    await expect(runClaude(call, { query, env })).resolves.toEqual({
+      data: { ok: 1 },
+      costUsd: 0.01,
+    });
+    expect(seen.prompt).toBe('the diff');
+    expect(seen.options).toMatchObject({
+      systemPrompt: 'system',
+      model: 'claude-haiku-4-5-20251001',
+      outputFormat: { type: 'json_schema', schema: { type: 'object' } },
+      maxBudgetUsd: 0.25,
+      tools: [],
+      settingSources: [],
+      persistSession: false,
+    });
+    expect(seen.options?.['env']).toEqual({ CODE_REVIEW_RUNNING: '1', HOME: '/h' });
   });
 
-  it('skips when the change holds no reviewable code', () => {
-    const reason = criticGate({ ...open, reviewableFiles: 0 });
-    expect(reason).toContain('critics skipped');
-    expect(reason).toContain('no reviewable code');
+  it("keeps the assistant's error reason for a failed turn", async () => {
+    const { query } = scripted([
+      { type: 'assistant', error: 'rate_limit', message: { content: [] } },
+      { type: 'result', ...success({ is_error: true, result: 'slow down' }) },
+    ]);
+    await expect(runClaude(call, { query, env: {} })).rejects.toThrow(/rate_limit: slow down/);
   });
 
-  it('skips without an API key — the fork-PR case CI documents', () => {
-    const reason = criticGate({ ...open, keyPresent: false });
-    expect(reason).toContain('critics skipped');
-    expect(reason).toContain('ANTHROPIC_API_KEY');
-    expect(reason).toContain('deterministic rules only');
+  it('stands aside when the turn outlives its timeout', async () => {
+    const { query } = scripted('hang');
+    await expect(runClaude({ ...call, timeoutMs: 20 }, { query, env: {} })).rejects.toBeInstanceOf(
+      ReviewUnavailableError,
+    );
+  });
+});
+
+describe('the subscription gate', () => {
+  const account = (info: Record<string, unknown>) =>
+    (() => ({ accountInfo: () => Promise.resolve(info) })) as unknown as ClaudeQuery;
+
+  it('finds no problem with a machine login or a setup-token token, and names what it found otherwise', async () => {
+    await expect(
+      subscriptionProblem({
+        query: account({ apiProvider: 'firstParty', subscriptionType: 'Claude Max' }),
+        env: {},
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      subscriptionProblem({
+        query: account({ apiProvider: 'firstParty', tokenSource: 'CLAUDE_CODE_OAUTH_TOKEN' }),
+        env: {},
+      }),
+    ).resolves.toBeUndefined();
+    const problem = await subscriptionProblem({
+      query: account({ apiProvider: 'firstParty', tokenSource: 'none' }),
+      env: {},
+    });
+    expect(problem).toMatch(/found no subscription login/);
+    expect(problem).toMatch(/claude setup-token/);
   });
 
-  it('skips when the CLI is missing, and says so distinctly from the key case', () => {
-    const reason = criticGate({ ...open, cliAvailable: false });
-    expect(reason).toContain('critics skipped');
-    expect(reason).toContain('claude CLI');
-    expect(reason).not.toContain('ANTHROPIC_API_KEY');
-  });
-
-  it('reports the no-code case ahead of credentials, because it needs no fixing', () => {
-    const reason = criticGate({ reviewableFiles: 0, keyPresent: false, cliAvailable: false });
-    expect(reason).toContain('no reviewable code');
+  it('skips the critics with the reason — never an API key — and runs them when there is none', () => {
+    expect(criticGate({ reviewableFiles: 3, subscriptionProblem: undefined })).toBeUndefined();
+    expect(criticGate({ reviewableFiles: 0, subscriptionProblem: undefined })).toBe(
+      'critics skipped: no reviewable code in the change set',
+    );
+    const skipped = criticGate({
+      reviewableFiles: 3,
+      subscriptionProblem: 'found no subscription login',
+    });
+    expect(skipped).toBe('critics skipped: found no subscription login — deterministic rules only');
+    expect(skipped).not.toContain('ANTHROPIC_API_KEY');
   });
 });
