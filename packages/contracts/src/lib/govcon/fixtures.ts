@@ -115,9 +115,12 @@ export const leadOf = (overrides: Partial<Lead> = {}): Lead => ({
 export const leadsReportOf = (overrides: Partial<LeadsReport> = {}): LeadsReport => ({
   profile: 'tiny',
   candidates: 1,
+  capped: false,
   excluded: 0,
   matching: 1,
   leads: [leadOf()],
+  limit: 25,
+  offset: 0,
   ...overrides,
 });
 

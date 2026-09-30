@@ -1,40 +1,31 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import {
-  describeQuery,
-  type Description,
-  type DescriptionFetch,
-  type LeadsReport,
-  type LeadTier,
-  type NoticeDto,
-  type OpportunityQuery,
-  type PullReport,
-  type PullWindow,
-  type SearchProfile,
-  type SliceOutcome,
-  type SliceReport,
-  type SourceCall,
-  type SourceStatus,
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type {
+  Description,
+  DescriptionFetch,
+  LeadsReport,
+  LeadTier,
+  NoticeDto,
+  PullReport,
+  SearchProfile,
+  SourceCall,
+  SourceStatus,
+  StartPullRequest,
 } from '@sysdesign/contracts';
 
-import {
-  BUDGET_WINDOW_MS,
-  bucketOf,
-  type BudgetPolicy,
-  type Gated,
-  type RequestGate,
-} from '../../core/budget';
-import { planPulls } from '../../core/plan';
+import { BUDGET_WINDOW_MS, bucketOf, type BudgetPolicy, type RequestGate } from '../../core/budget';
+import { candidateFilterOf, type LeadFilters } from '../../core/candidates';
+import { planPulls, resolveWindow } from '../../core/plan';
 import type {
   NoticeDescriptions,
   OpportunityRepository,
   OpportunitySearch,
-  SearchPage,
   SourceCallLog,
   StoredDescription,
 } from '../../core/ports';
 import { validateProfile } from '../../core/profile';
-import { nextPage } from '../../core/query';
+import { runPull } from '../../core/pull';
 import { FACTORS, rankLeads, scoreLead } from '../../core/scoring';
+import { messageOf } from '../../core/text';
 import {
   BUDGET_POLICY,
   CLOCK,
@@ -46,10 +37,12 @@ import {
   SOURCE_CALL_LOG,
 } from './tokens';
 
-export interface LeadsOptions {
+/** Everything `GET /leads` may ask: store-side filters, the score cut, the page. */
+export interface LeadsOptions extends LeadFilters {
   minScore: number;
   tier: LeadTier | null;
   limit: number;
+  offset: number;
 }
 
 export interface CallsOptions {
@@ -62,9 +55,10 @@ const HOUR_MS = 60 * 60 * 1000;
 /**
  * Everything the CLI and the HTTP surface do, over the ports. A pull runs the
  * profile's plan through the gate and stores what normalized; ranking reads
- * the repository and never a source; a description is one gated request per
- * notice that the row then remembers; every profile is validated at boot so
- * a malformed one fails before any request.
+ * the repository — filtered and bounded in SQL — and never a source; a
+ * description is one gated request per notice that the row then remembers;
+ * every profile is validated at boot so a malformed one fails before any
+ * request.
  */
 @Injectable()
 export class OpportunitiesService {
@@ -99,63 +93,31 @@ export class OpportunitiesService {
     return profile;
   }
 
-  async pull(profileId: string, window: PullWindow): Promise<PullReport> {
+  /** The window is resolved here, with the injected clock; a window the plan cannot run is a 400. */
+  async pull(
+    profileId: string,
+    request: Pick<StartPullRequest, 'days' | 'from' | 'to'>,
+  ): Promise<PullReport> {
     const profile = this.profile(profileId);
-    const plan = planPulls(profile, window);
-    const seenAt = this.now();
-    const slices: SliceReport[] = [];
-    let stoppedBy: PullReport['stoppedBy'] = null;
-
-    for (const first of plan) {
-      if (stoppedBy !== null) {
-        slices.push(this.slice(first, 'skipped', `stopped earlier: ${stoppedBy}`));
-        continue;
-      }
-      const report = this.slice(first, 'ok', null);
-      let query = first;
-      for (let page = 0; page < profile.pull.maxPagesPerSlice; page += 1) {
-        const result = await this.searchPage(query);
-        if (result.kind === 'ok') {
-          const { opportunities, rejected, totalRecords } = result.value;
-          report.pages += 1;
-          report.received += opportunities.length + rejected.length;
-          report.rejected += rejected.length;
-          const summary = await this.repository.upsertMany(opportunities, seenAt);
-          report.inserted += summary.inserted;
-          report.updated += summary.updated;
-          const fetched = query.offset + opportunities.length + rejected.length;
-          if (fetched >= totalRecords || opportunities.length + rejected.length === 0) break;
-          if (page + 1 < profile.pull.maxPagesPerSlice) {
-            query = nextPage(query);
-            continue;
-          }
-          report.truncated = true;
-          report.detail = `${totalRecords - fetched} more record(s) beyond maxPagesPerSlice`;
-          break;
-        }
-        if (result.kind === 'cached') {
-          if (report.pages === 0) report.outcome = 'cached';
-          report.detail = `pulled ${result.requestedAt}${
-            result.recordCount === null ? '' : `, ${result.recordCount} record(s)`
-          }`;
-          break;
-        }
-        if (result.kind === 'budget-exhausted') {
-          if (report.pages === 0) report.outcome = 'budget-exhausted';
-          else report.truncated = true;
-          report.detail = `budget ${result.spent}/${result.budget} spent`;
-          stoppedBy = 'budget';
-          break;
-        }
-        report.outcome = report.pages === 0 ? 'error' : report.outcome;
-        report.detail = `${result.outcome}: ${result.message}`;
-        if (result.outcome === 'rate-limited') stoppedBy = 'rate-limited';
-        this.logger.warn(`slice ${describeQuery(query)} failed — ${report.detail}`);
-        break;
-      }
-      slices.push(report);
+    let window;
+    try {
+      window = resolveWindow(request, this.now());
+    } catch (error) {
+      throw new BadRequestException(messageOf(error));
     }
-
+    const plan = planPulls(profile, window).map((query) => ({ name: null, query }));
+    const { slices, stoppedBy } = await runPull(plan, {
+      maxPagesPerSlice: profile.pull.maxPagesPerSlice,
+      deadlineMs: this.budget.pullDeadlineMs,
+      now: this.now,
+      search: (query) =>
+        this.gate.spend(
+          { source: this.search.id, operation: 'search', query, cacheable: true },
+          () => this.search.search(query),
+        ),
+      store: (opportunities, seenAt) => this.repository.upsertMany(opportunities, seenAt),
+      warn: (message) => this.logger.warn(message),
+    });
     return {
       profile: profile.id,
       window,
@@ -170,25 +132,28 @@ export class OpportunitiesService {
   async leads(profileId: string, options: LeadsOptions): Promise<LeadsReport> {
     const profile = this.profile(profileId);
     const now = this.now();
-    const candidates = await this.repository.findCandidates({
-      activeOnly: true,
-      deadlineOnOrAfter: now,
-    });
-    const ranked = rankLeads(candidates, profile, now.getTime());
+    const { opportunities, capped } = await this.repository.findCandidates(
+      candidateFilterOf(profile, options, now),
+    );
+    const ranked = rankLeads(opportunities, profile, now.getTime());
     const matching = ranked.leads.filter(
       (lead) =>
         lead.score >= options.minScore && (options.tier === null || lead.tier === options.tier),
     );
     return {
       profile: profile.id,
-      candidates: candidates.length,
+      candidates: opportunities.length,
+      capped,
       excluded: ranked.excluded.length,
       matching: matching.length,
-      leads: matching.slice(0, options.limit),
+      leads: matching.slice(options.offset, options.offset + options.limit),
+      limit: options.limit,
+      offset: options.offset,
     };
   }
 
-  async show(noticeId: string, profileId: string): Promise<NoticeDto | null> {
+  /** One stored notice, scored, with its description when fetched; null when unknown. */
+  async notice(noticeId: string, profileId: string): Promise<NoticeDto | null> {
     const profile = this.profile(profileId);
     const opportunity = await this.repository.findOne(noticeId);
     if (!opportunity) return null;
@@ -218,7 +183,7 @@ export class OpportunitiesService {
    * gated request, then stored. An unknown notice is refused before any
    * request is spent.
    */
-  async describe(noticeId: string): Promise<DescriptionFetch> {
+  async fetchDescription(noticeId: string): Promise<DescriptionFetch> {
     if ((await this.repository.findOne(noticeId)) === null) {
       throw new NotFoundException(`no stored notice ${noticeId}`);
     }
@@ -234,20 +199,21 @@ export class OpportunitiesService {
       },
       () => this.descriptions.get(noticeId),
     );
-    if (result.kind === 'ok') {
-      const description: StoredDescription = { text: result.value, fetchedAt: this.now() };
-      await this.repository.saveDescription(noticeId, description);
-      return { status: 'ok', description: toDescription(description) };
+    switch (result.kind) {
+      case 'ok': {
+        const description: StoredDescription = { text: result.value, fetchedAt: this.now() };
+        await this.repository.saveDescription(noticeId, description);
+        return { status: 'ok', description: toDescription(description) };
+      }
+      case 'budget-exhausted':
+        return { status: 'budget-exhausted', spent: result.spent, budget: result.budget };
+      case 'cached':
+        // Not cacheable, so the gate never answers this; the row is the cache.
+        return { status: 'error', message: 'unexpected cached description' };
+      case 'error':
+        this.logger.warn(`description ${noticeId} failed — ${result.outcome}: ${result.message}`);
+        return { status: 'error', message: `${result.outcome}: ${result.message}` };
     }
-    if (result.kind === 'budget-exhausted') {
-      return { status: 'budget-exhausted', spent: result.spent, budget: result.budget };
-    }
-    if (result.kind === 'cached') {
-      // A description is never cacheable; the gate cannot answer this, and the row is the cache.
-      return { status: 'error', message: 'unexpected cached description' };
-    }
-    this.logger.warn(`description ${noticeId} failed — ${result.outcome}: ${result.message}`);
-    return { status: 'error', message: `${result.outcome}: ${result.message}` };
   }
 
   /** The ledger, newest first. */
@@ -259,34 +225,8 @@ export class OpportunitiesService {
     ];
   }
 
-  private searchPage(query: OpportunityQuery): Promise<Gated<SearchPage>> {
-    return this.gate.spend(
-      { source: this.search.id, operation: 'search', query, cacheable: true },
-      () => this.search.search(query),
-    );
-  }
-
   private dailyBudget(): number {
     return bucketOf(this.budget, this.search.id)?.dailyBudget ?? 0;
-  }
-
-  private slice(
-    query: OpportunityQuery,
-    outcome: SliceOutcome,
-    detail: string | null,
-  ): SliceReport {
-    return {
-      name: null,
-      query,
-      outcome,
-      pages: 0,
-      received: 0,
-      inserted: 0,
-      updated: 0,
-      rejected: 0,
-      truncated: false,
-      detail,
-    };
   }
 }
 

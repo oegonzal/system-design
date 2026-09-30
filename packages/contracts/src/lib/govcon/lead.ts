@@ -20,22 +20,38 @@ export interface Lead {
   excluded: { factor: string; reason: string } | null;
 }
 
-/** `GET /leads`: what was considered, what a gate removed, what the filters kept. */
+/** `GET /leads`: what was considered, what a gate removed, what the filters kept, one page of it. */
 export interface LeadsReport {
   profile: string;
-  /** Stored records that were active with an open (or unstated) deadline. */
+  /** Stored records the store-side filters admitted: active, open, biddable set-aside, no excluded type. */
   candidates: number;
+  /** `MAX_CANDIDATES` cut the set short; narrow the filters to see the rest. */
+  capped: boolean;
   excluded: number;
-  /** Leads over the score and tier filters, before the limit. */
+  /** Leads over the score and tier filters, before paging. */
   matching: number;
   leads: Lead[];
+  limit: number;
+  offset: number;
 }
 
+/** The query of `GET /leads`: the store-side filters, then the score cut, then the page. */
 export interface ListLeadsQuery {
   profile?: string;
   minScore?: number;
   tier?: LeadTier;
+  /** A NAICS code or family the primary code starts with (the store matches families; SAM.gov's `ncode` does not). */
+  naics?: string;
+  setAside?: string;
+  noticeType?: string;
+  /** Substring of the agency path. */
+  agency?: string;
+  /** Substring of the title or the solicitation number. */
+  q?: string;
+  /** Only notices whose deadline falls within this many days. */
+  deadlineWithinDays?: number;
   limit?: number;
+  offset?: number;
 }
 
 export type ListLeadsResponse = ApiResponse<LeadsReport>;

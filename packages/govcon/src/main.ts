@@ -9,8 +9,8 @@ import { configureApp } from './modules/app/configure-app';
  * govcon, two ways. `main.js pull | leads | search | show` runs one command
  * over the Nest context and exits by its result; `main.js serve` serves the
  * same service over HTTP (GET /profiles, GET /source, GET /source/calls,
- * POST /pulls, GET /leads, GET /opportunities/:id,
- * POST /opportunities/:id/description, GET /health) for the web client.
+ * POST /pulls, GET /leads, GET /notices/:id, POST /notices/:id/description,
+ * GET /health) for the web client.
  */
 async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {

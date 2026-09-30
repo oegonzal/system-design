@@ -203,9 +203,12 @@ export const EXCLUDED_LEAD: Lead = makeLead({
 export const makeLeadsReport = (overrides: Partial<LeadsReport> = {}): LeadsReport => ({
   profile: 'enfav',
   candidates: 4,
+  capped: false,
   excluded: 1,
   matching: 3,
   leads: LEADS,
+  limit: 25,
+  offset: 0,
   ...overrides,
 });
 

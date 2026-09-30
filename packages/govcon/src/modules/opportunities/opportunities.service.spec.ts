@@ -173,34 +173,52 @@ describe('the opportunities service', () => {
       NOW,
     );
 
-    const all = await service.leads('tiny', { minScore: 0, tier: null, limit: 25 });
+    const all = await service.leads('tiny', { minScore: 0, tier: null, limit: 25, offset: 0 });
     expect(inner.queries).toHaveLength(0);
-    expect(all).toMatchObject({ candidates: 3, excluded: 1, matching: 2 });
+    // The ineligible set-aside and the passed deadline never leave the store.
+    expect(all).toMatchObject({
+      candidates: 2,
+      capped: false,
+      excluded: 0,
+      matching: 2,
+      limit: 25,
+      offset: 0,
+    });
     expect(all.leads.map((lead) => [lead.opportunity.noticeId, lead.tier])).toEqual([
       ['best', 'high'],
       ['weak', 'low'],
     ]);
 
-    const high = await service.leads('tiny', { minScore: 0, tier: 'high', limit: 25 });
+    const high = await service.leads('tiny', { minScore: 0, tier: 'high', limit: 25, offset: 0 });
     expect(high.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['best']);
-    const limited = await service.leads('tiny', { minScore: 0, tier: null, limit: 1 });
+    const limited = await service.leads('tiny', { minScore: 0, tier: null, limit: 1, offset: 0 });
     expect(limited.matching).toBe(2);
     expect(limited.leads).toHaveLength(1);
-    const strict = await service.leads('tiny', { minScore: 90, tier: null, limit: 25 });
+    const second = await service.leads('tiny', { minScore: 0, tier: null, limit: 1, offset: 1 });
+    expect(second.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['weak']);
+    const filtered = await service.leads('tiny', {
+      minScore: 0,
+      tier: null,
+      limit: 25,
+      offset: 0,
+      q: 'lawn',
+    });
+    expect(filtered.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['weak']);
+    const strict = await service.leads('tiny', { minScore: 90, tier: null, limit: 25, offset: 0 });
     expect(strict.matching).toBe(1);
   });
 
   it('shows one stored notice with its trace and its description when fetched, or nothing', async () => {
     const { repository, service } = harness([]);
     await repository.upsertMany([opportunityOf({ noticeId: 'n-9' })], NOW);
-    const lead = await service.show('n-9', 'tiny');
+    const lead = await service.notice('n-9', 'tiny');
     expect(lead?.opportunity.noticeId).toBe('n-9');
     expect(lead?.factors).toHaveLength(6);
     expect(lead?.description).toBeNull();
-    expect(await service.show('missing', 'tiny')).toBeNull();
+    expect(await service.notice('missing', 'tiny')).toBeNull();
 
-    await service.describe('n-9');
-    expect((await service.show('n-9', 'tiny'))?.description).toEqual({
+    await service.fetchDescription('n-9');
+    expect((await service.notice('n-9', 'tiny'))?.description).toEqual({
       text: 'Description of n-9',
       fetchedAt: NOW.toISOString(),
     });
@@ -210,7 +228,7 @@ describe('the opportunities service', () => {
     const { descriptions, log, repository, service } = harness([]);
     await repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
 
-    const first = await service.describe('n-1');
+    const first = await service.fetchDescription('n-1');
     expect(first).toEqual({
       status: 'ok',
       description: { text: 'Description of n-1', fetchedAt: NOW.toISOString() },
@@ -218,18 +236,18 @@ describe('the opportunities service', () => {
     expect(descriptions.fetched).toEqual(['n-1']);
     expect(log.calls.map((call) => call.operation)).toEqual(['description']);
 
-    expect(await service.describe('n-1')).toEqual(first);
+    expect(await service.fetchDescription('n-1')).toEqual(first);
     expect(descriptions.fetched).toEqual(['n-1']);
     expect(log.calls).toHaveLength(1);
 
-    await expect(service.describe('nope')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.fetchDescription('nope')).rejects.toBeInstanceOf(NotFoundException);
     expect(descriptions.fetched).toEqual(['n-1']);
   });
 
   it('[GOV-9] reports a spent budget and a failed fetch as outcomes, storing nothing', async () => {
     const spent = harness([], { dailyBudget: 0 });
     await spent.repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
-    expect(await spent.service.describe('n-1')).toEqual({
+    expect(await spent.service.fetchDescription('n-1')).toEqual({
       status: 'budget-exhausted',
       spent: 0,
       budget: 0,
@@ -240,7 +258,7 @@ describe('the opportunities service', () => {
       descriptions: [failure('invalid-response', 200, 'body is not JSON')],
     });
     await repository.upsertMany([opportunityOf({ noticeId: 'n-2' })], NOW);
-    expect(await service.describe('n-2')).toEqual({
+    expect(await service.fetchDescription('n-2')).toEqual({
       status: 'error',
       message: 'invalid-response: body is not JSON',
     });
@@ -280,7 +298,10 @@ describe('the opportunities service', () => {
     );
     const { service } = harness([]);
     await expect(
-      service.leads('nope', { minScore: 0, tier: null, limit: 1 }),
+      service.leads('nope', { minScore: 0, tier: null, limit: 1, offset: 0 }),
     ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.pull('tiny', { from: '2026-09-27', to: '2026-09-26' })).rejects.toThrow(
+      /starts after it ends/,
+    );
   });
 });

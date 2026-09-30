@@ -45,14 +45,10 @@ export const api = {
     return unwrap(await request<ListLeadsResponse>(`/leads${toQueryString({ ...query })}`, opts));
   },
 
-  async getOpportunity(
-    noticeId: string,
-    profile: string,
-    opts: GetOptions = {},
-  ): Promise<NoticeDto> {
+  async getNotice(noticeId: string, profile: string, opts: GetOptions = {}): Promise<NoticeDto> {
     return unwrap(
       await request<GetNoticeResponse>(
-        `/opportunities/${encodeURIComponent(noticeId)}${toQueryString({ profile })}`,
+        `/notices/${encodeURIComponent(noticeId)}${toQueryString({ profile })}`,
         opts,
       ),
     );
@@ -61,7 +57,7 @@ export const api = {
   async fetchDescription(noticeId: string): Promise<DescriptionFetch> {
     return unwrap(
       await request<FetchDescriptionResponse>(
-        `/opportunities/${encodeURIComponent(noticeId)}/description`,
+        `/notices/${encodeURIComponent(noticeId)}/description`,
         { method: 'POST', body: {} },
       ),
     );

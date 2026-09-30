@@ -1,0 +1,29 @@
+import { Controller, Get, HttpCode, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import type { FetchDescriptionResponse, GetNoticeResponse } from '@sysdesign/contracts';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
+
+import { OpportunitiesService } from './opportunities.service';
+import { profileQuerySchema, type ProfileQuery } from './profile-query';
+
+/** One stored notice: its lead with the factor trace, and its description on demand. */
+@Controller('notices')
+export class NoticesController {
+  constructor(private readonly opportunities: OpportunitiesService) {}
+
+  @Get(':noticeId')
+  async get(
+    @Param('noticeId') noticeId: string,
+    @Query(new ZodValidationPipe(profileQuerySchema)) query: ProfileQuery,
+  ): Promise<GetNoticeResponse> {
+    const notice = await this.opportunities.notice(noticeId, query.profile);
+    if (!notice) throw new NotFoundException(`no stored notice ${noticeId}`);
+    return { data: notice };
+  }
+
+  /** One budgeted request the first time; the stored text afterwards. Synchronous, so 200. */
+  @Post(':noticeId/description')
+  @HttpCode(200)
+  async fetchDescription(@Param('noticeId') noticeId: string): Promise<FetchDescriptionResponse> {
+    return { data: await this.opportunities.fetchDescription(noticeId) };
+  }
+}

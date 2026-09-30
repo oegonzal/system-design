@@ -94,7 +94,7 @@ describe('GovconWorkspace', () => {
   it('[GOVU-2] re-queries the leads when a filter changes, opens a lead on click and writes it to the URL', async () => {
     const { calls } = stubApi([
       ...baseRoutes(),
-      { path: new RegExp(`^/opportunities/${NOTICE}$`), body: { data: makeLeadDetail() } },
+      { path: new RegExp(`^/notices/${NOTICE}$`), body: { data: makeLeadDetail() } },
     ]);
     renderWithTheme(<GovconWorkspace />);
     await screen.findByRole('table', { name: 'Leads' });
@@ -109,7 +109,7 @@ describe('GovconWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /JUNCTION BOX/ }));
     const lead = await screen.findByRole('region', { name: 'Lead' });
     await within(lead).findByRole('table', { name: 'Factor trace' });
-    expect(calls.map((call) => call.url)).toContain(`/opportunities/${NOTICE}?profile=enfav`);
+    expect(calls.map((call) => call.url)).toContain(`/notices/${NOTICE}?profile=enfav`);
     expect(routerMock.replace).toHaveBeenCalledWith(`?notice=${NOTICE}`);
     expect(screen.getByRole('button', { name: /JUNCTION BOX/ }).getAttribute('aria-current')).toBe(
       'true',
@@ -120,14 +120,14 @@ describe('GovconWorkspace', () => {
     setMockSearchParams({ notice: NOTICE });
     const { calls } = stubApi([
       ...baseRoutes(),
-      { path: new RegExp(`^/opportunities/${NOTICE}$`), body: { data: makeLeadDetail() } },
+      { path: new RegExp(`^/notices/${NOTICE}$`), body: { data: makeLeadDetail() } },
     ]);
     renderWithTheme(<GovconWorkspace />);
     const lead = await screen.findByRole('region', { name: 'Lead' });
     await within(lead).findByRole('heading', {
       name: '59--JUNCTION BOX, IN REPAIR/MODIFICATION OF',
     });
-    expect(calls.map((call) => call.url)).toContain(`/opportunities/${NOTICE}?profile=enfav`);
+    expect(calls.map((call) => call.url)).toContain(`/notices/${NOTICE}?profile=enfav`);
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
@@ -136,7 +136,7 @@ describe('GovconWorkspace', () => {
     const { calls } = stubApi([
       ...baseRoutes(),
       {
-        path: new RegExp(`^/opportunities/${NOTICE}$`),
+        path: new RegExp(`^/notices/${NOTICE}$`),
         sequence: [
           { data: makeLeadDetail() },
           { data: makeLeadDetail({ description: DESCRIPTION }) },
@@ -144,7 +144,7 @@ describe('GovconWorkspace', () => {
       },
       {
         method: 'POST',
-        path: new RegExp(`^/opportunities/${NOTICE}/description$`),
+        path: new RegExp(`^/notices/${NOTICE}/description$`),
         body: { data: { status: 'ok', description: DESCRIPTION } },
       },
     ]);
@@ -154,7 +154,7 @@ describe('GovconWorkspace', () => {
     const text = await screen.findByLabelText('Description text');
     expect(text.textContent).toContain('Delivery: 90 days ARO');
     expect(calls.filter((call) => call.method === 'POST').map((call) => call.url)).toEqual([
-      `/opportunities/${NOTICE}/description`,
+      `/notices/${NOTICE}/description`,
     ]);
     expect(screen.getByText('Description fetched and stored.')).toBeTruthy();
   });
@@ -163,10 +163,10 @@ describe('GovconWorkspace', () => {
     setMockSearchParams({ notice: NOTICE });
     stubApi([
       ...baseRoutes(),
-      { path: new RegExp(`^/opportunities/${NOTICE}$`), body: { data: makeLeadDetail() } },
+      { path: new RegExp(`^/notices/${NOTICE}$`), body: { data: makeLeadDetail() } },
       {
         method: 'POST',
-        path: new RegExp(`^/opportunities/${NOTICE}/description$`),
+        path: new RegExp(`^/notices/${NOTICE}/description$`),
         body: { data: { status: 'budget-exhausted', spent: 10, budget: 10 } },
       },
     ]);

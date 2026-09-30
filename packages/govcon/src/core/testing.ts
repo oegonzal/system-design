@@ -13,6 +13,7 @@ import {
 import type { Attempted, AttemptRecord, Fetched, SourceFailure } from './budget';
 import type {
   CandidateFilter,
+  CandidateSet,
   FreshCall,
   LedgerEntry,
   NoticeDescriptions,
@@ -86,18 +87,31 @@ export type Scripted<T> = Fetched<T> | Attempted<Fetched<T>>;
 const asAttempted = <T>(reply: Scripted<T>): Attempted<Fetched<T>> =>
   'attempts' in reply ? reply : attempted(reply);
 
-/** Answers the scripted replies in order, repeating the last, and remembers every query. */
+/**
+ * Answers the scripted replies in order, repeating the last, and remembers
+ * every query. `script` restarts it with new replies — a suite whose app is
+ * booted once can seed each test on its own.
+ */
 export function scriptedSearch(
   id: string,
-  replies: readonly Scripted<SearchPage>[],
+  initial: readonly Scripted<SearchPage>[],
   enabled = true,
-): OpportunitySearch & { queries: OpportunityQuery[] } {
+): OpportunitySearch & {
+  queries: OpportunityQuery[];
+  script(replies: readonly Scripted<SearchPage>[]): void;
+} {
   const queries: OpportunityQuery[] = [];
+  let replies = initial;
   let call = 0;
   return {
     id,
     availability: { enabled, reason: enabled ? null : 'no-key' },
     queries,
+    script(next) {
+      replies = next;
+      call = 0;
+      queries.length = 0;
+    },
     async search(query) {
       queries.push(query);
       const reply = replies[Math.min(call, replies.length - 1)];
@@ -212,16 +226,48 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
     return { inserted, updated };
   }
 
-  async findCandidates(filter: CandidateFilter): Promise<Opportunity[]> {
-    return [...this.rows.values()]
+  async findCandidates(filter: CandidateFilter): Promise<CandidateSet> {
+    const has = (haystack: string | null, needle: string) =>
+      haystack !== null && haystack.toLowerCase().includes(needle.toLowerCase());
+    const matching = [...this.rows.values()]
       .map((row) => row.opportunity)
-      .filter((opportunity) => !filter.activeOnly || opportunity.active !== false)
+      .filter((o) => !filter.activeOnly || o.active !== false)
       .filter(
-        (opportunity) =>
+        (o) =>
           filter.deadlineOnOrAfter === null ||
-          opportunity.responseDeadlineAt === null ||
-          Date.parse(opportunity.responseDeadlineAt) >= filter.deadlineOnOrAfter.getTime(),
-      );
+          o.responseDeadlineAt === null ||
+          Date.parse(o.responseDeadlineAt) >= filter.deadlineOnOrAfter.getTime(),
+      )
+      .filter(
+        (o) =>
+          filter.deadlineOnOrBefore === null ||
+          (o.responseDeadlineAt !== null &&
+            Date.parse(o.responseDeadlineAt) <= filter.deadlineOnOrBefore.getTime()),
+      )
+      .filter(
+        (o) =>
+          filter.setAsideCodes === null ||
+          o.setAsideCode === null ||
+          filter.setAsideCodes.includes(o.setAsideCode),
+      )
+      .filter((o) => o.noticeType === null || !filter.excludeNoticeTypes.includes(o.noticeType))
+      .filter(
+        (o) => filter.naicsPrefix === null || (o.naicsCode ?? '').startsWith(filter.naicsPrefix),
+      )
+      .filter((o) => filter.setAsideCode === null || o.setAsideCode === filter.setAsideCode)
+      .filter((o) => filter.noticeType === null || o.noticeType === filter.noticeType)
+      .filter((o) => filter.agencyContains === null || has(o.agencyPath, filter.agencyContains))
+      .filter(
+        (o) =>
+          filter.textContains === null ||
+          has(o.title, filter.textContains) ||
+          has(o.solicitationNumber, filter.textContains),
+      )
+      .sort((a, b) => b.postedAt.localeCompare(a.postedAt) || a.noticeId.localeCompare(b.noticeId));
+    return {
+      opportunities: matching.slice(0, filter.limit),
+      capped: matching.length > filter.limit,
+    };
   }
 
   async findOne(noticeId: string): Promise<Opportunity | null> {

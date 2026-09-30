@@ -7,7 +7,7 @@ import type { SourceCallLog } from '../../core/ports';
 import { PROFILES } from '../../profiles';
 import { budgetPolicyFromEnv, createSamGovSources } from '../sources/sam-gov/create-sources';
 import { LeadsController } from './leads.controller';
-import { OpportunitiesController } from './opportunities.controller';
+import { NoticesController } from './notices.controller';
 import { OpportunitiesService } from './opportunities.service';
 import { MikroOrmOpportunityRepository } from './persistence/mikro-orm-opportunity-repository';
 import { MikroOrmSourceCallLog } from './persistence/mikro-orm-source-call-log';
@@ -43,7 +43,7 @@ const sources = createSamGovSources(process.env, { warn });
     SourceController,
     PullsController,
     LeadsController,
-    OpportunitiesController,
+    NoticesController,
   ],
   providers: [
     OpportunitiesService,

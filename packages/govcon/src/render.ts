@@ -64,7 +64,7 @@ export function renderLeads(report: LeadsReport): string {
     lead.opportunity.uiLink ?? lead.opportunity.noticeId,
   ]);
   return [
-    `leads · profile ${report.profile} · ${report.candidates} candidate(s), ${report.excluded} excluded by gate, ${report.matching} over the filters, ${report.leads.length} shown`,
+    `leads · profile ${report.profile} · ${report.candidates} candidate(s)${report.capped ? ' (capped)' : ''}, ${report.excluded} excluded by gate, ${report.matching} over the filters, ${report.leads.length} shown from ${report.offset}`,
     rows.length > 0
       ? table(
           ['#', 'score', 'tier', 'deadline', 'set-aside', 'naics', 'agency', 'title', 'link'],
@@ -97,7 +97,7 @@ export function renderLead(lead: NoticeDto): string {
   ];
   const description = lead.description
     ? [`description (fetched ${day(lead.description.fetchedAt)})`, lead.description.text]
-    : ['description not fetched — `show <noticeId> --describe` spends one request'];
+    : ['description not fetched — `show <noticeId> --description` spends one request'];
   const trace = table(
     ['factor', 'value', 'weight', 'points', 'evidence'],
     lead.factors.map((f) => [

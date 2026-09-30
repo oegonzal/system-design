@@ -143,7 +143,7 @@ export function GovconWorkspace() {
     if (noticeId === null || form.profileId === '') return;
     const { id, signal } = detailRequest.begin();
     api
-      .getOpportunity(noticeId, form.profileId, { signal })
+      .getNotice(noticeId, form.profileId, { signal })
       .then((next) => {
         if (detailRequest.isCurrent(id)) {
           setDetail(next);

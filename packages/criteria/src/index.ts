@@ -417,6 +417,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every upstream capability spends through the one request gate: SAM.gov operations share one daily bucket per source id, an unbudgeted source is ledgered but never refused, and no adapter reaches the network except through it.',
   },
+  {
+    id: 'GOV-15',
+    statement:
+      "A ranking loads only what a gate would not exclude — active, open, a biddable set-aside or none, no excluded type — plus the request's filters, in SQL, bounded by MAX_CANDIDATES with the report saying when the bound cut; leads are ranked deterministically and paged.",
+  },
+  {
+    id: 'GOV-19',
+    statement:
+      'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',
+  },
 ] as const;
 
 export const CRITERION_IDS = CRITERIA.map((criterion) => criterion.id);

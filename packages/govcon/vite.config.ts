@@ -3,29 +3,50 @@ import { defineConfig } from 'vitest/config';
 
 import { nestBuildConfig } from '../../vite.nest';
 
+/** The specs that need Postgres: the persistence adapters and the HTTP surface. */
+const DB_SPECS = ['src/**/persistence/*.spec.ts', 'src/**/*.http.spec.ts'];
+
+const env = {
+  DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
+  // Nx loads a developer's `.env` for local tasks; no suite may ever spend a real request.
+  SAM_GOV_API_KEY: '',
+};
+
 export default defineConfig({
   root: __dirname,
   ...nestBuildConfig(),
   test: {
-    globals: true,
     root: __dirname,
-    environment: 'node',
-
-    // The persistence specs run against a real Postgres, so they get their own
-    // database unless the environment (CI) pins one, and share one lane. The
-    // SAM.gov key is blanked because Nx loads a developer's `.env` for local
-    // tasks and no suite may ever spend a real request.
-    env: {
-      DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
-      SAM_GOV_API_KEY: '',
-    },
-    fileParallelism: false,
-
-    include: ['src/**/*.{test,spec}.{ts,mts}'],
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/packages/govcon',
       provider: 'v8',
     },
+    // Two projects: the pure suites run in parallel; the Postgres suites
+    // share one database, so they share one lane.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'pure',
+          globals: true,
+          environment: 'node',
+          env,
+          include: ['src/**/*.{test,spec}.{ts,mts}'],
+          exclude: DB_SPECS,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'db',
+          globals: true,
+          environment: 'node',
+          env,
+          include: DB_SPECS,
+          fileParallelism: false,
+        },
+      },
+    ],
   },
 });

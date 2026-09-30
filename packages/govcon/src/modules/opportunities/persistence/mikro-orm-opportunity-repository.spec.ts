@@ -1,6 +1,7 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { ensureDatabase, GovconOpportunity, ormOptions } from '@sysdesign/db';
 
+import type { CandidateFilter } from '../../../core/ports';
 import { opportunityOf } from '../../../core/testing';
 import { MikroOrmOpportunityRepository } from './mikro-orm-opportunity-repository';
 
@@ -73,7 +74,7 @@ describe('the opportunity repository in Postgres', () => {
     expect(await repository.findDescription('d')).toMatchObject({ text: 'Bracket, 400 each' });
   });
 
-  it('[GOV-6] finds candidates by activity and deadline, unknowns kept, newest first', async () => {
+  it('[GOV-6] [GOV-15] filters candidates in SQL — activity, deadlines, set-asides, types, codes, text — newest first and bounded', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
     await orm.em.fork().nativeDelete(GovconOpportunity, {});
     await repository.upsertMany(
@@ -84,6 +85,9 @@ describe('the opportunity repository in Postgres', () => {
           active: null,
           responseDeadlineAt: null,
           postedAt: '2026-09-21T00:00:00.000Z',
+          setAsideCode: null,
+          naicsCode: '541511',
+          title: 'Custom software for the depot',
         }),
         opportunityOf({
           noticeId: 'inactive',
@@ -95,23 +99,61 @@ describe('the opportunity repository in Postgres', () => {
           responseDeadlineAt: '2026-09-01T00:00:00.000Z',
           postedAt: '2026-09-23T00:00:00.000Z',
         }),
+        opportunityOf({
+          noticeId: 'hubzone',
+          setAsideCode: 'HZC',
+          postedAt: '2026-09-24T00:00:00.000Z',
+        }),
+        opportunityOf({
+          noticeId: 'awarded',
+          noticeType: 'Award Notice',
+          postedAt: '2026-09-25T00:00:00.000Z',
+        }),
       ],
       t1,
     );
+    await repository.saveDescription('open', { text: 'never loaded by a ranking', fetchedAt: t1 });
     const cutoff = new Date('2026-09-26T00:00:00Z');
-    const ids = (rows: { noticeId: string }[]) => rows.map((row) => row.noticeId);
+    const base: CandidateFilter = {
+      activeOnly: true,
+      deadlineOnOrAfter: cutoff,
+      deadlineOnOrBefore: null,
+      setAsideCodes: ['SBA', 'SBP'],
+      excludeNoticeTypes: ['Award Notice'],
+      naicsPrefix: null,
+      setAsideCode: null,
+      noticeType: null,
+      agencyContains: null,
+      textContains: null,
+      limit: 100,
+    };
+    const ids = async (filter: Partial<CandidateFilter>) =>
+      (await repository.findCandidates({ ...base, ...filter })).opportunities.map(
+        (o) => o.noticeId,
+      );
 
-    expect(
-      ids(await repository.findCandidates({ activeOnly: true, deadlineOnOrAfter: cutoff })),
-    ).toEqual(['unknown', 'open']);
-    expect(
-      ids(await repository.findCandidates({ activeOnly: false, deadlineOnOrAfter: cutoff })),
-    ).toEqual(['inactive', 'unknown', 'open']);
-    expect(
-      ids(await repository.findCandidates({ activeOnly: true, deadlineOnOrAfter: null })),
-    ).toEqual(['closed', 'unknown', 'open']);
-    expect(
-      ids(await repository.findCandidates({ activeOnly: false, deadlineOnOrAfter: null })),
-    ).toHaveLength(4);
+    expect(await ids({})).toEqual(['unknown', 'open']);
+    expect(await ids({ activeOnly: false })).toEqual(['inactive', 'unknown', 'open']);
+    expect(await ids({ deadlineOnOrAfter: null })).toEqual(['closed', 'unknown', 'open']);
+    expect(await ids({ setAsideCodes: null, excludeNoticeTypes: [] })).toEqual([
+      'awarded',
+      'hubzone',
+      'unknown',
+      'open',
+    ]);
+    expect(await ids({ deadlineOnOrBefore: new Date('2026-10-31T00:00:00Z') })).toEqual(['open']);
+    expect(await ids({ naicsPrefix: '5415' })).toEqual(['unknown']);
+    expect(await ids({ naicsPrefix: '33' })).toEqual(['open']);
+    expect(await ids({ setAsideCode: 'SBA' })).toEqual(['open']);
+    expect(await ids({ noticeType: 'Solicitation' })).toEqual(['unknown', 'open']);
+    expect(await ids({ agencyContains: 'dla aviation' })).toEqual(['unknown', 'open']);
+    expect(await ids({ textContains: 'SOFTWARE' })).toEqual(['unknown']);
+    expect(await ids({ textContains: 'SPE4A7-26' })).toEqual(['unknown', 'open']);
+    expect(await ids({ textContains: '100%' })).toEqual([]);
+
+    const capped = await repository.findCandidates({ ...base, limit: 1 });
+    expect(capped.opportunities.map((o) => o.noticeId)).toEqual(['unknown']);
+    expect(capped.capped).toBe(true);
+    expect((await repository.findCandidates(base)).capped).toBe(false);
   });
 });

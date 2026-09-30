@@ -39,26 +39,26 @@ describe('govcon api client', () => {
     const detail = makeLeadDetail({ description: DESCRIPTION });
     const { calls } = stubApi([
       { path: '/leads', body: { data: report } },
-      { path: `/opportunities/${detail.opportunity.noticeId}`, body: { data: detail } },
+      { path: `/notices/${detail.opportunity.noticeId}`, body: { data: detail } },
     ]);
 
     expect(
       await api.listLeads({ profile: 'enfav', minScore: 40, tier: 'high', limit: 10 }),
     ).toEqual(report);
-    expect(await api.getOpportunity(detail.opportunity.noticeId, 'enfav')).toEqual(detail);
+    expect(await api.getNotice(detail.opportunity.noticeId, 'enfav')).toEqual(detail);
     expect(calls.map((call) => call.url)).toEqual([
       '/leads?profile=enfav&minScore=40&tier=high&limit=10',
-      `/opportunities/${detail.opportunity.noticeId}?profile=enfav`,
+      `/notices/${detail.opportunity.noticeId}?profile=enfav`,
     ]);
   });
 
   it('[GOVU-3] asks for a description with a POST and hands back the outcome as it came', async () => {
     const outcome = { status: 'budget-exhausted', spent: 10, budget: 10 } as const;
     const { calls, fetchMock } = stubApi([
-      { method: 'POST', path: /\/opportunities\/[^/]+\/description$/, body: { data: outcome } },
+      { method: 'POST', path: /\/notices\/[^/]+\/description$/, body: { data: outcome } },
     ]);
     expect(await api.fetchDescription('abc')).toEqual(outcome);
-    expect(calls[0]).toEqual({ method: 'POST', url: '/opportunities/abc/description' });
+    expect(calls[0]).toEqual({ method: 'POST', url: '/notices/abc/description' });
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe('POST');
   });
 

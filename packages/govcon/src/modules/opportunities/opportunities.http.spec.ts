@@ -34,6 +34,11 @@ type Envelope<T> = { data: T };
 type Page<T> = { data: T[]; meta: { total: number; limit: number; offset: number } };
 
 const NOW = new Date('2026-09-26T12:00:00Z');
+/** The two slices of the tiny profile: three notices, one of them a set-aside the profile cannot bid. */
+const PAGES = [
+  okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b', setAsideCode: '8A' })]),
+  okPage([opportunityOf({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
+];
 
 /**
  * The real module over real HTTP and the real Postgres ledger; only the
@@ -41,7 +46,11 @@ const NOW = new Date('2026-09-26T12:00:00Z');
  * the budget are exercised for real), the clock is fixed and the registry is
  * the tiny profile with two slices.
  */
-async function boot(): Promise<{ app: INestApplication; url: string }> {
+async function boot(): Promise<{
+  app: INestApplication;
+  url: string;
+  scripted: ReturnType<typeof scriptedSearch>;
+}> {
   const scripted = scriptedSearch('sam.gov', [
     okPage([
       opportunityOf({ noticeId: 'a' }),
@@ -67,7 +76,7 @@ async function boot(): Promise<{ app: INestApplication; url: string }> {
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);
-  return { app, url: await app.getUrl() };
+  return { app, url: await app.getUrl(), scripted };
 }
 
 const truncate = async (em: EntityManager) => {
@@ -86,13 +95,22 @@ describe('the govcon HTTP surface', () => {
   let app: INestApplication;
   let url: string;
   let em: EntityManager;
+  let scripted: ReturnType<typeof scriptedSearch>;
 
   beforeAll(async () => {
     await ensureDatabase();
-    ({ app, url } = await boot());
+    ({ app, url, scripted } = await boot());
     em = app.get(EntityManager);
-    await truncate(em);
   });
+
+  /** Every test seeds what it reads: an empty store, an empty ledger, the scripted pages from the top. */
+  beforeEach(async () => {
+    await truncate(em);
+    scripted.script(PAGES);
+  });
+
+  /** Two searches, three notices stored. */
+  const pulled = () => post(url, '/pulls', { profile: 'tiny', days: 2 });
 
   afterAll(async () => {
     await truncate(em);
@@ -128,6 +146,7 @@ describe('the govcon HTTP surface', () => {
       to: '2026-09-02',
     });
     expect(both.status).toBe(400);
+    expect(((await both.json()) as { message: string }).message).toMatch(/alternatives/);
     const backwards = await post(url, '/pulls', {
       profile: 'tiny',
       from: '2026-09-30',
@@ -156,10 +175,30 @@ describe('the govcon HTTP surface', () => {
     expect(source.data.budget.spent).toBe(2);
   });
 
-  it('[GOV-8] ranks the store over the query filters, coerced and bounded at the edge', async () => {
+  it('[GOV-8] [GOV-15] ranks the store over the query filters, coerced and bounded at the edge', async () => {
+    await pulled();
     const all = (await (await fetch(`${url}/leads?profile=tiny`)).json()) as Envelope<LeadsReport>;
-    expect(all.data).toMatchObject({ profile: 'tiny', candidates: 3, excluded: 1, matching: 2 });
+    // `b` is an 8(a) set-aside the profile cannot bid: filtered in SQL, never scored.
+    expect(all.data).toMatchObject({
+      profile: 'tiny',
+      candidates: 2,
+      capped: false,
+      excluded: 0,
+      matching: 2,
+      limit: 25,
+      offset: 0,
+    });
     expect(all.data.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['a', 'c']);
+
+    const page2 = (await (
+      await fetch(`${url}/leads?profile=tiny&limit=1&offset=1`)
+    ).json()) as Envelope<LeadsReport>;
+    expect(page2.data.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['c']);
+    const software = (await (
+      await fetch(`${url}/leads?profile=tiny&naics=5415&deadlineWithinDays=30`)
+    ).json()) as Envelope<LeadsReport>;
+    expect(software.data.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['c']);
+    expect((await fetch(`${url}/leads?profile=tiny&naics=x`)).status).toBe(400);
 
     const one = (await (
       await fetch(`${url}/leads?profile=tiny&tier=high&limit=1`)
@@ -181,45 +220,39 @@ describe('the govcon HTTP surface', () => {
   });
 
   it('[GOV-8] [GOV-9] shows a stored notice, fetches its description once, and reports a spent budget as an outcome', async () => {
+    await pulled();
     const detail = (await (
-      await fetch(`${url}/opportunities/a?profile=tiny`)
+      await fetch(`${url}/notices/a?profile=tiny`)
     ).json()) as Envelope<NoticeDto>;
     expect(detail.data.opportunity.noticeId).toBe('a');
     expect(detail.data.factors).toHaveLength(6);
     expect(detail.data.description).toBeNull();
-    expect((await fetch(`${url}/opportunities/nope?profile=tiny`)).status).toBe(404);
-    expect((await post(url, '/opportunities/nope/description', {})).status).toBe(404);
+    expect((await fetch(`${url}/notices/nope?profile=tiny`)).status).toBe(404);
+    expect((await post(url, '/notices/nope/description', {})).status).toBe(404);
 
-    const first = await post(url, '/opportunities/a/description', {});
+    const first = await post(url, '/notices/a/description', {});
     expect(first.status).toBe(200);
     expect(((await first.json()) as Envelope<DescriptionFetch>).data).toEqual({
       status: 'ok',
       description: { text: 'Description of a', fetchedAt: NOW.toISOString() },
     });
     const again = (
-      (await (
-        await post(url, '/opportunities/a/description', {})
-      ).json()) as Envelope<DescriptionFetch>
+      (await (await post(url, '/notices/a/description', {})).json()) as Envelope<DescriptionFetch>
     ).data;
     expect(again.status).toBe('ok');
 
     const shown = (await (
-      await fetch(`${url}/opportunities/a?profile=tiny`)
+      await fetch(`${url}/notices/a?profile=tiny`)
     ).json()) as Envelope<NoticeDto>;
     expect(shown.data.description?.text).toBe('Description of a');
 
     // 2 searches + 1 description = 3 of 4; the next description spends the last, the one after is refused.
     expect(
-      (
-        (await (
-          await post(url, '/opportunities/c/description', {})
-        ).json()) as Envelope<DescriptionFetch>
-      ).data.status,
+      ((await (await post(url, '/notices/c/description', {})).json()) as Envelope<DescriptionFetch>)
+        .data.status,
     ).toBe('ok');
     const refused = (
-      (await (
-        await post(url, '/opportunities/b/description', {})
-      ).json()) as Envelope<DescriptionFetch>
+      (await (await post(url, '/notices/b/description', {})).json()) as Envelope<DescriptionFetch>
     ).data;
     expect(refused).toEqual({ status: 'budget-exhausted', spent: 4, budget: 4 });
 
