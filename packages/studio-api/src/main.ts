@@ -12,8 +12,8 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // Prefix, CORS and the global ValidationPipe live in configureApp so the
-  // integration tests boot an identically configured app.
+  // Prefix and CORS live in configureApp so the integration tests boot an
+  // identically configured app.
   configureApp(app);
 
   const port = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3000;

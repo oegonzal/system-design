@@ -32,7 +32,7 @@ describe('star stories', () => {
     await h.close();
   });
   beforeEach(async () => {
-    await resetDesignData(h.em);
+    await resetDesignData(h.em, h.loop);
   });
 
   const createStory = async (body: SaveStarStoryRequest) =>
@@ -126,9 +126,13 @@ describe('star stories', () => {
 
   describe('links', () => {
     it('[STAR-3] links a story to a prompt and an experience, echoed in the DTO', async () => {
-      const { body: prompt } = await call<GetPromptResponse>(`${h.url}/prompts/generate`, {
+      const { body: prompt } = await call<GetPromptResponse>(`${h.url}/prompts`, {
         method: 'POST',
-        body: JSON.stringify({ experienceId: TICKETING_ID }),
+        body: JSON.stringify({
+          title: 'Serve an order history',
+          markdown: '# Serve an order history\n\n- list past orders',
+          experienceId: TICKETING_ID,
+        }),
       });
 
       const { status, body } = await createStory(

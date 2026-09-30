@@ -28,13 +28,13 @@ describe('experiences', () => {
       expect(body.data).toHaveLength(6);
       expect(body.meta.total).toBe(6);
       expect(body.data[0]?.id).toBe(TICKETING_ID);
-      expect(body.data.map((e) => e.archetype)).toEqual([
-        'flash-sale-ticketing',
-        'media-streaming-pipeline',
-        'workflow-automation',
-        'realtime-analytics',
-        'dag-orchestration',
-        'order-history-integration',
+      expect(body.data.map((e) => e.slug)).toEqual([
+        'ticketing-replatform',
+        'media-collectibles-platform',
+        'adtech-workflow-automation',
+        'network-risk-dashboards',
+        'agentic-dag-engine',
+        'retail-order-history',
       ]);
       expect(body.data[0]?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO, not a Date
     });
@@ -48,7 +48,8 @@ describe('experiences', () => {
 
       expect(status).toBe(200);
       expect(body.data.slug).toBe('ticketing-replatform');
-      expect(body.data.scaleFacts.concurrentUsers).toBe(10000);
+      // The numbers a prompt is sized from live in the prose, not in fields.
+      expect(body.data.highlights.join(' ')).toContain('10,000+ concurrent');
     });
 
     it('400s for a malformed id, before any query runs', async () => {

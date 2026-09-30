@@ -12,9 +12,7 @@ export const toExperienceProfileDto = (e: ExperienceProfile): ExperienceProfileD
   companyLabel: e.companyLabel,
   title: e.title,
   summary: e.summary,
-  archetype: e.archetype,
   techStack: e.techStack,
-  scaleFacts: e.scaleFacts,
   highlights: e.highlights,
   createdAt: e.createdAt.toISOString(),
 });

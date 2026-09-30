@@ -1,30 +1,19 @@
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
+import { configureCors } from '@sysdesign/nest-kit';
+
+/** The Next dev server runs on 4200; `CORS_ORIGIN` points elsewhere. */
+export const CORS_ORIGIN = {
+  envVar: 'CORS_ORIGIN',
+  defaultOrigin: 'http://localhost:4200',
+} as const;
 
 /**
- * Everything that turns a bare Nest app into *this* API.
- *
- * Called by both `main.ts` and the integration test harness, deliberately: if
- * the tests built their own pipe they could pass against validation rules
- * that production never applies.
+ * Everything that turns a bare Nest app into *this* API. Called by `main.ts`
+ * and the integration harness alike, so the tests boot what production
+ * boots. Validation is per route — every body and query passes a zod schema
+ * through `ZodValidationPipe` — so there is no global pipe to configure.
  */
-export function configureApp(app: INestApplication): INestApplication {
+export function configureApp<T extends INestApplication>(app: T): T {
   app.setGlobalPrefix('api');
-
-  // The Next dev server runs on 4200; override in other environments.
-  app.enableCors({
-    origin: process.env['CORS_ORIGIN'] ?? 'http://localhost:4200',
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true, // drop properties with no decorator
-      forbidNonWhitelisted: true, // ...and 400 rather than ignoring them silently
-      transform: true, // run @Type() coercion — needs class-transformer
-      // Implicit conversion guesses from the TypeScript type and lets "abc"
-      // arrive as NaN past @IsInt. Explicit @Type() is verbose and predictable.
-      transformOptions: { enableImplicitConversion: false },
-    }),
-  );
-
-  return app;
+  return configureCors(app, CORS_ORIGIN);
 }

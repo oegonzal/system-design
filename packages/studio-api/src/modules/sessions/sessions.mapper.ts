@@ -1,24 +1,60 @@
-import type { DesignSessionDto } from '@sysdesign/contracts';
+import type {
+  DesignRevisionDto,
+  DesignRevisionSummaryDto,
+  DesignSessionDto,
+  RevisionEvaluationRef,
+} from '@sysdesign/contracts';
+import type { DesignRevision, DesignSession } from '@sysdesign/db';
 
-import type { SessionWithLatest } from './sessions.service';
+/** A session plus the newest revision its DTO summarises. */
+export interface SessionWithLatest {
+  session: DesignSession;
+  latestRevision: DesignRevision | null;
+}
 
-/**
- * Session projection. The latest revision and its evaluation ride alongside
- * the entity because the DTO summarises them (`latestRevisionNumber`,
- * `latestGrade`) while the entity graph only reaches them through queries the
- * service already ran.
- */
-export const toSessionDto = ({
-  session,
-  latestRevision,
-  latestEvaluation,
-}: SessionWithLatest): DesignSessionDto => ({
+/** Where the grade lives, from the row's own pointer and cache; null for a revision graded before delegation. */
+export const toEvaluationRef = (r: DesignRevision): RevisionEvaluationRef | null =>
+  r.qualityRunId === null || r.qualityIteration === null
+    ? null
+    : {
+        runId: r.qualityRunId,
+        iteration: r.qualityIteration,
+        status: r.evaluationStatus ?? 'running',
+        overall: r.overall,
+        decision: r.decision,
+      };
+
+/** Full revision, graph included. */
+export const toRevisionDto = (r: DesignRevision): DesignRevisionDto => ({
+  id: r.id,
+  sessionId: r.session.id,
+  revisionNumber: r.revisionNumber,
+  origin: r.origin,
+  graph: r.graph,
+  brief: r.brief,
+  narrative: r.narrative,
+  evaluation: toEvaluationRef(r),
+  createdAt: r.createdAt.toISOString(),
+});
+
+/** List projection: the header and the grade, never the design itself. */
+export const toRevisionSummaryDto = (r: DesignRevision): DesignRevisionSummaryDto => ({
+  id: r.id,
+  revisionNumber: r.revisionNumber,
+  origin: r.origin,
+  evaluation: toEvaluationRef(r),
+  createdAt: r.createdAt.toISOString(),
+});
+
+export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): DesignSessionDto => ({
   id: session.id,
   promptId: session.prompt.id,
   status: session.status,
   revisionCount: session.revisions.count(),
   latestRevisionNumber: latestRevision?.revisionNumber ?? null,
-  latestGrade: latestEvaluation?.grade ?? null,
+  latestOverall: latestRevision?.overall ?? null,
+  latestDecision: latestRevision?.decision ?? null,
+  latestEvaluationStatus: latestRevision?.evaluationStatus ?? null,
   createdAt: session.createdAt.toISOString(),
   updatedAt: session.updatedAt.toISOString(),
 });

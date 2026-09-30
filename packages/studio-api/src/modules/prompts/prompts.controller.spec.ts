@@ -2,17 +2,71 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type {
   ApiErrorResponse,
   AuthorPromptRequest,
-  GeneratePromptRequest,
+  DesignPromptDraft,
+  GetPromptGenerationResponse,
+  GetPromptLibraryDocumentResponse,
   GetPromptResponse,
+  ListPromptLibraryResponse,
   ListPromptsResponse,
+  StartPromptGenerationResponse,
 } from '@sysdesign/contracts';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
 
 const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
 const MEDIA_ID = 'e1000000-0000-4000-8000-000000000002';
-const ORDER_HISTORY_ID = 'e1000000-0000-4000-8000-000000000006';
 const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
+
+/** Two functional bullets, one quality row, one scale row, one constraint: `c1…c5` under the fake grader. */
+export const AUTHORED_MARKDOWN = [
+  '# Serve a unified order history',
+  '',
+  '## Scenario',
+  '',
+  'You run the order-history service for a retailer that sells online and in stores.',
+  '',
+  '## Functional requirements',
+  '',
+  "1. Return a customer's past orders newest first, with line items.",
+  '2. Ingest online orders as the storefront pushes them by webhook.',
+  '',
+  '## Non-functional requirements',
+  '',
+  '| Kind | Requirement | Target |',
+  '| --- | --- | --- |',
+  '| latency | order-history reads | p99 ≤ 300 ms |',
+  '',
+  '## Scale targets',
+  '',
+  '| Metric | Target |',
+  '| --- | --- |',
+  '| peak read rate | 2,000 requests/s |',
+  '',
+  '## Constraints',
+  '',
+  '- The point-of-sale system only answers polling.',
+  '',
+].join('\n');
+
+export const authoredPrompt = (): AuthorPromptRequest => ({
+  title: 'Serve a unified order history',
+  markdown: AUTHORED_MARKDOWN,
+  experienceId: TICKETING_ID,
+});
+
+const draft = (): DesignPromptDraft => ({
+  title: 'Keep a flash on-sale fair',
+  scenario: 'You run the ticketing platform for a venue whose on-sales spike 28x within a minute.',
+  functionalRequirements: [
+    'Reserve a seat for exactly one buyer.',
+    'Release it when checkout lapses.',
+  ],
+  nonFunctionalRequirements: [
+    { kind: 'latency', requirement: 'reservation', target: 'p99 ≤ 500 ms' },
+  ],
+  scale: [{ metric: 'peak buyers', target: '10,000 concurrent' }],
+  constraints: ['Inventory lives in one relational database.'],
+});
 
 describe('prompts', () => {
   let h: Harness;
@@ -24,183 +78,276 @@ describe('prompts', () => {
     await h.close();
   });
   beforeEach(async () => {
-    await resetDesignData(h.em);
+    await resetDesignData(h.em, h.loop);
   });
 
-  const generate = async (body: GeneratePromptRequest | Record<string, unknown>) =>
-    call<GetPromptResponse>(`${h.url}/prompts/generate`, {
+  const author = (body: unknown) =>
+    call<GetPromptResponse>(`${h.url}/prompts`, { method: 'POST', body: JSON.stringify(body) });
+
+  const startGeneration = (body: unknown) =>
+    call<StartPromptGenerationResponse>(`${h.url}/prompts/generate`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
 
-  describe('POST /api/prompts/generate', () => {
-    it('[GEN-1] generates a prompt from an experience and persists it', async () => {
-      const { status, body } = await generate({ experienceId: TICKETING_ID });
+  const generation = (runId: string) =>
+    call<GetPromptGenerationResponse>(`${h.url}/prompts/generate/${runId}`);
+
+  describe('POST /api/prompts (authored)', () => {
+    it('[GEN-2] stores the markdown verbatim with the rubric the grader derived from it', async () => {
+      const { status, body } = await author(authoredPrompt());
 
       expect(status).toBe(201);
-      expect(body.data.experienceId).toBe(TICKETING_ID);
-      expect(body.data.archetype).toBe('flash-sale-ticketing');
-      expect(body.data.difficulty).toBe('standard'); // the default
-      expect(body.data.status).toBe('active');
-      expect(body.data.llmEnriched).toBe(false);
-      expect(body.data.generatorVersion).toBe('2.3.0');
-      expect(body.data.seed).toBeGreaterThanOrEqual(0);
-
-      // Persisted: fetchable through the read endpoint with identical content.
-      const fetched = await call<GetPromptResponse>(`${h.url}/prompts/${body.data.id}`);
-      expect(fetched.status).toBe(200);
-      expect(fetched.body.data).toEqual(body.data);
-    });
-
-    it('[GEN-2] generates identical content for the same explicit seed', async () => {
-      const first = await generate({ experienceId: TICKETING_ID, seed: 42 });
-      const second = await generate({ experienceId: TICKETING_ID, seed: 42 });
-
-      expect(second.body.data.title).toBe(first.body.data.title);
-      expect(second.body.data.scenario).toBe(first.body.data.scenario);
-      expect(second.body.data.functionalRequirements).toEqual(
-        first.body.data.functionalRequirements,
-      );
-      expect(second.body.data.nonFunctionalRequirements).toEqual(
-        first.body.data.nonFunctionalRequirements,
-      );
-      expect(second.body.data.scaleTargets).toEqual(first.body.data.scaleTargets);
-    });
-
-    it('[GEN-4] successive generations vary the framing, and omitting the experience rotates to the least practiced', async () => {
-      const first = await generate({ experienceId: TICKETING_ID });
-      const second = await generate({ experienceId: TICKETING_ID });
-
-      // Fresh random seeds, and the no-repeat draw keeps the framing moving —
-      // the old count-derived scheme served the identical "first prompt" after
-      // every database reset.
-      expect(second.body.data.seed).not.toBe(first.body.data.seed);
-      expect(second.body.data.title).not.toBe(first.body.data.title);
-
-      // "Surprise me": ticketing now has prompts and every other experience has
-      // none, so rotation picks the first untouched one in fixture order.
-      const surprise = await generate({});
-      expect(surprise.status).toBe(201);
-      expect(surprise.body.data.experienceId).toBe(MEDIA_ID);
-    });
-
-    it('[GEN-3] carries scenario, requirements and scale targets in the response', async () => {
-      const { body } = await generate({ experienceId: TICKETING_ID, difficulty: 'advanced' });
-
-      expect(body.data.scenario.length).toBeGreaterThan(100);
-      expect(body.data.functionalRequirements.length).toBeGreaterThanOrEqual(4);
-      expect(body.data.functionalRequirements.length).toBeLessThanOrEqual(6);
-      // Advanced guarantees latency + availability + signature + twist, then
-      // the fill floor lifts the count to 5..6.
-      expect(body.data.nonFunctionalRequirements.length).toBeGreaterThanOrEqual(5);
-      expect(body.data.nonFunctionalRequirements.length).toBeLessThanOrEqual(6);
-
-      const kinds = body.data.nonFunctionalRequirements.map((n) => n.kind);
-      expect(kinds).toContain('latency');
-      expect(kinds).toContain('availability');
-
-      // advanced = intro ×100; the fixture states 10,000 concurrent users.
-      expect(body.data.scaleTargets.concurrentUsers).toBe(1000000);
-    });
-
-    it('[PRD-1] an order-history prompt persists and returns its workflow spec; other archetypes carry null', async () => {
-      const ticketing = await generate({ experienceId: TICKETING_ID });
-      expect(ticketing.body.data.workflowSpec).toBeNull();
-
-      const { status, body } = await generate({
-        experienceId: ORDER_HISTORY_ID,
-        difficulty: 'standard',
+      expect(body.data).toMatchObject({
+        experienceId: TICKETING_ID,
+        title: 'Serve a unified order history',
+        markdown: AUTHORED_MARKDOWN,
+        source: 'authored',
+        status: 'active',
       });
-      expect(status).toBe(201);
-      const spec = body.data.workflowSpec;
-      expect(spec).not.toBeNull();
-      expect(spec?.operations.map((op) => op.id)).toContain('op-list-orders');
-      expect(spec?.ingests.map((ingest) => ingest.mode).sort()).toEqual(['pull', 'push']);
-      // Every budget an ingest quotes is on the prompt — the generator guarantees it.
-      const nfrIds = new Set(body.data.nonFunctionalRequirements.map((n) => n.id));
-      for (const ingest of spec?.ingests ?? []) {
-        expect(nfrIds.has(ingest.nfrId)).toBe(true);
-      }
+      expect(body.data.criteria.map((c) => `${c.id}:${c.kind}`)).toEqual([
+        'c1:functional',
+        'c2:functional',
+        'c3:non_functional',
+        'c4:scale',
+        'c5:constraint',
+      ]);
+      expect(h.loop.criteriaRequests).toEqual([
+        { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
+      ]);
     });
 
-    it('rejects an unknown experience with 422 — well-formed but unsatisfiable', async () => {
-      const { status, body } = await call<ApiErrorResponse>(`${h.url}/prompts/generate`, {
+    it('[DEL-2] the rubric is derived once and its ids are stable on every later read', async () => {
+      const { body: created } = await author(authoredPrompt());
+      const first = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`);
+      const second = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`);
+
+      expect(first.body.data.criteria).toEqual(created.data.criteria);
+      expect(second.body.data.criteria).toEqual(created.data.criteria);
+      expect(h.loop.criteriaRequests).toHaveLength(1);
+    });
+
+    it('[DEL-6] without a model the grader answers 503 and no prompt is written', async () => {
+      h.loop.llm = { enabled: false, model: null, reason: 'no-key' };
+      const { status, body } = await call<ApiErrorResponse & { llm: unknown }>(`${h.url}/prompts`, {
         method: 'POST',
-        body: JSON.stringify({ experienceId: UNKNOWN_UUID }),
+        body: JSON.stringify(authoredPrompt()),
       });
 
-      expect(status).toBe(422);
-      expect(JSON.stringify(body.message)).toContain(UNKNOWN_UUID);
+      expect(status).toBe(503);
+      expect(body.llm).toEqual({ enabled: false, model: null, reason: 'no-key' });
+      const list = await call<ListPromptsResponse>(`${h.url}/prompts`);
+      expect(list.body.meta.total).toBe(0);
     });
 
-    it('rejects an undeclared body property', async () => {
-      const { status } = await generate({ experienceId: TICKETING_ID, isAdmin: true });
-      expect(status).toBe(400);
+    it('rejects an unknown experience with 422, an undeclared key and an empty body with 400', async () => {
+      expect((await author({ ...authoredPrompt(), experienceId: UNKNOWN_UUID })).status).toBe(422);
+      expect((await author({ ...authoredPrompt(), difficulty: 'intro' })).status).toBe(400);
+      expect((await author({ ...authoredPrompt(), markdown: '' })).status).toBe(400);
     });
   });
 
-  describe('POST /api/prompts/:id/regenerate', () => {
-    it('creates a fresh prompt with a new derived seed', async () => {
-      const { body: original } = await generate({ experienceId: TICKETING_ID });
+  describe('the library', () => {
+    it('[GEN-3] lists the loop’s library and imports a document as a prompt with its own rubric', async () => {
+      const list = await call<ListPromptLibraryResponse>(`${h.url}/prompts/library`);
+      expect(list.status).toBe(200);
+      expect(list.body.data).toEqual([{ id: 'order-history', title: 'Serve an order history' }]);
 
-      const { status, body } = await call<GetPromptResponse>(
-        `${h.url}/prompts/${original.data.id}/regenerate`,
-        { method: 'POST' },
+      const document = await call<GetPromptLibraryDocumentResponse>(
+        `${h.url}/prompts/library/order-history`,
       );
+      expect(document.body.data.markdown).toContain('## Functional requirements');
 
+      const { status, body } = await call<GetPromptResponse>(`${h.url}/prompts/import`, {
+        method: 'POST',
+        body: JSON.stringify({ libraryId: 'order-history' }),
+      });
       expect(status).toBe(201);
-      expect(body.data.id).not.toBe(original.data.id);
-      expect(body.data.seed).not.toBe(original.data.seed);
-      expect(body.data.experienceId).toBe(TICKETING_ID);
-      expect(body.data.difficulty).toBe(original.data.difficulty);
+      expect(body.data).toMatchObject({
+        source: 'library',
+        experienceId: null,
+        title: 'Serve an order history',
+        markdown: document.body.data.markdown,
+      });
+      expect(body.data.criteria.map((c) => c.kind)).toEqual([
+        'functional',
+        'functional',
+        'non_functional',
+        'constraint',
+      ]);
     });
 
-    it('404s for an unknown prompt', async () => {
-      const { status } = await call(`${h.url}/prompts/${UNKNOWN_UUID}/regenerate`, {
+    it('a document the library does not hold is 404 to read and 422 to import', async () => {
+      expect((await call(`${h.url}/prompts/library/nope`)).status).toBe(404);
+      const { status } = await call(`${h.url}/prompts/import`, {
+        method: 'POST',
+        body: JSON.stringify({ libraryId: 'nope' }),
+      });
+      expect(status).toBe(422);
+    });
+  });
+
+  describe('POST /api/prompts/generate', () => {
+    it('[GEN-1] starts a design-prompt run from the experience and claims its best draft once', async () => {
+      const started = await startGeneration({ experienceId: TICKETING_ID });
+      expect(started.status).toBe(202);
+      expect(started.body.data).toEqual({ runId: 'fake-run-1', status: 'running' });
+      expect(h.loop.startRequests[0]).toMatchObject({
+        pipeline: 'design-prompt',
+        maxIterations: 2,
+      });
+      expect(h.loop.startRequests[0]?.goal).toContain('Where: Ticketing & events platform');
+      expect(h.loop.startRequests[0]?.goal).toContain('## Highlights');
+
+      const running = await generation('fake-run-1');
+      expect(running.status).toBe(200);
+      expect(running.body.data).toEqual({
+        runId: 'fake-run-1',
+        status: 'running',
+        decision: null,
+        overall: null,
+        prompt: null,
+        error: null,
+      });
+
+      h.loop.complete('fake-run-1', [
+        { overall: 58, decision: 'revise', mode: 'initial', artifact: draft() },
+        { overall: 86, decision: 'accept', mode: 'revise', artifact: draft() },
+      ]);
+      const done = await generation('fake-run-1');
+      expect(done.body.data).toMatchObject({ status: 'complete', decision: 'accept', overall: 86 });
+      const prompt = done.body.data.prompt;
+      expect(prompt).not.toBeNull();
+      expect(prompt).toMatchObject({
+        source: 'generated',
+        experienceId: TICKETING_ID,
+        title: 'Keep a flash on-sale fair',
+      });
+      expect(prompt?.markdown.startsWith('# Keep a flash on-sale fair\n')).toBe(true);
+      expect(prompt?.markdown).toContain('## Non-functional requirements');
+      expect(prompt?.criteria.length).toBeGreaterThan(0);
+
+      // Claimed once: a second poll answers the same prompt, and one row exists.
+      const again = await generation('fake-run-1');
+      expect(again.body.data.prompt?.id).toBe(prompt?.id);
+      const list = await call<ListPromptsResponse>(`${h.url}/prompts?source=generated`);
+      expect(list.body.meta.total).toBe(1);
+    });
+
+    it('omitting the experience draws from the least practised one', async () => {
+      await author(authoredPrompt()); // ticketing now has a prompt
+      const { status } = await startGeneration({});
+      expect(status).toBe(202);
+      expect(h.loop.startRequests[0]?.goal.startsWith('# Media, collectibles')).toBe(true);
+
+      h.loop.complete('fake-run-1', [{ overall: 80, mode: 'initial', artifact: draft() }]);
+      const done = await generation('fake-run-1');
+      expect(done.body.data.prompt?.experienceId).toBe(MEDIA_ID);
+    });
+
+    it('a failed run, and a run whose draft is not a prompt, are reported as failed and claim nothing', async () => {
+      await startGeneration({ experienceId: TICKETING_ID });
+      h.loop.fail('fake-run-1', 'the model went away');
+      const failed = await generation('fake-run-1');
+      expect(failed.body.data).toMatchObject({ status: 'failed', error: 'the model went away' });
+
+      await startGeneration({ experienceId: TICKETING_ID });
+      h.loop.complete('fake-run-2', [{ overall: 80, mode: 'initial', artifact: { nope: true } }]);
+      const junk = await generation('fake-run-2');
+      expect(junk.body.data.status).toBe('failed');
+      expect(junk.body.data.error).toContain('no prompt draft');
+
+      const list = await call<ListPromptsResponse>(`${h.url}/prompts`);
+      expect(list.body.meta.total).toBe(0);
+    });
+
+    it('404s for a run this studio never started, 422 for an unknown experience', async () => {
+      expect((await generation('nope')).status).toBe(404);
+      expect((await startGeneration({ experienceId: UNKNOWN_UUID })).status).toBe(422);
+    });
+  });
+
+  describe('the rubric', () => {
+    it('[UX-14] can be re-derived while nothing was graded against it, and is frozen once a session exists', async () => {
+      const { body: created } = await author(authoredPrompt());
+      const rederived = await call<GetPromptResponse>(
+        `${h.url}/prompts/${created.data.id}/criteria`,
+        {
+          method: 'POST',
+        },
+      );
+      expect(rederived.status).toBe(200);
+      expect(h.loop.criteriaRequests).toHaveLength(2);
+
+      await call(`${h.url}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ promptId: created.data.id }),
+      });
+      const frozen = await call<ApiErrorResponse>(`${h.url}/prompts/${created.data.id}/criteria`, {
         method: 'POST',
       });
-      expect(status).toBe(404);
+      expect(frozen.status).toBe(409);
+      const rewrite = await call<ApiErrorResponse>(`${h.url}/prompts/${created.data.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ markdown: '# Another prompt\n\n- one thing' }),
+      });
+      expect(rewrite.status).toBe(409);
+    });
+
+    it('rewriting the markdown before any session derives the rubric again', async () => {
+      const { body: created } = await author(authoredPrompt());
+      const { status, body } = await call<GetPromptResponse>(
+        `${h.url}/prompts/${created.data.id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            title: 'Renamed',
+            markdown: '# Renamed\n\n- one thing\n- two things',
+          }),
+        },
+      );
+      expect(status).toBe(200);
+      expect(body.data.title).toBe('Renamed');
+      expect(body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2']);
+      expect(h.loop.criteriaRequests).toHaveLength(2);
     });
   });
 
   describe('GET /api/prompts', () => {
-    it('filters by experience and difficulty, and paginates with a stable order', async () => {
-      await generate({ experienceId: TICKETING_ID, difficulty: 'intro', seed: 1 });
-      await generate({ experienceId: TICKETING_ID, difficulty: 'standard', seed: 2 });
-      await generate({ experienceId: MEDIA_ID, difficulty: 'standard', seed: 3 });
+    it('filters by source, status and experience, and paginates with a stable order', async () => {
+      await author(authoredPrompt());
+      await author({ ...authoredPrompt(), title: 'Second', experienceId: MEDIA_ID });
+      await call(`${h.url}/prompts/import`, {
+        method: 'POST',
+        body: JSON.stringify({ libraryId: 'order-history' }),
+      });
 
       const all = await call<ListPromptsResponse>(`${h.url}/prompts`);
       expect(all.body.meta.total).toBe(3);
 
-      const ticketing = await call<ListPromptsResponse>(
-        `${h.url}/prompts?experienceId=${TICKETING_ID}`,
-      );
-      expect(ticketing.body.meta.total).toBe(2);
-      expect(ticketing.body.data.every((p) => p.experienceId === TICKETING_ID)).toBe(true);
+      const authored = await call<ListPromptsResponse>(`${h.url}/prompts?source=authored`);
+      expect(authored.body.meta.total).toBe(2);
+      const media = await call<ListPromptsResponse>(`${h.url}/prompts?experienceId=${MEDIA_ID}`);
+      expect(media.body.data.map((p) => p.title)).toEqual(['Second']);
 
-      const intro = await call<ListPromptsResponse>(`${h.url}/prompts?difficulty=intro`);
-      expect(intro.body.meta.total).toBe(1);
-      expect(intro.body.data[0]?.difficulty).toBe('intro');
-
-      // limit/offset slice without overlap and report the unfiltered total.
       const pageOne = await call<ListPromptsResponse>(`${h.url}/prompts?limit=2&offset=0`);
       const pageTwo = await call<ListPromptsResponse>(`${h.url}/prompts?limit=2&offset=2`);
       expect(pageOne.body.data).toHaveLength(2);
       expect(pageTwo.body.data).toHaveLength(1);
       expect(pageOne.body.meta).toEqual({ total: 3, limit: 2, offset: 0 });
-      const ids = [...pageOne.body.data, ...pageTwo.body.data].map((p) => p.id);
-      expect(new Set(ids).size).toBe(3);
+      expect(new Set([...pageOne.body.data, ...pageTwo.body.data].map((p) => p.id)).size).toBe(3);
     });
 
-    it('rejects an out-of-range limit with 400', async () => {
+    it('rejects an out-of-range limit and an unknown filter with 400', async () => {
       expect((await call(`${h.url}/prompts?limit=0`)).status).toBe(400);
       expect((await call(`${h.url}/prompts?limit=101`)).status).toBe(400);
+      expect((await call(`${h.url}/prompts?difficulty=intro`)).status).toBe(400);
     });
   });
 
   describe('PATCH /api/prompts/:id', () => {
     it('archives and reactivates a prompt', async () => {
-      const { body: created } = await generate({ experienceId: TICKETING_ID });
+      const { body: created } = await author(authoredPrompt());
 
       const archived = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`, {
         method: 'PATCH',
@@ -219,161 +366,18 @@ describe('prompts', () => {
       expect(reactivated.body.data.status).toBe('active');
     });
 
-    it('rejects a status outside the vocabulary with 400', async () => {
-      const { body: created } = await generate({ experienceId: TICKETING_ID });
+    it('rejects a status outside the vocabulary with 400 and an unknown prompt with 404', async () => {
+      const { body: created } = await author(authoredPrompt());
       const { status } = await call(`${h.url}/prompts/${created.data.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'deleted' }),
       });
       expect(status).toBe(400);
-    });
-  });
-
-  /**
-   * "Bring your own take-home": the requirement set is stored verbatim, not
-   * drawn — so an assessment that states two requirements and two SLAs is
-   * graded on exactly those.
-   */
-  describe('POST /api/prompts (authored)', () => {
-    const assessment: AuthorPromptRequest = {
-      experienceId: ORDER_HISTORY_ID,
-      title: 'Order History Service for My Account',
-      scenario:
-        'You are designing the Order History service behind My Account on a storefront hosted on Shopify. Assume 2,000 concurrent shoppers.',
-      difficulty: 'standard',
-      functionalRequirements: [
-        'Show an Order History list within the My Account section',
-        'Show both online (Shopify) and offline (Retail POS) orders in that one list',
-      ],
-      functionalCapabilities: [],
-      nonFunctionalRequirements: [
-        {
-          id: 'ohi-fresh-online',
-          kind: 'consistency',
-          statement: 'An online order appears in the list within 1 minute',
-          target: 'visible ≤ 60s',
-          targetSpec: { metric: 'freshness_seconds', op: '<=', value: 60, unit: 's' },
-        },
-        {
-          id: 'ohi-sec-own-orders',
-          kind: 'security',
-          statement: 'A logged-in user can view only their own orders',
-        },
-      ],
-      scaleTargets: {
-        concurrentUsers: 2000,
-        requestsPerSecond: 150,
-        readWriteRatio: '98:2',
-        p99LatencyMs: 300,
-        availabilityPct: '99.9',
-      },
-      workflowSpec: {
-        version: 1,
-        entities: [
-          {
-            id: 'ent-order',
-            name: 'Order',
-            states: ['received', 'indexed'],
-            transitions: [
-              { from: null, to: 'received', via: 'ing-shopify-webhooks' },
-              { from: 'received', to: 'indexed', via: 'op-ingest-index' },
-            ],
-          },
-        ],
-        operations: [
-          { id: 'op-list-orders', kind: 'query', statement: 'Return the merged history' },
-          {
-            id: 'op-ingest-index',
-            kind: 'command',
-            statement: 'Upsert an incoming order',
-            consumes: ['evt-online-order-received'],
-          },
-        ],
-        events: [{ id: 'evt-online-order-received', statement: 'A new online order arrived' }],
-        aggregations: [],
-        ingests: [
-          {
-            id: 'ing-shopify-webhooks',
-            mode: 'push',
-            statement: 'Shopify pushes order webhooks',
-            nfrId: 'ohi-fresh-online',
-            emits: ['evt-online-order-received'],
-          },
-        ],
-      },
-    };
-
-    const author = (body: unknown) =>
-      call<GetPromptResponse>(`${h.url}/prompts`, { method: 'POST', body: JSON.stringify(body) });
-
-    it('[GEN-5] stores the assessment verbatim, graded under its experience archetype, and practicable', async () => {
-      const { status, body } = await author(assessment);
-      expect(status).toBe(201);
-      expect(body.data).toMatchObject({
-        experienceId: ORDER_HISTORY_ID,
-        archetype: 'order-history-integration',
-        title: assessment.title,
-        difficulty: 'standard',
-        generatorVersion: 'authored',
-        seed: 0,
-        llmEnriched: false,
-        functionalRequirements: assessment.functionalRequirements,
-        nonFunctionalRequirements: assessment.nonFunctionalRequirements,
-        scaleTargets: assessment.scaleTargets,
+      const missing = await call(`${h.url}/prompts/${UNKNOWN_UUID}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
       });
-      expect(body.data.workflowSpec?.ingests[0]?.nfrId).toBe('ohi-fresh-online');
-
-      const fetched = await call<GetPromptResponse>(`${h.url}/prompts/${body.data.id}`);
-      expect(fetched.body.data.nonFunctionalRequirements).toHaveLength(2);
-
-      const session = await call<{ data: { id: string } }>(`${h.url}/sessions`, {
-        method: 'POST',
-        body: JSON.stringify({ promptId: body.data.id }),
-      });
-      expect(session.status).toBe(201);
-    });
-
-    it('rejects a shape outside the vocabularies with 400', async () => {
-      const { status } = await author({
-        ...assessment,
-        nonFunctionalRequirements: [{ id: 'x', kind: 'vibes', statement: 'no' }],
-      });
-      expect(status).toBe(400);
-      const capability = await author({ ...assessment, functionalCapabilities: ['telepathy'] });
-      expect(capability.status).toBe(400);
-    });
-
-    it('collects every referential problem into one 422', async () => {
-      const spec = assessment.workflowSpec;
-      if (!spec) throw new Error('fixture has a spec');
-      const { status, body } = await call<ApiErrorResponse>(`${h.url}/prompts`, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...assessment,
-          workflowSpec: {
-            ...spec,
-            // The ingest names an NFR this prompt does not carry, and an
-            // operation emits an event the spec never declares.
-            ingests: [{ ...spec.ingests[0], nfrId: 'ohi-not-here' }],
-            operations: [
-              ...spec.operations,
-              { id: 'op-x', kind: 'command', statement: 'x', emits: ['evt-ghost'] },
-            ],
-          },
-        }),
-      });
-      expect(status).toBe(422);
-      const message = JSON.stringify(body);
-      expect(message).toContain('ohi-not-here');
-      expect(message).toContain('evt-ghost');
-    });
-
-    it('rejects an unknown experience with 422', async () => {
-      const { status } = await author({
-        ...assessment,
-        experienceId: '00000000-0000-4000-8000-000000000000',
-      });
-      expect(status).toBe(422);
+      expect(missing.status).toBe(404);
     });
   });
 });

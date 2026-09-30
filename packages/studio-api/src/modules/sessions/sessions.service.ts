@@ -1,234 +1,61 @@
 import {
   ConflictException,
-  Inject,
   Injectable,
-  Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { UniqueConstraintViolationException } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
-  DEFAULT_LIST_LIMIT,
-  validateBriefReferences,
-  validateGraphReferences,
-  validateNarration,
-  validateWorkflowReferences,
-  type BriefSuggestionsDto,
-  type InterfaceSuggestionsDto,
+  CANVAS_PIPELINE_ID,
+  type Decision,
+  type DesignSubmission,
+  type QualityRunStartedDto,
+  type QualityRunStatus,
   type SessionStatus,
 } from '@sysdesign/contracts';
 import {
-  createRevisionRecords,
+  createRevision,
   DesignRevision,
   DesignSession,
-  Evaluation,
   Prompt,
+  type RevisionRun,
 } from '@sysdesign/db';
-import { asRecordable, improverAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
-import { GIT_CONTEXT, makeRunId, writeDump } from '@sysdesign/run-dump';
 
-import { SUGGESTION_LLM } from '../llm/llm.token';
-import type { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
-import type { InterfaceSuggestionsRequestDto } from './dto/interface-suggestions.dto';
-import { suggestBindings } from './suggestions/suggest-bindings';
-import { suggestInterface } from './suggestions/suggest-interface';
-import {
-  buildSuggestionDump,
-  startSuggestionDump,
-  type SuggestionDump,
-  type SuggestionDumpLlm,
-} from './suggestions/suggestion-dump';
-import type { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
-import type { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
-import type { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
-import { EvalQueue } from './eval-queue';
+import { PromptsService } from '../prompts/prompts.service';
+import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import type { ListRevisionsQueryInput, ListSessionsQueryInput } from './session-requests';
+import type { SessionWithLatest } from './sessions.mapper';
+import { submissionProblems } from './submission';
 
-/** A session plus what its DTO summarises about the newest revision. */
-export interface SessionWithLatest {
+/** The terminal values an import already knows, written with the row instead of after it. */
+export interface RevisionCache {
+  status: QualityRunStatus;
+  overall: number | null;
+  decision: Decision | null;
+}
+
+/** A submission checked and ready to grade: the session it belongs to and the prompt it answers. */
+export interface PreparedSubmission {
   session: DesignSession;
-  latestRevision: DesignRevision | null;
-  latestEvaluation: Evaluation | null;
+  prompt: Prompt;
 }
 
-export interface RevisionWithEvaluation {
-  revision: DesignRevision;
-  evaluation: Evaluation | null;
-}
-
+/**
+ * Sessions and the revisions under them. A revision is graded by the quality
+ * loop: submitting one starts a `system-design-canvas` run over the drawing,
+ * the brief and the narrative, against the prompt's own criteria, and the
+ * row stores the run's id. The studio checks structure and stores; the loop
+ * judges.
+ */
 @Injectable()
 export class SessionsService {
-  private readonly logger = new Logger(SessionsService.name);
-
   constructor(
     private readonly em: EntityManager,
-    private readonly evalQueue: EvalQueue,
-    @Inject(SUGGESTION_LLM) private readonly llm: LlmClient,
+    private readonly loop: QualityLoopClient,
+    private readonly prompts: PromptsService,
   ) {}
-
-  /**
-   * Candidate bindings for a draft the author has not submitted.
-   *
-   * Read-only by construction: nothing here writes to `DesignRevision.brief`,
-   * which is the only field the grade reads. A proposal becomes a claim solely
-   * by the author accepting it in the editor and submitting a revision — so
-   * this endpoint has no path to the score at all, which is why it lives in the
-   * API rather than as an eval pass.
-   *
-   * An absent model is not an error: the response shape is identical with and
-   * without one, an empty list being the deterministic answer. That also keeps
-   * the shape the e2e suite exercises (which always runs deterministic) the
-   * same shape production returns.
-   */
-  async suggestBrief(
-    sessionId: string,
-    dto: BriefSuggestionsRequestDto,
-  ): Promise<BriefSuggestionsDto> {
-    const session = await this.em.findOne(
-      DesignSession,
-      { id: sessionId },
-      { populate: ['prompt'] },
-    );
-    if (!session) {
-      throw new NotFoundException(`Session ${sessionId} not found`);
-    }
-
-    const problems = [
-      ...validateGraphReferences(dto.graph),
-      ...validateWorkflowReferences(dto.graph, session.prompt.workflowSpec ?? null),
-    ];
-    if (problems.length > 0) {
-      throw new UnprocessableEntityException(problems);
-    }
-
-    const dump = startSuggestionDump({
-      runId: makeRunId(Date.now(), 'suggestion'),
-      sessionId,
-      now: Date.now(),
-      llm: this.llmStatus(),
-      git: GIT_CONTEXT,
-    });
-    dump.input({
-      promptId: session.prompt.id,
-      graph: dto.graph,
-      narrative: dto.narrative ?? null,
-    });
-
-    try {
-      const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
-      const proposals = await suggestBindings(llm, {
-        graph: dto.graph,
-        narrative: dto.narrative ?? null,
-        nfrs: session.prompt.nonFunctionalRequirements,
-        functionalRequirements: session.prompt.functionalRequirements,
-      });
-      dump.offered(proposals);
-      // Reports whether a model RAN, not whether it found anything. A model
-      // that ran and had nothing to offer is a different fact from no model at
-      // all, and collapsing them would make an empty list unreadable.
-      return { proposals, model: this.llm.enabled ? this.llm.model : null };
-    } catch (error) {
-      dump.failed(error);
-      throw error;
-    } finally {
-      this.writeDump(dump);
-    }
-  }
-
-  /**
-   * Candidate interface declarations for one component of an unsubmitted
-   * draft — the sibling of `suggestBrief`, with the same read-only guarantee:
-   * a proposal reaches the graph only when the author accepts it in the editor.
-   * The node must exist in the submitted graph; the same referential checks
-   * submit runs guard the graph itself.
-   */
-  async suggestInterface(
-    sessionId: string,
-    dto: InterfaceSuggestionsRequestDto,
-  ): Promise<InterfaceSuggestionsDto> {
-    const session = await this.em.findOne(
-      DesignSession,
-      { id: sessionId },
-      { populate: ['prompt'] },
-    );
-    if (!session) {
-      throw new NotFoundException(`Session ${sessionId} not found`);
-    }
-
-    const spec = session.prompt.workflowSpec ?? null;
-    const problems = [
-      ...validateGraphReferences(dto.graph),
-      ...validateWorkflowReferences(dto.graph, spec),
-      ...(dto.graph.nodes.some((node) => node.id === dto.nodeId)
-        ? []
-        : [`unknown node: ${dto.nodeId}`]),
-    ];
-    if (problems.length > 0) {
-      throw new UnprocessableEntityException(problems);
-    }
-
-    const dump = startSuggestionDump({
-      runId: makeRunId(Date.now(), 'suggestion'),
-      sessionId,
-      now: Date.now(),
-      llm: this.llmStatus(),
-      git: GIT_CONTEXT,
-    });
-    dump.input({
-      promptId: session.prompt.id,
-      graph: dto.graph,
-      narrative: dto.narrative ?? null,
-    });
-
-    try {
-      const llm = asRecordable(this.llm)?.withRecorder(dump.record) ?? this.llm;
-      const proposals = await suggestInterface(llm, {
-        graph: dto.graph,
-        nodeId: dto.nodeId,
-        spec,
-        nfrs: session.prompt.nonFunctionalRequirements,
-        functionalRequirements: session.prompt.functionalRequirements,
-        narrative: dto.narrative ?? null,
-      });
-      dump.offered(proposals);
-      return { nodeId: dto.nodeId, proposals, model: this.llm.enabled ? this.llm.model : null };
-    } catch (error) {
-      dump.failed(error);
-      throw error;
-    } finally {
-      this.writeDump(dump);
-    }
-  }
-
-  /**
-   * Swallows deliberately: this runs in a `finally`, so a throw would replace
-   * whatever the request was already reporting. An audit trail must never cost
-   * a response.
-   */
-  private writeDump(dump: SuggestionDump): void {
-    try {
-      writeDump(buildSuggestionDump(dump.state, Date.now()));
-    } catch (error) {
-      this.logger.warn(
-        `suggestion run dump ${dump.state.runId} not written: ${
-          error instanceof Error ? error.message : error
-        }`,
-      );
-    }
-  }
-
-  /**
-   * Derived facts only — the API key is never recorded, in any form. The
-   * suggesters run on the assistive client, so "why is it off" is answered
-   * by the coach's switches, not the eval's.
-   */
-  private llmStatus(): SuggestionDumpLlm {
-    return {
-      enabled: this.llm.enabled,
-      model: this.llm.model,
-      reason: this.llm.enabled ? null : improverAvailabilityFromEnv().reason,
-    };
-  }
 
   async create(promptId: string): Promise<DesignSession> {
     const prompt = await this.em.findOne(Prompt, promptId);
@@ -236,7 +63,7 @@ export class SessionsService {
       throw new UnprocessableEntityException(`Unknown promptId: ${promptId}`);
     }
     if (prompt.status === 'archived') {
-      throw new UnprocessableEntityException('prompt is archived — regenerate or reactivate it');
+      throw new UnprocessableEntityException('prompt is archived — reactivate it first');
     }
 
     const session = this.em.create(DesignSession, { prompt });
@@ -245,155 +72,145 @@ export class SessionsService {
     return session;
   }
 
-  async list(query: ListSessionsQueryDto): Promise<[SessionWithLatest[], number]> {
+  async list(query: ListSessionsQueryInput): Promise<[SessionWithLatest[], number]> {
     const [sessions, total] = await this.em.findAndCount(
       DesignSession,
       { ...(query.promptId ? { prompt: query.promptId } : {}) },
       {
-        // Populated for revisionCount/latestRevisionNumber; pages are 5–50
-        // rows, so an in-memory fold beats a bespoke aggregate query here.
+        // Populated for revisionCount and the latest revision's cached grade;
+        // pages are 5–50 rows, so an in-memory fold beats a bespoke aggregate.
         populate: ['revisions'],
-        limit: query.limit ?? DEFAULT_LIST_LIMIT,
-        offset: query.offset ?? 0,
+        limit: query.limit,
+        offset: query.offset,
         orderBy: { updatedAt: 'desc', id: 'asc' },
       },
     );
-
-    return [await this.withLatest(sessions), total];
+    return [sessions.map(withLatest), total];
   }
 
   async findOne(id: string): Promise<SessionWithLatest> {
     const session = await this.em.findOne(DesignSession, id, { populate: ['revisions'] });
-    if (!session) {
-      throw new NotFoundException(`Session ${id} not found`);
-    }
-    const [withLatest] = await this.withLatest([session]);
-    return withLatest;
+    if (!session) throw new NotFoundException(`Session ${id} not found`);
+    return withLatest(session);
   }
 
   async updateStatus(id: string, status: SessionStatus): Promise<SessionWithLatest> {
-    const withLatest = await this.findOne(id);
-    withLatest.session.status = status;
+    const found = await this.findOne(id);
+    found.session.status = status;
     await this.em.flush();
-    return withLatest;
+    return found;
   }
 
   /**
-   * One transaction for the whole submit: revision numbering, the queued
-   * evaluation and the queue entry commit together or not at all — the eval
-   * worker can never observe a revision without its job.
+   * Grade a design: the run starts before anything is written, so a loop
+   * that refuses leaves no half-graded revision behind; then the revision is
+   * stored pointing at iteration 1 of its own run.
    */
-  async submitRevision(
+  async submitRevision(sessionId: string, submission: DesignSubmission): Promise<DesignRevision> {
+    const { prompt } = await this.prepareSubmission(sessionId, submission);
+    const started = await this.startGradingRun(prompt, submission, 1);
+    return this.persistRevision(sessionId, submission, 'user', {
+      runId: started.runId,
+      iteration: 1,
+    });
+  }
+
+  /**
+   * Everything a submission must pass before a run is started, shared with the
+   * coach: the session exists and is open, the prompt has its rubric, and the
+   * graph, brief and narrative refer only to what exists. Every referential
+   * problem is reported at once.
+   */
+  async prepareSubmission(
     sessionId: string,
-    dto: SubmitRevisionRequestDto,
-  ): Promise<RevisionWithEvaluation> {
-    // The prompt is populated because a brief's references are checked against
-    // it: an nfrId it never declared, or a functional requirement index past
-    // the end, is impossible rather than merely unsupported.
+    submission: DesignSubmission,
+  ): Promise<PreparedSubmission> {
     const session = await this.em.findOne(DesignSession, sessionId, { populate: ['prompt'] });
-    if (!session) {
-      throw new NotFoundException(`Session ${sessionId} not found`);
-    }
+    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
     if (session.status !== 'in-progress') {
       throw new UnprocessableEntityException(
         `session is ${session.status} — only an in-progress session accepts revisions`,
       );
     }
+    const prompt = await this.prompts.ensureCriteria(session.prompt);
+    const problems = submissionProblems(submission, prompt.criteria);
+    if (problems.length > 0) throw new UnprocessableEntityException(problems);
+    return { session, prompt };
+  }
 
-    const problems = [
-      ...validateGraphReferences(dto.graph),
-      ...validateWorkflowReferences(dto.graph, session.prompt.workflowSpec ?? null),
-      ...(dto.brief ? validateBriefReferences(dto.graph, dto.brief, session.prompt) : []),
-      ...(dto.narrative ? validateNarration(dto.graph, dto.narrative, session.prompt) : []),
-    ];
-    if (problems.length > 0) {
-      throw new UnprocessableEntityException(problems);
-    }
-
-    try {
-      return await this.em.transactional((em) =>
-        createRevisionRecords(em, sessionId, dto, 'user', (txEm, revision) =>
-          this.evalQueue.enqueue(txEm, revision),
-        ),
+  /** One `system-design-canvas` run over the submission, on the prompt's fixed rubric. */
+  startGradingRun(
+    prompt: Prompt,
+    submission: DesignSubmission,
+    maxIterations: number,
+  ): Promise<QualityRunStartedDto> {
+    if (prompt.criteria.length === 0) {
+      throw new ServiceUnavailableException(
+        'the grader derived no criteria for this prompt yet — try again shortly',
       );
-    } catch (err) {
-      // Two concurrent submits computed the same revisionNumber; the unique
-      // (session, revision_number) constraint is the arbiter.
-      if (err instanceof UniqueConstraintViolationException) {
+    }
+    return this.loop.startRun({
+      pipeline: CANVAS_PIPELINE_ID,
+      goal: prompt.markdown,
+      output: submission,
+      criteria: prompt.criteria,
+      maxIterations,
+    });
+  }
+
+  /**
+   * The one write of a revision row, in its own transaction. The unique
+   * (session, revision_number) and (run, iteration) constraints arbitrate
+   * concurrent writers; a loser gets 409 and may retry or re-read.
+   */
+  async persistRevision(
+    sessionId: string,
+    submission: DesignSubmission,
+    origin: DesignRevision['origin'],
+    run: RevisionRun,
+    cache?: RevisionCache,
+  ): Promise<DesignRevision> {
+    try {
+      const revision = await this.em.transactional(async (em) => {
+        const created = await createRevision(em, sessionId, submission, origin, run);
+        if (cache) {
+          created.evaluationStatus = cache.status;
+          created.overall = cache.overall;
+          created.decision = cache.decision;
+        }
+        return created;
+      });
+      // The transaction ran on a fork; hand back the row as this context sees it.
+      return this.em.findOneOrFail(DesignRevision, revision.id, { refresh: true });
+    } catch (error) {
+      if (error instanceof UniqueConstraintViolationException) {
         throw new ConflictException('a concurrent submission won this revision number — retry');
       }
-      throw err;
+      throw error;
     }
   }
 
   async listRevisions(
     sessionId: string,
-    query: ListRevisionsQueryDto,
-  ): Promise<[RevisionWithEvaluation[], number]> {
+    query: ListRevisionsQueryInput,
+  ): Promise<[DesignRevision[], number]> {
     const session = await this.em.findOne(DesignSession, sessionId);
-    if (!session) {
-      throw new NotFoundException(`Session ${sessionId} not found`);
-    }
-
-    const [revisions, total] = await this.em.findAndCount(
+    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    return this.em.findAndCount(
       DesignRevision,
       { session: sessionId },
-      {
-        limit: query.limit ?? DEFAULT_LIST_LIMIT,
-        offset: query.offset ?? 0,
-        orderBy: { revisionNumber: 'desc' },
-      },
+      { limit: query.limit, offset: query.offset, orderBy: { revisionNumber: 'desc' } },
     );
-
-    const evaluationByRevisionId = await this.evaluationsFor(revisions);
-    return [
-      revisions.map((revision) => ({
-        revision,
-        evaluation: evaluationByRevisionId.get(revision.id) ?? null,
-      })),
-      total,
-    ];
-  }
-
-  /** Resolves each session's newest revision and that revision's evaluation. */
-  private async withLatest(sessions: DesignSession[]): Promise<SessionWithLatest[]> {
-    const latestBySessionId = new Map<string, DesignRevision | null>(
-      sessions.map((session) => [
-        session.id,
-        session.revisions
-          .getItems()
-          .reduce<DesignRevision | null>(
-            (max, r) => (max === null || r.revisionNumber > max.revisionNumber ? r : max),
-            null,
-          ),
-      ]),
-    );
-
-    const latestRevisions = [...latestBySessionId.values()].filter(
-      (r): r is DesignRevision => r !== null,
-    );
-    const evaluationByRevisionId = await this.evaluationsFor(latestRevisions);
-
-    return sessions.map((session) => {
-      const latestRevision = latestBySessionId.get(session.id) ?? null;
-      return {
-        session,
-        latestRevision,
-        latestEvaluation: latestRevision
-          ? (evaluationByRevisionId.get(latestRevision.id) ?? null)
-          : null,
-      };
-    });
-  }
-
-  /** One IN query instead of an N+1 — Evaluation points at Revision, not back. */
-  private async evaluationsFor(revisions: DesignRevision[]): Promise<Map<string, Evaluation>> {
-    if (revisions.length === 0) {
-      return new Map();
-    }
-    const evaluations = await this.em.find(Evaluation, {
-      revision: { $in: revisions.map((r) => r.id) },
-    });
-    return new Map(evaluations.map((e) => [e.revision.id, e]));
   }
 }
+
+/** The newest revision of a session whose revisions are loaded. */
+const withLatest = (session: DesignSession): SessionWithLatest => ({
+  session,
+  latestRevision: session.revisions
+    .getItems()
+    .reduce<DesignRevision | null>(
+      (max, r) => (max === null || r.revisionNumber > max.revisionNumber ? r : max),
+      null,
+    ),
+});

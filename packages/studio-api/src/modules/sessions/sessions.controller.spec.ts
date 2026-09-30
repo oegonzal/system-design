@@ -1,41 +1,86 @@
+import { BadGatewayException } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  NARRATION_PROSE_MAX_LENGTH,
+  DEFAULT_IMPROVE_ITERATIONS,
   type ApiErrorResponse,
   type CanvasGraph,
+  type DesignBrief,
+  type DesignNarrative,
+  type DesignSubmission,
+  type GetEvaluationResponse,
+  type GetImproveRunResponse,
   type GetPromptResponse,
   type GetRevisionResponse,
-  type BriefSuggestionsResponse,
   type GetSessionResponse,
   type ListRevisionsResponse,
   type ListSessionsResponse,
+  type StartImproveResponse,
 } from '@sysdesign/contracts';
-import { EvalJob } from '@sysdesign/db';
+import { DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
+import { authoredPrompt } from '../prompts/prompts.controller.spec';
 
-const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
 const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
-
-/** A minimal structured narrative — overview only — for round-trip assertions. */
-const narrativeWith = (overview: string) => ({
-  version: 1,
-  overview,
-  componentRationales: [],
-  flowNarrations: [],
-});
 
 const validGraph = (): CanvasGraph => ({
   nodes: [
     { id: 'client', kind: 'client', label: 'Web client' },
-    { id: 'api', kind: 'service', label: 'API', config: { replicas: 3 } },
+    {
+      id: 'api',
+      kind: 'service',
+      label: 'API',
+      config: [{ key: 'replicas', value: 3 }],
+      operations: [{ name: 'listOrders', kind: 'query' }],
+    },
     { id: 'db', kind: 'database', label: 'Primary DB', position: { x: 100, y: 200 } },
   ],
   edges: [
-    { id: 'e-client-api', source: 'client', target: 'api', kind: 'sync' },
-    { id: 'e-api-db', source: 'api', target: 'db' },
+    { id: 'e-client-api', source: 'client', target: 'api', kind: 'sync', carries: ['listOrders'] },
+    { id: 'e-api-db', source: 'api', target: 'db', kind: 'sync' },
   ],
 });
+
+const validBrief = (): DesignBrief => ({
+  version: 1,
+  bindings: [
+    {
+      criterionId: 'c1',
+      nodeIds: ['api', 'db'],
+      path: ['e-client-api', 'e-api-db'],
+      claim: 'the API reads the customer shard',
+    },
+    { criterionId: 'c3', nodeIds: ['api'], claim: 'three replicas behind the gateway' },
+  ],
+});
+
+const validNarrative = (overview = 'first cut'): DesignNarrative => ({
+  version: 1,
+  overview,
+  componentRationales: [{ nodeId: 'db', prose: 'The primary DB is the source of truth.' }],
+  criterionNarrations: [{ criterionId: 'c1', prose: 'Client → API → DB, newest first.' }],
+});
+
+const submission = (
+  graph: CanvasGraph = validGraph(),
+  brief: DesignBrief | null = validBrief(),
+  narrative: DesignNarrative | null = validNarrative(),
+): DesignSubmission => ({ graph, brief, narrative });
+
+/** The coach's second iteration: the author's graph plus a read replica, ids prefixed ai-. */
+const coached = (): DesignSubmission => {
+  const base = submission();
+  return {
+    ...base,
+    graph: {
+      nodes: [...base.graph.nodes, { id: 'ai-replica', kind: 'replica', label: 'Read replica' }],
+      edges: [
+        ...base.graph.edges,
+        { id: 'ai-e-replica', source: 'db', target: 'ai-replica', kind: 'async' },
+      ],
+    },
+  };
+};
 
 describe('sessions', () => {
   let h: Harness;
@@ -47,13 +92,13 @@ describe('sessions', () => {
     await h.close();
   });
   beforeEach(async () => {
-    await resetDesignData(h.em);
+    await resetDesignData(h.em, h.loop);
   });
 
   const makePrompt = async () => {
-    const { body } = await call<GetPromptResponse>(`${h.url}/prompts/generate`, {
+    const { body } = await call<GetPromptResponse>(`${h.url}/prompts`, {
       method: 'POST',
-      body: JSON.stringify({ experienceId: TICKETING_ID }),
+      body: JSON.stringify(authoredPrompt()),
     });
     return body.data;
   };
@@ -64,573 +109,468 @@ describe('sessions', () => {
       body: JSON.stringify({ promptId }),
     });
 
-  const submitRevision = async (
-    sessionId: string,
-    graph: unknown,
-    narrative?: unknown,
-    brief?: unknown,
-  ) =>
+  const startSession = async () => {
+    const prompt = await makePrompt();
+    const { body } = await createSession(prompt.id);
+    return { prompt, sessionId: body.data.id };
+  };
+
+  const submit = (sessionId: string, body: unknown) =>
     call<GetRevisionResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
       method: 'POST',
-      body: JSON.stringify({
-        graph,
-        ...(narrative === undefined ? {} : { narrative }),
-        ...(brief === undefined ? {} : { brief }),
-      }),
+      body: JSON.stringify(body),
     });
 
+  const evaluation = (revisionId: string) =>
+    call<GetEvaluationResponse>(`${h.url}/revisions/${revisionId}/evaluation`);
+
   describe('POST /api/sessions', () => {
-    it('creates an in-progress session with empty revision stats', async () => {
+    it('creates an in-progress session with no grade yet', async () => {
       const prompt = await makePrompt();
       const { status, body } = await createSession(prompt.id);
 
       expect(status).toBe(201);
-      expect(body.data.promptId).toBe(prompt.id);
-      expect(body.data.status).toBe('in-progress');
-      expect(body.data.revisionCount).toBe(0);
-      expect(body.data.latestRevisionNumber).toBeNull();
-      expect(body.data.latestGrade).toBeNull();
+      expect(body.data).toMatchObject({
+        promptId: prompt.id,
+        status: 'in-progress',
+        revisionCount: 0,
+        latestRevisionNumber: null,
+        latestOverall: null,
+        latestDecision: null,
+        latestEvaluationStatus: null,
+      });
     });
 
-    it('rejects an archived prompt with 422', async () => {
+    it('rejects an archived prompt and an unknown prompt with 422', async () => {
       const prompt = await makePrompt();
       await call(`${h.url}/prompts/${prompt.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'archived' }),
       });
-
-      const { status, body } = await call<ApiErrorResponse>(`${h.url}/sessions`, {
+      const archived = await call<ApiErrorResponse>(`${h.url}/sessions`, {
         method: 'POST',
         body: JSON.stringify({ promptId: prompt.id }),
       });
-
-      expect(status).toBe(422);
-      expect(JSON.stringify(body.message)).toContain('archived');
-    });
-
-    it('rejects an unknown prompt with 422', async () => {
+      expect(archived.status).toBe(422);
+      expect(JSON.stringify(archived.body.message)).toContain('archived');
       expect((await createSession(UNKNOWN_UUID)).status).toBe(422);
     });
   });
 
   describe('POST /api/sessions/:id/revisions', () => {
-    it('creates a revision with an embedded queued evaluation and a queue job', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
+    it('[DEL-1] a submission is one canvas run on the prompt’s rubric, and the revision points at its first iteration', async () => {
+      const { prompt, sessionId } = await startSession();
 
-      const { status, body } = await submitRevision(
-        session.data.id,
-        validGraph(),
-        narrativeWith('first cut'),
-      );
+      const { status, body } = await submit(sessionId, submission());
 
       expect(status).toBe(201);
-      expect(body.data.sessionId).toBe(session.data.id);
-      expect(body.data.revisionNumber).toBe(1);
-      expect(body.data.narrative?.overview).toBe('first cut');
-      expect(body.data.graph.nodes).toHaveLength(3);
-      expect(body.data.evaluation?.status).toBe('queued');
-      expect(body.data.evaluation?.findings).toEqual([]);
-      expect(body.data.evaluation?.overallScore).toBeNull();
+      expect(body.data).toMatchObject({
+        sessionId,
+        revisionNumber: 1,
+        origin: 'user',
+        brief: validBrief(),
+        narrative: validNarrative(),
+        evaluation: {
+          runId: 'fake-run-1',
+          iteration: 1,
+          status: 'running',
+          overall: null,
+          decision: null,
+        },
+      });
+      expect(body.data.graph).toEqual(validGraph());
+      expect(h.loop.startRequests).toEqual([
+        {
+          pipeline: 'system-design-canvas',
+          goal: prompt.markdown,
+          output: submission(),
+          criteria: prompt.criteria,
+          maxIterations: 1,
+        },
+      ]);
 
-      // The queue row committed in the same transaction as the revision.
-      const job = await h.em.fork().findOne(EvalJob, { revision: body.data.id });
-      expect(job).not.toBeNull();
-      expect(job?.status).toBe('queued');
-
-      // Revision numbers are dense per session.
-      const second = await submitRevision(session.data.id, validGraph());
+      // Dense numbering, one run per submission.
+      const second = await submit(sessionId, submission(validGraph(), null, null));
       expect(second.body.data.revisionNumber).toBe(2);
+      expect(second.body.data.evaluation?.runId).toBe('fake-run-2');
+      expect(second.body.data.brief).toBeNull();
     });
 
-    it('rejects an oversize rationale (400), an unknown-node rationale (422), and round-trips a valid structured narrative', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      // Shape: a rationale past the per-slot cap is a 400 at the DTO layer.
-      const overCap = await submitRevision(session.data.id, validGraph(), {
-        version: 1,
-        componentRationales: [{ nodeId: 'db', prose: 'x'.repeat(NARRATION_PROSE_MAX_LENGTH + 1) }],
-        flowNarrations: [],
-      });
-      expect(overCap.status).toBe(400);
-
-      // Reference: a rationale for a node the graph never declared is a 422.
-      const unknownNode = await submitRevision(session.data.id, validGraph(), {
-        version: 1,
-        componentRationales: [{ nodeId: 'ghost', prose: 'This node is not on the canvas at all.' }],
-        flowNarrations: [],
-      });
-      expect(unknownNode.status).toBe(422);
-
-      const narrative = {
-        version: 1,
-        overview: 'The web client calls the API, which persists to the primary DB.',
-        componentRationales: [
-          {
-            nodeId: 'db',
-            prose: 'The primary DB persists every order and is the source of truth.',
-          },
-        ],
-        flowNarrations: [
-          { requirementIndex: 0, prose: 'The client reads availability from the API.' },
-        ],
-      };
-      const { status, body } = await submitRevision(session.data.id, validGraph(), narrative);
-      expect(status).toBe(201);
-      expect(body.data.narrative).toEqual(narrative);
-    });
-
-    it('round-trips a design brief, and defaults it to null when none is sent', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      const bare = await submitRevision(session.data.id, validGraph());
-      expect(bare.body.data.brief).toBeNull();
-
-      const brief = {
-        version: 1,
-        nfrBindings: [
-          {
-            nfrId: prompt.nonFunctionalRequirements[0].id,
-            nodeIds: ['db'],
-            mechanism: 'backups',
-            note: 'nightly snapshots, 30 day retention',
-          },
-        ],
-        flows: [{ id: 'f-1', requirementIndex: 0, path: ['e-client-api', 'e-api-db'] }],
-      };
-      const { status, body } = await submitRevision(
-        session.data.id,
-        validGraph(),
-        undefined,
-        brief,
-      );
-      expect(status).toBe(201);
-      expect(body.data.brief).toEqual(brief);
-    });
-
-    it('rejects an unknown mechanism with 400 and an impossible one with 422', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      const nfrId = prompt.nonFunctionalRequirements[0].id;
-
-      const unknownMechanism = await submitRevision(session.data.id, validGraph(), undefined, {
-        version: 1,
-        nfrBindings: [{ nfrId, nodeIds: ['db'], mechanism: 'vibes' }],
-        flows: [],
-      });
-      expect(unknownMechanism.status).toBe(400);
-
-      // Shape is fine; a client simply cannot be a dead-letter queue.
-      const impossible = await submitRevision(session.data.id, validGraph(), undefined, {
-        version: 1,
-        nfrBindings: [{ nfrId, nodeIds: ['client'], mechanism: 'dlq' }],
-        flows: [],
-      });
-      expect(impossible.status).toBe(422);
-      expect(JSON.stringify(impossible.body)).toContain('cannot provide dlq');
-    });
-
-    it('accepts a binding the diagram fails to back up — that is a grade, not a 400', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      // No `backups` knob anywhere, so nothing corroborates this claim. The
-      // API must still store it; the evaluation is what teaches the author.
-      const { status } = await submitRevision(session.data.id, validGraph(), undefined, {
-        version: 1,
-        nfrBindings: [
-          {
-            nfrId: prompt.nonFunctionalRequirements[0].id,
-            nodeIds: ['db'],
-            mechanism: 'backups',
-          },
-        ],
-        flows: [],
-      });
-      expect(status).toBe(201);
-    });
-
-    it('rejects a node kind outside the palette with 400 — a shape error', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
+    it('[DEL-5] the studio refuses only what is impossible, every problem at once, and writes nothing', async () => {
+      const { sessionId } = await startSession();
 
       const graph = validGraph();
-      graph.nodes[0] = { id: 'mf', kind: 'mainframe' as never, label: 'Mainframe' };
-
-      expect((await submitRevision(session.data.id, graph)).status).toBe(400);
-    });
-
-    it('rejects referential problems with 422 listing every one', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      // Dangling edge target.
-      const dangling = validGraph();
-      dangling.edges.push({ id: 'e-ghost', source: 'api', target: 'ghost' });
-      const danglingRes = await call<ApiErrorResponse>(
-        `${h.url}/sessions/${session.data.id}/revisions`,
-        { method: 'POST', body: JSON.stringify({ graph: dangling }) },
+      graph.edges.push({ id: 'e-ghost', source: 'api', target: 'ghost', kind: 'sync' });
+      graph.edges.push({ id: 'e-loop', source: 'api', target: 'api', kind: 'sync' });
+      graph.edges[1] = { ...graph.edges[1], carries: ['CancelOrder'] };
+      const brief: DesignBrief = {
+        version: 1,
+        bindings: [{ criterionId: 'c9', nodeIds: ['nobody'], claim: 'bound to nothing' }],
+      };
+      const narrative: DesignNarrative = {
+        version: 1,
+        componentRationales: [{ nodeId: 'ghost', prose: 'not drawn' }],
+        criterionNarrations: [],
+      };
+      const { status, body } = await call<ApiErrorResponse>(
+        `${h.url}/sessions/${sessionId}/revisions`,
+        { method: 'POST', body: JSON.stringify({ graph, brief, narrative }) },
       );
-      expect(danglingRes.status).toBe(422);
-      expect(JSON.stringify(danglingRes.body.message)).toContain('ghost');
 
-      // Self-loop.
-      const selfLoop = validGraph();
-      selfLoop.edges.push({ id: 'e-loop', source: 'api', target: 'api' });
-      expect((await submitRevision(session.data.id, selfLoop)).status).toBe(422);
-
-      // Duplicate node ids.
-      const dupNodes = validGraph();
-      dupNodes.nodes.push({ id: 'api', kind: 'service', label: 'API again' });
-      expect((await submitRevision(session.data.id, dupNodes)).status).toBe(422);
-
-      // Duplicate edge ids.
-      const dupEdges = validGraph();
-      dupEdges.edges.push({ id: 'e-api-db', source: 'client', target: 'db' });
-      expect((await submitRevision(session.data.id, dupEdges)).status).toBe(422);
-
-      // Nothing was persisted along the way.
-      const list = await call<ListRevisionsResponse>(
-        `${h.url}/sessions/${session.data.id}/revisions`,
-      );
+      expect(status).toBe(422);
+      const problems = JSON.stringify(body.message);
+      for (const fragment of [
+        'unknown target node: ghost',
+        'self-loop',
+        'carries CancelOrder',
+        'unknown criterion: c9',
+        'unknown node: nobody',
+        'explains unknown node: ghost',
+      ]) {
+        expect(problems).toContain(fragment);
+      }
+      expect(h.loop.startRequests).toEqual([]);
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
       expect(list.body.meta.total).toBe(0);
     });
 
-    it('rejects a revision against a non-in-progress session with 422', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      await call(`${h.url}/sessions/${session.data.id}`, {
+    it('a claim the diagram does not back is a grade, not a 422', async () => {
+      const { sessionId } = await startSession();
+      const brief: DesignBrief = {
+        version: 1,
+        bindings: [
+          { criterionId: 'c3', nodeIds: ['db'], claim: 'replicated across three regions' },
+        ],
+      };
+      expect((await submit(sessionId, submission(validGraph(), brief))).status).toBe(201);
+    });
+
+    it('rejects a shape outside the schema with 400: an unknown kind, a nested config value, a missing brief key', async () => {
+      const { sessionId } = await startSession();
+
+      const badKind = validGraph();
+      badKind.nodes[0] = { id: 'mf', kind: 'mainframe' as never, label: 'Mainframe' };
+      expect((await submit(sessionId, submission(badKind))).status).toBe(400);
+
+      const nested = validGraph();
+      nested.nodes[1] = {
+        ...nested.nodes[1],
+        config: [{ key: 'retry', value: { attempts: 3 } as never }],
+      };
+      expect((await submit(sessionId, submission(nested))).status).toBe(400);
+
+      expect((await submit(sessionId, { graph: validGraph() })).status).toBe(400);
+    });
+
+    it('a grader that refuses the run is a 502, and nothing is written', async () => {
+      const { sessionId } = await startSession();
+      h.loop.failNextStart = new BadGatewayException('the quality loop is unreachable');
+
+      expect((await submit(sessionId, submission())).status).toBe(502);
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(0);
+    });
+
+    it('a prompt whose rubric could not be derived cannot be graded: 503 from the grader, no revision', async () => {
+      const { prompt, sessionId } = await startSession();
+      const fork = h.em.fork();
+      const row = await fork.findOneOrFail(Prompt, prompt.id);
+      row.criteria = [];
+      await fork.flush();
+      h.loop.llm = { enabled: false, model: null, reason: 'deterministic' };
+
+      expect((await submit(sessionId, submission())).status).toBe(503);
+      expect(h.loop.startRequests).toEqual([]);
+    });
+
+    it('rejects a revision against a closed session with 422 and an unknown session with 404', async () => {
+      const { sessionId } = await startSession();
+      await call(`${h.url}/sessions/${sessionId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'completed' }),
       });
-
-      expect((await submitRevision(session.data.id, validGraph())).status).toBe(422);
-    });
-
-    it('404s for an unknown session', async () => {
-      expect((await submitRevision(UNKNOWN_UUID, validGraph())).status).toBe(404);
+      expect((await submit(sessionId, submission())).status).toBe(422);
+      expect((await submit(UNKNOWN_UUID, submission())).status).toBe(404);
     });
   });
 
-  describe('POST /api/sessions/:id/revisions — interface contracts', () => {
-    /** client → gateway → service → queue → worker with declared interfaces. */
-    const interfaceGraph = (): CanvasGraph => ({
-      nodes: [
-        { id: 'client', kind: 'client', label: 'Web client' },
-        {
-          id: 'gw',
-          kind: 'gateway',
-          label: 'API Gateway',
-          operations: [
-            { name: 'PlaceOrder', kind: 'command' },
-            { name: 'GetOrder', kind: 'query', idempotent: true },
-          ],
-        },
-        {
-          id: 'orders',
-          kind: 'service',
-          label: 'Order Service',
-          responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
-          operations: [
-            { name: 'PlaceOrder', kind: 'command', notes: 'Validates inventory first' },
-            { name: 'GetOrder', kind: 'query', idempotent: true },
-          ],
-        },
-        {
-          id: 'order-queue',
-          kind: 'queue',
-          label: 'Order Queue',
-          operations: [{ name: 'OrderPlaced', kind: 'event' }],
-        },
-        { id: 'fulfillment', kind: 'worker', label: 'Fulfillment Worker' },
-      ],
-      edges: [
-        { id: 'e-in', source: 'client', target: 'gw', kind: 'sync' },
-        {
-          id: 'e-call',
-          source: 'gw',
-          target: 'orders',
-          kind: 'sync',
-          carries: ['PlaceOrder', 'GetOrder'],
-        },
-        {
-          id: 'e-produce',
-          source: 'orders',
-          target: 'order-queue',
-          kind: 'async',
-          carries: ['OrderPlaced'],
-        },
-        {
-          id: 'e-consume',
-          source: 'order-queue',
-          target: 'fulfillment',
-          kind: 'async',
-          carries: ['OrderPlaced'],
-        },
-      ],
-    });
+  describe('GET /api/revisions/:id/evaluation', () => {
+    it('[DEL-4] reads the run for the revision’s iteration, grounds findings onto the canvas, and caches the terminal grade', async () => {
+      const { sessionId } = await startSession();
+      const { body: created } = await submit(sessionId, submission());
+      const revisionId = created.data.id;
 
-    const startSession = async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      return session.data.id;
-    };
-
-    it('round-trips an interface-rich graph through submit unchanged', async () => {
-      const sessionId = await startSession();
-
-      const { status, body } = await submitRevision(sessionId, interfaceGraph());
-
-      expect(status).toBe(201);
-      expect(body.data.graph).toEqual(interfaceGraph());
-    });
-
-    it('accepts a carry referencing an undeclared name — an eval lesson, not a save blocker', async () => {
-      const sessionId = await startSession();
-      const graph = interfaceGraph();
-      graph.edges[1] = { ...graph.edges[1], carries: ['CancelOrder'] };
-
-      expect((await submitRevision(sessionId, graph)).status).toBe(201);
-    });
-
-    it('rejects oversize interface shapes and config bags with 400', async () => {
-      const sessionId = await startSession();
-      const manyOps = (count: number) =>
-        Array.from({ length: count }, (_, i) => ({ name: `op-${i}`, kind: 'query' as const }));
-
-      const tooManyOps = interfaceGraph();
-      tooManyOps.nodes[2] = { ...tooManyOps.nodes[2], operations: manyOps(13) };
-
-      const tooManyResponsibilities = interfaceGraph();
-      tooManyResponsibilities.nodes[2] = {
-        ...tooManyResponsibilities.nodes[2],
-        responsibilities: Array.from({ length: 7 }, (_, i) => `responsibility ${i}`),
-      };
-
-      const overlongOpName = interfaceGraph();
-      overlongOpName.nodes[1] = {
-        ...overlongOpName.nodes[1],
-        operations: [{ name: 'x'.repeat(61), kind: 'command' }],
-      };
-
-      const bloatedConfig = interfaceGraph();
-      bloatedConfig.nodes[2] = {
-        ...bloatedConfig.nodes[2],
-        config: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`key-${i}`, i])),
-      };
-
-      const nestedConfig = interfaceGraph();
-      nestedConfig.nodes[2] = {
-        ...nestedConfig.nodes[2],
-        config: { retry: { attempts: 3 } as never },
-      };
-
-      for (const graph of [
-        tooManyOps,
-        tooManyResponsibilities,
-        overlongOpName,
-        bloatedConfig,
-        nestedConfig,
-      ]) {
-        expect((await submitRevision(sessionId, graph)).status).toBe(400);
-      }
-    });
-
-    it('rejects duplicate operation names and duplicate carries with 422', async () => {
-      const sessionId = await startSession();
-
-      const dupOps = interfaceGraph();
-      dupOps.nodes[2] = {
-        ...dupOps.nodes[2],
-        operations: [
-          { name: 'PlaceOrder', kind: 'command' },
-          { name: 'PlaceOrder', kind: 'query' },
-        ],
-      };
-      const dupOpsRes = await call<ApiErrorResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
-        method: 'POST',
-        body: JSON.stringify({ graph: dupOps }),
+      const running = await evaluation(revisionId);
+      expect(running.status).toBe(200);
+      expect(running.body.data).toMatchObject({
+        runId: 'fake-run-1',
+        iteration: 1,
+        status: 'running',
+        overall: null,
+        decision: null,
+        dimensions: {},
+        findings: [],
+        criterionResults: [],
+        stopReason: null,
+        error: null,
       });
-      expect(dupOpsRes.status).toBe(422);
-      expect(JSON.stringify(dupOpsRes.body.message)).toContain('duplicate operation name');
 
-      const dupCarries = interfaceGraph();
-      dupCarries.edges[1] = { ...dupCarries.edges[1], carries: ['GetOrder', 'GetOrder'] };
-      const dupCarriesRes = await call<ApiErrorResponse>(
-        `${h.url}/sessions/${sessionId}/revisions`,
-        { method: 'POST', body: JSON.stringify({ graph: dupCarries }) },
-      );
-      expect(dupCarriesRes.status).toBe(422);
-      expect(JSON.stringify(dupCarriesRes.body.message)).toContain('duplicate carries entry');
+      h.loop.complete('fake-run-1');
+      const done = await evaluation(revisionId);
+      expect(done.body.data).toMatchObject({
+        status: 'complete',
+        overall: 64,
+        decision: 'revise',
+        dimensions: { coverage: 70, quality_attributes: 52, compliance: 100 },
+        stopReason: 'max-iterations',
+      });
+      expect(done.body.data.findings).toEqual([
+        {
+          id: 'unhandled_failure|node.2',
+          lenses: ['critic.architecture', 'critic.scenarios'],
+          type: 'unhandled_failure',
+          severity: 'high',
+          confidence: 'high',
+          fixability: 'fixable_local',
+          criterionIds: ['c2'],
+          nodeIds: ['api'],
+          edgeIds: [],
+          locationRefs: ['node.2'],
+          rationale: 'a single instance serves every read; a restart drops the target',
+          reconciledTo: null,
+        },
+      ]);
+      expect(done.body.data.criterionResults.map((r) => `${r.criterionId}:${r.result}`)).toEqual([
+        'c1:pass',
+        'c2:partial',
+        'c3:fail',
+        'c4:fail',
+        'c5:fail',
+      ]);
+
+      // The terminal grade was written back: lists never fetch the loop.
+      const revision = await call<GetRevisionResponse>(`${h.url}/revisions/${revisionId}`);
+      expect(revision.body.data.evaluation).toEqual({
+        runId: 'fake-run-1',
+        iteration: 1,
+        status: 'complete',
+        overall: 64,
+        decision: 'revise',
+      });
+      const sessions = await call<ListSessionsResponse>(`${h.url}/sessions`);
+      expect(sessions.body.data[0]).toMatchObject({
+        id: sessionId,
+        revisionCount: 1,
+        latestRevisionNumber: 1,
+        latestOverall: 64,
+        latestDecision: 'revise',
+        latestEvaluationStatus: 'complete',
+      });
     });
 
-    it('rejects a graph over the whole-graph operation budget with 422', async () => {
-      const sessionId = await startSession();
-      // 33 × 12 + 5 = 401 declared operations — one past the budget of 400.
-      const graph: CanvasGraph = {
-        nodes: Array.from({ length: 34 }, (_, i) => ({
-          id: `svc-${i}`,
-          kind: 'service' as const,
-          label: `Service ${i}`,
-          operations: Array.from({ length: i === 33 ? 5 : 12 }, (_, j) => ({
-            name: `op-${j}`,
-            kind: 'query' as const,
-          })),
-        })),
-        edges: [],
-      };
+    it('a failed run is reported failed with its error', async () => {
+      const { sessionId } = await startSession();
+      const { body: created } = await submit(sessionId, submission());
+      h.loop.fail('fake-run-1', 'the model went away');
 
-      const { status, body } = await call<ApiErrorResponse>(
-        `${h.url}/sessions/${sessionId}/revisions`,
-        { method: 'POST', body: JSON.stringify({ graph }) },
-      );
-      expect(status).toBe(422);
-      expect(JSON.stringify(body.message)).toContain('401 operations');
+      const { body } = await evaluation(created.data.id);
+      expect(body.data).toMatchObject({
+        status: 'failed',
+        error: 'the model went away',
+        overall: null,
+      });
+    });
+
+    it('404s for an unknown revision, a run the loop lost, and a revision graded before delegation', async () => {
+      const { sessionId } = await startSession();
+      expect((await evaluation(UNKNOWN_UUID)).status).toBe(404);
+
+      const { body: created } = await submit(sessionId, submission());
+      h.loop.runs.delete('fake-run-1');
+      expect((await evaluation(created.data.id)).status).toBe(404);
+
+      const fork = h.em.fork();
+      const legacy = fork.create(DesignRevision, {
+        session: fork.getReference(DesignSession, sessionId),
+        revisionNumber: 99,
+        origin: 'user',
+        graph: validGraph(),
+        brief: null,
+        narrative: null,
+      });
+      fork.persist(legacy);
+      await fork.flush();
+      expect((await evaluation(legacy.id)).status).toBe(404);
+      const read = await call<GetRevisionResponse>(`${h.url}/revisions/${legacy.id}`);
+      expect(read.body.data.evaluation).toBeNull();
     });
   });
 
-  describe('GET /api/sessions/:id/revisions', () => {
-    it('lists graph-free summaries, newest revision first', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      await submitRevision(session.data.id, validGraph(), narrativeWith('v1'));
-      await submitRevision(session.data.id, validGraph(), narrativeWith('v2'));
+  describe('the coach', () => {
+    const startImprove = (sessionId: string, body: unknown) =>
+      call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    const readImprove = (sessionId: string, runId: string) =>
+      call<GetImproveRunResponse>(`${h.url}/sessions/${sessionId}/improve/${runId}`);
+
+    it('[DEL-3] the draft becomes the author’s revision, and each iteration that beat every earlier one is imported once as the coach’s', async () => {
+      const { prompt, sessionId } = await startSession();
+
+      const started = await startImprove(sessionId, { ...submission(), maxIterations: 3 });
+      expect(started.status).toBe(202);
+      expect(started.body.data.runId).toBe('fake-run-1');
+      expect(started.body.data.revision).toMatchObject({
+        revisionNumber: 1,
+        origin: 'user',
+        evaluation: { runId: 'fake-run-1', iteration: 1, status: 'running' },
+      });
+      expect(h.loop.startRequests[0]).toMatchObject({
+        pipeline: 'system-design-canvas',
+        criteria: prompt.criteria,
+        maxIterations: 3,
+      });
+
+      h.loop.exchanges('fake-run-1', 5);
+      const running = await readImprove(sessionId, 'fake-run-1');
+      expect(running.body.data).toMatchObject({
+        runId: 'fake-run-1',
+        sessionId,
+        status: 'running',
+        exchangeCount: 5,
+        iterations: [],
+        stopReason: null,
+      });
+
+      h.loop.complete('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+        { overall: 70, decision: 'revise', artifact: coached() },
+      ]);
+      const done = await readImprove(sessionId, 'fake-run-1');
+      expect(done.body.data).toMatchObject({ status: 'complete', stopReason: 'max-iterations' });
+      const [first, second, third] = done.body.data.iterations;
+      expect(first).toMatchObject({
+        iteration: 1,
+        mode: 'provided',
+        overall: 60,
+        decision: 'revise',
+      });
+      expect(first.revisionId).toBe(started.body.data.revision.id);
+      expect(second).toMatchObject({ iteration: 2, mode: 'revise', overall: 72 });
+      expect(second.revisionId).not.toBeNull();
+      expect(third).toMatchObject({ iteration: 3, overall: 70, revisionId: null });
+
+      // Imported once: a second read answers the same revision.
+      const again = await readImprove(sessionId, 'fake-run-1');
+      expect(again.body.data.iterations[1].revisionId).toBe(second.revisionId);
+
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(2);
+      expect(list.body.data[0]).toMatchObject({
+        revisionNumber: 2,
+        origin: 'assistant',
+        evaluation: {
+          runId: 'fake-run-1',
+          iteration: 2,
+          status: 'complete',
+          overall: 72,
+          decision: 'revise',
+        },
+      });
+      expect(list.body.data[1]).toMatchObject({
+        revisionNumber: 1,
+        origin: 'user',
+        evaluation: { iteration: 1, status: 'complete', overall: 60 },
+      });
+      const imported = await call<GetRevisionResponse>(`${h.url}/revisions/${second.revisionId}`);
+      expect(imported.body.data.graph.nodes.map((n) => n.id)).toContain('ai-replica');
+    });
+
+    it('an iteration whose artifact the studio would refuse is skipped, never stored', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, submission());
+      expect(h.loop.startRequests[0]?.maxIterations).toBe(DEFAULT_IMPROVE_ITERATIONS);
+
+      const dangling = coached();
+      dangling.graph.edges.push({ id: 'ai-bad', source: 'api', target: 'nowhere', kind: 'sync' });
+      h.loop.complete('fake-run-1', [
+        { overall: 40 },
+        { overall: 90, artifact: dangling },
+        { overall: 95, artifact: { nope: true } },
+      ]);
+      const { body } = await readImprove(sessionId, 'fake-run-1');
+      expect(body.data.iterations.map((it) => it.revisionId === null)).toEqual([false, true, true]);
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(1);
+    });
+
+    it('404s for a run that is not this session’s, 400 for more iterations than the loop allows', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, submission());
+      const other = await startSession();
+      expect((await readImprove(other.sessionId, 'fake-run-1')).status).toBe(404);
+      expect((await readImprove(sessionId, 'nope')).status).toBe(404);
+      expect((await startImprove(sessionId, { ...submission(), maxIterations: 11 })).status).toBe(
+        400,
+      );
+    });
+  });
+
+  describe('lists and status', () => {
+    it('lists graph-free summaries newest first, and summarises the newest revision on the session', async () => {
+      const { sessionId } = await startSession();
+      await submit(sessionId, submission(validGraph(), null, validNarrative('v1')));
+      await submit(sessionId, submission(validGraph(), null, validNarrative('v2')));
 
       const { status, body } = await call<ListRevisionsResponse>(
-        `${h.url}/sessions/${session.data.id}/revisions`,
+        `${h.url}/sessions/${sessionId}/revisions`,
       );
-
       expect(status).toBe(200);
       expect(body.meta.total).toBe(2);
       expect(body.data.map((r) => r.revisionNumber)).toEqual([2, 1]);
       expect(body.data[0]).not.toHaveProperty('graph');
-      expect(body.data[0].narrative?.overview).toBe('v2');
-      expect(body.data[0]).toMatchObject({
-        evaluationStatus: 'queued',
-        overallScore: null,
-        grade: null,
+      expect(body.data[0].evaluation).toEqual({
+        runId: 'fake-run-2',
+        iteration: 1,
+        status: 'running',
+        overall: null,
+        decision: null,
       });
-    });
-  });
 
-  describe('GET /api/sessions', () => {
-    it('summarises revision count and latest revision, latestGrade null while queued', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      await submitRevision(session.data.id, validGraph());
-      await submitRevision(session.data.id, validGraph());
-
-      const { body } = await call<ListSessionsResponse>(`${h.url}/sessions`);
-
-      expect(body.meta.total).toBe(1);
-      expect(body.data[0]).toMatchObject({
-        id: session.data.id,
+      const sessions = await call<ListSessionsResponse>(`${h.url}/sessions`);
+      expect(sessions.body.data[0]).toMatchObject({
+        id: sessionId,
         revisionCount: 2,
         latestRevisionNumber: 2,
-        latestGrade: null,
+        latestEvaluationStatus: 'running',
       });
     });
 
-    it('filters by promptId', async () => {
-      const promptA = await makePrompt();
-      const promptB = await makePrompt();
-      await createSession(promptA.id);
-      await createSession(promptB.id);
-
-      const { body } = await call<ListSessionsResponse>(`${h.url}/sessions?promptId=${promptA.id}`);
-
-      expect(body.meta.total).toBe(1);
-      expect(body.data[0]?.promptId).toBe(promptA.id);
-    });
-  });
-
-  describe('PATCH /api/sessions/:id', () => {
-    it('updates the session status', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      const { status, body } = await call<GetSessionResponse>(
-        `${h.url}/sessions/${session.data.id}`,
-        { method: 'PATCH', body: JSON.stringify({ status: 'abandoned' }) },
+    it('filters sessions by promptId', async () => {
+      const a = await startSession();
+      await startSession();
+      const { body } = await call<ListSessionsResponse>(
+        `${h.url}/sessions?promptId=${a.prompt.id}`,
       );
+      expect(body.meta.total).toBe(1);
+      expect(body.data[0]?.promptId).toBe(a.prompt.id);
+    });
 
+    it('updates the session status, 404 for an unknown session', async () => {
+      const { sessionId } = await startSession();
+      const { status, body } = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'abandoned' }),
+      });
       expect(status).toBe(200);
       expect(body.data.status).toBe('abandoned');
-    });
-
-    it('404s for an unknown session', async () => {
-      const { status } = await call(`${h.url}/sessions/${UNKNOWN_UUID}`, {
+      const missing = await call(`${h.url}/sessions/${UNKNOWN_UUID}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'completed' }),
       });
-      expect(status).toBe(404);
-    });
-  });
-
-  /**
-   * Every automated context here runs EVAL_DETERMINISTIC=1, so this is the only
-   * path CI can reach — which is exactly why the response shape must not depend
-   * on whether a model is configured. An empty list is the deterministic answer,
-   * not an error, so production and CI exercise the same contract.
-   */
-  describe('brief suggestions', () => {
-    it('answers 200 with an empty list and no model when none is configured', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-
-      const { status, body } = await call<BriefSuggestionsResponse>(
-        `${h.url}/sessions/${session.data.id}/brief-suggestions`,
-        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
-      );
-
-      expect(status).toBe(200);
-      expect(body.data).toEqual({ proposals: [], model: null });
-    });
-
-    it('404s for an unknown session', async () => {
-      const { status } = await call<ApiErrorResponse>(
-        `${h.url}/sessions/${UNKNOWN_UUID}/brief-suggestions`,
-        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
-      );
-      expect(status).toBe(404);
-    });
-
-    it('400s without a graph, and 422s on a graph that does not hold together', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      const url = `${h.url}/sessions/${session.data.id}/brief-suggestions`;
-
-      const missing = await call<ApiErrorResponse>(url, { method: 'POST', body: '{}' });
-      expect(missing.status).toBe(400);
-
-      const dangling = await call<ApiErrorResponse>(url, {
-        method: 'POST',
-        body: JSON.stringify({
-          graph: {
-            nodes: [{ id: 'a', kind: 'client', label: 'A' }],
-            edges: [{ id: 'e', source: 'a', target: 'ghost' }],
-          },
-        }),
-      });
-      expect(dangling.status).toBe(422);
-      expect(JSON.stringify(dangling.body.message)).toContain('ghost');
-    });
-
-    /** Read-only by construction: asking must never create a revision. */
-    it('stores nothing — the brief is only ever written by submitting', async () => {
-      const prompt = await makePrompt();
-      const { body: session } = await createSession(prompt.id);
-      await call<BriefSuggestionsResponse>(
-        `${h.url}/sessions/${session.data.id}/brief-suggestions`,
-        { method: 'POST', body: JSON.stringify({ graph: validGraph() }) },
-      );
-
-      const { body: revisions } = await call<ListRevisionsResponse>(
-        `${h.url}/sessions/${session.data.id}/revisions`,
-      );
-      expect(revisions.data).toEqual([]);
+      expect(missing.status).toBe(404);
     });
   });
 });

@@ -9,7 +9,7 @@ export class ExperiencesService {
   /**
    * Seeded reference data — a handful of rows, so no pagination parameters.
    * Ordered by id: the fixture assigns sequential UUIDs, so this is fixture
-   * order, which is deliberate (one experience per archetype, in order).
+   * order, which is deliberate.
    */
   async list(): Promise<[ExperienceProfile[], number]> {
     return this.em.findAndCount(ExperienceProfile, {}, { orderBy: { id: 'asc' } });

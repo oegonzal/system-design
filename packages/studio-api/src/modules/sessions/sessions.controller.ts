@@ -9,47 +9,57 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import {
-  DEFAULT_LIST_LIMIT,
-  type BriefSuggestionsResponse,
-  type GetRevisionResponse,
-  type GetSessionResponse,
-  type ListRevisionsResponse,
-  type InterfaceSuggestionsResponse,
-  type ListSessionsResponse,
+import type {
+  CreateSessionRequest,
+  GetImproveRunResponse,
+  GetRevisionResponse,
+  GetSessionResponse,
+  ListRevisionsResponse,
+  ListSessionsResponse,
+  StartImproveRequest,
+  StartImproveResponse,
+  SubmitRevisionRequest,
+  UpdateSessionRequest,
 } from '@sysdesign/contracts';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { ok, page } from '../../common/envelope';
-import { toRevisionDto, toRevisionSummaryDto } from '../evaluations/evaluations.mapper';
-import { BriefSuggestionsRequestDto } from './dto/brief-suggestions.dto';
-import { InterfaceSuggestionsRequestDto } from './dto/interface-suggestions.dto';
-import { CreateSessionRequestDto } from './dto/create-session.dto';
-import { ListRevisionsQueryDto } from './dto/list-revisions-query.dto';
-import { ListSessionsQueryDto } from './dto/list-sessions-query.dto';
-import { SubmitRevisionRequestDto } from './dto/submit-revision.dto';
-import { UpdateSessionRequestDto } from './dto/update-session.dto';
-import { toSessionDto } from './sessions.mapper';
+import { ImproveService } from './improve.service';
+import {
+  createSessionSchema,
+  listRevisionsQuerySchema,
+  listSessionsQuerySchema,
+  startImproveSchema,
+  submitRevisionSchema,
+  updateSessionSchema,
+  type ListRevisionsQueryInput,
+  type ListSessionsQueryInput,
+} from './session-requests';
+import { toRevisionDto, toRevisionSummaryDto, toSessionDto } from './sessions.mapper';
 import { SessionsService } from './sessions.service';
 
 @Controller('sessions')
 export class SessionsController {
-  constructor(private readonly sessions: SessionsService) {}
+  constructor(
+    private readonly sessions: SessionsService,
+    private readonly improve: ImproveService,
+  ) {}
 
   /** 201 by Nest's POST default. */
   @Post()
-  async create(@Body() dto: CreateSessionRequestDto): Promise<GetSessionResponse> {
-    const session = await this.sessions.create(dto.promptId);
-    return ok(toSessionDto({ session, latestRevision: null, latestEvaluation: null }));
+  async create(
+    @Body(new ZodValidationPipe(createSessionSchema)) body: CreateSessionRequest,
+  ): Promise<GetSessionResponse> {
+    const session = await this.sessions.create(body.promptId);
+    return ok(toSessionDto({ session, latestRevision: null }));
   }
 
   @Get()
-  async list(@Query() query: ListSessionsQueryDto): Promise<ListSessionsResponse> {
+  async list(
+    @Query(new ZodValidationPipe(listSessionsQuerySchema)) query: ListSessionsQueryInput,
+  ): Promise<ListSessionsResponse> {
     const [items, total] = await this.sessions.list(query);
-    return page(items.map(toSessionDto), {
-      total,
-      limit: query.limit ?? DEFAULT_LIST_LIMIT,
-      offset: query.offset ?? 0,
-    });
+    return page(items.map(toSessionDto), { total, limit: query.limit, offset: query.offset });
   }
 
   @Get(':id')
@@ -60,53 +70,49 @@ export class SessionsController {
   @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateSessionRequestDto,
+    @Body(new ZodValidationPipe(updateSessionSchema)) body: UpdateSessionRequest,
   ): Promise<GetSessionResponse> {
-    return ok(toSessionDto(await this.sessions.updateStatus(id, dto.status)));
+    return ok(toSessionDto(await this.sessions.updateStatus(id, body.status)));
   }
 
-  /** 201 with the embedded just-queued evaluation. */
+  /** 201 with the revision; its grade is running — poll `GET /revisions/:id/evaluation`. */
   @Post(':id/revisions')
   async submitRevision(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: SubmitRevisionRequestDto,
+    @Body(new ZodValidationPipe(submitRevisionSchema)) body: SubmitRevisionRequest,
   ): Promise<GetRevisionResponse> {
-    const { revision, evaluation } = await this.sessions.submitRevision(id, dto);
-    return ok(toRevisionDto(revision, evaluation));
-  }
-
-  /**
-   * 200, not 201: this computes an answer and stores nothing. The proposals are
-   * offered to the author and reach the graded brief only if they accept one.
-   */
-  @Post(':id/brief-suggestions')
-  @HttpCode(200)
-  async suggestBrief(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: BriefSuggestionsRequestDto,
-  ): Promise<BriefSuggestionsResponse> {
-    return ok(await this.sessions.suggestBrief(id, dto));
-  }
-
-  /** Same contract as brief suggestions: computed, offered, stored nowhere. */
-  @Post(':id/interface-suggestions')
-  @HttpCode(200)
-  async suggestInterface(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: InterfaceSuggestionsRequestDto,
-  ): Promise<InterfaceSuggestionsResponse> {
-    return ok(await this.sessions.suggestInterface(id, dto));
+    return ok(toRevisionDto(await this.sessions.submitRevision(id, body)));
   }
 
   @Get(':id/revisions')
   async listRevisions(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: ListRevisionsQueryDto,
+    @Query(new ZodValidationPipe(listRevisionsQuerySchema)) query: ListRevisionsQueryInput,
   ): Promise<ListRevisionsResponse> {
     const [items, total] = await this.sessions.listRevisions(id, query);
-    return page(
-      items.map(({ revision, evaluation }) => toRevisionSummaryDto(revision, evaluation)),
-      { total, limit: query.limit ?? DEFAULT_LIST_LIMIT, offset: query.offset ?? 0 },
-    );
+    return page(items.map(toRevisionSummaryDto), {
+      total,
+      limit: query.limit,
+      offset: query.offset,
+    });
+  }
+
+  /** 202: the draft is stored as a revision and the coach is running; poll the run. */
+  @Post(':id/improve')
+  @HttpCode(202)
+  async startImprove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(startImproveSchema)) body: StartImproveRequest,
+  ): Promise<StartImproveResponse> {
+    return ok(await this.improve.start(id, body));
+  }
+
+  /** Reading the run imports every iteration that beat the ones before it, once. */
+  @Get(':id/improve/:runId')
+  async getImprove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('runId') runId: string,
+  ): Promise<GetImproveRunResponse> {
+    return ok(await this.improve.get(id, runId));
   }
 }

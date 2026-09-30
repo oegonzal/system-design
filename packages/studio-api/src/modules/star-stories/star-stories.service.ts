@@ -6,12 +6,11 @@ import {
 } from '@nestjs/common';
 import { UniqueConstraintViolationException, type FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { DEFAULT_LIST_LIMIT } from '@sysdesign/contracts';
+import type { SaveStarStoryRequest } from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt, StarStory } from '@sysdesign/db';
 
 import { contains } from '../../common/ilike';
-import type { ListStarStoriesQueryDto } from './dto/list-star-stories-query.dto';
-import type { SaveStarStoryRequestDto } from './dto/save-star-story.dto';
+import type { ListStarStoriesQueryInput } from './star-story-requests';
 
 interface StoryLinks {
   prompt: Prompt | null;
@@ -22,7 +21,7 @@ interface StoryLinks {
 export class StarStoriesService {
   constructor(private readonly em: EntityManager) {}
 
-  async create(dto: SaveStarStoryRequestDto): Promise<StarStory> {
+  async create(dto: SaveStarStoryRequest): Promise<StarStory> {
     const { prompt, experience } = await this.resolveLinks(dto);
 
     const story = this.em.create(StarStory, {
@@ -41,15 +40,15 @@ export class StarStoriesService {
     return story;
   }
 
-  async list(query: ListStarStoriesQueryDto): Promise<[StarStory[], number]> {
+  async list(query: ListStarStoriesQueryInput): Promise<[StarStory[], number]> {
     return this.em.findAndCount(StarStory, this.buildWhere(query), {
-      limit: query.limit ?? DEFAULT_LIST_LIMIT,
-      offset: query.offset ?? 0,
+      limit: query.limit,
+      offset: query.offset,
       orderBy: { updatedAt: 'desc', id: 'asc' },
     });
   }
 
-  private buildWhere(query: ListStarStoriesQueryDto): FilterQuery<StarStory> {
+  private buildWhere(query: ListStarStoriesQueryInput): FilterQuery<StarStory> {
     return {
       ...(query.search
         ? {
@@ -77,7 +76,7 @@ export class StarStoriesService {
   }
 
   /** PUT semantics: every field replaced, links included — absent means unlink. */
-  async replace(id: string, dto: SaveStarStoryRequestDto): Promise<StarStory> {
+  async replace(id: string, dto: SaveStarStoryRequest): Promise<StarStory> {
     const story = await this.findOne(id);
     const { prompt, experience } = await this.resolveLinks(dto);
 
@@ -101,7 +100,7 @@ export class StarStoriesService {
   }
 
   /** 422 rather than 400: the ids are well-formed, they just point at nothing. */
-  private async resolveLinks(dto: SaveStarStoryRequestDto): Promise<StoryLinks> {
+  private async resolveLinks(dto: SaveStarStoryRequest): Promise<StoryLinks> {
     const prompt = dto.promptId ? await this.em.findOne(Prompt, dto.promptId) : null;
     if (dto.promptId && !prompt) {
       throw new UnprocessableEntityException(`Unknown promptId: ${dto.promptId}`);

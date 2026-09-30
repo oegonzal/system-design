@@ -9,24 +9,26 @@ import { ensureDatabase, ExperienceProfile } from '@sysdesign/db';
 
 import { configureApp } from '../common/configure-app';
 import { AppModule } from '../modules/app/app.module';
+import { QualityLoopClient } from '../modules/quality-loop/quality-loop.client';
+import { FakeQualityLoopClient } from './fake-quality-loop.client';
 
 export interface Harness {
   app: INestApplication;
   em: EntityManager;
+  /** The grader, as the specs script it. */
+  loop: FakeQualityLoopClient;
   /** Absolute base URL including the /api prefix. */
   url: string;
   close: () => Promise<void>;
 }
 
 /**
- * Boots the real application on an ephemeral port.
- *
- * `configureApp` is shared with `main.ts` on purpose — a harness that built
- * its own ValidationPipe could pass against rules production never applies.
- *
- * `listen(0)` plus global `fetch` rather than supertest keeps the dependency
- * list unchanged, and requests go through the real HTTP stack — middleware,
- * request-scoped MikroORM context included.
+ * Boots the real application on an ephemeral port with one substitution: the
+ * quality loop is a fake bound to its port, so a spec scripts what the grader
+ * answers and asserts what the studio asked it. `configureApp` is shared with
+ * `main.ts` on purpose, and `listen(0)` plus global `fetch` sends every
+ * request through the real HTTP stack — pipes, request-scoped MikroORM
+ * context included.
  */
 export async function createHarness(): Promise<Harness> {
   // The suite's database (sysdesign_test by default — vite.config.ts) is
@@ -34,7 +36,11 @@ export async function createHarness(): Promise<Harness> {
   // database and never truncates it.
   await ensureDatabase();
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const loop = new FakeQualityLoopClient();
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(QualityLoopClient)
+    .useValue(loop)
+    .compile();
 
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);
@@ -45,6 +51,7 @@ export async function createHarness(): Promise<Harness> {
   return {
     app,
     em,
+    loop,
     url: `${await app.getUrl()}/api`,
     close: () => app.close(),
   };
@@ -74,14 +81,19 @@ async function ensureSeeded(em: EntityManager): Promise<void> {
 
 /**
  * Wipes everything the tests create. Truncating `prompt` cascades through
- * design_session, design_revision, evaluation, finding and eval_job (and any
- * story linked to a prompt); `star_story` is truncated for the unlinked rest.
- * The seeded experiences deliberately survive.
+ * design_session, design_revision and prompt_generation (and any story
+ * linked to a prompt); `star_story` is truncated for the unlinked rest. The
+ * seeded experiences deliberately survive, and the fake grader forgets.
  */
-export async function resetDesignData(em: EntityManager): Promise<void> {
+export async function resetDesignData(
+  em: EntityManager,
+  loop?: FakeQualityLoopClient,
+): Promise<void> {
   const connection = em.fork().getConnection();
   await connection.execute('truncate table "prompt" cascade');
+  await connection.execute('truncate table "prompt_generation" cascade');
   await connection.execute('truncate table "star_story" cascade');
+  loop?.reset();
 }
 
 /** Small fetch wrapper returning both status and parsed body (204-safe). */

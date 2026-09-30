@@ -10,15 +10,19 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import {
-  DEFAULT_LIST_LIMIT,
-  type GetStarStoryResponse,
-  type ListStarStoriesResponse,
+import type {
+  GetStarStoryResponse,
+  ListStarStoriesResponse,
+  SaveStarStoryRequest,
 } from '@sysdesign/contracts';
+import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { ok, page } from '../../common/envelope';
-import { ListStarStoriesQueryDto } from './dto/list-star-stories-query.dto';
-import { SaveStarStoryRequestDto } from './dto/save-star-story.dto';
+import {
+  listStarStoriesQuerySchema,
+  saveStarStorySchema,
+  type ListStarStoriesQueryInput,
+} from './star-story-requests';
 import { toStarStoryDto } from './star-stories.mapper';
 import { StarStoriesService } from './star-stories.service';
 
@@ -27,18 +31,18 @@ export class StarStoriesController {
   constructor(private readonly stories: StarStoriesService) {}
 
   @Post()
-  async create(@Body() dto: SaveStarStoryRequestDto): Promise<GetStarStoryResponse> {
+  async create(
+    @Body(new ZodValidationPipe(saveStarStorySchema)) dto: SaveStarStoryRequest,
+  ): Promise<GetStarStoryResponse> {
     return ok(toStarStoryDto(await this.stories.create(dto)));
   }
 
   @Get()
-  async list(@Query() query: ListStarStoriesQueryDto): Promise<ListStarStoriesResponse> {
+  async list(
+    @Query(new ZodValidationPipe(listStarStoriesQuerySchema)) query: ListStarStoriesQueryInput,
+  ): Promise<ListStarStoriesResponse> {
     const [items, total] = await this.stories.list(query);
-    return page(items.map(toStarStoryDto), {
-      total,
-      limit: query.limit ?? DEFAULT_LIST_LIMIT,
-      offset: query.offset ?? 0,
-    });
+    return page(items.map(toStarStoryDto), { total, limit: query.limit, offset: query.offset });
   }
 
   @Get(':id')
@@ -50,7 +54,7 @@ export class StarStoriesController {
   @Put(':id')
   async replace(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: SaveStarStoryRequestDto,
+    @Body(new ZodValidationPipe(saveStarStorySchema)) dto: SaveStarStoryRequest,
   ): Promise<GetStarStoryResponse> {
     return ok(toStarStoryDto(await this.stories.replace(id, dto)));
   }
