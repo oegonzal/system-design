@@ -291,6 +291,36 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Web specs mount through the theme and stub the API at the fetch boundary through the shared harness.',
   },
+  {
+    id: 'GOVU-5',
+    statement:
+      'The govcon client is six routes under one shell: the nav is one data table the bar, the titles and the announcer all read, the current route is marked, every client-side navigation is announced, and the active profile is one choice in the header that every page scores against.',
+  },
+  {
+    id: 'GOVU-6',
+    statement:
+      'The search page ranks the store over its filters without spending, and runs, saves, edits, orders and toggles saved searches into the daily pull — every SAM.gov request behind a click that states its cost.',
+  },
+  {
+    id: 'GOVU-7',
+    statement:
+      'The pipeline page lists tracked notices by stage with what is due, and a stage, reminder, note or estimate edited inline is written to the service and read back.',
+  },
+  {
+    id: 'GOVU-8',
+    statement:
+      "The notice page shows the facts, the place of performance and contacts, the attachments as public links, the score trace, the description on demand, the awards of its solicitation and NAICS, the awardee's registration, and the bid panel that puts it in the pipeline.",
+  },
+  {
+    id: 'GOVU-9',
+    statement:
+      'The intel page fetches awards from the sources the user chose, stating the cost, lists and summarizes what is stored, and looks registrants up by UEI with their exclusion flag.',
+  },
+  {
+    id: 'GOVU-10',
+    statement:
+      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands and tiers — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',

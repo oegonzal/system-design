@@ -1,48 +1,44 @@
-import styled from '@emotion/styled';
 import { agencyOf, clip, day, type LeadsReport } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
+import { useLink } from '../../components/link-context';
 import { TIER_TONE } from '../tones';
 
-const RowButton = styled.button`
-  all: unset;
-  cursor: pointer;
-  color: ${({ theme }) => theme.color.accent.default};
-  text-decoration: underline;
-
-  &[aria-current='true'] {
-    font-weight: ${({ theme }) => theme.font.weight.semibold};
-    text-decoration: none;
-    color: ${({ theme }) => theme.color.text.primary};
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.color.border.focus};
-    outline-offset: 2px;
-  }
-`;
-
+/** The columns, as data: the header vocabulary and how each row renders it. */
 export interface LeadTableProps {
   report: LeadsReport;
-  activeNoticeId: string | null;
-  onSelect(noticeId: string): void;
+  /** The row that is open, when one is. */
+  activeNoticeId?: string | null;
+  /** The route a title opens; `/notices/:id` in the app. */
+  noticeHref?: (noticeId: string) => string;
+  /** A shorter heading for a panel that is one of several. */
+  heading?: string;
 }
 
-/** The ranking as the service returned it; the title opens the lead, the link opens sam.gov. */
-export function LeadTable({ report, activeNoticeId, onSelect }: LeadTableProps) {
+const defaultHref = (noticeId: string): string => `/notices/${encodeURIComponent(noticeId)}`;
+
+/** The ranking as the service returned it; the title opens the notice, the link opens sam.gov. */
+export function LeadTable({
+  report,
+  activeNoticeId = null,
+  noticeHref = defaultHref,
+  heading = 'Leads',
+}: LeadTableProps) {
+  const Link = useLink();
   return (
     <Stack gap={3}>
-      <Heading level={2}>Leads</Heading>
+      <Heading level={2}>{heading}</Heading>
       <Text tone="secondary" size="sm">
-        {report.candidates} candidate(s) · {report.excluded} excluded by a gate · {report.matching}{' '}
-        over the filters · {report.leads.length} shown
+        {report.candidates} candidate(s){report.capped ? ' (capped — narrow the filters)' : ''} ·{' '}
+        {report.excluded} excluded by a gate · {report.matching} over the filters ·{' '}
+        {report.leads.length} shown from {report.offset}
       </Text>
       {report.leads.length === 0 ? (
         <Text tone="muted" size="sm">
           No leads — pull first, or lower the minimum score.
         </Text>
       ) : (
-        <Table aria-label="Leads">
+        <Table aria-label={heading}>
           <thead>
             <tr>
               <th>#</th>
@@ -59,9 +55,10 @@ export function LeadTable({ report, activeNoticeId, onSelect }: LeadTableProps) 
           <tbody>
             {report.leads.map((lead, index) => {
               const o = lead.opportunity;
+              const active = o.noticeId === activeNoticeId;
               return (
                 <tr key={o.noticeId}>
-                  <td>{index + 1}</td>
+                  <td>{report.offset + index + 1}</td>
                   <td>{lead.score.toFixed(1)}</td>
                   <td>
                     {lead.tier ? <Badge tone={TIER_TONE[lead.tier]}>{lead.tier}</Badge> : '—'}
@@ -71,13 +68,14 @@ export function LeadTable({ report, activeNoticeId, onSelect }: LeadTableProps) 
                   <td>{o.naicsCode ?? '—'}</td>
                   <td>{clip(agencyOf(o.agencyPath), 36)}</td>
                   <td>
-                    <RowButton
-                      type="button"
-                      aria-current={o.noticeId === activeNoticeId}
-                      onClick={() => onSelect(o.noticeId)}
+                    <Link
+                      href={noticeHref(o.noticeId)}
+                      $variant="inline"
+                      $active={active}
+                      aria-current={active ? 'true' : undefined}
                     >
                       {clip(o.title, 70)}
-                    </RowButton>
+                    </Link>
                   </td>
                   <td>
                     {o.uiLink ? (

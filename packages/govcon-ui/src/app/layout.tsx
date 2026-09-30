@@ -4,9 +4,9 @@ import type { ReactNode } from 'react';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'Govcon',
+  title: { default: 'Govcon', template: '%s · Govcon' },
   description:
-    'Pull SAM.gov contract opportunities inside a daily budget, rank what is stored against the company profile, read each lead.',
+    'Find and bid on federal contract opportunities: pull SAM.gov inside a daily budget, rank the store against your profile, track bids, read the award history.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

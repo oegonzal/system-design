@@ -1,12 +1,8 @@
-import { Suspense } from 'react';
+import { DashboardClient } from '../features/dashboard/dashboard.client';
+import { pageMetadata } from './nav';
 
-import { GovconWorkspace } from '../features/workspace/govcon-workspace';
+export const metadata = pageMetadata('/');
 
-/** Suspense: `useSearchParams` bails out of static prerender in Next 15 without a boundary. */
-export default function GovconPage() {
-  return (
-    <Suspense fallback={null}>
-      <GovconWorkspace />
-    </Suspense>
-  );
+export default function DashboardPage() {
+  return <DashboardClient />;
 }

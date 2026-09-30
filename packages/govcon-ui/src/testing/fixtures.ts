@@ -1,22 +1,36 @@
 import {
+  awardOf,
+  awardsSummaryOf,
+  bidOf,
+  bidPipelineSummaryOf,
   descriptionOf,
+  entityOf,
   leadOf,
   noticeOf,
   opportunityOf,
   profileOf,
   pullReportOf,
+  savedSearchOf,
   sliceReportOf,
   sourceCallOf,
   sourceStatusOf,
+  storedProfileOf,
+  type Award,
+  type AwardsSummary,
+  type Bid,
+  type BidPipelineSummary,
   type Description,
+  type Entity,
   type Lead,
   type LeadsReport,
   type NoticeDto,
   type Opportunity,
+  type PipelineRow,
   type PullReport,
-  type SearchProfile,
+  type SavedSearch,
   type SourceCall,
   type SourceStatus,
+  type StoredProfile,
 } from '@sysdesign/contracts';
 
 /**
@@ -24,7 +38,8 @@ import {
  * over the contracts' builders so every spec and story here starts from the
  * same wire-shaped facts. ISO stamps are fixed so renders never drift.
  */
-export const PROFILE: SearchProfile = profileOf({
+export const PROFILE: StoredProfile = storedProfileOf({
+  ...profileOf(),
   id: 'enfav',
   company: 'Enfav LLC',
   naics: ['332710', '333249', '541511', '541512'],
@@ -43,6 +58,14 @@ export const PROFILE: SearchProfile = profileOf({
       exclude: ['Award Notice', 'Justification'],
     },
   },
+  isDefault: true,
+});
+
+/** A second profile, so a switch has somewhere to go. */
+export const OTHER_PROFILE: StoredProfile = storedProfileOf({
+  id: 'other',
+  company: 'Other Co',
+  isDefault: false,
 });
 
 export const SOURCE_STATUS: SourceStatus = sourceStatusOf({
@@ -63,9 +86,11 @@ export const DISABLED_SOURCE: SourceStatus = sourceStatusOf({
   buckets: [{ id: 'sam.gov', spent: 0, limit: 10, windowHours: 24 }],
 });
 
+export const NOTICE_ID = '21b781192a4f4026a2946237984a9c06';
+
 export const makeOpportunity = (overrides: Partial<Opportunity> = {}): Opportunity =>
   opportunityOf({
-    noticeId: '21b781192a4f4026a2946237984a9c06',
+    noticeId: NOTICE_ID,
     title: '59--JUNCTION BOX, IN REPAIR/MODIFICATION OF',
     solicitationNumber: 'N0010426QFG43',
     agencyPath: 'DEPT OF DEFENSE.DEPT OF THE NAVY.NAVSUP.NAVSUP WEAPON SYSTEMS SUPPORT',
@@ -289,3 +314,105 @@ export const CALLS: SourceCall[] = [
   }),
   sourceCallOf({ id: 'c1' }),
 ];
+
+export const SAVED_SEARCHES: SavedSearch[] = [
+  savedSearchOf({
+    id: 's-1',
+    profileId: 'enfav',
+    name: 'Machine shops',
+    filter: { naics: '332710' },
+    pullOrder: 0,
+  }),
+  savedSearchOf({
+    id: 's-2',
+    profileId: 'enfav',
+    name: 'Custom programming',
+    filter: { naics: '541511', status: 'active' },
+    pullOrder: 1,
+    lastRunAt: '2026-09-26T19:10:37.782Z',
+  }),
+  savedSearchOf({
+    id: 's-3',
+    profileId: 'enfav',
+    name: 'Brackets anywhere',
+    filter: { title: 'bracket' },
+    days: 30,
+    includedInPull: false,
+    pullOrder: 2,
+  }),
+];
+
+export const BID: Bid = bidOf({ noticeId: NOTICE_ID, reminderAt: '2026-10-01T09:00:00.000Z' });
+
+export const PIPELINE_ROWS: PipelineRow[] = [
+  { bid: BID, lead: makeLead() },
+  {
+    bid: bidOf({
+      noticeId: 'a82be74dbc744767aae22bcb273c223f',
+      stage: 'submitted',
+      notes: '',
+      reminderAt: null,
+      estimatedValue: null,
+    }),
+    lead: LEADS[1] ?? makeLead(),
+  },
+  {
+    bid: bidOf({
+      noticeId: '0f1e2d3c4b5a69788796a5b4c3d2e1f0',
+      stage: 'watching',
+      reminderAt: '2026-09-28T09:00:00.000Z',
+    }),
+    lead: LEADS[2] ?? makeLead(),
+  },
+];
+
+export const PIPELINE_SUMMARY: BidPipelineSummary = bidPipelineSummaryOf({
+  byStage: { watching: 1, qualifying: 1, preparing: 0, submitted: 1, won: 0, lost: 0, passed: 0 },
+  dueSoon: 2,
+  total: 3,
+});
+
+export const AWARDS: Award[] = [
+  awardOf(),
+  awardOf({
+    externalId: 'SPE4A726P0456-0',
+    solicitationNumber: null,
+    awardeeName: 'BRACKET WORKS LLC',
+    awardeeUei: 'BRK123456789',
+    amount: 18750,
+    offersReceived: 6,
+    setAsideCode: null,
+    signedAt: '2026-08-02',
+  }),
+  awardOf({
+    source: 'usaspending',
+    externalId: 'CONT_AWD_FA865021C5000',
+    solicitationNumber: null,
+    agencyPath: 'Department of Defense.Department of the Air Force',
+    agencyCode: null,
+    awardeeName: 'GLOBE MACHINE MANUFACTURING COMPANY',
+    awardeeUei: 'VADFZLHBJDJ9',
+    amount: 17152539,
+    offersReceived: null,
+    extentCompeted: null,
+    setAsideCode: null,
+    signedAt: '2021-08-03',
+    completionAt: '2026-08-16',
+    placeOfPerformance: { city: null, state: 'WA', zip: null, country: null },
+  }),
+];
+
+export const AWARDS_SUMMARY: AwardsSummary = awardsSummaryOf();
+
+export const ENTITY: Entity = entityOf();
+export const OWN_ENTITY: Entity = entityOf({
+  uei: 'ENF123456789',
+  cage: '9EN01',
+  legalName: 'ENFAV LLC',
+  registrationExpiresAt: '2027-06-30',
+  naics: [
+    { code: '332710', small: true },
+    { code: '541511', small: true },
+  ],
+  psc: ['7030', 'DA01'],
+});
