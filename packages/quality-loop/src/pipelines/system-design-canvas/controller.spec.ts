@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { STANDARD } from '../../core/controllers';
-import { confirmed, decision as _decision, ledger, tinyPolicy } from '../../core/testing';
+import { confirmed, ledger, tinyPolicy } from '../../core/testing';
 import { REVISE_ONLY } from './controller';
 
 const policy = tinyPolicy();
