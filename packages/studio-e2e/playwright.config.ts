@@ -18,15 +18,26 @@ const baseURL = process.env['BASE_URL'] || 'http://localhost:4200';
 const DEMO = !!process.env['DEMO'];
 
 /**
- * Postgres connection details ride through to all three servers. `tilt up`
- * (or the compose file) provides the Postgres server itself — the suite never
- * starts one — but the suite's *database* defaults to its own
- * `sysdesign_test` (created/migrated/seeded by `global-setup.ts`), so an e2e
- * run never truncates the developer's real practice history. CI pins
- * `DB_NAME` explicitly and keeps its ephemeral service database.
+ * Postgres connection details ride through to the API server and the global
+ * setup. `tilt up` (or the compose file) provides the Postgres server itself
+ * — the suite never starts one — on 5433 by default, but the suite's
+ * *database* defaults to its own `sysdesign_test` (created/migrated/seeded by
+ * `global-setup.ts`), so an e2e run never truncates the developer's real
+ * practice history. CI pins `DB_PORT` and `DB_NAME` explicitly and keeps its
+ * ephemeral service database.
  */
-const DB_PORT = process.env['DB_PORT'] ?? '5432';
+const DB_PORT = process.env['DB_PORT'] ?? '5433';
 const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
+
+/**
+ * The grader is a stub, not the real quality loop: every grade in the suite
+ * is a pure function of what was submitted (three nodes score 64), a run
+ * completes in 400 ms, and no model or network is involved. The studio API
+ * reaches it through the same `QUALITY_LOOP_URL` it would use for the real
+ * service, so the API under test is exactly the production wiring.
+ */
+const QUALITY_LOOP_STUB_PORT = process.env['QUALITY_LOOP_STUB_PORT'] ?? '3103';
+const QUALITY_LOOP_URL = `http://127.0.0.1:${QUALITY_LOOP_STUB_PORT}`;
 
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
@@ -35,7 +46,7 @@ export default defineConfig({
   globalSetup: require.resolve('./src/support/global-setup'),
 
   /*
-   * The practice loop does two full submit → evaluate rounds on top of a dev
+   * The practice loop does two full submit → grade rounds on top of a dev
    * server's first-hit compile, so the Playwright default of 30s per test is
    * too tight on a cold run.
    */
@@ -70,28 +81,26 @@ export default defineConfig({
   },
 
   /*
-   * All three processes, because these tests exercise the real API and the
-   * real evaluation worker against a real database rather than stubs.
-   * `EVAL_DETERMINISTIC=1` pins the critic to the rule engine alone, so a
-   * grade is a pure function of the submitted graph — no model, no network.
+   * Three processes: the stub grader, the real API against a real database,
+   * and the real UI. Nothing in the studio is mocked — only the service
+   * behind its one outbound port.
    */
   webServer: [
+    {
+      command: `pnpm exec tsx --tsconfig tsconfig.base.json packages/studio-e2e/src/support/quality-loop-stub.ts`,
+      url: `${QUALITY_LOOP_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+      cwd: workspaceRoot,
+      timeout: 60_000,
+      env: { QUALITY_LOOP_STUB_PORT },
+    },
     {
       command: 'pnpm exec nx run studio-api:serve',
       url: 'http://localhost:3000/api/health',
       reuseExistingServer: !process.env.CI,
       cwd: workspaceRoot,
       timeout: 180_000,
-      env: { DB_PORT, DB_NAME, EVAL_DETERMINISTIC: '1' },
-    },
-    {
-      command: 'pnpm exec nx run eval-worker:serve',
-      url: 'http://localhost:3002/health',
-      reuseExistingServer: !process.env.CI,
-      cwd: workspaceRoot,
-      timeout: 180_000,
-      /* A 300ms poll keeps submit → verdict under two seconds in the specs. */
-      env: { DB_PORT, DB_NAME, EVAL_DETERMINISTIC: '1', EVAL_POLL_INTERVAL_MS: '300' },
+      env: { DB_PORT, DB_NAME, QUALITY_LOOP_URL },
     },
     {
       command: 'pnpm exec nx run studio-ui:serve',

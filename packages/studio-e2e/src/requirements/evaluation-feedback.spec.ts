@@ -1,22 +1,27 @@
 import { expect, test } from '@playwright/test';
-import { EVAL_DIMENSIONS } from '@sysdesign/contracts';
 
-import { generatePrompt } from '../support/backend';
-import { buildNaiveDesign, CanvasPage, openPracticeSession } from '../support/canvas.page';
+import { authorPrompt } from '../support/backend';
+import {
+  buildNaiveDesign,
+  CanvasPage,
+  NAIVE_DESIGN_SCORE,
+  openPracticeSession,
+} from '../support/canvas.page';
 import { PromptsPage } from '../support/prompts.page';
 
 /**
- * Submit → graded verdict, against the real worker. `EVAL_DETERMINISTIC=1`
- * (set by the webServer config) pins grading to the rule engine, so the
- * naive design's findings are a function of the graph alone.
+ * Submit → graded verdict, through the real API against the stub grader,
+ * whose grade is a pure function of the graph: three nodes score 64 with a
+ * `revise`, `c1` passes and the rest are partial, the database draws an
+ * unhandled-failure finding and the first connection an unbacked claim.
  */
-test.describe('the critic pipeline', () => {
-  test('[EVAL-1] a submitted revision is graded with per-dimension scores', async ({
+test.describe('the grading feedback', () => {
+  test('[EVAL-1] a submitted revision shows the overall score, the decision, one meter per dimension and a result per criterion', async ({
     page,
     request,
   }) => {
-    // Start practice the way a person does: from a generated prompt's detail page.
-    const prompt = await generatePrompt(request);
+    // Start practice the way a person does: from the prompt's detail page.
+    const prompt = await authorPrompt(request);
     const prompts = new PromptsPage(page);
     await prompts.openDetail(prompt.id);
     await prompts.startPractice();
@@ -25,47 +30,59 @@ test.describe('the critic pipeline', () => {
     await canvas.ready();
     await buildNaiveDesign(canvas);
     await canvas.submit();
-
     await canvas.expectEvaluationComplete(1);
-    // 0–100, possibly fractional (weighted dimension means, e.g. "74.3").
-    await expect(page.getByTestId('overall-score')).toHaveText(/^\d{1,3}(\.\d+)?$/);
-    for (const dimension of EVAL_DIMENSIONS) {
-      if (dimension === 'product') {
-        // A ticketing prompt states no workflow spec, so the product
-        // dimension is honestly "Not assessed" rather than a free meter.
-        await expect(page.getByTestId('not-assessed-product')).toBeVisible();
-        continue;
-      }
-      await expect(page.getByRole('meter', { name: dimension })).toBeVisible();
+
+    await canvas.expectOverall(NAIVE_DESIGN_SCORE);
+    await canvas.expectDecision('revise');
+    await expect(page.getByTestId('stop-reason')).toHaveText('Max iterations');
+
+    // One meter per dimension the pipeline declared, none "not assessed".
+    for (const dimension of ['coverage', 'quality_attributes', 'compliance']) {
+      await canvas.expectDimensionScored(dimension);
     }
-    // No narrative was submitted — that is graded, not excused, so the
-    // dimension shows a real meter at zero rather than dropping out.
-    await expect(page.getByTestId('not-assessed-explanation')).toHaveCount(0);
-    await expect(page.getByRole('meter', { name: 'explanation' })).toHaveAttribute(
+    await expect(canvas.dimensionMeter('coverage')).toHaveAttribute(
       'aria-valuenow',
-      '0',
+      String(NAIVE_DESIGN_SCORE),
     );
+    await expect(canvas.dimensionMeter('compliance')).toHaveAttribute('aria-valuenow', '100');
+
+    // A row per criterion of the prompt's rubric, reading as a statement.
+    await canvas.expectCriterionResult('c1', 'pass');
+    for (const criterionId of ['c2', 'c3', 'c4', 'c5']) {
+      await canvas.expectCriterionResult(criterionId, 'partial');
+    }
+    await expect(canvas.criterionResult('c1')).toContainText('past orders newest first');
   });
 
-  test('[EVAL-2] findings carry a message and point at affected elements', async ({
+  test('[EVAL-2] a finding carries its rationale and highlights the node or edge it names when selected', async ({
     page,
     request,
   }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
 
-    await canvas.expectFindingCount((count) => count >= 1);
+    // Grouped by severity, in urgency order.
+    await expect(page.getByTestId('findings-group-high')).toBeVisible();
+    await expect(page.getByTestId('findings-group-medium')).toBeVisible();
 
-    // Every generated prompt carries an availability NFR, so the unreplicated
-    // database always draws this exact critical finding.
-    const finding = canvas.findingItem('Single database with no replica');
-    await expect(finding).toBeVisible();
-    // The message teaches — it ties the risk back to the prompt's target.
-    await expect(finding).toContainText('availability');
+    // The lens's own words, the criterion it cites, and every lens that confirmed it.
+    const failure = canvas.finding('unhandled_failure|node.3');
+    await expect(failure).toBeVisible();
+    await expect(failure).toContainText('a restart drops the target');
+    await expect(failure.getByTestId('finding-criterion')).toHaveText('c2');
+    await expect(failure.getByTestId('finding-lens')).toHaveCount(2);
+    await expect(failure.getByTestId('finding-type')).toHaveText('unhandled_failure');
 
-    await canvas.clickFinding('Single database with no replica');
-    await canvas.expectNodeHighlighted('n-3'); // the database it points at
+    // `node.3` resolved by position to the author's own id: the database.
+    await canvas.clickFinding('unhandled_failure|node.3');
+    await canvas.expectNodeHighlighted('n-3', 'high');
+    await expect(canvas.node('n-2')).not.toHaveAttribute('data-severity', /.+/);
+
+    // `edge.1` likewise: the client → service connection.
+    await canvas.clickFinding('unbacked_claim|edge.1');
+    await canvas.expectEdgeHighlighted('e-1', 'medium');
+    await expect(canvas.finding('unbacked_claim|edge.1').getByTestId('finding-explanation')).toBeVisible();
   });
 });

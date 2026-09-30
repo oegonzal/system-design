@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { NODE_KINDS } from '@sysdesign/contracts';
+import { NODE_KIND_CATEGORIES, NODE_KINDS } from '@sysdesign/contracts';
 
 import { openPracticeSession } from '../support/canvas.page';
 
@@ -10,7 +10,7 @@ import { openPracticeSession } from '../support/canvas.page';
  */
 test.describe('interactive design canvas', () => {
   test('[UX-1] the palette offers every node kind in the contract', async ({ page, request }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
 
     for (const kind of NODE_KINDS) {
       await expect(canvas.paletteItem(kind)).toBeVisible();
@@ -24,11 +24,30 @@ test.describe('interactive design canvas', () => {
     await canvas.expectNodeCount(1);
   });
 
+  test('[UX-4] the palette groups blocks by category and filters them by name', async ({
+    page,
+    request,
+  }) => {
+    const { canvas } = await openPracticeSession(page, request);
+
+    for (const category of NODE_KIND_CATEGORIES) {
+      await expect(canvas.blocksCategory(category.id)).toBeVisible();
+    }
+
+    await canvas.filterBlocks('cache');
+    await expect(canvas.paletteItem('cache')).toBeVisible();
+    await expect(canvas.paletteItem('client')).toHaveCount(0);
+    await expect(canvas.blocksCategory('clients-edge')).toHaveCount(0);
+
+    await canvas.filterBlocks('');
+    await expect(canvas.paletteItem('client')).toBeVisible();
+  });
+
   test('[UX-2] adds, connects, edits and deletes blocks on the canvas', async ({
     page,
     request,
   }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
 
     await canvas.addFromPalette('client'); // n-1
     await canvas.moveNode('n-1', { x: 280, y: 100 });
@@ -53,7 +72,7 @@ test.describe('interactive design canvas', () => {
   });
 
   test('[UX-3] edges distinguish sync from async calls', async ({ page, request }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
 
     await canvas.addFromPalette('service'); // n-1
     await canvas.moveNode('n-1', { x: 280, y: 100 });
@@ -77,11 +96,52 @@ test.describe('interactive design canvas', () => {
     page,
     request,
   }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
 
     await canvas.dragFromPalette('cache', 360, 200);
 
     await canvas.expectNodeCount(1);
     await expect(canvas.node('n-1')).toHaveAttribute('data-kind', 'cache');
+  });
+
+  test('[UX-7] a selected block explains what its kind is for and when to use it', async ({
+    page,
+    request,
+  }) => {
+    const { canvas } = await openPracticeSession(page, request);
+
+    await canvas.addFromPalette('queue'); // n-1, selected on add
+    await expect(canvas.kindGuide).toBeVisible();
+    await expect(canvas.kindGuide).not.toBeEmpty();
+    const queueGuide = (await canvas.kindGuide.textContent()) ?? '';
+
+    // The guide follows the kind, not the block: change it and the text changes.
+    await canvas.setNodeKind('cache');
+    await expect(canvas.kindGuide).not.toHaveText(queueGuide);
+  });
+
+  test('[UX-9] a free-form configuration key is typed by what is written — a number, a flag, or text', async ({
+    page,
+    request,
+  }) => {
+    const { canvas } = await openPracticeSession(page, request);
+
+    await canvas.addFromPalette('database'); // n-1, selected on add
+    await expect(page.getByTestId('config-section')).toBeVisible();
+
+    await canvas.setConfig('replicas', '3');
+    await canvas.expectConfigType('replicas', 'number');
+    await canvas.setConfig('synchronous_commit', 'true');
+    await canvas.expectConfigType('synchronous_commit', 'boolean');
+    await canvas.setConfig('region', 'us-east-1');
+    await canvas.expectConfigType('region', 'string');
+
+    // The block's own meta line counts what was declared.
+    await canvas.expectNodeMeta('n-1', '3 config');
+
+    // A key already set is refused, not silently overwritten.
+    await page.getByTestId('config-key').fill('replicas');
+    await expect(page.getByTestId('config-error')).toContainText('already set');
+    await expect(page.getByTestId('config-add')).toBeDisabled();
   });
 });

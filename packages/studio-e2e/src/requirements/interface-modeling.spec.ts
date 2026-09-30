@@ -9,28 +9,36 @@ import { openPracticeSession } from '../support/canvas.page';
  * over the wire.
  */
 test.describe('interface modeling', () => {
-  test('[UX-5] declares operations on a service and carries them on a connection', async ({
+  test('[UX-5] a connection carries an operation declared on either of its endpoints', async ({
     page,
     request,
   }) => {
-    const canvas = await openPracticeSession(page, request);
+    const { canvas } = await openPracticeSession(page, request);
 
     await canvas.addFromPalette('client'); // n-1
     await canvas.moveNode('n-1', { x: 300, y: 80 });
     await canvas.addFromPalette('service'); // n-2
     await canvas.moveNode('n-2', { x: 300, y: 320 });
 
+    // One operation on the target (the service serves it) …
     await canvas.selectNode('n-2');
     await canvas.addOperation('placeOrder', 'command');
     await canvas.expectNodeMeta('n-2', '1 ops');
 
+    // … and one on the source (the client publishes it).
+    await canvas.selectNode('n-1');
+    await canvas.addOperation('checkoutStarted', 'event');
+    await canvas.expectNodeMeta('n-1', '1 ops');
+
     await canvas.connect('n-1', 'n-2'); // e-1
     await canvas.selectEdge('e-1');
+    // The field offers both declarations; neither had to be typed.
     await canvas.toggleCarry('placeOrder');
-    await canvas.expectEdgePill('placeOrder');
+    await canvas.toggleCarry('checkoutStarted');
+    await canvas.expectEdgePill('placeOrder · checkoutStarted');
 
     // The declarations survive the wire: the API accepts the revision (no
-    // 4xx), so the toolbar's revision chip appears.
+    // 4xx), so the toolbar's revision badge appears.
     await canvas.submit();
     await expect(page.getByText(/rev #1/)).toBeVisible();
   });

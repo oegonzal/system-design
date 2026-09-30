@@ -1,11 +1,17 @@
 import { expect, test } from '@playwright/test';
 
 import { AppNav } from '../support/app-nav';
-import { buildNaiveDesign, CanvasPage } from '../support/canvas.page';
+import { AUTHORED_MARKDOWN, AUTHORED_TITLE } from '../support/backend';
+import {
+  buildNaiveDesign,
+  CanvasPage,
+  NAIVE_DESIGN_PLUS_ONE_SCORE,
+  NAIVE_DESIGN_SCORE,
+} from '../support/canvas.page';
 import { step } from '../support/demo';
 import { PromptsPage } from '../support/prompts.page';
 
-const REPLICA_FINDING = 'Single database with no replica';
+const DATABASE_FINDING = 'unhandled_failure|node.3';
 
 /**
  * The whole product in one story, and the only test the demo target runs.
@@ -17,17 +23,17 @@ const REPLICA_FINDING = 'Single database with no replica';
  *     nx run studio-e2e:e2e-demo
  */
 test(
-  '[EVAL-3] the practice loop: prompt → design → verdict → accepted fix → better score',
+  '[EVAL-3] the practice loop: prompt → design → verdict → improved along a finding → better score',
   { tag: '@demo' },
   async ({ page }) => {
     const nav = new AppNav(page);
     const prompts = new PromptsPage(page);
     const canvas = new CanvasPage(page);
 
-    await step(page, ' 1 — Generate a prompt from the ticketing experience', async () => {
+    await step(page, ' 1 — Write the order-history prompt', async () => {
       await nav.open('/prompts');
-      await prompts.selectTicketingExperience();
-      await prompts.generate();
+      await prompts.openComposer();
+      await prompts.author({ title: AUTHORED_TITLE, markdown: AUTHORED_MARKDOWN });
       await expect(prompts.promptPane).toBeVisible();
     });
 
@@ -44,27 +50,34 @@ test(
       },
     );
 
-    await step(page, ' 4 — Submit revision #1 for evaluation', async () => {
+    await step(page, ' 4 — Submit revision #1 for grading', async () => {
       await canvas.submit();
       await canvas.expectEvaluationComplete(1);
+      await canvas.expectOverall(NAIVE_DESIGN_SCORE);
+      await canvas.expectDecision('revise');
     });
 
-    await step(page, ' 5 — The critical finding highlights the fragile database', async () => {
-      await canvas.clickFinding(REPLICA_FINDING);
-      await canvas.expectNodeHighlighted('n-3');
+    await step(page, ' 5 — The high finding highlights the fragile database', async () => {
+      await canvas.clickFinding(DATABASE_FINDING);
+      await canvas.expectNodeHighlighted('n-3', 'high');
     });
 
-    await step(page, ' 6 — Preview the suggested read replica, then accept it', async () => {
-      await canvas.previewFix(REPLICA_FINDING);
-      await expect(canvas.suggestionControls).toBeVisible();
-      await canvas.acceptSuggestion();
-      await expect(canvas.suggestionControls).toHaveCount(0);
-      await canvas.expectNodeCount(4); // the ghost replica is real now
+    await step(page, ' 6 — Improve along the finding: add a read replica', async () => {
+      // Dropped at an exact spot, clear of the column the first three occupy:
+      // a fourth staggered click-add lands under the pannable minimap, and a
+      // drop beside the service covers its connection handle — nodes are
+      // about 250px wide, so the replica goes left of and between the rows.
+      await canvas.dragFromPalette('replica', 40, 140); // n-4
+      await expect(canvas.node('n-4')).toHaveAttribute('data-kind', 'replica');
+      await canvas.connect('n-2', 'n-4'); // e-3: the service reads from the replica
+      await expect(canvas.edge('e-3')).toBeAttached();
+      await canvas.expectNodeCount(4);
     });
 
     await step(page, ' 7 — Resubmit as revision #2', async () => {
       await canvas.submit();
       await canvas.expectEvaluationComplete(2);
+      await canvas.expectOverall(NAIVE_DESIGN_PLUS_ONE_SCORE);
     });
 
     await step(page, ' 8 — The revision timeline shows a strictly rising score', async () => {

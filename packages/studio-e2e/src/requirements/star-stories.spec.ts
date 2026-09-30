@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createStory, generatePrompt, ticketingExperience } from '../support/backend';
+import { authorPrompt, createStory, ticketingExperience } from '../support/backend';
 import { StoriesPage } from '../support/stories.page';
 import { uniqueName } from '../support/unique';
 
@@ -59,7 +59,7 @@ test.describe('STAR story repository', () => {
   });
 
   test('[STAR-3] a story links to a prompt and an experience', async ({ page, request }) => {
-    const prompt = await generatePrompt(request);
+    const prompt = await authorPrompt(request, { title: uniqueName('Linked prompt') });
     const experience = await ticketingExperience(request);
     const title = uniqueName('Linked story');
 

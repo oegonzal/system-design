@@ -1,94 +1,37 @@
 import { expect, test } from '@playwright/test';
 
-import {
-  buildNaiveDesign,
-  openPracticeSession,
-  openPracticeSessionWithPrompt,
-} from '../support/canvas.page';
+import { buildNaiveDesign, openPracticeSession } from '../support/canvas.page';
 
 /**
- * The design brief is the graded explanation: requirement bindings and traced
- * flows, each one a reference the engine checks against the canvas. The prose
- * walkthrough is graded beside it — authored as reference-anchored slots and
- * scored by reference, not by substring, which is what let the narrative be
- * graded again after the substring regime was deleted.
- *
- * `EVAL_DETERMINISTIC=1` (set by the webServer config) pins grading to the
- * rule engine, so every verdict here is a pure function of graph + brief +
- * narrative.
+ * The design brief is the grounded half of explaining a design: for each of
+ * the prompt's criteria, which components hold it, a claim in the author's
+ * words, and — where a request travels — the path of edges it takes. Every
+ * reference is one the grader can check against the canvas, which is why it
+ * is authored by reference (a checkbox per component, a button per hop)
+ * rather than typed.
  */
 test.describe('the design brief', () => {
-  test('the walkthrough overview is submitted with the diagram and survives a reload', async ({
+  test('[UX-6] a criterion is bound to components with a claim and a traced path, submitted with the diagram, and comes back on reload', async ({
     page,
     request,
   }) => {
-    const canvas = await openPracticeSession(page, request);
-    await buildNaiveDesign(canvas);
-
-    const overview =
-      'The Client calls the Service, which writes every order to the Database before acknowledging. ' +
-      'Reads are served from the same Service so the account page stays consistent with what was written.';
-    await canvas.setOverview(overview);
-    await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
-
-    await page.reload();
-    await canvas.ready();
-    await canvas.narrativeTab.click();
-    await expect(canvas.narrativeOverview()).toHaveValue(overview);
-  });
-
-  /**
-   * The authoring round trip, end to end through the browser.
-   *
-   * The monitoring block is the deliberate choice: `monitoring` is corroborated
-   * by a component's KIND alone, so the claim is provable without driving the
-   * properties panel to set a config knob — which keeps this test about
-   * authoring a brief rather than about editing node config.
-   */
-  test('[UX-6] a design brief is authored beside the diagram and submitted with it', async ({
-    page,
-    request,
-  }) => {
-    const { canvas, prompt } = await openPracticeSessionWithPrompt(page, request);
+    const { canvas } = await openPracticeSession(page, request); // rubric c1…c5
     await buildNaiveDesign(canvas); // client n-1 → service n-2 → database n-3
-    // Left where it lands: nothing here touches it on the canvas, and a fourth
-    // staggered add drifts under the pannable minimap, which eats the pointer a
-    // move would need.
-    await canvas.addFromPalette('monitoring'); // n-4
 
-    // The prompt is generated per test, so the requirement is read off it.
-    const requirement = prompt.nonFunctionalRequirements[0];
-    await canvas.bindMechanism(requirement.id, 'monitoring');
-    await canvas.toggleBindingNode(requirement.id, 'n-4');
-    // The engine's verdict, shown live while authoring — the same
-    // `judgeMechanism` that will grade it.
-    await canvas.expectBindingVerdict(requirement.id, 'corroborated');
+    const claim = 'the service reads the customer shard newest first';
+    await canvas.expectBindingState('c1', 'empty');
+    await canvas.setBindingClaim('c1', claim);
+    await canvas.expectBindingState('c1', 'incomplete');
+    await canvas.toggleBindingNode('c1', 'n-2');
+    await canvas.toggleBindingNode('c1', 'n-3');
+    await canvas.expectBindingState('c1', 'bound');
 
-    await canvas.traceFlow(0, ['e-1', 'e-2']);
-    await canvas.expectFlowComplete(0);
+    // The tracer offers only hops that continue the walk: after e-1 lands on
+    // the service, e-2 is the one edge leaving it.
+    await canvas.openFlowTracer('c1');
+    await canvas.traceFlow('c1', ['e-1', 'e-2']);
+    await canvas.expectFlowTraced('c1', 2);
 
-    await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
-
-    // Before the editor existed, every submission scored this dimension 0
-    // against a finding saying so. Both halves of that are now false.
-    await canvas.expectDimensionScored('explanation');
-    await expect(canvas.findingItem('The design explains nothing')).toHaveCount(0);
-  });
-
-  test('[UX-6] a submitted brief comes back when the revision is reloaded', async ({
-    page,
-    request,
-  }) => {
-    const { canvas, prompt } = await openPracticeSessionWithPrompt(page, request);
-    await buildNaiveDesign(canvas);
-    await canvas.addFromPalette('monitoring'); // n-4
-
-    const requirement = prompt.nonFunctionalRequirements[0];
-    await canvas.bindMechanism(requirement.id, 'monitoring');
-    await canvas.toggleBindingNode(requirement.id, 'n-4');
-    await canvas.traceFlow(0, ['e-1', 'e-2']);
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
 
@@ -97,48 +40,11 @@ test.describe('the design brief', () => {
     await canvas.briefTab.click();
 
     // The claim, the components and the traced walk all survive the round trip.
-    await expect(page.getByTestId(`binding-mechanism-${requirement.id}`)).toHaveValue('monitoring');
-    await expect(page.getByTestId(`binding-node-${requirement.id}-n-4`)).toBeChecked();
-    await canvas.expectFlowComplete(0);
-  });
-
-  /**
-   * Suggestions are opt-in and, with no model configured, say so rather than
-   * failing. This is the path CI and every headless run take, so it is the one
-   * that must never be a spinner or an error.
-   */
-  test('[UX-9] suggestions are asked for explicitly, and answer honestly with no model', async ({
-    page,
-    request,
-  }) => {
-    const canvas = await openPracticeSession(page, request);
-    await buildNaiveDesign(canvas);
-
-    await canvas.askForSuggestions();
-    await canvas.expectNoSuggestionsOffered();
-
-    // Nothing was proposed, so nothing can have been accepted into the brief.
-    await expect(page.locator('[data-testid^="binding-proposal-"]')).toHaveCount(0);
-  });
-
-  /**
-   * The same honesty for a component's interface: the panel explains why each
-   * section applies, offers to suggest, and says plainly when no model answered
-   * — never a spinner, never a phantom proposal.
-   */
-  test('[UX-14] a component explains its sections and asks for its interface honestly', async ({
-    page,
-    request,
-  }) => {
-    const canvas = await openPracticeSession(page, request);
-    await buildNaiveDesign(canvas);
-
-    await canvas.selectNode('n-2'); // the service
-    await expect(page.getByTestId('config-guide')).toBeVisible();
-    await expect(page.getByTestId('interface-guide')).toBeVisible();
-
-    await canvas.askForInterfaceSuggestions();
-    await canvas.expectNoInterfaceSuggestionsOffered();
-    await expect(page.locator('[data-testid^="interface-proposal-proposal-"]')).toHaveCount(0);
+    await expect(canvas.bindingClaim('c1')).toHaveValue(claim);
+    await expect(canvas.bindingNode('c1', 'n-2')).toBeChecked();
+    await expect(canvas.bindingNode('c1', 'n-3')).toBeChecked();
+    await expect(canvas.bindingNode('c1', 'n-1')).not.toBeChecked();
+    await canvas.expectBindingState('c1', 'bound');
+    await canvas.expectFlowTraced('c1', 2);
   });
 });

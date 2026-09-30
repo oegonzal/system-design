@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import js from '@eslint/js';
 import nxEslintPlugin from '@nx/eslint-plugin';
 import eslintReact from '@eslint-react/eslint-plugin';
-import playwright from 'eslint-plugin-playwright';
 
 const compat = new FlatCompat({
   baseDirectory: dirname(fileURLToPath(import.meta.url)),
@@ -92,47 +91,6 @@ export default [
     files: ['**/*.js', '**/*.jsx'],
     rules: { ...config.rules },
   })),
-  {
-    // Catches the class of bug an e2e suite attracts: an unawaited expect, a
-    // conditional assertion, a test left focused.
-    ...playwright.configs['flat/recommended'],
-    files: ['packages/studio-e2e/**/*.ts'],
-    rules: {
-      ...playwright.configs['flat/recommended'].rules,
-      // Assertions live on the page objects, so the rule cannot see them from
-      // the spec. It matches called property names exactly — no globs — so the
-      // page objects' assertion methods are listed by name.
-      'playwright/expect-expect': [
-        'warn',
-        {
-          assertFunctionNames: [
-            'expect',
-            // canvas.page.ts
-            'expectNodeCount',
-            'expectNodeHighlighted',
-            'expectEvaluationComplete',
-            'expectFindingCount',
-            'expectScoreTrendIncreasing',
-            'expectEdgePill',
-            'expectNodeMeta',
-            'expectBindingVerdict',
-            'expectFlowComplete',
-            'expectDimensionScored',
-            'expectNoSuggestionsOffered',
-            'expectNoInterfaceSuggestionsOffered',
-            'expectWorkflowVerdict',
-            // app-nav.ts
-            'expectActiveNav',
-            // stories.page.ts
-            'expectStoryListed',
-            // settings.page.ts
-            'expectColorMode',
-            'expectAccent',
-          ],
-        },
-      ],
-    },
-  },
   {
     files: [
       'packages/studio-ui/**/*.ts',

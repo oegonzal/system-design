@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "packages/studio-e2e/src",
-  "implicitDependencies": ["studio-ui", "studio-api", "eval-worker"],
+  "implicitDependencies": ["studio-ui", "studio-api"],
   "targets": {
     "e2e": {
       "dependsOn": []
