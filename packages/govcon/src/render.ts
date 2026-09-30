@@ -4,9 +4,12 @@ import {
   day,
   describeQuery,
   summarizePull,
+  type EntityLookup,
+  type FetchAwardsReport,
   type LeadsReport,
   type NoticeDto,
   type PullReport,
+  type StoredProfile,
 } from '@sysdesign/contracts';
 
 /**
@@ -109,4 +112,61 @@ export function renderLead(lead: NoticeDto): string {
     ]),
   );
   return [...head, '', trace, '', ...description].join('\n');
+}
+
+export function renderAwardsFetch(report: FetchAwardsReport): string {
+  const rows = report.slices.map((slice) => [
+    slice.source,
+    slice.code,
+    slice.outcome,
+    String(slice.pages),
+    String(slice.received),
+    String(slice.inserted),
+    String(slice.updated),
+    `${slice.truncated ? 'truncated' : ''}${slice.truncated && slice.detail ? ' · ' : ''}${slice.detail ?? ''}`,
+  ]);
+  return [
+    table(['source', 'code', 'outcome', 'pages', 'received', 'inserted', 'updated', 'note'], rows),
+    `budget: ${report.spent === null ? '?' : report.spent}/${report.budget} sam.gov attempts in the last 24h`,
+  ].join('\n');
+}
+
+export function renderEntities(lookup: EntityLookup): string {
+  const rows = lookup.entities.map((entity) => [
+    entity.uei,
+    entity.cage ?? '—',
+    clip(entity.legalName, 40),
+    entity.registrationStatus ?? '—',
+    entity.registrationExpiresAt ?? '—',
+    entity.excluded ? 'EXCLUDED' : 'no',
+    entity.naics.map((n) => `${n.code}${n.small === true ? '*' : ''}`).join(' '),
+    entity.sbaCertifications.join(' ') || '—',
+  ]);
+  return [
+    rows.length > 0
+      ? table(
+          ['uei', 'cage', 'name', 'status', 'expires', 'excluded', 'naics (* small)', 'sba'],
+          rows,
+        )
+      : '(no registrant found)',
+    lookup.unknown.length > 0 ? `unknown: ${lookup.unknown.join(', ')}` : '',
+    `budget: ${lookup.spent === null ? '?' : lookup.spent}/${lookup.budget} sam.gov attempts in the last 24h`,
+  ]
+    .filter((line) => line.length > 0)
+    .join('\n');
+}
+
+export function renderProfiles(profiles: readonly StoredProfile[]): string {
+  return table(
+    ['id', 'company', 'default', 'uei', 'naics', 'horizon', 'updated'],
+    profiles.map((profile) => [
+      profile.id,
+      clip(profile.company, 30),
+      profile.isDefault ? 'yes' : '',
+      profile.entityUei ?? '—',
+      profile.naics.join(' '),
+      `${profile.leads.horizonDays}d`,
+      day(profile.updatedAt),
+    ]),
+  );
 }

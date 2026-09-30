@@ -14,29 +14,37 @@ export function budgetTone(spent: number, limit: number): MeterTone {
   return used >= 0.9 ? 'danger' : used >= 0.6 ? 'warn' : 'success';
 }
 
-/** The upstream, read-out only: whether it can be called, and how much of the rolling day's budget is gone. */
+/** The upstreams, read-out only: each source and whether it can be called, each bucket as a meter over the rolling day. */
 export function SourceStatus({ status }: SourceStatusProps) {
-  const { availability, budget } = status;
-  const availabilityKey = availability.enabled ? 'enabled' : 'disabled';
   return (
     <Stack gap={4}>
       <Stack direction="row" gap={3} align="center" wrap>
-        <Heading level={2}>Source</Heading>
-        <Badge tone={AVAILABILITY_TONE[availabilityKey]}>
-          {status.id} {availability.enabled ? 'enabled' : `disabled (${availability.reason})`}
-        </Badge>
+        <Heading level={2}>Sources</Heading>
+        {status.sources.map((source) => (
+          <Badge
+            key={source.id}
+            tone={AVAILABILITY_TONE[source.availability.enabled ? 'enabled' : 'disabled']}
+          >
+            {source.id}{' '}
+            {source.availability.enabled ? 'enabled' : `disabled (${source.availability.reason})`}
+            {source.bucket === null ? ' · free' : ''}
+          </Badge>
+        ))}
       </Stack>
-      {budget.spent === null ? (
-        <Text tone="secondary">
-          Budget unknown — the call ledger could not be read. Limit {budget.limit} per{' '}
-          {budget.windowHours} h.
-        </Text>
-      ) : (
-        <Meter
-          label={`Budget: ${budget.spent} of ${budget.limit} requests used in the last ${budget.windowHours} h`}
-          value={budget.limit > 0 ? (budget.spent / budget.limit) * 100 : 100}
-          tone={budgetTone(budget.spent, budget.limit)}
-        />
+      {status.buckets.map((bucket) =>
+        bucket.spent === null ? (
+          <Text key={bucket.id} tone="secondary">
+            {bucket.id}: budget unknown — the call ledger could not be read. Limit {bucket.limit}{' '}
+            per {bucket.windowHours} h.
+          </Text>
+        ) : (
+          <Meter
+            key={bucket.id}
+            label={`${bucket.id}: ${bucket.spent} of ${bucket.limit} requests used in the last ${bucket.windowHours} h`}
+            value={bucket.limit > 0 ? (bucket.spent / bucket.limit) * 100 : 100}
+            tone={budgetTone(bucket.spent, bucket.limit)}
+          />
+        ),
       )}
       <Text tone="muted" size="sm">
         {status.cacheTtlHours > 0

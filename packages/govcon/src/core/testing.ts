@@ -218,12 +218,16 @@ export class InMemorySourceCallLog implements SourceCallLog {
     this.calls.push(row);
   }
 
-  async list(limit: number, offset: number): Promise<[SourceCallRecord[], number]> {
+  async list(
+    limit: number,
+    offset: number,
+    operation: SourceOperation | null = null,
+  ): Promise<[SourceCallRecord[], number]> {
     this.fail();
-    const newestFirst = [...this.calls].sort(
-      (a, b) => b.requestedAt.getTime() - a.requestedAt.getTime(),
-    );
-    return [newestFirst.slice(offset, offset + limit), this.calls.length];
+    const matching = [...this.calls]
+      .filter((call) => operation === null || call.operation === operation)
+      .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
+    return [matching.slice(offset, offset + limit), matching.length];
   }
 
   async findFresh(

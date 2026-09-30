@@ -46,6 +46,10 @@ export interface SourceCallLog {
   ): Promise<FreshCall | null>;
   /** Every attempt since `since`, whatever its outcome or operation. */
   countSince(source: string, since: Date): Promise<number>;
-  /** Newest first, with the total. */
-  list(limit: number, offset: number): Promise<[SourceCallRecord[], number]>;
+  /** Newest first, with the total; one operation when asked. */
+  list(
+    limit: number,
+    offset: number,
+    operation?: SourceOperation | null,
+  ): Promise<[SourceCallRecord[], number]>;
 }

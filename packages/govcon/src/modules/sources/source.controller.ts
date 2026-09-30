@@ -20,7 +20,7 @@ export class SourceController {
   async calls(
     @Query(new ZodValidationPipe(listCallsQuerySchema)) query: ListCallsQueryInput,
   ): Promise<ListSourceCallsResponse> {
-    const [data, total] = await this.source.calls(query);
+    const [data, total] = await this.source.calls({ ...query, operation: query.operation ?? null });
     return { data, meta: { total, limit: query.limit, offset: query.offset } };
   }
 }

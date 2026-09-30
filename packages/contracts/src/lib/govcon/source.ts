@@ -1,25 +1,33 @@
 import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { OperationQuery } from './query';
-import type { SourceCallOutcome } from './vocab';
+import type { SourceCallOutcome, SourceOperation } from './vocab';
 
 export interface SourceAvailability {
   enabled: boolean;
   reason: 'no-key' | null;
 }
 
-/** One rolling window of attempts against one upstream. */
+/** One upstream by id, and the bucket it spends — none for a free source. */
+export interface SourceInfo {
+  id: string;
+  availability: SourceAvailability;
+  bucket: string | null;
+}
+
+/** One rolling window of attempts, shared by every operation against the source it names. */
 export interface BudgetBucket {
+  /** The source id the bucket counts, e.g. `sam.gov`. */
+  id: string;
   /** Attempts inside the window, as the ledger counts them; null when it could not be read. */
   spent: number | null;
   limit: number;
   windowHours: number;
 }
 
-/** `GET /source`: what the upstream is and how much of today's budget is left. */
+/** `GET /source`: every upstream, every bucket, and the cache window. */
 export interface SourceStatus {
-  id: string;
-  availability: SourceAvailability;
-  budget: BudgetBucket;
+  sources: SourceInfo[];
+  buckets: BudgetBucket[];
   cacheTtlHours: number;
 }
 
@@ -54,6 +62,7 @@ export type SourceCall = OperationQuery & {
 };
 
 export interface ListCallsQuery {
+  operation?: SourceOperation;
   limit?: number;
   offset?: number;
 }

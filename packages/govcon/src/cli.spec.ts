@@ -1,5 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { leadsReportOf, noticeOf, pullReportOf, sliceReportOf } from '@sysdesign/contracts';
+import {
+  entityOf,
+  leadsReportOf,
+  noticeOf,
+  pullReportOf,
+  sliceReportOf,
+  storedProfileOf,
+} from '@sysdesign/contracts';
 
 import { execute, parseOptions, USAGE, type CliService, type Io, type Options } from './cli';
 
@@ -42,6 +49,46 @@ describe('parseOptions', () => {
       description: true,
     });
     expect(parsed(['search']).limit).toBe(25);
+    expect(
+      parsed([
+        'awards',
+        'fetch',
+        '--naics',
+        '332710,541511',
+        '--from',
+        '2026-06-01',
+        '--to',
+        '2026-09-29',
+      ]).awards,
+    ).toEqual({
+      naics: ['332710', '541511'],
+      psc: [],
+      from: '2026-06-01',
+      to: '2026-09-29',
+      sources: ['sam.gov', 'usaspending'],
+    });
+    expect(
+      parsed([
+        'awards',
+        'fetch',
+        '--psc',
+        '4920',
+        '--from',
+        '2026-06-01',
+        '--to',
+        '2026-09-29',
+        '--sources',
+        'usaspending',
+      ]).awards?.sources,
+    ).toEqual(['usaspending']);
+    expect(parsed(['entities', 'lookup', 'ABC123DEF456', 'ZZZ000000001'])).toMatchObject({
+      command: 'entities',
+      ueis: ['ABC123DEF456', 'ZZZ000000001'],
+    });
+    expect(parsed(['profiles', 'list', '--json'])).toMatchObject({
+      command: 'profiles',
+      json: true,
+    });
   });
 
   it.each([
@@ -53,6 +100,29 @@ describe('parseOptions', () => {
     [['leads', '--limit', 'many'], '--limit must be a non-negative integer'],
     [['pull', '--days', '1.5'], '--days must be a non-negative integer'],
     [['pull', '--bogus'], "Unknown option '--bogus'"],
+    [['awards'], 'awards takes the subcommand fetch'],
+    [['awards', 'fetch', '--naics', '33'], 'awards fetch takes --from and --to'],
+    [
+      ['awards', 'fetch', '--from', '2026-06-01', '--to', '2026-09-29'],
+      'awards fetch takes --naics or --psc',
+    ],
+    [
+      [
+        'awards',
+        'fetch',
+        '--naics',
+        '33',
+        '--from',
+        '2026-06-01',
+        '--to',
+        '2026-09-29',
+        '--sources',
+        'ebay',
+      ],
+      '--sources must be among',
+    ],
+    [['entities', 'lookup'], 'entities lookup takes UEIs'],
+    [['profiles', 'show'], 'profiles takes the subcommand list'],
   ])('refuses %j', (argv, message) => {
     const result = parseOptions(argv);
     expect(result).toBeInstanceOf(Error);
@@ -72,6 +142,30 @@ describe('execute', () => {
     leads: async () => leadsReportOf(),
     notice: async () => noticeOf(),
     fetchDescription: async () => ({ status: 'ok', description: { text: 'x', fetchedAt: 'y' } }),
+    fetchAwards: async () => ({
+      slices: [
+        {
+          source: 'sam.gov',
+          code: '332710',
+          outcome: 'ok',
+          pages: 1,
+          received: 3,
+          inserted: 3,
+          updated: 0,
+          truncated: false,
+          detail: null,
+        },
+      ],
+      spent: 1,
+      budget: 1000,
+    }),
+    lookupEntities: async () => ({
+      entities: [entityOf()],
+      unknown: ['ZZZ000000001'],
+      spent: 2,
+      budget: 1000,
+    }),
+    listProfiles: async () => [storedProfileOf()],
     ...overrides,
   });
 
@@ -84,6 +178,48 @@ describe('execute', () => {
     const json = io();
     expect(await execute(parsed(['leads', '--json']), service(), json.sink)).toBe(0);
     expect(JSON.parse(json.out[0] ?? '')).toEqual(leadsReportOf());
+  });
+
+  it('renders an awards fetch, an entity lookup and the profiles, exiting 1 when no awards slice succeeded', async () => {
+    const { out, sink } = io();
+    expect(
+      await execute(
+        parsed([
+          'awards',
+          'fetch',
+          '--naics',
+          '332710',
+          '--from',
+          '2026-06-01',
+          '--to',
+          '2026-09-29',
+        ]),
+        service(),
+        sink,
+      ),
+    ).toBe(0);
+    expect(out[0]).toMatch(/sam\.gov\s+332710\s+ok\s+1\s+3\s+3/);
+    expect(out[0]).toContain('budget: 1/1000 sam.gov attempts');
+    const empty = service({ fetchAwards: async () => ({ slices: [], spent: 0, budget: 1 }) });
+    expect(
+      await execute(
+        parsed(['awards', 'fetch', '--naics', '33', '--from', '2026-06-01', '--to', '2026-09-29']),
+        empty,
+        io().sink,
+      ),
+    ).toBe(1);
+
+    const entities = io();
+    expect(
+      await execute(parsed(['entities', 'lookup', 'ABC123DEF456']), service(), entities.sink),
+    ).toBe(0);
+    expect(entities.out[0]).toContain('PRECISION PARTS CO');
+    expect(entities.out[0]).toContain('332710*');
+    expect(entities.out[0]).toContain('unknown: ZZZ000000001');
+
+    const profiles = io();
+    expect(await execute(parsed(['profiles', 'list']), service(), profiles.sink)).toBe(0);
+    expect(profiles.out[0]).toMatch(/tiny\s+Tiny LLC\s+yes/);
   });
 
   it('exits 1 when a pull stored nothing, and when the notice is not stored', async () => {

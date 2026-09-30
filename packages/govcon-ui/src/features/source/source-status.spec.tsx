@@ -9,11 +9,12 @@ import { budgetTone } from './source-status';
 const { Default, NearlySpent, Disabled, LedgerUnreadable } = composeStories(stories);
 
 describe('SourceStatus', () => {
-  it('[GOVU-1] shows the source, whether it can be called, and the budget as a meter over the rolling day', () => {
+  it('[GOVU-1] shows every source, whether it can be called, and each bucket as a meter over the rolling day', () => {
     renderWithTheme(<Default />);
     expect(screen.getByText('sam.gov enabled')).toBeTruthy();
+    expect(screen.getByText('usaspending enabled · free')).toBeTruthy();
     const meter = screen.getByRole('meter', {
-      name: 'Budget: 3 of 10 requests used in the last 24 h',
+      name: 'sam.gov: 3 of 10 requests used in the last 24 h',
     });
     expect(meter.getAttribute('aria-valuenow')).toBe('30');
     expect(screen.getByText(/pulled inside the last 24 h is not pulled again/)).toBeTruthy();
@@ -26,7 +27,7 @@ describe('SourceStatus', () => {
 
   it('[GOVU-1] says when the budget is unknown instead of drawing a meter', () => {
     renderWithTheme(<LedgerUnreadable />);
-    expect(screen.getByText(/Budget unknown/)).toBeTruthy();
+    expect(screen.getByText(/budget unknown/)).toBeTruthy();
     expect(screen.queryByRole('meter')).toBeNull();
   });
 

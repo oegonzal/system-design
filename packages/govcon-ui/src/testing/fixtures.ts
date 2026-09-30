@@ -46,12 +46,21 @@ export const PROFILE: SearchProfile = profileOf({
 });
 
 export const SOURCE_STATUS: SourceStatus = sourceStatusOf({
-  budget: { spent: 3, limit: 10, windowHours: 24 },
+  buckets: [{ id: 'sam.gov', spent: 3, limit: 10, windowHours: 24 }],
+});
+
+/** A bucket as the fixture's, with the spend changed. */
+export const withSpent = (spent: number | null): SourceStatus => ({
+  ...SOURCE_STATUS,
+  buckets: SOURCE_STATUS.buckets.map((bucket) => ({ ...bucket, spent })),
 });
 
 export const DISABLED_SOURCE: SourceStatus = sourceStatusOf({
-  availability: { enabled: false, reason: 'no-key' },
-  budget: { spent: 0, limit: 10, windowHours: 24 },
+  sources: [
+    { id: 'sam.gov', availability: { enabled: false, reason: 'no-key' }, bucket: 'sam.gov' },
+    { id: 'usaspending', availability: { enabled: true, reason: null }, bucket: null },
+  ],
+  buckets: [{ id: 'sam.gov', spent: 0, limit: 10, windowHours: 24 }],
 });
 
 export const makeOpportunity = (overrides: Partial<Opportunity> = {}): Opportunity =>

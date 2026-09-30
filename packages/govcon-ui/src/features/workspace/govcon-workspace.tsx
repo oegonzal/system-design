@@ -204,9 +204,11 @@ export function GovconWorkspace() {
 
   const profile = profiles?.find((candidate) => candidate.id === form.profileId) ?? null;
   const shown = detail !== null && detail.opportunity.noticeId === noticeId ? detail : null;
+  /** The budgeted upstream is the one a pull needs; a free source never blocks it. */
+  const search = source?.sources.find((item) => item.bucket !== null) ?? source?.sources[0] ?? null;
   const sourceDisabledReason =
-    source !== null && !source.availability.enabled
-      ? source.availability.reason === 'no-key'
+    search !== null && !search.availability.enabled
+      ? search.availability.reason === 'no-key'
         ? 'SAM_GOV_API_KEY is not set (no-key)'
         : 'the source is disabled'
       : null;

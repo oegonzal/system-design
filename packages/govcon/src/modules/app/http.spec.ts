@@ -186,9 +186,11 @@ describe('the govcon HTTP surface', () => {
 
     const source = await get<Envelope<SourceStatus>>(url, '/source');
     expect(source.data).toEqual({
-      id: 'sam.gov',
-      availability: { enabled: true, reason: null },
-      budget: { spent: 0, limit: 4, windowHours: 24 },
+      sources: [
+        { id: 'sam.gov', availability: { enabled: true, reason: null }, bucket: 'sam.gov' },
+        { id: 'usaspending', availability: { enabled: true, reason: null }, bucket: null },
+      ],
+      buckets: [{ id: 'sam.gov', spent: 0, limit: 4, windowHours: 24 }],
       cacheTtlHours: 0,
     });
   });
@@ -334,7 +336,7 @@ describe('the govcon HTTP surface', () => {
     expect(report).toMatchObject({ profile: 'tiny', spent: 2, budget: 4, stoppedBy: null });
 
     const source = await get<Envelope<SourceStatus>>(url, '/source');
-    expect(source.data.budget.spent).toBe(2);
+    expect(source.data.buckets[0]?.spent).toBe(2);
     const searches = await get<Envelope<SavedSearch[]>>(url, '/profiles/tiny/searches');
     expect(searches.data.map((s) => s.lastRunAt)).toEqual([NOW.toISOString(), NOW.toISOString()]);
   });
@@ -432,6 +434,10 @@ describe('the govcon HTTP surface', () => {
     ).toEqual(['a', 'c']);
     expect(JSON.stringify(calls)).not.toContain('api_key');
     expect((await fetch(`${url}/source/calls?limit=0`)).status).toBe(400);
+    const described = await get<Page<SourceCall>>(url, '/source/calls?operation=description');
+    expect(described.meta.total).toBe(2);
+    expect(described.data.every((call) => call.operation === 'description')).toBe(true);
+    expect((await fetch(`${url}/source/calls?operation=magic`)).status).toBe(400);
   });
 
   it('[GOV-8] [GOV-12] puts a bid on a stored notice, shows it on the notice, lists the pipeline, and removes it', async () => {

@@ -199,9 +199,11 @@ export const pullReportOf = (overrides: Partial<PullReport> = {}): PullReport =>
 });
 
 export const sourceStatusOf = (overrides: Partial<SourceStatus> = {}): SourceStatus => ({
-  id: 'sam.gov',
-  availability: { enabled: true, reason: null },
-  budget: { spent: 3, limit: 1000, windowHours: 24 },
+  sources: [
+    { id: 'sam.gov', availability: { enabled: true, reason: null }, bucket: 'sam.gov' },
+    { id: 'usaspending', availability: { enabled: true, reason: null }, bucket: null },
+  ],
+  buckets: [{ id: 'sam.gov', spent: 3, limit: 1000, windowHours: 24 }],
   cacheTtlHours: 24,
   ...overrides,
 });

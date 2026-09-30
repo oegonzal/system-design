@@ -103,5 +103,8 @@ describe('the source call log in Postgres', () => {
     const [rest, sameTotal] = await log.list(10, 2);
     expect(sameTotal).toBe(6);
     expect(rest).toHaveLength(4);
+    const [descriptions, described] = await log.list(10, 0, 'description');
+    expect(described).toBe(1);
+    expect(descriptions.map((row) => row.operation)).toEqual(['description']);
   });
 });

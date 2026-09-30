@@ -43,14 +43,18 @@ export class MikroOrmSourceCallLog implements SourceCallLog {
     return this.em.fork().count(GovconSourceCall, { source, requestedAt: { $gte: since } });
   }
 
-  async list(limit: number, offset: number): Promise<[SourceCallRecord[], number]> {
+  async list(
+    limit: number,
+    offset: number,
+    operation: SourceOperation | null = null,
+  ): Promise<[SourceCallRecord[], number]> {
     const [rows, total] = await this.em
       .fork()
-      .findAndCount(
-        GovconSourceCall,
-        {},
-        { orderBy: { requestedAt: 'desc', seq: 'desc' }, limit, offset },
-      );
+      .findAndCount(GovconSourceCall, operation === null ? {} : { operation }, {
+        orderBy: { requestedAt: 'desc', seq: 'desc' },
+        limit,
+        offset,
+      });
     return [rows.map(toRecord), total];
   }
 }
