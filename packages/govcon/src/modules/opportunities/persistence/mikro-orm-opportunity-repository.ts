@@ -56,6 +56,9 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
     const conditions: FilterQuery<GovconOpportunity>[] = [];
     // `active != false` would drop the unknowns: SQL's null never compares.
     if (filter.activeOnly) conditions.push({ $or: [{ active: true }, { active: null }] });
+    if (filter.postedOnOrAfter !== null) {
+      conditions.push({ postedAt: { $gte: filter.postedOnOrAfter } });
+    }
     if (filter.deadlineOnOrAfter !== null) {
       conditions.push({
         $or: [

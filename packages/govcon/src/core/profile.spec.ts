@@ -2,11 +2,8 @@ import type { SearchProfile } from '@sysdesign/contracts';
 import type { z } from 'zod';
 
 import { ENFAV } from '../profiles/enfav';
-import { searchProfileSchema, validateProfile } from './profile';
-import { FACTORS } from './scoring';
+import { parseProfile, searchProfileSchema, validateProfile } from './profile';
 import { tinyProfile } from './testing';
-
-const ids = FACTORS.map((factor) => factor.id);
 
 describe('the search profile', () => {
   it('[GOV-5] validates exactly the wire contract — the schema output and SearchProfile are one type', () => {
@@ -14,8 +11,9 @@ describe('the search profile', () => {
   });
 
   it('[GOV-5] accepts the tiny profile and the shipped Enfav profile', () => {
-    expect(() => validateProfile(tinyProfile(), ids)).not.toThrow();
-    expect(validateProfile(ENFAV, ids).id).toBe('enfav');
+    expect(() => validateProfile(tinyProfile())).not.toThrow();
+    expect(validateProfile(ENFAV).id).toBe('enfav');
+    expect(parseProfile(tinyProfile())).toEqual({ ok: true, profile: tinyProfile() });
   });
 
   it.each([
@@ -33,7 +31,7 @@ describe('the search profile', () => {
         ...p,
         scoring: { ...p.scoring, weights: { ...p.scoring.weights, naics: 0.2, magic: 0.1 } },
       }),
-      /must name exactly the factors/,
+      /Unrecognized key/,
     ],
     [
       'a missing factor weight',
@@ -43,7 +41,7 @@ describe('the search profile', () => {
         );
         return { ...p, scoring: { ...p.scoring, weights: { ...rest, naics: 0.45 } } };
       },
-      /must name exactly the factors/,
+      /weights\.psc/,
     ],
     [
       'a NAICS code that is not 2–6 digits',
@@ -84,17 +82,44 @@ describe('the search profile', () => {
       /setAside\.byCode\.SBA/,
     ],
     [
-      'no slices to pull',
-      (p: ReturnType<typeof tinyProfile>) => ({ ...p, pull: { ...p.pull, slices: [] } }),
-      /pull\.slices/,
+      'a page size over the provider ceiling',
+      (p: ReturnType<typeof tinyProfile>) => ({ ...p, pull: { ...p.pull, pageSize: 5000 } }),
+      /pull\.pageSize/,
+    ],
+    [
+      'a UEI that is not twelve characters',
+      (p: ReturnType<typeof tinyProfile>) => ({ ...p, entityUei: 'short' }),
+      /entityUei/,
+    ],
+    [
+      'freshness bands out of order',
+      (p: ReturnType<typeof tinyProfile>) => ({
+        ...p,
+        scoring: {
+          ...p.scoring,
+          freshness: {
+            ...p.scoring.freshness,
+            bands: [
+              { maxDays: 14, value: 1 },
+              { maxDays: 3, value: 0.3 },
+            ],
+          },
+        },
+      }),
+      /freshness\.bands bands must ascend/,
     ],
     [
       'an unknown field',
       (p: ReturnType<typeof tinyProfile>) => ({ ...p, extra: true }),
       /Unrecognized key/,
     ],
-  ])('[GOV-5] rejects %s at load, naming the path', (_label, mutate, pattern) => {
-    expect(() => validateProfile(mutate(tinyProfile()), ids)).toThrow(pattern);
-    expect(() => validateProfile(mutate(tinyProfile()), ids)).toThrow(/^profile tiny: /);
+  ])('[GOV-5] [GOV-13] rejects %s at load, naming the path', (_label, mutate, pattern) => {
+    expect(() => validateProfile(mutate(tinyProfile()))).toThrow(pattern);
+    expect(() => validateProfile(mutate(tinyProfile()))).toThrow(/^profile tiny: /);
+    const parsed = parseProfile(mutate(tinyProfile()));
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) throw new Error('expected issues');
+    expect(parsed.issues.length).toBeGreaterThan(0);
+    expect(parsed.issues.every((issue) => typeof issue.path === 'string')).toBe(true);
   });
 });

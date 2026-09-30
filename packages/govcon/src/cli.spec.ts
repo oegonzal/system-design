@@ -13,7 +13,7 @@ describe('parseOptions', () => {
   it('reads each command with its options and leaves the window rule to the service', () => {
     expect(parsed(['pull'])).toMatchObject({
       command: 'pull',
-      profile: 'enfav',
+      profile: undefined,
       window: { days: undefined, from: undefined, to: undefined },
       json: false,
     });

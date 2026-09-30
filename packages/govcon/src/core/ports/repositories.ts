@@ -13,6 +13,8 @@ export interface StoredDescription {
 export interface CandidateFilter {
   /** Drop records the source marked inactive; unknown stays in. */
   activeOnly: boolean;
+  /** Keep only records posted at or after this. */
+  postedOnOrAfter: Date | null;
   /** Drop records whose stated deadline is before this; no deadline stays in. */
   deadlineOnOrAfter: Date | null;
   /** Keep only records with a stated deadline at or before this. */

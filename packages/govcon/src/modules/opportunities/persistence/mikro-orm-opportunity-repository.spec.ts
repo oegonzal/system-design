@@ -116,6 +116,7 @@ describe('the opportunity repository in Postgres', () => {
     const cutoff = new Date('2026-09-26T00:00:00Z');
     const base: CandidateFilter = {
       activeOnly: true,
+      postedOnOrAfter: null,
       deadlineOnOrAfter: cutoff,
       deadlineOnOrBefore: null,
       setAsideCodes: ['SBA', 'SBP'],
@@ -134,6 +135,7 @@ describe('the opportunity repository in Postgres', () => {
 
     expect(await ids({})).toEqual(['unknown', 'open']);
     expect(await ids({ activeOnly: false })).toEqual(['inactive', 'unknown', 'open']);
+    expect(await ids({ postedOnOrAfter: new Date('2026-09-21T00:00:00Z') })).toEqual(['unknown']);
     expect(await ids({ deadlineOnOrAfter: null })).toEqual(['closed', 'unknown', 'open']);
     expect(await ids({ setAsideCodes: null, excludeNoticeTypes: [] })).toEqual([
       'awarded',

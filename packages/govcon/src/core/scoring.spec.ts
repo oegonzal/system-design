@@ -1,8 +1,10 @@
-import { FACTORS, rankLeads, scoreLead } from './scoring';
-import { opportunityOf, tinyProfile } from './testing';
+import { FACTOR_IDS } from '@sysdesign/contracts';
+
+import { FACTORS, rankLeads, scoreLead, type HistoryIndex } from './scoring';
+import { contextAt, opportunityOf, tinyProfile } from './testing';
 import { containsPhrase, tokenize } from './text';
 
-const NOW = Date.parse('2026-09-26T12:00:00Z');
+const NOW = contextAt(Date.parse('2026-09-26T12:00:00Z'));
 const profile = tinyProfile();
 
 const pointsOf = (lead: ReturnType<typeof scoreLead>) =>
@@ -20,11 +22,14 @@ describe('scoring', () => {
       setAside: 15,
       noticeType: 10,
       deadline: 15,
+      history: 0,
+      freshness: 0,
     });
     expect(lead.score).toBe(92.5);
     expect(lead.tier).toBe('high');
     expect(lead.excluded).toBeNull();
-    expect(lead.factors.map((trace) => trace.id)).toEqual(FACTORS.map((factor) => factor.id));
+    expect(lead.factors.map((trace) => trace.id)).toEqual([...FACTOR_IDS]);
+    expect(Object.keys(FACTORS).sort()).toEqual([...FACTOR_IDS].sort());
     expect(lead.factors.reduce((total, trace) => total + trace.points, 0)).toBeCloseTo(
       lead.score,
       6,
@@ -81,7 +86,7 @@ describe('scoring', () => {
     expect(lead.score).toBe(0);
     expect(lead.tier).toBeNull();
     // The trace still shows what every other factor saw.
-    expect(lead.factors).toHaveLength(FACTORS.length);
+    expect(lead.factors).toHaveLength(FACTOR_IDS.length);
   });
 
   it('prices unrestricted, unknown notice types and missing deadlines by the profile defaults', () => {
@@ -105,6 +110,44 @@ describe('scoring', () => {
       value: 0.6,
       evidence: ['97 day(s) to respond, beyond the last band'],
     });
+  });
+
+  it('prices history by stored awards in the NAICS and freshness by days since posting, both as data', () => {
+    const history: HistoryIndex = {
+      countFor: (naics, agency, days) =>
+        naics === '332710' && days === 365
+          ? { same: 3, agency: agency === '097.97AS.SPE4A7' ? 1 : 0 }
+          : { same: 0, agency: 0 },
+    };
+    const priced = tinyProfile({
+      scoring: {
+        ...profile.scoring,
+        weights: { ...profile.scoring.weights, naics: 0.1, history: 0.1, freshness: 0.1 },
+      },
+    });
+    const lead = scoreLead(opportunityOf(), priced, { ...NOW, history });
+    expect(lead.factors.find((trace) => trace.id === 'history')).toMatchObject({
+      value: 0.6,
+      points: 6,
+      evidence: [
+        '3 stored award(s) in naics 332710 in the last 365 day(s)',
+        '1 of them at this agency',
+      ],
+    });
+    // Posted six days before NOW: the 14-day band.
+    expect(lead.factors.find((trace) => trace.id === 'freshness')).toMatchObject({
+      value: 0.7,
+      points: 7,
+      evidence: ['posted 6 day(s) ago'],
+    });
+    const stale = scoreLead(opportunityOf({ postedAt: '2026-01-01T00:00:00.000Z' }), priced, NOW);
+    expect(stale.factors.find((trace) => trace.id === 'freshness')).toMatchObject({
+      value: 0.4,
+      evidence: ['posted 268 day(s) ago, beyond the last band'],
+    });
+    expect(
+      scoreLead(opportunityOf(), priced, NOW).factors.find((t) => t.id === 'history')?.evidence,
+    ).toEqual(['no stored award in naics 332710']);
   });
 
   it('[GOV-4] ranks deterministically: score, then newest, then notice id; exclusions kept apart', () => {

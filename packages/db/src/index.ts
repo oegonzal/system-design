@@ -2,6 +2,8 @@ export * from './entities/design-revision.entity';
 export * from './entities/design-session.entity';
 export * from './entities/experience-profile.entity';
 export * from './entities/govcon-opportunity.entity';
+export * from './entities/govcon-saved-search.entity';
+export * from './entities/govcon-search-profile.entity';
 export * from './entities/govcon-source-call.entity';
 export * from './entities/memory-embedding.entity';
 export * from './entities/orchestration-run-child.entity';

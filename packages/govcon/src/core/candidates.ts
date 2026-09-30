@@ -13,7 +13,8 @@ export type LeadFilters = Pick<
 /**
  * What the store is asked for before anything is scored: the profile's
  * gates pushed down (active, open deadline, a set-aside it may bid on or
- * none, no excluded notice type) plus the request's filters, bounded by
+ * none, no excluded notice type, posted inside the leads horizon) plus the
+ * request's filters, bounded by
  * `MAX_CANDIDATES` so one ranking never reads the whole table. Everything a
  * gate would exclude anyway is never loaded; everything else is scored.
  */
@@ -24,6 +25,7 @@ export function candidateFilterOf(
 ): CandidateFilter {
   return {
     activeOnly: true,
+    postedOnOrAfter: new Date(now.getTime() - profile.leads.horizonDays * DAY_MS),
     deadlineOnOrAfter: now,
     deadlineOnOrBefore:
       filters.deadlineWithinDays === undefined

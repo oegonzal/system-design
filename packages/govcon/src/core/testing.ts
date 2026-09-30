@@ -19,13 +19,19 @@ import type {
   NoticeDescriptions,
   OpportunityRepository,
   OpportunitySearch,
+  ProfileRecord,
+  ProfileRepository,
   RejectedRecord,
+  SavedSearchInput,
+  SavedSearchRecord,
+  SavedSearchRepository,
   SearchPage,
   SourceCallLog,
   SourceCallRecord,
   StoredDescription,
   UpsertSummary,
 } from './ports';
+import { NO_HISTORY, type ScoringContext } from './scoring';
 import type { OpportunityQuery } from './query';
 
 export { opportunityOf } from '@sysdesign/contracts';
@@ -34,8 +40,40 @@ export { opportunityOf } from '@sysdesign/contracts';
 export const tinyProfile = (overrides: Partial<SearchProfile> = {}): SearchProfile =>
   profileOf(overrides);
 
+/** The item at `index`, or a failure a spec can read — never a non-null assertion. */
+export function pick<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) throw new Error(`no item at ${index} of ${items.length}`);
+  return item;
+}
+
+/** A value a fake or a repository answered, or a failure a spec can read. */
+export function must<T>(value: T | null | undefined | 'conflict'): T {
+  if (value === null || value === undefined || value === 'conflict') throw new Error(`expected a value, got ${String(value)}`);
+  return value;
+}
+
 /** The fixed instant the fakes stamp attempts with. */
 export const T0 = new Date('2026-09-26T12:00:00.000Z');
+
+/** A scoring context at `T0` with no stored awards. */
+export const contextAt = (nowMs = T0.getTime()): ScoringContext => ({ nowMs, history: NO_HISTORY });
+
+/** The two saved searches the tiny profile pulls, one per NAICS. */
+export const tinySearches = (profileId = 'tiny'): SavedSearchRecord[] =>
+  [
+    { name: 'Machine shops', filter: { naics: '332710' }, pullOrder: 0 },
+    { name: 'Computer services', filter: { naics: '5415' }, pullOrder: 1 },
+  ].map((search, index) => ({
+    id: `s-${index + 1}`,
+    profileId,
+    days: 3,
+    includedInPull: true,
+    lastRunAt: null,
+    createdAt: T0,
+    updatedAt: T0,
+    ...search,
+  }));
 
 export const okPage = (
   opportunities: Opportunity[],
@@ -234,6 +272,11 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
       .filter((o) => !filter.activeOnly || o.active !== false)
       .filter(
         (o) =>
+          filter.postedOnOrAfter === null ||
+          Date.parse(o.postedAt) >= filter.postedOnOrAfter.getTime(),
+      )
+      .filter(
+        (o) =>
           filter.deadlineOnOrAfter === null ||
           o.responseDeadlineAt === null ||
           Date.parse(o.responseDeadlineAt) >= filter.deadlineOnOrAfter.getTime(),
@@ -280,5 +323,117 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
 
   async saveDescription(noticeId: string, description: StoredDescription): Promise<void> {
     this.descriptions.set(noticeId, description);
+  }
+}
+
+export class InMemoryProfileRepository implements ProfileRepository {
+  readonly rows = new Map<string, ProfileRecord>();
+
+  async list(): Promise<ProfileRecord[]> {
+    return [...this.rows.values()].sort((a, b) => a.profile.id.localeCompare(b.profile.id));
+  }
+
+  async find(id: string): Promise<ProfileRecord | null> {
+    return this.rows.get(id) ?? null;
+  }
+
+  async findDefault(): Promise<ProfileRecord | null> {
+    return [...this.rows.values()].find((row) => row.isDefault) ?? null;
+  }
+
+  async count(): Promise<number> {
+    return this.rows.size;
+  }
+
+  async insert(
+    profile: SearchProfile,
+    isDefault: boolean,
+    at: Date,
+  ): Promise<ProfileRecord | null> {
+    if (this.rows.has(profile.id)) return null;
+    const row = { profile, isDefault, createdAt: at, updatedAt: at };
+    this.rows.set(profile.id, row);
+    return row;
+  }
+
+  async update(profile: SearchProfile, at: Date): Promise<ProfileRecord | null> {
+    const existing = this.rows.get(profile.id);
+    if (!existing) return null;
+    const row = { ...existing, profile, updatedAt: at };
+    this.rows.set(profile.id, row);
+    return row;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    return this.rows.delete(id);
+  }
+
+  async setDefault(id: string): Promise<boolean> {
+    if (!this.rows.has(id)) return false;
+    for (const [key, row] of this.rows) this.rows.set(key, { ...row, isDefault: key === id });
+    return true;
+  }
+}
+
+export class InMemorySavedSearchRepository implements SavedSearchRepository {
+  readonly rows = new Map<string, SavedSearchRecord>();
+  private next = 1;
+
+  async listByProfile(profileId: string): Promise<SavedSearchRecord[]> {
+    return [...this.rows.values()]
+      .filter((row) => row.profileId === profileId)
+      .sort((a, b) => a.pullOrder - b.pullOrder || a.name.localeCompare(b.name));
+  }
+
+  async find(id: string): Promise<SavedSearchRecord | null> {
+    return this.rows.get(id) ?? null;
+  }
+
+  async insert(
+    profileId: string,
+    input: SavedSearchInput,
+    at: Date,
+  ): Promise<SavedSearchRecord | null> {
+    if (this.taken(profileId, input.name, null)) return null;
+    const row = {
+      id: `s-${this.next++}`,
+      profileId,
+      lastRunAt: null,
+      createdAt: at,
+      updatedAt: at,
+      ...input,
+    };
+    this.rows.set(row.id, row);
+    return row;
+  }
+
+  async update(
+    id: string,
+    input: SavedSearchInput,
+    at: Date,
+  ): Promise<SavedSearchRecord | null | 'conflict'> {
+    const existing = this.rows.get(id);
+    if (!existing) return null;
+    if (this.taken(existing.profileId, input.name, id)) return 'conflict';
+    const row = { ...existing, ...input, updatedAt: at };
+    this.rows.set(id, row);
+    return row;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    return this.rows.delete(id);
+  }
+
+  async markRun(ids: readonly string[], at: Date): Promise<void> {
+    for (const id of ids) {
+      const row = this.rows.get(id);
+      if (row) this.rows.set(id, { ...row, lastRunAt: at });
+    }
+  }
+
+  private taken(profileId: string, name: string, except: string | null): boolean {
+    return [...this.rows.values()].some(
+      (row) => row.profileId === profileId && row.name === name && row.id !== except,
+    );
   }
 }

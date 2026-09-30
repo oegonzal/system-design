@@ -5,6 +5,8 @@ import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
 import { GovconOpportunity } from './entities/govcon-opportunity.entity';
+import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
+import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -52,6 +54,8 @@ export const ormOptions = {
     StarStory,
     GovconOpportunity,
     GovconSourceCall,
+    GovconSearchProfile,
+    GovconSavedSearch,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

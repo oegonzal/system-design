@@ -1,17 +1,66 @@
 import { DEFAULT_PULL_DAYS, MAX_PULL_DAYS } from '@sysdesign/contracts';
 
-import { planPulls, resolveWindow } from './plan';
-import { tinyProfile } from './testing';
+import { planPulls, planSearch, resolveWindow } from './plan';
+import { pick, tinyProfile, tinySearches } from './testing';
 
 const NOW = new Date('2026-09-26T23:30:00Z');
 
 describe('the pull plan', () => {
-  it('is one first page per slice, in declared order, over the validated window', () => {
-    const plan = planPulls(tinyProfile(), { from: '2026-09-20', to: '2026-09-26' });
+  it('[GOV-14] is one first page per saved search flagged for the pull, in pull order, over the validated window', () => {
+    const searches = [
+      ...tinySearches(),
+      {
+        ...pick(tinySearches(), 0),
+        id: 's-3',
+        name: 'Not pulled',
+        includedInPull: false,
+        pullOrder: -1,
+      },
+    ];
+    const plan = planPulls(tinyProfile(), [pick(searches, 1), pick(searches, 2), pick(searches, 0)], {
+      from: '2026-09-20',
+      to: '2026-09-26',
+    });
     expect(plan).toEqual([
-      { limit: 100, naics: '332710', offset: 0, postedFrom: '2026-09-20', postedTo: '2026-09-26' },
-      { limit: 100, naics: '5415', offset: 0, postedFrom: '2026-09-20', postedTo: '2026-09-26' },
+      {
+        name: 'Machine shops',
+        query: {
+          limit: 100,
+          naics: '332710',
+          offset: 0,
+          postedFrom: '2026-09-20',
+          postedTo: '2026-09-26',
+        },
+      },
+      {
+        name: 'Computer services',
+        query: {
+          limit: 100,
+          naics: '5415',
+          offset: 0,
+          postedFrom: '2026-09-20',
+          postedTo: '2026-09-26',
+        },
+      },
     ]);
+    expect(
+      planSearch(
+        tinyProfile(),
+        null,
+        { naics: '11', status: 'active' },
+        { from: '2026-09-20', to: '2026-09-26' },
+      ),
+    ).toEqual({
+      name: null,
+      query: {
+        limit: 100,
+        naics: '11',
+        offset: 0,
+        postedFrom: '2026-09-20',
+        postedTo: '2026-09-26',
+        status: 'active',
+      },
+    });
   });
 
   it('resolves the last n days in UTC ending today, the default when nothing is asked, or an explicit window', () => {

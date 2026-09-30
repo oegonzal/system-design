@@ -34,11 +34,7 @@ export const PROFILE: SearchProfile = profileOf({
     { term: 'replacement parts', aliases: ['spare parts', 'repair parts'], weight: 0.5 },
     { term: 'software development', aliases: ['software', 'custom software'], weight: 0.5 },
   ],
-  pull: {
-    slices: [{ naics: '332710' }, { naics: '333249' }, { naics: '541511' }, { naics: '541512' }],
-    pageSize: 1000,
-    maxPagesPerSlice: 1,
-  },
+  pull: { pageSize: 1000, maxPagesPerSlice: 1 },
   scoring: {
     ...profileOf().scoring,
     noticeType: {

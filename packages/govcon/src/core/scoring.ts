@@ -1,10 +1,12 @@
-import type {
-  FactorTrace,
-  Interest,
-  Lead,
-  LeadTier,
-  Opportunity,
-  SearchProfile,
+import {
+  FACTOR_IDS,
+  type FactorId,
+  type FactorTrace,
+  type Interest,
+  type Lead,
+  type LeadTier,
+  type Opportunity,
+  type SearchProfile,
 } from '@sysdesign/contracts';
 
 import { containsPhrase, tokenize } from './text';
@@ -12,12 +14,13 @@ import { containsPhrase, tokenize } from './text';
 export type { FactorTrace, Lead };
 
 /**
- * Deterministic ranking. Each factor reads the opportunity and the profile and
- * answers a value in [0, 1], an optional exclude gate and the evidence it saw;
- * `scoreLead` applies the gates first and then the profile's weights, and the
- * trace it returns is the arithmetic — every point is attributable. Nothing
- * here is tuned in code: families, phrases, prices, bands and thresholds are
- * all the profile's data.
+ * Deterministic ranking. Each factor reads the opportunity, the profile and
+ * the context and answers a value in [0, 1], an optional exclude gate and the
+ * evidence it saw; `scoreLead` applies the gates first and then the profile's
+ * weights, and the trace it returns is the arithmetic — every point is
+ * attributable. Nothing here is tuned in code: families, phrases, prices,
+ * bands and thresholds are all the profile's data. The table is closed over
+ * `FACTOR_IDS`, so a profile prices every factor and no factor goes unpriced.
  */
 
 export interface FactorAssessment {
@@ -26,9 +29,31 @@ export interface FactorAssessment {
   evidence: string[];
 }
 
+/** What the stored awards say about a code and an agency. */
+export interface HistoryIndex {
+  /** Awards signed in the last `days` days in this NAICS, and how many of them at this agency. */
+  countFor(
+    naics: string | null,
+    agencyCode: string | null,
+    days: number,
+  ): { same: number; agency: number };
+}
+
+/** What a scoring reads besides the record and the profile: the instant, and the store's history. */
+export interface ScoringContext {
+  nowMs: number;
+  history: HistoryIndex;
+}
+
+/** No stored awards — the context of a ranking before any award was fetched. */
+export const NO_HISTORY: HistoryIndex = { countFor: () => ({ same: 0, agency: 0 }) };
+
 export interface Factor {
-  id: string;
-  assess(opportunity: Opportunity, profile: SearchProfile, nowMs: number): FactorAssessment;
+  assess(
+    opportunity: Opportunity,
+    profile: SearchProfile,
+    context: ScoringContext,
+  ): FactorAssessment;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -95,13 +120,21 @@ const codesOf = (opportunity: Opportunity): string[] => [
   ),
 ];
 
-export const FACTORS: readonly Factor[] = [
-  {
-    id: 'naics',
+/** The first band the days fit, else `beyond`. */
+const banded = (
+  days: number,
+  bands: readonly { maxDays: number; value: number }[],
+  beyond: number,
+): { value: number; band: boolean } => {
+  const band = bands.find((candidate) => days <= candidate.maxDays);
+  return band ? { value: band.value, band: true } : { value: beyond, band: false };
+};
+
+export const FACTORS: Record<FactorId, Factor> = {
+  naics: {
     assess: (opportunity, profile) => familyMatch('naics', codesOf(opportunity), profile.naics, 6),
   },
-  {
-    id: 'psc',
+  psc: {
     assess: (opportunity, profile) =>
       familyMatch(
         'psc',
@@ -110,12 +143,10 @@ export const FACTORS: readonly Factor[] = [
         4,
       ),
   },
-  {
-    id: 'interests',
+  interests: {
     assess: (opportunity, profile) => matchInterests(opportunity.title, profile.interests),
   },
-  {
-    id: 'setAside',
+  setAside: {
     assess: (opportunity, profile) => {
       const code = opportunity.setAsideCode;
       if (code === null) return assessed(profile.scoring.setAside.unrestricted, 'unrestricted');
@@ -125,8 +156,7 @@ export const FACTORS: readonly Factor[] = [
         : assessed(price, `set-aside ${code}`);
     },
   },
-  {
-    id: 'noticeType',
+  noticeType: {
     assess: (opportunity, profile) => {
       const type = opportunity.noticeType;
       const policy = profile.scoring.noticeType;
@@ -137,9 +167,8 @@ export const FACTORS: readonly Factor[] = [
         : assessed(price, `notice type ${type}`);
     },
   },
-  {
-    id: 'deadline',
-    assess: (opportunity, profile, nowMs) => {
+  deadline: {
+    assess: (opportunity, profile, { nowMs }) => {
       if (opportunity.active === false) return excluded('inactive');
       const policy = profile.scoring.deadline;
       if (opportunity.responseDeadlineAt === null)
@@ -148,14 +177,40 @@ export const FACTORS: readonly Factor[] = [
       if (Number.isNaN(deadlineMs)) return assessed(policy.none, 'deadline unreadable');
       if (deadlineMs < nowMs) return excluded(`deadline passed ${opportunity.responseDeadlineAt}`);
       const daysLeft = (deadlineMs - nowMs) / DAY_MS;
-      const band = policy.bands.find((candidate) => daysLeft <= candidate.maxDays);
       const days = Math.ceil(daysLeft);
-      return band
-        ? assessed(band.value, `${days} day(s) to respond`)
-        : assessed(policy.beyond, `${days} day(s) to respond, beyond the last band`);
+      const { value, band } = banded(daysLeft, policy.bands, policy.beyond);
+      return assessed(
+        value,
+        band ? `${days} day(s) to respond` : `${days} day(s) to respond, beyond the last band`,
+      );
     },
   },
-];
+  history: {
+    assess: (opportunity, profile, { history }) => {
+      const policy = profile.scoring.history;
+      const code = opportunity.naicsCode;
+      const { same, agency } = history.countFor(code, opportunity.agencyCode, policy.days);
+      if (same === 0) return assessed(0, `no stored award in naics ${code ?? 'unknown'}`);
+      return assessed(
+        same / policy.saturateAt,
+        `${same} stored award(s) in naics ${code} in the last ${policy.days} day(s)`,
+        ...(agency > 0 ? [`${agency} of them at this agency`] : []),
+      );
+    },
+  },
+  freshness: {
+    assess: (opportunity, profile, { nowMs }) => {
+      const policy = profile.scoring.freshness;
+      const postedMs = Date.parse(opportunity.postedAt);
+      const days = Number.isNaN(postedMs) ? Infinity : Math.max(0, (nowMs - postedMs) / DAY_MS);
+      const { value, band } = banded(days, policy.bands, policy.beyond);
+      const ago = Number.isFinite(days)
+        ? `posted ${Math.floor(days)} day(s) ago`
+        : 'posted date unreadable';
+      return assessed(value, band ? ago : `${ago}, beyond the last band`);
+    },
+  },
+};
 
 const tenth = (value: number): number => Math.round(value * 10) / 10;
 
@@ -165,17 +220,21 @@ export function tierOf(score: number, profile: SearchProfile): LeadTier {
   return 'low';
 }
 
-export function scoreLead(opportunity: Opportunity, profile: SearchProfile, nowMs: number): Lead {
+export function scoreLead(
+  opportunity: Opportunity,
+  profile: SearchProfile,
+  context: ScoringContext,
+): Lead {
   const factors: FactorTrace[] = [];
   let excluded: Lead['excluded'] = null;
-  for (const factor of FACTORS) {
-    const weight = profile.scoring.weights[factor.id] ?? 0;
-    const assessment = factor.assess(opportunity, profile, nowMs);
+  for (const id of FACTOR_IDS) {
+    const weight = profile.scoring.weights[id];
+    const assessment = FACTORS[id].assess(opportunity, profile, context);
     if (assessment.gate === 'exclude' && excluded === null) {
-      excluded = { factor: factor.id, reason: assessment.evidence[0] ?? factor.id };
+      excluded = { factor: id, reason: assessment.evidence[0] ?? id };
     }
     factors.push({
-      id: factor.id,
+      id,
       value: assessment.value,
       weight,
       points: tenth(100 * weight * assessment.value),
@@ -196,9 +255,9 @@ const byRank = (a: Lead, b: Lead): number =>
 export function rankLeads(
   candidates: readonly Opportunity[],
   profile: SearchProfile,
-  nowMs: number,
+  context: ScoringContext,
 ): { leads: Lead[]; excluded: Lead[] } {
-  const scored = candidates.map((candidate) => scoreLead(candidate, profile, nowMs));
+  const scored = candidates.map((candidate) => scoreLead(candidate, profile, context));
   return {
     leads: scored.filter((lead) => lead.excluded === null).sort(byRank),
     excluded: scored.filter((lead) => lead.excluded !== null),

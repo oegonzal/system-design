@@ -9,6 +9,7 @@ describe('candidateFilterOf', () => {
   it('[GOV-15] pushes the profile gates and the request filters down, bounded by MAX_CANDIDATES', () => {
     expect(candidateFilterOf(tinyProfile(), {}, now)).toEqual({
       activeOnly: true,
+      postedOnOrAfter: new Date('2026-05-29T12:00:00Z'),
       deadlineOnOrAfter: now,
       deadlineOnOrBefore: null,
       setAsideCodes: ['SBA', 'SBP'],

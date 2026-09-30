@@ -1,162 +1,55 @@
 import { NotFoundException } from '@nestjs/common';
 
 import { RequestGate, type BudgetPolicy } from '../../core/budget';
-import type { SearchPage } from '../../core/ports';
-import type { SearchProfile } from '../../core/profile';
 import {
   failure,
   InMemoryOpportunityRepository,
+  InMemoryProfileRepository,
+  InMemorySavedSearchRepository,
   InMemorySourceCallLog,
-  okPage,
   opportunityOf,
   scriptedDescriptions,
-  scriptedSearch,
   tinyProfile,
   type Scripted,
 } from '../../core/testing';
+import { ProfilesService } from '../profiles/profiles.service';
 import { OpportunitiesService } from './opportunities.service';
 
 const NOW = new Date('2026-09-26T12:00:00Z');
-const window = { from: '2026-09-23', to: '2026-09-26' };
 
-function harness(
-  replies: readonly Scripted<SearchPage>[],
-  options: {
-    profile?: SearchProfile;
-    dailyBudget?: number;
-    ttlMs?: number;
-    descriptions?: readonly Scripted<string>[];
-  } = {},
+async function harness(
+  options: { dailyBudget?: number; descriptions?: readonly Scripted<string>[] } = {},
 ) {
-  const inner = scriptedSearch('sam.gov', replies);
   const descriptions = scriptedDescriptions('sam.gov', options.descriptions);
   const log = new InMemorySourceCallLog();
   const repository = new InMemoryOpportunityRepository();
+  const profileRepository = new InMemoryProfileRepository();
+  await profileRepository.insert(tinyProfile(), true, NOW);
   const policy: BudgetPolicy = {
-    ttlMs: options.ttlMs ?? 0,
+    ttlMs: 0,
     pullDeadlineMs: 120_000,
     buckets: { 'sam.gov': { dailyBudget: options.dailyBudget ?? 10 } },
   };
-  const profile = options.profile ?? tinyProfile();
-  const service = new OpportunitiesService(
-    inner,
-    descriptions,
-    repository,
-    log,
-    new Map([[profile.id, profile]]),
-    policy,
-    new RequestGate(log, policy, () => NOW),
+  const profiles = new ProfilesService(
+    profileRepository,
+    new InMemorySavedSearchRepository(),
     () => NOW,
   );
-  return { inner, descriptions, log, repository, service, profile };
+  const service = new OpportunitiesService(
+    repository,
+    descriptions,
+    new RequestGate(log, policy, () => NOW),
+    profiles,
+    () => NOW,
+  );
+  return { descriptions, log, repository, service };
 }
 
+const page = { minScore: 0, tier: null, limit: 25, offset: 0 } as const;
+
 describe('the opportunities service', () => {
-  it('[GOV-1] pulls every slice, stores what normalized and reports what did not, per slice', async () => {
-    const rejected = [{ noticeId: null, issues: ['noticeId: missing'] }];
-    const { inner, repository, service } = harness([
-      okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3, rejected),
-      okPage([opportunityOf({ noticeId: 'b', title: 'seen twice' })]),
-    ]);
-
-    const report = await service.pull('tiny', window);
-    expect(inner.queries.map((q) => q.naics)).toEqual(['332710', '5415']);
-    expect(
-      report.slices.map((s) => [s.outcome, s.received, s.inserted, s.updated, s.rejected]),
-    ).toEqual([
-      ['ok', 3, 2, 0, 1],
-      ['ok', 1, 0, 1, 0],
-    ]);
-    expect(report).toMatchObject({
-      profile: 'tiny',
-      window,
-      spent: 2,
-      budget: 10,
-      stoppedBy: null,
-    });
-    expect(report.source).toEqual({ id: 'sam.gov', availability: { enabled: true, reason: null } });
-    expect(repository.rows.size).toBe(2);
-    expect(repository.rows.get('b')?.opportunity.title).toBe('seen twice');
-  });
-
-  it('[GOV-3] stops at the budget: the slice that hit it says so, the rest are skipped, nothing more is called', async () => {
-    const profile = tinyProfile({
-      pull: {
-        slices: [{ naics: '11' }, { naics: '22' }, { naics: '33' }],
-        pageSize: 100,
-        maxPagesPerSlice: 1,
-      },
-    });
-    const { inner, service } = harness([okPage([opportunityOf()])], { profile, dailyBudget: 1 });
-
-    const report = await service.pull('tiny', window);
-    expect(report.slices.map((s) => s.outcome)).toEqual(['ok', 'budget-exhausted', 'skipped']);
-    expect(report.slices[1]?.detail).toBe('budget 1/1 spent');
-    expect(report.slices[2]?.detail).toBe('stopped earlier: budget');
-    expect(report.stoppedBy).toBe('budget');
-    expect(report.spent).toBe(1);
-    expect(inner.queries).toHaveLength(1);
-  });
-
-  it('[GOV-3] a rate-limited reply ends the pull and is never retried', async () => {
-    const { inner, service } = harness([failure('rate-limited', 429, 'over quota')]);
-    const report = await service.pull('tiny', window);
-    expect(report.slices.map((s) => s.outcome)).toEqual(['error', 'skipped']);
-    expect(report.slices[0]?.detail).toBe('rate-limited: over quota');
-    expect(report.stoppedBy).toBe('rate-limited');
-    expect(inner.queries).toHaveLength(1);
-  });
-
-  it('[GOV-2] reports a slice pulled inside the cache window as cached and stores nothing again', async () => {
-    const { service, repository } = harness([okPage([opportunityOf()])], { ttlMs: 60_000 });
-    const first = await service.pull('tiny', window);
-    expect(first.slices.map((s) => s.outcome)).toEqual(['ok', 'ok']);
-    expect(first.spent).toBe(2);
-    repository.rows.clear();
-    const second = await service.pull('tiny', window);
-    expect(second.slices.map((s) => s.outcome)).toEqual(['cached', 'cached']);
-    expect(second.slices[0]?.detail).toBe('pulled 2026-09-26T12:00:00.000Z, 1 record(s)');
-    expect(repository.rows.size).toBe(0);
-    expect(second.spent).toBe(2);
-  });
-
-  it('pages a slice up to maxPagesPerSlice and reports what remains as truncated', async () => {
-    const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 2 } });
-    const { inner, service } = harness(
-      [
-        okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 5),
-        okPage([opportunityOf({ noticeId: 'c' }), opportunityOf({ noticeId: 'd' })], 5),
-      ],
-      { profile },
-    );
-    const report = await service.pull('tiny', window);
-    expect(inner.queries.map((q) => q.offset)).toEqual([0, 2]);
-    expect(report.slices[0]).toMatchObject({
-      outcome: 'ok',
-      pages: 2,
-      received: 4,
-      inserted: 4,
-      truncated: true,
-      detail: '1 more record(s) beyond maxPagesPerSlice',
-    });
-  });
-
-  it('stops paging when a page reports the total reached', async () => {
-    const profile = tinyProfile({ pull: { slices: [{}], pageSize: 2, maxPagesPerSlice: 5 } });
-    const { inner, service } = harness(
-      [
-        okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b' })], 3),
-        okPage([opportunityOf({ noticeId: 'c' })], 3),
-      ],
-      { profile },
-    );
-    const report = await service.pull('tiny', window);
-    expect(inner.queries).toHaveLength(2);
-    expect(report.slices[0]).toMatchObject({ pages: 2, received: 3, truncated: false });
-  });
-
-  it('[GOV-4] ranks stored candidates offline — no request — over the score and tier filters and the limit', async () => {
-    const { inner, repository, service } = harness([]);
+  it('[GOV-4] [GOV-15] ranks stored candidates offline — no request — over the filters, the score cut and the page', async () => {
+    const { descriptions, repository, service } = await harness();
     await repository.upsertMany(
       [
         opportunityOf({ noticeId: 'best' }),
@@ -169,14 +62,16 @@ describe('the opportunities service', () => {
         }),
         opportunityOf({ noticeId: 'gone', setAsideCode: 'HZC' }),
         opportunityOf({ noticeId: 'closed', responseDeadlineAt: '2026-09-01T00:00:00.000Z' }),
+        opportunityOf({ noticeId: 'old', postedAt: '2026-01-01T00:00:00.000Z' }),
       ],
       NOW,
     );
 
-    const all = await service.leads('tiny', { minScore: 0, tier: null, limit: 25, offset: 0 });
-    expect(inner.queries).toHaveLength(0);
-    // The ineligible set-aside and the passed deadline never leave the store.
+    const all = await service.leads(undefined, page);
+    expect(descriptions.fetched).toEqual([]);
+    // The ineligible set-aside, the passed deadline and the notice beyond the horizon never leave the store.
     expect(all).toMatchObject({
+      profile: 'tiny',
       candidates: 2,
       capped: false,
       excluded: 0,
@@ -189,32 +84,35 @@ describe('the opportunities service', () => {
       ['weak', 'low'],
     ]);
 
-    const high = await service.leads('tiny', { minScore: 0, tier: 'high', limit: 25, offset: 0 });
-    expect(high.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['best']);
-    const limited = await service.leads('tiny', { minScore: 0, tier: null, limit: 1, offset: 0 });
+    expect(
+      (await service.leads('tiny', { ...page, tier: 'high' })).leads.map(
+        (l) => l.opportunity.noticeId,
+      ),
+    ).toEqual(['best']);
+    const limited = await service.leads('tiny', { ...page, limit: 1 });
     expect(limited.matching).toBe(2);
     expect(limited.leads).toHaveLength(1);
-    const second = await service.leads('tiny', { minScore: 0, tier: null, limit: 1, offset: 1 });
-    expect(second.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['weak']);
-    const filtered = await service.leads('tiny', {
-      minScore: 0,
-      tier: null,
-      limit: 25,
-      offset: 0,
-      q: 'lawn',
-    });
-    expect(filtered.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['weak']);
-    const strict = await service.leads('tiny', { minScore: 90, tier: null, limit: 25, offset: 0 });
-    expect(strict.matching).toBe(1);
+    expect(
+      (await service.leads('tiny', { ...page, limit: 1, offset: 1 })).leads.map(
+        (l) => l.opportunity.noticeId,
+      ),
+    ).toEqual(['weak']);
+    expect(
+      (await service.leads('tiny', { ...page, q: 'lawn' })).leads.map(
+        (l) => l.opportunity.noticeId,
+      ),
+    ).toEqual(['weak']);
+    expect((await service.leads('tiny', { ...page, minScore: 90 })).matching).toBe(1);
+    await expect(service.leads('nope', page)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('shows one stored notice with its trace and its description when fetched, or nothing', async () => {
-    const { repository, service } = harness([]);
+    const { repository, service } = await harness();
     await repository.upsertMany([opportunityOf({ noticeId: 'n-9' })], NOW);
-    const lead = await service.notice('n-9', 'tiny');
-    expect(lead?.opportunity.noticeId).toBe('n-9');
-    expect(lead?.factors).toHaveLength(6);
-    expect(lead?.description).toBeNull();
+    const notice = await service.notice('n-9', undefined);
+    expect(notice?.opportunity.noticeId).toBe('n-9');
+    expect(notice?.factors).toHaveLength(8);
+    expect(notice?.description).toBeNull();
     expect(await service.notice('missing', 'tiny')).toBeNull();
 
     await service.fetchDescription('n-9');
@@ -225,7 +123,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-9] fetches a description once: the store answers afterwards without a request, an unknown notice is refused before any', async () => {
-    const { descriptions, log, repository, service } = harness([]);
+    const { descriptions, log, repository, service } = await harness();
     await repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
 
     const first = await service.fetchDescription('n-1');
@@ -245,7 +143,7 @@ describe('the opportunities service', () => {
   });
 
   it('[GOV-9] reports a spent budget and a failed fetch as outcomes, storing nothing', async () => {
-    const spent = harness([], { dailyBudget: 0 });
+    const spent = await harness({ dailyBudget: 0 });
     await spent.repository.upsertMany([opportunityOf({ noticeId: 'n-1' })], NOW);
     expect(await spent.service.fetchDescription('n-1')).toEqual({
       status: 'budget-exhausted',
@@ -254,7 +152,7 @@ describe('the opportunities service', () => {
     });
     expect(await spent.repository.findDescription('n-1')).toBeNull();
 
-    const { log, repository, service } = harness([], {
+    const { log, repository, service } = await harness({
       descriptions: [failure('invalid-response', 200, 'body is not JSON')],
     });
     await repository.upsertMany([opportunityOf({ noticeId: 'n-2' })], NOW);
@@ -264,44 +162,5 @@ describe('the opportunities service', () => {
     });
     expect(await repository.findDescription('n-2')).toBeNull();
     expect(log.calls[0]).toMatchObject({ operation: 'description', outcome: 'invalid-response' });
-  });
-
-  it('reports the source status with the budget as the ledger counts it, and lists the ledger newest first', async () => {
-    const { service, log } = harness([okPage([opportunityOf()])], {
-      dailyBudget: 4,
-      ttlMs: 6 * 60 * 60 * 1000,
-    });
-    expect(await service.status()).toEqual({
-      id: 'sam.gov',
-      availability: { enabled: true, reason: null },
-      budget: { spent: 0, limit: 4, windowHours: 24 },
-      cacheTtlHours: 6,
-    });
-    await service.pull('tiny', window);
-    expect((await service.status()).budget.spent).toBe(2);
-
-    const [calls, total] = await service.calls({ limit: 1, offset: 0 });
-    expect(total).toBe(2);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({
-      operation: 'search',
-      outcome: 'ok',
-      requestedAt: NOW.toISOString(),
-    });
-    expect(log.calls).toHaveLength(2);
-  });
-
-  it('[GOV-5] refuses to boot on a malformed profile, and names an unknown one', async () => {
-    const broken = tinyProfile({ scoring: { ...tinyProfile().scoring, weights: { naics: 1 } } });
-    expect(() => harness([], { profile: broken })).toThrow(
-      /profile tiny: scoring.weights must name exactly/,
-    );
-    const { service } = harness([]);
-    await expect(
-      service.leads('nope', { minScore: 0, tier: null, limit: 1, offset: 0 }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(service.pull('tiny', { from: '2026-09-27', to: '2026-09-26' })).rejects.toThrow(
-      /starts after it ends/,
-    );
   });
 });

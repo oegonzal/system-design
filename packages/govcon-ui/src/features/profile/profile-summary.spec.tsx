@@ -8,7 +8,7 @@ import * as stories from './profile-summary.stories';
 const { Default } = composeStories(stories);
 
 describe('ProfileSummary', () => {
-  it('[GOVU-1] shows the codes, interests, weights, set-aside prices, tiers and slices as data', () => {
+  it('[GOVU-1] shows the codes, interests, weights, set-aside prices, tiers and pull bounds as data', () => {
     renderWithTheme(<Default />);
     expect(screen.getByRole('heading', { name: 'Profile · Enfav LLC (enfav)' })).toBeTruthy();
     expect(screen.getByText('332710')).toBeTruthy();
@@ -19,6 +19,8 @@ describe('ProfileSummary', () => {
       screen.getByText(/SBA 100% · SBP 80% · open competition 50% · any other code is excluded/),
     ).toBeTruthy();
     expect(screen.getByText(/high at 70\+, medium at 45\+/)).toBeTruthy();
-    expect(screen.getByText(/4 slice\(s\) — naics=332710, naics=333249/)).toBeTruthy();
+    expect(
+      screen.getByText(/up to 1 page\(s\) of 1000 each · leads from the last 120 days/),
+    ).toBeTruthy();
   });
 });

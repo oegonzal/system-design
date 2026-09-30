@@ -4,7 +4,7 @@ import type { Entity } from './entity';
 import type { Lead, LeadsReport } from './lead';
 import type { NoticeDto } from './notice';
 import type { Opportunity } from './opportunity';
-import type { SearchProfile } from './profile';
+import type { SearchProfile, StoredProfile } from './profile';
 import type { PullReport, SliceReport } from './pull';
 import type { SavedSearch } from './search';
 import type { Description, SourceCall, SourceStatus } from './source';
@@ -53,13 +53,15 @@ export const opportunityOf = (overrides: Partial<Opportunity> = {}): Opportunity
 export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile => ({
   id: 'tiny',
   company: 'Tiny LLC',
+  entityUei: null,
   naics: ['332710', '5415'],
   psc: ['53', 'D3'],
   interests: [
     { term: 'additive manufacturing', aliases: ['3d printing'], weight: 0.6 },
     { term: 'replacement parts', aliases: ['replacement brackets'], weight: 0.5 },
   ],
-  pull: { slices: [{ naics: '332710' }, { naics: '5415' }], pageSize: 100, maxPagesPerSlice: 1 },
+  pull: { pageSize: 100, maxPagesPerSlice: 1 },
+  leads: { horizonDays: 120 },
   scoring: {
     weights: {
       naics: 0.3,
@@ -68,6 +70,8 @@ export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile
       setAside: 0.15,
       noticeType: 0.1,
       deadline: 0.15,
+      history: 0,
+      freshness: 0,
     },
     setAside: { byCode: { SBA: 1, SBP: 0.8 }, unrestricted: 0.5 },
     noticeType: {
@@ -84,8 +88,24 @@ export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile
       beyond: 0.6,
       none: 0.4,
     },
+    history: { days: 365, saturateAt: 5 },
+    freshness: {
+      bands: [
+        { maxDays: 3, value: 1 },
+        { maxDays: 14, value: 0.7 },
+      ],
+      beyond: 0.4,
+    },
     tiers: { high: 70, medium: 45 },
   },
+  ...overrides,
+});
+
+export const storedProfileOf = (overrides: Partial<StoredProfile> = {}): StoredProfile => ({
+  ...profileOf(),
+  isDefault: true,
+  createdAt: '2026-09-27T00:00:00.000Z',
+  updatedAt: '2026-09-27T00:00:00.000Z',
   ...overrides,
 });
 
@@ -107,6 +127,14 @@ export const leadOf = (overrides: Partial<Lead> = {}): Lead => ({
     { id: 'setAside', value: 1, weight: 0.15, points: 15, evidence: ['set-aside SBA'] },
     { id: 'noticeType', value: 1, weight: 0.1, points: 10, evidence: ['notice type Solicitation'] },
     { id: 'deadline', value: 0.8, weight: 0.15, points: 12, evidence: ['20 day(s) to respond'] },
+    {
+      id: 'history',
+      value: 0,
+      weight: 0,
+      points: 0,
+      evidence: ['no stored award in naics 332710'],
+    },
+    { id: 'freshness', value: 0.7, weight: 0, points: 0, evidence: ['posted 6 day(s) ago'] },
   ],
   excluded: null,
   ...overrides,

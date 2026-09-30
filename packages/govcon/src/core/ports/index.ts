@@ -1,10 +1,12 @@
 /**
  * The ports the govcon package runs over, one file per capability. The real
- * sources are SAM.gov adapters behind the request gate; the repository and
+ * sources are SAM.gov adapters behind the request gate; the repositories and
  * the ledger are MikroORM; specs hand in the fakes from `../testing`. Nothing
  * here knows about Nest, the filesystem, the environment, `fetch` or a clock.
  */
 export * from './description';
 export * from './ledger';
+export * from './profiles';
 export * from './repositories';
 export * from './search';
+export * from './searches';

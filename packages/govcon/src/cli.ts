@@ -24,7 +24,7 @@ import {
 import { messageOf } from './core/text';
 import { AppModule } from './modules/app/app.module';
 import { OpportunitiesService } from './modules/opportunities/opportunities.service';
-import { DEFAULT_PROFILE_ID } from './profiles';
+import { PullService } from './modules/pulls/pull.service';
 import { renderLead, renderLeads, renderPull } from './render';
 
 export const USAGE = `usage: govcon <command> [options]
@@ -41,7 +41,8 @@ type Command = (typeof COMMANDS)[number];
 export interface Options {
   command: Command;
   noticeId: string | null;
-  profile: string;
+  /** Unset means the default profile. */
+  profile: string | undefined;
   /** The window as asked; the service resolves and validates it. */
   window: Pick<StartPullRequest, 'days' | 'from' | 'to'>;
   minScore: number;
@@ -57,11 +58,9 @@ export interface Io {
   error(text: string): void;
 }
 
-/** The slice of the service the CLI drives — the fake in the spec implements exactly this. */
-export type CliService = Pick<
-  OpportunitiesService,
-  'pull' | 'leads' | 'notice' | 'fetchDescription'
->;
+/** The slice of the services the CLI drives — the fake in the spec implements exactly this. */
+export type CliService = Pick<PullService, 'pull'> &
+  Pick<OpportunitiesService, 'leads' | 'notice' | 'fetchDescription'>;
 
 const isCommand = (value: string | undefined): value is Command =>
   COMMANDS.includes(value as Command);
@@ -104,7 +103,7 @@ export function parseOptions(argv: readonly string[]): Options | Error {
     return {
       command,
       noticeId: positionals[0] ?? null,
-      profile: values.profile ?? DEFAULT_PROFILE_ID,
+      profile: values.profile,
       window: { days: integer(values.days, 'days'), from: values.from, to: values.to },
       minScore: integer(values['min-score'], 'min-score') ?? 0,
       tier: (values.tier as LeadTier | undefined) ?? null,
@@ -177,7 +176,15 @@ export async function cli(argv: readonly string[]): Promise<number> {
   }
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   try {
-    return await execute(options, app.get(OpportunitiesService), {
+    const pulls = app.get(PullService);
+    const opportunities = app.get(OpportunitiesService);
+    const service: CliService = {
+      pull: (profileId, request) => pulls.pull(profileId, request),
+      leads: (profileId, options) => opportunities.leads(profileId, options),
+      notice: (noticeId, profileId) => opportunities.notice(noticeId, profileId),
+      fetchDescription: (noticeId) => opportunities.fetchDescription(noticeId),
+    };
+    return await execute(options, service, {
       out: (text) => console.log(text),
       error: (text) => console.error(text),
     });

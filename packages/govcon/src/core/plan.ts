@@ -3,11 +3,13 @@ import {
   MAX_PULL_DAYS,
   MIN_PULL_DAYS,
   type PullWindow,
+  type QueryFilter,
   type SearchProfile,
   type StartPullRequest,
 } from '@sysdesign/contracts';
 
-import { canonicalQuery, type OpportunityQuery } from './query';
+import type { PlannedSlice } from './pull';
+import { canonicalQuery } from './query';
 
 export type { PullWindow };
 
@@ -65,20 +67,56 @@ export function resolveWindow(
     : windowEndingAt(now, request.days ?? DEFAULT_PULL_DAYS);
 }
 
+/** What the plan needs of a saved search. */
+export interface PlannableSearch {
+  name: string;
+  filter: QueryFilter;
+  includedInPull: boolean;
+  pullOrder: number;
+}
+
 /**
- * The first page of every slice the profile declares, in declared order —
- * so when the budget runs out it is the last slices that go unpulled. Later
+ * The first page of every saved search flagged for the pull, in `pullOrder`
+ * — so when the budget runs out it is the last ones that go unpulled. Later
  * pages come from `nextPage` while the report is under `maxPagesPerSlice`.
  */
-export function planPulls(profile: SearchProfile, window: PullWindow): OpportunityQuery[] {
+export function planPulls(
+  profile: SearchProfile,
+  searches: readonly PlannableSearch[],
+  window: PullWindow,
+): PlannedSlice[] {
   const { from, to } = validateWindow(window);
-  return profile.pull.slices.map((slice) =>
-    canonicalQuery({
-      ...slice,
+  return searches
+    .filter((search) => search.includedInPull)
+    .sort((a, b) => a.pullOrder - b.pullOrder || a.name.localeCompare(b.name))
+    .map((search) => ({
+      name: search.name,
+      query: canonicalQuery({
+        ...search.filter,
+        postedFrom: from,
+        postedTo: to,
+        limit: profile.pull.pageSize,
+        offset: 0,
+      }),
+    }));
+}
+
+/** One search run by itself: the same slice a pull would run, under its name. */
+export function planSearch(
+  profile: SearchProfile,
+  name: string | null,
+  filter: QueryFilter,
+  window: PullWindow,
+): PlannedSlice {
+  const { from, to } = validateWindow(window);
+  return {
+    name,
+    query: canonicalQuery({
+      ...filter,
       postedFrom: from,
       postedTo: to,
       limit: profile.pull.pageSize,
       offset: 0,
     }),
-  );
+  };
 }

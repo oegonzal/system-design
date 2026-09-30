@@ -1,19 +1,16 @@
-import type { SearchProfile } from '../core/profile';
+import type { QueryFilter, SearchProfile } from '@sysdesign/contracts';
 
 /**
  * Enfav LLC: a small business (total small business set-asides and open
  * competition; no 8(a), HUBZone, veteran or women-owned status) working across
  * two families — parts and additive manufacturing on one side, software,
  * automation and data on the other. Everything below is data the scorer and
- * the pull plan read; change a number here, never in code.
- *
- * Slices are six-digit NAICS codes, one request each: eight a day fits a
- * personal SAM.gov key's budget with room to spare. If SAM.gov proves to
- * match `ncode` by prefix, four-digit families halve the spend.
+ * the pull read; it seeds the store once and is edited there afterwards.
  */
 export const ENFAV = {
   id: 'enfav',
   company: 'Enfav LLC',
+  entityUei: null,
   naics: [
     // Manufacturing and parts.
     '332710', // machine shops
@@ -78,20 +75,8 @@ export const ENFAV = {
     { term: 'maintenance', aliases: ['repair', 'sustainment', 'overhaul'], weight: 0.3 },
     { term: 'inventory management', aliases: ['inventory', 'supply chain'], weight: 0.3 },
   ],
-  pull: {
-    slices: [
-      { naics: '332710' },
-      { naics: '333249' },
-      { naics: '326199' },
-      { naics: '339999' },
-      { naics: '541511' },
-      { naics: '541512' },
-      { naics: '541519' },
-      { naics: '518210' },
-    ],
-    pageSize: 1000,
-    maxPagesPerSlice: 1,
-  },
+  pull: { pageSize: 1000, maxPagesPerSlice: 1 },
+  leads: { horizonDays: 120 },
   scoring: {
     weights: {
       naics: 0.3,
@@ -100,6 +85,9 @@ export const ENFAV = {
       setAside: 0.15,
       noticeType: 0.1,
       deadline: 0.15,
+      // Priced at nothing until enough awards are stored to mean something; the trace still shows them.
+      history: 0,
+      freshness: 0,
     },
     setAside: { byCode: { SBA: 1, SBP: 0.8 }, unrestricted: 0.5 },
     noticeType: {
@@ -122,6 +110,31 @@ export const ENFAV = {
       beyond: 0.6,
       none: 0.4,
     },
+    history: { days: 365, saturateAt: 5 },
+    freshness: {
+      bands: [
+        { maxDays: 3, value: 1 },
+        { maxDays: 14, value: 0.7 },
+        { maxDays: 45, value: 0.4 },
+      ],
+      beyond: 0.2,
+    },
     tiers: { high: 70, medium: 45 },
   },
 } satisfies SearchProfile;
+
+/**
+ * The seed's saved searches: one six-digit NAICS each, every one flagged for
+ * the daily pull, one request apiece. SAM.gov matches `ncode` exactly, so a
+ * family would find nothing.
+ */
+export const ENFAV_SEARCHES: readonly { name: string; filter: QueryFilter }[] = [
+  { name: 'Machine shops', filter: { naics: '332710' } },
+  { name: 'Industrial machinery', filter: { naics: '333249' } },
+  { name: 'Plastics products', filter: { naics: '326199' } },
+  { name: 'Miscellaneous manufacturing', filter: { naics: '339999' } },
+  { name: 'Custom programming', filter: { naics: '541511' } },
+  { name: 'Systems design', filter: { naics: '541512' } },
+  { name: 'Other computer services', filter: { naics: '541519' } },
+  { name: 'Data processing and hosting', filter: { naics: '518210' } },
+];

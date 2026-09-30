@@ -1,26 +1,32 @@
 import {
+  FACTOR_IDS,
+  MAX_PAGE_SIZE,
+  MAX_PULL_DAYS,
   NOTICE_STATUSES,
   NOTICE_TYPES,
+  type FactorId,
   type NoticeTypeCode,
+  type QueryFilter,
   type SearchProfile,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 /**
  * The search profile's validator. The shape is the wire type `SearchProfile`
- * in contracts (the web client reads it too); this schema is checked against
- * it in both directions — `satisfies` here, `expectTypeOf` in the spec — so
- * the two cannot drift. Prices are open maps wherever an external vocabulary
- * appears: an unlisted set-aside or notice type is priced by the profile's
- * defaults and gates, never by code.
+ * in contracts (the web client reads and edits it); this schema is checked
+ * against it in both directions — `satisfies` here, `expectTypeOf` in the
+ * spec — so the two cannot drift. Prices are open maps wherever an external
+ * vocabulary appears; the weights are closed over the scorer's factor ids,
+ * so a profile that cannot be priced is refused with the path named.
  *
- * `validateProfile` runs at boot, like `validatePipeline` in quality-loop: a
- * malformed profile fails before any request is spent.
+ * `validateProfile` runs at the seed and on every read; `parseProfile`
+ * answers the issues a client shows per field.
  */
 export type { SearchProfile };
 
 const unit = z.number().min(0).max(1);
 const noticeTypeCodes = Object.keys(NOTICE_TYPES) as [NoticeTypeCode, ...NoticeTypeCode[]];
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export const interestSchema = z.strictObject({
   term: z.string().min(2),
@@ -29,8 +35,8 @@ export const interestSchema = z.strictObject({
   weight: z.number().gt(0).max(1),
 });
 
-/** One query a pull runs — the API's filters, minus the window and paging. */
-export const sliceSchema = z.strictObject({
+/** One search's filters — a saved search, an ad hoc run — the API's parameters minus window and paging. */
+export const queryFilterSchema = z.strictObject({
   noticeType: z.enum(noticeTypeCodes).optional(),
   naics: z
     .string()
@@ -49,53 +55,61 @@ export const sliceSchema = z.strictObject({
   zip: z.string().min(3).optional(),
   organizationName: z.string().min(1).optional(),
   organizationCode: z.string().min(1).optional(),
-  deadlineFrom: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  deadlineTo: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-});
+  deadlineFrom: isoDate.optional(),
+  deadlineTo: isoDate.optional(),
+}) satisfies z.ZodType<QueryFilter>;
+
+const dayBands = z.array(z.strictObject({ maxDays: z.number().int().min(0), value: unit })).min(1);
+
+const ascending = (bands: readonly { maxDays: number }[]): boolean =>
+  bands.every((band, index) => index === 0 || band.maxDays > (bands[index - 1]?.maxDays ?? 0));
+
+/** One weight per factor, no more, no fewer — the record is closed over `FACTOR_IDS`. */
+const weightsSchema = z.strictObject(
+  Object.fromEntries(FACTOR_IDS.map((id) => [id, unit])) as Record<FactorId, typeof unit>,
+);
 
 export const searchProfileSchema = z
   .strictObject({
-    id: z.string().regex(/^[a-z][a-z0-9-]*$/),
+    id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
     company: z.string().min(1),
+    entityUei: z
+      .string()
+      .regex(/^[A-Z0-9]{12}$/)
+      .nullable(),
     /** NAICS codes or families, 2–6 digits; a shorter code is the whole family. */
     naics: z.array(z.string().regex(/^\d{2,6}$/)).min(1),
     /** PSC codes or families, 1–4 characters. */
     psc: z.array(z.string().regex(/^[A-Z0-9]{1,4}$/)),
     interests: z.array(interestSchema),
     pull: z.strictObject({
-      slices: z.array(sliceSchema).min(1),
-      pageSize: z.number().int().min(1).max(1000),
+      pageSize: z.number().int().min(1).max(MAX_PAGE_SIZE),
       maxPagesPerSlice: z.number().int().min(1),
     }),
+    leads: z.strictObject({
+      horizonDays: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_PULL_DAYS * 10),
+    }),
     scoring: z.strictObject({
-      /** One weight per factor id; they sum to 1. */
-      weights: z.record(z.string(), unit),
+      weights: weightsSchema,
       setAside: z.strictObject({
-        /** Codes the company may bid on and how attractive each is; any other code excludes. */
         byCode: z.record(z.string(), unit),
-        /** A notice with no set-aside: open competition. */
         unrestricted: unit,
       }),
       noticeType: z.strictObject({
         byType: z.record(z.string(), unit),
         default: unit,
-        /** Types that are never a lead, e.g. an award already made. */
         exclude: z.array(z.string()),
       }),
-      deadline: z.strictObject({
-        /** Ascending by `maxDays`; the first band the days left fit takes it. */
-        bands: z.array(z.strictObject({ maxDays: z.number().int().min(0), value: unit })).min(1),
-        /** Further out than the last band. */
-        beyond: unit,
-        /** No deadline stated. */
-        none: unit,
+      deadline: z.strictObject({ bands: dayBands, beyond: unit, none: unit }),
+      history: z.strictObject({
+        days: z.number().int().min(1),
+        saturateAt: z.number().int().min(1),
       }),
+      freshness: z.strictObject({ bands: dayBands, beyond: unit }),
       tiers: z.strictObject({
         high: z.number().min(0).max(100),
         medium: z.number().min(0).max(100),
@@ -111,13 +125,17 @@ export const searchProfileSchema = z
         message: `weights sum to ${sum}, not 1`,
       });
     }
-    const days = profile.scoring.deadline.bands.map((band) => band.maxDays);
-    if (days.some((value, index) => index > 0 && value <= (days[index - 1] ?? 0))) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['scoring', 'deadline', 'bands'],
-        message: 'bands must ascend by maxDays',
-      });
+    for (const [name, bands] of [
+      ['deadline', profile.scoring.deadline.bands],
+      ['freshness', profile.scoring.freshness.bands],
+    ] as const) {
+      if (!ascending(bands)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['scoring', name, 'bands'],
+          message: 'bands must ascend by maxDays',
+        });
+      }
     }
     if (profile.scoring.tiers.high <= profile.scoring.tiers.medium) {
       ctx.addIssue({
@@ -128,29 +146,39 @@ export const searchProfileSchema = z
     }
   }) satisfies z.ZodType<SearchProfile>;
 
-/**
- * The profile as validated data, or an error naming every problem. `factorIds`
- * is the scorer's table: a weight for a factor that does not exist, or a
- * factor with no weight, is a profile that cannot be priced.
- */
-export function validateProfile(candidate: unknown, factorIds: readonly string[]): SearchProfile {
+export interface ProfileIssue {
+  /** Dotted; empty for the root. */
+  path: string;
+  message: string;
+}
+
+export type ParsedProfile =
+  { ok: true; profile: SearchProfile } | { ok: false; issues: ProfileIssue[] };
+
+/** The profile as validated data, or every problem with its path — what a form shows per field. */
+export function parseProfile(candidate: unknown): ParsedProfile {
+  const parsed = searchProfileSchema.safeParse(candidate);
+  return parsed.success
+    ? { ok: true, profile: parsed.data }
+    : {
+        ok: false,
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.map(String).join('.'),
+          message: issue.message,
+        })),
+      };
+}
+
+/** The profile as validated data, or an Error naming every problem — for the seed and the store's reads. */
+export function validateProfile(candidate: unknown): SearchProfile {
   const name =
     typeof candidate === 'object' && candidate !== null && 'id' in candidate
       ? String((candidate as { id: unknown }).id)
       : '?';
-  const parsed = searchProfileSchema.safeParse(candidate);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map(
-      (issue) => `${issue.path.map(String).join('.') || '(root)'} ${issue.message}`,
-    );
+  const parsed = parseProfile(candidate);
+  if (!parsed.ok) {
+    const issues = parsed.issues.map((issue) => `${issue.path || '(root)'} ${issue.message}`);
     throw new Error(`profile ${name}: ${issues.join('; ')}`);
   }
-  const declared = Object.keys(parsed.data.scoring.weights).sort();
-  const expected = [...factorIds].sort();
-  if (declared.join(',') !== expected.join(',')) {
-    throw new Error(
-      `profile ${name}: scoring.weights must name exactly the factors ${expected.join(', ')} (got ${declared.join(', ') || 'none'})`,
-    );
-  }
-  return parsed.data;
+  return parsed.profile;
 }

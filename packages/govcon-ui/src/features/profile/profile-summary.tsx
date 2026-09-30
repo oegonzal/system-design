@@ -1,4 +1,4 @@
-import { describeQuery, type SearchProfile } from '@sysdesign/contracts';
+import type { SearchProfile } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 
 export interface ProfileSummaryProps {
@@ -56,9 +56,8 @@ export function ProfileSummary({ profile }: ProfileSummaryProps) {
         beyond {pct(scoring.deadline.beyond)}, none {pct(scoring.deadline.none)}
       </Text>
       <Text size="sm">
-        Pull: {profile.pull.slices.length} slice(s) —{' '}
-        {profile.pull.slices.map((slice) => describeQuery(slice)).join(', ')} · up to{' '}
-        {profile.pull.maxPagesPerSlice} page(s) of {profile.pull.pageSize}
+        Pull: the saved searches flagged for it, up to {profile.pull.maxPagesPerSlice} page(s) of{' '}
+        {profile.pull.pageSize} each · leads from the last {profile.leads.horizonDays} days
       </Text>
       <Text tone="muted" size="sm">
         Read-only here; the profile lives in the govcon package as data.

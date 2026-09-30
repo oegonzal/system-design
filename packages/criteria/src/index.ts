@@ -23,12 +23,12 @@ export const CRITERIA: readonly Criterion[] = [
   },
   {
     id: 'UX-5',
-    statement: 'Components declare operations and responsibilities, and connections carry them.',
+    statement: 'Components declare operations and responsibilities, and a connection carries an operation declared on either of its endpoints.',
   },
   {
     id: 'UX-6',
     statement:
-      'A design brief — requirement bindings and traced flows — is authored alongside the diagram and submitted with it.',
+      "A design brief binds each of the prompt's criteria to the components that hold it — with a claim in the author's words and, where a request travels, a traced path of edges — and is submitted with the diagram.",
   },
   {
     id: 'UX-7',
@@ -37,12 +37,12 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-8',
     statement:
-      'The walkthrough is authored as reference-anchored slots — an overview, a rationale per component, a narration per requirement — and each slot shows the same graded verdict the engine will read.',
+      'The walkthrough is authored as reference-anchored slots — an overview, a rationale per component, a narration per criterion — and submitted with the diagram for the grader to read.',
   },
   {
     id: 'UX-9',
     statement:
-      'Suggested bindings are proposals the author accepts or dismisses one at a time; an unaccepted proposal is never submitted, and each shows the same corroboration verdict the grade will use.',
+      "A component's configuration is free-form: any key with a text, number or flag value, typed as the author enters it, with no vocabulary the editor must know.",
   },
   {
     id: 'UX-10',
@@ -52,7 +52,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-11',
     statement:
-      'A stuck author can hand the design to the AI coach: the coach tab streams the run’s trajectory live while it works, the improved design loads back from the timeline, and every machine-made revision is marked with its assistant origin. Without a live model the control explains itself instead of failing.',
+      'A stuck author can hand the design to the AI coach: the coach is a revise run of the grader, its progress shows live, every iteration that beat the ones before it loads back from the timeline marked with its assistant origin, and without a live model the control explains itself instead of failing.',
   },
   {
     id: 'UX-12',
@@ -60,152 +60,69 @@ export const CRITERIA: readonly Criterion[] = [
       'A practice URL for a session that no longer exists shows a graceful not-found with a way back to the dashboard, never a raw server error; a transient load failure offers a retry instead.',
   },
   // Prompt generation from experience
-  { id: 'GEN-1', statement: 'A design prompt can be generated from a seeded experience.' },
+  { id: 'GEN-1', statement: "A design prompt can be generated from an experience by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated." },
   {
     id: 'GEN-2',
-    statement: 'The same experience, difficulty and seed produce an identical prompt.',
+    statement: 'A prompt can be written by hand as markdown and is stored verbatim with the rubric the grader derives from it.',
   },
   {
     id: 'GEN-3',
-    statement: 'A prompt presents scenario, functional requirements, NFRs and scale targets.',
-  },
-  {
-    id: 'GEN-4',
-    statement:
-      'Successive generated prompts vary: a fresh seed is drawn per generation and redrawn while its framing echoes a recent prompt, and generating without an experience rotates to the least-practiced one — so practice covers every archetype instead of repeating the same prompt.',
-  },
-  {
-    id: 'GEN-5',
-    statement:
-      "A prompt can be authored from an assessment's own requirements — validated against the same vocabularies and spec closure the generator honors — and graded by its experience's archetype rubric as it applies to those requirements.",
+    statement: "A prompt can be imported from the grader's library and is stored with the rubric the grader derives from it.",
   },
   // Critic / eval pipeline
-  { id: 'EVAL-1', statement: 'A submitted revision is graded with per-dimension scores.' },
+  { id: 'EVAL-1', statement: "A submitted revision is graded by the quality loop: the feedback shows the run's overall score, decision, one meter per dimension the pipeline declares, and a result per criterion." },
   {
     id: 'EVAL-2',
-    statement: 'Findings teach: each carries a message and points at affected elements.',
+    statement: "Findings teach: each carries the lens's rationale and is grounded onto the canvas — the nodes and edges it names highlight when selected.",
   },
   {
     id: 'EVAL-3',
-    statement: 'An accepted suggestion, resubmitted, improves the overall score.',
-  },
-  {
-    id: 'EVAL-4',
-    statement: 'Unmet expectations surface as teaching findings with ghost-fix suggestions.',
-  },
-  {
-    id: 'EVAL-5',
-    statement:
-      'Scores are calibrated: an empty canvas fails, a naive design fails, and only demonstrated depth earns an A.',
-  },
-  {
-    id: 'EVAL-6',
-    statement:
-      'An LLM pass never emits the findings or coverage the score reads, nor authors a number: its advisory axes and scenarios ride beside the grade for display, and a rogue LLM scoring artifact is dropped.',
-  },
-  {
-    id: 'EVAL-7',
-    statement:
-      'Adversarial scenarios are selected deterministically and narrated as failure stories.',
-  },
-  {
-    id: 'EVAL-8',
-    statement: 'Every evaluation records the profile it was graded under and its evidence trail.',
-  },
-  {
-    id: 'EVAL-9',
-    statement:
-      'A component that no traced flow and no corroborated binding accounts for becomes a finding.',
-  },
-  {
-    id: 'EVAL-10',
-    statement:
-      'A submitted brief earns the explanation dimension by corroboration: each claim is checked against the diagram the author drew.',
-  },
-  {
-    id: 'EVAL-11',
-    statement:
-      'A design submitted without a brief — or with one that names more components than hold a claim — is graded on that, never excused from the explanation dimension.',
-  },
-  {
-    id: 'EVAL-12',
-    statement:
-      'A claim the diagram cannot back up is caught deterministically and costs more than making no claim at all.',
-  },
-  {
-    id: 'EVAL-13',
-    statement:
-      'Every evaluation writes a run dump: its inputs, every LLM prompt and response, the scoring arithmetic, and the result — on the failure path too.',
-  },
-  {
-    id: 'EVAL-14',
-    statement:
-      'An improvement run raises the score monotonically: every accepted iteration persists as an assistant-origin revision graded strictly higher than the one before, and rejected candidates are never persisted as revisions.',
-  },
-  {
-    id: 'EVAL-15',
-    statement:
-      'The design narrative is graded by reference and required for a top grade: a missing or insubstantial walkthrough both loses explanation points and caps the letter grade below an A.',
-  },
-  {
-    id: 'EVAL-16',
-    statement:
-      "A critic or evaluator lens's grounded ordinal evidence — a weakness magnitude and confidence tied to a prompt requirement and the affected components — moves the score only through the engine's generic, bounded, weakness-only deterministic scorer: it can lower an already-assessed dimension, never by a raw LLM number, never past a deterministic cap, and never at all on the deterministic path.",
-  },
-  {
-    id: 'UX-13',
-    statement:
-      'The config-knob vocabulary is one declarative table shared by the editor, the drift gate, the suggester and the validators — a knob the grader cannot read cannot be set.',
+    statement: 'A design improved along a finding, resubmitted, is graded higher, and the timeline shows the rising trend.',
   },
   {
     id: 'UX-14',
     statement:
-      "A component's interface can be suggested: proposals are enum-locked to that component's gradeable vocabulary, verified by the same validators submit runs, and accepted one at a time — never all at once.",
-  },
-  {
-    id: 'EVAL-17',
-    statement:
-      'Every LLM lens — critic, narrative, depth, workability, scenarios — emits grounded graded evidence; none emits a free-form finding.',
-  },
-  {
-    id: 'EVAL-18',
-    statement:
-      'A running evaluation refreshes its job lock at every pass boundary, fenced by the worker that holds it, so a long live eval is never reaped as dead nor resurrected by a stale heartbeat.',
+      'A prompt shows its markdown and its criteria as chips grouped by kind; the criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been graded against them.',
   },
   // STAR repository
   { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },
   { id: 'STAR-3', statement: 'A story can link to a prompt and an experience.' },
-  // Business-workflow (product) layer
+  // Grading delegated to the quality loop
   {
-    id: 'PRD-1',
+    id: 'DEL-1',
     statement:
-      'A workflow prompt presents its API contract, events, ingest SLAs and entity lifecycle beside the prose requirements.',
+      "Grading is delegated: a submission is one system-design-canvas run started on the prompt's fixed criteria before the revision row is written, and the row points at the run's iteration that judged it.",
   },
   {
-    id: 'PRD-2',
+    id: 'DEL-2',
     statement:
-      'Workflow coverage is claimed by reference — a Fulfills pick and event emissions — and corroborated structurally, never by matching names.',
+      "A prompt is markdown plus criteria derived once through the grader's derive stage; the ids are stable for the prompt's life, so a brief written against c3 still means c3 on the next revision.",
   },
   {
-    id: 'PRD-3',
+    id: 'DEL-3',
     statement:
-      'On a workflow prompt, declaring nothing scores the product dimension 0; on any other prompt it is not assessed and renormalizes out.',
+      "The coach is a revise run: the draft is stored as the author's revision, and every iteration that beat the ones before it is imported once as an assistant revision with its own grade.",
   },
   {
-    id: 'PRD-4',
+    id: 'DEL-4',
     statement:
-      'Workflow coverage chips show the same corroboration verdict the grade will use, live while authoring.',
+      "The grade the studio shows is the run's, read for one iteration and grounded by position onto the graded graph; the studio invents no score, decision or dimension and caches only the terminal scalars.",
   },
   {
-    id: 'PRD-5',
+    id: 'DEL-5',
     statement:
-      'Freshness SLAs are graded structurally: declared polling cadence and push wiring against the budgets the prompt states.',
+      'The studio validates structure only — references that cannot resolve — and every problem at once; whether a design is any good is never decided by the studio.',
   },
   {
-    id: 'PRD-6',
+    id: 'DEL-6',
     statement:
-      'The workability axis reports ordinal factor evaluations with rationales and never moves the deterministic score.',
+      "Three prompt sources — authored, imported, generated — yield one shape, and a grader without a model answers 503 with its availability rather than an invented rubric.",
+  },
+  {
+    id: 'DEL-7',
+    statement:
+      'One zod schema defines a design submission for every side: the studio API validates with it, the canvas pipeline declares its artifact with it, and the canvas UI types its store from it.',
   },
   // Quality-control loop (packages/quality-loop)
   {
@@ -421,6 +338,16 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'GOV-15',
     statement:
       "A ranking loads only what a gate would not exclude — active, open, a biddable set-aside or none, no excluded type — plus the request's filters, in SQL, bounded by MAX_CANDIDATES with the report saying when the bound cut; leads are ranked deterministically and paged.",
+  },
+  {
+    id: 'GOV-13',
+    statement:
+      'Profiles and saved searches are validated data in the store: every write passes the boot schema (400 with issues per path, nothing written), exactly one profile is the default while any exists, and the shipped profile seeds an empty store once.',
+  },
+  {
+    id: 'GOV-14',
+    statement:
+      "A pull is exactly the profile's saved searches flagged for it, in pull order, each stamped when run; a saved search or a bare filter runs by itself as a pull of one slice and stores what normalized.",
   },
   {
     id: 'GOV-19',
