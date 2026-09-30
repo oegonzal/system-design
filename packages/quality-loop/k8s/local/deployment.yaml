@@ -34,10 +34,21 @@ spec:
               value: '3003'
             - name: QUALITY_LOOP_CORS_ORIGIN
               value: http://localhost:4201
-            # No model in the cluster by default: every run escalates honestly.
-            # Set QUALITY_LOOP_AUTH=claude-code or mount ANTHROPIC_API_KEY to grade live.
-            - name: QUALITY_LOOP_DETERMINISTIC
-              value: '1'
+            # The loop boots only with a model, and a pod has no Claude Code
+            # login, so the key comes from the Secret the Tiltfile builds from
+            # the shell's ANTHROPIC_API_KEY. With it empty the pod exits 1 with
+            # the loop's own message naming the variable.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quality-loop-model
+                  key: ANTHROPIC_API_KEY
+            - name: LLM_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: quality-loop-model
+                  key: LLM_MODEL
+                  optional: true
 ---
 apiVersion: v1
 kind: Service

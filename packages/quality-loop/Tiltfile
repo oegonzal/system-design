@@ -23,10 +23,37 @@ docker_build(
     ],
 )
 
+# The model. The loop boots only with a provider, and a pod has no Claude Code
+# login, so the key is the one exported by the shell that ran `tilt up`. The
+# Secret is always built: with the key empty the pod starts and exits 1 with
+# the loop's own message naming the variable, instead of hanging on a Secret
+# that does not exist. Warn here, because that exit is easy to misread.
+_MODEL_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+
+if not _MODEL_KEY:
+    warn(
+        'quality-loop: ANTHROPIC_API_KEY is not exported in this shell.\n'
+        + '  The quality-loop pod will exit at boot naming the variable, and grading,\n'
+        + '  coaching and prompt generation stay unavailable until it is.\n'
+        + '  Fix: export ANTHROPIC_API_KEY=… then run `tilt up` from that same terminal.'
+    )
+
+k8s_yaml(encode_yaml({
+    'apiVersion': 'v1',
+    'kind': 'Secret',
+    'metadata': {'name': 'quality-loop-model'},
+    'type': 'Opaque',
+    'stringData': {
+        'ANTHROPIC_API_KEY': _MODEL_KEY,
+        'LLM_MODEL': os.getenv('LLM_MODEL', ''),
+    },
+}))
+
 k8s_yaml(['./k8s/local/deployment.yaml'])
 
 k8s_resource(
     'quality-loop',
+    objects=['quality-loop-model:secret'],
     port_forwards=3003,
     resource_deps=['db: migration:up'],
     labels=['backend'],
