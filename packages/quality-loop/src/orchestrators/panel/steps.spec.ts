@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { RunInput } from '../../core/loop/run-pipeline';
 import { confirmed, decision, ledger, runDto, traceOf } from '../../core/testing';
-import type { StepContext } from '../definition';
+import type { StepContext } from '../runner/definition';
+import { fakeStepContext } from '../runner/testing';
 import { panelStep, reconcileStep, type PanelSource } from './steps';
 
 type Outputs = { first: QualityRunDto; panel: QualityRunDto[]; reconcile: unknown };
@@ -27,19 +28,18 @@ function contextOf(
   overrides: { pipelines?: string[]; samples?: number; outputs?: Partial<Outputs> } = {},
 ): { ctx: Ctx; executed: { pipeline: string | undefined; input: RunInput }[] } {
   const executed: { pipeline: string | undefined; input: RunInput }[] = [];
-  const ctx: Ctx = {
-    request: { pipeline: 'tiny', goal: 'g', samples: overrides.samples },
-    context: {},
-    outputs: overrides.outputs ?? {},
-    ports: undefined,
-    pipelines: overrides.pipelines ?? ['tiny'],
-    registry: [],
-    acceptAtOf: () => 80,
-    execute: (input, pipeline) => {
+  const ctx: Ctx = fakeStepContext<Outputs, unknown>(
+    undefined,
+    (input, pipeline) => {
       executed.push({ pipeline, input });
       return Promise.resolve(script(executed.length));
     },
-  };
+    {
+      request: { pipeline: 'tiny', goal: 'g', samples: overrides.samples },
+      outputs: overrides.outputs ?? {},
+      pipelines: overrides.pipelines ?? ['tiny'],
+    },
+  );
   return { ctx, executed };
 }
 

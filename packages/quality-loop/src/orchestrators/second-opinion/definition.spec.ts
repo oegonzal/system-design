@@ -1,17 +1,14 @@
-import type {
-  PipelineSummary,
-  QualityRunDto,
-  StartOrchestrationRequest,
-} from '@sysdesign/contracts';
+import type { QualityRunDto, StartOrchestrationRequest } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { RunInput } from '../../core/loop/run-pipeline';
 import { confirmed, decision, ledger, runRecord, traceOf } from '../../core/testing';
-import { validateOrchestrator } from '../definition';
-import { openRecord, runOrchestration, type OrchestrationDeps } from '../run-orchestration';
+import { validateOrchestrator } from '../runner/definition';
+import { openRecord } from '../runner/record';
+import { runOrchestration } from '../runner/run-orchestration';
+import { orchestrationDeps, performed } from '../runner/testing';
 import { SECOND_OPINION } from './definition';
 
-const summary = { id: 'tiny', policy: { thresholds: { acceptAt: 80 } } } as PipelineSummary;
 const ARTIFACT = { text: 'the answer', parts: ['one'] };
 
 /** A judged run over the artifact given, confirming the finding keys given. */
@@ -30,27 +27,20 @@ const judged = (runId: string, artifact: unknown, findings: string[], overall = 
 /** The first call produces the artifact; every later call judges whatever it was handed. */
 function deps(firstFindings: string[], panelFindings: string[][]) {
   const asked: RunInput[] = [];
-  const harness: OrchestrationDeps<unknown> = {
-    ports: undefined,
-    pipelines: () => [summary],
-    execute: (request, onOpened) => {
-      asked.push({
-        goal: request.goal,
-        output: request.output,
-        maxIterations: request.maxIterations,
-      });
-      const call = asked.length;
-      const run =
-        call === 1
-          ? judged('first', ARTIFACT, firstFindings, 82)
-          : judged(`p-${call - 1}`, request.output, panelFindings[call - 2] ?? [], 76);
-      onOpened?.(run);
-      return Promise.resolve(run);
-    },
-    flush: () => Promise.resolve(),
-    now: () => 'now',
-    warn: () => undefined,
-  };
+  const harness = orchestrationDeps<unknown>(undefined, (request, onOpened) => {
+    asked.push({
+      goal: request.goal,
+      output: request.output,
+      maxIterations: request.maxIterations,
+    });
+    const call = asked.length;
+    const run =
+      call === 1
+        ? judged('first', ARTIFACT, firstFindings, 82)
+        : judged(`p-${call - 1}`, request.output, panelFindings[call - 2] ?? [], 76);
+    onOpened?.(run);
+    return Promise.resolve(run);
+  });
   return { harness, asked };
 }
 
@@ -68,8 +58,7 @@ describe('the second-opinion orchestrator', () => {
 
   it('[QL-19] hands the first artifact to every panel sample, judge-only, and reconciles the first opinion with them', async () => {
     const { harness, asked } = deps(['gap|x', 'leak|z'], [['gap|x'], ['gap|x', 'leak|z']]);
-    const record = openRecord(SECOND_OPINION, request, null, {}, 1, () => 'now');
-    await runOrchestration(SECOND_OPINION, record, request, null, harness);
+    const record = await performed(SECOND_OPINION, request, harness);
 
     expect(asked).toEqual([
       { goal: 'g', output: undefined, maxIterations: undefined },
@@ -105,8 +94,7 @@ describe('the second-opinion orchestrator', () => {
       onOpened?.(run);
       return Promise.resolve(run);
     };
-    const record = openRecord(SECOND_OPINION, request, null, {}, 1, () => 'now');
-    await runOrchestration(SECOND_OPINION, record, request, null, harness);
+    const record = await performed(SECOND_OPINION, request, harness);
     expect(record.steps['panel']).toMatchObject({
       status: 'skipped',
       reason: 'no-artifact',

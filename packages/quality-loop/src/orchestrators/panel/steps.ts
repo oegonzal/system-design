@@ -11,7 +11,8 @@ import { DEFAULT_PANEL_SAMPLES } from '@sysdesign/contracts';
 
 import { outputsOf, reconcile } from '../../core/outputs';
 import type { RunInput } from '../../core/loop/run-pipeline';
-import type { StepContext, StepResult } from '../definition';
+import { completed, skipped } from '../common';
+import type { StepContext, StepResult } from '../runner/definition';
 
 /** What every sample runs on, or the declared reason the panel cannot run at all. */
 export type PanelSource = { input: RunInput } | { skip: string; note?: string | null };
@@ -22,34 +23,48 @@ export type PanelSource = { input: RunInput } | { skip: string; note?: string | 
  * at a time is the rule there. A failed sample is counted, not fatal, unless
  * none completed — then the panel is the run's failure.
  */
+interface Sampled {
+  runs: QualityRunDto[];
+  failed: number;
+  lastError: QualityRunDto['error'];
+}
+
+/** Every declared pipeline `samples` times over one input, one child after another. */
+async function runSamples<O extends object, P>(
+  ctx: StepContext<O, P>,
+  input: RunInput,
+  samples: number,
+): Promise<Sampled> {
+  const sampled: Sampled = { runs: [], failed: 0, lastError: null };
+  for (const pipeline of ctx.pipelines) {
+    for (let sample = 0; sample < samples; sample += 1) {
+      const child = await ctx.execute(input, pipeline);
+      if (completed(child)) {
+        sampled.runs.push(child);
+      } else {
+        sampled.failed += 1;
+        sampled.lastError = child.error;
+      }
+    }
+  }
+  return sampled;
+}
+
 export const panelStep =
   <O extends object, P>(source: (ctx: StepContext<O, P>) => PanelSource) =>
   async (ctx: StepContext<O, P>): Promise<StepResult<QualityRunDto[]>> => {
     const from = source(ctx);
-    if ('skip' in from) return { status: 'skipped', reason: from.skip, note: from.note ?? null };
+    if ('skip' in from) return skipped(from.skip, from.note);
 
     const samples = ctx.request.samples ?? DEFAULT_PANEL_SAMPLES;
-    const runs: QualityRunDto[] = [];
-    let failed = 0;
-    let lastError: QualityRunDto['error'] = null;
-    for (const pipeline of ctx.pipelines) {
-      for (let sample = 0; sample < samples; sample += 1) {
-        const child = await ctx.execute(from.input, pipeline);
-        if (child.status === 'failed' || child.trace === null) {
-          failed += 1;
-          lastError = child.error;
-        } else {
-          runs.push(child);
-        }
-      }
-    }
+    const { runs, failed, lastError } = await runSamples(ctx, from.input, samples);
     const counts = { lenses: ctx.pipelines.length, samples, completed: runs.length, failed };
-    const asked = runs.length + failed;
+    const shortfall = `${failed} of ${runs.length + failed} sample(s) failed`;
     if (runs.length === 0) {
       return {
         status: 'failed',
         reason: 'run-failed',
-        note: `${failed} of ${asked} sample(s) failed`,
+        note: shortfall,
         counts,
         error: lastError ?? {
           name: 'PanelFailed',
@@ -59,13 +74,7 @@ export const panelStep =
       };
     }
     if (failed > 0) {
-      return {
-        status: 'complete',
-        reason: 'sample-failed',
-        note: `${failed} of ${asked} sample(s) failed`,
-        counts,
-        output: runs,
-      };
+      return { status: 'complete', reason: 'sample-failed', note: shortfall, counts, output: runs };
     }
     return { status: 'complete', counts, output: runs };
   };

@@ -13,7 +13,7 @@ import type {
 } from '@sysdesign/contracts';
 import { ORCHESTRATION_REASONS } from '@sysdesign/contracts';
 
-import type { RunInput } from '../core/loop/run-pipeline';
+import type { RunInput } from '../../core/loop/run-pipeline';
 
 export interface StepResult<V = unknown> {
   status: 'complete' | 'skipped' | 'failed';

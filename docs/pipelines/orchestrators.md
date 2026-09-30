@@ -79,8 +79,12 @@ target and the router never offers one as a route. `refuseInternal`,
 step should read that as part of the brief), `runTarget` (run a declared
 pipeline as the run's own deliverable: its failure is the orchestration's),
 `providedAsOutput` (the stand-in a provided run makes), `briefRoutes` (the
-registry minus the internal pipelines, as `{ id, description }`), and
-`soleChild`.
+registry minus the internal pipelines, as `{ id, description }`), and the
+shapes every step adapter writes: `requestInput` (the request's own run
+inputs), `skipped`, `completed` (a child that ran to a trace) and
+`runFailed` (the step's failure in the child's words). The runner itself is
+`orchestrators/runner/`: the definition types, the record, the ledger, the
+loop, and the harness the orchestrator specs share.
 
 **`orchestrators/panel/steps.ts`.** Two adapter factories. `panelStep(source)`
 runs each of the step's declared pipelines `samples` times over the input

@@ -9,6 +9,7 @@ import type {
   MemoryContextDto,
   MemoryStepReason,
   QualityRunDto,
+  RunTrace,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -24,6 +25,7 @@ import {
   queryText,
   readPack,
   withMemory,
+  type ChunkOrigin,
   type FusedHit,
   type MemoryToStore,
 } from '../../modules/memory/compose';
@@ -40,8 +42,8 @@ import {
   MEMORY_RECALL_ID,
   renderGoal as renderQuery,
 } from '../../pipelines/memory-recall/input';
-import { runTarget } from '../common';
-import type { StepContext, StepResult } from '../definition';
+import { completed, requestInput, runFailed, runTarget, skipped } from '../common';
+import type { StepContext, StepResult } from '../runner/definition';
 
 /** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
 export interface MemoryPorts {
@@ -66,30 +68,35 @@ export interface MemoryOutputs {
 
 type Ctx = StepContext<MemoryOutputs, MemoryPorts>;
 
-/** A skip yields nothing, so it satisfies every step's result type. */
+/** A skip for one of the memory orchestrator's declared reasons, or the runner's two that a step may give itself. */
 const skip = (
   reason: MemoryStepReason | 'pipeline-unavailable' | 'upstream-skipped',
   note: string | null = null,
-): StepResult<never> => ({
-  status: 'skipped',
-  reason,
-  note,
-});
+): StepResult<never> => skipped(reason, note);
 
 const contextOf = (ctx: Ctx): MemoryContextDto => ctx.context as unknown as MemoryContextDto;
 
-/** Recall memory for the goal; yields the goal the target should run with, or nothing. */
-export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
-  const { embeddings, store, probes } = ctx.ports;
+/** Why a recall cannot run at all — no embeddings, no store, nothing stored, no pipeline — or null when it can. */
+function recallReadiness(ctx: Ctx): StepResult<never> | null {
   const context = contextOf(ctx);
-  const goal = ctx.request.goal;
-  if (!embeddings.enabled) return skip('embeddings-disabled', context.embedding.reason);
+  if (!ctx.ports.embeddings.enabled) return skip('embeddings-disabled', context.embedding.reason);
   if (!context.store.ready) {
     return skip('store-unavailable', context.store.note ?? context.store.reason);
   }
   if (context.store.chunks === 0) return skip('store-empty');
-  const acceptAt = ctx.acceptAtOf(MEMORY_RECALL_ID);
-  if (acceptAt === null) return skip('pipeline-unavailable', MEMORY_RECALL_ID);
+  if (ctx.acceptAtOf(MEMORY_RECALL_ID) === null) {
+    return skip('pipeline-unavailable', MEMORY_RECALL_ID);
+  }
+  return null;
+}
+
+/** Recall memory for the goal; yields the goal the target should run with, or nothing. */
+export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
+  const notReady = recallReadiness(ctx);
+  if (notReady !== null) return notReady;
+  const { embeddings, store, probes } = ctx.ports;
+  const goal = ctx.request.goal;
+  const acceptAt = ctx.acceptAtOf(MEMORY_RECALL_ID) ?? 0;
 
   const query = queryText(goal);
   // The goal is always probe zero; derived conditions only widen the net.
@@ -107,9 +114,7 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
   if (hits.length === 0) return skip('store-empty');
 
   const child = await ctx.execute({ goal: renderQuery(buildQuery(query, texts, hits)) });
-  if (child.status === 'failed' || child.trace === null) {
-    return { status: 'failed', reason: 'run-failed', note: child.error?.message ?? null };
-  }
+  if (!completed(child)) return runFailed(child);
   const readout = readPack(outputsOf(child.trace), hits, acceptAt);
   const counts = {
     probes: texts.length,
@@ -132,11 +137,7 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
 
 /** Run the target pipeline with whatever recall handed on; its failure is the run's. */
 export const target = (ctx: Ctx): Promise<StepResult<QualityRunDto>> =>
-  runTarget(ctx, {
-    goal: ctx.outputs.recall?.goal ?? ctx.request.goal,
-    output: ctx.request.output,
-    maxIterations: ctx.request.maxIterations,
-  });
+  runTarget(ctx, requestInput(ctx.request, ctx.outputs.recall?.goal ?? ctx.request.goal));
 
 /** Digest the finished target; yields what the digest endorsed, or nothing with the reason. */
 export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
@@ -159,9 +160,7 @@ export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
   if (record === null) return skip('nothing-to-digest');
 
   const child = await ctx.execute({ goal: renderRecord(record) });
-  if (child.status === 'failed' || child.trace === null) {
-    return { status: 'failed', reason: 'run-failed', note: child.error?.message ?? null };
-  }
+  if (!completed(child)) return runFailed(child);
   const { admitted, proposed, memories } = memoriesToStore(outputsOf(child.trace), acceptAt);
   const counts = { memories: proposed, kept: memories.length };
   if (!admitted) return { status: 'complete', reason: 'not-accepted', counts };
@@ -183,6 +182,27 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   return indexMemories(ctx.ports, source, digested, model);
 }
 
+/** Where a memory came from, as every chunk of it says: the run, its pipeline, how it ended, and the day. */
+const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => ({
+  runId: source.runId,
+  pipeline: trace.pipeline.id,
+  decision: trace.finalDecision,
+  iteration: trace.bestIteration,
+  when: dayOf(source.startedAt),
+});
+
+/** The calendar day of an ISO timestamp. */
+const dayOf = (iso: string): string => iso.slice(0, 10);
+
+/** The named vectors of chunk `index` out of one batch that asked every name of every chunk in order. */
+const vectorsFor = (
+  index: number,
+  vectors: readonly (readonly number[])[],
+): Record<(typeof VECTOR_NAMES)[number], number[]> =>
+  Object.fromEntries(
+    VECTOR_NAMES.map((name, offset) => [name, vectors[index * VECTOR_NAMES.length + offset]]),
+  ) as Record<(typeof VECTOR_NAMES)[number], number[]>;
+
 /**
  * Write a source run's memories to the store as exactly these chunks. Pure of
  * the ledger, so re-indexing an already digested run — after the index
@@ -197,18 +217,7 @@ export async function indexMemories(
 ): Promise<StepResult<undefined>> {
   const trace = source.trace;
   if (trace === null) return skip('nothing-to-digest');
-  const chunks = chunksOf(
-    digested.memories,
-    {
-      runId: source.runId,
-      pipeline: trace.pipeline.id,
-      decision: trace.finalDecision,
-      iteration: trace.bestIteration,
-      when: source.startedAt.slice(0, 10),
-    },
-    digested.digestRunId,
-    model,
-  );
+  const chunks = chunksOf(digested.memories, originOf(source, trace), digested.digestRunId, model);
   // Both indexed texts of every chunk, in one batch: the cache dedupes, and
   // the vectors come back in the order they were asked for.
   const embedded = await ports.embeddings.embed(
@@ -218,15 +227,7 @@ export async function indexMemories(
   try {
     const stored = await ports.store.replaceRunChunks(
       source.runId,
-      chunks.map((chunk, index) => ({
-        ...chunk,
-        vectors: Object.fromEntries(
-          VECTOR_NAMES.map((name, offset) => [
-            name,
-            embedded.vectors[index * VECTOR_NAMES.length + offset],
-          ]),
-        ) as Record<(typeof VECTOR_NAMES)[number], number[]>,
-      })),
+      chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
     );
     return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
   } catch (error) {

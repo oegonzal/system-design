@@ -338,7 +338,7 @@ a deployment fact, and a step whose pipeline is missing is skipped
 `pipeline-unavailable` at run time rather than keeping the whole service from
 starting.
 
-**The runner is generic.** `src/orchestrators/run-orchestration.ts` executes
+**The runner is generic.** `src/orchestrators/runner/run-orchestration.ts` executes
 any such map: it seeds the ledger from the declared ids, runs the steps in
 order, skips a step whose need yielded nothing (`upstream-failed` or
 `upstream-skipped`, the note naming the step that blocked), hands each step a

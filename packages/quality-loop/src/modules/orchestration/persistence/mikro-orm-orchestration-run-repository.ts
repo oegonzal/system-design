@@ -13,7 +13,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import { OrchestrationRun, OrchestrationRunChild, QualityRun } from '@sysdesign/db';
 
-import { closeSteps } from '../../../orchestrators/run-orchestration';
+import { closeSteps } from '../../../orchestrators/runner/record';
 import type { OrchestrationListQuery, OrchestrationRunRepository } from '../ports';
 import { childrenOf, fromRow, toRow } from './orchestration-run-mapper';
 

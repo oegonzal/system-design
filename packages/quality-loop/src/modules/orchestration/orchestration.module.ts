@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 
-import { CALIBRATION } from '../../orchestrators/calibration/definition';
-import { MEMORY } from '../../orchestrators/memory/definition';
+import { MEMORY_ORCHESTRATOR_ID, ROUTER_ORCHESTRATOR_ID } from '@sysdesign/contracts';
+
+import { ORCHESTRATORS } from '../../orchestrators';
 import type { MemoryPorts } from '../../orchestrators/memory/steps';
-import { ROUTER } from '../../orchestrators/router/definition';
 import type { RouterPorts } from '../../orchestrators/router/steps';
-import { SECOND_OPINION } from '../../orchestrators/second-opinion/definition';
 import { MemoryModule } from '../memory/memory.module';
 import { MEMORY_PORTS } from '../memory/tokens';
 import { RouterModule } from '../router/router.module';
@@ -21,12 +20,11 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
   ({ definition, ports }) as OrchestratorHost;
 
 /**
- * The runner, the record and every orchestrator bound to its ports. A
- * definition is data in `orchestrators/`; the ports are adapters owned by the
- * module that built them, so the binding — and only the binding — lives here.
- * Adding an orchestrator is one entry in this map and its module's ports; the
- * two panel orchestrators need none, since every step of theirs runs a
- * registered pipeline or reads what one produced.
+ * The runner, the record and every registered orchestrator bound to its
+ * ports. A definition is data in `orchestrators/`; the ports are adapters
+ * owned by the module that built them, so the binding — and only the binding
+ * — lives here. An orchestrator that declares ports gets them by id; one that
+ * declares none, like the two panels, is bound to nothing.
  */
 @Module({
   imports: [RunsModule, OrchestrationRecordModule, MemoryModule, RouterModule],
@@ -38,13 +36,18 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
       useFactory: (
         memory: MemoryPorts,
         router: RouterPorts,
-      ): ReadonlyMap<string, OrchestratorHost> =>
-        new Map<string, OrchestratorHost>([
-          [MEMORY.id, host(MEMORY, memory)],
-          [CALIBRATION.id, host(CALIBRATION, undefined)],
-          [SECOND_OPINION.id, host(SECOND_OPINION, undefined)],
-          [ROUTER.id, host(ROUTER, router)],
-        ]),
+      ): ReadonlyMap<string, OrchestratorHost> => {
+        const ports = new Map<string, unknown>([
+          [MEMORY_ORCHESTRATOR_ID, memory],
+          [ROUTER_ORCHESTRATOR_ID, router],
+        ]);
+        return new Map(
+          [...ORCHESTRATORS.values()].map((definition) => [
+            definition.id,
+            host(definition, ports.get(definition.id)),
+          ]),
+        );
+      },
       inject: [MEMORY_PORTS, ROUTER_PORTS],
     },
   ],

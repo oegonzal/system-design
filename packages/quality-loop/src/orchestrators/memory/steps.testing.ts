@@ -17,7 +17,8 @@ import {
   InMemoryMemoryStore,
   vectorOf,
 } from '../../modules/memory/testing';
-import type { StepContext } from '../definition';
+import type { StepContext } from '../runner/definition';
+import { fakeStepContext } from '../runner/testing';
 import type { MemoryOutputs, MemoryPorts } from './steps';
 
 /** The accept bar both memory pipelines declare; the steps read it off the summary. */
@@ -112,20 +113,20 @@ export function stepContext(
   } = {},
 ): MemoryStepContext {
   const executed: { goal: string }[] = [];
+  const execute = (input: { goal: string }): Promise<QualityRunDto> => {
+    executed.push({ goal: input.goal });
+    const result = typeof answer === 'function' ? answer() : answer;
+    if (!result) throw new Error('no child run was expected');
+    return Promise.resolve(toRunDto(result));
+  };
   return {
     executed,
-    request: { pipeline: 'system-design', goal: overrides.goal ?? GOAL },
-    context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
-    outputs: overrides.outputs ?? {},
-    ports: memoryPorts(overrides.ports),
-    pipelines: ['system-design'],
-    registry: [],
-    acceptAtOf: () => (overrides.acceptAt === undefined ? ACCEPT_AT : overrides.acceptAt),
-    execute: (input): Promise<QualityRunDto> => {
-      executed.push({ goal: input.goal });
-      const result = typeof answer === 'function' ? answer() : answer;
-      if (!result) throw new Error('no child run was expected');
-      return Promise.resolve(toRunDto(result));
-    },
+    ...fakeStepContext<MemoryOutputs, MemoryPorts>(memoryPorts(overrides.ports), execute, {
+      request: { pipeline: 'system-design', goal: overrides.goal ?? GOAL },
+      context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
+      outputs: overrides.outputs ?? {},
+      pipelines: ['system-design'],
+      acceptAtOf: () => (overrides.acceptAt === undefined ? ACCEPT_AT : overrides.acceptAt),
+    }),
   };
 }

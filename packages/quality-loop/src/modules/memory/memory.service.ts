@@ -21,7 +21,7 @@ import { MEMORY_ORCHESTRATOR_ID } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { outputsOf } from '../../core/outputs';
-import { soleChild } from '../../orchestrators/common';
+import { digestedChildren } from '../../orchestrators/memory/definition';
 import { indexMemories, type MemoryPorts } from '../../orchestrators/memory/steps';
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { alias, MAX_CANDIDATES, probeAlias } from '../../pipelines/memory-recall/input';
@@ -69,14 +69,13 @@ export class MemoryService implements OnModuleInit {
     if (record === null || record.orchestrator !== MEMORY_ORCHESTRATOR_ID) {
       throw new NotFoundException(`memory run ${id} not found`);
     }
-    const digested = soleChild(record.steps['digest']);
-    const targeted = soleChild(record.steps['target']);
-    if (digested === null || targeted === null) {
+    const children = digestedChildren(record);
+    if (children === null) {
       throw new BadRequestException(`memory run ${id} digested no run to re-index`);
     }
     const [digestRun, source] = await Promise.all([
-      this.runs.get(digested),
-      this.runs.get(targeted),
+      this.runs.get(children.digestRunId),
+      this.runs.get(children.targetRunId),
     ]);
     if (digestRun?.trace == null || source === null) {
       throw new NotFoundException(`memory run ${id} refers to a run that is no longer stored`);

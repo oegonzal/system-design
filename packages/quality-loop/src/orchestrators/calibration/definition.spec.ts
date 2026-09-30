@@ -1,42 +1,32 @@
-import type { PipelineSummary, StartOrchestrationRequest } from '@sysdesign/contracts';
+import type { StartOrchestrationRequest } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { decision, runRecord, traceOf } from '../../core/testing';
-import { validateOrchestrator } from '../definition';
-import { openRecord, runOrchestration, type OrchestrationDeps } from '../run-orchestration';
+import { validateOrchestrator } from '../runner/definition';
+import { orchestrationDeps, performed } from '../runner/testing';
 import { CALIBRATION } from './definition';
 
-const summary = { id: 'tiny', policy: { thresholds: { acceptAt: 80 } } } as PipelineSummary;
-
 /** Every sample answers with a judged run whose overall climbs by five. */
-function deps(): OrchestrationDeps<unknown> & { asked: { pipeline: string; goal: string }[] } {
+function harness() {
   const asked: { pipeline: string; goal: string }[] = [];
-  return {
-    asked,
-    ports: undefined,
-    pipelines: () => [summary],
-    execute: (request, onOpened) => {
-      asked.push({ pipeline: request.pipeline, goal: request.goal });
-      const overall = 70 + asked.length * 5;
-      const run = runRecord(
-        `r-${asked.length}`,
-        traceOf({ decision: decision({ scores: { dimensions: { a: overall }, overall } }) }),
-        { pipeline: request.pipeline },
-      );
-      onOpened?.(run);
-      return Promise.resolve(run);
-    },
-    flush: () => Promise.resolve(),
-    now: () => 'now',
-    warn: () => undefined,
-  };
+  const deps = orchestrationDeps<unknown>(undefined, (request, onOpened) => {
+    asked.push({ pipeline: request.pipeline, goal: request.goal });
+    const overall = 70 + asked.length * 5;
+    const run = runRecord(
+      `r-${asked.length}`,
+      traceOf({ decision: decision({ scores: { dimensions: { a: overall }, overall } }) }),
+      { pipeline: request.pipeline },
+    );
+    onOpened?.(run);
+    return Promise.resolve(run);
+  });
+  return { deps, asked };
 }
 
 const perform = async (request: StartOrchestrationRequest) => {
-  const record = openRecord(CALIBRATION, request, null, {}, 1, () => 'now');
-  const harness = deps();
-  await runOrchestration(CALIBRATION, record, request, null, harness);
-  return { record, asked: harness.asked };
+  const { deps, asked } = harness();
+  const record = await performed(CALIBRATION, request, deps);
+  return { record, asked };
 };
 
 describe('the calibration orchestrator', () => {

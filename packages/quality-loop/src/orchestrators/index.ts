@@ -4,7 +4,7 @@
  * binding them, since ports are adapters and a definition is data.
  */
 import { CALIBRATION } from './calibration/definition';
-import type { OrchestratorDefinition } from './definition';
+import type { OrchestratorDefinition } from './runner/definition';
 import { MEMORY } from './memory/definition';
 import { ROUTER } from './router/definition';
 import { SECOND_OPINION } from './second-opinion/definition';

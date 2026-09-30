@@ -8,10 +8,10 @@
 import {
   CANVAS_PIPELINE_ID,
   PROMPT_PIPELINE_ID,
-  type OrchestrationStepDto,
   type PipelineSummary,
   type QualityRunDto,
   type RouteDto,
+  type RunTrace,
   type StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 
@@ -20,7 +20,7 @@ import type { RunInput } from '../core/loop/run-pipeline';
 import { bareGoal } from '../modules/memory/compose';
 import { EXPERIENCE_DIGEST_ID } from '../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../pipelines/memory-recall/input';
-import type { StepContext, StepResult } from './definition';
+import type { StepContext, StepResult } from './runner/definition';
 
 /**
  * Pipelines that take a goal another program composed — a memory step, or
@@ -49,6 +49,34 @@ export const bareRequest = (request: StartOrchestrationRequest): StartOrchestrat
   goal: bareGoal(request.goal),
 });
 
+/** The run inputs a request carries, for a step that runs a pipeline on the request's own terms. */
+export const requestInput = (
+  request: StartOrchestrationRequest,
+  goal: string = request.goal,
+): RunInput => ({
+  goal,
+  output: request.output,
+  maxIterations: request.maxIterations,
+});
+
+/** A skip yields nothing, so it satisfies every step's result type. */
+export const skipped = (reason: string, note: string | null = null): StepResult<never> => ({
+  status: 'skipped',
+  reason,
+  note,
+});
+
+/** A child that ran to a trace; anything else is a run the step cannot read. */
+export const completed = (child: QualityRunDto): child is QualityRunDto & { trace: RunTrace } =>
+  child.status !== 'failed' && child.trace !== null;
+
+/** The step's failure when its child did not complete, in the child's own words. */
+export const runFailed = (child: QualityRunDto): StepResult<never> => ({
+  status: 'failed',
+  reason: 'run-failed',
+  note: child.error?.message ?? null,
+});
+
 /** The stand-in a step declares when a provided run is exactly its output. */
 export const providedAsOutput = (run: QualityRunDto): StepResult<QualityRunDto> => ({
   status: 'skipped',
@@ -67,11 +95,9 @@ export async function runTarget<O extends object, P>(
   pipeline?: string,
 ): Promise<StepResult<QualityRunDto>> {
   const child = await ctx.execute(input, pipeline);
-  if (child.status === 'failed' || child.trace === null) {
+  if (!completed(child)) {
     return {
-      status: 'failed',
-      reason: 'run-failed',
-      note: child.error?.message ?? null,
+      ...runFailed(child),
       error: child.error ?? {
         name: 'RunFailed',
         message: 'the target run produced no trace',
@@ -95,7 +121,3 @@ export const briefRoutes = (registry: readonly PipelineSummary[]): RouteDto[] =>
   registry
     .filter((summary) => !INTERNAL_PIPELINES.includes(summary.id))
     .map((summary) => ({ id: summary.id, description: summary.description }));
-
-/** The one child of a step that runs a pipeline once; null when it opened none. */
-export const soleChild = (step: OrchestrationStepDto | undefined): string | null =>
-  step?.runIds[0] ?? null;

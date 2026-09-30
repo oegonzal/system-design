@@ -8,7 +8,7 @@
 import { ROUTER_ORCHESTRATOR_ID, ROUTER_STEP_REASONS } from '@sysdesign/contracts';
 
 import { bareRequest } from '../common';
-import type { OrchestratorDefinition } from '../definition';
+import type { OrchestratorDefinition } from '../runner/definition';
 import { classify, judge, type RouterOutputs, type RouterPorts } from './steps';
 
 export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {

@@ -4,12 +4,16 @@
  * three registered pipelines, declared here as data; the adapters beside it
  * are the only code.
  */
-import { MEMORY_ORCHESTRATOR_ID, MEMORY_STEP_REASONS } from '@sysdesign/contracts';
+import {
+  MEMORY_ORCHESTRATOR_ID,
+  MEMORY_STEP_REASONS,
+  type OrchestrationRunDto,
+} from '@sysdesign/contracts';
 
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { bareRequest, providedAsOutput, refuseInternal } from '../common';
-import type { OrchestratorDefinition } from '../definition';
+import type { OrchestratorDefinition } from '../runner/definition';
 import { digest, recall, store, target, type MemoryOutputs, type MemoryPorts } from './steps';
 
 export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
@@ -42,4 +46,18 @@ export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
     { id: 'digest', pipeline: EXPERIENCE_DIGEST_ID, needs: ['target'], run: digest },
     { id: 'store', needs: ['digest'], run: store },
   ],
+};
+
+/**
+ * The digest run and the target run a memory record names — one each, since
+ * both steps run their pipeline once — or null when either never opened.
+ */
+export const digestedChildren = (
+  record: OrchestrationRunDto,
+): { digestRunId: string; targetRunId: string } | null => {
+  const digestRunId = record.steps['digest']?.runIds[0];
+  const targetRunId = record.steps['target']?.runIds[0];
+  return digestRunId === undefined || targetRunId === undefined
+    ? null
+    : { digestRunId, targetRunId };
 };

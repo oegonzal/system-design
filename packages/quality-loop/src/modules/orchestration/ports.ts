@@ -5,7 +5,7 @@
  */
 import type { ListOrchestrationRunsQuery, OrchestrationRunDto } from '@sysdesign/contracts';
 
-import type { OrchestratorDefinition } from '../../orchestrators/definition';
+import type { OrchestratorDefinition } from '../../orchestrators/runner/definition';
 
 export interface OrchestratorHost<O extends object = Record<string, unknown>, P = unknown> {
   definition: OrchestratorDefinition<O, P>;

@@ -14,8 +14,8 @@ import {
 } from '@sysdesign/contracts';
 
 import { outputsOf } from '../../core/outputs';
-import { bareRequest, providedAsOutput, refuseInternal, runTarget } from '../common';
-import type { OrchestratorDefinition } from '../definition';
+import { bareRequest, providedAsOutput, refuseInternal, requestInput, runTarget } from '../common';
+import type { OrchestratorDefinition } from '../runner/definition';
 import { panelStep, reconcileStep } from '../panel/steps';
 
 export interface SecondOpinionOutputs {
@@ -37,12 +37,7 @@ export const SECOND_OPINION: OrchestratorDefinition<SecondOpinionOutputs, unknow
     {
       id: 'first',
       pipeline: (request) => request.pipeline,
-      run: (ctx) =>
-        runTarget(ctx, {
-          goal: ctx.request.goal,
-          output: ctx.request.output,
-          maxIterations: ctx.request.maxIterations,
-        }),
+      run: (ctx) => runTarget(ctx, requestInput(ctx.request)),
       provided: providedAsOutput,
     },
     {

@@ -21,8 +21,9 @@ import type {
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { validateOrchestrator } from '../../orchestrators/definition';
-import { openRecord, runOrchestration } from '../../orchestrators/run-orchestration';
+import { validateOrchestrator } from '../../orchestrators/runner/definition';
+import { openRecord } from '../../orchestrators/runner/record';
+import { runOrchestration } from '../../orchestrators/runner/run-orchestration';
 import { RunsService } from '../runs/runs.service';
 import type { OrchestrationListQuery, OrchestrationRunRepository, OrchestratorHost } from './ports';
 import { ORCHESTRATION_RUN_REPOSITORY, ORCHESTRATOR_HOSTS } from './tokens';

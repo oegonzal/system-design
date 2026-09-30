@@ -3,20 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 import { decision, runRecord, traceOf } from '../../core/testing';
 import type { BriefClassifier, Classification } from '../../modules/router/classifier';
-import { validateOrchestrator } from '../definition';
-import { openRecord, runOrchestration, type OrchestrationDeps } from '../run-orchestration';
+import { validateOrchestrator } from '../runner/definition';
+import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
 import { ROUTER } from './definition';
 import type { RouterPorts } from './steps';
 
-const summaries = (...ids: string[]): PipelineSummary[] =>
-  ids.map(
-    (id) =>
-      ({
-        id,
-        description: `${id} grades`,
-        policy: { thresholds: { acceptAt: 80 } },
-      }) as PipelineSummary,
-  );
+const summaries = (...ids: string[]): PipelineSummary[] => ids.map((id) => summaryOf(id));
 
 const classifier = (answer: Classification | null, enabled = true): BriefClassifier => ({
   enabled,
@@ -42,10 +34,9 @@ async function perform(registry: PipelineSummary[], c: BriefClassifier) {
       return c.classify(goal, offered);
     },
   };
-  const deps: OrchestrationDeps<RouterPorts> = {
-    ports: ports(spying),
-    pipelines: () => registry,
-    execute: (req, onOpened) => {
+  const deps = orchestrationDeps<RouterPorts>(
+    ports(spying),
+    (req, onOpened) => {
       asked.push({ pipeline: req.pipeline, maxIterations: req.maxIterations });
       const run = runRecord(
         'judged',
@@ -55,19 +46,11 @@ async function perform(registry: PipelineSummary[], c: BriefClassifier) {
       onOpened?.(run);
       return Promise.resolve(run);
     },
-    flush: () => Promise.resolve(),
-    now: () => 'now',
-    warn: () => undefined,
-  };
-  const record = openRecord(
-    ROUTER,
-    request,
-    null,
-    await ROUTER.context(deps.ports),
-    1,
-    () => 'now',
+    { pipelines: () => registry },
   );
-  await runOrchestration(ROUTER, record, request, null, deps);
+  const record = await performed(ROUTER, request, deps, {
+    context: await ROUTER.context(deps.ports),
+  });
   return { record, asked, routes };
 }
 

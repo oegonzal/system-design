@@ -15,8 +15,8 @@ import type {
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
 
 import type { BriefClassifier } from '../../modules/router/classifier';
-import { briefRoutes, runTarget } from '../common';
-import type { StepContext, StepResult } from '../definition';
+import { briefRoutes, requestInput, runTarget } from '../common';
+import type { StepContext, StepResult } from '../runner/definition';
 
 /** The ports the router runs over; the module that owns the classifier binds them. */
 export interface RouterPorts {
@@ -74,7 +74,6 @@ export async function classify(ctx: Ctx): Promise<StepResult<{ pipeline: string 
  */
 export const judge = (ctx: Ctx): Promise<StepResult<QualityRunDto>> =>
   runTarget(ctx, {
-    goal: ctx.request.goal,
-    output: ctx.request.output,
+    ...requestInput(ctx.request),
     maxIterations: ctx.request.maxIterations ?? DEFAULT_QUALITY_RUN_ITERATIONS,
   });

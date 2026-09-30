@@ -12,8 +12,8 @@ import {
   type QualityRunDto,
 } from '@sysdesign/contracts';
 
-import { bareRequest, refuseInternal } from '../common';
-import type { OrchestratorDefinition } from '../definition';
+import { bareRequest, refuseInternal, requestInput } from '../common';
+import type { OrchestratorDefinition } from '../runner/definition';
 import { panelStep, reconcileStep } from '../panel/steps';
 
 export interface CalibrationOutputs {
@@ -35,13 +35,7 @@ export const CALIBRATION: OrchestratorDefinition<CalibrationOutputs, unknown> = 
     {
       id: 'panel',
       pipeline: (request) => request.pipeline,
-      run: panelStep<CalibrationOutputs, unknown>((ctx) => ({
-        input: {
-          goal: ctx.request.goal,
-          output: ctx.request.output,
-          maxIterations: ctx.request.maxIterations,
-        },
-      })),
+      run: panelStep<CalibrationOutputs, unknown>((ctx) => ({ input: requestInput(ctx.request) })),
     },
     {
       id: 'reconcile',
