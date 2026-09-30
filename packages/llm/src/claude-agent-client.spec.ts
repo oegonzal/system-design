@@ -96,9 +96,10 @@ describe('extractStructured', () => {
 
 /** A stand-in for the SDK's `query` that replays messages (then optionally throws, as the real SDK does on a non-zero exit) and records the options it got. */
 function scripted(messages: readonly unknown[], thenThrow?: Error) {
-  const seen: { env?: NodeJS.ProcessEnv } = {};
-  const run = ((params: { options?: { env?: NodeJS.ProcessEnv } }) => {
+  const seen: { env?: NodeJS.ProcessEnv; options?: Record<string, unknown> } = {};
+  const run = ((params: { options?: Record<string, unknown> & { env?: NodeJS.ProcessEnv } }) => {
     seen.env = params.options?.env;
+    seen.options = params.options;
     return (async function* () {
       yield* messages;
       if (thenThrow) throw thenThrow;
@@ -128,6 +129,10 @@ describe('the subscription client at its call site', () => {
       expect(seen.env).not.toHaveProperty('ANTHROPIC_API_KEY');
       expect(seen.env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
       expect(seen.env).toHaveProperty('CLAUDE_CODE_MAX_OUTPUT_TOKENS');
+      // Every built-in tool off by the SDK's own switch, not a list of names that goes stale.
+      expect(seen.options?.['tools']).toEqual([]);
+      expect(seen.options).not.toHaveProperty('disallowedTools');
+      expect(seen.options).toMatchObject({ maxTurns: 1, settingSources: [] });
     } finally {
       for (const [name, value] of [
         ['ANTHROPIC_API_KEY', saved.key],

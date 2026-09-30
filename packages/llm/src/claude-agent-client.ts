@@ -19,32 +19,15 @@ export const CLAUDE_AGENT_TIMEOUT_MS = 300_000;
 const MAX_OUTPUT_TOKENS = '16000';
 
 /**
- * Every built-in Claude Code tool, denied by name. `allowedTools: []` does NOT
- * make an agent tool-less (the SDK treats it as "no extra allow rules", not
- * "deny all"), so a scoring-adjacent coach call must remove the tools
- * explicitly. Combined with `settingSources: []` (no project/user config, no
- * MCP servers) and single-turn `default` permission, the model has nothing to
- * call and no way to be granted one.
+ * No tools at all. `tools: []` is the SDK's own "disable every built-in
+ * tool" — unlike a list of names to deny, which went stale as the CLI grew
+ * new tools (ToolSearch, Workflow, Monitor, SendMessage…) and left them on
+ * offer: a model that reached for one used up its single turn, and the call
+ * came back `error_max_turns`. Combined with `settingSources: []` (no
+ * project/user config, no MCP servers) and single-turn `default`
+ * permission, the model has nothing to call and no way to be granted one.
  */
-const ALL_BUILTIN_TOOLS = [
-  'Bash',
-  'BashOutput',
-  'KillShell',
-  'Edit',
-  'MultiEdit',
-  'Write',
-  'NotebookEdit',
-  'Read',
-  'Glob',
-  'Grep',
-  'LS',
-  'WebFetch',
-  'WebSearch',
-  'Task',
-  'TodoWrite',
-  'ExitPlanMode',
-  'Skill',
-];
+const NO_TOOLS: string[] = [];
 
 /**
  * Scan `text` for balanced, string-aware top-level `{...}` objects and yield
@@ -263,7 +246,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
           systemPrompt: request.system,
           ...(this.requestedModel ? { model: this.requestedModel } : {}),
           maxTurns: 1,
-          disallowedTools: ALL_BUILTIN_TOOLS,
+          tools: NO_TOOLS,
           permissionMode: 'default',
           // No project/user settings, skills or MCP servers leak into a
           // scoring-adjacent call; nothing about this run is persisted to disk.
