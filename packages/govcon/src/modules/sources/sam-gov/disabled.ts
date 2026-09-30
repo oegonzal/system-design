@@ -1,7 +1,12 @@
 import type { SourceAvailability } from '@sysdesign/contracts';
 
 import type { Attempted, Fetched, SourceFailure } from '../../../core/budget';
-import type { ContractAwards, NoticeDescriptions, OpportunitySearch } from '../../../core/ports';
+import type {
+  ContractAwards,
+  EntityRegistry,
+  NoticeDescriptions,
+  OpportunitySearch,
+} from '../../../core/ports';
 import { SAM_GOV_SOURCE_ID } from './http';
 
 /**
@@ -36,4 +41,10 @@ export class DisabledAwards implements ContractAwards {
   readonly id = SAM_GOV_SOURCE_ID;
   readonly availability = DISABLED;
   search = nothing;
+}
+
+export class DisabledRegistry implements EntityRegistry {
+  readonly id = SAM_GOV_SOURCE_ID;
+  readonly availability = DISABLED;
+  lookup = nothing;
 }

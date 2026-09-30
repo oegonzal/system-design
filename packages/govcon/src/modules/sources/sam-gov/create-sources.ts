@@ -1,10 +1,16 @@
 import type { SourceAvailability } from '@sysdesign/contracts';
 
 import type { BudgetPolicy } from '../../../core/budget';
-import type { ContractAwards, NoticeDescriptions, OpportunitySearch } from '../../../core/ports';
+import type {
+  ContractAwards,
+  EntityRegistry,
+  NoticeDescriptions,
+  OpportunitySearch,
+} from '../../../core/ports';
 import { SAM_GOV_AWARDS_URL, SamGovAwards } from './awards';
 import { SAM_GOV_DESCRIPTION_URL, SamGovDescriptions } from './descriptions';
-import { DisabledAwards, DisabledDescriptions, DisabledSearch } from './disabled';
+import { DisabledAwards, DisabledDescriptions, DisabledRegistry, DisabledSearch } from './disabled';
+import { SAM_GOV_ENTITIES_URL, SamGovEntities } from './entities';
 import { SAM_GOV_SOURCE_ID, SamGovHttp, type SamGovHttpOptions } from './http';
 import { SAM_GOV_SEARCH_URL, SamGovSearch } from './search';
 
@@ -16,6 +22,7 @@ import { SAM_GOV_SEARCH_URL, SamGovSearch } from './search';
  *   SAM_GOV_BASE_URL              the search URL (default production; alpha for testing)
  *   SAM_GOV_DESCRIPTION_URL       the notice description URL (default production)
  *   SAM_GOV_AWARDS_URL            the Contract Awards search URL (default production)
+ *   SAM_GOV_ENTITIES_URL          the Entity Management URL (default production)
  *   SAM_GOV_DAILY_BUDGET          attempts per rolling day against SAM.gov, every API and outcome counted (default 1000, this key's quota)
  *   SAM_GOV_CACHE_TTL_HOURS       how long a pulled query is not pulled again (default 24; 0 disables)
  *   GOVCON_PULL_DEADLINE_SECONDS  a pull starts no new slice after this long (default 120)
@@ -30,6 +37,7 @@ export interface SamGovCredentials {
   searchUrl: string;
   descriptionUrl: string;
   awardsUrl: string;
+  entitiesUrl: string;
 }
 
 const numberOr = (value: string | undefined, fallback: number): number => {
@@ -49,6 +57,7 @@ export function samGovCredentialsFromEnv(
     searchUrl: env['SAM_GOV_BASE_URL']?.trim() || SAM_GOV_SEARCH_URL,
     descriptionUrl: env['SAM_GOV_DESCRIPTION_URL']?.trim() || SAM_GOV_DESCRIPTION_URL,
     awardsUrl: env['SAM_GOV_AWARDS_URL']?.trim() || SAM_GOV_AWARDS_URL,
+    entitiesUrl: env['SAM_GOV_ENTITIES_URL']?.trim() || SAM_GOV_ENTITIES_URL,
   };
 }
 
@@ -77,6 +86,7 @@ export interface SamGovSources {
   search: OpportunitySearch;
   descriptions: NoticeDescriptions;
   awards: ContractAwards;
+  entities: EntityRegistry;
 }
 
 export function createSamGovSources(
@@ -89,6 +99,7 @@ export function createSamGovSources(
       search: new DisabledSearch(),
       descriptions: new DisabledDescriptions(),
       awards: new DisabledAwards(),
+      entities: new DisabledRegistry(),
     };
   }
   const { warn, ...http } = options;
@@ -97,5 +108,6 @@ export function createSamGovSources(
     search: new SamGovSearch(transport, credentials.searchUrl, warn),
     descriptions: new SamGovDescriptions(transport, credentials.descriptionUrl),
     awards: new SamGovAwards(transport, credentials.awardsUrl, warn),
+    entities: new SamGovEntities(transport, credentials.entitiesUrl, warn),
   };
 }

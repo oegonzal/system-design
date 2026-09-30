@@ -6,6 +6,7 @@ import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
 import { GovconAward } from './entities/govcon-award.entity';
 import { GovconBid } from './entities/govcon-bid.entity';
+import { GovconEntity } from './entities/govcon-entity.entity';
 import { GovconOpportunity } from './entities/govcon-opportunity.entity';
 import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
 import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
@@ -60,6 +61,7 @@ export const ormOptions = {
     GovconSavedSearch,
     GovconBid,
     GovconAward,
+    GovconEntity,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

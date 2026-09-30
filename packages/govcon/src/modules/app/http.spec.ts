@@ -4,6 +4,8 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import type {
   Award,
   AwardsSummary,
+  Entity,
+  EntityLookup,
   Bid,
   BidPipelineSummary,
   DescriptionFetch,
@@ -21,6 +23,7 @@ import {
   ensureDatabase,
   GovconAward,
   GovconBid,
+  GovconEntity,
   GovconOpportunity,
   GovconSavedSearch,
   GovconSearchProfile,
@@ -37,13 +40,17 @@ import {
   tinyProfile,
   awardDraftOf,
   awardPageOf,
+  entityBatchOf,
+  entityDraftOf,
   scriptedContractAwards,
   scriptedSpendingAwards,
+  scriptedRegistry,
 } from '../../core/testing';
 import {
   BUDGET_POLICY,
   CLOCK,
   CONTRACT_AWARDS,
+  ENTITY_REGISTRY,
   NOTICE_DESCRIPTIONS,
   OPPORTUNITY_SEARCH,
   SPENDING_AWARDS,
@@ -109,6 +116,8 @@ async function boot() {
     .useValue(contractAwards)
     .overrideProvider(SPENDING_AWARDS)
     .useValue(spendingAwards)
+    .overrideProvider(ENTITY_REGISTRY)
+    .useValue(scriptedRegistry([entityBatchOf([entityDraftOf()])]))
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);
@@ -118,6 +127,7 @@ async function boot() {
 const truncate = async (em: EntityManager) => {
   await em.fork().nativeDelete(GovconSourceCall, {});
   await em.fork().nativeDelete(GovconAward, {});
+  await em.fork().nativeDelete(GovconEntity, {});
   await em.fork().nativeDelete(GovconBid, {});
   await em.fork().nativeDelete(GovconOpportunity, {});
   await em.fork().nativeDelete(GovconSavedSearch, {});
@@ -515,5 +525,34 @@ describe('the govcon HTTP surface', () => {
     expect(notice.data.factors.find((f) => f.id === 'history')?.evidence[0]).toBe(
       '2 stored award(s) in naics 332710 in the last 365 day(s)',
     );
+  });
+
+  it("[GOV-8] [GOV-18] looks registrants up through the gate, reads them from the store, and answers the profile's own", async () => {
+    expect((await get<Envelope<Entity | null>>(url, '/entities/own')).data).toBeNull();
+    expect((await get<Envelope<Entity | null>>(url, '/entities/ABC123DEF456')).data).toBeNull();
+    expect((await fetch(`${url}/entities/short`)).status).toBe(400);
+    const bad = await post(url, '/entities/lookup', { ueis: ['nope'] });
+    expect(bad.status).toBe(400);
+    expect((await json<Issues>(bad)).issues[0]?.path).toBe('ueis.0');
+
+    const looked = await post(url, '/entities/lookup', { ueis: ['ABC123DEF456', 'ZZZ000000001'] });
+    expect(looked.status).toBe(200);
+    const lookup = (await json<Envelope<EntityLookup>>(looked)).data;
+    expect(lookup.entities.map((e) => e.uei)).toEqual(['ABC123DEF456']);
+    expect(lookup.unknown).toEqual(['ZZZ000000001']);
+    expect(lookup).toMatchObject({ spent: 1, budget: 4 });
+    expect((await get<Envelope<Entity | null>>(url, '/entities/ABC123DEF456')).data).toMatchObject({
+      legalName: 'PRECISION PARTS CO',
+      excluded: false,
+    });
+
+    const withUei = tinyProfile({ entityUei: 'ABC123DEF456' });
+    expect((await send(url, 'PUT', '/profiles/tiny', withUei)).status).toBe(200);
+    expect((await get<Envelope<Entity | null>>(url, '/entities/own?profile=tiny')).data?.uei).toBe(
+      'ABC123DEF456',
+    );
+    expect(
+      (await get<Page<SourceCall>>(url, '/source/calls')).data.map((call) => call.operation),
+    ).toEqual(['entity']);
   });
 });

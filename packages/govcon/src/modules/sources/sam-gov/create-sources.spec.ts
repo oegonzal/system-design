@@ -10,6 +10,7 @@ import {
 import { SAM_GOV_AWARDS_URL, SamGovAwards } from './awards';
 import { SAM_GOV_DESCRIPTION_URL, SamGovDescriptions } from './descriptions';
 import { DisabledDescriptions, DisabledSearch } from './disabled';
+import { SAM_GOV_ENTITIES_URL, SamGovEntities } from './entities';
 import { SAM_GOV_ALPHA_SEARCH_URL, SAM_GOV_SEARCH_URL, SamGovSearch } from './search';
 
 describe('the SAM.gov environment factory', () => {
@@ -40,6 +41,7 @@ describe('the SAM.gov environment factory', () => {
     expect(live.search).toBeInstanceOf(SamGovSearch);
     expect(live.descriptions).toBeInstanceOf(SamGovDescriptions);
     expect(live.awards).toBeInstanceOf(SamGovAwards);
+    expect(live.entities).toBeInstanceOf(SamGovEntities);
     expect(samGovAvailabilityFromEnv({ SAM_GOV_API_KEY: 'k' })).toEqual({
       enabled: true,
       reason: null,
@@ -49,6 +51,7 @@ describe('the SAM.gov environment factory', () => {
       searchUrl: SAM_GOV_SEARCH_URL,
       descriptionUrl: SAM_GOV_DESCRIPTION_URL,
       awardsUrl: SAM_GOV_AWARDS_URL,
+      entitiesUrl: SAM_GOV_ENTITIES_URL,
     });
     expect(
       samGovCredentialsFromEnv({
@@ -61,6 +64,7 @@ describe('the SAM.gov environment factory', () => {
       searchUrl: SAM_GOV_ALPHA_SEARCH_URL,
       descriptionUrl: 'https://api-alpha.sam.gov/prod/opportunities/v1/noticedesc',
       awardsUrl: SAM_GOV_AWARDS_URL,
+      entitiesUrl: SAM_GOV_ENTITIES_URL,
     });
   });
 

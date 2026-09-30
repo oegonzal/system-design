@@ -8,8 +8,9 @@ export interface EntityNaics {
 
 /**
  * A SAM.gov registrant as stored: Entity Management's registration, core
- * data and assertions reduced to what a bidder asks — is it registered, until
- * when, what it claims, and (when checked) whether it is excluded.
+ * data and assertions reduced to what a bidder asks — is it registered,
+ * until when, what it claims, and whether it is excluded (the registration
+ * carries that flag, so no separate exclusions request is ever spent).
  */
 export interface Entity {
   uei: string;
@@ -18,24 +19,29 @@ export interface Entity {
   registrationStatus: string | null;
   /** ISO date. */
   registrationExpiresAt: string | null;
+  /** SAM.gov's business type codes, e.g. `2X` for-profit, `XS` small business. */
   businessTypes: string[];
+  /** SBA certification codes, e.g. `A6` 8(a). */
   sbaCertifications: string[];
   naics: EntityNaics[];
   psc: string[];
-  parentUei: string | null;
-  parentName: string | null;
-  /** null until the exclusions list was asked. */
-  excluded: boolean | null;
-  exclusionCheckedAt: string | null;
+  excluded: boolean;
   /** ISO 8601. */
   fetchedAt: string;
 }
 
-/** `POST /entities/lookup`: up to `MAX_UEI_BATCH` UEIs in one request, plus one exclusions request each when asked. */
+/** `POST /entities/lookup`: up to `MAX_UEI_BATCH` UEIs spend one request. */
 export interface LookupEntitiesRequest {
   ueis: string[];
-  exclusions: boolean;
+}
+
+/** What a lookup came back with: the entities the registry knows, and the UEIs it does not. */
+export interface EntityLookup {
+  entities: Entity[];
+  unknown: string[];
+  spent: number | null;
+  budget: number;
 }
 
 export type GetEntityResponse = ApiResponse<Entity | null>;
-export type LookupEntitiesResponse = ApiResponse<Entity[]>;
+export type LookupEntitiesResponse = ApiResponse<EntityLookup>;

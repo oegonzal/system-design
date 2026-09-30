@@ -3,6 +3,7 @@ export * from './entities/design-session.entity';
 export * from './entities/experience-profile.entity';
 export * from './entities/govcon-award.entity';
 export * from './entities/govcon-bid.entity';
+export * from './entities/govcon-entity.entity';
 export * from './entities/govcon-opportunity.entity';
 export * from './entities/govcon-saved-search.entity';
 export * from './entities/govcon-search-profile.entity';

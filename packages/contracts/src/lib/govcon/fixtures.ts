@@ -324,10 +324,7 @@ export const entityOf = (overrides: Partial<Entity> = {}): Entity => ({
   sbaCertifications: [],
   naics: [{ code: '332710', small: true }],
   psc: ['5340'],
-  parentUei: null,
-  parentName: null,
   excluded: false,
-  exclusionCheckedAt: '2026-09-27T04:05:00.000Z',
   fetchedAt: '2026-09-27T04:05:00.000Z',
   ...overrides,
 });

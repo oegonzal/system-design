@@ -1,0 +1,118 @@
+{
+  "totalRecords": 2,
+  "entityData": [
+    {
+      "entityRegistration": {
+        "ueiSAM": "JYKDMRSL7U65",
+        "cageCode": "8U976",
+        "legalBusinessName": "R. L. MORRISSEY & ASSOCIATES, INC",
+        "dbaName": null,
+        "registrationStatus": "Active",
+        "registrationDate": "2001-12-03",
+        "registrationExpirationDate": "2027-01-19",
+        "exclusionStatusFlag": "N",
+        "exclusionURL": null,
+        "purposeOfRegistrationDesc": "All Awards"
+      },
+      "coreData": {
+        "generalInformation": {
+          "entityStructureCode": "2L",
+          "entityStructureDesc": "Corporate Entity (Not Tax Exempt)",
+          "entityTypeCode": "F",
+          "entityTypeDesc": "Business or Organization",
+          "profitStructureCode": "2X",
+          "profitStructureDesc": "For Profit Organization",
+          "organizationStructureCode": "MF",
+          "organizationStructureDesc": "Manufacturer of Goods",
+          "stateOfIncorporationCode": "OH",
+          "stateOfIncorporationDesc": "OHIO",
+          "countryOfIncorporationCode": "USA",
+          "countryOfIncorporationDesc": "UNITED STATES"
+        },
+        "businessTypes": {
+          "businessTypeList": [
+            {
+              "businessTypeCode": "2X",
+              "businessTypeDesc": "For Profit Organization"
+            },
+            {
+              "businessTypeCode": "F",
+              "businessTypeDesc": "Business or Organization"
+            },
+            {
+              "businessTypeCode": "MF",
+              "businessTypeDesc": "Manufacturer of Goods"
+            }
+          ],
+          "sbaBusinessTypeList": [
+            {
+              "sbaBusinessTypeCode": null,
+              "sbaBusinessTypeDesc": null,
+              "certificationEntryDate": null,
+              "certificationExitDate": null
+            }
+          ]
+        }
+      },
+      "assertions": {
+        "goodsAndServices": {
+          "primaryNaics": "332722",
+          "naicsList": [
+            {
+              "naicsCode": "332722",
+              "naicsDescription": "Bolt, Nut, Screw, Rivet, and Washer Manufacturing ",
+              "sbaSmallBusiness": "Y",
+              "naicsException": null
+            },
+            {
+              "naicsCode": "423840",
+              "naicsDescription": "Industrial Supplies Merchant Wholesalers",
+              "sbaSmallBusiness": "Y",
+              "naicsException": null
+            }
+          ],
+          "pscList": [
+            {
+              "pscCode": null,
+              "pscDescription": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "entityRegistration": {
+        "ueiSAM": "BROKEN000001",
+        "legalBusinessName": null,
+        "registrationStatus": "Expired",
+        "exclusionStatusFlag": "Y"
+      },
+      "coreData": {
+        "businessTypes": {
+          "businessTypeList": [],
+          "sbaBusinessTypeList": [
+            {
+              "sbaBusinessTypeCode": "A6",
+              "sbaBusinessTypeDesc": "8(a) Program Participant"
+            }
+          ]
+        }
+      },
+      "assertions": {
+        "goodsAndServices": {
+          "naicsList": [
+            {
+              "naicsCode": "541511",
+              "sbaSmallBusiness": "N"
+            }
+          ],
+          "pscList": [
+            {
+              "pscCode": "DA01"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

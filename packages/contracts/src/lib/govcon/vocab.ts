@@ -56,7 +56,9 @@ export type SourceCallOutcome = (typeof SOURCE_CALL_OUTCOMES)[number];
 /**
  * What one ledger row was. Every operation against SAM.gov spends the one
  * daily bucket; only searches answer the cache; `spending` is USAspending,
- * ledgered for the record and priced at nothing.
+ * ledgered for the record and priced at nothing. `exclusions` is reserved:
+ * a registration carries its exclusion flag, so the exclusions API is not
+ * called today.
  */
 export const SOURCE_OPERATIONS = [
   'search',

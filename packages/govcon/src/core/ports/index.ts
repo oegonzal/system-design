@@ -7,6 +7,7 @@
 export * from './awards';
 export * from './bids';
 export * from './description';
+export * from './entities';
 export * from './ledger';
 export * from './profiles';
 export * from './repositories';

@@ -13,6 +13,7 @@ import {
   BUDGET_POLICY,
   CLOCK,
   CONTRACT_AWARDS,
+  ENTITY_REGISTRY,
   NOTICE_DESCRIPTIONS,
   OPPORTUNITY_SEARCH,
   REQUEST_GATE,
@@ -44,6 +45,7 @@ const spending = createUsaSpendingSources(process.env, { warn });
     { provide: NOTICE_DESCRIPTIONS, useValue: sources.descriptions },
     { provide: CONTRACT_AWARDS, useValue: sources.awards },
     { provide: SPENDING_AWARDS, useValue: spending.awards },
+    { provide: ENTITY_REGISTRY, useValue: sources.entities },
     {
       provide: REQUEST_GATE,
       useFactory: (log: SourceCallLog, policy: BudgetPolicy, now: () => Date) =>
@@ -60,6 +62,7 @@ const spending = createUsaSpendingSources(process.env, { warn });
     NOTICE_DESCRIPTIONS,
     CONTRACT_AWARDS,
     SPENDING_AWARDS,
+    ENTITY_REGISTRY,
     REQUEST_GATE,
   ],
 })
