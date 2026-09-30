@@ -3,17 +3,28 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { makePrompt, PROMPT_MARKDOWN } from '../../testing/fixtures';
+import { makePrompt } from '../../testing/fixtures';
 import { PromptPane } from './prompt-pane';
 
 describe('PromptPane', () => {
-  it('[UX-14] shows the markdown verbatim, the source, and the criteria grouped by kind', () => {
+  it('[UX-14] renders the markdown — headings demoted under the title, the requirement table as a table — the source, and the criteria grouped by kind', () => {
     renderWithTheme(<PromptPane prompt={makePrompt()} />);
 
     expect(screen.getByTestId('prompt-source').textContent).toBe('authored');
-    expect(within(screen.getByTestId('prompt-markdown')).getByLabelText('Prompt').textContent).toBe(
-      PROMPT_MARKDOWN,
-    );
+    const rendered = within(screen.getByTestId('prompt-markdown')).getByLabelText('Prompt');
+    // The prompt's own `#` sits under the pane's h2 title; its `##` sections one step lower.
+    expect(
+      within(rendered).getByRole('heading', { level: 3, name: 'Design an order-history service' }),
+    ).toBeTruthy();
+    expect(
+      within(rendered).getByRole('heading', { level: 4, name: 'Functional requirements' }),
+    ).toBeTruthy();
+    expect(within(rendered).queryByRole('heading', { level: 1 })).toBeNull();
+    const tables = within(rendered).getAllByRole('table');
+    expect(tables).toHaveLength(2);
+    expect(within(tables[0]).getByRole('cell', { name: 'p99 ≤ 200 ms' })).toBeTruthy();
+    expect(rendered.textContent).not.toContain('| ---');
+    expect(rendered.textContent).not.toContain('## ');
 
     const groups = screen.getAllByTestId(/^criteria-group-/);
     expect(groups.map((group) => group.getAttribute('data-testid'))).toEqual([

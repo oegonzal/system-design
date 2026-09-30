@@ -12,8 +12,11 @@ export default meta;
 
 type Story = StoryObj<typeof PromptPane>;
 
-/** The markdown as written, the criteria grouped by kind. */
+/** The markdown rendered, the criteria grouped by kind. */
 export const Derived: Story = { args: { prompt: makePrompt() } };
+
+/** A generated prompt: its rubric came with its draft, so nothing is derived. */
+export const Generated: Story = { args: { prompt: makePrompt({ source: 'generated' }) } };
 
 /** A generated prompt whose rubric is still being derived. */
 export const Normalizing: Story = {

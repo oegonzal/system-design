@@ -1,15 +1,7 @@
 'use client';
 
 import type { PromptDto, SuccessCriterion } from '@sysdesign/contracts';
-import {
-  Badge,
-  Button,
-  Heading,
-  PreformattedText,
-  Spinner,
-  Stack,
-  Text,
-} from '@sysdesign/design-system';
+import { Badge, Button, Heading, Markdown, Spinner, Stack, Text } from '@sysdesign/design-system';
 
 import { groupCriteriaByKind, humanizeKind } from './criteria';
 
@@ -26,10 +18,10 @@ export interface PromptPaneProps {
 }
 
 /**
- * The prompt, readable at a glance while designing: its markdown exactly as
- * written, and the criteria the quality loop derived from it, grouped by
- * kind — the same ids the brief binds and the feedback cites. Pure props —
- * Storybook-safe.
+ * The prompt, readable at a glance while designing: its markdown rendered —
+ * headings stepped under the title, requirement tables as tables — and the
+ * criteria the quality loop derived from it, grouped by kind — the same ids
+ * the brief binds and the feedback cites. Pure props — Storybook-safe.
  */
 export function PromptPane({
   prompt,
@@ -52,7 +44,7 @@ export function PromptPane({
         </Stack>
       </Stack>
 
-      <PreformattedText label="Prompt" text={prompt.markdown} data-testid="prompt-markdown" />
+      <Markdown label="Prompt" text={prompt.markdown} data-testid="prompt-markdown" />
 
       <Stack gap={3}>
         <Heading level={3}>Criteria</Heading>

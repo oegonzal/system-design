@@ -107,9 +107,11 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
         >
           {busy === 'start' ? 'Starting…' : 'Start practice'}
         </Button>
-        {/* Re-deriving is refused once sessions cite these ids; the pane's own
-            button covers the case where there are no criteria at all yet. */}
-        {criteria.criteria.length > 0 ? (
+        {/* A generated prompt's rubric is its draft's — the grader would refuse
+            to re-derive it. Re-deriving is refused once sessions cite these ids
+            too; the pane's own button covers the case where there are no
+            criteria at all yet. */}
+        {prompt.source !== 'generated' && criteria.criteria.length > 0 ? (
           <Button
             variant="subtle"
             onClick={criteria.derive}

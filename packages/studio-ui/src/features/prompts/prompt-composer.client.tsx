@@ -11,7 +11,7 @@ import {
 import {
   Button,
   Heading,
-  PreformattedText,
+  Markdown,
   SelectField,
   Spinner,
   Stack,
@@ -237,7 +237,7 @@ export function PromptComposer() {
               )}
               {selectedId !== null ? (
                 previewed ? (
-                  <PreformattedText
+                  <Markdown
                     label={previewed.title}
                     text={previewed.markdown}
                     data-testid="library-preview"
