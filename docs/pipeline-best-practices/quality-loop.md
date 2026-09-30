@@ -1,6 +1,6 @@
 # The quality loop (`packages/quality-loop`)
 
-The generic quality-control loop from [overview.md](./overview.md), as a NestJS starter that runs end to end. A pipeline is data; the model returns categories and ordinals; the deterministic policy owns every number and the final decision; every run writes a dump. The studio's own grading in `eval-worker` is untouched — this package is the doctrine applied to any task, starting with a system-design prompt held in a markdown file.
+The generic quality-control loop from [overview.md](./overview.md), as a NestJS starter that runs end to end. A pipeline is data; the model returns categories and ordinals; the deterministic policy owns every number and the final decision; every run writes a dump. The studio grades and coaches through this package too (`system-design-canvas`, `design-prompt`) — it is the doctrine applied to any task, starting with a system-design prompt held in a markdown file.
 
 ## The loop, stage by stage
 
@@ -11,10 +11,10 @@ The generic quality-control loop from [overview.md](./overview.md), as a NestJS 
 | Deterministic validators      | `core/stages/schema-validator.ts` always first, plus any `Validator<T>` a pipeline brings. A `block` failure skips every lens.                                                        |
 | Critics                       | `core/stages/llm-critic.ts`: defects with type, severity, confidence, fixability, location refs and criterion refs — all enum-locked per request.                                     |
 | Evaluators                    | `core/stages/llm-evaluator.ts`: `pass                                                                                                                                                 | partial | fail  | not_applicable` per criterion of its kinds. Each kind has exactly one judge. |
-| Evidence normalizer           | `core/evidence/normalize.ts`: admission, structural keys, agreement across samples, lower-middle medians, cross-lens merge, reconciliation.                                                    |
-| Deterministic decision policy | `core/controllers/`: scores, then gates in a fixed order, every step traced.                                                                                                             |
+| Evidence normalizer           | `core/evidence/normalize.ts`: admission, structural keys, agreement across samples, lower-middle medians, cross-lens merge, reconciliation.                                           |
+| Deterministic decision policy | `core/controllers/`: scores, then gates in a fixed order, every step traced.                                                                                                          |
 | Controller decision           | `accept                                                                                                                                                                               | revise  | retry | escalate                                                                     | reject`, plus the runner's stop reason. |
-| Trace + lessons               | `core/loop/run-pipeline.ts` returns a `RunTrace`; `dump/build-run-dump.ts` lays it out; `@sysdesign/run-dump` writes it under `static/runs`.                                               |
+| Trace + lessons               | `core/loop/run-pipeline.ts` returns a `RunTrace`; `dump/build-run-dump.ts` lays it out; `@sysdesign/run-dump` writes it under `static/runs`.                                          |
 
 Everything under `src/core/` is pure: no Nest, no filesystem, no clock (`now` is injected). The Nest layer (`src/modules/`) binds the model client, the pipeline registry and the trace store.
 
@@ -59,17 +59,20 @@ Without a live model the loop is honest rather than empty: no criteria are deriv
 
 Every wire type lives in `@sysdesign/contracts` under `lib/quality-loop/`, so the service, the CLI and the web client share one definition; the app keeps only the zod-bound `OutputShape`/`TaskSpec` and its internal `RunRecord` (the wire run plus git context and the full exchanges).
 
-| Route              | Returns                                                                                                         |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `GET /health`      | `{ status: 'ok' }`                                                                                              |
-| `GET /pipelines`   | `ListPipelinesResponse` — each `PipelineSummary` (task vocabulary, lens specs, the policy)                      |
-| `GET /prompts`     | `ListPromptLibraryResponse` — `{ id, title }` per markdown file, titled by its first H1, sorted by id           |
-| `GET /prompts/:id` | `GetPromptLibraryDocumentResponse` — the markdown verbatim; 404 when the file is not there                      |
-| `POST /runs`       | 202 `StartQualityRunResponse` — body `StartQualityRunRequest` (`pipeline`, `goal`, `output?`, `maxIterations?`) |
-| `GET /runs/:id`    | `GetQualityRunResponse` — `QualityRunDto`: status, availability, the trace once complete, exchanges summarised  |
-| `GET /runs`        | `ListQualityRunsResponse` — newest first; `?pipeline`, `?status`, `?limit` (default 50, max 100), `?offset`     |
+| Route              | Returns                                                                                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`      | `{ status: 'ok', llm }` — `LlmAvailabilityDto`: whether a model backs the loop, which, and why not                                                  |
+| `GET /pipelines`   | `ListPipelinesResponse` — each `PipelineSummary` (task vocabulary, lens specs, the policy)                                                          |
+| `GET /prompts`     | `ListPromptLibraryResponse` — `{ id, title }` per markdown file, titled by its first H1, sorted by id                                               |
+| `GET /prompts/:id` | `GetPromptLibraryDocumentResponse` — the markdown verbatim; 404 when the file is not there                                                          |
+| `POST /criteria`   | `DeriveCriteriaResponse` — body `DeriveCriteriaRequest` (`pipeline`, `goal`): the derive stage alone, no run; 503 with `llm` when no model backs it |
+| `POST /runs`       | 202 `StartQualityRunResponse` — body `StartQualityRunRequest` (`pipeline`, `goal`, `output?`, `criteria?`, `maxIterations?`)                        |
+| `GET /runs/:id`    | `GetQualityRunResponse` — `QualityRunDto`: status, availability, the trace once complete, exchanges summarised                                      |
+| `GET /runs`        | `ListQualityRunsResponse` — newest first; `?pipeline`, `?status`, `?limit` (default 50, max 100), `?offset`                                         |
 
-`GET /runs/:id` summarises each exchange to `{ scope, ordinal, outcome, durationMs, startedAt }`; the prompts and responses are only in the dump. The prompt library is a port (`PromptLibrary`) with a filesystem adapter — a database-backed one drops in behind the same routes.
+`GET /runs/:id` summarises each exchange to `{ scope, ordinal, outcome, durationMs, startedAt }`; the prompts and responses are only in the dump.
+
+**A fixed rubric.** A run that carries `criteria` uses them verbatim and never asks the deriver: the ids are what the caller cites across runs (the studio's prompt keeps `c1…cN` for its life, and every canvas submitted against it is graded on the same list). A rubric that does not fit the pipeline — an empty list, a duplicate id, a kind the task does not declare, more than `maxCriteria` — is refused with 400 before any row exists. `POST /criteria` is the derive stage on its own: with a model it answers the rubric, without one it answers 503 and the availability, and never invents a list. `criteriaProvided` on the run record says which happened. The prompt library is a port (`PromptLibrary`) with a filesystem adapter — a database-backed one drops in behind the same routes.
 
 ## Memory runs
 
@@ -95,13 +98,16 @@ A folder beside `src/pipelines/system-design/` and one line in `src/pipelines/in
 
 `validatePipeline` runs at boot and at every run: weights sum to 1, every kind and type is priced onto a known dimension, thresholds and decay are in range, every lens can reach `minHits`, every kind has exactly one evaluator, no reserved or duplicate ids, and the output schema converts to JSON Schema.
 
-Three instances exist, each a folder under `src/pipelines/`:
+Six instances exist, each a folder under `src/pipelines/`:
 
-| Pipeline            | Artifact           | Input                                                                            | Criterion kinds                               | Dimensions                                              |
-| ------------------- | ------------------ | -------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
-| `system-design`     | `DesignAnswer`     | a prompt md                                                                      | functional, non_functional, scale, constraint | completeness, quality_attributes, compliance, soundness |
-| `memory-recall`     | `MemoryPack`       | a prompt md plus candidate chunks recalled for it (`input.ts`)                   | need, admissibility                           | coverage, precision, fidelity                           |
-| `experience-digest` | `ExperienceDigest` | a finished run of any pipeline, composed from its `QualityRunDto` (`compose.ts`) | signal, transition                            | attribution, fidelity, reuse                            |
+| Pipeline               | Artifact                        | Input                                                                                                                                                                     | Criterion kinds                               | Dimensions                                              |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| `system-design`        | `DesignAnswer`                  | a prompt md                                                                                                                                                               | functional, non_functional, scale, constraint | completeness, quality_attributes, compliance, soundness |
+| `memory-recall`        | `MemoryPack`                    | a prompt md plus candidate chunks recalled for it (`input.ts`)                                                                                                            | need, admissibility                           | coverage, precision, fidelity                           |
+| `experience-digest`    | `ExperienceDigest`              | a finished run of any pipeline, composed from its `QualityRunDto` (`compose.ts`)                                                                                          | signal, transition                            | attribution, fidelity, reuse                            |
+| `agentic-design`       | `AgenticDesign`                 | a brief md for a workflow of agents, tools and rules                                                                                                                      | capability, contract, property, constraint    | completeness, interfaces, compliance, soundness         |
+| `system-design-canvas` | `DesignSubmission` (contracts)  | the studio's prompt md as goal, the canvas — graph, brief, narrative — as a provided `output`, the prompt's criteria as the fixed rubric; more than one iteration coaches | functional, non_functional, scale, constraint | coverage, quality_attributes, compliance                |
+| `design-prompt`        | `DesignPromptDraft` (contracts) | an engineer's experience rendered to md by the studio; the accepted draft renders to the prompt convention with `renderDesignPromptMarkdown`                              | fidelity, gradeability, scope                 | fidelity, gradeability, scope                           |
 
 A pipeline whose input is more than a prompt owns an **input codec** (`input.ts`): a typed input rendered to the goal markdown — the flexible md verbatim under its own heading, pipeline-owned sections around it, engine-assigned aliases (`m3`, `f4`, `r2`) — closing with `## Index`, a fenced JSON block the codec reads back with zod. The input schema refuses anything that would render beyond the goal budget. Every alias is a location the artifact must give a verdict to (`kept ∪ dropped`, `evidence ∪ unused`), so a finding about an item keeps its key across revisions and maps straight back to the source. **Exact checks are validators** (`validators.ts`): an alias the index does not hold, an alias placed twice, an item left without a verdict, a pack or digest over its limit — each blocks, none reads prose; both validators start from the output schema because the engine runs every validator on any artifact it has. What the goal does not state cannot become a criterion, so standing rules such as grounding and transfer are critic-checked finding types, and `experience-digest` records the engine's own facts — remediations selected, transitions from the lessons, score deltas — rather than letting a model author an effect.
 

@@ -9,8 +9,8 @@ import { configureApp } from './modules/app/configure-app';
  * The quality loop, three ways: `main.js run …` runs one pipeline from the
  * command line and exits; `main.js replay …` decides every recorded iteration
  * of a pipeline again under each controller and exits; anything else serves
- * the HTTP surface (POST /runs, GET /runs/:id, GET /pipelines, GET /prompts,
- * GET /prompts/:id, GET /health).
+ * the HTTP surface (POST /runs, GET /runs/:id, POST /criteria, GET /pipelines,
+ * GET /prompts, GET /prompts/:id, GET /health).
  */
 async function bootstrap() {
   process.on('uncaughtException', (error) => {

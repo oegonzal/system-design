@@ -43,6 +43,33 @@ export function fakeLlm(...canned: readonly unknown[]): LlmClient & LlmRecordabl
   return build(null);
 }
 
+/**
+ * `fakeLlm` whose canned answers are consumed in order: when more than one
+ * canned object satisfies a request's schema, the first is used once and
+ * dropped, so a stage asked the same question twice — the producer on
+ * revise, an evaluator on the next iteration — gets the next answer. The
+ * last answer for a schema stands for every later call. Twins share the
+ * queue, so attribution works as it does for `fakeLlm`.
+ */
+export function sequencedLlm(...canned: readonly unknown[]): LlmClient & LlmRecordable {
+  const remaining = [...canned];
+  const build = (sink: LlmCallSink | null): LlmClient & LlmRecordable => ({
+    enabled: true,
+    model: 'test-model',
+    completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+      const matches = remaining.flatMap((candidate, index) =>
+        request.schema.safeParse(candidate).success ? [index] : [],
+      );
+      const answer = matches.length > 0 ? [remaining[matches[0]]] : [];
+      if (matches.length > 1) remaining.splice(matches[0], 1);
+      const twin = fakeLlm(...answer);
+      return (sink ? twin.withRecorder(sink) : twin).completeStructured(request);
+    },
+    withRecorder: (next) => build(next),
+  });
+  return build(null);
+}
+
 export const disabledLlm = (): LlmClient => ({
   enabled: false,
   model: null,
