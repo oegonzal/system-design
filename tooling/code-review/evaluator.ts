@@ -3,8 +3,8 @@ import type { Finding, Severity } from './policy';
 /**
  * The deterministic end of the pipeline.
  *
- * Two streams of findings meet here: the always-on rules engine (runs with or
- * without an API key) and the sanitised critic reports. The LLM evaluator pass,
+ * Two streams of findings meet here: the always-on rules engine (it runs even
+ * when the critics are skipped) and the sanitised critic reports. The LLM evaluator pass,
  * when it runs, only deduplicates and reconciles *critic* findings against each
  * other — it never sees the rule findings and cannot drop them, because a
  * deterministic check being argued away by a model would make the rules engine

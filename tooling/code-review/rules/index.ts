@@ -8,8 +8,8 @@ import { themeGuard } from './theme-guard';
 /**
  * The deterministic rules engine.
  *
- * These run on every review, with or without an API key, and their findings
- * enter the pipeline ahead of the critics'. Each rule is a pure function over
+ * These run on every review, whether or not the critics can reach Claude Code,
+ * and their findings enter the pipeline ahead of the critics'. Each rule is a pure function over
  * the changed files' *content* — not the diff — because the properties they
  * check (import direction, file length, barrel width, forbidden vocabulary)
  * are properties of the file as it will be committed, and a rule that only

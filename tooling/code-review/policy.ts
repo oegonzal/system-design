@@ -23,8 +23,9 @@ export interface SanitiseResult {
   dropped: string[];
 }
 
-/** How an unverifiable quote is handled. */
-export type EvidenceGuard = 'enforce' | 'warn' | 'off';
+import type { EvidenceGuard } from './config';
+
+export type { EvidenceGuard };
 
 export interface SanitiseContext {
   /** Files whose diff actually reached the critic. */
@@ -34,7 +35,8 @@ export interface SanitiseContext {
   prompt: string;
   /** False when no stated purpose was available, which disables scope categories. */
   intentAvailable: boolean;
-  evidenceGuard?: EvidenceGuard;
+  /** How an unverifiable quote is handled; declared, defaulted and validated in `config.ts`. */
+  evidenceGuard: EvidenceGuard;
 }
 
 /**
@@ -54,7 +56,7 @@ export function sanitise(report: CriticReport, context: SanitiseContext): Saniti
   const scopeOnly = new Set(CRITICS[report.critic].scopeCategories);
   const changed = new Set(context.changedFiles);
   const reviewed = new Set(context.reviewedFiles);
-  const guard: EvidenceGuard = context.evidenceGuard ?? 'warn';
+  const guard = context.evidenceGuard;
   const dropped: string[] = [];
 
   const findings = report.findings.filter((finding) => {

@@ -22,6 +22,28 @@ import { DEFAULT_RUNS_DIR, type CiProvenance } from './persist';
  * that `claude setup-token` prints, stored as a repository secret. There is
  * no key and no switch.
  */
+/**
+ * Every flag the review takes. A switch stands alone; a valued flag is
+ * `--name=value`. Anything else — an unknown flag, `--profile full` with a
+ * space, an empty value — is refused by name rather than silently ignored.
+ */
+export const REVIEW_FLAGS = {
+  /** Review the staged index (the pre-commit hook). Implies the quick profile. */
+  staged: { name: '--staged', valued: false },
+  /** `=<ref>`: review the branch against a base (CI). Implies the full profile. */
+  base: { name: '--base', valued: true },
+  /** `=<name>`: override the profile the scope implies. */
+  profile: { name: '--profile', valued: true },
+  /** `=<path>`: also write the report as markdown. */
+  markdown: { name: '--markdown', valued: true },
+  /** `=<path>`: where run records go; outranks the variable. */
+  runsDir: { name: '--runs-dir', valued: true },
+  /** Leave no run record behind. */
+  noRecord: { name: '--no-record', valued: false },
+} as const;
+
+type FlagKey = keyof typeof REVIEW_FLAGS;
+
 export const REVIEW_ENV = {
   /** Where run records are written. */
   runsDir: 'CODE_REVIEW_RUNS_DIR',
@@ -86,8 +108,36 @@ export class ReviewConfigError extends Error {
   override readonly name = 'ReviewConfigError';
 }
 
-const flagValue = (argv: readonly string[], name: string): string | undefined =>
-  argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
+/** The flags given, checked against the declaration: switches as `true`, valued flags as their value. */
+function parseFlags(argv: readonly string[]): Partial<Record<FlagKey, string | true>> {
+  const byName = new Map(
+    (Object.entries(REVIEW_FLAGS) as [FlagKey, (typeof REVIEW_FLAGS)[FlagKey]][]).map(
+      ([key, flag]) => [flag.name, { key, valued: flag.valued }],
+    ),
+  );
+  const given: Partial<Record<FlagKey, string | true>> = {};
+  for (const arg of argv) {
+    const [name, ...rest] = arg.split('=');
+    const flag = byName.get(name ?? '');
+    const value = rest.join('=');
+    if (!flag || flag.valued !== rest.length > 0 || (flag.valued && value === '')) {
+      const expected = Object.values(REVIEW_FLAGS)
+        .map((f) => (f.valued ? `${f.name}=<value>` : f.name))
+        .join(', ');
+      throw new ReviewConfigError(`unknown or malformed flag "${arg}" — expected ${expected}`);
+    }
+    given[flag.key] = flag.valued ? value : true;
+  }
+  return given;
+}
+
+const valueOf = (
+  given: Partial<Record<FlagKey, string | true>>,
+  key: FlagKey,
+): string | undefined => {
+  const value = given[key];
+  return typeof value === 'string' ? value : undefined;
+};
 
 const set = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
   const value = env[name];
@@ -131,13 +181,23 @@ function ciProvenance(env: NodeJS.ProcessEnv): CiProvenance {
   return { isCi: Boolean(set(env, PLATFORM_ENV.ci)) };
 }
 
-/** The one read of argv and the environment. Anything it cannot use is refused here, by name. */
-export function loadReviewConfig(argv: readonly string[], env: NodeJS.ProcessEnv): ReviewConfig {
-  const staged = argv.includes('--staged');
-  const base = flagValue(argv, 'base');
-  if (!staged && !base) throw new ReviewConfigError('specify --staged or --base=<ref>');
+/**
+ * The one read of argv and the environment — the only place under
+ * `tooling/code-review` that touches `process`. Anything it cannot use is
+ * refused here, by name.
+ */
+export function loadReviewConfig(
+  argv: readonly string[] = process.argv.slice(2),
+  env: NodeJS.ProcessEnv = process.env,
+): ReviewConfig {
+  const given = parseFlags(argv);
+  const staged = given.staged === true;
+  const base = valueOf(given, 'base');
+  if (staged === (base !== undefined)) {
+    throw new ReviewConfigError('specify exactly one of --staged or --base=<ref>');
+  }
 
-  const requested = flagValue(argv, 'profile') ?? (staged ? 'quick' : 'full');
+  const requested = valueOf(given, 'profile') ?? (staged ? 'quick' : 'full');
   if (!Object.hasOwn(PROFILES, requested)) {
     throw new ReviewConfigError(
       `unknown profile "${requested}" — expected ${Object.keys(PROFILES).join(' or ')}`,
@@ -153,9 +213,9 @@ export function loadReviewConfig(argv: readonly string[], env: NodeJS.ProcessEnv
       ...chosen,
       diffBudgetChars: positiveInteger(env, REVIEW_ENV.maxDiffChars) ?? chosen.diffBudgetChars,
     },
-    markdownOut: flagValue(argv, 'markdown'),
-    runsDir: flagValue(argv, 'runs-dir') ?? set(env, REVIEW_ENV.runsDir) ?? DEFAULT_RUNS_DIR,
-    record: !argv.includes('--no-record'),
+    markdownOut: valueOf(given, 'markdown'),
+    runsDir: valueOf(given, 'runsDir') ?? set(env, REVIEW_ENV.runsDir) ?? DEFAULT_RUNS_DIR,
+    record: given.noRecord !== true,
     intent: env[REVIEW_ENV.intent],
     evidenceGuard: oneOf(env, REVIEW_ENV.evidenceGuard, EVIDENCE_GUARDS, DEFAULT_EVIDENCE_GUARD),
     stepSummaryPath: set(env, PLATFORM_ENV.stepSummary),

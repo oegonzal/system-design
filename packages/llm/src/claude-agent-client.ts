@@ -286,10 +286,12 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       let failure: LlmCall['error'] = null;
       let assistantError: string | null = null;
       let usage: LlmCall['usage'] = null;
+      let sawResult = false;
       try {
         for await (const message of turn) {
           if (message.type === 'assistant' && message.error) assistantError = message.error;
           if (message.type === 'result') {
+            sawResult = true;
             if (message.subtype === 'success' && !message.is_error) resultText = message.result;
             else
               failure = {
@@ -306,6 +308,10 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
             }
           }
         }
+      } catch (error) {
+        // The CLI exits non-zero after an error result and the SDK rethrows
+        // that exit; the result already carries the reason worth recording.
+        if (!sawResult) throw error;
       } finally {
         clearTimeout(timer);
       }

@@ -94,13 +94,14 @@ describe('extractStructured', () => {
   });
 });
 
-/** A stand-in for the SDK's `query` that replays messages and records the options it got. */
-function scripted(messages: readonly unknown[]) {
+/** A stand-in for the SDK's `query` that replays messages (then optionally throws, as the real SDK does on a non-zero exit) and records the options it got. */
+function scripted(messages: readonly unknown[], thenThrow?: Error) {
   const seen: { env?: NodeJS.ProcessEnv } = {};
   const run = ((params: { options?: { env?: NodeJS.ProcessEnv } }) => {
     seen.env = params.options?.env;
     return (async function* () {
       yield* messages;
+      if (thenThrow) throw thenThrow;
     })();
   }) as unknown as ClaudeQuery;
   return { run, seen };
@@ -152,6 +153,23 @@ describe('the subscription client at its call site', () => {
     ).resolves.toBeNull();
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
+      outcome: 'error',
+      error: { name: 'authentication_failed', message: 'Invalid bearer token' },
+    });
+
+    // The real SDK throws on the CLI's exit code after an error result; the result still wins.
+    const exiting = scripted(
+      [
+        { type: 'assistant', error: 'authentication_failed', message: { content: [] } },
+        { type: 'result', subtype: 'success', is_error: true, result: 'Invalid bearer token' },
+      ],
+      new Error('Claude Code returned an error result: Invalid bearer token'),
+    );
+    const afterExit: LlmCall[] = [];
+    await new ClaudeAgentLlmClient({ query: exiting.run })
+      .withRecorder((call) => afterExit.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(afterExit[0]).toMatchObject({
       outcome: 'error',
       error: { name: 'authentication_failed', message: 'Invalid bearer token' },
     });

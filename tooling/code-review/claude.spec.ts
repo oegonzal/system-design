@@ -88,8 +88,12 @@ const call: ClaudeCall = {
   timeoutMs: 1_000,
 };
 
-/** A stand-in for the SDK's `query`: records what it was given, then replays messages or hangs until aborted. */
-function scripted(messages: readonly unknown[] | 'hang') {
+/**
+ * A stand-in for the SDK's `query`: records what it was given, then replays
+ * messages, optionally throwing afterwards as the real SDK does when the CLI
+ * exits non-zero after an error result — or hangs until aborted.
+ */
+function scripted(messages: readonly unknown[] | 'hang', thenThrow?: Error) {
   const seen: { prompt?: unknown; options?: Record<string, unknown> } = {};
   const query = ((params: { prompt: unknown; options: Record<string, unknown> }) => {
     seen.prompt = params.prompt;
@@ -102,6 +106,7 @@ function scripted(messages: readonly unknown[] | 'hang') {
         );
       } else {
         yield* messages;
+        if (thenThrow) throw thenThrow;
       }
     })();
   }) as unknown as ClaudeQuery;
@@ -138,6 +143,57 @@ describe('runClaude', () => {
       { type: 'result', ...success({ is_error: true, result: 'slow down' }) },
     ]);
     await expect(runClaude(call, { query, env: {} })).rejects.toThrow(/rate_limit: slow down/);
+  });
+
+  it("classifies the recorded result when the SDK then throws on the CLI's exit code", async () => {
+    const exit = new Error('Claude Code returned an error result: Reached maximum budget ($0.25)');
+    const budget = scripted(
+      [
+        {
+          type: 'result',
+          subtype: 'error_max_budget_usd',
+          is_error: true,
+          total_cost_usd: 0.27,
+          errors: ['Reached maximum budget ($0.25)'],
+        },
+      ],
+      exit,
+    );
+    const stopped = runClaude(call, { query: budget.query, env: {} });
+    await expect(stopped).rejects.toBeInstanceOf(ReviewUnavailableError);
+    await expect(
+      runClaude(call, {
+        query: scripted(
+          [
+            {
+              type: 'result',
+              subtype: 'error_max_budget_usd',
+              is_error: true,
+              total_cost_usd: 0.27,
+              errors: [],
+            },
+          ],
+          exit,
+        ).query,
+        env: {},
+      }),
+    ).rejects.toThrow(/\$0\.25 budget was reached/);
+
+    const apiError = scripted(
+      [
+        { type: 'assistant', error: 'rate_limit', message: { content: [] } },
+        { type: 'result', ...success({ is_error: true, result: 'slow down' }) },
+      ],
+      new Error('Claude Code returned an error result: slow down'),
+    );
+    await expect(runClaude(call, { query: apiError.query, env: {} })).rejects.toThrow(
+      /rate_limit: slow down/,
+    );
+
+    const noResult = scripted([], new Error('spawn failed'));
+    await expect(runClaude(call, { query: noResult.query, env: {} })).rejects.toThrow(
+      'spawn failed',
+    );
   });
 
   it('stands aside when the turn outlives its timeout', async () => {

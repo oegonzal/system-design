@@ -167,7 +167,7 @@ jobs:
             ${{ github.event.pull_request.title }}
 
             ${{ github.event.pull_request.body }}
-        run: pnpm review:code --base=origin/${{ github.base_ref }} --profile=full --markdown=review.md
+        run: pnpm review:code --base=origin/${{ github.base_ref }} --markdown=review.md
 
       - name: Upload review record
         if: always()

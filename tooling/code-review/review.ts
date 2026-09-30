@@ -218,7 +218,7 @@ async function main(): Promise<number> {
   const startedAt = Date.now();
   const runId = makeRunId(startedAt);
   // The one read of argv and the environment; everything below receives it.
-  const config = loadReviewConfig(process.argv.slice(2), process.env);
+  const config = loadReviewConfig();
   const { scope, profile, settings, markdownOut, runsDir, record } = config;
   const runtime = defaultRuntime(config.claudeEnv);
 

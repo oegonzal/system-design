@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { DECLARED_ENV, loadReviewConfig, REVIEW_ENV, ReviewConfigError } from './config';
@@ -49,6 +50,14 @@ describe('the review configuration', () => {
 
   it('refuses what it cannot use, naming the flag or the variable — never a silent default', () => {
     expect(() => loadReviewConfig([], {})).toThrow(/--staged or --base/);
+    expect(() => loadReviewConfig(['--staged', '--base=main'], {})).toThrow(/exactly one/);
+    // A space instead of `=`, an unknown flag, an empty value: refused, not ignored.
+    expect(() => loadReviewConfig(['--staged', '--profile', 'full'], {})).toThrow(
+      /unknown or malformed flag "--profile"/,
+    );
+    expect(() => loadReviewConfig(['--staged', '--verbose'], {})).toThrow(/"--verbose"/);
+    expect(() => loadReviewConfig(['--base='], {})).toThrow(/"--base="/);
+    expect(() => loadReviewConfig(['--staged=yes'], {})).toThrow(/"--staged=yes"/);
     expect(() => loadReviewConfig(['--staged', '--profile=huge'], {})).toThrow(
       /unknown profile "huge"/,
     );
@@ -110,12 +119,73 @@ describe('one source of truth for every knob', () => {
       return /\.ts$/.test(entry.name) && !/\.spec\.ts$/.test(entry.name) ? [path] : [];
     });
 
-  it('no review module but config.ts reads the environment', () => {
-    const readers = sources(HERE)
-      .filter((file) => !file.endsWith(`${join('code-review', 'config.ts')}`))
-      .filter((file) => /process\.env(\[|\.)|\benv\[['"]/.test(readFileSync(file, 'utf8')))
-      .map((file) => relative(REPO_ROOT, file));
-    expect(readers).toEqual([]);
+  /**
+   * Structural, not textual: every module is parsed, and any reach for the
+   * process environment or argv outside config.ts fails — a property or
+   * element access, a destructuring of \`process\`, or an import of \`env\`,
+   * \`argv\` or the module itself from \`process\` / \`node:process\`.
+   */
+  it('no review module but config.ts reaches for the environment or argv', () => {
+    const PROCESS_MODULES = new Set(['process', 'node:process']);
+    const READS = new Set(['env', 'argv']);
+    const violations: string[] = [];
+
+    for (const file of sources(HERE).filter((f) => !f.endsWith(join('code-review', 'config.ts')))) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+      );
+      const processNames = new Set(['process']);
+      const flag = (node: ts.Node, what: string) =>
+        violations.push(
+          `${relative(REPO_ROOT, file)}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1} ${what}`,
+        );
+      const isProcess = (node: ts.Expression): boolean =>
+        (ts.isIdentifier(node) && processNames.has(node.text)) ||
+        (ts.isPropertyAccessExpression(node) && node.name.text === 'process');
+
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isImportDeclaration(node) &&
+          ts.isStringLiteral(node.moduleSpecifier) &&
+          PROCESS_MODULES.has(node.moduleSpecifier.text)
+        ) {
+          const clause = node.importClause;
+          if (clause?.name) processNames.add(clause.name.text);
+          const bindings = clause?.namedBindings;
+          if (bindings && ts.isNamespaceImport(bindings)) processNames.add(bindings.name.text);
+          if (bindings && ts.isNamedImports(bindings)) {
+            for (const element of bindings.elements) {
+              if (READS.has((element.propertyName ?? element.name).text))
+                flag(element, `imports ${element.name.text} from process`);
+            }
+          }
+        }
+        if (
+          ts.isPropertyAccessExpression(node) &&
+          READS.has(node.name.text) &&
+          isProcess(node.expression)
+        ) {
+          flag(node, node.getText(source));
+        }
+        if (ts.isElementAccessExpression(node) && isProcess(node.expression)) {
+          flag(node, node.getText(source));
+        }
+        if (
+          ts.isVariableDeclaration(node) &&
+          node.initializer &&
+          ts.isObjectBindingPattern(node.name) &&
+          isProcess(node.initializer)
+        ) {
+          flag(node, `destructures ${node.name.getText(source)} from process`);
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(violations).toEqual([]);
   });
 
   it('the pre-commit hook names no variable the config does not declare', () => {

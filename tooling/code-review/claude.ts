@@ -94,40 +94,30 @@ export function classifyResult<T>(
   const costUsd = result.total_cost_usd ?? 0;
 
   if (result.subtype === 'error_max_budget_usd') {
-    return reject(
-      new ReviewUnavailableError(
-        `the $${budgetUsd.toFixed(2)} budget was reached ($${costUsd.toFixed(4)} spent). ` +
-          'Reduce the change set, or raise the budget for this profile.',
-      ),
+    throw new ReviewUnavailableError(
+      `the $${budgetUsd.toFixed(2)} budget was reached ($${costUsd.toFixed(4)} spent). ` +
+        'Reduce the change set, or raise the budget for this profile.',
     );
   }
   if (result.is_error || result.subtype !== 'success') {
     const detail =
       (result.subtype === 'success' ? result.result : result.errors?.join('; '))?.trim() ||
       result.subtype;
-    return reject(
-      new Error(
-        `claude reported an error: ${assistantError ? `${assistantError}: ` : ''}${detail}`,
-      ),
+    throw new Error(
+      `claude reported an error: ${assistantError ? `${assistantError}: ` : ''}${detail}`,
     );
   }
 
   const data = result.structured_output ?? tryParse(result.result);
   if (data === undefined) {
-    return reject(
-      new Error(
-        `claude returned no structured output despite a schema being supplied:\n${String(
-          result.result ?? '',
-        ).slice(0, 500)}`,
-      ),
+    throw new Error(
+      `claude returned no structured output despite a schema being supplied:\n${String(
+        result.result ?? '',
+      ).slice(0, 500)}`,
     );
   }
   return { data: data as T, costUsd };
 }
-
-const reject = (error: Error): never => {
-  throw error;
-};
 
 /**
  * One bounded reasoning step.
@@ -172,14 +162,14 @@ export async function runClaude<T>(
       if (message.type === 'result') result = message as TurnResult;
     }
   } catch (error) {
-    if (timedOut) throw new ReviewUnavailableError(`claude timed out after ${call.timeoutMs}ms`);
-    throw error;
+    // The CLI exits non-zero after an error result (a budget stop, an API
+    // error) and the SDK rethrows that exit. The result already said why, and
+    // classifying it is what tells "not reviewed" from "review failed".
+    if (!timedOut && result === null) throw error;
   } finally {
     clearTimeout(timer);
   }
-  if (timedOut && result === null) {
-    throw new ReviewUnavailableError(`claude timed out after ${call.timeoutMs}ms`);
-  }
+  if (timedOut) throw new ReviewUnavailableError(`claude timed out after ${call.timeoutMs}ms`);
   return classifyResult<T>(result, assistantError, call.budgetUsd);
 }
 

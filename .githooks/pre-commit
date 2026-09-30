@@ -136,7 +136,7 @@ if [ ! -f tooling/code-review/review.ts ]; then
 fi
 
 echo "  → code review (quick profile)"
-if ! pnpm review:code --staged --profile=quick; then
+if ! pnpm review:code --staged; then
   echo "  Commit refused by code review."
   echo "  Re-run with SKIP_REVIEW=1 git commit … to bypass the review only,"
   echo "  or git commit --no-verify to bypass every check."
