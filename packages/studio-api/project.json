@@ -6,20 +6,13 @@
   "tags": ["type:app", "scope:node"],
   "targets": {
     "serve": {
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "studio-api:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "studio-api:build:development"
-        },
-        "production": {
-          "buildTarget": "studio-api:build:production"
-        }
+        "parallel": true,
+        "commands": [
+          "vite build --watch --config packages/studio-api/vite.config.ts",
+          "node --watch --watch-preserve-output packages/studio-api/dist/main.js"
+        ]
       }
     },
     "typecheck": {

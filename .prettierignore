@@ -3,5 +3,6 @@ coverage
 storybook-static
 .nx
 .next
+.next-dev
 pnpm-lock.yaml
 packages/db/src/migrations

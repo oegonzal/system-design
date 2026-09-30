@@ -16,7 +16,7 @@
 
 load('./tilt/toolchain.Tiltfile', 'tool_env')
 
-watch_settings(ignore=['.nx/**', '**/.next/**', 'packages/**/vite.config.ts.timestamp-*.mjs'])
+watch_settings(ignore=['.nx/**', '**/.next/**', '**/.next-dev/**', 'packages/**/vite.config.ts.timestamp-*.mjs'])
 
 include('./tilt/postgres/Tiltfile')
 include('./packages/studio-api/Tiltfile')

@@ -16,6 +16,7 @@ export default [
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      '**/.next-dev/**',
       '**/out-tsc/**',
       '**/coverage/**',
       '**/storybook-static/**',

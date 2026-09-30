@@ -30,6 +30,13 @@ export const NEST_EXTERNALS = [
   'tslib',
 ];
 
+/**
+ * `vite build --watch` is what the apps' `serve` targets run beside
+ * `node --watch dist/main.js`: a watch build must not empty `dist/` on its
+ * first pass, or the process serving from it restarts into a missing file.
+ */
+const watching = process.argv.includes('--watch') || process.argv.includes('-w');
+
 /** `build` + `ssr` blocks for a single-entry CJS Nest bundle. */
 export function nestBuildConfig() {
   return {
@@ -37,7 +44,7 @@ export function nestBuildConfig() {
     build: {
       ssr: true,
       outDir: './dist',
-      emptyOutDir: true,
+      emptyOutDir: !watching,
       sourcemap: true,
       minify: false,
       rolldownOptions: {
