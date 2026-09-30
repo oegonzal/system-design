@@ -58,6 +58,7 @@ const warn = (detail: string): void => {
 
 export class OpenAiEmbeddingClient implements EmbeddingClient {
   readonly enabled = true;
+  readonly reason = null;
   readonly model: string;
   readonly dimensions: number;
   private readonly apiKey: string;

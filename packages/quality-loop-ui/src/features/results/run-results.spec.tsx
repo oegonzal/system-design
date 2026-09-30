@@ -49,7 +49,7 @@ describe('RunResults', () => {
     expect(gates.getByText('artifactPresent: no')).toBeTruthy();
     expect(screen.getByText('completeness: not assessed')).toBeTruthy();
     expect(screen.getByText('No criteria were derived.')).toBeTruthy();
-    expect(screen.getAllByText(/llm-disabled/)).toHaveLength(2);
+    expect(screen.getAllByText(/llm-failed/)).toHaveLength(2);
     expect(screen.getByLabelText('Rendered artifact').textContent).toBe(
       'No artifact was produced.',
     );

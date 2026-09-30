@@ -10,7 +10,7 @@ const SESSION_PATH = new RegExp(`^/api/sessions/${SESSION}$`);
 const AVAILABILITY = {
   method: 'GET',
   path: '/api/grading/availability',
-  body: { data: { enabled: false, model: null, reason: 'no-key' } },
+  body: { data: { model: 'test-model' } },
 };
 
 afterEach(() => {

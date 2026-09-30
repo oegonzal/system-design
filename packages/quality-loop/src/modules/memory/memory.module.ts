@@ -4,21 +4,19 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { MemoryEmbedding } from '@sysdesign/db';
 import {
   createEmbeddingClientFromEnv,
-  embeddingAvailabilityFromEnv,
+  embeddingAvailability,
   type EmbeddingClient,
   type LlmClient,
 } from '@sysdesign/llm';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
-import {
-  noQueryProbes,
-  type EmbeddingCache,
-  type MemoryPorts,
-  type MemoryStore,
-  type QueryProbes,
+import type {
+  EmbeddingCache,
+  MemoryPorts,
+  MemoryStore,
+  QueryProbes,
 } from '../../orchestrators/memory/ports';
 import { OrchestrationRecordModule } from '../orchestration/orchestration-record.module';
-import { availabilityOf, llmBacked } from '../runs/llm-backed';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { MemoryController } from './memory.controller';
@@ -61,7 +59,8 @@ const memoryPorts = (
 ): MemoryPorts => {
   const embeddings = new CachedEmbeddings(client, cache, (message) => logger.warn(message));
   return {
-    embedding: availabilityOf(embeddings, () => embeddingAvailabilityFromEnv().reason),
+    // From the client that was built, never re-read from the environment.
+    embedding: embeddingAvailability(client),
     embeddings,
     store,
     probes,
@@ -78,18 +77,16 @@ const memoryPorts = (
   controllers: [MemoryController],
   providers: [
     MemoryService,
-    // The environment decides once, at boot: OPENAI_API_KEY under the quality
-    // loop's own determinism switch, else the no-op that keeps every run honest
-    // about why it skipped.
+    // The environment decides once, at boot: OPENAI_API_KEY, else a disabled
+    // client that carries its reason — the memory tier is optional.
     { provide: EMBEDDING_CLIENT, useFactory: createEmbeddingClientFromEnv },
     { provide: EMBEDDING_CACHE, useClass: MikroOrmEmbeddingCache },
     { provide: MEMORY_STORE, useFactory: qdrantStore, inject: [EMBEDDING_CLIENT] },
-    // The same client the runs module uses; no model means no probes, and a
-    // recall over the goal alone — exactly what it did before probes existed.
+    // The same client the runs module uses.
     {
       provide: QUERY_PROBES,
       useFactory: (client: LlmClient): QueryProbes =>
-        llmBacked(client, (llm, warn) => new LlmQueryProbes(llm, warn), noQueryProbes, logger),
+        new LlmQueryProbes(client, (message) => logger.warn(message)),
       inject: [QUALITY_LOOP_LLM],
     },
     {

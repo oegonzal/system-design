@@ -21,7 +21,6 @@ const STOP_REASONS = [
   'escalated',
   'plateau',
   'max-iterations',
-  'producer-unavailable',
 ] as const satisfies ContractStopReasons;
 
 /** The dump writes it; the row keeps it so a run can be traced to its commit without the folder. */
@@ -90,8 +89,9 @@ export class QualityRun {
   @Property({ type: 'integer' })
   exchangeCount: Opt<number> = 0;
 
+  /** Which model backed the run. Rows recorded before the loop required a model carry their old shape; only `model` is read. */
   @Property({ type: 'json' })
-  llm!: Contracts.LlmAvailabilityDto;
+  llm!: Contracts.LlmModelDto;
 
   @Property({ type: 'json' })
   request!: Contracts.QualityRunRequestSummary;

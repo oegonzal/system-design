@@ -1,17 +1,17 @@
 import type { LlmCall } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import { disabledLlm, fakeLlm, tinyPipeline } from '../testing';
+import { fakeLlm, tinyPipeline } from '../testing';
 import { createCriteriaDeriver } from './derive-criteria';
 
 const { task, deriveCriteria } = tinyPipeline();
 
 describe('createCriteriaDeriver', () => {
-  it('[QL-2] returns no criteria and an llm-disabled diagnostic without a model, never assembling a prompt', async () => {
-    const derived = await createCriteriaDeriver(task, deriveCriteria, disabledLlm())('goal');
+  it('[QL-2] a completion the model fails is llm-failed and no criteria — never an invented rubric', async () => {
+    const derived = await createCriteriaDeriver(task, deriveCriteria, fakeLlm())('goal');
     expect(derived).toEqual({
       criteria: null,
-      diagnostic: expect.objectContaining({ stage: 'criteria', reason: 'llm-disabled' }),
+      diagnostic: expect.objectContaining({ stage: 'criteria', reason: 'llm-failed' }),
     });
   });
 

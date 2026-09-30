@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { RunRepository } from '../../core/ports';
-import { disabledLlm, fakeLlm, gatedLlm, result, tinyPipeline } from '../../core/testing';
+import { fakeLlm, gatedLlm, result, tinyPipeline } from '../../core/testing';
 import {
   bootApp,
   claimDumpDir,
@@ -97,7 +97,7 @@ describe('the HTTP surface', () => {
     record = await settledRun(runId);
     expect(record).toMatchObject({
       status: 'complete',
-      llm: { enabled: true, model: 'test-model' },
+      llm: { model: 'test-model' },
     });
     expect(record.trace).toMatchObject({ finalDecision: 'accept', stopReason: 'accepted' });
     expect(record.exchanges.map((exchange) => exchange.scope)).toEqual([
@@ -180,7 +180,7 @@ describe('the HTTP surface', () => {
     expect((await fetch(`${url}/runs/missing`)).status).toBe(404);
     expect((await (await fetch(`${url}/health`)).json()) as unknown).toEqual({
       status: 'ok',
-      llm: { enabled: true, model: 'test-model', reason: null },
+      llm: { model: 'test-model' },
     });
   });
 
@@ -318,7 +318,7 @@ describe('the HTTP surface', () => {
         pipeline: 'tiny',
         criteria: [{ id: 'c1', kind: 'must', statement: 'has text' }],
         diagnostic: null,
-        llm: { enabled: true, model: 'test-model', reason: null },
+        llm: { model: 'test-model' },
       },
     });
     const after = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
@@ -327,20 +327,23 @@ describe('the HTTP surface', () => {
     expect((await postJson(url, '/criteria', { pipeline: 'tiny', goal: '' })).status).toBe(400);
   });
 
-  it('[QL-20] without a model, POST /criteria answers 503 with the reason and never invents a rubric', async () => {
-    const dark = await bootApp([[QUALITY_LOOP_LLM, disabledLlm()], tinyOnly()]);
+  it('[QL-20] a derivation the model fails answers 503 with the diagnostic and never an empty rubric', async () => {
+    // A model with no answers: every call is a schema miss.
+    const dark = await bootApp([[QUALITY_LOOP_LLM, fakeLlm()], tinyOnly()]);
     try {
       const darkUrl = dark.url;
+      const before = ((await (await fetch(`${darkUrl}/runs`)).json()) as Page<unknown>).meta.total;
       const response = await postJson(darkUrl, '/criteria', { pipeline: 'tiny', goal: 'g' });
       expect(response.status).toBe(503);
-      expect((await response.json()) as unknown).toMatchObject({
-        llm: { enabled: false },
-        diagnostic: { stage: 'criteria', reason: 'llm-disabled' },
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({
+        llm: { model: 'test-model' },
+        diagnostic: { stage: 'criteria', reason: 'llm-failed' },
       });
-      expect((await (await fetch(`${darkUrl}/health`)).json()) as unknown).toMatchObject({
-        status: 'ok',
-        llm: { enabled: false },
-      });
+      expect(body).not.toHaveProperty('criteria');
+      expect(((await (await fetch(`${darkUrl}/runs`)).json()) as Page<unknown>).meta.total).toBe(
+        before,
+      );
     } finally {
       await dark.app.close();
     }
@@ -353,7 +356,7 @@ describe('the HTTP surface', () => {
         id,
         pipeline: 'tiny',
         pipelineVersion: tinyPipeline().version,
-        llm: { enabled: true, model: 'test-model', reason: null },
+        llm: { model: 'test-model' },
         request: {
           goal: 'g',
           outputProvided: false,

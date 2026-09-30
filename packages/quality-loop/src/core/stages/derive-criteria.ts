@@ -19,9 +19,6 @@ export function createCriteriaDeriver<T>(
   llm: LlmClient,
 ): CriteriaDeriver {
   return async (goal) => {
-    if (!llm.enabled) {
-      return { criteria: null, diagnostic: stageDiagnostic(CRITERIA_STAGE, 'llm-disabled') };
-    }
     const kinds = enumTuple(Object.keys(task.criterionKinds));
     if (!kinds) {
       return {

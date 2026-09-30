@@ -18,7 +18,7 @@ import type {
   IterationTrace,
   LensOutcome,
   Lesson,
-  LlmAvailabilityDto,
+  LlmModelDto,
   LlmExchangeSummaryDto,
   QualityControlDecision,
   QualityRunRequestSummary,
@@ -41,7 +41,7 @@ export interface QualityRunRow {
   overall: number | null;
   bestIteration: number | null;
   exchangeCount: number;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
   request: QualityRunRequestSummary;
   git: GitContext;
   exchanges: LlmExchangeSummaryDto[];

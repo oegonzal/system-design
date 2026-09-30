@@ -277,7 +277,7 @@ describe('sessions', () => {
       const row = await fork.findOneOrFail(Prompt, prompt.id);
       row.criteria = [];
       await fork.flush();
-      h.loop.llm = { enabled: false, model: null, reason: 'deterministic' };
+      h.loop.derivationFails = true;
 
       expect((await submit(sessionId, submission())).status).toBe(503);
       expect(h.loop.startRequests).toEqual([]);

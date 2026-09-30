@@ -65,16 +65,7 @@ export function createLlmProducer<T>(
   llm: LlmClient,
 ): Producer<T> {
   return {
-    enabled: llm.enabled,
     async produce({ contract, mode, prior, remediations, refusals }) {
-      if (!llm.enabled) {
-        return {
-          output: null,
-          diagnostic: stageDiagnostic(PRODUCER_STAGE, 'llm-disabled'),
-          model: null,
-        };
-      }
-
       const briefed = briefing(task, spec, contract, mode, prior, remediations, refusals);
       const output = await llm.completeStructured({
         system: systemPrompt('producer', spec.persona),

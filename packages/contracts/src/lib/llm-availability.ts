@@ -1,10 +1,12 @@
 /**
- * Whether a model-backed role can run at all — derived facts only, never the
- * key. The coach and the quality loop both report it so a client can disable
- * a button with an honest reason instead of a failing call.
+ * Whether the EMBEDDINGS tier can run — derived facts only, never the key.
+ * The memory half of a run is optional: without OPENAI_API_KEY its steps skip
+ * with `embeddings-disabled` and the target still runs. The model itself is
+ * never optional — a loop without one does not boot — so its report is the
+ * plain `LlmModelDto`.
  */
 export interface LlmAvailabilityDto {
   enabled: boolean;
   model: string | null;
-  reason: 'deterministic' | 'no-key' | null;
+  reason: 'no-key' | null;
 }

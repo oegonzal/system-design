@@ -30,9 +30,8 @@ export const FIXABILITIES = [
 ] as const;
 export type Fixability = (typeof FIXABILITIES)[number];
 
-/** Why a stage produced nothing — the eval worker's reasons, verbatim. */
+/** Why a stage produced nothing. A model that answers nothing is `llm-failed`; there is no "off". */
 export const DIAGNOSTIC_REASONS = [
-  'llm-disabled',
   'llm-failed',
   'token-clipped',
   'llm-artifact-rejected',
@@ -47,7 +46,6 @@ export const STOP_REASONS = [
   'escalated',
   'plateau',
   'max-iterations',
-  'producer-unavailable',
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 

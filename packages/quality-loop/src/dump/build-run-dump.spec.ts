@@ -21,7 +21,7 @@ const record = (overrides: Partial<RunRecord>): RunRecord => ({
   status: 'complete',
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:00:01.000Z',
-  llm: { enabled: true, model: 'test-model', reason: null },
+  llm: { model: 'test-model' },
   git: { branch: 'main', headSha: 'abc' },
   request: {
     goal: '# Goal\n\nDo it.',

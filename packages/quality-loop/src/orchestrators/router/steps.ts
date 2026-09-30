@@ -6,7 +6,7 @@
  * declared-pipeline check, not the classifier, is what dispatches: the judge
  * step's pipeline is whatever `classify` produced, and only that.
  */
-import type { QualityRunDto, RouterContextDto, RouterStepReason } from '@sysdesign/contracts';
+import type { QualityRunDto, RouterStepReason } from '@sysdesign/contracts';
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
 
 import { briefRoutes, requestInput, runTarget } from '../common';
@@ -32,14 +32,6 @@ export async function classify(ctx: Ctx): Promise<StepResult<{ pipeline: string 
   const routes = briefRoutes(ctx.registry);
   const counts = { routes: routes.length };
   if (routes.length === 0) return unplaced('no-routes', 'no registered pipeline takes a brief');
-  if (!ctx.ports.classifier.enabled) {
-    const { reason } = (ctx.context as unknown as RouterContextDto).classifier;
-    return unplaced(
-      'classifier-disabled',
-      `no model to classify with: ${reason ?? 'disabled'}`,
-      counts,
-    );
-  }
   const answer = await ctx.ports.classifier.classify(ctx.request.goal, routes);
   if (answer === null) {
     return unplaced(

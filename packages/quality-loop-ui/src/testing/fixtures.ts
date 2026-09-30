@@ -25,7 +25,7 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
   status: 'complete',
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:05:17.000Z',
-  llm: { enabled: true, model: 'test-model', reason: null },
+  llm: { model: 'test-model' },
   request: {
     goal: PROMPT_MARKDOWN,
     outputProvided: false,
@@ -69,10 +69,9 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
   ...overrides,
 });
 
-/** The deterministic route: the model is off, nothing is produced, the controller escalates. */
+/** Every model call failed: nothing is derived or produced, the controller escalates honestly. */
 export const makeEscalatedRun = (): QualityRunDto =>
   makeRun({
-    llm: { enabled: false, model: null, reason: 'deterministic' },
     exchanges: [],
     finishedAt: '2026-09-06T00:00:00.400Z',
     trace: makeTrace({
@@ -94,8 +93,8 @@ export const makeEscalatedRun = (): QualityRunDto =>
             findings: [],
             discarded: [],
             diagnostics: [
-              { stage: 'criteria', sample: null, reason: 'llm-disabled', detail: null },
-              { stage: 'producer', sample: null, reason: 'llm-disabled', detail: null },
+              { stage: 'criteria', sample: null, reason: 'llm-failed', detail: null },
+              { stage: 'producer', sample: null, reason: 'llm-failed', detail: null },
               { stage: 'lenses', sample: null, reason: 'not-applicable', detail: 'no artifact' },
             ],
           },

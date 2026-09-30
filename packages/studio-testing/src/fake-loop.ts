@@ -3,7 +3,7 @@ import type {
   DerivedCriteriaDto,
   Diagnostic,
   IterationTrace,
-  LlmAvailabilityDto,
+  LlmModelDto,
   LlmExchangeSummaryDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
@@ -65,7 +65,7 @@ export class LoopRefused extends Error {
 export class DerivationFailed extends Error {
   constructor(
     message: string,
-    readonly llm: LlmAvailabilityDto,
+    readonly llm: LlmModelDto,
     readonly diagnostic: Diagnostic | null,
   ) {
     super(message);
@@ -104,7 +104,7 @@ export class FakeLoop {
   readonly requests = new Map<string, StartQualityRunRequest>();
   readonly startRequests: StartQualityRunRequest[] = [];
   readonly criteriaRequests: DeriveCriteriaRequest[] = [];
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
   unreachable = false;
   /** The model answers, and derives nothing: `POST /criteria` is a 503 with the diagnostic. */
   derivationFails = false;
@@ -129,7 +129,7 @@ export class FakeLoop {
     this.startExchanges = options.startExchanges ?? [];
     this.now = options.now ?? (() => '2026-09-29T00:00:00.000Z');
     this.library = [...(options.library ?? [])];
-    this.llm = { enabled: true, model: this.model, reason: null };
+    this.llm = { model: this.model };
   }
 
   /** What a run on this goal does when it settles; `once` scenarios are consumed. */
@@ -149,13 +149,13 @@ export class FakeLoop {
     this.startRequests.length = 0;
     this.criteriaRequests.length = 0;
     this.scenarios.clear();
-    this.llm = { enabled: true, model: this.model, reason: null };
+    this.llm = { model: this.model };
     this.unreachable = false;
     this.derivationFails = false;
     this.failNextStart = null;
   }
 
-  health(): { status: 'ok'; llm: LlmAvailabilityDto } {
+  health(): { status: 'ok'; llm: LlmModelDto } {
     if (this.unreachable) throw new LoopUnreachable();
     return { status: 'ok', llm: this.llm };
   }
@@ -164,9 +164,6 @@ export class FakeLoop {
     if (this.unreachable) throw new LoopUnreachable();
     this.criteriaRequests.push(request);
     this.assertKnown(request.pipeline);
-    if (!this.llm.enabled) {
-      throw new DerivationFailed('no model is available to derive criteria', this.llm, null);
-    }
     if (this.derivationFails) {
       throw new DerivationFailed('the model derived no criteria', this.llm, {
         stage: 'criteria',

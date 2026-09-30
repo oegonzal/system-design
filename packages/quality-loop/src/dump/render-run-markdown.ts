@@ -71,14 +71,7 @@ function lessonsSection(trace: RunTrace): string[] {
 
 /** One line per exchange, or the reason there were none. */
 function modelCallsSection(record: RunRecord): string[] {
-  if (record.exchanges.length === 0) {
-    return [
-      record.llm.enabled
-        ? `None — no stage reached the model.`
-        : `None: the model is off (${record.llm.reason}). Every LLM stage returns before assembling a prompt.`,
-      ``,
-    ];
-  }
+  if (record.exchanges.length === 0) return [`None — no stage reached the model.`, ``];
   return [
     ...record.exchanges.map(
       (exchange) =>

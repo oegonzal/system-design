@@ -1,11 +1,6 @@
 'use client';
 
-import type {
-  EvaluationDto,
-  EvaluationFindingDto,
-  LlmAvailabilityDto,
-  SuccessCriterion,
-} from '@sysdesign/contracts';
+import type { EvaluationDto, EvaluationFindingDto, SuccessCriterion } from '@sysdesign/contracts';
 import { Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
 import { CriterionResultsTable } from './criterion-results-table';
@@ -26,16 +21,9 @@ export interface EvaluationPanelProps {
   onSelectFinding: (finding: EvaluationFindingDto) => void;
 }
 
-/** Why the loop could not score — from the run's own model report. */
-function escalationCopy(llm: LlmAvailabilityDto): string {
-  if (llm.reason === 'deterministic') {
-    return 'The quality loop ran without a model (deterministic mode), so it escalated instead of scoring this design. Set QUALITY_LOOP_DETERMINISTIC=0 to grade for real.';
-  }
-  if (llm.reason === 'no-key') {
-    return 'The quality loop has no model to grade with, so it escalated instead of scoring this design. Set ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code to use your Claude login.';
-  }
-  return 'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
-}
+/** An escalation without a score: the lenses could not reach a verdict. */
+const ESCALATED_COPY =
+  'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
 
 /**
  * The feedback dock: running → spinner, failed → error + resubmit, complete →
@@ -94,7 +82,7 @@ export function EvaluationPanel({
         <>
           {escalated ? (
             <Text size="sm" tone="secondary" data-testid="evaluation-escalated">
-              {escalationCopy(evaluation.llm)}
+              {ESCALATED_COPY}
             </Text>
           ) : null}
           <ScoreSummary evaluation={evaluation} />

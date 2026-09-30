@@ -1,6 +1,6 @@
 import type { DesignBrief, DesignNarrative, DesignSubmission, CanvasGraph } from './canvas.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
-import type { LlmAvailabilityDto } from './llm-availability';
+import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
 import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
 import type { Decision, IterationMode, StopReason } from './quality-loop/vocab';
@@ -109,7 +109,7 @@ export interface ImproveRunDto {
   runId: string;
   sessionId: Uuid;
   status: QualityRunStatus;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
   /** Model calls made so far — the only live signal while the loop runs. */
   exchangeCount: number;
   iterations: ImproveIterationDto[];

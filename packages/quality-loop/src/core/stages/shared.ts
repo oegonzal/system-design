@@ -46,10 +46,6 @@ export async function sampleEach<Response, R>(
   const outcomes: LensOutcome<R>[] = [];
   for (const [index, llm] of clients.entries()) {
     const sample = index + 1;
-    if (!llm.enabled) {
-      outcomes.push(skipped(lensId, sample, 'llm-disabled'));
-      continue;
-    }
     const response = await llm.completeStructured(request);
     outcomes.push(
       response === null

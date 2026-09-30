@@ -14,7 +14,7 @@ import type {
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
-  LlmAvailabilityDto,
+  LlmModelDto,
   PromptDto,
   PromptGenerationDto,
   PromptLibraryDocumentDto,
@@ -192,9 +192,9 @@ export const api = {
   },
 
   // Grading and the coach ---------------------------------------------------
-  /** 503 when the grader is unreachable — callers treat a throw as unavailable. */
-  async gradingAvailability(opts: GetOptions = {}): Promise<LlmAvailabilityDto> {
-    return unwrap(await request<ApiResponse<LlmAvailabilityDto>>('/grading/availability', opts));
+  /** The model behind the grader; 503 when it is unreachable — callers treat a throw as unavailable. */
+  async gradingAvailability(opts: GetOptions = {}): Promise<LlmModelDto> {
+    return unwrap(await request<ApiResponse<LlmModelDto>>('/grading/availability', opts));
   },
 
   /** Persists the draft as a revision and starts the coach (202). */

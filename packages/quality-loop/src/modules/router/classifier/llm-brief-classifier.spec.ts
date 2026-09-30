@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { disabledLlm, fakeLlm } from '../../../core/testing';
-import { noClassifier } from '../../../orchestrators/router/ports';
+import { fakeLlm } from '../../../core/testing';
 import { LlmBriefClassifier, renderRoutes } from './llm-brief-classifier';
 
 const routes = [
@@ -19,7 +18,6 @@ describe('the brief classifier', () => {
       seen.push(call.user);
     });
     const classifier = new LlmBriefClassifier(llm);
-    expect(classifier.enabled).toBe(true);
     expect(await classifier.classify('# Brief\n\nthe deciding sentence', routes)).toEqual({
       pipeline: 'agentic-design',
       rationale: 'roles and contracts',
@@ -35,11 +33,7 @@ describe('the brief classifier', () => {
     expect(await classifier.classify('brief', routes)).toBeNull();
   });
 
-  it('[QL-19] without a model, or without routes, there is nothing to ask and the answer is null', async () => {
-    expect(noClassifier.enabled).toBe(false);
-    expect(await noClassifier.classify('brief', routes)).toBeNull();
-    expect(await new LlmBriefClassifier(disabledLlm()).classify('brief', routes)).toBeNull();
-
+  it('[QL-19] without routes there is nothing to ask and the answer is null', async () => {
     const calls: string[] = [];
     const llm = fakeLlm({ pipeline: 'system-design', rationale: 'x' }).withRecorder((call) => {
       calls.push(call.user);

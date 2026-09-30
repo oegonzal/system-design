@@ -127,15 +127,16 @@ describe('prompts', () => {
       expect(h.loop.criteriaRequests).toHaveLength(1);
     });
 
-    it('[DEL-6] without a model the grader answers 503 and no prompt is written', async () => {
-      h.loop.llm = { enabled: false, model: null, reason: 'no-key' };
-      const { status, body } = await call<ApiErrorResponse & { llm: unknown }>(`${h.url}/prompts`, {
-        method: 'POST',
-        body: JSON.stringify(authoredPrompt()),
-      });
+    it('[DEL-6] when the grader cannot derive a rubric it answers 503 with the diagnostic and no prompt is written', async () => {
+      h.loop.derivationFails = true;
+      const { status, body } = await call<ApiErrorResponse & { llm: unknown; diagnostic: unknown }>(
+        `${h.url}/prompts`,
+        { method: 'POST', body: JSON.stringify(authoredPrompt()) },
+      );
 
       expect(status).toBe(503);
-      expect(body.llm).toEqual({ enabled: false, model: null, reason: 'no-key' });
+      expect(body.llm).toEqual({ model: 'fake-model' });
+      expect(body.diagnostic).toMatchObject({ stage: 'criteria', reason: 'llm-failed' });
       const list = await call<ListPromptsResponse>(`${h.url}/prompts`);
       expect(list.body.meta.total).toBe(0);
     });

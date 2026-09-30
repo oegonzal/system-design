@@ -135,7 +135,7 @@ const indexRowOf = (record: RunRecord, manifest: Manifest): string =>
     overall: manifest.overall,
     iterations: manifest.iterations,
     exchangeCount: manifest.exchangeCount,
-    llmEnabled: record.llm.enabled,
+    model: record.llm.model,
   })}\n`;
 
 export function buildRunDump(record: RunRecord, pipeline: PipelineSummary | null): BuiltDump {

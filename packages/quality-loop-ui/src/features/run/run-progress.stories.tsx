@@ -28,7 +28,7 @@ export const Running: Story = {
 export const Complete: Story = { args: { run: complete } };
 
 /** The model was off; the record says so instead of pretending. */
-export const ModelOff: Story = { args: { run: makeEscalatedRun() } };
+export const ModelFailed: Story = { args: { run: makeEscalatedRun() } };
 
 export const Failed: Story = {
   args: {

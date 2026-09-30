@@ -12,16 +12,12 @@ const summaries = (...ids: string[]): PipelineSummary[] => ids.map((id) => summa
 const composed = (...ids: string[]): PipelineSummary[] =>
   ids.map((id) => summaryOf(id, 80, 'composed'));
 
-const classifier = (answer: Classification | null, enabled = true): BriefClassifier => ({
-  enabled,
-  model: enabled ? 'test-model' : null,
+const classifier = (answer: Classification | null): BriefClassifier => ({
+  model: 'test-model',
   classify: () => Promise.resolve(answer),
 });
 
-const ports = (c: BriefClassifier): RouterPorts => ({
-  classifier: c,
-  llm: { enabled: c.enabled, model: c.model, reason: c.enabled ? null : 'no-key' },
-});
+const ports = (c: BriefClassifier): RouterPorts => ({ classifier: c, model: { model: c.model } });
 
 const request: StartOrchestrationRequest = { goal: 'g' };
 
@@ -72,7 +68,7 @@ describe('the router orchestrator', () => {
     expect(record.status).toBe('complete');
     expect(record.pipeline).toBeNull();
     expect(record.context).toEqual({
-      classifier: { enabled: true, model: 'test-model', reason: null },
+      classifier: { model: 'test-model' },
     });
     expect(record.steps['classify']).toMatchObject({
       status: 'complete',
@@ -105,17 +101,7 @@ describe('the router orchestrator', () => {
     });
   });
 
-  it('[QL-19] no model, or no pipeline that takes a brief, is said in the same place', async () => {
-    const disabled = await perform(summaries('tiny'), classifier(null, false));
-    expect(disabled.record.context).toEqual({
-      classifier: { enabled: false, model: null, reason: 'no-key' },
-    });
-    expect(disabled.record.steps['classify']).toMatchObject({
-      status: 'failed',
-      reason: 'classifier-disabled',
-    });
-    expect(disabled.record.error?.message).toContain('no-key');
-
+  it('[QL-19] no pipeline that takes a brief is said in the same place', async () => {
     const nowhere = await perform(
       composed('memory-recall', 'experience-digest'),
       classifier({ pipeline: 'memory-recall', rationale: 'never asked' }),

@@ -11,7 +11,7 @@ const meta: Meta<typeof ImprovementPanel> = {
     error: null,
     isPolling: false,
     message: '',
-    availability: { enabled: true, model: 'claude', reason: null },
+    availability: { status: 'reachable', model: 'claude' },
     onStart: () => undefined,
     onLoadRevision: () => undefined,
   },
@@ -23,9 +23,14 @@ type Story = StoryObj<typeof ImprovementPanel>;
 /** Idle, a model available: pick the iterations and hand over the draft. */
 export const Idle: Story = {};
 
-/** No model configured — the button is off and says why. */
+/** The quality loop cannot be reached — the button is off and says why. */
 export const Unavailable: Story = {
-  args: { availability: { enabled: false, model: null, reason: 'no-key' } },
+  args: { availability: { status: 'unreachable' } },
+};
+
+/** Availability still being asked — the button waits without a reason. */
+export const Checking: Story = {
+  args: { availability: { status: 'checking' } },
 };
 
 /** Mid-run: model calls ticking up, one iteration already imported. */

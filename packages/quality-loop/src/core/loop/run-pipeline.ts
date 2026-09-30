@@ -397,8 +397,8 @@ const beats = <T>(entry: IterationTrace<T>, best: IterationTrace<T> | null): boo
 
 /**
  * What the decision means for the loop: a terminal decision stops it with
- * its reason; otherwise the loop stops for a reason of its own — no producer,
- * a plateau, the budget — or goes round again in the mode decided.
+ * its reason; otherwise the loop stops for a reason of its own — a plateau,
+ * the budget — or goes round again in the mode decided.
  */
 function afterDecision<T>(
   entry: IterationTrace<T>,
@@ -415,7 +415,6 @@ function afterDecision<T>(
     case 'escalate':
       return { stop: 'escalated' };
     default:
-      if (!stages.producer.enabled) return { stop: 'producer-unavailable' };
       if (stalled >= plateauAfter) return { stop: 'plateau' };
       if (budget.last) return { stop: 'max-iterations' };
       return { mode: entry.decision.finalDecision };

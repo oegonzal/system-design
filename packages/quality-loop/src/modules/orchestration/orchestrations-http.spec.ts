@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
 import { ensureDatabase, OrchestrationRun } from '@sysdesign/db';
-import { NoopEmbeddingClient } from '@sysdesign/llm';
+import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -26,7 +26,7 @@ const ROUTE = { pipeline: 'system-design', rationale: 'a system to design' };
 const boot = () =>
   bootApp([
     [QUALITY_LOOP_LLM, fakeLlm(...CANNED, ROUTE)],
-    [EMBEDDING_CLIENT, new NoopEmbeddingClient()],
+    [EMBEDDING_CLIENT, new DisabledEmbeddingClient('no-key')],
     [MEMORY_STORE, new InMemoryMemoryStore(null)],
   ]);
 
@@ -62,12 +62,8 @@ describe('the orchestrations HTTP surface', () => {
     const record = await settle(data.orchestrationRunId);
 
     expect(record.status).toBe('complete');
-    // The suite pins the loop deterministic, so the reason is exact whatever the developer's `.env` holds.
-    expect(record.context['embedding']).toEqual({
-      enabled: false,
-      model: null,
-      reason: 'deterministic',
-    });
+    // The reason is the injected client's own, whatever the developer's `.env` holds.
+    expect(record.context['embedding']).toEqual({ enabled: false, model: null, reason: 'no-key' });
     expect(record.context['store']).toMatchObject({ ready: false, reason: 'no-model', chunks: 0 });
     expect(record.request.maxIterations).toBe(2);
     expect(record.steps['recall']).toMatchObject({
@@ -203,7 +199,7 @@ describe('the orchestrations HTTP surface', () => {
       samples: null,
     });
     expect(record.context).toEqual({
-      classifier: { enabled: true, model: 'test-model', reason: null },
+      classifier: { model: 'test-model' },
     });
     expect(record.steps['classify']).toMatchObject({
       status: 'complete',

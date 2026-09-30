@@ -29,16 +29,12 @@ export class LlmBriefClassifier implements BriefClassifier {
     private readonly warn: (message: string) => void = () => undefined,
   ) {}
 
-  get enabled(): boolean {
-    return this.client.enabled;
-  }
-
-  get model(): string | null {
+  get model(): string {
     return this.client.model;
   }
 
   async classify(goal: string, routes: readonly RouteDto[]): Promise<Classification | null> {
-    if (!this.client.enabled || routes.length === 0) return null;
+    if (routes.length === 0) return null;
     const ids = routes.map((route) => route.id) as [string, ...string[]];
     try {
       return await this.client.completeStructured({

@@ -51,8 +51,6 @@ export interface Produced<T> {
 }
 
 export interface Producer<T> {
-  /** False when no model backs it — the runner stops with `producer-unavailable`. */
-  readonly enabled: boolean;
   produce(input: ProducerInput<T>): Promise<Produced<T>>;
 }
 

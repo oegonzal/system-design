@@ -1,4 +1,4 @@
-import { NoopLlmClient, type LlmExchange } from '@sysdesign/llm';
+import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { composeController } from '../controllers';
@@ -78,7 +78,6 @@ describe('runLoop', () => {
   it('[QL-9] revises with the selected remediations, keeps the best by a strict-better gate, and stops on accept', async () => {
     const inputs: ProducerInput<TinyOutput>[] = [];
     const producer: Producer<TinyOutput> = {
-      enabled: true,
       produce: (input) => {
         inputs.push(input);
         return scriptedProducer([DRAFT_1, DRAFT_2]).produce(input);
@@ -148,19 +147,31 @@ describe('runLoop', () => {
     expect(trace.stopReason).toBe('max-iterations');
   });
 
-  it('[QL-9] a provided artifact is judged; with the producer off the loop stops as producer-unavailable', async () => {
-    const trace = await runLoop(
-      scriptedStages({
-        producer: { enabled: false, produce: () => Promise.reject(new Error('never')) },
-      }),
+  it('[QL-9] a provided artifact is judged as iteration 1, and the producer is asked only from iteration 2', async () => {
+    let asked = 0;
+    const producer: Producer<TinyOutput> = {
+      produce: (input) => (asked++, scriptedProducer([DRAFT_2]).produce(input)),
+    };
+    const judged = await runLoop(
+      scriptedStages({ producer }),
       tinyPipeline(),
-      { goal: 'g', output: DRAFT_1 },
+      { goal: 'g', output: DRAFT_1, maxIterations: 1 },
       clock,
     );
-    expect(trace.iterations).toHaveLength(1);
-    expect(trace.iterations[0].mode).toBe('provided');
-    expect(trace.finalDecision).toBe('revise');
-    expect(trace.stopReason).toBe('producer-unavailable');
+    expect(judged.iterations).toHaveLength(1);
+    expect(judged.iterations[0].mode).toBe('provided');
+    expect(judged.finalDecision).toBe('revise');
+    expect(judged.stopReason).toBe('max-iterations');
+    expect(asked).toBe(0);
+
+    const revised = await runLoop(
+      scriptedStages({ producer }),
+      tinyPipeline(),
+      { goal: 'g', output: DRAFT_1, maxIterations: 2 },
+      clock,
+    );
+    expect(revised.iterations.map((iteration) => iteration.mode)).toEqual(['provided', 'revise']);
+    expect(asked).toBe(1);
   });
 
   it('[QL-25] a produced artifact is normalized before the validators; a provided one never is', async () => {
@@ -214,7 +225,6 @@ describe('runLoop', () => {
     const inputs: ProducerInput<TinyOutput>[] = [];
     const scripted = scriptedProducer([DRAFT_1, { text: 2 } as never, DRAFT_2]);
     const producer: Producer<TinyOutput> = {
-      enabled: true,
       produce: (input) => {
         inputs.push(input);
         return scripted.produce(input);
@@ -275,7 +285,6 @@ describe('runLoop', () => {
         ]),
       ],
       producer: {
-        enabled: true,
         produce: (input) => {
           inputs.push(input);
           return scripted.produce(input);
@@ -328,31 +337,35 @@ describe('runLoop', () => {
 });
 
 describe('runPipeline', () => {
-  it('[QL-9] without a live model it escalates honestly: no criteria, llm-disabled diagnostics, no number', async () => {
+  it('[QL-9] when every model call fails it escalates honestly: llm-failed diagnostics, no criteria, no invented number, every miss recorded', async () => {
     const exchanges: LlmExchange[] = [];
     const trace = await runPipeline(
       tinyPipeline(),
       { goal: 'g' },
-      { llm: new NoopLlmClient(), sink: (e) => exchanges.push(e), now: clock },
+      { llm: fakeLlm(), sink: (e) => exchanges.push(e), now: clock },
     );
     expect(trace.contract.criteria).toEqual([]);
     expect(trace.finalDecision).toBe('escalate');
     expect(trace.stopReason).toBe('escalated');
     expect(trace.iterations[0].ledger.diagnostics.map((d) => `${d.stage}:${d.reason}`)).toEqual([
-      'criteria:llm-disabled',
-      'producer:llm-disabled',
+      'criteria:llm-failed',
+      'producer:llm-failed',
       'lenses:not-applicable',
     ]);
     expect(trace.iterations[0].decision.scores).toEqual({
       dimensions: { substance: null, form: null },
       overall: 0,
     });
-    expect(exchanges).toEqual([]);
+    // The misses are on the record: nothing is hidden behind an "off" switch.
+    expect(exchanges.map((exchange) => [exchange.scope, exchange.outcome])).toEqual([
+      ['criteria', 'schema-miss'],
+      ['producer', 'schema-miss'],
+    ]);
 
     const judged = await runPipeline(
       tinyPipeline(),
       { goal: 'g', output: DRAFT_1 },
-      { llm: new NoopLlmClient(), sink: () => undefined, now: clock },
+      { llm: fakeLlm(), sink: () => undefined, now: clock },
     );
     expect(judged.iterations[0].validation.map((report) => report.validatorId)).toEqual(['schema']);
     expect(judged.iterations[0].decision.gates).toMatchObject({

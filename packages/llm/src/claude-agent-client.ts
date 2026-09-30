@@ -183,7 +183,6 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
  * API-key client.
  */
 export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
-  readonly enabled = true;
   readonly model: string;
 
   /** Only set when the caller pinned one; otherwise the CLI's default rules. */

@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { emptyUpstream, type LensContext } from '../ports';
-import {
-  criterion,
-  disabledLlm,
-  fakeLlm,
-  finding,
-  tinyPipeline,
-  type TinyOutput,
-} from '../testing';
+import { criterion, fakeLlm, finding, tinyPipeline, type TinyOutput } from '../testing';
 import { createLlmCritic } from './llm-critic';
 
 const definition = tinyPipeline();
@@ -43,14 +36,15 @@ describe('createLlmCritic', () => {
     const good = fakeLlm({
       findings: [finding({ locationRefs: ['part.1'], criterionIds: ['c1'] })],
     });
+    // The middle sample's model answers nothing: that sample is llm-failed, its neighbours report.
     const critic = createLlmCritic({ ...definition.critics[0], samples: 3 }, definition.task, [
       good,
-      disabledLlm(),
+      fakeLlm(),
       good,
     ]);
     const outcomes = await critic.run(ctx);
     expect(outcomes.map((outcome) => outcome.report?.sample ?? outcome.diagnostic?.reason)).toEqual(
-      [1, 'llm-disabled', 3],
+      [1, 'llm-failed', 3],
     );
   });
 });

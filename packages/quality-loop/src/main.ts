@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
+import { preflight } from './boot';
 import { replayCli } from './cli/replay';
 import { runCli } from './cli/run';
 import { AppModule } from './modules/app/app.module';
@@ -14,18 +15,31 @@ const DEFAULT_PORT = 3003;
  * of a pipeline again under each controller and exits; anything else serves
  * the HTTP surface — runs, pipelines, criteria, prompts, orchestrations, the
  * memory and router tools, and `/health` (the README lists the routes).
+ *
+ * `serve` and `run` refuse to start without a model provider — exit 1 with
+ * both variables named, before any module boots. `replay` calls no model and
+ * boots a slimmer context.
  */
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {
     console.error(error);
     process.exit(1);
   });
 
-  if (process.argv[2] === 'replay') {
-    process.exit(await replayCli(process.argv.slice(3)));
+  const argv = process.argv.slice(2);
+  let checked: ReturnType<typeof preflight>;
+  try {
+    checked = preflight(argv, process.env);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
   }
-  if (process.argv[2] === 'run') {
-    process.exit(await runCli(process.argv.slice(3)));
+
+  if (checked.command === 'replay') {
+    process.exit(await replayCli(argv.slice(1)));
+  }
+  if (checked.command === 'run') {
+    process.exit(await runCli(argv.slice(1)));
   }
 
   const app = configureApp(await NestFactory.create(AppModule));
@@ -36,6 +50,10 @@ async function bootstrap() {
     : DEFAULT_PORT;
   await app.listen(port);
   Logger.log(`quality-loop listening on http://localhost:${port}/health`);
+  Logger.log(`quality-loop model: ${checked.model?.model ?? 'none'}`);
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});

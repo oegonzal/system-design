@@ -41,7 +41,6 @@ export class LlmQueryProbes implements QueryProbes {
   ) {}
 
   async derive(goal: string): Promise<string[]> {
-    if (!this.client.enabled) return [];
     try {
       const answer = await this.client.completeStructured({
         system: persona,

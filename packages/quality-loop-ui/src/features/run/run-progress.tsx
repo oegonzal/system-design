@@ -54,9 +54,7 @@ export function RunProgress({ run }: RunProgressProps) {
         </Text>
       </Stack>
       <Text tone="muted" size="sm">
-        {run.llm.enabled
-          ? `Model: ${run.llm.model ?? 'unknown'}`
-          : `Model off: ${run.llm.reason ?? 'unavailable'} — the loop escalates honestly.`}
+        {`Model: ${run.llm.model ?? 'not recorded'}`}
         {run.error ? ` · ${run.error.name}: ${run.error.message}` : ''}
       </Text>
       {run.exchanges.length > 0 ? (

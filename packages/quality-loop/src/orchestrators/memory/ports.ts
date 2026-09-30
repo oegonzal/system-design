@@ -101,9 +101,6 @@ export interface QueryProbes {
   derive(goal: string): Promise<string[]>;
 }
 
-/** Derives nothing; recall falls back to the goal. Used when no model is configured. */
-export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
-
 /** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
 export interface MemoryPorts {
   embedding: LlmAvailabilityDto;

@@ -1,13 +1,13 @@
 import type { LlmClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import { noQueryProbes } from '../../../orchestrators/memory/ports';
+import { noQueryProbes } from '../../../orchestrators/memory/steps.testing';
 import { LlmQueryProbes } from './llm-query-probes';
 
-const client = (
-  completeStructured: LlmClient['completeStructured'],
-  enabled = true,
-): LlmClient => ({ enabled, model: 'fake', completeStructured });
+const client = (completeStructured: LlmClient['completeStructured']): LlmClient => ({
+  model: 'fake',
+  completeStructured,
+});
 
 describe('deriving what to search under', () => {
   it('never lets a probe failure cost the recall, whatever the client does', async () => {
@@ -16,11 +16,9 @@ describe('deriving what to search under', () => {
       client(() => Promise.reject(new Error('rate limited'))),
       () => undefined,
     );
-    const off = new LlmQueryProbes(client(() => Promise.resolve(null), false));
 
     expect(await refused.derive('a goal')).toEqual([]);
     expect(await threw.derive('a goal')).toEqual([]);
-    expect(await off.derive('a goal')).toEqual([]);
     expect(await noQueryProbes.derive('a goal')).toEqual([]);
   });
 

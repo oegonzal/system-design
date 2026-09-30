@@ -1,5 +1,5 @@
 import type { ApiListResponse, ApiResponse } from '../envelope';
-import type { LlmAvailabilityDto } from '../llm-availability';
+import type { LlmModelDto } from '../llm-model';
 import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
 import type { SuccessCriterion } from './evidence';
@@ -50,7 +50,7 @@ export interface QualityRunDto {
   status: QualityRunStatus;
   startedAt: IsoDateString;
   finishedAt: IsoDateString | null;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
   request: QualityRunRequestSummary;
   trace: RunTrace | null;
   exchanges: LlmExchangeSummaryDto[];
@@ -109,7 +109,7 @@ export interface QualityRunSummaryDto {
   iterations: number;
   criteria: number;
   exchangeCount: number;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
 }
 
 /** `GET /runs` — newest first; `limit` defaults to DEFAULT_LIST_LIMIT, capped at MAX_LIST_LIMIT. */

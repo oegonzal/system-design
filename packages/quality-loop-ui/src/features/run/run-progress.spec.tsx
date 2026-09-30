@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { formatElapsed } from './run-progress';
 import * as stories from './run-progress.stories';
 
-const { Running, Complete, ModelOff, Failed } = composeStories(stories);
+const { Running, Complete, ModelFailed, Failed } = composeStories(stories);
 
 describe('RunProgress', () => {
   it('[QLU-2] shows the status, the elapsed time and one row per attributed exchange', () => {
@@ -29,9 +29,9 @@ describe('RunProgress', () => {
     expect(screen.getAllByRole('row')).toHaveLength(1 + 2);
   });
 
-  it('says when the model was off, and what a failed run died of', () => {
-    const { unmount } = renderWithTheme(<ModelOff />);
-    expect(screen.getByText(/Model off: deterministic/)).toBeTruthy();
+  it('names the model behind an escalated run, and what a failed run died of', () => {
+    const { unmount } = renderWithTheme(<ModelFailed />);
+    expect(screen.getByText(/Model: test-model/)).toBeTruthy();
     expect(screen.getByText('No model exchanges yet.')).toBeTruthy();
     unmount();
 

@@ -2,7 +2,7 @@ import { BadGatewayException, ServiceUnavailableException } from '@nestjs/common
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
-  LlmAvailabilityDto,
+  LlmModelDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityRunDto,
@@ -81,11 +81,11 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     return this.core.criteriaRequests;
   }
 
-  get llm(): LlmAvailabilityDto {
+  get llm(): LlmModelDto {
     return this.core.llm;
   }
 
-  set llm(value: LlmAvailabilityDto) {
+  set llm(value: LlmModelDto) {
     this.core.llm = value;
   }
 

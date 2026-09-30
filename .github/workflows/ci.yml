@@ -43,9 +43,6 @@ jobs:
       DB_PASSWORD: admin
       DB_NAME: sysdesign
       QDRANT_URL: http://localhost:6333
-      # No model in CI, whatever is exported: the quality loop's specs use fakes
-      # and the e2e suite a stub, and this switch makes a stray key change nothing.
-      QUALITY_LOOP_DETERMINISTIC: '1'
       NEXT_TELEMETRY_DISABLED: '1'
 
     steps:

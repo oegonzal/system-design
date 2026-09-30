@@ -1,114 +1,72 @@
-import type { LlmAvailabilityDto } from '@sysdesign/contracts';
+import type { LlmModelDto } from '@sysdesign/contracts';
 import { AnthropicLlmClient, DEFAULT_LLM_MODEL } from './anthropic-client';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
-import {
-  DEFAULT_EMBEDDING_MODEL,
-  NoopEmbeddingClient,
-  type EmbeddingClient,
-} from './embedding-client';
+import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-client';
 import type { LlmClient } from './llm-client';
-import { NoopLlmClient } from './noop-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 /**
  * Environment-driven factories — the only place LLM env vars are read.
  *
- * A model-consuming ROLE names its own determinism switch and its own
- * subscription opt-in. Determinism outranks everything: CI and the e2e suite
- * set it so nothing a test reads depends on a model, even on a machine where
- * a developer has a key exported. An explicit API key wins over the
- * subscription route, and `<authVar>=claude-code` runs the role through this
- * machine's Claude Code login via the Agent SDK — no API key required, none
- * ever read.
+ * The quality loop runs on a model or not at all. An explicit API key wins;
+ * `QUALITY_LOOP_AUTH=claude-code` runs every call through this machine's
+ * Claude Code login via the Agent SDK — no key read, none stored. Neither
+ * configured is a boot failure naming both, never a client that quietly
+ * answers nothing.
  */
-export interface LlmRole {
-  /** `<var>=1` yields the no-op client whatever else is set. */
-  deterministicVar: string;
-  /** `<var>=claude-code` routes through the Agent SDK. */
-  authVar: string;
+export const QUALITY_LOOP_AUTH_VAR = 'QUALITY_LOOP_AUTH';
+export const CLAUDE_CODE_ROUTE = 'claude-code';
+export const CLAUDE_CODE_MODEL_LABEL = 'claude-code/subscription';
+
+export const MODEL_PROVIDER_HELP =
+  "the quality loop needs a model: set ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code to run through this machine's Claude Code login";
+
+export class MissingModelProviderError extends Error {
+  override readonly name = 'MissingModelProvider';
+
+  constructor() {
+    super(MODEL_PROVIDER_HELP);
+  }
 }
 
-/** The quality loop's producer and lenses — the one model-consuming role the stack runs. */
-export const QUALITY_LOOP_ROLE: LlmRole = {
-  deterministicVar: 'QUALITY_LOOP_DETERMINISTIC',
-  authVar: 'QUALITY_LOOP_AUTH',
-};
+export type QualityLoopProvider =
+  { route: 'api'; apiKey: string; model: string } | { route: 'claude-code'; model: string };
 
-export function createRoleLlmFromEnv(
-  role: LlmRole,
+/** Which route the environment configures, or the boot failure. */
+export function resolveQualityLoopProvider(
   env: NodeJS.ProcessEnv = process.env,
-): LlmClient {
-  if (env[role.deterministicVar] === '1') return new NoopLlmClient();
-  if (env['ANTHROPIC_API_KEY']) {
-    return new AnthropicLlmClient({
-      apiKey: env['ANTHROPIC_API_KEY'],
-      model: env['LLM_MODEL'] || undefined,
-    });
+): QualityLoopProvider {
+  const apiKey = env['ANTHROPIC_API_KEY'];
+  if (apiKey) return { route: 'api', apiKey, model: env['LLM_MODEL'] || DEFAULT_LLM_MODEL };
+  if (env[QUALITY_LOOP_AUTH_VAR] === CLAUDE_CODE_ROUTE) {
+    return { route: 'claude-code', model: env['LLM_MODEL'] || CLAUDE_CODE_MODEL_LABEL };
   }
-  if (env[role.authVar] === 'claude-code') {
-    return new ClaudeAgentLlmClient({ model: env['LLM_MODEL'] || undefined });
-  }
-  return new NoopLlmClient();
+  throw new MissingModelProviderError();
 }
 
-/** The wire shape (`contracts`) is the one definition; this is its node-side name. */
-export type LlmAvailability = LlmAvailabilityDto;
+/** The model report a boot would announce, without constructing a client — the preflight's question. */
+export const describeModelProvider = (env: NodeJS.ProcessEnv = process.env): LlmModelDto => ({
+  model: resolveQualityLoopProvider(env).model,
+});
+
+export function createQualityLoopLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
+  const provider = resolveQualityLoopProvider(env);
+  return provider.route === 'api'
+    ? new AnthropicLlmClient({ apiKey: provider.apiKey, model: provider.model })
+    : new ClaudeAgentLlmClient({ model: env['LLM_MODEL'] || undefined });
+}
 
 /**
- * Derived facts only — never the key. Answers "would the role's factory yield
- * a live client, and why not" without constructing one, so a service can
- * report availability per request.
- */
-export function roleAvailabilityFromEnv(
-  role: LlmRole,
-  env: NodeJS.ProcessEnv = process.env,
-): LlmAvailability {
-  if (env[role.deterministicVar] === '1') {
-    return { enabled: false, model: null, reason: 'deterministic' };
-  }
-  if (env['ANTHROPIC_API_KEY']) {
-    return { enabled: true, model: env['LLM_MODEL'] || DEFAULT_LLM_MODEL, reason: null };
-  }
-  if (env[role.authVar] === 'claude-code') {
-    return { enabled: true, model: env['LLM_MODEL'] || 'claude-code/subscription', reason: null };
-  }
-  return { enabled: false, model: null, reason: 'no-key' };
-}
-
-export const createQualityLoopLlmFromEnv = (env: NodeJS.ProcessEnv = process.env): LlmClient =>
-  createRoleLlmFromEnv(QUALITY_LOOP_ROLE, env);
-
-export const qualityLoopAvailabilityFromEnv = (
-  env: NodeJS.ProcessEnv = process.env,
-): LlmAvailability => roleAvailabilityFromEnv(QUALITY_LOOP_ROLE, env);
-
-/**
- * The quality loop's embeddings: the loop's own determinism switch first, then
- * `OPENAI_API_KEY`. `OPENAI_EMBEDDING_MODEL` picks the model; `OPENAI_MODEL`
- * names a chat model and stays unread.
+ * The quality loop's embeddings: `OPENAI_API_KEY`, else a disabled client that
+ * carries its reason — the memory tier is optional. `OPENAI_EMBEDDING_MODEL`
+ * picks the model; `OPENAI_MODEL` names a chat model and stays unread.
  */
 export function createEmbeddingClientFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): EmbeddingClient {
-  if (env[QUALITY_LOOP_ROLE.deterministicVar] === '1') return new NoopEmbeddingClient();
-  if (!env['OPENAI_API_KEY']) return new NoopEmbeddingClient();
+  if (!env['OPENAI_API_KEY']) return new DisabledEmbeddingClient('no-key');
   return new OpenAiEmbeddingClient({
     apiKey: env['OPENAI_API_KEY'],
     model: env['OPENAI_EMBEDDING_MODEL'] || undefined,
   });
-}
-
-/** The embeddings factory's shadow: would it yield a live client, and why not. */
-export function embeddingAvailabilityFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): LlmAvailability {
-  if (env[QUALITY_LOOP_ROLE.deterministicVar] === '1') {
-    return { enabled: false, model: null, reason: 'deterministic' };
-  }
-  if (!env['OPENAI_API_KEY']) return { enabled: false, model: null, reason: 'no-key' };
-  return {
-    enabled: true,
-    model: env['OPENAI_EMBEDDING_MODEL'] || DEFAULT_EMBEDDING_MODEL,
-    reason: null,
-  };
 }

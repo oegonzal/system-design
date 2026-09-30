@@ -66,8 +66,8 @@ export interface LlmExchange extends LlmCall {
 }
 
 /**
- * `null` for a client that cannot record, which is the honest answer for the
- * no-op: it never talks to a model, so there is no call to report.
+ * `null` for a client that cannot record — a spec's plain fake, say — so a
+ * caller records nothing rather than guessing at a call.
  */
 export function asRecordable(client: LlmClient): LlmRecordable | null {
   const candidate = client as Partial<LlmRecordable>;

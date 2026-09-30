@@ -9,11 +9,11 @@ import { z } from 'zod';
  * A model that answers by SCHEMA: the first canned object that satisfies the
  * request's schema is the reply. Stage schemas are strict, so canned answers
  * for different stages never cross-match. Recordable, so attribution specs
- * see real exchanges.
+ * see real exchanges. `fakeLlm()` with no canned answers is the failing
+ * model: every call is a schema miss and the stage records `llm-failed`.
  */
 export function fakeLlm(...canned: readonly unknown[]): LlmClient & LlmRecordable {
   const build = (sink: LlmCallSink | null): LlmClient & LlmRecordable => ({
-    enabled: true,
     model: 'test-model',
     async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
       const hit = canned
@@ -54,7 +54,6 @@ export function fakeLlm(...canned: readonly unknown[]): LlmClient & LlmRecordabl
 export function sequencedLlm(...canned: readonly unknown[]): LlmClient & LlmRecordable {
   const remaining = [...canned];
   const build = (sink: LlmCallSink | null): LlmClient & LlmRecordable => ({
-    enabled: true,
     model: 'test-model',
     completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
       const matches = remaining.flatMap((candidate, index) =>
@@ -69,12 +68,6 @@ export function sequencedLlm(...canned: readonly unknown[]): LlmClient & LlmReco
   });
   return build(null);
 }
-
-export const disabledLlm = (): LlmClient => ({
-  enabled: false,
-  model: null,
-  completeStructured: () => Promise.resolve(null),
-});
 
 /**
  * A model that waits: every call blocks until `release()` — so a spec can
@@ -91,7 +84,6 @@ export function gatedLlm(
   const build = (
     client: LlmClient & LlmRecordable,
   ): LlmClient & LlmRecordable & { release(): void } => ({
-    enabled: client.enabled,
     model: client.model,
     async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
       await gate;

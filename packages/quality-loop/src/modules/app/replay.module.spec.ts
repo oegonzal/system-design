@@ -36,7 +36,7 @@ describe('the replay module', () => {
         id,
         pipeline: 'tiny',
         pipelineVersion: '0.0.1',
-        llm: { enabled: true, model: 'test-model', reason: null },
+        llm: { model: 'test-model' },
         request: {
           goal: 'g',
           outputProvided: false,

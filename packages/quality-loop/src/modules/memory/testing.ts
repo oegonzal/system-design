@@ -26,6 +26,7 @@ export function fakeEmbeddings(
   const calls: string[][] = [];
   return {
     enabled: true,
+    reason: null,
     model: FAKE_MODEL,
     dimensions,
     calls,

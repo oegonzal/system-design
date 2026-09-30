@@ -130,7 +130,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-6',
     statement:
-      'Three prompt sources — authored, imported, generated — yield one shape, and a grader without a model answers 503 with its availability rather than an invented rubric.',
+      'Three prompt sources — authored, imported, generated — yield one shape, and a grader that cannot derive a rubric answers 503 with its diagnostic and model report rather than an invented one.',
   },
   {
     id: 'DEL-7',
@@ -181,7 +181,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-9',
     statement:
-      'The loop revises or retries with the selected remediations, keeps the best artifact by a strict-better gate, stops with an explicit reason, and without a live model escalates honestly with llm-disabled diagnostics and no invented number.',
+      'The loop revises or retries with the selected remediations, keeps the best artifact by a strict-better gate, stops with an explicit reason, and when every model call fails escalates honestly with llm-failed diagnostics and no invented number.',
   },
   {
     id: 'QL-10',
@@ -201,7 +201,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-13',
     statement:
-      'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, surviving a restart, and listing newest first.',
+      'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, listing newest first, and surviving a restart: a row left running by a dead process is failed only once its heartbeat is stale, and a late close from its owner reclaims it with the true outcome.',
   },
   {
     id: 'QL-14',
@@ -226,17 +226,37 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-18',
     statement:
-      'Embeddings are a port beside the LLM client chosen from the environment — no key or deterministic mode yields a disabled client with a reason — reached over an injectable transport that batches, retries a rate limit once and refuses a vector of the wrong length.',
+      'Embeddings are a port beside the LLM client chosen from the environment — no OPENAI_API_KEY yields a disabled client that carries its reason, the memory tier being optional — reached over an injectable transport that batches, retries a rate limit once and refuses a vector of the wrong length.',
   },
   {
     id: 'QL-20',
     statement:
-      'A run may carry its rubric: supplied criteria are used verbatim and the deriver is never asked, a rubric that does not fit the pipeline is refused before any row exists, POST /criteria derives a rubric from a goal alone and never invents one without a model, and the health report says which model backs the loop.',
+      'A run may carry its rubric: supplied criteria are used verbatim and the deriver is never asked, a rubric that does not fit the pipeline is refused before any row exists, POST /criteria derives a rubric from a goal alone and answers 503 rather than an empty rubric when the model derives none, and the health report names the model backing the loop.',
   },
   {
     id: 'QL-21',
     statement:
       "The studio's two pipelines are ordinary registered pipelines: a canvas is judged as a provided artifact whose locations are positional with the author's ids printed beside them, the coach keeps every author id and prefixes what it adds with ai-, and a prompt drafted from an experience renders through the one markdown convention the studio stores — both pipelines being internal to the orchestrators, never routes for a brief.",
+  },
+  {
+    id: 'QL-22',
+    statement:
+      'The loop boots only with a model provider — ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code — and exits 1 naming both otherwise; replay boots without one because it calls no model; availability is read from the constructed client, never re-derived from the environment.',
+  },
+  {
+    id: 'QL-23',
+    statement:
+      'A run may adopt a recorded iteration of an earlier run — same pipeline id and version, equal rubric — verbatim as iteration 1 in mode adopted, with no model call, and the record says which run it adopted from.',
+  },
+  {
+    id: 'QL-24',
+    statement:
+      'Every pipeline declares its goal source; a composed-goal pipeline is never a route for a brief, a target for an orchestrator, or a choice in the loop UI.',
+  },
+  {
+    id: 'QL-25',
+    statement:
+      'A pipeline may declare a deterministic normalize the loop applies to produced artifacts only, before validation, so what is judged is what is stored; and a producer is told why its last revision was refused by a validator.',
   },
   // Quality-loop web client (packages/quality-loop-ui)
   {

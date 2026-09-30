@@ -1,15 +1,15 @@
 import type { ZodType } from 'zod';
 
 /**
- * The one seam every LLM feature goes through — prompt enrichment in the API,
- * the design critic in the eval worker. Callers never construct an SDK client
- * or read env vars; they receive an `LlmClient` and behave identically
- * whether it is the real thing or the no-op.
+ * The one seam every model call goes through. Callers never construct an SDK
+ * client or read env vars; they receive an `LlmClient` and behave identically
+ * on either provider route.
  *
  * The contract is deliberately narrow: one structured call, `null` on any
- * failure. Every caller must already have a deterministic answer it is
- * improving on, so "the model was unavailable / refused / returned junk" is
- * never an error path — it is the deterministic path.
+ * failure — a refusal, a parse miss, an API error. A caller records that as
+ * `llm-failed` and carries on honestly; it never invents an answer. A process
+ * that would call a model and has no provider does not boot, so there is no
+ * "disabled" client to branch on.
  */
 export interface StructuredRequest<T> {
   /** System prompt — role, constraints, tone. */
@@ -23,10 +23,8 @@ export interface StructuredRequest<T> {
 }
 
 export interface LlmClient {
-  /** False for the no-op client — callers may skip prompt assembly entirely. */
-  readonly enabled: boolean;
-  /** Model id in use, or null when disabled. Persisted for audit (e.g. evaluation.criticModel). */
-  readonly model: string | null;
+  /** Model id in use. Persisted for audit beside every run. */
+  readonly model: string;
   /** Returns the validated object, or null on refusal, parse failure, or API error. */
   completeStructured<T>(request: StructuredRequest<T>): Promise<T | null>;
 }

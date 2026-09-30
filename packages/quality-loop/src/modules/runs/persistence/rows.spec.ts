@@ -57,7 +57,7 @@ describe('the run rows', () => {
 
   it('[QL-13] keeps an escalated run honest: no criteria, no artifact, the diagnostics intact', () => {
     const source = fullRecord({
-      llm: { enabled: false, model: null, reason: 'deterministic' },
+      llm: { model: 'test-model' },
       exchanges: [],
       trace: fullTrace({
         contract: { goal: '# Goal', criteria: [] },
@@ -79,7 +79,7 @@ describe('the run rows', () => {
               findings: [],
               discarded: [],
               diagnostics: [
-                { stage: 'producer', sample: null, reason: 'llm-disabled', detail: null },
+                { stage: 'producer', sample: null, reason: 'llm-failed', detail: null },
               ],
             },
             remediations: [],
@@ -129,7 +129,7 @@ describe('the run rows', () => {
       iterations: 1,
       criteria: 2,
       exchangeCount: 2,
-      llm: { enabled: true, model: 'test-model', reason: null },
+      llm: { model: 'test-model' },
     });
   });
 });

@@ -52,15 +52,17 @@ describe('HttpQualityLoopClient', () => {
     expect(await client.getRun('r2')).toBeNull();
   });
 
-  it('[DEL-6] a 503 from /criteria is a 503 carrying the availability; a refusal is 502; a timeout is 504; a dead socket is 502', async () => {
-    const llm = { enabled: false, model: null, reason: 'no-key' };
-    const noModel = new HttpQualityLoopClient(
+  it('[DEL-6] a 503 from /criteria is a 503 carrying the diagnostic and the model; a refusal is 502; a timeout is 504; a dead socket is 503', async () => {
+    const llm = { model: 'm' };
+    const diagnostic = { stage: 'criteria', sample: null, reason: 'llm-failed', detail: null };
+    const failed = new HttpQualityLoopClient(
       'http://loop',
-      scripted(() => json(503, { message: 'no model', llm })).fetch,
+      scripted(() => json(503, { message: 'the model derived no criteria', llm, diagnostic }))
+        .fetch,
     );
-    await expect(noModel.deriveCriteria({ pipeline: 'p', goal: 'g' })).rejects.toMatchObject({
+    await expect(failed.deriveCriteria({ pipeline: 'p', goal: 'g' })).rejects.toMatchObject({
       constructor: ServiceUnavailableException,
-      response: { llm },
+      response: { llm, diagnostic },
     });
 
     const refusing = new HttpQualityLoopClient(
@@ -83,13 +85,13 @@ describe('HttpQualityLoopClient', () => {
       'http://loop',
       scripted(() => new TypeError('fetch failed')).fetch,
     );
-    await expect(dead.health()).rejects.toBeInstanceOf(BadGatewayException);
+    await expect(dead.health()).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
   it('reads health unwrapped, and a library document by a path id encoded segment by segment', async () => {
     const { fetch, calls } = scripted(({ url }) =>
       url.endsWith('/health')
-        ? json(200, { status: 'ok', llm: { enabled: true, model: 'm', reason: null } })
+        ? json(200, { status: 'ok', llm: { model: 'm' } })
         : url.endsWith('/prompts/agentic/workflow%20graph')
           ? json(200, { data: { id: 'agentic/workflow graph', title: 't', markdown: '# t' } })
           : json(404, {}),
@@ -98,7 +100,7 @@ describe('HttpQualityLoopClient', () => {
 
     expect(await client.health()).toEqual({
       status: 'ok',
-      llm: { enabled: true, model: 'm', reason: null },
+      llm: { model: 'm' },
     });
     expect((await client.getPrompt('agentic/workflow graph'))?.title).toBe('t');
     expect(calls[1]?.url).toBe('http://loop/prompts/agentic/workflow%20graph');

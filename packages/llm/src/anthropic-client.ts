@@ -11,7 +11,7 @@ export const DEFAULT_LLM_MODEL = 'claude-sonnet-5';
  * Real Claude client. `messages.parse` + `zodOutputFormat` makes the schema a
  * server-side output constraint, so "the model returned prose instead of
  * JSON" stops being a failure mode; what remains (refusal, API error,
- * parse miss) maps to `null` and the caller's deterministic path.
+ * parse miss) maps to `null`, which the caller records as `llm-failed`.
  *
  * `claude-sonnet-5` is the default: the critic and enricher run on every
  * submission, and Sonnet's cost/latency fits a background loop. Set
@@ -22,7 +22,6 @@ export const DEFAULT_LLM_MODEL = 'claude-sonnet-5';
  * modes all exist at once. Everything below the `return` is lost to callers.
  */
 export class AnthropicLlmClient implements LlmClient, LlmRecordable {
-  readonly enabled = true;
   readonly model: string;
 
   private readonly client: Anthropic;

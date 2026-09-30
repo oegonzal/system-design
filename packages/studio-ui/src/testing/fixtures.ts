@@ -349,7 +349,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     runId: 'run-1',
     iteration: 1,
     status: 'complete',
-    llm: { enabled: true, model: 'test-model', reason: null },
+    llm: { model: 'test-model' },
     overall: 72,
     decision: 'revise',
     dimensions: { coverage: 80, quality_attributes: 60, compliance: 90 },
@@ -377,7 +377,7 @@ export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveR
     runId: 'run-2',
     sessionId: 'session-1',
     status: 'running',
-    llm: { enabled: true, model: 'test-model', reason: null },
+    llm: { model: 'test-model' },
     exchangeCount: 4,
     iterations: [
       { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },

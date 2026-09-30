@@ -6,9 +6,10 @@ import {
   MAX_IMPROVE_ITERATIONS,
   type ImproveIterationDto,
   type ImproveRunDto,
-  type LlmAvailabilityDto,
   type StopReason,
 } from '@sysdesign/contracts';
+
+import type { GraderAvailability } from './grader-availability';
 import {
   Badge,
   Button,
@@ -29,7 +30,7 @@ export interface ImprovementPanelProps {
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
   message: string;
   /** null while loading; the idle copy explains a disabled coach honestly. */
-  availability: LlmAvailabilityDto | null;
+  availability: GraderAvailability;
   /** True while the draft is being posted, before a run id exists. */
   starting?: boolean;
   /** Nothing on the canvas — there is nothing to coach. */
@@ -67,18 +68,10 @@ const STOPPED_COPY: Record<StopReason, string> = {
   escalated: 'The coach escalated — the loop could not score this design.',
   plateau: 'The coach plateaued — its last revisions stopped improving the score.',
   'max-iterations': 'The coach used its iteration budget.',
-  'producer-unavailable': 'The coach has no model to revise with.',
 };
 
-function unavailableCopy(availability: LlmAvailabilityDto): string {
-  if (availability.reason === 'deterministic') {
-    return 'The coach is off in deterministic mode — set QUALITY_LOOP_DETERMINISTIC=0 to enable it.';
-  }
-  if (availability.reason === 'no-key') {
-    return 'The coach needs a live model — set ANTHROPIC_API_KEY, or QUALITY_LOOP_AUTH=claude-code to use your Claude login.';
-  }
-  return 'The coach cannot reach the quality loop right now.';
-}
+/** The one way the coach can be unavailable: a booted loop always has a model, so only "unreachable" remains. */
+const UNREACHABLE_COPY = 'The coach cannot reach the quality loop right now.';
 
 /** The strictly-better iteration that was imported with the highest score — the one worth loading. */
 function bestImported(run: ImproveRunDto): ImproveIterationDto | null {
@@ -112,7 +105,8 @@ export function ImprovementPanel({
 }: ImprovementPanelProps) {
   const [iterations, setIterations] = useState(DEFAULT_IMPROVE_ITERATIONS);
   const active = starting || isPolling || (run !== null && run.status === 'running');
-  const unavailable = availability !== null && !availability.enabled;
+  const unavailable = availability.status !== 'reachable';
+  const unreachable = availability.status === 'unreachable';
   const best = run ? bestImported(run) : null;
 
   return (
@@ -144,15 +138,15 @@ export function ImprovementPanel({
             variant="solid"
             onClick={() => onStart(iterations)}
             disabled={active || unavailable || canvasEmpty}
-            title={unavailable && availability ? unavailableCopy(availability) : undefined}
+            title={unreachable ? UNREACHABLE_COPY : undefined}
             data-testid="improve-run"
           >
             {active ? 'Coaching…' : 'Improve with the coach'}
           </Button>
         </Stack>
-        {unavailable && availability ? (
+        {unreachable ? (
           <Text size="sm" tone="muted" data-testid="improver-unavailable">
-            {unavailableCopy(availability)}
+            {UNREACHABLE_COPY}
           </Text>
         ) : null}
       </Stack>

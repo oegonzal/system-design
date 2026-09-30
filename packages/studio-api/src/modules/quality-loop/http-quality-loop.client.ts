@@ -69,9 +69,11 @@ export class HttpQualityLoopClient extends QualityLoopClient {
     const answer = await this.call('POST', '/criteria', request, DERIVE_TIMEOUT_MS);
     if (answer.status === 200) return data<DerivedCriteriaDto>(answer.body);
     if (answer.status === 503) {
+      const body = answer.body as { llm?: unknown; diagnostic?: unknown };
       throw new ServiceUnavailableException({
-        message: `the quality loop has no model to derive criteria: ${messageOf(answer.body)}`,
-        llm: (answer.body as { llm?: unknown }).llm ?? null,
+        message: `the quality loop could not derive criteria: ${messageOf(answer.body)}`,
+        llm: body.llm ?? null,
+        diagnostic: body.diagnostic ?? null,
       });
     }
     throw this.refused('POST /criteria', answer);
@@ -133,7 +135,8 @@ export class HttpQualityLoopClient extends QualityLoopClient {
           `the quality loop did not answer ${method} ${path} within ${timeoutMs} ms`,
         );
       }
-      throw new BadGatewayException(`the quality loop is unreachable: ${describe(error)}`);
+      // A grader nobody can reach is unavailable, not a gateway that answered badly.
+      throw new ServiceUnavailableException(`the quality loop is unreachable: ${describe(error)}`);
     }
     const text = await response.text();
     let parsed: unknown;

@@ -4,5 +4,4 @@ export * from './create-client';
 export * from './embedding-client';
 export * from './exchange';
 export * from './llm-client';
-export * from './noop-client';
 export * from './openai-embedding-client';

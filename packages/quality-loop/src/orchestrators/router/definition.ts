@@ -20,7 +20,7 @@ export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {
   takesTarget: false,
   reasons: ROUTER_STEP_REASONS,
   normalize: bareRequest,
-  context: (ports) => Promise.resolve({ classifier: ports.llm }),
+  context: (ports) => Promise.resolve({ classifier: ports.model }),
   steps: [
     { id: 'classify', run: classify },
     {

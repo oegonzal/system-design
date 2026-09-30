@@ -9,7 +9,7 @@ import type {
   StartQualityRunRequest,
   SuccessCriterion,
 } from '@sysdesign/contracts';
-import { qualityLoopAvailabilityFromEnv, type LlmClient, type LlmExchange } from '@sysdesign/llm';
+import type { LlmClient, LlmExchange } from '@sysdesign/llm';
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
 
 import { summariseExchange, type RunRecord } from '../../core/contracts';
@@ -21,7 +21,6 @@ import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
 import type { RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
-import { availabilityOf } from './llm-backed';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
 /**
@@ -73,8 +72,8 @@ export class RunsService {
 
   /**
    * The derive-criteria stage alone: one model call, no run row, no dump.
-   * Without a model the criteria are empty and the diagnostic says why —
-   * a rubric is never invented.
+   * When the model derives nothing the criteria are empty and the diagnostic
+   * says why — the controller turns that into 503; a rubric is never invented.
    */
   async deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto> {
     const definition = this.resolve(request.pipeline);
@@ -177,8 +176,9 @@ export class RunsService {
     }
   }
 
+  /** Which model backs this process — a booted loop always has one. */
   private availability(): RunRecord['llm'] {
-    return availabilityOf(this.llm, () => qualityLoopAvailabilityFromEnv().reason);
+    return { model: this.llm.model };
   }
 
   private async open(

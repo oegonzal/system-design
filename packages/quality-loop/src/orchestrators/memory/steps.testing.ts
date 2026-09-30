@@ -16,7 +16,7 @@ import {
 import type { StepContext } from '../runner/definition';
 import { fakeStepContext } from '../runner/testing';
 import { CachedEmbeddings } from './embeddings';
-import { noQueryProbes, type MemoryPorts } from './ports';
+import type { MemoryPorts, QueryProbes } from './ports';
 import type { MemoryOutputs } from './steps';
 import { GOAL, hitOf } from './testing';
 
@@ -35,7 +35,7 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
   status: failed || trace === null ? 'failed' : 'complete',
   startedAt: '2026-09-07T00:00:00.000Z',
   finishedAt: '2026-09-07T00:01:00.000Z',
-  llm: { enabled: true, model: 'test-model', reason: null },
+  llm: { model: 'test-model' },
   request: {
     goal: trace?.contract.goal ?? GOAL,
     outputProvided: false,
@@ -64,6 +64,9 @@ export const memoryContext = (overrides: Partial<MemoryContextDto> = {}): Memory
 });
 
 /** Ports over an in-memory store seeded with the sample hits. */
+/** Derives nothing; recall falls back to the goal — the default probes a spec runs over. */
+export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
+
 export function memoryPorts(overrides: Partial<MemoryPorts> = {}): MemoryPorts {
   const store = new InMemoryMemoryStore();
   void store.replaceRunChunks(

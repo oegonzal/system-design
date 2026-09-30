@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { AnthropicLlmClient } from './anthropic-client';
 import { asRecordable, type LlmCall } from './exchange';
-import { NoopLlmClient } from './noop-client';
 
 const schema = z.object({ verdict: z.string() });
 
@@ -121,11 +120,13 @@ describe('AnthropicLlmClient', () => {
 });
 
 describe('asRecordable', () => {
-  it('offers recording for the real client and refuses it for the no-op', () => {
+  it('offers recording for the real client and refuses it for a client that cannot record', () => {
     expect(
       asRecordable(new AnthropicLlmClient({ client: fakeSdk(() => message()) })),
     ).not.toBeNull();
-    // The honest answer: it never talks to a model, so there is nothing to report.
-    expect(asRecordable(new NoopLlmClient())).toBeNull();
+    // A plain client has no calls to report.
+    expect(
+      asRecordable({ model: 'x', completeStructured: () => Promise.resolve(null) }),
+    ).toBeNull();
   });
 });

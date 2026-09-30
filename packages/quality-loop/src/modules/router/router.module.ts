@@ -1,12 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
-import { qualityLoopAvailabilityFromEnv, type LlmClient } from '@sysdesign/llm';
+import type { LlmClient } from '@sysdesign/llm';
 
-import {
-  noClassifier,
-  type BriefClassifier,
-  type RouterPorts,
-} from '../../orchestrators/router/ports';
-import { availabilityOf, llmBacked } from '../runs/llm-backed';
+import type { BriefClassifier, RouterPorts } from '../../orchestrators/router/ports';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { LlmBriefClassifier } from './classifier/llm-brief-classifier';
@@ -26,18 +21,17 @@ const logger = new Logger('RouterModule');
   controllers: [RouterController],
   providers: [
     RouterService,
-    // No model means no classifier, and a classify step that says so.
     {
       provide: BRIEF_CLASSIFIER,
       useFactory: (client: LlmClient): BriefClassifier =>
-        llmBacked(client, (llm, warn) => new LlmBriefClassifier(llm, warn), noClassifier, logger),
+        new LlmBriefClassifier(client, (message) => logger.warn(message)),
       inject: [QUALITY_LOOP_LLM],
     },
     {
       provide: ROUTER_PORTS,
       useFactory: (classifier: BriefClassifier): RouterPorts => ({
         classifier,
-        llm: availabilityOf(classifier, () => qualityLoopAvailabilityFromEnv().reason),
+        model: { model: classifier.model },
       }),
       inject: [BRIEF_CLASSIFIER],
     },

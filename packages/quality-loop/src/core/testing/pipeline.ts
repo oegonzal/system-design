@@ -136,7 +136,6 @@ export const reported = <R>(report: R): LensOutcome<R> => ({ report, diagnostic:
 export const scriptedProducer = (outputs: readonly (TinyOutput | null)[]): Producer<TinyOutput> => {
   let call = 0;
   return {
-    enabled: true,
     produce: () => {
       const output = outputs[Math.min(call++, outputs.length - 1)] ?? null;
       return Promise.resolve({
@@ -204,7 +203,7 @@ export const scriptedEvaluator = (
 export const DRAFT_1: TinyOutput = { text: 'first', parts: ['a'] };
 export const DRAFT_2: TinyOutput = { text: 'second', parts: ['a', 'b'] };
 
-/** A deriver that answers with the given criteria, or — given null — as a model that is off. */
+/** A deriver that answers with the given criteria, or — given null — as a model that failed. */
 export const scriptedDeriver =
   (criteria: SuccessCriterion[] | null): Stages<TinyOutput>['deriveCriteria'] =>
   () =>
@@ -212,7 +211,7 @@ export const scriptedDeriver =
       criteria,
       diagnostic: criteria
         ? null
-        : { stage: 'criteria', sample: null, reason: 'llm-disabled' as const, detail: null },
+        : { stage: 'criteria', sample: null, reason: 'llm-failed' as const, detail: null },
     });
 
 /** The tiny task's schema, as a blocking validator the loop runs first. */

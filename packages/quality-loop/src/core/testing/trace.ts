@@ -117,7 +117,7 @@ export const runDto = (
   status: trace === null ? 'failed' : 'complete',
   startedAt: '2026-09-22T00:00:00.000Z',
   finishedAt: '2026-09-22T00:01:00.000Z',
-  llm: { enabled: true, model: 'test-model', reason: null },
+  llm: { model: 'test-model' },
   request: {
     goal: trace?.contract.goal ?? 'g',
     outputProvided: false,

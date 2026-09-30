@@ -1,5 +1,5 @@
 import type { ApiResponse } from './envelope';
-import type { LlmAvailabilityDto } from './llm-availability';
+import type { LlmModelDto } from './llm-model';
 import type { EvidenceResult } from './quality-loop/evidence';
 import type { QualityRunStatus } from './quality-loop/runs';
 import type {
@@ -50,7 +50,7 @@ export interface EvaluationDto {
   /** Which iteration of the run this revision is: 1 for a submission, k for a coach revision. */
   iteration: number;
   status: QualityRunStatus;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
   overall: number | null;
   decision: Decision | null;
   /** Keyed by the pipeline's own dimension names; null means the dimension was not assessed. */

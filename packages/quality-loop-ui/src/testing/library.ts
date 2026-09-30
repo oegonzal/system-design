@@ -109,7 +109,7 @@ export const makeRunSummary = (
   iterations: 1,
   criteria: 2,
   exchangeCount: 4,
-  llm: { enabled: true, model: 'test-model', reason: null },
+  llm: { model: 'test-model' },
   ...overrides,
 });
 

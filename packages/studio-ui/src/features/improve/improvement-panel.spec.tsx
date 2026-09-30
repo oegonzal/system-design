@@ -8,10 +8,10 @@ import { makeImproveRun } from '../../testing/fixtures';
 import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
-const LIVE = { enabled: true, model: 'claude', reason: null } as const;
+const LIVE = { status: 'reachable', model: 'claude' } as const;
 
 function renderPanel(overrides: Partial<ImprovementPanelProps> = {}) {
-  renderWithTheme(
+  return renderWithTheme(
     <ImprovementPanel
       run={null}
       error={null}
@@ -42,15 +42,15 @@ describe('ImprovementPanel', () => {
     expect(onStart).toHaveBeenCalledWith(2);
   });
 
-  it('disables the coach with an honest reason when the grader is off', () => {
-    renderPanel({ availability: { enabled: false, model: null, reason: 'no-key' } });
+  it('[UX-11] says so when the quality loop cannot be reached, and waits silently while availability is checked', () => {
+    const { unmount } = renderPanel({ availability: { status: 'unreachable' } });
     expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId('improver-unavailable').textContent).toContain('ANTHROPIC_API_KEY');
-  });
-
-  it('says so when the quality loop cannot even be reached', () => {
-    renderPanel({ availability: { enabled: false, model: null, reason: null } });
     expect(screen.getByTestId('improver-unavailable').textContent).toContain('cannot reach');
+    unmount();
+
+    renderPanel({ availability: { status: 'checking' } });
+    expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId('improver-unavailable')).toBeNull();
   });
 
   it('[UX-11] renders the live run: model calls so far and one row per iteration', () => {

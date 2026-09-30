@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ClaudeAgentLlmClient, extractStructured } from './claude-agent-client';
-import { createQualityLoopLlmFromEnv, qualityLoopAvailabilityFromEnv } from './create-client';
-import { NoopLlmClient } from './noop-client';
+import { createQualityLoopLlmFromEnv, describeModelProvider } from './create-client';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
 
@@ -99,32 +98,21 @@ describe('claude-code subscription auth for the quality loop', () => {
     const env = { QUALITY_LOOP_AUTH: 'claude-code' };
     const client = createQualityLoopLlmFromEnv(env);
     expect(client).toBeInstanceOf(ClaudeAgentLlmClient);
-    expect(client.enabled).toBe(true);
-    expect(qualityLoopAvailabilityFromEnv(env)).toEqual({
-      enabled: true,
-      model: 'claude-code/subscription',
-      reason: null,
-    });
+    expect(describeModelProvider(env)).toEqual({ model: 'claude-code/subscription' });
   });
 
-  it('an explicit API key outranks claude-code auth; determinism outranks both', () => {
+  it('an explicit API key outranks claude-code auth', () => {
     const withKey = createQualityLoopLlmFromEnv({
       QUALITY_LOOP_AUTH: 'claude-code',
       ANTHROPIC_API_KEY: 'sk-test',
     });
     expect(withKey).not.toBeInstanceOf(ClaudeAgentLlmClient);
-    expect(withKey.enabled).toBe(true);
-
-    const deterministic = createQualityLoopLlmFromEnv({
-      QUALITY_LOOP_DETERMINISTIC: '1',
-      QUALITY_LOOP_AUTH: 'claude-code',
-    });
-    expect(deterministic).toBeInstanceOf(NoopLlmClient);
+    expect(withKey.model).toBe('claude-sonnet-5');
   });
 
   it('LLM_MODEL pins the agent model and the availability label', () => {
     const env = { QUALITY_LOOP_AUTH: 'claude-code', LLM_MODEL: 'claude-opus-5' };
     expect(createQualityLoopLlmFromEnv(env).model).toBe('claude-opus-5');
-    expect(qualityLoopAvailabilityFromEnv(env).model).toBe('claude-opus-5');
+    expect(describeModelProvider(env).model).toBe('claude-opus-5');
   });
 });

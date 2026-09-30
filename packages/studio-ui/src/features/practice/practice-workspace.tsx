@@ -6,7 +6,6 @@ import type {
   DesignRevisionSummaryDto,
   DesignSessionDto,
   EvaluationFindingDto,
-  LlmAvailabilityDto,
   PromptDto,
 } from '@sysdesign/contracts';
 import {
@@ -37,6 +36,12 @@ import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { buildAndDownloadRunZip } from '../export/export-run';
 import { ImprovementPanel } from '../improve/improvement-panel';
+import {
+  CHECKING,
+  reachable,
+  UNREACHABLE,
+  type GraderAvailability,
+} from '../improve/grader-availability';
 import { useImproveRunPolling } from '../improve/use-improve-run-polling';
 import { PromptPane } from '../prompts/prompt-pane';
 import { usePromptCriteria } from '../prompts/use-prompt-criteria';
@@ -65,7 +70,6 @@ const WORKSPACE_MIN_HEIGHT = '640px';
 const PROPERTIES_MAX_SHARE = '45%';
 
 /** The grader could not even be asked — the coach reads it as off, without a reason. */
-const UNREACHABLE: LlmAvailabilityDto = { enabled: false, model: null, reason: null };
 
 /**
  * Fills the shell's Main (a flex column with a definite height): shrinkable
@@ -244,7 +248,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [exporting, setExporting] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [startingImprove, setStartingImprove] = useState(false);
-  const [availability, setAvailability] = useState<LlmAvailabilityDto | null>(null);
+  const [availability, setAvailability] = useState<GraderAvailability>(CHECKING);
 
   const promptCriteria = usePromptCriteria(prompt);
   const { criteria } = promptCriteria;
@@ -300,14 +304,14 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     setReloadKey((key) => key + 1);
   }, []);
 
-  // Whether the grader — and so the coach — can run at all. A 503 (or no
-  // answer) is "unreachable", which the coach panel explains without a reason.
+  // Whether the grader — and so the coach — can run at all. A booted loop
+  // always has a model; a 503 (or no answer) is "unreachable".
   useEffect(() => {
     let disposed = false;
     void api
       .gradingAvailability()
-      .then((loaded) => {
-        if (!disposed) setAvailability(loaded);
+      .then((report) => {
+        if (!disposed) setAvailability(reachable(report));
       })
       .catch(() => {
         if (!disposed) setAvailability(UNREACHABLE);

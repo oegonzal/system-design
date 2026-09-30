@@ -1,7 +1,7 @@
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
-  LlmAvailabilityDto,
+  LlmModelDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityRunDto,
@@ -9,10 +9,10 @@ import type {
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
-/** What `GET /health` answers: liveness and which model backs the loop. */
+/** What `GET /health` answers: liveness and which model backs the loop — a booted loop always names one. */
 export interface QualityLoopHealth {
   status: string;
-  llm: LlmAvailabilityDto;
+  llm: LlmModelDto;
 }
 
 /**
@@ -25,7 +25,7 @@ export interface QualityLoopHealth {
  */
 export abstract class QualityLoopClient {
   abstract health(): Promise<QualityLoopHealth>;
-  /** The derive stage alone. Throws 503 (with the availability) when no model backs the loop. */
+  /** The derive stage alone. Throws 503 (with the loop's diagnostic) when the model derived nothing. */
   abstract deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto>;
   abstract startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto>;
   /** Null when the loop has no such run. */

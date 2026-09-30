@@ -1,7 +1,7 @@
 /**
  * Attribution is explicit, not temporal: lenses run concurrently, so every
  * stage instance gets its own recording twin whose closure stamps the scope
- * and a per-scope ordinal. A no-op client is not recordable and passes through.
+ * and a per-scope ordinal. A client that cannot record (a spec's plain fake) passes through.
  */
 import { asRecordable, type LlmClient } from '@sysdesign/llm';
 
