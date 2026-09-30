@@ -11,11 +11,12 @@ runs actually showed. For the five pipelines the rest of the app runs, see
 Two facts organise everything below:
 
 1. **The engine never changed.** `core/` gained one file for all of this —
-   `outputs.ts`, the standard view of what a run produced — and no edit. The
-   composition is an _orchestrator_: data under `src/orchestrators/memory/`
-   that maps three registered pipelines together, executed by one generic
-   runner beside it (§4), exactly as a pipeline is data under `src/pipelines/`
-   executed by the engine. What the two memory pipelines have gained since — a
+   `outputs.ts`, the standard view of what a run produced, since grown into
+   the folder `core/outputs/` — and no edit. The composition is an
+   _orchestrator_: data under `src/orchestrators/memory/` that maps three
+   registered pipelines together, executed by one generic runner beside it
+   (§4), exactly as a pipeline is data under `src/pipelines/` executed by the
+   engine. What the two memory pipelines have gained since — a
    probe list in the recall query, an alias space for it, a gated
    `run_specific` — lives inside their own folders, which is what being an
    instance of `PipelineDefinition` is for. A fourth pipeline was registered
@@ -400,10 +401,12 @@ stored is a 404, embeddings being off is a 400.
 **The ledger and the sweep.** `StepLedger` (in the runner) mutates the record
 in memory and chains every flush onto one serial promise, so writes land in
 order and a failed flush is logged rather than thrown — the record in memory
-is the truth and `close()` writes it whole. Writes after `open` are guarded by
-`status: 'running'`, so a late flush never resurrects a row the boot sweep
-already failed. `OrchestrationService.onModuleInit` fails every row still
-`running` from a dead process through the same `closeSteps` the error path
+is the truth and `close()` writes it whole. Every flush refreshes the row's
+heartbeat, and writes after `open` are guarded by `status: 'running'`, so a
+late flush never resurrects a row the janitor failed; only the owner's close
+reclaims a row failed as interrupted, with the true outcome. The janitor
+(`src/modules/janitor/`) fails a row only once its heartbeat is stale and no
+child run is still heartbeating, through the same `closeSteps` the error path
 uses; the memory module's own boot hook only verifies the store and logs.
 
 ---
@@ -883,10 +886,11 @@ Notes, not fixes. None affects behaviour.
   need.
 - Nothing prunes either store. `replaceRunChunks` deletes only by run id, and
   the embedding cache has no expiry.
-- The boot sweep runs in every process that boots `AppModule`, including the
-  CLI. Running `pnpm quality-loop:run` while the server has a memory run in
-  flight will fail that run as `interrupted`. Quality runs have carried the
-  same property since `d0c92e3`.
+- The boot sweep ran in every process that booted `AppModule`, the CLI
+  included, so `pnpm quality-loop:run` beside a server with a memory run in
+  flight failed that run as `interrupted`, as quality runs had since
+  `d0c92e3`. Closed with SEAM-4: a row is failed only once its heartbeat is
+  stale, and `replay` sweeps nothing.
 - `overview.md` has since been rewritten around the studio's three
   quality-loop paths; the studio itself no longer calls a model, and probe
   derivation is one of the loop's call sites like any lens.
@@ -898,9 +902,9 @@ failure becomes a regression fixture, is not (STUDIO-7).
 
 Not built yet, by choice: filtered or per-project search, pruning and expiry,
 storing findings and sections as chunks rather than only lessons (the kinds
-are already in the vocabulary), a web-client control for memory runs, a Tilt
-manifest for the vector store, a score floor on retrieval, and any movement of
-the two memory pipelines' thresholds against a corpus. The corpus itself is no
+are already in the vocabulary), a web-client control for memory runs, a score
+floor on retrieval, and any movement of the two memory pipelines' thresholds
+against a corpus. The corpus itself is no
 longer missing — §6 is what reading it produced — but nothing has been tuned
 because of it, and a floor set on six chunks would be a number invented to look
 like a measurement.
@@ -936,12 +940,14 @@ separate limits were wrong, and it took three runs to establish which.
 
 Nearly every lens in every pipeline overran the number beside it, and had done
 all along. It was invisible because the subscription client passes `maxTokens`
-to the Agent SDK, which does not enforce it — but `anthropic-client.ts` sets it
-as a hard `max_tokens`. The system would have appeared to work until the first
-run with an API key, at which point most lenses would truncate mid-JSON and
-fail their schema. Every cap now sits above its measured maximum: producer
-16000, critics 12000, evaluators 8000, `deriveCriteria` 4000, in all four
-pipelines.
+to the Agent SDK, which does not enforce it — but the API-key client the seam
+also had then, `anthropic-client.ts`, set it as a hard `max_tokens`. The
+system would have appeared to work until the first run with an API key, at
+which point most lenses would have truncated mid-JSON and failed their
+schema. That client is gone — the loop runs only on the subscription — but a
+cap is still a contract with whichever client enforces it next. Every cap now
+sits above its measured maximum: producer 16000, critics 12000, evaluators
+8000, `deriveCriteria` 4000, in all four pipelines.
 
 The output schema was the second, and the first diagnosis of it was wrong in a
 way worth recording, because the wrong fix made things worse.

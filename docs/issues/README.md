@@ -71,11 +71,11 @@ of re-deriving the problem.
 | STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                             | closed   | —        |
 | PLAT-1   | No observability integration                                             | open     | high     |
 | PLAT-2   | Nothing declared or deployed on AWS                                      | open     | medium   |
-| PLAT-3   | Tilt covers the studio but not the vector store or the quality loop      | open     | medium   |
+| PLAT-3   | Tilt covers the studio but not the vector store or the quality loop      | closed   | —        |
 | PLAT-4   | The quality-loop client has no browser journey                           | open     | low      |
-| PLAT-5   | Stale counts in four places                                              | open     | low      |
+| PLAT-5   | Stale counts in four places                                              | closed   | —        |
 | PLAT-6   | A root-level file outside every gate                                     | open     | low      |
-| PLAT-7   | A tracked note that trips the branding tripwire, already in history      | open     | high     |
+| PLAT-7   | A tracked note that trips the branding tripwire, already in history      | accepted | —        |
 | PLAT-8   | Not built at single-user scale: review queue, monitors, canary           | accepted | —        |
 | PLAT-9   | No docs index                                                            | open     | low      |
 

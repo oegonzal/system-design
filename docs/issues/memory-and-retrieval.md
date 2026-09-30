@@ -94,7 +94,7 @@ availability probe hit the vendor-hop lesson at 0.7155 and a freshness probe
 ranked the p99 lesson first, yet fusion over complete lists left it fifth.
 The store is now at 287 points.
 
-**Recommendation.** Run `POST /memory-runs/retrieval-report` over the fifteen
+**Recommendation.** Run `POST /memory/retrieval-report` over the fifteen
 agentic prompts and read the per-probe score distributions. Set a floor only
 if a gap separates served from unserved candidates; otherwise record that it
 does not and keep none. Try weighted fusion (a probe's own top score as its
@@ -200,10 +200,9 @@ returns the probes, each probe's ranking and the fused list.
 
 Filtered or per-project search; pruning and expiry (MEM-6); storing findings
 and sections as chunks rather than only lessons (the kinds are already in the
-vocabulary); a web-client control for memory runs; a Tilt manifest for the
-vector store (PLAT-3); and any movement of the two memory pipelines'
-thresholds against a corpus. Each was declined with a reason in memory-runs
-§11 and quality-loop.md; the reasons still hold.
+vocabulary); a web-client control for memory runs; and any movement of the
+two memory pipelines' thresholds against a corpus. Each was declined with a
+reason in memory-runs §11 and quality-loop.md; the reasons still hold.
 
 ---
 

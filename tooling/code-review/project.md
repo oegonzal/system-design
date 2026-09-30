@@ -25,11 +25,19 @@ anything the map already generates is deliberately absent, because a second copy
   envelope shapes, canvas node/edge kinds, appearance options, and the constant tuples the API
   validates against and the design system maps to tokens.
 - `criteria` — the brief's completion criteria as data, each claimed by a tagged test title.
-- `db` — the MikroORM entities, the hand-written migrations, and the seed.
+- `db` — the MikroORM entities, the hand-written migrations, the seed, and the one declaration of
+  the connection defaults.
 - `llm` — the model-client abstraction: one interface, one provider adapter (the Claude Code
   subscription, through the Agent SDK), and a login check that asks Claude Code whether it is signed
-  in — a process that needs a model and has no login fails at boot. Knows nothing about HTTP or the
-  canvas.
+  in — a process that needs a model and has no login fails at boot. Beside it, the embeddings port:
+  an OpenAI adapter over an injectable transport, or, with no key, a disabled client that carries its
+  reason, because the memory tier is optional. Knows nothing about HTTP or the canvas.
+- `nest-kit` — the Nest apps' shared plumbing: the zod validation pipe, the MikroORM root module,
+  the health controller, CORS, list paging and its envelope, LIKE escaping. Small on purpose:
+  anything here couples every API to it.
+- `run-dump` — the payload-agnostic half of a run dump: run ids, a folder written file by file
+  through a temp name and a rename, and one index row appended last. The quality loop lays out its
+  own records and writes them through it; the code review mints its run ids here.
 - `design-system` — the token layer plus domain-free primitives. Knows nothing about designs,
   sessions or evaluations.
 - `studio-ui` — the app: routes, the canvas, the feature components that _do_ know the domain, the
@@ -72,13 +80,17 @@ inventing something; code that breaks one is a finding.
 
 - **One vocabulary, declared in `contracts`.** Option tuples — node kinds, edge kinds, accents,
   colour modes, motion levels — live there because `type:shared` may depend on nothing else, and
-  because the NestJS services must not import React to learn what a valid value is. The API
-  validates with `@IsIn([...TUPLE])`; the design system maps every option under
+  because the NestJS services must not import React to learn what a valid value is. The APIs
+  validate with `z.enum(TUPLE)`; the design system maps every option under
   `satisfies Record<Option, …>`; adding a value therefore fails the build until every consumer
   accounts for it. Widening one of these to `string`, or re-declaring the vocabulary on one side,
   removes that guarantee and is a finding.
-- **DTO classes `implement` the contract interfaces.** The wire shape has one definition; a DTO that
-  restates fields without implementing the interface can drift from it silently.
+- **Requests are zod schemas, not DTO classes.** Every Nest app validates a body or query through
+  `nest-kit`'s `ZodValidationPipe` — a failure is a 400 whose issues name each path. A schema
+  `contracts` already carries (a design submission, a draft) is used verbatim rather than restated;
+  one declared beside a controller links to its contract type where one exists
+  (`satisfies z.ZodType<Contract>`) or exports its own (`z.infer`). A DTO class or a
+  class-validator decorator restating the rule is a second copy of it.
 - **Stories are the spec fixtures.** A spec that calls `composeStories` on its own component's
   stories is the house pattern: the state shown in the catalog is the state under test. That is not
   indirection. A component that ships stories but no spec is missing a test, not covered by one.
@@ -86,8 +98,8 @@ inventing something; code that breaks one is a finding.
   rather than stubbing the theme object.
 - **Completion criteria are traced by tag.** A test title containing `[UX-1]`, `[GEN-2]` or
   `[EVAL-3]` claims a criterion owned by `packages/criteria`, whose coverage check fails if any
-  criterion has no test. The tag is read statically across two test runners: a machine-checked
-  reference, not decoration.
+  criterion has no test or a test claims an id the registry does not declare. The tag is read
+  statically across two test runners: a machine-checked reference, not decoration.
 - **Deterministic before probabilistic.** The quality loop runs its validators before any lens is
   consulted, and a model's output never overrides a validator's or the controller's. The same shape
   governs this review pipeline. Code that lets a model decide what a deterministic check already

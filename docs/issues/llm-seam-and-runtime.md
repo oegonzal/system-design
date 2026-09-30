@@ -88,19 +88,23 @@ records two exchanges and one report.
 
 ### SEAM-3 · No temperature, seed or memoisation at the seam
 
-**Status** open · **Severity** medium · **Where** `packages/llm`
+**Status** open · **Severity** medium · **Where** `packages/llm/src/claude-agent-client.ts`
 
-**What.** Nothing in `packages/llm/src` sets `temperature`, `seed` or
-`top_p`; every lens samples at the transport's default. The CLI transport
-cannot set temperature at all; the API client could. No response is
-memoised (ENG-7), so no experiment can hold the judges fixed.
+**What.** The seam has one transport, Claude Code through the Agent SDK, and
+its options take no `temperature`, `seed` or `top_p`: every lens samples at
+Claude Code's default, and nothing in `packages/llm` can pin it. No response
+is memoised (ENG-7), so no experiment can hold the judges fixed.
 
-**Evidence.** `grep -ri temperature packages/llm/src` is empty; the retired
-gap analysis, §2.4 and §3.3.
+**Evidence.** `grep -ri temperature packages/llm/src` is empty, and the Agent
+SDK's `Options` declares none of the three; the retired gap analysis, §2.4
+and §3.3.
 
-**Recommendation.** Temperature 0 where the transport allows and record the
-setting on the exchange; memoisation per ENG-7; persist the per-lens model
-id on the report so a judge change is visible in the record.
+**Recommendation.** Memoisation per ENG-7 is the lever the transport leaves:
+a replayed response is the only judge that holds still. Persist the per-lens
+model id on the report so a judge change is visible in the record, and read
+the spread the seam cannot pin from the `calibration` orchestrator, which
+reports it per goal. Should a transport that takes a temperature ever join the
+seam, set 0 there and record it on the exchange.
 
 ---
 
@@ -197,5 +201,5 @@ reports where fresh panels disagree with the recorded verdict and each other.
 Both write a `PanelReportDto` on the record; nothing yet turns it into a
 regression fixture or runs in CI.
 
-**Verify.** The regression suite runs in CI without a key; the live harness
-writes its table to `docs/pipelines`.
+**Verify.** The regression suite runs in CI without a model login; the live
+harness writes its table to `docs/pipelines`.

@@ -61,13 +61,14 @@ share one fake loop (`packages/studio-testing`).
 
 ### Without Kubernetes — the same stack as local processes
 
-If you're not running Tilt/k8s, `pnpm stack:up` brings the same stack up with
-the backends as processes on this machine. Both launchers use one **durable**
-Postgres and Qdrant (the quality loop's memory store): the `docker-compose`
-services on ports **5433** and **6333**, with named volumes, so your practice
-runs survive a shutdown or reboot and either launcher shows the same ones.
-`tilt up` starts them through `pnpm stack:db` and `tilt down` leaves them
-running.
+If you're not running Tilt/k8s, `pnpm stack:up` runs the studio — API,
+quality loop and UI — as processes on this machine, on the same ports;
+`pnpm govcon:start` and `pnpm quality-loop-ui:serve` add the rest. Both
+launchers use one **durable** Postgres and Qdrant (the quality loop's memory
+store): the `docker-compose` services on ports **5433** and **6333**, with
+named volumes, so your practice runs survive a shutdown or reboot and either
+launcher shows the same ones. `tilt up` starts them through `pnpm stack:db`
+and `tilt down` leaves them running.
 
 ```bash
 pnpm stack:up     # durable db + vector store → migrate → seed → api + quality loop + ui
@@ -87,7 +88,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | -------------------------- | ------------------------------------------------------------------------------------------------- |
 | `packages/contracts`       | Wire types, `as const` vocabularies and the zod schemas every layer derives from                  |
 | `packages/db`              | MikroORM entities, migrations, seed — shared by the API and the quality loop                      |
-| `packages/llm`             | The one LLM seam: Claude via structured outputs on a key or the subscription route; none, no boot |
+| `packages/llm`             | The one LLM seam: Claude Code on the subscription login (none, no boot), plus the embeddings port |
 | `packages/nest-kit`        | Shared Nest plumbing: zod pipe, MikroORM root module, health, CORS, list paging, LIKE escaping    |
 | `packages/design-system`   | Emotion tokens → semantic roles → primitives, contrast-asserted                                   |
 | `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop     |

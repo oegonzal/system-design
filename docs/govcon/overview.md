@@ -9,7 +9,10 @@ is deterministic and every point is traced — and, from the same key, reads a
 notice's description, the awards the government already made (SAM.gov and
 USAspending), and the registrants behind them. Bids are tracked per notice.
 It is one Nest context two ways: a command line, and an HTTP surface the
-web client `packages/govcon-ui` operates.
+web client `packages/govcon-ui` operates. The API notes it started from — a
+first request against SAM.gov and USAspending, and the shape it was meant to
+grow into — are archived in
+[../archived/samgov-api-notes.md](../archived/samgov-api-notes.md).
 
 ## Why it is shaped this way
 

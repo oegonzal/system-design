@@ -22,40 +22,50 @@
 The only thing that has to persist for all of the above is the **database
 volume** — which is what the durable local stack guarantees.
 
-## Bringing your runs back in the future
+## Bringing your runs back: one stack, two launchers
+
+There is one local stack, whichever launcher starts it:
+
+- **The stores.** The `docker-compose` services are the one definition of
+  each: `db` (image `postgres:16-alpine`, **named volume** `sysdesign-pgdata`,
+  host port **5433**) and `vectors` (Qdrant, image `qdrant/qdrant:v1.19.1`,
+  **named volume** `sysdesign-qdrant`, host port **6333**, `QDRANT_URL`), both
+  `restart: unless-stopped`. `pnpm stack:db` brings them up and waits until
+  both answer (`pg_isready`, then `GET /readyz` on Qdrant); both launchers
+  begin with that same step.
+- **The schema and reference data.** `pnpm db:migrate` applies any pending
+  migrations and `pnpm db:seed` re-seeds the reference experiences; both are
+  idempotent, and the seed never touches your sessions.
+- **The apps.** The API (3000), the quality loop (3003), govcon (3004) and
+  the three web clients (4200, 4201, 4202) find the stores and one another at
+  their defaults, so no connection variable is set.
+
+The launchers differ only in where the apps run:
 
 ```bash
 # from the repo root, with the repo's Node on PATH
-pnpm stack:up
+pnpm stack:up   # stores → migrate → seed → the API, the loop and the studio UI as local processes
+tilt up         # stores → migrate → seed → the API, the loop and govcon as pods; the web clients locally
 ```
 
-This runs `scripts/stack.sh`, which:
-
-1. starts the durable Postgres and the vector store (`docker compose up -d db
-vectors`) — Postgres image `postgres:16-alpine`, **named volume**
-   `sysdesign-pgdata`, host port **5433**; Qdrant image `qdrant/qdrant:v1.19.1`,
-   **named volume** `sysdesign-qdrant`, host port **6333** (`QDRANT_URL`); both
-   `restart: unless-stopped`;
-2. waits for both to be ready (`pg_isready`, then `GET /readyz` on Qdrant);
-3. applies any pending migrations (`pnpm db:migrate`, idempotent) and re-seeds
-   the reference experiences (`pnpm db:seed`, idempotent — never touches your
-   sessions);
-4. starts the API, the quality loop and the UI, which find the stores and one
-   another at their defaults, so no connection variable is set; the loop runs
-   on this machine's Claude Code login.
+`pnpm stack:up` runs `scripts/stack.sh` and keeps the studio in the
+foreground (Ctrl-C stops it); `pnpm govcon:start` and
+`pnpm quality-loop-ui:serve` add the rest. Its loop runs on this machine's
+Claude Code login. Under `tilt up` the pods reach the stores on the host
+through `host.docker.internal` (the `local-stores` ConfigMap in
+`tilt/stores/`), and `tilt down` removes the pods and the dev servers but
+never stops the stores — so either launcher shows the same runs.
 
 `pnpm stack:down` stops both containers; the data stays in the named volumes.
-`pnpm stack:db` brings up only the database and the vector store (for
-tests/tools). `tilt up` brings the same runs back: its `stores` resource runs
-`pnpm stack:db`, and its pods use these containers. The quality loop's memory
-runs need the vector store and, for live embeddings, `OPENAI_API_KEY` in
-`.env` (Node loads the file on `serve` and `quality-loop:run`); without
+The quality loop's memory runs need the vector store and, for live
+embeddings, `OPENAI_API_KEY` in `.env` (Node loads the file on `serve` and
+`quality-loop:run`; under Tilt it rides in the loop's Secret, below); without
 either, memory steps skip with a stated reason and the target pipeline still
 runs.
 
 Because the volumes are named and the containers have `restart: unless-stopped`,
 the database and the vector store return on their own after a Docker or machine
-restart; `pnpm stack:up` then just re-attaches the app. Your sessions are
+restart; either launcher then just re-attaches the apps. Your sessions are
 exactly where you left them.
 
 ## Grading needs a model
@@ -207,17 +217,14 @@ may fail confusingly (your data still safe — nothing truncates `sysdesign`).
 The `serve` targets are two plain processes (`vite build --watch` and
 `node --watch`) that need no Nx daemon, so a dev API you left running is
 rebuilt on every edit — and is still the one Playwright reuses. Stop the dev
-stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
+servers before `nx e2e studio-e2e` — Ctrl-C `pnpm stack:up`, or `tilt down` —
+and leave the stores up: the suite needs Postgres (`pnpm stack:db`).
 
 ## Notes / gotchas
 
 - Port **5433** is the app's default (`packages/db/src/connection.ts`) and
   avoids a stale `:5432` container that may exist on a dev machine. Only CI
   sets `DB_PORT`, to its service's 5432.
-- This durable `docker-compose` stack is the one **local** database, whichever
-  launcher runs the apps. Under Tilt the pods reach Postgres and Qdrant on the
-  host through `host.docker.internal` (the `local-stores` ConfigMap in
-  `tilt/stores/`), and `tilt down` never stops them.
 - Under Tilt the loop signs in with `CLAUDE_CODE_OAUTH_TOKEN` from the Secret
   `quality-loop-model`, which `packages/quality-loop/Tiltfile` builds at
   `tilt up` from the shell's variables, else from the repo's `.env` (a pod has

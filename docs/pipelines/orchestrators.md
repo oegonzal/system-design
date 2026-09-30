@@ -52,7 +52,7 @@ order they opened, each recorded the moment the child's row exists. A step
 that runs a pipeline three times has three ids; the record carries them as
 `orchestration_run_child` rows keyed by step and ordinal. Nothing else
 changed in the runner: the cascade, the closed reasons, the one serial flush
-chain and the boot sweep are what §4 of the memory page says they are.
+chain and the janitor's sweep are what §4 of the memory page says they are.
 
 **A step may report.** Beside `counts` (numbers a client can tone) a step
 may leave a `report` — the orchestrator's own shape, declared beside its
@@ -247,9 +247,9 @@ is the headline (`runs`, distinct `decisions`, `contestedTypes`,
 opinion, so `seenBy: [0]` on a contested key means only the recorded verdict
 saw it, and `[1, 2, 3]` means every fresh panel did and the record did not.
 
-Do not run anything that boots `AppModule` — `main.js replay`, the CLI —
-while an orchestration is live: the boot sweep fails every `running` row
-(SEAM-4 in the register).
+A CLI run or `main.js replay` beside a live orchestration is safe: the
+janitor fails a row only once its heartbeat is stale and no child run is
+still heartbeating, and `replay` sweeps nothing (SEAM-4, closed).
 
 ---
 
