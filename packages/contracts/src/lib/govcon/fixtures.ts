@@ -161,6 +161,7 @@ export const descriptionOf = (overrides: Partial<Description> = {}): Description
 export const noticeOf = (overrides: Partial<NoticeDto> = {}): NoticeDto => ({
   ...leadOf(),
   description: null,
+  attachments: [],
   bid: null,
   ...overrides,
 });

@@ -348,6 +348,7 @@ describe('the govcon HTTP surface', () => {
     expect(detail.data.factors).toHaveLength(8);
     expect(detail.data.description).toBeNull();
     expect(detail.data.bid).toBeNull();
+    expect(detail.data.attachments).toEqual([]);
     expect((await fetch(`${url}/notices/nope?profile=tiny`)).status).toBe(404);
     expect((await post(url, '/notices/nope/description', {})).status).toBe(404);
 

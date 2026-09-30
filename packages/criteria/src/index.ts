@@ -368,6 +368,11 @@ export const CRITERIA: readonly Criterion[] = [
       "A pull is exactly the profile's saved searches flagged for it, in pull order, each stamped when run; a saved search or a bare filter runs by itself as a pull of one slice and stores what normalized.",
   },
   {
+    id: 'GOV-16',
+    statement:
+      "A notice's attachments are listed from the stored record with their public SAM.gov links, in order; the client links to them directly — no key is ever appended, nothing is proxied, and nothing is spent.",
+  },
+  {
     id: 'GOV-19',
     statement:
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',

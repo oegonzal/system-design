@@ -109,7 +109,7 @@ describe('the opportunities service', () => {
     await expect(service.leads('nope', page)).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('shows one stored notice with its trace and its description when fetched, or nothing', async () => {
+  it('[GOV-16] shows one stored notice with its trace, its attachments as public links, and its description when fetched, or nothing', async () => {
     const { repository, service } = await harness();
     await repository.upsertMany([opportunityOf({ noticeId: 'n-9' })], NOW);
     const notice = await service.notice('n-9', undefined);
@@ -117,6 +117,24 @@ describe('the opportunities service', () => {
     expect(notice?.factors).toHaveLength(8);
     expect(notice?.description).toBeNull();
     expect(notice?.bid).toBeNull();
+    expect(notice?.attachments).toEqual([]);
+    await repository.upsertMany(
+      [
+        opportunityOf({
+          noticeId: 'n-8',
+          resourceLinks: [
+            'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/abc/download',
+          ],
+        }),
+      ],
+      NOW,
+    );
+    expect((await service.notice('n-8', 'tiny'))?.attachments).toEqual([
+      {
+        ordinal: 0,
+        url: 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/abc/download',
+      },
+    ]);
     expect(await service.notice('missing', 'tiny')).toBeNull();
 
     await service.fetchDescription('n-9');

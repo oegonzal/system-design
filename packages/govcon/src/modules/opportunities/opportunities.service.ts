@@ -83,6 +83,7 @@ export class OpportunitiesService {
     return {
       ...scoreLead(opportunity, profile, this.context(this.now())),
       description: stored ? toDescription(stored) : null,
+      attachments: opportunity.resourceLinks.map((url, ordinal) => ({ ordinal, url })),
       bid: bid ? toBid(bid) : null,
     };
   }
