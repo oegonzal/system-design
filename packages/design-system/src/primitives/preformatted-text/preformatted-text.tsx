@@ -27,11 +27,10 @@ export interface PreformattedTextProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * A document shown exactly as written — a markdown prompt, a rendered
- * artifact. Deliberately no markdown renderer: the bracketed ids a finding
- * points at, and the author's own line breaks, stay visible verbatim, and
- * the design system carries no third-party renderer for the sake of one
- * block.
+ * A document shown exactly as written — a rendered artifact whose bracketed
+ * ids a finding cites, a raw export. The author's own line breaks and
+ * markup stay visible verbatim. For a document meant to be *read* — a
+ * prompt, a library preview — use `Markdown`, which renders it.
  */
 export function PreformattedText({ label, text, ...rest }: PreformattedTextProps) {
   return (

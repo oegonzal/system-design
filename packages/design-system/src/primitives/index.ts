@@ -9,6 +9,7 @@ export * from './field/text-field';
 export * from './heading/heading';
 export * from './link/link';
 export * from './live-region/live-region';
+export * from './markdown/markdown';
 export * from './meter/meter';
 export * from './preformatted-text/preformatted-text';
 export * from './skeleton/skeleton';
