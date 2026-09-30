@@ -5,30 +5,38 @@
 import { AXIS_FACTOR_LEVELS, SEVERITIES } from '@sysdesign/contracts';
 import type { DecisionPolicy } from '@sysdesign/contracts';
 
+import { sum } from './arithmetic';
 import type { TaskSpec } from './contracts';
+
+/** How far from exactly 1 the dimension weights may sum, allowing for the decimals they are written in. */
+const WEIGHT_TOLERANCE = 1e-9;
+
+type Fail = (message: string) => never;
 
 const inUnit = (value: number): boolean => value >= 0 && value <= 1;
 
 const sameKeys = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && [...a].sort().every((key, index) => key === [...b].sort()[index]);
 
-/** Throws on the first violation, naming the pipeline. A bad rubric must never grade anyone. */
-export function validatePolicy(
-  policy: DecisionPolicy,
-  task: TaskSpec<unknown>,
-  pipeline: string,
-): void {
-  const fail = (message: string): never => {
-    throw new Error(`pipeline ${pipeline}: ${message}`);
-  };
-
+/** At least one dimension, weights that sum to 1 and none negative. */
+function checkDimensions(policy: DecisionPolicy, fail: Fail): string[] {
   const dimensions = Object.keys(policy.dimensionWeights);
   if (dimensions.length === 0) fail('policy declares no dimensions');
-  const weightSum = dimensions.reduce((sum, key) => sum + policy.dimensionWeights[key], 0);
-  if (Math.abs(weightSum - 1) > 1e-9) fail(`dimension weights sum to ${weightSum}, not 1`);
+  const weightSum = sum(dimensions.map((key) => policy.dimensionWeights[key]));
+  if (Math.abs(weightSum - 1) > WEIGHT_TOLERANCE)
+    fail(`dimension weights sum to ${weightSum}, not 1`);
   if (dimensions.some((key) => policy.dimensionWeights[key] < 0))
     fail('a dimension weight is negative');
+  return dimensions;
+}
 
+/** The policy prices exactly the task's kinds, each onto a declared dimension with a positive weight. */
+function checkCriterionKinds(
+  policy: DecisionPolicy,
+  task: TaskSpec<unknown>,
+  dimensions: readonly string[],
+  fail: Fail,
+): void {
   const kinds = Object.keys(task.criterionKinds);
   if (kinds.length === 0) fail('task declares no criterion kinds');
   if (!sameKeys(kinds, Object.keys(policy.criterionKinds))) {
@@ -40,7 +48,15 @@ export function validatePolicy(
       fail(`kind ${kind} lands on unknown dimension ${priced.dimension}`);
     if (!(priced.weight > 0)) fail(`kind ${kind} must weigh more than 0`);
   }
+}
 
+/** The policy maps exactly the task's finding types, each onto a declared dimension. */
+function checkFindingTypes(
+  policy: DecisionPolicy,
+  task: TaskSpec<unknown>,
+  dimensions: readonly string[],
+  fail: Fail,
+): void {
   const types = Object.keys(task.findingTypes);
   if (types.length === 0) fail('task declares no finding types');
   if (!sameKeys(types, Object.keys(policy.findingTypes))) {
@@ -51,7 +67,10 @@ export function validatePolicy(
     if (!dimensions.includes(mapped.dimension))
       fail(`finding type ${type} lands on unknown dimension ${mapped.dimension}`);
   }
+}
 
+/** Result values and confidence weights on the unit scale and ordered; penalties non-negative and decaying. */
+function checkPricing(policy: DecisionPolicy, fail: Fail): void {
   const { pass, partial, fail: failValue } = policy.resultValues;
   if (![pass, partial, failValue].every(inUnit) || pass < partial || partial < failValue) {
     fail('resultValues must be in [0,1] with pass ≥ partial ≥ fail');
@@ -72,6 +91,10 @@ export function validatePolicy(
   if (policy.blockingSeverities.some((severity) => !SEVERITIES.includes(severity))) {
     fail('blockingSeverities names an unknown severity');
   }
+}
+
+/** Agreement, thresholds and the loop's limits, each within its range. */
+function checkLoop(policy: DecisionPolicy, fail: Fail): void {
   if (!(policy.evidence.minHits >= 1)) fail('evidence.minHits must be ≥ 1');
   if (!inUnit(policy.evidence.minAssessedShare)) fail('evidence.minAssessedShare must be in [0,1]');
   const { acceptAt, rejectBelow } = policy.thresholds;
@@ -82,4 +105,20 @@ export function validatePolicy(
   if (!(maxIterations >= 1 && plateauAfter >= 1 && concurrency >= 1)) {
     fail('loop.maxIterations, plateauAfter and concurrency must be ≥ 1');
   }
+}
+
+/** Throws on the first violation, naming the pipeline. A bad rubric must never grade anyone. */
+export function validatePolicy(
+  policy: DecisionPolicy,
+  task: TaskSpec<unknown>,
+  pipeline: string,
+): void {
+  const fail: Fail = (message) => {
+    throw new Error(`pipeline ${pipeline}: ${message}`);
+  };
+  const dimensions = checkDimensions(policy, fail);
+  checkCriterionKinds(policy, task, dimensions, fail);
+  checkFindingTypes(policy, task, dimensions, fail);
+  checkPricing(policy, fail);
+  checkLoop(policy, fail);
 }

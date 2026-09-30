@@ -1,71 +1,26 @@
 import { NoopLlmClient, type LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import type { SuccessCriterion } from '@sysdesign/contracts';
-import type {
-  Critic,
-  Evaluator,
-  Producer,
-  ProducerInput,
-  Stages,
-  UpstreamEvidenceBundle,
-} from '../ports';
-import { composeController, STANDARD } from '../controllers';
+import { composeController } from '../controllers';
 import { describePipeline } from '../pipeline';
-import { runLoop, runPipeline } from './run-pipeline';
+import type { Critic, Evaluator, Producer, ProducerInput, UpstreamEvidenceBundle } from '../ports';
 import {
-  criterion,
+  DRAFT_1,
+  DRAFT_2,
   fakeLlm,
   finding,
   result,
   scriptedCritic,
   scriptedEvaluator,
   scriptedProducer,
+  scriptedStages,
   tinyPipeline,
   tinyPolicy,
   type TinyOutput,
 } from '../testing';
+import { runLoop, runPipeline } from './run-pipeline';
 
 const clock = () => 0;
-const deriver = (criteria: SuccessCriterion[] | null) => () =>
-  Promise.resolve({
-    criteria,
-    diagnostic: criteria
-      ? null
-      : { stage: 'criteria', sample: null, reason: 'llm-disabled' as const, detail: null },
-  });
-
-const v1: TinyOutput = { text: 'first', parts: ['a'] };
-const v2: TinyOutput = { text: 'second', parts: ['a', 'b'] };
-
-function stages(overrides: Partial<Stages<TinyOutput>> = {}): Stages<TinyOutput> {
-  return {
-    deriveCriteria: deriver([criterion('c1'), criterion('c2', 'nice')]),
-    producer: scriptedProducer([v1, v2]),
-    validators: [
-      {
-        id: 'schema',
-        gate: 'block',
-        validate: (artifact, contract) => ({
-          validatorId: 'schema',
-          gate: 'block',
-          problems: contract.output.schema.safeParse(artifact).success
-            ? []
-            : [{ severity: 'critical', locationRefs: [], message: 'not the shape' }],
-        }),
-      },
-    ],
-    critics: [scriptedCritic('critic.tiny', [[[finding({ criterionIds: ['c1'] })]], [[]]])],
-    evaluators: [
-      scriptedEvaluator('evaluator.tiny', [
-        [[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]],
-        [[result({ criterionId: 'c1' }), result({ criterionId: 'c2' })]],
-      ]),
-    ],
-    controller: STANDARD,
-    ...overrides,
-  };
-}
 
 describe('runLoop', () => {
   it('[QL-9] a lens that consumes findings runs after the first wave and is shown only what it confirmed', async () => {
@@ -97,7 +52,7 @@ describe('runLoop', () => {
       },
     };
     const trace = await runLoop(
-      stages({ critics: [firstWave], evaluators: [secondWave] }),
+      scriptedStages({ critics: [firstWave], evaluators: [secondWave] }),
       tinyPipeline(),
       { goal: 'g', maxIterations: 1 },
       clock,
@@ -126,7 +81,7 @@ describe('runLoop', () => {
       enabled: true,
       produce: (input) => {
         inputs.push(input);
-        return scriptedProducer([v1, v2]).produce(input);
+        return scriptedProducer([DRAFT_1, DRAFT_2]).produce(input);
       },
     };
     // The first producer call is consumed by the scripted stub above, so script both.
@@ -134,13 +89,18 @@ describe('runLoop', () => {
     producer.produce = (input) => {
       inputs.push(input);
       return Promise.resolve({
-        output: call++ === 0 ? v1 : v2,
+        output: call++ === 0 ? DRAFT_1 : DRAFT_2,
         diagnostic: null,
         model: 'scripted',
       });
     };
 
-    const trace = await runLoop(stages({ producer }), tinyPipeline(), { goal: 'build it' }, clock);
+    const trace = await runLoop(
+      scriptedStages({ producer }),
+      tinyPipeline(),
+      { goal: 'build it' },
+      clock,
+    );
 
     expect(
       trace.iterations.map((iteration) => [iteration.mode, iteration.decision.finalDecision]),
@@ -150,7 +110,7 @@ describe('runLoop', () => {
     ]);
     expect(trace.stopReason).toBe('accepted');
     expect(trace.bestIteration).toBe(2);
-    expect(inputs[1]).toMatchObject({ mode: 'revise', prior: v1 });
+    expect(inputs[1]).toMatchObject({ mode: 'revise', prior: DRAFT_1 });
     expect(inputs[1].remediations.map((note) => note.note)).toEqual([
       'criterion c1: it is there',
       'something is missing',
@@ -171,7 +131,7 @@ describe('runLoop', () => {
       run: (ctx: Parameters<typeof critic.run>[0]) => (lensCalls++, critic.run(ctx)),
     };
     const trace = await runLoop(
-      stages({ critics: [counted] }),
+      scriptedStages({ critics: [counted] }),
       tinyPipeline(),
       { goal: 'g', output: { text: 1 }, maxIterations: 1 },
       clock,
@@ -190,9 +150,11 @@ describe('runLoop', () => {
 
   it('[QL-9] a provided artifact is judged; with the producer off the loop stops as producer-unavailable', async () => {
     const trace = await runLoop(
-      stages({ producer: { enabled: false, produce: () => Promise.reject(new Error('never')) } }),
+      scriptedStages({
+        producer: { enabled: false, produce: () => Promise.reject(new Error('never')) },
+      }),
       tinyPipeline(),
-      { goal: 'g', output: v1 },
+      { goal: 'g', output: DRAFT_1 },
       clock,
     );
     expect(trace.iterations).toHaveLength(1);
@@ -206,10 +168,10 @@ describe('runLoop', () => {
       [[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]],
     ]);
     const trace = await runLoop(
-      stages({
+      scriptedStages({
         evaluators: [flat],
         critics: [scriptedCritic('critic.tiny', [[[]]])],
-        producer: scriptedProducer([v1]),
+        producer: scriptedProducer([DRAFT_1]),
       }),
       tinyPipeline(),
       { goal: 'g', maxIterations: 6 },
@@ -245,7 +207,7 @@ describe('runPipeline', () => {
 
     const judged = await runPipeline(
       tinyPipeline(),
-      { goal: 'g', output: v1 },
+      { goal: 'g', output: DRAFT_1 },
       { llm: new NoopLlmClient(), sink: () => undefined, now: clock },
     );
     expect(judged.iterations[0].validation.map((report) => report.validatorId)).toEqual(['schema']);
@@ -264,7 +226,7 @@ describe('runPipeline', () => {
           { kind: 'nice', statement: 'has parts' },
         ],
       },
-      v1,
+      DRAFT_1,
       { findings: [] },
       { results: [result({ criterionId: 'c1', locationRefs: [] })], advisoryVerdict: null },
       { results: [result({ criterionId: 'c2', locationRefs: [] })], advisoryVerdict: null },
@@ -331,7 +293,7 @@ describe('the controller port', () => {
       policy: { ...tinyPolicy(), loop: { maxIterations: 2, plateauAfter: 5, concurrency: 2 } },
     });
     const trace = await runLoop(
-      stages({ controller: alwaysRevise }),
+      scriptedStages({ controller: alwaysRevise }),
       definition,
       { goal: 'goal' },
       clock,
@@ -347,65 +309,5 @@ describe('the controller port', () => {
     ]);
     expect(trace.stopReason).toBe('max-iterations');
     expect(describePipeline(definition as never).controller.id).toBe('always-revise');
-  });
-});
-
-describe('a supplied rubric', () => {
-  const rubric = [criterion('req-1'), criterion('nfr-1', 'nice')];
-
-  it('[QL-20] is used verbatim and the deriver is never asked', async () => {
-    let derivations = 0;
-    const counting: Stages<TinyOutput>['deriveCriteria'] = () => {
-      derivations += 1;
-      return Promise.resolve({ criteria: [criterion('c1')], diagnostic: null });
-    };
-    const trace = await runLoop(
-      stages({
-        deriveCriteria: counting,
-        critics: [
-          scriptedCritic('critic.tiny', [
-            [[finding({ criterionIds: ['req-1'], rationale: 'the text is thin' })]],
-          ]),
-        ],
-        evaluators: [
-          scriptedEvaluator('evaluator.tiny', [
-            [
-              [
-                result({ criterionId: 'req-1', result: 'partial' }),
-                result({ criterionId: 'nfr-1' }),
-              ],
-            ],
-          ]),
-        ],
-      }),
-      tinyPipeline(),
-      { goal: 'g', criteria: rubric, maxIterations: 1 },
-      clock,
-    );
-    expect(derivations).toBe(0);
-    expect(trace.contract.criteria).toEqual(rubric);
-    const [iteration] = trace.iterations;
-    expect(iteration.ledger.criteria.map((evidence) => evidence.criterionId)).toEqual([
-      'req-1',
-      'nfr-1',
-    ]);
-    expect(iteration.ledger.diagnostics.map((diagnostic) => diagnostic.stage)).not.toContain(
-      'criteria',
-    );
-    // The ledger carries the critic's words for a reader; the decision never read them.
-    expect(iteration.ledger.findings[0]).toMatchObject({
-      criterionIds: ['req-1'],
-      rationale: 'the text is thin',
-    });
-  });
-
-  it('[QL-20] is refused before any stage runs when it does not fit the pipeline', async () => {
-    await expect(
-      runPipeline(
-        tinyPipeline(),
-        { goal: 'g', criteria: [{ id: 'c1', kind: 'bogus', statement: 's' }] },
-        { llm: fakeLlm(), sink: () => undefined, now: clock },
-      ),
-    ).rejects.toThrow(/rubric rejected: criterion c1 has kind bogus/);
   });
 });

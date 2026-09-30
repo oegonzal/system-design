@@ -34,42 +34,29 @@ export {
   validators,
 } from './gates';
 
-
-
 /** The doctrine's controller as it has always decided: ordered gates, thresholds, then route. */
 export const STANDARD: Controller = composeController('standard', {
-  gates: [
-    artifact,
-    validators,
-    evidence,
-    policyAllowed,
-    acceptThreshold,
-    rejectFloor
-  ],
+  gates: [artifact, validators, evidence, policyAllowed, acceptThreshold, rejectFloor],
   route: byRemediations,
 });
 
+/** Where the floor sits under every assessed dimension in the strategy that has one. */
+const DEFAULT_FLOOR = 50;
 
-
-/** The standard order with a floor of 50 under every assessed dimension before the accept threshold. */
+/** The standard order with a floor under every assessed dimension before the accept threshold. */
 export const DIMENSION_FLOOR: Controller = composeController('dimension-floor', {
   gates: [
     artifact,
     validators,
     evidence,
     policyAllowed,
-    dimensionFloor(50),
+    dimensionFloor(DEFAULT_FLOOR),
     acceptThreshold,
     rejectFloor,
   ],
   route: byRemediations,
 });
 
-
-
 export const CONTROLLERS: ReadonlyMap<string, Controller> = new Map(
-  [
-    STANDARD, 
-    DIMENSION_FLOOR
-  ].map((controller) => [controller.id, controller]),
+  [STANDARD, DIMENSION_FLOOR].map((controller) => [controller.id, controller]),
 );

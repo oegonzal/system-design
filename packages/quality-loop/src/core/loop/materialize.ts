@@ -12,7 +12,7 @@ import { createCriteriaDeriver } from '../stages/derive-criteria';
 import { createLlmCritic } from '../stages/llm-critic';
 import { createLlmEvaluator } from '../stages/llm-evaluator';
 import { createLlmProducer } from '../stages/llm-producer';
-import { schemaValidator } from '../stages/schema-validator';
+import { createSchemaValidator } from '../stages/schema-validator';
 import { CRITERIA_STAGE, PRODUCER_STAGE } from '../stages/shared';
 
 const sampleScope = (lensId: string, sample: number): string => `${lensId}.s${sample}`;
@@ -45,7 +45,7 @@ export function materialize<T>(
 
     producer: createLlmProducer(definition.task, definition.producer, scoped(PRODUCER_STAGE)),
 
-    validators: [schemaValidator<T>(), ...definition.validators],
+    validators: [createSchemaValidator<T>(), ...definition.validators],
 
     critics: definition.critics.map((spec) =>
       createLlmCritic(spec, definition.task, perSample(spec)),

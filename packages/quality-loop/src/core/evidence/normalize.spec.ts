@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { EvaluationReport } from '@sysdesign/contracts';
 import { STANDARD } from '../controllers';
-import { findingKey, normalize, type NormalizeInput } from './normalize';
+import { findingKey } from './identity';
+import { normalize, type NormalizeInput } from './normalize';
 import {
   criterion,
   finding,

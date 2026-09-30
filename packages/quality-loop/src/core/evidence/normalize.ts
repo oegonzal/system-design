@@ -21,6 +21,8 @@ import type {
 } from '@sysdesign/contracts';
 
 import type { TaskContract } from '../contracts';
+import { unannotated } from './annotate';
+import { admitRefs, findingKey, sameDefect } from './identity';
 import {
   CONFIDENCE_LOW_FIRST,
   compareFindings,
@@ -31,7 +33,6 @@ import {
   SEVERITY_MILD_FIRST,
   unique,
 } from './ordering';
-import { unannotated } from './annotate';
 
 export interface NormalizeInput<T> {
   contract: TaskContract<T>;
@@ -43,35 +44,12 @@ export interface NormalizeInput<T> {
   diagnostics: Diagnostic[];
 }
 
-/** Structural identity of a finding: its type and where it points, never its wording. */
-export const findingKey = (type: string, locationRefs: readonly string[]): string =>
-  `${type}|${unique(locationRefs).sort(compareStrings).join(',')}`;
-
-/**
- * Whether two findings describe one defect: the same type, pointing at a common
- * location — or neither pointing anywhere.
- *
- * This is deliberately weaker than equal keys. Identity used to require the
- * *same set* of locations, which made agreement almost unreachable: two samples
- * describing one defect routinely cite overlapping but different evidence, so
- * one listing five locations and another listing four counted as two unrelated
- * singletons. Measured over 200 dumped iterations that discarded 60% of every
- * panel's findings as unconfirmed, and 88-100% on a pipeline whose artifact
- * exposes more locations to cite. Overlap is the honest test of "the same
- * defect"; the wording is still never compared.
- */
-export const sameDefect = (
-  a: { readonly type: string; readonly locationRefs: readonly string[] },
-  b: { readonly type: string; readonly locationRefs: readonly string[] },
-): boolean =>
-  a.type === b.type &&
-  (a.locationRefs.length === 0 || b.locationRefs.length === 0
-    ? a.locationRefs.length === b.locationRefs.length
-    : a.locationRefs.some((ref) => b.locationRefs.includes(ref)));
-
-/** Keep only refs that exist — the enum should already guarantee it; this is the re-check. */
-export const admitRefs = (refs: readonly string[], known: ReadonlySet<string>): string[] =>
-  unique(refs.filter((ref) => known.has(ref))).sort(compareStrings);
+/** The ids that exist for this artifact and this contract: everything else is inadmissible. */
+interface Known {
+  locations: ReadonlySet<string>;
+  criteria: ReadonlySet<string>;
+  types: ReadonlySet<string>;
+}
 
 interface Admitted {
   lens: string;
@@ -84,6 +62,25 @@ interface Defect {
   refs: Set<string>;
   members: Admitted[];
 }
+
+/** A defect enough samples agreed on, with everything its confirming lenses said about it. */
+interface Confirmed {
+  raws: RawFinding[];
+  hits: number;
+  lenses: string[];
+  refs: string[];
+}
+
+interface CriterionBucket {
+  samples: Set<number>;
+  raws: RawCriterionResult[];
+}
+
+const knownIn = <T>(input: NormalizeInput<T>): Known => ({
+  locations: new Set(input.locations.map((location) => location.id)),
+  criteria: new Set(input.contract.criteria.map((criterion) => criterion.id)),
+  types: new Set(Object.keys(input.contract.findingTypes)),
+});
 
 /**
  * Admitted findings grouped into defects by `sameDefect`, as connected
@@ -126,28 +123,22 @@ function defectsOf(items: readonly Admitted[]): Defect[] {
   return defects;
 }
 
-interface CriterionBucket {
-  samples: Set<number>;
-  raws: RawCriterionResult[];
-}
+// ---- findings: admit → group into defects → agreement per lens → merge ----
 
-export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): EvidenceLedger {
-  const { contract } = input;
-  const { minHits } = policy.evidence;
-  const knownLocations = new Set(input.locations.map((location) => location.id));
-  const knownCriteria = new Set(contract.criteria.map((criterion) => criterion.id));
-  const knownTypes = new Set(Object.keys(contract.findingTypes));
-  const discarded: DiscardedItem[] = [];
-
-  // ---- findings: admit → group into defects → agreement per lens → merge ----
+/** Findings of a type the task knows, refs re-checked; lenses ranked by the order they reported in. */
+function admitFindings(
+  critics: readonly LensOutcome<CriticReport>[],
+  known: Known,
+  discarded: DiscardedItem[],
+): { admitted: Admitted[]; lensOrder: Map<string, number> } {
   const admitted: Admitted[] = [];
   const lensOrder = new Map<string, number>();
-  for (const outcome of input.critics) {
+  for (const outcome of critics) {
     if (!outcome.report) continue;
     const { criticId, sample, findings } = outcome.report;
     if (!lensOrder.has(criticId)) lensOrder.set(criticId, lensOrder.size);
     for (const raw of findings) {
-      if (!knownTypes.has(raw.type)) {
+      if (!known.types.has(raw.type)) {
         discarded.push({
           lens: criticId,
           key: findingKey(raw.type, raw.locationRefs),
@@ -161,20 +152,27 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
         sample,
         raw: {
           ...raw,
-          locationRefs: admitRefs(raw.locationRefs, knownLocations),
-          criterionIds: admitRefs(raw.criterionIds, knownCriteria),
+          locationRefs: admitRefs(raw.locationRefs, known.locations),
+          criterionIds: admitRefs(raw.criterionIds, known.criteria),
         },
       });
     }
   }
+  return { admitted, lensOrder };
+}
 
-  // A defect is confirmed when one lens saw it in `minHits` of its own samples.
-  // That rule is unchanged: two lenses seeing it once each is still two
-  // opinions, not agreement. Only what counts as "it" has been relaxed.
-  const merged = new Map<
-    string,
-    { raws: RawFinding[]; hits: number; lenses: string[]; refs: string[] }
-  >();
+/**
+ * A defect is confirmed when one lens saw it in `minHits` of its own samples.
+ * Two lenses seeing it once each is still two opinions, not agreement; only
+ * what counts as "it" is as loose as `sameDefect`.
+ */
+function confirmFindings(
+  admitted: readonly Admitted[],
+  lensOrder: ReadonlyMap<string, number>,
+  minHits: number,
+  discarded: DiscardedItem[],
+): Map<string, Confirmed> {
+  const confirmed = new Map<string, Confirmed>();
   for (const defect of defectsOf(admitted)) {
     const refs = [...defect.refs].sort(compareStrings);
     const key = findingKey(defect.type, refs);
@@ -199,21 +197,30 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
       continue;
     }
     const lenses = confirming.map(([lens]) => lens);
-    merged.set(key, {
+    confirmed.set(key, {
       raws: defect.members.filter((m) => lenses.includes(m.lens)).map((m) => m.raw),
       hits: confirming.reduce((total, [, seen]) => total + seen.size, 0),
       lenses,
       refs,
     });
   }
+  return confirmed;
+}
 
-  // ---- criteria: admit → agreement within the sole judge → conservative median
-  const judged = new Map<string, CriterionBucket>();
-  for (const outcome of input.evaluators) {
+// ---- criteria: admit → agreement within the sole judge → conservative median
+
+/** Results on criteria the contract holds, bucketed per criterion, refs re-checked. */
+function admitResults(
+  evaluators: readonly LensOutcome<EvaluationReport>[],
+  known: Known,
+  discarded: DiscardedItem[],
+): Map<string, CriterionBucket> {
+  const buckets = new Map<string, CriterionBucket>();
+  for (const outcome of evaluators) {
     if (!outcome.report) continue;
     const { evaluatorId, sample, results } = outcome.report;
     for (const raw of results) {
-      if (!knownCriteria.has(raw.criterionId)) {
+      if (!known.criteria.has(raw.criterionId)) {
         discarded.push({
           lens: evaluatorId,
           key: raw.criterionId,
@@ -222,15 +229,23 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
         });
         continue;
       }
-      const bucket = judged.get(raw.criterionId) ?? { samples: new Set<number>(), raws: [] };
-      judged.set(raw.criterionId, bucket);
+      const bucket = buckets.get(raw.criterionId) ?? { samples: new Set<number>(), raws: [] };
+      buckets.set(raw.criterionId, bucket);
       bucket.samples.add(sample);
-      bucket.raws.push({ ...raw, locationRefs: admitRefs(raw.locationRefs, knownLocations) });
+      bucket.raws.push({ ...raw, locationRefs: admitRefs(raw.locationRefs, known.locations) });
     }
   }
+  return buckets;
+}
 
-  const criteria: CriterionEvidence[] = contract.criteria.map((criterion) => {
-    const bucket = judged.get(criterion.id);
+/** One entry per contract criterion: unassessed under `minHits`, otherwise the lower-middle median. */
+function settleCriteria<T>(
+  contract: TaskContract<T>,
+  buckets: ReadonlyMap<string, CriterionBucket>,
+  minHits: number,
+): CriterionEvidence[] {
+  return contract.criteria.map((criterion) => {
+    const bucket = buckets.get(criterion.id);
     const hits = bucket?.samples.size ?? 0;
     if (!bucket || hits < minHits) {
       return {
@@ -261,11 +276,19 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
       locationRefs: unique(bucket.raws.flatMap((raw) => raw.locationRefs)).sort(compareStrings),
     };
   });
+}
 
-  // ---- reconciliation: a finding on a criterion already failed is not priced twice
+// ---- reconciliation: a finding on a criterion already failed is not priced twice
+
+/** Confirmed defects as ledger findings, worst first, each reconciled to the first short criterion it names. */
+function reconcileFindings<T>(
+  confirmed: ReadonlyMap<string, Confirmed>,
+  criteria: readonly CriterionEvidence[],
+  contract: TaskContract<T>,
+): ConfirmedFinding[] {
   const resultOf = new Map(criteria.map((evidence) => [evidence.criterionId, evidence.result]));
   const contractOrder = new Map(contract.criteria.map((criterion, index) => [criterion.id, index]));
-  const findings: ConfirmedFinding[] = [...merged]
+  return [...confirmed]
     .map(([key, entry]) => {
       const first = entry.raws[0];
       const criterionIds = unique(entry.raws.flatMap((raw) => raw.criterionIds)).sort(
@@ -300,12 +323,29 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
       };
     })
     .sort(compareFindings);
+}
 
-  const diagnostics = [
-    ...input.diagnostics,
-    ...input.critics.flatMap((outcome) => (outcome.diagnostic ? [outcome.diagnostic] : [])),
-    ...input.evaluators.flatMap((outcome) => (outcome.diagnostic ? [outcome.diagnostic] : [])),
-  ];
+/** What the stages reported about themselves, in stage order: the caller's, then every lens's. */
+const gatheredDiagnostics = <T>(input: NormalizeInput<T>): Diagnostic[] => [
+  ...input.diagnostics,
+  ...input.critics.flatMap((outcome) => (outcome.diagnostic ? [outcome.diagnostic] : [])),
+  ...input.evaluators.flatMap((outcome) => (outcome.diagnostic ? [outcome.diagnostic] : [])),
+];
+
+export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): EvidenceLedger {
+  const { contract } = input;
+  const { minHits } = policy.evidence;
+  const known = knownIn(input);
+  const discarded: DiscardedItem[] = [];
+
+  const { admitted, lensOrder } = admitFindings(input.critics, known, discarded);
+  const confirmed = confirmFindings(admitted, lensOrder, minHits, discarded);
+  const criteria = settleCriteria(
+    contract,
+    admitResults(input.evaluators, known, discarded),
+    minHits,
+  );
+  const findings = reconcileFindings(confirmed, criteria, contract);
 
   return {
     artifactPresent: input.artifactPresent,
@@ -315,6 +355,6 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
     discarded: discarded.sort(
       (a, b) => compareStrings(a.lens, b.lens) || compareStrings(a.key, b.key),
     ),
-    diagnostics,
+    diagnostics: gatheredDiagnostics(input),
   };
 }

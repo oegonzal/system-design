@@ -32,6 +32,12 @@ const refs = (ids: readonly string[], max: number, description: string) => {
 
 const STATEMENT_MAX = CRITERION_STATEMENT_MAX_LENGTH;
 const RATIONALE_MAX = 600;
+/** How many artifact parts one finding may point at. */
+const MAX_LOCATION_REFS = 8;
+/** How many criteria one finding may weaken. */
+const MAX_CRITERION_REFS = 4;
+/** How many artifact parts one result may cite as evidence. */
+const MAX_EVIDENCE_REFS = 6;
 
 export function criteriaSchema(kinds: EnumTuple, maxCriteria: number) {
   return z.strictObject({
@@ -78,12 +84,12 @@ export function findingsSchema(
             ),
           locationRefs: refs(
             locationIds,
-            8,
+            MAX_LOCATION_REFS,
             'Ids of the artifact parts this concerns. Empty only if artifact-wide.',
           ),
           criterionIds: refs(
             criterionIds,
-            4,
+            MAX_CRITERION_REFS,
             'The success criteria this defect weakens. Empty only if cross-cutting.',
           ),
           rationale: z
@@ -115,7 +121,11 @@ export function evaluationSchema(
               'pass: fully satisfied. partial: addressed but incomplete. fail: unmet. not_applicable: the criterion cannot apply to this artifact.',
             ),
           confidence: z.enum(AXIS_FACTOR_LEVELS),
-          locationRefs: refs(locationIds, 6, 'Ids of the artifact parts that are your evidence.'),
+          locationRefs: refs(
+            locationIds,
+            MAX_EVIDENCE_REFS,
+            'Ids of the artifact parts that are your evidence.',
+          ),
           rationale: z.string().max(RATIONALE_MAX).describe('Why, in one sentence.'),
         }),
       )

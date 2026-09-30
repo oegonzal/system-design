@@ -11,7 +11,7 @@ import type { StageSpec } from '../pipeline';
 import type { CriteriaDeriver } from '../ports';
 import { goalSection, joinSections, kindsSection, systemPrompt } from './prompting';
 import { criteriaSchema, enumTuple } from './schemas';
-import { CRITERIA_STAGE, diagnostic } from './shared';
+import { CRITERIA_STAGE, stageDiagnostic } from './shared';
 
 export function createCriteriaDeriver<T>(
   task: TaskSpec<T>,
@@ -20,13 +20,13 @@ export function createCriteriaDeriver<T>(
 ): CriteriaDeriver {
   return async (goal) => {
     if (!llm.enabled) {
-      return { criteria: null, diagnostic: diagnostic(CRITERIA_STAGE, null, 'llm-disabled') };
+      return { criteria: null, diagnostic: stageDiagnostic(CRITERIA_STAGE, 'llm-disabled') };
     }
     const kinds = enumTuple(Object.keys(task.criterionKinds));
     if (!kinds) {
       return {
         criteria: null,
-        diagnostic: diagnostic(CRITERIA_STAGE, null, 'not-applicable', 'no criterion kinds'),
+        diagnostic: stageDiagnostic(CRITERIA_STAGE, 'not-applicable', 'no criterion kinds'),
       };
     }
 
@@ -38,7 +38,7 @@ export function createCriteriaDeriver<T>(
       maxTokens: spec.maxTokens,
     });
     if (response === null) {
-      return { criteria: null, diagnostic: diagnostic(CRITERIA_STAGE, null, 'llm-failed') };
+      return { criteria: null, diagnostic: stageDiagnostic(CRITERIA_STAGE, 'llm-failed') };
     }
 
     return {
@@ -48,7 +48,7 @@ export function createCriteriaDeriver<T>(
         statement: item.statement.trim(),
       })),
       diagnostic: goalText.clipped
-        ? diagnostic(CRITERIA_STAGE, null, 'token-clipped', 'goal exceeded the prompt budget')
+        ? stageDiagnostic(CRITERIA_STAGE, 'token-clipped', 'goal exceeded the prompt budget')
         : null,
     };
   };

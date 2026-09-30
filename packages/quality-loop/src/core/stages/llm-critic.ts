@@ -4,7 +4,7 @@
  * this contract's criteria. `samples` independent calls, each on its own
  * scoped client so the dump attributes every exchange.
  */
-import type { CriticReport, LensOutcome } from '@sysdesign/contracts';
+import type { CriticReport } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { TaskSpec } from '../contracts';
@@ -22,7 +22,7 @@ import {
   validationSection,
 } from './prompting';
 import { enumTuple, findingsSchema } from './schemas';
-import { skipped } from './shared';
+import { sampleEach, skipped } from './shared';
 
 export function createLlmCritic<T>(
   spec: LensSpec,
@@ -32,9 +32,11 @@ export function createLlmCritic<T>(
   return {
     id: spec.id,
     consumes: spec.consumes,
-    async run(ctx: LensContext<T>) {
+    run(ctx: LensContext<T>) {
       const types = enumTuple(Object.keys(task.findingTypes));
-      if (!types) return [skipped(spec.id, null, 'not-applicable', 'no finding types')];
+      if (!types) {
+        return Promise.resolve([skipped(spec.id, null, 'not-applicable', 'no finding types')]);
+      }
 
       const request = {
         system: systemPrompt('critic', spec.persona),
@@ -56,24 +58,11 @@ export function createLlmCritic<T>(
         maxTokens: spec.maxTokens,
       };
 
-      const outcomes: LensOutcome<CriticReport>[] = [];
-      for (const [index, llm] of clients.entries()) {
-        const sample = index + 1;
-        if (!llm.enabled) {
-          outcomes.push(skipped(spec.id, sample, 'llm-disabled'));
-          continue;
-        }
-        const response = await llm.completeStructured(request);
-        outcomes.push(
-          response === null
-            ? skipped(spec.id, sample, 'llm-failed')
-            : {
-                report: { criticId: spec.id, sample, findings: response.findings },
-                diagnostic: null,
-              },
-        );
-      }
-      return outcomes;
+      return sampleEach(spec.id, clients, request, (sample, response): CriticReport => ({
+        criticId: spec.id,
+        sample,
+        findings: response.findings,
+      }));
     },
   };
 }

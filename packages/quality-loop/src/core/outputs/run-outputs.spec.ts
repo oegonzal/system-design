@@ -1,19 +1,14 @@
-import type { RunTrace } from '@sysdesign/contracts';
+import type { Decision, RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL, passed, traceOf } from '../../modules/memory/testing';
+import { decision, evidence, ledger, traceOf } from '../testing';
 import { admits, outputsOf } from './run-outputs';
 
-const trace = (decision: RunTrace['finalDecision'], overall = 90) =>
+const trace = (finalDecision: Decision, overall = 90): RunTrace =>
   traceOf({
-    pipeline: 'system-design',
-    goal: GOAL,
     artifact: { summary: 'a design' },
-    locations: ['summary'],
-    criteria: [{ id: 'c1', kind: 'functional', statement: 'x' }],
-    results: [passed('c1', 'functional', ['summary'])],
-    decision,
-    overall,
+    ledger: ledger({ criteria: [evidence({ criterionId: 'c1', locationRefs: ['summary'] })] }),
+    decision: decision({ finalDecision, scores: { dimensions: {}, overall } }),
   });
 
 describe('outputsOf', () => {

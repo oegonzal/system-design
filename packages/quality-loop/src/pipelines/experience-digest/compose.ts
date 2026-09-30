@@ -15,7 +15,7 @@ import {
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
-import { admitRefs, sameDefect } from '../../core/evidence/normalize';
+import { admitRefs, sameDefect } from '../../core/evidence/identity';
 import { outputsOf } from '../../core/outputs';
 import { GOAL_MAX_BYTES } from '../../core/contracts';
 import {

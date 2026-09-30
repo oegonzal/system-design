@@ -17,15 +17,14 @@ import type {
   ValidationReport,
 } from '@sysdesign/contracts';
 
-import { compareFindings, compareStrings, severityRank } from '../evidence/ordering';
+import { round1, round4, sum } from '../arithmetic';
+import { compareFindings, compareStrings, severityRank, unique } from '../evidence/ordering';
 
-export const round1 = (value: number): number => Math.round(value * 10) / 10;
+const SCORE_MIN = 0;
+const SCORE_MAX = 100;
 
 const clamp = (value: number, low: number, high: number): number =>
   Math.min(high, Math.max(low, value));
-
-const sum = (values: readonly number[]): number =>
-  values.reduce((total, value) => total + value, 0);
 
 /** Ordering severities for criterion shortfalls in the remediation list; never priced. */
 const SHORTFALL_SEVERITY: Record<'fail' | 'partial', Severity> = {
@@ -56,68 +55,101 @@ export interface GateContext {
   remediations: Remediation[];
 }
 
-function scoreDimensions(ledger: EvidenceLedger, policy: DecisionPolicy): Scored {
-  const chargeable = ledger.findings.filter((finding) => finding.reconciledTo === null);
+type PricedCriterion = DimensionTrace['criteria'][number];
+type Penalty = DimensionTrace['penalties'][number];
+
+// ---- scoring --------------------------------------------------------------
+
+/** What a settled result earns of its criterion's weight; nothing when nobody assessed it. */
+const resultValue = (policy: DecisionPolicy, evidence: CriterionEvidence): number =>
+  evidence.result === 'unassessed' || evidence.result === 'not_applicable'
+    ? 0
+    : policy.resultValues[evidence.result];
+
+/** The criteria that land on a dimension, each with its weight and what it earned. */
+function priceCriteria(
+  ledger: EvidenceLedger,
+  policy: DecisionPolicy,
+  dimension: string,
+): PricedCriterion[] {
+  return ledger.criteria
+    .filter(
+      (evidence) =>
+        policy.criterionKinds[evidence.kind].dimension === dimension &&
+        evidence.result !== 'not_applicable',
+    )
+    .map((evidence) => ({
+      criterionId: evidence.criterionId,
+      kind: evidence.kind,
+      weight: policy.criterionKinds[evidence.kind].weight,
+      result: evidence.result,
+      value: resultValue(policy, evidence),
+    }));
+}
+
+/**
+ * The charge for a dimension's findings, worst first: severity points weighed
+ * by confidence, decayed down the list, then scaled so the total never exceeds
+ * the policy's cap per dimension.
+ */
+function chargeFindings(
+  findings: readonly ConfirmedFinding[],
+  policy: DecisionPolicy,
+): { penalties: Penalty[]; penaltyTotal: number; clampScale: number } {
   const { bySeverity, decay, maxPerDimension } = policy.penalties;
-
-  const dimensions = Object.keys(policy.dimensionWeights).map((dimension): DimensionTrace => {
-    const criteria = ledger.criteria
-      .filter(
-        (evidence) =>
-          policy.criterionKinds[evidence.kind].dimension === dimension &&
-          evidence.result !== 'not_applicable',
-      )
-      .map((evidence) => ({
-        criterionId: evidence.criterionId,
-        kind: evidence.kind,
-        weight: policy.criterionKinds[evidence.kind].weight,
-        result: evidence.result,
-        value:
-          evidence.result === 'unassessed' || evidence.result === 'not_applicable'
-            ? 0
-            : policy.resultValues[evidence.result],
-      }));
-    const totalWeight = sum(criteria.map((criterion) => criterion.weight));
-    const earned = sum(criteria.map((criterion) => criterion.weight * (criterion.value ?? 0)));
-
-    const findings = chargeable
-      .filter((finding) => policy.findingTypes[finding.type].dimension === dimension)
-      .sort(compareFindings);
-    const base =
-      criteria.length > 0 ? (100 * earned) / totalWeight : findings.length > 0 ? 100 : null;
-
-    const penalties = findings.map((finding, position) => {
-      const listPoints =
-        bySeverity[finding.severity] * policy.confidenceWeights[finding.confidence];
-      const decayed = listPoints * decay ** position;
-      return {
-        key: finding.key,
-        position,
-        severity: finding.severity,
-        confidence: finding.confidence,
-        listPoints: round1(listPoints),
-        decayed: round1(decayed),
-        points: decayed,
-      };
-    });
-    const rawTotal = sum(penalties.map((penalty) => penalty.points));
-    const clampScale = rawTotal > maxPerDimension ? maxPerDimension / rawTotal : 1;
-    for (const penalty of penalties) penalty.points = round1(penalty.points * clampScale);
-    const penaltyTotal = rawTotal * clampScale;
-    const score = base === null ? null : round1(clamp(base - penaltyTotal, 0, 100));
-
+  const penalties = findings.map((finding, position): Penalty => {
+    const listPoints = bySeverity[finding.severity] * policy.confidenceWeights[finding.confidence];
+    const decayed = listPoints * decay ** position;
     return {
-      dimension,
-      weight: score === null ? null : policy.dimensionWeights[dimension],
-      criteria,
-      base: base === null ? null : round1(base),
-      penalties,
-      penaltyTotal: round1(penaltyTotal),
-      clampScale: round1(clampScale * 1000) / 1000,
-      score,
+      key: finding.key,
+      position,
+      severity: finding.severity,
+      confidence: finding.confidence,
+      listPoints: round1(listPoints),
+      decayed: round1(decayed),
+      points: decayed,
     };
   });
+  const rawTotal = sum(penalties.map((penalty) => penalty.points));
+  const clampScale = rawTotal > maxPerDimension ? maxPerDimension / rawTotal : 1;
+  for (const penalty of penalties) penalty.points = round1(penalty.points * clampScale);
+  return { penalties, penaltyTotal: rawTotal * clampScale, clampScale };
+}
 
+/** One dimension priced: what its criteria earned, less what its findings cost, clamped to the scale. */
+function scoreDimension(
+  ledger: EvidenceLedger,
+  chargeable: readonly ConfirmedFinding[],
+  policy: DecisionPolicy,
+  dimension: string,
+): DimensionTrace {
+  const criteria = priceCriteria(ledger, policy, dimension);
+  const totalWeight = sum(criteria.map((criterion) => criterion.weight));
+  const earned = sum(criteria.map((criterion) => criterion.weight * (criterion.value ?? 0)));
+
+  const findings = chargeable
+    .filter((finding) => policy.findingTypes[finding.type].dimension === dimension)
+    .sort(compareFindings);
+  const base =
+    criteria.length > 0 ? (100 * earned) / totalWeight : findings.length > 0 ? 100 : null;
+
+  const { penalties, penaltyTotal, clampScale } = chargeFindings(findings, policy);
+  const score = base === null ? null : round1(clamp(base - penaltyTotal, SCORE_MIN, SCORE_MAX));
+
+  return {
+    dimension,
+    weight: score === null ? null : policy.dimensionWeights[dimension],
+    criteria,
+    base: base === null ? null : round1(base),
+    penalties,
+    penaltyTotal: round1(penaltyTotal),
+    clampScale: round4(clampScale),
+    score,
+  };
+}
+
+/** The weighted overall over the dimensions that were assessed at all. */
+function weighOverall(dimensions: DimensionTrace[]): Scored {
   const assessed = dimensions.flatMap((trace) =>
     trace.score !== null && trace.weight !== null
       ? [{ score: trace.score, weight: trace.weight }]
@@ -133,60 +165,85 @@ function scoreDimensions(ledger: EvidenceLedger, policy: DecisionPolicy): Scored
   };
 }
 
-/** Everything the producer could act on, worst first. Pricing and fixing are different questions. */
-function selectRemediations(ledger: EvidenceLedger): Remediation[] {
-  const fromFindings = ledger.findings
+function scoreDimensions(ledger: EvidenceLedger, policy: DecisionPolicy): Scored {
+  const chargeable = ledger.findings.filter((finding) => finding.reconciledTo === null);
+  return weighOverall(
+    Object.keys(policy.dimensionWeights).map((dimension) =>
+      scoreDimension(ledger, chargeable, policy, dimension),
+    ),
+  );
+}
+
+// ---- remediations ---------------------------------------------------------
+
+const findingRemediations = (ledger: EvidenceLedger): Remediation[] =>
+  ledger.findings
     .filter(
       (finding) =>
         finding.fixability === 'fixable_local' || finding.fixability === 'requires_retry',
     )
-    .map((finding): Remediation => ({
+    .map((finding) => ({
       subject: { finding: finding.key },
       action: finding.fixability === 'fixable_local' ? 'revise' : 'retry',
       severity: finding.severity,
       targetRefs: finding.locationRefs,
     }));
-  const fromCriteria = ledger.criteria
+
+const criterionRemediations = (ledger: EvidenceLedger): Remediation[] =>
+  ledger.criteria
     .filter((evidence) => evidence.result === 'fail' || evidence.result === 'partial')
-    .map((evidence): Remediation => ({
+    .map((evidence) => ({
       subject: { criterion: evidence.criterionId },
       action: 'revise',
       severity: SHORTFALL_SEVERITY[evidence.result as 'fail' | 'partial'],
       targetRefs: evidence.locationRefs,
     }));
-  const fromValidators = ledger.validation
+
+const validatorRemediations = (ledger: EvidenceLedger): Remediation[] =>
+  ledger.validation
     .filter((report) => report.problems.length > 0)
-    .map((report): Remediation => ({
+    .map((report) => ({
       subject: { validator: report.validatorId },
       action: report.gate === 'block' ? 'retry' : 'revise',
       severity: [...report.problems].sort(
         (a, b) => severityRank(a.severity) - severityRank(b.severity),
       )[0].severity,
-      targetRefs: [...new Set(report.problems.flatMap((problem) => problem.locationRefs))].sort(
+      targetRefs: unique(report.problems.flatMap((problem) => problem.locationRefs)).sort(
         compareStrings,
       ),
     }));
-  const subjectKey = (remediation: Remediation): string => Object.values(remediation.subject)[0];
-  return [...fromValidators, ...fromFindings, ...fromCriteria].sort(
-    (a, b) =>
-      severityRank(a.severity) - severityRank(b.severity) ||
-      compareStrings(subjectKey(a), subjectKey(b)),
-  );
-}
+
+const subjectKey = (remediation: Remediation): string => Object.values(remediation.subject)[0];
+
+const worstFirst = (a: Remediation, b: Remediation): number =>
+  severityRank(a.severity) - severityRank(b.severity) ||
+  compareStrings(subjectKey(a), subjectKey(b));
+
+/** Everything the producer could act on, worst first. Pricing and fixing are different questions. */
+const selectRemediations = (ledger: EvidenceLedger): Remediation[] =>
+  [
+    ...validatorRemediations(ledger),
+    ...findingRemediations(ledger),
+    ...criterionRemediations(ledger),
+  ].sort(worstFirst);
+
+// ---- the facts ------------------------------------------------------------
 
 const isBlocker = (finding: ConfirmedFinding, policy: DecisionPolicy): boolean =>
   policy.blockingSeverities.includes(finding.severity) || policy.findingTypes[finding.type].gate;
+
+/** How much of the contract was judged at all; zero when there was nothing to judge. */
+const assessedShareOf = (criteria: readonly CriterionEvidence[]): number =>
+  criteria.length === 0
+    ? 0
+    : criteria.filter((evidence) => evidence.result !== 'unassessed').length / criteria.length;
 
 export function buildContext(ledger: EvidenceLedger, policy: DecisionPolicy): GateContext {
   const scored = scoreDimensions(ledger, policy);
   const validators = ledger.validation.filter(
     (report) => report.gate === 'block' && report.problems.length > 0,
   );
-  const assessedShare =
-    ledger.criteria.length === 0
-      ? 0
-      : ledger.criteria.filter((evidence) => evidence.result !== 'unassessed').length /
-        ledger.criteria.length;
+  const assessedShare = assessedShareOf(ledger.criteria);
   const findings = ledger.findings.filter((finding) => isBlocker(finding, policy));
   const criteria = ledger.criteria.filter(
     (evidence) => policy.criterionKinds[evidence.kind].gate && evidence.result === 'fail',

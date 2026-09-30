@@ -8,6 +8,7 @@
  */
 import type {
   ControllerParams,
+  ControllerSummary,
   Decision,
   DecisionPolicy,
   DecisionStep,
@@ -15,8 +16,9 @@ import type {
   QualityControlDecision,
 } from '@sysdesign/contracts';
 
+import { round1, round4 } from '../arithmetic';
 import type { Controller } from '../ports';
-import { buildContext, round1, type GateContext } from './context';
+import { buildContext, type GateContext, type Scored } from './context';
 
 export type Verdict =
   { ok: true; detail: string } | { ok: false; decision: Decision; reason: string };
@@ -47,6 +49,16 @@ export interface ControllerParts {
   route: Route;
 }
 
+/** A gate or route as the summary shows it: its factor, and its parameters when it declares any. */
+export const projectStep = ({
+  factor,
+  params,
+}: {
+  factor: string;
+  params?: ControllerParams;
+}): ControllerSummary['steps'][number] =>
+  params === undefined ? { factor } : { factor, params: { ...params } };
+
 /** Refuses a malformed composition where it is declared — at module load, so at boot. */
 function validateParts(id: string, parts: ControllerParts): void {
   const fail = (message: string): never => {
@@ -59,16 +71,46 @@ function validateParts(id: string, parts: ControllerParts): void {
   if (new Set(factors).size !== factors.length) fail('factors must be unique');
 }
 
+type Record = (factor: string, outcome: DecisionStep['outcome'], detail: string) => void;
+
+/** Gates in order until one settles, every later one skipped; the route settles what no gate did. */
+function consultGates(parts: ControllerParts, ctx: GateContext, record: Record): Settled {
+  let settled: Settled | null = null;
+  for (const gate of parts.gates) {
+    if (settled) {
+      record(gate.factor, 'skipped', 'not reached');
+      continue;
+    }
+    const verdict = gate.check(ctx);
+    if (verdict.ok) {
+      record(gate.factor, 'passed', verdict.detail);
+    } else {
+      settled = { decision: verdict.decision, reason: verdict.reason };
+      record(gate.factor, 'decided', verdict.reason);
+    }
+  }
+  if (settled) {
+    record(parts.route.factor, 'skipped', 'not reached');
+    return settled;
+  }
+  const routed = parts.route.settle(ctx);
+  record(parts.route.factor, 'decided', routed.reason);
+  return routed;
+}
+
+const projectScores = (scored: Scored): QualityControlDecision['scores'] => ({
+  dimensions: Object.fromEntries(scored.dimensions.map((entry) => [entry.dimension, entry.score])),
+  overall: scored.overall,
+});
+
 export function composeController(id: string, parts: ControllerParts): Controller {
   validateParts(id, parts);
-  const steps = [...parts.gates, parts.route].map(({ factor, params }) =>
-    params === undefined ? { factor } : { factor, params: { ...params } },
-  );
+  const steps = [...parts.gates, parts.route].map(projectStep);
 
   const decide = (ledger: EvidenceLedger, policy: DecisionPolicy): QualityControlDecision => {
     const ctx = buildContext(ledger, policy);
     const trace: DecisionStep[] = [];
-    const record = (factor: string, outcome: DecisionStep['outcome'], detail: string): void => {
+    const record: Record = (factor, outcome, detail) => {
       trace.push({ order: trace.length + 1, factor, outcome, detail });
     };
 
@@ -78,43 +120,18 @@ export function composeController(id: string, parts: ControllerParts): Controlle
       'computed',
       `overall ${ctx.scored.overall} over ${assessedCount} assessed dimension(s)`,
     );
-
-    let settled: Settled | null = null;
-    for (const gate of parts.gates) {
-      if (settled) {
-        record(gate.factor, 'skipped', 'not reached');
-        continue;
-      }
-      const verdict = gate.check(ctx);
-      if (verdict.ok) {
-        record(gate.factor, 'passed', verdict.detail);
-      } else {
-        settled = { decision: verdict.decision, reason: verdict.reason };
-        record(gate.factor, 'decided', verdict.reason);
-      }
-    }
-    if (settled) {
-      record(parts.route.factor, 'skipped', 'not reached');
-    } else {
-      settled = parts.route.settle(ctx);
-      record(parts.route.factor, 'decided', settled.reason);
-    }
+    const settled = consultGates(parts, ctx, record);
 
     return {
       finalDecision: settled.decision,
       gates: ctx.gates,
-      scores: {
-        dimensions: Object.fromEntries(
-          ctx.scored.dimensions.map((entry) => [entry.dimension, entry.score]),
-        ),
-        overall: ctx.scored.overall,
-      },
+      scores: projectScores(ctx.scored),
       selectedRemediations: ctx.remediations,
       reason: settled.reason,
       trace: {
         steps: trace,
         dimensions: ctx.scored.dimensions,
-        weightSum: round1(ctx.scored.weightSum * 1000) / 1000,
+        weightSum: round4(ctx.scored.weightSum),
         weightedTotal: round1(ctx.scored.weightedTotal),
       },
     };

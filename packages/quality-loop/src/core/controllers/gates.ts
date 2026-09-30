@@ -10,6 +10,13 @@ import type { GateContext } from './context';
 
 const percent = (share: number): number => Math.round(share * 100);
 
+/** Every open blocker by name: finding keys first, then the gating criteria that failed. */
+const blockerNames = (ctx: GateContext): string =>
+  [
+    ...ctx.blocking.findings.map((finding) => finding.key),
+    ...ctx.blocking.criteria.map((entry) => entry.criterionId),
+  ].join(', ');
+
 export const artifact: Gate = {
   factor: 'artifact',
   check: (ctx) =>
@@ -63,10 +70,7 @@ export const policyAllowed: Gate = {
     }
     const { findings, criteria } = ctx.blocking;
     const fixabilities = findings.map((finding) => finding.fixability);
-    const named = [
-      ...findings.map((finding) => finding.key),
-      ...criteria.map((entry) => entry.criterionId),
-    ].join(', ');
+    const named = blockerNames(ctx);
     if (fixabilities.includes('unfixable')) {
       return { ok: false, decision: 'reject', reason: `unfixable blocker: ${named}` };
     }

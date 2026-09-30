@@ -26,8 +26,8 @@ export function dimensionFloor(floor: number): Gate {
       );
       if (below.length === 0) {
         return {
-          ok: true, 
-          detail: `every assessed dimension at or above ${floor}` 
+          ok: true,
+          detail: `every assessed dimension at or above ${floor}`,
         };
       }
       const named = below.map((entry) => `${entry.dimension} ${entry.score}`).join(', ');

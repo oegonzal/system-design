@@ -13,9 +13,8 @@ import type {
   SpreadDto,
 } from '@sysdesign/contracts';
 
+import { round1, sum } from '../arithmetic';
 import type { RunOutputs } from './run-outputs';
-
-const round = (value: number): number => Math.round(value * 10) / 10;
 
 /** The spread of the numbers present; null when none is. `n` says how many were. */
 export function spread(values: readonly (number | null | undefined)[]): SpreadDto | null {
@@ -23,13 +22,13 @@ export function spread(values: readonly (number | null | undefined)[]): SpreadDt
   if (present.length === 0) return null;
   const min = Math.min(...present);
   const max = Math.max(...present);
-  const mean = present.reduce((total, value) => total + value, 0) / present.length;
+  const mean = sum(present) / present.length;
   return {
     n: present.length,
-    min: round(min),
-    max: round(max),
-    mean: round(mean),
-    range: round(max - min),
+    min: round1(min),
+    max: round1(max),
+    mean: round1(mean),
+    range: round1(max - min),
   };
 }
 
@@ -50,15 +49,9 @@ const split = (counts: Record<string, number>, runs: number): string[] =>
     .filter(([, count]) => count > 0 && count < runs)
     .map(([key]) => key);
 
-export function reconcile(
-  outputs: readonly RunOutputs[],
-  alignment: PanelAlignment,
-): PanelReportDto {
-  const runs = outputs.length;
-  const decisions = tally(outputs.map((output) => output.trace.finalDecision));
-  const stopReasons = tally(outputs.map((output) => output.trace.stopReason));
-
-  const gates = tally(
+/** Each gate → in how many runs it held. */
+const heldGates = (outputs: readonly RunOutputs[]): Record<string, number> =>
+  tally(
     outputs.flatMap((output) =>
       Object.entries(output.decision?.gates ?? {})
         .filter(([, holds]) => holds)
@@ -66,11 +59,13 @@ export function reconcile(
     ),
   );
 
+/** Each dimension any run scored → the spread of its scores across the runs. */
+function dimensionSpreads(outputs: readonly RunOutputs[]): Record<string, SpreadDto | null> {
   const named = new Set<string>();
   for (const output of outputs) {
     for (const name of Object.keys(output.decision?.scores.dimensions ?? {})) named.add(name);
   }
-  const dimensions = Object.fromEntries(
+  return Object.fromEntries(
     [...named]
       .sort()
       .map((name) => [
@@ -78,13 +73,21 @@ export function reconcile(
         spread(outputs.map((output) => output.decision?.scores.dimensions[name] ?? null)),
       ]),
   );
+}
 
-  // A type counts once per run however many findings of it the run confirmed.
-  const findingTypes = tally(
-    outputs.flatMap((output) => [...new Set(output.findings.map((finding) => finding.type))]),
-  );
+/** Each finding type → in how many runs it was confirmed; once per run however many findings of it. */
+const findingTypeTally = (outputs: readonly RunOutputs[]): Record<string, number> =>
+  tally(outputs.flatMap((output) => [...new Set(output.findings.map((finding) => finding.type))]));
 
-  // Finding keys are type and locations; only a fixed artifact makes them comparable.
+/**
+ * Each finding key → which runs confirmed it, keys sorted. Finding keys are
+ * type and locations; only a fixed artifact makes them comparable, so under
+ * `produced` alignment nothing is listed.
+ */
+function findingsSeenBy(
+  outputs: readonly RunOutputs[],
+  alignment: PanelAlignment,
+): [string, { type: string; seenBy: number[] }][] {
   const seen = new Map<string, { type: string; seenBy: number[] }>();
   if (alignment === 'provided') {
     outputs.forEach((output, index) => {
@@ -95,7 +98,17 @@ export function reconcile(
       }
     });
   }
-  const keyed = [...seen.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...seen.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+export function reconcile(
+  outputs: readonly RunOutputs[],
+  alignment: PanelAlignment,
+): PanelReportDto {
+  const runs = outputs.length;
+  const decisions = tally(outputs.map((output) => output.trace.finalDecision));
+  const findingTypes = findingTypeTally(outputs);
+  const keyed = findingsSeenBy(outputs, alignment);
   const contestedFindings: ContestedFindingDto[] = keyed
     .filter(([, entry]) => entry.seenBy.length < runs)
     .map(([key, entry]) => ({ key, type: entry.type, seenBy: entry.seenBy }));
@@ -104,11 +117,11 @@ export function reconcile(
     alignment,
     runs,
     decisions,
-    stopReasons,
-    gates,
+    stopReasons: tally(outputs.map((output) => output.trace.stopReason)),
+    gates: heldGates(outputs),
     iterations: spread(outputs.map((output) => output.trace.iterations.length)),
     overall: spread(outputs.map((output) => output.decision?.scores.overall ?? null)),
-    dimensions,
+    dimensions: dimensionSpreads(outputs),
     findingTypes,
     unanimous: {
       findingTypes: held(findingTypes, runs),

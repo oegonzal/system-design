@@ -15,7 +15,7 @@ import type {
 import { PRODUCER_BRIEFING, UPSTREAM_EVIDENCE } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { SCORES_FACTOR } from './controllers/compose';
+import { projectStep, SCORES_FACTOR } from './controllers/compose';
 import type { TaskSpec } from './contracts';
 import { validatePolicy } from './policy';
 import type { Controller, Validator } from './ports';
@@ -79,15 +79,11 @@ const RESERVED_STAGE_IDS = ['producer', 'criteria', 'lenses'] as const;
 const describePipelineId = (definition: PipelineDefinition<unknown>): string =>
   `${definition.id}@${definition.version}`;
 
-/** Fails fast on a malformed pipeline — before boot completes, never mid-run. */
-export function validatePipeline(definition: PipelineDefinition<unknown>): void {
-  const name = describePipelineId(definition);
-  const fail = (message: string): never => {
-    throw new Error(`pipeline ${name}: ${message}`);
-  };
+type Fail = (message: string) => never;
+type Definition = PipelineDefinition<unknown>;
 
-  validatePolicy(definition.policy, definition.task, name);
-
+/** Every lens: a unique, unreserved id, enough samples to ever confirm anything, sane caps, a persona. */
+function checkLenses(definition: Definition, fail: Fail): void {
   const lenses = [...definition.critics, ...definition.evaluators];
   const ids = lenses.map((lens) => lens.id);
   if (new Set(ids).size !== ids.length) fail('lens ids must be unique');
@@ -104,7 +100,10 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
       fail(`lens ${lens.id} needs maxItems and maxTokens ≥ 1`);
     if (lens.persona.trim().length === 0) fail(`lens ${lens.id} has an empty persona`);
   }
+}
 
+/** Every criterion kind has exactly one judge, and every judge judges kinds that exist. */
+function checkJudges(definition: Definition, fail: Fail): void {
   const judged = new Map<string, string>();
   for (const evaluator of definition.evaluators) {
     for (const kind of evaluator.criterionKinds) {
@@ -118,9 +117,15 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   for (const kind of Object.keys(definition.task.criterionKinds)) {
     if (!judged.has(kind)) fail(`kind ${kind} has no evaluator`);
   }
+}
 
-  // A declared dependency on evidence nobody produces is a malformed pipeline:
-  // the first wave must contain a lens of the kind that produces it.
+/**
+ * A declared dependency on evidence nobody produces is a malformed pipeline:
+ * the first wave must contain a lens of the kind that produces it. The same
+ * for what the producer is briefed with.
+ */
+function checkWaves(definition: Definition, fail: Fail): void {
+  const lenses = [...definition.critics, ...definition.evaluators];
   const firstWaveCritics = definition.critics.filter((lens) => lens.consumes.length === 0);
   const firstWaveEvaluators = definition.evaluators.filter((lens) => lens.consumes.length === 0);
   for (const lens of lenses) {
@@ -138,14 +143,20 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
     if (!(PRODUCER_BRIEFING as readonly string[]).includes(briefing))
       fail(`producer consumes unknown briefing ${briefing}`);
   }
+}
 
+function checkTask(definition: Definition, fail: Fail): void {
   const validatorIds = definition.validators.map((validator) => validator.id);
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
+}
 
-  // The controller is declared by reference and composed elsewhere; what boot
-  // re-checks is its projection, since a hand-written controller never passed
-  // through `composeController`.
+/**
+ * The controller is declared by reference and composed elsewhere; what boot
+ * re-checks is its projection, since a hand-written controller never passed
+ * through `composeController`.
+ */
+function checkController(definition: Definition, fail: Fail): void {
   const { controller } = definition;
   if (!controller || controller.id.trim().length === 0) fail('pipeline declares no controller');
   const factors = controller.summary.steps.map((step) => step.factor);
@@ -156,11 +167,51 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   if (new Set(factors).size !== factors.length) {
     fail(`controller ${controller.id} consults a factor twice`);
   }
+}
+
+/** Fails fast on a malformed pipeline — before boot completes, never mid-run. */
+export function validatePipeline(definition: PipelineDefinition<unknown>): void {
+  const name = describePipelineId(definition);
+  const fail: Fail = (message) => {
+    throw new Error(`pipeline ${name}: ${message}`);
+  };
+
+  validatePolicy(definition.policy, definition.task, name);
+  checkLenses(definition, fail);
+  checkJudges(definition, fail);
+  checkWaves(definition, fail);
+  checkTask(definition, fail);
+  checkController(definition, fail);
 
   // Both clients turn the output schema into JSON Schema; an unsupported zod
   // type would otherwise surface as a null response mid-run.
   z.toJSONSchema(definition.task.output.schema);
 }
+
+const summariseLens = ({ id, samples, maxItems, maxTokens, consumes }: LensSpec) => ({
+  id,
+  samples,
+  maxItems,
+  maxTokens,
+  consumes: [...consumes],
+});
+
+/** Key order is the summary's wire order: what it judges comes before what it consumes. */
+const summariseEvaluator = ({
+  id,
+  samples,
+  maxItems,
+  maxTokens,
+  criterionKinds,
+  consumes,
+}: EvaluatorSpec) => ({
+  id,
+  samples,
+  maxItems,
+  maxTokens,
+  criterionKinds: [...criterionKinds],
+  consumes: [...consumes],
+});
 
 /** The serialisable projection: what `GET /pipelines` returns and the dump stores. */
 export function describePipeline(definition: PipelineDefinition<unknown>): PipelineSummary {
@@ -176,28 +227,11 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
     },
     producer: { consumes: [...definition.producer.consumes] },
     validators: definition.validators.map(({ id, gate }) => ({ id, gate })),
-    critics: definition.critics.map(({ id, samples, maxItems, maxTokens, consumes }) => ({
-      id,
-      samples,
-      maxItems,
-      maxTokens,
-      consumes: [...consumes],
-    })),
-    evaluators: definition.evaluators.map(
-      ({ id, samples, maxItems, maxTokens, criterionKinds, consumes }) => ({
-        id,
-        samples,
-        maxItems,
-        maxTokens,
-        criterionKinds: [...criterionKinds],
-        consumes: [...consumes],
-      }),
-    ),
+    critics: definition.critics.map(summariseLens),
+    evaluators: definition.evaluators.map(summariseEvaluator),
     controller: {
       id: definition.controller.summary.id,
-      steps: definition.controller.summary.steps.map(({ factor, params }) =>
-        params === undefined ? { factor } : { factor, params: { ...params } },
-      ),
+      steps: definition.controller.summary.steps.map(projectStep),
     },
     policy: definition.policy,
   };

@@ -16,7 +16,7 @@ import { z } from 'zod';
 
 import { STANDARD } from '../controllers';
 import type { PipelineDefinition } from '../pipeline';
-import type { Critic, Evaluator, Producer } from '../ports';
+import type { Critic, Evaluator, Producer, Stages } from '../ports';
 
 // ---- the tiny task ----------------------------------------------------------
 
@@ -202,3 +202,55 @@ export const scriptedEvaluator = (
     },
   };
 };
+
+// ---- a whole loop, scripted ----------------------------------------------------
+
+/** The tiny task's two drafts, in the order the scripted producer returns them. */
+export const DRAFT_1: TinyOutput = { text: 'first', parts: ['a'] };
+export const DRAFT_2: TinyOutput = { text: 'second', parts: ['a', 'b'] };
+
+/** A deriver that answers with the given criteria, or — given null — as a model that is off. */
+export const scriptedDeriver =
+  (criteria: SuccessCriterion[] | null): Stages<TinyOutput>['deriveCriteria'] =>
+  () =>
+    Promise.resolve({
+      criteria,
+      diagnostic: criteria
+        ? null
+        : { stage: 'criteria', sample: null, reason: 'llm-disabled' as const, detail: null },
+    });
+
+/** The tiny task's schema, as a blocking validator the loop runs first. */
+const tinySchemaValidator = (): Stages<TinyOutput>['validators'][number] => ({
+  id: 'schema',
+  gate: 'block',
+  validate: (artifact, contract) => ({
+    validatorId: 'schema',
+    gate: 'block',
+    problems: contract.output.schema.safeParse(artifact).success
+      ? []
+      : [{ severity: 'critical', locationRefs: [], message: 'not the shape' }],
+  }),
+});
+
+/**
+ * A full set of scripted stages for the tiny task: two criteria, two drafts,
+ * a critic that finds one gap and then none, an evaluator that improves on
+ * the second draft. Override what a spec is about.
+ */
+export function scriptedStages(overrides: Partial<Stages<TinyOutput>> = {}): Stages<TinyOutput> {
+  return {
+    deriveCriteria: scriptedDeriver([criterion('c1'), criterion('c2', 'nice')]),
+    producer: scriptedProducer([DRAFT_1, DRAFT_2]),
+    validators: [tinySchemaValidator()],
+    critics: [scriptedCritic('critic.tiny', [[[finding({ criterionIds: ['c1'] })]], [[]]])],
+    evaluators: [
+      scriptedEvaluator('evaluator.tiny', [
+        [[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]],
+        [[result({ criterionId: 'c1' }), result({ criterionId: 'c2' })]],
+      ]),
+    ],
+    controller: STANDARD,
+    ...overrides,
+  };
+}
