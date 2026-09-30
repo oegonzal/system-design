@@ -34,10 +34,11 @@ export interface ScoreSummaryProps {
 }
 
 /**
- * The headline: the controller's overall score, its decision, why the loop
- * stopped, and one meter per dimension the pipeline declared. The dimension
- * names are the pipeline's own — whatever keys arrive are what render, in the
- * order the loop reported them. Purely presentational — Storybook-safe.
+ * The headline: the controller's overall score, its decision and the
+ * controller's own sentence for it, why the loop stopped, and one meter per
+ * dimension the pipeline declared. The dimension names are the pipeline's
+ * own — whatever keys arrive are what render, in the order the loop reported
+ * them. Purely presentational — Storybook-safe.
  */
 export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
   const dimensions = Object.entries(evaluation.dimensions);
@@ -60,6 +61,11 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
           </Badge>
         ) : null}
       </ScoreRow>
+      {evaluation.decisionReason ? (
+        <Text size="sm" tone="muted" data-testid="decision-reason">
+          {evaluation.decisionReason}
+        </Text>
+      ) : null}
       {dimensions.length > 0 ? (
         <Stack gap={3}>
           {dimensions.map(([key, value]) =>

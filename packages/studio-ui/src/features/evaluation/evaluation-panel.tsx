@@ -3,7 +3,7 @@
 import type { EvaluationDto, EvaluationFindingDto, SuccessCriterion } from '@sysdesign/contracts';
 import { Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
-import { CriterionResultsTable } from './criterion-results-table';
+import { CriterionResultsList } from './criterion-results-list';
 import { FindingsList } from './findings-list';
 import { ScoreSummary } from './score-summary';
 
@@ -16,6 +16,8 @@ export interface EvaluationPanelProps {
   message: string;
   /** The prompt's rubric, so criterion ids read as statements. */
   criteria: SuccessCriterion[];
+  /** The loaded revision was stored before grading was delegated — it has no evaluation to poll. */
+  legacy?: boolean;
   /** There is no retry endpoint: retrying a failed grade is resubmitting the draft. */
   onRetry: () => void;
   onSelectFinding: (finding: EvaluationFindingDto) => void;
@@ -25,12 +27,17 @@ export interface EvaluationPanelProps {
 const ESCALATED_COPY =
   'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
 
+/** A revision from before grading moved to the loop: nothing to poll, only to resubmit. */
+const LEGACY_COPY =
+  'This revision was stored before grading moved to the quality loop, so it has no evaluation. Resubmit it to grade it.';
+
 /**
  * The feedback dock: running → spinner, failed → error + resubmit, complete →
  * the score summary, the criterion results and the findings. An escalation
- * with no score says why before showing what the lenses did find. The
- * LiveRegion is mounted unconditionally so status changes are announced,
- * not just rendered.
+ * with no score says why before showing what the lenses did find; a legacy
+ * revision says it has nothing to show and offers the resubmit instead of
+ * the idle copy. The LiveRegion is mounted unconditionally so status
+ * changes are announced, not just rendered.
  */
 export function EvaluationPanel({
   evaluation,
@@ -38,6 +45,7 @@ export function EvaluationPanel({
   isPolling,
   message,
   criteria,
+  legacy = false,
   onRetry,
   onSelectFinding,
 }: EvaluationPanelProps) {
@@ -52,7 +60,16 @@ export function EvaluationPanel({
     <Stack gap={5} data-testid="evaluation-panel">
       <LiveRegion message={message} />
 
-      {evaluation === null && error === null && !isPolling ? (
+      {legacy ? (
+        <Stack gap={3} data-testid="evaluation-legacy">
+          <Text size="sm">{LEGACY_COPY}</Text>
+          <div>
+            <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
+              Resubmit for grading
+            </Button>
+          </div>
+        </Stack>
+      ) : evaluation === null && error === null && !isPolling ? (
         <Text size="sm" tone="muted">
           Submit your design to have the quality loop grade it.
         </Text>
@@ -88,7 +105,7 @@ export function EvaluationPanel({
           <ScoreSummary evaluation={evaluation} />
           <Stack gap={2}>
             <Heading level={3}>Criteria</Heading>
-            <CriterionResultsTable results={evaluation.criterionResults} criteria={criteria} />
+            <CriterionResultsList results={evaluation.criterionResults} criteria={criteria} />
           </Stack>
           <Stack gap={2}>
             <Heading level={3}>Findings</Heading>

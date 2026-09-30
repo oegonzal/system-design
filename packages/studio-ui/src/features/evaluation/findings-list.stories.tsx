@@ -27,10 +27,14 @@ export const CompleteWithFindings: Story = {
         type: 'unbacked_claim',
         severity: 'medium',
         criterionIds: ['c3'],
+        locations: [
+          { ref: 'binding.2', label: 'c3 ← n-3', part: 'binding', key: 'c3' },
+          { ref: 'node.3', label: 'n-3 · database · Orders DB', part: 'node', key: 'n-3' },
+        ],
         nodeIds: ['n-3'],
         locationRefs: ['binding.2', 'node.3'],
         rationale:
-          'The brief says a replica keeps reads under budget, but the canvas draws no replica.',
+          'binding.2 says a replica keeps reads under budget, but node.3 is the only store drawn.',
         reconciledTo: 'c3',
       }),
       makeFinding({
@@ -39,9 +43,12 @@ export const CompleteWithFindings: Story = {
         type: 'operability_gap',
         severity: 'info',
         criterionIds: [],
+        locations: [
+          { ref: 'node.2', label: 'n-2 · service · Order Service', part: 'node', key: 'n-2' },
+        ],
         nodeIds: ['n-2'],
         locationRefs: ['node.2'],
-        rationale: 'Nothing watches the service; the goal asks for observability.',
+        rationale: 'Nothing watches node.2; the goal asks for observability.',
       }),
     ],
   },

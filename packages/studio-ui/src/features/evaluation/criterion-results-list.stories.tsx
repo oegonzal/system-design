@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { makeCriteria, makeCriterionResult, makeEvaluation } from '../../testing/fixtures';
-import { CriterionResultsTable } from './criterion-results-table';
+import { CriterionResultsList } from './criterion-results-list';
 
-const meta: Meta<typeof CriterionResultsTable> = {
-  title: 'Studio/Evaluation/CriterionResultsTable',
-  component: CriterionResultsTable,
+const meta: Meta<typeof CriterionResultsList> = {
+  title: 'Studio/Evaluation/CriterionResultsList',
+  component: CriterionResultsList,
   args: { criteria: makeCriteria() },
 };
 export default meta;
 
-type Story = StoryObj<typeof CriterionResultsTable>;
+type Story = StoryObj<typeof CriterionResultsList>;
 
 /** The fixture evaluation: a pass, two partials, a fail and a pass. */
 export const Mixed: Story = { args: { results: makeEvaluation().criterionResults } };

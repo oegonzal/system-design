@@ -14,6 +14,17 @@ describe('ScoreSummary', () => {
     expect(screen.getByTestId('stop-reason').textContent).toBe('Max iterations');
   });
 
+  it('[EVAL-1] shows the decision reason under the headline', () => {
+    const { unmount } = renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
+    expect(screen.getByTestId('decision-reason').textContent).toBe(
+      'below the accept threshold of 75',
+    );
+    unmount();
+
+    renderWithTheme(<ScoreSummary evaluation={makeEvaluation({ decisionReason: null })} />);
+    expect(screen.queryByTestId('decision-reason')).toBeNull();
+  });
+
   it('[EVAL-1] renders one meter per dimension the pipeline reported, keyed by its own name', () => {
     renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
 

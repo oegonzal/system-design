@@ -10,6 +10,7 @@ import {
 import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 
 import { humanizeToken } from './humanize';
+import { substituteLocationLabels } from './location-labels';
 
 export interface FindingsListProps {
   findings: EvaluationFindingDto[];
@@ -87,8 +88,10 @@ function groupBySeverity(findings: EvaluationFindingDto[]): [Severity, Evaluatio
 /**
  * Confirmed findings grouped by severity in the contract's urgency order.
  * Every chip is a fact from the ledger — which lenses confirmed it, its type,
- * how sure they were, how fixable it is, which criteria it names. Clicking a
- * title highlights the affected elements on the canvas. Presentational —
+ * how sure they were, how fixable it is, which criteria it names, and where
+ * on the design it points, by label rather than position. The rationale reads
+ * with the same labels in place of the ids the lens wrote. Clicking a title
+ * highlights the affected elements on the canvas. Presentational —
  * everything stateful arrives through props.
  */
 export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: FindingsListProps) {
@@ -143,9 +146,11 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                   {humanizeToken(finding.type)}
                 </TitleButton>
                 <Text size="sm" tone="secondary">
-                  {finding.rationale ?? 'No rationale was recorded for this finding.'}
+                  {finding.rationale !== null
+                    ? substituteLocationLabels(finding.rationale, finding.locations)
+                    : 'No rationale was recorded for this finding.'}
                 </Text>
-                {finding.criterionIds.length > 0 || finding.locationRefs.length > 0 ? (
+                {finding.criterionIds.length > 0 || finding.locations.length > 0 ? (
                   <BadgeRow>
                     {finding.criterionIds.map((criterionId) => (
                       <Badge
@@ -157,11 +162,16 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                         {criterionId}
                       </Badge>
                     ))}
-                    {finding.locationRefs.length > 0 ? (
-                      <Text as="span" size="sm" tone="muted">
-                        at {finding.locationRefs.join(', ')}
-                      </Text>
-                    ) : null}
+                    {finding.locations.map((location) => (
+                      <Badge
+                        key={location.ref}
+                        tone="neutral"
+                        title={location.ref}
+                        data-testid="finding-location"
+                      >
+                        {location.label}
+                      </Badge>
+                    ))}
                   </BadgeRow>
                 ) : null}
               </Item>

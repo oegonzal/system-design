@@ -9,6 +9,7 @@ import type {
 } from '@sysdesign/contracts';
 
 import { humanizeToken } from '../evaluation/humanize';
+import { substituteLocationLabels } from '../evaluation/location-labels';
 
 /**
  * Pure Markdown serializers for a practice run — one per artifact, each a
@@ -140,9 +141,12 @@ export function narrativeMarkdown(
   return joinLines(lines);
 }
 
+/**
+ * The graph is not consulted: every location a finding cites arrives already
+ * labelled by the grader, so the export reads the same words as the panel.
+ */
 export function feedbackMarkdown(
   evaluation: EvaluationDto | null,
-  graph: CanvasGraph,
   criteria: readonly SuccessCriterion[],
   revisionNumber: number | null,
 ): string {
@@ -178,17 +182,18 @@ export function feedbackMarkdown(
     lines.push(NONE);
   }
 
-  const labels = nodeLabels(graph);
   lines.push(``, `## Findings`, ``);
   if (evaluation.findings.length > 0) {
     for (const finding of evaluation.findings) {
-      const where = finding.nodeIds.map((id) => labels.get(id) ?? id).join(', ');
+      const where = finding.locations.map((location) => location.label).join(', ');
       const criteriaCited = finding.criterionIds.join(', ');
       lines.push(
         `- **[${finding.severity} · ${finding.lenses.join(', ')} · ${humanizeToken(finding.type)}]**${
           where ? ` (${where})` : ''
         }${criteriaCited ? ` — ${criteriaCited}` : ''}`,
-        ...(finding.rationale ? [`  ${finding.rationale}`] : []),
+        ...(finding.rationale
+          ? [`  ${substituteLocationLabels(finding.rationale, finding.locations)}`]
+          : []),
       );
     }
   } else {
@@ -197,9 +202,7 @@ export function feedbackMarkdown(
   lines.push(
     ``,
     `---`,
-    `_run ${evaluation.runId} · iteration ${evaluation.iteration}${
-      evaluation.llm.model ? ` · model ${evaluation.llm.model}` : ' · no model'
-    }_`,
+    `_run ${evaluation.runId} · iteration ${evaluation.iteration} · model ${evaluation.llm.model}_`,
   );
   return joinLines(lines);
 }

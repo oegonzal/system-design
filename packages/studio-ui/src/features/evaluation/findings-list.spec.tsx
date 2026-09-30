@@ -18,8 +18,10 @@ const findings = [
     severity: 'critical',
     type: 'unbacked_claim',
     lenses: ['critic.explanation'],
+    locations: [{ ref: 'binding.2', label: 'c3 ← n-3', part: 'binding', key: 'c3' }],
     locationRefs: ['binding.2'],
     nodeIds: [],
+    rationale: 'binding.2 claims a replica the canvas does not draw.',
     reconciledTo: 'c3',
   }),
 ];
@@ -50,7 +52,19 @@ describe('FindingsList', () => {
     expect(within(item).getByTestId('finding-type').textContent).toBe('unhandled_failure');
     expect(item.textContent).toContain('high confidence');
     expect(item.textContent).toContain('fixable local');
-    expect(item.textContent).toContain('at node.3');
+  });
+
+  it('[EVAL-2] shows every location a finding cites by its label, with the raw ref as its title, and reads the rationale with ids replaced', () => {
+    renderWithTheme(<FindingsList findings={findings} onSelect={vi.fn()} />);
+
+    const chips = within(screen.getByTestId('finding-f-crit')).getAllByTestId('finding-location');
+    expect(chips.map((chip) => chip.textContent)).toEqual(['n-3 · database · Orders DB']);
+    expect(chips[0].getAttribute('title')).toBe('node.3');
+    expect(screen.getByTestId('finding-f-crit').textContent).not.toContain('at node.3');
+
+    const claim = screen.getByTestId('finding-f-claim');
+    expect(claim.textContent).toContain('c3 ← n-3 claims a replica the canvas does not draw.');
+    expect(claim.textContent).not.toContain('binding.2 claims');
   });
 
   it('chips the criteria a finding names, carrying the statement as a title', () => {

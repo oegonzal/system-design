@@ -71,11 +71,16 @@ describe('briefMarkdown', () => {
 });
 
 describe('feedbackMarkdown', () => {
-  it('[UX-10] renders the score line, dimensions, criteria and findings by label', () => {
+  it('[UX-10] renders the score line, dimensions, criteria and findings by their location labels, substituting ids in the rationale', () => {
     const evaluation = makeEvaluation({
-      findings: [makeFinding({ lenses: ['critic.architecture'], nodeIds: ['n-3'] })],
+      findings: [
+        makeFinding({
+          lenses: ['critic.architecture'],
+          rationale: 'node.3 is both the read bottleneck and the single point of failure.',
+        }),
+      ],
     });
-    const md = feedbackMarkdown(evaluation, graph, criteria, 2);
+    const md = feedbackMarkdown(evaluation, criteria, 2);
     expect(md).toContain('# Feedback — revision #2');
     expect(md).toContain('**72/100 · revise**');
     expect(md).toContain('## Dimensions');
@@ -83,12 +88,18 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('## Criteria');
     expect(md).toContain('| c3 — p99 read latency stays under 200 ms | fail | high |');
     expect(md).toContain('## Findings');
-    expect(md).toContain('- **[high · critic.architecture · Unhandled failure]** (Orders DB) — c3');
+    expect(md).toContain(
+      '- **[high · critic.architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
+    );
+    expect(md).toContain(
+      '  n-3 · database · Orders DB is both the read bottleneck and the single point of failure.',
+    );
+    expect(md).toContain('_run run-1 · iteration 1 · model test-model_');
   });
 
   it('says not-graded when the evaluation is absent or still running', () => {
-    expect(feedbackMarkdown(null, graph, criteria, 1)).toContain('Not graded yet');
-    expect(feedbackMarkdown(makeEvaluation({ status: 'running' }), graph, criteria, 1)).toContain(
+    expect(feedbackMarkdown(null, criteria, 1)).toContain('Not graded yet');
+    expect(feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, 1)).toContain(
       'Not graded yet',
     );
   });

@@ -68,10 +68,7 @@ export async function buildAndDownloadRunZip(input: RunExportInput): Promise<voi
   zip.file('prompt.md', promptMarkdown(input.prompt, input.criteria));
   zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
   zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
-  zip.file(
-    'feedback.md',
-    feedbackMarkdown(input.evaluation, input.graph, input.criteria, input.revisionNumber),
-  );
+  zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.criteria, input.revisionNumber));
   zip.file('revisions.md', revisionsMarkdown(input.revisions));
 
   // Best-effort: a diagram-capture hiccup must never cost the Markdown export.
