@@ -34,9 +34,5 @@ export default defineConfig({
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/design-system',
-      provider: 'v8',
-    },
   },
 });

@@ -16,7 +16,7 @@ import { CRITERIA } from '../packages/criteria/src/index';
  */
 const WORKSPACE = join(__dirname, '..');
 const SPEC_PATTERN = /\.spec\.(ts|tsx)$/;
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', 'coverage', 'storybook-static']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.next', 'storybook-static']);
 
 function collectSpecFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

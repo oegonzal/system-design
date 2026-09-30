@@ -25,23 +25,6 @@
       }
     }
   ],
-  "generators": {
-    "@nx/react": {
-      "application": {
-        "babel": true,
-        "style": "@emotion/styled",
-        "linter": "eslint",
-        "bundler": "vite"
-      },
-      "component": {
-        "style": "@emotion/styled"
-      },
-      "library": {
-        "style": "@emotion/styled",
-        "linter": "eslint"
-      }
-    }
-  },
   "analytics": false,
   "pluginsConfig": {
     "@nx/js": {

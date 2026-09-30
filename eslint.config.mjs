@@ -18,7 +18,6 @@ export default [
       '**/.next/**',
       '**/.next-dev/**',
       '**/out-tsc/**',
-      '**/coverage/**',
       '**/storybook-static/**',
       '**/vite.config.*',
       '**/vitest.config.*',

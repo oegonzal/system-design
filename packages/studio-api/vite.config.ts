@@ -27,9 +27,5 @@ export default defineConfig({
 
     include: ['src/**/*.{test,spec}.{ts,mts}'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/studio-api',
-      provider: 'v8',
-    },
   },
 });

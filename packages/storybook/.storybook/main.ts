@@ -39,7 +39,7 @@ const config: StorybookConfig = {
    * - `studio-ui`'s tsconfig says `jsx: "preserve"` (Next owns its JSX), so
    *   Vite's tsconfig-driven native transform leaves that package's JSX
    *   untouched and the build dies parsing it. An explicit React plugin —
-   *   with Emotion's babel plugin, matching the packages' own test configs —
+   *   with Emotion's JSX runtime, matching the packages' own test configs —
    *   transforms everything uniformly.
    */
   viteFinal: async (viteConfig) => {

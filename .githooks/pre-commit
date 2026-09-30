@@ -55,7 +55,7 @@ partial=()
 
 for file in "${staged[@]}"; do
   case "$file" in
-    dist/* | */dist/* | coverage/* | */coverage/* | storybook-static/* | */storybook-static/* | .nx/* | */.nx/* | .next/* | */.next/*)
+    dist/* | */dist/* | storybook-static/* | */storybook-static/* | .nx/* | */.nx/* | .next/* | */.next/*)
       continue
       ;;
   esac

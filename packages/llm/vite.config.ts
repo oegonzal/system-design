@@ -12,9 +12,5 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/llm',
-      provider: 'v8',
-    },
   },
 });

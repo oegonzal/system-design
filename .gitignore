@@ -27,7 +27,6 @@ node_modules
 !.vscode/extensions.json
 
 # misc
-/coverage
 npm-debug.log
 yarn-error.log
 

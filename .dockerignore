@@ -4,7 +4,6 @@ node_modules
 **/.next
 .nx
 .git
-coverage
 storybook-static
 test-output
 playwright-report

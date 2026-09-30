@@ -26,9 +26,5 @@ export default defineConfig({
 
     include: ['src/**/*.{test,spec}.{ts,mts}'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/quality-loop',
-      provider: 'v8',
-    },
   },
 });

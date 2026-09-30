@@ -11,7 +11,7 @@ const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
  * - `outputFileTracingRoot` names the real workspace root so Next stops
  *   guessing it from the nearest lockfile.
  * - `compiler.emotion` is the SWC half of Emotion; the Vite side (tests,
- *   Storybook) configures the Babel plugin instead.
+ *   Storybook) uses Emotion's JSX runtime (`jsxImportSource`) instead.
  * - `distDir` is `.next-dev` under `next dev` and `.next` otherwise, so a
  *   build never clobbers the running dev server's chunks (nor the reverse).
  *   `next-env.d.ts` is regenerated per distDir and stays untracked; the two

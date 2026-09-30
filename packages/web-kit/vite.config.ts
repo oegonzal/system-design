@@ -20,9 +20,5 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/web-kit',
-      provider: 'v8',
-    },
   },
 });

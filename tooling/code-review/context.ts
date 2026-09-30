@@ -35,7 +35,6 @@ const REVIEWABLE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 const IGNORED = [
   /(^|\/)node_modules\//,
   /(^|\/)dist\//,
-  /(^|\/)coverage\//,
   /(^|\/)\.next\//,
   /(^|\/)storybook-static\//,
   /(^|\/)\.nx\//,

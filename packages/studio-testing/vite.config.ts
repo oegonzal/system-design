@@ -16,9 +16,5 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/studio-testing',
-      provider: 'v8',
-    },
   },
 });

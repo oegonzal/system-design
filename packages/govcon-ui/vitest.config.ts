@@ -19,6 +19,5 @@ export default defineConfig({
     setupFiles: ['./src/vitest.setup.ts'],
     include: ['src/**/*.spec.{ts,tsx}'],
     reporters: ['default'],
-    coverage: { reportsDirectory: '../../coverage/packages/govcon-ui', provider: 'v8' },
   },
 });

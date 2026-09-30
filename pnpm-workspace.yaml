@@ -1,10 +1,18 @@
 packages:
   # all packages in direct subdirs of packages/
   - 'packages/*'
+# `true` runs a dependency's install script; `false` skips it on purpose.
+# core-js's postinstall only prints a funding banner.
 allowBuilds:
   '@nestjs/core': true
   '@parcel/watcher': true
   '@swc/core': true
+  core-js: false
+  esbuild: true
   nx: true
   sharp: true
   unrs-resolver: true
+peerDependencyRules:
+  allowedVersions:
+    typescript: '6'
+    eslint: '10'

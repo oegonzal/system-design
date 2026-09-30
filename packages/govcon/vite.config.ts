@@ -18,10 +18,6 @@ export default defineConfig({
   test: {
     root: __dirname,
     reporters: ['default'],
-    coverage: {
-      reportsDirectory: '../../coverage/packages/govcon',
-      provider: 'v8',
-    },
     // Two projects: the pure suites run in parallel; the Postgres suites
     // share one database, so they share one lane.
     projects: [
