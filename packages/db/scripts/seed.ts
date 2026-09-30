@@ -15,25 +15,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { MikroORM } from '@mikro-orm/postgresql';
-import type * as Contracts from '@sysdesign/contracts';
-
 import config from '../mikro-orm.config';
 import { ExperienceProfile } from '../src/entities/experience-profile.entity';
 
 const FIXTURE = join(__dirname, '../src/seed/experiences.fixture.json');
-
-// Local tuple + `satisfies` against the contract, because `@swc-node/register`
-// cannot resolve the `@sysdesign/contracts` alias to a CommonJS module — the
-// same pattern the entities use.
-type ContractArchetypes = (typeof Contracts)['ARCHETYPES'];
-const ARCHETYPES = [
-  'flash-sale-ticketing',
-  'media-streaming-pipeline',
-  'workflow-automation',
-  'realtime-analytics',
-  'dag-orchestration',
-  'order-history-integration',
-] as const satisfies ContractArchetypes;
 
 interface FixtureRow {
   id: string;
@@ -41,23 +26,20 @@ interface FixtureRow {
   companyLabel: string;
   title: string;
   summary: string;
-  archetype: Contracts.Archetype;
   techStack: string[];
-  scaleFacts: Contracts.ScaleFacts;
   highlights: string[];
 }
 
 function loadFixture(): FixtureRow[] {
   const rows = JSON.parse(readFileSync(FIXTURE, 'utf8')) as FixtureRow[];
 
-  // Fail loudly rather than half-seeding: the generator templates key off
-  // `archetype`, so a bad row would surface much later as a missing template.
+  // Fail loudly rather than half-seeding: the prompt pipeline writes from the
+  // prose, so a row with no highlights would surface later as a thin prompt.
   const bad = rows.filter(
     (row) =>
       !row.id ||
       !row.slug ||
       !row.title ||
-      !(ARCHETYPES as readonly string[]).includes(row.archetype) ||
       row.techStack.length === 0 ||
       row.highlights.length === 0,
   );

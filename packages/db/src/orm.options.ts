@@ -3,13 +3,9 @@ import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
-import { EvalJob } from './entities/eval-job.entity';
-import { Evaluation } from './entities/evaluation.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
-import { Finding } from './entities/finding.entity';
 import { GovconOpportunity } from './entities/govcon-opportunity.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
-import { ImprovementRun } from './entities/improvement-run.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
 import { OrchestrationRunChild } from './entities/orchestration-run-child.entity';
@@ -19,12 +15,13 @@ import { QualityRunCriterionResult } from './entities/quality-run-criterion-resu
 import { QualityRunFinding } from './entities/quality-run-finding.entity';
 import { QualityRunIteration } from './entities/quality-run-iteration.entity';
 import { Prompt } from './entities/prompt.entity';
+import { PromptGeneration } from './entities/prompt-generation.entity';
 import { StarStory } from './entities/star-story.entity';
 
 /**
- * ORM settings shared by every entry point that configures MikroORM: the API's
- * DbModule, the eval worker's DbModule, and `mikro-orm.config.ts` (the CLI
- * that creates and applies migrations).
+ * ORM settings shared by every entry point that configures MikroORM: the
+ * studio API's, the quality loop's and govcon's DbModules, and
+ * `mikro-orm.config.ts` (the CLI that creates and applies migrations).
  *
  * They have to agree. `namingStrategy` in particular decides whether the apps
  * query `revision_number` or `revisionNumber` — and since migrations are
@@ -41,12 +38,9 @@ export const ormOptions = {
   entities: [
     ExperienceProfile,
     Prompt,
+    PromptGeneration,
     DesignSession,
     DesignRevision,
-    Evaluation,
-    Finding,
-    EvalJob,
-    ImprovementRun,
     MemoryEmbedding,
     OrchestrationRun,
     OrchestrationRunChild,

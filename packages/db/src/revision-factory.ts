@@ -2,55 +2,46 @@ import type { EntityManager } from '@mikro-orm/postgresql';
 import type * as Contracts from '@sysdesign/contracts';
 
 import { DesignRevision } from './entities/design-revision.entity';
-import { Evaluation } from './entities/evaluation.entity';
 
-/** The design being persisted — the same trio a submit carries. */
-export interface RevisionInput {
-  graph: Contracts.CanvasGraph;
-  narrative?: Contracts.DesignNarrative | null;
-  brief?: Contracts.DesignBrief | null;
+/** The iteration of the quality-loop run that grades the revision. */
+export interface RevisionRun {
+  runId: string;
+  iteration: number;
 }
 
 /**
  * The one way a revision comes into being, shared by everything that persists
- * one: the API's submit path, the improvement-run start (base revision), and
- * the eval worker's accepted coach candidates. Dense numbering (max + 1), the
- * queued evaluation, and the caller's queue entry are created together — run
- * this inside a transaction, and let the unique (session, revision_number)
- * constraint arbitrate concurrent writers (retry on violation).
+ * one: a submission, the coach's base revision, and every coach iteration the
+ * studio imports. Dense numbering (max + 1) and the run pointer are written
+ * together — run this inside a transaction, and let the unique
+ * (session, revision_number) and (quality_run_id, quality_iteration)
+ * constraints arbitrate concurrent writers (retry or skip on violation).
  *
- * `enqueue` stays a callback because the queue is the caller's seam: the API
- * goes through its swappable `EvalQueue`, the worker writes the job row
- * directly.
+ * The cache starts `running`; an import of a finished iteration overwrites it
+ * with the terminal values before flushing.
  */
-export async function createRevisionRecords(
+export function createRevision(
   em: EntityManager,
   sessionId: string,
-  input: RevisionInput,
+  submission: Contracts.DesignSubmission,
   origin: Contracts.RevisionOrigin,
-  enqueue: (em: EntityManager, revision: DesignRevision) => Promise<void>,
-): Promise<{ revision: DesignRevision; evaluation: Evaluation }> {
-  const latest = await em.findOne(
-    DesignRevision,
-    { session: sessionId },
-    { orderBy: { revisionNumber: 'desc' } },
-  );
-
-  const revision = em.create(DesignRevision, {
-    session: sessionId,
-    revisionNumber: (latest?.revisionNumber ?? 0) + 1,
-    origin,
-    graph: input.graph,
-    narrative: input.narrative ?? null,
-    brief: input.brief ?? null,
-  });
-  em.persist(revision);
-
-  // Born queued; the worker moves it through running → complete/failed.
-  const evaluation = em.create(Evaluation, { revision });
-  em.persist(evaluation);
-
-  await enqueue(em, revision);
-
-  return { revision, evaluation };
+  run: RevisionRun,
+): Promise<DesignRevision> {
+  return em
+    .findOne(DesignRevision, { session: sessionId }, { orderBy: { revisionNumber: 'desc' } })
+    .then((latest) => {
+      const revision = em.create(DesignRevision, {
+        session: sessionId,
+        revisionNumber: (latest?.revisionNumber ?? 0) + 1,
+        origin,
+        graph: submission.graph,
+        brief: submission.brief,
+        narrative: submission.narrative,
+        qualityRunId: run.runId,
+        qualityIteration: run.iteration,
+        evaluationStatus: 'running',
+      });
+      em.persist(revision);
+      return revision;
+    });
 }
