@@ -3,8 +3,8 @@ import fixture from './fixtures/awards-response.json';
 import { httpOf, KEY } from './testing';
 
 const request = {
-  naics: '332710',
-  psc: null,
+  naics: ['332710'],
+  psc: [],
   from: '2026-06-01',
   to: '2026-09-29',
   limit: 100,
@@ -54,14 +54,17 @@ describe('the SAM.gov contract awards', () => {
     expect(JSON.stringify(result)).not.toContain(KEY);
   });
 
-  it('renders a PSC slice, reports an unreadable envelope, and says when the last page was reached', async () => {
+  it('joins codes and pages by index the way the provider counts, reports an unreadable envelope, and says when the last page was reached', async () => {
     expect(
-      Object.fromEntries(toSamAwardParams({ ...request, naics: null, psc: '4920', offset: 200 })),
+      Object.fromEntries(
+        toSamAwardParams({ ...request, naics: ['332710', '541511'], psc: ['4920'], offset: 200 }),
+      ),
     ).toEqual({
       dateSigned: '[06/01/2026,09/29/2026]',
       limit: '100',
-      offset: '200',
-      pscCode: '4920',
+      offset: '2',
+      naicsCode: '332710~541511',
+      productOrServiceCode: '4920',
     });
     const odd = httpOf([{ body: { totalRecords: 'x', awardSummary: 'nope' } }]);
     expect((await new SamGovAwards(odd.http).search(request)).result).toMatchObject({

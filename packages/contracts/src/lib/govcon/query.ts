@@ -50,14 +50,15 @@ export interface AttachmentRequest {
   ordinal: number;
 }
 
-/** One page of SAM.gov's Contract Awards search. */
+/** One page of SAM.gov's Contract Awards search: up to a hundred codes of each kind in one request. */
 export interface AwardsRequest {
-  naics: string | null;
-  psc: string | null;
+  naics: string[];
+  psc: string[];
   /** ISO dates the award was signed between, inclusive. */
   from: string;
   to: string;
   limit: number;
+  /** A record offset here; the provider counts pages, and the adapter converts. */
   offset: number;
 }
 
@@ -125,9 +126,7 @@ const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => str
   description: (query) => `description ${query.noticeId}`,
   attachment: (query) => `attachment ${query.ordinal + 1} of ${query.noticeId}`,
   awards: (query) =>
-    `awards ${[query.naics && `naics=${query.naics}`, query.psc && `psc=${query.psc}`]
-      .filter(Boolean)
-      .join(' ')} signed ${query.from}..${query.to}${pageOf(query.offset, query.limit)}`,
+    `awards naics=${query.naics.join(',') || '*'} psc=${query.psc.join(',') || '*'} signed ${query.from}..${query.to}${pageOf(query.offset, query.limit)}`,
   spending: (query) =>
     `spending naics=${query.naics.join(',') || '*'} psc=${query.psc.join(',') || '*'} ${query.from}..${query.to} page ${query.page}`,
   entity: (query) =>

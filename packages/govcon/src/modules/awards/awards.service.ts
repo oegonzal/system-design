@@ -85,77 +85,43 @@ export class AwardsService {
 
   async fetch(request: FetchAwardsRequest): Promise<FetchAwardsReport> {
     const slices: AwardsFetchSlice[] = [];
-    let stopped = false;
+    const naics = request.naics;
+    const psc = request.psc ?? [];
+    const codes = [...naics, ...psc].join(',');
     if (request.sources.includes('sam.gov')) {
-      for (const [kind, codes] of [
-        ['naics', request.naics],
-        ['psc', request.psc ?? []],
-      ] as const) {
-        for (const code of codes) {
-          const slice = sliceOf('sam.gov', code);
-          if (stopped) {
-            slice.outcome = 'skipped';
-            slice.detail = 'stopped earlier';
-          } else {
-            stopped = await this.paged(slice, (page) =>
-              this.gate.spend(
-                {
-                  source: this.contractAwards.id,
-                  operation: 'awards',
-                  query: {
-                    naics: kind === 'naics' ? code : null,
-                    psc: kind === 'psc' ? code : null,
-                    from: request.from,
-                    to: request.to,
-                    limit: AWARD_PAGE_SIZE,
-                    offset: page * AWARD_PAGE_SIZE,
-                  },
-                  cacheable: false,
-                },
-                () =>
-                  this.contractAwards.search({
-                    naics: kind === 'naics' ? code : null,
-                    psc: kind === 'psc' ? code : null,
-                    from: request.from,
-                    to: request.to,
-                    limit: AWARD_PAGE_SIZE,
-                    offset: page * AWARD_PAGE_SIZE,
-                  }),
-              ),
-            );
-          }
-          slices.push(slice);
-        }
-      }
+      const slice = sliceOf('sam.gov', codes);
+      await this.paged(slice, (page) => {
+        const query = {
+          naics,
+          psc,
+          from: request.from,
+          to: request.to,
+          limit: AWARD_PAGE_SIZE,
+          offset: page * AWARD_PAGE_SIZE,
+        };
+        return this.gate.spend(
+          { source: this.contractAwards.id, operation: 'awards', query, cacheable: false },
+          () => this.contractAwards.search(query),
+        );
+      });
+      slices.push(slice);
     }
     if (request.sources.includes('usaspending')) {
-      const slice = sliceOf('usaspending', [...request.naics, ...(request.psc ?? [])].join(','));
-      await this.paged(slice, (page) =>
-        this.gate.spend(
-          {
-            source: this.spendingAwards.id,
-            operation: 'spending',
-            query: {
-              naics: request.naics,
-              psc: request.psc ?? [],
-              from: request.from,
-              to: request.to,
-              page: page + 1,
-              limit: AWARD_PAGE_SIZE,
-            },
-            cacheable: false,
-          },
-          () =>
-            this.spendingAwards.search({
-              naics: request.naics,
-              psc: request.psc ?? [],
-              from: request.from,
-              to: request.to,
-              page: page + 1,
-              limit: AWARD_PAGE_SIZE,
-            }),
-        ),
-      );
+      const slice = sliceOf('usaspending', codes);
+      await this.paged(slice, (page) => {
+        const query = {
+          naics,
+          psc,
+          from: request.from,
+          to: request.to,
+          page: page + 1,
+          limit: AWARD_PAGE_SIZE,
+        };
+        return this.gate.spend(
+          { source: this.spendingAwards.id, operation: 'spending', query, cacheable: false },
+          () => this.spendingAwards.search(query),
+        );
+      });
       slices.push(slice);
     }
     return {

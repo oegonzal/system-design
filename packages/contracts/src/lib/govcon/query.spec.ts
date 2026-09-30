@@ -31,15 +31,15 @@ describe('describeCall', () => {
       describeCall({
         operation: 'awards',
         query: {
-          naics: '332710',
-          psc: null,
+          naics: ['332710'],
+          psc: [],
           from: '2026-01-01',
           to: '2026-06-30',
           limit: 100,
           offset: 100,
         },
       }),
-    ).toBe('awards naics=332710 signed 2026-01-01..2026-06-30 page 2');
+    ).toBe('awards naics=332710 psc=* signed 2026-01-01..2026-06-30 page 2');
     expect(
       describeCall({
         operation: 'spending',

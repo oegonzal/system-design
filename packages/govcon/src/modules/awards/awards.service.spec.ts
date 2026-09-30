@@ -43,9 +43,9 @@ function harness(
 }
 
 describe('the awards service', () => {
-  it('[GOV-17] fetches one gated page per code from SAM.gov and one from USAspending, dedupes by source and id, and stamps the fetch', async () => {
+  it('[GOV-17] fetches one gated page for every code from SAM.gov and one from USAspending, dedupes by source and id, and stamps the fetch', async () => {
     const { service, awards, log, contractAwards, spendingAwards } = harness(
-      [awardPageOf([draft('a'), draft('b')]), awardPageOf([draft('b', { amount: 999 })])],
+      [awardPageOf([draft('a'), draft('b')])],
       [awardPageOf([draft('u', { source: 'usaspending' })])],
     );
     const report = await service.fetch({
@@ -65,29 +65,23 @@ describe('the awards service', () => {
         s.updated,
       ]),
     ).toEqual([
-      ['sam.gov', '332710', 'ok', 1, 2, 2, 0],
-      ['sam.gov', '541511', 'ok', 1, 1, 0, 1],
+      ['sam.gov', '332710,541511', 'ok', 1, 2, 2, 0],
       ['usaspending', '332710,541511', 'ok', 1, 1, 1, 0],
     ]);
-    expect(report).toMatchObject({ spent: 2, budget: 10 });
-    expect(contractAwards.requests.map((r) => [r.naics, r.offset])).toEqual([
-      ['332710', 0],
-      ['541511', 0],
+    expect(report).toMatchObject({ spent: 1, budget: 10 });
+    expect(contractAwards.requests.map((r) => [r.naics, r.psc, r.offset])).toEqual([
+      [['332710', '541511'], [], 0],
     ]);
     expect(spendingAwards.requests[0]).toMatchObject({ naics: ['332710', '541511'], page: 1 });
     expect(log.calls.map((call) => [call.source, call.operation])).toEqual([
       ['sam.gov', 'awards'],
-      ['sam.gov', 'awards'],
       ['usaspending', 'spending'],
     ]);
     expect(awards.rows.size).toBe(3);
-    expect(awards.rows.get('sam.gov:b')).toMatchObject({
-      amount: 999,
-      fetchedAt: NOW.toISOString(),
-    });
+    expect(awards.rows.get('sam.gov:b')).toMatchObject({ fetchedAt: NOW.toISOString() });
   });
 
-  it('[GOV-17] pages up to the bound, stops the SAM.gov slices at the budget, and lets a failed slice fail alone', async () => {
+  it('[GOV-17] pages up to the bound, marks a slice the budget cut as truncated, and lets a failed source fail alone', async () => {
     const paged = harness([
       awardPageOf([draft('p1')], { hasMore: true }),
       awardPageOf([draft('p2')], { hasMore: true }),
@@ -107,30 +101,30 @@ describe('the awards service', () => {
     });
     expect(paged.contractAwards.requests.map((r) => r.offset)).toEqual([0, 100, 200]);
 
-    const spent = harness([awardPageOf([draft('x')])], [awardPageOf([])], 1);
+    const spent = harness([awardPageOf([draft('x')], { hasMore: true })], [awardPageOf([])], 1);
     const stopped = await spent.service.fetch({
       naics: ['11', '22', '33'],
       from: '2026-06-01',
       to: '2026-09-29',
       sources: ['sam.gov', 'usaspending'],
     });
-    expect(stopped.slices.map((s) => [s.source, s.outcome, s.detail])).toEqual([
-      ['sam.gov', 'ok', null],
-      ['sam.gov', 'budget-exhausted', 'budget 1/1 spent'],
-      ['sam.gov', 'skipped', 'stopped earlier'],
-      ['usaspending', 'ok', null],
+    expect(
+      stopped.slices.map((s) => [s.source, s.outcome, s.pages, s.truncated, s.detail]),
+    ).toEqual([
+      ['sam.gov', 'ok', 1, true, 'budget 1/1 spent'],
+      ['usaspending', 'ok', 1, false, null],
     ]);
 
-    const failing = harness([failure('error', 500, 'status 500'), awardPageOf([draft('y')])]);
+    const failing = harness([failure('error', 500, 'status 500')], [awardPageOf([draft('y')])]);
     const partial = await failing.service.fetch({
       naics: ['11', '22'],
       from: '2026-06-01',
       to: '2026-09-29',
-      sources: ['sam.gov'],
+      sources: ['sam.gov', 'usaspending'],
     });
-    expect(partial.slices.map((s) => [s.outcome, s.detail])).toEqual([
-      ['error', 'error: status 500'],
-      ['ok', null],
+    expect(partial.slices.map((s) => [s.source, s.outcome, s.detail])).toEqual([
+      ['sam.gov', 'error', 'error: status 500'],
+      ['usaspending', 'ok', null],
     ]);
   });
 

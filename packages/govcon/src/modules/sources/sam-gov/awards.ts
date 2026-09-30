@@ -10,14 +10,19 @@ import { toSamDate } from './search';
 /** The Contract Awards search: one GET per page, the key on the request like every SAM.gov API. */
 export const SAM_GOV_AWARDS_URL = 'https://api.sam.gov/contract-awards/v1/search';
 
-/** The request under the provider's parameter names — `dateSigned=[MM/dd/yyyy,MM/dd/yyyy]` as it insists. */
+/**
+ * The request under the provider's parameter names, as its documentation
+ * spells them: `dateSigned=[MM/dd/yyyy,MM/dd/yyyy]`, up to a hundred codes
+ * joined by `~` in `naicsCode` and `productOrServiceCode`, and `offset` as a
+ * page index — so the record offset the port speaks becomes a page here.
+ */
 export function toSamAwardParams(request: AwardsRequest): URLSearchParams {
   const params = new URLSearchParams();
   params.set('dateSigned', `[${toSamDate(request.from)},${toSamDate(request.to)}]`);
   params.set('limit', String(request.limit));
-  params.set('offset', String(request.offset));
-  if (request.naics !== null) params.set('naicsCode', request.naics);
-  if (request.psc !== null) params.set('pscCode', request.psc);
+  params.set('offset', String(Math.floor(request.offset / request.limit)));
+  if (request.naics.length > 0) params.set('naicsCode', request.naics.join('~'));
+  if (request.psc.length > 0) params.set('productOrServiceCode', request.psc.join('~'));
   return params;
 }
 
