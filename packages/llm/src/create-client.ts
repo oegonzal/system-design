@@ -1,6 +1,6 @@
 import type { LlmModelDto } from '@sysdesign/contracts';
 
-import { readClaudeAccount, signedIn, type ClaudeAccount } from './claude-account';
+import { describeAccount, readClaudeAccount, signedIn, type ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient, SUBSCRIPTION_MODEL_LABEL } from './claude-agent-client';
 import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-client';
 import type { LlmClient } from './llm-client';
@@ -12,21 +12,26 @@ import { OpenAiEmbeddingClient } from './openai-embedding-client';
  * The quality loop runs on a Claude Code subscription login and nothing else:
  * this machine's `claude login`, or — where there is no login, a container —
  * the long-lived `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints.
- * No API key is read, and none reaches the CLI. A process without a login is
- * a boot failure saying how to get one, never a client that quietly fails
- * every call.
+ * No API key is read, and none reaches the CLI. A process without the
+ * subscription is a boot failure saying how to get one, never a client that
+ * quietly fails every call.
+ *
+ * The boot check proves a subscription credential is present, not that it
+ * is still valid: that takes a model call. A revoked or mistyped token fails
+ * the first call instead, and the exchange records the CLI's own reason.
  */
 export const MODEL_PROVIDER_HELP =
-  'the quality loop runs only on a Claude Code subscription login and found none: run `claude login` on this machine, or give a container the CLAUDE_CODE_OAUTH_TOKEN that `claude setup-token` prints';
+  'the quality loop runs only on a Claude Code subscription login: run `claude login` on this machine, or give a container the CLAUDE_CODE_OAUTH_TOKEN that `claude setup-token` prints';
 
 export class MissingModelProviderError extends Error {
   override readonly name = 'MissingModelProvider';
 
-  constructor(cause?: unknown) {
+  /** `found` is what the check saw instead of a subscription; `cause` a check that could not finish. */
+  constructor(detail: { found?: string; cause?: unknown } = {}) {
     super(
-      cause === undefined
-        ? MODEL_PROVIDER_HELP
-        : `${MODEL_PROVIDER_HELP} (the login check failed: ${cause instanceof Error ? cause.message : String(cause)})`,
+      detail.cause !== undefined
+        ? `could not check the Claude Code login (${detail.cause instanceof Error ? detail.cause.message : String(detail.cause)}) — ${MODEL_PROVIDER_HELP}`
+        : `found no subscription login${detail.found ? ` (Claude Code reports ${detail.found})` : ''} — ${MODEL_PROVIDER_HELP}`,
     );
   }
 }
@@ -37,9 +42,9 @@ export const describeModelProvider = (env: NodeJS.ProcessEnv = process.env): Llm
 });
 
 /**
- * Refuse unless Claude Code reports a login. The account is asked of the
- * CLI itself, so a Keychain login and an OAuth token are recognised alike;
- * a check that cannot finish is a refusal too.
+ * Refuse unless Claude Code reports the subscription. The account is asked
+ * of the CLI itself, so a Keychain login and an OAuth token are recognised
+ * alike; a check that cannot finish is a refusal too, with its own reason.
  */
 export async function assertSubscriptionLogin(
   read: () => Promise<ClaudeAccount> = () => readClaudeAccount(),
@@ -47,10 +52,10 @@ export async function assertSubscriptionLogin(
   let account: ClaudeAccount;
   try {
     account = await read();
-  } catch (error) {
-    throw new MissingModelProviderError(error);
+  } catch (cause) {
+    throw new MissingModelProviderError({ cause });
   }
-  if (!signedIn(account)) throw new MissingModelProviderError();
+  if (!signedIn(account)) throw new MissingModelProviderError({ found: describeAccount(account) });
 }
 
 export function createQualityLoopLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import type { ClaudeQuery } from './claude-account';
 import { ClaudeAgentLlmClient, extractStructured } from './claude-agent-client';
+import type { LlmCall } from './exchange';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
 
@@ -88,6 +90,82 @@ describe('extractStructured', () => {
     expect(extractStructured('{"answer":"has } and { braces","score":1}', schema)).toEqual({
       answer: 'has } and { braces',
       score: 1,
+    });
+  });
+});
+
+/** A stand-in for the SDK's `query` that replays messages and records the options it got. */
+function scripted(messages: readonly unknown[]) {
+  const seen: { env?: NodeJS.ProcessEnv } = {};
+  const run = ((params: { options?: { env?: NodeJS.ProcessEnv } }) => {
+    seen.env = params.options?.env;
+    return (async function* () {
+      yield* messages;
+    })();
+  }) as unknown as ClaudeQuery;
+  return { run, seen };
+}
+
+const answer = z.object({ answer: z.string() });
+
+describe('the subscription client at its call site', () => {
+  it('[QL-22] spawns the CLI with no non-subscription credential in its environment', async () => {
+    const saved = {
+      key: process.env['ANTHROPIC_API_KEY'],
+      token: process.env['ANTHROPIC_AUTH_TOKEN'],
+    };
+    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    process.env['ANTHROPIC_AUTH_TOKEN'] = 'gateway';
+    try {
+      const { run, seen } = scripted([
+        { type: 'result', subtype: 'success', is_error: false, result: '{"answer":"ok"}' },
+      ]);
+      const client = new ClaudeAgentLlmClient({ query: run });
+      await expect(
+        client.completeStructured({ system: 's', user: 'u', schema: answer }),
+      ).resolves.toEqual({ answer: 'ok' });
+      expect(seen.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+      expect(seen.env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
+      expect(seen.env).toHaveProperty('CLAUDE_CODE_MAX_OUTPUT_TOKENS');
+    } finally {
+      for (const [name, value] of [
+        ['ANTHROPIC_API_KEY', saved.key],
+        ['ANTHROPIC_AUTH_TOKEN', saved.token],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
+  it("[QL-22] a turn that ended on an API error is recorded as an error with the CLI's own reason", async () => {
+    const calls: LlmCall[] = [];
+    const { run } = scripted([
+      { type: 'assistant', error: 'authentication_failed', message: { content: [] } },
+      { type: 'result', subtype: 'success', is_error: true, result: 'Invalid bearer token' },
+    ]);
+    const client = new ClaudeAgentLlmClient({ query: run }).withRecorder((call) =>
+      calls.push(call),
+    );
+    await expect(
+      client.completeStructured({ system: 's', user: 'u', schema: answer }),
+    ).resolves.toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      outcome: 'error',
+      error: { name: 'authentication_failed', message: 'Invalid bearer token' },
+    });
+
+    const stopped = scripted([
+      { type: 'result', subtype: 'error_max_turns', is_error: true, errors: ['turn limit'] },
+    ]);
+    const more: LlmCall[] = [];
+    await new ClaudeAgentLlmClient({ query: stopped.run })
+      .withRecorder((call) => more.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(more[0]).toMatchObject({
+      outcome: 'error',
+      error: { name: 'error_max_turns', message: 'turn limit' },
     });
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { signedIn, subscriptionEnv, type ClaudeAccount } from './claude-account';
+import type { ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
 import {
   assertSubscriptionLogin,
@@ -13,8 +13,10 @@ import { DisabledEmbeddingClient, embeddingAvailability } from './embedding-clie
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
+  apiProvider: 'firstParty',
   subscriptionType: null,
   tokenSource: null,
+  apiKeySource: null,
   ...overrides,
 });
 
@@ -35,35 +37,30 @@ describe('the quality loop runs on the Claude Code subscription only', () => {
     expect(describeModelProvider(env)).toEqual({ model: 'claude-opus-5' });
   });
 
-  it('[QL-22] an API key never reaches the CLI; everything else does', () => {
-    const env = subscriptionEnv({
-      ANTHROPIC_API_KEY: 'sk-test',
-      HOME: '/h',
-      CLAUDE_CODE_OAUTH_TOKEN: 't',
-    });
-    expect(env).toEqual({ HOME: '/h', CLAUDE_CODE_OAUTH_TOKEN: 't' });
-  });
-
-  it('[QL-22] a machine login or an OAuth token counts as signed in; the source "none" does not', () => {
-    expect(signedIn(account({ subscriptionType: 'Claude Max' }))).toBe(true);
-    expect(signedIn(account({ tokenSource: 'CLAUDE_CODE_OAUTH_TOKEN' }))).toBe(true);
-    expect(signedIn(account({ tokenSource: 'none' }))).toBe(false);
-    expect(signedIn(account({}))).toBe(false);
-  });
-
-  it('[QL-22] the login check refuses with how to get a login, and a check that cannot finish is a refusal too', async () => {
+  it('[QL-22] the login check refuses what is not the subscription, saying what it found and how to get a login', async () => {
     await expect(
       assertSubscriptionLogin(() => Promise.resolve(account({ subscriptionType: 'Claude Max' }))),
     ).resolves.toBeUndefined();
+    const none = assertSubscriptionLogin(() => Promise.resolve(account({ tokenSource: 'none' })));
+    await expect(none).rejects.toThrow(MissingModelProviderError);
     await expect(
       assertSubscriptionLogin(() => Promise.resolve(account({ tokenSource: 'none' }))),
-    ).rejects.toThrow(MissingModelProviderError);
+    ).rejects.toThrow(
+      /found no subscription login \(Claude Code reports provider firstParty, token source none\).*claude login.*claude setup-token/,
+    );
     await expect(
-      assertSubscriptionLogin(() => Promise.resolve(account({ tokenSource: 'none' }))),
-    ).rejects.toThrow(/claude login.*claude setup-token/);
+      assertSubscriptionLogin(() =>
+        Promise.resolve(account({ tokenSource: 'ANTHROPIC_AUTH_TOKEN' })),
+      ),
+    ).rejects.toThrow(/token source ANTHROPIC_AUTH_TOKEN/);
+  });
+
+  it('[QL-22] a check that cannot finish is a refusal with its own reason, not "no login"', async () => {
+    const failed = assertSubscriptionLogin(() => Promise.reject(new Error('CLI exited')));
+    await expect(failed).rejects.toThrow(/could not check the Claude Code login \(CLI exited\)/);
     await expect(
       assertSubscriptionLogin(() => Promise.reject(new Error('CLI exited'))),
-    ).rejects.toThrow(/the login check failed: CLI exited/);
+    ).rejects.not.toThrow(/found no subscription login/);
   });
 });
 

@@ -30,6 +30,17 @@ docker_build(
 # printed). The Secret is always built: with no token the pod starts and
 # exits 1 with the loop's own message, instead of hanging on a Secret that
 # does not exist. Warn here, because that exit is easy to misread.
+def _dotenv_value(raw):
+    """One value the way Node's --env-file reads it: a matched quote pair, or an unquoted value up to a `#`."""
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] in ('"', "'"):
+        closing = raw.find(raw[0], 1)
+        if closing > 0:
+            return raw[1:closing]
+    if '#' in raw:
+        return raw[:raw.index('#')].strip()
+    return raw
+
 def _dotenv(path):
     values = {}
     for line in str(read_file(path, '')).splitlines():
@@ -37,7 +48,10 @@ def _dotenv(path):
         if not line or line.startswith('#') or '=' not in line:
             continue
         key, value = line.split('=', 1)
-        values[key.strip()] = value.strip().strip('"').strip("'")
+        key = key.strip()
+        if key.startswith('export '):
+            key = key[len('export '):].strip()
+        values[key] = _dotenv_value(value)
     return values
 
 _ENV_FILE = _dotenv(config.main_dir + '/.env')

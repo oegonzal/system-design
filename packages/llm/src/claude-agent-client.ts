@@ -1,6 +1,6 @@
 import { z, type ZodIssue, type ZodType } from 'zod';
 
-import { subscriptionEnv } from './claude-account';
+import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import type { LlmClient, StructuredRequest } from './llm-client';
 
@@ -191,15 +191,18 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   /** Only set when the caller pinned one; otherwise the CLI's default rules. */
   private readonly requestedModel: string | undefined;
   private readonly sink: LlmCallSink | null;
+  /** The SDK's `query`; injectable so a spec never spawns the CLI. */
+  private readonly run: ClaudeQuery | undefined;
 
-  constructor(options: { model?: string; sink?: LlmCallSink } = {}) {
+  constructor(options: { model?: string; sink?: LlmCallSink; query?: ClaudeQuery } = {}) {
     this.requestedModel = options.model;
     this.model = options.model ?? SUBSCRIPTION_MODEL_LABEL;
     this.sink = options.sink ?? null;
+    this.run = options.query;
   }
 
   withRecorder(sink: LlmCallSink): LlmClient {
-    return new ClaudeAgentLlmClient({ model: this.requestedModel, sink });
+    return new ClaudeAgentLlmClient({ model: this.requestedModel, sink, query: this.run });
   }
 
   async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
@@ -246,7 +249,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         jsonSchema,
       ].join('\n');
 
-      const { query } = await import('@anthropic-ai/claude-agent-sdk');
+      const query = this.run ?? (await import('@anthropic-ai/claude-agent-sdk')).query;
 
       // A hard backstop: interrupt() is cooperative and cannot end a wedged
       // subprocess, so an AbortController drives the SDK's real kill path.
@@ -278,11 +281,24 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       });
 
       let resultText: string | null = null;
+      // A turn that ended on an API error (an expired token, a rate limit)
+      // still arrives as a result: keep the CLI's own reason for the record.
+      let failure: LlmCall['error'] = null;
+      let assistantError: string | null = null;
       let usage: LlmCall['usage'] = null;
       try {
         for await (const message of turn) {
+          if (message.type === 'assistant' && message.error) assistantError = message.error;
           if (message.type === 'result') {
-            resultText = message.subtype === 'success' ? message.result : null;
+            if (message.subtype === 'success' && !message.is_error) resultText = message.result;
+            else
+              failure = {
+                name: assistantError ?? message.subtype,
+                message:
+                  message.subtype === 'success'
+                    ? message.result
+                    : message.errors.join('; ') || message.subtype,
+              };
             const u = (message as { usage?: { input_tokens?: number; output_tokens?: number } })
               .usage;
             if (u) {
@@ -295,7 +311,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       }
 
       if (resultText === null) {
-        record('error', null, null, null, usage);
+        record('error', null, null, failure, usage);
         return null;
       }
       const parsed = extractStructured(resultText, request.schema);
