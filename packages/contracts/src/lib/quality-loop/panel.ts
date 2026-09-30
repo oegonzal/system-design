@@ -10,10 +10,13 @@ export const SECOND_OPINION_ORCHESTRATOR_ID = 'second-opinion';
 
 /** Why a panel or reconcile step skipped or completed short — beyond the runner's own reasons. */
 export const PANEL_STEP_REASONS = ['sample-failed', 'too-few-runs'] as const;
-export type PanelStepReason = (typeof PANEL_STEP_REASONS)[number];
 
 export const SECOND_OPINION_STEP_REASONS = [...PANEL_STEP_REASONS, 'no-artifact'] as const;
-export type SecondOpinionStepReason = (typeof SECOND_OPINION_STEP_REASONS)[number];
+
+/** A panel step runs each of its pipelines this many times unless the request says otherwise. */
+export const DEFAULT_PANEL_SAMPLES = 3;
+/** Every sample is a whole run on the subscription client; the request may not ask for more than this. */
+export const MAX_PANEL_SAMPLES = 5;
 
 /**
  * What the reconciled runs had in common. `produced`: each run produced its

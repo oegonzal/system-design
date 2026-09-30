@@ -36,7 +36,6 @@ export const ORCHESTRATION_REASONS = [
   'errored',
   'interrupted',
 ] as const;
-export type OrchestrationReason = (typeof ORCHESTRATION_REASONS)[number];
 
 export interface OrchestrationStepDto {
   status: OrchestrationStepStatus;
@@ -79,11 +78,6 @@ export interface OrchestrationRunStartedDto {
   orchestrationRunId: Uuid;
   status: QualityRunStatus;
 }
-
-/** A panel step runs each of its pipelines this many times unless the request says otherwise. */
-export const DEFAULT_PANEL_SAMPLES = 3;
-/** Every sample is a whole run on the subscription client; the request may not ask for more than this. */
-export const MAX_PANEL_SAMPLES = 5;
 
 /**
  * The run inputs, plus the two an orchestration decides for itself: whether a
