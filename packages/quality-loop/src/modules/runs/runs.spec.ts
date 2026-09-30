@@ -1,5 +1,4 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
 import {
@@ -11,28 +10,31 @@ import {
   QualityRunIteration,
 } from '@sysdesign/db';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { disabledLlm, fakeLlm, result, tinyPipeline } from '../../core/testing';
+import {
+  bootApp,
+  claimDumpDir,
+  getJson,
+  postJson,
+  truncate,
+  type Envelope,
+  type Page,
+} from '../http/testing';
+import { PIPELINES_TOKEN, QUALITY_LOOP_LLM } from './tokens';
 
-// A directory of this file's own, so the assertions never see another suite's dump.
-const DUMP_DIR = join(tmpdir(), `sysdesign-quality-loop-dumps-${crypto.randomUUID()}`);
-process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
+const DUMP_DIR = claimDumpDir('quality-loop');
+const TABLES = ['quality_run'];
 
-const { AppModule } = await import('../app/app.module');
-const { configureApp } = await import('../app/configure-app');
-const { PIPELINES_TOKEN, QUALITY_LOOP_LLM } = await import('./tokens');
-
-type Envelope<T> = { data: T };
-type Page<T> = { data: T[]; meta: { total: number; limit: number; offset: number } };
+const tinyOnly = () => [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])] as const;
 
 /** The real module over real HTTP; a fresh instance shares nothing but the database. */
-async function boot(): Promise<{ app: INestApplication; url: string }> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(QUALITY_LOOP_LLM)
-    .useValue(
+const boot = () =>
+  bootApp([
+    [
+      QUALITY_LOOP_LLM,
       fakeLlm(
         { criteria: [{ kind: 'must', statement: 'has text' }] },
         { text: 'made', parts: ['one'] },
@@ -42,17 +44,9 @@ async function boot(): Promise<{ app: INestApplication; url: string }> {
           advisoryVerdict: null,
         },
       ),
-    )
-    .overrideProvider(PIPELINES_TOKEN)
-    .useValue(new Map([['tiny', tinyPipeline()]]))
-    .compile();
-  const app = configureApp(moduleRef.createNestApplication());
-  await app.listen(0);
-  return { app, url: await app.getUrl() };
-}
-
-const truncate = (em: EntityManager) =>
-  em.fork().getConnection().execute('truncate table "quality_run" cascade');
+    ],
+    tinyOnly(),
+  ]);
 
 describe('the HTTP surface', () => {
   let app: INestApplication;
@@ -61,15 +55,26 @@ describe('the HTTP surface', () => {
   let runId = '';
   let record: QualityRunDto | null = null;
 
+  /** The run once it is no longer running — a fake model settles within a second. */
+  const settledRun = async (id: string): Promise<QualityRunDto> => {
+    let run: QualityRunDto | null = null;
+    for (let attempt = 0; attempt < 50 && run?.status !== 'complete'; attempt++) {
+      run = (await getJson<Envelope<QualityRunDto>>(url, `/runs/${id}`)).data;
+      if (run.status === 'running') await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    if (!run) throw new Error('the run was never observed');
+    return run;
+  };
+
   beforeAll(async () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em);
+    await truncate(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em);
+    await truncate(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });
@@ -80,21 +85,15 @@ describe('the HTTP surface', () => {
     >;
     expect(pipelines.data.map((pipeline) => pipeline.id)).toEqual(['tiny']);
 
-    const started = await fetch(`${url}/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'tiny', goal: '# Goal\n\nMake a thing.' }),
+    const started = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal\n\nMake a thing.',
     });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ runId: string; status: string }>;
     runId = data.runId;
 
-    for (let attempt = 0; attempt < 50 && record?.status !== 'complete'; attempt++) {
-      record = ((await (await fetch(`${url}/runs/${runId}`)).json()) as Envelope<QualityRunDto>)
-        .data;
-      if (record.status === 'running') await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    if (!record) throw new Error('the run was never observed');
+    record = await settledRun(runId);
     expect(record).toMatchObject({
       status: 'complete',
       llm: { enabled: true, model: 'test-model' },
@@ -169,21 +168,13 @@ describe('the HTTP surface', () => {
   });
 
   it('[QL-10] validates the body with zod and 404s an unknown pipeline or run', async () => {
-    const bad = await fetch(`${url}/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'tiny', goal: '', maxIterations: 99 }),
-    });
+    const bad = await postJson(url, '/runs', { pipeline: 'tiny', goal: '', maxIterations: 99 });
     expect(bad.status).toBe(400);
     expect(
       ((await bad.json()) as { issues: { path: string }[] }).issues.map((issue) => issue.path),
     ).toEqual(['goal', 'maxIterations']);
 
-    const unknown = await fetch(`${url}/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'nope', goal: 'g' }),
-    });
+    const unknown = await postJson(url, '/runs', { pipeline: 'nope', goal: 'g' });
     expect(unknown.status).toBe(404);
     expect((await fetch(`${url}/runs/missing`)).status).toBe(404);
     expect((await (await fetch(`${url}/health`)).json()) as unknown).toEqual({
@@ -197,26 +188,21 @@ describe('the HTTP surface', () => {
       { id: 'req-1', kind: 'must', statement: 'has text' },
       { id: 'nfr-1', kind: 'nice', statement: 'has parts' },
     ];
-    const started = await fetch(`${url}/runs`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'tiny', goal: '# Goal', criteria: rubric }),
+    const started = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal',
+      criteria: rubric,
     });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ runId: string }>;
-    let run: QualityRunDto | null = null;
-    for (let attempt = 0; attempt < 50 && run?.status !== 'complete'; attempt++) {
-      run = ((await (await fetch(`${url}/runs/${data.runId}`)).json()) as Envelope<QualityRunDto>)
-        .data;
-      if (run.status === 'running') await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    expect(run?.request).toMatchObject({ criteriaProvided: true });
-    expect(run?.exchanges.map((exchange) => exchange.scope)).toEqual([
+    const run = await settledRun(data.runId);
+    expect(run.request).toMatchObject({ criteriaProvided: true });
+    expect(run.exchanges.map((exchange) => exchange.scope)).toEqual([
       'producer',
       'critic.tiny.s1',
       'evaluator.tiny.s1',
     ]);
-    expect(run?.trace?.contract.criteria).toEqual(rubric);
+    expect(run.trace?.contract.criteria).toEqual(rubric);
     const rows = await em
       .fork()
       .find(QualityRunCriterion, { run: data.runId }, { orderBy: { position: 'asc' } });
@@ -237,11 +223,7 @@ describe('the HTTP surface', () => {
         statement: 's',
       })),
     ]) {
-      const response = await fetch(`${url}/runs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pipeline: 'tiny', goal: 'g', criteria }),
-      });
+      const response = await postJson(url, '/runs', { pipeline: 'tiny', goal: 'g', criteria });
       expect(response.status).toBe(400);
       const body = (await response.json()) as { issues: { path: string }[] };
       expect(body.issues[0].path).toBe('criteria');
@@ -252,10 +234,9 @@ describe('the HTTP surface', () => {
 
   it('[QL-20] POST /criteria derives a rubric with one model call and writes no run', async () => {
     const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
-    const response = await fetch(`${url}/criteria`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'tiny', goal: '# Goal\n\nMake a thing.' }),
+    const response = await postJson(url, '/criteria', {
+      pipeline: 'tiny',
+      goal: '# Goal\n\nMake a thing.',
     });
     expect(response.status).toBe(200);
     expect((await response.json()) as unknown).toEqual({
@@ -268,42 +249,15 @@ describe('the HTTP surface', () => {
     });
     const after = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
     expect(after).toBe(before);
-    expect(
-      (
-        await fetch(`${url}/criteria`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pipeline: 'nope', goal: 'g' }),
-        })
-      ).status,
-    ).toBe(404);
-    expect(
-      (
-        await fetch(`${url}/criteria`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ pipeline: 'tiny', goal: '' }),
-        })
-      ).status,
-    ).toBe(400);
+    expect((await postJson(url, '/criteria', { pipeline: 'nope', goal: 'g' })).status).toBe(404);
+    expect((await postJson(url, '/criteria', { pipeline: 'tiny', goal: '' })).status).toBe(400);
   });
 
   it('[QL-20] without a model, POST /criteria answers 503 with the reason and never invents a rubric', async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(QUALITY_LOOP_LLM)
-      .useValue(disabledLlm())
-      .overrideProvider(PIPELINES_TOKEN)
-      .useValue(new Map([['tiny', tinyPipeline()]]))
-      .compile();
-    const dark = configureApp(moduleRef.createNestApplication());
-    await dark.listen(0);
+    const dark = await bootApp([[QUALITY_LOOP_LLM, disabledLlm()], tinyOnly()]);
     try {
-      const darkUrl = await dark.getUrl();
-      const response = await fetch(`${darkUrl}/criteria`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pipeline: 'tiny', goal: 'g' }),
-      });
+      const darkUrl = dark.url;
+      const response = await postJson(darkUrl, '/criteria', { pipeline: 'tiny', goal: 'g' });
       expect(response.status).toBe(503);
       expect((await response.json()) as unknown).toMatchObject({
         llm: { enabled: false },
@@ -314,7 +268,7 @@ describe('the HTTP surface', () => {
         llm: { enabled: false },
       });
     } finally {
-      await dark.close();
+      await dark.app.close();
     }
   });
 

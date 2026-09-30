@@ -19,8 +19,9 @@ export class RouterService {
     @Inject(ROUTER_PORTS) private readonly ports: RouterPorts,
   ) {}
 
-  async report(goal: string): Promise<RouteReportDto> {
-    const routes = briefRoutes(this.runs.list());
+  /** The routes the brief could take and the one the classifier picks, or null when it cannot say. */
+  async routeReport(goal: string): Promise<RouteReportDto> {
+    const routes = briefRoutes(this.runs.pipelines());
     const answer = await this.ports.classifier.classify(bareGoal(goal), routes);
     return { routes, pipeline: answer?.pipeline ?? null, rationale: answer?.rationale ?? null };
   }

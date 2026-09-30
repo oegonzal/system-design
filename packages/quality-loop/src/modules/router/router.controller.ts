@@ -2,7 +2,8 @@ import { Body, Controller, HttpCode, Post } from '@nestjs/common';
 import type { RouteReportRequest, RouteReportResponse } from '@sysdesign/contracts';
 
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
-import { routeReportRequestSchema } from './router-request';
+
+import { goalRequestSchema } from '../http/goal-request';
 import { RouterService } from './router.service';
 
 @Controller('router')
@@ -13,8 +14,8 @@ export class RouterController {
   @Post('report')
   @HttpCode(200)
   async report(
-    @Body(new ZodValidationPipe(routeReportRequestSchema)) body: RouteReportRequest,
+    @Body(new ZodValidationPipe(goalRequestSchema)) body: RouteReportRequest,
   ): Promise<RouteReportResponse> {
-    return { data: await this.router.report(body.goal) };
+    return { data: await this.router.routeReport(body.goal) };
   }
 }

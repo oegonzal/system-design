@@ -9,6 +9,6 @@ export class PipelinesController {
 
   @Get()
   list(): ListPipelinesResponse {
-    return { data: this.runs.list() };
+    return { data: this.runs.pipelines() };
   }
 }

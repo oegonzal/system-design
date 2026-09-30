@@ -18,6 +18,7 @@ import {
   type QueryProbes,
 } from '../../orchestrators/memory/ports';
 import { OrchestrationRecordModule } from '../orchestration/orchestration-record.module';
+import { availabilityOf, llmBacked } from '../runs/llm-backed';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { MemoryController } from './memory.controller';
@@ -60,11 +61,7 @@ const memoryPorts = (
 ): MemoryPorts => {
   const embeddings = new CachedEmbeddings(client, cache, (message) => logger.warn(message));
   return {
-    embedding: {
-      enabled: embeddings.enabled,
-      model: client.model,
-      reason: embeddings.enabled ? null : embeddingAvailabilityFromEnv().reason,
-    },
+    embedding: availabilityOf(embeddings, () => embeddingAvailabilityFromEnv().reason),
     embeddings,
     store,
     probes,
@@ -91,8 +88,8 @@ const memoryPorts = (
     // recall over the goal alone — exactly what it did before probes existed.
     {
       provide: QUERY_PROBES,
-      useFactory: (client: LlmClient) =>
-        client.enabled ? new LlmQueryProbes(client, (m) => logger.warn(m)) : noQueryProbes,
+      useFactory: (client: LlmClient): QueryProbes =>
+        llmBacked(client, (llm, warn) => new LlmQueryProbes(llm, warn), noQueryProbes, logger),
       inject: [QUALITY_LOOP_LLM],
     },
     {

@@ -15,7 +15,11 @@ import {
 
 import type { RunRecord } from '../../../core/contracts';
 import type { RunListQuery, RunRepository } from '../../../core/ports';
-import { fromRows, toRows, toSummary } from './run-mapper';
+import { interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
+import { fromRows } from './from-rows';
+import type { RunRows } from './rows';
+import { toRows } from './to-rows';
+import { toSummary } from './to-summary';
 
 /**
  * Runs in Postgres through MikroORM. Every method forks the root
@@ -59,15 +63,7 @@ export class MikroOrmRunRepository implements RunRepository {
       for (const criterion of rows.criteria) {
         tem.create(QualityRunCriterion, { ...withoutRunId(criterion), run });
       }
-      for (const { row, findings, results } of rows.iterations) {
-        const iteration = tem.create(QualityRunIteration, { ...withoutRunId(row), run });
-        for (const finding of findings) {
-          tem.create(QualityRunFinding, { ...withoutIds(finding), run, iteration });
-        }
-        for (const result of results) {
-          tem.create(QualityRunCriterionResult, { ...withoutIds(result), run, iteration });
-        }
-      }
+      for (const iteration of rows.iterations) insertIteration(tem, run, iteration);
     });
   }
 
@@ -94,29 +90,14 @@ export class MikroOrmRunRepository implements RunRepository {
     const em = this.em.fork();
     const [runs, total] = await em.findAndCount(
       QualityRun,
-      {
-        ...(query.pipeline ? { pipeline: query.pipeline } : {}),
-        ...(query.status ? { status: query.status } : {}),
-      },
-      { limit: query.limit, offset: query.offset, orderBy: { startedAt: 'desc', id: 'desc' } },
+      presentFilters({ pipeline: query.pipeline, status: query.status }),
+      { limit: query.limit, offset: query.offset, orderBy: NEWEST_FIRST },
     );
-    const ids = runs.map((run) => run.id);
-    const [iterations, criteria] =
-      ids.length === 0
-        ? [new Map<string, number>(), new Map<string, number>()]
-        : await Promise.all([
-            countByRun(em, 'quality_run_iteration', ids),
-            countByRun(em, 'quality_run_criterion', ids),
-          ]);
-    return [
-      runs.map((run) =>
-        toSummary(run, {
-          iterations: iterations.get(run.id) ?? 0,
-          criteria: criteria.get(run.id) ?? 0,
-        }),
-      ),
-      total,
-    ];
+    const counts = await countsFor(
+      em,
+      runs.map((run) => run.id),
+    );
+    return [runs.map((run) => toSummary(run, counts(run.id))), total];
   }
 
   async failInterrupted(): Promise<number> {
@@ -126,18 +107,47 @@ export class MikroOrmRunRepository implements RunRepository {
       {
         status: 'failed',
         finishedAt: new Date(),
-        error: {
-          name: 'Interrupted',
-          message: 'the service restarted while the run was in flight',
-          stack: null,
-        },
+        error: interruptedError('run'),
         updatedAt: new Date(),
       },
     );
   }
 }
 
-/** Grouped counts for a page of ids — one query per table, never one per run. */
+/** One iteration and its ledger rows, pointing at the run and at each other by reference. */
+function insertIteration(
+  em: EntityManager,
+  run: QualityRun,
+  { row, findings, results }: RunRows['iterations'][number],
+): void {
+  const iteration = em.create(QualityRunIteration, { ...withoutRunId(row), run });
+  for (const finding of findings) {
+    em.create(QualityRunFinding, { ...withoutIds(finding), run, iteration });
+  }
+  for (const result of results) {
+    em.create(QualityRunCriterionResult, { ...withoutIds(result), run, iteration });
+  }
+}
+
+/** The iteration and criterion counts of a page of runs — one query per table, never one per run. */
+async function countsFor(
+  em: EntityManager,
+  ids: string[],
+): Promise<(runId: string) => { iterations: number; criteria: number }> {
+  const [iterations, criteria] =
+    ids.length === 0
+      ? [new Map<string, number>(), new Map<string, number>()]
+      : await Promise.all([
+          countByRun(em, 'quality_run_iteration', ids),
+          countByRun(em, 'quality_run_criterion', ids),
+        ]);
+  return (runId) => ({
+    iterations: iterations.get(runId) ?? 0,
+    criteria: criteria.get(runId) ?? 0,
+  });
+}
+
+/** Grouped counts for a page of ids. */
 async function countByRun(
   em: EntityManager,
   table: string,

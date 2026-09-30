@@ -44,11 +44,14 @@ const keysSchema = z.strictObject({
   lesson: z.string().min(1),
 }) satisfies z.ZodType<Record<VectorName, string>>;
 
+/** `contentHash` is sha-256 as hex. */
+const SHA256_HEX_LENGTH = 64;
+
 const payloadSchema = chunkSourceSchema.extend({
   text: z.string().min(1),
   /** The texts this point's named vectors are of — the store describes itself. */
   keys: keysSchema,
-  contentHash: z.string().length(64),
+  contentHash: z.string().length(SHA256_HEX_LENGTH),
   model: z.string().min(1),
   evidence: z.array(z.strictObject({ kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) })),
   digestRunId: z.string().nullable(),

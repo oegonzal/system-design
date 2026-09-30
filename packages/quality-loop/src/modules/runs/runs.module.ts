@@ -33,7 +33,7 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from '
     RunsService,
     // The environment decides once, at boot: a key, the subscription route
     // under QUALITY_LOOP_AUTH=claude-code, else no-op (and always no-op under
-    // QUALITY_LOOP_DETERMINISTIC=1, falling back to EVAL_DETERMINISTIC).
+    // QUALITY_LOOP_DETERMINISTIC=1).
     { provide: QUALITY_LOOP_LLM, useFactory: createQualityLoopLlmFromEnv },
     { provide: PIPELINES_TOKEN, useValue: PIPELINES },
     { provide: TRACE_STORE, useClass: DumpTraceStore },

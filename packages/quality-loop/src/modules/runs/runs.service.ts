@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
@@ -23,6 +16,8 @@ import { describePipeline, validatePipeline, type PipelineDefinition } from '../
 import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';
+import { orNotFound } from '../http/or-not-found';
+import { availabilityOf } from './llm-backed';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
 /**
@@ -39,12 +34,12 @@ export class RunsService implements OnModuleInit {
   constructor(
     @Inject(QUALITY_LOOP_LLM) private readonly llm: LlmClient,
     @Inject(PIPELINES_TOKEN)
-    private readonly pipelines: ReadonlyMap<string, PipelineDefinition<unknown>>,
+    private readonly registry: ReadonlyMap<string, PipelineDefinition<unknown>>,
     @Inject(TRACE_STORE) private readonly traces: TraceStore,
     @Inject(RUN_REPOSITORY) private readonly repository: RunRepository,
   ) {
     // A malformed pipeline fails boot, never a run.
-    for (const definition of pipelines.values()) validatePipeline(definition);
+    for (const definition of registry.values()) validatePipeline(definition);
   }
 
   /** Boot only: a run still `running` that this process never saw died with the previous one. */
@@ -53,8 +48,20 @@ export class RunsService implements OnModuleInit {
     if (failed > 0) this.logger.warn(`marked ${failed} interrupted run(s) failed`);
   }
 
-  list(): PipelineSummary[] {
-    return [...this.pipelines.values()].map(describePipeline);
+  /** Every registered pipeline as the wire describes it. */
+  pipelines(): PipelineSummary[] {
+    return [...this.registry.values()].map(describePipeline);
+  }
+
+  /** One registered pipeline as the wire describes it; a name that is not registered is a 404. */
+  summary(pipeline: string): PipelineSummary {
+    return describePipeline(this.resolve(pipeline));
+  }
+
+  /** The summary when the pipeline is named and registered, else undefined — no 404. */
+  summaryOf(pipeline: string | undefined): PipelineSummary | undefined {
+    const definition = pipeline === undefined ? undefined : this.registry.get(pipeline);
+    return definition === undefined ? undefined : describePipeline(definition);
   }
 
   get(runId: string): Promise<QualityRunDto | null> {
@@ -109,9 +116,7 @@ export class RunsService implements OnModuleInit {
   }
 
   private resolve(pipeline: string): PipelineDefinition<unknown> {
-    const definition = this.pipelines.get(pipeline);
-    if (!definition) throw new NotFoundException(`unknown pipeline ${pipeline}`);
-    return definition;
+    return orNotFound(this.registry.get(pipeline), `unknown pipeline ${pipeline}`);
   }
 
   /** A rubric that does not fit the pipeline is refused before any row exists — the pipe's own 400 shape. */
@@ -130,11 +135,7 @@ export class RunsService implements OnModuleInit {
   }
 
   private availability(): RunRecord['llm'] {
-    return {
-      enabled: this.llm.enabled,
-      model: this.llm.model,
-      reason: this.llm.enabled ? null : qualityLoopAvailabilityFromEnv().reason,
-    };
+    return availabilityOf(this.llm, () => qualityLoopAvailabilityFromEnv().reason);
   }
 
   private async open(

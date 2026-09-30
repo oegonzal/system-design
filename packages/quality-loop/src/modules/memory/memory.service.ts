@@ -15,28 +15,55 @@ import {
 import type {
   OrchestrationStepDto,
   RetrievalHitDto,
+  RetrievalProbeDto,
   RetrievalReportDto,
 } from '@sysdesign/contracts';
 import { MEMORY_ORCHESTRATOR_ID } from '@sysdesign/contracts';
-import { z } from 'zod';
 
 import { outputsOf } from '../../core/outputs';
 import { digestedChildren } from '../../orchestrators/memory/definition';
 import { memoriesToStore } from '../../orchestrators/memory/digest/read-digest';
-import type { MemoryHit, MemoryPorts } from '../../orchestrators/memory/ports';
+import type { MemoryHit, MemoryPorts, MemoryProbe } from '../../orchestrators/memory/ports';
 import { fuse } from '../../orchestrators/memory/recall/fusion';
 import { bareGoal } from '../../orchestrators/memory/recall/inject';
 import { probeOf, probesOf, probeTexts, queryText } from '../../orchestrators/memory/recall/query';
 import { indexMemories } from '../../orchestrators/memory/store/index-memories';
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { alias, MAX_CANDIDATES, probeAlias } from '../../pipelines/memory-recall/input';
+import { isOrchestrationRunId } from '../orchestration/orchestration-request';
 import type { OrchestrationRunRepository } from '../orchestration/ports';
 import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
 import { RunsService } from '../runs/runs.service';
 import { MEMORY_PORTS } from './tokens';
 
-/** An orchestration run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
-const orchestrationRunId = z.uuid();
+/** The first text searched is the prompt itself; the rest are the derived probes, aliased in order. */
+const probeLabel = (position: number): string =>
+  position === 0 ? 'prompt' : probeAlias(position - 1);
+
+const asHit = (hit: MemoryHit): RetrievalHitDto => ({
+  runId: hit.source.runId,
+  ref: hit.source.ref,
+  score: hit.score,
+  text: hit.text,
+});
+
+/** One searched text with its own rankings: every vector it was searched under, and what each found. */
+const probeReport = (
+  text: string,
+  position: number,
+  probes: readonly MemoryProbe[],
+  ranked: readonly MemoryHit[][],
+): RetrievalProbeDto => ({
+  alias: probeLabel(position),
+  text,
+  found: probes
+    .map((probe, index) => ({ probe, index }))
+    .filter(({ index }) => probeOf(index) === position)
+    .map(({ probe, index }) => ({
+      using: probe.using,
+      hits: (ranked[index] ?? []).map(asHit),
+    })),
+});
 
 @Injectable()
 export class MemoryService implements OnModuleInit {
@@ -68,7 +95,7 @@ export class MemoryService implements OnModuleInit {
    * that answers differently destroys what it was meant to migrate.
    */
   async reindex(id: string): Promise<OrchestrationStepDto> {
-    const record = orchestrationRunId.safeParse(id).success ? await this.records.find(id) : null;
+    const record = isOrchestrationRunId(id) ? await this.records.find(id) : null;
     if (record === null || record.orchestrator !== MEMORY_ORCHESTRATOR_ID) {
       throw new NotFoundException(`memory run ${id} not found`);
     }
@@ -124,37 +151,19 @@ export class MemoryService implements OnModuleInit {
     if (embedded === null) throw new BadRequestException('embeddings are unavailable');
     const probes = probesOf(embedded.vectors, MAX_CANDIDATES);
     const ranked = await store.searchMany(probes);
-    const asHit = (hit: MemoryHit): RetrievalHitDto => ({
-      runId: hit.source.runId,
-      ref: hit.source.ref,
-      score: hit.score,
-      text: hit.text,
-    });
     return {
       store: availability,
-      probes: texts.map((text, position) => ({
-        alias: position === 0 ? 'prompt' : probeAlias(position - 1),
-        text,
-        found: probes
-          .map((probe, index) => ({ probe, index }))
-          .filter(({ index }) => probeOf(index) === position)
-          .map(({ probe, index }) => ({
-            using: probe.using,
-            hits: (ranked[index] ?? []).map(asHit),
-          })),
-      })),
+      probes: texts.map((text, position) => probeReport(text, position, probes, ranked)),
       candidates: fuse(ranked, MAX_CANDIDATES).map((hit, position) => ({
         alias: alias(position),
         ...asHit(hit),
-        matched: hit.probes.map((index) => (index === 0 ? 'prompt' : probeAlias(index - 1))),
+        matched: hit.probes.map(probeLabel),
       })),
     };
   }
 
   /** A registered pipeline's own accept bar; unreachable when it is not registered. */
   private acceptAt(pipeline: string): number {
-    const summary = this.runs.list().find((candidate) => candidate.id === pipeline);
-    if (!summary) throw new NotFoundException(`unknown pipeline ${pipeline}`);
-    return summary.policy.thresholds.acceptAt;
+    return this.runs.summary(pipeline).policy.thresholds.acceptAt;
   }
 }

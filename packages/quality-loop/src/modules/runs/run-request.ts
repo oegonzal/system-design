@@ -4,8 +4,11 @@ import {
   CRITERION_STATEMENT_MAX_LENGTH,
   MAX_PROVIDED_CRITERIA,
   MAX_QUALITY_RUN_ITERATIONS,
+  QUALITY_RUN_STATUSES,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
+
+import { PAGE_FIELDS } from '../http/paging';
 
 /** One criterion of a supplied rubric; the caps are the persisted row's. */
 export const providedCriterionSchema = z.strictObject({
@@ -26,3 +29,11 @@ export const runRequestSchema = z.strictObject({
   maxIterations: z.number().int().min(1).max(MAX_QUALITY_RUN_ITERATIONS).optional(),
   criteria: z.array(providedCriterionSchema).min(1).max(MAX_PROVIDED_CRITERIA).optional(),
 });
+
+/** The query of `GET /runs`. Coercion belongs here, at the HTTP edge — never in core/. */
+export const listRunsQuerySchema = z.strictObject({
+  pipeline: z.string().min(1).optional(),
+  status: z.enum(QUALITY_RUN_STATUSES).optional(),
+  ...PAGE_FIELDS,
+});
+export type ListRunsQuery = z.output<typeof listRunsQuerySchema>;

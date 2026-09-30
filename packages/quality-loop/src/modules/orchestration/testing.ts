@@ -1,9 +1,13 @@
 /**
- * What a model answers in the orchestration suites: one canned reply per
- * pipeline per stage, in the order `fakeLlm` tries them. Every pipeline's
- * criteria, artifact and evaluation schemas differ in their enums, so
- * nothing here cross-matches. Pure data — no vitest imports.
+ * What the orchestration suites share: the canned model answers — one per
+ * pipeline per stage, in the order `fakeLlm` tries them; every pipeline's
+ * criteria, artifact and evaluation schemas differ in their enums, so nothing
+ * cross-matches — and the poll that waits for an orchestration to settle.
+ * Pure helpers only — no vitest imports.
  */
+import type { OrchestrationRunDto } from '@sysdesign/contracts';
+
+import { getJson, type Envelope } from '../http/testing';
 
 const result = (criterionId: string, locationRefs: string[]) => ({
   criterionId,
@@ -90,3 +94,23 @@ export const CANNED: readonly unknown[] = [
   { results: [result('c1', ['m1'])], advisoryVerdict: null },
   { results: [result('c1', ['memory.1'])], advisoryVerdict: null },
 ];
+
+/** Three chained runs even with a fake model take a while under a loaded CI box: a deadline, not a count. */
+const SETTLE_DEADLINE_MS = 120_000;
+const SETTLE_INTERVAL_MS = 50;
+
+/** The orchestration once it is no longer running, polled until then. */
+export async function settledOrchestration(url: string, id: string): Promise<OrchestrationRunDto> {
+  let record: OrchestrationRunDto | null = null;
+  for (
+    const deadline = Date.now() + SETTLE_DEADLINE_MS;
+    Date.now() < deadline && record?.status !== 'complete' && record?.status !== 'failed';
+  ) {
+    record = (await getJson<Envelope<OrchestrationRunDto>>(url, `/orchestrations/${id}`)).data;
+    if (record.status === 'running') {
+      await new Promise((resolve) => setTimeout(resolve, SETTLE_INTERVAL_MS));
+    }
+  }
+  if (!record) throw new Error('the orchestration run was never observed');
+  return record;
+}

@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  NotFoundException,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import type {
   GetOrchestrationRunResponse,
   ListOrchestrationRunsResponse,
@@ -17,6 +8,9 @@ import type {
 } from '@sysdesign/contracts';
 
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
+
+import { orNotFound } from '../http/or-not-found';
+import { page } from '../http/paging';
 import {
   fromRunRequestSchema,
   listOrchestrationsQuerySchema,
@@ -57,13 +51,12 @@ export class OrchestrationController {
     @Query(new ZodValidationPipe(listOrchestrationsQuerySchema)) query: ListOrchestrationsQuery,
   ): Promise<ListOrchestrationRunsResponse> {
     const [data, total] = await this.orchestrations.list(query);
-    return { data, meta: { total, limit: query.limit, offset: query.offset } };
+    return page(data, total, query);
   }
 
   @Get(':id')
   async get(@Param('id') id: string): Promise<GetOrchestrationRunResponse> {
     const record = await this.orchestrations.get(id);
-    if (!record) throw new NotFoundException(`orchestration run ${id} not found`);
-    return { data: record };
+    return { data: orNotFound(record, `orchestration run ${id} not found`) };
   }
 }

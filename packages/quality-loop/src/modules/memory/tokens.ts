@@ -1,7 +1,4 @@
-/**
- * Injection tokens for the memory module's ports (interfaces vanish at
- * runtime, so Nest needs a value to key each provider on).
- */
+/** Injection tokens for the memory module's ports: interfaces vanish at runtime, so Nest keys each provider on a symbol. */
 export const EMBEDDING_CLIENT = Symbol('EMBEDDING_CLIENT');
 export const EMBEDDING_CACHE = Symbol('EMBEDDING_CACHE');
 export const MEMORY_STORE = Symbol('MEMORY_STORE');

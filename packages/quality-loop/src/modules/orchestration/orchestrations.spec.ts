@@ -1,55 +1,40 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
 import { ensureDatabase, MemoryEmbedding } from '@sysdesign/db';
 import { rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
 import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
 import { GOAL } from '../../orchestrators/memory/testing';
+import {
+  bootApp,
+  claimDumpDir,
+  getJson,
+  postJson,
+  truncate,
+  type Envelope,
+  type Page,
+} from '../http/testing';
 import { fakeEmbeddings, InMemoryMemoryStore } from '../memory/testing';
-import { CANNED } from './testing';
+import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
+import { QUALITY_LOOP_LLM } from '../runs/tokens';
+import { CANNED, settledOrchestration } from './testing';
 
-const DUMP_DIR = join(tmpdir(), `sysdesign-orchestration-dumps-${crypto.randomUUID()}`);
-process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
-
-const { AppModule } = await import('../app/app.module');
-const { configureApp } = await import('../app/configure-app');
-const { QUALITY_LOOP_LLM } = await import('../runs/tokens');
-const { EMBEDDING_CLIENT, MEMORY_STORE } = await import('../memory/tokens');
-
-type Envelope<T> = { data: T };
-type Page<T> = { data: T[]; meta: { total: number; limit: number; offset: number } };
+const DUMP_DIR = claimDumpDir('orchestration');
+const TABLES = ['orchestration_run_child', 'orchestration_run', 'memory_embedding', 'quality_run'];
 
 const embeddings = fakeEmbeddings();
 const store = new InMemoryMemoryStore();
 
 /** The real modules over real HTTP with the REAL pipeline registry; only the model and the store are fakes. */
-async function boot(): Promise<{ app: INestApplication; url: string }> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(QUALITY_LOOP_LLM)
-    .useValue(fakeLlm(...CANNED))
-    .overrideProvider(EMBEDDING_CLIENT)
-    .useValue(embeddings)
-    .overrideProvider(MEMORY_STORE)
-    .useValue(store)
-    .compile();
-  const app = configureApp(moduleRef.createNestApplication());
-  await app.listen(0);
-  return { app, url: await app.getUrl() };
-}
-
-const truncate = (em: EntityManager) =>
-  em
-    .fork()
-    .getConnection()
-    .execute(
-      'truncate table "orchestration_run_child", "orchestration_run", "memory_embedding", "quality_run" cascade',
-    );
+const boot = () =>
+  bootApp([
+    [QUALITY_LOOP_LLM, fakeLlm(...CANNED)],
+    [EMBEDDING_CLIENT, embeddings],
+    [MEMORY_STORE, store],
+  ]);
 
 describe('the memory orchestration over the three pipelines', () => {
   let app: INestApplication;
@@ -60,20 +45,19 @@ describe('the memory orchestration over the three pipelines', () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em);
+    await truncate(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em);
+    await truncate(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });
 
   const start = async (): Promise<string> => {
-    const started = await fetch(`${url}/orchestrations/memory`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pipeline: 'system-design', goal: GOAL }),
+    const started = await postJson(url, '/orchestrations/memory', {
+      pipeline: 'system-design',
+      goal: GOAL,
     });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{
@@ -84,25 +68,11 @@ describe('the memory orchestration over the three pipelines', () => {
     return data.orchestrationRunId;
   };
 
-  const settle = async (id: string): Promise<OrchestrationRunDto> => {
-    // Three chained runs even with a fake model take a while under a loaded CI box: a deadline, not a count.
-    let record: OrchestrationRunDto | null = null;
-    for (
-      const deadline = Date.now() + 120_000;
-      Date.now() < deadline && record?.status !== 'complete' && record?.status !== 'failed';
-    ) {
-      record = (
-        (await (await fetch(`${url}/orchestrations/${id}`)).json()) as Envelope<OrchestrationRunDto>
-      ).data;
-      if (record.status === 'running') await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    if (!record) throw new Error('the orchestration run was never observed');
-    return record;
-  };
+  const settle = (id: string) => settledOrchestration(url, id);
 
   const run = async (runId: string | null): Promise<QualityRunDto> => {
     if (runId === null) throw new Error('a child run id was expected');
-    return ((await (await fetch(`${url}/runs/${runId}`)).json()) as Envelope<QualityRunDto>).data;
+    return (await getJson<Envelope<QualityRunDto>>(url, `/runs/${runId}`)).data;
   };
 
   it('[QL-16] on a cold start the target runs bare, the digest learns from it, and the store keeps what it endorsed', async () => {
@@ -205,11 +175,7 @@ describe('the memory orchestration over the three pipelines', () => {
     ).data.at(-1);
     const targetRunId = first?.steps['target'].runIds[0];
     if (!targetRunId) throw new Error('the first run must have a target');
-    const started = await fetch(`${url}/orchestrations/memory/from-run`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ runId: targetRunId }),
-    });
+    const started = await postJson(url, '/orchestrations/memory/from-run', { runId: targetRunId });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
     const record = await settle(data.orchestrationRunId);

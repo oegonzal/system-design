@@ -1,63 +1,34 @@
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
 import { ensureDatabase, OrchestrationRun } from '@sysdesign/db';
 import { NoopEmbeddingClient } from '@sysdesign/llm';
 import { rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
 import { GOAL } from '../../orchestrators/memory/testing';
+import { bootApp, claimDumpDir, postJson, truncate, type Envelope } from '../http/testing';
 import { InMemoryMemoryStore } from '../memory/testing';
-import { CANNED } from './testing';
+import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
+import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import type { OrchestrationRunRepository } from './ports';
+import { CANNED, settledOrchestration } from './testing';
+import { ORCHESTRATION_RUN_REPOSITORY } from './tokens';
 
-const DUMP_DIR = join(tmpdir(), `sysdesign-orchestration-http-dumps-${crypto.randomUUID()}`);
-process.env['EVAL_DUMP_DIR'] = DUMP_DIR;
-
-const { AppModule } = await import('../app/app.module');
-const { configureApp } = await import('../app/configure-app');
-const { QUALITY_LOOP_LLM } = await import('../runs/tokens');
-const { EMBEDDING_CLIENT, MEMORY_STORE } = await import('../memory/tokens');
-const { ORCHESTRATION_RUN_REPOSITORY } = await import('./tokens');
-
-type Envelope<T> = { data: T };
+const DUMP_DIR = claimDumpDir('orchestration-http');
+const TABLES = ['orchestration_run_child', 'orchestration_run', 'quality_run'];
 
 /** What the fake answers the brief classifier with: the schema is locked to the registered routes. */
 const ROUTE = { pipeline: 'system-design', rationale: 'a system to design' };
 
 /** Without embeddings: the memory steps are honest about why they skipped, the target still runs. */
-async function boot(): Promise<{ app: INestApplication; url: string }> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(QUALITY_LOOP_LLM)
-    .useValue(fakeLlm(...CANNED, ROUTE))
-    .overrideProvider(EMBEDDING_CLIENT)
-    .useValue(new NoopEmbeddingClient())
-    .overrideProvider(MEMORY_STORE)
-    .useValue(new InMemoryMemoryStore(null))
-    .compile();
-  const app = configureApp(moduleRef.createNestApplication());
-  await app.listen(0);
-  return { app, url: await app.getUrl() };
-}
-
-const truncate = (em: EntityManager) =>
-  em
-    .fork()
-    .getConnection()
-    .execute(
-      'truncate table "orchestration_run_child", "orchestration_run", "quality_run" cascade',
-    );
-
-const post = (url: string, path: string, body: unknown) =>
-  fetch(`${url}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+const boot = () =>
+  bootApp([
+    [QUALITY_LOOP_LLM, fakeLlm(...CANNED, ROUTE)],
+    [EMBEDDING_CLIENT, new NoopEmbeddingClient()],
+    [MEMORY_STORE, new InMemoryMemoryStore(null)],
+  ]);
 
 describe('the orchestrations HTTP surface', () => {
   let app: INestApplication;
@@ -69,32 +40,19 @@ describe('the orchestrations HTTP surface', () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em);
+    await truncate(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em);
+    await truncate(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });
 
-  const settle = async (id: string): Promise<OrchestrationRunDto> => {
-    let record: OrchestrationRunDto | null = null;
-    for (
-      const deadline = Date.now() + 120_000;
-      Date.now() < deadline && record?.status !== 'complete' && record?.status !== 'failed';
-    ) {
-      record = (
-        (await (await fetch(`${url}/orchestrations/${id}`)).json()) as Envelope<OrchestrationRunDto>
-      ).data;
-      if (record.status === 'running') await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    if (!record) throw new Error('the orchestration run was never observed');
-    return record;
-  };
+  const settle = (id: string) => settledOrchestration(url, id);
 
   it('[QL-16] without embeddings the target still completes and every memory step says why it did not run', async () => {
-    const started = await post(url, '/orchestrations/memory', {
+    const started = await postJson(url, '/orchestrations/memory', {
       pipeline: 'system-design',
       goal: GOAL,
       maxIterations: 2,
@@ -138,19 +96,19 @@ describe('the orchestrations HTTP surface', () => {
   });
 
   it('[QL-16] validates the body at the edge, refuses a memory pipeline as the target, and 404s the unknown', async () => {
-    const empty = await post(url, '/orchestrations/memory', {});
+    const empty = await postJson(url, '/orchestrations/memory', {});
     expect(empty.status).toBe(400);
     const issues = ((await empty.json()) as { issues: { path: string }[] }).issues.map(
       (i) => i.path,
     );
     // The edge no longer demands a pipeline: whether one is named is the orchestrator's declaration.
     expect(issues).toEqual(['goal']);
-    const unnamed = await post(url, '/orchestrations/memory', { goal: GOAL });
+    const unnamed = await postJson(url, '/orchestrations/memory', { goal: GOAL });
     expect(unnamed.status).toBe(400);
     expect(((await unnamed.json()) as { message: string }).message).toMatch(/takes a target/);
     expect(
       (
-        await post(url, '/orchestrations/memory', {
+        await postJson(url, '/orchestrations/memory', {
           pipeline: 'system-design',
           goal: GOAL,
           samples: 9,
@@ -158,27 +116,29 @@ describe('the orchestrations HTTP surface', () => {
       ).status,
     ).toBe(400);
     expect(
-      (await post(url, '/orchestrations/memory', { pipeline: 'nope', goal: GOAL })).status,
+      (await postJson(url, '/orchestrations/memory', { pipeline: 'nope', goal: GOAL })).status,
     ).toBe(404);
     expect(
-      (await post(url, '/orchestrations/memory', { pipeline: 'memory-recall', goal: GOAL })).status,
-    ).toBe(400);
-    expect(
-      (await post(url, '/orchestrations/memory', { pipeline: 'experience-digest', goal: GOAL }))
+      (await postJson(url, '/orchestrations/memory', { pipeline: 'memory-recall', goal: GOAL }))
         .status,
     ).toBe(400);
     expect(
-      (await post(url, '/orchestrations/nope', { pipeline: 'system-design', goal: GOAL })).status,
+      (await postJson(url, '/orchestrations/memory', { pipeline: 'experience-digest', goal: GOAL }))
+        .status,
+    ).toBe(400);
+    expect(
+      (await postJson(url, '/orchestrations/nope', { pipeline: 'system-design', goal: GOAL }))
+        .status,
     ).toBe(404);
-    expect((await post(url, '/orchestrations/memory/from-run', { runId: 'nope' })).status).toBe(
+    expect((await postJson(url, '/orchestrations/memory/from-run', { runId: 'nope' })).status).toBe(
       404,
     );
     expect((await fetch(`${url}/orchestrations/not-a-uuid`)).status).toBe(404);
-    expect((await post(url, '/memory/not-a-uuid/reindex', {})).status).toBe(404);
+    expect((await postJson(url, '/memory/not-a-uuid/reindex', {})).status).toBe(404);
   });
 
   it('[QL-16] starts from an already persisted run through the same ledger, with recall and target provided', async () => {
-    const started = await post(url, '/orchestrations/memory/from-run', { runId: targetRunId });
+    const started = await postJson(url, '/orchestrations/memory/from-run', { runId: targetRunId });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
     const record = await settle(data.orchestrationRunId);
@@ -207,14 +167,14 @@ describe('the orchestrations HTTP surface', () => {
   });
 
   it('[QL-19] the router refuses a named pipeline, reports the judge it would pick, and judges once with it', async () => {
-    const named = await post(url, '/orchestrations/router', {
+    const named = await postJson(url, '/orchestrations/router', {
       pipeline: 'system-design',
       goal: GOAL,
     });
     expect(named.status).toBe(400);
     expect(((await named.json()) as { message: string }).message).toMatch(/chooses its own/);
 
-    const report = await post(url, '/router/report', { goal: GOAL });
+    const report = await postJson(url, '/router/report', { goal: GOAL });
     expect(report.status).toBe(200);
     expect(((await report.json()) as Envelope<RouteReportDto>).data).toEqual({
       routes: [
@@ -225,7 +185,7 @@ describe('the orchestrations HTTP surface', () => {
       rationale: 'a system to design',
     });
 
-    const started = await post(url, '/orchestrations/router', { goal: GOAL });
+    const started = await postJson(url, '/orchestrations/router', { goal: GOAL });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
     const record = await settle(data.orchestrationRunId);
@@ -259,7 +219,7 @@ describe('the orchestrations HTTP surface', () => {
   });
 
   it('[QL-19] calibration runs a goal `samples` times and reconciles; second opinion judges a stored artifact again', async () => {
-    const calibration = await post(url, '/orchestrations/calibration', {
+    const calibration = await postJson(url, '/orchestrations/calibration', {
       pipeline: 'system-design',
       goal: GOAL,
       samples: 2,
@@ -288,7 +248,7 @@ describe('the orchestrations HTTP surface', () => {
       overall: { n: 2, range: 0 },
     });
 
-    const second = await post(url, '/orchestrations/second-opinion/from-run', {
+    const second = await postJson(url, '/orchestrations/second-opinion/from-run', {
       runId: targetRunId,
       samples: 2,
     });

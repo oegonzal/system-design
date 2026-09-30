@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  NotFoundException,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import type {
   GetQualityRunResponse,
   ListQualityRunsResponse,
@@ -15,10 +6,12 @@ import type {
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
 
-import { listRunsQuerySchema, type ListRunsQuery } from './list-runs-query';
-import { runRequestSchema } from './run-request';
-import { RunsService } from './runs.service';
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
+
+import { orNotFound } from '../http/or-not-found';
+import { page } from '../http/paging';
+import { listRunsQuerySchema, runRequestSchema, type ListRunsQuery } from './run-request';
+import { RunsService } from './runs.service';
 
 @Controller('runs')
 export class RunsController {
@@ -40,13 +33,11 @@ export class RunsController {
     @Query(new ZodValidationPipe(listRunsQuerySchema)) query: ListRunsQuery,
   ): Promise<ListQualityRunsResponse> {
     const [data, total] = await this.runs.listRuns(query);
-    return { data, meta: { total, limit: query.limit, offset: query.offset } };
+    return page(data, total, query);
   }
 
   @Get(':id')
   async get(@Param('id') id: string): Promise<GetQualityRunResponse> {
-    const run = await this.runs.get(id);
-    if (!run) throw new NotFoundException(`run ${id} not found`);
-    return { data: run };
+    return { data: orNotFound(await this.runs.get(id), `run ${id} not found`) };
   }
 }

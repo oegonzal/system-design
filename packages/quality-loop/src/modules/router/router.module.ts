@@ -6,6 +6,7 @@ import {
   type BriefClassifier,
   type RouterPorts,
 } from '../../orchestrators/router/ports';
+import { availabilityOf, llmBacked } from '../runs/llm-backed';
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { LlmBriefClassifier } from './classifier/llm-brief-classifier';
@@ -29,18 +30,14 @@ const logger = new Logger('RouterModule');
     {
       provide: BRIEF_CLASSIFIER,
       useFactory: (client: LlmClient): BriefClassifier =>
-        client.enabled ? new LlmBriefClassifier(client, (m) => logger.warn(m)) : noClassifier,
+        llmBacked(client, (llm, warn) => new LlmBriefClassifier(llm, warn), noClassifier, logger),
       inject: [QUALITY_LOOP_LLM],
     },
     {
       provide: ROUTER_PORTS,
       useFactory: (classifier: BriefClassifier): RouterPorts => ({
         classifier,
-        llm: {
-          enabled: classifier.enabled,
-          model: classifier.model,
-          reason: classifier.enabled ? null : qualityLoopAvailabilityFromEnv().reason,
-        },
+        llm: availabilityOf(classifier, () => qualityLoopAvailabilityFromEnv().reason),
       }),
       inject: [BRIEF_CLASSIFIER],
     },

@@ -6,6 +6,8 @@
 import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import type { OrchestrationRun } from '@sysdesign/db';
 
+import { toDate, toDateOrNull, toIso, toIsoOrNull } from '../../runs/persistence/conventions';
+
 export interface OrchestrationRunRow {
   id: string;
   orchestrator: string;
@@ -42,8 +44,8 @@ export function toRow(record: OrchestrationRunDto): OrchestrationRunRow {
     context: record.context,
     steps: record.steps,
     error: record.error,
-    startedAt: new Date(record.startedAt),
-    finishedAt: record.finishedAt === null ? null : new Date(record.finishedAt),
+    startedAt: toDate(record.startedAt),
+    finishedAt: toDateOrNull(record.finishedAt),
   };
 }
 
@@ -53,8 +55,8 @@ export function fromRow(row: OrchestrationRun): OrchestrationRunDto {
     orchestrator: row.orchestrator,
     pipeline: row.pipeline,
     status: row.status,
-    startedAt: row.startedAt.toISOString(),
-    finishedAt: row.finishedAt === null ? null : row.finishedAt.toISOString(),
+    startedAt: toIso(row.startedAt),
+    finishedAt: toIsoOrNull(row.finishedAt),
     // Rows written before a run could carry its rubric have no flag: it was derived.
     request: { ...row.request, criteriaProvided: row.request.criteriaProvided ?? false },
     context: row.context,

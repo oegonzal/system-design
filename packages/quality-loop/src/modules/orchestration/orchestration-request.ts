@@ -1,11 +1,7 @@
-import {
-  DEFAULT_LIST_LIMIT,
-  MAX_LIST_LIMIT,
-  MAX_PANEL_SAMPLES,
-  QUALITY_RUN_STATUSES,
-} from '@sysdesign/contracts';
+import { MAX_PANEL_SAMPLES, QUALITY_RUN_STATUSES } from '@sysdesign/contracts';
 import { z } from 'zod';
 
+import { PAGE_FIELDS } from '../http/paging';
 import { runRequestSchema } from '../runs/run-request';
 
 const samples = z.number().int().min(1).max(MAX_PANEL_SAMPLES).optional();
@@ -33,7 +29,12 @@ export const listOrchestrationsQuerySchema = z.strictObject({
   orchestrator: z.string().min(1).optional(),
   pipeline: z.string().min(1).optional(),
   status: z.enum(QUALITY_RUN_STATUSES).optional(),
-  limit: z.coerce.number().int().min(1).max(MAX_LIST_LIMIT).default(DEFAULT_LIST_LIMIT),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...PAGE_FIELDS,
 });
 export type ListOrchestrationsQuery = z.output<typeof listOrchestrationsQuerySchema>;
+
+const orchestrationRunId = z.uuid();
+
+/** An orchestration run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
+export const isOrchestrationRunId = (id: string): boolean =>
+  orchestrationRunId.safeParse(id).success;

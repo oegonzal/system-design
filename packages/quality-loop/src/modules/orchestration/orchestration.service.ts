@@ -4,14 +4,7 @@
  * step. The engine and the pipelines are consumed, never changed: every child
  * goes through `RunsService.execute`.
  */
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  type OnModuleInit,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import type {
   OrchestrationRunDto,
   QualityRunDto,
@@ -19,17 +12,15 @@ import type {
   StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
-import { z } from 'zod';
 
 import { validateOrchestrator } from '../../orchestrators/runner/definition';
 import { openRecord } from '../../orchestrators/runner/record';
 import { runOrchestration } from '../../orchestrators/runner/run-orchestration';
+import { orNotFound } from '../http/or-not-found';
 import { RunsService } from '../runs/runs.service';
+import { isOrchestrationRunId } from './orchestration-request';
 import type { OrchestrationListQuery, OrchestrationRunRepository, OrchestratorHost } from './ports';
 import { ORCHESTRATION_RUN_REPOSITORY, ORCHESTRATOR_HOSTS } from './tokens';
-
-/** An orchestration run id is a uuid; anything else cannot be a row, so it is not found rather than a database error. */
-const orchestrationRunId = z.uuid();
 
 @Injectable()
 export class OrchestrationService implements OnModuleInit {
@@ -51,7 +42,7 @@ export class OrchestrationService implements OnModuleInit {
   }
 
   async get(id: string): Promise<OrchestrationRunDto | null> {
-    if (!orchestrationRunId.safeParse(id).success) return null;
+    if (!isOrchestrationRunId(id)) return null;
     const record = await this.repository.find(id);
     return record === null ? null : this.sequenced(record);
   }
@@ -104,8 +95,7 @@ export class OrchestrationService implements OnModuleInit {
     body: StartOrchestrationFromRunRequest,
   ): Promise<OrchestrationRunDto> {
     const host = this.host(orchestrator);
-    const source = await this.runs.get(body.runId);
-    if (source === null) throw new NotFoundException(`run ${body.runId} not found`);
+    const source = orNotFound(await this.runs.get(body.runId), `run ${body.runId} not found`);
     const normalized = this.admit(host, {
       ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
       goal: source.request.goal,
@@ -121,9 +111,7 @@ export class OrchestrationService implements OnModuleInit {
   }
 
   private host(orchestrator: string): OrchestratorHost {
-    const host = this.hosts.get(orchestrator);
-    if (!host) throw new NotFoundException(`unknown orchestrator ${orchestrator}`);
-    return host;
+    return orNotFound(this.hosts.get(orchestrator), `unknown orchestrator ${orchestrator}`);
   }
 
   /**
@@ -136,21 +124,10 @@ export class OrchestrationService implements OnModuleInit {
     request: StartOrchestrationRequest,
   ): StartOrchestrationRequest {
     const normalized = host.definition.normalize?.(request) ?? request;
-    const { id, takesTarget } = host.definition;
-    if (takesTarget && normalized.pipeline === undefined) {
-      throw new BadRequestException(`${id} takes a target pipeline; name one`);
-    }
-    if (!takesTarget && normalized.pipeline !== undefined) {
-      throw new BadRequestException(`${id} chooses its own pipeline; do not name one`);
-    }
-    const summaries = this.runs.list();
-    if (
-      normalized.pipeline !== undefined &&
-      !summaries.some((summary) => summary.id === normalized.pipeline)
-    ) {
-      throw new NotFoundException(`unknown pipeline ${normalized.pipeline}`);
-    }
-    const refusal = host.definition.refuse?.(normalized, summaries);
+    assertTargetDeclared(host, normalized);
+    // A named target must be registered — the same 404 a run would get.
+    if (normalized.pipeline !== undefined) this.runs.summary(normalized.pipeline);
+    const refusal = host.definition.refuse?.(normalized, this.runs.pipelines());
     if (refusal !== null && refusal !== undefined) throw new BadRequestException(refusal);
     return normalized;
   }
@@ -160,22 +137,29 @@ export class OrchestrationService implements OnModuleInit {
     request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<OrchestrationRunDto> {
-    const summary = this.runs.list().find((candidate) => candidate.id === request.pipeline);
-    const maxIterations =
-      provided?.request.maxIterations ??
-      request.maxIterations ??
-      summary?.policy.loop.maxIterations ??
-      DEFAULT_QUALITY_RUN_ITERATIONS;
     const record = openRecord(
       host.definition,
       request,
       provided,
       await host.definition.context(host.ports),
-      maxIterations,
+      this.iterationBudget(request, provided),
       () => new Date().toISOString(),
     );
     await this.repository.open(record);
     return record;
+  }
+
+  /** The provided run's budget, else the request's, else the target pipeline's own, else the default. */
+  private iterationBudget(
+    request: StartOrchestrationRequest,
+    provided: QualityRunDto | null,
+  ): number {
+    return (
+      provided?.request.maxIterations ??
+      request.maxIterations ??
+      this.runs.summaryOf(request.pipeline)?.policy.loop.maxIterations ??
+      DEFAULT_QUALITY_RUN_ITERATIONS
+    );
   }
 
   private async perform(
@@ -188,7 +172,7 @@ export class OrchestrationService implements OnModuleInit {
     try {
       await runOrchestration(host.definition, record, request, provided, {
         ports: host.ports,
-        pipelines: () => this.runs.list(),
+        pipelines: () => this.runs.pipelines(),
         execute: (child, onOpened) => this.runs.execute(child, onOpened),
         flush: (current) => this.repository.update(current),
         now: () => new Date().toISOString(),
@@ -202,5 +186,16 @@ export class OrchestrationService implements OnModuleInit {
       }
       this.logger.log(`${label} ${record.status}`);
     }
+  }
+}
+
+/** The declaration decides whether a target is named at all. */
+function assertTargetDeclared(host: OrchestratorHost, request: StartOrchestrationRequest): void {
+  const { id, takesTarget } = host.definition;
+  if (takesTarget && request.pipeline === undefined) {
+    throw new BadRequestException(`${id} takes a target pipeline; name one`);
+  }
+  if (!takesTarget && request.pipeline !== undefined) {
+    throw new BadRequestException(`${id} chooses its own pipeline; do not name one`);
   }
 }

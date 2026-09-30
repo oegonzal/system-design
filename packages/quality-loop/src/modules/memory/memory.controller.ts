@@ -2,7 +2,8 @@ import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
 import type { ReindexMemoryRunResponse, RetrievalReportResponse } from '@sysdesign/contracts';
 
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
-import { reportRequestSchema } from './memory-request';
+
+import { goalRequestSchema } from '../http/goal-request';
 import { MemoryService } from './memory.service';
 
 /** The memory tools that need no orchestration; a memory run is `POST /orchestrations/memory`. */
@@ -28,7 +29,7 @@ export class MemoryController {
   @Post('retrieval-report')
   @HttpCode(200)
   async report(
-    @Body(new ZodValidationPipe(reportRequestSchema)) body: { goal: string },
+    @Body(new ZodValidationPipe(goalRequestSchema)) body: { goal: string },
   ): Promise<RetrievalReportResponse> {
     return { data: await this.memory.retrievalReport(body.goal) };
   }

@@ -14,14 +14,9 @@ import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import { OrchestrationRun, OrchestrationRunChild, QualityRun } from '@sysdesign/db';
 
 import { closeSteps } from '../../../orchestrators/runner/record';
+import { interruptedError, NEWEST_FIRST, presentFilters } from '../../runs/persistence/conventions';
 import type { OrchestrationListQuery, OrchestrationRunRepository } from '../ports';
-import { childrenOf, fromRow, toRow } from './orchestration-run-mapper';
-
-const INTERRUPTED = {
-  name: 'Interrupted',
-  message: 'the service restarted while the orchestration run was in flight',
-  stack: null,
-};
+import { childrenOf, fromRow, toRow, type ChildRef } from './orchestration-run-mapper';
 
 @Injectable()
 export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepository {
@@ -30,23 +25,13 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
   async open(record: OrchestrationRunDto): Promise<void> {
     const em = this.em.fork();
     const row = em.create(OrchestrationRun, toRow(record));
-    for (const { step, ordinal, runId } of childrenOf(record)) {
-      em.create(OrchestrationRunChild, {
-        run: row,
-        step,
-        ordinal,
-        qualityRun: em.getReference(QualityRun, runId),
-      });
-    }
+    for (const child of childrenOf(record)) addChild(em, row, child);
     await em.flush();
   }
 
   async update(record: OrchestrationRunDto): Promise<void> {
     const em = this.em.fork();
-    const row = await em.findOne(OrchestrationRun, {
-      id: record.orchestrationRunId,
-      status: 'running',
-    });
+    const row = await running(em, record.orchestrationRunId);
     if (row === null) return;
     row.steps = record.steps;
     row.updatedAt = new Date();
@@ -56,10 +41,7 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
 
   async close(record: OrchestrationRunDto): Promise<void> {
     const em = this.em.fork();
-    const row = await em.findOne(OrchestrationRun, {
-      id: record.orchestrationRunId,
-      status: 'running',
-    });
+    const row = await running(em, record.orchestrationRunId);
     if (row === null) return;
     const next = toRow(record);
     row.status = next.status;
@@ -77,15 +59,15 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
   }
 
   async list(query: OrchestrationListQuery): Promise<[OrchestrationRunDto[], number]> {
-    const where: FilterQuery<OrchestrationRun> = {
-      ...(query.orchestrator ? { orchestrator: query.orchestrator } : {}),
-      ...(query.pipeline ? { pipeline: query.pipeline } : {}),
-      ...(query.status ? { status: query.status } : {}),
-    };
+    const where: FilterQuery<OrchestrationRun> = presentFilters({
+      orchestrator: query.orchestrator,
+      pipeline: query.pipeline,
+      status: query.status,
+    });
     const [rows, total] = await this.em.fork().findAndCount(OrchestrationRun, where, {
       limit: query.limit,
       offset: query.offset,
-      orderBy: { startedAt: 'desc', id: 'desc' },
+      orderBy: NEWEST_FIRST,
     });
     return [rows.map(fromRow), total];
   }
@@ -96,7 +78,7 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
     const at = new Date();
     for (const row of rows) {
       row.status = 'failed';
-      row.error = INTERRUPTED;
+      row.error = interruptedError('orchestration run');
       row.steps = closeSteps(row.steps, 'interrupted', null, at.toISOString());
       row.finishedAt = at;
     }
@@ -111,18 +93,26 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
   ): Promise<void> {
     const existing = await em.find(OrchestrationRunChild, { run: row.id });
     const known = new Map(existing.map((child) => [`${child.step}#${child.ordinal}`, child]));
-    for (const { step, ordinal, runId } of childrenOf(record)) {
-      const child = known.get(`${step}#${ordinal}`);
+    for (const ref of childrenOf(record)) {
+      const child = known.get(`${ref.step}#${ref.ordinal}`);
       if (child === undefined) {
-        em.create(OrchestrationRunChild, {
-          run: row,
-          step,
-          ordinal,
-          qualityRun: em.getReference(QualityRun, runId),
-        });
-      } else if (child.qualityRun?.id !== runId) {
-        child.qualityRun = em.getReference(QualityRun, runId);
+        addChild(em, row, ref);
+      } else if (child.qualityRun?.id !== ref.runId) {
+        child.qualityRun = em.getReference(QualityRun, ref.runId);
       }
     }
   }
 }
+
+/** The row, only while it is still running — a finished or swept one is never written again. */
+const running = (em: EntityManager, id: string): Promise<OrchestrationRun | null> =>
+  em.findOne(OrchestrationRun, { id, status: 'running' });
+
+/** One child row, pointing at its quality run by reference. */
+const addChild = (em: EntityManager, row: OrchestrationRun, { step, ordinal, runId }: ChildRef) =>
+  em.create(OrchestrationRunChild, {
+    run: row,
+    step,
+    ordinal,
+    qualityRun: em.getReference(QualityRun, runId),
+  });
