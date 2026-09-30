@@ -1,3 +1,4 @@
+export * from './alert/alert';
 export * from './badge/badge';
 export * from './badge/tones';
 export * from './button/button';
@@ -6,6 +7,7 @@ export * from './field/select-field';
 export * from './field/text-area-field';
 export * from './field/text-field';
 export * from './heading/heading';
+export * from './link/link';
 export * from './live-region/live-region';
 export * from './meter/meter';
 export * from './preformatted-text/preformatted-text';

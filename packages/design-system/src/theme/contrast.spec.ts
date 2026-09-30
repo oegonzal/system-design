@@ -128,6 +128,15 @@ const TEXT_PAIRS: readonly (readonly [ColorPath, ColorPath])[] = [
 
 /** WCAG 1.4.11 — component boundaries and other non-text affordances. */
 const UI_PAIRS: readonly (readonly [ColorPath, ColorPath])[] = [
+  // A link's accent underline and a nav item's current mark, on every surface it sits on.
+  [
+    ['accent', 'default'],
+    ['bg', 'surface'],
+  ],
+  [
+    ['accent', 'default'],
+    ['bg', 'app'],
+  ],
   [
     ['border', 'default'],
     ['bg', 'surface'],
