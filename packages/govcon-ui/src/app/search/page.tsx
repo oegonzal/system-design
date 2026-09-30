@@ -1,8 +1,8 @@
-import { PageStub } from '../../components/page-stub';
+import { SearchClient } from '../../features/search/search.client';
 import { pageMetadata } from '../nav';
 
 export const metadata = pageMetadata('/search');
 
-export default function Page() {
-  return <PageStub href="/search" />;
+export default function SearchPage() {
+  return <SearchClient />;
 }

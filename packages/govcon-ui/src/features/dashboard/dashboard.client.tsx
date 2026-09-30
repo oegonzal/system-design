@@ -19,6 +19,7 @@ import { useState } from 'react';
 
 import { api } from '../../api/client';
 import { useProfile } from '../../providers/profile-context';
+import { sourceDisabledReason } from '../source/source-availability';
 import { EntityCard } from '../entities/entity-card';
 import { LeadTable } from '../leads/lead-table';
 import { PullControls, type PullForm } from '../pull/pull-controls';
@@ -73,13 +74,7 @@ export function DashboardClient() {
   });
 
   const pullProfileId = form.profileId === '' ? (profileId ?? '') : form.profileId;
-  const search = source.data?.sources.find((item) => item.bucket !== null) ?? null;
-  const sourceDisabledReason =
-    search !== null && !search.availability.enabled
-      ? search.availability.reason === 'no-key'
-        ? 'SAM_GOV_API_KEY is not set (no-key)'
-        : 'the source is disabled'
-      : null;
+  const disabledReason = sourceDisabledReason(source.data);
 
   return (
     <Stack gap={6}>
@@ -107,7 +102,7 @@ export function DashboardClient() {
               onChange={setForm}
               onPull={() => void pull.run({ ...form, profileId: pullProfileId })}
               pulling={pull.pending}
-              sourceDisabledReason={sourceDisabledReason}
+              sourceDisabledReason={disabledReason}
             />
           )}
           {pull.error ? <Alert tone="danger">{pull.error}</Alert> : null}
