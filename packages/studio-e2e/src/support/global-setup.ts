@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 
+import { connectionSettings } from '@sysdesign/db/connection';
 import { Client } from 'pg';
 
 /**
@@ -25,11 +26,8 @@ import { Client } from 'pg';
  * in memory and starts empty with every run of the suite.
  */
 export default async function globalSetup(): Promise<void> {
-  const host = process.env['DB_HOST'] ?? 'localhost';
-  const port = Number(process.env['DB_PORT'] ?? 5433);
-  const user = process.env['DB_USERNAME'] ?? 'admin';
-  const password = process.env['DB_PASSWORD'] ?? 'admin';
   const database = process.env['DB_NAME'] ?? 'sysdesign_test';
+  const { host, port, user, password } = connectionSettings(process.env);
 
   // Create the database if it does not exist yet (42P04 = already there).
   const maintenance = new Client({ host, port, user, password, database: 'postgres' });
@@ -45,7 +43,7 @@ export default async function globalSetup(): Promise<void> {
   // Idempotent: applies only pending migrations. Run via the root scripts so
   // this file stays dependency-light and cannot drift from the CLI's config.
   const repoRoot = join(__dirname, '../../../..');
-  const env = { ...process.env, DB_NAME: database, DB_PORT: String(port) };
+  const env = { ...process.env, DB_NAME: database };
   execSync('pnpm db:migrate', { cwd: repoRoot, env, stdio: 'inherit' });
 
   const client = new Client({ host, port, user, password, database });

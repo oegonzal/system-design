@@ -126,7 +126,7 @@ Loaded by Node from `.env` (`--env-file-if-exists=.env`).
 | `SAM_GOV_DAILY_BUDGET`                                                                      | Attempts per rolling 24 hours against SAM.gov, every API and outcome counted; default 1000.                                                                                                                                                           |
 | `SAM_GOV_CACHE_TTL_HOURS`                                                                   | How long a pulled search is not pulled again; default 24, `0` disables.                                                                                                                                                                               |
 | `GOVCON_PULL_DEADLINE_SECONDS`                                                              | A pull starts no new slice after this long; default 120.                                                                                                                                                                                              |
-| `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME`                                   | Postgres; the `govcon` script defaults `DB_PORT` to 5433 (`pnpm stack:db`).                                                                                                                                                                           |
+| `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME`                                   | Postgres; the defaults are the compose server `pnpm stack:db` starts (port 5433).                                                                                                                                                                     |
 | `GOVCON_PORT`, `GOVCON_CORS_ORIGIN`                                                         | The HTTP port (3004) and the browser origin allowed (`http://localhost:4202`).                                                                                                                                                                        |
 | `NEXT_PUBLIC_GOVCON_URL`                                                                    | (web client) the service's base URL; default `http://localhost:3004`.                                                                                                                                                                                 |
 
@@ -173,7 +173,7 @@ title claims one.
 ## First run
 
 ```
-pnpm stack:db && DB_PORT=5433 pnpm db:migrate
+pnpm stack:db && pnpm db:migrate
 pnpm govcon profiles list             # the seeded profile, once
 pnpm govcon search --days 3           # 8 requests with the shipped searches, then the ranking
 pnpm govcon show <noticeId> --description

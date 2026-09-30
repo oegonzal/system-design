@@ -4,6 +4,7 @@ import { Migrator } from '@mikro-orm/migrations';
 import { MikroORM } from '@mikro-orm/postgresql';
 import { Client } from 'pg';
 
+import { connectionSettings } from '../connection';
 import { ormOptions } from '../orm.options';
 
 /**
@@ -25,11 +26,8 @@ export function ensureDatabase(): Promise<void> {
 async function createAndMigrate(): Promise<void> {
   // Read the environment at call time: `ormOptions` snapshots it at import,
   // and the maintenance connection must not depend on module load order.
-  const host = process.env['DB_HOST'] ?? 'localhost';
-  const port = parseInt(process.env['DB_PORT'] ?? '5432', 10);
-  const user = process.env['DB_USERNAME'] ?? 'admin';
-  const password = process.env['DB_PASSWORD'] ?? 'admin';
-  const dbName = process.env['DB_NAME'] ?? 'sysdesign';
+  const connection = connectionSettings(process.env);
+  const { host, port, user, password, dbName } = connection;
 
   const client = new Client({ host, port, user, password, database: 'postgres' });
   await client.connect();
@@ -44,11 +42,7 @@ async function createAndMigrate(): Promise<void> {
 
   const orm = await MikroORM.init({
     ...ormOptions,
-    host,
-    port,
-    user,
-    password,
-    dbName,
+    ...connection,
     extensions: [Migrator],
     migrations: {
       path: join(__dirname, '../migrations'),

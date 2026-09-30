@@ -574,7 +574,7 @@ pnpm stack:down                                  # both, data stays in the named
 # to get one, so a run can never "complete" with nothing judged. Embeddings
 # stay optional: without OPENAI_API_KEY the memory steps skip with
 # embeddings-disabled and the target still runs.
-env DB_PORT=5433 node --env-file-if-exists=.env packages/quality-loop/dist/main.js
+node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 
 # a memory run: the memory orchestrator, with the same body as POST /runs
 curl -s -X POST localhost:3003/orchestrations/memory -H 'content-type: application/json' \
@@ -602,7 +602,7 @@ curl -s localhost:6333/collections
 
 # two controllers on the same evidence, no model: every recorded iteration of a
 # pipeline decided again under each strategy in core/controllers (§13)
-env DB_PORT=5433 node --env-file-if-exists=.env packages/quality-loop/dist/main.js \
+node --env-file-if-exists=.env packages/quality-loop/dist/main.js \
   replay --pipeline memory-recall --limit 100
 ```
 

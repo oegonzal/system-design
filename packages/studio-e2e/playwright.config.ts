@@ -18,15 +18,14 @@ const baseURL = process.env['BASE_URL'] || 'http://localhost:4200';
 const DEMO = !!process.env['DEMO'];
 
 /**
- * Postgres connection details ride through to the API server and the global
- * setup. `tilt up` (or the compose file) provides the Postgres server itself
- * — the suite never starts one — on 5433 by default, but the suite's
- * *database* defaults to its own `sysdesign_test` (created/migrated/seeded by
- * `global-setup.ts`), so an e2e run never truncates the developer's real
- * practice history. CI pins `DB_PORT` and `DB_NAME` explicitly and keeps its
- * ephemeral service database.
+ * The suite never starts Postgres: the local stack provides the server at
+ * the connection defaults `@sysdesign/db` declares, and CI's `DB_*` variables
+ * reach the API server and the global setup unchanged. What the suite owns is
+ * the *database*: it defaults to its own `sysdesign_test` (created, migrated
+ * and seeded by `global-setup.ts`), so an e2e run never truncates the
+ * developer's real practice history. CI pins `DB_NAME` explicitly and keeps
+ * its ephemeral service database.
  */
-const DB_PORT = process.env['DB_PORT'] ?? '5433';
 const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
 
 /**
@@ -107,7 +106,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: workspaceRoot,
       timeout: 180_000,
-      env: { DB_PORT, DB_NAME, QUALITY_LOOP_URL },
+      env: { DB_NAME, QUALITY_LOOP_URL },
     },
     {
       command: 'pnpm exec nx run studio-ui:serve',

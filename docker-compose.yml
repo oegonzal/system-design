@@ -7,8 +7,8 @@
 #   - `restart: unless-stopped` brings the server back after a Docker/machine
 #     restart without anyone having to `docker start` it.
 #
-# Port 5433 matches the app's `DB_PORT` and avoids a stale :5432 on this machine.
-# Credentials/db name match `packages/db/src/orm.options.ts` defaults.
+# Port 5433, the credentials and the db name are the app's connection defaults
+# (`packages/db/src/connection.ts`); 5433 also avoids a stale :5432 on this machine.
 #
 # `vectors` is the quality loop's memory store (Qdrant): the same named-volume
 # and restart rules apply, it is started and stopped together with `db` by

@@ -40,9 +40,9 @@ vectors`) — Postgres image `postgres:16-alpine`, **named volume**
 3. applies any pending migrations (`pnpm db:migrate`, idempotent) and re-seeds
    the reference experiences (`pnpm db:seed`, idempotent — never touches your
    sessions);
-4. starts the API, the quality loop and the UI with `DB_PORT=5433` and
-   `QUALITY_LOOP_URL=http://localhost:3003`; the loop runs on this machine's
-   Claude Code login.
+4. starts the API, the quality loop and the UI, which find the stores and one
+   another at their defaults, so no connection variable is set; the loop runs
+   on this machine's Claude Code login.
 
 `pnpm stack:down` stops both containers; the data stays in the named volumes.
 `pnpm stack:db` brings up only the database and the vector store (for
@@ -193,7 +193,7 @@ run that lives outside the database entirely.
 Integration suites (`nx test studio-api`, `nx test quality-loop`) and the e2e
 suite truncate tables between tests — so they default to their **own database,
 `sysdesign_test`**, created and migrated automatically on the same Postgres
-server (run them with `DB_PORT=5433` so they land on the compose server). Your
+server. Your
 `sysdesign` practice history is never truncated by a test run. CI pins
 `DB_NAME` explicitly and keeps its ephemeral service database. None of them
 reaches a model: studio-api's specs bind a fake loop client, the loop's specs
@@ -209,8 +209,9 @@ stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
 
 ## Notes / gotchas
 
-- Port **5433** (not the app default 5432) avoids a stale `:5432` container that
-  may exist on a dev machine; the stack scripts export `DB_PORT=5433`.
+- Port **5433** is the app's default (`packages/db/src/connection.ts`) and
+  avoids a stale `:5432` container that may exist on a dev machine. Only CI
+  sets `DB_PORT`, to its service's 5432.
 - This durable `docker-compose` stack is the canonical **local** database. The
   committed Tilt/Kubernetes path (`tilt up`, `tilt/postgres/*`) is a separate,
   independent database — don't mix them, or each will show only its own runs.

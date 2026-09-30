@@ -9,9 +9,9 @@ pnpm govcon show <noticeId> --description   # one notice with its trace; the tex
 pnpm govcon awards fetch --naics 332710 --from 2026-06-01 --to 2026-09-29
 pnpm govcon entities lookup <uei>
 pnpm govcon:serve                           # the HTTP surface on :3004 for packages/govcon-ui
-DB_PORT=5433 pnpm exec nx test govcon       # the pure suites in parallel, the Postgres suites in one lane
+pnpm exec nx test govcon                    # the pure suites in parallel, the Postgres suites in one lane
 ```
 
 Layout: `src/core` (pure — the budget gate, the ports, the profile schema, the pull plan and run, the candidate filter, scoring, award intel), `src/modules/sources` (SAM.gov and USAspending adapters over one attempt-reporting transport, the ledger), `src/modules/{profiles,pulls,opportunities,bids,awards,entities}` (one concern each), `src/profiles/enfav.ts` (the seed), `src/cli.ts` + `src/render.ts`.
 
-How it works, every route, the environment and the budget semantics: [docs/govcon/overview.md](../../docs/govcon/overview.md). Tables live in `packages/db`; `pnpm stack:db` then `DB_PORT=5433 pnpm db:migrate` before the first pull. Every wire type is in `@sysdesign/contracts` under `lib/govcon`.
+How it works, every route, the environment and the budget semantics: [docs/govcon/overview.md](../../docs/govcon/overview.md). Tables live in `packages/db`; `pnpm stack:db` then `pnpm db:migrate` before the first pull. Every wire type is in `@sysdesign/contracts` under `lib/govcon`.

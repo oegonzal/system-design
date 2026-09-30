@@ -13,12 +13,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-export DB_PORT="${DB_PORT:-5433}"
-export QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-export QUALITY_LOOP_URL="${QUALITY_LOOP_URL:-http://localhost:3003}"
+# Nothing is exported: the apps' defaults (DB_PORT, QDRANT_URL,
+# QUALITY_LOOP_URL) already point at these containers and at each other.
 
 wait_db() {
-  echo "waiting for postgres on :${DB_PORT} ..."
+  echo "waiting for postgres on $(docker compose port db 5432) ..."
   for _ in $(seq 1 60); do
     if docker compose exec -T db pg_isready -U admin -d sysdesign >/dev/null 2>&1; then
       echo "postgres ready"
@@ -31,9 +30,12 @@ wait_db() {
 }
 
 wait_vectors() {
-  echo "waiting for qdrant at ${QDRANT_URL} ..."
+  # The address compose published, so the check follows docker-compose.yml.
+  local url
+  url="http://$(docker compose port vectors 6333)"
+  echo "waiting for qdrant at ${url} ..."
   for _ in $(seq 1 60); do
-    if curl -sf "${QDRANT_URL}/readyz" >/dev/null 2>&1; then
+    if curl -sf "${url}/readyz" >/dev/null 2>&1; then
       echo "qdrant ready"; return 0
     fi
     sleep 1
@@ -56,7 +58,7 @@ case "${1:-up}" in
     pnpm db:migrate
     echo "seeding reference data ..."
     pnpm db:seed
-    echo "starting api + quality loop + ui (DB_PORT=${DB_PORT}, model via the Claude Code login) — Ctrl-C to stop"
+    echo "starting api + quality loop + ui (model via the Claude Code login) — Ctrl-C to stop"
     pnpm start
     ;;
   down)

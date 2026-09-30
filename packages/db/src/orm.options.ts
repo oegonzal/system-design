@@ -1,6 +1,7 @@
 import { UnderscoreNamingStrategy } from '@mikro-orm/core';
 import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 
+import { connectionSettings } from './connection';
 import { CoachingRun } from './entities/coaching-run.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
@@ -35,11 +36,7 @@ import { StarStory } from './entities/star-story.entity';
  * the CLI just created. One shared object makes the drift unrepresentable.
  */
 export const ormOptions = {
-  host: process.env['DB_HOST'] ?? 'localhost',
-  port: parseInt(process.env['DB_PORT'] ?? '5432', 10),
-  user: process.env['DB_USERNAME'] ?? 'admin',
-  password: process.env['DB_PASSWORD'] ?? 'admin',
-  dbName: process.env['DB_NAME'] ?? 'sysdesign',
+  ...connectionSettings(process.env),
 
   entities: [
     ExperienceProfile,
