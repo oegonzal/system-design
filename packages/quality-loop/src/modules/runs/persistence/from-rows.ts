@@ -129,8 +129,13 @@ export function fromRows(
     startedAt: toIso(run.startedAt),
     finishedAt: toIsoOrNull(run.finishedAt),
     llm: run.llm,
-    // Rows written before a run could carry its rubric have no flag: it was derived.
-    request: { ...run.request, criteriaProvided: run.request.criteriaProvided ?? false },
+    // Rows written before a run could carry its rubric have no flag: it was
+    // derived; before a run could adopt an iteration, none was adopted.
+    request: {
+      ...run.request,
+      criteriaProvided: run.request.criteriaProvided ?? false,
+      adoptedFrom: run.request.adoptedFrom ?? null,
+    },
     trace: traceFromRows(run, criteria, iterations, findings, results),
     exchanges: run.exchanges,
     error: run.error,

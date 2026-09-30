@@ -27,11 +27,19 @@ export interface RunErrorDto {
   stack: string | null;
 }
 
+/** A recorded iteration of an earlier run, named by the run's id and the iteration's number. */
+export interface AdoptedIterationRef {
+  runId: string;
+  iteration: number;
+}
+
 export interface QualityRunRequestSummary {
   goal: string;
   outputProvided: boolean;
   /** True when the caller supplied the rubric; false when it was derived from the goal. */
   criteriaProvided: boolean;
+  /** The recorded iteration this run took as its iteration 1; null when it produced or judged its own. */
+  adoptedFrom: AdoptedIterationRef | null;
   maxIterations: number;
 }
 
@@ -66,6 +74,14 @@ export interface StartQualityRunRequest {
    * stores a rubric once keeps `c3` meaning `c3` across runs.
    */
   criteria?: SuccessCriterion[];
+  /**
+   * Adopt a recorded iteration of an earlier run as iteration 1 — verbatim,
+   * in mode `adopted`, no model asked to judge it again — and go on from its
+   * decision. Mutually exclusive with `output`. Requires `criteria` equal to
+   * the adopted run's rubric, and the same pipeline id and version; anything
+   * else is refused with 400.
+   */
+  adopt?: AdoptedIterationRef;
 }
 
 /** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */

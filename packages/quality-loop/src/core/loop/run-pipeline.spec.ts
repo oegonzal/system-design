@@ -246,6 +246,67 @@ describe('runLoop', () => {
     ]);
   });
 
+  it('[QL-23] an adopted iteration is iteration 1 verbatim in mode adopted, no stage runs for it, and the loop goes on from its decision', async () => {
+    // A recorded iteration: judged by an earlier run, decided revise at 40.
+    const earlier = await runLoop(
+      scriptedStages({ producer: scriptedProducer([DRAFT_1]) }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+    const recorded = earlier.iterations[0];
+    expect(recorded.decision.finalDecision).toBe('revise');
+
+    const inputs: ProducerInput<TinyOutput>[] = [];
+    let lensCalls = 0;
+    const critic = scriptedCritic('critic.tiny', [[[]]]);
+    const counted = {
+      ...critic,
+      run: (ctx: Parameters<typeof critic.run>[0]) => (lensCalls++, critic.run(ctx)),
+    };
+    const scripted = scriptedProducer([DRAFT_2]);
+    let derived = 0;
+    const stages = scriptedStages({
+      critics: [counted],
+      // The revision passes both criteria, so it beats the adopted 'partial' on c1.
+      evaluators: [
+        scriptedEvaluator('evaluator.tiny', [
+          [[result({ criterionId: 'c1' }), result({ criterionId: 'c2' })]],
+        ]),
+      ],
+      producer: {
+        enabled: true,
+        produce: (input) => {
+          inputs.push(input);
+          return scripted.produce(input);
+        },
+      },
+      deriveCriteria: (goal) => (derived++, scriptedStages().deriveCriteria(goal)),
+    });
+    const trace = await runLoop(
+      stages,
+      tinyPipeline(),
+      { goal: 'g', criteria: earlier.contract.criteria, adopted: recorded, maxIterations: 2 },
+      clock,
+    );
+
+    expect(trace.iterations[0]).toEqual({ ...recorded, iteration: 1, mode: 'adopted' });
+    // Nothing ran for iteration 1: no derivation, no producer, no lens.
+    expect(derived).toBe(0);
+    expect(inputs).toHaveLength(1);
+    expect(lensCalls).toBe(1);
+    // Iteration 2 revised the adopted artifact against its remediations.
+    expect(inputs[0]).toMatchObject({
+      mode: 'revise',
+      prior: recorded.artifact,
+      remediations: recorded.remediations,
+      refusals: [],
+    });
+    expect(trace.iterations[1].mode).toBe('revise');
+    expect(trace.bestIteration).toBe(2);
+    expect(trace.lessons.length).toBeGreaterThan(0);
+  });
+
   it('[QL-9] stops on a plateau when revisions stop improving', async () => {
     const flat = scriptedEvaluator('evaluator.tiny', [
       [[result({ criterionId: 'c1', result: 'partial' }), result({ criterionId: 'c2' })]],

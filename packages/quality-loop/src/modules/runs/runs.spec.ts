@@ -233,6 +233,79 @@ describe('the HTTP surface', () => {
     expect(after).toBe(before);
   });
 
+  it('[QL-23] POST /runs adopts a recorded iteration of an earlier run — same pipeline version, equal rubric — and refuses anything else with 400', async () => {
+    // The fake judges `c1`, so a rubric under that id is assessed and accepted.
+    const rubric = [{ id: 'c1', kind: 'must', statement: 'has text' }];
+    const first = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal',
+      criteria: rubric,
+    });
+    const earlier = await settledRun(
+      ((await first.json()) as Envelope<{ runId: string }>).data.runId,
+    );
+
+    const started = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal',
+      criteria: rubric,
+      adopt: { runId: earlier.runId, iteration: 1 },
+      maxIterations: 2,
+    });
+    expect(started.status).toBe(202);
+    const { runId: adopting } = ((await started.json()) as Envelope<{ runId: string }>).data;
+    const run = await settledRun(adopting);
+    expect(run.request).toMatchObject({
+      outputProvided: false,
+      criteriaProvided: true,
+      adoptedFrom: { runId: earlier.runId, iteration: 1 },
+    });
+    expect(run.trace?.iterations[0]).toEqual({
+      ...earlier.trace?.iterations[0],
+      iteration: 1,
+      mode: 'adopted',
+    });
+    // The loop went on from the recorded decision — an accept, so it stopped
+    // there — and asked the model nothing at all.
+    expect(earlier.trace?.finalDecision).toBe('accept');
+    expect(run.trace?.iterations).toHaveLength(1);
+    expect(run.trace?.stopReason).toBe('accepted');
+    expect(run.exchanges).toEqual([]);
+    const manifest = JSON.parse(
+      readFileSync(join(DUMP_DIR, adopting, 'manifest.json'), 'utf8'),
+    ) as { adoptedFrom: unknown };
+    expect(manifest.adoptedFrom).toEqual({ runId: earlier.runId, iteration: 1 });
+
+    const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    const refused: [string, unknown][] = [
+      [
+        'adopt',
+        { adopt: { runId: earlier.runId, iteration: 1 }, output: { text: 'x', parts: [] } },
+      ],
+      ['criteria', { adopt: { runId: earlier.runId, iteration: 1 } }],
+      ['adopt', { criteria: rubric, adopt: { runId: 'no-such-run', iteration: 1 } }],
+      ['adopt', { criteria: rubric, adopt: { runId: earlier.runId, iteration: 9 } }],
+      [
+        'criteria',
+        {
+          criteria: [{ id: 'c1', kind: 'must', statement: 'has other text' }],
+          adopt: { runId: earlier.runId, iteration: 1 },
+        },
+      ],
+    ];
+    for (const [path, body] of refused) {
+      const answer = await postJson(url, '/runs', {
+        pipeline: 'tiny',
+        goal: '# Goal',
+        ...(body as object),
+      });
+      expect(answer.status).toBe(400);
+      const { issues } = (await answer.json()) as { issues: { path: string }[] };
+      expect(issues[0].path).toBe(path);
+    }
+    expect(((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total).toBe(before);
+  });
+
   it('[QL-20] POST /criteria derives a rubric with one model call and writes no run', async () => {
     const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
     const response = await postJson(url, '/criteria', {
@@ -281,7 +354,13 @@ describe('the HTTP surface', () => {
         pipeline: 'tiny',
         pipelineVersion: tinyPipeline().version,
         llm: { enabled: true, model: 'test-model', reason: null },
-        request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
+        request: {
+          goal: 'g',
+          outputProvided: false,
+          criteriaProvided: false,
+          adoptedFrom: null,
+          maxIterations: 1,
+        },
         git: { branch: '', headSha: '' },
         startedAt: new Date(),
         heartbeatAt,

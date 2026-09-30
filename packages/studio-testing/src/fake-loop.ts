@@ -73,14 +73,6 @@ export class DerivationFailed extends Error {
   }
 }
 
-/**
- * `adopt` lands on the wire in a later change; the fake accepts it today so
- * the studio's coach can be scripted against it before the loop grows it.
- */
-export type AdoptingRunRequest = StartQualityRunRequest & {
-  adopt?: { runId: string; iteration: number };
-};
-
 export interface FakeLoopOptions {
   model?: string;
   /** `fake-run` → `fake-run-1`, `fake-run-2`, …; the stub uses a per-process prefix. */
@@ -109,8 +101,8 @@ const exchangesOf = (scopes: readonly string[], at: string): LlmExchangeSummaryD
 
 export class FakeLoop {
   readonly runs = new Map<string, QualityRunDto>();
-  readonly requests = new Map<string, AdoptingRunRequest>();
-  readonly startRequests: AdoptingRunRequest[] = [];
+  readonly requests = new Map<string, StartQualityRunRequest>();
+  readonly startRequests: StartQualityRunRequest[] = [];
   readonly criteriaRequests: DeriveCriteriaRequest[] = [];
   llm: LlmAvailabilityDto;
   unreachable = false;
@@ -191,7 +183,7 @@ export class FakeLoop {
     };
   }
 
-  startRun(request: AdoptingRunRequest): QualityRunStartedDto {
+  startRun(request: StartQualityRunRequest): QualityRunStartedDto {
     if (this.unreachable) throw new LoopUnreachable();
     if (this.failNextStart) {
       const error = this.failNextStart;
@@ -222,6 +214,7 @@ export class FakeLoop {
         goal: request.goal,
         outputProvided: request.output !== undefined,
         criteriaProvided: request.criteria !== undefined,
+        adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? 1,
       },
       trace: null,
@@ -319,7 +312,7 @@ export class FakeLoop {
   }
 
   /** The recorded iteration an adopting run starts from, or the loop's refusal. */
-  private resolveAdoption(request: AdoptingRunRequest): IterationTrace {
+  private resolveAdoption(request: StartQualityRunRequest): IterationTrace {
     const adopt = request.adopt;
     if (!adopt) throw new Error('no adopt on the request');
     const source = this.runs.get(adopt.runId);

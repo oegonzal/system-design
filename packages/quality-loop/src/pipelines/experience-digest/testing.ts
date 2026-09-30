@@ -217,6 +217,8 @@ export const sampleRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto
       goal: '# Prompt — Serve an order history\n\nList past orders.',
       outputProvided: false,
       criteriaProvided: false,
+
+      adoptedFrom: null,
       maxIterations: 3,
     },
     trace: {

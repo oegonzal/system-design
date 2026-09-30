@@ -8,6 +8,7 @@ import type {
   CriticReport,
   Diagnostic,
   EvaluationReport,
+  IterationMode,
   IterationTrace,
   LensOutcome,
   ProduceMode,
@@ -38,11 +39,17 @@ import { mapConcurrent } from './scoped-llm';
 
 export interface RunInput {
   goal: string;
-  /** A supplied artifact to judge; iteration 1 adopts it instead of producing. */
+  /** A supplied artifact to judge; iteration 1 takes it as provided instead of producing. */
   output?: unknown;
   maxIterations?: number;
   /** A fixed rubric; when present the derive-criteria stage is not called. */
   criteria?: readonly SuccessCriterion[];
+  /**
+   * A recorded iteration of an earlier run, taken verbatim as iteration 1 in
+   * mode `adopted` — no stage runs for it — and gone on from. Resolved by the
+   * service (same pipeline and version, equal rubric), never by the loop.
+   */
+  adopted?: IterationTrace;
 }
 
 export interface RunDeps {
@@ -104,12 +111,16 @@ export async function runLoop<T>(
   const iterations: IterationTrace<T>[] = [];
   let best: IterationTrace<T> | null = null;
   let stalled = 0;
-  let mode: ProduceMode | 'provided' = input.output !== undefined ? 'provided' : 'initial';
+  let mode: IterationMode =
+    input.adopted !== undefined ? 'adopted' : input.output !== undefined ? 'provided' : 'initial';
   let stop: StopReason | null = null;
 
   for (let iteration = 1; iteration <= maxIterations && stop === null; iteration++) {
     const previous = iterations[iterations.length - 1] ?? null;
-    const entry: IterationTrace<T> = await runIteration(loop, iteration, mode, best, previous);
+    const entry: IterationTrace<T> =
+      mode === 'adopted'
+        ? adoptIteration(input.adopted as IterationTrace<T>, iteration)
+        : await runIteration(loop, iteration, mode, best, previous);
     iterations.push(entry);
 
     if (beats(entry, best)) {
@@ -153,6 +164,17 @@ function deriveOrAdopt<T>(
       })
     : stages.deriveCriteria(input.goal);
 }
+
+/**
+ * A recorded iteration taken as this run's own: ledger, decision,
+ * remediations and locations verbatim, renumbered, in mode `adopted`. The
+ * loop then goes on exactly as it would from a decision it made itself.
+ */
+const adoptIteration = <T>(source: IterationTrace<T>, iteration: number): IterationTrace<T> => ({
+  ...structuredClone(source),
+  iteration,
+  mode: 'adopted',
+});
 
 /** Produce, validate, judge, normalize, decide — one iteration, timed end to end. */
 async function runIteration<T>(

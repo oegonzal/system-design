@@ -58,7 +58,11 @@ export function fromRow(row: OrchestrationRun): OrchestrationRunDto {
     startedAt: toIso(row.startedAt),
     finishedAt: toIsoOrNull(row.finishedAt),
     // Rows written before a run could carry its rubric have no flag: it was derived.
-    request: { ...row.request, criteriaProvided: row.request.criteriaProvided ?? false },
+    request: {
+      ...row.request,
+      criteriaProvided: row.request.criteriaProvided ?? false,
+      adoptedFrom: row.request.adoptedFrom ?? null,
+    },
     context: row.context,
     steps: row.steps,
     error: row.error,

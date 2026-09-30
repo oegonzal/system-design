@@ -2,7 +2,7 @@ import { MAX_PANEL_SAMPLES, QUALITY_RUN_STATUSES } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { PAGE_FIELDS } from '../http/paging';
-import { runRequestSchema } from '../runs/run-request';
+import { runRequestShape } from '../runs/run-request';
 
 const samples = z.number().int().min(1).max(MAX_PANEL_SAMPLES).optional();
 
@@ -13,7 +13,7 @@ const samples = z.number().int().min(1).max(MAX_PANEL_SAMPLES).optional();
  * the service enforces the declaration), and `samples` sizes a panel step.
  * Which of them reach which step is the orchestrator's business.
  */
-export const orchestrationRequestSchema = runRequestSchema.extend({
+export const orchestrationRequestSchema = runRequestShape.omit({ adopt: true }).extend({
   pipeline: z.string().min(1).optional(),
   samples,
 });

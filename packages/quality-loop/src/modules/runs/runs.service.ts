@@ -2,10 +2,12 @@ import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
+  IterationTrace,
   PipelineSummary,
   QualityRunDto,
   QualityRunSummaryDto,
   StartQualityRunRequest,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
 import { qualityLoopAvailabilityFromEnv, type LlmClient, type LlmExchange } from '@sysdesign/llm';
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
@@ -90,8 +92,9 @@ export class RunsService {
   async start(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     this.assertRubric(request, definition);
+    const adopted = await this.resolveAdoption(request, definition);
     const record = await this.open(request, definition);
-    void this.perform(record, request, definition);
+    void this.perform(record, request, definition, adopted);
     return record;
   }
 
@@ -106,10 +109,53 @@ export class RunsService {
   ): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     this.assertRubric(request, definition);
+    const adopted = await this.resolveAdoption(request, definition);
     const record = await this.open(request, definition);
     onOpened?.(record);
-    await this.perform(record, request, definition);
+    await this.perform(record, request, definition, adopted);
     return record;
+  }
+
+  /**
+   * The recorded iteration an adopting request starts from — or a 400 that
+   * names what does not line up: the run, its pipeline or version, the
+   * iteration, or a rubric that is not the one it was judged against. Read
+   * before the row opens, so a refused adoption leaves nothing behind.
+   */
+  private async resolveAdoption(
+    request: StartQualityRunRequest,
+    definition: PipelineDefinition<unknown>,
+  ): Promise<IterationTrace | undefined> {
+    const { adopt } = request;
+    if (adopt === undefined) return undefined;
+    // Declared with its type so the compiler narrows after each call.
+    const refuse: (message: string, path?: 'adopt' | 'criteria') => never = (
+      message,
+      path = 'adopt',
+    ) => {
+      throw new BadRequestException({ message: 'invalid adopt', issues: [{ path, message }] });
+    };
+    if (request.output !== undefined) refuse('output and adopt are mutually exclusive');
+    if (request.criteria === undefined) {
+      refuse('adopt requires the rubric the adopted run was judged against', 'criteria');
+    }
+    const source = await this.repository.find(adopt.runId);
+    if (source === null) refuse(`run ${adopt.runId} not found`);
+    if (source.pipeline !== definition.id) {
+      refuse(`run ${adopt.runId} ran ${source.pipeline}, not ${definition.id}`);
+    }
+    if (source.trace === null) refuse(`run ${adopt.runId} never completed`);
+    if (source.trace.pipeline.version !== definition.version) {
+      refuse(
+        `run ${adopt.runId} was judged by ${definition.id}@${source.trace.pipeline.version}, not @${definition.version}`,
+      );
+    }
+    const iteration = source.trace.iterations.find((it) => it.iteration === adopt.iteration);
+    if (iteration === undefined) refuse(`run ${adopt.runId} has no iteration ${adopt.iteration}`);
+    if (!sameRubric(request.criteria ?? [], source.trace.contract.criteria)) {
+      refuse(`the rubric is not the one run ${adopt.runId} was judged against`, 'criteria');
+    }
+    return iteration;
   }
 
   private resolve(pipeline: string): PipelineDefinition<unknown> {
@@ -151,6 +197,7 @@ export class RunsService {
         goal: request.goal,
         outputProvided: request.output !== undefined,
         criteriaProvided: request.criteria !== undefined,
+        adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
       },
       trace: null,
@@ -165,6 +212,7 @@ export class RunsService {
     record: RunRecord,
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
+    adopted: IterationTrace | undefined,
   ): Promise<void> {
     // The row is alive while this process says so: a model call can run for
     // minutes with no exchange to record, so the heartbeat ticks on its own.
@@ -193,6 +241,7 @@ export class RunsService {
           output: request.output,
           maxIterations: request.maxIterations,
           criteria: request.criteria,
+          adopted,
         },
         { llm: this.llm, sink, now: Date.now },
       );
@@ -221,6 +270,19 @@ export class RunsService {
     }
   }
 }
+
+/** Position by position: the same ids, kinds and statements — what "the rubric it was judged against" means. */
+const sameRubric = (
+  requested: readonly SuccessCriterion[],
+  recorded: readonly SuccessCriterion[],
+): boolean =>
+  requested.length === recorded.length &&
+  requested.every(
+    (criterion, index) =>
+      criterion.id === recorded[index].id &&
+      criterion.kind === recorded[index].kind &&
+      criterion.statement === recorded[index].statement,
+  );
 
 /**
  * An unref'd interval that refreshes a running row's heartbeat a few times

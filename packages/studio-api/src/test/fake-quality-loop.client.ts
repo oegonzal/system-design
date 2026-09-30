@@ -14,7 +14,6 @@ import {
   FakeLoop,
   LoopRefused,
   LoopUnreachable,
-  type AdoptingRunRequest,
   type FakeIteration,
   type RunScenario,
 } from '@sysdesign/studio-testing';
@@ -70,11 +69,11 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     return this.core.runs;
   }
 
-  get requests(): Map<string, AdoptingRunRequest> {
+  get requests(): Map<string, StartQualityRunRequest> {
     return this.core.requests;
   }
 
-  get startRequests(): AdoptingRunRequest[] {
+  get startRequests(): StartQualityRunRequest[] {
     return this.core.startRequests;
   }
 

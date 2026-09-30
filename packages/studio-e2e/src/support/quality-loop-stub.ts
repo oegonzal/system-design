@@ -1,12 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
-import { CANVAS_PIPELINE_ID, PROMPT_PIPELINE_ID } from '@sysdesign/contracts';
+import {
+  CANVAS_PIPELINE_ID,
+  PROMPT_PIPELINE_ID,
+  type StartQualityRunRequest,
+} from '@sysdesign/contracts';
 import {
   DerivationFailed,
   FakeLoop,
   LoopRefused,
   LoopUnreachable,
-  type AdoptingRunRequest,
   type RunScenario,
 } from '@sysdesign/studio-testing';
 
@@ -212,7 +215,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       ) {
         return badRequest(res, 'pipeline and goal are required');
       }
-      const started = loop.startRun(body as unknown as AdoptingRunRequest);
+      const started = loop.startRun(body as unknown as StartQualityRunRequest);
       setTimeout(() => loop.settle(started.runId), COMPLETION_DELAY_MS);
       return send(res, 202, { data: started });
     }

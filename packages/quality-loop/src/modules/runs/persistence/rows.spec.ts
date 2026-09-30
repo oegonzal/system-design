@@ -44,6 +44,17 @@ describe('the run rows', () => {
     expect(roundtrip(rows)).toEqual(toRunDto(source));
   });
 
+  it('[QL-23] an adopted iteration and where it came from round-trip unchanged', () => {
+    const source = fullRecord({
+      request: { ...fullRecord().request, adoptedFrom: { runId: 'earlier-quality', iteration: 2 } },
+      trace: fullTrace({ iterations: [fullIteration({ mode: 'adopted' })] }),
+    });
+    const rows = toRows(source, () => 'iteration-1');
+    expect(rows.iterations[0]?.row.mode).toBe('adopted');
+    expect(roundtrip(rows)).toEqual(toRunDto(source));
+    expect(roundtrip(rows).request.adoptedFrom).toEqual({ runId: 'earlier-quality', iteration: 2 });
+  });
+
   it('[QL-13] keeps an escalated run honest: no criteria, no artifact, the diagnostics intact', () => {
     const source = fullRecord({
       llm: { enabled: false, model: null, reason: 'deterministic' },

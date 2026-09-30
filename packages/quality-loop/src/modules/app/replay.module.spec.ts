@@ -37,7 +37,13 @@ describe('the replay module', () => {
         pipeline: 'tiny',
         pipelineVersion: '0.0.1',
         llm: { enabled: true, model: 'test-model', reason: null },
-        request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
+        request: {
+          goal: 'g',
+          outputProvided: false,
+          criteriaProvided: false,
+          adoptedFrom: null,
+          maxIterations: 1,
+        },
         git: { branch: '', headSha: '' },
         startedAt: new Date(),
         // Stale by any threshold: a sweeper would fail it at boot.

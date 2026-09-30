@@ -158,6 +158,8 @@ describe('the orchestrations HTTP surface', () => {
       goal: GOAL,
       outputProvided: false,
       criteriaProvided: false,
+
+      adoptedFrom: null,
       maxIterations: 2,
     });
     expect(record.steps['digest']).toMatchObject({
@@ -195,6 +197,8 @@ describe('the orchestrations HTTP surface', () => {
       goal: GOAL,
       outputProvided: false,
       criteriaProvided: false,
+
+      adoptedFrom: null,
       maxIterations: 1,
       samples: null,
     });
@@ -281,6 +285,8 @@ describe('the orchestrations HTTP surface', () => {
     expect(opinion.request).toMatchObject({
       outputProvided: true,
       criteriaProvided: false,
+
+      adoptedFrom: null,
       maxIterations: 1,
     });
   });
@@ -307,6 +313,8 @@ describe('the orchestrations HTTP surface', () => {
           goal: GOAL,
           outputProvided: false,
           criteriaProvided: false,
+
+          adoptedFrom: null,
           maxIterations: 1,
           samples: null,
         },

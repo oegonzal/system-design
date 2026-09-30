@@ -27,6 +27,8 @@ const record = (overrides: Partial<RunRecord>): RunRecord => ({
     goal: '# Goal\n\nDo it.',
     outputProvided: false,
     criteriaProvided: false,
+
+    adoptedFrom: null,
     maxIterations: 3,
   },
   trace: null,
@@ -84,8 +86,12 @@ describe('buildRunDump', () => {
     );
 
     const paths = dump.files.map((file) => file.path);
-    const manifest = JSON.parse(dump.files[0].content) as { criteriaProvided: boolean };
+    const manifest = JSON.parse(dump.files[0].content) as {
+      criteriaProvided: boolean;
+      adoptedFrom: unknown;
+    };
     expect(manifest.criteriaProvided).toBe(false);
+    expect(manifest.adoptedFrom).toBeNull();
     expect(paths).toEqual([
       'manifest.json',
       'run.md',

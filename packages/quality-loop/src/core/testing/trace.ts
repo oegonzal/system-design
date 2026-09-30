@@ -122,6 +122,8 @@ export const runDto = (
     goal: trace?.contract.goal ?? 'g',
     outputProvided: false,
     criteriaProvided: false,
+
+    adoptedFrom: null,
     maxIterations: 1,
   },
   trace,

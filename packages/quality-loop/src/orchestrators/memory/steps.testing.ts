@@ -40,6 +40,8 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
     goal: trace?.contract.goal ?? GOAL,
     outputProvided: false,
     criteriaProvided: false,
+
+    adoptedFrom: null,
     maxIterations: 1,
   },
   trace,

@@ -54,6 +54,7 @@ function manifestOf(record: RunRecord) {
     iterations: trace?.iterations.length ?? 0,
     criteria: trace?.contract.criteria.length ?? 0,
     criteriaProvided: record.request.criteriaProvided,
+    adoptedFrom: record.request.adoptedFrom,
     exchangeCount: record.exchanges.length,
     error: record.error,
     note: 'Contains the goal and the model’s prose verbatim.',
