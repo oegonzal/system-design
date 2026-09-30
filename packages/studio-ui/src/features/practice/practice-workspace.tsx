@@ -374,16 +374,26 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     refreshRevisions();
   }, [improve.acceptedCount, refreshRevisions]);
 
-  // When the grade for the submitted draft lands, the timeline needs the
-  // fresh score.
+  // When the grade for the submitted draft lands — or fails — the timeline
+  // needs the fresh status.
   useEffect(() => {
     const evaluation = polling.evaluation;
-    if (!evaluation || evaluation.status !== 'complete') return;
+    if (!evaluation || evaluation.status === 'running') return;
     const key = `${evaluation.runId}:${evaluation.iteration}`;
     if (completedFor.current === key) return;
     completedFor.current = key;
     refreshRevisions();
   }, [polling.evaluation, refreshRevisions]);
+
+  // A coaching run that ends writes what became of its base revision; the
+  // timeline reads it back once, when the run reaches its end.
+  const coachEndedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const run = improve.run;
+    if (!run || run.status === 'running' || coachEndedFor.current === run.runId) return;
+    coachEndedFor.current = run.runId;
+    refreshRevisions();
+  }, [improve.run, refreshRevisions]);
 
   /** The draft as the API takes it: graph plus brief and narrative, null when nothing is claimed. */
   const readDraft = useCallback(() => {
