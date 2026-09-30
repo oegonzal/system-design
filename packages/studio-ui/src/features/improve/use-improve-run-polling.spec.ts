@@ -2,7 +2,7 @@ import { stubApi } from '@sysdesign/web-testing';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeImproveRun } from '../../testing/fixtures';
+import { makeImproveIteration, makeImproveRun } from '../../testing/fixtures';
 import {
   IMPROVE_POLL_BACKOFF_MAX_MS,
   IMPROVE_POLL_INTERVAL_MS,
@@ -16,20 +16,14 @@ const running = (imported: number, exchangeCount: number) => ({
   data: makeImproveRun({
     exchangeCount,
     iterations: [
-      {
-        iteration: 1,
-        mode: 'provided' as const,
-        overall: 64,
-        decision: 'revise' as const,
-        revisionId: 'rev-1',
-      },
-      ...Array.from({ length: imported }, (_, index) => ({
-        iteration: index + 2,
-        mode: 'revise' as const,
-        overall: 70 + index * 5,
-        decision: 'revise' as const,
-        revisionId: `rev-${index + 2}`,
-      })),
+      makeImproveIteration(),
+      ...Array.from({ length: imported }, (_, index) =>
+        makeImproveIteration({
+          iteration: index + 2,
+          overall: 70 + index * 5,
+          revisionId: `rev-${index + 2}`,
+        }),
+      ),
     ],
   }),
 });

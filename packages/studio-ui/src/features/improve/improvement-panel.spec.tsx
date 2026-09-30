@@ -4,7 +4,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { makeImproveRun } from '../../testing/fixtures';
+import { makeImproveIteration, makeImproveRun } from '../../testing/fixtures';
 import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
@@ -58,9 +58,27 @@ describe('ImprovementPanel', () => {
       run: makeImproveRun({
         exchangeCount: 7,
         iterations: [
-          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-          { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
-          { iteration: 3, mode: 'revise', overall: 70, decision: 'revise', revisionId: null },
+          makeImproveIteration({
+            iteration: 1,
+            mode: 'provided',
+            overall: 64,
+            decision: 'revise',
+            revisionId: 'rev-1',
+          }),
+          makeImproveIteration({
+            iteration: 2,
+            mode: 'revise',
+            overall: 72,
+            decision: 'revise',
+            revisionId: 'rev-2',
+          }),
+          makeImproveIteration({
+            iteration: 3,
+            mode: 'revise',
+            overall: 70,
+            decision: 'revise',
+            revisionId: null,
+          }),
         ],
       }),
       isPolling: true,
@@ -82,9 +100,27 @@ describe('ImprovementPanel', () => {
         status: 'complete',
         stopReason: 'plateau',
         iterations: [
-          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-          { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
-          { iteration: 3, mode: 'revise', overall: 80, decision: 'accept', revisionId: 'rev-3' },
+          makeImproveIteration({
+            iteration: 1,
+            mode: 'provided',
+            overall: 64,
+            decision: 'revise',
+            revisionId: 'rev-1',
+          }),
+          makeImproveIteration({
+            iteration: 2,
+            mode: 'revise',
+            overall: 72,
+            decision: 'revise',
+            revisionId: 'rev-2',
+          }),
+          makeImproveIteration({
+            iteration: 3,
+            mode: 'revise',
+            overall: 80,
+            decision: 'accept',
+            revisionId: 'rev-3',
+          }),
         ],
       }),
       onLoadRevision,
@@ -101,8 +137,20 @@ describe('ImprovementPanel', () => {
         status: 'complete',
         stopReason: 'max-iterations',
         iterations: [
-          { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-          { iteration: 2, mode: 'revise', overall: 60, decision: 'revise', revisionId: null },
+          makeImproveIteration({
+            iteration: 1,
+            mode: 'provided',
+            overall: 64,
+            decision: 'revise',
+            revisionId: 'rev-1',
+          }),
+          makeImproveIteration({
+            iteration: 2,
+            mode: 'revise',
+            overall: 60,
+            decision: 'revise',
+            revisionId: null,
+          }),
         ],
       }),
     });

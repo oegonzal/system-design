@@ -26,10 +26,26 @@ export class EvaluationsService {
         `Revision ${revisionId} was stored before grading moved to the quality loop and has no evaluation`,
       );
     }
+    return this.syncRevision(revision);
+  }
+
+  /**
+   * Read the revision's run, map it, and write the terminal cache back when
+   * it differs — the one place the cache is refreshed, shared with whoever
+   * must know whether a grade is still in flight before acting on it.
+   */
+  async syncRevision(revision: DesignRevision): Promise<EvaluationDto> {
+    if (revision.qualityRunId === null || revision.qualityIteration === null) {
+      throw new NotFoundException(`Revision ${revision.id} has no evaluation`);
+    }
     const run = await this.loop.getRun(revision.qualityRunId);
     if (!run) throw new NotFoundException(`Run ${revision.qualityRunId} not found`);
 
-    const dto = toEvaluationDto(run, revision.qualityIteration, revision.graph);
+    const dto = toEvaluationDto(run, revision.qualityIteration, {
+      graph: revision.graph,
+      brief: revision.brief,
+      narrative: revision.narrative,
+    });
     if (
       dto.status !== 'running' &&
       (revision.evaluationStatus !== dto.status ||

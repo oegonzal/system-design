@@ -333,6 +333,7 @@ describe('sessions', () => {
           confidence: 'high',
           fixability: 'fixable_local',
           criterionIds: ['c2'],
+          locations: [{ ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' }],
           nodeIds: ['api'],
           edgeIds: [],
           locationRefs: ['node.2'],
@@ -368,7 +369,7 @@ describe('sessions', () => {
       });
     });
 
-    it('a failed run is reported failed with its error', async () => {
+    it('a failed run is reported failed with its error, cached as failed on the revision, and a resubmit starts a fresh run', async () => {
       const { sessionId } = await startSession();
       const { body: created } = await submit(sessionId, submission());
       h.loop.fail('fake-run-1', 'the model went away');
@@ -379,6 +380,43 @@ describe('sessions', () => {
         error: 'the model went away',
         overall: null,
       });
+      const read = await call<GetRevisionResponse>(`${h.url}/revisions/${created.data.id}`);
+      expect(read.body.data.evaluation).toMatchObject({
+        status: 'failed',
+        overall: null,
+        decision: null,
+      });
+
+      const again = await submit(sessionId, submission());
+      expect(again.status).toBe(201);
+      expect(again.body.data).toMatchObject({
+        revisionNumber: 2,
+        evaluation: { runId: 'fake-run-2', status: 'running' },
+      });
+    });
+
+    it('[DEL-3] a failed coaching run started from a draft marks the draft revision failed and imports nothing', async () => {
+      const { sessionId } = await startSession();
+      const started = await call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
+        method: 'POST',
+        body: JSON.stringify(submission()),
+      });
+      h.loop.fail('fake-run-1', 'the model went away');
+      const { body } = await call<GetImproveRunResponse>(
+        `${h.url}/sessions/${sessionId}/improve/fake-run-1`,
+      );
+      expect(body.data).toMatchObject({
+        status: 'failed',
+        error: 'the model went away',
+        iterations: [],
+        baseRevisionId: started.body.data.revision.id,
+      });
+      const read = await call<GetRevisionResponse>(
+        `${h.url}/revisions/${started.body.data.revision.id}`,
+      );
+      expect(read.body.data.evaluation?.status).toBe('failed');
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(1);
     });
 
     it('404s for an unknown revision, a run the loop lost, and a revision graded before delegation', async () => {
@@ -450,17 +488,34 @@ describe('sessions', () => {
       ]);
       const done = await readImprove(sessionId, 'fake-run-1');
       expect(done.body.data).toMatchObject({ status: 'complete', stopReason: 'max-iterations' });
+      expect(done.body.data).toMatchObject({
+        baseRevisionId: started.body.data.revision.id,
+        maxIterations: 3,
+      });
       const [first, second, third] = done.body.data.iterations;
       expect(first).toMatchObject({
         iteration: 1,
         mode: 'provided',
         overall: 60,
         decision: 'revise',
+        reason: 'fake',
+        outcome: 'base',
+        problems: [],
       });
       expect(first.revisionId).toBe(started.body.data.revision.id);
-      expect(second).toMatchObject({ iteration: 2, mode: 'revise', overall: 72 });
+      expect(second).toMatchObject({
+        iteration: 2,
+        mode: 'revise',
+        overall: 72,
+        outcome: 'imported',
+      });
       expect(second.revisionId).not.toBeNull();
-      expect(third).toMatchObject({ iteration: 3, overall: 70, revisionId: null });
+      expect(third).toMatchObject({
+        iteration: 3,
+        overall: 70,
+        outcome: 'not-better',
+        revisionId: null,
+      });
 
       // Imported once: a second read answers the same revision.
       const again = await readImprove(sessionId, 'fake-run-1');
@@ -488,7 +543,7 @@ describe('sessions', () => {
       expect(imported.body.data.graph.nodes.map((n) => n.id)).toContain('ai-replica');
     });
 
-    it('an iteration whose artifact the studio would refuse is skipped, never stored', async () => {
+    it('[DEL-3] an iteration whose artifact the studio would refuse is reported refused with its problems, never stored', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
       expect(h.loop.startRequests[0]?.maxIterations).toBe(DEFAULT_IMPROVE_ITERATIONS);
@@ -502,8 +557,18 @@ describe('sessions', () => {
       ]);
       const { body } = await readImprove(sessionId, 'fake-run-1');
       expect(body.data.iterations.map((it) => it.revisionId === null)).toEqual([false, true, true]);
+      expect(body.data.iterations.map((it) => it.outcome)).toEqual(['base', 'refused', 'refused']);
+      expect(body.data.iterations[1].problems.join('; ')).toMatch(/nowhere/);
+      expect(body.data.iterations[2].problems).toEqual(['the artifact is not a submission']);
       const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
       expect(list.body.meta.total).toBe(1);
+      // A second read answers the same, and still stores nothing.
+      const again = await readImprove(sessionId, 'fake-run-1');
+      expect(again.body.data.iterations.map((it) => it.outcome)).toEqual([
+        'base',
+        'refused',
+        'refused',
+      ]);
     });
 
     it('404s for a run that is not this session’s, 400 for more iterations than the loop allows', async () => {

@@ -5,6 +5,7 @@ import {
   designSubmissionSchema,
   MAX_IMPROVE_ITERATIONS,
   type ImproveIterationDto,
+  type ImproveIterationOutcome,
   type ImproveRunDto,
   type IterationTrace,
   type QualityRunStatus,
@@ -64,13 +65,22 @@ export class ImproveService {
     const header = {
       runId,
       sessionId,
+      baseRevisionId: base.id,
+      maxIterations: run.request.maxIterations,
       status: run.status,
       llm: run.llm,
       exchangeCount: run.exchanges.length,
       stopReason: run.trace?.stopReason ?? null,
       error: run.error?.message ?? null,
     };
-    if (run.trace === null) return { ...header, iterations: [] };
+    if (run.trace === null) {
+      // A run that died before its trace: the draft revision is its own base and takes the failure.
+      if (run.status === 'failed' && base.evaluationStatus !== 'failed') {
+        base.evaluationStatus = 'failed';
+        await this.em.flush();
+      }
+      return { ...header, iterations: [] };
+    }
 
     const stored = new Map(
       (await this.em.find(DesignRevision, { session: sessionId, qualityRunId: runId })).map(
@@ -84,9 +94,19 @@ export class ImproveService {
       const overall = it.decision.scores.overall;
       const cache = { status: run.status, overall, decision: it.decision.finalDecision };
       let revision = stored.get(it.iteration) ?? null;
+      let outcome: ImproveIterationOutcome = it.iteration === 1 ? 'base' : 'not-better';
+      let problems: string[] = [];
       if (revision === null && it.iteration > 1 && it.artifact !== null && overall > bestBefore) {
-        revision = await this.import(sessionId, runId, it, criteria, cache);
+        const imported = await this.import(sessionId, runId, it, criteria, cache);
+        if ('revision' in imported) {
+          revision = imported.revision;
+          outcome = 'imported';
+        } else {
+          outcome = 'refused';
+          problems = imported.problems;
+        }
       } else if (revision !== null) {
+        if (it.iteration > 1) outcome = 'imported';
         revision.evaluationStatus = cache.status;
         revision.overall = cache.overall;
         revision.decision = cache.decision;
@@ -96,6 +116,9 @@ export class ImproveService {
         mode: it.mode,
         overall,
         decision: it.decision.finalDecision,
+        reason: it.decision.reason,
+        outcome,
+        problems,
         revisionId: revision?.id ?? null,
       });
       bestBefore = Math.max(bestBefore, overall);
@@ -106,8 +129,10 @@ export class ImproveService {
 
   /**
    * One coach iteration as an assistant revision — only if the loop's
-   * artifact is a submission the studio itself would accept. A coach that
-   * drew an edge to nowhere is logged and skipped, never stored.
+   * artifact is a submission the studio itself would accept. The loop
+   * repairs what it can before judging, so what arrives here is what was
+   * judged; a coach that still drew an edge to nowhere is refused with the
+   * reasons, logged, and never stored — the studio repairs nothing.
    */
   private async import(
     sessionId: string,
@@ -115,34 +140,42 @@ export class ImproveService {
     it: IterationTrace,
     criteria: readonly SuccessCriterion[],
     cache: { status: QualityRunStatus; overall: number; decision: ImproveIterationDto['decision'] },
-  ): Promise<DesignRevision | null> {
+  ): Promise<{ revision: DesignRevision } | { problems: string[] }> {
     const parsed = designSubmissionSchema.safeParse(it.artifact);
     if (!parsed.success) {
       this.logger.warn(`run ${runId} iteration ${it.iteration}: artifact is not a submission`);
-      return null;
+      return { problems: ['the artifact is not a submission'] };
     }
     const problems = submissionProblems(parsed.data, criteria);
     if (problems.length > 0) {
       this.logger.warn(
         `run ${runId} iteration ${it.iteration}: not imported — ${problems.join('; ')}`,
       );
-      return null;
+      return { problems };
     }
     try {
-      return await this.sessions.persistRevision(
-        sessionId,
-        parsed.data,
-        'assistant',
-        { runId, iteration: it.iteration },
-        cache,
-      );
+      return {
+        revision: await this.sessions.persistRevision(
+          sessionId,
+          parsed.data,
+          'assistant',
+          { runId, iteration: it.iteration },
+          cache,
+        ),
+      };
     } catch (error) {
       // A concurrent poll imported the same iteration; its row is the answer.
       if (error instanceof ConflictException) {
-        return this.em.findOne(DesignRevision, {
+        const revision = await this.em.findOne(DesignRevision, {
           qualityRunId: runId,
           qualityIteration: it.iteration,
         });
+        if (revision !== null) return { revision };
+        return {
+          problems: [
+            'a concurrent submission took this revision number; imported on the next read',
+          ],
+        };
       }
       throw error;
     }

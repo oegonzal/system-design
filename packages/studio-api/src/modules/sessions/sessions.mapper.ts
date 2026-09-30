@@ -55,6 +55,7 @@ export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): De
   latestOverall: latestRevision?.overall ?? null,
   latestDecision: latestRevision?.decision ?? null,
   latestEvaluationStatus: latestRevision?.evaluationStatus ?? null,
+  draft: session.draft,
   createdAt: session.createdAt.toISOString(),
   updatedAt: session.updatedAt.toISOString(),
 });

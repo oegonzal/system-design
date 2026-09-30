@@ -10,6 +10,8 @@ import type {
   EvaluationDto,
   EvaluationFindingDto,
   ExperienceProfileDto,
+  ImproveIterationDto,
+  ImproveIterationOutcome,
   ImproveRunDto,
   PromptDto,
   PromptGenerationDto,
@@ -267,6 +269,7 @@ export function makeSession(overrides: Partial<DesignSessionDto> = {}): DesignSe
     latestOverall: 72,
     latestDecision: 'revise',
     latestEvaluationStatus: 'complete',
+    draft: null,
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
@@ -322,6 +325,7 @@ export function makeFinding(overrides: Partial<EvaluationFindingDto> = {}): Eval
     confidence: 'high',
     fixability: 'fixable_local',
     criterionIds: ['c3'],
+    locations: [{ ref: 'node.3', label: 'n-3 · database · Orders DB', part: 'node', key: 'n-3' }],
     nodeIds: ['n-3'],
     edgeIds: [],
     locationRefs: ['node.3'],
@@ -352,6 +356,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     llm: { model: 'test-model' },
     overall: 72,
     decision: 'revise',
+    decisionReason: 'below the accept threshold of 75',
     dimensions: { coverage: 80, quality_attributes: 60, compliance: 90 },
     findings: [makeFinding()],
     criterionResults: [
@@ -372,16 +377,43 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
   };
 }
 
+/**
+ * One coach iteration. Iteration 1 is the base the run started from; a later
+ * one with a revision id was imported, without one it was not better —
+ * unless the override says otherwise.
+ */
+export function makeImproveIteration(
+  overrides: Partial<ImproveIterationDto> = {},
+): ImproveIterationDto {
+  const iteration = overrides.iteration ?? 1;
+  const revisionId =
+    overrides.revisionId === undefined ? (iteration === 1 ? 'rev-1' : null) : overrides.revisionId;
+  const outcome: ImproveIterationOutcome =
+    overrides.outcome ??
+    (iteration === 1 ? 'base' : revisionId !== null ? 'imported' : 'not-better');
+  return {
+    iteration,
+    mode: iteration === 1 ? 'provided' : 'revise',
+    overall: 64,
+    decision: 'revise',
+    reason: 'below the accept threshold of 75',
+    problems: [],
+    ...overrides,
+    outcome,
+    revisionId,
+  };
+}
+
 export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveRunDto {
   return {
     runId: 'run-2',
     sessionId: 'session-1',
+    baseRevisionId: 'rev-1',
+    maxIterations: 3,
     status: 'running',
     llm: { model: 'test-model' },
     exchangeCount: 4,
-    iterations: [
-      { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-    ],
+    iterations: [makeImproveIteration()],
     stopReason: null,
     error: null,
     ...overrides,

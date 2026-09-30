@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeImproveRun } from '../../testing/fixtures';
+import { makeImproveIteration, makeImproveRun } from '../../testing/fixtures';
 import { ImprovementPanel } from './improvement-panel';
 
 const meta: Meta<typeof ImprovementPanel> = {
@@ -39,8 +39,20 @@ export const Running: Story = {
     run: makeImproveRun({
       exchangeCount: 9,
       iterations: [
-        { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-        { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
+        makeImproveIteration({
+          iteration: 1,
+          mode: 'provided',
+          overall: 64,
+          decision: 'revise',
+          revisionId: 'rev-1',
+        }),
+        makeImproveIteration({
+          iteration: 2,
+          mode: 'revise',
+          overall: 72,
+          decision: 'revise',
+          revisionId: 'rev-2',
+        }),
       ],
     }),
     isPolling: true,
@@ -56,9 +68,27 @@ export const Stopped: Story = {
       stopReason: 'plateau',
       exchangeCount: 22,
       iterations: [
-        { iteration: 1, mode: 'provided', overall: 64, decision: 'revise', revisionId: 'rev-1' },
-        { iteration: 2, mode: 'revise', overall: 72, decision: 'revise', revisionId: 'rev-2' },
-        { iteration: 3, mode: 'revise', overall: 70, decision: 'revise', revisionId: null },
+        makeImproveIteration({
+          iteration: 1,
+          mode: 'provided',
+          overall: 64,
+          decision: 'revise',
+          revisionId: 'rev-1',
+        }),
+        makeImproveIteration({
+          iteration: 2,
+          mode: 'revise',
+          overall: 72,
+          decision: 'revise',
+          revisionId: 'rev-2',
+        }),
+        makeImproveIteration({
+          iteration: 3,
+          mode: 'revise',
+          overall: 70,
+          decision: 'revise',
+          revisionId: null,
+        }),
       ],
     }),
     message: 'Coach finished — best score 72.',

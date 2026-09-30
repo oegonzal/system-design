@@ -1,3 +1,4 @@
+export * from './entities/coaching-run.entity';
 export * from './entities/design-revision.entity';
 export * from './entities/design-session.entity';
 export * from './entities/experience-profile.entity';

@@ -1,4 +1,10 @@
-import type { DesignBrief, DesignNarrative, DesignSubmission, CanvasGraph } from './canvas.schema';
+import type {
+  CanvasGraph,
+  DesignBrief,
+  DesignNarrative,
+  DesignSubmission,
+  SessionDraft,
+} from './canvas.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
@@ -39,6 +45,8 @@ export interface DesignSessionDto {
   latestOverall: number | null;
   latestDecision: Decision | null;
   latestEvaluationStatus: QualityRunStatus | null;
+  /** The unsubmitted canvas saved with the session; null once submitted or never edited. */
+  draft: SessionDraft | null;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
 }
@@ -96,18 +104,34 @@ export interface StartImproveRequest extends DesignSubmission {
 export const DEFAULT_IMPROVE_ITERATIONS = 3;
 export const MAX_IMPROVE_ITERATIONS = MAX_QUALITY_RUN_ITERATIONS;
 
+/**
+ * What became of one iteration in the studio: the base the run started from,
+ * an assistant revision imported because it beat every earlier one, a lower
+ * score left where it was, or an artifact the studio would not store.
+ */
+export const IMPROVE_ITERATION_OUTCOMES = ['base', 'imported', 'not-better', 'refused'] as const;
+export type ImproveIterationOutcome = (typeof IMPROVE_ITERATION_OUTCOMES)[number];
+
 export interface ImproveIterationDto {
   iteration: number;
   mode: IterationMode;
   overall: number | null;
   decision: Decision | null;
-  /** The revision this iteration was imported as; null when it was not better than every earlier one. */
+  /** The controller's own sentence for its decision. */
+  reason: string | null;
+  outcome: ImproveIterationOutcome;
+  /** Why the studio refused to store the artifact; empty unless `outcome` is `refused`. */
+  problems: string[];
+  /** The revision this iteration is or became; null when `outcome` says why there is none. */
   revisionId: Uuid | null;
 }
 
 export interface ImproveRunDto {
   runId: string;
   sessionId: Uuid;
+  /** The revision iteration 1 of the run is — the draft stored for it, or the graded revision it adopted. */
+  baseRevisionId: Uuid;
+  maxIterations: number;
   status: QualityRunStatus;
   llm: LlmModelDto;
   /** Model calls made so far — the only live signal while the loop runs. */

@@ -1,6 +1,7 @@
 import { UnderscoreNamingStrategy } from '@mikro-orm/core';
 import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 
+import { CoachingRun } from './entities/coaching-run.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
@@ -46,6 +47,7 @@ export const ormOptions = {
     PromptGeneration,
     DesignSession,
     DesignRevision,
+    CoachingRun,
     MemoryEmbedding,
     OrchestrationRun,
     OrchestrationRunChild,

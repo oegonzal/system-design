@@ -38,6 +38,14 @@ export class DesignSession {
   @OneToMany(() => DesignRevision, (revision) => revision.session)
   revisions = new Collection<DesignRevision>(this);
 
+  /**
+   * The unsubmitted canvas, saved as the author works and shape-checked
+   * only; restored on the next open ahead of the last submitted revision,
+   * cleared by a submit or a coach run started from it.
+   */
+  @Property({ type: 'json', nullable: true })
+  draft: Contracts.SessionDraft | null = null;
+
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();
 
