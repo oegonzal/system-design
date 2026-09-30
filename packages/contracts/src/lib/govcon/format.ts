@@ -1,9 +1,11 @@
+import { DUE_SOON_DAYS } from './constants';
 import type { PullReport } from './pull';
 
 /**
  * The formatting the CLI's tables and the web client's cells share, pure and
  * zone-free: dates render as their ISO date, never through the machine's
- * clock; money as whole dollars. Presentation only — nothing here decides.
+ * clock; money as whole dollars. Presentation, plus the one date rule both
+ * sides count by (`isDueSoonAt`); every instant is the caller's `nowMs`.
  */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,6 +42,17 @@ export const daysUntil = (iso: string | null, nowMs: number): number | null => {
   const at = Date.parse(iso);
   return Number.isNaN(at) ? null : Math.ceil((at - nowMs) / DAY_MS);
 };
+
+/**
+ * Whether any mark — a reminder, a deadline, as ISO instants — falls inside
+ * `DUE_SOON_DAYS` of `nowMs`, or has passed. The one rule the server's
+ * pipeline count and the client's due list both apply.
+ */
+export const isDueSoonAt = (marks: readonly (string | null)[], nowMs: number): boolean =>
+  marks.some((mark) => {
+    const days = daysUntil(mark, nowMs);
+    return days !== null && days <= DUE_SOON_DAYS;
+  });
 
 /** Which rows a page shows of the whole: `1–10 of 24`, or `0 of 0` for an empty page. */
 export const rangeLabel = (offset: number, count: number, total: number): string =>

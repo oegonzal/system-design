@@ -5,6 +5,7 @@ import {
   type AwardsQuery,
   type FetchAwardsRequest,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -28,10 +29,9 @@ export const awardFiltersSchema = z.strictObject({
 export type AwardFiltersInput = z.output<typeof awardFiltersSchema>;
 
 /** The query of `GET /awards`: the filters and the page. */
-export const awardsQuerySchema = awardFiltersSchema.extend({
-  limit: z.coerce.number().int().min(1).max(MAX_AWARD_LIMIT).default(DEFAULT_AWARD_LIMIT),
-  offset: z.coerce.number().int().min(0).default(0),
-}) satisfies z.ZodType<AwardsQuery>;
+export const awardsQuerySchema = awardFiltersSchema.extend(
+  pageFields(MAX_AWARD_LIMIT, DEFAULT_AWARD_LIMIT),
+) satisfies z.ZodType<AwardsQuery>;
 export type AwardsQueryInput = z.output<typeof awardsQuerySchema>;
 
 /** The body of `POST /awards/fetch`: which sources to spend on, for which codes and dates. */

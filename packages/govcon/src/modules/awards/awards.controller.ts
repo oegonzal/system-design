@@ -4,7 +4,7 @@ import type {
   GetAwardsSummaryResponse,
   ListAwardsResponse,
 } from '@sysdesign/contracts';
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import {
   awardFiltersSchema,
@@ -27,7 +27,7 @@ export class AwardsController {
   ): Promise<ListAwardsResponse> {
     const { limit, offset, ...filters } = query;
     const [data, total] = await this.awards.list(filters, limit, offset);
-    return { data, meta: { total, limit, offset } };
+    return page(data, total, query);
   }
 
   @Get('summary')

@@ -1,13 +1,14 @@
 import {
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
   PROMPT_MARKDOWN_MAX_LENGTH,
   PROMPT_SOURCES,
   PROMPT_STATUSES,
   PROMPT_TITLE_MAX_LENGTH,
   promptDocumentSchema,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
-
-import { listQueryShape } from '../../common/list-query';
 
 /** The request shapes of the prompts routes — zod, so an unknown key is a 400 and a number is a number. */
 
@@ -28,7 +29,7 @@ export const updatePromptSchema = z.strictObject({
 });
 
 export const listPromptsQuerySchema = z.strictObject({
-  ...listQueryShape,
+  ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
   experienceId: z.uuid().optional(),
   source: z.enum(PROMPT_SOURCES).optional(),
   status: z.enum(PROMPT_STATUSES).optional(),

@@ -4,4 +4,6 @@
 export * from './cors';
 export * from './db.module';
 export * from './health.controller';
+export * from './like';
+export * from './paging';
 export * from './zod.pipe';

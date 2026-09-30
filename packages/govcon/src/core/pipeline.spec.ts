@@ -1,4 +1,4 @@
-import { isDueSoon, summarizePipeline } from './pipeline';
+import { summarizePipeline } from './pipeline';
 import { opportunityOf } from './testing';
 import type { BidWithNotice } from './ports';
 
@@ -43,9 +43,9 @@ describe('the pipeline summary', () => {
       dueSoon: 3,
       total: 5,
     });
-    expect(isDueSoon(row(), NOW)).toBe(false);
-    expect(isDueSoon(row({}, '2026-10-03T12:00:00.000Z'), NOW)).toBe(true);
-    expect(isDueSoon(row({}, null), NOW)).toBe(false);
+    expect(summarizePipeline([row()], NOW).dueSoon).toBe(0);
+    expect(summarizePipeline([row({}, '2026-10-03T12:00:00.000Z')], NOW).dueSoon).toBe(1);
+    expect(summarizePipeline([row({}, null)], NOW).dueSoon).toBe(0);
     expect(summarizePipeline([], NOW).total).toBe(0);
   });
 });

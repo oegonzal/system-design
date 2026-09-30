@@ -7,10 +7,9 @@ import type {
   StartOrchestrationResponse,
 } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { orNotFound } from '../http/or-not-found';
-import { page } from '../http/paging';
 import {
   fromRunRequestSchema,
   listOrchestrationsQuerySchema,

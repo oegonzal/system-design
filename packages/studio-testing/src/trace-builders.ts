@@ -167,7 +167,7 @@ export function runTrace(
 // ---- the canvas pipeline: a grade that is a function of the drawing -------
 
 /** The graph inside a submission, when the output is one. */
-export function graphOf(output: unknown): CanvasGraph | null {
+function graphOf(output: unknown): CanvasGraph | null {
   if (!output || typeof output !== 'object' || !('graph' in output)) return null;
   const graph = (output as { graph: unknown }).graph;
   if (!graph || typeof graph !== 'object') return null;
@@ -177,12 +177,12 @@ export function graphOf(output: unknown): CanvasGraph | null {
 }
 
 /** Three boxes score 64, four 72, five 80 (accepted); nothing beats 95. */
-export const canvasOverall = (graph: CanvasGraph | null): number =>
+const canvasOverall = (graph: CanvasGraph | null): number =>
   Math.min(95, 40 + 8 * (graph?.nodes.length ?? 0));
 
-export const decide = (overall: number): Decision => (overall >= 80 ? 'accept' : 'revise');
+const decide = (overall: number): Decision => (overall >= 80 ? 'accept' : 'revise');
 
-export function finding(
+function finding(
   type: string,
   severity: Severity,
   locationRefs: string[],
@@ -212,7 +212,7 @@ export function finding(
  * exactly as the canvas pipeline cites them; the studio resolves them back
  * to the author's ids.
  */
-export function canvasFindings(
+function canvasFindings(
   graph: CanvasGraph | null,
   criteria: readonly SuccessCriterion[],
 ): ConfirmedFinding[] {
@@ -247,7 +247,7 @@ export function canvasFindings(
 }
 
 /** `c1` passes, the rest are partial: a rubric row per criterion the run was given. */
-export const criteriaRows = (criteria: readonly SuccessCriterion[]): CriterionEvidence[] =>
+const criteriaRows = (criteria: readonly SuccessCriterion[]): CriterionEvidence[] =>
   criteria.map((criterion, position) => ({
     criterionId: criterion.id,
     kind: criterion.kind,
@@ -257,7 +257,7 @@ export const criteriaRows = (criteria: readonly SuccessCriterion[]): CriterionEv
     locationRefs: [],
   }));
 
-export function iterationTrace(
+function iterationTrace(
   iteration: number,
   mode: IterationMode,
   artifact: unknown,
@@ -304,14 +304,14 @@ export function iterationTrace(
 }
 
 /** An id no element of the graph already uses — `ai-replica`, or `ai-replica-2` on a re-coached design. */
-export function freshId(base: string, taken: readonly { id: string }[]): string {
+function freshId(base: string, taken: readonly { id: string }[]): string {
   let candidate = base;
   for (let n = 2; taken.some((item) => item.id === candidate); n += 1) candidate = `${base}-${n}`;
   return candidate;
 }
 
 /** The coach's one idea: a read replica hung off the last component, ids prefixed `ai-` as the schema asks. */
-export function revised(output: unknown): unknown {
+function revised(output: unknown): unknown {
   const graph = graphOf(output);
   if (!graph) return output;
   const last = graph.nodes[graph.nodes.length - 1];
@@ -331,7 +331,7 @@ export function revised(output: unknown): unknown {
   return { ...(output as object), graph: { nodes, edges } };
 }
 
-export function canvasIteration(
+function canvasIteration(
   iteration: number,
   mode: IterationMode,
   artifact: unknown,
@@ -360,7 +360,7 @@ export function canvasIteration(
  * better" side by side. The loop stops at the first accepted iteration, as
  * the real runner does.
  */
-export function canvasIterations(
+function canvasIterations(
   request: StartQualityRunRequest,
   criteria: readonly SuccessCriterion[],
   adopted: IterationTrace | null = null,
@@ -392,13 +392,13 @@ export function canvasIterations(
 // ---- the prompt pipeline: a draft from the goal's own title ---------------
 
 /** The goal's first `# heading`, or a neutral fallback when it has none. */
-export function firstHeading(goal: string): string {
+function firstHeading(goal: string): string {
   const match = /^#\s+(.+)$/m.exec(goal);
   return (match?.[1] ?? 'Design a resilient service').trim().slice(0, 120);
 }
 
 /** A draft that satisfies `designPromptDraftSchema`, brand-neutral, one per goal title. */
-export function draftFromGoal(goal: string): DesignPromptDraft {
+function draftFromGoal(goal: string): DesignPromptDraft {
   const title = firstHeading(goal);
   return {
     title,
@@ -416,7 +416,7 @@ export function draftFromGoal(goal: string): DesignPromptDraft {
   };
 }
 
-export function promptIterations(
+function promptIterations(
   request: StartQualityRunRequest,
   criteria: readonly SuccessCriterion[],
 ): IterationTrace[] {

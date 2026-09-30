@@ -6,10 +6,9 @@ import type {
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
 
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { orNotFound } from '../http/or-not-found';
-import { page } from '../http/paging';
 import { listRunsQuerySchema, runRequestSchema, type ListRunsQuery } from './run-request';
 import { RunsService } from './runs.service';
 

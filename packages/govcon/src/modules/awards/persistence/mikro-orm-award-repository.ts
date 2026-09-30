@@ -2,13 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { EntityManager, type FilterQuery } from '@mikro-orm/postgresql';
 import type { Award } from '@sysdesign/contracts';
 import { GovconAward } from '@sysdesign/db';
+import { escapeLike } from '@sysdesign/nest-kit';
 
 import type { AwardFilter, AwardRepository, HistoryRow, UpsertSummary } from '../../../core/ports';
 
 const BATCH = 250;
-
-/** `%` and `_` in a user's substring must match themselves. */
-const like = (text: string): string => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
 const toRow = (
   award: Award,
@@ -58,7 +56,7 @@ const whereOf = (filter: AwardFilter): FilterQuery<GovconAward> => {
     conditions.push({ naicsCode: { $like: `${filter.naicsPrefix}%` } });
   if (filter.pscPrefix !== null) conditions.push({ pscCode: { $like: `${filter.pscPrefix}%` } });
   if (filter.agencyContains !== null)
-    conditions.push({ agencyPath: { $ilike: like(filter.agencyContains) } });
+    conditions.push({ agencyPath: { $ilike: `%${escapeLike(filter.agencyContains)}%` } });
   if (filter.solicitationNumber !== null)
     conditions.push({ solicitationNumber: filter.solicitationNumber });
   if (filter.awardeeUei !== null) conditions.push({ awardeeUei: filter.awardeeUei });

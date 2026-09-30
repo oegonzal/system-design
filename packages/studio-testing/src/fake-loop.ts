@@ -1,16 +1,16 @@
-import type {
-  DeriveCriteriaRequest,
-  DerivedCriteriaDto,
-  Diagnostic,
-  IterationTrace,
-  LlmModelDto,
-  LlmExchangeSummaryDto,
-  PromptLibraryDocumentDto,
-  PromptLibraryEntryDto,
-  QualityRunDto,
-  QualityRunStartedDto,
-  StartQualityRunRequest,
-  SuccessCriterion,
+import {
+  sameRubric,
+  type DeriveCriteriaRequest,
+  type DerivedCriteriaDto,
+  type Diagnostic,
+  type IterationTrace,
+  type LlmModelDto,
+  type LlmExchangeSummaryDto,
+  type PromptLibraryDocumentDto,
+  type PromptLibraryEntryDto,
+  type QualityRunDto,
+  type QualityRunStartedDto,
+  type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
@@ -85,10 +85,6 @@ export interface FakeLoopOptions {
   startExchanges?: readonly string[];
   now?: () => string;
 }
-
-const sameRubric = (a: readonly SuccessCriterion[], b: readonly SuccessCriterion[]): boolean =>
-  a.length === b.length &&
-  a.every((c, i) => c.id === b[i].id && c.kind === b[i].kind && c.statement === b[i].statement);
 
 const exchangesOf = (scopes: readonly string[], at: string): LlmExchangeSummaryDto[] =>
   scopes.map((scope, index) => ({

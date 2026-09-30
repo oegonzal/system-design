@@ -1,12 +1,13 @@
 import {
+  DEFAULT_LIST_LIMIT,
   designSubmissionSchema,
   MAX_IMPROVE_ITERATIONS,
+  MAX_LIST_LIMIT,
   SESSION_STATUSES,
   sessionDraftSchema,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
-
-import { listQueryShape } from '../../common/list-query';
 
 /** The request shapes of the sessions routes. A submission is the contracts' own schema, verbatim. */
 
@@ -15,12 +16,14 @@ export const createSessionSchema = z.strictObject({ promptId: z.uuid() });
 export const updateSessionSchema = z.strictObject({ status: z.enum(SESSION_STATUSES) });
 
 export const listSessionsQuerySchema = z.strictObject({
-  ...listQueryShape,
+  ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
   promptId: z.uuid().optional(),
 });
 export type ListSessionsQueryInput = z.infer<typeof listSessionsQuerySchema>;
 
-export const listRevisionsQuerySchema = z.strictObject({ ...listQueryShape });
+export const listRevisionsQuerySchema = z.strictObject(
+  pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
+);
 export type ListRevisionsQueryInput = z.infer<typeof listRevisionsQuerySchema>;
 
 export const submitRevisionSchema = designSubmissionSchema;

@@ -29,6 +29,19 @@ export const CRITERION_ID_MAX_LENGTH = 20;
 export const CRITERION_KIND_MAX_LENGTH = 60;
 export const CRITERION_STATEMENT_MAX_LENGTH = 300;
 
+/** Position by position: the same ids, kinds and statements — what "the rubric it was judged against" means. */
+export const sameRubric = (
+  requested: readonly SuccessCriterion[],
+  recorded: readonly SuccessCriterion[],
+): boolean =>
+  requested.length === recorded.length &&
+  requested.every(
+    (criterion, index) =>
+      criterion.id === recorded[index].id &&
+      criterion.kind === recorded[index].kind &&
+      criterion.statement === recorded[index].statement,
+  );
+
 /** A stage that produced nothing, and why. Never evidence; always traced. */
 export interface Diagnostic {
   stage: string;

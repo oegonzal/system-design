@@ -196,6 +196,7 @@ login, and the process refuses to boot). An API key is never used.
 | `CANVAS_PIPELINE_ID`, `PROMPT_PIPELINE_ID`                                                       | `packages/contracts/src/lib/studio-pipelines.ts` | the pipeline definitions, studio-api, the e2e stub            |
 | `createRevision`                                                                                 | `packages/db/src/revision-factory.ts`            | submit, coach start, coach import                             |
 | `ZodValidationPipe`, `DbModule`, `HealthController`, `configureCors`                             | `packages/nest-kit`                              | studio-api, quality-loop, govcon                              |
+| `pageFields`, `page`, `escapeLike`                                                               | `packages/nest-kit`                              | the list and search routes of the three APIs                  |
 | `CRITERIA` registry (`[DEL-n]`, `[EVAL-n]`, `[GEN-n]`, `[UX-n]`, `[QL-n]` ids tests claim)       | `packages/criteria/src/index.ts`                 | test suites across every pipeline                             |
 
 ---

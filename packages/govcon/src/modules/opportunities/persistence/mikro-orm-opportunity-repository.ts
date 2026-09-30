@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityManager, type FilterQuery } from '@mikro-orm/postgresql';
 import type { Opportunity } from '@sysdesign/contracts';
 import { GovconOpportunity } from '@sysdesign/db';
+import { escapeLike } from '@sysdesign/nest-kit';
 
 import type {
   CandidateFilter,
@@ -14,9 +15,6 @@ import { fromRow, toRow } from './opportunity-mapper';
 
 /** Rows per statement — well inside Postgres's parameter ceiling for a 30-column row. */
 const BATCH = 250;
-
-/** `%` and `_` in a user's substring must match themselves. */
-const like = (text: string): string => `%${text.replace(/[\\%_]/g, '\\$&')}%`;
 
 /**
  * The feed in Postgres. Every method forks the entity manager (a CLI command
@@ -85,10 +83,10 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
     if (filter.setAsideCode !== null) conditions.push({ setAsideCode: filter.setAsideCode });
     if (filter.noticeType !== null) conditions.push({ noticeType: filter.noticeType });
     if (filter.agencyContains !== null) {
-      conditions.push({ agencyPath: { $ilike: like(filter.agencyContains) } });
+      conditions.push({ agencyPath: { $ilike: `%${escapeLike(filter.agencyContains)}%` } });
     }
     if (filter.textContains !== null) {
-      const pattern = like(filter.textContains);
+      const pattern = `%${escapeLike(filter.textContains)}%`;
       conditions.push({
         $or: [{ title: { $ilike: pattern } }, { solicitationNumber: { $ilike: pattern } }],
       });

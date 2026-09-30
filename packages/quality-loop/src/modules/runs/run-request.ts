@@ -2,13 +2,14 @@ import {
   CRITERION_ID_MAX_LENGTH,
   CRITERION_KIND_MAX_LENGTH,
   CRITERION_STATEMENT_MAX_LENGTH,
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
   MAX_PROVIDED_CRITERIA,
   MAX_QUALITY_RUN_ITERATIONS,
   QUALITY_RUN_STATUSES,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
-
-import { PAGE_FIELDS } from '../http/paging';
 
 /** One criterion of a supplied rubric; the caps are the persisted row's. */
 export const providedCriterionSchema = z.strictObject({
@@ -54,6 +55,6 @@ export const runRequestSchema = runRequestShape
 export const listRunsQuerySchema = z.strictObject({
   pipeline: z.string().min(1).optional(),
   status: z.enum(QUALITY_RUN_STATUSES).optional(),
-  ...PAGE_FIELDS,
+  ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
 });
 export type ListRunsQuery = z.output<typeof listRunsQuerySchema>;

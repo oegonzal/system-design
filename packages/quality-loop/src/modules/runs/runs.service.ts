@@ -1,13 +1,13 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  DeriveCriteriaRequest,
-  DerivedCriteriaDto,
-  IterationTrace,
-  PipelineSummary,
-  QualityRunDto,
-  QualityRunSummaryDto,
-  StartQualityRunRequest,
-  SuccessCriterion,
+import {
+  sameRubric,
+  type DeriveCriteriaRequest,
+  type DerivedCriteriaDto,
+  type IterationTrace,
+  type PipelineSummary,
+  type QualityRunDto,
+  type QualityRunSummaryDto,
+  type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import type { LlmClient, LlmExchange } from '@sysdesign/llm';
 import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
@@ -270,19 +270,6 @@ export class RunsService {
     }
   }
 }
-
-/** Position by position: the same ids, kinds and statements — what "the rubric it was judged against" means. */
-const sameRubric = (
-  requested: readonly SuccessCriterion[],
-  recorded: readonly SuccessCriterion[],
-): boolean =>
-  requested.length === recorded.length &&
-  requested.every(
-    (criterion, index) =>
-      criterion.id === recorded[index].id &&
-      criterion.kind === recorded[index].kind &&
-      criterion.statement === recorded[index].statement,
-  );
 
 /**
  * An unref'd interval that refreshes a running row's heartbeat a few times

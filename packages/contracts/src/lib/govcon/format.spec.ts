@@ -4,6 +4,7 @@ import {
   day,
   daysLeftLabel,
   daysUntil,
+  isDueSoonAt,
   minute,
   money,
   rangeLabel,
@@ -45,6 +46,16 @@ describe('govcon formatting', () => {
     expect(rangeLabel(20, 4, 24)).toBe('21–24 of 24');
     expect(rangeLabel(0, 0, 0)).toBe('0 of 0');
     expect([null, -2, 0, 5].map(daysLeftLabel)).toEqual(['—', '2 day(s) ago', 'today', '5 day(s)']);
+  });
+
+  it('calls a mark due soon inside the week, the last day and a passed one included', () => {
+    const now = Date.parse('2026-09-26T12:00:00Z');
+    expect(isDueSoonAt(['2026-10-03T12:00:00.000Z'], now)).toBe(true);
+    expect(isDueSoonAt(['2026-10-03T12:00:00.001Z'], now)).toBe(false);
+    expect(isDueSoonAt(['2026-09-01T00:00:00.000Z'], now)).toBe(true);
+    expect(isDueSoonAt(['2026-10-10T12:00:00.000Z', '2026-09-28T09:00:00.000Z'], now)).toBe(true);
+    expect(isDueSoonAt([null, 'not a date'], now)).toBe(false);
+    expect(isDueSoonAt([], now)).toBe(false);
   });
 
   it('summarizes a pull the way the CLI and the client both print it', () => {

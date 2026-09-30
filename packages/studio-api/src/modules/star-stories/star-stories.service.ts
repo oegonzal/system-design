@@ -8,8 +8,8 @@ import { UniqueConstraintViolationException, type FilterQuery } from '@mikro-orm
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { SaveStarStoryRequest } from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt, StarStory } from '@sysdesign/db';
+import { escapeLike } from '@sysdesign/nest-kit';
 
-import { contains } from '../../common/ilike';
 import type { ListStarStoriesQueryInput } from './star-story-requests';
 
 interface StoryLinks {
@@ -49,13 +49,14 @@ export class StarStoriesService {
   }
 
   private buildWhere(query: ListStarStoriesQueryInput): FilterQuery<StarStory> {
+    const pattern = query.search ? `%${escapeLike(query.search)}%` : null;
     return {
-      ...(query.search
+      ...(pattern
         ? {
             $or: [
-              { title: { $ilike: contains(query.search) } },
-              { situation: { $ilike: contains(query.search) } },
-              { result: { $ilike: contains(query.search) } },
+              { title: { $ilike: pattern } },
+              { situation: { $ilike: pattern } },
+              { result: { $ilike: pattern } },
             ],
           }
         : {}),

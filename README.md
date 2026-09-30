@@ -86,7 +86,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/contracts`       | Wire types, `as const` vocabularies and the zod schemas every layer derives from                  |
 | `packages/db`              | MikroORM entities, migrations, seed — shared by the API and the quality loop                      |
 | `packages/llm`             | The one LLM seam: Claude via structured outputs on a key or the subscription route; none, no boot |
-| `packages/nest-kit`        | Shared Nest plumbing: the zod validation pipe, the MikroORM root module, health, CORS             |
+| `packages/nest-kit`        | Shared Nest plumbing: zod pipe, MikroORM root module, health, CORS, list paging, LIKE escaping    |
 | `packages/design-system`   | Emotion tokens → semantic roles → primitives, contrast-asserted                                   |
 | `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop     |
 | `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                                  |

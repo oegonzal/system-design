@@ -3,12 +3,9 @@ import { composeStories } from '@storybook/react';
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { PIPELINE_ROWS } from '../../testing/fixtures';
-import { isDueSoon } from './due-soon';
 import * as stories from './due-soon.stories';
 
 const { Default, Quiet } = composeStories(stories);
-const NOW = Date.parse('2026-09-26T12:00:00Z');
 
 describe('DueSoon', () => {
   it('[GOVU-1] lists the tracked notices due inside the week by reminder or deadline, soonest mark first', () => {
@@ -44,7 +41,6 @@ describe('DueSoon', () => {
       '2026-09-28',
       '2 day(s)',
     ]);
-    expect(PIPELINE_ROWS.map((row) => isDueSoon(row, NOW))).toEqual([true, false, true]);
   });
 
   it('says when nothing is due', () => {

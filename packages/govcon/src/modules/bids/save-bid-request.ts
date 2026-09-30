@@ -4,6 +4,7 @@ import {
   MAX_PIPELINE_LIMIT,
   type SaveBidRequest,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
 
 /** The body of `PUT /notices/:noticeId/bid`. Omitted fields keep their stored value; the service merges. */
@@ -19,7 +20,6 @@ export type SaveBidBody = z.output<typeof saveBidRequestSchema>;
 export const listPipelineQuerySchema = z.strictObject({
   profile: z.string().min(1).optional(),
   stage: z.enum(BID_STAGES).optional(),
-  limit: z.coerce.number().int().min(1).max(MAX_PIPELINE_LIMIT).default(DEFAULT_PIPELINE_LIMIT),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...pageFields(MAX_PIPELINE_LIMIT, DEFAULT_PIPELINE_LIMIT),
 });
 export type ListPipelineQueryInput = z.output<typeof listPipelineQuerySchema>;

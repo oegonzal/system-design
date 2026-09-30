@@ -4,7 +4,7 @@ import type {
   ListPipelineResponse,
   SaveBidResponse,
 } from '@sysdesign/contracts';
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { BidsService } from './bids.service';
 import {
@@ -48,7 +48,7 @@ export class PipelineController {
       limit: query.limit,
       offset: query.offset,
     });
-    return { data, meta: { total, limit: query.limit, offset: query.offset } };
+    return page(data, total, query);
   }
 
   @Get('summary')

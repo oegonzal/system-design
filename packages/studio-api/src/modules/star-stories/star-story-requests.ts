@@ -1,12 +1,13 @@
 import {
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
   STORY_MAX_TAGS,
   STORY_SECTION_MAX_LENGTH,
   STORY_TAG_MAX_LENGTH,
   STORY_TITLE_MAX_LENGTH,
 } from '@sysdesign/contracts';
+import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
-
-import { listQueryShape } from '../../common/list-query';
 
 /** Shared by POST (create) and PUT (full replace); bounded by the column widths so Postgres never has to refuse. */
 export const saveStarStorySchema = z.strictObject({
@@ -21,7 +22,7 @@ export const saveStarStorySchema = z.strictObject({
 });
 
 export const listStarStoriesQuerySchema = z.strictObject({
-  ...listQueryShape,
+  ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
   /** Case-insensitive contains over title, situation and result. */
   search: z.string().max(STORY_SECTION_MAX_LENGTH).optional(),
   /** Exact tag membership — a term longer than a tag can never match one. */

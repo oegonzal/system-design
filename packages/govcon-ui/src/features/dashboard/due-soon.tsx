@@ -3,6 +3,7 @@ import {
   daysLeftLabel,
   daysUntil,
   DUE_SOON_DAYS,
+  isDueSoonAt,
   type PipelineRow,
 } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
@@ -16,17 +17,12 @@ export interface DueSoonProps {
   nowMs: number;
 }
 
-/** Due inside the week by reminder or by deadline, or already past. */
-export const isDueSoon = (row: PipelineRow, nowMs: number): boolean =>
-  [row.bid.reminderAt, row.lead.opportunity.responseDeadlineAt].some((mark) => {
-    const days = daysUntil(mark, nowMs);
-    return days !== null && days <= DUE_SOON_DAYS;
-  });
-
 /** Tracked notices with a reminder or a deadline inside the week — what to do first. */
 export function DueSoon({ rows, nowMs }: DueSoonProps) {
   const Link = useLink();
-  const due = rows.filter((row) => isDueSoon(row, nowMs));
+  const due = rows.filter(({ bid, lead }) =>
+    isDueSoonAt([bid.reminderAt, lead.opportunity.responseDeadlineAt], nowMs),
+  );
   return (
     <Stack gap={3}>
       <Heading level={2}>Due this week</Heading>
