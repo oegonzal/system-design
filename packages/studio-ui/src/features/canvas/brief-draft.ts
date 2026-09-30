@@ -1,15 +1,9 @@
 import {
-  BINDING_CLAIM_MAX_LENGTH,
-  BINDING_MAX_NODES,
-  BRIEF_MAX_BINDINGS,
-  DESIGN_BRIEF_VERSION,
   FLOW_MAX_STEPS,
   type Binding,
   type CanvasEdge,
   type CanvasGraph,
   type CanvasNode,
-  type CriterionRef,
-  type DesignBrief,
 } from '@sysdesign/contracts';
 
 /**
@@ -21,9 +15,11 @@ import {
  * a claim the canvas simply fails to back up — that claim is the lesson.
  *
  * So every rejectable shape is prevented here rather than validated: the flow
- * tracer only offers hops that connect, and `reconcileBrief` is the one place
- * a draft becomes a payload — dropping anything the canvas or the rubric no
- * longer supports, because a node can be deleted long after it was bound.
+ * tracer only offers hops that connect, and `reconcileBrief` (in
+ * `@sysdesign/contracts`, shared with the quality loop's canvas pipeline) is
+ * the one place a draft becomes a payload — dropping anything the canvas or
+ * the rubric no longer supports, because a node can be deleted long after it
+ * was bound.
  */
 
 /** How far along one criterion's binding is — what the row's chip says. */
@@ -72,67 +68,6 @@ export function walkNodes(graph: CanvasGraph, path: readonly string[]): CanvasNo
     if (target) visited.push(target);
   }
   return visited;
-}
-
-/** The longest prefix of `path` that is still a connected walk of real edges. */
-function validPrefix(graph: CanvasGraph, path: readonly string[]): string[] {
-  const kept: string[] = [];
-  let previousTarget: string | null = null;
-  for (const edgeId of path.slice(0, FLOW_MAX_STEPS)) {
-    const edge = graph.edges.find((candidate) => candidate.id === edgeId);
-    if (!edge) break;
-    if (previousTarget !== null && edge.source !== previousTarget) break;
-    kept.push(edge.id);
-    previousTarget = edge.target;
-  }
-  return kept;
-}
-
-/**
- * The draft as a payload, or `null` when there is nothing worth sending.
- *
- * Null rather than an empty brief on purpose: the lenses read "no brief" as
- * exactly that, while a stored `{ bindings: [] }` would imply the author
- * chose to bind nothing.
- *
- * Everything here is a DROP, never a rejection. The canvas is edited long after
- * a binding is made, and an author who deletes a node should not be told their
- * brief is invalid — the claim about that node simply stops existing. A binding
- * is kept only when the API would accept it: a criterion the prompt derived, a
- * claim, at least one component still on the canvas, and a path that is a
- * connected walk (truncated at the first hop that no longer connects).
- */
-export function reconcileBrief(
-  bindings: readonly Binding[],
-  graph: CanvasGraph,
-  criteria: readonly CriterionRef[],
-): DesignBrief | null {
-  const nodeIds = new Set(graph.nodes.map((node) => node.id));
-  const criterionIds = new Set(criteria.map((criterion) => criterion.id));
-  const seen = new Set<string>();
-
-  const kept: Binding[] = [];
-  for (const binding of bindings) {
-    if (!criterionIds.has(binding.criterionId) || seen.has(binding.criterionId)) continue;
-    const claim = binding.claim.trim().slice(0, BINDING_CLAIM_MAX_LENGTH);
-    if (claim.length === 0) continue;
-    const nodes = [...new Set(binding.nodeIds)]
-      .filter((id) => nodeIds.has(id))
-      .slice(0, BINDING_MAX_NODES);
-    if (nodes.length === 0) continue;
-    const path = validPrefix(graph, binding.path ?? []);
-    seen.add(binding.criterionId);
-    kept.push({
-      criterionId: binding.criterionId,
-      nodeIds: nodes,
-      ...(path.length > 0 ? { path } : {}),
-      claim,
-    });
-    if (kept.length >= BRIEF_MAX_BINDINGS) break;
-  }
-
-  if (kept.length === 0) return null;
-  return { version: DESIGN_BRIEF_VERSION, bindings: kept };
 }
 
 /**

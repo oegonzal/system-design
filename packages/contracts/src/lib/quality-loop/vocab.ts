@@ -55,6 +55,23 @@ export const PRODUCE_MODES = ['initial', 'revise', 'retry'] as const;
 export type ProduceMode = (typeof PRODUCE_MODES)[number];
 
 /**
+ * How an iteration came by its artifact: produced by the loop in one of the
+ * modes above, `provided` by the caller and judged as handed in, or `adopted`
+ * — a recorded iteration of an earlier run copied verbatim, no model called.
+ */
+export const ITERATION_MODES = [...PRODUCE_MODES, 'provided', 'adopted'] as const;
+export type IterationMode = (typeof ITERATION_MODES)[number];
+
+/**
+ * What kind of goal a pipeline takes. `brief`: a goal a person typed — a
+ * route for the router and a target for an orchestrator. `composed`: a goal
+ * another program composed (a memory step, the studio) — never offered as a
+ * route, accepted as a target, or listed for a person to pick.
+ */
+export const GOAL_SOURCES = ['brief', 'composed'] as const;
+export type GoalSource = (typeof GOAL_SOURCES)[number];
+
+/**
  * What a lens may declare it consumes from the wave before it: the findings
  * the normaliser confirmed, or the criterion results it settled. Never a raw
  * report — the deterministic normaliser is the boundary between tiers.

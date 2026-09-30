@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { PROMPT_TITLE_MAX_LENGTH } from './prompts';
+import { CRITERION_STATEMENT_MAX_LENGTH, type SuccessCriterion } from './quality-loop/evidence';
+import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines';
 
 /**
  * A system-design prompt as the `design-prompt` pipeline drafts it from an
@@ -11,7 +13,16 @@ import { PROMPT_TITLE_MAX_LENGTH } from './prompts';
  *
  * Kinds and targets are open strings on purpose: the model chooses the words
  * and the numbers; nothing here is a closed vocabulary a grader keys on.
+ *
+ * The row bounds sum to the canvas pipeline's criteria cap, because a
+ * generated prompt's rubric is its rows (`criteriaFromDraft`): one criterion
+ * per row, never more than the grader can hold, never a blank one.
  */
+const FUNCTIONAL_MAX_ROWS = 8;
+const NON_FUNCTIONAL_MAX_ROWS = 6;
+const SCALE_MAX_ROWS = 6;
+const CONSTRAINT_MAX_ROWS = 4;
+
 export const designPromptDraftSchema = z.strictObject({
   title: z.string().max(PROMPT_TITLE_MAX_LENGTH).describe('Imperative, brand-neutral, one line.'),
   scenario: z
@@ -20,28 +31,30 @@ export const designPromptDraftSchema = z.strictObject({
     .describe(
       "The situation in the second person, brand-neutral, drawn from the experience's real domain.",
     ),
-  functionalRequirements: z.array(z.string().max(240)).max(8),
+  functionalRequirements: z.array(z.string().min(1).max(240)).max(FUNCTIONAL_MAX_ROWS),
   nonFunctionalRequirements: z
     .array(
       z.strictObject({
         kind: z
           .string()
+          .min(1)
           .max(24)
           .describe(
             'latency, availability, consistency, durability, security, cost, throughput, observability, …',
           ),
-        requirement: z.string().max(160),
+        requirement: z.string().min(1).max(160),
         target: z
           .string()
+          .min(1)
           .max(60)
           .describe('A figure with its unit or percentile, in words: "p99 ≤ 300 ms".'),
       }),
     )
-    .max(8),
+    .max(NON_FUNCTIONAL_MAX_ROWS),
   scale: z
-    .array(z.strictObject({ metric: z.string().max(40), target: z.string().max(40) }))
-    .max(10),
-  constraints: z.array(z.string().max(240)).max(6),
+    .array(z.strictObject({ metric: z.string().min(1).max(40), target: z.string().min(1).max(40) }))
+    .max(SCALE_MAX_ROWS),
+  constraints: z.array(z.string().min(1).max(240)).max(CONSTRAINT_MAX_ROWS),
 });
 export type DesignPromptDraft = z.infer<typeof designPromptDraftSchema>;
 
@@ -97,4 +110,36 @@ export function renderDesignPromptMarkdown(draft: DesignPromptDraft): string {
   }
 
   return `${sections.join('\n\n')}\n`;
+}
+
+const statement = (text: string): string => text.trim().slice(0, CRITERION_STATEMENT_MAX_LENGTH);
+
+/**
+ * A generated prompt's rubric is its rows: one criterion per row, in the
+ * order the markdown prints the sections, kinded by the section it came from
+ * — the same four kinds the canvas pipeline declares. No model is asked to
+ * read back what the draft already states, so the ids `c1…cN` are fixed the
+ * moment the prompt is claimed, and there are never more than the grader's
+ * cap because the row bounds sum to it.
+ */
+export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] {
+  const [functional, nonFunctional, scale, constraint] = CANVAS_CRITERION_KINDS;
+  const statements: { kind: string; statement: string }[] = [
+    ...draft.functionalRequirements.map((text) => ({
+      kind: functional,
+      statement: statement(text),
+    })),
+    ...draft.nonFunctionalRequirements.map((row) => ({
+      kind: nonFunctional,
+      statement: statement(`${row.kind} — ${row.requirement} — ${row.target}`),
+    })),
+    ...draft.scale.map((row) => ({
+      kind: scale,
+      statement: statement(`${row.metric} — ${row.target}`),
+    })),
+    ...draft.constraints.map((text) => ({ kind: constraint, statement: statement(text) })),
+  ];
+  return statements
+    .slice(0, CANVAS_MAX_CRITERIA)
+    .map((item, index) => ({ id: `c${index + 1}`, ...item }));
 }

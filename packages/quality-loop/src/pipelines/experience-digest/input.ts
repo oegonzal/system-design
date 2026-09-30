@@ -11,7 +11,7 @@ import {
   DECISIONS,
   FIXABILITIES,
   MAX_QUALITY_RUN_ITERATIONS,
-  PRODUCE_MODES,
+  ITERATION_MODES,
   SEVERITIES,
   STOP_REASONS,
 } from '@sysdesign/contracts';
@@ -66,7 +66,7 @@ export type Transition = z.infer<typeof transitionSchema>;
 
 const iterationSummarySchema = z.strictObject({
   iteration,
-  mode: z.enum([...PRODUCE_MODES, 'provided'] as const),
+  mode: z.enum(ITERATION_MODES),
   decision: z.enum(DECISIONS),
   reason: z.string().max(REASON_MAX),
   overall: z.number(),

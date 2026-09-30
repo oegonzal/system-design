@@ -9,7 +9,7 @@ import type {
   SuccessCriterion,
   ValidationReport,
 } from './evidence';
-import type { Decision, ProduceMode, StopReason } from './vocab';
+import type { Decision, IterationMode, StopReason } from './vocab';
 
 /** What the producer is asked to act on. Chosen by the policy from the ledger. */
 export interface Remediation {
@@ -93,7 +93,7 @@ export interface QualityControlDecision {
 
 export interface IterationTrace<T = unknown> {
   iteration: number;
-  mode: ProduceMode | 'provided';
+  mode: IterationMode;
   artifact: T | null;
   locations: ArtifactLocation[];
   /** The text every judge read — `OutputShape.render(artifact)`; null when there was no artifact. */

@@ -39,8 +39,9 @@ describe('the design-prompt shape validator', () => {
   });
 
   it('[QL-3] a target without a figure is located at its row', () => {
+    // An empty target fails the schema outright; a blank one passes it and is this validator's to name.
     const draft = sampleDraft();
-    draft.nonFunctionalRequirements[1] = { ...draft.nonFunctionalRequirements[1], target: '' };
+    draft.nonFunctionalRequirements[1] = { ...draft.nonFunctionalRequirements[1], target: ' ' };
     draft.scale[0] = { ...draft.scale[0], target: '  ' };
     expect(problems(draft)).toEqual([
       {

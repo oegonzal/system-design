@@ -12,7 +12,7 @@ import type {
   NodeOperation,
   Severity,
 } from '@sysdesign/contracts';
-import { BINDING_MAX_NODES } from '@sysdesign/contracts';
+import { BINDING_MAX_NODES, reconcileBrief, reconcileNarration } from '@sysdesign/contracts';
 import {
   applyEdgeChanges,
   applyNodeChanges,
@@ -23,9 +23,7 @@ import {
 } from '@xyflow/react';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
-import { reconcileBrief } from './brief-draft';
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
-import { reconcileNarration } from './narration-draft';
 import type { SdEdge, SdNode } from './types';
 
 /** Default label when a kind is dropped from the palette. */

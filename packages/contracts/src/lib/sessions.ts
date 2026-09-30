@@ -3,7 +3,7 @@ import type { ApiListResponse, ApiResponse } from './envelope';
 import type { LlmAvailabilityDto } from './llm-availability';
 import type { IsoDateString, Uuid } from './primitives';
 import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
-import type { Decision, ProduceMode, StopReason } from './quality-loop/vocab';
+import type { Decision, IterationMode, StopReason } from './quality-loop/vocab';
 
 export const SESSION_STATUSES = ['in-progress', 'completed', 'abandoned'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
@@ -98,7 +98,7 @@ export const MAX_IMPROVE_ITERATIONS = MAX_QUALITY_RUN_ITERATIONS;
 
 export interface ImproveIterationDto {
   iteration: number;
-  mode: ProduceMode | 'provided';
+  mode: IterationMode;
   overall: number | null;
   decision: Decision | null;
   /** The revision this iteration was imported as; null when it was not better than every earlier one. */
