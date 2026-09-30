@@ -43,6 +43,7 @@ of re-deriving the problem.
 | ENG-7    | No response memoisation; a re-grade re-bills                             | open     | medium   |
 | ENG-8    | `agentic-design` accepts 6 of 40 iterations                              | watch    | —        |
 | ENG-9    | `replay` reads one page and does not say so                              | open     | low      |
+| ENG-10   | A boot sweep fails another process's live run; its close cannot undo it  | open     | medium   |
 | MEM-1    | Persona compliance still costs admission                                 | open     | medium   |
 | MEM-2    | Memory transfers, but improving answers is unproven                      | open     | high     |
 | MEM-3    | No retrieval score floor; RRF trades sharpness for breadth               | open     | medium   |

@@ -243,3 +243,42 @@ size; print the count read at the top of the table.
 
 **Verify.** The header states "N runs read"; a fixture repository with more
 runs than the page size is read in full.
+
+---
+
+### ENG-10 · A boot sweep fails another process's live run, and its close cannot undo it
+
+**Status** open · **Severity** medium · **Where** `modules/runs/persistence/mikro-orm-run-repository.ts` (`failInterrupted`, `close`), `modules/orchestration/persistence/mikro-orm-orchestration-run-repository.ts` (the same pair)
+
+**What.** `failInterrupted` marks every row still `running` as failed with
+an `Interrupted` error, on the assumption that the only process that could
+have opened it is the one that just died. `close` then writes the header
+only where `status = 'running'`, so a late finish never resurrects a swept
+row. Both hold with one served loop. They break as soon as two processes
+share the database — `main.js run` beside the service, `main.js replay`
+booting while a run is in flight, or the service restarting under a CLI run:
+the sweep fails the other process's live run, and when that process
+finishes, `close` matches zero header rows while its transaction still
+inserts the criteria and iteration children under the failed header.
+
+**Evidence.** Run `2026-09-30T02-11-45-659-69a085-quality`
+(`system-design-canvas`), opened by a CLI smoke at 02:11:45Z and swept by a
+replay boot at 02:12:44Z: `GET /runs/:id` answers `failed` /
+`Interrupted` / `trace: null`; its dump says `complete`, `revise`, overall
+58.7; its `quality_run_criterion` and `quality_run_iteration` rows exist.
+The orchestration repository has the same shape (`update` and `close` both
+match `status: 'running'`).
+
+**Recommendation.** Either (a) the sweep only fails rows its own previous
+incarnation opened — an owner id (or heartbeat) column on `quality_run` and
+`orchestration_run`, set at `open`, matched at boot — or (b) `close`
+overwrites an interruption with the real terminal state: match
+`status in ('running', 'failed')` where `error.name = 'Interrupted'`, so a
+row can go running → interrupted → its true outcome but never
+complete → anything. (a) keeps the sweep honest for concurrent processes;
+(b) keeps a swept row from lying once the truth arrives. Until one lands,
+never boot a second process against the same database while a run is live.
+
+**Verify.** Two repositories over one database: the first opens a run, the
+second boots and sweeps, the first closes — the row ends in the first's
+terminal state, its children under a header that agrees with them.
