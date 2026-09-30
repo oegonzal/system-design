@@ -68,12 +68,18 @@ through the Agent SDK:
   and put the token it prints in the repo's gitignored `.env` as
   `CLAUDE_CODE_OAUTH_TOKEN=…` (or export it in the shell that runs `tilt up`).
 
-An API key in the environment is never used: it is withheld from the Claude
-Code process, so nothing is billed outside the subscription. There is no way
-to run the loop without a model. `serve` and `run` ask Claude Code whether it
-is signed in before anything boots — an account check, no model call — and
-exit 1 saying how to get a login when it is not; `replay` reads recorded runs
-and needs none. A booted loop always has a model, so
+No other credential is ever used: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`
+and `CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR` are withheld from every Claude Code
+process, so nothing is billed outside the subscription. There is no way to
+run the loop without a model. `serve` and `run` ask Claude Code how it is
+signed in before anything boots — an account check, no model call — and
+accept only the first-party subscription: the machine login or the
+setup-token token. Anything else (no login, a gateway token, a key helper, a
+third-party provider) exits 1 saying what was found and how to get a login.
+The check proves the credential is present, not that it is still valid: a
+revoked token fails the first call instead, and that call's recorded
+exchange carries the CLI's own reason (for example `authentication_failed`).
+`replay` reads recorded runs and needs none. A booted loop always has a model, so
 `GET /api/grading/availability` (the loop's `GET /health`, proxied) either
 names it or answers 503 because the loop is unreachable, and the UI reads it
 to explain a disabled control instead of failing. `POST /criteria` answers

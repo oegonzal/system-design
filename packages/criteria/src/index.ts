@@ -246,7 +246,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-22',
     statement:
-      'The loop runs only on a Claude Code subscription login — a machine login or CLAUDE_CODE_OAUTH_TOKEN — which serve and run check at boot without a model call, exiting 1 and saying how to get one otherwise; an API key is never passed to the Claude Code process; replay boots without a login because it calls no model; availability is read from the constructed client, never re-derived from the environment.',
+      'The loop runs only on a Claude Code subscription login — a machine login or CLAUDE_CODE_OAUTH_TOKEN — which serve and run check at boot without a model call, accepting only the first-party subscription and exiting 1 saying what was found and how to get one otherwise; no API key or gateway token is ever passed to the Claude Code process; replay boots without a login because it calls no model; availability is read from the constructed client, never re-derived from the environment.',
   },
   {
     id: 'QL-23',
