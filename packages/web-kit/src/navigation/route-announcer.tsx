@@ -4,17 +4,9 @@ import { LiveRegion } from '@sysdesign/design-system';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { NAV_ITEMS } from '../app/nav';
-
-function labelFor(pathname: string): string {
-  const item = NAV_ITEMS.find((candidate) =>
-    candidate.href === '/'
-      ? pathname === '/'
-      : pathname === candidate.href || pathname.startsWith(`${candidate.href}/`),
-  );
-  if (item) return item.label;
-  if (pathname.startsWith('/practice/')) return 'Practice';
-  return pathname;
+export interface RouteAnnouncerProps {
+  /** The name a pathname is announced by; without one, the pathname itself. */
+  labelFor: (pathname: string) => string | undefined;
 }
 
 /**
@@ -23,7 +15,7 @@ function labelFor(pathname: string): string {
  * page load is deliberately not announced (screen readers announce the
  * document title themselves).
  */
-export function RouteAnnouncer() {
+export function RouteAnnouncer({ labelFor }: RouteAnnouncerProps) {
   const pathname = usePathname();
   const [message, setMessage] = useState('');
   const isFirst = useRef(true);
@@ -34,7 +26,8 @@ export function RouteAnnouncer() {
       return;
     }
     // eslint-disable-next-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- announcing is inherently an effect of navigation
-    setMessage(`Navigated to ${labelFor(pathname)}`);
+    setMessage(`Navigated to ${labelFor(pathname) ?? pathname}`);
+    // Only a navigation announces: `labelFor` is a lookup, and a new identity of it is not one.
   }, [pathname]);
 
   return <LiveRegion message={message} />;

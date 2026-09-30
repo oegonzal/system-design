@@ -94,7 +94,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                  |
 | `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)   |
 | `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger      |
-| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, polling hook                        |
+| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer    |
 | `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                   |
 | `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub           |
 | `packages/studio-ui`       | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository              |

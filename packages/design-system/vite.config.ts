@@ -1,7 +1,5 @@
 /// <reference types='vitest' />
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
+import { webTestConfig } from '../../vite.web';
 
 /**
  * Deliberately declares no `build` block and ships no `index.html`.
@@ -12,26 +10,7 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
  * this package wants: it is consumed as TypeScript source through the path alias
  * and inlined by whichever app imports it, same as `@sysdesign/contracts`.
  */
-export default defineConfig({
-  root: __dirname,
-  cacheDir: '../../node_modules/.vite/packages/design-system',
-
-  plugins: [
-    react({
-      // The css prop and styled components compile through Emotion's JSX
-      // runtime (plugin-react v6 is oxc-based; no babel pass).
-      jsxImportSource: '@emotion/react',
-    }),
-    nxViteTsPaths(),
-  ],
-
-  test: {
-    watch: false,
-    globals: true,
-    environment: 'jsdom',
-    // jsdom lacks matchMedia, ResizeObserver and scrollIntoView; the file stubs them.
-    setupFiles: ['./src/test-setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    reporters: ['default'],
-  },
+export default webTestConfig(__dirname, 'design-system', {
+  // jsdom lacks matchMedia, ResizeObserver and scrollIntoView; the file stubs them.
+  setupFiles: ['./src/test-setup.ts'],
 });

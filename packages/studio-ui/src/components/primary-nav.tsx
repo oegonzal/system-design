@@ -2,7 +2,7 @@
 
 import styled from '@emotion/styled';
 import { transient } from '@sysdesign/design-system';
-import { useConfirmLeave } from '@sysdesign/web-kit';
+import { isUnder, useConfirmLeave } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -37,11 +37,6 @@ const NavLink = styled(Link, transient)<{ $active: boolean }>`
   }
 `;
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 /** The app's routes. A page with unsaved work is asked before a link leaves it. */
 export function PrimaryNav() {
   const pathname = usePathname();
@@ -50,7 +45,7 @@ export function PrimaryNav() {
   return (
     <Nav aria-label="Primary">
       {NAV_ITEMS.map((item) => {
-        const active = isActive(pathname, item.href);
+        const active = isUnder(pathname, item.href);
         return (
           <NavLink
             key={item.href}

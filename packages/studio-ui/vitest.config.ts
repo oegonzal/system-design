@@ -1,7 +1,5 @@
 /// <reference types='vitest' />
-import react from '@vitejs/plugin-react';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
-import { defineConfig } from 'vitest/config';
+import { webTestConfig } from '../../vite.web';
 
 /**
  * Deliberately `vitest.config.ts`, not `vite.config.ts`: project.json owns
@@ -9,26 +7,7 @@ import { defineConfig } from 'vitest/config';
  * not tempt `@nx/vite` into inferring build targets. A vitest-named config
  * yields exactly the inferred `test` target and nothing else.
  */
-export default defineConfig({
-  root: __dirname,
-  cacheDir: '../../node_modules/.vite/packages/studio-ui',
-
-  plugins: [
-    react({
-      // Emotion's JSX runtime: the Vite half of what
-      // next.config.js does with compiler.emotion for the app build.
-      jsxImportSource: '@emotion/react',
-    }),
-    nxViteTsPaths(),
-  ],
-
-  test: {
-    watch: false,
-    globals: true,
-    environment: 'jsdom',
-    // React Flow needs more of a browser than jsdom provides; see the file.
-    setupFiles: ['./src/vitest.setup.ts'],
-    include: ['src/**/*.spec.{ts,tsx}'],
-    reporters: ['default'],
-  },
+export default webTestConfig(__dirname, 'studio-ui', {
+  // React Flow needs more of a browser than jsdom provides; see the file.
+  setupFiles: ['./src/vitest.setup.ts'],
 });

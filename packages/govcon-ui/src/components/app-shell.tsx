@@ -2,13 +2,14 @@
 
 import styled from '@emotion/styled';
 import { SkipLink, Stack, Text } from '@sysdesign/design-system';
+import { RouteAnnouncer } from '@sysdesign/web-kit';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
 
+import { navItemFor } from '../app/nav';
 import { useLink } from './link-context';
 import { PrimaryNav } from './primary-nav';
 import { ProfileSwitcher } from './profile-switcher';
-import { RouteAnnouncer } from './route-announcer';
 
 const Shell = styled.div`
   min-height: 100dvh;
@@ -44,6 +45,8 @@ const Main = styled.main`
   box-sizing: border-box;
 `;
 
+const labelFor = (pathname: string) => navItemFor(pathname)?.label;
+
 /** The frame every page sits in: brand, nav, the profile choice, `main`, and the route announcer. */
 export function AppShell({ children }: { children?: ReactNode }) {
   const mainRef = useRef<HTMLElement>(null);
@@ -71,7 +74,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <Main id="main" ref={mainRef}>
         {children}
       </Main>
-      <RouteAnnouncer />
+      <RouteAnnouncer labelFor={labelFor} />
     </Shell>
   );
 }

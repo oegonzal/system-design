@@ -2,14 +2,14 @@
 
 import styled from '@emotion/styled';
 import { SkipLink } from '@sysdesign/design-system';
-import { useConfirmLeave } from '@sysdesign/web-kit';
+import { RouteAnnouncer, useConfirmLeave } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 
+import { navItemFor } from '../app/nav';
 import { PrimaryNav } from './primary-nav';
-import { RouteAnnouncer } from './route-announcer';
 
 const Shell = styled.div`
   height: 100vh; /* fallback for browsers without dvh */
@@ -68,6 +68,8 @@ const Main = styled.main`
   box-sizing: border-box;
 `;
 
+const labelFor = (pathname: string) => navItemFor(pathname)?.label;
+
 export interface AppShellProps {
   children?: ReactNode;
 }
@@ -100,7 +102,7 @@ export function AppShell({ children }: AppShellProps) {
       <Main id="main" ref={mainRef}>
         {children}
       </Main>
-      <RouteAnnouncer />
+      <RouteAnnouncer labelFor={labelFor} />
     </Shell>
   );
 }

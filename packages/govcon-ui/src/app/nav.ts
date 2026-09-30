@@ -1,16 +1,10 @@
-import type { Metadata } from 'next';
+import { navTable, type NavItem } from '@sysdesign/web-kit';
 
 /**
  * The navigation vocabulary and per-route metadata, in one place. The nav
  * bar maps over `NAV_ITEMS`; each `page.tsx` exports `pageMetadata('/route')`
  * so titles and the nav can never disagree.
  */
-export interface NavItem {
-  href: string;
-  label: string;
-  description: string;
-}
-
 export const NAV_ITEMS = [
   {
     href: '/',
@@ -36,7 +30,7 @@ export const NAV_ITEMS = [
 ] as const satisfies readonly NavItem[];
 
 /** Routes with metadata but no nav entry. */
-export const EXTRA_PAGES: readonly NavItem[] = [
+const EXTRA_PAGES: readonly NavItem[] = [
   {
     href: '/notices',
     label: 'Notice',
@@ -44,19 +38,4 @@ export const EXTRA_PAGES: readonly NavItem[] = [
   },
 ];
 
-export function pageMetadata(href: string): Metadata {
-  const item = [...NAV_ITEMS, ...EXTRA_PAGES].find((candidate) => candidate.href === href);
-  if (!item) return {};
-  return { title: item.label, description: item.description };
-}
-
-/** The nav item a pathname belongs to — its own route, or a route it is under. */
-export function navItemFor(pathname: string): NavItem | null {
-  return (
-    [...NAV_ITEMS, ...EXTRA_PAGES].find((item) =>
-      item.href === '/'
-        ? pathname === '/'
-        : pathname === item.href || pathname.startsWith(`${item.href}/`),
-    ) ?? null
-  );
-}
+export const { navItemFor, pageMetadata } = navTable(NAV_ITEMS, EXTRA_PAGES);

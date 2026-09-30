@@ -12,7 +12,6 @@ import { NAV_ITEMS, navItemFor, pageMetadata } from '../app/nav';
 import { ProfileProvider, PROFILE_STORAGE_KEY } from '../providers/profile-context';
 import { OTHER_PROFILE, PROFILE } from '../testing/fixtures';
 import { AppShell } from './app-shell';
-import { RouteAnnouncer } from './route-announcer';
 
 vi.mock('next/navigation', async () => {
   const harness = await vi.importActual<typeof WebTesting>('@sysdesign/web-testing');
@@ -61,13 +60,19 @@ describe('the shell', () => {
   });
 
   it('[GOVU-5] announces a navigation after the first render, never the first', async () => {
+    stubApi([{ path: '/profiles', body: { data: [PROFILE] } }]);
+    const shell = () => (
+      <ProfileProvider>
+        <AppShell />
+      </ProfileProvider>
+    );
     setMockPathname('/');
-    const { rerender } = renderWithTheme(<RouteAnnouncer />);
+    const { rerender } = renderWithTheme(shell());
     expect(screen.getByRole('status').textContent).toBe('');
-    setMockPathname('/search');
+    setMockPathname('/notices/abc');
     await act(async () => {
-      rerender(<RouteAnnouncer />);
+      rerender(shell());
     });
-    expect(screen.getByRole('status').textContent).toBe('Navigated to Search');
+    expect(screen.getByRole('status').textContent).toBe('Navigated to Notice');
   });
 });

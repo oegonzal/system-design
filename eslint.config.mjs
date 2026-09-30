@@ -21,6 +21,7 @@ export default [
       '**/storybook-static/**',
       '**/vite.config.*',
       '**/vitest.config.*',
+      '**/next.config.js',
       '**/next-env.d.ts',
     ],
   },

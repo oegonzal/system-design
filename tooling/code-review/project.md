@@ -42,7 +42,8 @@ anything the map already generates is deliberately absent, because a second copy
   and evaluator lenses → evidence normalizer → deterministic policy, and every run writes a dump.
   Lenses return enums and ordinals only; the policy owns every number and the final decision.
 - `web-kit` — the Next apps' shared runtime plumbing: the Emotion SSR registry, the typed HTTP
-  request core, and the last-write-wins and status-driven polling hooks. Knows no domain.
+  request core, the route table (`navTable`, `isUnder`) and its `RouteAnnouncer`, and the
+  last-write-wins and status-driven polling hooks. Knows no domain.
 - `web-testing` — the spec harness the web packages share: a themed render, a scripted fetch stub,
   the `next/navigation` mock and the jsdom shims. Imported only by specs and `vitest.setup.ts`.
 - `quality-loop-ui` — the Next.js client for the quality loop: pick a prompt from the library, run a
