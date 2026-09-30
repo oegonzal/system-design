@@ -1,4 +1,9 @@
-import { NOTICE_TYPES, type NoticeTypeCode, type SearchProfile } from '@sysdesign/contracts';
+import {
+  NOTICE_STATUSES,
+  NOTICE_TYPES,
+  type NoticeTypeCode,
+  type SearchProfile,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 /**
@@ -36,6 +41,7 @@ export const sliceSchema = z.strictObject({
     .regex(/^[A-Z0-9]{1,4}$/)
     .optional(),
   setAside: z.string().min(1).optional(),
+  status: z.enum(NOTICE_STATUSES).optional(),
   title: z.string().min(1).optional(),
   solicitationNumber: z.string().min(1).optional(),
   noticeId: z.string().min(1).optional(),

@@ -1,4 +1,6 @@
-import { MAX_WINDOW_DAYS, planPulls, validateWindow, windowEndingAt } from './plan';
+import { MAX_PULL_DAYS } from '@sysdesign/contracts';
+
+import { planPulls, validateWindow, windowEndingAt } from './plan';
 import { tinyProfile } from './testing';
 
 describe('the pull plan', () => {
@@ -21,7 +23,7 @@ describe('the pull plan', () => {
   it.each([
     [{ from: '09/20/2026', to: '2026-09-26' }, /YYYY-MM-DD/],
     [{ from: '2026-09-27', to: '2026-09-26' }, /starts after it ends/],
-    [{ from: '2025-01-01', to: '2026-09-26' }, new RegExp(`more than ${MAX_WINDOW_DAYS} days`)],
+    [{ from: '2025-01-01', to: '2026-09-26' }, new RegExp(`more than ${MAX_PULL_DAYS} days`)],
     [{ from: '2026-13-01', to: '2026-09-26' }, /real dates/],
   ])('refuses the window %j', (window, pattern) => {
     expect(() => validateWindow(window)).toThrow(pattern);

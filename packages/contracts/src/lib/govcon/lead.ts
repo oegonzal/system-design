@@ -1,6 +1,5 @@
 import type { ApiResponse } from '../envelope';
 import type { Opportunity } from './opportunity';
-import type { DescriptionDto } from './source';
 import type { LeadTier } from './vocab';
 
 /** One factor's contribution: `points = 100 × weight × value`, one decimal; the traces sum to the score. */
@@ -32,11 +31,6 @@ export interface LeadsReport {
   leads: Lead[];
 }
 
-/** `GET /opportunities/:noticeId`: the lead plus its description, when fetched. */
-export interface LeadDetailDto extends Lead {
-  description: DescriptionDto | null;
-}
-
 export interface ListLeadsQuery {
   profile?: string;
   minScore?: number;
@@ -44,8 +38,4 @@ export interface ListLeadsQuery {
   limit?: number;
 }
 
-export const DEFAULT_LEAD_LIMIT = 25;
-export const MAX_LEAD_LIMIT = 200;
-
 export type ListLeadsResponse = ApiResponse<LeadsReport>;
-export type GetLeadResponse = ApiResponse<LeadDetailDto>;

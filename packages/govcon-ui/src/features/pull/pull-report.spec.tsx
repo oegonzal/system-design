@@ -4,7 +4,7 @@ import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { makePullReport } from '../../testing/fixtures';
-import { summarizePull } from './pull-report';
+import { summarizePull } from '@sysdesign/contracts';
 import * as stories from './pull-report.stories';
 
 const { BudgetStopped, RateLimited } = composeStories(stories);

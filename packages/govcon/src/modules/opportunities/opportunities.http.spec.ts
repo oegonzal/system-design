@@ -2,13 +2,13 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
-  DescriptionResultDto,
-  LeadDetailDto,
+  DescriptionFetch,
+  NoticeDto,
   LeadsReport,
   PullReport,
   SearchProfile,
-  SourceCallDto,
-  SourceStatusDto,
+  SourceCall,
+  SourceStatus,
 } from '@sysdesign/contracts';
 import { ensureDatabase, GovconOpportunity, GovconSourceCall } from '@sysdesign/db';
 
@@ -96,7 +96,7 @@ describe('the govcon HTTP surface', () => {
     expect(profiles.data.map((profile) => profile.id)).toEqual(['tiny']);
     expect(profiles.data[0]?.scoring.weights).toEqual(tinyProfile().scoring.weights);
 
-    const source = (await (await fetch(`${url}/source`)).json()) as Envelope<SourceStatusDto>;
+    const source = (await (await fetch(`${url}/source`)).json()) as Envelope<SourceStatus>;
     expect(source.data).toEqual({
       id: 'sam.gov',
       availability: { enabled: true, reason: null },
@@ -142,7 +142,7 @@ describe('the govcon HTTP surface', () => {
     ]);
     expect(report).toMatchObject({ profile: 'tiny', spent: 2, budget: 4, stoppedBy: null });
 
-    const source = (await (await fetch(`${url}/source`)).json()) as Envelope<SourceStatusDto>;
+    const source = (await (await fetch(`${url}/source`)).json()) as Envelope<SourceStatus>;
     expect(source.data.budget.spent).toBe(2);
   });
 
@@ -173,7 +173,7 @@ describe('the govcon HTTP surface', () => {
   it('[GOV-8] [GOV-9] shows a stored notice, fetches its description once, and reports a spent budget as an outcome', async () => {
     const detail = (await (
       await fetch(`${url}/opportunities/a?profile=tiny`)
-    ).json()) as Envelope<LeadDetailDto>;
+    ).json()) as Envelope<NoticeDto>;
     expect(detail.data.opportunity.noticeId).toBe('a');
     expect(detail.data.factors).toHaveLength(6);
     expect(detail.data.description).toBeNull();
@@ -182,20 +182,20 @@ describe('the govcon HTTP surface', () => {
 
     const first = await post(url, '/opportunities/a/description', {});
     expect(first.status).toBe(200);
-    expect(((await first.json()) as Envelope<DescriptionResultDto>).data).toEqual({
+    expect(((await first.json()) as Envelope<DescriptionFetch>).data).toEqual({
       status: 'ok',
       description: { text: 'Description of a', fetchedAt: NOW.toISOString() },
     });
     const again = (
       (await (
         await post(url, '/opportunities/a/description', {})
-      ).json()) as Envelope<DescriptionResultDto>
+      ).json()) as Envelope<DescriptionFetch>
     ).data;
     expect(again.status).toBe('ok');
 
     const shown = (await (
       await fetch(`${url}/opportunities/a?profile=tiny`)
-    ).json()) as Envelope<LeadDetailDto>;
+    ).json()) as Envelope<NoticeDto>;
     expect(shown.data.description?.text).toBe('Description of a');
 
     // 2 searches + 1 description = 3 of 4; the next description spends the last, the one after is refused.
@@ -203,23 +203,21 @@ describe('the govcon HTTP surface', () => {
       (
         (await (
           await post(url, '/opportunities/c/description', {})
-        ).json()) as Envelope<DescriptionResultDto>
+        ).json()) as Envelope<DescriptionFetch>
       ).data.status,
     ).toBe('ok');
     const refused = (
       (await (
         await post(url, '/opportunities/b/description', {})
-      ).json()) as Envelope<DescriptionResultDto>
+      ).json()) as Envelope<DescriptionFetch>
     ).data;
     expect(refused).toEqual({ status: 'budget-exhausted', spent: 4, budget: 4 });
 
     // Every row carries the fixed clock, so the order among them is not meaningful — the counts are.
-    const page = (await (await fetch(`${url}/source/calls?limit=3`)).json()) as Page<SourceCallDto>;
+    const page = (await (await fetch(`${url}/source/calls?limit=3`)).json()) as Page<SourceCall>;
     expect(page.meta).toEqual({ total: 4, limit: 3, offset: 0 });
     expect(page.data).toHaveLength(3);
-    const calls = (await (
-      await fetch(`${url}/source/calls?limit=10`)
-    ).json()) as Page<SourceCallDto>;
+    const calls = (await (await fetch(`${url}/source/calls?limit=10`)).json()) as Page<SourceCall>;
     expect(calls.data.map((call) => call.operation).sort()).toEqual([
       'description',
       'description',

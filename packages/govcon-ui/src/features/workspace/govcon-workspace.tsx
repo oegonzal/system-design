@@ -2,12 +2,13 @@
 
 import {
   DEFAULT_PULL_DAYS,
-  type LeadDetailDto,
+  summarizePull,
+  type NoticeDto,
   type LeadsReport,
   type ListSourceCallsResponse,
   type PullReport as PullReportDto,
   type SearchProfile,
-  type SourceStatusDto,
+  type SourceStatus as SourceStatusData,
 } from '@sysdesign/contracts';
 import { Heading, LiveRegion, Spinner, Stack, Surface, Text } from '@sysdesign/design-system';
 import { isAbortError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
@@ -20,7 +21,7 @@ import { DEFAULT_LEAD_FILTERS, LeadFiltersControls, type LeadFilters } from '../
 import { LeadTable } from '../leads/lead-table';
 import { ProfileSummary } from '../profile/profile-summary';
 import { PullControls, type PullForm } from '../pull/pull-controls';
-import { PullReport, summarizePull } from '../pull/pull-report';
+import { PullReport } from '../pull/pull-report';
 import { CallHistory } from '../source/call-history';
 import { SourceStatus } from '../source/source-status';
 
@@ -45,7 +46,7 @@ export function GovconWorkspace() {
   const [profiles, setProfiles] = useState<SearchProfile[] | null>(null);
   const [profilesError, setProfilesError] = useState<string | null>(null);
   const [form, setForm] = useState<PullForm>({ profileId: '', days: DEFAULT_PULL_DAYS });
-  const [source, setSource] = useState<SourceStatusDto | null>(null);
+  const [source, setSource] = useState<SourceStatusData | null>(null);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [calls, setCalls] = useState<ListSourceCallsResponse | null>(null);
   const [callsError, setCallsError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export function GovconWorkspace() {
   const [leadsError, setLeadsError] = useState<string | null>(null);
   // The deep link is the initial selection — read once, at first render.
   const [noticeId, setNoticeId] = useState<string | null>(() => searchParams.get('notice'));
-  const [detail, setDetail] = useState<LeadDetailDto | null>(null);
+  const [detail, setDetail] = useState<NoticeDto | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
   const [problem, setProblem] = useState<DescriptionProblem | null>(null);

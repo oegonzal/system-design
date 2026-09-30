@@ -1,8 +1,8 @@
 /**
  * A contract opportunity as the govcon package stores and ranks it: SAM.gov's
  * record normalized once — dates as ISO strings, codes as the source spelled
- * them, nested objects flattened to what a lead needs. The row also keeps the
- * record as received; this is the shape every other layer reads.
+ * them, nested objects flattened to what a lead needs. This is the shape
+ * every other layer reads; nothing keeps the provider's record as received.
  */
 
 /** Where the work is performed, as codes and names SAM.gov supplies. */
@@ -77,6 +77,7 @@ export interface Opportunity {
   /** The human page on sam.gov. */
   uiLink: string | null;
   additionalInfoLink: string | null;
+  /** Attachment URLs; each download is a budgeted request through the service. */
   resourceLinks: string[];
   award: OpportunityAward | null;
   /** Which source produced the record, e.g. `sam.gov`. */

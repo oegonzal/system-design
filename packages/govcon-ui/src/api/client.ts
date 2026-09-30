@@ -1,9 +1,9 @@
 import type {
-  DescriptionResultDto,
+  DescriptionFetch,
   FetchDescriptionResponse,
-  GetLeadResponse,
+  GetNoticeResponse,
   GetSourceResponse,
-  LeadDetailDto,
+  NoticeDto,
   LeadsReport,
   ListCallsQuery,
   ListLeadsQuery,
@@ -12,7 +12,7 @@ import type {
   ListSourceCallsResponse,
   PullReport,
   SearchProfile,
-  SourceStatusDto,
+  SourceStatus,
   StartPullRequest,
   StartPullResponse,
 } from '@sysdesign/contracts';
@@ -33,7 +33,7 @@ export const api = {
     return unwrap(await request<ListProfilesResponse>('/profiles', opts));
   },
 
-  async getSource(opts: GetOptions = {}): Promise<SourceStatusDto> {
+  async getSource(opts: GetOptions = {}): Promise<SourceStatus> {
     return unwrap(await request<GetSourceResponse>('/source', opts));
   },
 
@@ -49,16 +49,16 @@ export const api = {
     noticeId: string,
     profile: string,
     opts: GetOptions = {},
-  ): Promise<LeadDetailDto> {
+  ): Promise<NoticeDto> {
     return unwrap(
-      await request<GetLeadResponse>(
+      await request<GetNoticeResponse>(
         `/opportunities/${encodeURIComponent(noticeId)}${toQueryString({ profile })}`,
         opts,
       ),
     );
   },
 
-  async fetchDescription(noticeId: string): Promise<DescriptionResultDto> {
+  async fetchDescription(noticeId: string): Promise<DescriptionFetch> {
     return unwrap(
       await request<FetchDescriptionResponse>(
         `/opportunities/${encodeURIComponent(noticeId)}/description`,

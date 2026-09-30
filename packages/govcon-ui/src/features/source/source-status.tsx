@@ -1,10 +1,10 @@
-import type { SourceStatusDto } from '@sysdesign/contracts';
+import type { SourceStatus as SourceStatusData } from '@sysdesign/contracts';
 import { Badge, Heading, Meter, Stack, Text, type MeterTone } from '@sysdesign/design-system';
 
 import { AVAILABILITY_TONE } from '../tones';
 
 export interface SourceStatusProps {
-  status: SourceStatusDto;
+  status: SourceStatusData;
 }
 
 /** Usage is the bad end of this scale, so the tone is explicit: the meter's default reads the other way. */

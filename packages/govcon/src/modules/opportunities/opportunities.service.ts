@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   describeQuery,
-  type DescriptionDto,
-  type DescriptionResultDto,
-  type LeadDetailDto,
+  type Description,
+  type DescriptionFetch,
+  type NoticeDto,
   type LeadsReport,
   type LeadTier,
   type OpportunityQuery,
@@ -12,8 +12,8 @@ import {
   type SearchProfile,
   type SliceOutcome,
   type SliceReport,
-  type SourceCallDto,
-  type SourceStatusDto,
+  type SourceCall,
+  type SourceStatus,
 } from '@sysdesign/contracts';
 
 import { BUDGET_WINDOW_MS, type BudgetPolicy } from '../../core/budgeted-source';
@@ -180,7 +180,7 @@ export class OpportunitiesService {
     };
   }
 
-  async show(noticeId: string, profileId: string): Promise<LeadDetailDto | null> {
+  async show(noticeId: string, profileId: string): Promise<NoticeDto | null> {
     const profile = this.profile(profileId);
     const opportunity = await this.repository.findOne(noticeId);
     if (!opportunity) return null;
@@ -192,7 +192,7 @@ export class OpportunitiesService {
   }
 
   /** The upstream and how much of the rolling day's budget is left. */
-  async status(): Promise<SourceStatusDto> {
+  async status(): Promise<SourceStatus> {
     return {
       id: this.source.id,
       availability: this.source.availability,
@@ -210,7 +210,7 @@ export class OpportunitiesService {
    * budgeted request, then stored. An unknown notice is refused before any
    * request is spent.
    */
-  async describe(noticeId: string): Promise<DescriptionResultDto> {
+  async describe(noticeId: string): Promise<DescriptionFetch> {
     if ((await this.repository.findOne(noticeId)) === null) {
       throw new NotFoundException(`no stored notice ${noticeId}`);
     }
@@ -235,9 +235,12 @@ export class OpportunitiesService {
   }
 
   /** The ledger, newest first. */
-  async calls(options: CallsOptions): Promise<[SourceCallDto[], number]> {
+  async calls(options: CallsOptions): Promise<[SourceCall[], number]> {
     const [rows, total] = await this.log.list(options.limit, options.offset);
-    return [rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() })), total];
+    return [
+      rows.map((row) => ({ ...row, requestedAt: row.requestedAt.toISOString() }) as SourceCall),
+      total,
+    ];
   }
 
   private slice(
@@ -246,6 +249,7 @@ export class OpportunitiesService {
     detail: string | null,
   ): SliceReport {
     return {
+      name: null,
       query,
       outcome,
       pages: 0,
@@ -273,7 +277,7 @@ export class OpportunitiesService {
   }
 }
 
-const toDescriptionDto = (stored: StoredDescription): DescriptionDto => ({
+const toDescriptionDto = (stored: StoredDescription): Description => ({
   text: stored.text,
   fetchedAt: stored.fetchedAt.toISOString(),
 });

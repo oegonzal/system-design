@@ -1,5 +1,5 @@
 import { Controller, Get, HttpCode, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import type { FetchDescriptionResponse, GetLeadResponse } from '@sysdesign/contracts';
+import type { FetchDescriptionResponse, GetNoticeResponse } from '@sysdesign/contracts';
 
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
 import { OpportunitiesService } from './opportunities.service';
@@ -14,7 +14,7 @@ export class OpportunitiesController {
   async get(
     @Param('noticeId') noticeId: string,
     @Query(new ZodValidationPipe(profileQuerySchema)) query: ProfileQuery,
-  ): Promise<GetLeadResponse> {
+  ): Promise<GetNoticeResponse> {
     const lead = await this.opportunities.show(noticeId, query.profile);
     if (!lead) throw new NotFoundException(`no stored notice ${noticeId}`);
     return { data: lead };

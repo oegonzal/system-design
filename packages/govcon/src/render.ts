@@ -1,7 +1,11 @@
 import {
+  agencyOf,
+  clip,
+  day,
   describeQuery,
-  type LeadDetailDto,
+  summarizePull,
   type LeadsReport,
+  type NoticeDto,
   type PullReport,
 } from '@sysdesign/contracts';
 
@@ -9,13 +13,6 @@ import {
  * stdout for humans. Fixed-width tables built with padEnd — no dependency, and
  * `--json` prints the report objects untouched for anything else.
  */
-const clip = (text: string | null, width: number): string => {
-  const value = text ?? '—';
-  return value.length > width ? `${value.slice(0, width - 1)}…` : value;
-};
-
-const day = (iso: string | null): string => (iso === null ? '—' : iso.slice(0, 10));
-
 function table(header: readonly string[], rows: readonly (readonly string[])[]): string {
   const widths = header.map((title, index) =>
     Math.max(title.length, ...rows.map((row) => (row[index] ?? '').length)),
@@ -30,12 +27,6 @@ function table(header: readonly string[], rows: readonly (readonly string[])[]):
   );
 }
 
-const agencyOf = (path: string | null): string | null => {
-  if (path === null) return null;
-  const parts = path.split('.').filter((part) => part.trim().length > 0);
-  return parts[parts.length - 1] ?? path;
-};
-
 export function renderPull(report: PullReport): string {
   const rows = report.slices.map((slice) => [
     slice.outcome,
@@ -47,9 +38,6 @@ export function renderPull(report: PullReport): string {
     String(slice.rejected),
     `${slice.truncated ? 'truncated' : ''}${slice.truncated && slice.detail ? ' · ' : ''}${slice.detail ?? ''}`,
   ]);
-  const counts = (outcome: string) =>
-    report.slices.filter((slice) => slice.outcome === outcome).length;
-  const stored = report.slices.reduce((total, slice) => total + slice.inserted + slice.updated, 0);
   const lines = [
     `pull · profile ${report.profile} · posted ${report.window.from}..${report.window.to} · source ${report.source.id}${
       report.source.availability.enabled ? '' : ` (disabled: ${report.source.availability.reason})`
@@ -58,9 +46,7 @@ export function renderPull(report: PullReport): string {
       ['outcome', 'slice', 'pages', 'received', 'inserted', 'updated', 'rejected', 'note'],
       rows,
     ),
-    `budget: ${report.spent === null ? '?' : report.spent}/${report.budget} attempts in the last 24h · ${stored} stored · ${counts('cached')} cached · ${counts('budget-exhausted') + counts('skipped')} not pulled${
-      report.stoppedBy ? ` (stopped: ${report.stoppedBy})` : ''
-    }`,
+    summarizePull(report),
   ];
   return lines.join('\n');
 }
@@ -88,7 +74,7 @@ export function renderLeads(report: LeadsReport): string {
   ].join('\n');
 }
 
-export function renderLead(lead: LeadDetailDto): string {
+export function renderLead(lead: NoticeDto): string {
   const o = lead.opportunity;
   const head = [
     `${o.title}`,

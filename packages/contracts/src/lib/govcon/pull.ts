@@ -1,7 +1,7 @@
 import type { ApiResponse } from '../envelope';
 import type { OpportunityQuery } from './query';
 import type { SourceAvailability } from './source';
-import type { SliceOutcome } from './vocab';
+import type { PullStop, SliceOutcome } from './vocab';
 
 /** Inclusive ISO dates the source is asked for. */
 export interface PullWindow {
@@ -10,6 +10,8 @@ export interface PullWindow {
 }
 
 export interface SliceReport {
+  /** The saved search the slice ran, when it was one. */
+  name: string | null;
   query: OpportunityQuery;
   outcome: SliceOutcome;
   pages: number;
@@ -31,7 +33,7 @@ export interface PullReport {
   /** Attempts inside the budget window after this pull, as the ledger counts them; null when it could not be read. */
   spent: number | null;
   budget: number;
-  stoppedBy: 'budget' | 'rate-limited' | null;
+  stoppedBy: PullStop | null;
 }
 
 /** The body of `POST /pulls`: a profile and either the last `days` days or an explicit window. */
@@ -41,7 +43,5 @@ export interface StartPullRequest {
   from?: string;
   to?: string;
 }
-
-export const DEFAULT_PULL_DAYS = 3;
 
 export type StartPullResponse = ApiResponse<PullReport>;

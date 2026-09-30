@@ -21,7 +21,7 @@ describe('CallHistory', () => {
     expect(cells(rows[0] as HTMLElement)).toEqual([
       '2026-09-27 02:57',
       'description',
-      'notice 21b78119…',
+      'description 21b781192a4f4026a2946237984a9c06',
       'ok',
       '1',
       '640',

@@ -9,8 +9,11 @@ const OUTCOMES = [
   'invalid-response',
 ] as const satisfies ContractOutcomes;
 
-type ContractOperations = (typeof Contracts)['SOURCE_OPERATIONS'];
-const OPERATIONS = ['search', 'description'] as const satisfies ContractOperations;
+/** The operations this schema admits so far; the vocabulary is wider and the next migration widens the check. */
+const OPERATIONS = [
+  'search',
+  'description',
+] as const satisfies readonly Contracts.SourceOperation[];
 
 /**
  * One request the govcon package made to an upstream source. The row is both

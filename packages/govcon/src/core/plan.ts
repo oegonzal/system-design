@@ -1,12 +1,10 @@
-import type { PullWindow, SearchProfile } from '@sysdesign/contracts';
+import { MAX_PULL_DAYS, type PullWindow, type SearchProfile } from '@sysdesign/contracts';
 
 import { canonicalQuery, type OpportunityQuery } from './query';
 
 export type { PullWindow };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** SAM.gov rejects a wider posted-date range. */
-export const MAX_WINDOW_DAYS = 366;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
@@ -31,8 +29,8 @@ export function validateWindow(window: PullWindow): PullWindow {
     throw new Error(`window dates must be real dates, got ${window.from}..${window.to}`);
   }
   if (from > to) throw new Error(`window starts after it ends: ${window.from}..${window.to}`);
-  if ((to - from) / DAY_MS > MAX_WINDOW_DAYS) {
-    throw new Error(`window spans more than ${MAX_WINDOW_DAYS} days: ${window.from}..${window.to}`);
+  if ((to - from) / DAY_MS > MAX_PULL_DAYS) {
+    throw new Error(`window spans more than ${MAX_PULL_DAYS} days: ${window.from}..${window.to}`);
   }
   return window;
 }

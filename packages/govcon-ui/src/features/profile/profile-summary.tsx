@@ -57,12 +57,8 @@ export function ProfileSummary({ profile }: ProfileSummaryProps) {
       </Text>
       <Text size="sm">
         Pull: {profile.pull.slices.length} slice(s) —{' '}
-        {profile.pull.slices
-          .map((slice) =>
-            describeQuery({ ...slice, postedFrom: '', postedTo: '', limit: 1, offset: 0 }),
-          )
-          .join(', ')}{' '}
-        · up to {profile.pull.maxPagesPerSlice} page(s) of {profile.pull.pageSize}
+        {profile.pull.slices.map((slice) => describeQuery(slice)).join(', ')} · up to{' '}
+        {profile.pull.maxPagesPerSlice} page(s) of {profile.pull.pageSize}
       </Text>
       <Text tone="muted" size="sm">
         Read-only here; the profile lives in the govcon package as data.

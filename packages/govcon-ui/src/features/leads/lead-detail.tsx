@@ -1,5 +1,5 @@
 import styled from '@emotion/styled';
-import type { LeadDetailDto, LeadTier } from '@sysdesign/contracts';
+import { day, type LeadTier, type NoticeDto } from '@sysdesign/contracts';
 import {
   Badge,
   Button,
@@ -11,7 +11,6 @@ import {
   type MeterTone,
 } from '@sysdesign/design-system';
 
-import { day } from '../format';
 import { TIER_TONE } from '../tones';
 
 const Pre = styled.pre`
@@ -33,7 +32,7 @@ const Pre = styled.pre`
 const SCORE_TONE: Record<LeadTier, MeterTone> = { high: 'success', medium: 'warn', low: 'danger' };
 
 export interface LeadDetailProps {
-  lead: LeadDetailDto;
+  lead: NoticeDto;
   onFetchDescription(): void;
   /** While the description request is in flight. */
   fetching?: boolean;

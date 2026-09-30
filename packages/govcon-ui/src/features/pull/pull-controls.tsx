@@ -1,13 +1,10 @@
-import type { SearchProfile } from '@sysdesign/contracts';
+import { MAX_PULL_DAYS, MIN_PULL_DAYS, type SearchProfile } from '@sysdesign/contracts';
 import { Button, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
 
 export interface PullForm {
   profileId: string;
   days: number;
 }
-
-export const MIN_PULL_DAYS = 1;
-export const MAX_PULL_DAYS = 366;
 
 export const clampDays = (value: number): number =>
   Number.isFinite(value)

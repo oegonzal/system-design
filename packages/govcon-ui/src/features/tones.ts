@@ -26,6 +26,11 @@ export const CALL_OUTCOME_TONE: Record<SourceCallOutcome, BadgeTone> = {
 export const OPERATION_TONE: Record<SourceOperation, BadgeTone> = {
   search: 'accent',
   description: 'neutral',
+  attachment: 'neutral',
+  awards: 'medium',
+  spending: 'medium',
+  entity: 'high',
+  exclusions: 'high',
 };
 
 export const TIER_TONE: Record<LeadTier, BadgeTone> = {

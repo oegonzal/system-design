@@ -1,8 +1,7 @@
 import styled from '@emotion/styled';
-import type { LeadsReport } from '@sysdesign/contracts';
+import { agencyOf, clip, day, type LeadsReport } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
-import { agencyOf, clip, day } from '../format';
 import { TIER_TONE } from '../tones';
 
 const RowButton = styled.button`

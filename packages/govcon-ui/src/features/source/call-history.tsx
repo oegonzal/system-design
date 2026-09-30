@@ -1,23 +1,12 @@
-import { describeQuery, type DescriptionRequest, type SourceCallDto } from '@sysdesign/contracts';
+import { describeCall, minute, type SourceCall } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
-import { minute } from '../format';
 import { CALL_OUTCOME_TONE, OPERATION_TONE } from '../tones';
 
 export interface CallHistoryProps {
-  calls: readonly SourceCallDto[];
+  calls: readonly SourceCall[];
   total: number;
 }
-
-/** A description row's query has no window; a search's always does. */
-const isDescriptionRequest = (query: SourceCallDto['query']): query is DescriptionRequest =>
-  !('postedFrom' in query);
-
-/** What one ledger row asked for. */
-export const describeCall = (call: SourceCallDto): string =>
-  isDescriptionRequest(call.query)
-    ? `notice ${call.query.noticeId.slice(0, 8)}…`
-    : describeQuery(call.query);
 
 /** The ledger newest first: every request made upstream, its operation, outcome and size. */
 export function CallHistory({ calls, total }: CallHistoryProps) {

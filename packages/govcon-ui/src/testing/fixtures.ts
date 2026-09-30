@@ -1,18 +1,30 @@
-import type {
-  DescriptionDto,
-  Lead,
-  LeadDetailDto,
-  LeadsReport,
-  Opportunity,
-  PullReport,
-  SearchProfile,
-  SourceCallDto,
-  SourceStatusDto,
+import {
+  descriptionOf,
+  leadOf,
+  noticeOf,
+  opportunityOf,
+  profileOf,
+  pullReportOf,
+  sliceReportOf,
+  sourceCallOf,
+  sourceStatusOf,
+  type Description,
+  type Lead,
+  type LeadsReport,
+  type NoticeDto,
+  type Opportunity,
+  type PullReport,
+  type SearchProfile,
+  type SourceCall,
+  type SourceStatus,
 } from '@sysdesign/contracts';
 
-/** Stable wire-shaped data for stories and specs; ISO stamps hardcoded so renders never drift. */
-
-export const PROFILE: SearchProfile = {
+/**
+ * The client's story: Enfav's profile and a NAVSUP repair solicitation, built
+ * over the contracts' builders so every spec and story here starts from the
+ * same wire-shaped facts. ISO stamps are fixed so renders never drift.
+ */
+export const PROFILE: SearchProfile = profileOf({
   id: 'enfav',
   company: 'Enfav LLC',
   naics: ['332710', '333249', '541511', '541512'],
@@ -28,108 +40,80 @@ export const PROFILE: SearchProfile = {
     maxPagesPerSlice: 1,
   },
   scoring: {
-    weights: {
-      naics: 0.3,
-      psc: 0.15,
-      interests: 0.15,
-      setAside: 0.15,
-      noticeType: 0.1,
-      deadline: 0.15,
-    },
-    setAside: { byCode: { SBA: 1, SBP: 0.8 }, unrestricted: 0.5 },
+    ...profileOf().scoring,
     noticeType: {
       byType: { Solicitation: 1, 'Combined Synopsis/Solicitation': 1, 'Sources Sought': 0.7 },
       default: 0.2,
       exclude: ['Award Notice', 'Justification'],
     },
-    deadline: {
-      bands: [
-        { maxDays: 3, value: 0.3 },
-        { maxDays: 14, value: 1 },
-        { maxDays: 45, value: 0.8 },
-      ],
-      beyond: 0.6,
-      none: 0.4,
-    },
-    tiers: { high: 70, medium: 45 },
   },
-};
+});
 
-export const SOURCE_STATUS: SourceStatusDto = {
-  id: 'sam.gov',
-  availability: { enabled: true, reason: null },
+export const SOURCE_STATUS: SourceStatus = sourceStatusOf({
   budget: { spent: 3, limit: 10, windowHours: 24 },
-  cacheTtlHours: 24,
-};
+});
 
-export const DISABLED_SOURCE: SourceStatusDto = {
-  id: 'sam.gov',
+export const DISABLED_SOURCE: SourceStatus = sourceStatusOf({
   availability: { enabled: false, reason: 'no-key' },
   budget: { spent: 0, limit: 10, windowHours: 24 },
-  cacheTtlHours: 24,
-};
-
-export const makeOpportunity = (overrides: Partial<Opportunity> = {}): Opportunity => ({
-  noticeId: '21b781192a4f4026a2946237984a9c06',
-  title: '59--JUNCTION BOX, IN REPAIR/MODIFICATION OF',
-  solicitationNumber: 'N0010426QFG43',
-  agencyPath: 'DEPT OF DEFENSE.DEPT OF THE NAVY.NAVSUP.NAVSUP WEAPON SYSTEMS SUPPORT',
-  agencyCode: '097.1700.N00104',
-  postedAt: '2026-09-25T00:00:00.000Z',
-  responseDeadlineAt: '2026-10-26T20:30:00.000Z',
-  archiveAt: null,
-  archiveType: 'auto15',
-  noticeType: 'Solicitation',
-  baseType: 'Solicitation',
-  active: true,
-  naicsCode: '332710',
-  naicsCodes: ['332710'],
-  classificationCode: '5975',
-  setAsideCode: null,
-  setAsideDescription: null,
-  organizationType: 'OFFICE',
-  placeOfPerformance: { city: 'Mechanicsburg', state: 'PA', zip: '17050', country: 'USA' },
-  officeAddress: { city: 'MECHANICSBURG', state: 'PA', zip: '17050', countryCode: 'USA' },
-  pointsOfContact: [
-    {
-      type: 'primary',
-      title: null,
-      fullName: 'Noelle Smith',
-      email: 'noelle.smith@navy.example',
-      phone: '717-605-3992',
-    },
-  ],
-  descriptionUrl:
-    'https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=21b781192a4f4026a2946237984a9c06',
-  uiLink: 'https://sam.gov/workspace/contract/opp/21b781192a4f4026a2946237984a9c06/view',
-  additionalInfoLink: null,
-  resourceLinks: [],
-  award: null,
-  source: 'sam.gov',
-  ...overrides,
 });
 
-export const makeLead = (overrides: Partial<Lead> = {}): Lead => ({
-  opportunity: makeOpportunity(),
-  score: 71.5,
-  tier: 'high',
-  factors: [
-    { id: 'naics', value: 1, weight: 0.3, points: 30, evidence: ['naics 332710'] },
-    { id: 'psc', value: 0.5, weight: 0.15, points: 7.5, evidence: ['psc 5975 in family 59'] },
-    {
-      id: 'interests',
-      value: 0.3,
-      weight: 0.15,
-      points: 4.5,
-      evidence: ['maintenance (as "repair")'],
-    },
-    { id: 'setAside', value: 0.5, weight: 0.15, points: 7.5, evidence: ['unrestricted'] },
-    { id: 'noticeType', value: 1, weight: 0.1, points: 10, evidence: ['notice type Solicitation'] },
-    { id: 'deadline', value: 0.8, weight: 0.15, points: 12, evidence: ['30 day(s) to respond'] },
-  ],
-  excluded: null,
-  ...overrides,
-});
+export const makeOpportunity = (overrides: Partial<Opportunity> = {}): Opportunity =>
+  opportunityOf({
+    noticeId: '21b781192a4f4026a2946237984a9c06',
+    title: '59--JUNCTION BOX, IN REPAIR/MODIFICATION OF',
+    solicitationNumber: 'N0010426QFG43',
+    agencyPath: 'DEPT OF DEFENSE.DEPT OF THE NAVY.NAVSUP.NAVSUP WEAPON SYSTEMS SUPPORT',
+    agencyCode: '097.1700.N00104',
+    postedAt: '2026-09-25T00:00:00.000Z',
+    responseDeadlineAt: '2026-10-26T20:30:00.000Z',
+    classificationCode: '5975',
+    setAsideCode: null,
+    setAsideDescription: null,
+    placeOfPerformance: { city: 'Mechanicsburg', state: 'PA', zip: '17050', country: 'USA' },
+    officeAddress: { city: 'MECHANICSBURG', state: 'PA', zip: '17050', countryCode: 'USA' },
+    pointsOfContact: [
+      {
+        type: 'primary',
+        title: null,
+        fullName: 'Noelle Smith',
+        email: 'noelle.smith@navy.example',
+        phone: '717-605-3992',
+      },
+    ],
+    descriptionUrl:
+      'https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=21b781192a4f4026a2946237984a9c06',
+    uiLink: 'https://sam.gov/workspace/contract/opp/21b781192a4f4026a2946237984a9c06/view',
+    ...overrides,
+  });
+
+export const makeLead = (overrides: Partial<Lead> = {}): Lead =>
+  leadOf({
+    opportunity: makeOpportunity(),
+    score: 71.5,
+    tier: 'high',
+    factors: [
+      { id: 'naics', value: 1, weight: 0.3, points: 30, evidence: ['naics 332710'] },
+      { id: 'psc', value: 0.5, weight: 0.15, points: 7.5, evidence: ['psc 5975 in family 59'] },
+      {
+        id: 'interests',
+        value: 0.3,
+        weight: 0.15,
+        points: 4.5,
+        evidence: ['maintenance (as "repair")'],
+      },
+      { id: 'setAside', value: 0.5, weight: 0.15, points: 7.5, evidence: ['unrestricted'] },
+      {
+        id: 'noticeType',
+        value: 1,
+        weight: 0.1,
+        points: 10,
+        evidence: ['notice type Solicitation'],
+      },
+      { id: 'deadline', value: 0.8, weight: 0.15, points: 12, evidence: ['30 day(s) to respond'] },
+    ],
+    ...overrides,
+  });
 
 /** High, medium, low — the order a ranking would put them in. */
 export const LEADS: Lead[] = [
@@ -225,116 +209,63 @@ export const makeLeadsReport = (overrides: Partial<LeadsReport> = {}): LeadsRepo
   ...overrides,
 });
 
-export const DESCRIPTION: DescriptionDto = {
-  text: 'The Defense Logistics Agency intends to purchase 400 each of NSN 5340-01-123-4567, bracket, mounting, additively manufactured to drawing 12345678 rev C.\nDelivery: 90 days ARO\nQuestions to A. Buyer — a.buyer@dla.mil — by 10/03/2026.',
-  fetchedAt: '2026-09-27T02:57:23.527Z',
-};
+export const DESCRIPTION: Description = descriptionOf();
 
-export const makeLeadDetail = (overrides: Partial<LeadDetailDto> = {}): LeadDetailDto => ({
-  ...makeLead(),
-  description: null,
-  ...overrides,
-});
+export const makeLeadDetail = (overrides: Partial<NoticeDto> = {}): NoticeDto =>
+  noticeOf({ ...makeLead(), description: null, ...overrides });
 
-export const makePullReport = (overrides: Partial<PullReport> = {}): PullReport => ({
-  profile: 'enfav',
-  window: { from: '2026-09-24', to: '2026-09-26' },
-  source: { id: 'sam.gov', availability: { enabled: true, reason: null } },
-  slices: [
-    {
-      query: {
-        postedFrom: '2026-09-24',
-        postedTo: '2026-09-26',
-        limit: 1000,
-        offset: 0,
-        naics: '332710',
-      },
-      outcome: 'ok',
-      pages: 1,
-      received: 2,
-      inserted: 2,
-      updated: 0,
-      rejected: 0,
-      truncated: false,
-      detail: null,
-    },
-    {
-      query: {
-        postedFrom: '2026-09-24',
-        postedTo: '2026-09-26',
-        limit: 1000,
-        offset: 0,
-        naics: '333249',
-      },
-      outcome: 'cached',
-      pages: 0,
-      received: 0,
-      inserted: 0,
-      updated: 0,
-      rejected: 0,
-      truncated: false,
-      detail: 'pulled 2026-09-26T19:10:37.782Z, 0 record(s)',
-    },
-    {
-      query: {
-        postedFrom: '2026-09-24',
-        postedTo: '2026-09-26',
-        limit: 1000,
-        offset: 0,
-        naics: '541511',
-      },
-      outcome: 'budget-exhausted',
-      pages: 0,
-      received: 0,
-      inserted: 0,
-      updated: 0,
-      rejected: 0,
-      truncated: false,
-      detail: 'budget 3/3 spent',
-    },
-    {
-      query: {
-        postedFrom: '2026-09-24',
-        postedTo: '2026-09-26',
-        limit: 1000,
-        offset: 0,
-        naics: '541512',
-      },
-      outcome: 'skipped',
-      pages: 0,
-      received: 0,
-      inserted: 0,
-      updated: 0,
-      rejected: 0,
-      truncated: false,
-      detail: 'stopped earlier: budget',
-    },
-  ],
-  spent: 3,
-  budget: 3,
-  stoppedBy: 'budget',
-  ...overrides,
-});
+const slice = (naics: string, overrides: Partial<ReturnType<typeof sliceReportOf>> = {}) =>
+  sliceReportOf({
+    query: { postedFrom: '2026-09-24', postedTo: '2026-09-26', limit: 1000, offset: 0, naics },
+    ...overrides,
+  });
 
-export const CALLS: SourceCallDto[] = [
-  {
+export const makePullReport = (overrides: Partial<PullReport> = {}): PullReport =>
+  pullReportOf({
+    profile: 'enfav',
+    slices: [
+      slice('332710'),
+      slice('333249', {
+        outcome: 'cached',
+        pages: 0,
+        received: 0,
+        inserted: 0,
+        detail: 'pulled 2026-09-26T19:10:37.782Z, 0 record(s)',
+      }),
+      slice('541511', {
+        outcome: 'budget-exhausted',
+        pages: 0,
+        received: 0,
+        inserted: 0,
+        detail: 'budget 3/3 spent',
+      }),
+      slice('541512', {
+        outcome: 'skipped',
+        pages: 0,
+        received: 0,
+        inserted: 0,
+        detail: 'stopped earlier: budget',
+      }),
+    ],
+    spent: 3,
+    budget: 3,
+    stoppedBy: 'budget',
+    ...overrides,
+  });
+
+export const CALLS: SourceCall[] = [
+  sourceCallOf({
     id: 'c3',
-    source: 'sam.gov',
     operation: 'description',
     queryKey: 'd'.repeat(64),
     query: { noticeId: '21b781192a4f4026a2946237984a9c06' },
     requestedAt: '2026-09-27T02:57:23.527Z',
     durationMs: 640,
-    status: 200,
-    outcome: 'ok',
     totalRecords: null,
     recordCount: 1,
-    error: null,
-  },
-  {
+  }),
+  sourceCallOf({
     id: 'c2',
-    source: 'sam.gov',
-    operation: 'search',
     queryKey: 'b'.repeat(64),
     query: {
       postedFrom: '2026-09-25',
@@ -345,30 +276,8 @@ export const CALLS: SourceCallDto[] = [
     },
     requestedAt: '2026-09-27T02:10:37.782Z',
     durationMs: 181,
-    status: 200,
-    outcome: 'ok',
     totalRecords: 0,
     recordCount: 0,
-    error: null,
-  },
-  {
-    id: 'c1',
-    source: 'sam.gov',
-    operation: 'search',
-    queryKey: 'a'.repeat(64),
-    query: {
-      postedFrom: '2026-09-25',
-      postedTo: '2026-09-27',
-      limit: 1000,
-      offset: 0,
-      naics: '332710',
-    },
-    requestedAt: '2026-09-27T02:10:36.823Z',
-    durationMs: 931,
-    status: 200,
-    outcome: 'ok',
-    totalRecords: 2,
-    recordCount: 2,
-    error: null,
-  },
+  }),
+  sourceCallOf({ id: 'c1' }),
 ];

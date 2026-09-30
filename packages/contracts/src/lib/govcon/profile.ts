@@ -22,7 +22,8 @@ export interface PullPolicy {
   maxPagesPerSlice: number;
 }
 
-export interface DeadlineBand {
+/** A value for everything up to `maxDays` days; bands ascend and the first fit wins. */
+export interface DayBand {
   maxDays: number;
   value: number;
 }
@@ -44,7 +45,7 @@ export interface ScoringPolicy {
   };
   deadline: {
     /** Ascending by `maxDays`; the first band the days left fit takes it. */
-    bands: DeadlineBand[];
+    bands: DayBand[];
     /** Further out than the last band. */
     beyond: number;
     /** No deadline stated. */
@@ -68,4 +69,9 @@ export interface SearchProfile {
   scoring: ScoringPolicy;
 }
 
+/** `POST /profiles` and `PUT /profiles/:id` take the whole document; the service validates it. */
+export type SaveProfileRequest = SearchProfile;
+
 export type ListProfilesResponse = ApiResponse<SearchProfile[]>;
+export type GetProfileResponse = ApiResponse<SearchProfile>;
+export type SaveProfileResponse = ApiResponse<SearchProfile>;

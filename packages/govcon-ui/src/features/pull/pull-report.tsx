@@ -1,21 +1,14 @@
-import { describeQuery, type PullReport as PullReportDto } from '@sysdesign/contracts';
+import {
+  describeQuery,
+  summarizePull,
+  type PullReport as PullReportDto,
+} from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { SLICE_OUTCOME_TONE } from '../tones';
 
 export interface PullReportProps {
   report: PullReportDto;
-}
-
-/** The pull's budget line, as the CLI prints it. */
-export function summarizePull(report: PullReportDto): string {
-  const stored = report.slices.reduce((total, slice) => total + slice.inserted + slice.updated, 0);
-  const count = (outcome: string) =>
-    report.slices.filter((slice) => slice.outcome === outcome).length;
-  const notPulled = count('budget-exhausted') + count('skipped');
-  const spent = report.spent === null ? '?' : String(report.spent);
-  const stopped = report.stoppedBy ? ` (stopped: ${report.stoppedBy})` : '';
-  return `${spent} of ${report.budget} attempts used in the last 24 h · ${stored} stored · ${count('cached')} cached · ${notPulled} not pulled${stopped}`;
 }
 
 /** One row per slice: what was asked, how it went, what it stored. */
