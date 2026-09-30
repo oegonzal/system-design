@@ -1,9 +1,9 @@
 /**
  * The harness the HTTP suites share: a dump directory of the suite's own, the
  * real application over a real port with the providers a suite fakes, the
- * tables it truncates, and the two ways it talks to the app. The application
- * module is imported inside `bootApp`, after the environment is set, because
- * the dump directory is read at import.
+ * tables it truncates, and the two ways it talks to the app. The dump
+ * directory is read when the application boots, so a suite claims its own
+ * before calling `bootApp`.
  */
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -25,7 +25,7 @@ export type Page<T> = { data: T[]; meta: { total: number; limit: number; offset:
 /** A dump directory of this suite's own, so its assertions never see another suite's dump. */
 export function claimDumpDir(label: string): string {
   const dir = join(tmpdir(), `sysdesign-${label}-dumps-${crypto.randomUUID()}`);
-  process.env['EVAL_DUMP_DIR'] = dir;
+  process.env['QUALITY_LOOP_DUMP_DIR'] = dir;
   return dir;
 }
 

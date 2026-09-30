@@ -1,6 +1,11 @@
 /**
  * The guards that keep a dump from being the thing that breaks a run.
  *
+ * The quality loop's dump builder (`quality-loop/src/dump/build-run-dump.ts`)
+ * caps and copies every recorded field through these. The loop also caps text
+ * for its prompts, memory queries and digests with `capText`, and records the
+ * errors of its runs, orchestrations and memory store with `describeError`.
+ *
  * Everything here fails soft. A dump is an audit trail; an audit trail that can
  * throw is worse than none, because it takes the graded evaluation down with
  * it. Every function below returns a description of the problem instead.

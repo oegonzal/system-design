@@ -19,7 +19,7 @@ export default defineConfig({
     // `quality_run` between files, so they get their own database unless the
     // environment (CI) pins one, and share one lane like studio-api.
     env: {
-      EVAL_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
+      QUALITY_LOOP_DUMP_DIR: join(tmpdir(), 'sysdesign-test-run-dumps'),
       DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
     },
     fileParallelism: false,

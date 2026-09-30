@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildRunRecord,
-  makeRunId,
   RUN_SCHEMA_VERSION,
   toIndexRows,
   writeRunRecord,
@@ -154,17 +153,5 @@ describe('writeRunRecord', () => {
     const lines = readFileSync(second.indexPath, 'utf8').trim().split('\n');
     expect(lines).toHaveLength(6); // three findings per run, two runs
     expect(lines.map((l) => JSON.parse(l).runId)).toContain('first');
-  });
-});
-
-describe('makeRunId', () => {
-  it('sorts chronologically as a plain string', () => {
-    const early = makeRunId(Date.parse('2026-01-01T00:00:00Z'), () => 0);
-    const later = makeRunId(Date.parse('2026-06-01T00:00:00Z'), () => 0);
-    expect([later, early].sort()).toEqual([early, later]);
-  });
-
-  it('is filesystem-safe', () => {
-    expect(makeRunId(Date.parse('2026-08-27T10:00:00.000Z'), () => 0.5)).not.toMatch(/[:.]/);
   });
 });

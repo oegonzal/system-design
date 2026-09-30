@@ -1,5 +1,7 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 
+import { makeRunStamp } from '@sysdesign/run-dump';
+
 import {
   criticGate,
   defaultRuntime,
@@ -20,7 +22,7 @@ import { CRITICS, type CriticName } from './critics';
 import { sanitise, type CriticReport, type Finding } from './policy';
 import { decide, defaultSummary, mergeFindings, worseOf, type SourcedFinding } from './evaluator';
 import { runRules, type ChangedFile } from './rules/index';
-import { buildRunRecord, makeRunId, writeRunRecord, type CriticOutcome } from './persist';
+import { buildRunRecord, writeRunRecord, type CriticOutcome } from './persist';
 import { buildRepoMap, type RepoMap } from './repo-map';
 import { toMarkdown, toTerminal, type ReviewOutcome } from './report';
 
@@ -216,7 +218,7 @@ export function criticSchemaFor(name: CriticName, intentAvailable = true): Recor
 
 async function main(): Promise<number> {
   const startedAt = Date.now();
-  const runId = makeRunId(startedAt);
+  const runId = makeRunStamp(startedAt);
   // The one read of argv and the environment; everything below receives it.
   const config = loadReviewConfig();
   const { scope, profile, settings, markdownOut, runsDir, record } = config;

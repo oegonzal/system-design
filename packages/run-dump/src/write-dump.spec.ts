@@ -2,11 +2,15 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeRunId } from './run-id';
+import { makeRunId, makeRunStamp } from './run-id';
 import { capText, describeError, jsonSafe, MAX_TEXT_BYTES } from './serialize';
-import { dumpDir, findPromptRunId, INDEX_FILE, writeDump, type BuiltDump } from './write-dump';
+import { gitContext, INDEX_FILE, writeDump, type BuiltDump } from './write-dump';
+
+// Stands in for git, so the spec can count what `gitContext` spawns.
+const execFileSync = vi.hoisted(() => vi.fn(() => 'main\n'));
+vi.mock('node:child_process', () => ({ execFileSync }));
 
 const dirs: string[] = [];
 function tempDir(): string {
@@ -20,33 +24,39 @@ afterEach(() => {
 
 function dump(overrides: Partial<BuiltDump> = {}): BuiltDump {
   return {
-    runId: '2026-09-01T07-20-05-880-9f3c2a-eval',
+    runId: '2026-09-01T07-20-05-880-9f3c2a-quality',
     files: [
       { path: 'manifest.json', content: '{"runId":"x"}\n' },
       { path: '06-llm/01.llm.critic.1.system.txt', content: 'You are a critic.' },
     ],
-    indexRow: `${JSON.stringify({ runId: 'x', kind: 'eval' })}\n`,
+    indexRow: `${JSON.stringify({ runId: 'x', kind: 'quality' })}\n`,
     ...overrides,
   };
 }
 
-describe('makeRunId', () => {
+describe('makeRunStamp', () => {
   it('sorts chronologically as a plain string, across a day boundary', () => {
-    const before = makeRunId(Date.parse('2026-08-31T23:59:59.000Z'), 'eval', () => 0.9);
-    const after = makeRunId(Date.parse('2026-09-01T00:00:01.000Z'), 'eval', () => 0.1);
+    const before = makeRunStamp(Date.parse('2026-08-31T23:59:59.000Z'), () => 0.9);
+    const after = makeRunStamp(Date.parse('2026-09-01T00:00:01.000Z'), () => 0.1);
     // The suffix is deliberately the LARGER one on the earlier run: ordering
     // must come from the stamp, never from the tiebreaker.
     expect([after, before].sort()).toEqual([before, after]);
   });
 
-  it('names the kind so a listing distinguishes the two pipelines', () => {
-    const now = Date.parse('2026-09-01T07:20:05.880Z');
-    expect(makeRunId(now, 'prompt', () => 0)).toMatch(/-prompt$/);
-    expect(makeRunId(now, 'eval', () => 0)).toMatch(/-eval$/);
+  it('has no characters a filesystem or a shell would fight over', () => {
+    expect(makeRunStamp(Date.now(), () => 0.5)).toMatch(/^[A-Za-z0-9-]+$/);
   });
 
-  it('has no characters a filesystem or a shell would fight over', () => {
-    expect(makeRunId(Date.now(), 'eval', () => 0.5)).toMatch(/^[A-Za-z0-9-]+$/);
+  /** The code review's `.code-review/runs` records are named by the bare stamp; their ids must not drift. */
+  it('keeps the stamp-and-suffix format the recorded runs already use', () => {
+    expect(makeRunStamp(Date.parse('2026-08-27T10:00:00.000Z'), () => 0.5)).toBe(
+      '2026-08-27T10-00-00-000-7fffff',
+    );
+  });
+
+  it('names a dump folder by its stamp and kind', () => {
+    const now = Date.parse('2026-09-01T07:20:05.880Z');
+    expect(makeRunId(now, 'quality', () => 0)).toBe(`${makeRunStamp(now, () => 0)}-quality`);
   });
 });
 
@@ -103,7 +113,7 @@ describe('writeDump', () => {
   it('appends exactly one index line per run', () => {
     const dir = tempDir();
     writeDump(dump(), dir);
-    writeDump(dump({ runId: 'second-run-eval' }), dir);
+    writeDump(dump({ runId: 'second-run-quality' }), dir);
 
     const rows = readFileSync(join(dir, INDEX_FILE), 'utf8').split('\n').filter(Boolean);
     expect(rows).toHaveLength(2);
@@ -122,53 +132,12 @@ describe('writeDump', () => {
   });
 });
 
-describe('findPromptRunId', () => {
-  it('returns the newest run for a prompt, and null when there is none', () => {
-    const dir = tempDir();
-    writeDump(
-      dump({
-        runId: 'older-prompt',
-        indexRow: `${JSON.stringify({ runId: 'older-prompt', kind: 'prompt', promptId: 'pr-1' })}\n`,
-      }),
-      dir,
-    );
-    writeDump(
-      dump({
-        runId: 'newer-prompt',
-        indexRow: `${JSON.stringify({ runId: 'newer-prompt', kind: 'prompt', promptId: 'pr-1' })}\n`,
-      }),
-      dir,
-    );
-
-    expect(findPromptRunId('pr-1', dir)).toBe('newer-prompt');
-    expect(findPromptRunId('pr-missing', dir)).toBeNull();
-  });
-
-  it('ignores eval rows, which carry a promptId too', () => {
-    const dir = tempDir();
-    writeDump(
-      dump({
-        runId: 'an-eval',
-        indexRow: `${JSON.stringify({ runId: 'an-eval', kind: 'eval', promptId: 'pr-2' })}\n`,
-      }),
-      dir,
-    );
-    expect(findPromptRunId('pr-2', dir)).toBeNull();
-  });
-
-  /** Never worth failing a run over: a missing or corrupt index is just absent. */
-  it('is silent when there is no index, or a row will not parse', () => {
-    const dir = tempDir();
-    expect(findPromptRunId('pr-1', dir)).toBeNull();
-
-    writeFileSync(join(dir, INDEX_FILE), 'not json at all\n');
-    expect(findPromptRunId('pr-1', dir)).toBeNull();
-  });
-});
-
-describe('dumpDir', () => {
-  it('defaults to the repo tree and honours the override tests rely on', () => {
-    expect(dumpDir({})).toBe(join(process.cwd(), 'static', 'runs'));
-    expect(dumpDir({ EVAL_DUMP_DIR: '/tmp/elsewhere' })).toBe('/tmp/elsewhere');
+describe('gitContext', () => {
+  it('spawns nothing at import, then reads git once and serves it from memory', () => {
+    expect(execFileSync).not.toHaveBeenCalled();
+    const first = gitContext();
+    expect(first).toEqual({ branch: 'main', headSha: 'main' });
+    expect(gitContext()).toBe(first);
+    expect(execFileSync).toHaveBeenCalledTimes(2);
   });
 });

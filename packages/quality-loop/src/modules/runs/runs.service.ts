@@ -10,7 +10,7 @@ import type {
   SuccessCriterion,
 } from '@sysdesign/contracts';
 import type { LlmClient, LlmExchange } from '@sysdesign/llm';
-import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
+import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
 import { summariseExchange, type RunRecord } from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
@@ -192,7 +192,7 @@ export class RunsService {
       startedAt: new Date().toISOString(),
       finishedAt: null,
       llm: this.availability(),
-      git: GIT_CONTEXT,
+      git: gitContext(),
       request: {
         goal: request.goal,
         outputProvided: request.output !== undefined,

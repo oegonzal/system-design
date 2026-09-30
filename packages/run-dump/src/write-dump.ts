@@ -1,17 +1,16 @@
 /**
- * Run-folder plumbing, shared by every pipeline that dumps.
+ * Run-folder plumbing for the quality loop's dumps.
  *
- * What is shared is deliberately only the payload-AGNOSTIC half: a run id, a
- * list of files, one index line. The records themselves stay in the apps that
- * own their types — a quality run's dump is written against the loop's trace,
- * a govcon pull's against its ledger — and neither vocabulary belongs in a
- * package the other has to depend on.
+ * What lives here is deliberately only the payload-AGNOSTIC half: a run id, a
+ * list of files, one index line. The records themselves are laid out by the
+ * loop (`quality-loop/src/dump/build-run-dump.ts`), which owns their types, and
+ * written by its trace store; the code review mints its run ids here too.
  *
  * Three rules here, each earned:
  *
- * 1. **Never throw.** Callers invoke this from a `finally`. A throw there
- *    replaces whatever error the run was already reporting, turning a retryable
- *    failure into a crashed loop.
+ * 1. **The caller owns failure.** A write the disk refuses throws. The trace
+ *    store catches and logs it, because it runs from a `finally` where a throw
+ *    would replace the run's own outcome and skip closing its row.
  * 2. **Write each file through a temp name and rename.** A process killed
  *    mid-write must not leave half a JSON file for every later reader to trip
  *    over.
@@ -19,10 +18,10 @@
  *    complete, so a half-written run is never indexed. One small flat line per
  *    run keeps the append atomic — several processes share this directory.
  *
- * Synchronous `fs` is deliberate: neither caller has throughput to protect, and
- * async would only add an unawaited promise to a path that must not fail.
+ * Synchronous `fs` is deliberate: the one writer has no throughput to protect,
+ * and async would only add an unawaited promise to a path that must not fail.
  */
-import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
@@ -49,20 +48,15 @@ export interface GitContext {
   headSha: string;
 }
 
-/**
- * `EVAL_DUMP_DIR` exists so test suites can point this at a temp directory —
- * `static/runs` should keep meaning *real runs* — and as the escape hatch if
- * the tree ever needs to live on another disk.
- */
-export function dumpDir(env: NodeJS.ProcessEnv = process.env): string {
-  return env['EVAL_DUMP_DIR'] ?? join(process.cwd(), 'static', 'runs');
-}
-
 export interface WriteResult {
   runDir: string;
 }
 
-export function writeDump(dump: BuiltDump, dir = dumpDir()): WriteResult {
+/**
+ * Every file under `dir/<runId>`, then the index row. Throws when a write
+ * fails, leaving that run unindexed — a caller in a `finally` must catch.
+ */
+export function writeDump(dump: BuiltDump, dir: string): WriteResult {
   const runDir = join(dir, dump.runId);
 
   for (const file of dump.files) {
@@ -77,36 +71,17 @@ export function writeDump(dump: BuiltDump, dir = dumpDir()): WriteResult {
   return { runDir };
 }
 
-/**
- * The newest prompt run that produced this prompt, so an evaluation can be read
- * back to the scenario it was answering.
- *
- * Reading the index rather than storing a column means no migration and no
- * schema coupling — and when the prompt predates this feature the link is
- * simply absent, which is honest. `promptId` stays on the manifest either way,
- * so a manual join always works.
- */
-export function findPromptRunId(promptId: string, dir = dumpDir()): string | null {
-  try {
-    const rows = readFileSync(join(dir, INDEX_FILE), 'utf8').split('\n');
-    for (let index = rows.length - 1; index >= 0; index -= 1) {
-      const line = rows[index];
-      if (!line) continue;
-      const row = JSON.parse(line) as { kind?: string; promptId?: string; runId?: string };
-      if (row.kind === 'prompt' && row.promptId === promptId) return row.runId ?? null;
-    }
-  } catch {
-    // No index yet, or a row we cannot read — neither is worth a failed run.
-  }
-  return null;
-}
+let git: GitContext | null = null;
 
 /**
- * Read once at module load, not per run: a long-lived service's HEAD does not
- * move, and three `git` subprocesses on every submission is a real cost on a
- * background loop's hot path.
+ * Read once, on first use, not per run: a long-lived service's HEAD does not
+ * move, and two `git` subprocesses on every submission is a real cost on a
+ * background loop's hot path. Lazy, so importing this package spawns nothing.
  */
-export const GIT_CONTEXT: GitContext = readGit();
+export function gitContext(): GitContext {
+  git ??= readGit();
+  return git;
+}
 
 function readGit(): GitContext {
   const run = (args: string[]): string => {

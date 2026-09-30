@@ -210,7 +210,7 @@ login, and the process refuses to boot). An API key is never used.
 | `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                            |
 | `LLM_MODEL`                       | pins the model the subscription runs                                                                                        |
 | `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `600000`                             |
-| `EVAL_DUMP_DIR`                   | where the loop's run dumps go; the specs point it at a temp directory                                                       |
+| `QUALITY_LOOP_DUMP_DIR`           | where the loop's run dumps go; default `static/runs`; the specs point it at a temp directory                                |
 
 ---
 

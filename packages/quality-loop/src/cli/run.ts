@@ -3,7 +3,8 @@
  *
  * The goal file is read verbatim as the inputGoal. Boots the same Nest context
  * the HTTP surface uses, runs to completion, prints a summary and exits by the
- * decision. The dump under the run-dump directory is the full record.
+ * decision. The dump under `QUALITY_LOOP_DUMP_DIR` (default `static/runs`) is
+ * the full record.
  */
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -11,10 +12,10 @@ import { parseArgs } from 'node:util';
 
 import { NestFactory } from '@nestjs/core';
 import type { SuccessCriterion } from '@sysdesign/contracts';
-import { dumpDir } from '@sysdesign/run-dump';
 
 import type { RunRecord } from '../core/contracts';
 import { AppModule } from '../modules/app/app.module';
+import { dumpDir } from '../modules/runs/runs.module';
 import { RunsService } from '../modules/runs/runs.service';
 import { intOr } from './args';
 

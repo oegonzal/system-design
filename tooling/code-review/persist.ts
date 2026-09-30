@@ -171,15 +171,6 @@ export function writeRunRecord(record: RunRecord, runsDir = DEFAULT_RUNS_DIR): W
   return { recordPath, indexPath };
 }
 
-/** Sortable and unique: an ISO-ish stamp plus a short random suffix. */
-export function makeRunId(now: number, random: () => number = Math.random): string {
-  const stamp = new Date(now).toISOString().replace(/[:.]/g, '-').replace('Z', '');
-  const suffix = Math.floor(random() * 0xffffff)
-    .toString(16)
-    .padStart(6, '0');
-  return `${stamp}-${suffix}`;
-}
-
 function readGit(): RunRecord['git'] {
   const run = (args: string[]): string => {
     try {
