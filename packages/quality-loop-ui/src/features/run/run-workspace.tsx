@@ -56,7 +56,10 @@ export function RunWorkspace() {
     const controller = new AbortController();
     const { signal } = controller;
     Promise.all([api.listPrompts({ signal }), api.listPipelines({ signal })])
-      .then(([prompts, pipelines]) => {
+      .then(([prompts, registry]) => {
+        // A pipeline that takes a composed goal (a memory step's, the studio's)
+        // is never a choice here: the registry says so, the form never learns of it.
+        const pipelines = registry.filter((pipeline) => pipeline.goalSource === 'brief');
         setLibrary({ prompts, pipelines });
         setForm(initialForm(prompts, pipelines));
       })

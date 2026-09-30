@@ -36,6 +36,10 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
 
   version: '1.0.0',
 
+  // A brief a person types: a route for the router, a target for an orchestrator.
+
+  goalSource: 'brief',
+
   description:
     'A design for a workflow of agents, tools and rules, judged for coverage, the fit between its parts, and whether it holds for inputs nobody anticipated.',
 

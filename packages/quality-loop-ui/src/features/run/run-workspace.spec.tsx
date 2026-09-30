@@ -58,6 +58,32 @@ afterEach(() => {
 });
 
 describe('RunWorkspace', () => {
+  it('[QL-24] offers only the pipelines that take a brief, and defaults to the first of them', async () => {
+    stubApi([
+      { path: '/prompts', body: { data: PROMPT_ENTRIES } },
+      {
+        path: '/pipelines',
+        body: {
+          data: [
+            makePipeline({ id: 'memory-recall', goalSource: 'composed' }),
+            makePipeline(),
+            makePipeline({ id: 'system-design-canvas', goalSource: 'composed' }),
+          ],
+        },
+      },
+      RECENT,
+      { path: '/prompts/notification-fanout', body: { data: makePromptDocument() } },
+    ]);
+
+    renderWithTheme(<RunWorkspace />);
+    await advance(0);
+    await advance(0);
+
+    const pipelineSelect = screen.getByLabelText('Pipeline') as HTMLSelectElement;
+    expect([...pipelineSelect.options].map((option) => option.value)).toEqual(['system-design']);
+    expect(pipelineSelect.value).toBe('system-design');
+  });
+
   it('[QLU-1] [QLU-2] lists the library, starts a run from the chosen prompt, follows it to the verdict', async () => {
     const bodies: unknown[] = [];
     const { calls } = stubApi([

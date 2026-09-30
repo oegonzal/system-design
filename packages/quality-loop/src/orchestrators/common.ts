@@ -1,44 +1,41 @@
 /**
- * What more than one orchestrator declares: the pipelines a brief may never
- * be sent to, the request taken bare, the adapter that runs a pipeline as the
+ * What more than one orchestrator declares: the refusal of a composed-goal
+ * pipeline as a target, the request taken bare, the adapter that runs a pipeline as the
  * run's own deliverable, the stand-in a provided run makes, and the routes a
  * brief may be dispatched to. Each orchestrator names which of these it uses;
  * the runner applies none of them.
  */
-import {
-  CANVAS_PIPELINE_ID,
-  PROMPT_PIPELINE_ID,
-  type PipelineSummary,
-  type QualityRunDto,
-  type RouteDto,
-  type RunTrace,
-  type StartOrchestrationRequest,
+import type {
+  PipelineSummary,
+  QualityRunDto,
+  RouteDto,
+  RunTrace,
+  StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 
 import { outputsOf } from '../core/outputs';
 import type { RunInput } from '../core/loop/run-pipeline';
 import { bareGoal } from './memory/recall/inject';
-import { EXPERIENCE_DIGEST_ID } from '../pipelines/experience-digest/input';
-import { MEMORY_RECALL_ID } from '../pipelines/memory-recall/input';
 import type { StepContext, StepResult } from './runner/definition';
 
 /**
- * Pipelines that take a goal another program composed — a memory step, or
- * the studio — never a brief a person typed. No orchestrator accepts one as
- * a target, and no router offers one as a route.
+ * The `refuse` of every orchestrator that takes a target: a pipeline that
+ * declares a composed goal — a memory step's, the studio's — is not one. Read
+ * from the registry's summaries, never from a list of ids kept here; an
+ * unregistered id is the service's 404, which comes first.
  */
-const INTERNAL_PIPELINES: readonly string[] = [
-  MEMORY_RECALL_ID,
-  EXPERIENCE_DIGEST_ID,
-  CANVAS_PIPELINE_ID,
-  PROMPT_PIPELINE_ID,
-];
-
-/** The `refuse` of every orchestrator that takes a target: an internal pipeline is not one. */
-export const refuseInternal = (request: StartOrchestrationRequest): string | null =>
-  request.pipeline !== undefined && INTERNAL_PIPELINES.includes(request.pipeline)
+export const refuseInternal = (
+  request: StartOrchestrationRequest,
+  pipelines: readonly PipelineSummary[],
+): string | null => {
+  const target =
+    request.pipeline === undefined
+      ? undefined
+      : pipelines.find((summary) => summary.id === request.pipeline);
+  return target?.goalSource === 'composed'
     ? `${request.pipeline} is not a target: it takes a composed goal, not a brief`
     : null;
+};
 
 /**
  * The `normalize` every orchestrator declares: a stored goal may carry what
@@ -119,5 +116,5 @@ export async function runTarget<O extends object, P>(
 /** The registered pipelines a brief may be routed to, as a classifier should see them. */
 export const briefRoutes = (registry: readonly PipelineSummary[]): RouteDto[] =>
   registry
-    .filter((summary) => !INTERNAL_PIPELINES.includes(summary.id))
+    .filter((summary) => summary.goalSource === 'brief')
     .map((summary) => ({ id: summary.id, description: summary.description }));

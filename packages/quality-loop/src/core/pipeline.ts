@@ -8,11 +8,12 @@
  */
 import type {
   DecisionPolicy,
+  GoalSource,
   PipelineSummary,
   ProducerBriefing,
   UpstreamEvidence,
 } from '@sysdesign/contracts';
-import { PRODUCER_BRIEFING, UPSTREAM_EVIDENCE } from '@sysdesign/contracts';
+import { GOAL_SOURCES, PRODUCER_BRIEFING, UPSTREAM_EVIDENCE } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
@@ -62,6 +63,13 @@ export interface PipelineDefinition<T> {
   id: string;
   version: string;
   description: string;
+  /**
+   * What kind of goal the pipeline takes: a brief a person typed, or a goal
+   * another program composed. Validated at boot and projected into the
+   * summary; the orchestrators, the router and the loop UI read it there —
+   * never a list of ids kept somewhere else.
+   */
+  goalSource: GoalSource;
   task: TaskSpec<T>;
   deriveCriteria: StageSpec;
   producer: ProducerSpec;
@@ -146,6 +154,9 @@ function checkWaves(definition: Definition, fail: Fail): void {
 }
 
 function checkTask(definition: Definition, fail: Fail): void {
+  if (!(GOAL_SOURCES as readonly string[]).includes(definition.goalSource)) {
+    fail(`goalSource ${String(definition.goalSource)} is not one of ${GOAL_SOURCES.join(', ')}`);
+  }
   const validatorIds = definition.validators.map((validator) => validator.id);
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
@@ -220,6 +231,7 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
     id: definition.id,
     version: definition.version,
     description: definition.description,
+    goalSource: definition.goalSource,
     task: {
       criterionKinds: { ...task.criterionKinds },
       findingTypes: { ...task.findingTypes },

@@ -8,6 +8,9 @@ import { ROUTER } from './definition';
 import type { BriefClassifier, Classification, RouterPorts } from './ports';
 
 const summaries = (...ids: string[]): PipelineSummary[] => ids.map((id) => summaryOf(id));
+/** Pipelines that take a composed goal — never a route, whatever the classifier says. */
+const composed = (...ids: string[]): PipelineSummary[] =>
+  ids.map((id) => summaryOf(id, 80, 'composed'));
 
 const classifier = (answer: Classification | null, enabled = true): BriefClassifier => ({
   enabled,
@@ -62,7 +65,7 @@ describe('the router orchestrator', () => {
 
   it('[QL-19] offers every registered brief-taking pipeline as a route, runs the one chosen, and judges once', async () => {
     const { record, asked, routes } = await perform(
-      summaries('tiny', 'other', 'memory-recall'),
+      [...summaries('tiny', 'other'), ...composed('memory-recall')],
       classifier({ pipeline: 'other', rationale: 'it is the other kind' }),
     );
     expect(routes).toEqual([['tiny', 'other']]);
@@ -114,7 +117,7 @@ describe('the router orchestrator', () => {
     expect(disabled.record.error?.message).toContain('no-key');
 
     const nowhere = await perform(
-      summaries('memory-recall', 'experience-digest'),
+      composed('memory-recall', 'experience-digest'),
       classifier({ pipeline: 'memory-recall', rationale: 'never asked' }),
     );
     expect(nowhere.routes).toEqual([]);

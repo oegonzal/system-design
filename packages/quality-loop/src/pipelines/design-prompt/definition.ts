@@ -31,6 +31,10 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
 
     version: '1.0.0',
 
+    // A goal another program composes; never a route, a target, or a choice in the UI.
+
+    goalSource: 'composed',
+
     description:
       "A system-design prompt written from an engineer's experience, judged for fidelity to that experience, for whether a panel could grade answers to it, and for staying brand-neutral and one session wide.",
 

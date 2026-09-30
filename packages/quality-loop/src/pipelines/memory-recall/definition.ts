@@ -22,6 +22,9 @@ const MAX_CRITERIA = 12;
 export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
   id: MEMORY_RECALL_ID,
   version: '1.0.0',
+
+  // A goal another program composes; never a route, a target, or a choice in the UI.
+  goalSource: 'composed',
   description:
     'Chunks recalled from memory for a query, judged for coverage, precision and fidelity and curated into a pack a producer could read.',
 

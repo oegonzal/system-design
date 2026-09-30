@@ -48,6 +48,7 @@ export function tinyPipeline(
     id: 'tiny',
     version: '0.0.1',
     description: 'A two-field artifact for specs.',
+    goalSource: 'brief',
     task: {
       criterionKinds: {
         must: 'Something the goal requires.',

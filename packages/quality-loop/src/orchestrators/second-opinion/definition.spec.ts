@@ -6,7 +6,7 @@ import { confirmed, decision, ledger, runRecord, traceOf } from '../../core/test
 import { validateOrchestrator } from '../runner/definition';
 import { openRecord } from '../runner/record';
 import { runOrchestration } from '../runner/run-orchestration';
-import { orchestrationDeps, performed } from '../runner/testing';
+import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
 import { SECOND_OPINION } from './definition';
 
 const ARTIFACT = { text: 'the answer', parts: ['one'] };
@@ -51,9 +51,11 @@ describe('the second-opinion orchestrator', () => {
     expect(() => validateOrchestrator(SECOND_OPINION as never)).not.toThrow();
     expect(SECOND_OPINION.takesTarget).toBe(true);
     expect(SECOND_OPINION.steps.map((step) => step.id)).toEqual(['first', 'panel', 'reconcile']);
-    expect(SECOND_OPINION.refuse?.({ pipeline: 'experience-digest', goal: 'g' }, [])).toMatch(
-      /not a target/,
-    );
+    expect(
+      SECOND_OPINION.refuse?.({ pipeline: 'experience-digest', goal: 'g' }, [
+        summaryOf('experience-digest', 80, 'composed'),
+      ]),
+    ).toMatch(/not a target/);
   });
 
   it('[QL-19] hands the first artifact to every panel sample, judge-only, and reconciles the first opinion with them', async () => {

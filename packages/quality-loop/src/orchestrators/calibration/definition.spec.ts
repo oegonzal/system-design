@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { decision, runRecord, traceOf } from '../../core/testing';
 import { validateOrchestrator } from '../runner/definition';
-import { orchestrationDeps, performed } from '../runner/testing';
+import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
 import { CALIBRATION } from './definition';
 
 /** Every sample answers with a judged run whose overall climbs by five. */
@@ -34,10 +34,11 @@ describe('the calibration orchestrator', () => {
     expect(() => validateOrchestrator(CALIBRATION as never)).not.toThrow();
     expect(CALIBRATION.takesTarget).toBe(true);
     expect(CALIBRATION.steps.map((step) => step.id)).toEqual(['panel', 'reconcile']);
-    expect(CALIBRATION.refuse?.({ pipeline: 'memory-recall', goal: 'g' }, [])).toMatch(
+    const registry = [summaryOf('tiny'), summaryOf('memory-recall', 80, 'composed')];
+    expect(CALIBRATION.refuse?.({ pipeline: 'memory-recall', goal: 'g' }, registry)).toMatch(
       /not a target/,
     );
-    expect(CALIBRATION.refuse?.({ pipeline: 'tiny', goal: 'g' }, [])).toBeNull();
+    expect(CALIBRATION.refuse?.({ pipeline: 'tiny', goal: 'g' }, registry)).toBeNull();
   });
 
   it('[QL-19] runs the goal `samples` times through the named pipeline and reports the spread, naming every child', async () => {

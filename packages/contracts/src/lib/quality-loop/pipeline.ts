@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type { AxisFactorLevel, Severity } from './vocab';
+import type { AxisFactorLevel, GoalSource, Severity } from './vocab';
 
 /**
  * The decision policy: every number, threshold, gate and route the controller
@@ -51,6 +51,8 @@ export interface PipelineSummary {
   id: string;
   version: string;
   description: string;
+  /** What kind of goal the pipeline takes; a composed one is never a route, a target, or a choice. */
+  goalSource: GoalSource;
   task: {
     criterionKinds: Record<string, string>;
     findingTypes: Record<string, string>;

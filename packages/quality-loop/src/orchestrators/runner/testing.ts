@@ -5,6 +5,7 @@
  * it. Pure helpers only — no vitest imports.
  */
 import type {
+  GoalSource,
   OrchestrationRunDto,
   PipelineSummary,
   QualityRunDto,
@@ -15,9 +16,18 @@ import type { OrchestratorDefinition, StepContext } from './definition';
 import { openRecord } from './record';
 import { runOrchestration, type OrchestrationDeps } from './run-orchestration';
 
-/** A registered pipeline as an orchestrator reads it: its id, a description, its accept bar. */
-export const summaryOf = (id: string, acceptAt = 80): PipelineSummary =>
-  ({ id, description: `${id} grades`, policy: { thresholds: { acceptAt } } }) as PipelineSummary;
+/** A registered pipeline as an orchestrator reads it: its id, a description, its goal source, its accept bar. */
+export const summaryOf = (
+  id: string,
+  acceptAt = 80,
+  goalSource: GoalSource = 'brief',
+): PipelineSummary =>
+  ({
+    id,
+    description: `${id} grades`,
+    goalSource,
+    policy: { thresholds: { acceptAt } },
+  }) as PipelineSummary;
 
 export type FakeDeps<P> = OrchestrationDeps<P> & {
   /** Every record the runner flushed, as it stood at that moment. */

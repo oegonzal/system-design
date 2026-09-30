@@ -23,6 +23,9 @@ const MAX_CRITERIA = 16;
 export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   id: EXPERIENCE_DIGEST_ID,
   version: '1.0.0',
+
+  // A goal another program composes; never a route, a target, or a choice in the UI.
+  goalSource: 'composed',
   description:
     'A finished run of any pipeline, judged for what its evidence shows moved quality, and distilled into memories worth keeping.',
 

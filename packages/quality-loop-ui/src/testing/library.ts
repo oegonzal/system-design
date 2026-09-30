@@ -31,6 +31,7 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
   id: 'system-design',
   version: '1.0.0',
   description: 'Grade a system design answer against a markdown prompt.',
+  goalSource: 'brief',
   task: {
     criterionKinds: {
       functional: 'A capability the prompt asks for.',

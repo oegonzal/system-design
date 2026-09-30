@@ -23,6 +23,10 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
 
   version: '1.0.0',
 
+  // A brief a person types: a route for the router, a target for an orchestrator.
+
+  goalSource: 'brief',
+
   description:
     'A structured system-design answer to a markdown prompt, judged for coverage, soundness and scale.',
 

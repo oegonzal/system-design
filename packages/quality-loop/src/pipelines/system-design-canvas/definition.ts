@@ -46,6 +46,10 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
   version: '1.0.0',
 
+  // A goal another program composes; never a route, a target, or a choice in the UI.
+
+  goalSource: 'composed',
+
   description:
     'A canvas drawn in the studio — nodes, edges, the brief binding each requirement to the parts that hold it, and the narrative — judged against the prompt it answers, and coached when asked.',
 

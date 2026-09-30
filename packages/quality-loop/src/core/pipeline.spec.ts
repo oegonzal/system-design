@@ -114,4 +114,14 @@ describe('validatePipeline', () => {
     ]);
     expect(JSON.stringify(summary)).not.toContain('persona');
   });
+
+  it('[QL-24] declares its goal source, refuses one it does not know, and projects it into the summary', () => {
+    expect(describePipeline(asAny(tinyPipeline())).goalSource).toBe('brief');
+    expect(describePipeline(asAny(tinyPipeline({ goalSource: 'composed' }))).goalSource).toBe(
+      'composed',
+    );
+    expect(() => validatePipeline(asAny(tinyPipeline({ goalSource: 'typed' as never })))).toThrow(
+      /goalSource typed is not one of brief, composed/,
+    );
+  });
 });
