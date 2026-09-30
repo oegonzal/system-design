@@ -110,7 +110,7 @@ export class ReviewConfigError extends Error {
 
 /** The flags given, checked against the declaration: switches as `true`, valued flags as their value. */
 function parseFlags(argv: readonly string[]): Partial<Record<FlagKey, string | true>> {
-  const byName = new Map(
+  const byName = new Map<string, { key: FlagKey; valued: boolean }>(
     (Object.entries(REVIEW_FLAGS) as [FlagKey, (typeof REVIEW_FLAGS)[FlagKey]][]).map(
       ([key, flag]) => [flag.name, { key, valued: flag.valued }],
     ),
