@@ -78,6 +78,7 @@ export function useImproveRunPolling(
     error,
     isPolling,
     message: describe(run, error, isPolling, unreachable),
-    acceptedCount: run?.iterations.filter((iteration) => iteration.revisionId !== null).length ?? 0,
+    acceptedCount:
+      run?.iterations.filter((iteration) => iteration.outcome === 'imported').length ?? 0,
   };
 }

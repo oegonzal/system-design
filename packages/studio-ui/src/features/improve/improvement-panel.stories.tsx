@@ -95,6 +95,47 @@ export const Stopped: Story = {
   },
 };
 
+/** An iteration the studio would not store: accepted by the loop, refused here, and it says why. */
+export const Refused: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'accepted',
+      exchangeCount: 14,
+      iterations: [
+        makeImproveIteration({ iteration: 1, overall: 64, decision: 'revise' }),
+        makeImproveIteration({
+          iteration: 2,
+          overall: 83,
+          decision: 'accept',
+          reason: 'at or above the accept threshold of 75',
+          outcome: 'refused',
+          problems: [
+            'binding c2 names node n-9, which the canvas does not draw',
+            'narration c4 cites edge e-7, which the canvas does not draw',
+          ],
+          revisionId: null,
+        }),
+      ],
+    }),
+    message: 'Coach finished — best score 83.',
+  },
+};
+
+/** Started from a graded revision: iteration 1 reuses that grade instead of grading again. */
+export const FromGradedRevision: Story = {
+  args: {
+    run: makeImproveRun({
+      exchangeCount: 3,
+      iterations: [
+        makeImproveIteration({ iteration: 1, mode: 'adopted', overall: 72, decision: 'revise' }),
+      ],
+    }),
+    isPolling: true,
+    message: 'Coaching — 3 model calls so far.',
+  },
+};
+
 /** The run failed outright. */
 export const Failed: Story = {
   args: {

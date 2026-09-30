@@ -61,11 +61,11 @@ describe('useImproveRunPolling', () => {
 
     await advance(0);
     expect(hook.result.current.run?.status).toBe('running');
-    expect(hook.result.current.acceptedCount).toBe(1); // the draft itself
+    expect(hook.result.current.acceptedCount).toBe(0); // the starting point is not an import
     expect(hook.result.current.message).toBe('Coaching — 3 model calls so far.');
 
     await advance(IMPROVE_POLL_INTERVAL_MS);
-    expect(hook.result.current.acceptedCount).toBe(2);
+    expect(hook.result.current.acceptedCount).toBe(1);
     expect(hook.result.current.message).toBe('Coaching — 8 model calls so far.');
 
     await advance(IMPROVE_POLL_INTERVAL_MS);

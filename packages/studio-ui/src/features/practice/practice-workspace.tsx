@@ -258,15 +258,18 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
 
-  // Initial load: session → prompt + revision summaries → latest full graph.
+  // Initial load: session → prompt + revision summaries + coaching runs →
+  // latest full graph. The newest coaching run is polled again from here, so
+  // a reload mid-coach picks the run back up instead of forgetting it.
   useEffect(() => {
     const { id, signal } = loader.begin();
     void (async () => {
       try {
         const loadedSession = await api.getSession(sessionId, { signal });
-        const [loadedPrompt, loadedRevisions] = await Promise.all([
+        const [loadedPrompt, loadedRevisions, coachingRuns] = await Promise.all([
           api.getPrompt(loadedSession.promptId, { signal }),
           api.listRevisions(sessionId, { signal }),
+          api.listImproveRuns(sessionId, { signal }),
         ]);
         const sorted = [...loadedRevisions.data].sort(byNewest);
         const latest = sorted[0];
@@ -282,6 +285,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           storeApi.getState().loadBrief(latestFull.brief);
           setFeedback({ id: latest.id, revisionNumber: latest.revisionNumber });
         }
+        setActiveRunId(coachingRuns[0]?.runId ?? null);
         setLoading(false);
       } catch (error) {
         if (loader.isStale(id, error)) return;
@@ -410,38 +414,49 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     getNodes,
   ]);
 
-  // Hand the current canvas to the coach: the draft is persisted as the base
-  // revision (so what the coach improved is on the record), then the loop
-  // revises it in the background — the coach tab follows the iterations.
+  // Hand the canvas to the coach. An unedited, graded revision on screen is
+  // handed over as it is — the loop adopts its grade as the starting point and
+  // no revision is duplicated. An edited draft is persisted as the base
+  // revision first (so what the coach improved is on the record). Either way
+  // the loop then revises in the background — the coach tab follows the
+  // iterations.
   const handleStartImprove = useCallback(
     async (maxIterations: number) => {
-      if (
-        !window.confirm(
-          'Hand this design to the coach? Your current draft is submitted as a revision first.',
-        )
-      ) {
-        return;
-      }
+      const loaded = viewingRevision ?? feedback;
+      const graded =
+        loaded !== null &&
+        (polling.evaluation?.status ??
+          revisions.find((candidate) => candidate.id === loaded.id)?.evaluation?.status) ===
+          'complete';
+      const fromRevision = !storeApi.getState().dirty && loaded !== null && graded;
+      const question = fromRevision
+        ? `Hand revision #${loaded.revisionNumber} to the coach? Its grade is reused as the starting point.`
+        : 'Hand this design to the coach? Your current draft is submitted as a revision first.';
+      if (!window.confirm(question)) return;
       setStartingImprove(true);
       setSubmitError(null);
       try {
-        const started = await api.startImprove(sessionId, { ...readDraft(), maxIterations });
+        const started = fromRevision
+          ? await api.startImprove(sessionId, { baseRevisionId: loaded.id, maxIterations })
+          : await api.startImprove(sessionId, { ...readDraft(), maxIterations });
         acceptedSeen.current = 0;
         setActiveRunId(started.runId);
-        setFeedback({ id: started.revision.id, revisionNumber: started.revision.revisionNumber });
-        setViewingRevision(null);
-        setRevisions((current) => [
-          toSummary(started.revision),
-          ...current.filter((candidate) => candidate.id !== started.revision.id),
-        ]);
-        storeApi.getState().markClean();
+        if (!fromRevision) {
+          setFeedback({ id: started.revision.id, revisionNumber: started.revision.revisionNumber });
+          setViewingRevision(null);
+          setRevisions((current) => [
+            toSummary(started.revision),
+            ...current.filter((candidate) => candidate.id !== started.revision.id),
+          ]);
+          storeApi.getState().markClean();
+        }
       } catch (error) {
         setSubmitError(toErrorMessage(error, 'Could not start the coach.'));
       } finally {
         setStartingImprove(false);
       }
     },
-    [sessionId, readDraft, storeApi],
+    [sessionId, readDraft, storeApi, viewingRevision, feedback, polling.evaluation, revisions],
   );
 
   const handleSelectFinding = useCallback(

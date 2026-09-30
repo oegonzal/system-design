@@ -1,6 +1,6 @@
 import { DEFAULT_IMPROVE_ITERATIONS, MAX_IMPROVE_ITERATIONS } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -53,7 +53,7 @@ describe('ImprovementPanel', () => {
     expect(screen.queryByTestId('improver-unavailable')).toBeNull();
   });
 
-  it('[UX-11] renders the live run: model calls so far and one row per iteration', () => {
+  it('[UX-11] renders the live run: model calls so far and one badge per outcome — starting point, imported, not better, refused with its problems', () => {
     renderPanel({
       run: makeImproveRun({
         exchangeCount: 7,
@@ -77,6 +77,16 @@ describe('ImprovementPanel', () => {
             mode: 'revise',
             overall: 70,
             decision: 'revise',
+            reason: 'no better than iteration 2',
+            revisionId: null,
+          }),
+          makeImproveIteration({
+            iteration: 4,
+            mode: 'revise',
+            overall: 81,
+            decision: 'accept',
+            outcome: 'refused',
+            problems: ['binding c1 names a component the canvas does not draw'],
             revisionId: null,
           }),
         ],
@@ -86,11 +96,36 @@ describe('ImprovementPanel', () => {
     });
 
     expect(screen.getByText('Coaching — 7 model calls so far…')).toBeTruthy();
-    expect(screen.getByTestId('improve-iteration-1').textContent).toContain('your draft');
+    expect(screen.getByTestId('improve-iteration-1').textContent).toContain('starting point');
     expect(screen.getByTestId('improve-iteration-2').textContent).toContain('imported');
-    expect(screen.getByTestId('improve-iteration-3').textContent).toContain('not better');
+    const lower = screen.getByTestId('improve-iteration-3');
+    expect(lower.textContent).toContain('not better');
+    expect(within(lower).getByTestId('improve-iteration-reason').textContent).toBe(
+      'no better than iteration 2',
+    );
+    const refused = screen.getByTestId('improve-iteration-4');
+    expect(refused.textContent).toContain('refused');
+    expect(within(refused).getByTestId('improve-iteration-problems').textContent).toContain(
+      'binding c1 names a component the canvas does not draw',
+    );
+    expect(screen.queryByTestId('improve-iteration-adopted')).toBeNull();
     expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByTestId('load-best-revision')).toBeNull();
+  });
+
+  it('[UX-11] a run started from a graded revision shows its starting point as a reused grade', () => {
+    renderPanel({
+      run: makeImproveRun({
+        iterations: [
+          makeImproveIteration({ iteration: 1, mode: 'adopted', overall: 72, decision: 'revise' }),
+        ],
+      }),
+      isPolling: true,
+    });
+
+    const base = screen.getByTestId('improve-iteration-1');
+    expect(base.textContent).toContain('starting point');
+    expect(within(base).getByTestId('improve-iteration-adopted').textContent).toBe('grade reused');
   });
 
   it('[UX-11] once stopped, explains why and offers the best imported revision', async () => {

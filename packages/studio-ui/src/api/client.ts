@@ -2,6 +2,7 @@ import type {
   ApiListResponse,
   ApiResponse,
   AuthorPromptRequest,
+  CoachingRunSummaryDto,
   CreateSessionRequest,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
@@ -197,13 +198,26 @@ export const api = {
     return unwrap(await request<ApiResponse<LlmModelDto>>('/grading/availability', opts));
   },
 
-  /** Persists the draft as a revision and starts the coach (202). */
+  /**
+   * Starts the coach (202): from the draft, persisted first as a revision, or
+   * from a graded revision whose grade the loop adopts as its starting point.
+   */
   async startImprove(sessionId: string, body: StartImproveRequest): Promise<StartImproveDto> {
     return unwrap(
       await request<ApiResponse<StartImproveDto>>(`/sessions/${sessionId}/improve`, {
         method: 'POST',
         body,
       }),
+    );
+  },
+
+  /** The session's coaching runs, newest first — how a reloaded workspace finds the live one. */
+  async listImproveRuns(
+    sessionId: string,
+    opts: GetOptions = {},
+  ): Promise<CoachingRunSummaryDto[]> {
+    return unwrap(
+      await request<ApiResponse<CoachingRunSummaryDto[]>>(`/sessions/${sessionId}/improve`, opts),
     );
   },
 
