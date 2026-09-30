@@ -107,8 +107,8 @@ jobs:
         with:
           name: test-artifacts
           path: |
-            packages/studio-e2e/playwright-report
-            packages/studio-e2e/test-output
+            dist/.playwright/packages/studio-e2e/playwright-report
+            dist/.playwright/packages/studio-e2e/test-output
           retention-days: 7
           if-no-files-found: ignore
 

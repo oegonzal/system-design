@@ -42,8 +42,6 @@ const QUALITY_LOOP_URL = `http://127.0.0.1:${QUALITY_LOOP_STUB_PORT}`;
 const GRADER_DOWN = /grader-down\.spec\.ts$/;
 /** The specs that assert the single-column layout; they run only at the narrow width. */
 const NARROW = /narrow-viewport\.spec\.ts$/;
-/** What the full-width browser projects skip. */
-const BROWSER_IGNORES = [GRADER_DOWN, NARROW];
 
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
@@ -119,32 +117,21 @@ export default defineConfig({
   ],
 
   /*
-   * The browser projects share one stub process and run their files in
-   * parallel; a spec that flips the stub's global health switch would race
-   * them. `grader-down` therefore runs alone: `dependencies` places it in the
-   * phase after every dependency-free project (phases run one after another,
-   * and a dependent project is never selected implicitly — CI names it), and
-   * one worker keeps its own files serial. `narrow` is the same browser at a
-   * width under the dock's breakpoint, for the specs that assert the
-   * single-column layout.
+   * Chrome only: every project is Desktop Chrome. `chromium` runs the suite
+   * at full width, and `narrow` is the same browser at a width under the
+   * dock's breakpoint, for the specs that assert the single-column layout.
+   * Both share one stub process and run their files in parallel; a spec that
+   * flips the stub's global health switch would race them. `grader-down`
+   * therefore runs alone: `dependencies` places it in the phase after every
+   * dependency-free project (phases run one after another, and a dependent
+   * project is never selected implicitly — CI names it), and one worker keeps
+   * its own files serial.
    */
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: BROWSER_IGNORES,
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-      testIgnore: BROWSER_IGNORES,
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-      testIgnore: BROWSER_IGNORES,
+      testIgnore: [GRADER_DOWN, NARROW],
     },
 
     {

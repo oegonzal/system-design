@@ -12,8 +12,8 @@ import { setGraderUnreachable } from '../support/grader';
  * revision waiting on a grade that will never come.
  *
  * Runs only in the `grader-down` Playwright project: the health switch is
- * global to the stub, and this project runs alone after every browser
- * project has finished (see playwright.config.ts).
+ * global to the stub, and this project runs alone after `chromium` and
+ * `narrow` have finished (see playwright.config.ts).
  */
 test.describe.configure({ mode: 'serial' });
 
