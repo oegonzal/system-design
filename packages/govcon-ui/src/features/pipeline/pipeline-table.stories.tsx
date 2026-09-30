@@ -1,0 +1,36 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn } from 'storybook/test';
+
+import { PIPELINE_ROWS } from '../../testing/fixtures';
+import { PipelineTable } from './pipeline-table';
+
+const NOW = Date.parse('2026-09-26T12:00:00Z');
+
+const meta: Meta<typeof PipelineTable> = {
+  title: 'Govcon/Pipeline/PipelineTable',
+  component: PipelineTable,
+  args: {
+    rows: PIPELINE_ROWS,
+    total: 3,
+    limit: 50,
+    offset: 0,
+    nowMs: NOW,
+    onStageChange: fn(),
+    onPage: fn(),
+  },
+};
+export default meta;
+
+type Story = StoryObj<typeof PipelineTable>;
+
+/** Three tracked notices, one reminder due, stages editable in place. */
+export const Default: Story = {};
+
+/** A second page of a longer pipeline. */
+export const Paged: Story = { args: { total: 120, offset: 50 } };
+
+/** A stage being written: the selects wait. */
+export const Saving: Story = { args: { saving: PIPELINE_ROWS[0]?.bid.noticeId ?? null } };
+
+/** Nothing tracked in this stage. */
+export const Empty: Story = { args: { rows: [], total: 0 } };

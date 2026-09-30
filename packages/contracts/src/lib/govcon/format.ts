@@ -41,6 +41,10 @@ export const daysUntil = (iso: string | null, nowMs: number): number | null => {
   return Number.isNaN(at) ? null : Math.ceil((at - nowMs) / DAY_MS);
 };
 
+/** Whole days until a mark, as a cell reads it: `3 day(s)`, `today`, `2 day(s) ago`, or a dash. */
+export const daysLeftLabel = (days: number | null): string =>
+  days === null ? DASH : days < 0 ? `${-days} day(s) ago` : days === 0 ? 'today' : `${days} day(s)`;
+
 /** The file name at the end of an attachment URL's path, decoded; the URL itself when the path has none. */
 export const attachmentName = (url: string): string => {
   let pathname: string;

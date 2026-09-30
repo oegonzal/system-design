@@ -3,6 +3,7 @@ import {
   attachmentName,
   clip,
   day,
+  daysLeftLabel,
   daysUntil,
   minute,
   money,
@@ -40,6 +41,7 @@ describe('govcon formatting', () => {
     expect(daysUntil('2026-09-19T00:00:00Z', now)).toBe(-1);
     expect(daysUntil(null, now)).toBeNull();
     expect(daysUntil('not a date', now)).toBeNull();
+    expect([null, -2, 0, 5].map(daysLeftLabel)).toEqual(['—', '2 day(s) ago', 'today', '5 day(s)']);
   });
 
   it('names an attachment by the last path segment, decoded', () => {

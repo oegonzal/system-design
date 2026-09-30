@@ -1,4 +1,10 @@
-import { day, daysUntil, DUE_SOON_DAYS, type PipelineRow } from '@sysdesign/contracts';
+import {
+  day,
+  daysLeftLabel,
+  daysUntil,
+  DUE_SOON_DAYS,
+  type PipelineRow,
+} from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
@@ -16,9 +22,6 @@ export const isDueSoon = (row: PipelineRow, nowMs: number): boolean =>
     const days = daysUntil(mark, nowMs);
     return days !== null && days <= DUE_SOON_DAYS;
   });
-
-const leftLabel = (days: number | null): string =>
-  days === null ? '—' : days < 0 ? `${-days} day(s) ago` : days === 0 ? 'today' : `${days} day(s)`;
 
 /** Tracked notices with a reminder or a deadline inside the week — what to do first. */
 export function DueSoon({ rows, nowMs }: DueSoonProps) {
@@ -63,7 +66,7 @@ export function DueSoon({ rows, nowMs }: DueSoonProps) {
                   </td>
                   <td>{day(o.responseDeadlineAt)}</td>
                   <td>{day(bid.reminderAt)}</td>
-                  <td>{leftLabel(Number.isFinite(left) ? left : null)}</td>
+                  <td>{daysLeftLabel(Number.isFinite(left) ? left : null)}</td>
                 </tr>
               );
             })}

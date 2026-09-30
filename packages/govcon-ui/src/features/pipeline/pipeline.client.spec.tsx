@@ -1,0 +1,84 @@
+import type * as WebTesting from '@sysdesign/web-testing';
+import { renderWithTheme, resetNavigationMock, stubApi } from '@sysdesign/web-testing';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ProfileProvider } from '../../providers/profile-context';
+import { BID, PIPELINE_ROWS, PIPELINE_SUMMARY, PROFILE } from '../../testing/fixtures';
+import { PipelineClient } from './pipeline.client';
+
+vi.mock('next/navigation', async () => {
+  const harness = await vi.importActual<typeof WebTesting>('@sysdesign/web-testing');
+  return harness.createNextNavigationMock();
+});
+
+const mount = () =>
+  renderWithTheme(
+    <ProfileProvider>
+      <PipelineClient />
+    </ProfileProvider>,
+  );
+
+beforeEach(() => resetNavigationMock());
+afterEach(() => vi.unstubAllGlobals());
+
+describe('PipelineClient', () => {
+  it('[GOVU-7] lists the tracked notices for the active profile with the counts, filters by stage tab, and writes a stage change back', async () => {
+    const { calls, fetchMock } = stubApi([
+      { path: '/profiles', body: { data: [PROFILE] } },
+      { path: '/pipeline/summary', body: { data: PIPELINE_SUMMARY } },
+      {
+        path: '/pipeline',
+        handler: ({ url }) => {
+          const stage = url.searchParams.get('stage');
+          const rows =
+            stage === null ? PIPELINE_ROWS : PIPELINE_ROWS.filter((row) => row.bid.stage === stage);
+          return { body: { data: rows, meta: { total: rows.length, limit: 50, offset: 0 } } };
+        },
+      },
+      {
+        method: 'PUT',
+        path: /\/notices\/[^/]+\/bid$/,
+        body: { data: { ...BID, stage: 'preparing' } },
+      },
+    ]);
+    mount();
+    await screen.findByRole('table', { name: 'Pipeline' });
+    expect(screen.getByRole('list', { name: 'Pipeline summary' })).toBeTruthy();
+    expect(calls.map((call) => call.url)).toContain('/pipeline?profile=enfav&limit=50&offset=0');
+    expect(screen.getByText('3 tracked · showing 3 from 0')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'submitted' }));
+    await screen.findByText('1 tracked · showing 1 from 0');
+    expect(calls.map((call) => call.url)).toContain(
+      '/pipeline?profile=enfav&stage=submitted&limit=50&offset=0',
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'all' }));
+    await screen.findByText('3 tracked · showing 3 from 0');
+    const before = calls.length;
+    fireEvent.change(screen.getAllByLabelText(/^Stage of/)[0] as HTMLSelectElement, {
+      target: { value: 'preparing' },
+    });
+    await screen.findByText('Moved to preparing.');
+    const put = fetchMock.mock.calls.find((call) => (call[1] as RequestInit).method === 'PUT');
+    expect(String(put?.[0])).toContain('/notices/21b781192a4f4026a2946237984a9c06/bid');
+    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({ stage: 'preparing' });
+    await waitFor(() => {
+      expect(calls.slice(before).map((call) => call.url)).toEqual(
+        expect.arrayContaining(['/pipeline/summary', '/pipeline?profile=enfav&limit=50&offset=0']),
+      );
+    });
+  });
+
+  it('shows the service error where the page would be and keeps the counts', async () => {
+    stubApi([
+      { path: '/profiles', body: { data: [PROFILE] } },
+      { path: '/pipeline/summary', body: { data: PIPELINE_SUMMARY } },
+      { path: '/pipeline', status: 500, body: { statusCode: 500, message: 'the store is down' } },
+    ]);
+    mount();
+    expect((await screen.findByRole('alert')).textContent).toBe('the store is down');
+    expect(screen.getByRole('list', { name: 'Pipeline summary' })).toBeTruthy();
+  });
+});
