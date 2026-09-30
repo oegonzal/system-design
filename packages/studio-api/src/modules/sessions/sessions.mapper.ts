@@ -1,10 +1,11 @@
 import type {
+  CoachingRunSummaryDto,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
   DesignSessionDto,
   RevisionEvaluationRef,
 } from '@sysdesign/contracts';
-import type { DesignRevision, DesignSession } from '@sysdesign/db';
+import type { CoachingRun, DesignRevision, DesignSession } from '@sysdesign/db';
 
 /** A session plus the newest revision its DTO summarises. */
 export interface SessionWithLatest {
@@ -44,6 +45,13 @@ export const toRevisionSummaryDto = (r: DesignRevision): DesignRevisionSummaryDt
   origin: r.origin,
   evaluation: toEvaluationRef(r),
   createdAt: r.createdAt.toISOString(),
+});
+
+export const toCoachingRunSummaryDto = (run: CoachingRun): CoachingRunSummaryDto => ({
+  runId: run.runId,
+  baseRevisionId: run.baseRevision.id,
+  maxIterations: run.maxIterations,
+  startedAt: run.startedAt.toISOString(),
 });
 
 export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): DesignSessionDto => ({

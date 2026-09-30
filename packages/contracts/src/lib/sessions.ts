@@ -92,13 +92,30 @@ export interface ListSessionsQuery {
 }
 
 /**
- * `POST /sessions/:id/improve` — hand the draft to the coach. The draft is
- * persisted first as the author's own revision, then the loop revises it up
- * to `maxIterations` times; every strictly better iteration becomes an
+ * `POST /sessions/:id/improve` — hand the coach a starting point. From the
+ * draft: it is persisted first as the author's own revision and graded as
+ * iteration 1. From a graded revision: the loop adopts that grade verbatim as
+ * iteration 1 and no revision is duplicated. Either way the loop then revises
+ * up to `maxIterations` times, and every strictly better iteration becomes an
  * assistant revision.
  */
-export interface StartImproveRequest extends DesignSubmission {
+export interface StartImproveFromDraftRequest extends DesignSubmission {
   maxIterations?: number;
+}
+export interface StartImproveFromRevisionRequest {
+  /** A revision of this session whose grade is complete. */
+  baseRevisionId: Uuid;
+  maxIterations?: number;
+}
+export type StartImproveRequest = StartImproveFromDraftRequest | StartImproveFromRevisionRequest;
+
+/** One coaching run of a session, as `GET /sessions/:id/improve` lists them, newest first. */
+export interface CoachingRunSummaryDto {
+  runId: string;
+  /** The revision iteration 1 of the run is. */
+  baseRevisionId: Uuid;
+  maxIterations: number;
+  startedAt: string;
 }
 
 export const DEFAULT_IMPROVE_ITERATIONS = 3;
@@ -157,3 +174,4 @@ export type ListRevisionsResponse = ApiListResponse<DesignRevisionSummaryDto>;
 export type GetRevisionResponse = ApiResponse<DesignRevisionDto>;
 export type StartImproveResponse = ApiResponse<StartImproveDto>;
 export type GetImproveRunResponse = ApiResponse<ImproveRunDto>;
+export type ListCoachingRunsResponse = ApiResponse<CoachingRunSummaryDto[]>;

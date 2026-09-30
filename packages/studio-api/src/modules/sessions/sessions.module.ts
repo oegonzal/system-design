@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
+import { CoachingRun, DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
 
 import { PromptsModule } from '../prompts/prompts.module';
 import { EvaluationsService } from './evaluations.service';
@@ -10,7 +10,10 @@ import { SessionsController } from './sessions.controller';
 import { SessionsService } from './sessions.service';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([DesignSession, DesignRevision, Prompt]), PromptsModule],
+  imports: [
+    MikroOrmModule.forFeature([DesignSession, DesignRevision, CoachingRun, Prompt]),
+    PromptsModule,
+  ],
   controllers: [SessionsController, RevisionsController],
   providers: [SessionsService, EvaluationsService, ImproveService],
 })

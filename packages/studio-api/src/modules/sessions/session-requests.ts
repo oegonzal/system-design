@@ -28,7 +28,18 @@ export const submitRevisionSchema = designSubmissionSchema;
 /** The unsubmitted canvas: the contracts' draft schema, shape only. */
 export const putSessionDraftSchema = sessionDraftSchema;
 
-export const startImproveSchema = z.strictObject({
+const maxIterations = z.number().int().min(1).max(MAX_IMPROVE_ITERATIONS).optional();
+
+/** The coach starts from the draft, or from a graded revision of the session. */
+export const startImproveFromDraftSchema = z.strictObject({
   ...designSubmissionSchema.shape,
-  maxIterations: z.number().int().min(1).max(MAX_IMPROVE_ITERATIONS).optional(),
+  maxIterations,
 });
+export const startImproveFromRevisionSchema = z.strictObject({
+  baseRevisionId: z.uuid(),
+  maxIterations,
+});
+export const startImproveSchema = z.union([
+  startImproveFromDraftSchema,
+  startImproveFromRevisionSchema,
+]);

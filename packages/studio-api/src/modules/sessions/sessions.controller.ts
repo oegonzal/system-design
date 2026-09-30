@@ -16,6 +16,7 @@ import type {
   GetRevisionResponse,
   GetSessionDraftResponse,
   GetSessionResponse,
+  ListCoachingRunsResponse,
   PutSessionDraftRequest,
   ListRevisionsResponse,
   ListSessionsResponse,
@@ -127,6 +128,12 @@ export class SessionsController {
   }
 
   /** Reading the run imports every iteration that beat the ones before it, once. */
+  /** Every coaching run of the session, newest first — what a reloaded workspace resumes polling. */
+  @Get(':id/improve')
+  async listImprove(@Param('id', ParseUUIDPipe) id: string): Promise<ListCoachingRunsResponse> {
+    return ok(await this.improve.list(id));
+  }
+
   @Get(':id/improve/:runId')
   async getImprove(
     @Param('id', ParseUUIDPipe) id: string,
