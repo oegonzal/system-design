@@ -118,6 +118,7 @@ describe('the memory orchestration over the three pipelines', () => {
     expect(record.request).toEqual({
       goal: GOAL,
       outputProvided: false,
+      criteriaProvided: false,
       maxIterations: 3,
       samples: null,
     });

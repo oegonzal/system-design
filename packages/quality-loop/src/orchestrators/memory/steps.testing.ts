@@ -36,7 +36,12 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
   startedAt: '2026-09-07T00:00:00.000Z',
   finishedAt: '2026-09-07T00:01:00.000Z',
   llm: { enabled: true, model: 'test-model', reason: null },
-  request: { goal: trace?.contract.goal ?? GOAL, outputProvided: false, maxIterations: 1 },
+  request: {
+    goal: trace?.contract.goal ?? GOAL,
+    outputProvided: false,
+    criteriaProvided: false,
+    maxIterations: 1,
+  },
   trace,
   exchanges: [],
   error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,

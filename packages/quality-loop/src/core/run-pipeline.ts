@@ -15,24 +15,26 @@ import type {
   RemediationNote,
   RunTrace,
   StopReason,
+  SuccessCriterion,
   ValidationReport,
 } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
+import { annotate } from './annotate';
 import type { TaskContract } from './contracts';
 import { deriveLessons } from './lessons';
 import { materialize } from './materialize';
-import { admitRefs, normalize, sameDefect } from './normalize';
+import { normalize } from './normalize';
 import { validatePipeline, type PipelineDefinition } from './pipeline';
 import {
   emptyUpstream,
-  type AnnotatedFinding,
   type Critic,
   type Evaluator,
   type ExchangeSink,
   type LensContext,
   type Stages,
 } from './ports';
+import { rubricProblems } from './rubric';
 import { mapConcurrent } from './scoped-llm';
 import { diagnostic, LENSES_STAGE } from './stages/shared';
 
@@ -41,6 +43,8 @@ export interface RunInput {
   /** A supplied artifact to judge; iteration 1 adopts it instead of producing. */
   output?: unknown;
   maxIterations?: number;
+  /** A fixed rubric; when present the derive-criteria stage is not called. */
+  criteria?: readonly SuccessCriterion[];
 }
 
 export interface RunDeps {
@@ -55,6 +59,10 @@ export async function runPipeline<T>(
   deps: RunDeps,
 ): Promise<RunTrace<T>> {
   validatePipeline(definition as PipelineDefinition<unknown>);
+  const problems = input.criteria ? rubricProblems(input.criteria, definition.task) : [];
+  if (problems.length > 0) {
+    throw new Error(`pipeline ${definition.id}: rubric rejected: ${problems.join('; ')}`);
+  }
   return runLoop(materialize(definition, deps.llm, deps.sink), definition, input, deps.now);
 }
 
@@ -71,7 +79,12 @@ export async function runLoop<T>(
   const { policy, task } = definition;
   const maxIterations = Math.max(1, input.maxIterations ?? policy.loop.maxIterations);
 
-  const derived = await stages.deriveCriteria(input.goal);
+  // A supplied rubric is used verbatim — its ids are what the caller cites
+  // across runs — so the deriver is never asked.
+  const derived =
+    input.criteria !== undefined
+      ? { criteria: input.criteria.map((criterion) => ({ ...criterion })), diagnostic: null }
+      : await stages.deriveCriteria(input.goal);
   const contract: TaskContract<T> = { ...task, goal: input.goal, criteria: derived.criteria ?? [] };
   const baseDiagnostics = derived.diagnostic ? [derived.diagnostic] : [];
 
@@ -178,7 +191,7 @@ export async function runLoop<T>(
       );
     }
 
-    const ledger = normalize(
+    const confirmedLedger = normalize(
       {
         contract,
         artifactPresent: artifact !== null,
@@ -190,6 +203,12 @@ export async function runLoop<T>(
       },
       policy,
     );
+    // The words ride on the ledger for readers of the trace; the controller
+    // decides on the structural fields beside them and never reads prose.
+    const ledger = {
+      ...confirmedLedger,
+      findings: annotate(confirmedLedger.findings, critics, locations),
+    };
     const decision = stages.controller.decide(ledger, policy);
     const remediations = hydrate(
       decision.selectedRemediations,
@@ -274,30 +293,6 @@ async function runWave<T>(
     critics: results.flatMap((result) => result.critic ?? []),
     evaluators: results.flatMap((result) => result.evaluator ?? []),
   };
-}
-
-/**
- * Each confirmed finding with the first sentence a critic gave for it. A
- * confirmed finding groups raw ones, so its key is no longer any single raw
- * finding's key: match by membership. Prose for a model, never for a decision.
- */
-export function annotate(
-  confirmed: readonly ConfirmedFinding[],
-  critics: readonly LensOutcome<CriticReport>[],
-  locations: readonly { id: string }[],
-): AnnotatedFinding[] {
-  const known = new Set(locations.map((location) => location.id));
-  const raws = critics.flatMap((outcome) =>
-    (outcome.report?.findings ?? []).map((raw) => ({
-      type: raw.type,
-      locationRefs: admitRefs(raw.locationRefs, known),
-      rationale: raw.rationale,
-    })),
-  );
-  return confirmed.map((finding) => ({
-    ...finding,
-    rationale: raws.find((raw) => sameDefect(finding, raw))?.rationale ?? null,
-  }));
 }
 
 /**

@@ -349,3 +349,63 @@ describe('the controller port', () => {
     expect(describePipeline(definition as never).controller.id).toBe('always-revise');
   });
 });
+
+describe('a supplied rubric', () => {
+  const rubric = [criterion('req-1'), criterion('nfr-1', 'nice')];
+
+  it('[QL-20] is used verbatim and the deriver is never asked', async () => {
+    let derivations = 0;
+    const counting: Stages<TinyOutput>['deriveCriteria'] = () => {
+      derivations += 1;
+      return Promise.resolve({ criteria: [criterion('c1')], diagnostic: null });
+    };
+    const trace = await runLoop(
+      stages({
+        deriveCriteria: counting,
+        critics: [
+          scriptedCritic('critic.tiny', [
+            [[finding({ criterionIds: ['req-1'], rationale: 'the text is thin' })]],
+          ]),
+        ],
+        evaluators: [
+          scriptedEvaluator('evaluator.tiny', [
+            [
+              [
+                result({ criterionId: 'req-1', result: 'partial' }),
+                result({ criterionId: 'nfr-1' }),
+              ],
+            ],
+          ]),
+        ],
+      }),
+      tinyPipeline(),
+      { goal: 'g', criteria: rubric, maxIterations: 1 },
+      clock,
+    );
+    expect(derivations).toBe(0);
+    expect(trace.contract.criteria).toEqual(rubric);
+    const [iteration] = trace.iterations;
+    expect(iteration.ledger.criteria.map((evidence) => evidence.criterionId)).toEqual([
+      'req-1',
+      'nfr-1',
+    ]);
+    expect(iteration.ledger.diagnostics.map((diagnostic) => diagnostic.stage)).not.toContain(
+      'criteria',
+    );
+    // The ledger carries the critic's words for a reader; the decision never read them.
+    expect(iteration.ledger.findings[0]).toMatchObject({
+      criterionIds: ['req-1'],
+      rationale: 'the text is thin',
+    });
+  });
+
+  it('[QL-20] is refused before any stage runs when it does not fit the pipeline', async () => {
+    await expect(
+      runPipeline(
+        tinyPipeline(),
+        { goal: 'g', criteria: [{ id: 'c1', kind: 'bogus', statement: 's' }] },
+        { llm: fakeLlm(), sink: () => undefined, now: clock },
+      ),
+    ).rejects.toThrow(/rubric rejected: criterion c1 has kind bogus/);
+  });
+});

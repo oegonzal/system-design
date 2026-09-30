@@ -158,6 +158,7 @@ export function openRecord<O extends object, P>(
     request: {
       goal: request.goal,
       outputProvided: provided?.request.outputProvided ?? request.output !== undefined,
+      criteriaProvided: provided?.request.criteriaProvided ?? request.criteria !== undefined,
       maxIterations,
       samples: request.samples ?? null,
     },

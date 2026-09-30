@@ -97,6 +97,7 @@ export interface FindingRow {
   criterionIds: string[];
   hits: number;
   lenses: string[];
+  rationale: string | null;
   reconciledTo: string | null;
 }
 
@@ -252,6 +253,7 @@ export function fromRows(
                       criterionIds,
                       hits,
                       lenses,
+                      rationale,
                       reconciledTo,
                     }) => ({
                       key,
@@ -263,6 +265,7 @@ export function fromRows(
                       criterionIds,
                       hits,
                       lenses,
+                      rationale,
                       reconciledTo,
                     }),
                   ),
@@ -286,7 +289,8 @@ export function fromRows(
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt?.toISOString() ?? null,
     llm: run.llm,
-    request: run.request,
+    // Rows written before a run could carry its rubric have no flag: it was derived.
+    request: { ...run.request, criteriaProvided: run.request.criteriaProvided ?? false },
     trace,
     exchanges: run.exchanges,
     error: run.error,

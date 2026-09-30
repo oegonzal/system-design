@@ -76,6 +76,7 @@ const source: QualityRunDto = {
   request: {
     goal: `${GOAL}\n\n${MEMORY_HEADING}\n\n- [m1] x`,
     outputProvided: false,
+    criteriaProvided: false,
     maxIterations: 1,
   },
   exchanges: [],

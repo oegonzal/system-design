@@ -58,6 +58,7 @@ const confirmed = (overrides: Partial<ConfirmedFinding>): ConfirmedFinding => ({
   criterionIds: ['c1'],
   hits: 2,
   lenses: ['critic.soundness'],
+  rationale: null,
   reconciledTo: null,
   ...overrides,
 });
@@ -205,6 +206,7 @@ export const sampleRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto
     request: {
       goal: '# Prompt — Serve an order history\n\nList past orders.',
       outputProvided: false,
+      criteriaProvided: false,
       maxIterations: 3,
     },
     trace: {

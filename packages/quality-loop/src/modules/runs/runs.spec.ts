@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { fakeLlm, result, tinyPipeline } from '../../core/testing';
+import { disabledLlm, fakeLlm, result, tinyPipeline } from '../../core/testing';
 
 // A directory of this file's own, so the assertions never see another suite's dump.
 const DUMP_DIR = join(tmpdir(), `sysdesign-quality-loop-dumps-${crypto.randomUUID()}`);
@@ -186,7 +186,136 @@ describe('the HTTP surface', () => {
     });
     expect(unknown.status).toBe(404);
     expect((await fetch(`${url}/runs/missing`)).status).toBe(404);
-    expect((await (await fetch(`${url}/health`)).json()) as unknown).toEqual({ status: 'ok' });
+    expect((await (await fetch(`${url}/health`)).json()) as unknown).toEqual({
+      status: 'ok',
+      llm: { enabled: true, model: 'test-model', reason: null },
+    });
+  });
+
+  it('[QL-20] a supplied rubric skips the criteria exchange and is persisted under its own ids', async () => {
+    const rubric = [
+      { id: 'req-1', kind: 'must', statement: 'has text' },
+      { id: 'nfr-1', kind: 'nice', statement: 'has parts' },
+    ];
+    const started = await fetch(`${url}/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pipeline: 'tiny', goal: '# Goal', criteria: rubric }),
+    });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ runId: string }>;
+    let run: QualityRunDto | null = null;
+    for (let attempt = 0; attempt < 50 && run?.status !== 'complete'; attempt++) {
+      run = ((await (await fetch(`${url}/runs/${data.runId}`)).json()) as Envelope<QualityRunDto>)
+        .data;
+      if (run.status === 'running') await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(run?.request).toMatchObject({ criteriaProvided: true });
+    expect(run?.exchanges.map((exchange) => exchange.scope)).toEqual([
+      'producer',
+      'critic.tiny.s1',
+      'evaluator.tiny.s1',
+    ]);
+    expect(run?.trace?.contract.criteria).toEqual(rubric);
+    const rows = await em
+      .fork()
+      .find(QualityRunCriterion, { run: data.runId }, { orderBy: { position: 'asc' } });
+    expect(rows.map((row) => row.criterionId)).toEqual(['req-1', 'nfr-1']);
+  });
+
+  it('[QL-20] a rubric that does not fit the pipeline is 400 with the offending path, and no row is written', async () => {
+    const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    for (const criteria of [
+      [{ id: 'c1', kind: 'bogus', statement: 's' }],
+      [
+        { id: 'c1', kind: 'must', statement: 's' },
+        { id: 'c1', kind: 'must', statement: 't' },
+      ],
+      Array.from({ length: tinyPipeline().task.maxCriteria + 1 }, (_, i) => ({
+        id: `c${i + 1}`,
+        kind: 'must',
+        statement: 's',
+      })),
+    ]) {
+      const response = await fetch(`${url}/runs`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pipeline: 'tiny', goal: 'g', criteria }),
+      });
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { issues: { path: string }[] };
+      expect(body.issues[0].path).toBe('criteria');
+    }
+    const after = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    expect(after).toBe(before);
+  });
+
+  it('[QL-20] POST /criteria derives a rubric with one model call and writes no run', async () => {
+    const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    const response = await fetch(`${url}/criteria`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pipeline: 'tiny', goal: '# Goal\n\nMake a thing.' }),
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()) as unknown).toEqual({
+      data: {
+        pipeline: 'tiny',
+        criteria: [{ id: 'c1', kind: 'must', statement: 'has text' }],
+        diagnostic: null,
+        llm: { enabled: true, model: 'test-model', reason: null },
+      },
+    });
+    const after = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    expect(after).toBe(before);
+    expect(
+      (
+        await fetch(`${url}/criteria`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pipeline: 'nope', goal: 'g' }),
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await fetch(`${url}/criteria`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ pipeline: 'tiny', goal: '' }),
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it('[QL-20] without a model, POST /criteria answers 503 with the reason and never invents a rubric', async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(QUALITY_LOOP_LLM)
+      .useValue(disabledLlm())
+      .overrideProvider(PIPELINES_TOKEN)
+      .useValue(new Map([['tiny', tinyPipeline()]]))
+      .compile();
+    const dark = configureApp(moduleRef.createNestApplication());
+    await dark.listen(0);
+    try {
+      const darkUrl = await dark.getUrl();
+      const response = await fetch(`${darkUrl}/criteria`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pipeline: 'tiny', goal: 'g' }),
+      });
+      expect(response.status).toBe(503);
+      expect((await response.json()) as unknown).toMatchObject({
+        llm: { enabled: false },
+        diagnostic: { stage: 'criteria', reason: 'llm-disabled' },
+      });
+      expect((await (await fetch(`${darkUrl}/health`)).json()) as unknown).toMatchObject({
+        status: 'ok',
+        llm: { enabled: false },
+      });
+    } finally {
+      await dark.close();
+    }
   });
 
   // Last: booting another app sweeps every `running` row, so it must never overlap a live run.
@@ -197,7 +326,7 @@ describe('the HTTP surface', () => {
       pipeline: 'tiny',
       pipelineVersion: tinyPipeline().version,
       llm: { enabled: true, model: 'test-model', reason: null },
-      request: { goal: 'g', outputProvided: false, maxIterations: 1 },
+      request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
       git: { branch: '', headSha: '' },
       startedAt: new Date(),
     });

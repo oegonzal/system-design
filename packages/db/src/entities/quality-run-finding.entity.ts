@@ -95,6 +95,10 @@ export class QualityRunFinding {
   @Property({ type: 'string[]' })
   lenses: string[] = [];
 
+  /** The first rationale a confirming lens gave — prose for a reader, never for the policy. */
+  @Property({ type: 'text', nullable: true })
+  rationale: string | null = null;
+
   @Property({ type: 'varchar', length: 20, nullable: true })
   reconciledTo: string | null = null;
 }

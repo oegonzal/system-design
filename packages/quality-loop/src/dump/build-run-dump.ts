@@ -51,6 +51,7 @@ export function buildRunDump(record: RunRecord, pipeline: PipelineSummary | null
     bestIteration: trace?.bestIteration ?? null,
     iterations: trace?.iterations.length ?? 0,
     criteria: trace?.contract.criteria.length ?? 0,
+    criteriaProvided: record.request.criteriaProvided,
     exchangeCount: record.exchanges.length,
     error: record.error,
     note: 'Contains the goal and the model’s prose verbatim.',

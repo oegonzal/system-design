@@ -279,6 +279,7 @@ export const confirmed = (overrides: Partial<ConfirmedFinding> = {}): ConfirmedF
   criterionIds: [],
   hits: 1,
   lenses: ['critic.tiny'],
+  rationale: null,
   reconciledTo: null,
   ...overrides,
 });
@@ -361,7 +362,12 @@ export const runDto = (
   startedAt: '2026-09-22T00:00:00.000Z',
   finishedAt: '2026-09-22T00:01:00.000Z',
   llm: { enabled: true, model: 'test-model', reason: null },
-  request: { goal: trace?.contract.goal ?? 'g', outputProvided: false, maxIterations: 1 },
+  request: {
+    goal: trace?.contract.goal ?? 'g',
+    outputProvided: false,
+    criteriaProvided: false,
+    maxIterations: 1,
+  },
   trace,
   exchanges: [],
   error: trace === null ? { name: 'Boom', message: 'the model went away', stack: null } : null,

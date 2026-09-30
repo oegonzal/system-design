@@ -29,7 +29,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
   startedAt: '2026-09-09T00:00:00.000Z',
   finishedAt: '2026-09-09T00:01:00.000Z',
   llm: { enabled: true, model: 'test-model', reason: null },
-  request: { goal: 'g', outputProvided: false, maxIterations: 1 },
+  request: { goal: 'g', outputProvided: false, criteriaProvided: false, maxIterations: 1 },
   trace: null,
   exchanges: [],
   error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,

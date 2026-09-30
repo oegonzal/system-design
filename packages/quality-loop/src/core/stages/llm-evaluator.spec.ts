@@ -38,6 +38,7 @@ describe('createLlmEvaluator', () => {
           criterionIds: ['c1'],
           hits: 1,
           lenses: ['critic.tiny'],
+          rationale: null,
           reconciledTo: null,
           rationale: 'the text is thin',
         },

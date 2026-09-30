@@ -6,7 +6,7 @@
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { LensSpec, PipelineDefinition } from './pipeline';
-import type { ExchangeSink, Stages } from './ports';
+import type { CriteriaDeriver, ExchangeSink, Stages } from './ports';
 import { scopeLlm } from './scoped-llm';
 import { createCriteriaDeriver } from './stages/derive-criteria';
 import { createLlmCritic } from './stages/llm-critic';
@@ -16,6 +16,19 @@ import { schemaValidator } from './stages/schema-validator';
 import { CRITERIA_STAGE, PRODUCER_STAGE } from './stages/shared';
 
 export const sampleScope = (lensId: string, sample: number): string => `${lensId}.s${sample}`;
+
+/** The derive-criteria stage alone — what `POST /criteria` runs, scoped like the loop's own. */
+export function materializeCriteria<T>(
+  definition: PipelineDefinition<T>,
+  llm: LlmClient,
+  sink: ExchangeSink,
+): CriteriaDeriver {
+  return createCriteriaDeriver(
+    definition.task,
+    definition.deriveCriteria,
+    scopeLlm(llm, CRITERIA_STAGE, sink),
+  );
+}
 
 export function materialize<T>(
   definition: PipelineDefinition<T>,
@@ -28,11 +41,7 @@ export function materialize<T>(
     Array.from({ length: lens.samples }, (_, index) => scoped(sampleScope(lens.id, index + 1)));
 
   return {
-    deriveCriteria: createCriteriaDeriver(
-      definition.task,
-      definition.deriveCriteria,
-      scoped(CRITERIA_STAGE),
-    ),
+    deriveCriteria: materializeCriteria(definition, llm, sink),
 
     producer: createLlmProducer(definition.task, definition.producer, scoped(PRODUCER_STAGE)),
 

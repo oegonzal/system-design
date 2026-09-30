@@ -10,6 +10,7 @@ import {
 import { createQualityLoopLlmFromEnv } from '@sysdesign/llm';
 
 import { PIPELINES } from '../../pipelines';
+import { CriteriaController } from './criteria.controller';
 import { DumpTraceStore } from './dump-trace-store';
 import { MikroOrmRunRepository } from './persistence/mikro-orm-run-repository';
 import { PipelinesController } from './pipelines.controller';
@@ -27,7 +28,7 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from '
       QualityRunCriterionResult,
     ]),
   ],
-  controllers: [RunsController, PipelinesController],
+  controllers: [RunsController, PipelinesController, CriteriaController],
   providers: [
     RunsService,
     // The environment decides once, at boot: a key, the subscription route

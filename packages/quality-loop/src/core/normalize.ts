@@ -31,6 +31,7 @@ import {
   SEVERITY_MILD_FIRST,
   unique,
 } from './ordering';
+import { unannotated } from './annotate';
 
 export interface NormalizeInput<T> {
   contract: TaskContract<T>;
@@ -294,6 +295,7 @@ export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): 
         criterionIds,
         hits: entry.hits,
         lenses: entry.lenses,
+        ...unannotated(),
         reconciledTo,
       };
     })

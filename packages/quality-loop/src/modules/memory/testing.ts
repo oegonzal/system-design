@@ -321,6 +321,7 @@ export const confirmed = (type: string, locationRefs: string[]): ConfirmedFindin
   criterionIds: [],
   hits: 2,
   lenses: ['critic.spec'],
+  rationale: null,
   reconciledTo: null,
 });
 

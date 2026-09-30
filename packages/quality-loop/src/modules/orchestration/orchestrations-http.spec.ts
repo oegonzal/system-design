@@ -192,7 +192,12 @@ describe('the orchestrations HTTP surface', () => {
       reason: 'provided-run',
       runIds: [targetRunId],
     });
-    expect(record.request).toMatchObject({ goal: GOAL, outputProvided: false, maxIterations: 2 });
+    expect(record.request).toMatchObject({
+      goal: GOAL,
+      outputProvided: false,
+      criteriaProvided: false,
+      maxIterations: 2,
+    });
     expect(record.steps['digest']).toMatchObject({
       status: 'skipped',
       reason: 'embeddings-disabled',
@@ -227,6 +232,7 @@ describe('the orchestrations HTTP surface', () => {
     expect(record.request).toEqual({
       goal: GOAL,
       outputProvided: false,
+      criteriaProvided: false,
       maxIterations: 1,
       samples: null,
     });
@@ -310,7 +316,11 @@ describe('the orchestrations HTTP surface', () => {
         request: { outputProvided: boolean; maxIterations: number };
       }>
     ).data;
-    expect(opinion.request).toMatchObject({ outputProvided: true, maxIterations: 1 });
+    expect(opinion.request).toMatchObject({
+      outputProvided: true,
+      criteriaProvided: false,
+      maxIterations: 1,
+    });
   });
 
   // Last: booting another app sweeps every `running` row, so it must never overlap a live run.
@@ -331,7 +341,13 @@ describe('the orchestrations HTTP surface', () => {
       orchestrator: 'memory',
       pipeline: 'system-design',
       status: 'running',
-      request: { goal: GOAL, outputProvided: false, maxIterations: 1, samples: null },
+      request: {
+        goal: GOAL,
+        outputProvided: false,
+        criteriaProvided: false,
+        maxIterations: 1,
+        samples: null,
+      },
       context: {},
       steps: {
         recall: step('complete', 'store-empty'),

@@ -1,5 +1,5 @@
 /**
- * `main.js run --pipeline <id> --goal <file.md> [--output <file.json>] [--iterations n]`
+ * `main.js run --pipeline <id> --goal <file.md> [--output <file.json>] [--criteria <file.json>] [--iterations n]`
  *
  * The goal file is read verbatim as the inputGoal. Boots the same Nest context
  * the HTTP surface uses, runs to completion, prints a summary and exits by the
@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import type { SuccessCriterion } from '@sysdesign/contracts';
+
 import { NestFactory } from '@nestjs/core';
 import type { QualityControlDecision } from '@sysdesign/contracts';
 import { dumpDir } from '@sysdesign/run-dump';
@@ -31,7 +33,7 @@ import { RunsService } from './modules/runs/runs.service';
 import { PIPELINES_TOKEN, RUN_REPOSITORY } from './modules/runs/tokens';
 
 const USAGE =
-  'usage: run --pipeline <id> --goal <file.md> [--output <file.json>] [--iterations <n>]';
+  'usage: run --pipeline <id> --goal <file.md> [--output <file.json>] [--criteria <file.json>] [--iterations <n>]';
 
 export async function runCli(argv: readonly string[]): Promise<number> {
   const { values } = parseArgs({
@@ -40,6 +42,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
       pipeline: { type: 'string' },
       goal: { type: 'string' },
       output: { type: 'string' },
+      criteria: { type: 'string' },
       iterations: { type: 'string' },
     },
   });
@@ -52,6 +55,9 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   const output = values.output
     ? (JSON.parse(readFileSync(resolve(values.output), 'utf8')) as unknown)
     : undefined;
+  const criteria = values.criteria
+    ? (JSON.parse(readFileSync(resolve(values.criteria), 'utf8')) as SuccessCriterion[])
+    : undefined;
   const maxIterations = values.iterations ? parseInt(values.iterations, 10) : undefined;
 
   const app = await NestFactory.createApplicationContext(AppModule, {
@@ -60,7 +66,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   try {
     const record = await app
       .get(RunsService)
-      .execute({ pipeline: values.pipeline, goal, output, maxIterations });
+      .execute({ pipeline: values.pipeline, goal, output, criteria, maxIterations });
     const last = record.trace?.iterations[record.trace.iterations.length - 1] ?? null;
     console.log(
       JSON.stringify(

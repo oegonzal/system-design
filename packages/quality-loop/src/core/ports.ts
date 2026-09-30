@@ -56,17 +56,12 @@ export interface Validator<T> {
   validate(artifact: T, contract: TaskContract<T>): ValidationReport;
 }
 
-/** A confirmed finding with the first sentence a critic gave for it — prose for a model, never for the decision. */
-export interface AnnotatedFinding extends ConfirmedFinding {
-  rationale: string | null;
-}
-
 /**
  * What the normaliser confirmed from the wave before. A lens receives only the
  * kinds it declared it consumes; a first-wave lens receives it empty.
  */
 export interface UpstreamEvidenceBundle {
-  findings: AnnotatedFinding[];
+  findings: ConfirmedFinding[];
   results: CriterionEvidence[];
 }
 

@@ -23,7 +23,12 @@ const record = (overrides: Partial<RunRecord>): RunRecord => ({
   finishedAt: '2026-09-06T00:00:01.000Z',
   llm: { enabled: true, model: 'test-model', reason: null },
   git: { branch: 'main', headSha: 'abc' },
-  request: { goal: '# Goal\n\nDo it.', outputProvided: false, maxIterations: 3 },
+  request: {
+    goal: '# Goal\n\nDo it.',
+    outputProvided: false,
+    criteriaProvided: false,
+    maxIterations: 3,
+  },
   trace: null,
   exchanges: [],
   error: null,
@@ -79,6 +84,8 @@ describe('buildRunDump', () => {
     );
 
     const paths = dump.files.map((file) => file.path);
+    const manifest = JSON.parse(dump.files[0].content) as { criteriaProvided: boolean };
+    expect(manifest.criteriaProvided).toBe(false);
     expect(paths).toEqual([
       'manifest.json',
       'run.md',

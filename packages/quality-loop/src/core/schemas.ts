@@ -12,6 +12,7 @@ import {
   DECISIONS,
   FIXABILITIES,
   SEVERITIES,
+  CRITERION_STATEMENT_MAX_LENGTH,
 } from '@sysdesign/contracts';
 
 export type EnumTuple = [string, ...string[]];
@@ -29,7 +30,7 @@ const refs = (ids: readonly string[], max: number, description: string) => {
   );
 };
 
-const STATEMENT_MAX = 300;
+const STATEMENT_MAX = CRITERION_STATEMENT_MAX_LENGTH;
 const RATIONALE_MAX = 600;
 
 export function criteriaSchema(kinds: EnumTuple, maxCriteria: number) {

@@ -1,5 +1,14 @@
-import { Inject, Injectable, Logger, NotFoundException, type OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  type OnModuleInit,
+} from '@nestjs/common';
 import type {
+  DeriveCriteriaRequest,
+  DerivedCriteriaDto,
   PipelineSummary,
   QualityRunDto,
   QualityRunSummaryDto,
@@ -9,8 +18,10 @@ import { qualityLoopAvailabilityFromEnv, type LlmClient, type LlmExchange } from
 import { describeError, GIT_CONTEXT, makeRunId } from '@sysdesign/run-dump';
 
 import { summariseExchange, type RunRecord } from '../../core/contracts';
+import { materializeCriteria } from '../../core/materialize';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
 import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
+import { rubricProblems } from '../../core/rubric';
 import { runPipeline } from '../../core/run-pipeline';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
 
@@ -54,9 +65,27 @@ export class RunsService implements OnModuleInit {
     return this.repository.list(query);
   }
 
+  /**
+   * The derive-criteria stage alone: one model call, no run row, no dump.
+   * Without a model the criteria are empty and the diagnostic says why —
+   * a rubric is never invented.
+   */
+  async deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto> {
+    const definition = this.resolve(request.pipeline);
+    const derive = materializeCriteria(definition, this.llm, () => undefined);
+    const { criteria, diagnostic } = await derive(request.goal);
+    return {
+      pipeline: request.pipeline,
+      criteria: criteria ?? [],
+      diagnostic,
+      llm: this.availability(),
+    };
+  }
+
   /** Start in the background; the row is readable at once. */
   async start(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
+    this.assertRubric(request, definition);
     const record = await this.open(request, definition);
     void this.perform(record, request, definition);
     return record;
@@ -72,6 +101,7 @@ export class RunsService implements OnModuleInit {
     onOpened?: (record: RunRecord) => void,
   ): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
+    this.assertRubric(request, definition);
     const record = await this.open(request, definition);
     onOpened?.(record);
     await this.perform(record, request, definition);
@@ -84,6 +114,29 @@ export class RunsService implements OnModuleInit {
     return definition;
   }
 
+  /** A rubric that does not fit the pipeline is refused before any row exists — the pipe's own 400 shape. */
+  private assertRubric(
+    request: StartQualityRunRequest,
+    definition: PipelineDefinition<unknown>,
+  ): void {
+    if (request.criteria === undefined) return;
+    const problems = rubricProblems(request.criteria, definition.task);
+    if (problems.length > 0) {
+      throw new BadRequestException({
+        message: 'invalid criteria',
+        issues: problems.map((message) => ({ path: 'criteria', message })),
+      });
+    }
+  }
+
+  private availability(): RunRecord['llm'] {
+    return {
+      enabled: this.llm.enabled,
+      model: this.llm.model,
+      reason: this.llm.enabled ? null : qualityLoopAvailabilityFromEnv().reason,
+    };
+  }
+
   private async open(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
@@ -94,15 +147,12 @@ export class RunsService implements OnModuleInit {
       status: 'running',
       startedAt: new Date().toISOString(),
       finishedAt: null,
-      llm: {
-        enabled: this.llm.enabled,
-        model: this.llm.model,
-        reason: this.llm.enabled ? null : qualityLoopAvailabilityFromEnv().reason,
-      },
+      llm: this.availability(),
       git: GIT_CONTEXT,
       request: {
         goal: request.goal,
         outputProvided: request.output !== undefined,
+        criteriaProvided: request.criteria !== undefined,
         maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
       },
       trace: null,
@@ -133,7 +183,12 @@ export class RunsService implements OnModuleInit {
     try {
       record.trace = await runPipeline(
         definition,
-        { goal: request.goal, output: request.output, maxIterations: request.maxIterations },
+        {
+          goal: request.goal,
+          output: request.output,
+          maxIterations: request.maxIterations,
+          criteria: request.criteria,
+        },
         { llm: this.llm, sink, now: Date.now },
       );
       record.status = 'complete';
