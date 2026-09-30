@@ -150,4 +150,9 @@ The dev servers need no Nx daemon: `nx run studio-api:serve` and
 Git hooks live in `.githooks` (activated by `pnpm install` via the `prepare`
 script): format staged files, lint/typecheck affected projects, then a quick
 review pass. `SKIP_REVIEW=1 git commit` skips the review; `--no-verify`
-skips everything.
+skips everything. The review's critics run on the same Claude Code
+subscription login as the quality loop — this machine's `claude login`
+locally, and in CI the `CLAUDE_CODE_OAUTH_TOKEN` repository secret that
+`claude setup-token` prints (without it, or on a fork PR, the deterministic
+rules run alone). No API key is read. Every setting the review takes is
+declared in `tooling/code-review/config.ts`.

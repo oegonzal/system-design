@@ -59,7 +59,7 @@ of re-deriving the problem.
 | SEAM-2   | No retry on a schema miss                                                | open     | high     |
 | SEAM-3   | No temperature, seed or memoisation at the seam                          | open     | medium   |
 | SEAM-4   | The boot sweep interrupts in-flight runs from any process                | closed   | —        |
-| SEAM-5   | The pre-commit review runs no critics on the subscription route          | open     | medium   |
+| SEAM-5   | The pre-commit review runs no critics on the subscription route          | closed   | —        |
 | SEAM-6   | CI never calls a model; no judge-regression harness                      | open     | medium   |
 | STUDIO-1 | Archetypes still drive prompt generation and coverage                    | closed   | —        |
 | STUDIO-2 | Two grading engines coexist                                              | closed   | —        |
@@ -85,8 +85,8 @@ Ordered by how much of what the system reports would change meaning if the
 entry were closed, then by cost. Each points at the entry that specifies it.
 
 1. **Fail fast without a model** — closed: SEAM-1, and STUDIO-8 before it.
-   The loop boots only with a model provider and exits naming both variables
-   otherwise; the no-op client is gone, so no run can look graded when it was
+   The loop boots only on a Claude Code subscription login and exits saying
+   how to get one otherwise; the no-op client is gone, so no run can look graded when it was
    not. ENG-10 and SEAM-4 closed beside it: a running row heartbeats, only a
    stale one is swept, and a late close reclaims a swept row with the truth.
 2. **Retry a schema miss once** — SEAM-2, ENG-2. One lost sample currently

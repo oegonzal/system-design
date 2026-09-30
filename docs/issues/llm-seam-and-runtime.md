@@ -137,7 +137,22 @@ never sweeping.
 
 ### SEAM-5 · The pre-commit review runs no critics on the subscription route
 
-**Status** open · **Severity** medium · **Where** `.githooks/pre-commit` step 4, `tooling/code-review`
+**Status** closed (2026-09-30) · **Severity** medium · **Where** `.githooks/pre-commit` step 4, `tooling/code-review`
+
+**Resolution.** The review no longer has a key gate or a CLI of its own: it
+reaches Claude Code through `@sysdesign/llm`, the same subscription-login
+check and the same withheld credentials the quality loop boots on, via the
+Agent SDK (the JSON Schema is still enforced by the API, the budget still
+capped per call). A machine's `claude login` runs the critics locally; CI
+passes the `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`, and a
+fork PR without secrets runs the rules alone, saying so. Every knob the
+review reads is declared once in `tooling/code-review/config.ts`, and its
+spec fails on any the hook or the CI job uses without declaring. Verified
+live: `pnpm review:code --base=61bbed0 --profile=quick` sent 7 of 7 files to
+the readability critic on the subscription; with no login (and an API key
+set) the critics were skipped with the reason and the rules still ran.
+
+What follows is the issue as it was found.
 
 **What.** The hook's fourth step runs the code review with the quick
 profile. Its critics need `ANTHROPIC_API_KEY`; without one they are skipped
