@@ -219,8 +219,8 @@ only the request's origin, and the record says nothing of it.
 ## 5. Operating it
 
 ```bash
-# the service, as before (QUALITY_LOOP_AUTH is the trap: without it every run degrades silently)
-env DB_PORT=5433 QUALITY_LOOP_AUTH=claude-code node --env-file-if-exists=.env packages/quality-loop/dist/main.js
+# the service, as before; it runs on this machine's Claude Code login and refuses to boot without one
+env DB_PORT=5433 node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 
 # which judge the router would pick, running nothing — the accuracy tool
 curl -s -X POST localhost:3003/router/report -H 'content-type: application/json' -d '{"goal":"# Prompt …"}'

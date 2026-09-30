@@ -46,13 +46,15 @@ tilt up                 # postgres → migrations → seed → api → quality l
 | Postgres        | localhost:5432 · `admin`/`admin` · db `sysdesign`    |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
-Grading needs a model. The quality loop boots only with one: `ANTHROPIC_API_KEY`,
-or — with `QUALITY_LOOP_AUTH=claude-code`, the local stack's default — this
-machine's Claude Code login. Without either, `serve` and `run` exit at boot
-naming both variables; there is no switch that runs the loop without a model,
-so a run never looks graded when none ran. Under Tilt the key comes from a
-Secret built from the shell's `ANTHROPIC_API_KEY`. No test calls a model: the
-loop's specs script a fake client, and the studio's specs and the e2e stub
+Grading needs a model, and the quality loop runs only on a Claude Code
+subscription login: this machine's `claude login`, or, where there is no login
+(a Tilt/Kubernetes pod), the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token`
+prints, kept in the repo's gitignored `.env` or exported in the shell. `serve`
+and `run` ask Claude Code whether it is signed in before anything boots (no
+model call) and exit 1 saying how to get a login when it is not; there is no
+switch that runs the loop without a model, so a run never looks graded when
+none ran. An API key in the environment is never used. No test calls a model:
+the loop's specs script a fake client, and the studio's specs and the e2e stub
 share one fake loop (`packages/studio-testing`).
 
 ### Without Kubernetes — durable local stack

@@ -179,8 +179,9 @@ disables a control with that reason instead of failing.
 
 Every model call lives in `packages/quality-loop`: the derive stage, the
 producer, and each lens sample, all through `@sysdesign/llm`'s one port on
-the provider the environment names (`ANTHROPIC_API_KEY`, else
-`QUALITY_LOOP_AUTH=claude-code`; neither, and the process refuses to boot).
+the Claude Code subscription login (a machine `claude login`, or
+`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` where there is none; no
+login, and the process refuses to boot). An API key is never used.
 
 ---
 
@@ -201,15 +202,15 @@ the provider the environment names (`ANTHROPIC_API_KEY`, else
 
 ## 7. Which switches gate what
 
-| Switch                            | Effect                                                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`               | the loop grades on the API; outranks the subscription route. Under Tilt, from the Secret `quality-loop-model`                   |
-| `QUALITY_LOOP_AUTH=claude-code`   | the loop grades through this machine's Claude Code login (the local stack's default)                                            |
-| neither                           | `serve` and `run` exit 1 at boot naming both; `replay` boots without a model. There is no switch that runs the loop without one |
-| `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                                |
-| `LLM_MODEL`                       | the model id on either route                                                                                                    |
-| `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `600000`                                 |
-| `EVAL_DUMP_DIR`                   | where the loop's run dumps go; the specs point it at a temp directory                                                           |
+| Switch                            | Effect                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| a Claude Code login               | the loop grades through this machine's `claude login` — the only route; nothing to export                                   |
+| `CLAUDE_CODE_OAUTH_TOKEN`         | the login where there is none (a Tilt/Kubernetes pod): the token `claude setup-token` prints, from `.env` or the shell      |
+| no login                          | `serve` and `run` exit 1 at boot saying how to get one; `replay` boots without a model. No switch runs the loop without one |
+| `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                            |
+| `LLM_MODEL`                       | pins the model the subscription runs                                                                                        |
+| `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `600000`                             |
+| `EVAL_DUMP_DIR`                   | where the loop's run dumps go; the specs point it at a temp directory                                                       |
 
 ---
 

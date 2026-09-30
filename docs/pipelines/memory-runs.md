@@ -568,14 +568,13 @@ pnpm stack:db
 pnpm db:migrate
 pnpm stack:down                                  # both, data stays in the named volumes
 
-# the service; Node loads .env, which is where OPENAI_API_KEY lives.
-# QUALITY_LOOP_AUTH is NOT in .env and NOT in any pnpm script. The loop boots
-# only with a model provider — this, or ANTHROPIC_API_KEY — and without either
-# it exits 1 naming both before Nest boots, so a run can never "complete" with
-# nothing judged. Embeddings stay optional: without OPENAI_API_KEY the memory
-# steps skip with embeddings-disabled and the target still runs.
-env DB_PORT=5433 QUALITY_LOOP_AUTH=claude-code \
-  node --env-file-if-exists=.env packages/quality-loop/dist/main.js
+# the service; Node loads .env, which is where OPENAI_API_KEY lives. The loop
+# runs only on this machine's Claude Code login (or CLAUDE_CODE_OAUTH_TOKEN
+# where there is none); without one it exits 1 before Nest boots, saying how
+# to get one, so a run can never "complete" with nothing judged. Embeddings
+# stay optional: without OPENAI_API_KEY the memory steps skip with
+# embeddings-disabled and the target still runs.
+env DB_PORT=5433 node --env-file-if-exists=.env packages/quality-loop/dist/main.js
 
 # a memory run: the memory orchestrator, with the same body as POST /runs
 curl -s -X POST localhost:3003/orchestrations/memory -H 'content-type: application/json' \

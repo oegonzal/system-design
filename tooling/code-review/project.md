@@ -26,10 +26,10 @@ anything the map already generates is deliberately absent, because a second copy
   validates against and the design system maps to tokens.
 - `criteria` — the brief's completion criteria as data, each claimed by a tagged test title.
 - `db` — the MikroORM entities, the hand-written migrations, and the seed.
-- `llm` — the model-client abstraction: one interface, two provider adapters (the API key, the
-  Claude Code subscription), and a factory that throws naming both variables when neither is
-  configured — a process that needs a model and has none fails at boot. Knows nothing about HTTP or
-  the canvas.
+- `llm` — the model-client abstraction: one interface, one provider adapter (the Claude Code
+  subscription, through the Agent SDK), and a login check that asks Claude Code whether it is signed
+  in — a process that needs a model and has no login fails at boot. Knows nothing about HTTP or the
+  canvas.
 - `design-system` — the token layer plus domain-free primitives. Knows nothing about designs,
   sessions or evaluations.
 - `studio-ui` — the app: routes, the canvas, the feature components that _do_ know the domain, the

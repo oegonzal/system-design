@@ -40,9 +40,9 @@ vectors`) — Postgres image `postgres:16-alpine`, **named volume**
 3. applies any pending migrations (`pnpm db:migrate`, idempotent) and re-seeds
    the reference experiences (`pnpm db:seed`, idempotent — never touches your
    sessions);
-4. starts the API, the quality loop and the UI with `DB_PORT=5433`,
-   `QUALITY_LOOP_URL=http://localhost:3003` and, by default,
-   `QUALITY_LOOP_AUTH=claude-code`.
+4. starts the API, the quality loop and the UI with `DB_PORT=5433` and
+   `QUALITY_LOOP_URL=http://localhost:3003`; the loop runs on this machine's
+   Claude Code login.
 
 `pnpm stack:down` stops both containers; the data stays in the named volumes.
 `pnpm stack:db` brings up only the database and the vector store (for
@@ -59,17 +59,21 @@ exactly where you left them.
 ## Grading needs a model
 
 Grading, coaching and prompt generation are runs of the quality loop, and a
-run needs a model. Two routes, in order of precedence:
+run needs a model. The loop runs only on a Claude Code subscription login,
+through the Agent SDK:
 
-- **API key:** export `ANTHROPIC_API_KEY` before `pnpm stack:up`; an explicit
-  key outranks the subscription route.
-- **Claude subscription (the stack's default):** `QUALITY_LOOP_AUTH=claude-code`
-  runs every model call through this machine's Claude Code login via the Agent
-  SDK — if `claude` is logged in, grading just works. No key is read or stored.
+- **On this machine:** `claude login` once — if `claude` is logged in, grading
+  just works. Nothing to export.
+- **Where there is no login (a Tilt/Kubernetes pod):** run `claude setup-token`
+  and put the token it prints in the repo's gitignored `.env` as
+  `CLAUDE_CODE_OAUTH_TOKEN=…` (or export it in the shell that runs `tilt up`).
 
-There is no way to run the loop without a model. `serve` and `run` check for
-a provider before anything boots and exit 1 naming both variables; `replay`
-reads recorded runs and needs none. A booted loop always has a model, so
+An API key in the environment is never used: it is withheld from the Claude
+Code process, so nothing is billed outside the subscription. There is no way
+to run the loop without a model. `serve` and `run` ask Claude Code whether it
+is signed in before anything boots — an account check, no model call — and
+exit 1 saying how to get a login when it is not; `replay` reads recorded runs
+and needs none. A booted loop always has a model, so
 `GET /api/grading/availability` (the loop's `GET /health`, proxied) either
 names it or answers 503 because the loop is unreachable, and the UI reads it
 to explain a disabled control instead of failing. `POST /criteria` answers
@@ -204,10 +208,11 @@ stack (`pnpm stack:down`) before `nx e2e studio-e2e`.
 - This durable `docker-compose` stack is the canonical **local** database. The
   committed Tilt/Kubernetes path (`tilt up`, `tilt/postgres/*`) is a separate,
   independent database — don't mix them, or each will show only its own runs.
-  Under Tilt the loop's key comes from the Secret `quality-loop-model`, which
-  `packages/quality-loop/Tiltfile` builds from the shell's `ANTHROPIC_API_KEY`
-  at `tilt up` (a pod has no Claude Code login). With it unset Tilt warns and
-  the pod exits at boot with the loop's own message.
+  Under Tilt the loop signs in with `CLAUDE_CODE_OAUTH_TOKEN` from the Secret
+  `quality-loop-model`, which `packages/quality-loop/Tiltfile` builds at
+  `tilt up` from the shell's variable, else from the repo's `.env` (a pod has
+  no `claude login`; `claude setup-token` prints the token). With neither Tilt
+  warns and the pod exits at boot with the loop's own message.
 - Under Tilt the host reaches the API (3000), the loop (3003) and Postgres
   (5432) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
