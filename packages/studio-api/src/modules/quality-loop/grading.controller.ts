@@ -2,7 +2,7 @@ import { Controller, Get, HttpException, ServiceUnavailableException } from '@ne
 import type { ApiResponse, LlmAvailabilityDto } from '@sysdesign/contracts';
 
 import { ok } from '../../common/envelope';
-import { QualityLoopClient } from './quality-loop.client';
+import { QualityLoopClient, type QualityLoopHealth } from './quality-loop.client';
 
 /**
  * Whether grading and coaching can run right now: the loop's own availability,
@@ -15,8 +15,9 @@ export class GradingController {
 
   @Get('availability')
   async availability(): Promise<ApiResponse<LlmAvailabilityDto>> {
+    let health: QualityLoopHealth;
     try {
-      return ok((await this.loop.health()).llm);
+      health = await this.loop.health();
     } catch (error) {
       if (error instanceof HttpException) {
         throw new ServiceUnavailableException(
@@ -25,5 +26,13 @@ export class GradingController {
       }
       throw error;
     }
+    // A loop that answers but says nothing about a model is an older build,
+    // not an available grader: the client must not read `{}` as enabled.
+    if (!health.llm) {
+      throw new ServiceUnavailableException(
+        'the grading service reports no model availability — an older quality loop is running',
+      );
+    }
+    return ok(health.llm);
   }
 }
