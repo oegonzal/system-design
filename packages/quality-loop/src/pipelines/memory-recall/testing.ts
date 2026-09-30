@@ -3,12 +3,13 @@
  * imports — so the file compiles under the app tsconfig.
  */
 import {
-  DEFAULT_RULES,
+  RECALL_RULES,
   MAX_CANDIDATES,
   MAX_KEPT,
   type ChunkSource,
   type MemoryQuery,
 } from './input';
+import { fill } from '../../core/testing';
 import type { MemoryPack } from './output';
 
 const source = (overrides: Partial<ChunkSource> = {}): ChunkSource => ({
@@ -40,7 +41,7 @@ export const sampleQuery = (overrides: Partial<MemoryQuery> = {}): MemoryQuery =
     '| --- | --- |',
     '| Reads/s | 150 |',
   ].join('\n'),
-  rules: [...DEFAULT_RULES],
+  rules: [...RECALL_RULES],
   probes: ['a read path depends on one upstream that can go down'],
   maxKept: 2,
   candidates: [
@@ -90,8 +91,6 @@ export const samplePack = (overrides: Partial<MemoryPack> = {}): MemoryPack => (
   gaps: ['nothing recalled covers the 150 reads/s target'],
   ...overrides,
 });
-
-const fill = (length: number, char = 'x'): string => char.repeat(length);
 
 /** Every field at its cap: the render of this must stay under the goal budget. */
 export const maximalQuery = (): MemoryQuery => ({

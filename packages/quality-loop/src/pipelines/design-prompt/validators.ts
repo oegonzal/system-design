@@ -7,40 +7,36 @@
  */
 import type { DesignPromptDraft, ValidationProblem } from '@sysdesign/contracts';
 
-import type { TaskContract } from '../../core/contracts';
+import { problem, type TaskContract } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 
 export const SHAPE_VALIDATOR_ID = 'shape';
 
-const problem = (message: string, locationRefs: string[] = []): ValidationProblem => ({
-  severity: 'medium',
-  locationRefs,
-  message,
-});
+/** Every gap in a draft is worth telling the lenses about, never blocking on. */
+const gap = (message: string, locationRefs: string[] = []): ValidationProblem =>
+  problem('medium', message, locationRefs);
 
 const blank = (text: string): boolean => text.trim().length === 0;
 
 function shape(draft: DesignPromptDraft): ValidationProblem[] {
   const problems: ValidationProblem[] = [];
-  if (blank(draft.title)) problems.push(problem('the prompt has no title', ['title']));
-  if (blank(draft.scenario)) problems.push(problem('the prompt has no scenario', ['scenario']));
+  if (blank(draft.title)) problems.push(gap('the prompt has no title', ['title']));
+  if (blank(draft.scenario)) problems.push(gap('the prompt has no scenario', ['scenario']));
   if (draft.functionalRequirements.length === 0) {
-    problems.push(problem('the prompt states no functional requirement'));
+    problems.push(gap('the prompt states no functional requirement'));
   }
   if (draft.nonFunctionalRequirements.length === 0) {
-    problems.push(problem('the prompt states no quality target'));
+    problems.push(gap('the prompt states no quality target'));
   }
-  if (draft.scale.length === 0) problems.push(problem('the prompt states no scale target'));
+  if (draft.scale.length === 0) problems.push(gap('the prompt states no scale target'));
   draft.nonFunctionalRequirements.forEach((row, index) => {
     if (blank(row.target)) {
-      problems.push(
-        problem(`quality target ${index + 1} has no target figure`, [`nfr.${index + 1}`]),
-      );
+      problems.push(gap(`quality target ${index + 1} has no target figure`, [`nfr.${index + 1}`]));
     }
   });
   draft.scale.forEach((row, index) => {
     if (blank(row.target)) {
-      problems.push(problem(`scale row ${index + 1} has no target figure`, [`scale.${index + 1}`]));
+      problems.push(gap(`scale row ${index + 1} has no target figure`, [`scale.${index + 1}`]));
     }
   });
   return problems;

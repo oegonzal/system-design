@@ -14,10 +14,21 @@ import type {
   Remediation,
 } from '@sysdesign/contracts';
 
+import { fill } from '../../core/testing';
 import {
+  ALIAS_MAX,
+  KEY_MAX,
+  LENS_MAX,
   MAX_CRITERIA_ITEMS,
+  MAX_FINDING_CRITERIA,
+  MAX_FINDING_LENSES,
+  MAX_FINDING_REFS,
   MAX_FINDINGS,
   MAX_MEMORIES,
+  RATIONALE_MAX,
+  REF_MAX,
+  STATEMENT_MAX,
+  TRANSITION_DETAIL_MAX,
   type ExperienceRecord,
   type RecordedCriterion,
   type RecordedFinding,
@@ -262,26 +273,24 @@ export const sampleDigest = (overrides: Partial<ExperienceDigest> = {}): Experie
   ...overrides,
 });
 
-const fill = (length: number, char = 'x'): string => char.repeat(length);
-
 const maximalFinding = (position: number): RecordedFinding => ({
   alias: `f${position + 1}`,
-  key: fill(200),
+  key: fill(KEY_MAX),
   type: fill(60),
   severity: 'critical',
   confidence: 'medium',
   fixability: 'fixable_local',
-  locationRefs: Array.from({ length: 8 }, () => fill(40)),
-  criteria: Array.from({ length: 4 }, () => fill(8)),
-  lenses: Array.from({ length: 6 }, () => fill(40)),
+  locationRefs: Array.from({ length: MAX_FINDING_REFS }, () => fill(REF_MAX)),
+  criteria: Array.from({ length: MAX_FINDING_CRITERIA }, () => fill(ALIAS_MAX)),
+  lenses: Array.from({ length: MAX_FINDING_LENSES }, () => fill(LENS_MAX)),
   iterations: Array.from({ length: 10 }, (_, index) => index + 1),
-  rationale: fill(200),
+  rationale: fill(RATIONALE_MAX),
   remediated: true,
-  reconciledTo: fill(8),
+  reconciledTo: fill(ALIAS_MAX),
   transitions: Array.from({ length: 10 }, () => ({
     kind: 'persisted' as const,
     iterations: [1, 2],
-    detail: fill(120),
+    detail: fill(TRANSITION_DETAIL_MAX),
   })),
 });
 
@@ -289,7 +298,7 @@ const maximalCriterion = (position: number): RecordedCriterion => ({
   alias: `r${position + 1}`,
   id: fill(20),
   kind: fill(60),
-  statement: fill(300),
+  statement: fill(STATEMENT_MAX),
   results: Array.from({ length: 10 }, (_, index) => ({
     iteration: index + 1,
     result: 'partial' as const,
@@ -297,7 +306,7 @@ const maximalCriterion = (position: number): RecordedCriterion => ({
   transitions: Array.from({ length: 10 }, () => ({
     kind: 'improved' as const,
     iterations: [1, 2],
-    detail: fill(120),
+    detail: fill(TRANSITION_DETAIL_MAX),
   })),
 });
 

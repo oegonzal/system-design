@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../core/outputs';
 import { GOAL_MAX_BYTES } from '../../core/contracts';
-import { fromRun } from '../../pipelines/experience-digest/compose';
+import { fromRun } from '../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
 import { sampleDigest, sampleRun } from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';

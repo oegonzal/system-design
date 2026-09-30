@@ -17,6 +17,7 @@
  */
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import criticContracts from './lenses/critic.contracts.md?raw';
 import criticGenerality from './lenses/critic.generality.md?raw';
 import criticRequirements from './lenses/critic.requirements.md?raw';
@@ -195,17 +196,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
       unhandled_failure: { dimension: 'soundness', gate: false },
     },
 
-    resultValues: { pass: 1, partial: 0.5, fail: 0 },
-
-    confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
-
-    penalties: {
-      bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
-      decay: 0.7,
-      maxPerDimension: 60,
-    },
-
-    blockingSeverities: ['critical'],
+    ...STANDARD_SCORING,
 
     // Two samples everywhere and two hits to confirm: three finding types gate
     // here, and one sample should never be able to block a run on its own.

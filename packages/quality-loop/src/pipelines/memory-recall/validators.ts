@@ -1,47 +1,30 @@
 /**
- * The exact checks: what the index says against what the pack cites. Both
- * run on every artifact the engine hands over, well-formed or not, so each
- * starts from the output schema; neither reads prose. Both block: a pack that
- * cites what was never recalled, or leaves a candidate unjudged, cannot be
- * trusted by any lens.
+ * The exact checks: what the index says against what the pack cites. A pack
+ * that cites what was never recalled, or leaves a candidate unjudged, cannot
+ * be trusted by any lens, so both block.
  */
-import type { Severity, ValidationProblem, ValidationReport } from '@sysdesign/contracts';
+import type { ValidationProblem } from '@sysdesign/contracts';
 
-import type { TaskContract } from '../../core/contracts';
+import {
+  indexedValidator,
+  LIMITS_VALIDATOR_ID,
+  problem,
+  REFERENCES_VALIDATOR_ID,
+  type IndexedRule,
+} from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 import { MEMORY_RECALL_ID, readIndex, type MemoryIndex } from './input';
 import type { MemoryPack } from './output';
 
-export const REFERENCES_VALIDATOR_ID = 'references';
-export const LIMITS_VALIDATOR_ID = 'limits';
+export { LIMITS_VALIDATOR_ID, REFERENCES_VALIDATOR_ID };
 
-type Rule = (pack: MemoryPack, index: MemoryIndex) => ValidationProblem[];
+type Rule = IndexedRule<MemoryPack, MemoryIndex>;
 
-const problem = (
-  severity: Severity,
-  message: string,
-  locationRefs: string[] = [],
-): ValidationProblem => ({ severity, locationRefs, message });
-
+/** Every candidate the pack gives a verdict, kept or dropped. */
 const verdicts = (pack: MemoryPack): string[] => [
   ...pack.kept.map((item) => item.chunk),
   ...pack.dropped.map((item) => item.chunk),
 ];
-
-/** A well-formed pack and a readable index, or the problems that stand in the way. */
-function check(
-  validatorId: string,
-  artifact: MemoryPack,
-  contract: TaskContract<MemoryPack>,
-  rule: Rule,
-  whenNoIndex: ValidationProblem[],
-): ValidationReport {
-  const parsed = contract.output.schema.safeParse(artifact);
-  if (!parsed.success) return { validatorId, gate: 'block', problems: [] };
-  const index = readIndex(contract.goal);
-  const problems = index === null ? whenNoIndex : rule(parsed.data, index);
-  return { validatorId, gate: 'block', problems };
-}
 
 const references: Rule = (pack, index) => {
   const known = new Set(index.candidates.map((candidate) => candidate.alias));
@@ -69,17 +52,16 @@ const limits: Rule = (pack, index) => {
   return problems;
 };
 
-export const referencesValidator: Validator<MemoryPack> = {
-  id: REFERENCES_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) =>
-    check(REFERENCES_VALIDATOR_ID, artifact, contract, references, [
-      problem('critical', `the goal carries no ${MEMORY_RECALL_ID} index`),
-    ]),
-};
+export const referencesValidator: Validator<MemoryPack> = indexedValidator(
+  REFERENCES_VALIDATOR_ID,
+  readIndex,
+  references,
+  [problem('critical', `the goal carries no ${MEMORY_RECALL_ID} index`)],
+);
 
-export const limitsValidator: Validator<MemoryPack> = {
-  id: LIMITS_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) => check(LIMITS_VALIDATOR_ID, artifact, contract, limits, []),
-};
+export const limitsValidator: Validator<MemoryPack> = indexedValidator(
+  LIMITS_VALIDATOR_ID,
+  readIndex,
+  limits,
+  [],
+);

@@ -278,7 +278,7 @@ this work.
   `experienceRecordSchema` each carry a `.refine` asserting that
   `renderGoal(x)` fits `GOAL_MAX_BYTES` (64,000). Without it a composed goal
   would be clipped by `goalSection` for the model while the validators read
-  the whole thing. `experience-digest/compose.ts` exports `fit`, which trims
+  the whole thing. `experience-digest/from-run.ts` exports `fit`, which trims
   in a fixed order — artifact, prompt, trailing findings, trailing criteria —
   and counts what it dropped under `omitted`.
 

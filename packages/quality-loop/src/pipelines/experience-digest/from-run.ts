@@ -15,13 +15,13 @@ import {
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
-import { admitRefs, sameDefect } from '../../core/evidence/identity';
+import { round1 } from '../../core/arithmetic';
+import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
+import { annotate } from '../../core/evidence/annotate';
 import { outputsOf } from '../../core/outputs';
-import { GOAL_MAX_BYTES } from '../../core/contracts';
 import {
   ARTIFACT_MAX,
-  DEFAULT_RULES,
-  goalBytes,
+  DIGEST_RULES,
   MAX_CRITERIA_ITEMS,
   MAX_FINDINGS,
   MAX_MEMORIES,
@@ -29,6 +29,8 @@ import {
   RATIONALE_MAX,
   REASON_MAX,
   renderGoal,
+  STATEMENT_MAX,
+  TRANSITION_DETAIL_MAX,
   type ExperienceRecord,
   type IterationSummary,
   type RecordedCriterion,
@@ -41,8 +43,6 @@ export interface ComposeOptions {
   rules?: readonly string[];
 }
 
-const round1 = (value: number): number => Math.round(value * 10) / 10;
-
 const delta = (now: number | null, before: number | null | undefined): number | null =>
   now === null || before === null || before === undefined ? null : round1(now - before);
 
@@ -52,7 +52,7 @@ const transitionsFor = (lessons: readonly Lesson[], subject: string): Transition
     .map((lesson) => ({
       kind: lesson.kind,
       iterations: [lesson.iterations[0], lesson.iterations[1]],
-      detail: capText(lesson.detail, 120).text,
+      detail: capText(lesson.detail, TRANSITION_DETAIL_MAX).text,
     }));
 
 const cap = (value: string, max: number): string => capText(value, max).text;
@@ -80,24 +80,43 @@ function summarise(iterations: readonly IterationTrace[]): IterationSummary[] {
 }
 
 /**
- * The first rationale any critic gave for a confirmed finding, in that
- * iteration. A confirmed finding groups several raw ones, so its key belongs to
- * the group rather than to any member: match by membership, not by key.
+ * The first sentence any critic gave for a confirmed finding in that
+ * iteration, capped — read from the critics' own reports, so a run recorded
+ * before findings carried their words is served the same way.
  */
-function rationaleFor(iteration: IterationTrace, key: string): string | null {
-  const confirmed = iteration.ledger.findings.find((finding) => finding.key === key);
-  if (!confirmed) return null;
-  const known = new Set(iteration.locations.map((location) => location.id));
-  for (const outcome of iteration.critics) {
-    for (const raw of outcome.report?.findings ?? []) {
-      const here = { type: raw.type, locationRefs: admitRefs(raw.locationRefs, known) };
-      if (sameDefect(confirmed, here)) return cap(raw.rationale, RATIONALE_MAX);
-    }
-  }
-  return null;
-}
+const rationaleFor = (iteration: IterationTrace, finding: ConfirmedFinding): string | null => {
+  const [annotated] = annotate([finding], iteration.critics, iteration.locations);
+  return annotated.rationale === null ? null : cap(annotated.rationale, RATIONALE_MAX);
+};
+
+/** Whether the policy selected the finding for remediation in that iteration. */
+const remediatedIn = (iteration: IterationTrace, key: string): boolean =>
+  iteration.decision.selectedRemediations.some(
+    (remediation) => 'finding' in remediation.subject && remediation.subject.finding === key,
+  );
 
 type Unaliased = Omit<RecordedFinding, 'alias'>;
+
+/** A finding as first seen, before any iteration has been folded into it. */
+const fresh = (
+  finding: ConfirmedFinding,
+  aliasOf: (id: string) => string,
+  lessons: readonly Lesson[],
+): Unaliased => ({
+  key: finding.key,
+  type: finding.type,
+  severity: finding.severity,
+  confidence: finding.confidence,
+  fixability: finding.fixability,
+  locationRefs: [...finding.locationRefs],
+  criteria: finding.criterionIds.map(aliasOf),
+  lenses: [...finding.lenses],
+  iterations: [],
+  rationale: null,
+  remediated: false,
+  reconciledTo: null,
+  transitions: transitionsFor(lessons, finding.key),
+});
 
 /**
  * Acted-on findings first, then the worst, then the earliest: under the cap,
@@ -108,35 +127,17 @@ const byPriority = (a: Unaliased, b: Unaliased): number =>
   SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) ||
   a.iterations[0] - b.iterations[0];
 
+/** Every confirmed finding across the iterations, folded by key, the latest iteration's reading kept. */
 function collectFindings(
   trace: RunTrace,
   criterionAlias: ReadonlyMap<string, string>,
 ): RecordedFinding[] {
   const byKey = new Map<string, Unaliased>();
   const aliasOf = (id: string): string => criterionAlias.get(id) ?? id;
-  const remediatedIn = (iteration: IterationTrace, key: string): boolean =>
-    iteration.decision.selectedRemediations.some(
-      (remediation) => 'finding' in remediation.subject && remediation.subject.finding === key,
-    );
-  const fresh = (finding: ConfirmedFinding): Unaliased => ({
-    key: finding.key,
-    type: finding.type,
-    severity: finding.severity,
-    confidence: finding.confidence,
-    fixability: finding.fixability,
-    locationRefs: [...finding.locationRefs],
-    criteria: finding.criterionIds.map(aliasOf),
-    lenses: [...finding.lenses],
-    iterations: [],
-    rationale: null,
-    remediated: false,
-    reconciledTo: null,
-    transitions: transitionsFor(trace.lessons, finding.key),
-  });
 
   for (const iteration of trace.iterations) {
     for (const finding of iteration.ledger.findings) {
-      const entry = byKey.get(finding.key) ?? fresh(finding);
+      const entry = byKey.get(finding.key) ?? fresh(finding, aliasOf, trace.lessons);
       byKey.set(finding.key, {
         ...entry,
         severity: finding.severity,
@@ -144,7 +145,7 @@ function collectFindings(
         fixability: finding.fixability,
         lenses: [...finding.lenses],
         iterations: [...entry.iterations, iteration.iteration],
-        rationale: entry.rationale ?? rationaleFor(iteration, finding.key),
+        rationale: entry.rationale ?? rationaleFor(iteration, finding),
         remediated: entry.remediated || remediatedIn(iteration, finding.key),
         reconciledTo: finding.reconciledTo ? aliasOf(finding.reconciledTo) : entry.reconciledTo,
       });
@@ -160,7 +161,7 @@ function collectCriteria(trace: RunTrace): RecordedCriterion[] {
     alias: `r${position + 1}`,
     id: criterion.id,
     kind: criterion.kind,
-    statement: cap(criterion.statement, 300),
+    statement: cap(criterion.statement, STATEMENT_MAX),
     results: trace.iterations.map((iteration) => ({
       iteration: iteration.iteration,
       result:
@@ -174,34 +175,42 @@ function collectCriteria(trace: RunTrace): RecordedCriterion[] {
 /** Below this, trimming the text loses more than dropping evidence would. */
 const TEXT_FLOOR = 2_000;
 
+const halve = (text: string): string => cap(text, Math.floor(goalBytes(text) / 2));
+
 /**
- * Fit a record to the goal budget, deterministically and in order of what
- * costs least to lose: the artifact text, then the prompt, then trailing
- * findings, then trailing criteria — each drop counted under `omitted`.
+ * The cheapest single trim left: the artifact text, then the prompt, then a
+ * trailing finding, then a trailing criterion — each drop counted under
+ * `omitted`. Null when there is nothing left to drop.
  */
+function trimStep(record: ExperienceRecord): ExperienceRecord | null {
+  if (record.artifact !== null && goalBytes(record.artifact) > TEXT_FLOOR) {
+    return { ...record, artifact: halve(record.artifact) };
+  }
+  if (goalBytes(record.prompt) > TEXT_FLOOR) return { ...record, prompt: halve(record.prompt) };
+  if (record.findings.length > 0) {
+    return {
+      ...record,
+      findings: record.findings.slice(0, -1),
+      omitted: { ...record.omitted, findings: record.omitted.findings + 1 },
+    };
+  }
+  if (record.criteria.length > 0) {
+    return {
+      ...record,
+      criteria: record.criteria.slice(0, -1),
+      omitted: { ...record.omitted, criteria: record.omitted.criteria + 1 },
+    };
+  }
+  return null;
+}
+
+/** Fit a record to the goal budget, deterministically, one cheapest trim at a time. */
 export function fit(record: ExperienceRecord, budget = GOAL_MAX_BYTES): ExperienceRecord {
   let current = record;
-  const halve = (text: string): string => cap(text, Math.floor(goalBytes(text) / 2));
   while (goalBytes(renderGoal(current)) > budget) {
-    if (current.artifact !== null && goalBytes(current.artifact) > TEXT_FLOOR) {
-      current = { ...current, artifact: halve(current.artifact) };
-    } else if (goalBytes(current.prompt) > TEXT_FLOOR) {
-      current = { ...current, prompt: halve(current.prompt) };
-    } else if (current.findings.length > 0) {
-      current = {
-        ...current,
-        findings: current.findings.slice(0, -1),
-        omitted: { ...current.omitted, findings: current.omitted.findings + 1 },
-      };
-    } else if (current.criteria.length > 0) {
-      current = {
-        ...current,
-        criteria: current.criteria.slice(0, -1),
-        omitted: { ...current.omitted, criteria: current.omitted.criteria + 1 },
-      };
-    } else {
-      return current;
-    }
+    const trimmed = trimStep(current);
+    if (trimmed === null) return current;
+    current = trimmed;
   }
   return current;
 }
@@ -231,7 +240,7 @@ export function fromRun(run: QualityRunDto, options: ComposeOptions = {}): Exper
       findings: Math.max(0, findings.length - MAX_FINDINGS),
       criteria: Math.max(0, criteria.length - MAX_CRITERIA_ITEMS),
     },
-    rules: [...(options.rules ?? DEFAULT_RULES)],
+    rules: [...(options.rules ?? DIGEST_RULES)],
     maxMemories: options.maxMemories ?? MAX_MEMORIES,
   });
 }

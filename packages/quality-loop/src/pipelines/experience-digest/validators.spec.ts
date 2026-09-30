@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
-import { fromRun } from './compose';
+import { contractOf } from '../../core/testing';
+import { fromRun } from './from-run';
 import { EXPERIENCE_DIGEST } from './definition';
 import { renderGoal } from './input';
 import type { ExperienceDigest } from './output';
@@ -14,11 +15,8 @@ const composedGoal = (): string => {
   return renderGoal(record);
 };
 
-const contract = (goal = composedGoal()): TaskContract<ExperienceDigest> => ({
-  ...EXPERIENCE_DIGEST.task,
-  goal,
-  criteria: [],
-});
+const contract = (goal = composedGoal()): TaskContract<ExperienceDigest> =>
+  contractOf(EXPERIENCE_DIGEST.task, goal);
 
 const messages = (artifact: ExperienceDigest, goal?: string) => ({
   references: referencesValidator.validate(artifact, contract(goal)).problems.map((p) => p.message),

@@ -6,10 +6,10 @@
  */
 import { z } from 'zod';
 
-import type { OutputShape } from '../../core/contracts';
-import { MAX_CANDIDATES, MAX_KEPT } from './input';
+import { section, type OutputShape } from '../../core/contracts';
+import { ALIAS_MAX, MAX_CANDIDATES, MAX_KEPT } from './input';
 
-const chunk = z.string().min(1).max(8).describe('The candidate alias exactly as listed.');
+const chunk = z.string().min(1).max(ALIAS_MAX).describe('The candidate alias exactly as listed.');
 
 export const memoryPackSchema = z.strictObject({
   summary: z
@@ -46,9 +46,6 @@ export const memoryPackSchema = z.strictObject({
     .describe('Needs of the query no candidate serves.'),
 });
 export type MemoryPack = z.infer<typeof memoryPackSchema>;
-
-const section = (title: string, lines: readonly string[]): string[] =>
-  lines.length === 0 ? [] : ['', `## ${title}`, ...lines];
 
 export const memoryPackOutput: OutputShape<MemoryPack> = {
   schema: memoryPackSchema,

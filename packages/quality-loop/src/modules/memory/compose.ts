@@ -14,7 +14,7 @@ import { readIndex as readDigestIndex } from '../../pipelines/experience-digest/
 import { experienceDigestSchema } from '../../pipelines/experience-digest/output';
 import {
   alias,
-  DEFAULT_RULES,
+  RECALL_RULES,
   MAX_CANDIDATES,
   MAX_KEPT,
   memoryQuerySchema,
@@ -66,7 +66,7 @@ export function buildQuery(
   const derived = probes.slice(1);
   return memoryQuerySchema.parse({
     query,
-    rules: [...DEFAULT_RULES],
+    rules: [...RECALL_RULES],
     probes: derived,
     maxKept: MAX_KEPT,
     candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({

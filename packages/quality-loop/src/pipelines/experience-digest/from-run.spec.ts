@@ -1,7 +1,7 @@
 import type { IterationTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { fromRun } from './compose';
+import { fromRun } from './from-run';
 import { MAX_FINDINGS } from './input';
 import { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun } from './testing';
 

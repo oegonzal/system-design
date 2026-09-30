@@ -18,29 +18,22 @@ import {
   validateBriefReferences,
   validateGraphReferences,
   validateNarration,
-  type Severity,
   type ValidationProblem,
   type ValidationReport,
   type ValidatorGate,
 } from '@sysdesign/contracts';
 
-import type { TaskContract } from '../../core/contracts';
+import { problem, REFERENCES_VALIDATOR_ID, type TaskContract } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 import type { CanvasSubmission } from './output';
 
-export const REFERENCES_VALIDATOR_ID = 'references';
+export { REFERENCES_VALIDATOR_ID };
 export const STRUCTURE_VALIDATOR_ID = 'structure';
 
 type Rule = (
   submission: CanvasSubmission,
   contract: TaskContract<CanvasSubmission>,
 ) => ValidationProblem[];
-
-const problem = (
-  severity: Severity,
-  message: string,
-  locationRefs: string[] = [],
-): ValidationProblem => ({ severity, locationRefs, message });
 
 function check(
   validatorId: string,

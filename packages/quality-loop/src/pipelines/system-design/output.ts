@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 
-import type { OutputShape } from '../../core/contracts';
+import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
 export const designAnswerSchema = z.strictObject({
   summary: z
@@ -62,19 +62,6 @@ export const designAnswerSchema = z.strictObject({
 });
 export type DesignAnswer = z.infer<typeof designAnswerSchema>;
 
-const numbered = <I>(prefix: string, items: readonly I[], label: (item: I) => string) =>
-  items.map((item, index) => ({ id: `${prefix}.${index + 1}`, label: label(item) }));
-
-const section = <I>(
-  title: string,
-  prefix: string,
-  items: readonly I[],
-  line: (item: I) => string,
-): string[] =>
-  items.length === 0
-    ? []
-    : ['', `## ${title}`, ...items.map((item, index) => `[${prefix}.${index + 1}] ${line(item)}`)];
-
 export const designAnswerOutput: OutputShape<DesignAnswer> = {
   schema: designAnswerSchema,
 
@@ -92,35 +79,35 @@ export const designAnswerOutput: OutputShape<DesignAnswer> = {
   render: (answer) =>
     [
       `[summary] ${answer.summary}`,
-      ...section('Assumptions', 'assumption', answer.assumptions, (item) => item),
-      ...section(
+      ...numberedSection('Assumptions', 'assumption', answer.assumptions, (item) => item),
+      ...numberedSection(
         'Components',
         'component',
         answer.components,
         (item) =>
           `${item.name} — ${item.responsibility}${item.technology ? ` (${item.technology})` : ''}`,
       ),
-      ...section(
+      ...numberedSection(
         'Flows',
         'flow',
         answer.flows,
         (item) => `${item.name}: ${item.steps.join(' → ')}`,
       ),
-      ...section('Data model', 'data', answer.dataModel, (item) => item),
-      ...section(
+      ...numberedSection('Data model', 'data', answer.dataModel, (item) => item),
+      ...numberedSection(
         'Trade-offs',
         'tradeoff',
         answer.tradeoffs,
         (item) =>
           `${item.decision} — ${item.rationale}${item.alternative ? ` (alternative: ${item.alternative})` : ''}`,
       ),
-      ...section(
+      ...numberedSection(
         'Risks',
         'risk',
         answer.risks,
         (item) => `${item.risk} — mitigation: ${item.mitigation}`,
       ),
-      ...section(
+      ...numberedSection(
         'Capacity',
         'capacity',
         answer.capacity,

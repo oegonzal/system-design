@@ -6,20 +6,7 @@
  */
 import { designPromptDraftSchema, type DesignPromptDraft } from '@sysdesign/contracts';
 
-import type { OutputShape } from '../../core/contracts';
-
-const numbered = <I>(prefix: string, items: readonly I[], label: (item: I) => string) =>
-  items.map((item, index) => ({ id: `${prefix}.${index + 1}`, label: label(item) }));
-
-const section = <I>(
-  title: string,
-  prefix: string,
-  items: readonly I[],
-  line: (item: I) => string,
-): string[] =>
-  items.length === 0
-    ? []
-    : ['', `## ${title}`, ...items.map((item, index) => `[${prefix}.${index + 1}] ${line(item)}`)];
+import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
 export const designPromptOutput: OutputShape<DesignPromptDraft> = {
   schema: designPromptDraftSchema,
@@ -41,19 +28,24 @@ export const designPromptOutput: OutputShape<DesignPromptDraft> = {
     [
       `[title] ${draft.title}`,
       `[scenario] ${draft.scenario}`,
-      ...section(
+      ...numberedSection(
         'Functional requirements',
         'functional',
         draft.functionalRequirements,
         (item) => item,
       ),
-      ...section(
+      ...numberedSection(
         'Non-functional requirements',
         'nfr',
         draft.nonFunctionalRequirements,
         (item) => `${item.kind} — ${item.requirement} — target: ${item.target}`,
       ),
-      ...section('Scale targets', 'scale', draft.scale, (item) => `${item.metric}: ${item.target}`),
-      ...section('Constraints', 'constraint', draft.constraints, (item) => item),
+      ...numberedSection(
+        'Scale targets',
+        'scale',
+        draft.scale,
+        (item) => `${item.metric}: ${item.target}`,
+      ),
+      ...numberedSection('Constraints', 'constraint', draft.constraints, (item) => item),
     ].join('\n'),
 };

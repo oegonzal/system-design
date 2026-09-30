@@ -7,6 +7,7 @@
  */
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import { EXPERIENCE_DIGEST_ID } from './input';
 import criticAttribution from './lenses/critic.attribution.md?raw';
 import criticProvenance from './lenses/critic.provenance.md?raw';
@@ -143,29 +144,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
         gate: false,
       },
     },
-    resultValues: {
-      pass: 1,
-      partial: 0.5,
-      fail: 0,
-    },
-    confidenceWeights: {
-      none: 0,
-      low: 0.33,
-      medium: 0.67,
-      high: 1,
-    },
-    penalties: {
-      bySeverity: {
-        critical: 40,
-        high: 25,
-        medium: 12,
-        low: 5,
-        info: 0,
-      },
-      decay: 0.7,
-      maxPerDimension: 60,
-    },
-    blockingSeverities: ['critical'],
+    ...STANDARD_SCORING,
     // Two samples everywhere and two hits to confirm: the gated
     // `misattributed_evidence` needs both samples of a critic to agree.
     evidence: { minHits: 2, minAssessedShare: 0.75 },

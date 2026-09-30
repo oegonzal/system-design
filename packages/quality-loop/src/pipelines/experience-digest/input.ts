@@ -17,7 +17,13 @@ import {
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { GOAL_MAX_BYTES } from '../../core/contracts';
+import {
+  FENCE_CLOSE,
+  FENCE_OPEN,
+  GOAL_MAX_BYTES,
+  goalBytes,
+  readFencedIndex,
+} from '../../core/contracts';
 
 export const EXPERIENCE_DIGEST_ID = 'experience-digest';
 
@@ -30,21 +36,31 @@ export const PROMPT_MAX = 12_000;
 export const ARTIFACT_MAX = 16_000;
 export const RATIONALE_MAX = 200;
 export const REASON_MAX = 200;
-const STATEMENT_MAX = 300;
+export const STATEMENT_MAX = 300;
 const RULE_MAX = 300;
 const MAX_RULES = 8;
+/** An evidence alias — `f12`, `r3` — and the engine ids a finding carries. */
+export const ALIAS_MAX = 8;
+export const KEY_MAX = 200;
+export const REF_MAX = 40;
+export const LENS_MAX = 40;
+export const TRANSITION_DETAIL_MAX = 120;
+/** How many locations, criteria and lenses one recorded finding lists. */
+export const MAX_FINDING_REFS = 8;
+export const MAX_FINDING_CRITERIA = 4;
+export const MAX_FINDING_LENSES = 6;
 
 export const EVIDENCE_KINDS = ['finding', 'criterion'] as const;
 const TRANSITION_KINDS = ['persisted', 'resolved', 'improved', 'regressed'] as const;
 
-const alias = z.string().min(1).max(8);
+const alias = z.string().min(1).max(ALIAS_MAX);
 const iteration = z.number().int().min(1);
 const score = z.number().nullable();
 
 const transitionSchema = z.strictObject({
   kind: z.enum(TRANSITION_KINDS),
   iterations: z.array(iteration).min(2).max(2),
-  detail: z.string().max(120),
+  detail: z.string().max(TRANSITION_DETAIL_MAX),
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
@@ -76,15 +92,15 @@ export type RecordedCriterion = z.infer<typeof recordedCriterionSchema>;
 
 export const recordedFindingSchema = z.strictObject({
   alias,
-  key: z.string().min(1).max(200),
+  key: z.string().min(1).max(KEY_MAX),
   type: z.string().min(1).max(60),
   severity: z.enum(SEVERITIES),
   confidence: z.enum(AXIS_FACTOR_LEVELS),
   fixability: z.enum(FIXABILITIES),
-  locationRefs: z.array(z.string().max(40)).max(8),
+  locationRefs: z.array(z.string().max(REF_MAX)).max(MAX_FINDING_REFS),
   /** Aliases of the record's criteria the finding weakened. */
-  criteria: z.array(alias).max(4),
-  lenses: z.array(z.string().max(40)).max(6),
+  criteria: z.array(alias).max(MAX_FINDING_CRITERIA),
+  lenses: z.array(z.string().max(LENS_MAX)).max(MAX_FINDING_LENSES),
   iterations: z.array(iteration).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
   rationale: z.string().max(RATIONALE_MAX).nullable(),
   /** The policy selected it for remediation in at least one iteration. */
@@ -111,12 +127,10 @@ const recordShape = z.strictObject({
 });
 export type ExperienceRecord = z.infer<typeof recordShape>;
 
-export const goalBytes = (goal: string): number => Buffer.byteLength(goal, 'utf8');
-
 /**
  * The shape plus the one invariant the caps alone cannot state: a record must
  * render under the engine's goal budget, or every stage would read a clipped
- * goal while the validators read the whole one. `compose.ts` fits a record to
+ * goal while the validators read the whole one. `from-run.ts` fits a record to
  * it; an orchestrator handing one over gets a refusal instead of a clip.
  */
 export const experienceRecordSchema = recordShape.refine(
@@ -125,7 +139,7 @@ export const experienceRecordSchema = recordShape.refine(
 );
 
 /** Rules an orchestrator can state as they are; they guide the producer and the critics. */
-export const DEFAULT_RULES: readonly string[] = [
+export const DIGEST_RULES: readonly string[] = [
   'A memory rests only on the findings and criteria it cites, and says only what they show.',
   'A memory claims a change in quality only where the record shows a transition or a score that moved.',
   'A memory states what to do or avoid in terms another prompt could use, and says when it applies.',
@@ -139,9 +153,6 @@ const indexSchema = z.strictObject({
   ),
 });
 export type ExperienceIndex = z.infer<typeof indexSchema>;
-
-const FENCE_OPEN = '```json\n';
-const FENCE_CLOSE = '\n```';
 
 const signed = (value: number | null): string =>
   value === null ? '' : ` (${value > 0 ? '+' : ''}${value})`;
@@ -182,16 +193,29 @@ const findingLine = (item: RecordedFinding): string => {
 const omittedLine = (count: number, noun: string): string[] =>
   count > 0 ? [`(${count} more ${noun} omitted)`] : [];
 
+/** The index the validators read back: every alias, its kind, and the engine id behind it. */
+const indexOf = (record: ExperienceRecord): ExperienceIndex => ({
+  pipeline: EXPERIENCE_DIGEST_ID,
+  maxMemories: record.maxMemories,
+  evidence: [
+    ...record.findings.map((f) => ({ alias: f.alias, kind: 'finding' as const, ref: f.key })),
+    ...record.criteria.map((c) => ({ alias: c.alias, kind: 'criterion' as const, ref: c.id })),
+  ],
+});
+
+/** What the run decided, iteration by iteration; one iteration alone can claim no change. */
+const outcomeLines = (record: ExperienceRecord): string[] => [
+  `- Run ${record.runId} of ${record.pipeline}: final decision ${record.finalDecision}, stopped by ${record.stopReason}, best iteration i${record.bestIteration}.`,
+  ...(record.iterations.length === 1
+    ? ['- One iteration only: no transition exists, so no change in quality can be claimed.']
+    : []),
+  ...record.iterations.map(
+    (it) =>
+      `- i${it.iteration} (${it.mode}): ${it.decision} — overall ${it.overall}${signed(it.overallDelta)} — ${scoreLine(it)} — ${it.reason}`,
+  ),
+];
+
 export function renderGoal(record: ExperienceRecord): string {
-  const index: ExperienceIndex = {
-    pipeline: EXPERIENCE_DIGEST_ID,
-    maxMemories: record.maxMemories,
-    evidence: [
-      ...record.findings.map((f) => ({ alias: f.alias, kind: 'finding' as const, ref: f.key })),
-      ...record.criteria.map((c) => ({ alias: c.alias, kind: 'criterion' as const, ref: c.id })),
-    ],
-  };
-  const single = record.iterations.length === 1;
   return [
     '# Source prompt',
     '',
@@ -199,14 +223,7 @@ export function renderGoal(record: ExperienceRecord): string {
     '',
     '## Outcome',
     '',
-    `- Run ${record.runId} of ${record.pipeline}: final decision ${record.finalDecision}, stopped by ${record.stopReason}, best iteration i${record.bestIteration}.`,
-    ...(single
-      ? ['- One iteration only: no transition exists, so no change in quality can be claimed.']
-      : []),
-    ...record.iterations.map(
-      (it) =>
-        `- i${it.iteration} (${it.mode}): ${it.decision} — overall ${it.overall}${signed(it.overallDelta)} — ${scoreLine(it)} — ${it.reason}`,
-    ),
+    ...outcomeLines(record),
     '',
     `## Artifact (best iteration i${record.bestIteration})`,
     '',
@@ -234,23 +251,10 @@ export function renderGoal(record: ExperienceRecord): string {
     '',
     '## Index',
     '',
-    `${FENCE_OPEN}${JSON.stringify(index)}${FENCE_CLOSE}`,
+    `${FENCE_OPEN}${JSON.stringify(indexOf(record))}${FENCE_CLOSE}`,
   ].join('\n');
 }
 
 /** The index this codec wrote, or null for a goal that is not an experience record. */
-export function readIndex(goal: string): ExperienceIndex | null {
-  const open = goal.lastIndexOf(FENCE_OPEN);
-  if (open < 0) return null;
-  const start = open + FENCE_OPEN.length;
-  const close = goal.indexOf(FENCE_CLOSE, start);
-  if (close < 0) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(goal.slice(start, close));
-  } catch {
-    return null;
-  }
-  const result = indexSchema.safeParse(parsed);
-  return result.success ? result.data : null;
-}
+export const readIndex = (goal: string): ExperienceIndex | null =>
+  readFencedIndex(goal, indexSchema);

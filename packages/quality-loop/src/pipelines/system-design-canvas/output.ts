@@ -18,12 +18,9 @@ import {
   type DesignSubmission,
 } from '@sysdesign/contracts';
 
-import type { OutputShape } from '../../core/contracts';
+import { numbered, type OutputShape } from '../../core/contracts';
 
 export type CanvasSubmission = DesignSubmission;
-
-const numbered = <I>(prefix: string, items: readonly I[], label: (item: I) => string) =>
-  items.map((item, index) => ({ id: `${prefix}.${index + 1}`, label: label(item) }));
 
 /** `n-7 (node.3)` — the author's id with the positional id a lens must cite. */
 function positional<I extends { id: string }>(items: readonly I[], prefix: string) {

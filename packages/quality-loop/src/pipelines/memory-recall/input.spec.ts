@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES } from '../../core/contracts';
-import { goalBytes, memoryQuerySchema, readIndex, renderGoal } from './input';
+import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
+import { memoryQuerySchema, readIndex, renderGoal } from './input';
 import { maximalQuery, sampleQuery } from './testing';
 
 describe('the memory-recall input codec', () => {

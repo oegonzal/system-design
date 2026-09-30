@@ -10,7 +10,7 @@ import {
   passed,
   traceOf,
 } from '../../modules/memory/testing';
-import { fromRun } from '../../pipelines/experience-digest/compose';
+import { fromRun } from '../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
 import { sampleDigest } from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';

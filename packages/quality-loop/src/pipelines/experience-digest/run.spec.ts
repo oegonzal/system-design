@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm } from '../../core/testing';
-import { fromRun } from './compose';
+import { fromRun } from './from-run';
 import { EXPERIENCE_DIGEST } from './definition';
 import { renderGoal } from './input';
 import { sampleDigest, sampleRun } from './testing';

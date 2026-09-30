@@ -18,10 +18,10 @@
  */
 import { z } from 'zod';
 
-import type { OutputShape } from '../../core/contracts';
-import { MAX_EVIDENCE, MAX_MEMORIES } from './input';
+import { section, type OutputShape } from '../../core/contracts';
+import { ALIAS_MAX, MAX_EVIDENCE, MAX_MEMORIES } from './input';
 
-const evidence = z.string().min(1).max(8).describe('An evidence alias exactly as listed.');
+const evidence = z.string().min(1).max(ALIAS_MAX).describe('An evidence alias exactly as listed.');
 
 export const experienceDigestSchema = z.strictObject({
   summary: z
@@ -55,9 +55,6 @@ export const experienceDigestSchema = z.strictObject({
   unused: z.array(evidence).max(MAX_EVIDENCE).describe('Every listed alias no memory rests on.'),
 });
 export type ExperienceDigest = z.infer<typeof experienceDigestSchema>;
-
-const section = (title: string, lines: readonly string[]): string[] =>
-  lines.length === 0 ? [] : ['', `## ${title}`, ...lines];
 
 const cited = (aliases: readonly string[]): string => aliases.map((id) => `[${id}]`).join(' ');
 

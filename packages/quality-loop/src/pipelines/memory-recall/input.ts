@@ -7,13 +7,21 @@
 import { DECISIONS } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { GOAL_MAX_BYTES } from '../../core/contracts';
+import {
+  FENCE_CLOSE,
+  FENCE_OPEN,
+  GOAL_MAX_BYTES,
+  goalBytes,
+  readFencedIndex,
+} from '../../core/contracts';
 
 export const MEMORY_RECALL_ID = 'memory-recall';
 
 /** Caps chosen so a maximal query renders well under the engine's goal budget. */
 export const MAX_CANDIDATES = 16;
 export const MAX_KEPT = 8;
+/** A candidate or probe alias: `m12`, `p3`. */
+export const ALIAS_MAX = 8;
 const QUERY_MAX = 16_000;
 const CHUNK_MAX = 1_200;
 const RULE_MAX = 300;
@@ -54,15 +62,13 @@ const queryShape = z.strictObject({
          * that it is useful — that is the pipeline's judgement, and the
          * retriever has no opinion worth deferring to.
          */
-        matched: z.array(z.string().min(1).max(8)).max(MAX_QUERY_PROBES).default([]),
+        matched: z.array(z.string().min(1).max(ALIAS_MAX)).max(MAX_QUERY_PROBES).default([]),
       }),
     )
     .min(1)
     .max(MAX_CANDIDATES),
 });
 export type MemoryQuery = z.infer<typeof queryShape>;
-
-export const goalBytes = (goal: string): number => Buffer.byteLength(goal, 'utf8');
 
 /**
  * The shape plus the one invariant the caps alone cannot state: a query must
@@ -76,7 +82,7 @@ export const memoryQuerySchema = queryShape.refine(
 );
 
 /** Rules an orchestrator can state as they are. */
-export const DEFAULT_RULES: readonly string[] = [
+export const RECALL_RULES: readonly string[] = [
   'Keep a chunk only for what its own text says; an insight the chunk does not state may not be attributed to it.',
   "Every kept chunk is cited by its alias, and its caveat names any way the chunk's context differs from the query.",
   'A chunk from a run that ended rejected or escalated may inform a risk, never a recommendation.',
@@ -95,21 +101,20 @@ export const alias = (position: number): string => `m${position + 1}`;
 /** The same, for the conditions a search ran under. */
 export const probeAlias = (position: number): string => `p${position + 1}`;
 
-const FENCE_OPEN = '```json\n';
-const FENCE_CLOSE = '\n```';
-
 const provenance = (id: string, source: ChunkSource): string =>
   `### [${id}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}`;
 
+/** The index the validators read back: each candidate's alias and where it came from. */
+const indexOf = (input: MemoryQuery): MemoryIndex => ({
+  pipeline: MEMORY_RECALL_ID,
+  maxKept: input.maxKept,
+  candidates: input.candidates.map((candidate, position) => ({
+    alias: alias(position),
+    source: candidate.source,
+  })),
+});
+
 export function renderGoal(input: MemoryQuery): string {
-  const index: MemoryIndex = {
-    pipeline: MEMORY_RECALL_ID,
-    maxKept: input.maxKept,
-    candidates: input.candidates.map((candidate, position) => ({
-      alias: alias(position),
-      source: candidate.source,
-    })),
-  };
   return [
     '# Memory query',
     '',
@@ -146,23 +151,9 @@ export function renderGoal(input: MemoryQuery): string {
     '',
     '## Index',
     '',
-    `${FENCE_OPEN}${JSON.stringify(index, null, 2)}${FENCE_CLOSE}`,
+    `${FENCE_OPEN}${JSON.stringify(indexOf(input), null, 2)}${FENCE_CLOSE}`,
   ].join('\n');
 }
 
 /** The index this codec wrote, or null for a goal that is not a memory query. */
-export function readIndex(goal: string): MemoryIndex | null {
-  const open = goal.lastIndexOf(FENCE_OPEN);
-  if (open < 0) return null;
-  const start = open + FENCE_OPEN.length;
-  const close = goal.indexOf(FENCE_CLOSE, start);
-  if (close < 0) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(goal.slice(start, close));
-  } catch {
-    return null;
-  }
-  const result = indexSchema.safeParse(parsed);
-  return result.success ? result.data : null;
-}
+export const readIndex = (goal: string): MemoryIndex | null => readFencedIndex(goal, indexSchema);

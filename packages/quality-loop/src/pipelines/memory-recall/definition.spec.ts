@@ -1,18 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { memoryPackOutput } from './output';
 import { samplePack } from './testing';
-
-const walk = (node: unknown, visit: (value: Record<string, unknown>) => void): void => {
-  if (Array.isArray(node)) return node.forEach((item) => walk(item, visit));
-  if (node && typeof node === 'object') {
-    visit(node as Record<string, unknown>);
-    Object.values(node).forEach((value) => walk(value, visit));
-  }
-};
 
 describe('the memory-recall pipeline', () => {
   it('[QL-1] is valid data with md personas loaded beside it', () => {
@@ -44,10 +36,7 @@ describe('the memory-recall pipeline', () => {
   });
 
   it('[QL-6] the pack a model answers with contains no number', () => {
-    const types: string[] = [];
-    walk(z.toJSONSchema(memoryPackOutput.schema), (node) => {
-      if (typeof node['type'] === 'string') types.push(node['type']);
-    });
+    const types = jsonSchemaTypes(memoryPackOutput.schema);
     expect(types).not.toContain('number');
     expect(types).not.toContain('integer');
   });

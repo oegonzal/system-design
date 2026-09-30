@@ -19,7 +19,7 @@
  */
 import { z } from 'zod';
 
-import type { OutputShape } from '../../core/contracts';
+import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
 export const agenticDesignSchema = z.strictObject({
   summary: z
@@ -111,19 +111,6 @@ export const agenticDesignSchema = z.strictObject({
 });
 export type AgenticDesign = z.infer<typeof agenticDesignSchema>;
 
-const numbered = <I>(prefix: string, items: readonly I[], label: (item: I) => string) =>
-  items.map((item, index) => ({ id: `${prefix}.${index + 1}`, label: label(item) }));
-
-const section = <I>(
-  title: string,
-  prefix: string,
-  items: readonly I[],
-  line: (item: I) => string,
-): string[] =>
-  items.length === 0
-    ? []
-    : ['', `## ${title}`, ...items.map((item, index) => `[${prefix}.${index + 1}] ${line(item)}`)];
-
 export const agenticDesignOutput: OutputShape<AgenticDesign> = {
   schema: agenticDesignSchema,
 
@@ -143,52 +130,52 @@ export const agenticDesignOutput: OutputShape<AgenticDesign> = {
   render: (answer) =>
     [
       `[summary] ${answer.summary}`,
-      ...section('Assumptions', 'assumption', answer.assumptions, (item) => item),
-      ...section(
+      ...numberedSection('Assumptions', 'assumption', answer.assumptions, (item) => item),
+      ...numberedSection(
         'Roles',
         'role',
         answer.roles,
         (item) =>
           `${item.name} — ${item.responsibility} | consumes: ${item.consumes} | produces: ${item.produces}`,
       ),
-      ...section(
+      ...numberedSection(
         'Contracts',
         'contract',
         answer.contracts,
         (item) => `${item.from} → ${item.to}: ${item.payload} | guarantee: ${item.guarantee}`,
       ),
-      ...section(
+      ...numberedSection(
         'Flows',
         'flow',
         answer.flows,
         (item) => `${item.name}: ${item.steps.join(' → ')}`,
       ),
-      ...section(
+      ...numberedSection(
         'Policies',
         'policy',
         answer.policies,
         (item) => `${item.name} — decides: ${item.decides} | declared as: ${item.declaredAs}`,
       ),
-      ...section(
+      ...numberedSection(
         'Memory',
         'memory',
         answer.memory,
         (item) => `${item.what} — shape: ${item.shape} | read by: ${item.usedBy}`,
       ),
-      ...section(
+      ...numberedSection(
         'Extensibility',
         'extension',
         answer.extensibility,
         (item) => `${item.change} — requires: ${item.requires}`,
       ),
-      ...section(
+      ...numberedSection(
         'Trade-offs',
         'tradeoff',
         answer.tradeoffs,
         (item) =>
           `${item.decision} — ${item.rationale}${item.alternative ? ` (alternative: ${item.alternative})` : ''}`,
       ),
-      ...section(
+      ...numberedSection(
         'Risks',
         'risk',
         answer.risks,

@@ -14,6 +14,7 @@ import { PROMPT_PIPELINE_ID } from '@sysdesign/contracts';
 
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import criticFidelity from './lenses/critic.fidelity.md?raw';
 import criticGradeability from './lenses/critic.gradeability.md?raw';
 import deriveCriteria from './lenses/derive-criteria.md?raw';
@@ -139,17 +140,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         overreach: { dimension: 'scope', gate: false },
       },
 
-      resultValues: { pass: 1, partial: 0.5, fail: 0 },
-
-      confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
-
-      penalties: {
-        bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
-        decay: 0.7,
-        maxPerDimension: 60,
-      },
-
-      blockingSeverities: ['critical'],
+      ...STANDARD_SCORING,
 
       evidence: { minHits: 1, minAssessedShare: 0.75 },
 

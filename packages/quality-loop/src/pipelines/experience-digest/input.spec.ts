@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES } from '../../core/contracts';
-import { fit, fromRun } from './compose';
-import { experienceRecordSchema, goalBytes, readIndex, renderGoal } from './input';
+import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
+import { fit, fromRun } from './from-run';
+import { experienceRecordSchema, readIndex, renderGoal } from './input';
 import { maximalRecord, sampleRun } from './testing';
 
 describe('the experience-digest input codec', () => {

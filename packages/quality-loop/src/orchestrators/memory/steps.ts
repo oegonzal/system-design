@@ -30,7 +30,7 @@ import {
 import type { CachedEmbeddings } from '../../modules/memory/embeddings';
 import { VECTOR_NAMES, type MemoryStore } from '../../modules/memory/ports';
 import type { QueryProbes } from '../../modules/memory/query-probes';
-import { fromRun } from '../../pipelines/experience-digest/compose';
+import { fromRun } from '../../pipelines/experience-digest/from-run';
 import {
   EXPERIENCE_DIGEST_ID,
   renderGoal as renderRecord,

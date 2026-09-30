@@ -24,6 +24,7 @@ import { CANVAS_PIPELINE_ID } from '@sysdesign/contracts';
 
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import criticArchitecture from './lenses/critic.architecture.md?raw';
 import criticExplanation from './lenses/critic.explanation.md?raw';
 import criticRequirements from './lenses/critic.requirements.md?raw';
@@ -218,17 +219,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       bad_assumption: { dimension: 'quality_attributes', gate: false },
     },
 
-    resultValues: { pass: 1, partial: 0.5, fail: 0 },
-
-    confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
-
-    penalties: {
-      bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
-      decay: 0.7,
-      maxPerDimension: 60,
-    },
-
-    blockingSeverities: ['critical'],
+    ...STANDARD_SCORING,
 
     // Two samples on every lens and two hits to confirm: a constraint
     // violation gates, and one sample must never be able to block a run.

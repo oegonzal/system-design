@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
+import { contractOf } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { renderGoal } from './input';
 import type { MemoryPack } from './output';
 import { samplePack, sampleQuery } from './testing';
 import { limitsValidator, referencesValidator } from './validators';
 
-const contract = (goal = renderGoal(sampleQuery())): TaskContract<MemoryPack> => ({
-  ...MEMORY_RECALL.task,
-  goal,
-  criteria: [],
-});
+const contract = (goal = renderGoal(sampleQuery())): TaskContract<MemoryPack> =>
+  contractOf(MEMORY_RECALL.task, goal);
 
 const messages = (artifact: MemoryPack, goal?: string) => ({
   references: referencesValidator.validate(artifact, contract(goal)).problems.map((p) => p.message),

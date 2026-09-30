@@ -11,6 +11,27 @@ import type { TaskSpec } from './contracts';
 /** How far from exactly 1 the dimension weights may sum, allowing for the decimals they are written in. */
 const WEIGHT_TOLERANCE = 1e-9;
 
+/**
+ * How every pipeline so far prices evidence into a score: a partial result
+ * earns half, confidence scales a finding's charge, severities cost what they
+ * cost with the second finding on a dimension charged at 0.7 of the first,
+ * and only a critical finding blocks on its own. A pipeline spreads this and
+ * writes over what it prices differently.
+ */
+export const STANDARD_SCORING: Pick<
+  DecisionPolicy,
+  'resultValues' | 'confidenceWeights' | 'penalties' | 'blockingSeverities'
+> = {
+  resultValues: { pass: 1, partial: 0.5, fail: 0 },
+  confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
+  penalties: {
+    bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
+    decay: 0.7,
+    maxPerDimension: 60,
+  },
+  blockingSeverities: ['critical'],
+};
+
 type Fail = (message: string) => never;
 
 const inUnit = (value: number): boolean => value >= 0 && value <= 1;

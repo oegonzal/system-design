@@ -1,46 +1,30 @@
 /**
- * The exact checks: what the index says against what the digest cites. Both
- * run on every artifact the engine hands over, well-formed or not, so each
- * starts from the output schema; neither reads prose. Both block: a digest
- * that rests on evidence the record never held, or leaves evidence unplaced,
- * cannot be trusted by any lens.
+ * The exact checks: what the index says against what the digest cites. A
+ * digest that rests on evidence the record never held, or leaves evidence
+ * unplaced, cannot be trusted by any lens, so both block.
  */
-import type { Severity, ValidationProblem, ValidationReport } from '@sysdesign/contracts';
+import type { ValidationProblem } from '@sysdesign/contracts';
 
-import type { TaskContract } from '../../core/contracts';
+import {
+  indexedValidator,
+  LIMITS_VALIDATOR_ID,
+  problem,
+  REFERENCES_VALIDATOR_ID,
+  type IndexedRule,
+} from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 import { EXPERIENCE_DIGEST_ID, readIndex, type ExperienceIndex } from './input';
 import type { ExperienceDigest } from './output';
 
-export const REFERENCES_VALIDATOR_ID = 'references';
-export const LIMITS_VALIDATOR_ID = 'limits';
+export { LIMITS_VALIDATOR_ID, REFERENCES_VALIDATOR_ID };
 
-type Rule = (digest: ExperienceDigest, index: ExperienceIndex) => ValidationProblem[];
+type Rule = IndexedRule<ExperienceDigest, ExperienceIndex>;
 
-const problem = (
-  severity: Severity,
-  message: string,
-  locationRefs: string[] = [],
-): ValidationProblem => ({ severity, locationRefs, message });
-
+/** Every alias the digest places somewhere: under a memory, or under unused. */
 const placements = (digest: ExperienceDigest): string[] => [
   ...digest.memories.flatMap((memory) => memory.evidence),
   ...digest.unused,
 ];
-
-function check(
-  validatorId: string,
-  artifact: ExperienceDigest,
-  contract: TaskContract<ExperienceDigest>,
-  rule: Rule,
-  whenNoIndex: ValidationProblem[],
-): ValidationReport {
-  const parsed = contract.output.schema.safeParse(artifact);
-  if (!parsed.success) return { validatorId, gate: 'block', problems: [] };
-  const index = readIndex(contract.goal);
-  const problems = index === null ? whenNoIndex : rule(parsed.data, index);
-  return { validatorId, gate: 'block', problems };
-}
 
 const references: Rule = (digest, index) => {
   const known = new Set(index.evidence.map((item) => item.alias));
@@ -71,17 +55,16 @@ const limits: Rule = (digest, index) => {
   return problems;
 };
 
-export const referencesValidator: Validator<ExperienceDigest> = {
-  id: REFERENCES_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) =>
-    check(REFERENCES_VALIDATOR_ID, artifact, contract, references, [
-      problem('critical', `the goal carries no ${EXPERIENCE_DIGEST_ID} index`),
-    ]),
-};
+export const referencesValidator: Validator<ExperienceDigest> = indexedValidator(
+  REFERENCES_VALIDATOR_ID,
+  readIndex,
+  references,
+  [problem('critical', `the goal carries no ${EXPERIENCE_DIGEST_ID} index`)],
+);
 
-export const limitsValidator: Validator<ExperienceDigest> = {
-  id: LIMITS_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) => check(LIMITS_VALIDATOR_ID, artifact, contract, limits, []),
-};
+export const limitsValidator: Validator<ExperienceDigest> = indexedValidator(
+  LIMITS_VALIDATOR_ID,
+  readIndex,
+  limits,
+  [],
+);

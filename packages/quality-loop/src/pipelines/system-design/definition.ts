@@ -5,6 +5,7 @@
  */
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import criticRequirements from './lenses/critic.requirements.md?raw';
 import criticScale from './lenses/critic.scale.md?raw';
 import criticSoundness from './lenses/critic.soundness.md?raw';
@@ -13,6 +14,9 @@ import evaluatorQuality from './lenses/evaluator.quality.md?raw';
 import evaluatorRequirements from './lenses/evaluator.requirements.md?raw';
 import producer from './lenses/producer.md?raw';
 import { designAnswerOutput, type DesignAnswer } from './output';
+
+/** Enough criteria for a brief with scale targets and constraints; the evaluators list at most this many. */
+const MAX_CRITERIA = 20;
 
 export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
   id: 'system-design',
@@ -51,7 +55,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       unhandled_failure: 'A failure the design would meet and does not handle.',
     },
 
-    maxCriteria: 20,
+    maxCriteria: MAX_CRITERIA,
 
     output: designAnswerOutput,
   },
@@ -103,7 +107,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: evaluatorRequirements,
       samples: 1,
       consumes: [],
-      maxItems: 20,
+      maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['functional', 'constraint'],
     },
@@ -112,7 +116,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       persona: evaluatorQuality,
       samples: 2,
       consumes: [],
-      maxItems: 20,
+      maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['non_functional', 'scale'],
     },
@@ -185,17 +189,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       },
     },
 
-    resultValues: { pass: 1, partial: 0.5, fail: 0 },
-
-    confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
-
-    penalties: {
-      bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
-      decay: 0.7,
-      maxPerDimension: 60,
-    },
-
-    blockingSeverities: ['critical'],
+    ...STANDARD_SCORING,
 
     evidence: { minHits: 1, minAssessedShare: 0.75 },
 
