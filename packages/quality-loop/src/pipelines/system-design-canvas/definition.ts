@@ -17,12 +17,13 @@
  *    `quality_attributes`, which the non-functional and scale criteria earn.
  *
  * The studio always provides the artifact, so the producer is the coach: it
- * runs on revise and retry only, and is told to keep the author's ids and to
- * prefix anything it adds with `ai-` so the studio can tell the two apart.
+ * runs on revise only — the controller never decides retry, because a fresh
+ * attempt would replace the author's canvas with the model's — and is told
+ * to keep the author's ids and to prefix anything it adds with `ai-` so the
+ * studio can tell the two apart.
  */
 import { CANVAS_PIPELINE_ID } from '@sysdesign/contracts';
 
-import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
 import criticArchitecture from './lenses/critic.architecture.md?raw';
@@ -34,6 +35,7 @@ import deriveCriteria from './lenses/derive-criteria.md?raw';
 import evaluatorQuality from './lenses/evaluator.quality.md?raw';
 import evaluatorRequirements from './lenses/evaluator.requirements.md?raw';
 import producer from './lenses/producer.md?raw';
+import { REVISE_ONLY } from './controller';
 import { canvasOutput, type CanvasSubmission } from './output';
 import { referencesValidator, structureValidator } from './validators';
 
@@ -118,7 +120,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   },
 
   validators: [referencesValidator, structureValidator],
-  controller: STANDARD,
+  controller: REVISE_ONLY,
 
   critics: [
     {
