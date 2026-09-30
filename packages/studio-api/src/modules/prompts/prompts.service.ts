@@ -8,6 +8,7 @@ import {
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
+  criteriaFromDraft,
   designPromptDraftSchema,
   PROMPT_PIPELINE_ID,
   renderDesignPromptMarkdown,
@@ -35,11 +36,15 @@ const GENERATION_ITERATIONS = 2;
 class AlreadyClaimed extends Error {}
 
 /**
- * Prompts are markdown documents with a rubric the quality loop derived. The
- * three ways one comes to exist — written, imported from the loop's library,
- * or drafted from an experience by the loop's `design-prompt` pipeline — all
- * end in the same row, and the rubric is derived the same way for each: once,
- * through `POST /criteria`, and kept for the prompt's life.
+ * Prompts are markdown documents with a rubric. The three ways one comes to
+ * exist — written, imported from the loop's library, or drafted from an
+ * experience by the loop's `design-prompt` pipeline — all end in the same
+ * row. A written or imported prompt's rubric is derived once from its
+ * markdown through the loop's `POST /criteria`; a generated prompt's rubric
+ * is its draft's own rows, one criterion each, since the draft was judged
+ * row by row and the markdown was rendered from it. Either way the rubric is
+ * kept for the prompt's life: a rewrite is a different prompt, derived again
+ * and authored from then on.
  */
 @Injectable()
 export class PromptsService {
@@ -192,9 +197,18 @@ export class PromptsService {
     return this.ensureCriteria(await this.require(id));
   }
 
-  /** Re-derive the rubric. Refused once sessions cite its ids. */
+  /**
+   * Re-derive the rubric. Refused once sessions cite its ids, and for a
+   * generated prompt, whose rubric is its draft's rows rather than a
+   * derivation — rewriting it is the way to a different rubric.
+   */
   async rederiveCriteria(id: string): Promise<Prompt> {
     const prompt = await this.require(id);
+    if (prompt.source === 'generated') {
+      throw new ConflictException(
+        `prompt ${id} was generated and its rubric is its draft's — rewrite it to derive a new one`,
+      );
+    }
     await this.assertNoSessions(prompt, 're-derive its criteria');
     prompt.criteria = [];
     return this.ensureCriteria(prompt);
@@ -202,8 +216,9 @@ export class PromptsService {
 
   /**
    * Archive or reactivate freely; retitle or rewrite only while no session
-   * has been graded against it — a rewritten prompt is a different prompt,
-   * and its criteria are derived again.
+   * has been graded against it — a rewritten prompt is a different prompt:
+   * its criteria are derived again, and whatever it was generated or
+   * imported from no longer describes it, so it is authored from then on.
    */
   async update(id: string, request: UpdatePromptRequest): Promise<Prompt> {
     const prompt = await this.require(id);
@@ -217,6 +232,7 @@ export class PromptsService {
         const criteria = await this.rubricFor(request.markdown);
         prompt.markdown = request.markdown;
         prompt.criteria = criteria;
+        prompt.source = 'authored';
       }
     }
     await this.em.flush();
@@ -287,7 +303,7 @@ export class PromptsService {
     draft: ReturnType<typeof designPromptDraftSchema.parse>,
   ): Promise<Prompt> {
     const markdown = renderDesignPromptMarkdown(draft);
-    const criteria = await this.rubricFor(markdown);
+    const criteria = criteriaFromDraft(draft);
     let id: string;
     try {
       id = await this.em.transactional(async (em) => {

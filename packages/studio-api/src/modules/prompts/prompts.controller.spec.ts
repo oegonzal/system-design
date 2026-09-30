@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { criteriaFromDraft } from '@sysdesign/contracts';
 import type {
   ApiErrorResponse,
   AuthorPromptRequest,
@@ -226,24 +227,83 @@ describe('prompts', () => {
       });
       expect(prompt?.markdown.startsWith('# Keep a flash on-sale fair\n')).toBe(true);
       expect(prompt?.markdown).toContain('## Non-functional requirements');
-      expect(prompt?.criteria.length).toBeGreaterThan(0);
+      // The rubric is the draft's rows, one criterion each — nothing was derived.
+      expect(prompt?.criteria).toEqual(criteriaFromDraft(draft()));
+      expect(prompt?.criteria.map((c) => `${c.id}:${c.kind}`)).toEqual([
+        'c1:functional',
+        'c2:functional',
+        'c3:non_functional',
+        'c4:scale',
+        'c5:constraint',
+      ]);
+      expect(h.loop.criteriaRequests).toEqual([]);
 
-      // Claimed once: a second poll answers the same prompt, and one row exists.
-      const again = await generation('fake-run-1');
+      // Claimed once: concurrent polls answer the same prompt, and one row exists.
+      const [again, andAgain] = await Promise.all([
+        generation('fake-run-1'),
+        generation('fake-run-1'),
+      ]);
       expect(again.body.data.prompt?.id).toBe(prompt?.id);
+      expect(andAgain.body.data.prompt?.id).toBe(prompt?.id);
       const list = await call<ListPromptsResponse>(`${h.url}/prompts?source=generated`);
       expect(list.body.meta.total).toBe(1);
+      expect(h.loop.criteriaRequests).toEqual([]);
     });
 
-    it('omitting the experience draws from the least practised one', async () => {
-      await author(authoredPrompt()); // ticketing now has a prompt
-      const { status } = await startGeneration({});
-      expect(status).toBe(202);
-      expect(h.loop.startRequests[0]?.goal.startsWith('# Media, collectibles')).toBe(true);
-
+    it('[UX-14] a generated prompt is not re-derived; rewriting it derives once and makes it authored', async () => {
+      await startGeneration({ experienceId: TICKETING_ID });
       h.loop.complete('fake-run-1', [{ overall: 80, mode: 'initial', artifact: draft() }]);
-      const done = await generation('fake-run-1');
-      expect(done.body.data.prompt?.experienceId).toBe(MEDIA_ID);
+      const { body: done } = await generation('fake-run-1');
+      const id = done.data.prompt?.id;
+      if (!id) throw new Error('claimed nothing');
+
+      const rederive = await call<ApiErrorResponse>(`${h.url}/prompts/${id}/criteria`, {
+        method: 'POST',
+      });
+      expect(rederive.status).toBe(409);
+      expect(JSON.stringify(rederive.body.message)).toMatch(/generated/);
+      expect(h.loop.criteriaRequests).toEqual([]);
+
+      const rewritten = await call<GetPromptResponse>(`${h.url}/prompts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ markdown: '# Rewritten\n\n- one thing\n- two things' }),
+      });
+      expect(rewritten.status).toBe(200);
+      expect(rewritten.body.data).toMatchObject({
+        source: 'authored',
+        experienceId: TICKETING_ID,
+        markdown: '# Rewritten\n\n- one thing\n- two things',
+      });
+      expect(rewritten.body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2']);
+      expect(h.loop.criteriaRequests).toHaveLength(1);
+      // Authored now: it can be re-derived like any written prompt.
+      const again = await call<GetPromptResponse>(`${h.url}/prompts/${id}/criteria`, {
+        method: 'POST',
+      });
+      expect(again.status).toBe(200);
+      expect(h.loop.criteriaRequests).toHaveLength(2);
+    });
+
+    it('[GEN-1] omitting the experience rotates through the least practised ones, fixture order breaking ties', async () => {
+      await author(authoredPrompt()); // ticketing now has a prompt
+      const drawn: (string | null)[] = [];
+      for (let n = 1; n <= 6; n += 1) {
+        const { status } = await startGeneration({});
+        expect(status).toBe(202);
+        h.loop.complete(`fake-run-${n}`, [{ overall: 80, mode: 'initial', artifact: draft() }]);
+        const done = await generation(`fake-run-${n}`);
+        drawn.push(done.body.data.prompt?.experienceId ?? null);
+      }
+      expect(h.loop.startRequests[0]?.goal.startsWith('# Media, collectibles')).toBe(true);
+      // Five experiences without a prompt, in fixture order; then every one has one and ticketing is first again.
+      expect(drawn).toEqual([
+        MEDIA_ID,
+        'e1000000-0000-4000-8000-000000000003',
+        'e1000000-0000-4000-8000-000000000004',
+        'e1000000-0000-4000-8000-000000000005',
+        'e1000000-0000-4000-8000-000000000006',
+        TICKETING_ID,
+      ]);
     });
 
     it('a failed run, and a run whose draft is not a prompt, are reported as failed and claim nothing', async () => {
