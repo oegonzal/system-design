@@ -44,6 +44,17 @@ const Article = styled.div`
     margin-top: ${({ theme }) => theme.space[1]}px;
   }
 
+  /* A GitHub task item: the checkbox reads its text as its label. */
+  li.task-list-item {
+    list-style: none;
+  }
+
+  li.task-list-item > label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: ${({ theme }) => theme.space[2]}px;
+  }
+
   li > ul,
   li > ol {
     margin-top: ${({ theme }) => theme.space[1]}px;
@@ -118,6 +129,12 @@ interface RenderedAnchor extends Rendered {
   title?: string;
 }
 
+interface RenderedListItem extends Rendered {
+  className?: string;
+}
+
+const TASK_ITEM_CLASS = 'task-list-item';
+
 /**
  * The document's own `#` is the block's label, one level above, so its
  * headings step down: `#` → h3, `##` → h4, `###` → h5, the rest → h6. A
@@ -136,6 +153,15 @@ function Anchor({ href, title, children }: RenderedAnchor) {
   );
 }
 
+/**
+ * A task-list item wraps its checkbox and text in one label, so the box is
+ * named by the text beside it — GitHub flavour renders the input bare.
+ */
+function ListItem({ className, children }: RenderedListItem) {
+  const task = className?.split(' ').includes(TASK_ITEM_CLASS) ?? false;
+  return <li className={className}>{task ? <label>{children}</label> : children}</li>;
+}
+
 function ScrollingTable({ children }: Rendered) {
   return (
     <TableScroller>
@@ -152,6 +178,7 @@ const COMPONENTS: Components = {
   h5: 'h6',
   h6: 'h6',
   a: Anchor,
+  li: ListItem,
   table: ScrollingTable,
 };
 

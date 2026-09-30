@@ -53,6 +53,18 @@ describe('Markdown', () => {
     expect(block.querySelector('del')?.textContent).toBe('the old spec');
   });
 
+  it('names a task-list checkbox by the text beside it', () => {
+    renderWithTheme(
+      <Markdown label="Notes" text={'- [x] Capacity estimate\n- [ ] Failure modes'} />,
+    );
+
+    const done = screen.getByRole('checkbox', { name: 'Capacity estimate' }) as HTMLInputElement;
+    expect(done.checked).toBe(true);
+    expect(
+      (screen.getByRole('checkbox', { name: 'Failure modes' }) as HTMLInputElement).checked,
+    ).toBe(false);
+  });
+
   it('renders a link as the design-system anchor that never leaks the referrer', () => {
     renderWithTheme(<Markdown label="Prompt" text={DOCUMENT} />);
 

@@ -38,12 +38,12 @@ type Story = StoryObj<typeof Markdown>;
 /** A prompt as the model wrote it: headings stepped under the label, a table, a quote. */
 export const Prompt: Story = {};
 
-/** Every block GitHub flavour adds: task list, strikethrough, fenced code, a rule, a link. */
+/** Every block GitHub flavour adds: task list, strikethrough, fenced code, a rule, a link, every heading depth. */
 export const GitHubFlavour: Story = {
   args: {
     label: 'Library preview',
     text: [
-      '### Checklist',
+      '## Checklist',
       '- [x] Capacity estimate',
       '- [ ] Failure modes',
       '',
@@ -55,8 +55,9 @@ export const GitHubFlavour: Story = {
       '',
       '---',
       '',
-      '#### Notes',
-      '##### Smaller',
+      '### Notes',
+      '#### Smaller',
+      '##### Smaller still',
       '###### Smallest',
     ].join('\n'),
   },
