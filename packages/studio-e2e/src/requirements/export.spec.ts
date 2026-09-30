@@ -3,11 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 import { AUTHORED_TITLE } from '../support/backend';
-import {
-  buildNaiveDesign,
-  NAIVE_DESIGN_SCORE,
-  openPracticeSession,
-} from '../support/canvas.page';
+import { buildNaiveDesign, NAIVE_DESIGN_SCORE, openPracticeSession } from '../support/canvas.page';
 
 /**
  * A run exports as a portable, database-independent copy. One click on

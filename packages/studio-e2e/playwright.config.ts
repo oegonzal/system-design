@@ -41,6 +41,10 @@ const QUALITY_LOOP_URL = `http://127.0.0.1:${QUALITY_LOOP_STUB_PORT}`;
 
 /** The one spec that takes the stub grader down; it must never share a phase with the others. */
 const GRADER_DOWN = /grader-down\.spec\.ts$/;
+/** The specs that assert the single-column layout; they run only at the narrow width. */
+const NARROW = /narrow-viewport\.spec\.ts$/;
+/** What the full-width browser projects skip. */
+const BROWSER_IGNORES = [GRADER_DOWN, NARROW];
 
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
@@ -129,25 +133,25 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: GRADER_DOWN,
+      testIgnore: BROWSER_IGNORES,
     },
 
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-      testIgnore: GRADER_DOWN,
+      testIgnore: BROWSER_IGNORES,
     },
 
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
-      testIgnore: GRADER_DOWN,
+      testIgnore: BROWSER_IGNORES,
     },
 
     {
       name: 'narrow',
       use: { ...devices['Desktop Chrome'], viewport: { width: 700, height: 900 } },
-      testMatch: /narrow-viewport\.spec\.ts$/,
+      testMatch: NARROW,
     },
 
     {

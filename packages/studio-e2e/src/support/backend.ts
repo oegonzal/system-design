@@ -1,11 +1,13 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
 import type {
   AuthorPromptRequest,
+  CoachingRunSummaryDto,
   DesignRevisionSummaryDto,
   DesignSessionDto,
   ExperienceProfileDto,
   PromptDto,
   PromptGenerationDto,
+  PromptStatus,
   QualityRunStartedDto,
   SaveStarStoryRequest,
   StarStoryDto,
@@ -171,15 +173,22 @@ export async function derivePromptCriteria(
   return unwrap(await request.post(`${API_URL}/prompts/${promptId}/criteria`));
 }
 
-/** Retire a prompt; its sessions stay readable, and the studio refuses new work on them. */
-export async function archivePrompt(
+export async function setPromptStatus(
   request: APIRequestContext,
   promptId: string,
+  status: PromptStatus,
 ): Promise<PromptDto> {
-  return unwrap(
-    await request.patch(`${API_URL}/prompts/${promptId}`, { data: { status: 'archived' } }),
-  );
+  return unwrap(await request.patch(`${API_URL}/prompts/${promptId}`, { data: { status } }));
 }
+
+/** Retire a prompt; its sessions stay readable, and the studio refuses new work on them. */
+export const archivePrompt = (request: APIRequestContext, promptId: string): Promise<PromptDto> =>
+  setPromptStatus(request, promptId, 'archived');
+
+export const reactivatePrompt = (
+  request: APIRequestContext,
+  promptId: string,
+): Promise<PromptDto> => setPromptStatus(request, promptId, 'active');
 
 // ---- sessions ---------------------------------------------------------------
 
@@ -208,6 +217,14 @@ export async function listRevisions(
   sessionId: string,
 ): Promise<DesignRevisionSummaryDto[]> {
   return unwrap(await request.get(`${API_URL}/sessions/${sessionId}/revisions`));
+}
+
+/** Every coaching run of a session, newest first — what a reloaded workspace resumes polling. */
+export async function coachingRuns(
+  request: APIRequestContext,
+  sessionId: string,
+): Promise<CoachingRunSummaryDto[]> {
+  return unwrap(await request.get(`${API_URL}/sessions/${sessionId}/improve`));
 }
 
 // ---- stories ----------------------------------------------------------------

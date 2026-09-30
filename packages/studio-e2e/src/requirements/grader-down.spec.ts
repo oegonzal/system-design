@@ -42,7 +42,8 @@ test.describe('the grader, unreachable', () => {
     await expect(page.getByText('rev #1')).toHaveCount(0);
     expect(await listRevisions(request, session.id)).toEqual([]);
 
-    // Back up: the same page, reloaded, offers the coach and grades the sketch.
+    // Back up: the same page, reloaded, offers the coach and grades the sketch
+    // — which came back as the session's draft, saved while the grader was down.
     await setGraderUnreachable(request, false);
     await page.reload();
     await canvas.ready();
@@ -50,7 +51,7 @@ test.describe('the grader, unreachable', () => {
     await expect(page.getByTestId('improve-run')).toBeEnabled();
     await expect(canvas.coachUnavailable).toHaveCount(0);
 
-    await buildNaiveDesign(canvas);
+    await canvas.expectNodeCount(3);
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
     expect(await listRevisions(request, session.id)).toHaveLength(1);

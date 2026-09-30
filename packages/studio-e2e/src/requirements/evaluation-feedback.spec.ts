@@ -55,7 +55,7 @@ test.describe('the grading feedback', () => {
     await expect(canvas.criterionResult('c1')).toContainText('past orders newest first');
   });
 
-  test('[EVAL-2] a finding carries its rationale and highlights the node or edge it names when selected', async ({
+  test('[EVAL-2] a finding names its places by label, carries its rationale, and highlights the node or edge it names when selected; the verdict carries its reason', async ({
     page,
     request,
   }) => {
@@ -64,9 +64,21 @@ test.describe('the grading feedback', () => {
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
 
+    // The controller's own sentence, under the score.
+    await expect(canvas.decisionReason).toHaveText(`stub: 3 nodes → ${NAIVE_DESIGN_SCORE}`);
+
     // Grouped by severity, in urgency order.
     await expect(page.getByTestId('findings-group-high')).toBeVisible();
     await expect(page.getByTestId('findings-group-medium')).toBeVisible();
+
+    // Every place a finding names is labelled from the graded revision — the
+    // author's id, the kind, the label — with the loop's own ref as its title.
+    const failureLocations = canvas.findingLocations('unhandled_failure|node.3');
+    await expect(failureLocations).toHaveText(['n-3 · database · Database']);
+    await expect(failureLocations.first()).toHaveAttribute('title', 'node.3');
+    await expect(canvas.findingLocations('unbacked_claim|edge.1')).toHaveText([
+      'e-1 · n-1 → n-2 (sync)',
+    ]);
 
     // The lens's own words, the criterion it cites, and every lens that confirmed it.
     const failure = canvas.finding('unhandled_failure|node.3');

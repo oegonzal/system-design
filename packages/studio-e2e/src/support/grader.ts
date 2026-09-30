@@ -39,7 +39,9 @@ export const setGraderUnreachable = (
 ): Promise<void> => ok(request.put(`${GRADER_URL}/__stub/health`, { data: { unreachable } }));
 
 export interface GraderRequests {
+  /** Every run started, oldest first, by the id the studio polls it under. */
   startRequests: {
+    runId: string;
     pipeline: string;
     goal: string;
     adopt: { runId: string; iteration: number } | null;

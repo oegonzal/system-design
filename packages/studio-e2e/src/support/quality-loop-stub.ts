@@ -149,7 +149,8 @@ async function control(
   }
   if (method === 'GET' && path === '/__stub/requests') {
     send(res, 200, {
-      startRequests: loop.startRequests.map(({ pipeline, goal, adopt }) => ({
+      startRequests: [...loop.requests].map(([runId, { pipeline, goal, adopt }]) => ({
+        runId,
         pipeline,
         goal,
         adopt: adopt ?? null,

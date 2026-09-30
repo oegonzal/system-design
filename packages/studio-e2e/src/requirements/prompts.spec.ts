@@ -9,14 +9,16 @@ import {
   authorPrompt,
   getPrompt,
 } from '../support/backend';
+import { graderRequests } from '../support/grader';
 import { ORDER_HISTORY_DOCUMENT } from '../support/library-fixtures';
 import { PromptsPage } from '../support/prompts.page';
 
 /**
  * The three ways a prompt comes to exist — drafted by the grader's prompt
- * pipeline, written by hand, copied from the grader's library — and the one
- * thing every source shares: a rubric the grader derives from the markdown,
- * shown as chips grouped by kind.
+ * pipeline, written by hand, copied from the grader's library — each shown
+ * as rendered markdown with its rubric as chips grouped by kind. A written
+ * or imported prompt's rubric is derived by the grader from the markdown; a
+ * generated prompt's is its draft's own rows, never derived.
  *
  * The grader is the suite's stub, so a generated draft is titled after the
  * experience it was drawn from, and the authored fixture always derives
@@ -44,10 +46,20 @@ test.describe('prompts', () => {
     await expect(
       prompts.promptPane.getByRole('heading', { level: 2, name: prompt.title }),
     ).toBeVisible();
-    // The draft was rendered to the house convention before it was stored.
-    await expect(prompts.markdownPane).toContainText('## Functional requirements');
-    await expect(prompts.markdownPane).toContainText('## Non-functional requirements');
+    // The draft was rendered to the house convention before it was stored,
+    // and renders as a document: its sections are headings under the title.
+    await expect(prompts.markdownHeading(prompt.title, 3)).toBeVisible();
+    await expect(prompts.markdownHeading('Functional requirements')).toBeVisible();
+    await expect(prompts.markdownHeading('Non-functional requirements')).toBeVisible();
+    await expect(prompts.markdownPane).not.toContainText('## ');
     await prompts.expectCriteriaChips(prompt.criteria.map((criterion) => criterion.id));
+
+    // The rubric is the draft's own rows: the grader was never asked to derive
+    // one for this prompt, and the page offers no re-derive.
+    expect(prompt.criteria.map((criterion) => criterion.kind)).toContain('functional');
+    const { criteriaRequests } = await graderRequests(request);
+    expect(criteriaRequests.some((call) => call.goal === prompt.markdown)).toBe(false);
+    await expect(prompts.rederiveButton).toHaveCount(0);
   });
 
   test('[GEN-2] a prompt written in the composer is stored verbatim with the rubric derived from it', async ({
@@ -63,7 +75,8 @@ test.describe('prompts', () => {
     await expect(
       prompts.promptPane.getByRole('heading', { level: 2, name: AUTHORED_TITLE }),
     ).toBeVisible();
-    await expect(prompts.markdownPane).toContainText('## Scale targets');
+    await expect(prompts.markdownHeading('Scale targets')).toBeVisible();
+    await expect(prompts.markdownPane.getByRole('table').first()).toBeVisible();
     await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
 
     const stored = await getPrompt(request, prompts.promptIdFromUrl());
@@ -82,7 +95,7 @@ test.describe('prompts', () => {
     await expect(
       prompts.promptPane.getByRole('heading', { level: 2, name: ORDER_HISTORY_DOCUMENT.title }),
     ).toBeVisible();
-    await expect(prompts.markdownPane).toContainText('## Constraints');
+    await expect(prompts.markdownHeading('Constraints')).toBeVisible();
     await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
 
     // The source filter narrows the browser to imports alone. Other workers
@@ -97,7 +110,7 @@ test.describe('prompts', () => {
     await expect(prompts.promptCards.filter({ hasText: 'generated' })).toHaveCount(0);
   });
 
-  test('[UX-14] the criteria show as chips grouped by kind, and can be re-derived while nothing was graded against them', async ({
+  test('[UX-14] a written prompt’s criteria show as chips grouped by kind, and can be re-derived while nothing was graded against them', async ({
     page,
     request,
   }) => {

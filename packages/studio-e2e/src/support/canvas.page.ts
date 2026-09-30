@@ -3,6 +3,7 @@ import type {
   CriterionResult,
   Decision,
   EdgeKind,
+  ImproveIterationOutcome,
   NodeKind,
   OperationKind,
   PromptDto,
@@ -17,6 +18,9 @@ import { createPracticeSession } from './backend';
  * server or a busy parallel run deserves headroom.
  */
 const EVAL_TIMEOUT = 30_000;
+
+/** The draft autosaves 1.5 s after the last edit; the PUT itself is quick. */
+const DRAFT_TIMEOUT = 10_000;
 
 /**
  * The palette advertises this MIME type on drag; the canvas drop handler
@@ -279,6 +283,27 @@ export class CanvasPage {
     await expect(this.page.getByTestId('submit-revision')).toBeDisabled();
   }
 
+  /** The toolbar's word on the unsubmitted draft: unsaved, saving, saved, or not saved. */
+  get draftStatus(): Locator {
+    return this.page.getByTestId('draft-status');
+  }
+
+  async expectDraftStatus(status: 'unsaved' | 'saving' | 'saved' | 'failed'): Promise<void> {
+    await expect(this.draftStatus).toHaveAttribute('data-status', status, {
+      timeout: DRAFT_TIMEOUT,
+    });
+  }
+
+  /** The banner over a loaded revision; its one control hands the design back as a draft. */
+  get readOnlyBanner(): Locator {
+    return this.page.getByTestId('readonly-banner');
+  }
+
+  async restoreAsDraft(): Promise<void> {
+    await this.readOnlyBanner.getByRole('button', { name: 'Restore as draft' }).click();
+    await expect(this.readOnlyBanner).toHaveCount(0);
+  }
+
   /**
    * The toolbar's badge for a run the loop lost, plus the feedback dock's
    * explanation with its resubmit control. The badge is the authoritative
@@ -314,6 +339,15 @@ export class CanvasPage {
 
   dockTab(name: 'Prompt' | 'Brief' | 'Narrative' | 'Feedback' | 'Coach' | 'Revisions'): Locator {
     return this.page.getByRole('tab', { name });
+  }
+
+  get promptTab(): Locator {
+    return this.dockTab('Prompt');
+  }
+
+  /** The prompt pane's badge for a prompt that was archived under the session. */
+  get promptArchivedBadge(): Locator {
+    return this.page.getByTestId('prompt-archived');
   }
 
   get briefTab(): Locator {
@@ -479,9 +513,19 @@ export class CanvasPage {
     await expect(this.criterionResult(criterionId)).toHaveAttribute('data-result', result);
   }
 
+  /** The controller's own sentence for its decision, under the score. */
+  get decisionReason(): Locator {
+    return this.page.getByTestId('decision-reason');
+  }
+
   /** A finding by the loop's structural key — `unhandled_failure|node.3`. */
   finding(id: string): Locator {
     return this.page.getByTestId(`finding-${id}`);
+  }
+
+  /** The places a finding names, each labelled from the graded revision (`n-3 · database · Database`). */
+  findingLocations(id: string): Locator {
+    return this.finding(id).getByTestId('finding-location');
   }
 
   /** Clicking a finding's title highlights the elements it names on the canvas. */
@@ -508,6 +552,22 @@ export class CanvasPage {
 
   coachIteration(iteration: number): Locator {
     return this.page.getByTestId(`improve-iteration-${iteration}`);
+  }
+
+  /** What became of the iteration in the studio — the row's outcome attribute. */
+  async expectCoachOutcome(iteration: number, outcome: ImproveIterationOutcome): Promise<void> {
+    await expect(this.coachIteration(iteration)).toHaveAttribute('data-outcome', outcome, {
+      timeout: EVAL_TIMEOUT,
+    });
+  }
+
+  coachIterationReason(iteration: number): Locator {
+    return this.coachIteration(iteration).getByTestId('improve-iteration-reason');
+  }
+
+  /** The coach panel's report of a run that failed. */
+  get coachError(): Locator {
+    return this.page.getByTestId('improvement-error');
   }
 
   /** The coach panel's reason for a disabled control. */

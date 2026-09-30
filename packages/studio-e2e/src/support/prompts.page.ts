@@ -106,6 +106,15 @@ export class PromptsPage {
     return this.page.getByTestId('prompt-markdown');
   }
 
+  /** A heading of the rendered markdown: the document's `#` is an h3 under the pane's title, its `##` an h4. */
+  markdownHeading(name: string, level: 3 | 4 | 5 | 6 = 4): Locator {
+    return this.markdownPane.getByRole('heading', { level, name, exact: true });
+  }
+
+  get rederiveButton(): Locator {
+    return this.page.getByTestId('rederive-criteria');
+  }
+
   async openDetail(promptId: string): Promise<void> {
     await this.page.goto(`/prompts/${promptId}`);
     await expect(this.promptPane).toBeVisible();
@@ -132,9 +141,7 @@ export class PromptsPage {
   }
 
   /** Every kind is its own group, and every chip sits in the group of its kind. */
-  async expectCriteriaGrouped(
-    byKind: Readonly<Record<string, readonly string[]>>,
-  ): Promise<void> {
+  async expectCriteriaGrouped(byKind: Readonly<Record<string, readonly string[]>>): Promise<void> {
     for (const [kind, criterionIds] of Object.entries(byKind)) {
       const group = this.criteriaGroup(kind);
       await expect(group).toBeVisible();
@@ -149,7 +156,8 @@ export class PromptsPage {
   async rederiveCriteria(): Promise<void> {
     const answered = this.page.waitForResponse(
       (response) =>
-        response.request().method() === 'POST' && /\/prompts\/[^/]+\/criteria$/.test(response.url()),
+        response.request().method() === 'POST' &&
+        /\/prompts\/[^/]+\/criteria$/.test(response.url()),
     );
     await this.page.getByTestId('rederive-criteria').click();
     expect((await answered).status()).toBe(200);
