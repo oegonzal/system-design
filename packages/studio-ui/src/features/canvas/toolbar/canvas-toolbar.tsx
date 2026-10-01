@@ -3,6 +3,7 @@
 import { PROMPT_COPY, type QualityRunStatus } from '@sysdesign/contracts';
 import { Badge, type BadgeTone, Button, Toolbar } from '@sysdesign/design-system';
 
+import { GRADE_STATUS_LABEL } from '../../evaluation/score';
 import { selectCanRedo, selectCanUndo } from '../canvas-store';
 import { useCanvasStore } from '../canvas-store-context';
 import type { DraftSaveStatus } from '../draft-status';
@@ -27,12 +28,6 @@ export interface CanvasToolbarProps {
   onExport: () => void;
   exporting: boolean;
 }
-
-const STATUS_LABEL: Record<QualityRunStatus, string> = {
-  running: 'grading…',
-  complete: 'graded',
-  failed: 'grading failed',
-};
 
 /** The draft badge per status; null shows nothing — a clean canvas has no draft to report. */
 const DRAFT_BADGE: Record<DraftSaveStatus, { tone: BadgeTone; label: string } | null> = {
@@ -138,7 +133,7 @@ export function CanvasToolbar({
       ) : null}
       {revisionStatus && revisionNumber !== null ? (
         <Badge tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}>
-          {`rev #${revisionNumber} · ${STATUS_LABEL[revisionStatus]}`}
+          {`rev #${revisionNumber} · ${GRADE_STATUS_LABEL[revisionStatus]}`}
         </Badge>
       ) : null}
     </Toolbar>

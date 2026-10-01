@@ -1,6 +1,11 @@
 'use client';
 
-import type { CanvasGraph, SuccessCriterion } from '@sysdesign/contracts';
+import {
+  NARRATION_OVERVIEW_MAX_LENGTH,
+  NARRATION_PROSE_MAX_LENGTH,
+  type CanvasGraph,
+  type SuccessCriterion,
+} from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Text, TextAreaField } from '@sysdesign/design-system';
 import { useMemo } from 'react';
 
@@ -45,7 +50,8 @@ export interface NarrativeEditorProps {
  * slot to a node or criterion id is what lets a lens read "this component is
  * explained" and "this requirement is walked" as references rather than
  * guessing which paragraph was about what. Read-only is the store's word: a
- * revision on screen is shown, never edited.
+ * revision on screen is shown, never edited. Each slot is bounded by the
+ * schema's own constant, so nothing the author writes is cut on the way out.
  */
 export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
   const readOnly = useCanvasStore((state) => state.readOnly);
@@ -89,6 +95,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
           label="The big picture — why this shape"
           data-testid="narrative-overview"
           rows={4}
+          maxLength={NARRATION_OVERVIEW_MAX_LENGTH}
           value={overview}
           disabled={readOnly}
           onChange={(event) => setOverview(event.target.value)}
@@ -116,6 +123,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                   label={`Why ${node.label} is here`}
                   data-testid={`narrative-rationale-${node.id}`}
                   rows={3}
+                  maxLength={NARRATION_PROSE_MAX_LENGTH}
                   value={prose}
                   disabled={readOnly}
                   onChange={(event) => setRationale(node.id, event.target.value)}
@@ -152,6 +160,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                       label={`Walkthrough for ${criterion.id}`}
                       data-testid={`narrative-narration-${criterion.id}`}
                       rows={3}
+                      maxLength={NARRATION_PROSE_MAX_LENGTH}
                       value={prose}
                       disabled={readOnly}
                       onChange={(event) => setNarration(criterion.id, event.target.value)}

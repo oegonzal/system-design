@@ -1,9 +1,4 @@
-import {
-  BINDING_CLAIM_MAX_LENGTH,
-  BINDING_MAX_NODES,
-  BRIEF_MAX_BINDINGS,
-  FLOW_MAX_STEPS,
-} from './canvas';
+import { BINDING_MAX_NODES, BRIEF_MAX_BINDINGS, FLOW_MAX_STEPS } from './canvas';
 import {
   DESIGN_BRIEF_VERSION,
   type Binding,
@@ -64,7 +59,8 @@ export function reconcileBrief(
   const kept: Binding[] = [];
   for (const binding of bindings) {
     if (!criterionIds.has(binding.criterionId) || seen.has(binding.criterionId)) continue;
-    const claim = binding.claim.trim().slice(0, BINDING_CLAIM_MAX_LENGTH);
+    // Trimmed, never cut: a claim past its bound stays whole for the schema to refuse.
+    const claim = binding.claim.trim();
     if (claim.length === 0) continue;
     const nodes = [...new Set(binding.nodeIds)]
       .filter((id) => nodeIds.has(id))

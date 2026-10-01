@@ -215,11 +215,17 @@ describe('revisionsMarkdown', () => {
           decision: 'reject',
         },
       }),
+      makeRevisionSummary({
+        revisionNumber: 3,
+        evaluation: { runId: 's', iteration: 1, status: 'running', overall: null, decision: null },
+      }),
     ]);
     expect(md).toContain('| Rev | Score | Decision | Status |');
     const rows = md.split('\n').filter((line) => /^\| \d/.test(line));
-    expect(rows[0]).toBe('| 1 | 20 | reject | complete |');
-    expect(rows[1]).toBe('| 2 (AI) | 80 | accept | complete |');
+    // The status in the studio's words, as the toolbar badge prints it — never the wire token.
+    expect(rows[0]).toBe('| 1 | 20 | reject | graded |');
+    expect(rows[1]).toBe('| 2 (AI) | 80 | accept | graded |');
+    expect(rows[2]).toBe('| 3 | — | — | grading… |');
   });
 
   it('says None with no revisions', () => {

@@ -13,7 +13,7 @@ import { markdownCell, nodeLabel } from '@sysdesign/contracts';
 import { humanizeReason } from '../evaluation/decision-reason';
 import { humanizeToken, lensName } from '../evaluation/humanize';
 import { substituteLocationLabels } from '../evaluation/location-labels';
-import { formatScore } from '../evaluation/score';
+import { formatScore, GRADE_STATUS_LABEL } from '../evaluation/score';
 import { humanizeKind } from '../prompts/criteria';
 
 /**
@@ -25,8 +25,9 @@ import { humanizeKind } from '../prompts/criteria';
  * `` `code` ``. Every id (node, edge, criterion, finding) is resolved to the
  * label or statement the author actually reads, every wire token (a criterion
  * kind, a dimension, a result, a lens) is printed in the words the studio
- * shows it in, and every score is printed the way the studio prints it
- * (`formatScore`) — the export is the panel's words, on paper.
+ * shows it in, and every score and grading status is printed the way the
+ * studio prints it (`formatScore`, `GRADE_STATUS_LABEL`) — the export is the
+ * panel's words, on paper.
  */
 
 const NONE = '_None._';
@@ -277,7 +278,7 @@ export function revisionsMarkdown(revisions: DesignRevisionSummaryDto[]): string
     lines.push(
       `| ${rev.revisionNumber}${rev.origin === 'assistant' ? ' (AI)' : ''} | ${formatScore(
         grade?.overall,
-      )} | ${grade?.decision ?? '—'} | ${grade?.status ?? '—'} |`,
+      )} | ${grade?.decision ?? '—'} | ${grade ? GRADE_STATUS_LABEL[grade.status] : '—'} |`,
     );
   }
   return joinLines(lines);

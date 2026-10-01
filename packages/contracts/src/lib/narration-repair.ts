@@ -1,10 +1,5 @@
 import type { CriterionRef } from './brief-validator';
-import {
-  NARRATION_MAX_COMPONENT_RATIONALES,
-  NARRATION_MAX_CRITERION_NARRATIONS,
-  NARRATION_OVERVIEW_MAX_LENGTH,
-  NARRATION_PROSE_MAX_LENGTH,
-} from './canvas';
+import { NARRATION_MAX_COMPONENT_RATIONALES, NARRATION_MAX_CRITERION_NARRATIONS } from './canvas';
 import {
   NARRATION_VERSION,
   type CanvasGraph,
@@ -20,6 +15,11 @@ import {
  * dropped, exactly as a binding whose node was deleted is dropped. Thinness
  * is never judged here: whether a rationale explains anything is the
  * explanation critic's call; this only knows written from unwritten.
+ *
+ * Prose is trimmed, never cut: nothing is cut to fit. The editors bound each
+ * slot with the schema's own constants as `maxLength`, so prose past its
+ * bound did not come from them, and it stays whole for the schema to refuse
+ * — a silent cut would send words the author never saw go missing.
  */
 
 /**
@@ -43,7 +43,7 @@ export function reconcileNarration(
   const componentRationales = rationales
     .map((rationale) => ({
       nodeId: rationale.nodeId,
-      prose: rationale.prose.trim().slice(0, NARRATION_PROSE_MAX_LENGTH),
+      prose: rationale.prose.trim(),
     }))
     .filter((rationale) => {
       if (rationale.prose.length === 0 || !nodeIds.has(rationale.nodeId)) return false;
@@ -57,7 +57,7 @@ export function reconcileNarration(
   const criterionNarrations = narrations
     .map((narration) => ({
       criterionId: narration.criterionId,
-      prose: narration.prose.trim().slice(0, NARRATION_PROSE_MAX_LENGTH),
+      prose: narration.prose.trim(),
     }))
     .filter((narration) => {
       if (narration.prose.length === 0 || !criterionIds.has(narration.criterionId)) return false;
@@ -67,7 +67,7 @@ export function reconcileNarration(
     })
     .slice(0, NARRATION_MAX_CRITERION_NARRATIONS);
 
-  const trimmedOverview = overview.trim().slice(0, NARRATION_OVERVIEW_MAX_LENGTH);
+  const trimmedOverview = overview.trim();
 
   if (
     trimmedOverview.length === 0 &&

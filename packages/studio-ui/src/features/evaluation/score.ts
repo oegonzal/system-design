@@ -1,3 +1,5 @@
+import type { QualityRunStatus } from '@sysdesign/contracts';
+
 /** What a score reads as when there is none: never graded, or nothing earned one. */
 export const NO_SCORE = '—';
 
@@ -10,3 +12,13 @@ export const NO_SCORE = '—';
 export function formatScore(score: number | null | undefined): string {
   return score === null || score === undefined ? NO_SCORE : String(Math.round(score));
 }
+
+/**
+ * A grading run's status in the studio's words — the toolbar's revision badge
+ * and the export's Status column print the same three, never the wire token.
+ */
+export const GRADE_STATUS_LABEL: Readonly<Record<QualityRunStatus, string>> = {
+  running: 'grading…',
+  complete: 'graded',
+  failed: 'grading failed',
+};

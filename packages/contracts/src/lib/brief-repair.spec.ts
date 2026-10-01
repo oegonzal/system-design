@@ -66,12 +66,12 @@ describe('reconcileBrief', () => {
     expect(reconcileBrief([binding({ criterionId: 'c99' })], graph, criteria)).toBeNull();
   });
 
-  it('drops a binding with no claim, and trims and clips the one it keeps', () => {
+  it('drops a binding with no claim, and trims the one it keeps — never cuts it to fit', () => {
     expect(reconcileBrief([binding({ claim: '   ' })], graph, criteria)).toBeNull();
     const long = 'x'.repeat(BINDING_CLAIM_MAX_LENGTH + 100);
     expect(
       reconcileBrief([binding({ claim: `  ${long}  ` })], graph, criteria)?.bindings[0].claim,
-    ).toHaveLength(BINDING_CLAIM_MAX_LENGTH);
+    ).toBe(long);
   });
 
   it('drops a node the canvas no longer has, and the binding if none survive', () => {

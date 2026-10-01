@@ -1,3 +1,4 @@
+import { NARRATION_OVERVIEW_MAX_LENGTH, NARRATION_PROSE_MAX_LENGTH } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -83,5 +84,14 @@ describe('NarrativeEditor', () => {
     for (const criterion of makeCriteria()) {
       expect(screen.getByTestId(`narrative-narration-${criterion.id}`)).toBeTruthy();
     }
+  });
+
+  it('[UX-8] bounds every slot by the schema’s own limit, so nothing written is cut on the way out', () => {
+    renderEditor();
+    const maxLength = (testId: string) =>
+      (screen.getByTestId(testId) as HTMLTextAreaElement).maxLength;
+    expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_MAX_LENGTH);
+    expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_MAX_LENGTH);
+    expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_MAX_LENGTH);
   });
 });

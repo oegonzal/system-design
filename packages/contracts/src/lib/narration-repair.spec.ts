@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CriterionRef } from './brief-validator';
-import type { CanvasGraph } from './canvas.schema';
+import { NARRATION_OVERVIEW_MAX_LENGTH, NARRATION_PROSE_MAX_LENGTH } from './canvas';
+import { designNarrativeSchema, type CanvasGraph } from './canvas.schema';
 import { reconcileNarration } from './narration-repair';
 
 const graph: CanvasGraph = {
@@ -68,5 +69,24 @@ describe('reconcileNarration', () => {
       componentRationales: [{ nodeId: 'n-3', prose: PROSE }],
       criterionNarrations: [{ criterionId: 'c1', prose: PROSE }],
     });
+  });
+
+  it('keeps prose past its bound whole for the schema to refuse — nothing is cut to fit', () => {
+    const long = 'x'.repeat(NARRATION_PROSE_MAX_LENGTH + 1);
+    const overview = 'y'.repeat(NARRATION_OVERVIEW_MAX_LENGTH + 1);
+    const narrative = reconcileNarration(
+      `  ${overview}  `,
+      [{ nodeId: 'n-3', prose: long }],
+      [{ criterionId: 'c1', prose: long }],
+      graph,
+      criteria,
+    );
+    expect(narrative).toEqual({
+      version: 1,
+      overview,
+      componentRationales: [{ nodeId: 'n-3', prose: long }],
+      criterionNarrations: [{ criterionId: 'c1', prose: long }],
+    });
+    expect(designNarrativeSchema.safeParse(narrative).success).toBe(false);
   });
 });

@@ -59,6 +59,6 @@ test.describe('exporting a run', () => {
     expect(feedback).toContain('| c1 — ');
 
     const revisions = await zip.files['revisions.md'].async('string');
-    expect(revisions).toContain(`| 1 | ${NAIVE_DESIGN_SCORE} | revise | complete |`);
+    expect(revisions).toContain(`| 1 | ${NAIVE_DESIGN_SCORE} | revise | graded |`);
   });
 });
