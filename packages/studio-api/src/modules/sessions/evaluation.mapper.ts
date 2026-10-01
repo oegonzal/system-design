@@ -1,4 +1,5 @@
 import {
+  DIAGNOSTIC_DEGRADES,
   locationIdsIn,
   submissionLocations,
   type ConfirmedFinding,
@@ -192,10 +193,13 @@ function toCriterionResult(
   };
 }
 
-/** The lens samples that answered nothing — what the grade was computed without. */
+/**
+ * The lens samples that should have answered and did not — what the grade was
+ * computed without. A lens with nothing to judge cost the grade nothing.
+ */
 const degradedSamples = (it: IterationTrace): DegradedSampleDto[] =>
   [...it.critics, ...it.evaluators].flatMap(({ diagnostic }) =>
-    diagnostic
+    diagnostic && DIAGNOSTIC_DEGRADES[diagnostic.reason]
       ? [{ stage: diagnostic.stage, sample: diagnostic.sample, reason: diagnostic.reason }]
       : [],
   );

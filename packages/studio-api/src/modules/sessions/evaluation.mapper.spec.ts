@@ -155,7 +155,7 @@ describe('toEvaluationDto', () => {
     expect(dto.degraded).toEqual([]);
   });
 
-  it('[DEL-4] a lens sample that answered nothing is reported, so a grade made without it says so', async () => {
+  it('[DEL-4] a lens sample that answered nothing is reported, so a grade made without it says so — a lens with nothing to judge is not', async () => {
     const run = await finishedRun();
     if (!run.trace) throw new Error('the fake completes synchronously');
     const [it] = run.trace.iterations;
@@ -166,6 +166,15 @@ describe('toEvaluationDto', () => {
     it.evaluators.push({
       report: null,
       diagnostic: { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped', detail: null },
+    });
+    it.evaluators.push({
+      report: null,
+      diagnostic: {
+        stage: 'evaluator.requirements',
+        sample: null,
+        reason: 'not-applicable',
+        detail: 'no criteria of its kinds',
+      },
     });
     expect(toEvaluationDto(run, 1, submission).degraded).toEqual([
       { stage: 'critic.scale', sample: 2, reason: 'llm-failed' },

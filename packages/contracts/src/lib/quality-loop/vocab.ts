@@ -39,6 +39,19 @@ export const DIAGNOSTIC_REASONS = [
 ] as const;
 export type DiagnosticReason = (typeof DIAGNOSTIC_REASONS)[number];
 
+/**
+ * Whether a reason means a stage that should have answered did not — what it
+ * fed was then computed without it. `not-applicable` is a stage with nothing
+ * to do, a lens with no criteria of its kinds, and costs a grade nothing.
+ * Exhaustive, so a new reason is classified where it is declared.
+ */
+export const DIAGNOSTIC_DEGRADES = {
+  'llm-failed': true,
+  'token-clipped': true,
+  'llm-artifact-rejected': true,
+  'not-applicable': false,
+} as const satisfies Record<DiagnosticReason, boolean>;
+
 /** Why the loop ended — the runner's reason, distinct from the last decision. */
 export const STOP_REASONS = [
   'accepted',

@@ -66,7 +66,7 @@ export interface CriterionResultDto {
   locations: EvaluationLocationDto[];
 }
 
-/** A lens sample that answered nothing: the grade stands on the samples that did. */
+/** A lens sample that should have answered and did not: the grade stands on the samples that did. */
 export interface DegradedSampleDto {
   /** The lens that ran it — `critic.scale`, `evaluator.quality`. */
   stage: string;
@@ -96,7 +96,11 @@ export interface EvaluationDto {
   criterionResults: CriterionResultDto[];
   /** Why the run stopped — only on the iteration that ended a completed run; null on every earlier one. */
   stopReason: StopReason | null;
-  /** The lens samples of this iteration that produced no report; empty when every lens answered. */
+  /**
+   * The lens samples of this iteration that should have answered and did not
+   * (`DIAGNOSTIC_DEGRADES`); empty when every lens with something to judge
+   * answered. A lens skipped as not applicable is not one.
+   */
   degraded: DegradedSampleDto[];
   error: string | null;
 }
