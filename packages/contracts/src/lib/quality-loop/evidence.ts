@@ -27,7 +27,13 @@ export interface SuccessCriterion {
 }
 export const CRITERION_ID_MAX_LENGTH = 20;
 export const CRITERION_KIND_MAX_LENGTH = 60;
-export const CRITERION_STATEMENT_MAX_LENGTH = 300;
+/**
+ * Above the longest statement a derive-criteria stage has measurably written
+ * (323 characters, across every pipeline's recorded runs): a derivation past
+ * it is refused whole, never cut, so the bound must not be one a model meets.
+ * The stored column is `text`, so only this bound limits it.
+ */
+export const CRITERION_STATEMENT_MAX_LENGTH = 400;
 
 /** Position by position: the same ids, kinds and statements — what "the rubric it was judged against" means. */
 export const sameRubric = (

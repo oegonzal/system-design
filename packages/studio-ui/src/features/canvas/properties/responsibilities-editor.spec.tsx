@@ -1,4 +1,4 @@
-import { NODE_MAX_RESPONSIBILITIES } from '@sysdesign/contracts';
+import { NODE_MAX_RESPONSIBILITIES, RESPONSIBILITY_MAX_LENGTH } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -76,7 +76,9 @@ describe('ResponsibilitiesEditor', () => {
   it('caps the input length to the contract and shows the helper', () => {
     renderWithTheme(<Harness />);
 
-    expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).maxLength).toBe(60);
+    expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).maxLength).toBe(
+      RESPONSIBILITY_MAX_LENGTH,
+    );
     expect(screen.getByText(/what is this component in charge of/i)).toBeTruthy();
   });
 });

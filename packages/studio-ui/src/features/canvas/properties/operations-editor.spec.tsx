@@ -1,4 +1,10 @@
-import { NODE_MAX_OPERATIONS, OPERATION_KINDS, type NodeOperation } from '@sysdesign/contracts';
+import {
+  NODE_MAX_OPERATIONS,
+  OPERATION_KINDS,
+  OPERATION_NAME_MAX_LENGTH,
+  OPERATION_NOTES_MAX_LENGTH,
+  type NodeOperation,
+} from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -180,7 +186,11 @@ describe('OperationsEditor', () => {
     renderWithTheme(<Harness initial={twoOps} />);
 
     const row = within(screen.getByTestId('operation-row-0'));
-    expect((row.getByLabelText('Name') as HTMLInputElement).maxLength).toBe(60);
-    expect((row.getByLabelText('Notes') as HTMLInputElement).maxLength).toBe(140);
+    expect((row.getByLabelText('Name') as HTMLInputElement).maxLength).toBe(
+      OPERATION_NAME_MAX_LENGTH,
+    );
+    expect((row.getByLabelText('Notes') as HTMLInputElement).maxLength).toBe(
+      OPERATION_NOTES_MAX_LENGTH,
+    );
   });
 });

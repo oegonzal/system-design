@@ -39,10 +39,13 @@ import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
  * means one shape; there is no DTO class or hand-written interface to drift.
  *
  * Bounds are `.max()` everywhere and `.min(1)` only on the things other parts
- * reference (ids, a binding's components, a claim) — a model that overshoots
- * a length is clamped by the client, but an empty string it should not have
- * emitted cannot be repaired, so the schema asks for as little as it can.
- * `.describe()` lines are read by the coach, which writes into this schema.
+ * reference (ids, a binding's components, a claim). Nothing is cut to fit: a
+ * string past its bound is a schema miss that discards the coach's whole
+ * answer, so every string bound sits above the longest the coach has
+ * measurably written (the canvas pipeline's spec holds them there), and an
+ * empty string it should not have emitted cannot be repaired either — the
+ * schema asks for as little as it can. `.describe()` lines are read by the
+ * coach, which writes into this schema.
  */
 
 const canvasId = z.string().min(1).max(CANVAS_ID_MAX_LENGTH);

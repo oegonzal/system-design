@@ -63,6 +63,16 @@ describe('per-request schemas', () => {
     ).toEqual([]);
   });
 
+  it('[QL-2] a derived statement bound sits above the longest any deriver has measurably written', () => {
+    // Across every pipeline's recorded derive-criteria answers (static/runs,
+    // to 2026-10-01) the longest statement ran 323 characters, a
+    // system-design one. A statement past its bound fails the derivation
+    // whole — never cut to fit — so the bound must not be one a model meets.
+    expect(
+      boundsBelowMeasured(criteriaSchema(['must'], 3), { 'criteria[].statement': 323 }),
+    ).toEqual([]);
+  });
+
   it('[QL-6] no schema a model answers contains a number', () => {
     const schemas = [
       criteriaSchema(['must'], 3),

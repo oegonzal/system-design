@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { reconcileBrief, validPrefix } from './brief-repair';
 import type { CriterionRef } from './brief-validator';
+import { BINDING_CLAIM_MAX_LENGTH } from './canvas';
 import type { Binding, CanvasGraph } from './canvas.schema';
 
 /** client → gateway → service → database, plus a stray cache off the service. */
@@ -67,10 +68,10 @@ describe('reconcileBrief', () => {
 
   it('drops a binding with no claim, and trims and clips the one it keeps', () => {
     expect(reconcileBrief([binding({ claim: '   ' })], graph, criteria)).toBeNull();
-    const long = 'x'.repeat(400);
+    const long = 'x'.repeat(BINDING_CLAIM_MAX_LENGTH + 100);
     expect(
       reconcileBrief([binding({ claim: `  ${long}  ` })], graph, criteria)?.bindings[0].claim,
-    ).toHaveLength(200);
+    ).toHaveLength(BINDING_CLAIM_MAX_LENGTH);
   });
 
   it('drops a node the canvas no longer has, and the binding if none survive', () => {

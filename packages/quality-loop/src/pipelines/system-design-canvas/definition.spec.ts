@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { boundsBelowMeasured, proseBounds } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import { canvasOutput } from './output';
 import { sampleSubmission } from './testing';
@@ -66,6 +67,41 @@ describe('the system-design-canvas pipeline', () => {
     for (const [stage, tokens] of Object.entries(measured)) {
       expect(declared[stage], stage).toBeGreaterThan(tokens);
     }
+  });
+
+  it('[QL-4] every string bound the coach writes into sits above the longest it has measurably written', () => {
+    // The longest each path has been written by the coach across the recorded
+    // canvas runs (static/runs, to 2026-10-01). A string past its bound is a
+    // miss that discards the whole revision — never cut to fit — so no bound
+    // may be one the coach meets. Every string the schema bounds is listed,
+    // so a new field cannot join the schema unmeasured.
+    const measured: Record<string, number> = {
+      'graph.nodes[].id': 19,
+      'graph.nodes[].label': 46,
+      'graph.nodes[].config[].key': 23,
+      'graph.nodes[].config[].value': 66,
+      'graph.nodes[].responsibilities[]': 52,
+      'graph.nodes[].operations[].name': 29,
+      'graph.nodes[].operations[].notes': 142,
+      'graph.edges[].id': 21,
+      'graph.edges[].source': 19,
+      'graph.edges[].target': 19,
+      'graph.edges[].label': 55,
+      'graph.edges[].carries[]': 29,
+      'brief.bindings[].criterionId': 2,
+      'brief.bindings[].nodeIds[]': 19,
+      'brief.bindings[].path[]': 18,
+      'brief.bindings[].claim': 229,
+      'narrative.overview': 1098,
+      'narrative.componentRationales[].nodeId': 19,
+      'narrative.componentRationales[].prose': 558,
+      'narrative.criterionNarrations[].criterionId': 2,
+      'narrative.criterionNarrations[].prose': 526,
+    };
+    expect(Object.keys(proseBounds(canvasOutput.schema)).sort()).toEqual(
+      Object.keys(measured).sort(),
+    );
+    expect(boundsBelowMeasured(canvasOutput.schema, measured)).toEqual([]);
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

@@ -218,11 +218,18 @@ export const CANVAS_ID_MAX_LENGTH = 64;
 export const NODE_LABEL_MAX_LENGTH = 80;
 export const EDGE_LABEL_MAX_LENGTH = 80;
 
+/*
+ * Every string bound below is one the coach writes into: the client never
+ * cuts a string to fit, so a bound the coach meets is a schema miss that
+ * discards its whole answer. Each sits above the longest the coach has
+ * measurably written — the canvas pipeline's spec holds them to those
+ * figures — and the editors enforce the same constants as `maxLength`.
+ */
 export const NODE_MAX_RESPONSIBILITIES = 6;
-export const RESPONSIBILITY_MAX_LENGTH = 60;
+export const RESPONSIBILITY_MAX_LENGTH = 80;
 export const NODE_MAX_OPERATIONS = 12;
 export const OPERATION_NAME_MAX_LENGTH = 60;
-export const OPERATION_NOTES_MAX_LENGTH = 140;
+export const OPERATION_NOTES_MAX_LENGTH = 200;
 export const EDGE_MAX_CARRIES = 8;
 /** Whole-graph operation budget, enforced by the graph validator. */
 export const CANVAS_MAX_TOTAL_OPERATIONS = 400;
@@ -234,9 +241,9 @@ export const NODE_CONFIG_STRING_VALUE_MAX_LENGTH = 120;
 export const BRIEF_MAX_BINDINGS = 24;
 export const BINDING_MAX_NODES = 12;
 export const FLOW_MAX_STEPS = 24;
-export const BINDING_CLAIM_MAX_LENGTH = 200;
+export const BINDING_CLAIM_MAX_LENGTH = 300;
 
-export const NARRATION_PROSE_MAX_LENGTH = 600;
-export const NARRATION_OVERVIEW_MAX_LENGTH = 1200;
+export const NARRATION_PROSE_MAX_LENGTH = 720;
+export const NARRATION_OVERVIEW_MAX_LENGTH = 1400;
 export const NARRATION_MAX_COMPONENT_RATIONALES = 40;
 export const NARRATION_MAX_CRITERION_NARRATIONS = 24;
