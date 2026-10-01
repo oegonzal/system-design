@@ -278,6 +278,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A pipeline may declare a deterministic normalize the loop applies to produced artifacts only, before validation, so what is judged is what is stored; and a producer is told why its last revision was refused by a validator.',
   },
+  {
+    id: 'QL-26',
+    statement:
+      'What a wave of lenses yields is a function of declaration order — lenses as declared, samples ascending — and never of which call answered first: a sample keeps the number it was planned with, so agreement across samples, the order of the lenses on a confirmed finding, and the rationale carried into the next iteration are all the same whatever the completion order.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
