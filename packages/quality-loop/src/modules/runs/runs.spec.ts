@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
+import type { QualityRunDto, QualityRunSummaryDto, RunTrace } from '@sysdesign/contracts';
 import {
   ensureDatabase,
   QualityRun,
@@ -13,6 +13,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import type { RunRecord } from '../../core/contracts';
+import { progressOf } from '../../core/loop/progress';
 import type { RunRepository } from '../../core/ports';
 import { fakeLlm, gatedLlm, result, sequencedLlm, tinyPipeline } from '../../core/testing';
 import {
@@ -25,6 +27,8 @@ import {
   type Page,
 } from '../http/testing';
 import { RunJanitor } from '../janitor/run-janitor';
+import { readSnapshot } from './persistence/snapshot';
+import { fullIteration, fullRecord, fullTrace } from './persistence/testing';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY } from './tokens';
 
 const DUMP_DIR = claimDumpDir('quality-loop');
@@ -46,6 +50,37 @@ const canned = () =>
 
 /** The real module over real HTTP; a fresh instance shares nothing but the database. */
 const boot = () => bootApp([[QUALITY_LOOP_LLM, canned()], tinyOnly()]);
+
+/**
+ * A model whose iteration 1 judges c1 partial and revises, and whose
+ * iteration 2 passes it. Gated after `CALLS_IN_ITERATION_1`, it holds a run
+ * in flight with one iteration recorded.
+ */
+const revisingModel = () =>
+  sequencedLlm(
+    { criteria: [{ kind: 'must', statement: 'has text' }] },
+    { text: 'made', parts: ['one'] },
+    { findings: [] },
+    {
+      results: [result({ criterionId: 'c1', result: 'partial', locationRefs: ['text'] })],
+      advisoryVerdict: null,
+    },
+    {
+      results: [result({ criterionId: 'c1', locationRefs: ['text'] })],
+      advisoryVerdict: null,
+    },
+  );
+const CALLS_IN_ITERATION_1 = 4; // criteria, producer, critic, evaluator
+
+/** Read until `done` holds — a fake model moves within a second; the last read is returned either way. */
+const pollUntil = async <T>(read: () => Promise<T>, done: (value: T) => boolean): Promise<T> => {
+  let value = await read();
+  for (let attempt = 0; attempt < 100 && !done(value); attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    value = await read();
+  }
+  return value;
+};
 
 const HOURS = 60 * 60 * 1000;
 
@@ -113,6 +148,8 @@ describe('the HTTP surface', () => {
       outcome: 'ok',
       durationMs: expect.any(Number),
       startedAt: expect.any(String),
+      attempt: 1,
+      errorName: null,
     });
     expect(record).not.toHaveProperty('git');
     expect(record.trace?.iterations[0]?.rendered).toBe('[text] made\n[part.1] one');
@@ -460,21 +497,7 @@ describe('the HTTP surface', () => {
   it('[QL-13] a running run records each iteration as it lands, GET /runs/:id shows them with no stop reason, and its close replaces them with the whole run', async () => {
     // Iteration 1 judges c1 partial and revises; the model then waits at the
     // gate before the revision, holding the run in flight after one iteration.
-    const model = sequencedLlm(
-      { criteria: [{ kind: 'must', statement: 'has text' }] },
-      { text: 'made', parts: ['one'] },
-      { findings: [] },
-      {
-        results: [result({ criterionId: 'c1', result: 'partial', locationRefs: ['text'] })],
-        advisoryVerdict: null,
-      },
-      {
-        results: [result({ criterionId: 'c1', locationRefs: ['text'] })],
-        advisoryVerdict: null,
-      },
-    );
-    const CALLS_IN_ITERATION_1 = 4; // criteria, producer, critic, evaluator
-    const gated = gatedLlm(model, CALLS_IN_ITERATION_1);
+    const gated = gatedLlm(revisingModel(), CALLS_IN_ITERATION_1);
     const owner = await bootApp([[QUALITY_LOOP_LLM, gated], tinyOnly()]);
     try {
       const started = await postJson(owner.url, '/runs', {
@@ -532,5 +555,141 @@ describe('the HTTP surface', () => {
     } finally {
       await owner.app.close();
     }
+  });
+  it('[QL-13] iterations a run recorded are final: a run that throws after one fails with it kept, so a grade already shown never disappears', async () => {
+    const gated = gatedLlm(revisingModel(), CALLS_IN_ITERATION_1);
+    const owner = await bootApp([[QUALITY_LOOP_LLM, gated], tinyOnly()]);
+    try {
+      const started = await postJson(owner.url, '/runs', {
+        pipeline: 'tiny',
+        goal: '# Goal',
+        maxIterations: 2,
+      });
+      const { runId: id } = ((await started.json()) as Envelope<{ runId: string }>).data;
+      const read = async () =>
+        (await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${id}`)).data;
+      const live = await pollUntil(read, (run) => run.trace?.iterations.length === 1);
+      expect(live.status).toBe('running');
+
+      // The model dies before iteration 2: the loop throws, and the run fails.
+      gated.fail(new Error('the model went away'));
+      const run = await pollUntil(read, (current) => current.status !== 'running');
+      expect(run).toMatchObject({
+        status: 'failed',
+        finishedAt: expect.any(String),
+        error: { message: 'the model went away' },
+      });
+      // What it recorded stands, with its standing and no stop reason — the loop never chose one.
+      expect(run.trace).toEqual(live.trace);
+      expect(run.trace).toMatchObject({
+        pipeline: { id: 'tiny', version: tinyPipeline().version },
+        bestIteration: 1,
+        finalDecision: 'revise',
+        stopReason: null,
+      });
+      expect(await em.fork().find(QualityRunIteration, { run: id })).toHaveLength(1);
+
+      // [QL-23] Final, so adoptable: a later run takes it as its iteration 1, verbatim.
+      const adopting = await postJson(url, '/runs', {
+        pipeline: 'tiny',
+        goal: '# Goal',
+        criteria: run.trace?.contract.criteria,
+        adopt: { runId: id, iteration: 1 },
+        maxIterations: 1,
+      });
+      expect(adopting.status).toBe(202);
+      const adopted = await settledRun(
+        ((await adopting.json()) as Envelope<{ runId: string }>).data.runId,
+      );
+      expect(adopted.trace?.iterations).toEqual([
+        { ...run.trace?.iterations[0], iteration: 1, mode: 'adopted' },
+      ]);
+    } finally {
+      await owner.app.close();
+    }
+  });
+
+  it('[QL-13] the repository writes a close with no trace and the janitor’s sweep as the header alone: the recorded iterations stand', async () => {
+    const repository = app.get<RunRepository>(RUN_REPOSITORY);
+    const trace = fullTrace({
+      iterations: [fullIteration(), fullIteration({ iteration: 2, mode: 'revise' })],
+    });
+    const progress = progressOf(trace, trace.iterations);
+    if (progress === null) throw new Error('two iterations stand somewhere');
+    const running = (runId: string): RunRecord =>
+      fullRecord({ runId, status: 'running', finishedAt: null, trace: null, exchanges: [] });
+    const threw = (runId: string): RunRecord => ({
+      ...running(runId),
+      status: 'failed',
+      finishedAt: new Date().toISOString(),
+      error: { name: 'Error', message: 'the model went away', stack: null },
+    });
+    const recorded = async (runId: string) => {
+      await repository.open(running(runId), trace.pipeline.version);
+      await repository.recordProgress(runId, progress);
+    };
+
+    // The loop threw: its close carries no trace, and replaces nothing.
+    await recorded('threw-quality');
+    expect(await repository.close(threw('threw-quality'))).toBe('closed');
+    const failed = await repository.find('threw-quality');
+    expect(failed).toMatchObject({ status: 'failed', error: { message: 'the model went away' } });
+    expect(failed?.trace).toEqual(progress);
+
+    // The janitor fails a stale row's header; the owner's late close then reclaims it, still with no trace.
+    await recorded('swept-quality');
+    await em
+      .fork()
+      .nativeUpdate(
+        QualityRun,
+        { id: 'swept-quality' },
+        { heartbeatAt: new Date(Date.now() - 2 * HOURS) },
+      );
+    await repository.failStale(new Date(Date.now() - HOURS));
+    const swept = await repository.find('swept-quality');
+    expect(swept).toMatchObject({ status: 'failed', error: { name: 'Interrupted' } });
+    expect(swept?.trace).toEqual(progress);
+    expect(await repository.close(threw('swept-quality'))).toBe('reclaimed');
+    const reclaimed = await repository.find('swept-quality');
+    expect(reclaimed).toMatchObject({
+      status: 'failed',
+      error: { message: 'the model went away' },
+    });
+    expect(reclaimed?.trace).toEqual(progress);
+  });
+
+  it('[QL-13] a run is read as one snapshot: a write landing between its queries is seen by none of them', async () => {
+    const repository = app.get<RunRepository>(RUN_REPOSITORY);
+    const one = fullTrace();
+    const two = fullTrace({
+      iterations: [fullIteration(), fullIteration({ iteration: 2, mode: 'revise' })],
+    });
+    const progress = (trace: RunTrace) => {
+      const standing = progressOf(trace, trace.iterations);
+      if (standing === null) throw new Error('an iteration stands somewhere');
+      return standing;
+    };
+    const id = 'snapshot-quality';
+    await repository.open(
+      fullRecord({ runId: id, status: 'running', finishedAt: null, trace: null }),
+      one.pipeline.version,
+    );
+    await repository.recordProgress(id, progress(one));
+
+    const seen = await readSnapshot(em, async (snapshot) => {
+      const counts = () =>
+        Promise.all([
+          snapshot.count(QualityRunIteration, { run: id }),
+          snapshot.count(QualityRunFinding, { run: id }),
+        ]);
+      const before = await counts();
+      // A writer replaces every child row while the read sits between its queries.
+      await repository.recordProgress(id, progress(two));
+      return { before, after: await counts() };
+    });
+    expect(seen.after).toEqual(seen.before);
+    expect(seen.before).toEqual([1, 2]);
+    // Outside that snapshot the write is there, read whole.
+    expect((await repository.find(id))?.trace).toEqual(progress(two));
   });
 });

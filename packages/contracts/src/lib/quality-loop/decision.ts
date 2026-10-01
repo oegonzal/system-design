@@ -121,9 +121,10 @@ export interface RunTrace<T = unknown> {
   bestIteration: number;
   finalDecision: Decision;
   /**
-   * Why the loop ended; null while it still runs — the trace then holds the
-   * iterations finished so far, `bestIteration` and `finalDecision` are its
-   * standing after the last of them, and the lessons are theirs.
+   * Why the loop ended; null while it still runs, and on a run that failed
+   * before it chose to stop — the trace then holds the iterations finished
+   * so far, `bestIteration` and `finalDecision` are its standing after the
+   * last of them, and the lessons are theirs.
    */
   stopReason: StopReason | null;
   lessons: Lesson[];

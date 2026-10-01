@@ -170,7 +170,7 @@ describe('FakeLoop', () => {
         output: undefined,
         adopt: { runId: 'fake-run-1', iteration: 1 },
       }),
-    ).toThrow(/never completed/);
+    ).toThrow(/still running/);
 
     loop.complete('fake-run-1', [
       { overall: 40 },
@@ -180,6 +180,32 @@ describe('FakeLoop', () => {
     expect(loop.getRun('fake-run-1')?.trace?.iterations).toHaveLength(3);
     expect(loop.getRun('fake-run-1')?.trace?.stopReason).toBe('max-iterations');
     expect(() => loop.progress('fake-run-1', [{ overall: 1 }])).toThrow(/settled/);
+  });
+
+  it('a run that fails after publishing progress keeps what it recorded, with no stop reason', () => {
+    const loop = new FakeLoop();
+    loop.startRun(request({ maxIterations: 3 }));
+    loop.progress('fake-run-1', [{ overall: 40 }, { overall: 55, artifact: graph(4) }]);
+    const recorded = loop.getRun('fake-run-1')?.trace;
+
+    loop.fail('fake-run-1', 'the model went away');
+    const failed = loop.getRun('fake-run-1');
+    expect(failed).toMatchObject({ status: 'failed', error: { message: 'the model went away' } });
+    expect(failed?.trace).toEqual(recorded);
+    expect(failed?.trace).toMatchObject({ bestIteration: 2, stopReason: null });
+
+    // Final, so adoptable — as the loop adopts any stopped run's recorded iteration.
+    loop.startRun({
+      ...request(),
+      output: undefined,
+      adopt: { runId: 'fake-run-1', iteration: 2 },
+    });
+    loop.complete('fake-run-2', []);
+    expect(loop.getRun('fake-run-2')?.trace?.iterations[0]).toEqual({
+      ...recorded?.iterations[1],
+      iteration: 1,
+      mode: 'adopted',
+    });
   });
 
   it('reset clears every run, request and scenario', () => {

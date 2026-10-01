@@ -77,11 +77,39 @@ describe('the run rows', () => {
     expect(running).toEqual(progress);
     // A tie keeps the earlier crown, as the loop's own gate does.
     expect(running).toMatchObject({ bestIteration: 1, finalDecision: 'revise', stopReason: null });
-    // Nothing finished yet is no trace; a run that failed before settling keeps none.
+    // Nothing finished yet is no trace.
     expect(
       roundtrip({ run: header, criteria: children.criteria, iterations: [] }).trace,
     ).toBeNull();
-    expect(roundtrip({ run: { ...header, status: 'failed' }, ...children }).trace).toBeNull();
+  });
+
+  it('[QL-13] iterations a run recorded are final: one that failed before settling reads back with them, its standing and no stop reason', () => {
+    const settled = fullTrace({
+      iterations: [fullIteration(), fullIteration({ iteration: 2, mode: 'revise' })],
+    });
+    const progress = progressOf(settled, settled.iterations);
+    if (progress === null) throw new Error('two iterations stand somewhere');
+    // The loop threw, or the janitor swept it: the header failed, the progress rows stand.
+    const failed = {
+      ...toRows(
+        fullRecord({
+          status: 'failed',
+          trace: null,
+          error: { name: 'Error', message: 'the model went away', stack: null },
+        }),
+      ).run,
+      pipelineVersion: settled.pipeline.version,
+    };
+    const children = progressRows(failed.id, progress);
+
+    const read = roundtrip({ run: failed, ...children });
+    expect(read).toMatchObject({ status: 'failed', error: { message: 'the model went away' } });
+    expect(read.trace).toEqual(progress);
+    expect(read.trace).toMatchObject({ bestIteration: 1, stopReason: null });
+    // One that failed before its first iteration landed recorded nothing to keep.
+    expect(
+      roundtrip({ run: failed, criteria: children.criteria, iterations: [] }).trace,
+    ).toBeNull();
   });
 
   it('[QL-23] an adopted iteration and where it came from round-trip unchanged', () => {

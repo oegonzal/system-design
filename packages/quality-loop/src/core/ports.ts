@@ -158,10 +158,19 @@ export interface RunRepository {
    * empty until `close`.
    */
   recordProgress(runId: string, progress: RunProgress): Promise<void>;
-  /** The terminal write: the header plus every child row, in one transaction, replacing any progress. */
+  /**
+   * The terminal write, in one transaction: the header, and — when the record
+   * settled a trace — every child row, replacing any progress. A record that
+   * ended without one (the loop threw) writes the header only: an iteration
+   * once recorded is final, so the ones its progress wrote stand.
+   */
   close(record: RunRecord): Promise<CloseOutcome>;
+  /** The run as the wire carries it, its header and child rows read as one snapshot. */
   find(runId: string): Promise<QualityRunDto | null>;
   list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]>;
-  /** Fail every `running` row whose heartbeat is older than `before`; returns how many. */
+  /**
+   * Fail every `running` row whose heartbeat is older than `before`; returns
+   * how many. The header only: the iterations those runs recorded stand.
+   */
   failStale(before: Date): Promise<number>;
 }

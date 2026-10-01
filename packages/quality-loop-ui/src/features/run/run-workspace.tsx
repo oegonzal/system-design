@@ -186,7 +186,7 @@ export function RunWorkspace() {
       )}
       {run.run?.trace && (
         <Surface as="section" aria-label="Results">
-          <RunResults key={run.run.runId} trace={run.run.trace} />
+          <RunResults key={run.run.runId} trace={run.run.trace} status={run.run.status} />
         </Surface>
       )}
     </Stack>

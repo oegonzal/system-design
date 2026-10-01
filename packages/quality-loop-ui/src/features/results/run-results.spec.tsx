@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as stories from './run-results.stories';
 
-const { Revised, Escalated, TwoIterations, Running } = composeStories(stories);
+const { Revised, Escalated, TwoIterations, Running, FailedPartway } = composeStories(stories);
 
 describe('RunResults', () => {
   it('[QLU-3] renders the decision, gates, scores, criteria, findings, remediations and the artifact', () => {
@@ -72,6 +72,14 @@ describe('RunResults', () => {
 
     expect(screen.getByText(/still running · best so far iteration 1 of 1 finished/)).toBeTruthy();
     expect(screen.queryByText(/stopped:/)).toBeNull();
+    expect(screen.getByRole('tab', { name: /Iteration 1/ })).toBeTruthy();
+  });
+
+  it('[QLU-2] a run that failed partway keeps the iterations it recorded, says it failed, and claims no stop', () => {
+    renderWithTheme(<FailedPartway />);
+
+    expect(screen.getByText(/failed partway · best iteration 1 of 1 finished/)).toBeTruthy();
+    expect(screen.queryByText(/still running|stopped:/)).toBeNull();
     expect(screen.getByRole('tab', { name: /Iteration 1/ })).toBeTruthy();
   });
 });

@@ -47,7 +47,10 @@ export interface QualityRunRequestSummary {
  * One run as the service reports it; `exchanges` grow live. While `status` is
  * `running`, `trace` holds the iterations finished so far with `stopReason`
  * null — null itself until the first iteration lands — and it is settled,
- * with its stop reason, once the status leaves `running`.
+ * with its stop reason, once the run completes. An iteration once recorded is
+ * final: a run that fails keeps every iteration it finished, with its
+ * standing after the last and `stopReason` still null, since the loop never
+ * chose to stop — `trace` is null only when it failed before the first.
  */
 export interface QualityRunDto {
   runId: string;

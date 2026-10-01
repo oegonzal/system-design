@@ -117,9 +117,10 @@ export class RunsService {
 
   /**
    * The recorded iteration an adopting request starts from — or a 400 that
-   * names what does not line up: the run, its pipeline or version, the
-   * iteration, or a rubric that is not the one it was judged against. Read
-   * before the row opens, so a refused adoption leaves nothing behind.
+   * names what does not line up: the run (unknown, or still running), its
+   * pipeline or version, the iteration, or a rubric that is not the one it
+   * was judged against. Read before the row opens, so a refused adoption
+   * leaves nothing behind.
    */
   private async resolveAdoption(
     request: StartQualityRunRequest,
@@ -143,10 +144,11 @@ export class RunsService {
     if (source.pipeline !== definition.id) {
       refuse(`run ${adopt.runId} ran ${source.pipeline}, not ${definition.id}`);
     }
-    // Its status, not its trace: a running run's iterations so far are not a verdict to adopt.
-    if (source.status !== 'complete' || source.trace === null) {
-      refuse(`run ${adopt.runId} never completed`);
-    }
+    // Its status, not its trace: a running run's iterations so far are not a
+    // verdict to adopt yet. One that stopped — completed, or failed after
+    // recording some — has final ones, and any of them can be adopted.
+    if (source.status === 'running') refuse(`run ${adopt.runId} is still running`);
+    if (source.trace === null) refuse(`run ${adopt.runId} recorded no iteration`);
     if (source.trace.pipeline.version !== definition.version) {
       refuse(
         `run ${adopt.runId} was judged by ${definition.id}@${source.trace.pipeline.version}, not @${definition.version}`,

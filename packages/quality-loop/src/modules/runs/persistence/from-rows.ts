@@ -1,6 +1,6 @@
 /**
  * Rows back into the wire record — the inverse of `toRows`, and of
- * `progressRows` while the run is still running. Inputs may arrive in any
+ * `progressRows` until the run settles a trace. Inputs may arrive in any
  * order; every list is sorted by its own key here. Rows come in with the
  * entity's own fields spread over them, so what reaches the wire is picked
  * by name, never by leaving fields out.
@@ -81,9 +81,11 @@ function iterationFromRows(
 }
 
 /**
- * The trace: settled, when the header says the run recorded one; the run so
- * far, while it is still running — the iterations its progress wrote, with
- * the standing the loop itself would publish over them; otherwise none.
+ * The trace: settled, when the header says the run recorded one; otherwise
+ * the iterations its progress wrote, with the standing the loop itself would
+ * publish over them and no stop reason — the run so far while it is running,
+ * and what it recorded before it failed once it has, since an iteration once
+ * recorded is final. None recorded is no trace.
  */
 function traceFromRows(
   run: QualityRunRow,
@@ -122,7 +124,7 @@ function traceFromRows(
       lessons: run.lessons ?? [],
     };
   }
-  return run.status === 'running' ? progressOf(head, recorded) : null;
+  return progressOf(head, recorded);
 }
 
 export function fromRows(

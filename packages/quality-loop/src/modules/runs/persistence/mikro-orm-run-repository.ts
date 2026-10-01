@@ -19,6 +19,7 @@ import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/po
 import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
 import type { RunRows } from './rows';
+import { readSnapshot } from './snapshot';
 import { progressRows, toRows } from './to-rows';
 import { toSummary } from './to-summary';
 
@@ -30,8 +31,10 @@ import { toSummary } from './to-summary';
  * recorded or still `running`, for the janitor to fail once its heartbeat is
  * stale. The `status: 'running'` guards keep exchanges, progress and
  * heartbeats off a row the janitor failed; only the owner's late close
- * reclaims it, with the true outcome. Progress and close both replace the
- * run's child rows wholesale, so a run's rows are always one snapshot.
+ * reclaims it, with the true outcome. Progress and a settled close replace
+ * the run's child rows wholesale, so a run's rows are always one snapshot,
+ * and `find` reads them as one; a close with no trace and the janitor's
+ * sweep write the header alone, so an iteration once recorded is final.
  */
 @Injectable()
 export class MikroOrmRunRepository implements RunRepository {
@@ -77,35 +80,44 @@ export class MikroOrmRunRepository implements RunRepository {
 
   async close(record: RunRecord): Promise<CloseOutcome> {
     const rows = toRows(record);
+    const settled = record.trace !== null;
     return this.em.fork().transactional(async (tem) => {
-      const { id, ...header } = rows.run;
+      const { id, pipelineVersion, ...header } = rows.run;
       const row = await tem.findOne(QualityRun, { id }, { lockMode: LockMode.PESSIMISTIC_WRITE });
       if (row === null) return 'refused';
       const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
       if (row.status !== 'running' && !reclaimable) return 'refused';
-      tem.assign(row, { ...header, updatedAt: new Date() });
-      await replaceChildren(tem, row, rows);
+      // A run that ended without a trace (the loop threw) has nothing to put in
+      // place of what its progress recorded: those iterations are final and
+      // stand, and so does the version its open wrote.
+      tem.assign(row, {
+        ...header,
+        ...(settled ? { pipelineVersion } : {}),
+        updatedAt: new Date(),
+      });
+      if (settled) await replaceChildren(tem, row, rows);
       return reclaimable ? 'reclaimed' : 'closed';
     });
   }
 
-  async find(runId: string): Promise<QualityRunDto | null> {
-    const em = this.em.fork();
-    const run = await em.findOne(QualityRun, { id: runId });
-    if (!run) return null;
-    const [criteria, iterations, findings, results] = await Promise.all([
-      em.find(QualityRunCriterion, { run: runId }, { orderBy: { position: 'asc' } }),
-      em.find(QualityRunIteration, { run: runId }, { orderBy: { iteration: 'asc' } }),
-      em.find(QualityRunFinding, { run: runId }, { orderBy: { position: 'asc' } }),
-      em.find(QualityRunCriterionResult, { run: runId }, { orderBy: { position: 'asc' } }),
-    ]);
-    return fromRows(
-      run,
-      criteria.map((row) => ({ ...row, runId })),
-      iterations.map((row) => ({ ...row, runId })),
-      findings.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
-      results.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
-    );
+  find(runId: string): Promise<QualityRunDto | null> {
+    return readSnapshot(this.em, async (em) => {
+      const run = await em.findOne(QualityRun, { id: runId });
+      if (!run) return null;
+      const [criteria, iterations, findings, results] = await Promise.all([
+        em.find(QualityRunCriterion, { run: runId }, { orderBy: { position: 'asc' } }),
+        em.find(QualityRunIteration, { run: runId }, { orderBy: { iteration: 'asc' } }),
+        em.find(QualityRunFinding, { run: runId }, { orderBy: { position: 'asc' } }),
+        em.find(QualityRunCriterionResult, { run: runId }, { orderBy: { position: 'asc' } }),
+      ]);
+      return fromRows(
+        run,
+        criteria.map((row) => ({ ...row, runId })),
+        iterations.map((row) => ({ ...row, runId })),
+        findings.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
+        results.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
+      );
+    });
   }
 
   async list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]> {

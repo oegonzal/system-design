@@ -1,6 +1,6 @@
 'use client';
 
-import type { RunTrace } from '@sysdesign/contracts';
+import type { QualityRunStatus, RunTrace } from '@sysdesign/contracts';
 import {
   Badge,
   DECISION_TONE,
@@ -18,20 +18,29 @@ import { IterationPanel } from './iteration-panel';
 
 export interface RunResultsProps {
   trace: RunTrace;
+  /** The run's own status: a trace with no stop reason is still running, or failed partway. */
+  status: QualityRunStatus;
+}
+
+/** Why the verdict stands where it does: the loop's stop, or the run's state when it never chose one. */
+function standingOf(trace: RunTrace, status: QualityRunStatus): string {
+  const best = `iteration ${trace.bestIteration} of ${trace.iterations.length}`;
+  if (trace.stopReason !== null) return `stopped: ${trace.stopReason} · best ${best}`;
+  return status === 'failed'
+    ? `failed partway · best ${best} finished`
+    : `still running · best so far ${best} finished`;
 }
 
 /**
  * The run's verdict and one tab per iteration, opening on the best one.
  * Mount it keyed by run id so a new run starts on its own best iteration.
- * While the run is still going the trace holds the iterations finished so
- * far: the verdict is its standing, and it says so rather than a stop.
+ * While the run is still going — or once it failed partway — the trace holds
+ * the iterations finished so far: the verdict is its standing, and it says
+ * so rather than a stop.
  */
-export function RunResults({ trace }: RunResultsProps) {
+export function RunResults({ trace, status }: RunResultsProps) {
   const [selected, setSelected] = useState(String(trace.bestIteration));
-  const standing =
-    trace.stopReason === null
-      ? `still running · best so far iteration ${trace.bestIteration} of ${trace.iterations.length} finished`
-      : `stopped: ${trace.stopReason} · best iteration ${trace.bestIteration} of ${trace.iterations.length}`;
+  const standing = standingOf(trace, status);
 
   return (
     <Stack gap={5}>

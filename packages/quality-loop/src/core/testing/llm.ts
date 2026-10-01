@@ -69,24 +69,33 @@ export function sequencedLlm(...canned: readonly unknown[]): LlmClient & LlmReco
   return build(null);
 }
 
+/** How a spec opens the gate: every held call goes on, or every held call throws. */
+export interface LlmGate {
+  release(): void;
+  fail(error: Error): void;
+}
+
 /**
  * A model that waits: every call after the first `passing` blocks until
  * `release()` — so a spec can hold a run in flight, from its start or partway
- * through, while it looks at it or boots a second instance beside it.
+ * through, while it looks at it or boots a second instance beside it — or
+ * throws once `fail(error)` breaks the gate, so the run dies right there.
  * Recording passes through to the inner client; twins share the count.
  */
 export function gatedLlm(
   inner: LlmClient & LlmRecordable,
   passing = 0,
-): LlmClient & LlmRecordable & { release(): void } {
+): LlmClient & LlmRecordable & LlmGate {
   let open: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
+  let broken: (error: Error) => void = () => undefined;
+  const gate = new Promise<void>((resolve, reject) => {
     open = resolve;
+    broken = reject;
   });
+  // A gate broken before any call waits on it is no unhandled rejection.
+  gate.catch(() => undefined);
   let calls = 0;
-  const build = (
-    client: LlmClient & LlmRecordable,
-  ): LlmClient & LlmRecordable & { release(): void } => ({
+  const build = (client: LlmClient & LlmRecordable): LlmClient & LlmRecordable & LlmGate => ({
     model: client.model,
     async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
       if (calls++ >= passing) await gate;
@@ -95,6 +104,7 @@ export function gatedLlm(
     // A recorded twin of the inner client shares the gate: `fakeLlm` twins are recordable too.
     withRecorder: (next) => build(client.withRecorder(next) as LlmClient & LlmRecordable),
     release: () => open(),
+    fail: (error) => broken(error),
   });
   return build(inner);
 }
