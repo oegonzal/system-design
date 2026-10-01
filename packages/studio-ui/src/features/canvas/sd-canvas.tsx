@@ -99,7 +99,6 @@ const CanvasFrame = styled.div`
   );
   --xy-minimap-mask-stroke-color: ${({ theme }) => theme.color.border.default};
   /* Attribution stays (free tier); just keep it readable on our surface. */
-  /* Attribution stays (free tier); just keep it readable on our surface. */
   --xy-attribution-background-color: transparent;
 
   .react-flow__controls,
@@ -117,27 +116,17 @@ const CanvasFrame = styled.div`
   }
 `;
 
-export interface SdCanvasProps {
-  /**
-   * @deprecated The canvas store's `readOnly` is the source of truth — set it
-   * with `setReadOnly`. While a caller still passes this, it is forwarded to
-   * the store, so the palette and properties lock with the canvas; left
-   * undefined, it does nothing.
-   */
-  readOnly?: boolean;
-}
-
 /**
- * The React Flow wiring. All graph state lives in the canvas store; this
- * component translates between DOM events and store actions, honours the
- * store's fit requests, and lends the store its view of the screen.
+ * The React Flow wiring. All graph state lives in the canvas store — its
+ * `readOnly` flag included, which the page sets — and this component
+ * translates between DOM events and store actions, honours the store's fit
+ * requests, and lends the store its view of the screen.
  */
-export function SdCanvas({ readOnly: readOnlyProp }: SdCanvasProps) {
+export function SdCanvas() {
   const theme = useTheme();
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
-  const readOnly = useCanvasStore((state) => state.readOnly) || readOnlyProp === true;
-  const setReadOnly = useCanvasStore((state) => state.setReadOnly);
+  const readOnly = useCanvasStore((state) => state.readOnly);
   const fitRequest = useCanvasStore((state) => state.fitRequest);
   const onNodesChange = useCanvasStore((state) => state.onNodesChange);
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
@@ -150,10 +139,6 @@ export function SdCanvas({ readOnly: readOnlyProp }: SdCanvasProps) {
   const { screenToFlowPosition, fitView } = useReactFlow();
   const flow = useStoreApi<SdNodeModel, SdEdgeModel>();
   useCanvasShortcuts();
-
-  useEffect(() => {
-    if (readOnlyProp !== undefined) setReadOnly(readOnlyProp);
-  }, [readOnlyProp, setReadOnly]);
 
   // The store asks where the author is looking when it places a block.
   useEffect(() => {

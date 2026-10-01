@@ -14,11 +14,6 @@ export interface CanvasToolbarProps {
   submitting: boolean;
   revisionStatus: QualityRunStatus | null;
   revisionNumber: number | null;
-  /**
-   * @deprecated The canvas store's `readOnly` is the source of truth; this is
-   * OR-ed with it until every caller has moved.
-   */
-  readOnly?: boolean;
   /** The session's prompt is archived: the studio refuses a submit until it is back. */
   promptArchived?: boolean;
   /**
@@ -62,7 +57,6 @@ export function CanvasToolbar({
   submitting,
   revisionStatus,
   revisionNumber,
-  readOnly: readOnlyProp = false,
   promptArchived = false,
   submitBlockedReason = null,
   draftStatus,
@@ -71,7 +65,7 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const dirty = useCanvasStore((state) => state.dirty);
   const isEmpty = useCanvasStore((state) => state.nodes.length === 0);
-  const readOnly = useCanvasStore((state) => state.readOnly) || readOnlyProp;
+  const readOnly = useCanvasStore((state) => state.readOnly);
   const canUndo = useCanvasStore(selectCanUndo);
   const canRedo = useCanvasStore(selectCanRedo);
   const undo = useCanvasStore((state) => state.undo);

@@ -9,7 +9,6 @@ import type {
   PromptDto,
   SuccessCriterion,
 } from '@sysdesign/contracts';
-import type { Node } from '@xyflow/react';
 
 import { diagramToPdfBlob, type DiagramCapture } from './diagram-pdf';
 import {
@@ -83,23 +82,4 @@ export async function exportRun(
 
   const blob = await zip.generateAsync({ type: 'blob' });
   triggerDownload(blob, `${slugify(input.prompt.title)}-rev${input.revisionNumber ?? 0}.zip`);
-}
-
-/**
- * @deprecated Use `useRunExport()`: it frames the diagram through the flow
- * instance (no React Flow sub-flow warning) and prints it on the canvas's own
- * surface. Kept only until the practice workspace has moved to the hook.
- */
-export async function buildAndDownloadRunZip(
-  input: RunExportInput & { nodes: Node[] },
-): Promise<void> {
-  const { nodes, ...run } = input;
-  const viewport = document.querySelector<HTMLElement>('.react-flow__viewport');
-  const { getNodesBounds } = await import('@xyflow/react');
-  await exportRun(
-    run,
-    viewport && nodes.length > 0
-      ? { viewport, bounds: getNodesBounds(nodes), background: '#ffffff' }
-      : null,
-  );
 }
