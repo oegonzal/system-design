@@ -4,6 +4,7 @@ import type { EvaluationDto } from '@sysdesign/contracts';
 import { usePolledResource } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
+import { formatScore } from './score';
 
 export const POLL_INTERVAL_MS = 1200;
 /** Backoff ceiling while the API cannot be reached — it restarts, the tab does not give up. */
@@ -35,7 +36,7 @@ function describe(
     case 'running':
       return 'Evaluation running…';
     case 'complete': {
-      const score = evaluation.overall !== null ? ` — ${evaluation.overall}/100` : '';
+      const score = evaluation.overall !== null ? ` — ${formatScore(evaluation.overall)}/100` : '';
       const decision = evaluation.decision ? ` · ${evaluation.decision}` : '';
       return `Evaluation complete${score}${decision}.`;
     }

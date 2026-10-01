@@ -11,6 +11,7 @@ import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 
 import { humanizeToken } from './humanize';
 import { substituteLocationLabels } from './location-labels';
+import { WrappingText } from './wrapping-text';
 
 export interface FindingsListProps {
   findings: EvaluationFindingDto[];
@@ -57,6 +58,7 @@ const TitleButton = styled.button`
   font-size: ${({ theme }) => theme.font.size.md};
   font-weight: ${({ theme }) => theme.font.weight.semibold};
   color: ${({ theme }) => theme.color.text.primary};
+  overflow-wrap: anywhere;
 
   &:hover {
     text-decoration: underline;
@@ -85,14 +87,19 @@ function groupBySeverity(findings: EvaluationFindingDto[]): [Severity, Evaluatio
   ).filter(([, group]) => group.length > 0);
 }
 
+/** Why a reconciled finding costs no points of its own: the criterion already charges it. */
+const reconciledTitle = (criterionId: string, statement: string | undefined): string =>
+  `Already counted against ${criterionId}${statement ? ` (${statement})` : ''}, so it is not scored twice.`;
+
 /**
  * Confirmed findings grouped by severity in the contract's urgency order.
- * Every chip is a fact from the ledger — which lenses confirmed it, its type,
- * how sure they were, how fixable it is, which criteria it names, and where
- * on the design it points, by label rather than position. The rationale reads
- * with the same labels in place of the ids the lens wrote. Clicking a title
- * highlights the affected elements on the canvas. Presentational —
- * everything stateful arrives through props.
+ * Every chip is a fact from the ledger, in words — which lenses confirmed it
+ * (the lens id as its title), how sure they were, how fixable it is, which
+ * criterion already counts it, which criteria it names, and where on the
+ * design it points, by label rather than position. The type is the title.
+ * The rationale reads with the same labels in place of the ids the lens
+ * wrote. Clicking a title highlights the affected elements on the canvas.
+ * Presentational — everything stateful arrives through props.
  */
 export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: FindingsListProps) {
   if (findings.length === 0) {
@@ -110,7 +117,7 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
       {groupBySeverity(findings).map(([severity, group]) => (
         <Stack key={severity} gap={2} data-testid={`findings-group-${severity}`}>
           <Heading level={3}>
-            {severity} ({group.length})
+            {humanizeToken(severity)} ({group.length})
           </Heading>
           <Stack as="ul" gap={0}>
             {group.map((finding) => (
@@ -118,13 +125,10 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                 <BadgeRow>
                   <Badge tone={finding.severity}>{finding.severity}</Badge>
                   {finding.lenses.map((lens) => (
-                    <Badge key={lens} tone="neutral" data-testid="finding-lens">
-                      {lens}
+                    <Badge key={lens} tone="neutral" title={lens} data-testid="finding-lens">
+                      {humanizeToken(lens).toLowerCase()}
                     </Badge>
                   ))}
-                  <Badge tone="neutral" data-testid="finding-type">
-                    {finding.type}
-                  </Badge>
                   <Badge tone="neutral">{finding.confidence} confidence</Badge>
                   <Badge tone="neutral">{humanizeToken(finding.fixability).toLowerCase()}</Badge>
                   {EXPLANATION_FINDING_TYPES.includes(finding.type) ? (
@@ -133,8 +137,15 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                     </Badge>
                   ) : null}
                   {finding.reconciledTo !== null ? (
-                    <Badge tone="neutral" data-testid="finding-reconciled">
-                      priced under {finding.reconciledTo}
+                    <Badge
+                      tone="neutral"
+                      title={reconciledTitle(
+                        finding.reconciledTo,
+                        statementOf.get(finding.reconciledTo),
+                      )}
+                      data-testid="finding-reconciled"
+                    >
+                      counted against {finding.reconciledTo}
                     </Badge>
                   ) : null}
                 </BadgeRow>
@@ -145,11 +156,11 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                 >
                   {humanizeToken(finding.type)}
                 </TitleButton>
-                <Text size="sm" tone="secondary">
+                <WrappingText size="sm" tone="secondary">
                   {finding.rationale !== null
                     ? substituteLocationLabels(finding.rationale, finding.locations)
                     : 'No rationale was recorded for this finding.'}
-                </Text>
+                </WrappingText>
                 {finding.criterionIds.length > 0 || finding.locations.length > 0 ? (
                   <BadgeRow>
                     {finding.criterionIds.map((criterionId) => (

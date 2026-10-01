@@ -56,7 +56,7 @@ describe('EvaluationPanel', () => {
     expect(screen.queryByTestId('evaluation-escalated')).toBeNull();
   });
 
-  it('idles with the submit copy, spins while running, and offers a resubmit on a failed run', () => {
+  it('idles with the submit copy, spins while running with how long it takes, and offers a resubmit on a failed run', () => {
     const { unmount } = renderPanel();
     expect(screen.getByText('Submit your design to have the quality loop grade it.')).toBeTruthy();
     unmount();
@@ -64,12 +64,26 @@ describe('EvaluationPanel', () => {
     const running = renderPanel({
       evaluation: makeEvaluation({ status: 'running', overall: null, decision: null }),
       isPolling: true,
+      startedAt: new Date(Date.now() - 75_000).toISOString(),
     });
     expect(screen.getByText('The lenses are reading your design…')).toBeTruthy();
+    expect(screen.getByTestId('grading-duration').textContent).toMatch(
+      /^Grading usually takes a few minutes — 1:1\d so far\.$/,
+    );
     running.unmount();
 
+    const unstamped = renderPanel({ evaluation: null, isPolling: true });
+    expect(screen.getByTestId('grading-duration').textContent).toBe(
+      'Grading usually takes a few minutes.',
+    );
+    unstamped.unmount();
+
     renderPanel({ error: 'the run failed' });
-    expect(screen.getByTestId('evaluation-error').textContent).toContain('the run failed');
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('data-testid')).toBe('evaluation-error');
+    expect(alert.textContent).toContain('Grading failed');
+    expect(alert.textContent).toContain('the run failed');
     expect(screen.getByTestId('retry-evaluation')).toBeTruthy();
+    expect(screen.queryByTestId('grading-duration')).toBeNull();
   });
 });

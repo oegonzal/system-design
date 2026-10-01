@@ -1,9 +1,10 @@
 'use client';
 
 import type { EvaluationDto, EvaluationFindingDto, SuccessCriterion } from '@sysdesign/contracts';
-import { Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
+import { Alert, Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 
 import { CriterionResultsList } from './criterion-results-list';
+import { useElapsed } from './elapsed';
 import { FindingsList } from './findings-list';
 import { ScoreSummary } from './score-summary';
 
@@ -18,6 +19,8 @@ export interface EvaluationPanelProps {
   criteria: SuccessCriterion[];
   /** The loaded revision was stored before grading was delegated — it has no evaluation to poll. */
   legacy?: boolean;
+  /** When the graded revision was stored — the grade started then; the running state counts from it. */
+  startedAt?: string | null;
   /** There is no retry endpoint: retrying a failed grade is resubmitting the draft. */
   onRetry: () => void;
   onSelectFinding: (finding: EvaluationFindingDto) => void;
@@ -31,13 +34,17 @@ const ESCALATED_COPY =
 const LEGACY_COPY =
   'This revision was stored before grading moved to the quality loop, so it has no evaluation. Resubmit it to grade it.';
 
+/** What a wait costs: several lenses read the design, each a model call. */
+const DURATION_HINT = 'Grading usually takes a few minutes';
+
 /**
- * The feedback dock: running → spinner, failed → error + resubmit, complete →
- * the score summary, the criterion results and the findings. An escalation
- * with no score says why before showing what the lenses did find; a legacy
- * revision says it has nothing to show and offers the resubmit instead of
- * the idle copy. The LiveRegion is mounted unconditionally so status
- * changes are announced, not just rendered.
+ * The feedback dock: running → spinner with how long it usually takes and
+ * how long it has taken, failed → the error + resubmit, complete → the score
+ * summary, the criterion results and the findings. An escalation with no
+ * score says why before showing what the lenses did find; a legacy revision
+ * says it has nothing to show and offers the resubmit instead of the idle
+ * copy. The LiveRegion is mounted unconditionally so status changes are
+ * announced, not just rendered.
  */
 export function EvaluationPanel({
   evaluation,
@@ -46,10 +53,13 @@ export function EvaluationPanel({
   message,
   criteria,
   legacy = false,
+  startedAt = null,
   onRetry,
   onSelectFinding,
 }: EvaluationPanelProps) {
   const status = evaluation?.status ?? null;
+  const running = (status === 'running' || (evaluation === null && isPolling)) && error === null;
+  const elapsed = useElapsed(startedAt, running);
   const escalated =
     evaluation !== null &&
     evaluation.status === 'complete' &&
@@ -75,24 +85,29 @@ export function EvaluationPanel({
         </Text>
       ) : null}
 
-      {(status === 'running' || (evaluation === null && isPolling)) && error === null ? (
-        <Stack direction="row" gap={3} align="center">
-          <Spinner label="" />
-          <Text size="sm" tone="secondary">
-            The lenses are reading your design…
+      {running ? (
+        <Stack gap={2}>
+          <Stack direction="row" gap={3} align="center">
+            <Spinner label="" />
+            <Text size="sm" tone="secondary">
+              The lenses are reading your design…
+            </Text>
+          </Stack>
+          <Text size="sm" tone="muted" data-testid="grading-duration">
+            {elapsed !== null ? `${DURATION_HINT} — ${elapsed} so far.` : `${DURATION_HINT}.`}
           </Text>
         </Stack>
       ) : null}
 
       {error !== null ? (
-        <Stack gap={3} data-testid="evaluation-error">
-          <Text size="sm">{error}</Text>
-          <div>
+        <Alert tone="danger" title="Grading failed" data-testid="evaluation-error">
+          <Stack gap={3} align="start">
+            <span>{error}</span>
             <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
               Resubmit for grading
             </Button>
-          </div>
-        </Stack>
+          </Stack>
+        </Alert>
       ) : null}
 
       {status === 'complete' && evaluation ? (
@@ -102,7 +117,7 @@ export function EvaluationPanel({
               {ESCALATED_COPY}
             </Text>
           ) : null}
-          <ScoreSummary evaluation={evaluation} />
+          <ScoreSummary evaluation={evaluation} criteria={criteria} />
           <Stack gap={2}>
             <Heading level={3}>Criteria</Heading>
             <CriterionResultsList results={evaluation.criterionResults} criteria={criteria} />

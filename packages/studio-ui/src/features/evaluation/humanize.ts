@@ -1,12 +1,13 @@
 /**
  * Wire tokens as words: `unhandled_failure` → "Unhandled failure",
- * `max-iterations` → "Max iterations", `non_functional` → "Non functional".
+ * `max-iterations` → "Max iterations", `critic.scale` → "Critic scale".
  * A grammar over separators, never a lookup — the vocabularies these come
  * from are open records on the pipeline, so a table here would be stale the
- * day a pipeline adds a type.
+ * day a pipeline adds a type. A vocabulary that declares its own labels (the
+ * canvas criterion kinds) is read from its declaration instead.
  */
 export function humanizeToken(token: string): string {
-  const words = token.split(/[_\-\s]+/).filter((word) => word.length > 0);
+  const words = token.split(/[_\-.\s]+/).filter((word) => word.length > 0);
   if (words.length === 0) return token;
   const joined = words.join(' ');
   return joined.charAt(0).toUpperCase() + joined.slice(1);

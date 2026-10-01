@@ -37,6 +37,33 @@ describe('CriterionResultsList', () => {
     expect(unassessed.textContent).not.toContain('confidence');
   });
 
+  it('[EVAL-2] reads the rationale with the labels of the places it names in place of the positional ids, and wraps what no label covers', () => {
+    renderWithTheme(
+      <CriterionResultsList
+        results={[
+          makeCriterionResult({
+            criterionId: 'c2',
+            result: 'not_applicable',
+            rationale: 'edge.5 shows the read-only API; narration.4 describes a keyed read.',
+            locations: [
+              { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
+              { ref: 'narration.4', label: 'c4 narration', part: 'narration', key: 'c4' },
+            ],
+          }),
+        ]}
+        criteria={makeCriteria()}
+      />,
+    );
+
+    const row = screen.getByTestId('criterion-result-c2');
+    const rationale = within(row).getByTestId('criterion-rationale');
+    expect(rationale.textContent).toBe(
+      'e-5 · n-2 → n-3 (sync) shows the read-only API; c4 narration describes a keyed read.',
+    );
+    expect(getComputedStyle(rationale).overflowWrap).toBe('anywhere');
+    expect(within(row).getByText('not applicable')).toBeTruthy();
+  });
+
   it('falls back to the bare id for a criterion the rubric no longer lists', () => {
     renderWithTheme(
       <CriterionResultsList results={[makeCriterionResult({ criterionId: 'c9' })]} criteria={[]} />,

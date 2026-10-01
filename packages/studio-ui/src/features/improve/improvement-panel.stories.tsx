@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeImproveIteration, makeImproveRun } from '../../testing/fixtures';
+import { makeImproveIteration, makeImproveRun, makeRevisionSummary } from '../../testing/fixtures';
 import { ImprovementPanel } from './improvement-panel';
 
 const meta: Meta<typeof ImprovementPanel> = {
@@ -142,5 +142,53 @@ export const Failed: Story = {
     run: makeImproveRun({ status: 'failed', error: 'the producer refused', iterations: [] }),
     error: 'the producer refused',
     message: 'Coach problem: the producer refused',
+  },
+};
+
+/** The run failed, and an earlier run's best is still offered. */
+export const FailedWithEarlierBest: Story = {
+  args: {
+    ...Failed.args,
+    earlierBest: makeRevisionSummary({
+      id: 'rev-4',
+      revisionNumber: 4,
+      origin: 'assistant',
+      evaluation: {
+        runId: 'run-1',
+        iteration: 2,
+        status: 'complete',
+        overall: 80,
+        decision: 'accept',
+      },
+    }),
+  },
+};
+
+/** The coach produced nothing to judge: unscored, and the stop says it was the coach's miss. */
+export const NoArtifact: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'escalated',
+      iterations: [
+        makeImproveIteration({ iteration: 1, overall: 12.1 }),
+        makeImproveIteration({
+          iteration: 2,
+          mode: 'revise',
+          overall: null,
+          decision: 'escalate',
+          reason: 'no artifact to judge',
+          outcome: 'no-artifact',
+          revisionId: null,
+        }),
+      ],
+    }),
+  },
+};
+
+/** A grade holds the session: the coach is off, in the session's own words. */
+export const BlockedByGrade: Story = {
+  args: {
+    blockedReason: 'Revision #2 is still being graded — wait for its verdict.',
   },
 };

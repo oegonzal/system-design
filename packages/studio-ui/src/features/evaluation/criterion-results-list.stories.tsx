@@ -33,5 +33,23 @@ export const EveryResult: Story = {
   },
 };
 
+/** A rationale that names positional ids reads with the labels of the places they are. */
+export const GroundedRationale: Story = {
+  args: {
+    results: [
+      makeCriterionResult({
+        criterionId: 'c2',
+        result: 'partial',
+        confidence: 'medium',
+        rationale: 'edge.5 shows the read-only API, and narration.4 describes a keyed read.',
+        locations: [
+          { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
+          { ref: 'narration.4', label: 'c4 narration', part: 'narration', key: 'c4' },
+        ],
+      }),
+    ],
+  },
+};
+
 /** Nothing assessed. */
 export const Empty: Story = { args: { results: [] } };

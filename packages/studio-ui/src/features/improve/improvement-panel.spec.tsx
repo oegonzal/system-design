@@ -1,10 +1,20 @@
-import { DEFAULT_IMPROVE_ITERATIONS, MAX_IMPROVE_ITERATIONS } from '@sysdesign/contracts';
+import {
+  DEFAULT_IMPROVE_ITERATIONS,
+  describeInFlight,
+  MAX_IMPROVE_ITERATIONS,
+  PROMPT_COPY,
+} from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { makeImproveIteration, makeImproveRun } from '../../testing/fixtures';
+import {
+  makeCriteria,
+  makeImproveIteration,
+  makeImproveRun,
+  makeRevisionSummary,
+} from '../../testing/fixtures';
 import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
@@ -56,7 +66,46 @@ describe('ImprovementPanel', () => {
   it('[UX-14] is off with the reason while the session’s prompt is archived, whatever the grader says', () => {
     renderPanel({ promptArchived: true });
     expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByTestId('improver-unavailable').textContent).toContain('archived');
+    expect(screen.getByTestId('improver-unavailable').textContent).toBe(PROMPT_COPY.archived);
+  });
+
+  it('[DEL-3] is off with the session’s own reason while another run holds its grading slot', () => {
+    const reason = describeInFlight({ kind: 'grade', runId: 'run-7', revisionNumber: 2 });
+    renderPanel({ blockedReason: reason });
+
+    const start = screen.getByTestId('improve-run') as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    expect(start.title).toBe(reason);
+    expect(screen.getByTestId('improver-unavailable').textContent).toBe(reason);
+  });
+
+  it('[UX-11] the iteration count reads the run’s own budget while there is a run, and the author’s choice for the next', async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    const { rerender } = renderPanel({
+      run: makeImproveRun({ maxIterations: 2 }),
+      isPolling: true,
+      onStart,
+    });
+    const select = () => screen.getByTestId('improve-iterations') as HTMLSelectElement;
+    expect(select().value).toBe('2');
+    expect(select().disabled).toBe(true);
+
+    rerender(
+      <ImprovementPanel
+        run={makeImproveRun({ maxIterations: 2, status: 'complete', stopReason: 'plateau' })}
+        error={null}
+        isPolling={false}
+        message=""
+        availability={LIVE}
+        onStart={onStart}
+        onLoadRevision={noop}
+      />,
+    );
+    expect(select().value).toBe('2');
+    await user.selectOptions(select(), '4');
+    await user.click(screen.getByTestId('improve-run'));
+    expect(onStart).toHaveBeenCalledWith(4);
   });
 
   it('[UX-11] renders the live run: model calls so far and one badge per outcome — starting point, imported, not better, refused with its problems', () => {
@@ -101,7 +150,9 @@ describe('ImprovementPanel', () => {
       message: 'Coaching — 7 model calls so far.',
     });
 
-    expect(screen.getByText('Coaching — 7 model calls so far…')).toBeTruthy();
+    expect(screen.getByTestId('improve-progress').textContent).toBe(
+      'Coaching — iteration 3 of 3, 7 model calls so far…',
+    );
     expect(screen.getByTestId('improve-iteration-1').textContent).toContain('starting point');
     expect(screen.getByTestId('improve-iteration-2').textContent).toContain('imported');
     const lower = screen.getByTestId('improve-iteration-3');
@@ -170,6 +221,99 @@ describe('ImprovementPanel', () => {
     expect(screen.getByTestId('improvement-stopped').textContent).toContain('plateaued');
     await userEvent.click(screen.getByTestId('load-best-revision'));
     expect(onLoadRevision).toHaveBeenCalledWith('rev-3');
+  });
+
+  it('[UX-11] names the criteria a reason cites by their statements, and wraps what it cannot name inside the dock', () => {
+    renderPanel({
+      criteria: makeCriteria(),
+      run: makeImproveRun({
+        iterations: [
+          makeImproveIteration({
+            reason: 'blockers to fix: contradiction|binding.2,edge.5,narration.2, c3',
+          }),
+        ],
+      }),
+      isPolling: true,
+    });
+
+    const reason = screen.getByTestId('improve-iteration-reason');
+    expect(reason.textContent).toBe(
+      'blockers to fix: contradiction|binding.2,edge.5,narration.2, “p99 read latency stays under 200 ms”',
+    );
+    expect(getComputedStyle(reason).overflowWrap).toBe('anywhere');
+  });
+
+  it('[DEL-3] a coach that produced nothing to judge says so — the stop is its miss, never a verdict on the design', () => {
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'escalated',
+        iterations: [
+          makeImproveIteration({ iteration: 1, overall: 12.1 }),
+          makeImproveIteration({
+            iteration: 2,
+            mode: 'revise',
+            overall: null,
+            decision: 'escalate',
+            reason: 'no artifact to judge',
+            outcome: 'no-artifact',
+            revisionId: null,
+          }),
+        ],
+      }),
+    });
+
+    const missing = screen.getByTestId('improve-iteration-2');
+    expect(missing.getAttribute('data-outcome')).toBe('no-artifact');
+    expect(missing.textContent).toContain('no revision produced');
+    expect(missing.textContent).toContain('—');
+    expect(screen.getByTestId('improve-iteration-1').textContent).toContain('12');
+    expect(screen.getByTestId('improve-iteration-1').textContent).not.toContain('12.1');
+    expect(screen.getByTestId('improvement-stopped').textContent).toBe(
+      'The coach could not produce a revision this time — try again.',
+    );
+  });
+
+  it('[UX-11] an escalation with a revision to judge says the loop needs a person, not that the design could not be scored', () => {
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'escalated',
+        iterations: [makeImproveIteration({ iteration: 1, decision: 'escalate' })],
+      }),
+    });
+    const stopped = screen.getByTestId('improvement-stopped').textContent ?? '';
+    expect(stopped).toContain('needs a person');
+    expect(stopped).not.toContain('could not score');
+  });
+
+  it('[UX-11] a failed run is reported as a failure, and the previous run’s best stays one click away', async () => {
+    const onLoadRevision = vi.fn();
+    renderPanel({
+      run: makeImproveRun({ status: 'failed', iterations: [], error: 'the model went away' }),
+      error: 'the model went away',
+      earlierBest: makeRevisionSummary({
+        id: 'rev-4',
+        revisionNumber: 4,
+        origin: 'assistant',
+        evaluation: {
+          runId: 'run-1',
+          iteration: 2,
+          status: 'complete',
+          overall: 80.4,
+          decision: 'accept',
+        },
+      }),
+      onLoadRevision,
+    });
+
+    const alert = screen.getByRole('alert');
+    expect(alert.getAttribute('data-testid')).toBe('improvement-error');
+    expect(alert.textContent).toContain('The coach run failed');
+    expect(alert.textContent).toContain('the model went away');
+    expect(screen.getByTestId('earlier-best').textContent).toContain('revision #4, scored 80');
+    await userEvent.click(screen.getByTestId('load-earlier-best'));
+    expect(onLoadRevision).toHaveBeenCalledWith('rev-4');
   });
 
   it('offers nothing to load when no iteration beat the draft', () => {

@@ -4,6 +4,8 @@ import type { ImproveRunDto } from '@sysdesign/contracts';
 import { usePolledResource } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
+import { formatScore } from '../evaluation/score';
+import { coachProgress } from './coach-progress';
 
 export const IMPROVE_POLL_INTERVAL_MS = 1500;
 /** Backoff ceiling while the API cannot be reached — it restarts, the tab does not give up. */
@@ -32,12 +34,12 @@ function describe(
   if (run === null) return isPolling ? 'Checking the coach…' : '';
   switch (run.status) {
     case 'running':
-      return `Coaching — ${run.exchangeCount} model calls so far.`;
+      return `${coachProgress(run)}.`;
     case 'complete': {
       const scores = run.iterations
         .map((iteration) => iteration.overall)
         .filter((overall): overall is number => overall !== null);
-      return `Coach finished${scores.length > 0 ? ` — best score ${Math.max(...scores)}` : ''}.`;
+      return `Coach finished${scores.length > 0 ? ` — best score ${formatScore(Math.max(...scores))}` : ''}.`;
     }
     case 'failed':
       return 'Coach failed.';

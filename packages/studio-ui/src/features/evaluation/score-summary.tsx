@@ -1,10 +1,14 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { EvaluationDto } from '@sysdesign/contracts';
+import type { EvaluationDto, SuccessCriterion } from '@sysdesign/contracts';
 import { Badge, DECISION_TONE, Meter, Stack, Text } from '@sysdesign/design-system';
 
+import { humanizeReason } from './decision-reason';
+import { degradedNote } from './degraded';
 import { humanizeToken } from './humanize';
+import { formatScore } from './score';
+import { WrappingText } from './wrapping-text';
 
 const ScoreRow = styled.div`
   display: flex;
@@ -29,24 +33,31 @@ const NotAssessedRow = styled.div`
   gap: ${({ theme }) => theme.space[4]}px;
 `;
 
+const NO_CRITERIA: SuccessCriterion[] = [];
+
 export interface ScoreSummaryProps {
   evaluation: EvaluationDto;
+  /** The prompt's rubric, so a criterion the decision cites reads as its statement. */
+  criteria?: SuccessCriterion[];
 }
 
 /**
  * The headline: the controller's overall score, its decision and the
- * controller's own sentence for it, why the loop stopped, and one meter per
- * dimension the pipeline declared. The dimension names are the pipeline's
- * own — whatever keys arrive are what render, in the order the loop reported
- * them. Purely presentational — Storybook-safe.
+ * controller's own sentence for it — every finding and criterion it cites
+ * named as the record names it — why the loop stopped, which lens samples
+ * the grade was computed without, and one meter per dimension the pipeline
+ * declared. The dimension names are the pipeline's own — whatever keys
+ * arrive are what render, in the order the loop reported them. Purely
+ * presentational — Storybook-safe.
  */
-export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
+export function ScoreSummary({ evaluation, criteria = NO_CRITERIA }: ScoreSummaryProps) {
   const dimensions = Object.entries(evaluation.dimensions);
+  const degraded = degradedNote(evaluation.degraded);
 
   return (
     <Stack gap={5} data-testid="score-summary">
       <ScoreRow>
-        <BigScore data-testid="overall-score">{evaluation.overall ?? '—'}</BigScore>
+        <BigScore data-testid="overall-score">{formatScore(evaluation.overall)}</BigScore>
         <Text as="span" size="sm" tone="muted">
           / 100
         </Text>
@@ -62,9 +73,14 @@ export function ScoreSummary({ evaluation }: ScoreSummaryProps) {
         ) : null}
       </ScoreRow>
       {evaluation.decisionReason ? (
-        <Text size="sm" tone="muted" data-testid="decision-reason">
-          {evaluation.decisionReason}
-        </Text>
+        <WrappingText size="sm" tone="muted" data-testid="decision-reason">
+          {humanizeReason(evaluation.decisionReason, { findings: evaluation.findings, criteria })}
+        </WrappingText>
+      ) : null}
+      {degraded !== null ? (
+        <WrappingText size="sm" tone="muted" data-testid="degraded-note">
+          {degraded}
+        </WrappingText>
       ) : null}
       {dimensions.length > 0 ? (
         <Stack gap={3}>

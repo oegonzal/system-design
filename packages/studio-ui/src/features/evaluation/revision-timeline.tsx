@@ -4,6 +4,8 @@ import styled from '@emotion/styled';
 import type { DesignRevisionSummaryDto } from '@sysdesign/contracts';
 import { Badge, DECISION_TONE, Stack, Text, transient } from '@sysdesign/design-system';
 
+import { formatScore } from './score';
+
 export interface RevisionTimelineProps {
   revisions: DesignRevisionSummaryDto[];
   /** The revision currently loaded on the canvas, if any. */
@@ -45,8 +47,8 @@ const Score = styled.span`
 
 /**
  * One chip per revision — `#n score decision` — newest first, an AI badge on
- * every revision the coach wrote. Selecting a chip loads that revision
- * read-only; the workspace owns that flow, this component only reports the
+ * every revision the coach wrote; the one on the canvas is `aria-current`.
+ * Selecting a chip loads that revision read-only; the workspace owns that flow, this component only reports the
  * click. Presentational — Storybook-safe.
  */
 export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: RevisionTimelineProps) {
@@ -64,17 +66,19 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
     <Stack direction="row" gap={2} wrap data-testid="revision-timeline">
       {ordered.map((revision) => {
         const grade = revision.evaluation;
+        const active = revision.id === activeRevisionId;
         return (
           <Chip
             key={revision.id}
             type="button"
-            $active={revision.id === activeRevisionId}
+            $active={active}
+            aria-current={active ? 'true' : undefined}
             onClick={() => onSelect(revision)}
             data-testid={`revision-chip-${revision.revisionNumber}`}
           >
             #{revision.revisionNumber}
             {grade?.overall !== null && grade?.overall !== undefined ? (
-              <Score data-testid="revision-score">{grade.overall}</Score>
+              <Score data-testid="revision-score">{formatScore(grade.overall)}</Score>
             ) : null}
             {grade?.decision ? (
               <Badge tone={DECISION_TONE[grade.decision]} data-testid="revision-decision">

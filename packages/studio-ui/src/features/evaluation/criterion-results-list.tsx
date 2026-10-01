@@ -4,6 +4,10 @@ import styled from '@emotion/styled';
 import type { CriterionResultDto, SuccessCriterion } from '@sysdesign/contracts';
 import { Badge, RESULT_TONE, Stack, Text } from '@sysdesign/design-system';
 
+import { humanizeToken } from './humanize';
+import { substituteLocationLabels } from './location-labels';
+import { WrappingText } from './wrapping-text';
+
 export interface CriterionResultsListProps {
   results: CriterionResultDto[];
   /** The prompt's rubric, so a row reads as a statement rather than `c3`. */
@@ -33,7 +37,8 @@ const Line = styled.div`
 /**
  * One stacked row per criterion the evaluators judged: the statement, the
  * settled result with the confidence behind it, and the evaluator's reason
- * on its own line. Stacked rather than tabular so a long statement and a
+ * on its own line, read with the labels of the places it names in place of
+ * the positional ids the model wrote. Stacked rather than tabular so a long statement and a
  * long reason both wrap inside the dock instead of squeezing four columns
  * into it. Purely presentational — Storybook-safe.
  */
@@ -63,14 +68,14 @@ export function CriterionResultsList({ results, criteria }: CriterionResultsList
             </Text>
           </Line>
           <Line>
-            <Badge tone={RESULT_TONE[row.result]}>{row.result.replace('_', ' ')}</Badge>
+            <Badge tone={RESULT_TONE[row.result]}>{humanizeToken(row.result).toLowerCase()}</Badge>
             <Text as="span" size="sm" tone="muted">
               {row.confidence ? `${row.confidence} confidence` : '—'}
             </Text>
           </Line>
-          <Text size="sm" tone="secondary">
-            {row.rationale ?? '—'}
-          </Text>
+          <WrappingText size="sm" tone="secondary" data-testid="criterion-rationale">
+            {row.rationale !== null ? substituteLocationLabels(row.rationale, row.locations) : '—'}
+          </WrappingText>
         </Row>
       ))}
     </Stack>

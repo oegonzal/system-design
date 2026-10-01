@@ -80,13 +80,25 @@ test.describe('the grading feedback', () => {
       'e-1 · n-1 → n-2 (sync)',
     ]);
 
-    // The lens's own words, the criterion it cites, and every lens that confirmed it.
+    // The lens's own words, the criterion it cites, and every lens that
+    // confirmed it — in words, the lens id kept as the chip's title; the type
+    // is the finding's title, never a wire token.
     const failure = canvas.finding('unhandled_failure|node.3');
     await expect(failure).toBeVisible();
     await expect(failure).toContainText('a restart drops the target');
     await expect(failure.getByTestId('finding-criterion')).toHaveText('c2');
-    await expect(failure.getByTestId('finding-lens')).toHaveCount(2);
-    await expect(failure.getByTestId('finding-type')).toHaveText('unhandled_failure');
+    await expect(failure.getByTestId('finding-lens')).toHaveText([
+      'critic architecture',
+      'critic scenarios',
+    ]);
+    await expect(failure.getByTestId('finding-lens').first()).toHaveAttribute(
+      'title',
+      'critic.architecture',
+    );
+    await expect(failure.getByTestId('finding-select-unhandled_failure|node.3')).toHaveText(
+      'Unhandled failure',
+    );
+    await expect(failure).not.toContainText('unhandled_failure');
 
     // `node.3` resolved by position to the author's own id: the database.
     await canvas.clickFinding('unhandled_failure|node.3');

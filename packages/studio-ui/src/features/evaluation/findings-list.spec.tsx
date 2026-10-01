@@ -40,18 +40,25 @@ describe('FindingsList', () => {
     ).toHaveLength(2);
   });
 
-  it('[EVAL-2] shows every lens that confirmed a finding, its type, confidence and fixability', () => {
+  it('[EVAL-2] shows every lens that confirmed a finding in words, its type as the title, its confidence and fixability — no wire token', () => {
     renderWithTheme(<FindingsList findings={findings} onSelect={vi.fn()} />);
 
     const item = screen.getByTestId('finding-f-crit');
-    expect(
-      within(item)
-        .getAllByTestId('finding-lens')
-        .map((chip) => chip.textContent),
-    ).toEqual(['critic.architecture', 'critic.scenarios']);
-    expect(within(item).getByTestId('finding-type').textContent).toBe('unhandled_failure');
+    const lenses = within(item).getAllByTestId('finding-lens');
+    expect(lenses.map((chip) => chip.textContent)).toEqual([
+      'critic architecture',
+      'critic scenarios',
+    ]);
+    expect(lenses.map((chip) => chip.getAttribute('title'))).toEqual([
+      'critic.architecture',
+      'critic.scenarios',
+    ]);
+    expect(screen.getByTestId('finding-select-f-crit').textContent).toBe('Unhandled failure');
+    expect(within(item).queryByTestId('finding-type')).toBeNull();
+    expect(item.textContent).not.toContain('unhandled_failure');
     expect(item.textContent).toContain('high confidence');
     expect(item.textContent).toContain('fixable local');
+    expect(screen.getByRole('heading', { name: 'Critical (2)' })).toBeTruthy();
   });
 
   it('[EVAL-2] shows every location a finding cites by its label, with the raw ref as its title, and reads the rationale with ids replaced', () => {
@@ -80,12 +87,18 @@ describe('FindingsList', () => {
     ).toBeNull();
   });
 
-  it('tags explanation findings and reconciled ones', () => {
-    renderWithTheme(<FindingsList findings={findings} onSelect={vi.fn()} />);
+  it('tags explanation findings, and says which criterion already counts a reconciled one', () => {
+    renderWithTheme(
+      <FindingsList findings={findings} criteria={makeCriteria()} onSelect={vi.fn()} />,
+    );
 
     const claim = screen.getByTestId('finding-f-claim');
     expect(within(claim).getByTestId('finding-explanation')).toBeTruthy();
-    expect(within(claim).getByTestId('finding-reconciled').textContent).toContain('c3');
+    const reconciled = within(claim).getByTestId('finding-reconciled');
+    expect(reconciled.textContent).toBe('counted against c3');
+    expect(reconciled.getAttribute('title')).toBe(
+      'Already counted against c3 (p99 read latency stays under 200 ms), so it is not scored twice.',
+    );
     expect(
       within(screen.getByTestId('finding-f-crit')).queryByTestId('finding-explanation'),
     ).toBeNull();

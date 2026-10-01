@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeEvaluation } from '../../testing/fixtures';
+import { makeCriteria, makeEvaluation, makeFinding } from '../../testing/fixtures';
 import { ScoreSummary } from './score-summary';
 
 const meta: Meta<typeof ScoreSummary> = {
@@ -44,6 +44,32 @@ export const Escalated: Story = {
       decision: 'escalate',
       stopReason: 'escalated',
       dimensions: {},
+    }),
+  },
+};
+
+/** A revise whose blockers are named as their records name them, and two lens samples that answered nothing. */
+export const BlockersAndMissingLenses: Story = {
+  args: {
+    criteria: makeCriteria(),
+    evaluation: makeEvaluation({
+      overall: 12.1,
+      decisionReason: 'blockers to fix: contradiction|binding.2,edge.5,narration.2, c3',
+      findings: [
+        makeFinding({
+          id: 'contradiction|binding.2,edge.5,narration.2',
+          type: 'contradiction',
+          locations: [
+            { ref: 'binding.2', label: 'c2 binding (n-3)', part: 'binding', key: 'c2' },
+            { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
+            { ref: 'narration.2', label: 'c2 narration', part: 'narration', key: 'c2' },
+          ],
+        }),
+      ],
+      degraded: [
+        { stage: 'critic.scale', sample: 1, reason: 'llm-failed' },
+        { stage: 'evaluator.quality', sample: 2, reason: 'token-clipped' },
+      ],
     }),
   },
 };

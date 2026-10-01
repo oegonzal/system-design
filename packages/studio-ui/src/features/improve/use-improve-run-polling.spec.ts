@@ -52,7 +52,7 @@ afterEach(() => {
 });
 
 describe('useImproveRunPolling', () => {
-  it('[UX-11] polls the run as iterations are imported, reports acceptedCount, and stops at terminal', async () => {
+  it('[UX-11] polls the run as iterations are imported, announces the iteration under way and the model calls, reports acceptedCount, and stops at terminal', async () => {
     const { fetchMock } = stubApi([
       { path: RUN_PATH, sequence: [running(0, 3), running(1, 8), completed()] },
     ]);
@@ -62,11 +62,11 @@ describe('useImproveRunPolling', () => {
     await advance(0);
     expect(hook.result.current.run?.status).toBe('running');
     expect(hook.result.current.acceptedCount).toBe(0); // the starting point is not an import
-    expect(hook.result.current.message).toBe('Coaching — 3 model calls so far.');
+    expect(hook.result.current.message).toBe('Coaching — iteration 2 of 3, 3 model calls so far.');
 
     await advance(IMPROVE_POLL_INTERVAL_MS);
     expect(hook.result.current.acceptedCount).toBe(1);
-    expect(hook.result.current.message).toBe('Coaching — 8 model calls so far.');
+    expect(hook.result.current.message).toBe('Coaching — iteration 3 of 3, 8 model calls so far.');
 
     await advance(IMPROVE_POLL_INTERVAL_MS);
     expect(hook.result.current.run?.status).toBe('complete');

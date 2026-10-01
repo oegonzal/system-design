@@ -2,7 +2,7 @@ import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { makeEvaluation } from '../../testing/fixtures';
+import { makeCriteria, makeEvaluation, makeFinding } from '../../testing/fixtures';
 import { ScoreSummary } from './score-summary';
 
 describe('ScoreSummary', () => {
@@ -23,6 +23,66 @@ describe('ScoreSummary', () => {
 
     renderWithTheme(<ScoreSummary evaluation={makeEvaluation({ decisionReason: null })} />);
     expect(screen.queryByTestId('decision-reason')).toBeNull();
+  });
+
+  it('[EVAL-1] names each blocker the decision cites — a finding by its type and places, a criterion by its statement — and wraps inside the dock', () => {
+    const finding = makeFinding({
+      id: 'contradiction|binding.2,edge.5',
+      type: 'contradiction',
+      locations: [
+        { ref: 'binding.2', label: 'c2 binding (n-3)', part: 'binding', key: 'c2' },
+        { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
+      ],
+    });
+    renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({
+          decision: 'revise',
+          decisionReason: 'blockers to fix: contradiction|binding.2,edge.5, c3',
+          findings: [finding],
+        })}
+        criteria={makeCriteria()}
+      />,
+    );
+
+    const reason = screen.getByTestId('decision-reason');
+    expect(reason.textContent).toBe(
+      'blockers to fix: Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync)), “p99 read latency stays under 200 ms”',
+    );
+    expect(getComputedStyle(reason).overflowWrap).toBe('anywhere');
+  });
+
+  it('[EVAL-1] prints the overall at the precision the dimension meters show', () => {
+    renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({ overall: 12.1, dimensions: { coverage: 16.6 } })}
+      />,
+    );
+
+    expect(screen.getByTestId('overall-score').textContent).toBe('12');
+    expect(screen.getByRole('meter').getAttribute('aria-valuenow')).toBe('17');
+  });
+
+  it('[DEL-4] says which lens samples the grade was computed without, and nothing when every lens answered', () => {
+    const { unmount } = renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({
+          degraded: [
+            { stage: 'critic.scale', sample: 1, reason: 'llm-failed' },
+            { stage: 'evaluator.quality', sample: null, reason: 'token-clipped' },
+          ],
+        })}
+      />,
+    );
+    const note = screen.getByTestId('degraded-note').textContent ?? '';
+    expect(note).toContain('Graded with 2 lens samples missing');
+    expect(note).toContain('critic scale #1 (the model did not answer)');
+    expect(note).toContain('evaluator quality (its answer was cut off)');
+    expect(note).not.toContain('llm-failed');
+    unmount();
+
+    renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
+    expect(screen.queryByTestId('degraded-note')).toBeNull();
   });
 
   it('[EVAL-1] renders one meter per dimension the pipeline reported, keyed by its own name', () => {
