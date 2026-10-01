@@ -1,4 +1,5 @@
 import {
+  DEFAULT_NODE_LABELS,
   NODE_KINDS,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
@@ -30,6 +31,24 @@ describe('PropertiesPanel', () => {
   it('shows an empty state when nothing is selected', () => {
     renderPanel();
     expect(screen.getByText(/select a block or connection/i)).toBeTruthy();
+  });
+
+  // A blank label is legal on the wire but reads as nothing in the diagram, in
+  // the text a lens judges and in a cited location, so the field refuses to be
+  // left empty.
+  it("restores the kind's own name when the label is cleared and left", async () => {
+    const user = userEvent.setup();
+    const store = renderPanel((seeded) => seeded.getState().select('n-3')); // n-3 is a database
+
+    const label = screen.getByLabelText('Label') as HTMLInputElement;
+    await user.clear(label);
+    expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.label).toBe('');
+
+    await user.tab();
+
+    expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.label).toBe(
+      DEFAULT_NODE_LABELS.database,
+    );
   });
 
   it('[UX-7] teaches what the selected kind is and when to use it, and swaps when the kind changes', async () => {

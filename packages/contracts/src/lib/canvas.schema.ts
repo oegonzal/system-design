@@ -5,6 +5,7 @@ import {
   BINDING_MAX_NODES,
   BRIEF_MAX_BINDINGS,
   CANVAS_ID_MAX_LENGTH,
+  CANVAS_MAX_TOTAL_OPERATIONS,
   CANVAS_MAX_EDGES,
   CANVAS_MAX_NODES,
   EDGE_KINDS,
@@ -88,13 +89,23 @@ export const canvasNodeSchema = z.strictObject({
     .strictObject({ x: z.number(), y: z.number() })
     .optional()
     .describe('Omit for a new node; the studio lays it out.'),
-  config: z.array(nodeConfigEntrySchema).max(NODE_CONFIG_MAX_KEYS).optional(),
+  config: z
+    .array(nodeConfigEntrySchema)
+    .max(NODE_CONFIG_MAX_KEYS)
+    .optional()
+    .describe('One entry per key; a key set twice is refused.'),
   /** Short role statements — "owns the order lifecycle", one clause each. */
   responsibilities: z
     .array(z.string().max(RESPONSIBILITY_MAX_LENGTH))
     .max(NODE_MAX_RESPONSIBILITIES)
     .optional(),
-  operations: z.array(nodeOperationSchema).max(NODE_MAX_OPERATIONS).optional(),
+  operations: z
+    .array(nodeOperationSchema)
+    .max(NODE_MAX_OPERATIONS)
+    .optional()
+    .describe(
+      "This node's declared interface. A name must be unique on the node, and an edge's `carries` matches it exactly.",
+    ),
 });
 export type CanvasNode = z.infer<typeof canvasNodeSchema>;
 
@@ -109,13 +120,27 @@ export const canvasEdgeSchema = z.strictObject({
   carries: z
     .array(z.string().min(1).max(OPERATION_NAME_MAX_LENGTH))
     .max(EDGE_MAX_CARRIES)
-    .optional(),
+    .optional()
+    .describe(
+      'Operation names this connection exercises, each declared on its source or its target, and none repeated.',
+    ),
 });
 export type CanvasEdge = z.infer<typeof canvasEdgeSchema>;
 
 export const canvasGraphSchema = z.strictObject({
-  nodes: z.array(canvasNodeSchema).max(CANVAS_MAX_NODES),
-  edges: z.array(canvasEdgeSchema).max(CANVAS_MAX_EDGES),
+  nodes: z
+    .array(canvasNodeSchema)
+    .max(CANVAS_MAX_NODES)
+    // The budget is the one rule no bound can carry — it is a sum across nodes —
+    // so it is stated here, interpolated, rather than left for the writer to be
+    // refused by a number it was never shown.
+    .describe(
+      `Every node id is distinct, and all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations.`,
+    ),
+  edges: z
+    .array(canvasEdgeSchema)
+    .max(CANVAS_MAX_EDGES)
+    .describe('Every edge id is distinct, and no edge joins a node to itself.'),
 });
 export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
 

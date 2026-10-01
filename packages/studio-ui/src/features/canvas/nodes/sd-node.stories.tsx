@@ -1,4 +1,5 @@
 import {
+  DEFAULT_NODE_LABELS,
   kindsInCategory,
   type NodeConfigEntry,
   type NodeKind,
@@ -8,7 +9,6 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReactFlow } from '@xyflow/react';
 
 import { withReactFlow } from '../../../testing/story-decorators';
-import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import { SdEdge } from '../edges/sd-edge';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
 import { SdNode } from './sd-node';

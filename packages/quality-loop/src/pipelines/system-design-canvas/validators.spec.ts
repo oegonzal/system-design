@@ -1,3 +1,4 @@
+import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_MAX_OPERATIONS } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
@@ -95,6 +96,42 @@ describe('the system-design-canvas validators', () => {
         message: 'edge edge-14 repeats edge edge-1: client-1 -> gateway-1 (sync)',
       },
     ]);
+  });
+
+  // The three rules the coach is now told about in the schema: each voids a
+  // whole revision, and none is expressible as a bound, so each is checked here
+  // as well as in the contracts spec that owns the function.
+  it('[QL-3] a repeated config key or operation name on one node blocks', () => {
+    const submission = sampleSubmission();
+    const node = submission.graph.nodes.find((candidate) => candidate.id === 'client-1');
+    if (!node) throw new Error('the sample canvas no longer has client-1');
+    node.config = [
+      { key: 'replicas', value: 2 },
+      { key: 'replicas', value: 3 },
+    ];
+    node.operations = [{ name: 'readHistory' }, { name: 'readHistory' }];
+    expect(messages(submission).references).toEqual([
+      `node ${node.id} sets config key replicas twice`,
+      `node ${node.id} declares duplicate operation name: readHistory`,
+    ]);
+  });
+
+  it('[QL-3] the whole-graph operation budget blocks a canvas the schema would accept', () => {
+    const submission = sampleSubmission();
+    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_MAX_OPERATIONS);
+    submission.graph.nodes = Array.from({ length: nodeCount }, (_, n) => ({
+      id: `n-${n}`,
+      kind: 'service' as const,
+      label: `Service ${n}`,
+      operations: Array.from({ length: NODE_MAX_OPERATIONS }, (_, i) => ({ name: `op-${n}-${i}` })),
+    }));
+    submission.graph.edges = [];
+    submission.brief = null;
+    submission.narrative = null;
+    expect(SYSTEM_DESIGN_CANVAS.task.output.schema.safeParse(submission).success).toBe(true);
+    expect(messages(submission).references).toContain(
+      `graph declares ${nodeCount * NODE_MAX_OPERATIONS} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
+    );
   });
 
   it('[QL-3] an ill-formed artifact is left to the schema validator', () => {

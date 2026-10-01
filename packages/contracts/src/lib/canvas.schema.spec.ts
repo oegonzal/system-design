@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { CANVAS_MAX_NODES, NODE_CONFIG_MAX_KEYS } from './canvas';
+import { CANVAS_MAX_NODES, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_MAX_KEYS } from './canvas';
 import { designSubmissionSchema, type DesignSubmission } from './canvas.schema';
 
 /** A complete, valid submission: every optional field present once. */
@@ -111,5 +111,30 @@ describe('designSubmissionSchema', () => {
 
   it('converts to JSON Schema, so a model can be asked to write into it', () => {
     expect(() => z.toJSONSchema(designSubmissionSchema)).not.toThrow();
+  });
+
+  /**
+   * A `.describe()` is the ONLY channel that reaches the coach: `z.toJSONSchema`
+   * carries a description and silently drops a `.refine()`, and a TypeScript
+   * comment reaches nobody. Every rule that voids a revision and cannot be
+   * expressed as a bound must therefore be said here, or the writer is refused
+   * for a rule it was never told.
+   */
+  it('tells the coach, in the JSON Schema itself, every rule that would void its revision', () => {
+    const json = JSON.stringify(z.toJSONSchema(designSubmissionSchema));
+    for (const rule of [
+      `all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations`,
+      'Every node id is distinct,',
+      'Every edge id is distinct, and no edge joins a node to itself.',
+      'One entry per key; a key set twice is refused.',
+      'A name must be unique on the node',
+      'each declared on its source or its target, and none repeated',
+      // The rules that were already stated, kept here so one list is the record.
+      "The author's id; keep it.",
+      'One connected walk of existing edge ids',
+      'At most one binding per criterion.',
+    ]) {
+      expect(json, `the coach is never told: ${rule}`).toContain(rule);
+    }
   });
 });

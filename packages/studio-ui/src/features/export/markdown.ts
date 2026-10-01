@@ -7,6 +7,7 @@ import type {
   PromptDto,
   SuccessCriterion,
 } from '@sysdesign/contracts';
+import { nodeLabel } from '@sysdesign/contracts';
 
 import { humanizeToken } from '../evaluation/humanize';
 import { substituteLocationLabels } from '../evaluation/location-labels';
@@ -29,7 +30,9 @@ function joinLines(lines: string[]): string {
 
 /** Node id → label, for turning brief/narrative references into readable prose. */
 function nodeLabels(graph: CanvasGraph): Map<string, string> {
-  return new Map(graph.nodes.map((node) => [node.id, node.label]));
+  // The same name the lens was shown, so a finding's prose and this document
+  // cannot disagree about what a node is called.
+  return new Map(graph.nodes.map((node) => [node.id, nodeLabel(node)]));
 }
 
 /** Edge id → "SourceLabel → TargetLabel", for rendering a traced path. */

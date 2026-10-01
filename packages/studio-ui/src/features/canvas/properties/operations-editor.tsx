@@ -73,6 +73,13 @@ function withKind(operation: NodeOperation, value: string): NodeOperation {
 export function OperationsEditor({ operations, onChange }: OperationsEditorProps) {
   const duplicates = duplicateIndexes(operations);
   const atCap = operations.length >= NODE_MAX_OPERATIONS;
+  // A repeated name voids the whole submission at the API. Add is refused while
+  // one stands, so a node cannot be filled up on top of an unresolved collision
+  // the author would then have to scroll back to find. This does not make a
+  // duplicate impossible — renaming a row is the only way to create one, and
+  // that stays a per-row caution, because blocking a keystroke would fight the
+  // typing.
+  const canAdd = !atCap && duplicates.size === 0;
 
   const replaceRow = (index: number, next: NodeOperation) => {
     onChange(operations.map((operation, current) => (current === index ? next : operation)));
@@ -149,7 +156,7 @@ export function OperationsEditor({ operations, onChange }: OperationsEditorProps
 
       <Stack direction="row" align="center" justify="between">
         <Button
-          disabled={atCap}
+          disabled={!canAdd}
           onClick={() => onChange([...operations, { name: '', kind: OPERATION_KINDS[0] }])}
         >
           Add operation

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CANVAS_MAX_TOTAL_OPERATIONS } from './canvas';
-import type { CanvasGraph } from './canvas.schema';
+import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_MAX_OPERATIONS } from './canvas';
+import { canvasGraphSchema, type CanvasGraph } from './canvas.schema';
 import { validateGraphReferences } from './graph-validator';
 
 const graph = (overrides: Partial<CanvasGraph> = {}): CanvasGraph => ({
@@ -82,18 +82,29 @@ describe('validateGraphReferences', () => {
     expect(problems).toContain('edge e-1 carries refund, which neither n-1 nor n-2 declares');
   });
 
-  it('holds the whole-graph operation budget', () => {
-    const problems = validateGraphReferences(
-      graph({
-        nodes: Array.from({ length: CANVAS_MAX_TOTAL_OPERATIONS + 1 }, (_, i) => ({
-          id: `n-${i}`,
-          kind: 'service' as const,
-          label: '',
-          operations: [{ name: 'op' }],
-        })),
-        edges: [],
-      }),
-    );
-    expect(problems.at(-1)).toMatch(/the maximum is 400/);
+  // The budget is the only cap the schema does not hold, so the fixture has to
+  // be a graph the schema ACCEPTS — otherwise neither route ever reaches this
+  // rule and the test proves nothing. The smallest such graph fills
+  // ceil((400 + 1) / 12) = 34 nodes to their own cap.
+  it('holds the whole-graph operation budget on a graph the schema accepts', () => {
+    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_MAX_OPERATIONS);
+    const nodes = Array.from({ length: nodeCount }, (_, n) => ({
+      id: `n-${n}`,
+      kind: 'service' as const,
+      label: `Service ${n}`,
+      operations: Array.from({ length: NODE_MAX_OPERATIONS }, (_, i) => ({ name: `op-${n}-${i}` })),
+    }));
+    const over = graph({ nodes, edges: [] });
+    expect(canvasGraphSchema.safeParse(over).success).toBe(true);
+    expect(nodeCount * NODE_MAX_OPERATIONS).toBeGreaterThan(CANVAS_MAX_TOTAL_OPERATIONS);
+
+    expect(validateGraphReferences(over)).toEqual([
+      `graph declares ${nodeCount * NODE_MAX_OPERATIONS} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
+    ]);
+
+    // One node fewer cannot reach the budget, so the rule is not merely always on.
+    const under = graph({ nodes: nodes.slice(0, nodeCount - 1), edges: [] });
+    expect(canvasGraphSchema.safeParse(under).success).toBe(true);
+    expect(validateGraphReferences(under)).toEqual([]);
   });
 });

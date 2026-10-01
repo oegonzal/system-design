@@ -15,6 +15,7 @@ import type {
 } from '@sysdesign/contracts';
 import {
   BINDING_MAX_NODES,
+  DEFAULT_NODE_LABELS,
   DESIGN_BRIEF_VERSION,
   NARRATION_VERSION,
   reconcileBrief,
@@ -32,51 +33,6 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
 import type { SdEdge, SdNode } from './types';
-
-/** Default label when a kind is dropped from the palette. */
-export const DEFAULT_NODE_LABELS = {
-  client: 'Client',
-  cdn: 'CDN',
-  dns: 'DNS',
-  gateway: 'API Gateway',
-  'load-balancer': 'Load Balancer',
-  'websocket-gateway': 'Realtime Gateway',
-  'service-mesh': 'Service Mesh',
-  service: 'Service',
-  worker: 'Worker',
-  'serverless-function': 'Serverless Function',
-  'batch-job': 'Batch Job',
-  database: 'Database',
-  replica: 'Read Replica',
-  'object-store': 'Object Store',
-  'search-index': 'Search Index',
-  'kv-store': 'KV Store',
-  'time-series-db': 'Time-Series DB',
-  'vector-db': 'Vector DB',
-  cache: 'Cache',
-  queue: 'Queue',
-  'event-stream': 'Event Stream',
-  'pub-sub': 'Pub/Sub Topic',
-  'cdc-connector': 'CDC Connector',
-  'notification-service': 'Notification Service',
-  'stream-processor': 'Stream Processor',
-  'data-warehouse': 'Data Warehouse',
-  'data-lake': 'Data Lake',
-  'ml-inference': 'ML Inference',
-  scheduler: 'Scheduler',
-  'workflow-engine': 'Workflow Engine',
-  'distributed-lock': 'Distributed Lock',
-  'id-generator': 'ID Generator',
-  'config-service': 'Config & Flags',
-  'auth-service': 'Auth Service',
-  'secrets-manager': 'Secrets Manager',
-  waf: 'WAF',
-  monitoring: 'Monitoring',
-  logging: 'Log Aggregation',
-  tracing: 'Tracing',
-  'external-api': 'External API',
-  'payment-provider': 'Payment Provider',
-} as const satisfies Record<NodeKind, string>;
 
 export interface HighlightState {
   nodeIds: string[];

@@ -1,4 +1,5 @@
 import type { DesignSubmission } from './canvas.schema';
+import { nodeLabel } from './node-label';
 
 /**
  * Every addressable part of a submission, numbered by position — the one
@@ -48,7 +49,7 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
     ...numbered(
       'node',
       graph.nodes,
-      (node) => `${node.id} · ${node.kind} · ${node.label}`,
+      (node) => `${node.id} · ${node.kind} · ${nodeLabel(node)}`,
       (node) => node.id,
     ),
     ...numbered(

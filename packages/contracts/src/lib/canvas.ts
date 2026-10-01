@@ -150,6 +150,56 @@ export function kindsInCategory(id: NodeKindCategoryId): NodeKind[] {
   return NODE_KINDS.filter((kind) => NODE_KIND_CATEGORY[kind] === id);
 }
 
+/**
+ * What each block is called before the author renames it: the palette's
+ * caption, the name a dropped node starts with, and the stand-in wherever a
+ * label is blank. Total over `NodeKind` by `satisfies`, so every kind has a
+ * name and no reader has to invent one.
+ */
+export const DEFAULT_NODE_LABELS = {
+  client: 'Client',
+  cdn: 'CDN',
+  dns: 'DNS',
+  gateway: 'API Gateway',
+  'load-balancer': 'Load Balancer',
+  'websocket-gateway': 'Realtime Gateway',
+  'service-mesh': 'Service Mesh',
+  service: 'Service',
+  worker: 'Worker',
+  'serverless-function': 'Serverless Function',
+  'batch-job': 'Batch Job',
+  database: 'Database',
+  replica: 'Read Replica',
+  'object-store': 'Object Store',
+  'search-index': 'Search Index',
+  'kv-store': 'KV Store',
+  'time-series-db': 'Time-Series DB',
+  'vector-db': 'Vector DB',
+  cache: 'Cache',
+  queue: 'Queue',
+  'event-stream': 'Event Stream',
+  'pub-sub': 'Pub/Sub Topic',
+  'cdc-connector': 'CDC Connector',
+  'notification-service': 'Notification Service',
+  'stream-processor': 'Stream Processor',
+  'data-warehouse': 'Data Warehouse',
+  'data-lake': 'Data Lake',
+  'ml-inference': 'ML Inference',
+  scheduler: 'Scheduler',
+  'workflow-engine': 'Workflow Engine',
+  'distributed-lock': 'Distributed Lock',
+  'id-generator': 'ID Generator',
+  'config-service': 'Config & Flags',
+  'auth-service': 'Auth Service',
+  'secrets-manager': 'Secrets Manager',
+  waf: 'WAF',
+  monitoring: 'Monitoring',
+  logging: 'Log Aggregation',
+  tracing: 'Tracing',
+  'external-api': 'External API',
+  'payment-provider': 'Payment Provider',
+} as const satisfies Record<NodeKind, string>;
+
 /** Solid request/response call vs. fire-and-forget messaging. */
 export const EDGE_KINDS = ['sync', 'async'] as const;
 export type EdgeKind = (typeof EDGE_KINDS)[number];

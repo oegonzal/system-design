@@ -23,6 +23,7 @@ export * from './lib/evaluations';
 export * from './lib/llm-availability';
 export * from './lib/llm-model';
 export * from './lib/graph-render';
+export * from './lib/node-label';
 export * from './lib/graph-validator';
 export * from './lib/brief-validator';
 export * from './lib/narration-validator';

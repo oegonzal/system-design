@@ -130,6 +130,21 @@ describe('OperationsEditor', () => {
     expect(screen.getByTestId('operation-duplicate-2').textContent).toMatch(/duplicate name/i);
   });
 
+  it('refuses Add while a duplicate name stands, so the row cannot be piled onto', () => {
+    renderWithTheme(
+      <Harness
+        initial={[
+          { name: 'placeOrder', kind: 'command' },
+          { name: 'placeOrder', kind: 'query' },
+        ]}
+      />,
+    );
+
+    expect(
+      (screen.getByRole('button', { name: 'Add operation' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it('never flags two still-unnamed rows as duplicates', () => {
     renderWithTheme(
       <Harness
@@ -142,6 +157,10 @@ describe('OperationsEditor', () => {
 
     expect(screen.queryByTestId('operation-duplicate-0')).toBeNull();
     expect(screen.queryByTestId('operation-duplicate-1')).toBeNull();
+    // …and Add stays open: an unnamed row is a row still being typed.
+    expect(
+      (screen.getByRole('button', { name: 'Add operation' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it(`disables Add at the contract cap of ${NODE_MAX_OPERATIONS} and shows the counter`, () => {

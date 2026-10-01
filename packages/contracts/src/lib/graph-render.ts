@@ -1,4 +1,6 @@
+import { NODE_MAX_OPERATIONS } from './canvas';
 import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
+import { nodeLabel } from './node-label';
 
 /**
  * One text rendering of a canvas, for every conversation the product has with
@@ -11,8 +13,16 @@ import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
  * caller's.
  */
 
-/** Budget per node line: enough to judge an interface, not enough to drown the prompt. */
-export const MAX_SERIALIZED_OPS = 8;
+/**
+ * Every operation a node may declare is printed. Pinned to the schema's own cap
+ * so the two cannot drift: a lens is asked which declarations no edge exercises,
+ * and it can only answer about the ones it was shown. An edge's `carries` is
+ * never elided either, so eliding a node's operations would read as "carried but
+ * never declared" — a defect the author did not commit. The whole-graph budget
+ * `CANVAS_MAX_TOTAL_OPERATIONS` is what keeps a prompt in bounds, and a
+ * blocking validator enforces it.
+ */
+export const MAX_SERIALIZED_OPS = NODE_MAX_OPERATIONS;
 /** Notes are context, not content — clip them before they dominate the line. */
 export const MAX_SERIALIZED_NOTE_LENGTH = 60;
 
@@ -52,7 +62,7 @@ export function renderNodeLine(node: CanvasNode): string {
     shown.length > 0
       ? ` ops=[${shown.map(renderOperation).join('; ')}${elided > 0 ? `; …+${elided} more` : ''}]`
       : '';
-  return `  node ${node.id} kind=${node.kind} label=${JSON.stringify(node.label)}${config}${roles}${ops}`;
+  return `  node ${node.id} kind=${node.kind} label=${JSON.stringify(nodeLabel(node))}${config}${roles}${ops}`;
 }
 
 export function renderEdgeLine(edge: CanvasEdge): string {

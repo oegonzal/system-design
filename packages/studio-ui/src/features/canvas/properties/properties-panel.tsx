@@ -2,19 +2,19 @@
 
 import styled from '@emotion/styled';
 import {
+  DEFAULT_NODE_LABELS,
   EDGE_KINDS,
   EDGE_LABEL_MAX_LENGTH,
+  kindsInCategory,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
   NODE_LABEL_MAX_LENGTH,
-  kindsInCategory,
   type EdgeKind,
   type NodeKind,
 } from '@sysdesign/contracts';
 import { Button, Heading, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
 
 import { useCanvasStore } from '../canvas-store-context';
-import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import { ConfigEditor } from './config-editor';
 import { EdgeCarriesField } from './edge-carries-field';
 import { OperationsEditor } from './operations-editor';
@@ -85,6 +85,15 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
             value={node.data.label}
             maxLength={NODE_LABEL_MAX_LENGTH}
             onChange={(event) => updateNode(node.id, { label: event.target.value })}
+            // Clearing the field is allowed while typing; leaving it blank is not.
+            // A nameless node reads as a nameless node everywhere it is printed —
+            // the diagram, the lens prompt, a cited location — so the kind's own
+            // name stands in on blur rather than at every keystroke.
+            onBlur={() => {
+              if (node.data.label.trim().length === 0) {
+                updateNode(node.id, { label: DEFAULT_NODE_LABELS[node.data.kind] });
+              }
+            }}
           />
           <SelectField
             label="Kind"

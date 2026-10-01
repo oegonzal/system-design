@@ -41,6 +41,19 @@ describe('submissionLocations', () => {
     ]);
   });
 
+  // The label is substituted into finding prose by the studio, so a blank one
+  // would surface mid-sentence as a dangling separator.
+  it("labels a blank-labelled node by its kind's own name, never with a trailing separator", () => {
+    const blank = submission();
+    blank.graph.nodes = [{ id: 'n-1', kind: 'kv-store', label: '' }];
+    expect(submissionLocations(blank)[0]).toEqual({
+      id: 'node.1',
+      label: 'n-1 · kv-store · KV Store',
+      part: 'node',
+      key: 'n-1',
+    });
+  });
+
   it('has no overview entry for a blank overview, and only nodes and edges without a brief or narrative', () => {
     const blank = submission();
     blank.narrative = { ...blank.narrative!, overview: '   ' };

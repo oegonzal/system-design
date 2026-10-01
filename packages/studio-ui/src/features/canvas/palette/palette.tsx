@@ -2,9 +2,10 @@
 
 import styled from '@emotion/styled';
 import {
+  DEFAULT_NODE_LABELS,
+  kindsInCategory,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
-  kindsInCategory,
   type NodeKind,
   type NodeKindCategoryId,
 } from '@sysdesign/contracts';
@@ -12,7 +13,6 @@ import { Heading, Stack, Text, TextField, transient } from '@sysdesign/design-sy
 import { useState, type DragEvent } from 'react';
 
 import { useCanvasStore } from '../canvas-store-context';
-import { DEFAULT_NODE_LABELS } from '../canvas-store';
 import { NODE_ICONS } from '../nodes/node-icons';
 
 export const NODE_DRAG_MIME = 'application/sysdesign-node';
