@@ -1,3 +1,5 @@
+import { DEFAULT_APPEARANCE_SETTINGS } from '@sysdesign/contracts';
+import { createTheme } from '@sysdesign/design-system';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { Position, ReactFlow } from '@xyflow/react';
 import { screen } from '@testing-library/react';
@@ -5,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SdNode } from '../nodes/sd-node';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
-import { SdEdge } from './sd-edge';
+import { edgeStroke, SdEdge } from './sd-edge';
 
 const nodeTypes = { sd: SdNode };
 const edgeTypes = { sd: SdEdge };
@@ -82,6 +84,35 @@ describe('SdEdge', () => {
     const edge = await screen.findByTestId('edge-e-1');
     expect(edge.querySelector('path')).toBeTruthy();
     expect(document.querySelector('.react-flow__edgelabel-renderer')?.textContent ?? '').toBe('');
+  });
+
+  it('[UX-10] carries its stroke inline on the path, so a copy of the diagram (the PDF) draws it', async () => {
+    renderEdge({});
+
+    const edge = await screen.findByTestId('edge-e-1');
+    const path = edge.querySelector<SVGPathElement>('path.react-flow__edge-path');
+    expect(path?.style.stroke).not.toBe('');
+    expect(path?.style.strokeWidth).not.toBe('');
+  });
+
+  it('[UX-3] dashes an async call inline and keeps a sync one solid', async () => {
+    renderEdge({ data: { kind: 'async' } });
+
+    const edge = await screen.findByTestId('edge-e-1');
+    const path = edge.querySelector<SVGPathElement>('path.react-flow__edge-path');
+    expect(path?.style.strokeDasharray).toBe('7 5');
+  });
+
+  it('strokes by severity over selection over rest', () => {
+    const theme = createTheme(DEFAULT_APPEARANCE_SETTINGS);
+    const rest = edgeStroke(theme, { kind: 'sync', severity: null, selected: false });
+    const selected = edgeStroke(theme, { kind: 'sync', severity: null, selected: true });
+    const flagged = edgeStroke(theme, { kind: 'sync', severity: 'high', selected: true });
+
+    expect(rest.stroke).toBe(theme.color.border.default);
+    expect(rest).not.toHaveProperty('strokeDasharray');
+    expect(selected.stroke).toBe(theme.color.border.focus);
+    expect(flagged.stroke).toBe(theme.color.severity.high.fg);
   });
 
   it('stamps the call style as data-kind', async () => {

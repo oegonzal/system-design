@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { humanizeKind } from '../prompts/criteria';
+
 import {
   makeBrief,
   makeCriteria,
@@ -30,7 +32,18 @@ describe('promptMarkdown', () => {
     expect(md.startsWith(PROMPT_MARKDOWN)).toBe(true);
     expect(md).toContain('## Criteria');
     expect(md).toContain('| Id | Kind | Statement |');
-    expect(md).toContain('| c3 | non_functional | p99 read latency stays under 200 ms |');
+    // The kind in the words the studio shows it in, never the wire token.
+    expect(md).toContain(
+      `| c3 | ${humanizeKind('non_functional')} | p99 read latency stays under 200 ms |`,
+    );
+    expect(md).not.toContain('non_functional');
+  });
+
+  it('escapes a pipe in a statement so the row keeps its columns', () => {
+    const md = promptMarkdown(prompt, [
+      { id: 'c1', kind: 'functional', statement: 'Reads | writes stay apart' },
+    ]);
+    expect(md).toContain('| c1 | Functional | Reads \\| writes stay apart |');
   });
 
   it('says None when no criteria were derived', () => {
@@ -50,6 +63,35 @@ describe('narrativeMarkdown', () => {
 
   it('says None when there is no narrative', () => {
     expect(narrativeMarkdown(null, graph, criteria)).toContain('_None._');
+  });
+
+  it('prints rationales in diagram order and narrations in rubric order, whatever order they were written in', () => {
+    const narrative = makeNarrative({
+      componentRationales: [
+        { nodeId: 'n-3', prose: 'Third.' },
+        { nodeId: 'ghost', prose: 'No such block.' },
+        { nodeId: 'n-1', prose: 'First.' },
+      ],
+      criterionNarrations: [
+        { criterionId: 'c3', prose: 'Latency.' },
+        { criterionId: 'c1', prose: 'History.' },
+      ],
+    });
+
+    const md = narrativeMarkdown(narrative, graph, criteria);
+
+    expect(md.indexOf('### Client')).toBeGreaterThan(-1);
+    expect(md.indexOf('### Client')).toBeLessThan(md.indexOf('### Orders DB'));
+    // A rationale for a block no longer drawn keeps its place after the drawn ones.
+    expect(md.indexOf('### Orders DB')).toBeLessThan(md.indexOf('### ghost'));
+    expect(md.indexOf('### c1 —')).toBeGreaterThan(-1);
+    expect(md.indexOf('### c1 —')).toBeLessThan(md.indexOf('### c3 —'));
+    // The stored narrative is left as written: its positional refs depend on it.
+    expect(narrative.componentRationales.map((rationale) => rationale.nodeId)).toEqual([
+      'n-3',
+      'ghost',
+      'n-1',
+    ]);
   });
 });
 
@@ -84,9 +126,9 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('# Feedback — revision #2');
     expect(md).toContain('**72/100 · revise**');
     expect(md).toContain('## Dimensions');
-    expect(md).toContain('| quality_attributes | 60 |');
+    expect(md).toContain('| Quality attributes | 60 |');
     expect(md).toContain('## Criteria');
-    expect(md).toContain('| c3 — p99 read latency stays under 200 ms | fail | high |');
+    expect(md).toContain('| c3 — p99 read latency stays under 200 ms | Fail | high |');
     expect(md).toContain('## Findings');
     expect(md).toContain(
       '- **[high · critic.architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
@@ -97,10 +139,13 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('_run run-1 · iteration 1 · model test-model_');
   });
 
-  it('says not-graded when the evaluation is absent or still running', () => {
-    expect(feedbackMarkdown(null, criteria, 1)).toContain('Not graded yet');
-    expect(feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, 1)).toContain(
-      'Not graded yet',
+  it('says not-graded in words when the evaluation is absent, running or failed — never a status token', () => {
+    expect(feedbackMarkdown(null, criteria, 1)).toContain('_Not graded yet._');
+    const running = feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, 1);
+    expect(running).toContain('Not graded yet — grading is still running.');
+    expect(running).not.toContain('status:');
+    expect(feedbackMarkdown(makeEvaluation({ status: 'failed' }), criteria, 1)).toContain(
+      'grading failed for this revision',
     );
   });
 });

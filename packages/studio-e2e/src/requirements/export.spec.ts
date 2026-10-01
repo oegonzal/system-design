@@ -43,18 +43,19 @@ test.describe('exporting a run', () => {
     // The diagram is a PDF (best-effort — a fallback note only if capture failed).
     expect(names.some((name) => name === 'diagram.pdf' || name === 'diagram.pdf.txt')).toBe(true);
 
-    // The prompt file is the markdown as written, followed by the rubric.
+    // The prompt file is the markdown as written, followed by the rubric —
+    // each kind in the words the studio shows it in, not the wire token.
     const prompt = await zip.files['prompt.md'].async('string');
     expect(prompt.startsWith(`# ${AUTHORED_TITLE}\n`)).toBe(true);
     expect(prompt).toContain('## Criteria');
-    expect(prompt).toContain('| c1 | functional |');
-    expect(prompt).toContain('| c5 | constraint |');
+    expect(prompt).toContain('| c1 | Functional |');
+    expect(prompt).toContain('| c5 | Constraint |');
 
     // The feedback file carries the grade and the criterion results.
     const feedback = await zip.files['feedback.md'].async('string');
     expect(feedback).toContain('# Feedback — revision #1');
     expect(feedback).toContain(`**${NAIVE_DESIGN_SCORE}/100 · revise**`);
-    expect(feedback).toContain('| coverage |');
+    expect(feedback).toContain('| Coverage |');
     expect(feedback).toContain('| c1 — ');
 
     const revisions = await zip.files['revisions.md'].async('string');

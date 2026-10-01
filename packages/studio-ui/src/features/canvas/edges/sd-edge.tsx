@@ -1,11 +1,11 @@
 'use client';
 
-import { css, keyframes } from '@emotion/react';
+import { css, keyframes, useTheme, type Theme } from '@emotion/react';
 import styled from '@emotion/styled';
 import type { EdgeKind, Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
 
 import type { SdEdge as SdEdgeModel } from '../types';
 
@@ -22,15 +22,30 @@ const still = css`
   animation: none;
 `;
 
-const EdgeGroup = styled('g', transient)<{
-  $kind: EdgeKind;
-  $severity: Severity | null;
-}>`
+/**
+ * The line itself, as inline style on the path rather than a stylesheet rule:
+ * whatever copies the diagram out of the page — the PDF export clones the
+ * viewport — keeps exactly what is drawn. A finding's severity outranks the
+ * selection, which outranks the resting line; async calls are dashed.
+ */
+export function edgeStroke(
+  theme: Theme,
+  { kind, severity, selected }: { kind: EdgeKind; severity: Severity | null; selected: boolean },
+): CSSProperties {
+  return {
+    stroke: severity
+      ? theme.color.severity[severity].fg
+      : selected
+        ? theme.color.border.focus
+        : theme.color.border.default,
+    strokeWidth: severity ? 2.5 : selected ? 2 : 1.5,
+    ...(kind === 'async' ? { strokeDasharray: '7 5' } : {}),
+  };
+}
+
+/** Only the motion lives in the stylesheet: an animation is nothing a still copy needs. */
+const EdgeGroup = styled('g', transient)<{ $kind: EdgeKind }>`
   .react-flow__edge-path {
-    stroke: ${({ theme, $severity }) =>
-      $severity ? theme.color.severity[$severity].fg : theme.color.border.default};
-    stroke-width: ${({ $severity }) => ($severity ? 2.5 : 1.5)};
-    ${({ $kind }) => ($kind === 'async' ? 'stroke-dasharray: 7 5;' : '')}
     /* Infinite animation, so the motion level gates it on/off rather than by
        duration — same policy as Spinner. The OS preference wins in CSS too. */
     ${({ theme, $kind }) => ($kind === 'async' && theme.motion.level === 'full' ? flowing : still)}
@@ -67,7 +82,9 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
     data,
     label,
     markerEnd,
+    selected = false,
   } = props;
+  const theme = useTheme();
 
   const [path, labelX, labelY] = getBezierPath({
     sourceX,
@@ -95,12 +112,16 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   return (
     <EdgeGroup
       $kind={kind}
-      $severity={severity}
       data-testid={`edge-${id}`}
       data-kind={kind}
       {...(severity ? { 'data-severity': severity } : {})}
     >
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} />
+      <BaseEdge
+        id={id}
+        path={path}
+        markerEnd={markerEnd}
+        style={edgeStroke(theme, { kind, severity, selected })}
+      />
       {pill !== null ? (
         <EdgeLabelRenderer>
           <LabelChip

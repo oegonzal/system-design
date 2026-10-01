@@ -5,12 +5,14 @@ import type {
   DesignRevisionSummaryDto,
   EvaluationDto,
   PromptDto,
+  QualityRunStatus,
   SuccessCriterion,
 } from '@sysdesign/contracts';
-import { nodeLabel } from '@sysdesign/contracts';
+import { markdownCell, nodeLabel } from '@sysdesign/contracts';
 
 import { humanizeToken } from '../evaluation/humanize';
 import { substituteLocationLabels } from '../evaluation/location-labels';
+import { humanizeKind } from '../prompts/criteria';
 
 /**
  * Pure Markdown serializers for a practice run — one per artifact, each a
@@ -19,10 +21,18 @@ import { substituteLocationLabels } from '../evaluation/location-labels';
  *
  * `#`/`##` headings, blank-line spacing, GitHub `| --- |` tables, `**bold**`,
  * `` `code` ``. Every id (node, edge, criterion) is resolved to the label or
- * statement the author actually reads.
+ * statement the author actually reads, and every wire token (a criterion
+ * kind, a dimension, a result) is printed in the words the studio shows it in.
  */
 
 const NONE = '_None._';
+
+/** What the feedback file says in place of a grade the revision does not have yet. */
+const UNGRADED: Record<Exclude<QualityRunStatus, 'complete'> | 'absent', string> = {
+  absent: '_Not graded yet._',
+  running: '_Not graded yet — grading is still running._',
+  failed: '_Not graded — grading failed for this revision._',
+};
 
 function joinLines(lines: string[]): string {
   return `${lines.join('\n').replace(/\n{3,}/g, '\n\n')}\n`;
@@ -50,9 +60,20 @@ function criterionStatements(criteria: readonly SuccessCriterion[]): Map<string,
   return new Map(criteria.map((criterion) => [criterion.id, criterion.statement]));
 }
 
-/** A table cell: pipes would break the row. */
-function cell(text: string): string {
-  return text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+/**
+ * A copy of `items` in the order their keys take in `order` — the diagram's
+ * node order, the rubric's criterion order — with anything `order` does not
+ * name kept after, as stored. Never applied to what is stored: positional
+ * references (`rationale.N`, `narration.N`) depend on the stored order.
+ */
+function inOrderOf<T>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+  order: readonly string[],
+): T[] {
+  const rank = new Map(order.map((key, index) => [key, index]));
+  const rankOf = (item: T) => rank.get(keyOf(item)) ?? order.length;
+  return [...items].sort((a, b) => rankOf(a) - rankOf(b));
 }
 
 export function promptMarkdown(prompt: PromptDto, criteria: readonly SuccessCriterion[]): string {
@@ -63,7 +84,9 @@ export function promptMarkdown(prompt: PromptDto, criteria: readonly SuccessCrit
       `| --- | --- | --- |`,
       ...criteria.map(
         (criterion) =>
-          `| ${criterion.id} | ${cell(criterion.kind)} | ${cell(criterion.statement)} |`,
+          `| ${criterion.id} | ${markdownCell(humanizeKind(criterion.kind))} | ${markdownCell(
+            criterion.statement,
+          )} |`,
       ),
     );
   } else {
@@ -90,11 +113,15 @@ export function briefMarkdown(
   for (const binding of brief.bindings) {
     const statement = statements.get(binding.criterionId);
     const criterion = statement
-      ? `${binding.criterionId} — ${cell(statement)}`
+      ? `${binding.criterionId} — ${markdownCell(statement)}`
       : binding.criterionId;
     const components = binding.nodeIds.map((id) => labels.get(id) ?? id).join(', ') || '—';
     const path = (binding.path ?? []).map((edgeId) => hops.get(edgeId) ?? edgeId).join(', then ');
-    lines.push(`| ${criterion} | ${cell(binding.claim)} | ${components} | ${path || '—'} |`);
+    lines.push(
+      `| ${criterion} | ${markdownCell(binding.claim)} | ${markdownCell(components)} | ${
+        markdownCell(path) || '—'
+      } |`,
+    );
   }
   return joinLines(lines);
 }
@@ -116,7 +143,12 @@ export function narrativeMarkdown(
   }
   lines.push(`## Why each component is here`, ``);
   if (narrative.componentRationales.length > 0) {
-    for (const rationale of narrative.componentRationales) {
+    const nodeOrder = graph.nodes.map((node) => node.id);
+    for (const rationale of inOrderOf(
+      narrative.componentRationales,
+      (item) => item.nodeId,
+      nodeOrder,
+    )) {
       lines.push(
         `### ${labels.get(rationale.nodeId) ?? rationale.nodeId}`,
         ``,
@@ -129,7 +161,12 @@ export function narrativeMarkdown(
   }
   lines.push(`## How each criterion is met`, ``);
   if (narrative.criterionNarrations.length > 0) {
-    for (const narration of narrative.criterionNarrations) {
+    const criterionOrder = criteria.map((criterion) => criterion.id);
+    for (const narration of inOrderOf(
+      narrative.criterionNarrations,
+      (item) => item.criterionId,
+      criterionOrder,
+    )) {
       const statement = statements.get(narration.criterionId);
       lines.push(
         `### ${narration.criterionId}${statement ? ` — ${statement}` : ''}`,
@@ -155,8 +192,12 @@ export function feedbackMarkdown(
 ): string {
   const heading = revisionNumber !== null ? ` — revision #${revisionNumber}` : '';
   const lines: string[] = [`# Feedback${heading}`, ``];
-  if (!evaluation || evaluation.status !== 'complete') {
-    lines.push(`_Not graded yet (status: ${evaluation?.status ?? 'none'})._`);
+  if (!evaluation) {
+    lines.push(UNGRADED.absent);
+    return joinLines(lines);
+  }
+  if (evaluation.status !== 'complete') {
+    lines.push(UNGRADED[evaluation.status]);
     return joinLines(lines);
   }
   lines.push(`**${evaluation.overall ?? '—'}/100 · ${evaluation.decision ?? '—'}**`, ``);
@@ -166,7 +207,7 @@ export function feedbackMarkdown(
 
   lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);
   for (const [key, value] of Object.entries(evaluation.dimensions)) {
-    lines.push(`| ${key} | ${value === null ? 'n/a' : value} |`);
+    lines.push(`| ${humanizeToken(key)} | ${value === null ? 'n/a' : value} |`);
   }
 
   const statements = criterionStatements(criteria);
@@ -176,9 +217,9 @@ export function feedbackMarkdown(
     for (const row of evaluation.criterionResults) {
       const statement = statements.get(row.criterionId);
       lines.push(
-        `| ${row.criterionId}${statement ? ` — ${cell(statement)}` : ''} | ${row.result} | ${
-          row.confidence ?? '—'
-        } | ${row.rationale ? cell(row.rationale) : '—'} |`,
+        `| ${row.criterionId}${statement ? ` — ${markdownCell(statement)}` : ''} | ${humanizeToken(
+          row.result,
+        )} | ${row.confidence ?? '—'} | ${row.rationale ? markdownCell(row.rationale) : '—'} |`,
       );
     }
   } else {

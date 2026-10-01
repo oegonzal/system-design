@@ -1,40 +1,56 @@
 'use client';
 
-import type { Node } from '@xyflow/react';
+import type { Rect } from '@xyflow/react';
+
+/** What it takes to draw the diagram onto a page, independent of the current pan and zoom. */
+export interface DiagramCapture {
+  /** React Flow's `.react-flow__viewport` — nodes, edges and pills; no minimap, controls or grid. */
+  viewport: HTMLElement;
+  /** The diagram's extent in flow coordinates, as the flow instance measures it. */
+  bounds: Rect;
+  /** The page behind the diagram: the surface it is drawn on, so the copy reads like the screen. */
+  background: string;
+}
+
+/** Room around the diagram on the page. */
+const PAGE_PADDING = 40;
+/** The smallest page, so a single block is not printed on a postage stamp. */
+const MIN_PAGE = { width: 400, height: 300 };
+/** Pixels per page unit in the embedded image, for a crisp print. */
+const PIXEL_RATIO = 2;
 
 /**
  * Render the whole diagram to a PDF blob, regardless of the current pan/zoom.
  *
- * The React-Flow "download image" recipe: frame every node with
- * `getNodesBounds` + `getViewportForBounds`, capture the `.react-flow__viewport`
- * (which holds only nodes + edges — the minimap, controls and background are
- * siblings, so they are excluded for free) at that computed transform via
- * `html-to-image`, then embed the PNG in a `jsPDF` sized to the graph.
+ * The React-Flow "download image" recipe: frame the bounds with
+ * `getViewportForBounds`, capture the viewport at that computed transform via
+ * `html-to-image`, then embed the PNG in a `jsPDF` sized to the graph. What
+ * is captured is what the elements carry inline — which is why an edge's
+ * stroke is inline style rather than a stylesheet rule.
  *
  * Everything is dynamically imported so these browser-only libs never touch the
  * server bundle. Returns null when there is nothing to draw.
  */
-export async function diagramToPdfBlob(nodes: Node[]): Promise<Blob | null> {
-  if (nodes.length === 0) return null;
+export async function diagramToPdfBlob({
+  viewport,
+  bounds,
+  background,
+}: DiagramCapture): Promise<Blob | null> {
+  if (bounds.width === 0 || bounds.height === 0) return null;
 
-  const viewport = document.querySelector<HTMLElement>('.react-flow__viewport');
-  if (!viewport) return null;
-
-  const [{ getNodesBounds, getViewportForBounds }, { toPng }, { jsPDF }] = await Promise.all([
+  const [{ getViewportForBounds }, { toPng }, { jsPDF }] = await Promise.all([
     import('@xyflow/react'),
     import('html-to-image'),
     import('jspdf'),
   ]);
 
-  const padding = 40;
-  const bounds = getNodesBounds(nodes);
-  const width = Math.max(Math.round(bounds.width) + padding * 2, 400);
-  const height = Math.max(Math.round(bounds.height) + padding * 2, 300);
+  const width = Math.max(Math.round(bounds.width) + PAGE_PADDING * 2, MIN_PAGE.width);
+  const height = Math.max(Math.round(bounds.height) + PAGE_PADDING * 2, MIN_PAGE.height);
   const viewportTransform = getViewportForBounds(bounds, width, height, 0.2, 2, 0.1);
 
   const png = await toPng(viewport, {
-    backgroundColor: '#ffffff',
-    pixelRatio: 2,
+    backgroundColor: background,
+    pixelRatio: PIXEL_RATIO,
     width,
     height,
     style: {
