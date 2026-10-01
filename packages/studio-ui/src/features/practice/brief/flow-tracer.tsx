@@ -68,9 +68,12 @@ export function FlowTracer({
       )}
 
       {path.length > 0 ? (
-        <Badge tone="success" data-testid={`flow-status-${criterionId}`}>
-          {`Traced · ${path.length} ${path.length === 1 ? 'hop' : 'hops'}`}
-        </Badge>
+        // In a row of its own: the column would stretch the chip past its words.
+        <Stack direction="row">
+          <Badge tone="success" data-testid={`flow-status-${criterionId}`}>
+            {`Traced · ${path.length} ${path.length === 1 ? 'hop' : 'hops'}`}
+          </Badge>
+        </Stack>
       ) : null}
 
       {hops.length > 0 ? (

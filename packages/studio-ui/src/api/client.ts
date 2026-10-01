@@ -6,6 +6,7 @@ import type {
   CreateSessionRequest,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
+  DesignSessionDetailDto,
   DesignSessionDto,
   EvaluationDto,
   ExperienceProfileDto,
@@ -144,8 +145,9 @@ export const api = {
     return request<ApiListResponse<DesignSessionDto>>(`/sessions${query({ ...params })}`, opts);
   },
 
-  async getSession(id: string, opts: GetOptions = {}): Promise<DesignSessionDto> {
-    return unwrap(await request<ApiResponse<DesignSessionDto>>(`/sessions/${id}`, opts));
+  /** The session with the run holding its grading slot, if any (`inFlight`). */
+  async getSession(id: string, opts: GetOptions = {}): Promise<DesignSessionDetailDto> {
+    return unwrap(await request<ApiResponse<DesignSessionDetailDto>>(`/sessions/${id}`, opts));
   },
 
   /** Keeps the unsubmitted canvas with the session (204); shape-checked only, cleared by a submit. */

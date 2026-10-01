@@ -1,5 +1,6 @@
+import { describeInFlight } from '@sysdesign/contracts';
 import { renderWithTheme, stubApi, type StubRoute } from '@sysdesign/web-testing';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,7 +13,7 @@ import {
   makeRevisionSummary,
   makeSession,
 } from '../../testing/fixtures';
-import { PracticeWorkspace } from './practice-workspace';
+import { LOAD_REVISION_CONFIRM, PracticeWorkspace } from './practice-workspace';
 
 const SESSION = '00000000-0000-4000-8000-000000000000';
 const SESSION_PATH = new RegExp(`^/api/sessions/${SESSION}$`);
@@ -56,6 +57,7 @@ function sessionRoutes(overrides: {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('PracticeWorkspace on open', () => {
@@ -125,6 +127,10 @@ describe('PracticeWorkspace on open', () => {
 
     expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
     expect((screen.getByTestId('submit-revision') as HTMLButtonElement).disabled).toBe(true);
+    // The palette is locked as well — the store is the one switch, so no
+    // block can be added behind the banner and then restored as the draft.
+    expect((screen.getByTestId('palette-cache') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('blocks-hint').textContent).not.toContain('Drag onto the canvas');
     await userEvent.click(screen.getByRole('tab', { name: 'Brief' }));
     expect((screen.getByTestId('binding-claim-c1') as HTMLInputElement).disabled).toBe(true);
     await userEvent.click(screen.getByRole('tab', { name: 'Narrative' }));
@@ -133,6 +139,7 @@ describe('PracticeWorkspace on open', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
     expect(screen.queryByTestId('readonly-banner')).toBeNull();
     expect((screen.getByTestId('submit-revision') as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId('palette-cache') as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByTestId('narrative-overview') as HTMLTextAreaElement).disabled).toBe(false);
     expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
   });
@@ -236,7 +243,7 @@ describe('PracticeWorkspace on open', () => {
 });
 
 describe('PracticeWorkspace load failures', () => {
-  it('shows a graceful not-found with a way back — never the raw server message — on a 404', async () => {
+  it('[UX-12] shows a graceful not-found with a way back — never the raw server message — on a 404', async () => {
     stubApi([
       {
         path: SESSION_PATH,
@@ -248,13 +255,30 @@ describe('PracticeWorkspace load failures', () => {
 
     renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
 
-    expect(await screen.findByRole('heading', { name: 'Session not found' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Practice session not found' })).toBeTruthy();
     expect(screen.getByTestId('notice-back').getAttribute('href')).toBe('/');
     expect(screen.queryByText(`Session ${SESSION} not found`)).toBeNull();
     expect(screen.queryByTestId('notice-retry')).toBeNull();
   });
 
-  it('shows a retryable error on a transient failure, and Retry re-issues the request', async () => {
+  it('[UX-12] reads an id that cannot name a session as not found — no raw validation message, no Retry that cannot succeed', async () => {
+    stubApi([
+      {
+        path: /^\/api\/sessions\/not-a-uuid$/,
+        status: 400,
+        body: { statusCode: 400, message: 'Validation failed (uuid is expected)' },
+      },
+      AVAILABILITY,
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId="not-a-uuid" />);
+
+    expect(await screen.findByRole('heading', { name: 'Practice session not found' })).toBeTruthy();
+    expect(screen.queryByText(/uuid is expected/)).toBeNull();
+    expect(screen.queryByTestId('notice-retry')).toBeNull();
+  });
+
+  it('[UX-12] shows a retryable error on a transient failure, and Retry re-issues the request', async () => {
     const { calls } = stubApi([
       {
         path: SESSION_PATH,
@@ -269,13 +293,195 @@ describe('PracticeWorkspace load failures', () => {
 
     renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
 
-    expect(await screen.findByRole('heading', { name: "Couldn't load this session" })).toBeTruthy();
+    expect(
+      await screen.findByRole('heading', { name: "Couldn't load this practice session" }),
+    ).toBeTruthy();
     const sessionCalls = () => calls.filter((c) => SESSION_PATH.test(c.url)).length;
     expect(sessionCalls()).toBe(1);
 
     await userEvent.click(screen.getByTestId('notice-retry'));
 
     await waitFor(() => expect(sessionCalls()).toBe(2));
-    expect(screen.getByRole('heading', { name: "Couldn't load this session" })).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: "Couldn't load this practice session" }),
+    ).toBeTruthy();
+  });
+});
+
+describe('PracticeWorkspace while a run holds the session', () => {
+  it('[DEL-3] keeps Submit and the coach off — in the session’s own words — while a run holds the slot, whichever revision is on screen', async () => {
+    const holding = { kind: 'grade', runId: 'run-2', revisionNumber: 2 } as const;
+    const revisions = [
+      makeRevisionSummary({
+        id: 'rev-2',
+        revisionNumber: 2,
+        evaluation: {
+          runId: 'run-2',
+          iteration: 1,
+          status: 'running',
+          overall: null,
+          decision: null,
+        },
+      }),
+      makeRevisionSummary(),
+    ];
+    stubApi(
+      sessionRoutes({
+        revisions,
+        extra: [
+          {
+            path: /^\/api\/revisions\/rev-2\/evaluation$/,
+            body: { data: makeEvaluation({ status: 'running', overall: null, decision: null }) },
+          },
+        ],
+      }).map((route) =>
+        route.path === SESSION_PATH
+          ? { path: SESSION_PATH, body: { data: makeSession({ id: SESSION, inFlight: holding }) } }
+          : route,
+      ),
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Revisions' }));
+    await userEvent.click(screen.getByTestId('revision-chip-1'));
+    expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
+
+    // The badge and the gate follow the session's newest submission, not revision #1 on screen.
+    expect(screen.getByText('rev #2 · grading…')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    const submit = screen.getByTestId('submit-revision') as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    expect(submit.title).toBe(describeInFlight(holding));
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Coach' }));
+    expect((screen.getByTestId('improve-run') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('improver-unavailable').textContent).toBe(describeInFlight(holding));
+  });
+});
+
+describe('PracticeWorkspace loading a revision over the draft', () => {
+  it('[UX-15] asks before the canvas is replaced in words that match the autosave — never "unsaved" for a saved draft', async () => {
+    const draft = {
+      graph: { nodes: [{ id: 'd-1', kind: 'client' as const, label: 'Draft client' }], edges: [] },
+      brief: null,
+      narrative: null,
+    };
+    stubApi(sessionRoutes({ session: { draft } }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Revisions' }));
+    await waitFor(
+      () => expect(screen.getByTestId('draft-status').textContent).toBe('draft saved'),
+      {
+        timeout: 4000,
+      },
+    );
+    await userEvent.click(screen.getByTestId('revision-chip-1'));
+
+    expect(confirm).toHaveBeenCalledWith(LOAD_REVISION_CONFIRM.saved);
+    expect(LOAD_REVISION_CONFIRM.saved).not.toMatch(/unsaved/i);
+    expect(screen.queryByTestId('readonly-banner')).toBeNull();
+  });
+
+  it('[UX-15] asks nothing when there is no draft to lose', async () => {
+    stubApi(sessionRoutes({}));
+    const confirm = vi.spyOn(window, 'confirm');
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Revisions' }));
+    await userEvent.click(screen.getByTestId('revision-chip-1'));
+
+    expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('PracticeWorkspace when an action fails', () => {
+  it('[DEL-3] says a refused submit as an alert, in the server’s words', async () => {
+    const reason = describeInFlight({ kind: 'coach', runId: 'run-5', revisionNumber: 1 });
+    stubApi(
+      sessionRoutes({
+        extra: [
+          {
+            method: 'POST',
+            path: `/api/sessions/${SESSION}/revisions`,
+            status: 409,
+            body: { statusCode: 409, message: reason },
+          },
+        ],
+      }),
+    );
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    const submit = await screen.findByTestId('submit-revision');
+    await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(submit);
+
+    const alert = await screen.findByTestId('submit-error');
+    expect(alert.getAttribute('role')).toBe('alert');
+    expect(within(alert).getByText("Couldn't submit for grading")).toBeTruthy();
+    expect(alert.textContent).toContain(reason);
+  });
+});
+
+describe('PracticeWorkspace after a failed coaching run', () => {
+  it('[UX-11] still offers the previous run’s best revision', async () => {
+    const revisions = [
+      makeRevisionSummary({
+        id: 'rev-2',
+        revisionNumber: 2,
+        origin: 'assistant',
+        evaluation: {
+          runId: 'run-1',
+          iteration: 2,
+          status: 'complete',
+          overall: 80,
+          decision: 'accept',
+        },
+      }),
+      makeRevisionSummary(),
+    ];
+    stubApi(
+      sessionRoutes({
+        revisions,
+        coachingRuns: [
+          {
+            runId: 'run-9',
+            baseRevisionId: 'rev-1',
+            maxIterations: 2,
+            startedAt: '2026-08-20T12:05:00.000Z',
+          },
+          {
+            runId: 'run-1',
+            baseRevisionId: 'rev-1',
+            maxIterations: 2,
+            startedAt: '2026-08-20T12:00:00.000Z',
+          },
+        ],
+        extra: [
+          {
+            path: `/api/sessions/${SESSION}/improve/run-9`,
+            body: {
+              data: makeImproveRun({
+                runId: 'run-9',
+                status: 'failed',
+                iterations: [],
+                error: 'the model went away',
+              }),
+            },
+          },
+        ],
+      }),
+    );
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Coach' }));
+
+    expect((await screen.findByTestId('improvement-error')).textContent).toContain(
+      'the model went away',
+    );
+    expect(screen.getByTestId('load-earlier-best').textContent).toBe('Load revision #2');
   });
 });

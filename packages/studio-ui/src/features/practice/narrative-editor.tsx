@@ -14,22 +14,26 @@ const CHIP: Record<NarrationSlotState, { tone: 'neutral' | 'success'; label: str
   filled: { tone: 'success', label: 'Written' },
 };
 
-/** Written or not — whether it explains anything is the explanation critic's call. */
+/**
+ * Written or not — whether it explains anything is the explanation critic's
+ * call. In a row of its own, so a column it sits in never stretches the chip
+ * past its words.
+ */
 function SlotChip({ prose }: { prose: string }) {
   const state = narrationSlotState(prose);
   const chip = CHIP[state];
   return (
-    <Badge tone={chip.tone} data-testid="narrative-slot-state" data-state={state}>
-      {chip.label}
-    </Badge>
+    <Stack direction="row">
+      <Badge tone={chip.tone} data-testid="narrative-slot-state" data-state={state}>
+        {chip.label}
+      </Badge>
+    </Stack>
   );
 }
 
 export interface NarrativeEditorProps {
   /** The prompt's rubric, as resolved by `usePromptCriteria`. */
   criteria: SuccessCriterion[];
-  /** A revision is on screen: shown, never edited. */
-  readOnly?: boolean;
 }
 
 /**
@@ -40,9 +44,11 @@ export interface NarrativeEditorProps {
  * overview, a rationale per component, a narration per criterion. Keying each
  * slot to a node or criterion id is what lets a lens read "this component is
  * explained" and "this requirement is walked" as references rather than
- * guessing which paragraph was about what.
+ * guessing which paragraph was about what. Read-only is the store's word: a
+ * revision on screen is shown, never edited.
  */
-export function NarrativeEditor({ criteria, readOnly = false }: NarrativeEditorProps) {
+export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
+  const readOnly = useCanvasStore((state) => state.readOnly);
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const overview = useCanvasStore((state) => state.narrativeOverview);

@@ -16,7 +16,7 @@ test.describe('practice session not found', () => {
     const bogus = '11111111-1111-4111-8111-111111111111';
     await page.goto(`/practice/${bogus}`);
 
-    await expect(page.getByRole('heading', { name: 'Session not found' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Practice session not found' })).toBeVisible();
     await expect(page.getByText(`Session ${bogus} not found`)).toHaveCount(0);
 
     const back = page.getByTestId('notice-back');

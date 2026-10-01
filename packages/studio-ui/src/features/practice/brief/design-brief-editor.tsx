@@ -15,8 +15,6 @@ export interface DesignBriefEditorProps {
   criteria: SuccessCriterion[];
   /** True while the quality loop is still deriving it. */
   deriving?: boolean;
-  /** A revision is on screen: shown, never edited. */
-  readOnly?: boolean;
 }
 
 /**
@@ -30,13 +28,11 @@ export interface DesignBriefEditorProps {
  *
  * Reads the store directly rather than taking a brief prop: the rows below are
  * presentational and controlled, so this is the only component that needs to
- * know where the draft lives.
+ * know where the draft lives — and whether it is read-only, which is the
+ * store's word too: a revision on screen is shown, never edited.
  */
-export function DesignBriefEditor({
-  criteria,
-  deriving = false,
-  readOnly = false,
-}: DesignBriefEditorProps) {
+export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEditorProps) {
+  const readOnly = useCanvasStore((state) => state.readOnly);
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const bindings = useCanvasStore((state) => state.bindings);

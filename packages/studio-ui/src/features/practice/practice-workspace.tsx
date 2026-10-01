@@ -1,15 +1,17 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type {
-  DesignRevisionDto,
-  DesignRevisionSummaryDto,
-  DesignSessionDto,
-  EvaluationFindingDto,
-  PromptDto,
-  RevisionEvaluationRef,
+import {
+  describeInFlight,
+  type DesignRevisionDto,
+  type DesignRevisionSummaryDto,
+  type EvaluationFindingDto,
+  type PromptDto,
+  type RevisionEvaluationRef,
+  type SessionInFlightDto,
 } from '@sysdesign/contracts';
 import {
+  Alert,
   Button,
   Heading,
   Skeleton,
@@ -21,25 +23,33 @@ import {
   Tabs,
   Text,
 } from '@sysdesign/design-system';
-import { ApiError, toErrorMessage, useLatestRequest, useLeaveGuard } from '@sysdesign/web-kit';
-import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import {
+  toErrorMessage,
+  useDocumentTitle,
+  useLatestRequest,
+  useLeaveGuard,
+} from '@sysdesign/web-kit';
+import { ReactFlowProvider } from '@xyflow/react';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
-import { FullPageNotice } from '../../components/full-page-notice';
+import { pageTitle } from '../../app/nav';
+import { LoadFailureNotice } from '../../components/load-failure-notice';
 import {
   CanvasStoreProvider,
   useCanvasStore,
   useCanvasStoreApi,
 } from '../canvas/canvas-store-context';
+import type { DraftSaveStatus } from '../canvas/draft-status';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
 import { EvaluationPanel } from '../evaluation/evaluation-panel';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
-import { buildAndDownloadRunZip } from '../export/export-run';
+import { useRunExport } from '../export/use-run-export';
+import { earlierRunBest } from '../improve/coach-history';
 import { ImprovementPanel } from '../improve/improvement-panel';
 import {
   CHECKING,
@@ -53,6 +63,7 @@ import { usePromptCriteria } from '../prompts/use-prompt-criteria';
 import { DesignBriefEditor } from './brief/design-brief-editor';
 import { NarrativeEditor } from './narrative-editor';
 import { useDraftAutosave } from './use-draft-autosave';
+import { useSessionInFlight } from './use-session-in-flight';
 
 function CanvasSkeleton() {
   return <Skeleton variant="block" height="480px" />;
@@ -77,6 +88,33 @@ const PROPERTIES_MAX_SHARE = '45%';
 
 /** What the tab says before it lets an in-app navigation leave an unsaved edit behind. */
 const LEAVE_WHILE_SAVING = 'Your draft is still being saved. Leave anyway?';
+
+/**
+ * What loading a revision onto the canvas costs the draft, by where the
+ * autosave stands; null asks nothing. A saved draft stays on the server —
+ * the session reopens on it — and only "Restore as draft" replaces it;
+ * edits that have not reached the server leave the screen with nothing
+ * behind them.
+ */
+export const LOAD_REVISION_CONFIRM: Record<DraftSaveStatus, string | null> = {
+  clean: null,
+  saved:
+    'Load this revision read-only? Your draft stays saved — the session reopens on it, and only restoring this revision as the draft replaces it.',
+  unsaved: 'Load this revision? Your latest edits are not saved yet and will be lost.',
+  saving: 'Load this revision? Your latest edits are still being saved and may be lost.',
+  failed: 'Load this revision? Your latest edits could not be saved and will be lost.',
+};
+
+/** An action that did not happen: what, and why in the server's words or ours. */
+interface ActionError {
+  title: string;
+  message: string;
+}
+
+const actionError = (title: string, error: unknown, fallback: string): ActionError => ({
+  title,
+  message: toErrorMessage(error, fallback),
+});
 
 /**
  * Fills the shell's Main (a flex column with a definite height): shrinkable
@@ -177,10 +215,32 @@ const DockTabs = styled(Tabs)`
   flex-direction: column;
 `;
 
+/**
+ * Six tabs in a narrow dock: one row that scrolls sideways, never a second
+ * row. The strip scrolls; the tablist inside is as wide as its tabs, so its
+ * underline runs the whole row.
+ */
+const DockTabStrip = styled.div`
+  position: relative;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+`;
+
+const DockTabList = styled(TabList)`
+  flex-wrap: nowrap;
+  min-width: max-content;
+
+  & > [role='tab'] {
+    white-space: nowrap;
+  }
+`;
+
 const DockPanel = styled(TabPanel)`
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding-top: ${({ theme }) => theme.space[4]}px;
 
   /* No authored display above: it would beat the UA [hidden] rule and break
      the state-preserving hide. This guard keeps the attribute honored. */
@@ -223,17 +283,22 @@ interface FeedbackTarget {
   id: string;
   revisionNumber: number;
   evaluation: RevisionEvaluationRef | null;
+  /** When it was stored — its grade started then. */
+  createdAt: string;
 }
 
-const toTarget = (revision: {
-  id: string;
-  revisionNumber: number;
-  evaluation: RevisionEvaluationRef | null;
-}): FeedbackTarget => ({
+const toTarget = (revision: FeedbackTarget): FeedbackTarget => ({
   id: revision.id,
   revisionNumber: revision.revisionNumber,
   evaluation: revision.evaluation,
+  createdAt: revision.createdAt,
 });
+
+/** The run a fresh submission's grade holds the session's slot with. */
+const gradeSlot = (revision: DesignRevisionDto): SessionInFlightDto | null =>
+  revision.evaluation === null
+    ? null
+    : { kind: 'grade', runId: revision.evaluation.runId, revisionNumber: revision.revisionNumber };
 
 function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
   return {
@@ -248,19 +313,23 @@ function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
 const byNewest = (a: DesignRevisionSummaryDto, b: DesignRevisionSummaryDto) =>
   b.revisionNumber - a.revisionNumber;
 
+/** The newest revision the author submitted — what Submit and the toolbar's grade badge are about. */
+const latestUserRevision = (
+  revisions: readonly DesignRevisionSummaryDto[],
+): DesignRevisionSummaryDto | null =>
+  revisions.find((candidate) => candidate.origin === 'user') ?? null;
+
 function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const storeApi = useCanvasStoreApi();
   const loader = useLatestRequest();
 
-  const [, setSession] = useState<DesignSessionDto | null>(null);
   const [prompt, setPrompt] = useState<PromptDto | null>(null);
   const [revisions, setRevisions] = useState<DesignRevisionSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<unknown>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ActionError | null>(null);
   const [feedback, setFeedback] = useState<FeedbackTarget | null>(null);
   const [viewingRevision, setViewingRevision] = useState<FeedbackTarget | null>(null);
   const [tab, setTab] = useState('prompt');
@@ -276,7 +345,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     feedback && feedback.evaluation !== null ? feedback.id : null,
   );
   const improve = useImproveRunPolling(sessionId, activeRunId);
-  const { getNodes } = useReactFlow();
+  const { inFlight, hold: holdSlot, recheck: recheckSlot } = useSessionInFlight(sessionId);
+  const exportRun = useRunExport();
   const canvasEmpty = useCanvasStore((state) => state.nodes.length === 0);
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
@@ -285,6 +355,27 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   // The draft is the author's only while it is on screen and the page is up.
   const autosave = useDraftAutosave(sessionId, storeApi, !readOnly && !loading);
   useLeaveGuard(autosave.pending, LEAVE_WHILE_SAVING);
+  useDocumentTitle(prompt ? pageTitle(prompt.title) : null);
+
+  // The store is the one read-only switch: every control that edits the
+  // canvas, the palette, the properties, the brief and the narrative reads it,
+  // and every edit action refuses while it is set.
+  useEffect(() => {
+    storeApi.getState().setReadOnly(readOnly);
+  }, [readOnly, storeApi]);
+
+  // The selected tab stays in view however it was chosen — a submit opens
+  // Feedback from code — by scrolling the strip sideways, never the page.
+  const tabStrip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabStrip.current;
+    const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (!strip || !selected) return;
+    const start = selected.offsetLeft;
+    const end = start + selected.offsetWidth;
+    if (start < strip.scrollLeft) strip.scrollLeft = start;
+    else if (end > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = end - strip.clientWidth;
+  }, [tab]);
 
   // Initial load: session → prompt + revision summaries + coaching runs → the
   // canvas. A saved draft comes back ahead of any revision — it is the
@@ -308,7 +399,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           draft === null && latestUser ? await api.getRevision(latestUser.id, { signal }) : null;
         if (!loader.isCurrent(id)) return;
 
-        setSession(loadedSession);
+        holdSlot(loadedSession.inFlight);
         setPrompt(loadedPrompt);
         setRevisions(sorted);
         if (draft !== null) {
@@ -323,21 +414,16 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setLoading(false);
       } catch (error) {
         if (loader.isStale(id, error)) return;
-        // A 404 means the session is gone — retrying cannot help, so offer a way
-        // back instead. Anything else (network, 5xx) is transient and retryable.
-        if (error instanceof ApiError && error.status === 404) {
-          setNotFound(true);
-        } else {
-          setLoadError(toErrorMessage(error, 'Could not load this practice session.'));
-        }
+        // What the read threw, kept whole: the shared notice decides whether
+        // nothing lives at this address or another try could succeed.
+        setLoadFailure(error);
         setLoading(false);
       }
     })();
   }, [sessionId, reloadKey]);
 
   const handleRetryLoad = useCallback(() => {
-    setLoadError(null);
-    setNotFound(false);
+    setLoadFailure(null);
     setLoading(true);
     setReloadKey((key) => key + 1);
   }, []);
@@ -375,7 +461,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   }, [improve.acceptedCount, refreshRevisions]);
 
   // When the grade for the submitted draft lands — or fails — the timeline
-  // needs the fresh status.
+  // needs the fresh status, and the slot it held is asked about at once.
   useEffect(() => {
     const evaluation = polling.evaluation;
     if (!evaluation || evaluation.status === 'running') return;
@@ -383,7 +469,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     if (completedFor.current === key) return;
     completedFor.current = key;
     refreshRevisions();
-  }, [polling.evaluation, refreshRevisions]);
+    recheckSlot();
+  }, [polling.evaluation, refreshRevisions, recheckSlot]);
 
   // A coaching run that ends writes what became of its base revision; the
   // timeline reads it back once, when the run reaches its end.
@@ -393,7 +480,16 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     if (!run || run.status === 'running' || coachEndedFor.current === run.runId) return;
     coachEndedFor.current = run.runId;
     refreshRevisions();
-  }, [improve.run, refreshRevisions]);
+    recheckSlot();
+  }, [improve.run, refreshRevisions, recheckSlot]);
+
+  // The slot frees when its run ends — whichever revision is on screen, the
+  // timeline (and the toolbar's grade badge with it) reads the verdict then.
+  const heldBefore = useRef<SessionInFlightDto | null>(null);
+  useEffect(() => {
+    if (heldBefore.current !== null && inFlight === null) refreshRevisions();
+    heldBefore.current = inFlight;
+  }, [inFlight, refreshRevisions]);
 
   /** The draft as the API takes it: graph plus brief and narrative, null when nothing is claimed. */
   const readDraft = useCallback(() => {
@@ -410,11 +506,12 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   // Once the revision exists the canvas is no longer unsubmitted work.
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
-    setSubmitError(null);
+    setFailure(null);
     try {
       await autosave.settle();
       const revision = await api.submitRevision(sessionId, readDraft());
       storeApi.getState().markClean();
+      holdSlot(gradeSlot(revision));
       setFeedback(toTarget(revision));
       setViewingRevision(null);
       setRevisions((current) => [
@@ -423,11 +520,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       ]);
       setTab('feedback');
     } catch (error) {
-      setSubmitError(toErrorMessage(error, 'Could not submit the revision.'));
+      setFailure(
+        actionError("Couldn't submit for grading", error, 'The revision was not submitted.'),
+      );
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId, readDraft, autosave, storeApi]);
+  }, [sessionId, readDraft, autosave, storeApi, holdSlot]);
 
   // Export the run as one zip: the diagram as a PDF plus prompt/narrative/brief/
   // feedback/revisions each as a separate .md. Reads whatever revision is on
@@ -435,19 +534,18 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const handleExport = useCallback(async () => {
     if (!prompt) return;
     setExporting(true);
-    setSubmitError(null);
+    setFailure(null);
     try {
-      await buildAndDownloadRunZip({
+      await exportRun({
         prompt,
         criteria,
         ...readDraft(),
         evaluation: polling.evaluation,
         revisions,
         revisionNumber: (viewingRevision ?? feedback)?.revisionNumber ?? null,
-        nodes: getNodes(),
       });
     } catch (error) {
-      setSubmitError(toErrorMessage(error, 'Could not export the run.'));
+      setFailure(actionError("Couldn't export the run", error, 'Nothing was downloaded.'));
     } finally {
       setExporting(false);
     }
@@ -459,7 +557,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     polling.evaluation,
     viewingRevision,
     feedback,
-    getNodes,
+    exportRun,
   ]);
 
   // Hand the canvas to the coach. An unedited, graded revision on screen is
@@ -479,7 +577,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         : 'Hand this design to the coach? Your current draft is submitted as a revision first.';
       if (!window.confirm(question)) return;
       setStartingImprove(true);
-      setSubmitError(null);
+      setFailure(null);
       try {
         let started;
         if (fromRevision) {
@@ -490,6 +588,11 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         }
         acceptedSeen.current = 0;
         setActiveRunId(started.runId);
+        holdSlot({
+          kind: 'coach',
+          runId: started.runId,
+          revisionNumber: fromRevision ? loaded.revisionNumber : started.revision.revisionNumber,
+        });
         if (!fromRevision) {
           storeApi.getState().markClean();
           setFeedback(toTarget(started.revision));
@@ -500,12 +603,21 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           ]);
         }
       } catch (error) {
-        setSubmitError(toErrorMessage(error, 'Could not start the coach.'));
+        setFailure(actionError("Couldn't start the coach", error, 'The coach did not start.'));
       } finally {
         setStartingImprove(false);
       }
     },
-    [sessionId, readDraft, storeApi, viewingRevision, feedback, polling.evaluation, autosave],
+    [
+      sessionId,
+      readDraft,
+      storeApi,
+      viewingRevision,
+      feedback,
+      polling.evaluation,
+      autosave,
+      holdSlot,
+    ],
   );
 
   const handleSelectFinding = useCallback(
@@ -520,13 +632,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   );
 
   // Accepts anything carrying a revision id — a timeline summary, or the
-  // coach panel's bare best-revision reference.
+  // coach panel's bare best-revision reference. What it asks first depends
+  // on what the draft would lose: nothing once the server holds it.
   const handleSelectRevision = useCallback(
     async (summary: { id: string }) => {
-      const { dirty } = storeApi.getState();
-      if (dirty && !window.confirm('Load this revision? Your unsaved draft will be replaced.')) {
-        return;
-      }
+      const question = LOAD_REVISION_CONFIRM[autosave.status];
+      if (question !== null && !window.confirm(question)) return;
+      setFailure(null);
       try {
         const revision = await api.getRevision(summary.id);
         storeApi.getState().setGraph(revision.graph);
@@ -536,10 +648,12 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setFeedback(toTarget(revision));
         setTab('feedback');
       } catch (error) {
-        setSubmitError(toErrorMessage(error, 'Could not load that revision.'));
+        setFailure(
+          actionError("Couldn't load that revision", error, 'The canvas was left as it was.'),
+        );
       }
     },
-    [storeApi],
+    [storeApi, autosave.status],
   );
 
   const handleRestoreAsDraft = useCallback(() => {
@@ -556,30 +670,37 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     );
   }
 
-  if (notFound) {
+  if (loadFailure !== null) {
     return (
-      <FullPageNotice
-        title="Session not found"
-        message="This practice session couldn't be found. It may have been removed, or created in a different environment."
-        backHref="/"
-      />
-    );
-  }
-
-  if (loadError !== null) {
-    return (
-      <FullPageNotice
-        title="Couldn't load this session"
-        message={loadError}
+      <LoadFailureNotice
+        noun="practice session"
+        error={loadFailure}
         onRetry={handleRetryLoad}
-        backHref="/"
+        exit={{ href: '/', label: 'Back to the dashboard' }}
       />
     );
   }
 
-  const revisionStatus = feedback
-    ? (polling.evaluation?.status ?? feedback.evaluation?.status ?? null)
-    : null;
+  // Submit and the toolbar's badge are about the session, not the revision on
+  // screen: its newest submission, live while it is the one being polled, and
+  // whatever run holds its grading slot — the server's word, or the coach
+  // this tab is watching revise.
+  const latest = latestUserRevision(revisions);
+  const latestStatus =
+    latest === null
+      ? null
+      : latest.id === feedback?.id && polling.evaluation !== null
+        ? polling.evaluation.status
+        : (latest.evaluation?.status ?? null);
+  const coaching = improve.run !== null && improve.run.status === 'running' ? improve.run : null;
+  const coachBase = revisions.find((candidate) => candidate.id === coaching?.baseRevisionId);
+  const holder: SessionInFlightDto | null =
+    inFlight ??
+    (coaching !== null && coachBase !== undefined
+      ? { kind: 'coach', runId: coaching.runId, revisionNumber: coachBase.revisionNumber }
+      : null);
+  const blockedReason = holder !== null ? describeInFlight(holder) : null;
+  const earlierBest = improve.run !== null ? earlierRunBest(revisions, improve.run.runId) : null;
   const legacy = feedback !== null && feedback.evaluation === null;
 
   return (
@@ -595,18 +716,18 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           <CanvasToolbar
             onSubmit={() => void handleSubmit()}
             submitting={submitting}
-            revisionStatus={revisionStatus}
-            revisionNumber={feedback?.revisionNumber ?? null}
-            readOnly={readOnly}
+            revisionStatus={latestStatus}
+            revisionNumber={latest?.revisionNumber ?? null}
             promptArchived={promptArchived}
+            submitBlockedReason={blockedReason}
             draftStatus={autosave.status}
             onExport={() => void handleExport()}
             exporting={exporting}
           />
-          {submitError !== null ? (
-            <Text size="sm" tone="secondary" data-testid="submit-error">
-              {submitError}
-            </Text>
+          {failure !== null ? (
+            <Alert tone="danger" title={failure.title} data-testid="submit-error">
+              {failure.message}
+            </Alert>
           ) : null}
           {viewingRevision !== null ? (
             <ReadOnlyBanner data-testid="readonly-banner">
@@ -617,20 +738,22 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             </ReadOnlyBanner>
           ) : null}
           <CanvasArea>
-            <SdCanvasLazy readOnly={readOnly} />
+            <SdCanvasLazy />
           </CanvasArea>
         </CanvasColumn>
 
         <Dock as="aside" padding={5} aria-label="Session details">
           <DockTabs value={tab} onChange={setTab}>
-            <TabList aria-label="Session panels">
-              <Tab value="prompt">Prompt</Tab>
-              <Tab value="brief">Brief</Tab>
-              <Tab value="narrative">Narrative</Tab>
-              <Tab value="feedback">Feedback</Tab>
-              <Tab value="coach">Coach</Tab>
-              <Tab value="revisions">Revisions</Tab>
-            </TabList>
+            <DockTabStrip ref={tabStrip}>
+              <DockTabList aria-label="Session panels">
+                <Tab value="prompt">Prompt</Tab>
+                <Tab value="brief">Brief</Tab>
+                <Tab value="narrative">Narrative</Tab>
+                <Tab value="feedback">Feedback</Tab>
+                <Tab value="coach">Coach</Tab>
+                <Tab value="revisions">Revisions</Tab>
+              </DockTabList>
+            </DockTabStrip>
             <DockPanel value="prompt">
               {prompt ? (
                 <PromptPane
@@ -647,14 +770,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               )}
             </DockPanel>
             <DockPanel value="brief">
-              <DesignBriefEditor
-                criteria={criteria}
-                deriving={promptCriteria.deriving}
-                readOnly={readOnly}
-              />
+              <DesignBriefEditor criteria={criteria} deriving={promptCriteria.deriving} />
             </DockPanel>
             <DockPanel value="narrative">
-              <NarrativeEditor criteria={criteria} readOnly={readOnly} />
+              <NarrativeEditor criteria={criteria} />
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel
@@ -664,6 +783,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 message={polling.message}
                 criteria={criteria}
                 legacy={legacy}
+                startedAt={feedback?.createdAt ?? null}
                 onRetry={() => void handleSubmit()}
                 onSelectFinding={handleSelectFinding}
               />
@@ -678,6 +798,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 starting={startingImprove}
                 canvasEmpty={canvasEmpty}
                 promptArchived={promptArchived}
+                blockedReason={blockedReason}
+                criteria={criteria}
+                earlierBest={earlierBest}
                 onStart={(maxIterations) => void handleStartImprove(maxIterations)}
                 onLoadRevision={(revisionId) => void handleSelectRevision({ id: revisionId })}
               />
