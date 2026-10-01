@@ -63,6 +63,15 @@ export const IN_FLIGHT_KINDS = ['grade', 'coach'] as const;
 export type InFlightKind = (typeof IN_FLIGHT_KINDS)[number];
 
 /**
+ * How a read knows the run holds the slot: `running` — the grader said so;
+ * `unknown` — the studio's record says the run was running, and the grader
+ * could not be asked. A write never acts on `unknown`: it asks the grader
+ * under the session lock, and a grader that cannot answer refuses it.
+ */
+export const IN_FLIGHT_STATES = ['running', 'unknown'] as const;
+export type InFlightState = (typeof IN_FLIGHT_STATES)[number];
+
+/**
  * The run holding a session's grading slot. While one is, the session takes
  * no submit and no coach start: the API refuses both (409) with
  * `describeInFlight`, and a client disables both with the same sentence.
@@ -72,23 +81,37 @@ export interface SessionInFlightDto {
   runId: string;
   /** The revision being graded, or the one the coach started from. */
   revisionNumber: number;
+  state: InFlightState;
 }
 
-const IN_FLIGHT_COPY: Record<InFlightKind, (revisionNumber: number) => string> = {
-  grade: (revisionNumber) =>
-    `Revision #${revisionNumber} is still being graded — wait for its verdict.`,
-  coach: (revisionNumber) =>
-    `The coach is still revising from revision #${revisionNumber} — wait for it to finish.`,
+const IN_FLIGHT_COPY: Record<
+  InFlightState,
+  Record<InFlightKind, (revisionNumber: number) => string>
+> = {
+  running: {
+    grade: (revisionNumber) =>
+      `Revision #${revisionNumber} is still being graded — wait for its verdict.`,
+    coach: (revisionNumber) =>
+      `The coach is still revising from revision #${revisionNumber} — wait for it to finish.`,
+  },
+  unknown: {
+    grade: (revisionNumber) =>
+      `Revision #${revisionNumber} may still be being graded — the grader cannot be reached to say.`,
+    coach: (revisionNumber) =>
+      `The coach may still be revising from revision #${revisionNumber} — the grader cannot be reached to say.`,
+  },
 };
 
 /** Why the session takes no submit and no coach start right now — the API's refusal and a client's disabled reason. */
 export const describeInFlight = (inFlight: SessionInFlightDto): string =>
-  IN_FLIGHT_COPY[inFlight.kind](inFlight.revisionNumber);
+  IN_FLIGHT_COPY[inFlight.state][inFlight.kind](inFlight.revisionNumber);
 
 /**
  * One session as `GET`, `POST` and `PATCH /sessions[/:id]` answer it: the
- * list row plus the run holding its grading slot, asked of the grader at
- * read time. Lists leave it out — it costs a grader read per session.
+ * list row plus the run holding its grading slot. The grader is asked only
+ * about a run the studio's record still says is running, and a grader that
+ * cannot answer makes that run `unknown`, never the read a failure. Lists
+ * leave it out — it can cost a grader read per session.
  */
 export interface DesignSessionDetailDto extends DesignSessionDto {
   inFlight: SessionInFlightDto | null;

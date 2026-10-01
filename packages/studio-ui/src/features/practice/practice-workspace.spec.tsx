@@ -310,7 +310,12 @@ describe('PracticeWorkspace load failures', () => {
 
 describe('PracticeWorkspace while a run holds the session', () => {
   it('[DEL-3] keeps Submit and the coach off — in the session’s own words — while a run holds the slot, whichever revision is on screen', async () => {
-    const holding = { kind: 'grade', runId: 'run-2', revisionNumber: 2 } as const;
+    const holding = {
+      kind: 'grade',
+      runId: 'run-2',
+      revisionNumber: 2,
+      state: 'running',
+    } as const;
     const revisions = [
       makeRevisionSummary({
         id: 'rev-2',
@@ -400,7 +405,12 @@ describe('PracticeWorkspace loading a revision over the draft', () => {
 
 describe('PracticeWorkspace when an action fails', () => {
   it('[DEL-3] says a refused submit as an alert, in the server’s words', async () => {
-    const reason = describeInFlight({ kind: 'coach', runId: 'run-5', revisionNumber: 1 });
+    const reason = describeInFlight({
+      kind: 'coach',
+      runId: 'run-5',
+      revisionNumber: 1,
+      state: 'running',
+    });
     stubApi(
       sessionRoutes({
         extra: [

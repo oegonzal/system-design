@@ -6,7 +6,7 @@ import { makeSession } from '../../testing/fixtures';
 import { IN_FLIGHT_POLL_INTERVAL_MS, useSessionInFlight } from './use-session-in-flight';
 
 const SESSION_PATH = /^\/api\/sessions\/session-1$/;
-const GRADE = { kind: 'grade', runId: 'run-2', revisionNumber: 2 } as const;
+const GRADE = { kind: 'grade', runId: 'run-2', revisionNumber: 2, state: 'running' } as const;
 
 async function advance(ms: number) {
   await act(async () => {
@@ -73,7 +73,7 @@ describe('useSessionInFlight', () => {
   });
 
   it('[DEL-3] reports a different run the server says holds the slot', async () => {
-    const coach = { kind: 'coach', runId: 'run-3', revisionNumber: 2 } as const;
+    const coach = { kind: 'coach', runId: 'run-3', revisionNumber: 2, state: 'running' } as const;
     stubApi([{ path: SESSION_PATH, body: { data: makeSession({ inFlight: coach }) } }]);
     const hook = renderHook(() => useSessionInFlight('session-1'));
 

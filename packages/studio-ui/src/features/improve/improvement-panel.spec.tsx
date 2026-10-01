@@ -70,7 +70,12 @@ describe('ImprovementPanel', () => {
   });
 
   it('[DEL-3] is off with the session’s own reason while another run holds its grading slot', () => {
-    const reason = describeInFlight({ kind: 'grade', runId: 'run-7', revisionNumber: 2 });
+    const reason = describeInFlight({
+      kind: 'grade',
+      runId: 'run-7',
+      revisionNumber: 2,
+      state: 'running',
+    });
     renderPanel({ blockedReason: reason });
 
     const start = screen.getByTestId('improve-run') as HTMLButtonElement;

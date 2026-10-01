@@ -178,8 +178,9 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     try {
       return Promise.resolve(call());
     } catch (error) {
+      // A grader nobody can reach is unavailable, as the HTTP client reports it.
       if (error instanceof LoopUnreachable) {
-        throw new BadGatewayException(error.message);
+        throw new ServiceUnavailableException(error.message);
       }
       if (error instanceof DerivationFailed) {
         throw new ServiceUnavailableException({

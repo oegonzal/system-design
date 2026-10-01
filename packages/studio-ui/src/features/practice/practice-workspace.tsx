@@ -294,11 +294,16 @@ const toTarget = (revision: FeedbackTarget): FeedbackTarget => ({
   createdAt: revision.createdAt,
 });
 
-/** The run a fresh submission's grade holds the session's slot with. */
+/** The run a fresh submission's grade holds the session's slot with — running, since it just started. */
 const gradeSlot = (revision: DesignRevisionDto): SessionInFlightDto | null =>
   revision.evaluation === null
     ? null
-    : { kind: 'grade', runId: revision.evaluation.runId, revisionNumber: revision.revisionNumber };
+    : {
+        kind: 'grade',
+        runId: revision.evaluation.runId,
+        revisionNumber: revision.revisionNumber,
+        state: 'running',
+      };
 
 function toSummary(revision: DesignRevisionDto): DesignRevisionSummaryDto {
   return {
@@ -592,6 +597,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           kind: 'coach',
           runId: started.runId,
           revisionNumber: fromRevision ? loaded.revisionNumber : started.revision.revisionNumber,
+          state: 'running',
         });
         if (!fromRevision) {
           storeApi.getState().markClean();
@@ -697,7 +703,12 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const holder: SessionInFlightDto | null =
     inFlight ??
     (coaching !== null && coachBase !== undefined
-      ? { kind: 'coach', runId: coaching.runId, revisionNumber: coachBase.revisionNumber }
+      ? {
+          kind: 'coach',
+          runId: coaching.runId,
+          revisionNumber: coachBase.revisionNumber,
+          state: 'running',
+        }
       : null);
   const blockedReason = holder !== null ? describeInFlight(holder) : null;
   const earlierBest = improve.run !== null ? earlierRunBest(revisions, improve.run.runId) : null;

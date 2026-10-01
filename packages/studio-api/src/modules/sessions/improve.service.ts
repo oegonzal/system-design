@@ -23,6 +23,7 @@ import {
 import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sysdesign/db';
 
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { recordCoachingStatus } from './coaching-status';
 import { findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
@@ -122,6 +123,7 @@ export class ImproveService {
           kind: 'grade',
           runId: base.qualityRunId,
           revisionNumber: base.revisionNumber,
+          state: 'running',
         }),
       );
     }
@@ -167,6 +169,8 @@ export class ImproveService {
     if (!coaching) throw new NotFoundException(`no coaching run ${runId} in session ${sessionId}`);
     const run = await this.loop.getRun(runId);
     if (!run) throw new NotFoundException(`Run ${runId} not found`);
+    // A finished run is recorded as such, so the session reads without asking again.
+    recordCoachingStatus(coaching, run.status);
 
     const base = coaching.baseRevision;
     // The base's grade is this run's own only on the draft path; an adopted
@@ -189,8 +193,8 @@ export class ImproveService {
     if (recorded.length === 0) {
       if (run.status === 'failed' && ownsBase && base.evaluationStatus !== 'failed') {
         base.evaluationStatus = 'failed';
-        await this.em.flush();
       }
+      await this.em.flush();
       return { ...header, iterations: [] };
     }
 

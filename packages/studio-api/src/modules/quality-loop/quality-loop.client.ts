@@ -1,3 +1,4 @@
+import { HttpException, HttpStatus } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
@@ -14,6 +15,21 @@ export interface QualityLoopHealth {
   status: string;
   llm: LlmModelDto;
 }
+
+/**
+ * The statuses every adapter of this port raises when the loop cannot answer
+ * — unreachable (503), too slow (504), or answering with an error (502) — as
+ * distinct from a run or document it does not have, which is `null`.
+ */
+export const LOOP_UNAVAILABLE_STATUSES: ReadonlySet<number> = new Set([
+  HttpStatus.BAD_GATEWAY,
+  HttpStatus.SERVICE_UNAVAILABLE,
+  HttpStatus.GATEWAY_TIMEOUT,
+]);
+
+/** Whether an error is the loop failing to answer — what a read may survive by saying it does not know. */
+export const isLoopUnavailable = (error: unknown): boolean =>
+  error instanceof HttpException && LOOP_UNAVAILABLE_STATUSES.has(error.getStatus());
 
 /**
  * The studio's port onto the quality loop — the only thing in this API that

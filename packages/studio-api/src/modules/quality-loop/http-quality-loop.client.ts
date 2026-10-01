@@ -46,10 +46,11 @@ const data = <T>(body: unknown): T => (body as ApiResponse<T>).data;
 
 /**
  * The quality loop over HTTP. Its failures become the studio's gateway
- * errors: a timeout is 504, an unreachable or refusing service is 502, and a
- * 503 from `/criteria` — no model — is passed through as 503 with the
- * availability, so the client can say why. A 404 on a read is `null`, not
- * an error: the caller decides what a missing run means.
+ * errors — `LOOP_UNAVAILABLE_STATUSES`: a timeout is 504, an unreachable
+ * service 503 and a refusing one 502, and a 503 from `/criteria` — no model —
+ * is passed through as 503 with the availability, so the client can say why.
+ * A 404 on a read is `null`, not an error: the caller decides what a missing
+ * run means.
  */
 export class HttpQualityLoopClient extends QualityLoopClient {
   constructor(

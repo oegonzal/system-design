@@ -2,6 +2,7 @@ import { BadGatewayException } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
+  describeInFlight,
   PROMPT_COPY,
   type ApiErrorResponse,
   type CanvasGraph,
@@ -21,7 +22,7 @@ import {
   type ListSessionsResponse,
   type StartImproveResponse,
 } from '@sysdesign/contracts';
-import { DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
+import { CoachingRun, DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
 import { authoredPrompt } from '../prompts/prompts.controller.spec';
@@ -322,6 +323,7 @@ describe('sessions', () => {
         kind: 'grade',
         runId: 'fake-run-1',
         revisionNumber: 1,
+        state: 'running',
       });
       const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
       expect(list.body.meta.total).toBe(1);
@@ -896,6 +898,7 @@ describe('sessions', () => {
         kind: 'coach',
         runId: 'fake-run-2',
         revisionNumber: 1,
+        state: 'running',
       });
       const refusal = 'The coach is still revising from revision #1 — wait for it to finish.';
       const submitted = await submit(sessionId, submission());
@@ -916,6 +919,62 @@ describe('sessions', () => {
       const free = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
       expect(free.body.data.inFlight).toBeNull();
       expect((await submit(sessionId, submission())).status).toBe(201);
+    });
+
+    it('[DEL-3] a session reads while the grader is down: a run its record says is running is in flight as unknown, an ended one is never asked about, and a write is still refused', async () => {
+      const { sessionId } = await startSession();
+      const session = () => call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      const { body: graded } = await submit(sessionId, submission());
+
+      // A grade in flight, the grader unreachable: the read answers, and says it cannot know.
+      h.loop.unreachable = true;
+      const unsure = await session();
+      expect(unsure.status).toBe(200);
+      const held = unsure.body.data.inFlight;
+      expect(held).toEqual({
+        kind: 'grade',
+        runId: 'fake-run-1',
+        revisionNumber: 1,
+        state: 'unknown',
+      });
+      expect(held && describeInFlight(held)).toBe(
+        'Revision #1 may still be being graded — the grader cannot be reached to say.',
+      );
+      // A write must know: asked under the lock, the unreachable grader refuses it.
+      expect((await submit(sessionId, submission())).status).toBe(503);
+      const patched = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'in-progress' }),
+      });
+      expect(patched.status).toBe(200);
+      expect(patched.body.data.inFlight?.state).toBe('unknown');
+
+      // Back up, the grade ends; a coach then runs to its end and is recorded as ended.
+      h.loop.unreachable = false;
+      h.loop.complete('fake-run-1');
+      await startImprove(sessionId, { baseRevisionId: graded.data.id, maxIterations: 2 });
+      expect((await session()).body.data.inFlight).toMatchObject({
+        kind: 'coach',
+        state: 'running',
+      });
+      h.loop.unreachable = true;
+      expect((await session()).body.data.inFlight).toMatchObject({
+        kind: 'coach',
+        runId: 'fake-run-2',
+        state: 'unknown',
+      });
+      h.loop.unreachable = false;
+      h.loop.complete('fake-run-2', [{ overall: 70, artifact: coached() }]);
+      expect((await session()).body.data.inFlight).toBeNull();
+      const coaching = await h.em.fork().findOneOrFail(CoachingRun, { runId: 'fake-run-2' });
+      expect(coaching.status).toBe('complete');
+
+      // Every run ended and recorded: the session reads without the grader at all.
+      h.loop.unreachable = true;
+      const ended = await session();
+      expect(ended.status).toBe(200);
+      expect(ended.body.data.inFlight).toBeNull();
+      h.loop.unreachable = false;
     });
 
     it('[DEL-3] a running coach’s finished iterations are listed and imported as they land, and it stops only when the run does', async () => {

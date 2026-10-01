@@ -31,7 +31,8 @@ import {
 } from '@sysdesign/db';
 
 import { PromptsService } from '../prompts/prompts.service';
-import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { isLoopUnavailable, QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { recordCoachingStatus } from './coaching-status';
 import { EvaluationsService } from './evaluations.service';
 import type { ListRevisionsQueryInput, ListSessionsQueryInput } from './session-requests';
 import type { SessionDetail, SessionWithLatest } from './sessions.mapper';
@@ -46,6 +47,14 @@ export interface RevisionCache {
 
 /** What a grading run is started over: the submission itself, or a recorded iteration to adopt. */
 export type RunSource = { output: DesignSubmission } | { adopt: AdoptedIterationRef };
+
+/**
+ * Who asks which run holds the slot. A `write` must know: the grader is
+ * asked, and a grader that cannot answer refuses the write. A `read` says
+ * what it cannot learn: a run the record says is running is `unknown` while
+ * the grader cannot be asked, and the read still answers.
+ */
+type SlotAsker = 'write' | 'read';
 
 /** What every write under the session lock receives: the transaction's manager, the row, its prompt. */
 export type LockedWork<T> = (
@@ -124,7 +133,7 @@ export class SessionsService {
   }
 
   private async detail(found: SessionWithLatest): Promise<SessionDetail> {
-    return { ...found, inFlight: await this.inFlight(this.em, found.session) };
+    return { ...found, inFlight: await this.inFlight(this.em, found.session, 'read') };
   }
 
   /**
@@ -196,15 +205,21 @@ export class SessionsService {
     if (problems.length > 0) throw new UnprocessableEntityException(problems);
   }
 
-  /** One run at a time per session: a submit or a coach start is refused while another holds the slot. */
+  /**
+   * One run at a time per session: a submit or a coach start is refused while
+   * another holds the slot. Asked as a write, under the session lock — a
+   * grader that cannot say whether the slot is free refuses the write too.
+   */
   async assertNoGradeInFlight(em: EntityManager, session: DesignSession): Promise<void> {
-    const inFlight = await this.inFlight(em, session);
+    const inFlight = await this.inFlight(em, session, 'write');
     if (inFlight !== null) throw new ConflictException(describeInFlight(inFlight));
   }
 
   /**
-   * The run holding the session's one grading slot, asked of the loop rather
-   * than of a cache. A coaching run comes first: it grades as it revises,
+   * The run holding the session's one grading slot. The loop is asked only
+   * about a run the studio's record says is running, and what it says of a
+   * finished one is recorded, so a session whose runs have ended reads
+   * without the grader. A coaching run comes first: it grades as it revises,
    * from a draft or from an adopted grade alike, and only the newest can be
    * live, since each start was refused while another was. Then the latest
    * revision's grade — its cache says `running` until someone reads the
@@ -213,18 +228,27 @@ export class SessionsService {
   private async inFlight(
     em: EntityManager,
     session: DesignSession,
+    asker: SlotAsker,
   ): Promise<SessionInFlightDto | null> {
     const coaching = await em.findOne(
       CoachingRun,
       { session: session.id },
       { orderBy: { startedAt: 'desc', runId: 'desc' }, populate: ['baseRevision'] },
     );
-    if (coaching !== null && (await this.loop.getRun(coaching.runId))?.status === 'running') {
-      return {
-        kind: 'coach',
-        runId: coaching.runId,
-        revisionNumber: coaching.baseRevision.revisionNumber,
-      };
+    if (coaching !== null && coaching.status === 'running') {
+      const state = await this.ask(asker, async () => {
+        const run = await this.loop.getRun(coaching.runId);
+        if (run !== null && recordCoachingStatus(coaching, run.status)) await em.flush();
+        return run?.status ?? null;
+      });
+      if (state === 'running' || state === 'unknown') {
+        return {
+          kind: 'coach',
+          runId: coaching.runId,
+          revisionNumber: coaching.baseRevision.revisionNumber,
+          state,
+        };
+      }
     }
     const latest = await em.findOne(
       DesignRevision,
@@ -233,10 +257,23 @@ export class SessionsService {
     );
     if (latest === null || latest.evaluationStatus !== 'running') return null;
     if (latest.qualityRunId === null) return null;
-    const grade = await this.evaluations.syncRevision(latest, em);
-    return grade.status === 'running'
-      ? { kind: 'grade', runId: latest.qualityRunId, revisionNumber: latest.revisionNumber }
+    const state = await this.ask(
+      asker,
+      async () => (await this.evaluations.syncRevision(latest, em)).status,
+    );
+    return state === 'running' || state === 'unknown'
+      ? { kind: 'grade', runId: latest.qualityRunId, revisionNumber: latest.revisionNumber, state }
       : null;
+  }
+
+  /** The loop's answer — or, for a read, `unknown` when the loop cannot give one. */
+  private async ask<A>(asker: SlotAsker, question: () => Promise<A>): Promise<A | 'unknown'> {
+    try {
+      return await question();
+    } catch (error) {
+      if (asker === 'read' && isLoopUnavailable(error)) return 'unknown';
+      throw error;
+    }
   }
 
   /** One `system-design-canvas` run on the prompt's fixed rubric: over a submission, or from a recorded iteration. */
