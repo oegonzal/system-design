@@ -1,4 +1,4 @@
-import type { ApiListResponse, ApiResponse, ListMeta } from '@sysdesign/contracts';
+import type { ApiResponse } from '@sysdesign/contracts';
 
 /**
  * Envelope constructors.
@@ -13,5 +13,4 @@ import type { ApiListResponse, ApiResponse, ListMeta } from '@sysdesign/contract
 /** Single resource: `{ data }`. */
 export const ok = <T>(data: T): ApiResponse<T> => ({ data });
 
-/** Collection: `{ data, meta }`. */
-export const page = <T>(data: T[], meta: ListMeta): ApiListResponse<T> => ({ data, meta });
+// Collections use nest-kit `page`, the one `{ data, meta }` envelope every API shares.

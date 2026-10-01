@@ -14,7 +14,6 @@ const motionProperties = (theme: AppTheme) => `
   --motion-duration-fast: ${theme.motion.ms.fast}ms;
   --motion-duration-normal: ${theme.motion.ms.normal}ms;
   --motion-duration-slow: ${theme.motion.ms.slow}ms;
-  --motion-distance: ${theme.motion.distancePx}px;
 `;
 
 /**
@@ -26,7 +25,6 @@ const REDUCED_MOTION_PROPERTIES = `
   --motion-duration-fast: 0.01ms;
   --motion-duration-normal: 0.01ms;
   --motion-duration-slow: 0.01ms;
-  --motion-distance: 0px;
 `;
 
 /**

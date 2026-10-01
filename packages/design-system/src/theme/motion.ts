@@ -53,8 +53,6 @@ export interface MotionTokens {
   easing: EasingScale;
   /** Raw milliseconds, for `globalStyles` to emit and for specs. Not for components. */
   ms: MotionMilliseconds;
-  /** Travel distance for entrance animations, in pixels. */
-  distancePx: number;
 }
 
 const BASE_MS: MotionMilliseconds = { instant: 80, fast: 150, normal: 240, slow: 400 };
@@ -66,12 +64,6 @@ const BASE_MS: MotionMilliseconds = { instant: 80, fast: 150, normal: 240, slow:
  * getting stranded at `opacity: 0`.
  */
 const TIME_SCALE = { full: 1, reduced: 0 } as const satisfies Record<MotionLevel, number>;
-
-/**
- * Distance is a separate axis from duration: a translate at any speed is still
- * vestibular motion, so `reduced` zeroes the travel as well as the clock.
- */
-const DISTANCE_PX = { full: 12, reduced: 0 } as const satisfies Record<MotionLevel, number>;
 
 /** Easing does not vary by level. One fewer axis to reason about. */
 export const EASING: EasingScale = {
@@ -97,7 +89,6 @@ export function createMotion(level: MotionLevel): MotionTokens {
   return {
     level,
     ms,
-    distancePx: DISTANCE_PX[level],
     easing: EASING,
     duration: {
       instant: `var(--motion-duration-instant, ${ms.instant}ms)`,
@@ -114,10 +105,6 @@ export function createMotion(level: MotionLevel): MotionTokens {
  * Interpolate these (``animation: ${spin} …``), never stringify them: a
  * stringified `Keyframes` skips Emotion's registration step and the animation
  * silently does nothing.
- *
- * A keyframe that translates reads `var(--motion-distance)` rather than taking
- * a parameter, so the motion level reaches it through the same channel as the
- * durations.
  */
 
 /** Skeleton placeholder. Infinite — see the reduced-motion note in `global.ts`. */

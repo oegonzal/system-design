@@ -25,9 +25,9 @@ import type {
   SubmitRevisionRequest,
   UpdateSessionRequest,
 } from '@sysdesign/contracts';
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
-import { ok, page } from '../../common/envelope';
+import { ok } from '../../common/envelope';
 import { ImproveService } from './improve.service';
 import {
   createSessionSchema,
@@ -64,7 +64,7 @@ export class SessionsController {
     @Query(new ZodValidationPipe(listSessionsQuerySchema)) query: ListSessionsQueryInput,
   ): Promise<ListSessionsResponse> {
     const [items, total] = await this.sessions.list(query);
-    return page(items.map(toSessionDto), { total, limit: query.limit, offset: query.offset });
+    return page(items.map(toSessionDto), total, query);
   }
 
   @Get(':id')
@@ -110,11 +110,7 @@ export class SessionsController {
     @Query(new ZodValidationPipe(listRevisionsQuerySchema)) query: ListRevisionsQueryInput,
   ): Promise<ListRevisionsResponse> {
     const [items, total] = await this.sessions.listRevisions(id, query);
-    return page(items.map(toRevisionSummaryDto), {
-      total,
-      limit: query.limit,
-      offset: query.offset,
-    });
+    return page(items.map(toRevisionSummaryDto), total, query);
   }
 
   /** 202: the draft is stored as a revision and the coach is running; poll the run. */

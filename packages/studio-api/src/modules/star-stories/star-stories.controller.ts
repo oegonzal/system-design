@@ -15,9 +15,9 @@ import type {
   ListStarStoriesResponse,
   SaveStarStoryRequest,
 } from '@sysdesign/contracts';
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
-import { ok, page } from '../../common/envelope';
+import { ok } from '../../common/envelope';
 import {
   listStarStoriesQuerySchema,
   saveStarStorySchema,
@@ -42,7 +42,7 @@ export class StarStoriesController {
     @Query(new ZodValidationPipe(listStarStoriesQuerySchema)) query: ListStarStoriesQueryInput,
   ): Promise<ListStarStoriesResponse> {
     const [items, total] = await this.stories.list(query);
-    return page(items.map(toStarStoryDto), { total, limit: query.limit, offset: query.offset });
+    return page(items.map(toStarStoryDto), total, query);
   }
 
   @Get(':id')

@@ -4,8 +4,9 @@ import {
   type GetExperienceResponse,
   type ListExperiencesResponse,
 } from '@sysdesign/contracts';
+import { page } from '@sysdesign/nest-kit';
 
-import { ok, page } from '../../common/envelope';
+import { ok } from '../../common/envelope';
 import { toExperienceProfileDto } from './experiences.mapper';
 import { ExperiencesService } from './experiences.service';
 
@@ -16,11 +17,7 @@ export class ExperiencesController {
   @Get()
   async list(): Promise<ListExperiencesResponse> {
     const [items, total] = await this.experiences.list();
-    return page(items.map(toExperienceProfileDto), {
-      total,
-      limit: DEFAULT_LIST_LIMIT,
-      offset: 0,
-    });
+    return page(items.map(toExperienceProfileDto), total, { limit: DEFAULT_LIST_LIMIT, offset: 0 });
   }
 
   /** ParseUUIDPipe turns a malformed id into a 400 before we query for nothing. */

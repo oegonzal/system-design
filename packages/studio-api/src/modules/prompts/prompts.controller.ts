@@ -21,9 +21,9 @@ import type {
   StartPromptGenerationResponse,
   UpdatePromptRequest,
 } from '@sysdesign/contracts';
-import { ZodValidationPipe } from '@sysdesign/nest-kit';
+import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
-import { ok, page } from '../../common/envelope';
+import { ok } from '../../common/envelope';
 import {
   authorPromptSchema,
   generatePromptSchema,
@@ -89,7 +89,7 @@ export class PromptsController {
     @Query(new ZodValidationPipe(listPromptsQuerySchema)) query: ListPromptsQueryInput,
   ): Promise<ListPromptsResponse> {
     const [items, total] = await this.prompts.list(query);
-    return page(items.map(toPromptDto), { total, limit: query.limit, offset: query.offset });
+    return page(items.map(toPromptDto), total, query);
   }
 
   @Get(':id')

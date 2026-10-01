@@ -15,6 +15,8 @@ async function bootstrap() {
   // Prefix and CORS live in configureApp so the integration tests boot an
   // identically configured app.
   configureApp(app);
+  // SIGTERM/SIGINT close the MikroORM pool instead of dropping connections.
+  app.enableShutdownHooks();
 
   const port = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 3000;
   await app.listen(port);
