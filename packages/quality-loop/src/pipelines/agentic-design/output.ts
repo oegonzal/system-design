@@ -7,9 +7,10 @@
  * `from` and `to` — because those are the names other sections point at, and a
  * dangling reference is a broken artifact rather than a weak one. Everywhere
  * else emptiness is a defect for a critic to name, deliberately not a schema
- * violation: `extractStructured` repairs a value that is too big by clamping it
- * but cannot repair one that is too small, and there is no retry, so a single
- * empty string would otherwise discard the whole answer. It already did once.
+ * violation: there is no retry, so a single empty string would discard the
+ * whole answer. It already did once. For the same reason every length bound
+ * sits above what the producer has measurably written (the spec holds the
+ * measurements): a string past its bound is a miss, never cut to fit.
  *
  * `roles` declare what they consume and produce; `contracts` declare the
  * hand-offs between them. That is redundant on purpose — the redundancy is what
@@ -25,21 +26,21 @@ export const agenticDesignSchema = z.strictObject({
   summary: z
     .string()
     .min(1)
-    .max(1100)
+    .max(1600)
     .describe(
       'The shape of the workflow in 3–5 sentences: the hardest thing about it and how the design meets it.',
     ),
   assumptions: z
-    .array(z.string().max(160))
+    .array(z.string().max(220))
     .max(8)
     .describe('What the brief left unsaid and you decided.'),
   roles: z
     .array(
       z.strictObject({
         name: z.string().min(1).max(60),
-        responsibility: z.string().max(300).describe('The one thing this role owns.'),
+        responsibility: z.string().max(340).describe('The one thing this role owns.'),
         consumes: z.string().max(200).describe('What it requires to do its work.'),
-        produces: z.string().max(200).describe('What it hands on, and in what shape.'),
+        produces: z.string().max(220).describe('What it hands on, and in what shape.'),
       }),
     )
     .min(1)
@@ -53,7 +54,7 @@ export const agenticDesignSchema = z.strictObject({
         payload: z.string().max(200).describe('What crosses the boundary.'),
         guarantee: z
           .string()
-          .max(200)
+          .max(360)
           .describe('What the receiver may assume, including on failure.'),
       }),
     )
@@ -63,7 +64,7 @@ export const agenticDesignSchema = z.strictObject({
     .array(
       z.strictObject({
         name: z.string().max(120),
-        steps: z.array(z.string().max(200)).max(8),
+        steps: z.array(z.string().max(340)).max(8),
       }),
     )
     .max(8)
@@ -72,8 +73,8 @@ export const agenticDesignSchema = z.strictObject({
     .array(
       z.strictObject({
         name: z.string().max(80),
-        decides: z.string().max(200).describe('What this rule settles.'),
-        declaredAs: z.string().max(160).describe('Where it lives as data rather than code.'),
+        decides: z.string().max(260).describe('What this rule settles.'),
+        declaredAs: z.string().max(280).describe('Where it lives as data rather than code.'),
       }),
     )
     .max(8)
@@ -81,9 +82,9 @@ export const agenticDesignSchema = z.strictObject({
   memory: z
     .array(
       z.strictObject({
-        what: z.string().max(160).describe('What is kept or retrieved.'),
-        shape: z.string().max(200).describe('The form it is stored in.'),
-        usedBy: z.string().max(120).describe('Which role reads it, and when.'),
+        what: z.string().max(200).describe('What is kept or retrieved.'),
+        shape: z.string().max(250).describe('The form it is stored in.'),
+        usedBy: z.string().max(170).describe('Which role reads it, and when.'),
       }),
     )
     .max(6)
@@ -92,21 +93,21 @@ export const agenticDesignSchema = z.strictObject({
     .array(
       z.strictObject({
         change: z.string().max(160).describe('A change someone will want.'),
-        requires: z.string().max(200).describe('What it costs — ideally data, not code.'),
+        requires: z.string().max(360).describe('What it costs — ideally data, not code.'),
       }),
     )
     .max(6),
   tradeoffs: z
     .array(
       z.strictObject({
-        decision: z.string().max(160),
-        rationale: z.string().max(300),
-        alternative: z.string().max(160).nullable(),
+        decision: z.string().max(180),
+        rationale: z.string().max(340),
+        alternative: z.string().max(210).nullable(),
       }),
     )
     .max(8),
   risks: z
-    .array(z.strictObject({ risk: z.string().max(160), mitigation: z.string().max(300) }))
+    .array(z.strictObject({ risk: z.string().max(200), mitigation: z.string().max(340) }))
     .max(8),
 });
 export type AgenticDesign = z.infer<typeof agenticDesignSchema>;

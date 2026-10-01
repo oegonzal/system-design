@@ -27,7 +27,7 @@ export const experienceDigestSchema = z.strictObject({
   summary: z
     .string()
     .min(1)
-    .max(500)
+    .max(950)
     .describe("What the record shows moved the output's quality, in 2–4 sentences."),
   memories: z
     .array(

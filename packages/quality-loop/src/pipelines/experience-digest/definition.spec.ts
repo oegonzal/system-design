@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { jsonSchemaTypes } from '../../core/testing';
+import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { EXPERIENCE_DIGEST } from './definition';
 import { experienceDigestOutput } from './output';
 import { sampleDigest } from './testing';
@@ -55,6 +55,19 @@ describe('the experience-digest pipeline', () => {
     for (const memory of digest.memories) {
       for (const alias of memory.evidence) expect(ids).not.toContain(alias);
     }
+  });
+
+  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
+    // The longest each path has been written across the recorded runs
+    // (static/runs, to 2026-10-01). A string past its bound is a miss that
+    // discards the whole answer — never cut to fit — so no bound may be one
+    // the producer meets.
+    const measured: Record<string, number> = {
+      summary: 755,
+      'memories[].insight': 862,
+      'memories[].appliesWhen': 235,
+    };
+    expect(boundsBelowMeasured(experienceDigestOutput.schema, measured)).toEqual([]);
   });
 
   it('[QL-6] the digest a model answers with contains no number', () => {

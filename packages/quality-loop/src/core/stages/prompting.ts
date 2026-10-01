@@ -38,7 +38,7 @@ const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly s
 };
 
 const OUTPUT_RULE =
-  'Reply with ONE complete JSON object that satisfies the schema — nothing else. Keep every string short; an over-long reply is truncated and discarded.';
+  'Reply with ONE complete JSON object that satisfies the schema — nothing else. Keep every string within its maxLength: a string past it is never cut to fit, and the whole reply is discarded.';
 
 export function systemPrompt(role: keyof typeof RULES, persona: string): string {
   return [persona.trim(), '', ...RULES[role], OUTPUT_RULE].join('\n');

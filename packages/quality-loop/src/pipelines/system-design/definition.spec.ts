@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { boundsBelowMeasured } from '../../core/testing';
 import { SYSTEM_DESIGN } from './definition';
 import { designAnswerOutput, type DesignAnswer } from './output';
 
@@ -27,6 +28,31 @@ describe('the system-design pipeline', () => {
       expect(lens.persona.length).toBeGreaterThan(80);
     }
     expect(SYSTEM_DESIGN.producer.persona).toContain('system-design');
+  });
+
+  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
+    // The longest each path has been written across the recorded runs
+    // (static/runs, to 2026-10-01). A string past its bound is a miss that
+    // discards the whole answer — never cut to fit — so no bound may be one
+    // the producer meets.
+    const measured: Record<string, number> = {
+      summary: 1032,
+      'assumptions[]': 180,
+      'components[].name': 41,
+      'components[].responsibility': 360,
+      'components[].technology': 95,
+      'flows[].name': 97,
+      'flows[].steps[]': 358,
+      'dataModel[]': 438,
+      'tradeoffs[].decision': 167,
+      'tradeoffs[].rationale': 457,
+      'tradeoffs[].alternative': 226,
+      'risks[].risk': 159,
+      'risks[].mitigation': 364,
+      'capacity[].metric': 50,
+      'capacity[].estimate': 279,
+    };
+    expect(boundsBelowMeasured(designAnswerOutput.schema, measured)).toEqual([]);
   });
 
   it('[QL-4] every location the answer exposes is printed verbatim where a judge reads it', () => {

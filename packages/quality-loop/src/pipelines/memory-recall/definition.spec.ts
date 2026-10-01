@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { jsonSchemaTypes } from '../../core/testing';
+import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { memoryPackOutput } from './output';
 import { samplePack } from './testing';
@@ -33,6 +33,22 @@ describe('the memory-recall pipeline', () => {
       'gap.1',
     ]);
     expect(memoryPackOutput.schema.safeParse(pack).success).toBe(true);
+  });
+
+  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
+    // The longest each path has been written across the recorded runs
+    // (static/runs, to 2026-10-01). A string past its bound is a miss that
+    // discards the whole answer — never cut to fit — so no bound may be one
+    // the producer meets.
+    const measured: Record<string, number> = {
+      summary: 842,
+      'kept[].serves': 163,
+      'kept[].insight': 575,
+      'kept[].caveat': 267,
+      'dropped[].reason': 250,
+      'gaps[]': 200,
+    };
+    expect(boundsBelowMeasured(memoryPackOutput.schema, measured)).toEqual([]);
   });
 
   it('[QL-6] the pack a model answers with contains no number', () => {

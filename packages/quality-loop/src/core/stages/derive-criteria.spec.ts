@@ -34,6 +34,8 @@ describe('createCriteriaDeriver', () => {
     ]);
     expect(calls[0].user).toContain('# The goal\n\nExactly this.');
     expect(calls[0].system).toContain(deriveCriteria.persona);
+    // Every stage is told the truth about its bounds: nothing it writes is cut to fit.
+    expect(calls[0].system).toContain('never cut to fit');
   });
 
   it('[QL-2] a refusal is a diagnostic, not evidence', async () => {

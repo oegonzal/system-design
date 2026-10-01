@@ -31,7 +31,12 @@ const refs = (ids: readonly string[], max: number, description: string) => {
 };
 
 const STATEMENT_MAX = CRITERION_STATEMENT_MAX_LENGTH;
-const RATIONALE_MAX = 600;
+/**
+ * Above the longest rationale any lens has measurably written (695
+ * characters, a critic, across every recorded run): a rationale past it is a
+ * miss, never cut to fit, so the bound must not be one a lens routinely meets.
+ */
+const RATIONALE_MAX = 900;
 /** How many artifact parts one finding may point at. */
 const MAX_LOCATION_REFS = 8;
 /** How many criteria one finding may weaken. */

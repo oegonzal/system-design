@@ -76,20 +76,22 @@ function* braceObjects(text: string): Generator<string> {
 }
 
 /**
- * Two kinds of schema issue are excess, not a wrong answer. A `too_big` on a
- * string or array is an overshoot: with no server-side constraint the model
- * writes past a `.max()` it was shown, and rejecting a whole pass for a
- * 900-character summary loses everything grounded in it. An
- * `unrecognized_keys` on a strict object is an aside: a `steps_note` beside
- * the `steps` the schema asked for. Clamp the one, strip the other, and let
- * the schema judge again — schema-driven, so no caller knows a cap or a key
- * list exists. Anything else is left for the schema to reject.
+ * Two kinds of schema issue are excess rather than a wrong answer, and both
+ * can be undone without changing a word the model wrote. An array past its
+ * `.max()` drops its trailing items — whole items, worst-last as every list
+ * here asks to be ordered. An `unrecognized_keys` on a strict object is an
+ * aside (a `steps_note` beside the `steps` the schema asked for) and is
+ * stripped. Schema-driven, so no caller knows a cap or a key list exists.
+ *
+ * A string past its `.max()` is never cut: a clamp lands mid-word, and the
+ * cut prose is then judged and stored as if the model had written it. An
+ * overshoot is a schema miss the loop can revise or retry, and its issues are
+ * recorded so the dump says which bound was crossed — a bound the model
+ * routinely crosses is sized from the runs, not enforced with scissors.
  */
 const isRepairable = (issue: ZodIssue): boolean =>
   issue.code === 'unrecognized_keys' ||
-  (issue.code === 'too_big' &&
-    typeof issue.maximum === 'number' &&
-    (issue.origin === 'string' || issue.origin === 'array'));
+  (issue.code === 'too_big' && typeof issue.maximum === 'number' && issue.origin === 'array');
 
 function repairExcess(value: unknown, issues: readonly ZodIssue[]): unknown {
   let next = value;
@@ -100,7 +102,7 @@ function repairExcess(value: unknown, issues: readonly ZodIssue[]): unknown {
     if (issue.code === 'too_big') {
       const maximum = issue.maximum as number;
       next = updateAt(next, path, (current) =>
-        typeof current === 'string' || Array.isArray(current) ? current.slice(0, maximum) : current,
+        Array.isArray(current) ? current.slice(0, maximum) : current,
       );
     } else if (issue.code === 'unrecognized_keys') {
       const unwanted = new Set(issue.keys);
@@ -133,7 +135,7 @@ function updateAt(
   return value;
 }
 
-/** Repairs can cascade (an array trimmed, then a member's string); a few rounds settle it. */
+/** Repairs can cascade (an array trimmed, then a member's key); a few rounds settle it. */
 const REPAIR_ROUNDS = 3;
 
 /** The one validated object, or why there was none — in words a dump can carry. */
@@ -148,7 +150,7 @@ const describeIssues = (issues: readonly ZodIssue[]): string =>
 /**
  * Pull the one schema-valid JSON object out of an agent's text. Tries every
  * fenced block, then every balanced brace span, returning the first that both
- * parses AND satisfies the schema — clamping length overshoots and stripping
+ * parses AND satisfies the schema — trimming array overshoots and stripping
  * unasked-for keys on the way. A miss names what each parsed candidate got
  * wrong, or that nothing parsed at all: a reply cut before its object closed
  * reads exactly like that.

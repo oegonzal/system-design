@@ -1,0 +1,52 @@
+/**
+ * The length bounds a schema shows the model. Pure helpers only — no vitest
+ * imports, so this file compiles under the app tsconfig even though only
+ * specs use it.
+ */
+import { z, type ZodType } from 'zod';
+
+/**
+ * Every string bound in a schema, by path — `summary`, `roles[].responsibility`,
+ * `assumptions[]` — read off its JSON Schema, the form the model is given. A
+ * pipeline spec holds this against the longest each path has measurably been
+ * written: the client never cuts prose to fit, so a bound the model meets is a
+ * schema miss waiting to discard a whole answer.
+ */
+export function proseBounds(schema: ZodType): Record<string, number> {
+  const bounds: Record<string, number> = {};
+  const visit = (node: unknown, path: string): void => {
+    if (node === null || typeof node !== 'object') return;
+    const json = node as Record<string, unknown>;
+    if (typeof json['maxLength'] === 'number') bounds[path] = json['maxLength'];
+    for (const key of ['anyOf', 'oneOf', 'allOf']) {
+      const branches = json[key];
+      if (Array.isArray(branches)) for (const branch of branches) visit(branch, path);
+    }
+    if (json['items'] !== undefined) visit(json['items'], `${path}[]`);
+    const properties = json['properties'];
+    if (properties !== null && typeof properties === 'object') {
+      for (const [key, child] of Object.entries(properties)) {
+        visit(child, path === '' ? key : `${path}.${key}`);
+      }
+    }
+  };
+  visit(z.toJSONSchema(schema), '');
+  return bounds;
+}
+
+/**
+ * The paths whose bound is not above the longest measured — empty when every
+ * bound clears its measurement — and any measured path the schema no longer
+ * has, so a renamed field cannot quietly drop out of the check.
+ */
+export function boundsBelowMeasured(
+  schema: ZodType,
+  measured: Readonly<Record<string, number>>,
+): string[] {
+  const bounds = proseBounds(schema);
+  return Object.entries(measured).flatMap(([path, longest]) => {
+    const bound = bounds[path];
+    if (bound === undefined) return [`${path}: no bound in the schema`];
+    return bound > longest ? [] : [`${path}: bound ${bound} ≤ measured ${longest}`];
+  });
+}

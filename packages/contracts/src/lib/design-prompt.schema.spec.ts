@@ -4,6 +4,8 @@ import { z } from 'zod';
 import {
   criteriaFromDraft,
   DESIGN_PROMPT_HEADINGS,
+  DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS,
+  DESIGN_PROMPT_SCENARIO_MAX_LENGTH,
   designPromptDraftSchema,
   renderDesignPromptMarkdown,
   type DesignPromptDraft,
@@ -78,6 +80,32 @@ describe('designPromptDraftSchema', () => {
   });
 });
 
+describe('the draft’s prose bounds', () => {
+  it('[GEN-1] sit above the longest the drafting model has measurably written, and the scenario says its limit', () => {
+    // The longest each field has been written across the recorded
+    // design-prompt runs (static/runs, to 2026-10-01). A draft past a bound
+    // is refused whole — never cut to fit — so no bound may be one it meets.
+    const { shape } = designPromptDraftSchema;
+    const nfr = shape.nonFunctionalRequirements.element.shape;
+    const scale = shape.scale.element.shape;
+    const bounds: [string, number | null, number][] = [
+      ['title', shape.title.maxLength, 105],
+      ['scenario', shape.scenario.maxLength, 1903],
+      ['functionalRequirements[]', shape.functionalRequirements.element.maxLength, 221],
+      ['nonFunctionalRequirements[].kind', nfr.kind.maxLength, 13],
+      ['nonFunctionalRequirements[].requirement', nfr.requirement.maxLength, 128],
+      ['nonFunctionalRequirements[].target', nfr.target.maxLength, 40],
+      ['scale[].metric', scale.metric.maxLength, 35],
+      ['scale[].target', scale.target.maxLength, 31],
+      ['constraints[]', shape.constraints.element.maxLength, 247],
+    ];
+    for (const [path, bound, longest] of bounds) {
+      expect(bound ?? 0, path).toBeGreaterThan(longest);
+    }
+    expect(shape.scenario.description).toContain(String(DESIGN_PROMPT_SCENARIO_MAX_LENGTH));
+  });
+});
+
 describe('criteriaFromDraft', () => {
   it('[GEN-1] yields one criterion per row, in render order, kinded by section, ids c1…cN', () => {
     expect(
@@ -92,7 +120,7 @@ describe('criteriaFromDraft', () => {
     ]);
   });
 
-  it('[GEN-1] never exceeds the canvas cap, uses only the canvas kinds, and trims and clips a statement', () => {
+  it('[GEN-1] never exceeds the canvas cap, uses only the canvas kinds, and trims a statement', () => {
     const criteria = criteriaFromDraft(maximalDraft());
     expect(criteria).toHaveLength(CANVAS_MAX_CRITERIA);
     expect(new Set(criteria.map((c) => c.kind))).toEqual(new Set(CANVAS_CRITERION_KINDS));
@@ -103,7 +131,36 @@ describe('criteriaFromDraft', () => {
       functionalRequirements: [`  ${'x'.repeat(240)}  `],
     })[0];
     expect(long.statement).toBe('x'.repeat(240));
-    expect(long.statement.length).toBeLessThanOrEqual(CRITERION_STATEMENT_MAX_LENGTH);
+  });
+
+  it('[GEN-1] every row a draft allows becomes a criterion whole — none is cut to fit a statement', () => {
+    for (const longest of Object.values(DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS)) {
+      expect(longest).toBeLessThanOrEqual(CRITERION_STATEMENT_MAX_LENGTH);
+    }
+    const { shape } = designPromptDraftSchema;
+    const full = (max: number | null) => 'x'.repeat(max ?? 0);
+    const nfr = shape.nonFunctionalRequirements.element.shape;
+    const metric = shape.scale.element.shape;
+    const draft: DesignPromptDraft = {
+      ...draftFixture(),
+      functionalRequirements: [full(shape.functionalRequirements.element.maxLength)],
+      nonFunctionalRequirements: [
+        {
+          kind: full(nfr.kind.maxLength),
+          requirement: full(nfr.requirement.maxLength),
+          target: full(nfr.target.maxLength),
+        },
+      ],
+      scale: [{ metric: full(metric.metric.maxLength), target: full(metric.target.maxLength) }],
+      constraints: [full(shape.constraints.element.maxLength)],
+    };
+    expect(designPromptDraftSchema.safeParse(draft).success).toBe(true);
+    expect(criteriaFromDraft(draft).map((c) => c.statement.length)).toEqual([
+      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.functional,
+      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.nonFunctional,
+      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.scale,
+      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.constraint,
+    ]);
   });
 });
 

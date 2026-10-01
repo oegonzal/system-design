@@ -45,45 +45,24 @@ describe('extractStructured', () => {
     expect(extractStructured(text, schema)).toEqual({ answer: 'real', score: 9 });
   });
 
-  it('clamps a length overshoot to its cap instead of losing the whole answer', () => {
-    // No server-side constraint on this route: a model shown `.max(10)` still
-    // writes twelve characters, and a 900-char summary must not sink a pass.
-    const capped = z.object({
-      summary: z.string().max(10),
-      items: z.array(z.object({ note: z.string().max(4) })).max(1),
-    });
-    const text = JSON.stringify({
-      summary: 'twelve chars',
-      items: [{ note: 'toolong' }, { note: 'dropped' }],
-    });
-    expect(extractStructured(text, capped)).toEqual({
-      summary: 'twelve cha',
-      items: [{ note: 'tool' }],
-    });
+  it('[QL-4] trims an array past its cap to whole items instead of losing the whole answer', () => {
+    // No server-side constraint on this route: a model shown `.max(1)` still
+    // writes two items, and the extra one is dropped whole — no word is cut.
+    const capped = z.object({ items: z.array(z.object({ note: z.string() })).max(1) });
+    const text = JSON.stringify({ items: [{ note: 'kept' }, { note: 'dropped' }] });
+    expect(extractStructured(text, capped)).toEqual({ items: [{ note: 'kept' }] });
   });
 
-  it('strips a key the schema never asked for instead of losing the whole answer', () => {
-    const schema = z.strictObject({
-      flows: z.array(z.strictObject({ name: z.string(), steps: z.array(z.string().max(20)) })),
-    });
-    const text = JSON.stringify({
-      flows: [
-        {
-          name: 'read',
-          steps: ['load the page', 'a step far longer than twenty chars'],
-          steps_note: 'aside',
-        },
-      ],
-    });
-
-    expect(extractStructured(text, schema)).toEqual({
-      flows: [{ name: 'read', steps: ['load the page', 'a step far longer th'] }],
-    });
-  });
-
-  it('does not clamp its way past a real schema miss', () => {
-    const capped = z.object({ summary: z.string().max(10), score: z.number() });
-    expect(extractStructured('{"summary":"twelve chars","score":"nope"}', capped)).toBeNull();
+  it('[QL-4] never cuts prose to fit a bound: an overlong string is a miss that names the bound', () => {
+    const capped = z.object({ summary: z.string().max(10) });
+    const text = JSON.stringify({ summary: 'twelve chars' });
+    expect(extractStructured(text, capped)).toBeNull();
+    const miss = parseStructured(text, capped);
+    expect(miss.ok).toBe(false);
+    if (!miss.ok) {
+      expect(miss.reason).toMatch(/^summary: /);
+      expect(miss.reason).toContain('10');
+    }
   });
 
   it('[QL-4] says why there is no object: nothing parsed, or what each parsed candidate got wrong', () => {
@@ -100,6 +79,26 @@ describe('extractStructured', () => {
       expect(two.reason).toContain('candidate 1: score: ');
       expect(two.reason).toContain('candidate 2: answer: ');
     }
+  });
+
+  it('strips a key the schema never asked for instead of losing the whole answer', () => {
+    const schema = z.strictObject({
+      flows: z.array(
+        z.strictObject({ name: z.string(), steps: z.array(z.string().max(20)).max(1) }),
+      ),
+    });
+    const text = JSON.stringify({
+      flows: [{ name: 'read', steps: ['load the page', 'render it'], steps_note: 'aside' }],
+    });
+
+    expect(extractStructured(text, schema)).toEqual({
+      flows: [{ name: 'read', steps: ['load the page'] }],
+    });
+  });
+
+  it('does not trim its way past a real schema miss', () => {
+    const capped = z.object({ items: z.array(z.string()).max(1), score: z.number() });
+    expect(extractStructured('{"items":["a","b"],"score":"nope"}', capped)).toBeNull();
   });
 
   it('skips a first fenced block that fails the schema and takes the second that passes', () => {
@@ -286,16 +285,16 @@ describe('the subscription client reads the whole turn', () => {
       error: { name: SCHEMA_MISS, message: expect.stringContaining('no complete JSON object') },
     });
 
-    const wrong = JSON.stringify({ answer: 'not a number' });
-    const over = scripted([said('m-1', wrong), succeeded(wrong)]);
+    const long = JSON.stringify({ answer: 'far past the bound' });
+    const over = scripted([said('m-1', long), succeeded(long)]);
     await new ClaudeAgentLlmClient({ query: over.run }).withRecorder(record).completeStructured({
       system: 's',
       user: 'u',
-      schema: z.object({ answer: z.number() }),
+      schema: z.object({ answer: z.string().max(4) }),
     });
     expect(calls[1]).toMatchObject({
       outcome: 'schema-miss',
-      text: wrong,
+      text: long,
       error: { name: SCHEMA_MISS, message: expect.stringMatching(/^answer: /) },
     });
   });

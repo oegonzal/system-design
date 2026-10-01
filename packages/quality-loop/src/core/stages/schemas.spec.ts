@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { criteriaSchema, evaluationSchema, findingsSchema } from './schemas';
-import { finding, result } from '../testing';
+import { boundsBelowMeasured, finding, result } from '../testing';
 
 const walk = (node: unknown, visit: (value: Record<string, unknown>) => void): void => {
   if (Array.isArray(node)) return node.forEach((item) => walk(item, visit));
@@ -47,6 +47,20 @@ describe('per-request schemas', () => {
       criteriaSchema(['must'], 3).safeParse({ criteria: [{ kind: 'nice', statement: 'x' }] })
         .success,
     ).toBe(false);
+  });
+
+  it('[QL-4] a lens rationale bound sits above the longest any lens has measurably written', () => {
+    // Across every pipeline's recorded runs (static/runs, to 2026-10-01): a
+    // critic's longest rationale ran 695 characters, an evaluator's 619. A
+    // rationale past its bound is a miss that loses the whole sample.
+    expect(
+      boundsBelowMeasured(findingsSchema(['gap'], ['c1'], ['text'], 4), {
+        'findings[].rationale': 695,
+      }),
+    ).toEqual([]);
+    expect(
+      boundsBelowMeasured(evaluationSchema(['c1'], ['text'], 1), { 'results[].rationale': 619 }),
+    ).toEqual([]);
   });
 
   it('[QL-6] no schema a model answers contains a number', () => {

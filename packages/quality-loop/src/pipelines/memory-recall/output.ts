@@ -15,7 +15,7 @@ export const memoryPackSchema = z.strictObject({
   summary: z
     .string()
     .min(1)
-    .max(500)
+    .max(1100)
     .describe('What the query needs from memory and what the candidates offer, in 2–4 sentences.'),
   kept: z
     .array(
@@ -25,23 +25,23 @@ export const memoryPackSchema = z.strictObject({
         insight: z
           .string()
           .min(1)
-          .max(400)
+          .max(720)
           .describe(
             "What the chunk teaches for this query, in the chunk's own terms — nothing the chunk does not say.",
           ),
         caveat: z
           .string()
-          .max(200)
+          .max(340)
           .nullable()
           .describe("How the chunk's context differs from the query, or null."),
       }),
     )
     .max(MAX_KEPT),
   dropped: z
-    .array(z.strictObject({ chunk, reason: z.string().min(1).max(200) }))
+    .array(z.strictObject({ chunk, reason: z.string().min(1).max(320) }))
     .max(MAX_CANDIDATES),
   gaps: z
-    .array(z.string().min(1).max(200))
+    .array(z.string().min(1).max(250))
     .max(10)
     .describe('Needs of the query no candidate serves.'),
 });

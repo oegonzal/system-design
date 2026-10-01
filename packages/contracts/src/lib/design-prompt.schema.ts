@@ -16,45 +16,82 @@ import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines'
  *
  * The row bounds sum to the canvas pipeline's criteria cap, because a
  * generated prompt's rubric is its rows (`criteriaFromDraft`): one criterion
- * per row, never more than the grader can hold, never a blank one.
+ * per row, never more than the grader can hold, never a blank one. And each
+ * row fits a criterion statement whole — a row is one, or composes into one
+ * with its separators — so no requirement is ever cut to become a criterion.
+ *
+ * The prose bounds sit above what the drafting model has measurably written
+ * (the spec holds the measurements). Nothing on the way in cuts prose to fit:
+ * a draft past a bound is refused whole, and the loop drafts again.
  */
 const FUNCTIONAL_MAX_ROWS = 8;
 const NON_FUNCTIONAL_MAX_ROWS = 6;
 const SCALE_MAX_ROWS = 6;
 const CONSTRAINT_MAX_ROWS = 4;
 
+export const DESIGN_PROMPT_SCENARIO_MAX_LENGTH = 2400;
+const NFR_KIND_MAX_LENGTH = 24;
+const NFR_REQUIREMENT_MAX_LENGTH = 160;
+const NFR_TARGET_MAX_LENGTH = 60;
+const SCALE_METRIC_MAX_LENGTH = 48;
+const SCALE_TARGET_MAX_LENGTH = 40;
+
+/** How a table row composes into one criterion statement: its cells, in order, joined by this. */
+const STATEMENT_SEPARATOR = ' — ';
+
+/** The longest statement a row can compose into — the spec holds it to `CRITERION_STATEMENT_MAX_LENGTH`. */
+export const DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS = {
+  functional: CRITERION_STATEMENT_MAX_LENGTH,
+  nonFunctional:
+    NFR_KIND_MAX_LENGTH +
+    NFR_REQUIREMENT_MAX_LENGTH +
+    NFR_TARGET_MAX_LENGTH +
+    2 * STATEMENT_SEPARATOR.length,
+  scale: SCALE_METRIC_MAX_LENGTH + SCALE_TARGET_MAX_LENGTH + STATEMENT_SEPARATOR.length,
+  constraint: CRITERION_STATEMENT_MAX_LENGTH,
+} as const;
+
 export const designPromptDraftSchema = z.strictObject({
   title: z.string().max(PROMPT_TITLE_MAX_LENGTH).describe('Imperative, brand-neutral, one line.'),
   scenario: z
     .string()
-    .max(1600)
+    .max(DESIGN_PROMPT_SCENARIO_MAX_LENGTH)
     .describe(
-      "The situation in the second person, brand-neutral, drawn from the experience's real domain.",
+      `The situation in the second person, brand-neutral, drawn from the experience's real domain — at most ${DESIGN_PROMPT_SCENARIO_MAX_LENGTH} characters.`,
     ),
-  functionalRequirements: z.array(z.string().min(1).max(240)).max(FUNCTIONAL_MAX_ROWS),
+  functionalRequirements: z
+    .array(z.string().min(1).max(CRITERION_STATEMENT_MAX_LENGTH))
+    .max(FUNCTIONAL_MAX_ROWS),
   nonFunctionalRequirements: z
     .array(
       z.strictObject({
         kind: z
           .string()
           .min(1)
-          .max(24)
+          .max(NFR_KIND_MAX_LENGTH)
           .describe(
             'latency, availability, consistency, durability, security, cost, throughput, observability, …',
           ),
-        requirement: z.string().min(1).max(160),
+        requirement: z.string().min(1).max(NFR_REQUIREMENT_MAX_LENGTH),
         target: z
           .string()
           .min(1)
-          .max(60)
+          .max(NFR_TARGET_MAX_LENGTH)
           .describe('A figure with its unit or percentile, in words: "p99 ≤ 300 ms".'),
       }),
     )
     .max(NON_FUNCTIONAL_MAX_ROWS),
   scale: z
-    .array(z.strictObject({ metric: z.string().min(1).max(40), target: z.string().min(1).max(40) }))
+    .array(
+      z.strictObject({
+        metric: z.string().min(1).max(SCALE_METRIC_MAX_LENGTH),
+        target: z.string().min(1).max(SCALE_TARGET_MAX_LENGTH),
+      }),
+    )
     .max(SCALE_MAX_ROWS),
-  constraints: z.array(z.string().min(1).max(240)).max(CONSTRAINT_MAX_ROWS),
+  constraints: z
+    .array(z.string().min(1).max(CRITERION_STATEMENT_MAX_LENGTH))
+    .max(CONSTRAINT_MAX_ROWS),
 });
 export type DesignPromptDraft = z.infer<typeof designPromptDraftSchema>;
 
@@ -120,7 +157,9 @@ export function renderDesignPromptMarkdown(draft: DesignPromptDraft): string {
   return `${sections.join('\n\n')}\n`;
 }
 
-const statement = (text: string): string => text.trim().slice(0, CRITERION_STATEMENT_MAX_LENGTH);
+/** A row's cells as one statement. The row bounds keep it within a criterion statement; nothing is cut. */
+const statement = (...cells: readonly string[]): string =>
+  cells.map((cell) => cell.trim()).join(STATEMENT_SEPARATOR);
 
 /**
  * A generated prompt's rubric is its rows: one criterion per row, in the
@@ -139,11 +178,11 @@ export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] 
     })),
     ...draft.nonFunctionalRequirements.map((row) => ({
       kind: nonFunctional,
-      statement: statement(`${row.kind} — ${row.requirement} — ${row.target}`),
+      statement: statement(row.kind, row.requirement, row.target),
     })),
     ...draft.scale.map((row) => ({
       kind: scale,
-      statement: statement(`${row.metric} — ${row.target}`),
+      statement: statement(row.metric, row.target),
     })),
     ...draft.constraints.map((text) => ({ kind: constraint, statement: statement(text) })),
   ];
