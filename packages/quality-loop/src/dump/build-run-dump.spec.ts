@@ -125,6 +125,55 @@ describe('buildRunDump', () => {
     expect(content(dump, 'run.md')).toContain('| 1 | initial | revise |');
   });
 
+  it('[QL-10] run.md keeps every table row to its columns and says why a model call missed', async () => {
+    const trace = await runLoop(
+      {
+        deriveCriteria: () => Promise.resolve({ criteria: [criterion('c1')], diagnostic: null }),
+        producer: scriptedProducer([{ text: 't', parts: [] }]),
+        validators: [],
+        controller: STANDARD,
+        critics: [],
+        evaluators: [],
+      },
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      () => 0,
+    );
+    // A reason quoting a structural finding key, whose `|` would open a column.
+    trace.iterations[0].decision.reason = 'blockers to fix: missing_requirement|binding.1,edge.2';
+    const missed = {
+      scope: 'producer',
+      ordinal: 1,
+      model: 'test-model',
+      system: 's',
+      user: 'u',
+      schema: {},
+      maxTokens: 28_000,
+      startedAt: '2026-10-01T00:00:00.000Z',
+      durationMs: 5,
+      outcome: 'schema-miss' as const,
+      stopReason: 'end_turn',
+      usage: { inputTokens: 4, outputTokens: 21_122 },
+      requestId: null,
+      text: '"id":"n-3"}',
+      response: null,
+      error: { name: 'SchemaMiss', message: 'no complete JSON object in the reply' },
+    };
+    const page = content(
+      buildRunDump(record({ trace, exchanges: [missed] }), null),
+      'run.md',
+    ).split('\n');
+
+    const reasonRow = page.find((line) => line.startsWith('| 1 |')) ?? '';
+    expect(reasonRow).toContain('missing_requirement\\|binding.1,edge.2');
+    const header = page.find((line) => line.startsWith('| # |')) ?? '';
+    const columns = (line: string) => line.split(/(?<!\\)\|/).length;
+    expect(columns(reasonRow)).toBe(columns(header));
+    expect(page).toContain(
+      '- `producer` #1 — schema-miss, 5 ms, 4 in / 21122 out — SchemaMiss: no complete JSON object in the reply',
+    );
+  });
+
   it('[QL-10] a run that failed before any trace still gets a manifest, the goal and the error', () => {
     const dump = buildRunDump(
       record({ status: 'failed', error: { name: 'Error', message: 'boom', stack: null } }),

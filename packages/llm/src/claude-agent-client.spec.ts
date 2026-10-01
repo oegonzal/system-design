@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import type { ClaudeQuery } from './claude-account';
-import { ClaudeAgentLlmClient, extractStructured } from './claude-agent-client';
+import {
+  ClaudeAgentLlmClient,
+  extractStructured,
+  OUTPUT_TOKEN_CEILING,
+  parseStructured,
+  SCHEMA_MISS,
+} from './claude-agent-client';
 import type { LlmCall } from './exchange';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
@@ -80,6 +86,22 @@ describe('extractStructured', () => {
     expect(extractStructured('{"summary":"twelve chars","score":"nope"}', capped)).toBeNull();
   });
 
+  it('[QL-4] says why there is no object: nothing parsed, or what each parsed candidate got wrong', () => {
+    // The tail of a reply cut mid-object: braces that never balance from the top.
+    const tail = '"id":"n-3","kind":"service"}],"edges":[]}}';
+    expect(parseStructured(tail, schema)).toEqual({
+      ok: false,
+      reason: 'no complete JSON object in the reply (0 candidate span(s), none parsed)',
+    });
+
+    const two = parseStructured('{"answer":"a"} then {"score":1}', schema);
+    expect(two.ok).toBe(false);
+    if (!two.ok) {
+      expect(two.reason).toContain('candidate 1: score: ');
+      expect(two.reason).toContain('candidate 2: answer: ');
+    }
+  });
+
   it('skips a first fenced block that fails the schema and takes the second that passes', () => {
     const text =
       'Current brief:\n```json\n{"answer":"stale"}\n```\nProposal:\n```json\n{"answer":"new","score":3}\n```';
@@ -128,7 +150,7 @@ describe('the subscription client at its call site', () => {
       ).resolves.toEqual({ answer: 'ok' });
       expect(seen.env).not.toHaveProperty('ANTHROPIC_API_KEY');
       expect(seen.env).not.toHaveProperty('ANTHROPIC_AUTH_TOKEN');
-      expect(seen.env).toHaveProperty('CLAUDE_CODE_MAX_OUTPUT_TOKENS');
+      expect(seen.env?.['CLAUDE_CODE_MAX_OUTPUT_TOKENS']).toBe(String(OUTPUT_TOKEN_CEILING));
       // Every built-in tool off by the SDK's own switch, not a list of names that goes stale.
       expect(seen.options?.['tools']).toEqual([]);
       expect(seen.options).not.toHaveProperty('disallowedTools');
@@ -190,5 +212,128 @@ describe('the subscription client at its call site', () => {
       outcome: 'error',
       error: { name: 'error_max_turns', message: 'turn limit' },
     });
+  });
+});
+
+/** One streamed assistant frame: a single text block, top-level, as the CLI emits it. */
+const said = (uuid: string, text: string, extra: Record<string, unknown> = {}) => ({
+  type: 'assistant',
+  uuid,
+  parent_tool_use_id: null,
+  message: { content: [{ type: 'text', text }], stop_reason: null },
+  ...extra,
+});
+
+const succeeded = (result: string, usage = { input_tokens: 2, output_tokens: 10 }) => ({
+  type: 'result',
+  subtype: 'success',
+  is_error: false,
+  result,
+  stop_reason: 'end_turn',
+  usage,
+});
+
+describe('the subscription client reads the whole turn', () => {
+  const graph = z.object({
+    nodes: z.array(z.object({ id: z.string(), kind: z.string() })),
+    edges: z.array(z.string()),
+  });
+
+  it('parses an answer the CLI resumed in a second message after the output cap', async () => {
+    // The first API call stops at the cap mid-object; the CLI resumes it, and
+    // `result` repeats only the second message — the tail, which never parses.
+    const head = '{"nodes":[{"id":"n-1","kind":"client"},{';
+    const tail = '"id":"n-2","kind":"service"}],"edges":["e-1"]}';
+    const calls: LlmCall[] = [];
+    const { run } = scripted([
+      said('m-1', head, { error: 'max_output_tokens' }),
+      said('m-2', tail),
+      succeeded(tail, { input_tokens: 4, output_tokens: 21_122 }),
+    ]);
+    const client = new ClaudeAgentLlmClient({ query: run }).withRecorder((call) =>
+      calls.push(call),
+    );
+
+    await expect(
+      client.completeStructured({ system: 's', user: 'u', schema: graph, maxTokens: 28_000 }),
+    ).resolves.toEqual({
+      nodes: [
+        { id: 'n-1', kind: 'client' },
+        { id: 'n-2', kind: 'service' },
+      ],
+      edges: ['e-1'],
+    });
+    expect(calls[0]).toMatchObject({
+      outcome: 'ok',
+      text: head + tail,
+      error: null,
+      stopReason: 'end_turn',
+      maxTokens: 28_000,
+      usage: { inputTokens: 4, outputTokens: 21_122 },
+    });
+  });
+
+  it('[QL-10] records why a reply missed the schema, so the dump says which bound or that nothing parsed', async () => {
+    const calls: LlmCall[] = [];
+    const record = (call: LlmCall) => calls.push(call);
+    const cut = scripted([said('m-1', '"id":"n-2"}]}'), succeeded('"id":"n-2"}]}')]);
+    await new ClaudeAgentLlmClient({ query: cut.run })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: graph });
+    expect(calls[0]).toMatchObject({
+      outcome: 'schema-miss',
+      response: null,
+      error: { name: SCHEMA_MISS, message: expect.stringContaining('no complete JSON object') },
+    });
+
+    const wrong = JSON.stringify({ answer: 'not a number' });
+    const over = scripted([said('m-1', wrong), succeeded(wrong)]);
+    await new ClaudeAgentLlmClient({ query: over.run }).withRecorder(record).completeStructured({
+      system: 's',
+      user: 'u',
+      schema: z.object({ answer: z.number() }),
+    });
+    expect(calls[1]).toMatchObject({
+      outcome: 'schema-miss',
+      text: wrong,
+      error: { name: SCHEMA_MISS, message: expect.stringMatching(/^answer: /) },
+    });
+  });
+
+  it('drops a message the CLI retracted, and falls back to the result when the stream holds no answer', async () => {
+    const retracted = scripted([
+      said('m-1', '{"answer":"refused leg"}'),
+      said('m-2', '{"answer":"replacement"}', { supersedes: ['m-1'] }),
+      succeeded('{"answer":"replacement"}'),
+    ]);
+    await expect(
+      new ClaudeAgentLlmClient({ query: retracted.run }).completeStructured({
+        system: 's',
+        user: 'u',
+        schema: answer,
+      }),
+    ).resolves.toEqual({ answer: 'replacement' });
+
+    // A subagent's frame is not the turn's own text.
+    const nested = scripted([
+      said('m-1', 'thinking out loud', { parent_tool_use_id: 'tool-1' }),
+      succeeded('{"answer":"from result"}'),
+    ]);
+    const calls: LlmCall[] = [];
+    await expect(
+      new ClaudeAgentLlmClient({ query: nested.run })
+        .withRecorder((call) => calls.push(call))
+        .completeStructured({ system: 's', user: 'u', schema: answer }),
+    ).resolves.toEqual({ answer: 'from result' });
+    expect(calls[0]?.text).toBe('{"answer":"from result"}');
+
+    const unparseable = scripted([said('m-1', 'Done.'), succeeded('{"answer":"in result"}')]);
+    await expect(
+      new ClaudeAgentLlmClient({ query: unparseable.run }).completeStructured({
+        system: 's',
+        user: 'u',
+        schema: answer,
+      }),
+    ).resolves.toEqual({ answer: 'in result' });
   });
 });

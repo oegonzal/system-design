@@ -1,8 +1,12 @@
+import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z, type ZodIssue, type ZodType } from 'zod';
 
 import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import type { LlmClient, StructuredRequest } from './llm-client';
+
+/** The `error.name` a schema miss is recorded under; its message is the schema's own complaint. */
+export const SCHEMA_MISS = 'SchemaMiss';
 
 /** The model report when no model is pinned: the subscription's own choice. */
 export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
@@ -11,12 +15,21 @@ export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
 export const CLAUDE_AGENT_TIMEOUT_MS = 300_000;
 
 /**
- * Output-token ceiling for the spawned turn. The coach's proposal — a full
- * brief plus a per-component narrative plus graph ops in one object — runs
- * ~4–6k tokens; the CLI's default cap truncates that mid-JSON, which then
- * fails to parse. This gives the turn room to close the object.
+ * Output-token ceiling for one API call of the spawned turn, thinking
+ * included. Sized from recorded runs: the largest turns so far wrote 26,054
+ * (an agentic-design producer, 2026-09-23) and 21,122 (a canvas coach,
+ * 2026-10-01) output tokens, and at the old 16,000 each was cut and resumed in
+ * a second message. A cut is no longer lossy — the turn's text is read whole,
+ * see `TurnTranscript` — but every resume is another model round trip.
  */
-const MAX_OUTPUT_TOKENS = '16000';
+export const OUTPUT_TOKEN_CEILING = 32_000;
+
+/**
+ * What a call that declares no `maxTokens` is recorded as having declared. A
+ * declaration is the caller's sizing, kept beside the usage in every dump so
+ * the two can be compared; the turn itself runs under `OUTPUT_TOKEN_CEILING`.
+ */
+const DEFAULT_MAX_TOKENS = 4096;
 
 /**
  * No tools at all. `tools: []` is the SDK's own "disable every built-in
@@ -123,19 +136,30 @@ function updateAt(
 /** Repairs can cascade (an array trimmed, then a member's string); a few rounds settle it. */
 const REPAIR_ROUNDS = 3;
 
+/** The one validated object, or why there was none — in words a dump can carry. */
+export type Extraction<T> = { ok: true; value: T } | { ok: false; reason: string };
+
+const issuePath = (issue: ZodIssue): string =>
+  issue.path.map((key) => String(key)).join('.') || '(root)';
+
+const describeIssues = (issues: readonly ZodIssue[]): string =>
+  issues.map((issue) => `${issuePath(issue)}: ${issue.message}`).join('; ');
+
 /**
- * Pull the one schema-valid JSON object out of an agent's final text.
- * Tries every fenced block, then every balanced brace span, returning the
- * first that both parses AND satisfies the schema — clamping length
- * overshoots and stripping unasked-for keys on the way. Anything else is `null`, the port's deterministic
- * path.
+ * Pull the one schema-valid JSON object out of an agent's text. Tries every
+ * fenced block, then every balanced brace span, returning the first that both
+ * parses AND satisfies the schema — clamping length overshoots and stripping
+ * unasked-for keys on the way. A miss names what each parsed candidate got
+ * wrong, or that nothing parsed at all: a reply cut before its object closed
+ * reads exactly like that.
  */
-export function extractStructured<T>(text: string, schema: ZodType<T>): T | null {
+export function parseStructured<T>(text: string, schema: ZodType<T>): Extraction<T> {
   const candidates: string[] = [];
   const fence = /```(?:json)?\s*([\s\S]*?)```/g;
   for (let m = fence.exec(text); m !== null; m = fence.exec(text)) candidates.push(m[1]);
   for (const span of braceObjects(text)) candidates.push(span);
 
+  const misses: string[] = [];
   for (const candidate of candidates) {
     let parsed: unknown;
     try {
@@ -143,15 +167,61 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
     } catch {
       continue;
     }
+    let issues: readonly ZodIssue[] = [];
     for (let round = 0; round <= REPAIR_ROUNDS; round++) {
       const result = schema.safeParse(parsed);
-      if (result.success) return result.data;
-      const { issues } = result.error;
+      if (result.success) return { ok: true, value: result.data };
+      issues = result.error.issues;
       if (issues.length === 0 || !issues.every(isRepairable)) break;
       parsed = repairExcess(parsed, issues);
     }
+    misses.push(describeIssues(issues));
   }
-  return null;
+  if (misses.length === 0) {
+    return {
+      ok: false,
+      reason: `no complete JSON object in the reply (${candidates.length} candidate span(s), none parsed)`,
+    };
+  }
+  return {
+    ok: false,
+    reason:
+      misses.length === 1
+        ? misses[0]
+        : misses.map((miss, index) => `candidate ${index + 1}: ${miss}`).join(' | '),
+  };
+}
+
+/** `parseStructured` for a caller that only needs the object: `null` is the port's deterministic path. */
+export function extractStructured<T>(text: string, schema: ZodType<T>): T | null {
+  const extraction = parseStructured(text, schema);
+  return extraction.ok ? extraction.value : null;
+}
+
+/**
+ * What one turn wrote. The CLI streams a turn as several assistant messages —
+ * one per content block, and when a reply runs past the output cap it resumes
+ * it in a further API call mid-thought — while the closing `result` repeats
+ * only the last message's text. A long answer read from `result` alone is its
+ * tail: no opening brace, nothing to parse. So every top-level text block is
+ * kept in arrival order and read as one; a message the CLI retracts (it names
+ * it in a later message's `supersedes`) is dropped.
+ */
+class TurnTranscript {
+  private readonly texts = new Map<string, string>();
+
+  add(message: SDKAssistantMessage): void {
+    if (message.parent_tool_use_id) return;
+    for (const retracted of message.supersedes ?? []) this.texts.delete(retracted);
+    const text = message.message.content
+      .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+      .join('');
+    if (text.length > 0) this.texts.set(message.uuid ?? `#${this.texts.size}`, text);
+  }
+
+  get text(): string {
+    return [...this.texts.values()].join('');
+  }
 }
 
 /**
@@ -163,8 +233,9 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
  * subscription.
  *
  * There is no server-side output constraint, so the schema rides in the
- * prompt as JSON Schema and `extractStructured` enforces it on the way out —
- * a miss is `null`, exactly the contract every caller already handles.
+ * prompt as JSON Schema and `parseStructured` enforces it on the way out over
+ * the whole turn's text — a miss is `null`, exactly the contract every caller
+ * already handles, and the recorded call says why.
  *
  * Implements `LlmRecordable` so a run dump captures the exchange.
  */
@@ -189,17 +260,13 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   }
 
   async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
-    const maxTokens = request.maxTokens ?? 4096;
+    const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
     const startedAt = new Date();
     const started = Date.now();
     let jsonSchema = '';
 
     const record = (
-      outcome: LlmCall['outcome'],
-      text: string | null,
-      response: unknown,
-      error: LlmCall['error'],
-      usage: LlmCall['usage'],
+      call: Pick<LlmCall, 'outcome' | 'text' | 'response' | 'error' | 'usage' | 'stopReason'>,
     ): void => {
       this.sink?.({
         model: this.model,
@@ -209,13 +276,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         maxTokens,
         startedAt: startedAt.toISOString(),
         durationMs: Date.now() - started,
-        outcome,
-        stopReason: null,
-        usage,
         requestId: null,
-        text,
-        response,
-        error,
+        ...call,
       });
     };
 
@@ -258,12 +320,14 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
           // reads live in process.env / the config dir and must be preserved.
           env: {
             ...subscriptionEnv(process.env),
-            CLAUDE_CODE_MAX_OUTPUT_TOKENS: MAX_OUTPUT_TOKENS,
+            CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(OUTPUT_TOKEN_CEILING),
           },
         },
       });
 
+      const transcript = new TurnTranscript();
       let resultText: string | null = null;
+      let stopReason: string | null = null;
       // A turn that ended on an API error (an expired token, a rate limit)
       // still arrives as a result: keep the CLI's own reason for the record.
       let failure: LlmCall['error'] = null;
@@ -272,9 +336,13 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       let sawResult = false;
       try {
         for await (const message of turn) {
-          if (message.type === 'assistant' && message.error) assistantError = message.error;
+          if (message.type === 'assistant') {
+            transcript.add(message);
+            if (message.error) assistantError = message.error;
+          }
           if (message.type === 'result') {
             sawResult = true;
+            stopReason = message.stop_reason ?? null;
             if (message.subtype === 'success' && !message.is_error) resultText = message.result;
             else
               failure = {
@@ -300,15 +368,47 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       }
 
       if (resultText === null) {
-        record('error', null, null, failure, usage);
+        record({ outcome: 'error', text: null, response: null, error: failure, usage, stopReason });
         return null;
       }
-      const parsed = extractStructured(resultText, request.schema);
-      record(parsed === null ? 'schema-miss' : 'ok', resultText, parsed, null, usage);
-      return parsed;
+      // The whole turn first; `result` alone only when the turn streamed no
+      // text of its own, or what it streamed does not hold the answer.
+      const written = transcript.text || resultText;
+      let extraction = parseStructured(written, request.schema);
+      if (!extraction.ok && written !== resultText) {
+        const fromResult = parseStructured(resultText, request.schema);
+        if (fromResult.ok) extraction = fromResult;
+      }
+      record(
+        extraction.ok
+          ? {
+              outcome: 'ok',
+              text: written,
+              response: extraction.value,
+              error: null,
+              usage,
+              stopReason,
+            }
+          : {
+              outcome: 'schema-miss',
+              text: written,
+              response: null,
+              error: { name: SCHEMA_MISS, message: extraction.reason },
+              usage,
+              stopReason,
+            },
+      );
+      return extraction.ok ? extraction.value : null;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      record('error', null, null, { name: err.name, message: err.message }, null);
+      record({
+        outcome: 'error',
+        text: null,
+        response: null,
+        error: { name: err.name, message: err.message },
+        usage: null,
+        stopReason: null,
+      });
       return null;
     }
   }

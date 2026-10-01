@@ -67,7 +67,12 @@ export const DESIGN_PROMPT_HEADINGS = {
   constraints: '## Constraints',
 } as const;
 
-const cell = (text: string): string => text.replace(/\|/g, '\\|').trim();
+/**
+ * Text made safe for one Markdown table cell: a pipe would open a column and a
+ * line break would end the row, so the one is escaped and the other folded.
+ */
+export const markdownCell = (text: string): string =>
+  text.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 
 /**
  * The house convention: `# Title`, then the scenario, numbered functional
@@ -90,14 +95,17 @@ export function renderDesignPromptMarkdown(draft: DesignPromptDraft): string {
   if (draft.nonFunctionalRequirements.length > 0) {
     sections.push(
       `${DESIGN_PROMPT_HEADINGS.nonFunctional}\n\n| Kind | Requirement | Target |\n| --- | --- | --- |\n${draft.nonFunctionalRequirements
-        .map((row) => `| ${cell(row.kind)} | ${cell(row.requirement)} | ${cell(row.target)} |`)
+        .map(
+          (row) =>
+            `| ${markdownCell(row.kind)} | ${markdownCell(row.requirement)} | ${markdownCell(row.target)} |`,
+        )
         .join('\n')}`,
     );
   }
   if (draft.scale.length > 0) {
     sections.push(
       `${DESIGN_PROMPT_HEADINGS.scale}\n\n| Metric | Target |\n| --- | --- |\n${draft.scale
-        .map((row) => `| ${cell(row.metric)} | ${cell(row.target)} |`)
+        .map((row) => `| ${markdownCell(row.metric)} | ${markdownCell(row.target)} |`)
         .join('\n')}`,
     );
   }

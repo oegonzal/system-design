@@ -42,6 +42,32 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
+  it('[QL-1] every declared output cap is above what its stage has measurably written', () => {
+    // The most output tokens, thinking included, each stage wrote across the
+    // recorded canvas runs (2026-09-30 – 2026-10-01). The coach's figure is a
+    // whole turn the client had to resume past its old 16k ceiling.
+    const measured: Record<string, number> = {
+      producer: 21_122,
+      'critic.requirements': 5_329,
+      'critic.architecture': 9_849,
+      'critic.scale': 6_629,
+      'critic.explanation': 7_230,
+      'critic.scenarios': 7_580,
+      'evaluator.requirements': 4_588,
+      'evaluator.quality': 6_754,
+    };
+    const declared: Record<string, number> = Object.fromEntries([
+      ['producer', SYSTEM_DESIGN_CANVAS.producer.maxTokens],
+      ...[...SYSTEM_DESIGN_CANVAS.critics, ...SYSTEM_DESIGN_CANVAS.evaluators].map(
+        (lens) => [lens.id, lens.maxTokens] as const,
+      ),
+    ]);
+    expect(Object.keys(declared).sort()).toEqual(Object.keys(measured).sort());
+    for (const [stage, tokens] of Object.entries(measured)) {
+      expect(declared[stage], stage).toBeGreaterThan(tokens);
+    }
+  });
+
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {
     const earning = new Set(
       Object.values(SYSTEM_DESIGN_CANVAS.policy.criterionKinds).map((kind) => kind.dimension),

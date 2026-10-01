@@ -35,10 +35,15 @@ export interface LlmCall {
   stopReason: string | null;
   usage: { inputTokens: number; outputTokens: number } | null;
   requestId: string | null;
-  /** The raw text blocks, joined — what the model actually wrote. */
+  /** The raw text blocks of the whole turn, joined — what the model actually wrote. */
   text: string | null;
   /** The validated object, or null. */
   response: unknown;
+  /**
+   * Why there is no response: the provider's reason on an `error`, the
+   * schema's complaint on a `schema-miss` — which bound was crossed, or that
+   * no object parsed at all. Null on `ok`.
+   */
   error: { name: string; message: string } | null;
 }
 

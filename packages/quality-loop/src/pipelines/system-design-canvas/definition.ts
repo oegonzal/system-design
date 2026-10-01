@@ -120,12 +120,12 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // criterion by id, and the author may have left one unbound — without the
   // ids the coach can only guess, and `references` refuses a guess. It still
   // revises against the remediations the panel selected, never against a
-  // score. 14000 keeps a full canvas under the subscription client's output
-  // cap. Lens caps are sized from a live run of the sample canvas: critics
-  // answered in 2.5–5.1k output tokens, evaluators in 0.4–0.7k.
+  // score. Every cap is sized from the recorded runs (the spec holds the
+  // measurements): a full coached canvas has taken up to 21.1k output tokens,
+  // thinking included, critics up to 9.8k and evaluators up to 6.8k.
   producer: {
     persona: producer,
-    maxTokens: 14000,
+    maxTokens: 28000,
     consumes: ['criteria'],
   },
 
@@ -182,7 +182,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: ['findings'],
       maxItems: CANVAS_MAX_CRITERIA,
-      maxTokens: 4000,
+      maxTokens: 9000,
       criterionKinds: ['functional', 'constraint'],
     },
     {
@@ -191,7 +191,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: ['findings'],
       maxItems: CANVAS_MAX_CRITERIA,
-      maxTokens: 4000,
+      maxTokens: 9000,
       criterionKinds: ['non_functional', 'scale'],
     },
   ],

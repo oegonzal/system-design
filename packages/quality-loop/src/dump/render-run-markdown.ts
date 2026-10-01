@@ -1,5 +1,5 @@
 /** `run.md`: the human entry point of a dump — what happened, in order, in one screen. */
-import type { IterationTrace, RunTrace } from '@sysdesign/contracts';
+import { markdownCell, type IterationTrace, type RunTrace } from '@sysdesign/contracts';
 
 import type { RunRecord } from '../core/contracts';
 
@@ -11,10 +11,22 @@ export interface RunHeadline {
   stopReason: string | null;
 }
 
+/** One table row, every cell escaped: a reason quoting a finding key (`type|refs`) must not open a column. */
+const row = (cells: readonly (string | number | null)[]): string =>
+  `| ${cells.map((value) => markdownCell(String(value ?? '—'))).join(' | ')} |`;
+
 const iterationRow = (iteration: IterationTrace<unknown>): string => {
   const { ledger, decision } = iteration;
   const assessed = ledger.criteria.filter((evidence) => evidence.result !== 'unassessed').length;
-  return `| ${iteration.iteration} | ${iteration.mode} | ${decision.finalDecision} | ${decision.scores.overall} | ${assessed}/${ledger.criteria.length} | ${ledger.findings.length} | ${decision.reason} |`;
+  return row([
+    iteration.iteration,
+    iteration.mode,
+    decision.finalDecision,
+    decision.scores.overall,
+    `${assessed}/${ledger.criteria.length}`,
+    ledger.findings.length,
+    decision.reason,
+  ]);
 };
 
 /** The verdict, every iteration as a row, and the last iteration's dimensions. */
@@ -33,9 +45,14 @@ function traceSection(trace: RunTrace): string[] {
     ``,
     `| dimension | score | base | penalties | weight |`,
     `| --- | --- | --- | --- | --- |`,
-    ...last.decision.trace.dimensions.map(
-      (dimension) =>
-        `| ${dimension.dimension} | ${dimension.score ?? '—'} | ${dimension.base ?? '—'} | ${dimension.penalties.length} (−${dimension.penaltyTotal}) | ${dimension.weight ?? '—'} |`,
+    ...last.decision.trace.dimensions.map((dimension) =>
+      row([
+        dimension.dimension,
+        dimension.score,
+        dimension.base,
+        `${dimension.penalties.length} (−${dimension.penaltyTotal})`,
+        dimension.weight,
+      ]),
     ),
     ``,
   ];
@@ -69,13 +86,13 @@ function lessonsSection(trace: RunTrace): string[] {
   ];
 }
 
-/** One line per exchange, or the reason there were none. */
+/** One line per exchange — with the recorded reason when it failed — or the reason there were none. */
 function modelCallsSection(record: RunRecord): string[] {
   if (record.exchanges.length === 0) return [`None — no stage reached the model.`, ``];
   return [
     ...record.exchanges.map(
       (exchange) =>
-        `- \`${exchange.scope}\` #${exchange.ordinal} — ${exchange.outcome}, ${exchange.durationMs} ms${exchange.usage ? `, ${exchange.usage.inputTokens} in / ${exchange.usage.outputTokens} out` : ''}`,
+        `- \`${exchange.scope}\` #${exchange.ordinal} — ${exchange.outcome}, ${exchange.durationMs} ms${exchange.usage ? `, ${exchange.usage.inputTokens} in / ${exchange.usage.outputTokens} out` : ''}${exchange.error ? ` — ${exchange.error.name}: ${exchange.error.message.replace(/\s+/g, ' ').trim()}` : ''}`,
     ),
     ``,
   ];
