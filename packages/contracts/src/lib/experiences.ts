@@ -18,5 +18,11 @@ export interface ExperienceProfileDto {
   createdAt: IsoDateString;
 }
 
+/** `GET /experiences` — paged like every list; the meta says what was applied. */
+export interface ListExperiencesQuery {
+  limit?: number;
+  offset?: number;
+}
+
 export type ListExperiencesResponse = ApiListResponse<ExperienceProfileDto>;
 export type GetExperienceResponse = ApiResponse<ExperienceProfileDto>;

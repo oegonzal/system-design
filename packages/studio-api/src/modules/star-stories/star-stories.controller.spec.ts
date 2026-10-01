@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type {
-  ApiErrorResponse,
-  GetPromptResponse,
-  GetStarStoryResponse,
-  ListStarStoriesResponse,
-  SaveStarStoryRequest,
+import {
+  STORY_TAG_MAX_LENGTH,
+  type ApiErrorResponse,
+  type GetPromptResponse,
+  type GetStarStoryResponse,
+  type ListStarStoriesResponse,
+  type SaveStarStoryRequest,
 } from '@sysdesign/contracts';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
@@ -80,6 +81,43 @@ describe('star stories', () => {
       await createStory(storyRequest());
       const { status } = await createStory(storyRequest({ situation: 'different situation' }));
       expect(status).toBe(409);
+    });
+
+    it('[STAR-1] refuses a blank title or section and an oversized tag with every path, and stores what it keeps trimmed', async () => {
+      const empty = await call<ApiErrorResponse>(`${h.url}/star-stories`, {
+        method: 'POST',
+        body: JSON.stringify(
+          storyRequest({
+            situation: '',
+            task: '  ',
+            action: '',
+            result: '\n',
+            tags: ['ok', 'x'.repeat(STORY_TAG_MAX_LENGTH + 1)],
+          }),
+        ),
+      });
+      expect(empty.status).toBe(400);
+      expect(empty.body.issues?.map((issue) => issue.path)).toEqual([
+        'situation',
+        'task',
+        'action',
+        'result',
+        'tags.1',
+      ]);
+      const list = await call<ListStarStoriesResponse>(`${h.url}/star-stories`);
+      expect(list.body.meta.total).toBe(0);
+
+      const { status, body } = await createStory(
+        storyRequest({ title: '  Padded title  ', tags: [' scaling '] }),
+      );
+      expect(status).toBe(201);
+      expect(body.data).toMatchObject({ title: 'Padded title', tags: ['scaling'] });
+
+      const blanked = await call(`${h.url}/star-stories/${body.data.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(storyRequest({ title: '   ' })),
+      });
+      expect(blanked.status).toBe(400);
     });
 
     it('rejects an undeclared body property', async () => {

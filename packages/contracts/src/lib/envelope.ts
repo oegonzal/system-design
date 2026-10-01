@@ -21,8 +21,16 @@ export interface ApiListResponse<T> {
   meta: ListMeta;
 }
 
+/** One offending field of a refused request body or query: its dotted path (`tags.1`) and why. */
+export interface ApiValidationIssue {
+  path: string;
+  message: string;
+}
+
 export interface ApiErrorResponse {
   statusCode: number;
   message: string | string[];
   error?: string;
+  /** A 400 from schema validation names every offending path, so a client can say which field. */
+  issues?: ApiValidationIssue[];
 }

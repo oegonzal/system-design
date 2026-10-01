@@ -37,6 +37,20 @@ describe('experiences', () => {
         'retail-order-history',
       ]);
       expect(body.data[0]?.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO, not a Date
+      expect(body.meta).toEqual({ total: 6, limit: 50, offset: 0 });
+    });
+
+    it('pages like every list: the meta reports the page it applied, and bounds are validated', async () => {
+      const { body } = await call<ListExperiencesResponse>(`${h.url}/experiences?limit=2&offset=1`);
+      expect(body.meta).toEqual({ total: 6, limit: 2, offset: 1 });
+      expect(body.data.map((e) => e.slug)).toEqual([
+        'media-collectibles-platform',
+        'adtech-workflow-automation',
+      ]);
+
+      expect((await call(`${h.url}/experiences?limit=101`)).status).toBe(400);
+      expect((await call(`${h.url}/experiences?limit=0`)).status).toBe(400);
+      expect((await call(`${h.url}/experiences?sort=title`)).status).toBe(400);
     });
   });
 

@@ -10,19 +10,16 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import type {
-  GetStarStoryResponse,
-  ListStarStoriesResponse,
-  SaveStarStoryRequest,
+import {
+  saveStarStorySchema,
+  type GetStarStoryResponse,
+  type ListStarStoriesResponse,
+  type SaveStarStoryRequest,
 } from '@sysdesign/contracts';
 import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { ok } from '../../common/envelope';
-import {
-  listStarStoriesQuerySchema,
-  saveStarStorySchema,
-  type ListStarStoriesQueryInput,
-} from './star-story-requests';
+import { listStarStoriesQuerySchema, type ListStarStoriesQueryInput } from './star-story-requests';
 import { toStarStoryDto } from './star-stories.mapper';
 import { StarStoriesService } from './star-stories.service';
 
