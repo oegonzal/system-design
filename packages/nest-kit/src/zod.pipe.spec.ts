@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import type { ApiValidationIssue } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -17,9 +18,10 @@ describe('ZodValidationPipe', () => {
       pipe.transform({ limit: 0, extra: true });
     } catch (error) {
       const response = (error as BadRequestException).getResponse() as {
-        issues: { path: string }[];
+        issues: ApiValidationIssue[];
       };
       expect(response.issues.map((issue) => issue.path).sort()).toEqual(['', 'limit']);
+      expect(response.issues.every((issue) => typeof issue.message === 'string')).toBe(true);
     }
   });
 });
