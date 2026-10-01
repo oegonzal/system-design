@@ -29,7 +29,7 @@ import type {
 } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 
-import type { RunRecord, TaskContract } from './contracts';
+import type { RunProgress, RunRecord, TaskContract } from './contracts';
 
 export interface ProducerInput<T> {
   contract: TaskContract<T>;
@@ -151,7 +151,14 @@ export interface RunRepository {
   recordExchange(runId: string, exchanges: LlmExchangeSummaryDto[]): Promise<void>;
   /** Refresh the running row's heartbeat: the process is still here. */
   heartbeat(runId: string): Promise<void>;
-  /** The terminal write: the header plus every child row, in one transaction. */
+  /**
+   * The iterations a running loop has finished so far, with the rubric they
+   * were judged against — a fresh snapshot each time, replacing the last, and
+   * only while the row is still `running`. The header's verdict columns stay
+   * empty until `close`.
+   */
+  recordProgress(runId: string, progress: RunProgress): Promise<void>;
+  /** The terminal write: the header plus every child row, in one transaction, replacing any progress. */
   close(record: RunRecord): Promise<CloseOutcome>;
   find(runId: string): Promise<QualityRunDto | null>;
   list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]>;

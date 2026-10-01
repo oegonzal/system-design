@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { RunRepository } from '../../core/ports';
-import { fakeLlm, gatedLlm, result, tinyPipeline } from '../../core/testing';
+import { fakeLlm, gatedLlm, result, sequencedLlm, tinyPipeline } from '../../core/testing';
 import {
   bootApp,
   claimDumpDir,
@@ -452,6 +452,67 @@ describe('the HTTP surface', () => {
       } finally {
         await other.app.close();
       }
+    } finally {
+      await owner.app.close();
+    }
+  });
+
+  it('[QL-13] a running run records each iteration as it lands, and its close replaces them with the whole run', async () => {
+    // Iteration 1 judges c1 partial and revises; the model then waits at the
+    // gate before the revision, holding the run in flight after one iteration.
+    const model = sequencedLlm(
+      { criteria: [{ kind: 'must', statement: 'has text' }] },
+      { text: 'made', parts: ['one'] },
+      { findings: [] },
+      {
+        results: [result({ criterionId: 'c1', result: 'partial', locationRefs: ['text'] })],
+        advisoryVerdict: null,
+      },
+      {
+        results: [result({ criterionId: 'c1', locationRefs: ['text'] })],
+        advisoryVerdict: null,
+      },
+    );
+    const CALLS_IN_ITERATION_1 = 4; // criteria, producer, critic, evaluator
+    const gated = gatedLlm(model, CALLS_IN_ITERATION_1);
+    const owner = await bootApp([[QUALITY_LOOP_LLM, gated], tinyOnly()]);
+    try {
+      const started = await postJson(owner.url, '/runs', {
+        pipeline: 'tiny',
+        goal: '# Goal',
+        maxIterations: 2,
+      });
+      const { runId: id } = ((await started.json()) as Envelope<{ runId: string }>).data;
+      const listed = async () =>
+        (await getJson<Page<QualityRunSummaryDto>>(owner.url, '/runs')).data.find(
+          (row) => row.runId === id,
+        );
+
+      let row = await listed();
+      for (let attempt = 0; attempt < 100 && row?.iterations !== 1; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        row = await listed();
+      }
+      expect(row).toMatchObject({ status: 'running', iterations: 1, criteria: 1, overall: null });
+      const [first] = await em.fork().find(QualityRunIteration, { run: id });
+      expect(first).toMatchObject({ iteration: 1, mode: 'initial' });
+      expect(first.decision.finalDecision).toBe('revise');
+
+      gated.release();
+      let run = (await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${id}`)).data;
+      for (let attempt = 0; attempt < 100 && run.status !== 'complete'; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        run = (await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${id}`)).data;
+      }
+      expect(run.trace?.iterations.map((iteration) => iteration.mode)).toEqual([
+        'initial',
+        'revise',
+      ]);
+      // One snapshot of rows: the close replaced the progress, never added to it.
+      const fork = em.fork();
+      expect(await fork.find(QualityRunIteration, { run: id })).toHaveLength(2);
+      expect(await fork.find(QualityRunCriterion, { run: id })).toHaveLength(1);
+      expect(await fork.find(QualityRunCriterionResult, { run: id })).toHaveLength(2);
     } finally {
       await owner.app.close();
     }

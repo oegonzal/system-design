@@ -19,7 +19,7 @@ import type {
 } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { TaskContract } from '../contracts';
+import type { RunProgress, TaskContract } from '../contracts';
 import { annotate, noteRemediations } from '../evidence/annotate';
 import { deriveLessons } from '../evidence/lessons';
 import { normalize } from '../evidence/normalize';
@@ -52,10 +52,19 @@ export interface RunInput {
   adopted?: IterationTrace;
 }
 
+/**
+ * Called once per finished iteration, in order, with the run so far — the
+ * extension point a host publishes progress through while the loop is still
+ * running. Synchronous on purpose: the loop never waits on what the host does
+ * with it, and a host that writes somewhere slow queues the write itself.
+ */
+export type IterationListener = (progress: RunProgress) => void;
+
 export interface RunDeps {
   llm: LlmClient;
   sink: ExchangeSink;
   now: () => number;
+  onIteration?: IterationListener;
 }
 
 export async function runPipeline<T>(
@@ -68,7 +77,13 @@ export async function runPipeline<T>(
   if (problems.length > 0) {
     throw new Error(`pipeline ${definition.id}: rubric rejected: ${problems.join('; ')}`);
   }
-  return runLoop(materialize(definition, deps.llm, deps.sink), definition, input, deps.now);
+  return runLoop(
+    materialize(definition, deps.llm, deps.sink),
+    definition,
+    input,
+    deps.now,
+    deps.onIteration,
+  );
 }
 
 /** Everything one iteration reads and never changes: the stages, the contract, the request. */
@@ -93,6 +108,7 @@ export async function runLoop<T>(
   definition: PipelineDefinition<T>,
   input: RunInput,
   now: () => number,
+  onIteration?: IterationListener,
 ): Promise<RunTrace<T>> {
   const { policy, task } = definition;
   const maxIterations = Math.max(1, input.maxIterations ?? policy.loop.maxIterations);
@@ -129,6 +145,7 @@ export async function runLoop<T>(
     } else {
       stalled += 1;
     }
+    onIteration?.(progressOf(loop, iterations, best));
 
     const next = afterDecision(entry, stages, policy.loop.plateauAfter, stalled, {
       last: iteration === maxIterations,
@@ -137,14 +154,27 @@ export async function runLoop<T>(
     else mode = next.mode;
   }
 
+  const { lessons, ...standing } = progressOf(loop, iterations, best);
+  return { ...standing, stopReason: stop ?? 'max-iterations', lessons };
+}
+
+/**
+ * The run so far, from the iterations recorded and the best among them —
+ * what every listener is handed and what the final trace adds its stop to.
+ * The iterations are a copy: a host may keep it while the loop goes on.
+ */
+function progressOf<T>(
+  loop: Loop<T>,
+  iterations: readonly IterationTrace<T>[],
+  best: IterationTrace<T> | null,
+): RunProgress<T> {
   const last = iterations[iterations.length - 1];
   return {
-    pipeline: { id: definition.id, version: definition.version },
-    contract: { goal: input.goal, criteria: contract.criteria },
-    iterations,
+    pipeline: { id: loop.definition.id, version: loop.definition.version },
+    contract: { goal: loop.input.goal, criteria: loop.contract.criteria },
+    iterations: [...iterations],
     bestIteration: (best ?? last).iteration,
     finalDecision: last.decision.finalDecision,
-    stopReason: stop ?? 'max-iterations',
     lessons: deriveLessons(iterations),
   };
 }

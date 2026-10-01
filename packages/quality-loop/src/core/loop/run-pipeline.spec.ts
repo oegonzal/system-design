@@ -1,6 +1,7 @@
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
+import type { RunProgress } from '../contracts';
 import { composeController } from '../controllers';
 import { describePipeline } from '../pipeline';
 import type { Critic, Evaluator, Producer, ProducerInput, UpstreamEvidenceBundle } from '../ports';
@@ -314,6 +315,56 @@ describe('runLoop', () => {
     expect(trace.iterations[1].mode).toBe('revise');
     expect(trace.bestIteration).toBe(2);
     expect(trace.lessons.length).toBeGreaterThan(0);
+  });
+
+  it('[QL-9] publishes the run so far after every iteration — an adopted one before any stage runs — and the trace is the last of them plus its stop', async () => {
+    const earlier = await runLoop(
+      scriptedStages({ producer: scriptedProducer([DRAFT_1]) }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+    const events: string[] = [];
+    const published: RunProgress<TinyOutput>[] = [];
+    const scripted = scriptedProducer([DRAFT_2]);
+    const stages = scriptedStages({
+      evaluators: [
+        scriptedEvaluator('evaluator.tiny', [
+          [[result({ criterionId: 'c1' }), result({ criterionId: 'c2' })]],
+        ]),
+      ],
+      producer: {
+        produce: (input) => {
+          events.push('produce');
+          return scripted.produce(input);
+        },
+      },
+    });
+
+    const trace = await runLoop(
+      stages,
+      tinyPipeline(),
+      {
+        goal: 'g',
+        criteria: earlier.contract.criteria,
+        adopted: earlier.iterations[0],
+        maxIterations: 2,
+      },
+      clock,
+      (progress) => {
+        events.push(`progress ${progress.iterations.length}`);
+        published.push(progress as RunProgress<TinyOutput>);
+      },
+    );
+
+    expect(events).toEqual(['progress 1', 'produce', 'progress 2']);
+    // The starting point is listed at once, as the loop stood after it.
+    expect(published[0]).not.toHaveProperty('stopReason');
+    expect(published[0]).toMatchObject({ bestIteration: 1, finalDecision: 'revise', lessons: [] });
+    expect(published[0].iterations.map((iteration) => iteration.mode)).toEqual(['adopted']);
+    const { stopReason, ...standing } = trace;
+    expect(stopReason).toBe('accepted');
+    expect(published[1]).toEqual(standing);
   });
 
   it('[QL-9] stops on a plateau when revisions stop improving', async () => {

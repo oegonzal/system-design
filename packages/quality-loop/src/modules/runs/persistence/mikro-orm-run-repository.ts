@@ -14,12 +14,12 @@ import {
   QualityRunIteration,
 } from '@sysdesign/db';
 
-import type { RunRecord } from '../../../core/contracts';
+import type { RunProgress, RunRecord } from '../../../core/contracts';
 import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/ports';
 import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
 import type { RunRows } from './rows';
-import { toRows } from './to-rows';
+import { progressRows, toRows } from './to-rows';
 import { toSummary } from './to-summary';
 
 /**
@@ -28,9 +28,10 @@ import { toSummary } from './to-summary';
  * request), so there is no request context to lean on. `nativeUpdate` writes
  * without loading; `close` is one transaction, so a run is either fully
  * recorded or still `running`, for the janitor to fail once its heartbeat is
- * stale. The `status: 'running'` guards keep exchanges and heartbeats off a
- * row the janitor failed; only the owner's late close reclaims it, with the
- * true outcome.
+ * stale. The `status: 'running'` guards keep exchanges, progress and
+ * heartbeats off a row the janitor failed; only the owner's late close
+ * reclaims it, with the true outcome. Progress and close both replace the
+ * run's child rows wholesale, so a run's rows are always one snapshot.
  */
 @Injectable()
 export class MikroOrmRunRepository implements RunRepository {
@@ -59,6 +60,21 @@ export class MikroOrmRunRepository implements RunRepository {
       .nativeUpdate(QualityRun, { id: runId, status: 'running' }, { heartbeatAt: new Date() });
   }
 
+  async recordProgress(runId: string, progress: RunProgress): Promise<void> {
+    const rows = progressRows(runId, progress);
+    await this.em.fork().transactional(async (tem) => {
+      const row = await tem.findOne(
+        QualityRun,
+        { id: runId, status: 'running' },
+        { lockMode: LockMode.PESSIMISTIC_WRITE },
+      );
+      if (row === null) return;
+      const now = new Date();
+      tem.assign(row, { heartbeatAt: now, updatedAt: now });
+      await replaceChildren(tem, row, rows);
+    });
+  }
+
   async close(record: RunRecord): Promise<CloseOutcome> {
     const rows = toRows(record);
     return this.em.fork().transactional(async (tem) => {
@@ -68,10 +84,7 @@ export class MikroOrmRunRepository implements RunRepository {
       const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
       if (row.status !== 'running' && !reclaimable) return 'refused';
       tem.assign(row, { ...header, updatedAt: new Date() });
-      for (const criterion of rows.criteria) {
-        tem.create(QualityRunCriterion, { ...withoutRunId(criterion), run: row });
-      }
-      for (const iteration of rows.iterations) insertIteration(tem, row, iteration);
+      await replaceChildren(tem, row, rows);
       return reclaimable ? 'reclaimed' : 'closed';
     });
   }
@@ -119,6 +132,26 @@ export class MikroOrmRunRepository implements RunRepository {
         { status: 'failed', finishedAt: now, error: interruptedError('run'), updatedAt: now },
       );
   }
+}
+
+/**
+ * The run's criteria and iterations, replacing whatever an earlier snapshot
+ * wrote: ledger rows first, since they point at their iteration.
+ */
+async function replaceChildren(
+  em: EntityManager,
+  run: QualityRun,
+  rows: Pick<RunRows, 'criteria' | 'iterations'>,
+): Promise<void> {
+  const owned = { run: run.id };
+  await em.nativeDelete(QualityRunFinding, owned);
+  await em.nativeDelete(QualityRunCriterionResult, owned);
+  await em.nativeDelete(QualityRunIteration, owned);
+  await em.nativeDelete(QualityRunCriterion, owned);
+  for (const criterion of rows.criteria) {
+    em.create(QualityRunCriterion, { ...withoutRunId(criterion), run });
+  }
+  for (const iteration of rows.iterations) insertIteration(em, run, iteration);
 }
 
 /** One iteration and its ledger rows, pointing at the run and at each other by reference. */

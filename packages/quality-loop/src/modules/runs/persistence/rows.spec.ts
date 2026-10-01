@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../../core/contracts';
 import { fullExchange, fullIteration, fullRecord, fullTrace, roundtrip } from './testing';
-import { toRows } from './to-rows';
+import { progressRows, toRows } from './to-rows';
 import { toSummary } from './to-summary';
 
 describe('the run rows', () => {
@@ -42,6 +42,20 @@ describe('the run rows', () => {
     ]);
 
     expect(roundtrip(rows)).toEqual(toRunDto(source));
+  });
+
+  it('[QL-13] a running loop’s progress is the same child rows its close will write', () => {
+    const source = fullRecord();
+    const trace = source.trace;
+    if (trace === null) throw new Error('the full record carries a trace');
+    const { stopReason: _stop, ...progress } = trace;
+    let a = 0;
+    let b = 0;
+    const closing = toRows(source, () => `iteration-${++a}`);
+    expect(progressRows(source.runId, progress, () => `iteration-${++b}`)).toEqual({
+      criteria: closing.criteria,
+      iterations: closing.iterations,
+    });
   });
 
   it('[QL-23] an adopted iteration and where it came from round-trip unchanged', () => {

@@ -1,6 +1,13 @@
-import type { LlmExchangeSummaryDto, QualityRunDto } from '@sysdesign/contracts';
+import type { LlmExchangeSummaryDto, QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import type { GitContext } from '@sysdesign/run-dump';
+
+/**
+ * A run as it stands after an iteration: everything its trace will say except
+ * why the loop stopped, which it has not yet. `bestIteration` and
+ * `finalDecision` are the loop's standing as of the last iteration recorded.
+ */
+export type RunProgress<T = unknown> = Omit<RunTrace<T>, 'stopReason'>;
 
 /** One run as the service holds it and the dump stores it: the wire shape plus git and the full exchanges. */
 export interface RunRecord extends Omit<QualityRunDto, 'exchanges'> {

@@ -1,7 +1,7 @@
 /** The record as rows: a header, the contract's criteria, and each iteration with its ledger split out. */
-import type { QualityRunDto } from '@sysdesign/contracts';
+import type { IterationTrace, QualityRunDto, SuccessCriterion } from '@sysdesign/contracts';
 
-import { toRunDto, type RunRecord } from '../../../core/contracts';
+import { toRunDto, type RunProgress, type RunRecord } from '../../../core/contracts';
 import { toDate, toDateOrNull } from './conventions';
 import type { CriterionRow, QualityRunRow, RunRows } from './rows';
 
@@ -30,9 +30,9 @@ function headerOf(record: RunRecord, dto: QualityRunDto): QualityRunRow {
   };
 }
 
-const criteriaRows = (dto: QualityRunDto): CriterionRow[] =>
-  (dto.trace?.contract.criteria ?? []).map((criterion, position) => ({
-    runId: dto.runId,
+const criteriaRows = (runId: string, criteria: readonly SuccessCriterion[]): CriterionRow[] =>
+  criteria.map((criterion, position) => ({
+    runId,
     position,
     criterionId: criterion.id,
     kind: criterion.kind,
@@ -40,14 +40,18 @@ const criteriaRows = (dto: QualityRunDto): CriterionRow[] =>
   }));
 
 /** Every iteration as its own row, its findings and results as rows pointing at it. */
-const iterationRows = (dto: QualityRunDto, newId: () => string): RunRows['iterations'] =>
-  (dto.trace?.iterations ?? []).map((entry) => {
+const iterationRows = (
+  runId: string,
+  iterations: readonly IterationTrace[],
+  newId: () => string,
+): RunRows['iterations'] =>
+  iterations.map((entry) => {
     const id = newId();
     const { ledger } = entry;
     return {
       row: {
         id,
-        runId: dto.runId,
+        runId,
         iteration: entry.iteration,
         mode: entry.mode,
         artifact: entry.artifact,
@@ -65,13 +69,13 @@ const iterationRows = (dto: QualityRunDto, newId: () => string): RunRows['iterat
       },
       findings: ledger.findings.map((finding, position) => ({
         iterationId: id,
-        runId: dto.runId,
+        runId,
         position,
         ...finding,
       })),
       results: ledger.criteria.map((evidence, position) => ({
         iterationId: id,
-        runId: dto.runId,
+        runId,
         position,
         ...evidence,
       })),
@@ -86,7 +90,19 @@ export function toRows(
   const dto = toRunDto(record);
   return {
     run: headerOf(record, dto),
-    criteria: criteriaRows(dto),
-    iterations: iterationRows(dto, newId),
+    criteria: criteriaRows(dto.runId, dto.trace?.contract.criteria ?? []),
+    iterations: iterationRows(dto.runId, dto.trace?.iterations ?? [], newId),
+  };
+}
+
+/** A running loop's progress as child rows — the same rows `toRows` writes, before there is a verdict. */
+export function progressRows(
+  runId: string,
+  progress: RunProgress,
+  newId: () => string = () => crypto.randomUUID(),
+): Pick<RunRows, 'criteria' | 'iterations'> {
+  return {
+    criteria: criteriaRows(runId, progress.contract.criteria),
+    iterations: iterationRows(runId, progress.iterations, newId),
   };
 }

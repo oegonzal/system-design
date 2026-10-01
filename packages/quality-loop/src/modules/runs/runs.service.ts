@@ -12,7 +12,7 @@ import {
 import type { LlmClient, LlmExchange } from '@sysdesign/llm';
 import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
-import { summariseExchange, type RunRecord } from '../../core/contracts';
+import { summariseExchange, type RunProgress, type RunRecord } from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
 import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
@@ -143,7 +143,10 @@ export class RunsService {
     if (source.pipeline !== definition.id) {
       refuse(`run ${adopt.runId} ran ${source.pipeline}, not ${definition.id}`);
     }
-    if (source.trace === null) refuse(`run ${adopt.runId} never completed`);
+    // Its status, not its trace: a running run's iterations so far are not a verdict to adopt.
+    if (source.status !== 'complete' || source.trace === null) {
+      refuse(`run ${adopt.runId} never completed`);
+    }
     if (source.trace.pipeline.version !== definition.version) {
       refuse(
         `run ${adopt.runId} was judged by ${definition.id}@${source.trace.pipeline.version}, not @${definition.version}`,
@@ -221,18 +224,25 @@ export class RunsService {
       this.janitor.staleAfterMs,
       (error) => this.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
     );
-    // Exchange writes are chained, never awaited by the loop: order is kept,
-    // a slow database never stalls a model call, and a failed write is logged.
+    // Live writes are chained, never awaited by the loop: order is kept, a
+    // slow database never stalls a model call, and a failed write is logged.
     let writes: Promise<void> = Promise.resolve();
+    const write = (what: string, task: () => Promise<void>) => {
+      writes = writes
+        .then(task)
+        .catch((error: unknown) =>
+          this.logger.warn(`run ${record.runId}: ${what} not recorded: ${String(error)}`),
+        );
+    };
     const sink = (exchange: LlmExchange) => {
       record.exchanges.push(exchange);
       const summaries = record.exchanges.map(summariseExchange);
-      writes = writes
-        .then(() => this.repository.recordExchange(record.runId, summaries))
-        .catch((error: unknown) =>
-          this.logger.warn(`run ${record.runId}: exchange not recorded: ${String(error)}`),
-        );
+      write('exchange', () => this.repository.recordExchange(record.runId, summaries));
     };
+    // Each finished iteration is published as it lands — an adopted one at
+    // once — so a reader sees the run's progress, not only its end.
+    const onIteration = (progress: RunProgress) =>
+      write('progress', () => this.repository.recordProgress(record.runId, progress));
     try {
       record.trace = await runPipeline(
         definition,
@@ -243,7 +253,7 @@ export class RunsService {
           criteria: request.criteria,
           adopted,
         },
-        { llm: this.llm, sink, now: Date.now },
+        { llm: this.llm, sink, now: Date.now, onIteration },
       );
       record.status = 'complete';
     } catch (error) {
