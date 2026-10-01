@@ -1,4 +1,4 @@
-# Prompt — Build workflows out of other workflows
+# Build workflows out of other workflows
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

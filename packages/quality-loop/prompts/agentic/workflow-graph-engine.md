@@ -1,4 +1,4 @@
-# Prompt — Run a declared graph of agents over a brief nobody anticipated
+# Run a declared graph of agents over a brief nobody anticipated
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

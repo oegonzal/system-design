@@ -1,4 +1,4 @@
-# Prompt — Let agents call each other's tools without knowing each other
+# Let agents call each other's tools without knowing each other
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

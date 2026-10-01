@@ -1,4 +1,4 @@
-# Prompt — Change a policy only when the evidence says to
+# Change a policy only when the evidence says to
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

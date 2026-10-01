@@ -1,4 +1,4 @@
-# Prompt — Retrieve past design evidence: a RAG pipeline over quality-loop outputs
+# Retrieve past design evidence: a RAG pipeline over quality-loop outputs
 
 **Archetype:** rag-design-memory · **Difficulty:** hard
 

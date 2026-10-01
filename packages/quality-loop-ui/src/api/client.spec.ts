@@ -25,7 +25,7 @@ describe('quality-loop api client', () => {
 
     expect(await api.listPrompts()).toEqual(PROMPT_ENTRIES);
     expect(await api.listPipelines()).toEqual([pipeline]);
-    expect((await api.getPrompt('order-history')).markdown).toContain('# Prompt');
+    expect(await api.getPrompt('order-history')).toEqual(makePromptDocument());
     expect(calls.map((call) => call.url)).toEqual([
       '/prompts',
       '/pipelines',

@@ -1,4 +1,4 @@
-# Prompt — Improve an artifact until the checks pass or the budget ends
+# Improve an artifact until the checks pass or the budget ends
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

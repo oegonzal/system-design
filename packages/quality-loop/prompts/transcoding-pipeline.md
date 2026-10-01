@@ -1,4 +1,4 @@
-# Prompt — Turn an uploaded video into every format a player asks for
+# Turn an uploaded video into every format a player asks for
 
 **Archetype:** media-pipeline · **Difficulty:** standard
 

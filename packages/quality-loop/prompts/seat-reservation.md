@@ -1,4 +1,4 @@
-# Prompt — Hold and sell seats without ever overselling
+# Hold and sell seats without ever overselling
 
 **Archetype:** inventory-contention · **Difficulty:** standard
 

@@ -10,11 +10,11 @@ import { join } from 'node:path';
 
 export const seedPromptLibrary = (): string => {
   const dir = mkdtempSync(join(tmpdir(), 'sysdesign-quality-loop-prompts-'));
-  writeFileSync(join(dir, 'zebra.md'), '\n# Prompt — Stripe the zebra\n\nBody.\n');
+  writeFileSync(join(dir, 'zebra.md'), '\n# Stripe the zebra\n\nBody.\n');
   writeFileSync(join(dir, 'apple.md'), 'No heading here, just a goal.\n');
   writeFileSync(join(dir, 'notes.txt'), '# Not a prompt\n');
   mkdirSync(join(dir, 'agentic'));
-  writeFileSync(join(dir, 'agentic', 'nested.md'), '# Prompt — Nested one\n\nBody.\n');
+  writeFileSync(join(dir, 'agentic', 'nested.md'), '# Nested one\n\nBody.\n');
   mkdirSync(join(dir, 'trap.md'));
   return dir;
 };

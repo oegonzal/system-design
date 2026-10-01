@@ -1,4 +1,4 @@
-# Prompt — Decide what a person has to look at
+# Decide what a person has to look at
 
 **Archetype:** agentic-workflow · **Difficulty:** standard
 

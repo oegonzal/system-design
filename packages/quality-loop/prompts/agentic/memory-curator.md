@@ -1,4 +1,4 @@
-# Prompt — Decide what a finished run is allowed to remember
+# Decide what a finished run is allowed to remember
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

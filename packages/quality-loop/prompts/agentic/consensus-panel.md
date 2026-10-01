@@ -1,4 +1,4 @@
-# Prompt — Get one answer out of several that disagree
+# Get one answer out of several that disagree
 
 **Archetype:** agentic-workflow · **Difficulty:** standard
 

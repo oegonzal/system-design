@@ -1,4 +1,4 @@
-# Prompt — Decide which claims survive being attacked
+# Decide which claims survive being attacked
 
 **Archetype:** agentic-workflow · **Difficulty:** standard
 

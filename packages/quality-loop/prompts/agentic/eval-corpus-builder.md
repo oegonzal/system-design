@@ -1,4 +1,4 @@
-# Prompt — Turn failures into a corpus that stays worth running
+# Turn failures into a corpus that stays worth running
 
 **Archetype:** agentic-workflow · **Difficulty:** standard
 

@@ -1,4 +1,4 @@
-# Prompt — Turn anything someone sends into one work object
+# Turn anything someone sends into one work object
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

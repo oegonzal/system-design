@@ -1,4 +1,4 @@
-# Prompt — Move money between accounts and keep the ledger balanced
+# Move money between accounts and keep the ledger balanced
 
 **Archetype:** payments-ledger · **Difficulty:** hard
 

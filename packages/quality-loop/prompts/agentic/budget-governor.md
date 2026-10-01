@@ -1,4 +1,4 @@
-# Prompt — Spend a fixed budget across a running graph and defend the cuts
+# Spend a fixed budget across a running graph and defend the cuts
 
 **Archetype:** agentic-workflow · **Difficulty:** standard
 

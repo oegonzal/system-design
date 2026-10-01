@@ -1,4 +1,4 @@
-# Prompt — Take a firehose of metrics and answer dashboard queries over it
+# Take a firehose of metrics and answer dashboard queries over it
 
 **Archetype:** time-series-store · **Difficulty:** hard
 

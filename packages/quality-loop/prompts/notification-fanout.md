@@ -1,4 +1,4 @@
-# Prompt — Fan out account notifications to email, push and in-app without double-sending
+# Fan out account notifications to email, push and in-app without double-sending
 
 **Archetype:** notification-fanout · **Difficulty:** standard
 

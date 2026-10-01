@@ -15,17 +15,17 @@ describe('FilePromptLibrary', () => {
 
   it('[QL-11] lists every markdown file below the root, titled by its first H1 or its id', async () => {
     expect(await library.list()).toEqual([
-      { id: 'agentic/nested', title: 'Prompt — Nested one' },
+      { id: 'agentic/nested', title: 'Nested one' },
       { id: 'apple', title: 'apple' },
-      { id: 'zebra', title: 'Prompt — Stripe the zebra' },
+      { id: 'zebra', title: 'Stripe the zebra' },
     ]);
   });
 
   it('[QL-11] a prompt in a subdirectory is identified by its path below the root', async () => {
     expect(await library.get('agentic/nested')).toEqual({
       id: 'agentic/nested',
-      title: 'Prompt — Nested one',
-      markdown: '# Prompt — Nested one\n\nBody.\n',
+      title: 'Nested one',
+      markdown: '# Nested one\n\nBody.\n',
     });
     // The stem alone is not the id: the path is, so it cannot collide.
     expect(await library.get('nested')).toBeNull();
@@ -34,8 +34,8 @@ describe('FilePromptLibrary', () => {
   it('[QL-11] serves the document verbatim and answers null for the unknown or the unsafe', async () => {
     expect(await library.get('zebra')).toEqual({
       id: 'zebra',
-      title: 'Prompt — Stripe the zebra',
-      markdown: '\n# Prompt — Stripe the zebra\n\nBody.\n',
+      title: 'Stripe the zebra',
+      markdown: '\n# Stripe the zebra\n\nBody.\n',
     });
     expect(await library.get('nope')).toBeNull();
     // Not rejected by a pattern — never walked to, so never a key.
@@ -54,6 +54,16 @@ describe('FilePromptLibrary', () => {
       'zebra',
     ]);
     rmSync(join(dir, 'mango.md'));
+  });
+
+  it('[QL-11] every shipped prompt is titled by its own first H1, and no label precedes the titles', async () => {
+    const shipped = await new FilePromptLibrary(join(__dirname, '../../../prompts')).list();
+    expect(shipped.length).toBeGreaterThan(1);
+    for (const { id, title } of shipped) expect(title, id).not.toBe(id);
+    expect(new Set(shipped.map((entry) => entry.title)).size).toBe(shipped.length);
+    // A word every title opens with is a label the documents share, not part
+    // of any one title — the H1 is the bare title the library lists.
+    expect(new Set(shipped.map((entry) => entry.title.split(' ')[0])).size).toBeGreaterThan(1);
   });
 
   it('titleOf takes the first H1 anywhere and never a lower heading', () => {

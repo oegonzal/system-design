@@ -1,4 +1,4 @@
-# Prompt — Decide in under a millisecond whether a call is over its quota
+# Decide in under a millisecond whether a call is over its quota
 
 **Archetype:** quota-enforcement · **Difficulty:** standard
 

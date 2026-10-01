@@ -1,4 +1,4 @@
-# Prompt — Turn carrier scan events into one live parcel timeline
+# Turn carrier scan events into one live parcel timeline
 
 **Archetype:** parcel-tracking · **Difficulty:** standard
 

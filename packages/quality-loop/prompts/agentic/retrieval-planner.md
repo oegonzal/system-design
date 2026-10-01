@@ -1,4 +1,4 @@
-# Prompt — Decide what to retrieve for a brief you cannot anticipate
+# Decide what to retrieve for a brief you cannot anticipate
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

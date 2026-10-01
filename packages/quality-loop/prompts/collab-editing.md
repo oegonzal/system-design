@@ -1,4 +1,4 @@
-# Prompt — Keep one document consistent while many people type into it
+# Keep one document consistent while many people type into it
 
 **Archetype:** realtime-collaboration · **Difficulty:** hard
 

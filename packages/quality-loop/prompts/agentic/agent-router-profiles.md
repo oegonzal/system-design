@@ -1,4 +1,4 @@
-# Prompt — Choose the right specialist graph for a brief you have never seen
+# Choose the right specialist graph for a brief you have never seen
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

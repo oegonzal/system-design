@@ -1,4 +1,4 @@
-# Prompt — Say where every claim in the answer came from
+# Say where every claim in the answer came from
 
 **Archetype:** agentic-workflow · **Difficulty:** hard
 

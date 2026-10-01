@@ -1,4 +1,4 @@
-# Prompt — Unify online and in-store orders behind one history
+# Unify online and in-store orders behind one history
 
 **Archetype:** order-history-integration · **Difficulty:** standard
 
