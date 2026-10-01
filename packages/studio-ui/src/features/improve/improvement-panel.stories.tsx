@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeImproveIteration, makeImproveRun, makeRevisionSummary } from '../../testing/fixtures';
+import {
+  makeFinding,
+  makeImproveIteration,
+  makeImproveRun,
+  makeRevisionSummary,
+} from '../../testing/fixtures';
 import { ImprovementPanel } from './improvement-panel';
 
 const meta: Meta<typeof ImprovementPanel> = {
@@ -87,6 +92,9 @@ export const Stopped: Story = {
           mode: 'revise',
           overall: 70,
           decision: 'revise',
+          // The reason cites the finding by its key; the row names it by its type and place.
+          reason: 'blockers to fix: unhandled_failure|node.3',
+          findings: [makeFinding()],
           revisionId: null,
         }),
       ],

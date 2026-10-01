@@ -11,10 +11,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   makeCriteria,
+  makeFinding,
   makeImproveIteration,
   makeImproveRun,
   makeRevisionSummary,
 } from '../../testing/fixtures';
+import { humanizeReason } from '../evaluation/decision-reason';
 import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
@@ -228,22 +230,29 @@ describe('ImprovementPanel', () => {
     expect(onLoadRevision).toHaveBeenCalledWith('rev-3');
   });
 
-  it('[UX-11] names the criteria a reason cites by their statements, and wraps what it cannot name inside the dock', () => {
-    renderPanel({
-      criteria: makeCriteria(),
-      run: makeImproveRun({
-        iterations: [
-          makeImproveIteration({
-            reason: 'blockers to fix: contradiction|binding.2,edge.5,narration.2, c3',
-          }),
-        ],
-      }),
-      isPolling: true,
+  it('[UX-11] names the findings and criteria a reason cites as the feedback summary does, and wraps what it cannot name inside the dock', () => {
+    const contradiction = makeFinding({
+      id: 'contradiction|binding.2,edge.5',
+      type: 'contradiction',
+      locations: [
+        { ref: 'binding.2', label: 'Brief: c2', part: 'binding', key: 'c2' },
+        { ref: 'edge.5', label: 'Order Service → Orders DB', part: 'edge', key: 'e-5' },
+      ],
     });
+    const reasonText =
+      'blockers to fix: contradiction|binding.2,edge.5, unbacked_claim|binding.9,narration.2, c3';
+    const iteration = makeImproveIteration({ reason: reasonText, findings: [contradiction] });
+    const run = makeImproveRun({ iterations: [iteration] });
+    const criteria = makeCriteria();
+    renderPanel({ criteria, run, isPolling: true });
 
     const reason = screen.getByTestId('improve-iteration-reason');
+    // One humanizer: the coach row reads exactly as the feedback summary would.
     expect(reason.textContent).toBe(
-      'blockers to fix: contradiction|binding.2,edge.5,narration.2, “p99 read latency stays under 200 ms”',
+      humanizeReason(reasonText, { findings: iteration.findings, criteria }),
+    );
+    expect(reason.textContent).toBe(
+      'blockers to fix: Contradiction (Brief: c2; Order Service → Orders DB), unbacked_claim|binding.9,narration.2, “p99 read latency stays under 200 ms”',
     );
     expect(getComputedStyle(reason).overflowWrap).toBe('anywhere');
   });

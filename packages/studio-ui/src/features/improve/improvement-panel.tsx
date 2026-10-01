@@ -150,7 +150,9 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * imported into the timeline when it beat everything before it, left where
  * it was when it did not, refused when the studio would not store it, or
  * missing when the coach produced nothing. Each row says why the controller
- * decided as it did, naming the criteria it cites. The iteration count
+ * decided as it did, naming the findings and criteria it cites the way the
+ * feedback summary names them — from the iteration's own findings, placed
+ * on the design it judged. The iteration count
  * reads the run's own budget while there is a run, and the author's choice
  * for the next one. Pure props, Storybook-safe; the workspace owns polling
  * and the load-revision flow.
@@ -281,7 +283,7 @@ export function ImprovementPanel({
                     tone="muted"
                     data-testid="improve-iteration-reason"
                   >
-                    {humanizeReason(iteration.reason, { criteria })}
+                    {humanizeReason(iteration.reason, { findings: iteration.findings, criteria })}
                   </WrappingText>
                 ) : null}
                 {iteration.outcome === 'refused' && iteration.problems.length > 0 ? (
