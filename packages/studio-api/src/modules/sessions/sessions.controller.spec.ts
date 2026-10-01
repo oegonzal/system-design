@@ -5,6 +5,7 @@ import {
   PROMPT_COPY,
   type ApiErrorResponse,
   type CanvasGraph,
+  type ConfirmedFinding,
   type DesignBrief,
   type DesignNarrative,
   type DesignSubmission,
@@ -622,6 +623,56 @@ describe('sessions', () => {
       expect(imported.body.data.graph.nodes.map((n) => n.id)).toContain('ai-replica');
     });
 
+    it('[DEL-3] each iteration lists its confirmed findings grounded on the design it judged, so its reason can name them', async () => {
+      const finding = (key: string, locationRefs: string[]): ConfirmedFinding => ({
+        key,
+        type: 'unhandled_failure',
+        severity: 'high',
+        confidence: 'high',
+        fixability: 'fixable_local',
+        locationRefs,
+        criterionIds: [],
+        hits: 2,
+        lenses: ['critic.architecture'],
+        rationale: 'a single instance serves every read',
+        reconciledTo: null,
+      });
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 3 });
+      h.loop.complete('fake-run-1', [
+        { overall: 40, findings: [finding('unhandled_failure|node.2', ['node.2'])] },
+        {
+          overall: 60,
+          artifact: coached(),
+          findings: [finding('unhandled_failure|node.4,node.9', ['node.4', 'node.9'])],
+        },
+        { overall: 70, artifact: { nope: true }, findings: [finding('gap|node.1', ['node.1'])] },
+      ]);
+      const [base, revised, unreadable] = (await readImprove(sessionId, 'fake-run-1')).body.data
+        .iterations;
+
+      // The base judged the author's drawing: node.2 is its API.
+      expect(base.findings).toEqual([
+        expect.objectContaining({
+          id: 'unhandled_failure|node.2',
+          locations: [expect.objectContaining({ ref: 'node.2', part: 'node', key: 'api' })],
+          nodeIds: ['api'],
+        }),
+      ]);
+      // The coach's revision is placed on its own drawing; a ref it cannot place stays verbatim.
+      expect(revised.findings[0]).toMatchObject({
+        nodeIds: ['ai-replica'],
+        locationRefs: ['node.4', 'node.9'],
+      });
+      expect(revised.findings[0].locations.map((location) => location.ref)).toEqual(['node.4']);
+      // An artifact that is no submission places nothing, and loses nothing.
+      expect(unreadable.findings[0]).toMatchObject({
+        locations: [],
+        nodeIds: [],
+        locationRefs: ['node.1'],
+      });
+    });
+
     it('[DEL-3] an iteration whose artifact the studio would refuse is reported refused with its problems, never stored', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
@@ -928,6 +979,7 @@ describe('sessions', () => {
         overall: null,
         decision: 'escalate',
         reason: 'fake',
+        findings: [],
         outcome: 'no-artifact',
         problems: [],
         revisionId: null,

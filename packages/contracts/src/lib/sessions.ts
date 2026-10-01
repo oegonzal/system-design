@@ -6,6 +6,7 @@ import type {
   SessionDraft,
 } from './canvas.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
+import type { EvaluationFindingDto } from './evaluations';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
 import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
@@ -187,6 +188,12 @@ export interface ImproveIterationDto {
   decision: Decision | null;
   /** The controller's own sentence for its decision. */
   reason: string | null;
+  /**
+   * The iteration's confirmed findings, grounded on its own submission — the
+   * artifact it judged — so a reader can name each finding `reason` cites by
+   * its labels rather than its key. Empty when it confirmed none.
+   */
+  findings: EvaluationFindingDto[];
   outcome: ImproveIterationOutcome;
   /** Why the studio refused to store the artifact; empty unless `outcome` is `refused`. */
   problems: string[];

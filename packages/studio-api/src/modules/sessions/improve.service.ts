@@ -16,7 +16,6 @@ import {
   type ImproveIterationDto,
   type ImproveIterationOutcome,
   type ImproveRunDto,
-  type IterationTrace,
   type StartImproveDto,
   type StartImproveRequest,
   type SuccessCriterion,
@@ -24,7 +23,7 @@ import {
 import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sysdesign/db';
 
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
-import { iterationGrade } from './evaluation.mapper';
+import { findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
 import { SessionsService, type RevisionCache } from './sessions.service';
@@ -206,6 +205,10 @@ export class ImproveService {
     for (const it of recorded) {
       const cache: RevisionCache = { status: 'complete', ...iterationGrade(it) };
       const { overall } = cache;
+      // What the iteration judged, when it is a submission: its findings are
+      // grounded on it, and it is what an import would store.
+      const judged = designSubmissionSchema.safeParse(it.artifact);
+      const submission = judged.success ? judged.data : null;
       let revision: DesignRevision | null = null;
       let outcome: ImproveIterationOutcome = 'not-better';
       let problems: string[] = [];
@@ -220,7 +223,14 @@ export class ImproveService {
         // The coach produced nothing to judge: no score, and no verdict on the design.
         outcome = 'no-artifact';
       } else if (overall !== null && overall > bestBefore) {
-        const imported = await this.import(sessionId, runId, it, criteria, cache);
+        const imported = await this.import(
+          sessionId,
+          runId,
+          it.iteration,
+          submission,
+          criteria,
+          cache,
+        );
         if ('revision' in imported) {
           revision = imported.revision;
           outcome = 'imported';
@@ -235,6 +245,7 @@ export class ImproveService {
         overall,
         decision: it.decision.finalDecision,
         reason: it.decision.reason,
+        findings: findingsOf(it, locationIndex(submission)),
         outcome,
         problems,
         revisionId: revision?.id ?? null,
@@ -255,19 +266,19 @@ export class ImproveService {
   private async import(
     sessionId: string,
     runId: string,
-    it: IterationTrace,
+    iteration: number,
+    submission: DesignSubmission | null,
     criteria: readonly SuccessCriterion[],
     cache: RevisionCache,
   ): Promise<{ revision: DesignRevision } | { problems: string[] }> {
-    const parsed = designSubmissionSchema.safeParse(it.artifact);
-    if (!parsed.success) {
-      this.logger.warn(`run ${runId} iteration ${it.iteration}: artifact is not a submission`);
+    if (submission === null) {
+      this.logger.warn(`run ${runId} iteration ${iteration}: artifact is not a submission`);
       return { problems: ['the artifact is not a submission'] };
     }
-    const problems = submissionProblems(parsed.data, criteria);
+    const problems = submissionProblems(submission, criteria);
     if (problems.length > 0) {
       this.logger.warn(
-        `run ${runId} iteration ${it.iteration}: not imported — ${problems.join('; ')}`,
+        `run ${runId} iteration ${iteration}: not imported — ${problems.join('; ')}`,
       );
       return { problems };
     }
@@ -275,9 +286,9 @@ export class ImproveService {
       return {
         revision: await this.sessions.persistRevision(
           sessionId,
-          parsed.data,
+          submission,
           'assistant',
-          { runId, iteration: it.iteration },
+          { runId, iteration },
           cache,
         ),
       };
@@ -286,7 +297,7 @@ export class ImproveService {
       if (error instanceof ConflictException) {
         const revision = await this.em.findOne(DesignRevision, {
           qualityRunId: runId,
-          qualityIteration: it.iteration,
+          qualityIteration: iteration,
         });
         if (revision !== null) return { revision };
         return {

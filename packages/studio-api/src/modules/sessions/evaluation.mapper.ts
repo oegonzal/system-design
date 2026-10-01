@@ -58,14 +58,14 @@ export function toEvaluationDto(
           : (run.error?.message ?? `the run has no iteration ${iteration}`),
     };
   }
-  const index = new Map(submissionLocations(submission).map((location) => [location.id, location]));
+  const index = locationIndex(submission);
   return {
     ...header,
     status: 'complete',
     ...iterationGrade(it),
     decisionReason: it.decision.reason,
     dimensions: { ...it.decision.scores.dimensions },
-    findings: it.ledger.findings.map((finding) => toFinding(finding, it, index)),
+    findings: findingsOf(it, index),
     criterionResults: it.ledger.criteria.map((row) => toCriterionResult(row, it, index)),
     stopReason: endedRun(run, iteration) ? (run.trace?.stopReason ?? null) : null,
     degraded: degradedSamples(it),
@@ -99,6 +99,30 @@ export function iterationGrade(it: IterationTrace): {
     decision: it.decision.finalDecision,
   };
 }
+
+/**
+ * The places of a submission, by the positional id a lens cites — the same
+ * numbering the canvas pipeline printed. No submission places nothing: every
+ * ref is then kept verbatim and nowhere else.
+ */
+export const locationIndex = (
+  submission: DesignSubmission | null,
+): ReadonlyMap<string, SubmissionLocation> =>
+  new Map(
+    submission === null
+      ? []
+      : submissionLocations(submission).map((location) => [location.id, location]),
+  );
+
+/**
+ * One iteration's confirmed findings as the studio shows them, grounded on
+ * the submission the iteration judged — a revision's grade and a coach
+ * iteration's row read them through this one projection.
+ */
+export const findingsOf = (
+  it: IterationTrace,
+  index: ReadonlyMap<string, SubmissionLocation>,
+): EvaluationFindingDto[] => it.ledger.findings.map((finding) => toFinding(finding, it, index));
 
 /** Why the run stopped belongs to the iteration that ended it, and only once the run has completed. */
 const endedRun = (run: QualityRunDto, iteration: number): boolean =>

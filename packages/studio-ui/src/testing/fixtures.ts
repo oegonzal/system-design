@@ -404,6 +404,7 @@ export function makeImproveIteration(
     overall: 64,
     decision: 'revise',
     reason: 'below the accept threshold of 75',
+    findings: [],
     problems: [],
     ...overrides,
     outcome,
