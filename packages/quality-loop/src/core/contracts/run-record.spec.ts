@@ -69,6 +69,8 @@ describe('toRunDto', () => {
           outcome: 'ok',
           durationMs: 12,
           startedAt: '2026-09-06T00:00:00.000Z',
+          attempt: 1,
+          errorName: null,
         },
       ],
     });

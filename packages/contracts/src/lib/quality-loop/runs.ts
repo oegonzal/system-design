@@ -19,6 +19,18 @@ export interface LlmExchangeSummaryDto {
   outcome: LlmExchangeOutcome;
   durationMs: number;
   startedAt: IsoDateString;
+  /**
+   * Which try this was within one call, 1-based. Absent on rows written before
+   * the seam could retry, which read as a single attempt.
+   */
+  attempt?: number;
+  /**
+   * Why there is no response, by name only — the provider's reason or the
+   * schema's. The message stays in the dump; the name is here so "which
+   * failures cost us samples" is a group-by over the rows rather than a walk
+   * over dump folders.
+   */
+  errorName?: string | null;
 }
 
 export interface RunErrorDto {

@@ -109,6 +109,7 @@ function exchangeFiles(exchange: LlmExchange, position: number): DumpFile[] {
         startedAt: exchange.startedAt,
         durationMs: exchange.durationMs,
         outcome: exchange.outcome,
+        attempt: exchange.attempt ?? 1,
         stopReason: exchange.stopReason,
         usage: exchange.usage,
         requestId: exchange.requestId,

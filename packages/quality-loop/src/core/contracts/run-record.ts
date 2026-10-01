@@ -22,7 +22,17 @@ export const summariseExchange = ({
   outcome,
   durationMs,
   startedAt,
-}: LlmExchange): LlmExchangeSummaryDto => ({ scope, ordinal, outcome, durationMs, startedAt });
+  attempt,
+  error,
+}: LlmExchange): LlmExchangeSummaryDto => ({
+  scope,
+  ordinal,
+  outcome,
+  durationMs,
+  startedAt,
+  attempt: attempt ?? 1,
+  errorName: error?.name ?? null,
+});
 
 /** The wire projection, picked field by field: prompts, responses and git stay in the dump. */
 export function toRunDto(record: RunRecord): QualityRunDto {

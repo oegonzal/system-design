@@ -45,6 +45,12 @@ export interface LlmCall {
    * no object parsed at all. Null on `ok`.
    */
   error: { name: string; message: string } | null;
+  /**
+   * Which try this was within one `completeStructured` call, 1-based. One call
+   * may record several attempts; they share a scope and are told apart by this.
+   * Optional so a hand-rolled literal keeps compiling and reads as a single try.
+   */
+  attempt?: number;
 }
 
 export type LlmCallSink = (call: LlmCall) => void;

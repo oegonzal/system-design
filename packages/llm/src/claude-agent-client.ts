@@ -267,6 +267,9 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
     const started = Date.now();
     let jsonSchema = '';
 
+    // One call records one attempt today; the loop below is where a retry will
+    // advance it, so every reader already sees the field.
+    const attempt = 1;
     const record = (
       call: Pick<LlmCall, 'outcome' | 'text' | 'response' | 'error' | 'usage' | 'stopReason'>,
     ): void => {
@@ -279,6 +282,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         startedAt: startedAt.toISOString(),
         durationMs: Date.now() - started,
         requestId: null,
+        attempt,
         ...call,
       });
     };
