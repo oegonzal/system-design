@@ -34,7 +34,7 @@ describe('PropertiesPanel', () => {
     expect(screen.getByText(/select a block or connection/i)).toBeTruthy();
   });
 
-  it('[UX-2] while the canvas is read-only the selection can be inspected and nothing in it edited', async () => {
+  it('[UX-16] while the canvas is read-only the selection can be inspected and nothing in it edited', async () => {
     const user = userEvent.setup();
     const store = renderPanel((seeded) => {
       seeded.getState().select('n-3');

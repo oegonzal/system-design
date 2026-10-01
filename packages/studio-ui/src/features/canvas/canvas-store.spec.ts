@@ -480,7 +480,7 @@ describe('canvas-store', () => {
   });
 
   describe('read-only', () => {
-    it('[UX-2] refuses every author edit while set, whichever control asks', () => {
+    it('[UX-16] refuses every author edit while set, whichever control asks', () => {
       const store = createCanvasStore(makeGraph());
       store.getState().setBindingClaim('c1', 'before');
       store.getState().setReadOnly(true);
@@ -540,7 +540,7 @@ describe('canvas-store', () => {
   describe('undo and redo', () => {
     const labels = (store: CanvasStore) => store.getState().nodes.map((node) => node.data.label);
 
-    it('[UX-2] walks edits back and forth, and a new edit forgets what was undone', () => {
+    it('[UX-16] walks edits back and forth, and a new edit forgets what was undone', () => {
       const store = createCanvasStore();
       store.getState().addNode('service');
       store.getState().addNode('database');
@@ -562,7 +562,7 @@ describe('canvas-store', () => {
       expect(labels(store)).toEqual(['Service', 'Cache']);
     });
 
-    it('[UX-2] a typed label is one step, and so is a whole drag', () => {
+    it('[UX-16] a typed label is one step, and so is a whole drag', () => {
       const store = createCanvasStore(makeGraph());
       for (const label of ['C', 'Ch', 'Che', 'Checkout']) {
         store.getState().updateNode('n-2', { label });
@@ -591,7 +591,7 @@ describe('canvas-store', () => {
       expect(labels(store)[1]).toBe('Order Service');
     });
 
-    it('[UX-2] a deleted block comes back with its connections in one step', () => {
+    it('[UX-16] a deleted block comes back with its connections in one step', () => {
       const store = createCanvasStore(makeGraph());
 
       store.getState().removeElements({ nodeIds: ['n-2'], edgeIds: [] });
@@ -603,7 +603,7 @@ describe('canvas-store', () => {
       expect(store.getState().edges.map((edge) => edge.id)).toEqual(['e-1', 'e-2']);
     });
 
-    it('[UX-2] Clear is one step back to the diagram, and keeps the brief and narrative', () => {
+    it('[UX-16] Clear is one step back to the diagram, and keeps the brief and narrative', () => {
       const store = createCanvasStore(makeGraph());
       store.getState().setNarrativeOverview('kept');
 

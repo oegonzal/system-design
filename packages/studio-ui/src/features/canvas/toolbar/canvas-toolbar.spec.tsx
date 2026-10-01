@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('CanvasToolbar', () => {
-  it('[UX-2] Undo and Redo follow the history and walk it', async () => {
+  it('[UX-16] Undo and Redo follow the history and walk it', async () => {
     const user = userEvent.setup();
     const store = createCanvasStore(makeGraph());
     renderToolbar(store);
@@ -51,7 +51,7 @@ describe('CanvasToolbar', () => {
     expect(store.getState().nodes[0]?.data.label).toBe('Browser');
   });
 
-  it('[UX-2] Clear asks first and is one undo away from the diagram', async () => {
+  it('[UX-16] Clear asks first and is one undo away from the diagram', async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       'confirm',
@@ -79,7 +79,7 @@ describe('CanvasToolbar', () => {
     expect(store.getState().fitRequest).toBe(before + 1);
   });
 
-  it('[UX-2] a read-only canvas leaves nothing to submit, clear or undo', () => {
+  it('[UX-16] a read-only canvas leaves nothing to submit, clear or undo', () => {
     const store = createCanvasStore(makeGraph());
     store.getState().updateNode('n-1', { label: 'Browser' });
     store.getState().setReadOnly(true);

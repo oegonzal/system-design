@@ -79,7 +79,7 @@ describe('Palette', () => {
     expect(first.position).not.toEqual(second.position);
   });
 
-  it('[UX-2] while the canvas is read-only every entry is disabled and adds nothing', async () => {
+  it('[UX-16] while the canvas is read-only every entry is disabled and adds nothing', async () => {
     const user = userEvent.setup();
     const store = renderPalette();
     act(() => store.getState().setReadOnly(true));

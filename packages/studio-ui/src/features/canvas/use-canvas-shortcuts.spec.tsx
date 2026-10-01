@@ -22,7 +22,7 @@ function mount(store: CanvasStore) {
 const label = (store: CanvasStore) => store.getState().nodes[0]?.data.label;
 
 describe('useCanvasShortcuts', () => {
-  it('[UX-2] ⌘Z / Ctrl+Z undoes, ⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y redoes', () => {
+  it('[UX-16] ⌘Z / Ctrl+Z undoes, ⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y redoes', () => {
     const store = createCanvasStore(makeGraph());
     mount(store);
     act(() => store.getState().updateNode('n-1', { label: 'Browser' }));

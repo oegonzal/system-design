@@ -103,6 +103,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The unsubmitted canvas is a draft kept with the session: it autosaves shape-checked only, is restored ahead of the latest revision when the workspace opens, is cleared by the submit or coach start it became, and the workspace asks before a pending save is lost.',
   },
+  {
+    id: 'UX-16',
+    statement:
+      'Canvas edits undo and redo step by step, from the toolbar and the keyboard — a typed field, a drag, a delete with its connections, a Clear each one step — and a revision on screen is read-only in every control: nothing on the canvas, the palette, the properties or the toolbar edits it.',
+  },
   // STAR repository
   {
     id: 'STAR-1',
