@@ -20,3 +20,6 @@ export const Tall: Story = {
 };
 
 export const Disabled: Story = { args: { disabled: true, defaultValue: 'read only' } };
+
+/** A refused value: the reason under the control, which is marked invalid and described by it. */
+export const Invalid: Story = { args: { error: 'Say how a request travels.', required: true } };

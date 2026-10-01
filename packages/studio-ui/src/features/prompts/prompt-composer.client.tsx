@@ -9,6 +9,7 @@ import {
   type PromptLibraryEntryDto,
 } from '@sysdesign/contracts';
 import {
+  Alert,
   Button,
   Heading,
   Markdown,
@@ -25,11 +26,48 @@ import {
   TextField,
   transient,
 } from '@sysdesign/design-system';
-import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import { toErrorMessage, useLatestRequest, useLeaveGuard } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api } from '../../api/client';
+
+/**
+ * The library as master and detail: the list beside the preview while both
+ * fit, the preview under the list when they do not. The list scrolls on its
+ * own, so picking an entry never sends the preview — or Import — off screen.
+ */
+const LibraryLayout = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.space[5]}px;
+`;
+
+const LibraryList = styled.ul`
+  flex: 1 1 240px;
+  max-width: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[2]}px;
+`;
+
+const LibraryDetail = styled.div`
+  flex: 3 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[4]}px;
+`;
+
+/** What leaving a composer with unsaved words asks first. */
+export const LEAVE_UNSAVED_PROMPT =
+  'Leave this page? The prompt you are writing has not been saved.';
 
 const EntryButton = styled('button', transient)<{ $selected: boolean }>`
   display: block;
@@ -107,6 +145,9 @@ export function PromptComposer() {
   }, [selectedId, preview]);
 
   const canAuthor = title.trim().length > 0 && markdown.trim().length > 0;
+  // Words typed and not yet saved are the author's to lose; a save in flight
+  // is already on its way, and navigates away itself.
+  useLeaveGuard((title.length > 0 || markdown.length > 0) && !saving, LEAVE_UNSAVED_PROMPT);
   // A document from an earlier selection is not this selection's preview.
   const previewed = document !== null && document.id === selectedId ? document : null;
 
@@ -144,9 +185,9 @@ export function PromptComposer() {
     <Stack gap={5}>
       <Heading level={1}>New prompt</Heading>
       {error !== null ? (
-        <Text tone="secondary" data-testid="compose-error">
+        <Alert tone="danger" data-testid="compose-error">
           {error}
-        </Text>
+        </Alert>
       ) : null}
       <Surface padding={6}>
         <Tabs value={tab} onChange={setTab}>
@@ -220,42 +261,53 @@ export function PromptComposer() {
                   The library is empty.
                 </Text>
               ) : (
-                <Stack as="ul" gap={2} data-testid="library-list">
-                  {library.map((entry) => (
-                    <li key={entry.id}>
-                      <EntryButton
-                        type="button"
-                        $selected={entry.id === selectedId}
-                        onClick={() => setSelectedId(entry.id)}
-                        data-testid={`library-entry-${entry.id}`}
+                <LibraryLayout>
+                  <LibraryList data-testid="library-list" aria-label="Library prompts">
+                    {library.map((entry) => (
+                      <li key={entry.id}>
+                        <EntryButton
+                          type="button"
+                          $selected={entry.id === selectedId}
+                          aria-pressed={entry.id === selectedId}
+                          onClick={() => setSelectedId(entry.id)}
+                          data-testid={`library-entry-${entry.id}`}
+                        >
+                          {entry.title}
+                        </EntryButton>
+                      </li>
+                    ))}
+                  </LibraryList>
+                  <LibraryDetail>
+                    <div>
+                      <Button
+                        variant="solid"
+                        onClick={() => void handleImport()}
+                        disabled={previewed === null || saving}
+                        data-testid="import-submit"
                       >
-                        {entry.title}
-                      </EntryButton>
-                    </li>
-                  ))}
-                </Stack>
+                        {saving ? 'Importing…' : 'Import prompt'}
+                      </Button>
+                    </div>
+                    {selectedId === null ? (
+                      <Text size="sm" tone="muted">
+                        Pick a prompt to preview it here.
+                      </Text>
+                    ) : previewed ? (
+                      <Stack gap={3}>
+                        <Heading level={2}>{previewed.title}</Heading>
+                        <Markdown
+                          label={previewed.title}
+                          title={previewed.title}
+                          text={previewed.markdown}
+                          data-testid="library-preview"
+                        />
+                      </Stack>
+                    ) : (
+                      <Spinner label="Loading the document" />
+                    )}
+                  </LibraryDetail>
+                </LibraryLayout>
               )}
-              {selectedId !== null ? (
-                previewed ? (
-                  <Markdown
-                    label={previewed.title}
-                    text={previewed.markdown}
-                    data-testid="library-preview"
-                  />
-                ) : (
-                  <Spinner label="Loading the document" />
-                )
-              ) : null}
-              <div>
-                <Button
-                  variant="solid"
-                  onClick={() => void handleImport()}
-                  disabled={previewed === null || saving}
-                  data-testid="import-submit"
-                >
-                  {saving ? 'Importing…' : 'Import prompt'}
-                </Button>
-              </div>
             </Stack>
           </TabPanel>
         </Tabs>

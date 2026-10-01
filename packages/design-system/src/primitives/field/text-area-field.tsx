@@ -1,19 +1,24 @@
 import { useId, type TextareaHTMLAttributes } from 'react';
 
-import { Area, FieldLabel, FieldRoot } from './field-control';
+import { Area, FieldFrame, invalidAttributes, type FieldProps } from './field-control';
 
-export interface TextAreaFieldProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
-  label: string;
-}
+export interface TextAreaFieldProps
+  extends FieldProps, TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
 /** A labelled multi-line input; four rows unless told otherwise. */
-export function TextAreaField({ label, id, rows = 4, ...rest }: TextAreaFieldProps) {
+export function TextAreaField({
+  label,
+  error,
+  id,
+  rows = 4,
+  'aria-describedby': describedBy,
+  ...rest
+}: TextAreaFieldProps) {
   const autoId = useId();
   const areaId = id ?? autoId;
   return (
-    <FieldRoot htmlFor={areaId}>
-      <FieldLabel>{label}</FieldLabel>
-      <Area id={areaId} rows={rows} {...rest} />
-    </FieldRoot>
+    <FieldFrame label={label} error={error} controlId={areaId}>
+      <Area id={areaId} rows={rows} {...invalidAttributes(areaId, error, describedBy)} {...rest} />
+    </FieldFrame>
   );
 }

@@ -43,12 +43,9 @@ test.describe('prompts', () => {
     const prompt = await getPrompt(request, prompts.promptIdFromUrl());
     expect(prompt.source).toBe('generated');
     await prompts.expectSource('generated');
-    await expect(
-      prompts.promptPane.getByRole('heading', { level: 2, name: prompt.title }),
-    ).toBeVisible();
+    await prompts.expectTitledOnce(prompt.title);
     // The draft was rendered to the house convention before it was stored,
     // and renders as a document: its sections are headings under the title.
-    await expect(prompts.markdownHeading(prompt.title, 3)).toBeVisible();
     await expect(prompts.markdownHeading('Functional requirements')).toBeVisible();
     await expect(prompts.markdownHeading('Non-functional requirements')).toBeVisible();
     await expect(prompts.markdownPane).not.toContainText('## ');
@@ -72,9 +69,7 @@ test.describe('prompts', () => {
     await prompts.author({ title: AUTHORED_TITLE, markdown: AUTHORED_MARKDOWN });
 
     await prompts.expectSource('authored');
-    await expect(
-      prompts.promptPane.getByRole('heading', { level: 2, name: AUTHORED_TITLE }),
-    ).toBeVisible();
+    await prompts.expectTitledOnce(AUTHORED_TITLE);
     await expect(prompts.markdownHeading('Scale targets')).toBeVisible();
     await expect(prompts.markdownPane.getByRole('table').first()).toBeVisible();
     await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
@@ -92,9 +87,7 @@ test.describe('prompts', () => {
     await prompts.importFromLibrary(ORDER_HISTORY_DOCUMENT.id);
 
     await prompts.expectSource('library');
-    await expect(
-      prompts.promptPane.getByRole('heading', { level: 2, name: ORDER_HISTORY_DOCUMENT.title }),
-    ).toBeVisible();
+    await prompts.expectTitledOnce(ORDER_HISTORY_DOCUMENT.title);
     await expect(prompts.markdownHeading('Constraints')).toBeVisible();
     await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
 
@@ -119,7 +112,7 @@ test.describe('prompts', () => {
     await prompts.openDetail(prompt.id);
 
     await prompts.expectCriteriaGrouped(AUTHORED_CRITERIA_BY_KIND);
-    await expect(prompts.criteriaGroup('non_functional')).toContainText('Non functional');
+    await expect(prompts.criteriaGroup('non_functional')).toContainText('Non-functional');
     await expect(prompts.criterionChip('c3')).toContainText('order-history reads');
 
     await prompts.rederiveCriteria();

@@ -64,7 +64,11 @@ describe('PromptComposer', () => {
     const { calls } = stubApi([
       EXPERIENCES,
       LIBRARY,
-      { path: '/api/prompts/library/order-history', body: { data: makeLibraryDocument() } },
+      {
+        path: '/api/prompts/library/order-history',
+        // A library document is titled by its own opening `#`.
+        body: { data: makeLibraryDocument({ title: 'Design an order-history service' }) },
+      },
       {
         method: 'POST',
         path: '/api/prompts/import',
@@ -76,12 +80,38 @@ describe('PromptComposer', () => {
     renderWithTheme(<PromptComposer />);
     await user.click(screen.getByRole('tab', { name: 'Import from the library' }));
 
-    await user.click(await screen.findByTestId('library-entry-order-history'));
-    expect(await screen.findByTestId('library-preview')).toBeTruthy();
+    const entry = await screen.findByTestId('library-entry-order-history');
+    expect(entry.getAttribute('aria-pressed')).toBe('false');
+    expect((screen.getByTestId('import-submit') as HTMLButtonElement).disabled).toBe(true);
+    await user.click(entry);
+    expect(entry.getAttribute('aria-pressed')).toBe('true');
+    const preview = await screen.findByTestId('library-preview');
+    // The preview is named by the document and titled once: its opening `#` is not repeated.
+    expect(
+      screen.getAllByRole('heading', { name: 'Design an order-history service' }),
+    ).toHaveLength(1);
+    expect(preview.getAttribute('aria-label')).toBe('Design an order-history service');
     await user.click(screen.getByTestId('import-submit'));
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith('/prompts/prompt-2'));
     expect(calls.some((call) => call.url === '/api/prompts/library/order-history')).toBe(true);
+  });
+
+  it('asks before a reload or close drops words that were typed and not saved', async () => {
+    const user = userEvent.setup();
+    stubApi([EXPERIENCES, LIBRARY]);
+    const leaving = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+
+    renderWithTheme(<PromptComposer />);
+    expect(leaving()).toBe(false);
+    await user.type(screen.getByTestId('compose-markdown'), '# Design it');
+    expect(leaving()).toBe(true);
+    await user.clear(screen.getByTestId('compose-markdown'));
+    expect(leaving()).toBe(false);
   });
 
   it('shows the API’s refusal instead of navigating', async () => {

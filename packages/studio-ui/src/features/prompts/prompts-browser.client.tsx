@@ -1,13 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import {
-  DEFAULT_LIST_LIMIT,
-  PROMPT_SOURCES,
-  type ExperienceProfileDto,
-  type PromptDto,
-  type PromptSource,
-} from '@sysdesign/contracts';
+import { DEFAULT_LIST_LIMIT, PROMPT_SOURCES, type PromptSource } from '@sysdesign/contracts';
 import {
   Badge,
   Button,
@@ -20,15 +14,34 @@ import {
   Surface,
   Text,
 } from '@sysdesign/design-system';
-import { toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import { query, UNREACHABLE_COPY, usePagedList, useResource } from '@sysdesign/web-kit';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { api } from '../../api/client';
+import { LoadMore } from '../../components/load-more';
+import { ResultList } from '../../components/result-list';
+import { RetryAlert } from '../../components/retry-alert';
+import { humanizeToken } from '../evaluation/humanize';
 import { usePromptGeneration } from './use-prompt-generation';
 
 const PAGE_SIZE = DEFAULT_LIST_LIMIT;
+
+/** The browser's filters, as the URL carries them: a reload, Back and a shared link all keep them. */
+interface PromptFilters {
+  experienceId: string;
+  source: '' | PromptSource;
+}
+
+/** A source the contract does not know is no filter at all. */
+const sourceOf = (value: string | null): PromptFilters['source'] =>
+  PROMPT_SOURCES.find((candidate) => candidate === value) ?? '';
+
+/** The filters a URL names. */
+const filtersOf = (params: Pick<URLSearchParams, 'get'>): PromptFilters => ({
+  experienceId: params.get('experienceId') ?? '',
+  source: sourceOf(params.get('source')),
+});
 
 const FilterRow = styled.div`
   display: flex;
@@ -36,8 +49,8 @@ const FilterRow = styled.div`
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.space[4]}px;
 
-  > label {
-    min-width: 220px;
+  > div {
+    flex: 1 1 220px;
   }
 `;
 
@@ -75,51 +88,35 @@ const ComposeLink = styled(Link)`
 
 export function PromptsBrowser() {
   const router = useRouter();
-  const listRequest = useLatestRequest();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { experienceId, source } = filtersOf(searchParams);
+  const filtered = experienceId !== '' || source !== '';
   const generation = usePromptGeneration((prompt) => router.push(`/prompts/${prompt.id}`));
 
-  const [experiences, setExperiences] = useState<ExperienceProfileDto[]>([]);
-  const [experienceId, setExperienceId] = useState('');
-  const [source, setSource] = useState<'' | PromptSource>('');
-  const [prompts, setPrompts] = useState<PromptDto[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const experiences = useResource(
+    async (signal) => (await api.listExperiences({ signal })).data,
+    [],
+  );
+  const prompts = usePagedList(
+    (page, signal) =>
+      api.listPrompts(
+        { ...(experienceId ? { experienceId } : {}), ...(source ? { source } : {}), ...page },
+        { signal },
+      ),
+    [experienceId, source],
+    { pageSize: PAGE_SIZE, fallback: UNREACHABLE_COPY },
+  );
 
-  useEffect(() => {
-    void api
-      .listExperiences()
-      .then((response) => setExperiences(response.data))
-      .catch((caught) => setError(toErrorMessage(caught, 'Could not load experiences.')));
-  }, []);
-
-  useEffect(() => {
-    const { id, signal } = listRequest.begin();
-    void (async () => {
-      setLoading(true);
-      try {
-        const response = await api.listPrompts(
-          {
-            ...(experienceId ? { experienceId } : {}),
-            ...(source ? { source } : {}),
-            limit: PAGE_SIZE,
-            offset,
-          },
-          { signal },
-        );
-        if (!listRequest.isCurrent(id)) return;
-        setPrompts((current) => (offset === 0 ? response.data : [...current, ...response.data]));
-        setTotal(response.meta.total);
-        setError(null);
-        setLoading(false);
-      } catch (caught) {
-        if (listRequest.isStale(id, caught)) return;
-        setError(toErrorMessage(caught, 'Could not load prompts.'));
-        setLoading(false);
-      }
-    })();
-  }, [experienceId, source, offset]);
+  // A filter change is a new address, not a new history entry.
+  const setFilters = (next: PromptFilters) =>
+    router.replace(
+      `${pathname}${query({
+        experienceId: next.experienceId || undefined,
+        source: next.source || undefined,
+      })}`,
+      { scroll: false },
+    );
 
   return (
     <Stack gap={6}>
@@ -136,14 +133,11 @@ export function PromptsBrowser() {
             <SelectField
               label="Experience"
               value={experienceId}
-              onChange={(event) => {
-                setExperienceId(event.target.value);
-                setOffset(0);
-              }}
+              onChange={(event) => setFilters({ experienceId: event.target.value, source })}
               data-testid="experience-select"
             >
               <option value="">All experiences</option>
-              {experiences.map((experience) => (
+              {(experiences.data ?? []).map((experience) => (
                 <option key={experience.id} value={experience.id}>
                   {experience.companyLabel} — {experience.title}
                 </option>
@@ -152,16 +146,15 @@ export function PromptsBrowser() {
             <SelectField
               label="Source"
               value={source}
-              onChange={(event) => {
-                setSource(event.target.value as '' | PromptSource);
-                setOffset(0);
-              }}
+              onChange={(event) =>
+                setFilters({ experienceId, source: sourceOf(event.target.value) })
+              }
               data-testid="source-select"
             >
               <option value="">Any source</option>
               {PROMPT_SOURCES.map((candidate) => (
                 <option key={candidate} value={candidate}>
-                  {candidate}
+                  {humanizeToken(candidate)}
                 </option>
               ))}
             </SelectField>
@@ -193,20 +186,50 @@ export function PromptsBrowser() {
               {generation.error}
             </Text>
           ) : null}
+          {experiences.error !== null ? (
+            <RetryAlert
+              title="Couldn't load your experiences"
+              message={experiences.error}
+              onRetry={experiences.reload}
+              retrying={experiences.loading}
+            />
+          ) : null}
         </Stack>
       </Surface>
 
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
-
-      {loading && prompts.length === 0 ? (
-        <Stack gap={3} aria-busy="true">
-          <Skeleton variant="block" height="72px" />
-          <Skeleton variant="block" height="72px" />
-          <Skeleton variant="block" height="72px" />
-        </Stack>
+      {prompts.items === null ? (
+        prompts.error !== null ? (
+          <RetryAlert
+            title="Couldn't load prompts"
+            message={prompts.error}
+            onRetry={prompts.reload}
+            data-testid="prompts-error"
+          />
+        ) : (
+          <Stack gap={3} aria-busy="true">
+            <Skeleton variant="block" height="72px" />
+            <Skeleton variant="block" height="72px" />
+            <Skeleton variant="block" height="72px" />
+          </Stack>
+        )
+      ) : prompts.items.length === 0 ? (
+        filtered ? (
+          <Stack gap={3} align="start" data-testid="prompts-empty-filtered">
+            <Text tone="muted">No prompts match these filters.</Text>
+            <Button
+              variant="subtle"
+              onClick={() => setFilters({ experienceId: '', source: '' })}
+              data-testid="clear-filters"
+            >
+              Clear filters
+            </Button>
+          </Stack>
+        ) : (
+          <Text tone="muted">No prompts yet — generate one, or write or import one.</Text>
+        )
       ) : (
-        <Stack as="ul" gap={3} data-testid="prompt-list">
-          {prompts.map((prompt) => (
+        <ResultList data-testid="prompt-list" aria-busy={prompts.loading}>
+          {prompts.items.map((prompt) => (
             <li key={prompt.id}>
               <CardLink href={`/prompts/${prompt.id}`}>
                 <Surface padding={4}>
@@ -215,7 +238,7 @@ export function PromptsBrowser() {
                       <strong>{prompt.title}</strong>
                     </Text>
                     <Stack direction="row" gap={2} wrap align="center">
-                      <Badge tone="neutral">{prompt.source}</Badge>
+                      <Badge tone="neutral">{humanizeToken(prompt.source)}</Badge>
                       {prompt.criteria.length > 0 ? (
                         <Badge tone="accent">{prompt.criteria.length} criteria</Badge>
                       ) : null}
@@ -229,24 +252,10 @@ export function PromptsBrowser() {
               </CardLink>
             </li>
           ))}
-        </Stack>
+        </ResultList>
       )}
 
-      {!loading && prompts.length === 0 && error === null ? (
-        <Text tone="muted">No prompts yet — generate one, or write or import one.</Text>
-      ) : null}
-
-      {prompts.length < total ? (
-        <div>
-          <Button
-            variant="subtle"
-            onClick={() => setOffset((current) => current + PAGE_SIZE)}
-            disabled={loading}
-          >
-            Load more ({prompts.length} of {total})
-          </Button>
-        </div>
-      ) : null}
+      <LoadMore list={prompts} noun="prompts" data-testid="more-prompts" />
     </Stack>
   );
 }

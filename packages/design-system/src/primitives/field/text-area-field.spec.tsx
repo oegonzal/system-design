@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-area-field.stories';
 
-const { Default, Tall, Disabled } = composeStories(stories);
+const { Default, Tall, Disabled, Invalid } = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
 describe('TextAreaField', () => {
@@ -27,5 +27,14 @@ describe('TextAreaField', () => {
   it('passes disabled through', () => {
     renderWithTheme(<Disabled />);
     expect((screen.getByLabelText('Design narrative') as HTMLTextAreaElement).disabled).toBe(true);
+  });
+
+  it('shows why a value is refused and marks the area invalid', () => {
+    renderWithTheme(<Invalid />);
+    const area = screen.getByLabelText('Design narrative');
+    expect(area.getAttribute('aria-invalid')).toBe('true');
+    expect(document.getElementById(area.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'Say how a request travels.',
+    );
   });
 });

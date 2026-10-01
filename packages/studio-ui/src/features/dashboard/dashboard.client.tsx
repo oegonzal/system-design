@@ -1,7 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { DesignSessionDto, ExperienceProfileDto } from '@sysdesign/contracts';
+import type { DesignSessionDto } from '@sysdesign/contracts';
 import {
   Badge,
   Button,
@@ -14,22 +14,29 @@ import {
   Surface,
   Text,
 } from '@sysdesign/design-system';
-import { toErrorMessage } from '@sysdesign/web-kit';
+import { UNREACHABLE_COPY, usePagedList, useResource } from '@sysdesign/web-kit';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api } from '../../api/client';
+import { LoadMore } from '../../components/load-more';
+import { RetryAlert } from '../../components/retry-alert';
+import { humanizeToken } from '../evaluation/humanize';
 import { usePromptGeneration } from '../prompts/use-prompt-generation';
+
+/** How many sessions the dashboard shows at a time; the rest are a click away. */
+export const RECENT_SESSIONS_PAGE = 8;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: ${({ theme }) => theme.space[4]}px;
 `;
 
 const SessionLink = styled(Link)`
   text-decoration: none;
+  color: inherit;
   display: block;
 
   &:focus-visible {
@@ -39,23 +46,57 @@ const SessionLink = styled(Link)`
   }
 `;
 
+function SessionCard({ session }: { session: DesignSessionDto }) {
+  return (
+    <SessionLink href={`/practice/${session.id}`} data-testid="session-card">
+      <Surface padding={4}>
+        <Stack gap={2}>
+          <Heading level={3}>{session.promptTitle}</Heading>
+          <Stack direction="row" gap={2} align="center" wrap>
+            <Badge tone="neutral" data-testid="session-status">
+              {humanizeToken(session.status)}
+            </Badge>
+            {session.latestOverall !== null ? (
+              <Badge tone="accent" data-testid="session-score">
+                {`${session.latestOverall}/100`}
+              </Badge>
+            ) : null}
+            {session.latestDecision ? (
+              <Badge tone={DECISION_TONE[session.latestDecision]} data-testid="session-decision">
+                {humanizeToken(session.latestDecision)}
+              </Badge>
+            ) : session.latestEvaluationStatus === 'running' ? (
+              <Badge tone="neutral">Grading…</Badge>
+            ) : null}
+          </Stack>
+          <Text size="sm" tone="secondary">
+            {session.revisionCount} {session.revisionCount === 1 ? 'revision' : 'revisions'} ·
+            updated {new Date(session.updatedAt).toLocaleDateString('en-US')}
+          </Text>
+        </Stack>
+      </Surface>
+    </SessionLink>
+  );
+}
+
+/**
+ * The home page: the experiences prompts are written from, and the practice
+ * sessions so far. Each section loads on its own — a failed list says so in
+ * its own place, with its own Retry, and never takes the other down.
+ */
 export function Dashboard() {
   const router = useRouter();
   const generation = usePromptGeneration((prompt) => router.push(`/prompts/${prompt.id}`));
 
-  const [experiences, setExperiences] = useState<ExperienceProfileDto[] | null>(null);
-  const [sessions, setSessions] = useState<DesignSessionDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const experiences = useResource(
+    async (signal) => (await api.listExperiences({ signal })).data,
+    [],
+  );
+  const sessions = usePagedList((page, signal) => api.listSessions(page, { signal }), [], {
+    pageSize: RECENT_SESSIONS_PAGE,
+    fallback: UNREACHABLE_COPY,
+  });
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
-
-  useEffect(() => {
-    void Promise.all([api.listExperiences(), api.listSessions({ limit: 8 })])
-      .then(([experienceList, sessionList]) => {
-        setExperiences(experienceList.data);
-        setSessions(sessionList.data);
-      })
-      .catch((caught) => setError(toErrorMessage(caught, 'Could not load the dashboard.')));
-  }, []);
 
   // No experienceId = "surprise me": the API picks the least-practised
   // experience, so repeated practice covers every experience.
@@ -64,6 +105,8 @@ export function Dashboard() {
     void generation.start(experienceId ? { experienceId } : {});
   };
   const busy = generation.generating;
+  // There is something to pick from only once the experiences have answered.
+  const canSurprise = (experiences.data?.length ?? 0) > 0;
 
   return (
     <Stack gap={7}>
@@ -75,7 +118,6 @@ export function Dashboard() {
         </Text>
       </Stack>
 
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
       <LiveRegion message={generation.message} />
       {busy ? (
         <Stack direction="row" gap={3} align="center" data-testid="prompt-generation-progress">
@@ -91,27 +133,24 @@ export function Dashboard() {
         </Text>
       ) : null}
 
-      <Stack gap={4}>
-        <Stack direction="row" gap={4} align="center" justify="between">
-          <Heading level={2}>Experiences</Heading>
+      <Stack as="section" gap={4} aria-labelledby="experiences-heading">
+        <Stack direction="row" gap={4} align="center" justify="between" wrap>
+          <Heading level={2} id="experiences-heading">
+            Experiences
+          </Heading>
           <Button
             variant="subtle"
             onClick={() => handleGenerate()}
-            disabled={busy}
+            disabled={busy || !canSurprise}
             data-testid="surprise-me"
             title="Write a prompt from your least-practised experience"
           >
             {busy && generatingFor === 'surprise' ? 'Writing…' : 'Surprise me'}
           </Button>
         </Stack>
-        {experiences === null ? (
-          <Grid aria-busy="true">
-            <Skeleton variant="block" height="160px" />
-            <Skeleton variant="block" height="160px" />
-          </Grid>
-        ) : (
+        {experiences.data !== null ? (
           <Grid data-testid="experience-list">
-            {experiences.map((experience) => (
+            {experiences.data.map((experience) => (
               <Surface key={experience.id} padding={5}>
                 <Stack gap={3}>
                   <Stack gap={1}>
@@ -144,52 +183,57 @@ export function Dashboard() {
               </Surface>
             ))}
           </Grid>
+        ) : experiences.error !== null ? (
+          <RetryAlert
+            title="Couldn't load your experiences"
+            message={experiences.error}
+            onRetry={experiences.reload}
+            retrying={experiences.loading}
+            data-testid="experiences-error"
+          />
+        ) : (
+          <Grid aria-busy="true">
+            <Skeleton variant="block" height="160px" />
+            <Skeleton variant="block" height="160px" />
+          </Grid>
         )}
       </Stack>
 
-      <Stack gap={4}>
-        <Heading level={2}>Recent sessions</Heading>
-        {sessions === null ? (
-          <Grid aria-busy="true">
-            <Skeleton variant="block" height="96px" />
-            <Skeleton variant="block" height="96px" />
-          </Grid>
-        ) : sessions.length === 0 ? (
+      <Stack as="section" gap={4} aria-labelledby="sessions-heading">
+        <Heading level={2} id="sessions-heading">
+          Practice sessions
+        </Heading>
+        {sessions.items === null ? (
+          sessions.error !== null ? (
+            <RetryAlert
+              title="Couldn't load your sessions"
+              message={sessions.error}
+              onRetry={sessions.reload}
+              retrying={sessions.loading}
+              data-testid="sessions-error"
+            />
+          ) : (
+            <Grid aria-busy="true">
+              <Skeleton variant="block" height="96px" />
+              <Skeleton variant="block" height="96px" />
+            </Grid>
+          )
+        ) : sessions.items.length === 0 ? (
           <Text tone="muted">No practice sessions yet. Generate a prompt and start one.</Text>
         ) : (
-          <Grid data-testid="session-list">
-            {sessions.map((session) => (
-              <SessionLink key={session.id} href={`/practice/${session.id}`}>
-                <Surface padding={4}>
-                  <Stack gap={2}>
-                    <Stack direction="row" gap={2} align="center" wrap>
-                      <Badge tone="neutral">{session.status}</Badge>
-                      {session.latestOverall !== null ? (
-                        <Badge tone="accent" data-testid="session-score">
-                          {`${session.latestOverall}/100`}
-                        </Badge>
-                      ) : null}
-                      {session.latestDecision ? (
-                        <Badge
-                          tone={DECISION_TONE[session.latestDecision]}
-                          data-testid="session-decision"
-                        >
-                          {session.latestDecision}
-                        </Badge>
-                      ) : session.latestEvaluationStatus === 'running' ? (
-                        <Badge tone="neutral">grading…</Badge>
-                      ) : null}
-                    </Stack>
-                    <Text size="sm" tone="secondary">
-                      {session.revisionCount}{' '}
-                      {session.revisionCount === 1 ? 'revision' : 'revisions'} · updated{' '}
-                      {new Date(session.updatedAt).toLocaleDateString('en-US')}
-                    </Text>
-                  </Stack>
-                </Surface>
-              </SessionLink>
-            ))}
-          </Grid>
+          <>
+            <Grid data-testid="session-list">
+              {sessions.items.map((session) => (
+                <SessionCard key={session.id} session={session} />
+              ))}
+            </Grid>
+            <LoadMore
+              list={sessions}
+              noun="sessions"
+              label="Show more sessions"
+              data-testid="more-sessions"
+            />
+          </>
         )}
       </Stack>
     </Stack>

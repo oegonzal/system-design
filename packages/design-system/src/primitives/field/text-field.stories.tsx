@@ -26,3 +26,8 @@ export const Disabled: Story = { args: { disabled: true, defaultValue: 'read onl
 export const Numeric: Story = {
   args: { label: 'Iterations', type: 'number', min: 1, max: 10, defaultValue: 1 },
 };
+
+/** A refused value: the reason under the control, which is marked invalid and described by it. */
+export const Invalid: Story = {
+  args: { defaultValue: '', error: 'A service needs a name.', required: true },
+};

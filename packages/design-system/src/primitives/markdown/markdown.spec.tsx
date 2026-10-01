@@ -25,10 +25,11 @@ const DOCUMENT = [
 ].join('\n');
 
 describe('Markdown', () => {
-  it('renders the document under a labelled block, its headings demoted below the label', () => {
+  it('names the block by its label without showing it, and steps the document’s headings down from level 3', () => {
     renderWithTheme(<Markdown label="Prompt" text={DOCUMENT} />);
 
-    expect(screen.getByRole('heading', { level: 3, name: 'Prompt' })).toBeTruthy();
+    // The label is the block's accessible name, never a second visible heading.
+    expect(screen.queryByRole('heading', { name: 'Prompt' })).toBeNull();
     const block = screen.getByLabelText('Prompt');
     expect(
       within(block).getByRole('heading', { level: 3, name: 'Design an order-history service' }),
@@ -42,6 +43,33 @@ describe('Markdown', () => {
     expect(within(block).queryByRole('heading', { level: 2 })).toBeNull();
   });
 
+  it('does not repeat the title the page shows — its sections step up into its place — and keeps an opening heading that says something else', () => {
+    const { unmount } = renderWithTheme(
+      <Markdown
+        label="Prompt"
+        title="Design an  order-history service "
+        headingLevel={2}
+        text={DOCUMENT}
+      />,
+    );
+    let block = screen.getByLabelText('Prompt');
+    expect(
+      within(block).queryByRole('heading', { name: 'Design an order-history service' }),
+    ).toBeNull();
+    // The sections sit one level under the page's h1.
+    expect(
+      within(block).getByRole('heading', { level: 2, name: 'Functional requirements' }),
+    ).toBeTruthy();
+    expect(within(block).getByRole('heading', { level: 3, name: 'Detail' })).toBeTruthy();
+    unmount();
+
+    renderWithTheme(<Markdown label="Prompt" title="Another title" text={DOCUMENT} />);
+    block = screen.getByLabelText('Prompt');
+    expect(
+      within(block).getByRole('heading', { level: 3, name: 'Design an order-history service' }),
+    ).toBeTruthy();
+  });
+
   it('renders GitHub flavour: a table, an ordered list, strikethrough', () => {
     renderWithTheme(<Markdown label="Prompt" text={DOCUMENT} />);
 
@@ -51,6 +79,15 @@ describe('Markdown', () => {
     expect(within(table).getByRole('cell', { name: '2,000 rps' })).toBeTruthy();
     expect(within(block).getByRole('list').tagName).toBe('OL');
     expect(block.querySelector('del')?.textContent).toBe('the old spec');
+  });
+
+  it('lets a table cell wrap only between words, where the prose around it may break anywhere', () => {
+    renderWithTheme(<Markdown label="Prompt" text={DOCUMENT} />);
+
+    const block = screen.getByLabelText('Prompt');
+    const cell = within(block).getByRole('cell', { name: 'Peak reads' });
+    expect(getComputedStyle(block).overflowWrap).toBe('anywhere');
+    expect(getComputedStyle(cell).overflowWrap).toBe('break-word');
   });
 
   it('names a task-list checkbox by the text beside it', () => {

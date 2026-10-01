@@ -35,8 +35,31 @@ export default meta;
 
 type Story = StoryObj<typeof Markdown>;
 
-/** A prompt as the model wrote it: headings stepped under the label, a table, a quote. */
+/** A prompt as the model wrote it: headings stepped under the page's, a table, a quote. */
 export const Prompt: Story = {};
+
+/**
+ * Under a page that already shows the title: the document's opening `#`
+ * says the same, so it is not repeated, and its sections sit one level
+ * under the page's h1.
+ */
+export const UnderItsTitle: Story = {
+  args: { title: 'Design an order-history service', headingLevel: 2 },
+};
+
+/** A narrow column: the table scrolls, and its cells wrap between words — never inside one. */
+export const NarrowTable: Story = {
+  args: {
+    label: 'Requirements',
+    text: [
+      '| Kind | Requirement |',
+      '| --- | --- |',
+      '| availability | Reads stay up while the POS is unreachable |',
+      '| consistency | An order shows once, whichever source saw it first |',
+    ].join('\n'),
+    style: { maxWidth: 220 },
+  },
+};
 
 /** Every block GitHub flavour adds: task list, strikethrough, fenced code, a rule, a link, every heading depth. */
 export const GitHubFlavour: Story = {

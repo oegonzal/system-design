@@ -108,6 +108,11 @@ const TEXT_PAIRS: readonly (readonly [ColorPath, ColorPath])[] = [
     ['danger', 'fg'],
     ['danger', 'bg'],
   ],
+  // A field's refusal reason sits on the form's surface, not on a tint.
+  [
+    ['danger', 'fg'],
+    ['bg', 'surface'],
+  ],
   [
     ['success', 'fg'],
     ['success', 'bg'],

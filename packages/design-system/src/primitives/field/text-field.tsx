@@ -1,19 +1,22 @@
 import { useId, type InputHTMLAttributes } from 'react';
 
-import { FieldLabel, FieldRoot, Input } from './field-control';
+import { FieldFrame, Input, invalidAttributes, type FieldProps } from './field-control';
 
-export interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string;
-}
+export interface TextFieldProps extends FieldProps, InputHTMLAttributes<HTMLInputElement> {}
 
-/** A labelled single-line input. The label wraps the control, so clicking it focuses the field. */
-export function TextField({ label, id, ...rest }: TextFieldProps) {
+/** A labelled single-line input; the label names the control, and clicking it focuses the field. */
+export function TextField({
+  label,
+  error,
+  id,
+  'aria-describedby': describedBy,
+  ...rest
+}: TextFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   return (
-    <FieldRoot htmlFor={inputId}>
-      <FieldLabel>{label}</FieldLabel>
-      <Input id={inputId} {...rest} />
-    </FieldRoot>
+    <FieldFrame label={label} error={error} controlId={inputId}>
+      <Input id={inputId} {...invalidAttributes(inputId, error, describedBy)} {...rest} />
+    </FieldFrame>
   );
 }

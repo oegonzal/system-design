@@ -1,13 +1,14 @@
 'use client';
 
-import type { PromptDto } from '@sysdesign/contracts';
-import { Button, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/design-system';
-import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import { PROMPT_COPY } from '@sysdesign/contracts';
+import { Alert, Button, Skeleton, Stack, Surface, Text, Toolbar } from '@sysdesign/design-system';
+import { toErrorMessage, useDocumentTitle, useResource } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api } from '../../api/client';
-import { FullPageNotice } from '../../components/full-page-notice';
+import { pageTitle } from '../../app/nav';
+import { LoadFailureNotice } from '../../components/load-failure-notice';
 import { PromptPane } from './prompt-pane';
 import { usePromptCriteria } from './use-prompt-criteria';
 
@@ -15,35 +16,24 @@ export interface PromptDetailProps {
   promptId: string;
 }
 
+/** Where a missing prompt's dead end leads. */
+const PROMPTS_EXIT = { href: '/prompts', label: 'Back to your prompts' } as const;
+
+/** Why an action is off, beside it: the button names it as its description. */
+interface DisabledReason {
+  id: string;
+  text: string;
+}
+
 export function PromptDetail({ promptId }: PromptDetailProps) {
   const router = useRouter();
-  const loader = useLatestRequest();
-
-  const [prompt, setPrompt] = useState<PromptDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loaded = useResource((signal) => api.getPrompt(promptId, { signal }), [promptId]);
+  // A prompt from an earlier id is not this page's prompt.
+  const prompt = loaded.data?.id === promptId ? loaded.data : null;
   const [busy, setBusy] = useState<'start' | 'archive' | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const criteria = usePromptCriteria(prompt);
-
-  useEffect(() => {
-    const { id, signal } = loader.begin();
-    void (async () => {
-      setLoading(true);
-      setNotFound(false);
-      try {
-        const loaded = await api.getPrompt(promptId, { signal });
-        if (!loader.isCurrent(id)) return;
-        setPrompt(loaded);
-        setLoading(false);
-      } catch (caught) {
-        if (loader.isStale(id, caught)) return;
-        if (caught instanceof ApiError && caught.status === 404) setNotFound(true);
-        else setError(toErrorMessage(caught, 'Could not load the prompt.'));
-        setLoading(false);
-      }
-    })();
-  }, [promptId]);
+  useDocumentTitle(prompt ? pageTitle(prompt.title) : null);
 
   const handleStart = async () => {
     setBusy('start');
@@ -62,10 +52,11 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
     setBusy('archive');
     setError(null);
     try {
-      const updated = await api.updatePrompt(prompt.id, {
-        status: prompt.status === 'active' ? 'archived' : 'active',
-      });
-      setPrompt(updated);
+      loaded.replace(
+        await api.updatePrompt(prompt.id, {
+          status: prompt.status === 'active' ? 'archived' : 'active',
+        }),
+      );
     } catch (caught) {
       setError(toErrorMessage(caught, 'Could not update the prompt.'));
     } finally {
@@ -73,8 +64,15 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
     }
   };
 
-  if (loading) {
-    return (
+  if (prompt === null) {
+    return loaded.failure !== null && !loaded.loading ? (
+      <LoadFailureNotice
+        noun="prompt"
+        error={loaded.failure}
+        onRetry={loaded.reload}
+        exit={PROMPTS_EXIT}
+      />
+    ) : (
       <Stack gap={4} aria-busy="true">
         <Skeleton variant="text" width="50%" />
         <Skeleton variant="block" height="360px" />
@@ -82,64 +80,81 @@ export function PromptDetail({ promptId }: PromptDetailProps) {
     );
   }
 
-  if (notFound || !prompt) {
-    return (
-      <FullPageNotice
-        title="Prompt not found"
-        message={
-          notFound
-            ? 'This prompt does not exist — it may have been deleted.'
-            : (error ?? 'Something went wrong loading this prompt.')
-        }
-        backHref="/"
-      />
-    );
-  }
+  // A generated prompt's rubric is its draft's — never re-derived, so it is
+  // never offered. Re-deriving is refused once sessions cite these ids, and
+  // the server says so on every read; the pane's own button covers the case
+  // where there are no criteria at all yet.
+  const offersRederive = prompt.source !== 'generated' && criteria.criteria.length > 0;
+  const archived = prompt.status === 'archived';
+  const startOff: DisabledReason | null = archived
+    ? { id: 'start-practice-reason', text: PROMPT_COPY.archived }
+    : null;
+  const rederiveOff: DisabledReason | null =
+    offersRederive && prompt.rubricLocked
+      ? { id: 'rederive-criteria-reason', text: PROMPT_COPY.criteriaLocked }
+      : null;
+  const reasons = [startOff, rederiveOff].filter(
+    (reason): reason is DisabledReason => reason !== null,
+  );
 
   return (
     <Stack gap={5}>
-      <Toolbar aria-label="Prompt actions">
-        <Button
-          variant="solid"
-          onClick={() => void handleStart()}
-          disabled={busy !== null}
-          data-testid="start-practice"
-        >
-          {busy === 'start' ? 'Starting…' : 'Start practice'}
-        </Button>
-        {/* A generated prompt's rubric is its draft's — the grader would refuse
-            to re-derive it. Re-deriving is refused once sessions cite these ids
-            too; the pane's own button covers the case where there are no
-            criteria at all yet. */}
-        {prompt.source !== 'generated' && criteria.criteria.length > 0 ? (
+      <Stack gap={2}>
+        <Toolbar aria-label="Prompt actions">
           <Button
-            variant="subtle"
-            onClick={criteria.derive}
-            disabled={busy !== null || criteria.deriving}
-            data-testid="rederive-criteria"
+            variant="solid"
+            onClick={() => void handleStart()}
+            disabled={busy !== null || startOff !== null}
+            aria-describedby={startOff?.id}
+            data-testid="start-practice"
           >
-            {criteria.deriving ? 'Deriving…' : 'Re-derive criteria'}
+            {busy === 'start' ? 'Starting…' : 'Start practice'}
           </Button>
-        ) : null}
-        <Button variant="ghost" onClick={() => void handleToggleArchive()} disabled={busy !== null}>
-          {prompt.status === 'active' ? 'Archive' : 'Unarchive'}
-        </Button>
-      </Toolbar>
+          {offersRederive ? (
+            <Button
+              variant="subtle"
+              onClick={criteria.derive}
+              disabled={busy !== null || criteria.deriving || rederiveOff !== null}
+              aria-describedby={rederiveOff?.id}
+              data-testid="rederive-criteria"
+            >
+              {criteria.deriving ? 'Deriving…' : 'Re-derive criteria'}
+            </Button>
+          ) : null}
+          <Button
+            variant="ghost"
+            onClick={() => void handleToggleArchive()}
+            disabled={busy !== null}
+          >
+            {archived ? 'Unarchive' : 'Archive'}
+          </Button>
+        </Toolbar>
+        {reasons.map((reason) => (
+          <Text key={reason.id} id={reason.id} size="sm" tone="muted" data-testid={reason.id}>
+            {reason.text}
+          </Text>
+        ))}
+      </Stack>
 
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
+      {error !== null ? (
+        <Alert tone="danger" data-testid="prompt-action-error">
+          {error}
+        </Alert>
+      ) : null}
       {criteria.error !== null && criteria.criteria.length > 0 ? (
-        <Text tone="secondary" data-testid="criteria-error">
+        <Alert tone="danger" data-testid="criteria-error">
           {criteria.error}
-        </Text>
+        </Alert>
       ) : null}
 
       <Surface padding={6}>
         <PromptPane
           prompt={prompt}
+          titleLevel={1}
           criteria={criteria.criteria}
           deriving={criteria.deriving}
           deriveError={criteria.error}
-          onDerive={criteria.derive}
+          onDerive={prompt.rubricLocked ? undefined : criteria.derive}
         />
       </Surface>
     </Stack>

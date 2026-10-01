@@ -106,9 +106,19 @@ export class PromptsPage {
     return this.page.getByTestId('prompt-markdown');
   }
 
-  /** A heading of the rendered markdown: the document's `#` is an h3 under the pane's title, its `##` an h4. */
-  markdownHeading(name: string, level: 3 | 4 | 5 | 6 = 4): Locator {
+  /**
+   * A heading of the rendered markdown. On the detail page the prompt's title
+   * is the page's h1; the document's own opening `#`, which says the same, is
+   * not repeated, so its `##` sections are h2s under it.
+   */
+  markdownHeading(name: string, level: 2 | 3 | 4 | 5 | 6 = 2): Locator {
     return this.markdownPane.getByRole('heading', { level, name, exact: true });
+  }
+
+  /** The prompt's title is the page's one h1, and reads once — never again inside the document. */
+  async expectTitledOnce(title: string): Promise<void> {
+    await expect(this.page.getByRole('heading', { level: 1 })).toHaveText(title);
+    await expect(this.page.getByRole('heading', { name: title, exact: true })).toHaveCount(1);
   }
 
   get rederiveButton(): Locator {
@@ -120,8 +130,9 @@ export class PromptsPage {
     await expect(this.promptPane).toBeVisible();
   }
 
+  /** The source badge reads the source as a word — `library` as "Library". */
   async expectSource(source: PromptSource): Promise<void> {
-    await expect(this.page.getByTestId('prompt-source')).toHaveText(source);
+    await expect(this.page.getByTestId('prompt-source')).toHaveText(source, { ignoreCase: true });
   }
 
   criterionChip(criterionId: string): Locator {

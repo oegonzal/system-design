@@ -1,12 +1,13 @@
+import { CANVAS_CRITERION_KINDS } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { makeCriteria } from '../../testing/fixtures';
-import { groupCriteriaByKind, humanizeKind, KNOWN_CRITERION_KINDS } from './criteria';
+import { groupCriteriaByKind, humanizeKind } from './criteria';
 
 describe('groupCriteriaByKind', () => {
-  it('[UX-14] groups in the known order — functional, non-functional, scale, constraint', () => {
+  it('[UX-14] groups in the contract’s order — functional, non-functional, scale, constraint', () => {
     const groups = groupCriteriaByKind([...makeCriteria()].reverse());
-    expect(groups.map((group) => group.kind)).toEqual(KNOWN_CRITERION_KINDS);
+    expect(groups.map((group) => group.kind)).toEqual([...CANVAS_CRITERION_KINDS]);
     expect(groups[0].criteria.map((criterion) => criterion.id)).toEqual(['c2', 'c1']);
   });
 
@@ -27,8 +28,9 @@ describe('groupCriteriaByKind', () => {
 });
 
 describe('humanizeKind', () => {
-  it('reads a kind token as a heading', () => {
-    expect(humanizeKind('non_functional')).toBe('Non functional');
+  it('reads a canvas kind by the contract’s label, and any other kind by its words', () => {
+    expect(humanizeKind('non_functional')).toBe('Non-functional');
     expect(humanizeKind('scale')).toBe('Scale');
+    expect(humanizeKind('data_fidelity')).toBe('Data fidelity');
   });
 });

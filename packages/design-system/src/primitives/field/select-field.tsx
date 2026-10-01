@@ -1,23 +1,28 @@
 import { useId, type ReactNode, type SelectHTMLAttributes } from 'react';
 
-import { FieldLabel, FieldRoot, SelectControl } from './field-control';
+import { FieldFrame, invalidAttributes, SelectControl, type FieldProps } from './field-control';
 
-export interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  label: string;
+export interface SelectFieldProps extends FieldProps, SelectHTMLAttributes<HTMLSelectElement> {
   /** The `<option>` elements. */
   children?: ReactNode;
 }
 
 /** A labelled native select — the options are the caller's. */
-export function SelectField({ label, id, children, ...rest }: SelectFieldProps) {
+export function SelectField({
+  label,
+  error,
+  id,
+  children,
+  'aria-describedby': describedBy,
+  ...rest
+}: SelectFieldProps) {
   const autoId = useId();
   const selectId = id ?? autoId;
   return (
-    <FieldRoot htmlFor={selectId}>
-      <FieldLabel>{label}</FieldLabel>
-      <SelectControl id={selectId} {...rest}>
+    <FieldFrame label={label} error={error} controlId={selectId}>
+      <SelectControl id={selectId} {...invalidAttributes(selectId, error, describedBy)} {...rest}>
         {children}
       </SelectControl>
-    </FieldRoot>
+    </FieldFrame>
   );
 }

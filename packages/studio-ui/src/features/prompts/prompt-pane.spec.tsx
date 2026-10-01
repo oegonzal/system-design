@@ -7,17 +7,22 @@ import { makePrompt } from '../../testing/fixtures';
 import { PromptPane } from './prompt-pane';
 
 describe('PromptPane', () => {
-  it('[UX-14] renders the markdown — headings demoted under the title, the requirement table as a table — the source, and the criteria grouped by kind', () => {
+  it('[UX-14] renders the markdown — the title once, sections under it, the requirement table as a table — the source, and the criteria grouped by kind', () => {
     renderWithTheme(<PromptPane prompt={makePrompt()} />);
 
-    expect(screen.getByTestId('prompt-source').textContent).toBe('authored');
-    const rendered = within(screen.getByTestId('prompt-markdown')).getByLabelText('Prompt');
-    // The prompt's own `#` sits under the pane's h2 title; its `##` sections one step lower.
+    expect(screen.getByTestId('prompt-source').textContent).toBe('Authored');
+    const rendered = screen.getByTestId('prompt-markdown');
+    expect(screen.getByLabelText('Prompt')).toBe(rendered);
+    // The title reads once, as the pane's h2: the document's own opening `#`
+    // says the same and is not repeated, and its `##` sections sit under it.
     expect(
-      within(rendered).getByRole('heading', { level: 3, name: 'Design an order-history service' }),
-    ).toBeTruthy();
+      screen.getAllByRole('heading', { name: 'Design an order-history service' }),
+    ).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: 'Design an order-history service' })).toBe(
+      screen.getAllByRole('heading')[0],
+    );
     expect(
-      within(rendered).getByRole('heading', { level: 4, name: 'Functional requirements' }),
+      within(rendered).getByRole('heading', { level: 3, name: 'Functional requirements' }),
     ).toBeTruthy();
     expect(within(rendered).queryByRole('heading', { level: 1 })).toBeNull();
     const tables = within(rendered).getAllByRole('table');
@@ -36,6 +41,18 @@ describe('PromptPane', () => {
     const row = screen.getByTestId('criterion-c3');
     expect(within(row).getByTestId('criterion-chip').textContent).toBe('c3');
     expect(row.textContent).toContain('p99 read latency stays under 200 ms');
+  });
+
+  it('is the page’s h1 where the prompt is the page, and everything under it steps down from there', () => {
+    renderWithTheme(<PromptPane prompt={makePrompt()} titleLevel={1} />);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Design an order-history service' }),
+    ).toBeTruthy();
+    const rendered = screen.getByTestId('prompt-markdown');
+    expect(within(rendered).getByRole('heading', { level: 2, name: 'Scenario' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Criteria' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 3, name: 'Non-functional' })).toBeTruthy();
   });
 
   it('[UX-14] badges an archived prompt', () => {

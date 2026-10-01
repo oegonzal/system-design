@@ -1,11 +1,10 @@
 import styled from '@emotion/styled';
-import type { HTMLAttributes, ReactNode } from 'react';
+import { useMemo, type HTMLAttributes, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 import { Heading, type HeadingLevel } from '../heading/heading';
 import { Link } from '../link/link';
-import { Stack } from '../stack/stack';
 import { Table } from '../table/table';
 
 /**
@@ -113,6 +112,14 @@ const Article = styled.div`
   img {
     max-width: 100%;
   }
+
+  /* A table scrolls (TableScroller) rather than squeeze, so its cells wrap
+     between words and never inside one: 'anywhere' would let a cell shrink to
+     a letter's width, breaking 'availability' mid-word in a narrow column. */
+  th,
+  td {
+    overflow-wrap: break-word;
+  }
 `;
 
 /** Lets a wide table scroll on its own instead of stretching the column. */
@@ -135,15 +142,30 @@ interface RenderedListItem extends Rendered {
 
 const TASK_ITEM_CLASS = 'task-list-item';
 
+/** Where the document's headings land: its own `#` at `base`, each deeper `#` one level lower. */
+type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+const MARKDOWN_HEADINGS: readonly HeadingTag[] = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+const DESIGN_SYSTEM_LEVELS: readonly HeadingLevel[] = [1, 2, 3, 4];
+
+/** A document heading the type scale has a step for, made once per level. */
+const DESIGNED_HEADINGS = new Map(
+  DESIGN_SYSTEM_LEVELS.map((level) => [
+    level,
+    function DocumentHeading({ children }: Rendered) {
+      return <Heading level={level}>{children}</Heading>;
+    },
+  ]),
+);
+
 /**
- * The document's own `#` is the block's label, one level above, so its
- * headings step down: `#` → h3, `##` → h4, `###` → h5, the rest → h6. A
- * prompt written to stand alone never mints a second page title.
+ * A document heading at `level`: the design system's `Heading` while the
+ * type scale has a step for it, the article's own h5/h6 styling below that.
  */
-const heading = (level: HeadingLevel) =>
-  function DemotedHeading({ children }: Rendered) {
-    return <Heading level={level}>{children}</Heading>;
-  };
+function headingAt(level: number): Components[HeadingTag] {
+  const clamped = Math.min(Math.max(level, 1), MARKDOWN_HEADINGS.length);
+  const designed = DESIGN_SYSTEM_LEVELS.find((candidate) => candidate === clamped);
+  return designed === undefined ? MARKDOWN_HEADINGS[clamped - 1] : DESIGNED_HEADINGS.get(designed);
+}
 
 function Anchor({ href, title, children }: RenderedAnchor) {
   return (
@@ -170,25 +192,78 @@ function ScrollingTable({ children }: Rendered) {
   );
 }
 
-const COMPONENTS: Components = {
-  h1: heading(3),
-  h2: heading(4),
-  h3: 'h5',
-  h4: 'h6',
-  h5: 'h6',
-  h6: 'h6',
+const BLOCKS: Components = {
   a: Anchor,
   li: ListItem,
   table: ScrollingTable,
 };
 
-const PLUGINS = [remarkGfm];
+const COMPONENT_SETS = new Map<number, Components>();
+
+/** The element map for a document whose own `#` lands at `base` — one per base, made once. */
+function componentsFor(base: number): Components {
+  const known = COMPONENT_SETS.get(base);
+  if (known) return known;
+  const headings = Object.fromEntries(
+    MARKDOWN_HEADINGS.map((tag, depth) => [tag, headingAt(base + depth)]),
+  ) as Components;
+  const components = { ...headings, ...BLOCKS };
+  COMPONENT_SETS.set(base, components);
+  return components;
+}
+
+/** The slice of the markdown tree this file reads: a node, its depth and text, its children. */
+interface MarkdownNode {
+  type: string;
+  depth?: number;
+  value?: string;
+  children?: MarkdownNode[];
+}
+
+const textOf = (node: MarkdownNode): string =>
+  node.value ?? (node.children ?? []).map(textOf).join('');
+
+const normalized = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+/** Every heading one step up — the document's sections taking the place of the title above them. */
+const promoteHeadings = (node: MarkdownNode): void => {
+  if (node.type === 'heading' && node.depth !== undefined) node.depth = Math.max(1, node.depth - 1);
+  node.children?.forEach(promoteHeadings);
+};
+
+/**
+ * A remark step for a document the page already titles. A prompt written to
+ * stand alone opens with its own title as `#`; when that heading says
+ * exactly what the page shows, it is dropped and the sections under it step
+ * up into its place — the title reads once, and the outline has no gap.
+ */
+const omitLeadingTitle = (title: string) => () => (tree: MarkdownNode) => {
+  const first = tree.children?.[0];
+  if (first?.type !== 'heading' || first.depth !== 1) return;
+  if (normalized(textOf(first)) !== normalized(title)) return;
+  tree.children?.shift();
+  tree.children?.forEach(promoteHeadings);
+};
 
 export interface MarkdownProps extends HTMLAttributes<HTMLDivElement> {
-  /** The heading over the block, and the block's accessible name. */
+  /**
+   * The block's accessible name — what a screen reader calls the document.
+   * Not shown: the page around the block titles it.
+   */
   label: string;
   /** GitHub-flavoured markdown; raw HTML in it is dropped, never rendered. */
   text: string;
+  /**
+   * The title the page already shows over the document. A document that
+   * opens with that same `#` heading does not repeat it, and its sections
+   * step up into the title's place.
+   */
+  title?: string;
+  /**
+   * The outline level the document's own `#` takes — one under the heading
+   * that titles the block; deeper headings step down from it. Default 3.
+   */
+  headingLevel?: number;
 }
 
 /**
@@ -196,20 +271,24 @@ export interface MarkdownProps extends HTMLAttributes<HTMLDivElement> {
  * flavour (tables, task lists, strikethrough, autolinks), every element in
  * the design system's own type and colour, and nothing the author did not
  * write: raw HTML is skipped and unsafe URL schemes are stripped, so a
- * markdown body from the model is safe to show as-is.
+ * markdown body from the model is safe to show as-is. Its headings sit
+ * under the page's own, so a prompt written to stand alone never mints a
+ * second page title.
  *
  * For text that must appear exactly as written — a rendered artifact whose
  * bracketed ids a finding cites — use `PreformattedText`.
  */
-export function Markdown({ label, text, ...rest }: MarkdownProps) {
+export function Markdown({ label, text, title, headingLevel = 3, ...rest }: MarkdownProps) {
+  const components = componentsFor(headingLevel);
+  const plugins = useMemo(
+    () => (title === undefined ? [remarkGfm] : [remarkGfm, omitLeadingTitle(title)]),
+    [title],
+  );
   return (
-    <Stack gap={2} {...rest}>
-      <Heading level={3}>{label}</Heading>
-      <Article aria-label={label}>
-        <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS} skipHtml>
-          {text}
-        </ReactMarkdown>
-      </Article>
-    </Stack>
+    <Article aria-label={label} {...rest}>
+      <ReactMarkdown remarkPlugins={plugins} components={components} skipHtml>
+        {text}
+      </ReactMarkdown>
+    </Article>
   );
 }
