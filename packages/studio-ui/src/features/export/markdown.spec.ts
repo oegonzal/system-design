@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { humanizeReason } from '../evaluation/decision-reason';
+import { formatScore } from '../evaluation/score';
 import { humanizeKind } from '../prompts/criteria';
 
 import {
   makeBrief,
   makeCriteria,
+  makeCriterionResult,
   makeEvaluation,
   makeFinding,
   makeGraph,
@@ -131,12 +134,50 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('| c3 — p99 read latency stays under 200 ms | Fail | high |');
     expect(md).toContain('## Findings');
     expect(md).toContain(
-      '- **[high · critic.architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
+      '- **[high · critic architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
     );
     expect(md).toContain(
       '  n-3 · database · Orders DB is both the read bottleneck and the single point of failure.',
     );
     expect(md).toContain('_run run-1 · iteration 1 · model test-model_');
+  });
+
+  it('[UX-10] prints what the panel prints: whole-point scores, the decision reason and every rationale in labels, never a key or a position', () => {
+    const finding = makeFinding({ lenses: ['critic.architecture', 'evaluator.coverage'] });
+    const evaluation = makeEvaluation({
+      overall: 72.6,
+      dimensions: { coverage: 79.5, compliance: null },
+      decisionReason: `blockers to fix: ${finding.id}, c3`,
+      findings: [finding],
+      criterionResults: [
+        makeCriterionResult({
+          criterionId: 'c3',
+          result: 'fail',
+          rationale: 'node.3 | the one primary — a read bottleneck.',
+          locations: finding.locations,
+        }),
+      ],
+    });
+
+    const md = feedbackMarkdown(evaluation, criteria, 2);
+
+    expect(md).toContain(`**${formatScore(72.6)}/100 · revise**`);
+    expect(md).toContain('**73/100 · revise**');
+    expect(md).toContain('| Coverage | 80 |');
+    expect(md).toContain('| Compliance | Not assessed |');
+    // The reason through the panel's own humanizer: the finding and the criterion by name.
+    expect(md).toContain(
+      humanizeReason(evaluation.decisionReason ?? '', { findings: evaluation.findings, criteria }),
+    );
+    expect(md).toContain(
+      'blockers to fix: Unhandled failure (n-3 · database · Orders DB), “p99 read latency stays under 200 ms”',
+    );
+    // A criterion's rationale reads with its labels, and its pipe never splits the row.
+    expect(md).toContain('| n-3 · database · Orders DB \\| the one primary — a read bottleneck. |');
+    expect(md).toContain('critic architecture, evaluator coverage');
+    expect(md).not.toContain(finding.id);
+    expect(md).not.toContain('node.3');
+    expect(md).not.toContain('critic.architecture');
   });
 
   it('says not-graded in words when the evaluation is absent, running or failed — never a status token', () => {
@@ -160,7 +201,7 @@ describe('revisionsMarkdown', () => {
           runId: 'r',
           iteration: 2,
           status: 'complete',
-          overall: 80,
+          overall: 79.6,
           decision: 'accept',
         },
       }),

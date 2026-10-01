@@ -9,7 +9,7 @@ import {
 } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 
-import { humanizeToken } from './humanize';
+import { humanizeToken, lensName } from './humanize';
 import { substituteLocationLabels } from './location-labels';
 import { WrappingText } from './wrapping-text';
 
@@ -126,7 +126,7 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                   <Badge tone={finding.severity}>{finding.severity}</Badge>
                   {finding.lenses.map((lens) => (
                     <Badge key={lens} tone="neutral" title={lens} data-testid="finding-lens">
-                      {humanizeToken(lens).toLowerCase()}
+                      {lensName(lens)}
                     </Badge>
                   ))}
                   <Badge tone="neutral">{finding.confidence} confidence</Badge>

@@ -23,6 +23,7 @@ import { api } from '../../api/client';
 import { LoadMore } from '../../components/load-more';
 import { RetryAlert } from '../../components/retry-alert';
 import { humanizeToken } from '../evaluation/humanize';
+import { formatScore } from '../evaluation/score';
 import { usePromptGeneration } from '../prompts/use-prompt-generation';
 
 /** How many sessions the dashboard shows at a time; the rest are a click away. */
@@ -58,7 +59,7 @@ function SessionCard({ session }: { session: DesignSessionDto }) {
             </Badge>
             {session.latestOverall !== null ? (
               <Badge tone="accent" data-testid="session-score">
-                {`${session.latestOverall}/100`}
+                {`${formatScore(session.latestOverall)}/100`}
               </Badge>
             ) : null}
             {session.latestDecision ? (

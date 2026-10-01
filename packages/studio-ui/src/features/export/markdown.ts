@@ -10,8 +10,10 @@ import type {
 } from '@sysdesign/contracts';
 import { markdownCell, nodeLabel } from '@sysdesign/contracts';
 
-import { humanizeToken } from '../evaluation/humanize';
+import { humanizeReason } from '../evaluation/decision-reason';
+import { humanizeToken, lensName } from '../evaluation/humanize';
 import { substituteLocationLabels } from '../evaluation/location-labels';
+import { formatScore } from '../evaluation/score';
 import { humanizeKind } from '../prompts/criteria';
 
 /**
@@ -20,9 +22,11 @@ import { humanizeKind } from '../prompts/criteria';
  * export is a copy of a run that lives entirely outside the database.
  *
  * `#`/`##` headings, blank-line spacing, GitHub `| --- |` tables, `**bold**`,
- * `` `code` ``. Every id (node, edge, criterion) is resolved to the label or
- * statement the author actually reads, and every wire token (a criterion
- * kind, a dimension, a result) is printed in the words the studio shows it in.
+ * `` `code` ``. Every id (node, edge, criterion, finding) is resolved to the
+ * label or statement the author actually reads, every wire token (a criterion
+ * kind, a dimension, a result, a lens) is printed in the words the studio
+ * shows it in, and every score is printed the way the studio prints it
+ * (`formatScore`) — the export is the panel's words, on paper.
  */
 
 const NONE = '_None._';
@@ -200,14 +204,22 @@ export function feedbackMarkdown(
     lines.push(UNGRADED[evaluation.status]);
     return joinLines(lines);
   }
-  lines.push(`**${evaluation.overall ?? '—'}/100 · ${evaluation.decision ?? '—'}**`, ``);
+  lines.push(`**${formatScore(evaluation.overall)}/100 · ${evaluation.decision ?? '—'}**`, ``);
+  if (evaluation.decisionReason) {
+    lines.push(
+      humanizeReason(evaluation.decisionReason, { findings: evaluation.findings, criteria }),
+      ``,
+    );
+  }
   if (evaluation.stopReason) {
     lines.push(`_Stopped: ${humanizeToken(evaluation.stopReason).toLowerCase()}._`, ``);
   }
 
   lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);
   for (const [key, value] of Object.entries(evaluation.dimensions)) {
-    lines.push(`| ${humanizeToken(key)} | ${value === null ? 'n/a' : value} |`);
+    lines.push(
+      `| ${humanizeToken(key)} | ${value === null ? 'Not assessed' : formatScore(value)} |`,
+    );
   }
 
   const statements = criterionStatements(criteria);
@@ -219,7 +231,9 @@ export function feedbackMarkdown(
       lines.push(
         `| ${row.criterionId}${statement ? ` — ${markdownCell(statement)}` : ''} | ${humanizeToken(
           row.result,
-        )} | ${row.confidence ?? '—'} | ${row.rationale ? markdownCell(row.rationale) : '—'} |`,
+        )} | ${row.confidence ?? '—'} | ${
+          row.rationale ? markdownCell(substituteLocationLabels(row.rationale, row.locations)) : '—'
+        } |`,
       );
     }
   } else {
@@ -232,7 +246,7 @@ export function feedbackMarkdown(
       const where = finding.locations.map((location) => location.label).join(', ');
       const criteriaCited = finding.criterionIds.join(', ');
       lines.push(
-        `- **[${finding.severity} · ${finding.lenses.join(', ')} · ${humanizeToken(finding.type)}]**${
+        `- **[${finding.severity} · ${finding.lenses.map(lensName).join(', ')} · ${humanizeToken(finding.type)}]**${
           where ? ` (${where})` : ''
         }${criteriaCited ? ` — ${criteriaCited}` : ''}`,
         ...(finding.rationale
@@ -261,9 +275,9 @@ export function revisionsMarkdown(revisions: DesignRevisionSummaryDto[]): string
   for (const rev of [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)) {
     const grade = rev.evaluation;
     lines.push(
-      `| ${rev.revisionNumber}${rev.origin === 'assistant' ? ' (AI)' : ''} | ${
-        grade?.overall ?? '—'
-      } | ${grade?.decision ?? '—'} | ${grade?.status ?? '—'} |`,
+      `| ${rev.revisionNumber}${rev.origin === 'assistant' ? ' (AI)' : ''} | ${formatScore(
+        grade?.overall,
+      )} | ${grade?.decision ?? '—'} | ${grade?.status ?? '—'} |`,
     );
   }
   return joinLines(lines);

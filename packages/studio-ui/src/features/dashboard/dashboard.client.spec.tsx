@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeExperience, makeSession } from '../../testing/fixtures';
+import { formatScore } from '../evaluation/score';
 import { Dashboard, RECENT_SESSIONS_PAGE } from './dashboard.client';
 
 vi.mock('next/navigation', async () => {
@@ -82,6 +83,25 @@ describe('Dashboard', () => {
     expect(within(failure).getByRole('button', { name: 'Retry' })).toBeTruthy();
     expect((screen.getByTestId('surprise-me') as HTMLButtonElement).disabled).toBe(true);
     expect(await screen.findByText(/No practice sessions yet/)).toBeTruthy();
+  });
+
+  it('prints a session’s latest score in whole points, as every other surface does', async () => {
+    stubApi([
+      EXPERIENCES,
+      {
+        path: '/api/sessions',
+        body: {
+          data: [makeSession({ latestOverall: 72.6 })],
+          meta: { total: 1, limit: RECENT_SESSIONS_PAGE, offset: 0 },
+        },
+      },
+    ]);
+
+    renderWithTheme(<Dashboard />);
+
+    const score = await screen.findByTestId('session-score');
+    expect(score.textContent).toBe(`${formatScore(72.6)}/100`);
+    expect(score.textContent).toBe('73/100');
   });
 
   it('names each session by its prompt with a readable status, and pages through the rest', async () => {

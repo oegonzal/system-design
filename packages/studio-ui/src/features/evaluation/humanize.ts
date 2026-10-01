@@ -12,3 +12,10 @@ export function humanizeToken(token: string): string {
   const joined = words.join(' ');
   return joined.charAt(0).toUpperCase() + joined.slice(1);
 }
+
+/**
+ * A lens as the studio names it — `critic.architecture` → "critic
+ * architecture": a lowercase phrase, since it reads as a chip beside the
+ * finding rather than as a title. The id itself stays the lens's identity.
+ */
+export const lensName = (lens: string): string => humanizeToken(lens).toLowerCase();
