@@ -5,6 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
+import { describeError } from '@sysdesign/run-dump';
 
 import type { RunRepository } from '../../core/ports';
 import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
@@ -46,20 +47,32 @@ export class RunJanitor implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Fail every run and orchestration run whose heartbeat is older than the threshold. */
+  /**
+   * The two ledgers are swept together and settled apart: they share nothing
+   * but the threshold, so one failing is no reason to leave the other
+   * unswept — and reporting zero for a sweep that did commit would send the
+   * next sweep after rows that are already failed.
+   */
   async sweep(): Promise<{ runs: number; orchestrations: number }> {
     const before = new Date(Date.now() - this.options.staleAfterMs);
-    try {
-      const runs = await this.runs.failStale(before);
-      const orchestrations = await this.orchestrations.failStale(before);
-      if (runs + orchestrations > 0) {
-        this.logger.warn(
-          `failed ${runs} run(s) and ${orchestrations} orchestration run(s) whose heartbeat is older than ${this.options.staleAfterMs} ms`,
-        );
-      }
-      return { runs, orchestrations };
-    } catch (error) {
-      this.logger.error(`sweep failed: ${String(error)}`);
-      return { runs: 0, orchestrations: 0 };
+    const [runs, orchestrations] = await Promise.allSettled([
+      this.runs.failStale(before),
+      this.orchestrations.failStale(before),
+    ]);
+    const swept = (outcome: PromiseSettledResult<number>, ledger: string): number => {
+      if (outcome.status === 'fulfilled') return outcome.value;
+      this.logger.error(`${ledger} sweep failed: ${describeError(outcome.reason).message}`);
+      return 0;
+    };
+    const failed = {
+      runs: swept(runs, 'run'),
+      orchestrations: swept(orchestrations, 'orchestration run'),
+    };
+    if (failed.runs + failed.orchestrations > 0) {
+      this.logger.warn(
+        `failed ${failed.runs} run(s) and ${failed.orchestrations} orchestration run(s) whose heartbeat is older than ${this.options.staleAfterMs} ms`,
+      );
     }
+    return failed;
   }
 }

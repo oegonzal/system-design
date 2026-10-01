@@ -1,9 +1,25 @@
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { FilePromptLibrary, titleOf } from './file-prompt-library';
 import { seedPromptLibrary } from './testing';
+
+/** Paths the suite has made unreadable, so one spec can race the walk against a deletion. */
+const unreadable = new Set<string>();
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const real = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...real,
+    readFile: (path: Parameters<typeof real.readFile>[0], encoding?: unknown) => {
+      if (unreadable.has(String(path))) {
+        return Promise.reject(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      }
+      return real.readFile(path, encoding as BufferEncoding);
+    },
+  };
+});
 
 describe('FilePromptLibrary', () => {
   const dir = seedPromptLibrary();
@@ -54,6 +70,27 @@ describe('FilePromptLibrary', () => {
       'zebra',
     ]);
     rmSync(join(dir, 'mango.md'));
+  });
+
+  it('[QL-11] a prompt that cannot be read drops out, it does not fail the listing', async () => {
+    // The directory is walked per request precisely so an edit shows up without
+    // a restart, which means the walk and the reads race real edits. `get`
+    // already answers that race with "unknown"; the listing answers it by
+    // serving every prompt it could read instead of none.
+    const racing = join(dir, 'vanishing.md');
+    writeFileSync(racing, '# Here for now\n');
+    unreadable.add(racing);
+
+    try {
+      expect((await library.list()).map((entry) => entry.id)).toEqual([
+        'agentic/nested',
+        'apple',
+        'zebra',
+      ]);
+    } finally {
+      unreadable.clear();
+      rmSync(racing, { force: true });
+    }
   });
 
   it('[QL-11] every shipped prompt is titled by its own first H1, and no label precedes the titles', async () => {

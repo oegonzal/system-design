@@ -1,4 +1,6 @@
+import { Logger } from '@nestjs/common';
 import type { PromptLibraryDocumentDto, PromptLibraryEntryDto } from '@sysdesign/contracts';
+import { describeError } from '@sysdesign/run-dump';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
@@ -31,6 +33,8 @@ const isMissing = (error: unknown): boolean =>
  * and it holds for inputs no pattern anticipated.
  */
 export class FilePromptLibrary implements PromptLibrary {
+  private readonly logger = new Logger(FilePromptLibrary.name);
+
   constructor(private readonly dir: string) {}
 
   /** id → absolute path, for every markdown file below the root. */
@@ -48,13 +52,30 @@ export class FilePromptLibrary implements PromptLibrary {
     return found;
   }
 
+  /**
+   * Every prompt the walk found, read together. The walk and the reads race
+   * concurrent edits by design — that is the price of having no cache — so one
+   * file deleted in between drops out of the listing rather than failing it.
+   * `get` already treats exactly that race as "unknown"; settling each read
+   * here is the same answer for the same race. A read that failed for any
+   * other reason still speaks up, in the log, naming the file.
+   */
   async list(): Promise<PromptLibraryEntryDto[]> {
-    const entries = await Promise.all(
-      [...(await this.index())].map(async ([id, path]) => ({
-        id,
-        title: titleOf(await readFile(path, 'utf8'), id),
-      })),
+    const found = [...(await this.index())];
+    const read = await Promise.allSettled(
+      found.map(async ([id, path]) => ({ id, title: titleOf(await readFile(path, 'utf8'), id) })),
     );
+    const entries: PromptLibraryEntryDto[] = [];
+    read.forEach((outcome, index) => {
+      if (outcome.status === 'fulfilled') {
+        entries.push(outcome.value);
+        return;
+      }
+      if (isMissing(outcome.reason)) return;
+      this.logger.warn(
+        `prompt ${found[index][0]} not listed: ${describeError(outcome.reason).message}`,
+      );
+    });
     return entries.sort((a, b) => a.id.localeCompare(b.id, 'en'));
   }
 
