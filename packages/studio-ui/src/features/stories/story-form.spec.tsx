@@ -1,3 +1,4 @@
+import { STORY_MAX_TAGS, STORY_TAG_MAX_LENGTH } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -70,6 +71,91 @@ describe('StoryForm', () => {
       result: story.result,
       tags: story.tags,
     });
+  });
+
+  it('[STAR-1] says what a visited, empty section is missing beside it, and why Save is off beside Save', async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<StoryForm onSave={vi.fn()} />);
+
+    const situation = screen.getByLabelText('Situation');
+    // Untouched: nothing is marked yet, but Save says what it waits for.
+    expect(situation.getAttribute('aria-invalid')).toBeNull();
+    const save = screen.getByTestId('save-story');
+    expect(document.getElementById(save.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'Title and all four STAR sections are required.',
+    );
+
+    await user.click(situation);
+    await user.tab();
+    expect(situation.getAttribute('aria-invalid')).toBe('true');
+    expect(
+      document.getElementById(situation.getAttribute('aria-describedby') ?? '')?.textContent,
+    ).toBe('Required.');
+    // Whitespace is not a section.
+    await user.type(situation, '   ');
+    expect(situation.getAttribute('aria-invalid')).toBe('true');
+    await user.type(situation, 'Primary at 95% CPU.');
+    expect(situation.getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('[STAR-1] names a tag that is too long, and counts tags past the limit — sending none of it', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    renderWithTheme(<StoryForm initial={makeStory({ tags: [] })} onSave={onSave} />);
+    const tags = screen.getByLabelText('Tags (comma separated)');
+    const save = screen.getByTestId('save-story') as HTMLButtonElement;
+    const reason = () =>
+      document.getElementById(tags.getAttribute('aria-describedby') ?? '')?.textContent;
+
+    const long = 'x'.repeat(STORY_TAG_MAX_LENGTH + 1);
+    await user.type(tags, `postgres, ${long}`);
+    expect(reason()).toBe(`“${long}” is longer than ${STORY_TAG_MAX_LENGTH} characters.`);
+    expect(save.disabled).toBe(true);
+    expect(screen.getByTestId('save-story-reason').textContent).toBe(
+      'Fix the marked fields to save.',
+    );
+
+    await user.clear(tags);
+    const many = Array.from({ length: STORY_MAX_TAGS + 1 }, (_, i) => `t${i}`);
+    await user.type(tags, many.join(','));
+    expect(reason()).toBe(`At most ${STORY_MAX_TAGS} tags — this has ${STORY_MAX_TAGS + 1}.`);
+    expect(save.disabled).toBe(true);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('[STAR-1] tells a failed save beside Save, as an alert, and a finished one until the next edit', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderWithTheme(
+      <StoryForm
+        initial={makeStory()}
+        onSave={vi.fn()}
+        error="A story titled “x” already exists"
+      />,
+    );
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('A story titled “x” already exists');
+    // Beside the action it is about.
+    expect(alert.parentElement?.contains(screen.getByTestId('save-story'))).toBe(true);
+
+    rerender(<StoryForm initial={makeStory()} onSave={vi.fn()} saved />);
+    expect(screen.getByTestId('story-saved').textContent).toBe('Saved');
+    await user.type(screen.getByLabelText('Title'), '!');
+    expect(screen.queryByTestId('story-saved')).toBeNull();
+  });
+
+  it('tells its container when it starts and stops holding unsaved edits', async () => {
+    const user = userEvent.setup();
+    const onDirtyChange = vi.fn();
+    renderWithTheme(
+      <StoryForm initial={makeStory()} onSave={vi.fn()} onDirtyChange={onDirtyChange} />,
+    );
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    const title = screen.getByLabelText('Title');
+    await user.type(title, '!');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    await user.type(title, '{Backspace}');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
   it('shows a delete button only when a handler is supplied', async () => {

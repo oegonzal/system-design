@@ -1,67 +1,47 @@
 'use client';
 
-import type {
-  ExperienceProfileDto,
-  PromptDto,
-  SaveStarStoryRequest,
-  StarStoryDto,
-} from '@sysdesign/contracts';
-import { Heading, LiveRegion, Skeleton, Stack, Surface, Text } from '@sysdesign/design-system';
-import { ApiError, toErrorMessage, useLatestRequest } from '@sysdesign/web-kit';
+import type { SaveStarStoryRequest } from '@sysdesign/contracts';
+import { Heading, LiveRegion, Skeleton, Stack, Surface } from '@sysdesign/design-system';
+import { toErrorMessage, useDocumentTitle, useLeaveGuard, useResource } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api } from '../../api/client';
-import { FullPageNotice } from '../../components/full-page-notice';
-import { StoryForm } from './story-form';
+import { pageTitle } from '../../app/nav';
+import { LoadFailureNotice } from '../../components/load-failure-notice';
+import { LEAVE_UNSAVED_STORY, StoryForm } from './story-form';
+import { useStoryLinkOptions } from './use-story-link-options';
 
 export interface StoryDetailProps {
   storyId: string;
 }
 
+/** Where a missing story's dead end leads. */
+const STORIES_EXIT = { href: '/stories', label: 'Back to your stories' } as const;
+
 export function StoryDetail({ storyId }: StoryDetailProps) {
   const router = useRouter();
-  const loader = useLatestRequest();
-
-  const [story, setStory] = useState<StarStoryDto | null>(null);
-  const [prompts, setPrompts] = useState<PromptDto[]>([]);
-  const [experiences, setExperiences] = useState<ExperienceProfileDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+  const loaded = useResource((signal) => api.getStory(storyId, { signal }), [storyId]);
+  // A story from an earlier id is not this page's story.
+  const story = loaded.data?.id === storyId ? loaded.data : null;
+  const { prompts, experiences } = useStoryLinkOptions();
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-
-  useEffect(() => {
-    const { id, signal } = loader.begin();
-    void (async () => {
-      try {
-        const loaded = await api.getStory(storyId, { signal });
-        if (!loader.isCurrent(id)) return;
-        setStory(loaded);
-        setLoading(false);
-      } catch (caught) {
-        if (loader.isStale(id, caught)) return;
-        if (caught instanceof ApiError && caught.status === 404) setNotFound(true);
-        else setError(toErrorMessage(caught, 'Could not load the story.'));
-        setLoading(false);
-      }
-    })();
-
-    void Promise.all([api.listPrompts({ limit: 50 }), api.listExperiences()])
-      .then(([promptList, experienceList]) => {
-        setPrompts(promptList.data);
-        setExperiences(experienceList.data);
-      })
-      .catch(() => undefined);
-  }, [storyId]);
+  useDocumentTitle(story ? pageTitle(story.title) : null);
+  useLeaveGuard(dirty && !saving, LEAVE_UNSAVED_STORY);
 
   const handleSave = async (payload: SaveStarStoryRequest) => {
     setSaving(true);
+    setSaved(false);
     setError(null);
+    // Emptied first, so a second save that reads the same is still announced.
+    setAnnouncement('');
     try {
-      const updated = await api.updateStory(storyId, payload);
-      setStory(updated);
+      loaded.replace(await api.updateStory(storyId, payload));
+      setSaved(true);
       setAnnouncement('Story saved.');
     } catch (caught) {
       setError(toErrorMessage(caught, 'Could not save the story.'));
@@ -73,6 +53,7 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
   const handleDelete = async () => {
     if (!window.confirm('Delete this story? This cannot be undone.')) return;
     setSaving(true);
+    setError(null);
     try {
       await api.deleteStory(storyId);
       router.push('/stories');
@@ -82,8 +63,15 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
     }
   };
 
-  if (loading) {
-    return (
+  if (story === null) {
+    return loaded.failure !== null && !loaded.loading ? (
+      <LoadFailureNotice
+        noun="STAR story"
+        error={loaded.failure}
+        onRetry={loaded.reload}
+        exit={STORIES_EXIT}
+      />
+    ) : (
       <Stack gap={4} aria-busy="true">
         <Skeleton variant="text" width="40%" />
         <Skeleton variant="block" height="420px" />
@@ -91,34 +79,23 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
     );
   }
 
-  if (notFound || !story) {
-    return (
-      <FullPageNotice
-        title="Story not found"
-        message={
-          notFound
-            ? 'This story does not exist — it may have been deleted.'
-            : (error ?? 'Something went wrong loading this story.')
-        }
-        backHref="/"
-      />
-    );
-  }
-
   return (
     <Stack gap={5}>
       <Heading level={1}>{story.title}</Heading>
       <LiveRegion message={announcement} />
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
       <Surface padding={6}>
+        {/* A new version of the story is a fresh form: its edits start from what was saved. */}
         <StoryForm
           key={story.updatedAt}
           initial={story}
           prompts={prompts}
           experiences={experiences}
           saving={saving}
+          saved={saved}
+          error={error}
           onSave={(payload) => void handleSave(payload)}
           onDelete={() => void handleDelete()}
+          onDirtyChange={setDirty}
         />
       </Surface>
     </Stack>

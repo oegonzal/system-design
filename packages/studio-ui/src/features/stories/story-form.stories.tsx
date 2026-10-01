@@ -34,3 +34,26 @@ export const Saving: Story = {
     saving: true,
   },
 };
+
+/** Just saved: "Saved" stands beside the actions until the next edit. */
+export const Saved: Story = {
+  args: {
+    initial: makeStory(),
+    saved: true,
+  },
+};
+
+/** The API refused the save: why, as an alert beside Save. */
+export const SaveRefused: Story = {
+  args: {
+    initial: makeStory(),
+    error: 'A story titled “The replica that saved the on-sale” already exists.',
+  },
+};
+
+/** A tag past the limit: named beside the tags field, and Save says why it is off. */
+export const TagTooLong: Story = {
+  args: {
+    initial: makeStory({ tags: ['postgres', 'a-tag-far-longer-than-any-tag-is-allowed-to-be'] }),
+  },
+};

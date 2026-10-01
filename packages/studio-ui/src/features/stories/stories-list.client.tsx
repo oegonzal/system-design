@@ -1,7 +1,11 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { StarStoryDto } from '@sysdesign/contracts';
+import {
+  DEFAULT_LIST_LIMIT,
+  STORY_SECTION_MAX_LENGTH,
+  STORY_TAG_MAX_LENGTH,
+} from '@sysdesign/contracts';
 import {
   Badge,
   Heading,
@@ -11,21 +15,38 @@ import {
   Text,
   TextField,
 } from '@sysdesign/design-system';
-import { toErrorMessage, useDebouncedValue, useLatestRequest } from '@sysdesign/web-kit';
+import { UNREACHABLE_COPY, useDebouncedValue, usePagedList } from '@sysdesign/web-kit';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api } from '../../api/client';
+import { LoadMore } from '../../components/load-more';
+import { ResultList } from '../../components/result-list';
+import { RetryAlert } from '../../components/retry-alert';
 
+/** How far a card quotes the story's result before it trails off. */
+const RESULT_EXCERPT_LENGTH = 160;
+
+/**
+ * Search takes the room the row has — its placeholder is a sentence — and
+ * the tag filter, a single word, takes less; both wrap to full width on a
+ * narrow screen.
+ */
 const FilterRow = styled.div`
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.space[4]}px;
+`;
 
-  > label {
-    min-width: 220px;
-  }
+const SearchSlot = styled.div`
+  flex: 3 1 320px;
+  min-width: 0;
+`;
+
+const TagSlot = styled.div`
+  flex: 1 1 180px;
+  min-width: 0;
 `;
 
 const NewStoryLink = styled(Link)`
@@ -60,37 +81,35 @@ const CardLink = styled(Link)`
   }
 `;
 
-export function StoriesList() {
-  const listRequest = useLatestRequest();
+const excerpt = (text: string): string =>
+  text.length > RESULT_EXCERPT_LENGTH ? `${text.slice(0, RESULT_EXCERPT_LENGTH)}…` : text;
 
+/**
+ * The STAR repository, a page at a time. The filters are bounded as the API
+ * bounds them, so a search can never be refused for its length; the rows on
+ * screen dim while a changed filter's rows arrive, and a filter whose rows
+ * could not load shows why in their place — never the previous filter's.
+ */
+export function StoriesList() {
   const [search, setSearch] = useState('');
   const [tag, setTag] = useState('');
-  const debouncedSearch = useDebouncedValue(search);
-  const debouncedTag = useDebouncedValue(tag);
+  const debouncedSearch = useDebouncedValue(search).trim();
+  const debouncedTag = useDebouncedValue(tag).trim();
+  const filtered = debouncedSearch !== '' || debouncedTag !== '';
 
-  const [stories, setStories] = useState<StarStoryDto[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const { id, signal } = listRequest.begin();
-    void (async () => {
-      try {
-        const response = await api.listStories(
-          {
-            ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
-            ...(debouncedTag.trim() ? { tag: debouncedTag.trim() } : {}),
-          },
-          { signal },
-        );
-        if (!listRequest.isCurrent(id)) return;
-        setStories(response.data);
-        setError(null);
-      } catch (caught) {
-        if (listRequest.isStale(id, caught)) return;
-        setError(toErrorMessage(caught, 'Could not load stories.'));
-      }
-    })();
-  }, [debouncedSearch, debouncedTag]);
+  const stories = usePagedList(
+    (page, signal) =>
+      api.listStories(
+        {
+          ...(debouncedSearch ? { search: debouncedSearch } : {}),
+          ...(debouncedTag ? { tag: debouncedTag } : {}),
+          ...page,
+        },
+        { signal },
+      ),
+    [debouncedSearch, debouncedTag],
+    { pageSize: DEFAULT_LIST_LIMIT, fallback: UNREACHABLE_COPY },
+  );
 
   return (
     <Stack gap={6}>
@@ -103,36 +122,53 @@ export function StoriesList() {
 
       <Surface padding={5}>
         <FilterRow>
-          <TextField
-            label="Search"
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search titles, situations, results…"
-            data-testid="story-search"
-          />
-          <TextField
-            label="Tag"
-            value={tag}
-            onChange={(event) => setTag(event.target.value)}
-            placeholder="e.g. caching"
-            data-testid="story-tag-filter"
-          />
+          <SearchSlot>
+            <TextField
+              label="Search"
+              type="search"
+              value={search}
+              maxLength={STORY_SECTION_MAX_LENGTH}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search titles, situations, results…"
+              data-testid="story-search"
+            />
+          </SearchSlot>
+          <TagSlot>
+            <TextField
+              label="Tag"
+              value={tag}
+              maxLength={STORY_TAG_MAX_LENGTH}
+              onChange={(event) => setTag(event.target.value)}
+              placeholder="e.g. caching"
+              data-testid="story-tag-filter"
+            />
+          </TagSlot>
         </FilterRow>
       </Surface>
 
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
-
-      {stories === null ? (
-        <Stack gap={3} aria-busy="true">
-          <Skeleton variant="block" height="88px" />
-          <Skeleton variant="block" height="88px" />
-        </Stack>
-      ) : stories.length === 0 ? (
-        <Text tone="muted">No stories match. Capture one — future-you will thank you.</Text>
+      {stories.items === null ? (
+        stories.error !== null ? (
+          <RetryAlert
+            title="Couldn't load stories"
+            message={stories.error}
+            onRetry={stories.reload}
+            data-testid="stories-error"
+          />
+        ) : (
+          <Stack gap={3} aria-busy="true">
+            <Skeleton variant="block" height="88px" />
+            <Skeleton variant="block" height="88px" />
+          </Stack>
+        )
+      ) : stories.items.length === 0 ? (
+        <Text tone="muted">
+          {filtered
+            ? 'No stories match. Try another search or tag.'
+            : 'No stories yet. Capture one — future-you will thank you.'}
+        </Text>
       ) : (
-        <Stack as="ul" gap={3} data-testid="story-list">
-          {stories.map((story) => (
+        <ResultList data-testid="story-list" aria-busy={stories.loading}>
+          {stories.items.map((story) => (
             <li key={story.id}>
               <CardLink href={`/stories/${story.id}`}>
                 <Surface padding={4}>
@@ -141,7 +177,7 @@ export function StoriesList() {
                       <strong>{story.title}</strong>
                     </Text>
                     <Text size="sm" tone="secondary">
-                      {story.result.length > 160 ? `${story.result.slice(0, 160)}…` : story.result}
+                      {excerpt(story.result)}
                     </Text>
                     <Stack direction="row" gap={2} wrap align="center">
                       {story.tags.map((storyTag) => (
@@ -158,8 +194,10 @@ export function StoriesList() {
               </CardLink>
             </li>
           ))}
-        </Stack>
+        </ResultList>
       )}
+
+      <LoadMore list={stories} noun="stories" data-testid="more-stories" />
     </Stack>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  STORY_MAX_TAGS,
   STORY_SECTION_MAX_LENGTH,
   STORY_TITLE_MAX_LENGTH,
   type ExperienceProfileDto,
@@ -10,6 +9,7 @@ import {
   type StarStoryDto,
 } from '@sysdesign/contracts';
 import {
+  Alert,
   Button,
   SelectField,
   Stack,
@@ -17,7 +17,9 @@ import {
   TextAreaField,
   TextField,
 } from '@sysdesign/design-system';
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+
+import { checkStory, parseTags, type StoryField } from './story-rule';
 
 export interface StoryFormProps {
   /** Existing story when editing; omit for a blank create form. */
@@ -26,64 +28,131 @@ export interface StoryFormProps {
   prompts?: PromptDto[];
   experiences?: ExperienceProfileDto[];
   saving?: boolean;
+  /** Why the last save failed, shown beside Save; null when it did not. */
+  error?: string | null;
+  /** True once the story on screen is the one just saved — "Saved" shows until the next edit. */
+  saved?: boolean;
   onSave: (payload: SaveStarStoryRequest) => void;
   onDelete?: () => void;
+  /** Told whenever the form starts or stops holding edits that are not saved. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
+
+/** What leaving a story with unsaved edits asks first. */
+export const LEAVE_UNSAVED_STORY =
+  'Leave this page? Your changes to this story have not been saved.';
 
 /** Stable empty defaults — an inline `[]` default prop is a fresh identity per render. */
 const NO_PROMPTS: PromptDto[] = [];
 const NO_EXPERIENCES: ExperienceProfileDto[] = [];
 
-function parseTags(raw: string): string[] {
-  return [
-    ...new Set(
-      raw
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0),
-    ),
-  ].slice(0, STORY_MAX_TAGS);
+interface StoryValues {
+  title: string;
+  situation: string;
+  task: string;
+  action: string;
+  result: string;
+  tags: string;
+  promptId: string;
+  experienceId: string;
 }
+
+const valuesOf = (story?: StarStoryDto): StoryValues => ({
+  title: story?.title ?? '',
+  situation: story?.situation ?? '',
+  task: story?.task ?? '',
+  action: story?.action ?? '',
+  result: story?.result ?? '',
+  tags: story?.tags.join(', ') ?? '',
+  promptId: story?.promptId ?? '',
+  experienceId: story?.experienceId ?? '',
+});
+
+/** The four STAR sections, in the order a story is told. */
+const SECTIONS = [
+  { field: 'situation', label: 'Situation', placeholder: 'Where were you, and what was at stake?' },
+  { field: 'task', label: 'Task', placeholder: 'What were you responsible for?' },
+  { field: 'action', label: 'Action', placeholder: 'What did you actually do?' },
+  { field: 'result', label: 'Result', placeholder: 'What changed, in numbers where possible?' },
+] as const satisfies readonly { field: StoryField; label: string; placeholder: string }[];
+
+/** The request a set of values saves as — the save rule trims; the form sends what was typed. */
+const payloadOf = (values: StoryValues): SaveStarStoryRequest => ({
+  title: values.title,
+  situation: values.situation,
+  task: values.task,
+  action: values.action,
+  result: values.result,
+  tags: parseTags(values.tags),
+  ...(values.promptId ? { promptId: values.promptId } : {}),
+  ...(values.experienceId ? { experienceId: values.experienceId } : {}),
+});
 
 /**
  * The STAR editor. Deliberately free of `next/navigation` and API calls —
- * containers own persistence and routing, which keeps this form pure enough
- * for Storybook and unit tests.
+ * containers own persistence, routing and the leave guard (told through
+ * `onDirtyChange`), which keeps this form pure enough for Storybook and unit
+ * tests.
+ *
+ * Validation is the contract's save rule, read field by field: a field says
+ * why it is refused beside itself — once it was visited, or as soon as it
+ * holds something the rule refuses (a tag too long, too many tags) — and a
+ * disabled Save says what is still missing. A failed save and a finished
+ * one are told beside Save, where the author is looking.
  */
 export function StoryForm({
   initial,
   prompts = NO_PROMPTS,
   experiences = NO_EXPERIENCES,
   saving = false,
+  error = null,
+  saved = false,
   onSave,
   onDelete,
+  onDirtyChange,
 }: StoryFormProps) {
-  const [title, setTitle] = useState(initial?.title ?? '');
-  const [situation, setSituation] = useState(initial?.situation ?? '');
-  const [task, setTask] = useState(initial?.task ?? '');
-  const [action, setAction] = useState(initial?.action ?? '');
-  const [result, setResult] = useState(initial?.result ?? '');
-  const [tagsRaw, setTagsRaw] = useState(initial?.tags.join(', ') ?? '');
-  const [promptId, setPromptId] = useState(initial?.promptId ?? '');
-  const [experienceId, setExperienceId] = useState(initial?.experienceId ?? '');
+  const reasonId = useId();
+  const [values, setValues] = useState<StoryValues>(() => valuesOf(initial));
+  const [visited, setVisited] = useState<ReadonlySet<StoryField>>(() => new Set());
+  const [initialValues] = useState(() => valuesOf(initial));
 
-  const complete = [title, situation, task, action, result].every(
-    (value) => value.trim().length > 0,
+  const check = checkStory(payloadOf(values));
+  const valid = check.accepted !== null;
+  const dirty = (Object.keys(values) as (keyof StoryValues)[]).some(
+    (key) => values[key] !== initialValues[key],
   );
 
-  const handleSave = () => {
-    if (!complete || saving) return;
-    onSave({
-      title: title.trim(),
-      situation: situation.trim(),
-      task: task.trim(),
-      action: action.trim(),
-      result: result.trim(),
-      tags: parseTags(tagsRaw),
-      ...(promptId ? { promptId } : {}),
-      ...(experienceId ? { experienceId } : {}),
-    });
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  const set = (key: keyof StoryValues) => (value: string) =>
+    setValues((current) => ({ ...current, [key]: value }));
+  const visit = (field: StoryField) => () =>
+    setVisited((current) => (current.has(field) ? current : new Set(current).add(field)));
+  /** A field's refusal, once the author has been there or has typed something it refuses. */
+  const errorFor = (field: StoryField): string | null => {
+    const refusal = check.errors[field] ?? null;
+    return refusal !== null && (visited.has(field) || values[field].trim().length > 0)
+      ? refusal
+      : null;
   };
+
+  const handleSave = () => {
+    if (saving) return;
+    if (check.accepted === null) {
+      setVisited(new Set(Object.keys(check.errors) as StoryField[]));
+      return;
+    }
+    // What the rule accepted — trimmed — is what is sent.
+    onSave(check.accepted);
+  };
+
+  const reason = valid
+    ? null
+    : check.missing.length > 0
+      ? 'Title and all four STAR sections are required.'
+      : 'Fix the marked fields to save.';
 
   return (
     <Stack
@@ -97,54 +166,39 @@ export function StoryForm({
     >
       <TextField
         label="Title"
-        value={title}
+        value={values.title}
         maxLength={STORY_TITLE_MAX_LENGTH}
-        onChange={(event) => setTitle(event.target.value)}
+        onChange={(event) => set('title')(event.target.value)}
+        onBlur={visit('title')}
+        error={errorFor('title')}
         placeholder="The outage we turned into a design win"
         required
       />
-      <TextAreaField
-        label="Situation"
-        value={situation}
-        maxLength={STORY_SECTION_MAX_LENGTH}
-        onChange={(event) => setSituation(event.target.value)}
-        placeholder="Where were you, and what was at stake?"
-        required
-      />
-      <TextAreaField
-        label="Task"
-        value={task}
-        maxLength={STORY_SECTION_MAX_LENGTH}
-        onChange={(event) => setTask(event.target.value)}
-        placeholder="What were you responsible for?"
-        required
-      />
-      <TextAreaField
-        label="Action"
-        value={action}
-        maxLength={STORY_SECTION_MAX_LENGTH}
-        onChange={(event) => setAction(event.target.value)}
-        placeholder="What did you actually do?"
-        required
-      />
-      <TextAreaField
-        label="Result"
-        value={result}
-        maxLength={STORY_SECTION_MAX_LENGTH}
-        onChange={(event) => setResult(event.target.value)}
-        placeholder="What changed, in numbers where possible?"
-        required
-      />
+      {SECTIONS.map((section) => (
+        <TextAreaField
+          key={section.field}
+          label={section.label}
+          value={values[section.field]}
+          maxLength={STORY_SECTION_MAX_LENGTH}
+          onChange={(event) => set(section.field)(event.target.value)}
+          onBlur={visit(section.field)}
+          error={errorFor(section.field)}
+          placeholder={section.placeholder}
+          required
+        />
+      ))}
       <TextField
         label="Tags (comma separated)"
-        value={tagsRaw}
-        onChange={(event) => setTagsRaw(event.target.value)}
+        value={values.tags}
+        onChange={(event) => set('tags')(event.target.value)}
+        onBlur={visit('tags')}
+        error={errorFor('tags')}
         placeholder="postgres, caching, incident"
       />
       <SelectField
         label="Linked prompt (optional)"
-        value={promptId}
-        onChange={(event) => setPromptId(event.target.value)}
+        value={values.promptId}
+        onChange={(event) => set('promptId')(event.target.value)}
       >
         <option value="">No linked prompt</option>
         {prompts.map((prompt) => (
@@ -155,8 +209,8 @@ export function StoryForm({
       </SelectField>
       <SelectField
         label="Linked experience (optional)"
-        value={experienceId}
-        onChange={(event) => setExperienceId(event.target.value)}
+        value={values.experienceId}
+        onChange={(event) => set('experienceId')(event.target.value)}
       >
         <option value="">No linked experience</option>
         {experiences.map((experience) => (
@@ -166,25 +220,37 @@ export function StoryForm({
         ))}
       </SelectField>
 
-      {!complete ? (
-        <Text size="sm" tone="muted">
-          Title and all four STAR sections are required.
-        </Text>
-      ) : null}
-
-      <Stack direction="row" gap={3}>
-        <Button
-          type="submit"
-          variant="solid"
-          disabled={!complete || saving}
-          data-testid="save-story"
-        >
-          {saving ? 'Saving…' : 'Save story'}
-        </Button>
-        {onDelete ? (
-          <Button variant="ghost" onClick={onDelete} disabled={saving} data-testid="delete-story">
-            Delete story
+      <Stack gap={3}>
+        {error !== null ? (
+          <Alert tone="danger" data-testid="story-save-error">
+            {error}
+          </Alert>
+        ) : null}
+        <Stack direction="row" gap={3} align="center" wrap>
+          <Button
+            type="submit"
+            variant="solid"
+            disabled={!valid || saving}
+            aria-describedby={reason !== null ? reasonId : undefined}
+            data-testid="save-story"
+          >
+            {saving ? 'Saving…' : 'Save story'}
           </Button>
+          {onDelete ? (
+            <Button variant="ghost" onClick={onDelete} disabled={saving} data-testid="delete-story">
+              Delete story
+            </Button>
+          ) : null}
+          {saved && !dirty && !saving ? (
+            <Text as="span" size="sm" tone="secondary" data-testid="story-saved">
+              Saved
+            </Text>
+          ) : null}
+        </Stack>
+        {reason !== null ? (
+          <Text id={reasonId} size="sm" tone="muted" data-testid="save-story-reason">
+            {reason}
+          </Text>
         ) : null}
       </Stack>
     </Stack>

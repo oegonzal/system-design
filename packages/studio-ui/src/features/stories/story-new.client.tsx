@@ -1,31 +1,23 @@
 'use client';
 
-import type { ExperienceProfileDto, PromptDto, SaveStarStoryRequest } from '@sysdesign/contracts';
-import { Heading, Stack, Surface, Text } from '@sysdesign/design-system';
-import { toErrorMessage } from '@sysdesign/web-kit';
+import type { SaveStarStoryRequest } from '@sysdesign/contracts';
+import { Heading, Stack, Surface } from '@sysdesign/design-system';
+import { toErrorMessage, useLeaveGuard } from '@sysdesign/web-kit';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { api } from '../../api/client';
-import { StoryForm } from './story-form';
+import { LEAVE_UNSAVED_STORY, StoryForm } from './story-form';
+import { useStoryLinkOptions } from './use-story-link-options';
 
 export function StoryNew() {
   const router = useRouter();
-
-  const [prompts, setPrompts] = useState<PromptDto[]>([]);
-  const [experiences, setExperiences] = useState<ExperienceProfileDto[]>([]);
+  const { prompts, experiences } = useStoryLinkOptions();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Link options are a convenience — the form works without them.
-    void Promise.all([api.listPrompts({ limit: 50 }), api.listExperiences()])
-      .then(([promptList, experienceList]) => {
-        setPrompts(promptList.data);
-        setExperiences(experienceList.data);
-      })
-      .catch(() => undefined);
-  }, []);
+  const [dirty, setDirty] = useState(false);
+  // A save in flight is on its way, and navigates away itself.
+  useLeaveGuard(dirty && !saving, LEAVE_UNSAVED_STORY);
 
   const handleSave = async (payload: SaveStarStoryRequest) => {
     setSaving(true);
@@ -42,13 +34,14 @@ export function StoryNew() {
   return (
     <Stack gap={5}>
       <Heading level={1}>New STAR story</Heading>
-      {error !== null ? <Text tone="secondary">{error}</Text> : null}
       <Surface padding={6}>
         <StoryForm
           prompts={prompts}
           experiences={experiences}
           saving={saving}
+          error={error}
           onSave={(payload) => void handleSave(payload)}
+          onDirtyChange={setDirty}
         />
       </Surface>
     </Stack>
