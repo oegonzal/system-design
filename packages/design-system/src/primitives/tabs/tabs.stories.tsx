@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
+import { Button } from '../button/button';
+import { Stack } from '../stack/stack';
 import { Text } from '../text/text';
 import { Tab, TabList, TabPanel, Tabs } from './tabs';
 
@@ -65,6 +67,41 @@ export const WithDisabledTab: Story = {
           <Text>Free-form notes.</Text>
         </TabPanel>
       </Tabs>
+    );
+  },
+};
+
+const DOCK_TABS = ['Prompt', 'Brief', 'Narrative', 'Feedback', 'Coach', 'Revisions'];
+
+/**
+ * Six tabs in a narrow dock: one row that scrolls sideways rather than a
+ * second row. The selected tab stays in view however it was chosen — the
+ * button selects the last one from code, as a page does after a submit.
+ */
+export const OneScrollingRow: Story = {
+  render: function OneScrollingRowStory() {
+    const [tab, setTab] = useState('Prompt');
+
+    return (
+      <Stack gap={4} style={{ maxWidth: 260 }}>
+        <Button variant="subtle" size="sm" onClick={() => setTab('Revisions')}>
+          Open Revisions
+        </Button>
+        <Tabs value={tab} onChange={setTab}>
+          <TabList aria-label="Session panels" overflow="scroll">
+            {DOCK_TABS.map((name) => (
+              <Tab key={name} value={name}>
+                {name}
+              </Tab>
+            ))}
+          </TabList>
+          {DOCK_TABS.map((name) => (
+            <TabPanel key={name} value={name}>
+              <Text>{name} panel.</Text>
+            </TabPanel>
+          ))}
+        </Tabs>
+      </Stack>
     );
   },
 };

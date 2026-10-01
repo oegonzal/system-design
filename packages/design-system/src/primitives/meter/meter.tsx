@@ -16,7 +16,17 @@ export interface MeterProps extends HTMLAttributes<HTMLDivElement> {
    * the scale inverts (queue depth: high is the bad end).
    */
   tone?: MeterTone;
+  /**
+   * How the value is printed beside the label, and spoken as
+   * `aria-valuetext`: given the clamped value, unrounded. Omit it and the
+   * meter prints whole points. Pass the app's own score format so a meter
+   * and every other place that prints the same score agree by construction,
+   * not by both happening to round alike.
+   */
+  formatValue?: (value: number) => string;
 }
+
+const wholePoints = (value: number): string => String(Math.round(value));
 
 /** Score bands: below 40 is failing, 40–69 needs work, 70+ is healthy. */
 const autoTone = (value: number): MeterTone =>
@@ -73,24 +83,27 @@ const Fill = styled('div', transient)<{ $tone: MeterTone }>`
  * `role="meter"` rather than `progressbar`: this reports a measurement, not
  * the progress of a task, and screen readers phrase the two differently.
  */
-export function Meter({ label, value, tone, ...rest }: MeterProps) {
+export function Meter({ label, value, tone, formatValue, ...rest }: MeterProps) {
   const labelId = useId();
-  const clamped = Math.round(Math.min(100, Math.max(0, value)));
+  const clamped = Math.min(100, Math.max(0, value));
+  const whole = Math.round(clamped);
+  const printed = (formatValue ?? wholePoints)(clamped);
 
   return (
     <Root {...rest}>
       <Row>
         <Label id={labelId}>{label}</Label>
-        <Value aria-hidden="true">{clamped}</Value>
+        <Value aria-hidden="true">{printed}</Value>
       </Row>
       <Track
         role="meter"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={clamped}
+        aria-valuenow={whole}
+        aria-valuetext={formatValue ? printed : undefined}
         aria-labelledby={labelId}
       >
-        <Fill $tone={tone ?? autoTone(clamped)} style={{ width: `${clamped}%` }} />
+        <Fill $tone={tone ?? autoTone(whole)} style={{ width: `${whole}%` }} />
       </Track>
     </Root>
   );

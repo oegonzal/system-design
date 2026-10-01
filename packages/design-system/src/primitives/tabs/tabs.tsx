@@ -2,8 +2,10 @@ import styled from '@emotion/styled';
 import {
   createContext,
   use,
+  useEffect,
   useId,
   useMemo,
+  useRef,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type KeyboardEvent,
@@ -11,6 +13,7 @@ import {
 } from 'react';
 
 import { transient } from '../../theme/styled';
+import { revealScrollLeft } from './reveal';
 
 interface TabsContextValue {
   value: string;
@@ -54,6 +57,12 @@ export function Tabs({ value, onChange, children, ...rest }: TabsProps) {
   );
 }
 
+/**
+ * What a row of tabs does when it outgrows its container: `wrap` breaks onto
+ * another row; `scroll` stays one row that scrolls sideways.
+ */
+export type TabListOverflow = 'wrap' | 'scroll';
+
 export interface TabListProps extends HTMLAttributes<HTMLDivElement> {
   /**
    * Required in spirit: a page with two tablists is unnavigable without
@@ -61,6 +70,14 @@ export interface TabListProps extends HTMLAttributes<HTMLDivElement> {
    * so it is documented instead.
    */
   'aria-label'?: string;
+  /**
+   * `wrap` (the default) for a page-wide header. `scroll` for a narrow
+   * container — a dock, a side panel — where a second row of tabs would eat
+   * the panel: one row that scrolls sideways and keeps the selected tab in
+   * view, however it was chosen — a click, the arrow keys, or the page
+   * selecting it from code.
+   */
+  overflow?: TabListOverflow;
 }
 
 const List = styled.div`
@@ -68,6 +85,28 @@ const List = styled.div`
   flex-wrap: wrap;
   gap: ${({ theme }) => theme.space[2]}px;
   border-bottom: 1px solid ${({ theme }) => theme.color.border.subtle};
+`;
+
+/** One row as wide as its tabs, so the underline runs the whole row inside the scroller. */
+const OneRowList = styled(List)`
+  flex-wrap: nowrap;
+  min-width: max-content;
+
+  & > [role='tab'] {
+    white-space: nowrap;
+  }
+`;
+
+/**
+ * The sideways scroller a one-row list sits in. Positioned, so a tab's
+ * `offsetLeft` is measured from it; never shrunk by a column flex parent, so
+ * the row keeps its height in a dock.
+ */
+const Scroller = styled.div`
+  position: relative;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
 `;
 
 /**
@@ -104,12 +143,34 @@ function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
   target.click();
 }
 
-/** The `role="tablist"` element. Renders `Tab`s and nothing else. */
-export function TabList(props: TabListProps) {
-  // Context is not read here, but requiring it keeps a stray TabList from
-  // rendering a tablist whose tabs would all throw.
-  useTabsContext('TabList');
-  return <List role="tablist" onKeyDown={moveFocus} {...props} />;
+/**
+ * The `role="tablist"` element. Renders `Tab`s and nothing else. With
+ * `overflow="scroll"` it sits in a scroller that follows the selection: each
+ * time the selected value changes, the scroller moves just far enough to
+ * show that tab — the scroller, never the page.
+ */
+export function TabList({ overflow = 'wrap', ...props }: TabListProps) {
+  // Requiring the context also keeps a stray TabList from rendering a
+  // tablist whose tabs would all throw.
+  const { value } = useTabsContext('TabList');
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const strip = scroller.current;
+    const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (!strip || !selected) return;
+    strip.scrollLeft = revealScrollLeft(
+      { start: selected.offsetLeft, end: selected.offsetLeft + selected.offsetWidth },
+      { scrollLeft: strip.scrollLeft, width: strip.clientWidth },
+    );
+  }, [value, overflow]);
+
+  if (overflow === 'wrap') return <List role="tablist" onKeyDown={moveFocus} {...props} />;
+  return (
+    <Scroller ref={scroller}>
+      <OneRowList role="tablist" onKeyDown={moveFocus} {...props} />
+    </Scroller>
+  );
 }
 
 export interface TabProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'value'> {

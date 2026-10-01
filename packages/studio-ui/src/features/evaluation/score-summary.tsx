@@ -97,7 +97,13 @@ export function ScoreSummary({ evaluation, criteria = NO_CRITERIA }: ScoreSummar
                 </Text>
               </NotAssessedRow>
             ) : (
-              <Meter key={key} label={humanizeToken(key)} value={value} data-dimension={key} />
+              <Meter
+                key={key}
+                label={humanizeToken(key)}
+                value={value}
+                formatValue={formatScore}
+                data-dimension={key}
+              />
             ),
           )}
         </Stack>

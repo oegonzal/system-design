@@ -215,27 +215,6 @@ const DockTabs = styled(Tabs)`
   flex-direction: column;
 `;
 
-/**
- * Six tabs in a narrow dock: one row that scrolls sideways, never a second
- * row. The strip scrolls; the tablist inside is as wide as its tabs, so its
- * underline runs the whole row.
- */
-const DockTabStrip = styled.div`
-  position: relative;
-  flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
-`;
-
-const DockTabList = styled(TabList)`
-  flex-wrap: nowrap;
-  min-width: max-content;
-
-  & > [role='tab'] {
-    white-space: nowrap;
-  }
-`;
-
 const DockPanel = styled(TabPanel)`
   flex: 1;
   min-height: 0;
@@ -368,19 +347,6 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   useEffect(() => {
     storeApi.getState().setReadOnly(readOnly);
   }, [readOnly, storeApi]);
-
-  // The selected tab stays in view however it was chosen — a submit opens
-  // Feedback from code — by scrolling the strip sideways, never the page.
-  const tabStrip = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const strip = tabStrip.current;
-    const selected = strip?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-    if (!strip || !selected) return;
-    const start = selected.offsetLeft;
-    const end = start + selected.offsetWidth;
-    if (start < strip.scrollLeft) strip.scrollLeft = start;
-    else if (end > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = end - strip.clientWidth;
-  }, [tab]);
 
   // Initial load: session → prompt + revision summaries + coaching runs → the
   // canvas. A saved draft comes back ahead of any revision — it is the
@@ -755,16 +721,16 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
 
         <Dock as="aside" padding={5} aria-label="Session details">
           <DockTabs value={tab} onChange={setTab}>
-            <DockTabStrip ref={tabStrip}>
-              <DockTabList aria-label="Session panels">
-                <Tab value="prompt">Prompt</Tab>
-                <Tab value="brief">Brief</Tab>
-                <Tab value="narrative">Narrative</Tab>
-                <Tab value="feedback">Feedback</Tab>
-                <Tab value="coach">Coach</Tab>
-                <Tab value="revisions">Revisions</Tab>
-              </DockTabList>
-            </DockTabStrip>
+            {/* Six tabs in a narrow dock: one row that scrolls sideways, and keeps
+                the selected tab in view when a submit opens Feedback from code. */}
+            <TabList aria-label="Session panels" overflow="scroll">
+              <Tab value="prompt">Prompt</Tab>
+              <Tab value="brief">Brief</Tab>
+              <Tab value="narrative">Narrative</Tab>
+              <Tab value="feedback">Feedback</Tab>
+              <Tab value="coach">Coach</Tab>
+              <Tab value="revisions">Revisions</Tab>
+            </TabList>
             <DockPanel value="prompt">
               {prompt ? (
                 <PromptPane

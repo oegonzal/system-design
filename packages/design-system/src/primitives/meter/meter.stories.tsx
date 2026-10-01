@@ -36,3 +36,8 @@ export const ExplicitTone: Story = {
 
 /** Out-of-range input clamps rather than throwing. */
 export const Clamped: Story = { args: { label: 'Overall', value: 103 } };
+
+/** An app's own score format: the meter prints what it is given, so it never disagrees with the page. */
+export const Formatted: Story = {
+  args: { label: 'Coverage', value: 79.46, formatValue: (value: number) => value.toFixed(1) },
+};

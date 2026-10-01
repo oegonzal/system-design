@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { makeCriteria, makeEvaluation, makeFinding } from '../../testing/fixtures';
+import { formatScore } from './score';
 import { ScoreSummary } from './score-summary';
 
 describe('ScoreSummary', () => {
@@ -52,15 +53,19 @@ describe('ScoreSummary', () => {
     expect(getComputedStyle(reason).overflowWrap).toBe('anywhere');
   });
 
-  it('[EVAL-1] prints the overall at the precision the dimension meters show', () => {
+  it('[EVAL-1] prints the overall and every dimension meter through the one score format', () => {
     renderWithTheme(
       <ScoreSummary
         evaluation={makeEvaluation({ overall: 12.1, dimensions: { coverage: 16.6 } })}
       />,
     );
 
-    expect(screen.getByTestId('overall-score').textContent).toBe('12');
-    expect(screen.getByRole('meter').getAttribute('aria-valuenow')).toBe('17');
+    expect(screen.getByTestId('overall-score').textContent).toBe(formatScore(12.1));
+    const meter = screen.getByRole('meter');
+    // The meter prints what formatScore says, on screen and to a screen reader.
+    expect(meter.getAttribute('aria-valuetext')).toBe(formatScore(16.6));
+    expect(screen.getByText(formatScore(16.6))).toBeTruthy();
+    expect(meter.getAttribute('aria-valuenow')).toBe('17');
   });
 
   it('[DEL-4] says which lens samples the grade was computed without, and nothing when every lens answered', () => {
