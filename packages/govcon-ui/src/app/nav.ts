@@ -3,8 +3,13 @@ import { navTable, type NavItem } from '@sysdesign/web-kit';
 /**
  * The navigation vocabulary and per-route metadata, in one place. The nav
  * bar maps over `NAV_ITEMS`; each `page.tsx` exports `pageMetadata('/route')`
- * so titles and the nav can never disagree.
+ * so titles and the nav can never disagree, and every title — the
+ * dashboard's at `/` included — carries the app's name in one form,
+ * `pageTitle`.
  */
+
+export const APP_NAME = 'Govcon';
+
 export const NAV_ITEMS = [
   {
     href: '/',
@@ -38,4 +43,8 @@ const EXTRA_PAGES: readonly NavItem[] = [
   },
 ];
 
-export const { navItemFor, pageMetadata } = navTable(NAV_ITEMS, EXTRA_PAGES);
+export const {
+  navItemFor,
+  pageMetadata,
+  titled: pageTitle,
+} = navTable(NAV_ITEMS, EXTRA_PAGES, { appName: APP_NAME });

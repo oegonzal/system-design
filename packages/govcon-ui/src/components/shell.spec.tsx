@@ -8,7 +8,7 @@ import {
 import { act, fireEvent, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NAV_ITEMS, navItemFor, pageMetadata } from '../app/nav';
+import { NAV_ITEMS, navItemFor, pageMetadata, pageTitle } from '../app/nav';
 import { ProfileProvider, PROFILE_STORAGE_KEY } from '../providers/profile-context';
 import { OTHER_PROFILE, PROFILE } from '../testing/fixtures';
 import { AppShell } from './app-shell';
@@ -45,9 +45,16 @@ describe('the shell', () => {
     expect(screen.getByRole('link', { name: 'Search' }).hasAttribute('aria-current')).toBe(false);
     expect(screen.getByRole('main').textContent).toContain('content');
     expect(pageMetadata('/intel')).toEqual({
-      title: 'Intel',
+      title: { absolute: 'Intel · Govcon' },
       description: expect.stringContaining('Awards'),
     });
+    // The dashboard sits in the root layout's own segment, where the layout's
+    // template never applies — so its title carries the app's name itself.
+    expect(pageMetadata('/')).toEqual({
+      title: { absolute: 'Dashboard · Govcon' },
+      description: expect.any(String),
+    });
+    expect(pageTitle('%s')).toBe('%s · Govcon');
     expect(navItemFor('/notices/abc')?.label).toBe('Notice');
     expect(navItemFor('/nowhere')).toBeNull();
 

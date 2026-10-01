@@ -148,14 +148,11 @@ describe('NoticeClient', () => {
     ]);
   });
 
-  it('renders a dead end with a way back when the notice is not stored', async () => {
+  it('renders a dead end with a way back when the notice is not stored, however the server words it', async () => {
     stubApi([
       profiles,
-      {
-        path: noticePath,
-        status: 404,
-        body: { statusCode: 404, message: `no stored notice ${NOTICE_ID}` },
-      },
+      // The status decides: the wording is the server's to change.
+      { path: noticePath, status: 404, body: { statusCode: 404, message: 'Not Found' } },
     ]);
     mount();
     await screen.findByRole('heading', { name: 'No such notice' });
@@ -163,5 +160,27 @@ describe('NoticeClient', () => {
       '/',
     );
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('offers a retry in the server’s own words when the read failed, and loads on the next try', async () => {
+    let reads = 0;
+    stubApi([
+      profiles,
+      {
+        path: noticePath,
+        handler: () => {
+          reads += 1;
+          return reads === 1
+            ? { status: 500, body: { statusCode: 500, message: 'The store is restarting.' } }
+            : { body: { data: full() } };
+        },
+      },
+    ]);
+    mount();
+    await screen.findByRole('heading', { name: 'The notice could not be loaded' });
+    expect(screen.getByText('The store is restarting.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByRole('heading', { name: '59--JUNCTION BOX, IN REPAIR/MODIFICATION OF' });
   });
 });

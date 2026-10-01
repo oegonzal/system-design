@@ -2,7 +2,7 @@
 
 import type { Entity, SaveBidRequest } from '@sysdesign/contracts';
 import { Alert, LiveRegion, Spinner, Stack, Surface } from '@sysdesign/design-system';
-import { useAction, useResource } from '@sysdesign/web-kit';
+import { readFailureOf, UNREACHABLE_COPY, useAction, useResource } from '@sysdesign/web-kit';
 import { useState } from 'react';
 
 import { api } from '../../api/client';
@@ -87,16 +87,20 @@ export function NoticeClient({ noticeId }: NoticeClientProps) {
   });
 
   if (notice.error !== null) {
-    const missing = notice.error.startsWith('no stored notice') || /status 404/i.test(notice.error);
-    return (
+    // The status decides, never the server's wording: nothing at the address
+    // is a dead end, anything else may load on a retry.
+    const failure = readFailureOf(notice.failure, UNREACHABLE_COPY);
+    return failure.kind === 'missing' ? (
       <FullPageNotice
-        title={missing ? 'No such notice' : 'The notice could not be loaded'}
-        message={
-          missing
-            ? `Nothing is stored under ${noticeId}. Pull first, or check the id.`
-            : notice.error
-        }
-        onRetry={missing ? undefined : notice.reload}
+        title="No such notice"
+        message={`Nothing is stored under ${noticeId}. Pull first, or check the id.`}
+        backHref="/"
+      />
+    ) : (
+      <FullPageNotice
+        title="The notice could not be loaded"
+        message={failure.message}
+        onRetry={notice.reload}
         backHref="/"
       />
     );
