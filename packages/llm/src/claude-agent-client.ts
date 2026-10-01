@@ -3,6 +3,7 @@ import { z, type ZodIssue, type ZodType } from 'zod';
 
 import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
+import { InFlightGate } from './in-flight-gate';
 import type { LlmClient, StructuredRequest } from './llm-client';
 
 /** The `error.name` a schema miss is recorded under; its message is the schema's own complaint. */
@@ -249,19 +250,44 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   private readonly sink: LlmCallSink | null;
   /** The SDK's `query`; injectable so a spec never spawns the CLI. */
   private readonly run: ClaudeQuery | undefined;
+  /** Admission to the provider. A twin shares it: it shares the transport. */
+  private readonly gate: InFlightGate;
 
-  constructor(options: { model?: string; sink?: LlmCallSink; query?: ClaudeQuery } = {}) {
+  constructor(
+    options: {
+      model?: string;
+      sink?: LlmCallSink;
+      query?: ClaudeQuery;
+      gate?: InFlightGate;
+    } = {},
+  ) {
     this.requestedModel = options.model;
     this.model = options.model ?? SUBSCRIPTION_MODEL_LABEL;
     this.sink = options.sink ?? null;
     this.run = options.query;
+    this.gate = options.gate ?? new InFlightGate();
   }
 
   withRecorder(sink: LlmCallSink): LlmClient {
-    return new ClaudeAgentLlmClient({ model: this.requestedModel, sink, query: this.run });
+    return new ClaudeAgentLlmClient({
+      model: this.requestedModel,
+      sink,
+      query: this.run,
+      gate: this.gate,
+    });
   }
 
-  async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+  /**
+   * One call, under one permit. Everything timed — the stamp, the duration and
+   * the abort timer — begins after admission, so a queue behind a busy provider
+   * is never charged to the call and can never turn a healthy answer into a
+   * timeout. The wait itself is recorded instead.
+   */
+  completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+    return this.gate.run(({ queuedMs }) => this.callOnce(request, queuedMs));
+  }
+
+  private async callOnce<T>(request: StructuredRequest<T>, queuedMs: number): Promise<T | null> {
     const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
     const startedAt = new Date();
     const started = Date.now();
@@ -283,6 +309,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         durationMs: Date.now() - started,
         requestId: null,
         attempt,
+        queuedMs,
         ...call,
       });
     };

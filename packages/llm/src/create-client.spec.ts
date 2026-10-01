@@ -7,9 +7,12 @@ import {
   createEmbeddingClientFromEnv,
   createQualityLoopLlmFromEnv,
   describeModelProvider,
+  IN_FLIGHT_VAR,
+  maxInFlight,
   MissingModelProviderError,
 } from './create-client';
 import { DisabledEmbeddingClient, embeddingAvailability } from './embedding-client';
+import { DEFAULT_GATE_POLICY } from './in-flight-gate';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
@@ -18,6 +21,18 @@ const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
   tokenSource: null,
   apiKeySource: null,
   ...overrides,
+});
+
+describe('the process ceiling', () => {
+  it('[QL-27] defaults when unset and refuses anything but a positive integer, by name', () => {
+    expect(maxInFlight({})).toBe(DEFAULT_GATE_POLICY.ceiling);
+    expect(maxInFlight({ [IN_FLIGHT_VAR]: '' })).toBe(DEFAULT_GATE_POLICY.ceiling);
+    expect(maxInFlight({ [IN_FLIGHT_VAR]: '3' })).toBe(3);
+
+    for (const bad of ['0', '-2', '2.5', 'lots']) {
+      expect(() => maxInFlight({ [IN_FLIGHT_VAR]: bad })).toThrow(IN_FLIGHT_VAR);
+    }
+  });
 });
 
 describe('the quality loop runs on the Claude Code subscription only', () => {

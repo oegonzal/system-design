@@ -10,6 +10,7 @@ import {
   SCHEMA_MISS,
 } from './claude-agent-client';
 import type { LlmCall } from './exchange';
+import { InFlightGate } from './in-flight-gate';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
 
@@ -130,6 +131,58 @@ function scripted(messages: readonly unknown[], thenThrow?: Error) {
 }
 
 const answer = z.object({ answer: z.string() });
+
+describe('the subscription client under the process gate', () => {
+  const ok = [{ type: 'result', subtype: 'success', is_error: false, result: '{"answer":"hi"}' }];
+
+  it('[QL-27] holds one permit for the span of a call and frees it afterwards', async () => {
+    const gate = new InFlightGate({ policy: { ceiling: 1 } });
+    const inside: number[] = [];
+    const { run } = scripted(ok);
+    const client = new ClaudeAgentLlmClient({
+      query: run,
+      gate,
+      sink: () => inside.push(gate.snapshot().inFlight),
+    });
+
+    await client.completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(inside).toEqual([1]);
+    expect(gate.snapshot()).toEqual({ ceiling: 1, inFlight: 0, waiting: 0 });
+  });
+
+  it('[QL-27] a wait for admission is recorded, never charged to the call', async () => {
+    const gate = new InFlightGate({ policy: { ceiling: 1 } });
+    const calls: LlmCall[] = [];
+    const { run } = scripted(ok);
+    const client = new ClaudeAgentLlmClient({ query: run, gate, sink: (call) => calls.push(call) });
+
+    // One permit, two callers: the second cannot start until the first is done.
+    await Promise.all([
+      client.completeStructured({ system: 's', user: 'u', schema: answer }),
+      client.completeStructured({ system: 's', user: 'u', schema: answer }),
+    ]);
+
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.outcome).toBe('ok');
+      // Whatever it waited, the duration measures the model and nothing else.
+      expect(call.durationMs).toBeGreaterThanOrEqual(0);
+      expect(call.queuedMs).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('[QL-27] a recording twin shares the gate rather than opening a second ceiling', async () => {
+    const gate = new InFlightGate({ policy: { ceiling: 1 } });
+    const { run } = scripted(ok);
+    const seen: number[] = [];
+    const twin = new ClaudeAgentLlmClient({ query: run, gate }).withRecorder(() =>
+      seen.push(gate.snapshot().inFlight),
+    );
+
+    await twin.completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(seen).toEqual([1]);
+  });
+});
 
 describe('the subscription client at its call site', () => {
   it('[QL-22] spawns the CLI with no non-subscription credential in its environment', async () => {

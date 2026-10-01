@@ -283,6 +283,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'What a wave of lenses yields is a function of declaration order — lenses as declared, samples ascending — and never of which call answered first: a sample keeps the number it was planned with, so agreement across samples, the order of the lenses on a confirmed finding, and the rationale carried into the next iteration are all the same whatever the completion order.',
   },
+  {
+    id: 'QL-27',
+    statement:
+      "One gate admits every provider call this process makes, so a pipeline's declared concurrency and the number of runs in flight cannot multiply into an unbounded number of subprocesses: it admits in arrival order up to a declared ceiling, frees its permit even when the call throws, never rejects of its own accord, and reports the wait so queueing is charged to neither the call's duration nor its timeout.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

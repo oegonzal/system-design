@@ -3,6 +3,7 @@ import type { LlmModelDto } from '@sysdesign/contracts';
 import { describeAccount, readClaudeAccount, signedIn, type ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient, SUBSCRIPTION_MODEL_LABEL } from './claude-agent-client';
 import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-client';
+import { DEFAULT_GATE_POLICY, providerGate } from './in-flight-gate';
 import type { LlmClient } from './llm-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
@@ -58,8 +59,33 @@ export async function assertSubscriptionLogin(
   if (!signedIn(account)) throw new MissingModelProviderError({ found: describeAccount(account) });
 }
 
+/**
+ * How many provider calls this process may have in flight. Declared here with
+ * the other model settings rather than beside whatever happens to spend them:
+ * one process leans on the provider once, however many runs it is serving.
+ */
+export const IN_FLIGHT_VAR = 'LLM_MAX_IN_FLIGHT';
+
+export class LlmSettingError extends Error {
+  override readonly name = 'LlmSetting';
+}
+
+/** A positive integer, or the declared default; anything else is refused by name. */
+export function maxInFlight(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env[IN_FLIGHT_VAR];
+  if (raw === undefined || raw === '') return DEFAULT_GATE_POLICY.ceiling;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new LlmSettingError(`${IN_FLIGHT_VAR} must be an integer of at least 1, got ${raw}`);
+  }
+  return parsed;
+}
+
 export function createQualityLoopLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  return new ClaudeAgentLlmClient({ model: env['LLM_MODEL'] || undefined });
+  return new ClaudeAgentLlmClient({
+    model: env['LLM_MODEL'] || undefined,
+    gate: providerGate({ ceiling: maxInFlight(env) }),
+  });
 }
 
 /**

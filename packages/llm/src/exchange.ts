@@ -51,6 +51,12 @@ export interface LlmCall {
    * Optional so a hand-rolled literal keeps compiling and reads as a single try.
    */
   attempt?: number;
+  /**
+   * Milliseconds this call waited for admission to the provider, kept out of
+   * `durationMs` on purpose: a queue is not work, and charging it to the call
+   * would make a busy process look like a slow model.
+   */
+  queuedMs?: number;
 }
 
 export type LlmCallSink = (call: LlmCall) => void;
