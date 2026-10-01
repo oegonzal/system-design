@@ -199,17 +199,22 @@ describe('toEvaluationDto', () => {
     if (!run?.trace) throw new Error('the fake completes synchronously');
     run.trace.stopReason = 'escalated';
 
-    expect(toEvaluationDto(run, 1, submission)).toMatchObject({ overall: 12, stopReason: null });
+    expect(toEvaluationDto(run, 1, submission)).toMatchObject({
+      overall: 12,
+      stopReason: null,
+      settled: true,
+    });
     // The iteration that ended the run carries the reason — and no artifact earns no score.
     expect(toEvaluationDto(run, 2, submission)).toMatchObject({
       status: 'complete',
+      settled: true,
       overall: null,
       decision: 'escalate',
       stopReason: 'escalated',
     });
   });
 
-  it('[DEL-4] an iteration a running run has recorded is complete; one it has not is still running', async () => {
+  it('[DEL-4] an iteration a running run has recorded is complete but not settled; one it has not is still running; a failure keeps the recorded one', async () => {
     const loop = new FakeQualityLoopClient();
     const { runId } = await loop.startRun({
       pipeline: 'system-design-canvas',
@@ -223,8 +228,10 @@ describe('toEvaluationDto', () => {
     if (!run) throw new Error('the fake keeps every run');
 
     expect(iterationStatus(run, 1)).toBe('complete');
+    // Recorded, so final — but whether it ends the run, and why, waits for the run.
     expect(toEvaluationDto(run, 1, submission)).toMatchObject({
       status: 'complete',
+      settled: false,
       overall: 40,
       stopReason: null,
       error: null,
@@ -232,16 +239,25 @@ describe('toEvaluationDto', () => {
     expect(iterationStatus(run, 2)).toBe('running');
     expect(toEvaluationDto(run, 2, submission)).toMatchObject({
       status: 'running',
+      settled: false,
       overall: null,
       error: null,
     });
 
+    // The grade already shown stays: a run that fails keeps what it recorded, with no stop reason.
     loop.fail(runId, 'the model went away');
     const failed = await loop.getRun(runId);
     if (!failed) throw new Error('the fake keeps every run');
-    expect(toEvaluationDto(failed, 1, submission).status).toBe('complete');
+    expect(toEvaluationDto(failed, 1, submission)).toMatchObject({
+      status: 'complete',
+      settled: true,
+      overall: 40,
+      stopReason: null,
+      error: null,
+    });
     expect(toEvaluationDto(failed, 2, submission)).toMatchObject({
       status: 'failed',
+      settled: true,
       error: 'the model went away',
     });
   });
@@ -281,6 +297,7 @@ describe('toEvaluationDto', () => {
       runId: run.runId,
       iteration: 1,
       status: 'running',
+      settled: false,
       llm: run.llm,
       overall: null,
       decision: null,

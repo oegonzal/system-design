@@ -283,6 +283,14 @@ export class FakeLoop {
     run.error = { name: 'Error', message, stack: null };
   }
 
+  /** The loop no longer has the run — its store lost it — so a read of it is a 404, as a run never started. */
+  forget(runId: string): void {
+    this.require(runId);
+    this.runs.delete(runId);
+    this.requests.delete(runId);
+    this.adoptions.delete(runId);
+  }
+
   /** Settle a running run by its goal's scenario — the stub's timer calls this; a spec may too. */
   settle(runId: string): void {
     const run = this.runs.get(runId);

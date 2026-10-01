@@ -355,10 +355,13 @@ export function makeCriterionResult(
 }
 
 export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): EvaluationDto {
+  const status = overrides.status ?? 'complete';
   return {
     runId: 'run-1',
     iteration: 1,
-    status: 'complete',
+    status,
+    // A running grade's run is still going; a terminal one's has stopped.
+    settled: status !== 'running',
     llm: { model: 'test-model' },
     overall: 72,
     decision: 'revise',

@@ -223,7 +223,9 @@ export class SessionsService {
    * from a draft or from an adopted grade alike, and only the newest can be
    * live, since each start was refused while another was. Then the latest
    * revision's grade — its cache says `running` until someone reads the
-   * evaluation, so a grade that finished unread is not in flight.
+   * evaluation, so a grade that finished unread is not in flight. A run the
+   * loop does not have holds nothing, a coach's or a grade's alike: nothing
+   * can be running it, so it never makes a read fail or a write wait.
    */
   private async inFlight(
     em: EntityManager,
@@ -259,7 +261,7 @@ export class SessionsService {
     if (latest.qualityRunId === null) return null;
     const state = await this.ask(
       asker,
-      async () => (await this.evaluations.syncRevision(latest, em)).status,
+      async () => (await this.evaluations.syncRevision(latest, em))?.status ?? null,
     );
     return state === 'running' || state === 'unknown'
       ? { kind: 'grade', runId: latest.qualityRunId, revisionNumber: latest.revisionNumber, state }

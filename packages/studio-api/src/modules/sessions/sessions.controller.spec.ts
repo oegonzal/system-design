@@ -506,7 +506,7 @@ describe('sessions', () => {
       expect((await evaluation(UNKNOWN_UUID)).status).toBe(404);
 
       const { body: created } = await submit(sessionId, submission());
-      h.loop.runs.delete('fake-run-1');
+      h.loop.forget('fake-run-1');
       expect((await evaluation(created.data.id)).status).toBe(404);
 
       const fork = h.em.fork();
@@ -523,6 +523,37 @@ describe('sessions', () => {
       expect((await evaluation(legacy.id)).status).toBe(404);
       const read = await call<GetRevisionResponse>(`${h.url}/revisions/${legacy.id}`);
       expect(read.body.data.evaluation).toBeNull();
+    });
+  });
+
+  describe('a run the loop no longer has', () => {
+    it('[DEL-3] holds nothing: the session reads with nothing in flight, takes the next submit, and the coach is refused a grade it cannot adopt', async () => {
+      const { sessionId } = await startSession();
+      const { body: graded } = await submit(sessionId, submission());
+      h.loop.forget('fake-run-1');
+
+      const read = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(read.status).toBe(200);
+      expect(read.body.data.inFlight).toBeNull();
+      // The cache is left as it was: the studio invents no outcome for a run it cannot see.
+      const revision = await call<GetRevisionResponse>(`${h.url}/revisions/${graded.data.id}`);
+      expect(revision.body.data.evaluation?.status).toBe('running');
+
+      const coach = await call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
+        method: 'POST',
+        body: JSON.stringify({ baseRevisionId: graded.data.id }),
+      });
+      expect(coach.status).toBe(422);
+      expect(JSON.stringify((coach.body as unknown as ApiErrorResponse).message)).toContain(
+        'is unknown to the grader',
+      );
+
+      const next = await submit(sessionId, submission());
+      expect(next.status).toBe(201);
+      expect(next.body.data).toMatchObject({
+        revisionNumber: 2,
+        evaluation: { runId: 'fake-run-2', status: 'running' },
+      });
     });
   });
 
@@ -988,9 +1019,15 @@ describe('sessions', () => {
       expect(first.body.data.iterations).toEqual([
         expect.objectContaining({ iteration: 1, overall: 60, outcome: 'base', revisionId: baseId }),
       ]);
-      // The base's grade is final once recorded, though the coach is still revising.
+      // The base's grade is final once recorded, though the coach is still revising
+      // — and not settled: whether it ends the run waits for the run.
       const base = await evaluation(baseId);
-      expect(base.body.data).toMatchObject({ status: 'complete', overall: 60, stopReason: null });
+      expect(base.body.data).toMatchObject({
+        status: 'complete',
+        settled: false,
+        overall: 60,
+        stopReason: null,
+      });
 
       h.loop.progress('fake-run-1', [
         { overall: 60, decision: 'revise' },
@@ -1021,7 +1058,48 @@ describe('sessions', () => {
         second.body.data.iterations[1].revisionId,
       );
       // The base is not the iteration that ended the run: its grade carries no stop reason.
-      expect((await evaluation(baseId)).body.data.stopReason).toBeNull();
+      expect((await evaluation(baseId)).body.data).toMatchObject({
+        settled: true,
+        stopReason: null,
+      });
+    });
+
+    it('[DEL-4] a coach that fails after recording iterations keeps every grade the studio showed: the base and the import stay complete', async () => {
+      const { sessionId } = await startSession();
+      const started = await startImprove(sessionId, { ...submission(), maxIterations: 3 });
+      const baseId = started.body.data.revision.id;
+      h.loop.progress('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+      ]);
+      const running = await readImprove(sessionId, 'fake-run-1');
+      const importedId = running.body.data.iterations[1].revisionId;
+      expect(importedId).not.toBeNull();
+
+      h.loop.fail('fake-run-1', 'the model went away');
+      const failed = await readImprove(sessionId, 'fake-run-1');
+      expect(failed.body.data).toMatchObject({
+        status: 'failed',
+        stopReason: null,
+        error: 'the model went away',
+      });
+      expect(failed.body.data.iterations.map((it) => it.revisionId)).toEqual([baseId, importedId]);
+      expect((await evaluation(baseId)).body.data).toMatchObject({
+        status: 'complete',
+        settled: true,
+        overall: 60,
+        stopReason: null,
+      });
+      expect((await evaluation(importedId ?? '')).body.data).toMatchObject({
+        status: 'complete',
+        settled: true,
+        overall: 72,
+      });
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.data.map((revision) => revision.evaluation?.status)).toEqual([
+        'complete',
+        'complete',
+      ]);
     });
 
     it('[DEL-3] an iteration with no artifact is its own outcome: unscored, never “not better”, never the design’s fault', async () => {

@@ -63,6 +63,29 @@ describe('useEvaluationPolling', () => {
     expect(fetchMock.mock.calls.length).toBe(callsAtCompletion);
   });
 
+  it('[DEL-4] keeps polling a recorded grade until its run settles, so the stop reason arrives', async () => {
+    const recorded = makeEvaluation({ settled: false, stopReason: null });
+    const settled = makeEvaluation({ settled: true, stopReason: 'max-iterations' });
+    const { fetchMock } = stubApi([
+      { path: EVAL_PATH, sequence: [{ data: recorded }, { data: settled }] },
+    ]);
+
+    const hook = renderHook(() => useEvaluationPolling('rev-1'));
+    await advance(0);
+    // The grade shows as soon as it is recorded, and the poll goes on.
+    expect(hook.result.current.evaluation?.status).toBe('complete');
+    expect(hook.result.current.evaluation?.stopReason).toBeNull();
+    expect(hook.result.current.isPolling).toBe(true);
+    expect(hook.result.current.message).toBe('Evaluation complete — 72/100 · revise.');
+
+    await advance(POLL_INTERVAL_MS);
+    expect(hook.result.current.evaluation?.stopReason).toBe('max-iterations');
+    expect(hook.result.current.isPolling).toBe(false);
+    const callsAtSettle = fetchMock.mock.calls.length;
+    await advance(POLL_INTERVAL_MS * 5);
+    expect(fetchMock.mock.calls.length).toBe(callsAtSettle);
+  });
+
   it('stops on failed and surfaces the run error', async () => {
     const { fetchMock } = stubApi([
       { path: EVAL_PATH, sequence: [envelope('running'), envelope('failed', 'Critic exploded')] },

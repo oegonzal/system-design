@@ -208,6 +208,15 @@ describe('FakeLoop', () => {
     });
   });
 
+  it('forgets a run as a loop whose store lost it: a read of it answers nothing', () => {
+    const loop = new FakeLoop();
+    loop.startRun(request());
+    loop.forget('fake-run-1');
+    expect(loop.getRun('fake-run-1')).toBeNull();
+    expect(loop.requests.has('fake-run-1')).toBe(false);
+    expect(() => loop.forget('fake-run-1')).toThrow(/no run/);
+  });
+
   it('reset clears every run, request and scenario', () => {
     const loop = new FakeLoop();
     loop.scenario(GOAL, { outcome: 'fail', message: 'x' });

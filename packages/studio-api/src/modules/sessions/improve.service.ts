@@ -117,7 +117,7 @@ export class ImproveService {
       );
     }
     const grade = await this.evaluations.syncRevision(base);
-    if (grade.status === 'running') {
+    if (grade?.status === 'running') {
       throw new ConflictException(
         describeInFlight({
           kind: 'grade',
@@ -127,9 +127,10 @@ export class ImproveService {
         }),
       );
     }
-    if (grade.status !== 'complete') {
+    if (grade?.status !== 'complete') {
+      const run = grade === null ? 'is unknown to the grader' : grade.status;
       throw new UnprocessableEntityException(
-        `revision #${base.revisionNumber} has no grade to adopt: its run ${grade.status} — submit it again`,
+        `revision #${base.revisionNumber} has no grade to adopt: its run ${run} — submit it again`,
       );
     }
     const adopt = { runId: base.qualityRunId, iteration: base.qualityIteration };

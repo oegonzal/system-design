@@ -31,14 +31,16 @@ import {
  *
  * An iteration's grade is final once the run has recorded it: a running
  * run's trace holds the iterations finished so far, so a coach's earlier
- * iterations read complete while it is still revising.
+ * iterations read complete while it is still revising, and a run that failed
+ * keeps the ones it recorded. Only the stop reason waits for the run to
+ * stop, so the DTO says whether it has (`settled`).
  */
 export function toEvaluationDto(
   run: QualityRunDto,
   iteration: number,
   submission: DesignSubmission,
 ): EvaluationDto {
-  const header = { runId: run.runId, iteration, llm: run.llm };
+  const header = { runId: run.runId, iteration, settled: run.status !== 'running', llm: run.llm };
   const it = run.trace?.iterations[iteration - 1];
   if (it === undefined) {
     const status = iterationStatus(run, iteration);

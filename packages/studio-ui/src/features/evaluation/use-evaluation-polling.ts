@@ -47,14 +47,15 @@ function describe(
 
 const fetchEvaluation = (revisionId: string, signal: AbortSignal) =>
   api.getEvaluation(revisionId, { signal });
-const isTerminal = (evaluation: EvaluationDto) =>
-  evaluation.status === 'complete' || evaluation.status === 'failed';
+// The run, not the iteration: a grade recorded while its run goes on still
+// waits for the stop reason only the run's end can give it.
+const isTerminal = (evaluation: EvaluationDto) => evaluation.settled;
 const terminalError = (evaluation: EvaluationDto) =>
   evaluation.status === 'failed' ? (evaluation.error ?? 'Evaluation failed.') : null;
 
 /**
- * Polls the grade for a revision until the run reaches a terminal status —
- * `usePolledResource` with this domain's copy. Status-driven, not
+ * Polls the grade for a revision until its run settles — `usePolledResource`
+ * with this domain's copy. Settled-driven, not
  * clock-capped: only the quality loop knows how long its lenses take, and
  * `error` (with the resubmit button it drives) is reserved for a run that
  * actually failed, never for an unreachable API.

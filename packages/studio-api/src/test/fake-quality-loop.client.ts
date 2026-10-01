@@ -173,6 +173,11 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     this.core.fail(runId, message);
   }
 
+  /** The loop no longer has the run: a read of it is the real client's null. */
+  forget(runId: string): void {
+    this.core.forget(runId);
+  }
+
   /** The fake's typed errors as the real client's exceptions; anything else is the spec's own. */
   private answer<T>(call: () => T): Promise<T> {
     try {

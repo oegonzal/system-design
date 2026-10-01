@@ -84,6 +84,13 @@ export interface EvaluationDto {
    * run's own state, and failed when the run ended without it.
    */
   status: QualityRunStatus;
+  /**
+   * Whether this grade can still change: false while the run is still
+   * running — even once this iteration is `complete`, since whether it ends
+   * the run, and why (`stopReason`), is known only when the run stops — and
+   * true once the run has completed or failed. A reader polls until it is.
+   */
+  settled: boolean;
   llm: LlmModelDto;
   /** The controller's score; null when the run has no iteration yet, when the iteration had no artifact, and when it assessed nothing — never the controller's zero for an empty ledger. */
   overall: number | null;
