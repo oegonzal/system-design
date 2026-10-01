@@ -252,28 +252,22 @@ export class FakeLoop {
     iterations: readonly FakeIteration[] | 'default' | 'auto' = 'default',
   ): void {
     const run = this.require(runId);
-    const request = this.requests.get(runId);
-    if (!request) throw new Error(`fake quality loop has no request for ${runId}`);
-    const adopted = this.adoptions.get(runId) ?? null;
-    const criteria = request.criteria ?? criteriaFromMarkdown(request.goal);
-
-    let traced: IterationTrace[];
-    if (iterations === 'auto') {
-      traced = autoIterations(request, criteria, adopted);
-    } else {
-      const specs = iterations === 'default' ? DEFAULT_ITERATIONS(criteria) : iterations;
-      traced =
-        adopted === null
-          ? tracesFrom(request, criteria, specs)
-          : [
-              { ...structuredClone(adopted), iteration: 1, mode: 'adopted' },
-              ...tracesFrom(request, criteria, specs, 2),
-            ];
-    }
-
     run.status = 'complete';
     run.finishedAt = this.now();
-    run.trace = runTrace(run.pipeline, this.version, run.request.goal, criteria, traced);
+    run.trace = this.traceOf(runId, iterations);
+  }
+
+  /**
+   * Record the iterations a still-running run has finished so far, as the
+   * loop publishes them: the run stays `running`, its trace holds only
+   * those iterations, and a later `complete` or `fail` settles it. The list
+   * reads as `complete`'s does — an adopting run's iteration 1 is the
+   * adopted one and the list describes what follows.
+   */
+  progress(runId: string, iterations: readonly FakeIteration[] = []): void {
+    const run = this.require(runId);
+    if (run.status !== 'running') throw new Error(`fake quality loop run ${runId} has settled`);
+    run.trace = this.traceOf(runId, iterations);
   }
 
   fail(runId: string, message: string): void {
@@ -292,6 +286,35 @@ export class FakeLoop {
     this.consume(run.request.goal, scenario);
     if (scenario.outcome === 'fail') return this.fail(runId, scenario.message);
     if (scenario.outcome === 'complete') return this.complete(runId, scenario.iterations ?? 'auto');
+  }
+
+  /** The trace a run's request and the spec's iterations describe. */
+  private traceOf(
+    runId: string,
+    iterations: readonly FakeIteration[] | 'default' | 'auto',
+  ): QualityRunDto['trace'] {
+    const run = this.require(runId);
+    const request = this.requests.get(runId);
+    if (!request) throw new Error(`fake quality loop has no request for ${runId}`);
+    const adopted = this.adoptions.get(runId) ?? null;
+    const criteria = request.criteria ?? criteriaFromMarkdown(request.goal);
+
+    let traced: IterationTrace[];
+    if (iterations === 'auto') {
+      traced = autoIterations(request, criteria, adopted);
+    } else {
+      const specs = iterations === 'default' ? DEFAULT_ITERATIONS(criteria) : iterations;
+      traced =
+        adopted === null
+          ? tracesFrom(request, criteria, specs)
+          : [
+              { ...structuredClone(adopted), iteration: 1, mode: 'adopted' },
+              ...tracesFrom(request, criteria, specs, 2),
+            ];
+    }
+    // Nothing finished yet is no trace at all, as the loop publishes it.
+    if (traced.length === 0) return null;
+    return runTrace(run.pipeline, this.version, run.request.goal, criteria, traced);
   }
 
   private consume(goal: string, scenario: RunScenario): void {

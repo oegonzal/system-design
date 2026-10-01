@@ -10,6 +10,7 @@ import {
   CANVAS_PIPELINE_ID,
   criteriaFromDraft,
   designPromptDraftSchema,
+  PROMPT_COPY,
   PROMPT_PIPELINE_ID,
   renderDesignPromptMarkdown,
   type AuthorPromptRequest,
@@ -27,7 +28,7 @@ import { DesignSession, ExperienceProfile, Prompt, PromptGeneration } from '@sys
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { renderExperienceGoal } from './experience-goal';
 import type { ListPromptsQueryInput } from './prompt-requests';
-import { toPromptDto } from './prompts.mapper';
+import { toPromptDto, type PromptView } from './prompts.mapper';
 
 /** The prompt pipeline writes, is criticised, and rewrites once. */
 const GENERATION_ITERATIONS = 2;
@@ -44,7 +45,8 @@ class AlreadyClaimed extends Error {}
  * is its draft's own rows, one criterion each, since the draft was judged
  * row by row and the markdown was rendered from it. Either way the rubric is
  * kept for the prompt's life: a rewrite is a different prompt, derived again
- * and authored from then on.
+ * and authored from then on. Once a session cites the criteria the prompt is
+ * locked — every read says so, and re-deriving or rewriting it is refused.
  */
 @Injectable()
 export class PromptsService {
@@ -66,7 +68,7 @@ export class PromptsService {
   }
 
   /** The rubric is derived before the row exists: a grader that cannot answer leaves nothing behind. */
-  async author(request: AuthorPromptRequest): Promise<Prompt> {
+  async author(request: AuthorPromptRequest): Promise<PromptView> {
     const experience = request.experienceId ? await this.experience(request.experienceId) : null;
     const criteria = await this.rubricFor(request.markdown);
     const prompt = this.em.create(Prompt, {
@@ -78,10 +80,10 @@ export class PromptsService {
     });
     this.em.persist(prompt);
     await this.em.flush();
-    return prompt;
+    return this.view(prompt);
   }
 
-  async import(request: ImportPromptRequest): Promise<Prompt> {
+  async import(request: ImportPromptRequest): Promise<PromptView> {
     const document = await this.loop.getPrompt(request.libraryId);
     if (!document) {
       throw new UnprocessableEntityException(`Unknown library prompt: ${request.libraryId}`);
@@ -96,7 +98,7 @@ export class PromptsService {
     });
     this.em.persist(prompt);
     await this.em.flush();
-    return prompt;
+    return this.view(prompt);
   }
 
   /**
@@ -150,7 +152,7 @@ export class PromptsService {
         error: null,
         decision: best?.decision.finalDecision ?? null,
         overall: best?.decision.scores.overall ?? null,
-        prompt: toPromptDto(await this.ensureCriteria(row.prompt)),
+        prompt: toPromptDto(await this.view(await this.ensureCriteria(row.prompt))),
       });
     }
     if (run === null) {
@@ -172,12 +174,12 @@ export class PromptsService {
       error: null,
       decision: best.decision.finalDecision,
       overall: best.decision.scores.overall,
-      prompt: toPromptDto(claimed),
+      prompt: toPromptDto(await this.view(claimed)),
     });
   }
 
-  async list(query: ListPromptsQueryInput): Promise<[Prompt[], number]> {
-    return this.em.findAndCount(
+  async list(query: ListPromptsQueryInput): Promise<[PromptView[], number]> {
+    const [prompts, total] = await this.em.findAndCount(
       Prompt,
       {
         ...(query.experienceId ? { experience: query.experienceId } : {}),
@@ -190,11 +192,12 @@ export class PromptsService {
         orderBy: { createdAt: 'desc', id: 'asc' },
       },
     );
+    return [await this.views(prompts), total];
   }
 
   /** A read derives the rubric when it is still empty — the one moment a prompt's criteria are minted. */
-  async findOne(id: string): Promise<Prompt> {
-    return this.ensureCriteria(await this.require(id));
+  async findOne(id: string): Promise<PromptView> {
+    return this.view(await this.ensureCriteria(await this.require(id)));
   }
 
   /**
@@ -202,29 +205,27 @@ export class PromptsService {
    * generated prompt, whose rubric is its draft's rows rather than a
    * derivation — rewriting it is the way to a different rubric.
    */
-  async rederiveCriteria(id: string): Promise<Prompt> {
+  async rederiveCriteria(id: string): Promise<PromptView> {
     const prompt = await this.require(id);
     if (prompt.source === 'generated') {
-      throw new ConflictException(
-        `prompt ${id} was generated and its rubric is its draft's — rewrite it to derive a new one`,
-      );
+      throw new ConflictException(PROMPT_COPY.generatedCriteria);
     }
-    await this.assertNoSessions(prompt, 're-derive its criteria');
+    await this.assertUnlocked(prompt, PROMPT_COPY.criteriaLocked);
     prompt.criteria = [];
-    return this.ensureCriteria(prompt);
+    return this.view(await this.ensureCriteria(prompt));
   }
 
   /**
    * Archive or reactivate freely; retitle or rewrite only while no session
-   * has been graded against it — a rewritten prompt is a different prompt:
+   * has been started on it — a rewritten prompt is a different prompt:
    * its criteria are derived again, and whatever it was generated or
    * imported from no longer describes it, so it is authored from then on.
    */
-  async update(id: string, request: UpdatePromptRequest): Promise<Prompt> {
+  async update(id: string, request: UpdatePromptRequest): Promise<PromptView> {
     const prompt = await this.require(id);
     if (request.status !== undefined) prompt.status = request.status;
     if (request.title !== undefined || request.markdown !== undefined) {
-      await this.assertNoSessions(prompt, 'be rewritten');
+      await this.assertUnlocked(prompt, PROMPT_COPY.textLocked);
       if (request.title !== undefined) prompt.title = request.title;
       if (request.markdown !== undefined && request.markdown !== prompt.markdown) {
         // Derived before anything is written: a grader that cannot derive
@@ -236,7 +237,7 @@ export class PromptsService {
       }
     }
     await this.em.flush();
-    return this.ensureCriteria(prompt);
+    return this.view(await this.ensureCriteria(prompt));
   }
 
   /**
@@ -289,12 +290,28 @@ export class PromptsService {
     return experiences[least];
   }
 
-  private async assertNoSessions(prompt: Prompt, verb: string): Promise<void> {
-    if ((await this.em.count(DesignSession, { prompt: prompt.id })) > 0) {
-      throw new ConflictException(
-        `prompt ${prompt.id} has sessions graded against its criteria and cannot ${verb}`,
-      );
-    }
+  /**
+   * Each prompt with whether practice has locked it: a session started on it
+   * cites its criteria by id. One grouped count for the lot — the rule
+   * `assertUnlocked` refuses with, so a read and a refusal never disagree.
+   */
+  private async views(prompts: readonly Prompt[]): Promise<PromptView[]> {
+    const sessions =
+      prompts.length === 0
+        ? {}
+        : await this.em.countBy(DesignSession, 'prompt', {
+            where: { prompt: { $in: prompts.map((prompt) => prompt.id) } },
+          });
+    return prompts.map((prompt) => ({ prompt, rubricLocked: (sessions[prompt.id] ?? 0) > 0 }));
+  }
+
+  private async view(prompt: Prompt): Promise<PromptView> {
+    const [view] = await this.views([prompt]);
+    return view;
+  }
+
+  private async assertUnlocked(prompt: Prompt, refusal: string): Promise<void> {
+    if ((await this.view(prompt)).rubricLocked) throw new ConflictException(refusal);
   }
 
   private async claim(

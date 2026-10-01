@@ -6,6 +6,7 @@ import type { QualityRunStatus } from './quality-loop/runs';
 import type {
   AxisFactorLevel,
   Decision,
+  DiagnosticReason,
   Fixability,
   Severity,
   StopReason,
@@ -57,15 +58,34 @@ export interface CriterionResultDto {
   result: EvidenceResult;
   confidence: AxisFactorLevel | null;
   rationale: string | null;
+  /**
+   * Every place the rationale's lens cited — by ref, or by naming a positional
+   * id in its prose — that the stored revision could place, so a reader sees
+   * the label where the model wrote `edge.5`.
+   */
+  locations: EvaluationLocationDto[];
+}
+
+/** A lens sample that answered nothing: the grade stands on the samples that did. */
+export interface DegradedSampleDto {
+  /** The lens that ran it — `critic.scale`, `evaluator.quality`. */
+  stage: string;
+  sample: number | null;
+  reason: DiagnosticReason;
 }
 
 export interface EvaluationDto {
   runId: string;
   /** Which iteration of the run this revision is: 1 for a submission, k for a coach revision. */
   iteration: number;
+  /**
+   * This iteration's grade: complete once the run has recorded it — a coach's
+   * earlier iterations finish while it is still revising — otherwise the
+   * run's own state, and failed when the run ended without it.
+   */
   status: QualityRunStatus;
   llm: LlmModelDto;
-  /** The controller's score; null when the run has no iteration yet, and when it assessed nothing — never the controller's zero for an empty ledger. */
+  /** The controller's score; null when the run has no iteration yet, when the iteration had no artifact, and when it assessed nothing — never the controller's zero for an empty ledger. */
   overall: number | null;
   decision: Decision | null;
   /** The controller's own sentence for its decision. */
@@ -74,7 +94,10 @@ export interface EvaluationDto {
   dimensions: Record<string, number | null>;
   findings: EvaluationFindingDto[];
   criterionResults: CriterionResultDto[];
+  /** Why the run stopped — only on the iteration that ended a completed run; null on every earlier one. */
   stopReason: StopReason | null;
+  /** The lens samples of this iteration that produced no report; empty when every lens answered. */
+  degraded: DegradedSampleDto[];
   error: string | null;
 }
 

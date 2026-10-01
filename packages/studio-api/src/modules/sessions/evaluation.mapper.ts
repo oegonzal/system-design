@@ -1,7 +1,12 @@
 import {
+  locationIdsIn,
   submissionLocations,
   type ConfirmedFinding,
+  type CriterionEvidence,
+  type CriterionResultDto,
   type CriticReport,
+  type Decision,
+  type DegradedSampleDto,
   type DesignSubmission,
   type EvaluationDto,
   type EvaluationFindingDto,
@@ -10,6 +15,7 @@ import {
   type IterationTrace,
   type LensOutcome,
   type QualityRunDto,
+  type QualityRunStatus,
   type SubmissionLocation,
 } from '@sysdesign/contracts';
 
@@ -21,61 +27,95 @@ import {
  * `submissionLocations` (the same numbering the pipeline printed) — and
  * invents nothing: a score, a decision or a dimension the loop did not
  * produce is null here, and so is a score the loop earned nothing for.
+ *
+ * An iteration's grade is final once the run has recorded it: a running
+ * run's trace holds the iterations finished so far, so a coach's earlier
+ * iterations read complete while it is still revising.
  */
 export function toEvaluationDto(
   run: QualityRunDto,
   iteration: number,
   submission: DesignSubmission,
 ): EvaluationDto {
-  const header = {
-    runId: run.runId,
-    iteration,
-    llm: run.llm,
-    error: run.error?.message ?? null,
-  };
-  const empty = {
-    overall: null,
-    decision: null,
-    decisionReason: null,
-    dimensions: {},
-    findings: [],
-    criterionResults: [],
-    stopReason: null,
-  };
-  if (run.trace === null) return { ...header, ...empty, status: run.status };
-
-  const it = run.trace.iterations[iteration - 1];
+  const header = { runId: run.runId, iteration, llm: run.llm };
+  const it = run.trace?.iterations[iteration - 1];
   if (it === undefined) {
+    const status = iterationStatus(run, iteration);
     return {
       ...header,
-      ...empty,
-      status: 'failed',
-      error: `the run has no iteration ${iteration}`,
+      status,
+      overall: null,
+      decision: null,
+      decisionReason: null,
+      dimensions: {},
+      findings: [],
+      criterionResults: [],
+      stopReason: null,
+      degraded: [],
+      error:
+        status === 'running'
+          ? null
+          : (run.error?.message ?? `the run has no iteration ${iteration}`),
     };
   }
   const index = new Map(submissionLocations(submission).map((location) => [location.id, location]));
-  const dimensions = { ...it.decision.scores.dimensions };
   return {
     ...header,
-    status: run.status,
-    // A zero over a ledger with nothing assessed is not a score.
-    overall: nothingAssessed(dimensions) ? null : it.decision.scores.overall,
-    decision: it.decision.finalDecision,
+    status: 'complete',
+    ...iterationGrade(it),
     decisionReason: it.decision.reason,
-    dimensions,
+    dimensions: { ...it.decision.scores.dimensions },
     findings: it.ledger.findings.map((finding) => toFinding(finding, it, index)),
-    criterionResults: it.ledger.criteria.map((row) => ({
-      criterionId: row.criterionId,
-      result: row.result,
-      confidence: row.confidence,
-      rationale: firstRationale(it.evaluators, row.criterionId),
-    })),
-    stopReason: run.trace.stopReason,
+    criterionResults: it.ledger.criteria.map((row) => toCriterionResult(row, it, index)),
+    stopReason: endedRun(run, iteration) ? (run.trace?.stopReason ?? null) : null,
+    degraded: degradedSamples(it),
+    error: null,
   };
 }
 
+/**
+ * Where one iteration's grade stands: complete once the run recorded it,
+ * else the run's own state — and failed when the run finished without it.
+ * The one rule every reader of a revision's grade applies, so the cache and
+ * the DTO never disagree.
+ */
+export function iterationStatus(run: QualityRunDto, iteration: number): QualityRunStatus {
+  if (run.trace?.iterations[iteration - 1] !== undefined) return 'complete';
+  return run.status === 'complete' ? 'failed' : run.status;
+}
+
+/**
+ * The controller's verdict on one recorded iteration, as the studio states
+ * it: no artifact, or a ledger with nothing assessed, earns no score — the
+ * controller's zero there is not one.
+ */
+export function iterationGrade(it: IterationTrace): {
+  overall: number | null;
+  decision: Decision;
+} {
+  const scored = it.artifact !== null && !nothingAssessed(it.decision.scores.dimensions);
+  return {
+    overall: scored ? it.decision.scores.overall : null,
+    decision: it.decision.finalDecision,
+  };
+}
+
+/** Why the run stopped belongs to the iteration that ended it, and only once the run has completed. */
+const endedRun = (run: QualityRunDto, iteration: number): boolean =>
+  run.status === 'complete' && run.trace?.iterations.length === iteration;
+
 const nothingAssessed = (dimensions: Record<string, number | null>): boolean =>
   Object.values(dimensions).every((value) => value === null);
+
+/** The refs the stored revision can place, each with its label, part and the author's key. */
+const placed = (
+  refs: readonly string[],
+  index: ReadonlyMap<string, SubmissionLocation>,
+): EvaluationLocationDto[] =>
+  refs.flatMap((ref) => {
+    const location = index.get(ref);
+    return location ? [{ ref, label: location.label, part: location.part, key: location.key }] : [];
+  });
 
 const toFinding = (
   finding: ConfirmedFinding,
@@ -83,10 +123,7 @@ const toFinding = (
   index: ReadonlyMap<string, SubmissionLocation>,
 ): EvaluationFindingDto => {
   // A ref the stored revision cannot place is kept verbatim in `locationRefs` and nowhere else.
-  const locations: EvaluationLocationDto[] = finding.locationRefs.flatMap((ref) => {
-    const location = index.get(ref);
-    return location ? [{ ref, label: location.label, part: location.part, key: location.key }] : [];
-  });
+  const locations = placed(finding.locationRefs, index);
   const keysOf = (part: EvaluationLocationDto['part']) =>
     locations.flatMap((location) =>
       location.part === part && location.key !== null ? [location.key] : [],
@@ -108,6 +145,37 @@ const toFinding = (
   };
 };
 
+/**
+ * One rubric row with the words of the first evaluator sample that gave
+ * any, and every place that sample cited — its refs, then the ids its prose
+ * names — so the prose reads in labels rather than positions.
+ */
+function toCriterionResult(
+  row: CriterionEvidence,
+  it: IterationTrace,
+  index: ReadonlyMap<string, SubmissionLocation>,
+): CriterionResultDto {
+  const said = firstSaid(it.evaluators, row.criterionId);
+  const cited = said
+    ? [...new Set([...said.locationRefs, ...locationIdsIn(said.rationale, [...index.values()])])]
+    : [];
+  return {
+    criterionId: row.criterionId,
+    result: row.result,
+    confidence: row.confidence,
+    rationale: said?.rationale ?? null,
+    locations: placed(cited, index),
+  };
+}
+
+/** The lens samples that answered nothing — what the grade was computed without. */
+const degradedSamples = (it: IterationTrace): DegradedSampleDto[] =>
+  [...it.critics, ...it.evaluators].flatMap(({ diagnostic }) =>
+    diagnostic
+      ? [{ stage: diagnostic.stage, sample: diagnostic.sample, reason: diagnostic.reason }]
+      : [],
+  );
+
 /** The words of the first critic sample that reported this defect, when the wire carried none. */
 function criticRationale(
   critics: readonly LensOutcome<CriticReport>[],
@@ -126,13 +194,14 @@ function criticRationale(
   return null;
 }
 
-function firstRationale(
+/** The first evaluator sample's result for a criterion that carries words. */
+function firstSaid(
   evaluators: readonly LensOutcome<EvaluationReport>[],
   criterionId: string,
-): string | null {
+): { rationale: string; locationRefs: readonly string[] } | null {
   for (const outcome of evaluators) {
     const raw = outcome.report?.results.find((result) => result.criterionId === criterionId);
-    if (raw && raw.rationale.length > 0) return raw.rationale;
+    if (raw && raw.rationale.length > 0) return raw;
   }
   return null;
 }

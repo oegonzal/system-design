@@ -151,6 +151,27 @@ describe('FakeLoop', () => {
     ).toThrow(LoopRefused);
   });
 
+  it('publishes a running run’s finished iterations as the loop does, and settles it later', () => {
+    const loop = new FakeLoop();
+    loop.startRun(request({ maxIterations: 3 }));
+    loop.progress('fake-run-1');
+    expect(loop.getRun('fake-run-1')).toMatchObject({ status: 'running', trace: null });
+
+    loop.progress('fake-run-1', [{ overall: 40 }, { overall: 55, artifact: graph(4) }]);
+    const running = loop.getRun('fake-run-1');
+    expect(running?.status).toBe('running');
+    expect(running?.finishedAt).toBeNull();
+    expect(running?.trace?.iterations.map((it) => it.decision.scores.overall)).toEqual([40, 55]);
+
+    loop.complete('fake-run-1', [
+      { overall: 40 },
+      { overall: 55, artifact: graph(4) },
+      { overall: 60, artifact: graph(5) },
+    ]);
+    expect(loop.getRun('fake-run-1')?.trace?.iterations).toHaveLength(3);
+    expect(() => loop.progress('fake-run-1', [{ overall: 1 }])).toThrow(/settled/);
+  });
+
   it('reset clears every run, request and scenario', () => {
     const loop = new FakeLoop();
     loop.scenario(GOAL, { outcome: 'fail', message: 'x' });

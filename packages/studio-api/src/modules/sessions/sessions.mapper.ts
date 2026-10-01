@@ -2,15 +2,22 @@ import type {
   CoachingRunSummaryDto,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
+  DesignSessionDetailDto,
   DesignSessionDto,
   RevisionEvaluationRef,
+  SessionInFlightDto,
 } from '@sysdesign/contracts';
 import type { CoachingRun, DesignRevision, DesignSession } from '@sysdesign/db';
 
-/** A session plus the newest revision its DTO summarises. */
+/** A session — its prompt loaded — plus the newest revision its DTO summarises. */
 export interface SessionWithLatest {
   session: DesignSession;
   latestRevision: DesignRevision | null;
+}
+
+/** One session as a single read answers it: the row plus the run holding its grading slot. */
+export interface SessionDetail extends SessionWithLatest {
+  inFlight: SessionInFlightDto | null;
 }
 
 /** Where the grade lives, from the row's own pointer and cache; null for a revision graded before delegation. */
@@ -57,6 +64,7 @@ export const toCoachingRunSummaryDto = (run: CoachingRun): CoachingRunSummaryDto
 export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): DesignSessionDto => ({
   id: session.id,
   promptId: session.prompt.id,
+  promptTitle: session.prompt.title,
   status: session.status,
   revisionCount: session.revisions.count(),
   latestRevisionNumber: latestRevision?.revisionNumber ?? null,
@@ -66,4 +74,9 @@ export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): De
   draft: session.draft,
   createdAt: session.createdAt.toISOString(),
   updatedAt: session.updatedAt.toISOString(),
+});
+
+export const toSessionDetailDto = (detail: SessionDetail): DesignSessionDetailDto => ({
+  ...toSessionDto(detail),
+  inFlight: detail.inFlight,
 });

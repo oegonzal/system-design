@@ -25,6 +25,20 @@ export type PromptSource = (typeof PROMPT_SOURCES)[number];
 export const PROMPT_TITLE_MAX_LENGTH = 120;
 export const PROMPT_MARKDOWN_MAX_LENGTH = 20_000;
 
+/**
+ * The sentences the API refuses a prompt change with and the studio shows
+ * beside the control it disables — one wording, in the studio's own
+ * vocabulary ("Unarchive"), never an id.
+ */
+export const PROMPT_COPY = {
+  archived: 'This prompt is archived — unarchive it to practise it again.',
+  criteriaLocked: 'This prompt already has practice sessions, so its criteria are fixed.',
+  textLocked:
+    'This prompt already has practice sessions, so its title and text are fixed — write a new prompt instead.',
+  generatedCriteria:
+    'This prompt was generated, so its criteria are its draft’s — rewrite it to derive new ones.',
+} as const;
+
 /** A title and a markdown body — what every source produces and what is stored. */
 export const promptDocumentSchema = z.strictObject({
   title: z.string().min(1).max(PROMPT_TITLE_MAX_LENGTH),
@@ -39,6 +53,12 @@ export interface PromptDto extends PromptDocument {
   criteria: SuccessCriterion[];
   source: PromptSource;
   status: PromptStatus;
+  /**
+   * True once any practice session was started on the prompt: its sessions
+   * cite the criteria by id, so the criteria are never re-derived and the
+   * title and text are never rewritten (both refused with 409).
+   */
+  rubricLocked: boolean;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
 }

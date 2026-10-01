@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { criteriaFromDraft } from '@sysdesign/contracts';
+import { criteriaFromDraft, PROMPT_COPY } from '@sysdesign/contracts';
 import type {
   ApiErrorResponse,
   AuthorPromptRequest,
@@ -261,7 +261,7 @@ describe('prompts', () => {
         method: 'POST',
       });
       expect(rederive.status).toBe(409);
-      expect(JSON.stringify(rederive.body.message)).toMatch(/generated/);
+      expect(rederive.body.message).toBe(PROMPT_COPY.generatedCriteria);
       expect(h.loop.criteriaRequests).toEqual([]);
 
       const rewritten = await call<GetPromptResponse>(`${h.url}/prompts/${id}`, {
@@ -329,8 +329,9 @@ describe('prompts', () => {
   });
 
   describe('the rubric', () => {
-    it('[UX-14] can be re-derived while nothing was graded against it, and is frozen once a session exists', async () => {
+    it('[UX-14] can be re-derived while no session was started on it, and every read says when it is locked', async () => {
       const { body: created } = await author(authoredPrompt());
+      expect(created.data.rubricLocked).toBe(false);
       const rederived = await call<GetPromptResponse>(
         `${h.url}/prompts/${created.data.id}/criteria`,
         {
@@ -338,21 +339,37 @@ describe('prompts', () => {
         },
       );
       expect(rederived.status).toBe(200);
+      expect(rederived.body.data.rubricLocked).toBe(false);
       expect(h.loop.criteriaRequests).toHaveLength(2);
 
+      // A session is started — nothing graded yet — and the prompt is locked.
       await call(`${h.url}/sessions`, {
         method: 'POST',
         body: JSON.stringify({ promptId: created.data.id }),
       });
+      const read = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`);
+      expect(read.body.data.rubricLocked).toBe(true);
+      const listed = await call<ListPromptsResponse>(`${h.url}/prompts`);
+      expect(listed.body.data.map((p) => p.rubricLocked)).toEqual([true]);
+
+      // The refusals are the reader's sentences — no id, and no claim that anything was graded.
       const frozen = await call<ApiErrorResponse>(`${h.url}/prompts/${created.data.id}/criteria`, {
         method: 'POST',
       });
       expect(frozen.status).toBe(409);
+      expect(frozen.body.message).toBe(PROMPT_COPY.criteriaLocked);
       const rewrite = await call<ApiErrorResponse>(`${h.url}/prompts/${created.data.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ markdown: '# Another prompt\n\n- one thing' }),
       });
       expect(rewrite.status).toBe(409);
+      expect(rewrite.body.message).toBe(PROMPT_COPY.textLocked);
+      // Archiving stays free on a locked prompt.
+      const archived = await call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      expect(archived.body.data).toMatchObject({ status: 'archived', rubricLocked: true });
     });
 
     it('rewriting the markdown before any session derives the rubric again', async () => {

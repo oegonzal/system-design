@@ -2,6 +2,7 @@ import { BadGatewayException } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
+  PROMPT_COPY,
   type ApiErrorResponse,
   type CanvasGraph,
   type DesignBrief,
@@ -142,12 +143,14 @@ describe('sessions', () => {
       expect(status).toBe(201);
       expect(body.data).toMatchObject({
         promptId: prompt.id,
+        promptTitle: prompt.title,
         status: 'in-progress',
         revisionCount: 0,
         latestRevisionNumber: null,
         latestOverall: null,
         latestDecision: null,
         latestEvaluationStatus: null,
+        inFlight: null,
       });
     });
 
@@ -162,7 +165,8 @@ describe('sessions', () => {
         body: JSON.stringify({ promptId: prompt.id }),
       });
       expect(archived.status).toBe(422);
-      expect(JSON.stringify(archived.body.message)).toContain('archived');
+      // The studio's own words ("Unarchive"), shared with the page through the contract.
+      expect(archived.body.message).toBe(PROMPT_COPY.archived);
       expect((await createSession(UNKNOWN_UUID)).status).toBe(422);
     });
   });
@@ -310,12 +314,20 @@ describe('sessions', () => {
       const third = await submit(sessionId, submission());
       expect(third.status).toBe(409);
       expect(JSON.stringify((third.body as unknown as ApiErrorResponse).message)).toContain(
-        'revision #1 is still being graded',
+        'Revision #1 is still being graded',
       );
+      const held = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(held.body.data.inFlight).toEqual({
+        kind: 'grade',
+        runId: 'fake-run-1',
+        revisionNumber: 1,
+      });
       const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
       expect(list.body.meta.total).toBe(1);
 
       h.loop.complete('fake-run-1');
+      const free = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(free.body.data.inFlight).toBeNull();
       const next = await submit(sessionId, submission());
       expect(next.status).toBe(201);
       expect(next.body.data.revisionNumber).toBe(2);
@@ -821,6 +833,109 @@ describe('sessions', () => {
       expect(list.body.data.map((r) => r.revisionNumber)).toEqual([3, 2, 1]);
     });
 
+    it('[DEL-3] a coach in flight holds the session — adopted or from the draft: no submit and no second coach until it ends, and the session says why', async () => {
+      const { sessionId } = await startSession();
+      const { body: graded } = await submit(sessionId, submission());
+      h.loop.complete('fake-run-1');
+      // Adopting stores no running revision: only the coaching run holds the slot.
+      await startImprove(sessionId, { baseRevisionId: graded.data.id, maxIterations: 2 });
+
+      const held = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(held.body.data.inFlight).toEqual({
+        kind: 'coach',
+        runId: 'fake-run-2',
+        revisionNumber: 1,
+      });
+      const refusal = 'The coach is still revising from revision #1 — wait for it to finish.';
+      const submitted = await submit(sessionId, submission());
+      expect(submitted.status).toBe(409);
+      expect((submitted.body as unknown as ApiErrorResponse).message).toBe(refusal);
+      const again = await startImprove(sessionId, { baseRevisionId: graded.data.id });
+      expect(again.status).toBe(409);
+      expect((again.body as unknown as ApiErrorResponse).message).toBe(refusal);
+      const fromDraft = await startImprove(sessionId, submission());
+      expect(fromDraft.status).toBe(409);
+      expect(h.loop.startRequests).toHaveLength(2);
+
+      // Its first iteration is recorded, but the run is still revising: still held.
+      h.loop.progress('fake-run-2');
+      expect((await submit(sessionId, submission())).status).toBe(409);
+
+      h.loop.complete('fake-run-2', [{ overall: 70, artifact: coached() }]);
+      const free = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
+      expect(free.body.data.inFlight).toBeNull();
+      expect((await submit(sessionId, submission())).status).toBe(201);
+    });
+
+    it('[DEL-3] a running coach’s finished iterations are listed and imported as they land, and it stops only when the run does', async () => {
+      const { sessionId } = await startSession();
+      const started = await startImprove(sessionId, { ...submission(), maxIterations: 3 });
+      const baseId = started.body.data.revision.id;
+
+      h.loop.progress('fake-run-1', [{ overall: 60, decision: 'revise' }]);
+      const first = await readImprove(sessionId, 'fake-run-1');
+      expect(first.body.data).toMatchObject({ status: 'running', stopReason: null });
+      expect(first.body.data.iterations).toEqual([
+        expect.objectContaining({ iteration: 1, overall: 60, outcome: 'base', revisionId: baseId }),
+      ]);
+      // The base's grade is final once recorded, though the coach is still revising.
+      const base = await evaluation(baseId);
+      expect(base.body.data).toMatchObject({ status: 'complete', overall: 60, stopReason: null });
+
+      h.loop.progress('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+      ]);
+      const second = await readImprove(sessionId, 'fake-run-1');
+      expect(second.body.data.status).toBe('running');
+      expect(second.body.data.iterations[1]).toMatchObject({
+        iteration: 2,
+        overall: 72,
+        outcome: 'imported',
+      });
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.data[0]).toMatchObject({
+        revisionNumber: 2,
+        origin: 'assistant',
+        evaluation: { iteration: 2, status: 'complete', overall: 72 },
+      });
+
+      h.loop.complete('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+        { overall: 70, decision: 'revise', artifact: coached() },
+      ]);
+      const done = await readImprove(sessionId, 'fake-run-1');
+      expect(done.body.data).toMatchObject({ status: 'complete', stopReason: 'max-iterations' });
+      expect(done.body.data.iterations[1].revisionId).toBe(
+        second.body.data.iterations[1].revisionId,
+      );
+      // The base is not the iteration that ended the run: its grade carries no stop reason.
+      expect((await evaluation(baseId)).body.data.stopReason).toBeNull();
+    });
+
+    it('[DEL-3] an iteration with no artifact is its own outcome: unscored, never “not better”, never the design’s fault', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 2 });
+      h.loop.complete('fake-run-1', [
+        { overall: 12, decision: 'revise' },
+        { overall: 0, decision: 'escalate', artifact: null },
+      ]);
+      const { body } = await readImprove(sessionId, 'fake-run-1');
+      expect(body.data.iterations[1]).toEqual({
+        iteration: 2,
+        mode: 'revise',
+        overall: null,
+        decision: 'escalate',
+        reason: 'fake',
+        outcome: 'no-artifact',
+        problems: [],
+        revisionId: null,
+      });
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(1);
+    });
+
     it('404s for a run that is not this session’s, 400 for more iterations than the loop allows', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
@@ -904,10 +1019,13 @@ describe('sessions', () => {
       const sessions = await call<ListSessionsResponse>(`${h.url}/sessions`);
       expect(sessions.body.data[0]).toMatchObject({
         id: sessionId,
+        promptTitle: 'Serve a unified order history',
         revisionCount: 2,
         latestRevisionNumber: 2,
         latestEvaluationStatus: 'running',
       });
+      // A list row costs no grader read: what holds the slot is a single session's to say.
+      expect(sessions.body.data[0]).not.toHaveProperty('inFlight');
     });
 
     it('filters sessions by promptId', async () => {

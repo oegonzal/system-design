@@ -6,7 +6,7 @@ import type {
   DesignNarrative,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
-  DesignSessionDto,
+  DesignSessionDetailDto,
   EvaluationDto,
   EvaluationFindingDto,
   ExperienceProfileDto,
@@ -72,6 +72,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     criteria: makeCriteria(),
     source: 'authored',
     status: 'active',
+    rubricLocked: false,
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
@@ -259,10 +260,13 @@ export function makeExperience(
   };
 }
 
-export function makeSession(overrides: Partial<DesignSessionDto> = {}): DesignSessionDto {
+export function makeSession(
+  overrides: Partial<DesignSessionDetailDto> = {},
+): DesignSessionDetailDto {
   return {
     id: 'session-1',
     promptId: 'prompt-1',
+    promptTitle: 'Design an order-history service',
     status: 'in-progress',
     revisionCount: 1,
     latestRevisionNumber: 1,
@@ -270,6 +274,7 @@ export function makeSession(overrides: Partial<DesignSessionDto> = {}): DesignSe
     latestDecision: 'revise',
     latestEvaluationStatus: 'complete',
     draft: null,
+    inFlight: null,
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
@@ -344,6 +349,7 @@ export function makeCriterionResult(
     result: 'pass',
     confidence: 'high',
     rationale: 'The binding traces the read from the client to the orders database.',
+    locations: [],
     ...overrides,
   };
 }
@@ -372,6 +378,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
       makeCriterionResult({ criterionId: 'c5', result: 'pass', confidence: 'high' }),
     ],
     stopReason: 'max-iterations',
+    degraded: [],
     error: null,
     ...overrides,
   };

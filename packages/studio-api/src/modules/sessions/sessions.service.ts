@@ -9,16 +9,20 @@ import { LockMode, UniqueConstraintViolationException } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
+  describeInFlight,
+  PROMPT_COPY,
   type AdoptedIterationRef,
   type Decision,
   type DesignSubmission,
   type QualityRunStartedDto,
   type QualityRunStatus,
   type SessionDraft,
+  type SessionInFlightDto,
   type SessionStatus,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
+  CoachingRun,
   createRevision,
   DesignRevision,
   DesignSession,
@@ -30,7 +34,7 @@ import { PromptsService } from '../prompts/prompts.service';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { EvaluationsService } from './evaluations.service';
 import type { ListRevisionsQueryInput, ListSessionsQueryInput } from './session-requests';
-import type { SessionWithLatest } from './sessions.mapper';
+import type { SessionDetail, SessionWithLatest } from './sessions.mapper';
 import { submissionProblems } from './submission';
 
 /** The terminal values an import already knows, written with the row instead of after it. */
@@ -57,7 +61,7 @@ export type LockedWork<T> = (
  * row stores the run's id. The studio checks structure and stores; the loop
  * judges. Every write that starts a run happens under a lock on the session
  * row, so two submits (or a submit and a coach start) on one session are
- * serialised: the second sees the first's running grade and is refused.
+ * serialised: the second sees the first's run in flight and is refused.
  */
 @Injectable()
 export class SessionsService {
@@ -68,19 +72,19 @@ export class SessionsService {
     private readonly evaluations: EvaluationsService,
   ) {}
 
-  async create(promptId: string): Promise<DesignSession> {
+  async create(promptId: string): Promise<SessionDetail> {
     const prompt = await this.em.findOne(Prompt, promptId);
     if (!prompt) {
       throw new UnprocessableEntityException(`Unknown promptId: ${promptId}`);
     }
     if (prompt.status === 'archived') {
-      throw new UnprocessableEntityException('prompt is archived — reactivate it first');
+      throw new UnprocessableEntityException(PROMPT_COPY.archived);
     }
 
     const session = this.em.create(DesignSession, { prompt });
     this.em.persist(session);
     await this.em.flush();
-    return session;
+    return this.detail({ session, latestRevision: null });
   }
 
   async list(query: ListSessionsQueryInput): Promise<[SessionWithLatest[], number]> {
@@ -88,9 +92,10 @@ export class SessionsService {
       DesignSession,
       { ...(query.promptId ? { prompt: query.promptId } : {}) },
       {
-        // Populated for revisionCount and the latest revision's cached grade;
-        // pages are 5–50 rows, so an in-memory fold beats a bespoke aggregate.
-        populate: ['revisions'],
+        // Populated for revisionCount, the latest revision's cached grade and
+        // the prompt's title; pages are 5–50 rows, so an in-memory fold beats
+        // a bespoke aggregate.
+        populate: ['revisions', 'prompt'],
         limit: query.limit,
         offset: query.offset,
         orderBy: { updatedAt: 'desc', id: 'asc' },
@@ -99,17 +104,27 @@ export class SessionsService {
     return [sessions.map(withLatest), total];
   }
 
-  async findOne(id: string): Promise<SessionWithLatest> {
-    const session = await this.em.findOne(DesignSession, id, { populate: ['revisions'] });
+  async findOne(id: string): Promise<SessionDetail> {
+    return this.detail(await this.load(id));
+  }
+
+  async updateStatus(id: string, status: SessionStatus): Promise<SessionDetail> {
+    const found = await this.load(id);
+    found.session.status = status;
+    await this.em.flush();
+    return this.detail(found);
+  }
+
+  private async load(id: string): Promise<SessionWithLatest> {
+    const session = await this.em.findOne(DesignSession, id, {
+      populate: ['revisions', 'prompt'],
+    });
     if (!session) throw new NotFoundException(`Session ${id} not found`);
     return withLatest(session);
   }
 
-  async updateStatus(id: string, status: SessionStatus): Promise<SessionWithLatest> {
-    const found = await this.findOne(id);
-    found.session.status = status;
-    await this.em.flush();
-    return found;
+  private async detail(found: SessionWithLatest): Promise<SessionDetail> {
+    return { ...found, inFlight: await this.inFlight(this.em, found.session) };
   }
 
   /**
@@ -167,7 +182,7 @@ export class SessionsService {
       );
     }
     if (prompt.status === 'archived') {
-      throw new UnprocessableEntityException('prompt is archived — reactivate it first');
+      throw new UnprocessableEntityException(PROMPT_COPY.archived);
     }
   }
 
@@ -181,25 +196,47 @@ export class SessionsService {
     if (problems.length > 0) throw new UnprocessableEntityException(problems);
   }
 
-  /**
-   * One grade at a time per session. The cache says `running` until someone
-   * reads the evaluation, so a latest revision that says so is asked of the
-   * loop first — a grade that finished unread is not in flight.
-   */
+  /** One run at a time per session: a submit or a coach start is refused while another holds the slot. */
   async assertNoGradeInFlight(em: EntityManager, session: DesignSession): Promise<void> {
+    const inFlight = await this.inFlight(em, session);
+    if (inFlight !== null) throw new ConflictException(describeInFlight(inFlight));
+  }
+
+  /**
+   * The run holding the session's one grading slot, asked of the loop rather
+   * than of a cache. A coaching run comes first: it grades as it revises,
+   * from a draft or from an adopted grade alike, and only the newest can be
+   * live, since each start was refused while another was. Then the latest
+   * revision's grade — its cache says `running` until someone reads the
+   * evaluation, so a grade that finished unread is not in flight.
+   */
+  private async inFlight(
+    em: EntityManager,
+    session: DesignSession,
+  ): Promise<SessionInFlightDto | null> {
+    const coaching = await em.findOne(
+      CoachingRun,
+      { session: session.id },
+      { orderBy: { startedAt: 'desc', runId: 'desc' }, populate: ['baseRevision'] },
+    );
+    if (coaching !== null && (await this.loop.getRun(coaching.runId))?.status === 'running') {
+      return {
+        kind: 'coach',
+        runId: coaching.runId,
+        revisionNumber: coaching.baseRevision.revisionNumber,
+      };
+    }
     const latest = await em.findOne(
       DesignRevision,
       { session: session.id },
       { orderBy: { revisionNumber: 'desc' } },
     );
-    if (latest === null || latest.evaluationStatus !== 'running') return;
-    if (latest.qualityRunId === null) return;
+    if (latest === null || latest.evaluationStatus !== 'running') return null;
+    if (latest.qualityRunId === null) return null;
     const grade = await this.evaluations.syncRevision(latest, em);
-    if (grade.status === 'running') {
-      throw new ConflictException(
-        `revision #${latest.revisionNumber} is still being graded — wait for its verdict`,
-      );
-    }
+    return grade.status === 'running'
+      ? { kind: 'grade', runId: latest.qualityRunId, revisionNumber: latest.revisionNumber }
+      : null;
   }
 
   /** One `system-design-canvas` run on the prompt's fixed rubric: over a submission, or from a recorded iteration. */

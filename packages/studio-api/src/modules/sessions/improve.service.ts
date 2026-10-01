@@ -8,16 +8,15 @@ import {
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
+  describeInFlight,
   designSubmissionSchema,
   MAX_IMPROVE_ITERATIONS,
   type CoachingRunSummaryDto,
-  type Decision,
   type DesignSubmission,
   type ImproveIterationDto,
   type ImproveIterationOutcome,
   type ImproveRunDto,
   type IterationTrace,
-  type QualityRunStatus,
   type StartImproveDto,
   type StartImproveRequest,
   type SuccessCriterion,
@@ -25,17 +24,11 @@ import {
 import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sysdesign/db';
 
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { iterationGrade } from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
-import { SessionsService } from './sessions.service';
+import { SessionsService, type RevisionCache } from './sessions.service';
 import { submissionProblems } from './submission';
-
-/** The terminal values an iteration's revision caches. */
-interface IterationCache {
-  status: QualityRunStatus;
-  overall: number;
-  decision: Decision;
-}
 
 /**
  * The coach: the same run as a grade, allowed to iterate. It starts from
@@ -43,9 +36,10 @@ interface IterationCache {
  * iteration 1 — or from a graded revision, whose recorded grade the loop
  * adopts verbatim as iteration 1 so nothing is graded twice or stored
  * twice. Every later iteration that beat everything before it is imported
- * once as an assistant revision when the run is read, so a timeline shows
- * the author's design and the coach's improvements in one sequence, each
- * with its own grade. Every run is recorded on the session, so a reloaded
+ * once as an assistant revision when the run is read — while it runs, as
+ * soon as the loop has recorded the iteration — so a timeline shows the
+ * author's design and the coach's improvements in one sequence, each with
+ * its own grade. Every run is recorded on the session, so a reloaded
  * workspace finds what to poll.
  */
 @Injectable()
@@ -125,7 +119,11 @@ export class ImproveService {
     const grade = await this.evaluations.syncRevision(base);
     if (grade.status === 'running') {
       throw new ConflictException(
-        `revision #${base.revisionNumber} is still being graded — wait for its verdict`,
+        describeInFlight({
+          kind: 'grade',
+          runId: base.qualityRunId,
+          revisionNumber: base.revisionNumber,
+        }),
       );
     }
     if (grade.status !== 'complete') {
@@ -175,6 +173,9 @@ export class ImproveService {
     // The base's grade is this run's own only on the draft path; an adopted
     // base keeps the grade of the run it came from, whatever became of this one.
     const ownsBase = base.qualityRunId === runId;
+    // A running run's trace holds the iterations finished so far; each is
+    // final once recorded, so it is imported now rather than at run end.
+    const recorded = run.trace?.iterations ?? [];
     const header = {
       runId,
       sessionId,
@@ -183,10 +184,10 @@ export class ImproveService {
       status: run.status,
       llm: run.llm,
       exchangeCount: run.exchanges.length,
-      stopReason: run.trace?.stopReason ?? null,
+      stopReason: run.status === 'complete' ? (run.trace?.stopReason ?? null) : null,
       error: run.error?.message ?? null,
     };
-    if (run.trace === null) {
+    if (recorded.length === 0) {
       if (run.status === 'failed' && ownsBase && base.evaluationStatus !== 'failed') {
         base.evaluationStatus = 'failed';
         await this.em.flush();
@@ -202,13 +203,9 @@ export class ImproveService {
     const criteria = coaching.session.prompt.criteria;
     const iterations: ImproveIterationDto[] = [];
     let bestBefore = Number.NEGATIVE_INFINITY;
-    for (const it of run.trace.iterations) {
-      const overall = it.decision.scores.overall;
-      const cache: IterationCache = {
-        status: run.status,
-        overall,
-        decision: it.decision.finalDecision,
-      };
+    for (const it of recorded) {
+      const cache: RevisionCache = { status: 'complete', ...iterationGrade(it) };
+      const { overall } = cache;
       let revision: DesignRevision | null = null;
       let outcome: ImproveIterationOutcome = 'not-better';
       let problems: string[] = [];
@@ -219,7 +216,10 @@ export class ImproveService {
       } else if ((revision = stored.get(it.iteration) ?? null) !== null) {
         outcome = 'imported';
         writeCache(revision, cache);
-      } else if (it.artifact !== null && overall > bestBefore) {
+      } else if (it.artifact === null) {
+        // The coach produced nothing to judge: no score, and no verdict on the design.
+        outcome = 'no-artifact';
+      } else if (overall !== null && overall > bestBefore) {
         const imported = await this.import(sessionId, runId, it, criteria, cache);
         if ('revision' in imported) {
           revision = imported.revision;
@@ -239,7 +239,7 @@ export class ImproveService {
         problems,
         revisionId: revision?.id ?? null,
       });
-      bestBefore = Math.max(bestBefore, overall);
+      if (overall !== null) bestBefore = Math.max(bestBefore, overall);
     }
     await this.em.flush();
     return { ...header, iterations };
@@ -257,7 +257,7 @@ export class ImproveService {
     runId: string,
     it: IterationTrace,
     criteria: readonly SuccessCriterion[],
-    cache: IterationCache,
+    cache: RevisionCache,
   ): Promise<{ revision: DesignRevision } | { problems: string[] }> {
     const parsed = designSubmissionSchema.safeParse(it.artifact);
     if (!parsed.success) {
@@ -300,7 +300,7 @@ export class ImproveService {
   }
 }
 
-function writeCache(revision: DesignRevision, cache: IterationCache): void {
+function writeCache(revision: DesignRevision, cache: RevisionCache): void {
   revision.evaluationStatus = cache.status;
   revision.overall = cache.overall;
   revision.decision = cache.decision;

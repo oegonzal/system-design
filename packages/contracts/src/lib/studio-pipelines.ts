@@ -24,5 +24,24 @@ export const CANVAS_CRITERION_KINDS = [
 ] as const;
 export type CanvasCriterionKind = (typeof CANVAS_CRITERION_KINDS)[number];
 
+/** What a reader calls each canvas criterion kind — a heading, a badge, an export column. */
+export const CANVAS_CRITERION_KIND_LABELS = {
+  functional: 'Functional',
+  non_functional: 'Non-functional',
+  scale: 'Scale',
+  constraint: 'Constraint',
+} as const satisfies Record<CanvasCriterionKind, string>;
+
+const isCanvasCriterionKind = (kind: string): kind is CanvasCriterionKind =>
+  (CANVAS_CRITERION_KINDS as readonly string[]).includes(kind);
+
+/**
+ * The declared label of a criterion kind, or null for a kind the canvas
+ * pipeline does not declare — kinds are an open vocabulary on a pipeline, so
+ * a reader falls back to the token itself rather than branching on it.
+ */
+export const canvasCriterionKindLabel = (kind: string): string | null =>
+  isCanvasCriterionKind(kind) ? CANVAS_CRITERION_KIND_LABELS[kind] : null;
+
 /** The canvas pipeline's `maxCriteria`; a rubric above it is refused by the loop. */
 export const CANVAS_MAX_CRITERIA = 24;

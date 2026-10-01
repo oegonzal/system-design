@@ -96,7 +96,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'UX-14',
     statement:
-      'A prompt shows its markdown rendered and its criteria as chips grouped by kind; a written or imported prompt’s criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been graded against them, while a generated prompt’s are its draft’s and are never re-derived; a rewrite derives once and makes the prompt authored; a session whose prompt was archived still reads but takes no submit and no coach until the prompt is back.',
+      'A prompt shows its markdown rendered and its criteria as chips grouped by kind; a written or imported prompt’s criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been started on them — every read says when that has locked them — while a generated prompt’s are its draft’s and are never re-derived; a rewrite derives once and makes the prompt authored; a session whose prompt was archived still reads but takes no submit and no coach until the prompt is back.',
   },
   {
     id: 'UX-15',
@@ -104,7 +104,11 @@ export const CRITERIA: readonly Criterion[] = [
       'The unsubmitted canvas is a draft kept with the session: it autosaves shape-checked only, is restored ahead of the latest revision when the workspace opens, is cleared by the submit or coach start it became, and the workspace asks before a pending save is lost.',
   },
   // STAR repository
-  { id: 'STAR-1', statement: 'STAR stories support create, read, update and delete.' },
+  {
+    id: 'STAR-1',
+    statement:
+      'STAR stories support create, read, update and delete; a story is saved only with a title and all four sections filled and its tags bounded, by one rule the API and the form share.',
+  },
   { id: 'STAR-2', statement: 'Stories are searchable and filterable by tag.' },
   { id: 'STAR-3', statement: 'A story can link to a prompt and an experience.' },
   // Grading delegated to the quality loop
@@ -121,12 +125,12 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-3',
     statement:
-      "The coach is a revise run recorded on its session: it starts from the draft, stored as the author's revision, or from a graded revision whose recorded grade the loop adopts verbatim; every iteration that beat the ones before it is imported once as an assistant revision with its own grade, and one the studio would refuse is reported refused with its problems and never stored.",
+      "The coach is a revise run recorded on its session: it starts from the draft, stored as the author's revision, or from a graded revision whose recorded grade the loop adopts verbatim; every iteration that beat the ones before it is imported once, as soon as the loop has recorded it, as an assistant revision with its own grade; one the studio would refuse is reported refused with its problems and never stored, and one with no artifact is reported as such, unscored; while the run is in flight the session takes no submit and no second coach, and says so.",
   },
   {
     id: 'DEL-4',
     statement:
-      "The grade the studio shows is the run's, read for one iteration and grounded by position onto the graded graph; the studio invents no score, decision or dimension and caches only the terminal scalars.",
+      "The grade the studio shows is the run's, read for one iteration and grounded by position onto the graded graph; the studio invents no score, decision or dimension, says which lens samples answered nothing, gives the stop reason only to the iteration that ended the run, and caches only the terminal scalars.",
   },
   {
     id: 'DEL-5',

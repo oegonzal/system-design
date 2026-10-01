@@ -39,6 +39,8 @@ export interface RevisionEvaluationRef {
 export interface DesignSessionDto {
   id: Uuid;
   promptId: Uuid;
+  /** The practised prompt's title, so a list row says what was practised. */
+  promptTitle: string;
   status: SessionStatus;
   revisionCount: number;
   latestRevisionNumber: number | null;
@@ -49,6 +51,46 @@ export interface DesignSessionDto {
   draft: SessionDraft | null;
   createdAt: IsoDateString;
   updatedAt: IsoDateString;
+}
+
+/**
+ * What can hold a session's one grading slot: a submitted revision's grade,
+ * or a coaching run — which grades as it revises, from a draft or from an
+ * adopted grade alike.
+ */
+export const IN_FLIGHT_KINDS = ['grade', 'coach'] as const;
+export type InFlightKind = (typeof IN_FLIGHT_KINDS)[number];
+
+/**
+ * The run holding a session's grading slot. While one is, the session takes
+ * no submit and no coach start: the API refuses both (409) with
+ * `describeInFlight`, and a client disables both with the same sentence.
+ */
+export interface SessionInFlightDto {
+  kind: InFlightKind;
+  runId: string;
+  /** The revision being graded, or the one the coach started from. */
+  revisionNumber: number;
+}
+
+const IN_FLIGHT_COPY: Record<InFlightKind, (revisionNumber: number) => string> = {
+  grade: (revisionNumber) =>
+    `Revision #${revisionNumber} is still being graded — wait for its verdict.`,
+  coach: (revisionNumber) =>
+    `The coach is still revising from revision #${revisionNumber} — wait for it to finish.`,
+};
+
+/** Why the session takes no submit and no coach start right now — the API's refusal and a client's disabled reason. */
+export const describeInFlight = (inFlight: SessionInFlightDto): string =>
+  IN_FLIGHT_COPY[inFlight.kind](inFlight.revisionNumber);
+
+/**
+ * One session as `GET`, `POST` and `PATCH /sessions[/:id]` answer it: the
+ * list row plus the run holding its grading slot, asked of the grader at
+ * read time. Lists leave it out — it costs a grader read per session.
+ */
+export interface DesignSessionDetailDto extends DesignSessionDto {
+  inFlight: SessionInFlightDto | null;
 }
 
 /** Full revision — graph included. Immutable once submitted. */
@@ -124,14 +166,23 @@ export const MAX_IMPROVE_ITERATIONS = MAX_QUALITY_RUN_ITERATIONS;
 /**
  * What became of one iteration in the studio: the base the run started from,
  * an assistant revision imported because it beat every earlier one, a lower
- * score left where it was, or an artifact the studio would not store.
+ * score left where it was, an artifact the studio would not store, or no
+ * artifact at all — the coach produced nothing to judge, so nothing was
+ * scored and the design is not to blame.
  */
-export const IMPROVE_ITERATION_OUTCOMES = ['base', 'imported', 'not-better', 'refused'] as const;
+export const IMPROVE_ITERATION_OUTCOMES = [
+  'base',
+  'imported',
+  'not-better',
+  'refused',
+  'no-artifact',
+] as const;
 export type ImproveIterationOutcome = (typeof IMPROVE_ITERATION_OUTCOMES)[number];
 
 export interface ImproveIterationDto {
   iteration: number;
   mode: IterationMode;
+  /** The controller's score; null when the iteration had no artifact or assessed nothing. */
   overall: number | null;
   decision: Decision | null;
   /** The controller's own sentence for its decision. */
@@ -151,9 +202,11 @@ export interface ImproveRunDto {
   maxIterations: number;
   status: QualityRunStatus;
   llm: LlmModelDto;
-  /** Model calls made so far — the only live signal while the loop runs. */
+  /** Model calls made so far — a live signal between iterations. */
   exchangeCount: number;
+  /** Every iteration the run has recorded — while it runs, the ones finished so far. */
   iterations: ImproveIterationDto[];
+  /** Why the run stopped; null until it has completed. */
   stopReason: StopReason | null;
   error: string | null;
 }
@@ -169,7 +222,7 @@ export type PutSessionDraftRequest = SessionDraft;
 export type GetSessionDraftResponse = ApiResponse<SessionDraft | null>;
 
 export type ListSessionsResponse = ApiListResponse<DesignSessionDto>;
-export type GetSessionResponse = ApiResponse<DesignSessionDto>;
+export type GetSessionResponse = ApiResponse<DesignSessionDetailDto>;
 export type ListRevisionsResponse = ApiListResponse<DesignRevisionSummaryDto>;
 export type GetRevisionResponse = ApiResponse<DesignRevisionDto>;
 export type StartImproveResponse = ApiResponse<StartImproveDto>;

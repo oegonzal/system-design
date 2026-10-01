@@ -164,6 +164,11 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     this.core.complete(runId, iterations);
   }
 
+  /** Record the iterations a still-running run has finished so far; it stays running. */
+  progress(runId: string, iterations: readonly FakeIteration[] = []): void {
+    this.core.progress(runId, iterations);
+  }
+
   fail(runId: string, message: string): void {
     this.core.fail(runId, message);
   }

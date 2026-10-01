@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CanvasGraph, DesignSubmission, QualityRunDto } from '@sysdesign/contracts';
 
 import { FakeQualityLoopClient } from '../../test/fake-quality-loop.client';
-import { toEvaluationDto } from './evaluation.mapper';
+import { iterationStatus, toEvaluationDto } from './evaluation.mapper';
 
 const graph: CanvasGraph = {
   nodes: [
@@ -19,7 +19,7 @@ const submission: DesignSubmission = {
   brief: { version: 1, bindings: [{ criterionId: 'c1', nodeIds: ['api'], claim: 'served' }] },
   narrative: {
     version: 1,
-    componentRationales: [],
+    componentRationales: [{ nodeId: 'db', prose: 'the store of record' }],
     criterionNarrations: [{ criterionId: 'c2', prose: 'sized for the peak' }],
   },
 };
@@ -93,7 +93,7 @@ async function finishedRun(): Promise<QualityRunDto> {
             result: 'partial',
             confidence: 'high',
             locationRefs: ['node.2'],
-            rationale: 'sized, but not for the peak',
+            rationale: 'sized, but narration.1 says peak while edge.1 and node.12 carry none',
           },
         ],
         advisoryVerdict: null,
@@ -121,11 +121,11 @@ describe('toEvaluationDto', () => {
       expect.objectContaining({
         id: 'scale_mismatch|binding.1,edge.1,node.2,node.9',
         locations: [
-          { ref: 'binding.1', label: 'c1 ← api', part: 'binding', key: 'c1' },
+          { ref: 'binding.1', label: 'c1 binding (api)', part: 'binding', key: 'c1' },
           { ref: 'edge.1', label: 'e-1 · client → api (sync)', part: 'edge', key: 'e-1' },
           { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' },
           // node.9 names nothing on the revision and is placed nowhere.
-          { ref: 'narration.1', label: 'c2', part: 'narration', key: 'c2' },
+          { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
         ],
         nodeIds: ['api'],
         edgeIds: ['e-1'],
@@ -137,14 +137,104 @@ describe('toEvaluationDto', () => {
       }),
     ]);
     expect(dto.criterionResults).toEqual([
-      { criterionId: 'c1', result: 'pass', confidence: 'high', rationale: null },
+      { criterionId: 'c1', result: 'pass', confidence: 'high', rationale: null, locations: [] },
       {
         criterionId: 'c2',
         result: 'partial',
         confidence: 'high',
-        rationale: 'sized, but not for the peak',
+        rationale: 'sized, but narration.1 says peak while edge.1 and node.12 carry none',
+        // The sample's own ref, then every id its prose names that the revision has — so the
+        // studio can read the prose in labels. node.12 names nothing here and is not invented.
+        locations: [
+          { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' },
+          { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
+          { ref: 'edge.1', label: 'e-1 · client → api (sync)', part: 'edge', key: 'e-1' },
+        ],
       },
     ]);
+    expect(dto.degraded).toEqual([]);
+  });
+
+  it('[DEL-4] a lens sample that answered nothing is reported, so a grade made without it says so', async () => {
+    const run = await finishedRun();
+    if (!run.trace) throw new Error('the fake completes synchronously');
+    const [it] = run.trace.iterations;
+    it.critics.push({
+      report: null,
+      diagnostic: { stage: 'critic.scale', sample: 2, reason: 'llm-failed', detail: 'timed out' },
+    });
+    it.evaluators.push({
+      report: null,
+      diagnostic: { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped', detail: null },
+    });
+    expect(toEvaluationDto(run, 1, submission).degraded).toEqual([
+      { stage: 'critic.scale', sample: 2, reason: 'llm-failed' },
+      { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped' },
+    ]);
+  });
+
+  it('[DEL-4] why the run stopped belongs to the iteration that ended it, never to an earlier one', async () => {
+    const loop = new FakeQualityLoopClient();
+    const { runId } = await loop.startRun({
+      pipeline: 'system-design-canvas',
+      goal: 'g',
+      output: { graph, brief: null, narrative: null },
+      criteria: [{ id: 'c1', kind: 'functional', statement: 'one' }],
+      maxIterations: 2,
+    });
+    loop.complete(runId, [
+      { overall: 12, decision: 'revise' },
+      { overall: 0, decision: 'escalate', artifact: null },
+    ]);
+    const run = await loop.getRun(runId);
+    if (!run?.trace) throw new Error('the fake completes synchronously');
+    run.trace.stopReason = 'escalated';
+
+    expect(toEvaluationDto(run, 1, submission)).toMatchObject({ overall: 12, stopReason: null });
+    // The iteration that ended the run carries the reason — and no artifact earns no score.
+    expect(toEvaluationDto(run, 2, submission)).toMatchObject({
+      status: 'complete',
+      overall: null,
+      decision: 'escalate',
+      stopReason: 'escalated',
+    });
+  });
+
+  it('[DEL-4] an iteration a running run has recorded is complete; one it has not is still running', async () => {
+    const loop = new FakeQualityLoopClient();
+    const { runId } = await loop.startRun({
+      pipeline: 'system-design-canvas',
+      goal: 'g',
+      output: { graph, brief: null, narrative: null },
+      criteria: [{ id: 'c1', kind: 'functional', statement: 'one' }],
+      maxIterations: 3,
+    });
+    loop.progress(runId, [{ overall: 40, decision: 'revise' }]);
+    const run = await loop.getRun(runId);
+    if (!run) throw new Error('the fake keeps every run');
+
+    expect(iterationStatus(run, 1)).toBe('complete');
+    expect(toEvaluationDto(run, 1, submission)).toMatchObject({
+      status: 'complete',
+      overall: 40,
+      stopReason: null,
+      error: null,
+    });
+    expect(iterationStatus(run, 2)).toBe('running');
+    expect(toEvaluationDto(run, 2, submission)).toMatchObject({
+      status: 'running',
+      overall: null,
+      error: null,
+    });
+
+    loop.fail(runId, 'the model went away');
+    const failed = await loop.getRun(runId);
+    if (!failed) throw new Error('the fake keeps every run');
+    expect(toEvaluationDto(failed, 1, submission).status).toBe('complete');
+    expect(toEvaluationDto(failed, 2, submission)).toMatchObject({
+      status: 'failed',
+      error: 'the model went away',
+    });
   });
 
   it('[DEL-4] an iteration where nothing was assessed has a null overall — never the controller’s zero', async () => {
@@ -190,6 +280,7 @@ describe('toEvaluationDto', () => {
       findings: [],
       criterionResults: [],
       stopReason: null,
+      degraded: [],
       error: null,
     });
   });

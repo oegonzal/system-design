@@ -8,7 +8,10 @@ import { nodeLabel } from './node-label';
  * are numbered UNFILTERED, so `binding.3` is the third binding whatever it
  * says; the label is what a reader sees, and `key` is the author's own id
  * (a node id, an edge id, a criterion id) so a consumer can highlight the
- * part without parsing the label.
+ * part without parsing the label. A label names its part — "c1 binding
+ * (n-2)", "Orders API rationale (n-2)", "c1 narration" — because a reader
+ * meets it substituted into a lens's prose, where a bare `c1` or `n-2` would
+ * read as the criterion or the node itself.
  */
 export const SUBMISSION_PARTS = [
   'node',
@@ -45,6 +48,12 @@ const numbered = <I>(
 export function submissionLocations(submission: DesignSubmission): SubmissionLocation[] {
   const { graph, brief, narrative } = submission;
   const overview = narrative?.overview?.trim() ?? '';
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  /** A rationale names the node it explains — by its label when the node is drawn. */
+  const explained = (nodeId: string): string => {
+    const node = nodes.get(nodeId);
+    return node ? `${nodeLabel(node)} rationale (${nodeId})` : `${nodeId} rationale`;
+  };
   return [
     ...numbered(
       'node',
@@ -61,7 +70,10 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
     ...numbered(
       'binding',
       brief?.bindings ?? [],
-      (binding) => `${binding.criterionId} ← ${binding.nodeIds.join(', ')}`,
+      (binding) =>
+        binding.nodeIds.length > 0
+          ? `${binding.criterionId} binding (${binding.nodeIds.join(', ')})`
+          : `${binding.criterionId} binding`,
       (binding) => binding.criterionId,
     ),
     ...(overview.length > 0
@@ -70,14 +82,35 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
     ...numbered(
       'rationale',
       narrative?.componentRationales ?? [],
-      (item) => item.nodeId,
+      (item) => explained(item.nodeId),
       (item) => item.nodeId,
     ),
     ...numbered(
       'narration',
       narrative?.criterionNarrations ?? [],
-      (item) => item.criterionId,
+      (item) => `${item.criterionId} narration`,
       (item) => item.criterionId,
     ),
   ];
+}
+
+const escapeRegExp = (literal: string): string => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * A global pattern matching any of `ids` as a whole token — longest first, so
+ * a listed `node.1` never matches inside the `node.12` beside it. Matching is
+ * against the ids a submission actually has, never a guess at what looks
+ * like one. Null when there is nothing to match.
+ */
+export function locationRefPattern(ids: readonly string[]): RegExp | null {
+  if (ids.length === 0) return null;
+  const alternatives = [...new Set(ids)].sort((a, b) => b.length - a.length).map(escapeRegExp);
+  return new RegExp(`\\b(?:${alternatives.join('|')})(?!\\w)`, 'g');
+}
+
+/** The ids of `locations` that `prose` names, in the order it first names them. */
+export function locationIdsIn(prose: string, locations: readonly { id: string }[]): string[] {
+  const pattern = locationRefPattern(locations.map((location) => location.id));
+  if (pattern === null) return [];
+  return [...new Set(Array.from(prose.matchAll(pattern), (match) => match[0]))];
 }

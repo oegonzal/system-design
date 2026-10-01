@@ -90,6 +90,7 @@ const OUTCOME_CHIP: Record<ImproveIterationOutcome, { tone: BadgeTone; label: st
   imported: { tone: 'success', label: 'imported' },
   'not-better': { tone: 'neutral', label: 'not better' },
   refused: { tone: 'critical', label: 'refused' },
+  'no-artifact': { tone: 'neutral', label: 'no revision produced' },
 };
 
 /** The imported iteration with the highest score — the one worth loading. */

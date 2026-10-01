@@ -88,8 +88,8 @@ export class PromptsController {
   async list(
     @Query(new ZodValidationPipe(listPromptsQuerySchema)) query: ListPromptsQueryInput,
   ): Promise<ListPromptsResponse> {
-    const [items, total] = await this.prompts.list(query);
-    return page(items.map(toPromptDto), total, query);
+    const [views, total] = await this.prompts.list(query);
+    return page(views.map(toPromptDto), total, query);
   }
 
   @Get(':id')
@@ -97,7 +97,7 @@ export class PromptsController {
     return ok(toPromptDto(await this.prompts.findOne(id)));
   }
 
-  /** Re-derive the rubric; 409 once sessions cite its ids. 200: the row already existed. */
+  /** Re-derive the rubric; 409 once the prompt is locked (`rubricLocked`). 200: the row already existed. */
   @Post(':id/criteria')
   @HttpCode(200)
   async rederive(@Param('id', ParseUUIDPipe) id: string): Promise<GetPromptResponse> {

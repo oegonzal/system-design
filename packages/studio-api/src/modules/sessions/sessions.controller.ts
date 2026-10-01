@@ -40,7 +40,12 @@ import {
   type ListRevisionsQueryInput,
   type ListSessionsQueryInput,
 } from './session-requests';
-import { toRevisionDto, toRevisionSummaryDto, toSessionDto } from './sessions.mapper';
+import {
+  toRevisionDto,
+  toRevisionSummaryDto,
+  toSessionDetailDto,
+  toSessionDto,
+} from './sessions.mapper';
 import { SessionsService } from './sessions.service';
 
 @Controller('sessions')
@@ -55,8 +60,7 @@ export class SessionsController {
   async create(
     @Body(new ZodValidationPipe(createSessionSchema)) body: CreateSessionRequest,
   ): Promise<GetSessionResponse> {
-    const session = await this.sessions.create(body.promptId);
-    return ok(toSessionDto({ session, latestRevision: null }));
+    return ok(toSessionDetailDto(await this.sessions.create(body.promptId)));
   }
 
   @Get()
@@ -69,7 +73,7 @@ export class SessionsController {
 
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<GetSessionResponse> {
-    return ok(toSessionDto(await this.sessions.findOne(id)));
+    return ok(toSessionDetailDto(await this.sessions.findOne(id)));
   }
 
   @Patch(':id')
@@ -77,7 +81,7 @@ export class SessionsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateSessionSchema)) body: UpdateSessionRequest,
   ): Promise<GetSessionResponse> {
-    return ok(toSessionDto(await this.sessions.updateStatus(id, body.status)));
+    return ok(toSessionDetailDto(await this.sessions.updateStatus(id, body.status)));
   }
 
   @Get(':id/draft')
