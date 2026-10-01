@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
-
 import { StoryDetail } from '../../../features/stories/story-detail.client';
+import { pageMetadata } from '../../nav';
 
-export const metadata: Metadata = {
-  title: 'STAR story',
-  description: 'Edit one interview story.',
-};
+/** The route's title until the story loads; the page then names the tab after the story. */
+export const metadata = pageMetadata('/stories/[storyId]');
 
 export default async function StoryDetailPage({
   params,

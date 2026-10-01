@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
-
 import { PromptDetail } from '../../../features/prompts/prompt-detail.client';
+import { pageMetadata } from '../../nav';
 
-export const metadata: Metadata = {
-  title: 'Prompt',
-  description: 'The markdown and the derived criteria of one design prompt.',
-};
+/** The route's title until the prompt loads; the page then names the tab after the prompt. */
+export const metadata = pageMetadata('/prompts/[promptId]');
 
 export default async function PromptDetailPage({
   params,

@@ -14,6 +14,11 @@ export interface RouteAnnouncerProps {
  * — a live region must exist before it has anything to say — and the initial
  * page load is deliberately not announced (screen readers announce the
  * document title themselves).
+ *
+ * Every navigation empties the region and then speaks into it on the next
+ * task, so two navigations that read the same — `/prompts/a` then
+ * `/prompts/b` — are two mutations, and two announcements; setting an
+ * identical string would be no change at all.
  */
 export function RouteAnnouncer({ labelFor }: RouteAnnouncerProps) {
   const pathname = usePathname();
@@ -23,10 +28,13 @@ export function RouteAnnouncer({ labelFor }: RouteAnnouncerProps) {
   useEffect(() => {
     if (isFirst.current) {
       isFirst.current = false;
-      return;
+      return undefined;
     }
+    const announcement = `Navigated to ${labelFor(pathname) ?? pathname}`;
     // eslint-disable-next-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- announcing is inherently an effect of navigation
-    setMessage(`Navigated to ${labelFor(pathname) ?? pathname}`);
+    setMessage('');
+    const speak = setTimeout(() => setMessage(announcement), 0);
+    return () => clearTimeout(speak);
     // Only a navigation announces: `labelFor` is a lookup, and a new identity of it is not one.
   }, [pathname]);
 

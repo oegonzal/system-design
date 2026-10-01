@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, createRequest, isAbortError, query, toErrorMessage, unwrap } from './request';
+import {
+  ApiError,
+  createRequest,
+  isAbortError,
+  query,
+  readFailureOf,
+  toErrorMessage,
+  unwrap,
+} from './request';
 
 type Reply = { status?: number; body?: unknown };
 
@@ -74,6 +82,30 @@ describe('createRequest', () => {
     const opaque = await request('/things').catch((error: unknown) => error);
     expect((opaque as ApiError).message).toBe('Request failed with status 502');
     expect((opaque as ApiError).body).toBeUndefined();
+    expect((opaque as ApiError).issues).toEqual([]);
+  });
+
+  it('carries a validation 400’s issues and names each offending field in its message', async () => {
+    stubFetch({
+      status: 400,
+      body: {
+        statusCode: 400,
+        message: 'validation failed',
+        issues: [
+          { path: 'tags.1', message: 'Too big' },
+          { path: '', message: 'Unrecognized key: "extra"' },
+          { nonsense: true },
+        ],
+      },
+    });
+
+    const thrown = (await request('/things').catch((error: unknown) => error)) as ApiError;
+
+    expect(thrown.issues).toEqual([
+      { path: 'tags.1', message: 'Too big' },
+      { path: '', message: 'Unrecognized key: "extra"' },
+    ]);
+    expect(thrown.message).toBe('validation failed — tags.1: Too big; Unrecognized key: "extra"');
   });
 
   it('treats 204 responses as void', async () => {
@@ -88,7 +120,7 @@ describe('helpers', () => {
     expect(query({})).toBe('');
   });
 
-  it('isAbortError recognizes AbortError and toErrorMessage prefers ApiError copy', () => {
+  it('[WEB-1] isAbortError recognizes AbortError, and toErrorMessage speaks only the server’s copy or the fallback', () => {
     const abort = new DOMException('The operation was aborted.', 'AbortError');
     expect(isAbortError(abort)).toBe(true);
     expect(isAbortError(new Error('boom'))).toBe(false);
@@ -96,8 +128,27 @@ describe('helpers', () => {
     expect(toErrorMessage(new ApiError(500, { statusCode: 500, message: 'DB down' }), 'x')).toBe(
       'DB down',
     );
-    expect(toErrorMessage(new Error('plain'), 'fallback copy')).toBe('plain');
+    // A dropped connection is the browser's TypeError — never shown as-is.
+    expect(toErrorMessage(new TypeError('Failed to fetch'), 'fallback copy')).toBe('fallback copy');
+    expect(toErrorMessage(new Error('plain'), 'fallback copy')).toBe('fallback copy');
     expect(toErrorMessage('not-an-error', 'fallback copy')).toBe('fallback copy');
     expect(toErrorMessage(abort, 'fallback copy')).toBe('fallback copy');
+  });
+
+  it('readFailureOf calls a by-address read missing on a 404 or a malformed address, failed otherwise', () => {
+    expect(readFailureOf(new ApiError(404, { message: 'Thing x not found' }), 'f')).toEqual({
+      kind: 'missing',
+    });
+    expect(
+      readFailureOf(new ApiError(400, { message: 'Validation failed (uuid is expected)' }), 'f'),
+    ).toEqual({ kind: 'missing' });
+    expect(readFailureOf(new ApiError(503, { message: 'The store is down' }), 'f')).toEqual({
+      kind: 'failed',
+      message: 'The store is down',
+    });
+    expect(readFailureOf(new TypeError('Failed to fetch'), 'Could not reach it.')).toEqual({
+      kind: 'failed',
+      message: 'Could not reach it.',
+    });
   });
 });

@@ -10,6 +10,7 @@ import { NAV_ITEMS } from '../app/nav';
 
 const Nav = styled.nav`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: ${({ theme }) => theme.space[2]}px;
 `;

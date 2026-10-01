@@ -2,12 +2,14 @@ import { ACCENTS, COLOR_MODES, DEFAULT_APPEARANCE_SETTINGS } from '@sysdesign/co
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { APP_NAME, pageTitle } from './nav';
 import { Providers } from './providers';
 
+/** A route without its own row still carries the app's name, in the table's own form. */
 export const metadata: Metadata = {
   title: {
-    default: 'System Design Studio',
-    template: '%s · System Design Studio',
+    default: APP_NAME,
+    template: pageTitle('%s'),
   },
   description:
     'Practice distributed-systems design on an interactive canvas, graded by a critic/eval pipeline.',

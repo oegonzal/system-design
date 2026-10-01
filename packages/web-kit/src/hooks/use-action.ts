@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { toErrorMessage } from '../http/request';
+import { toErrorMessage, UNREACHABLE_COPY } from '../http/request';
 
 export interface Action<A extends unknown[], R> {
   /** Runs the write; answers its result, or null when it failed (the error is on `error`). */
@@ -39,7 +39,7 @@ export function useAction<A extends unknown[], R>(
     try {
       return await latest.current(...args);
     } catch (failure: unknown) {
-      if (mounted.current) setError(toErrorMessage(failure, 'the request failed'));
+      if (mounted.current) setError(toErrorMessage(failure, UNREACHABLE_COPY));
       return null;
     } finally {
       if (mounted.current) setPending(false);

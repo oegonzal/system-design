@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { ApiError, UNREACHABLE_COPY } from '../http/request';
 import { useResource } from './use-resource';
 
 const deferred = <T>() => {
@@ -57,19 +58,61 @@ describe('useResource', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('reports a failure as its message and clears it on the next load', async () => {
+  it('reports a failure as copy and as what was thrown, and clears both on the next load', async () => {
+    const dropped = new TypeError('Failed to fetch');
     let fail = true;
     const { result } = renderHook(() =>
       useResource(async () => {
-        if (fail) throw new Error('connection refused');
+        if (fail) throw dropped;
         return 'ok';
       }, []),
     );
-    await waitFor(() => expect(result.current.error).toBe('connection refused'));
+    // The browser's words never reach the page; the caller classifies the cause.
+    await waitFor(() => expect(result.current.error).toBe(UNREACHABLE_COPY));
+    expect(result.current.failure).toBe(dropped);
     expect(result.current.loading).toBe(false);
     fail = false;
     act(() => result.current.reload());
     await waitFor(() => expect(result.current.data).toBe('ok'));
     expect(result.current.error).toBeNull();
+    expect(result.current.failure).toBeNull();
+  });
+
+  it('words a refusal in the server’s copy, or in the caller’s fallback for the unanswered', async () => {
+    const refused = renderHook(() =>
+      useResource(
+        async () => {
+          throw new ApiError(500, { statusCode: 500, message: 'The store is down' });
+        },
+        [],
+        { fallback: 'Could not load the thing.' },
+      ),
+    );
+    await waitFor(() => expect(refused.result.current.error).toBe('The store is down'));
+
+    const dropped = renderHook(() =>
+      useResource(
+        async () => {
+          throw new TypeError('Failed to fetch');
+        },
+        [],
+        { fallback: 'Could not load the thing.' },
+      ),
+    );
+    await waitFor(() => expect(dropped.result.current.error).toBe('Could not load the thing.'));
+  });
+
+  it('takes a write’s answer in place of the loaded data without reading again', async () => {
+    let loads = 0;
+    const { result } = renderHook(() =>
+      useResource(async () => {
+        loads += 1;
+        return 'loaded';
+      }, []),
+    );
+    await waitFor(() => expect(result.current.data).toBe('loaded'));
+    act(() => result.current.replace('written'));
+    expect(result.current.data).toBe('written');
+    expect(loads).toBe(1);
   });
 });

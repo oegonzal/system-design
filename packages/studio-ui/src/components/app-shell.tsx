@@ -19,11 +19,17 @@ const Shell = styled.div`
   background: ${({ theme }) => theme.color.bg.app};
 `;
 
+/**
+ * The brand and the nav share a row while they fit; on a narrow screen the
+ * nav wraps onto its own row (and its items onto more), so the header never
+ * pushes the page sideways.
+ */
 const Header = styled.header`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: ${({ theme }) => theme.space[5]}px;
+  gap: ${({ theme }) => `${theme.space[3]}px ${theme.space[5]}px`};
   padding: ${({ theme }) => `${theme.space[4]}px ${theme.space[6]}px`};
   background: ${({ theme }) => theme.color.bg.surface};
   border-bottom: 1px solid ${({ theme }) => theme.color.border.subtle};
