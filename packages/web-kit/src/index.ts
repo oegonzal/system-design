@@ -8,7 +8,10 @@
  *
  * App-runtime only. The registry and the announcer import `next/navigation`,
  * so a story must never import this barrel — directly or through a
- * component — or the catalog's Vite build drags the Next runtime in.
+ * component — or the catalog's Vite build drags the Next runtime in. What a
+ * presentational component needs is a separate, story-safe entry instead:
+ * `@sysdesign/web-kit/clock` (the elapsed clock), never re-exported here, so
+ * each thing has one import path.
  */
 export * from './emotion-registry';
 export * from './http/request';

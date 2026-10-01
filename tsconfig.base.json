@@ -18,6 +18,7 @@
       "@sysdesign/run-dump": ["./packages/run-dump/src/index.ts"],
       "@sysdesign/studio-testing": ["./packages/studio-testing/src/index.ts"],
       "@sysdesign/web-kit": ["./packages/web-kit/src/index.ts"],
+      "@sysdesign/web-kit/clock": ["./packages/web-kit/src/clock/index.ts"],
       "@sysdesign/web-testing": ["./packages/web-testing/src/index.ts"]
     },
     "skipDefaultLibCheck": true,

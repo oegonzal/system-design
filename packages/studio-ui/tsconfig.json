@@ -17,6 +17,7 @@
       "@sysdesign/contracts": ["../contracts/src/index.ts"],
       "@sysdesign/design-system": ["../design-system/src/index.ts"],
       "@sysdesign/web-kit": ["../web-kit/src/index.ts"],
+      "@sysdesign/web-kit/clock": ["../web-kit/src/clock/index.ts"],
       "@sysdesign/web-testing": ["../web-testing/src/index.ts"]
     }
   },

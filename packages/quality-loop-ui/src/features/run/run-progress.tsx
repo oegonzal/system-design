@@ -2,26 +2,9 @@
 
 import type { QualityRunDto } from '@sysdesign/contracts';
 import { Badge, Heading, Spinner, Stack, Table, Text } from '@sysdesign/design-system';
-import { useEffect, useState } from 'react';
+import { formatElapsed, useNow } from '@sysdesign/web-kit/clock';
 
 import { OUTCOME_TONE, STATUS_TONE } from '../results/tones';
-
-/** `m:ss` — long enough for a loop of several model calls, never wider. */
-export function formatElapsed(ms: number): string {
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-/** A once-a-second clock while the run is live; frozen once it is not. */
-function useNow(live: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [live]);
-  return now;
-}
 
 const time = (iso: string): string => new Date(iso).toLocaleTimeString();
 

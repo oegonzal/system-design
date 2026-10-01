@@ -3,7 +3,6 @@ import { composeStories } from '@storybook/react';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { formatElapsed } from './run-progress';
 import * as stories from './run-progress.stories';
 
 const { Running, Complete, ModelFailed, Failed } = composeStories(stories);
@@ -38,11 +37,5 @@ describe('RunProgress', () => {
     renderWithTheme(<Failed />);
     expect(screen.getByText('failed')).toBeTruthy();
     expect(screen.getByText(/the producer returned malformed JSON/)).toBeTruthy();
-  });
-
-  it('formats elapsed time as m:ss', () => {
-    expect(formatElapsed(0)).toBe('0:00');
-    expect(formatElapsed(65_400)).toBe('1:05');
-    expect(formatElapsed(-5)).toBe('0:00');
   });
 });

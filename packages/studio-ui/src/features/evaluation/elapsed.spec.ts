@@ -1,15 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { formatElapsed, useElapsed } from './elapsed';
-
-describe('formatElapsed', () => {
-  it('prints minutes and zero-padded seconds, never negative', () => {
-    expect(formatElapsed(0)).toBe('0:00');
-    expect(formatElapsed(65_400)).toBe('1:05');
-    expect(formatElapsed(-3_000)).toBe('0:00');
-  });
-});
+import { useElapsed } from './elapsed';
 
 describe('useElapsed', () => {
   beforeEach(() => {
@@ -43,6 +35,11 @@ describe('useElapsed', () => {
 
   it('has nothing to say without a start', () => {
     const { result } = renderHook(() => useElapsed(null, true));
+    expect(result.current).toBeNull();
+  });
+
+  it('has nothing to say about a start it cannot read', () => {
+    const { result } = renderHook(() => useElapsed('not an instant', true));
     expect(result.current).toBeNull();
   });
 });
