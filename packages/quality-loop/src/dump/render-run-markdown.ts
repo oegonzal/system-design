@@ -32,8 +32,9 @@ const iterationRow = (iteration: IterationTrace<unknown>): string => {
 /** The verdict, every iteration as a row, and the last iteration's dimensions. */
 function traceSection(trace: RunTrace): string[] {
   const last = trace.iterations[trace.iterations.length - 1];
+  const stopped = trace.stopReason === null ? 'still running' : `stopped: ${trace.stopReason}`;
   return [
-    `**${trace.finalDecision}** (stopped: ${trace.stopReason}) · overall ${last.decision.scores.overall}/100 · best iteration ${trace.bestIteration}`,
+    `**${trace.finalDecision}** (${stopped}) · overall ${last.decision.scores.overall}/100 · best iteration ${trace.bestIteration}`,
     ``,
     `## Iterations`,
     ``,

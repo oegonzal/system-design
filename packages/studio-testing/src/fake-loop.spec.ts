@@ -162,6 +162,15 @@ describe('FakeLoop', () => {
     expect(running?.status).toBe('running');
     expect(running?.finishedAt).toBeNull();
     expect(running?.trace?.iterations.map((it) => it.decision.scores.overall)).toEqual([40, 55]);
+    expect(running?.trace).toMatchObject({ bestIteration: 2, stopReason: null });
+    // A running run's iterations so far are not a verdict to adopt.
+    expect(() =>
+      loop.startRun({
+        ...request(),
+        output: undefined,
+        adopt: { runId: 'fake-run-1', iteration: 1 },
+      }),
+    ).toThrow(/never completed/);
 
     loop.complete('fake-run-1', [
       { overall: 40 },
@@ -169,6 +178,7 @@ describe('FakeLoop', () => {
       { overall: 60, artifact: graph(5) },
     ]);
     expect(loop.getRun('fake-run-1')?.trace?.iterations).toHaveLength(3);
+    expect(loop.getRun('fake-run-1')?.trace?.stopReason).toBe('max-iterations');
     expect(() => loop.progress('fake-run-1', [{ overall: 1 }])).toThrow(/settled/);
   });
 

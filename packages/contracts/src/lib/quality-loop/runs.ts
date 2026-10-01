@@ -43,7 +43,12 @@ export interface QualityRunRequestSummary {
   maxIterations: number;
 }
 
-/** One run as the service reports it. `trace` is null until the loop ends; `exchanges` grow live. */
+/**
+ * One run as the service reports it; `exchanges` grow live. While `status` is
+ * `running`, `trace` holds the iterations finished so far with `stopReason`
+ * null — null itself until the first iteration lands — and it is settled,
+ * with its stop reason, once the status leaves `running`.
+ */
 export interface QualityRunDto {
   runId: string;
   pipeline: string;

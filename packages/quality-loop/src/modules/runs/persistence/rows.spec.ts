@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../../core/contracts';
+import { progressOf } from '../../../core/loop/progress';
 import { fullExchange, fullIteration, fullRecord, fullTrace, roundtrip } from './testing';
 import { progressRows, toRows } from './to-rows';
 import { toSummary } from './to-summary';
@@ -48,7 +49,7 @@ describe('the run rows', () => {
     const source = fullRecord();
     const trace = source.trace;
     if (trace === null) throw new Error('the full record carries a trace');
-    const { stopReason: _stop, ...progress } = trace;
+    const progress = { ...trace, stopReason: null };
     let a = 0;
     let b = 0;
     const closing = toRows(source, () => `iteration-${++a}`);
@@ -56,6 +57,31 @@ describe('the run rows', () => {
       criteria: closing.criteria,
       iterations: closing.iterations,
     });
+  });
+
+  it('[QL-13] a running run reads back as the progress the loop published: its iterations so far, its standing, no stop reason', () => {
+    const settled = fullTrace({
+      iterations: [fullIteration(), fullIteration({ iteration: 2, mode: 'revise' })],
+    });
+    const progress = progressOf(settled, settled.iterations);
+    if (progress === null) throw new Error('two iterations stand somewhere');
+    // Open wrote the version from the definition; progress wrote the children.
+    const header = {
+      ...toRows(fullRecord({ status: 'running', finishedAt: null, trace: null })).run,
+      pipelineVersion: settled.pipeline.version,
+    };
+    let n = 0;
+    const children = progressRows(header.id, progress, () => `iteration-${++n}`);
+
+    const running = roundtrip({ run: header, ...children }).trace;
+    expect(running).toEqual(progress);
+    // A tie keeps the earlier crown, as the loop's own gate does.
+    expect(running).toMatchObject({ bestIteration: 1, finalDecision: 'revise', stopReason: null });
+    // Nothing finished yet is no trace; a run that failed before settling keeps none.
+    expect(
+      roundtrip({ run: header, criteria: children.criteria, iterations: [] }).trace,
+    ).toBeNull();
+    expect(roundtrip({ run: { ...header, status: 'failed' }, ...children }).trace).toBeNull();
   });
 
   it('[QL-23] an adopted iteration and where it came from round-trip unchanged', () => {

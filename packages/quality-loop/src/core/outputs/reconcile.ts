@@ -117,7 +117,10 @@ export function reconcile(
     alignment,
     runs,
     decisions,
-    stopReasons: tally(outputs.map((output) => output.trace.stopReason)),
+    // A run still going has no stop reason to count; it is counted once it settles.
+    stopReasons: tally(
+      outputs.flatMap(({ trace }) => (trace.stopReason === null ? [] : [trace.stopReason])),
+    ),
     gates: heldGates(outputs),
     iterations: spread(outputs.map((output) => output.trace.iterations.length)),
     overall: spread(outputs.map((output) => output.decision?.scores.overall ?? null)),

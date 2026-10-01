@@ -32,8 +32,9 @@ export interface RunProgressProps {
 /**
  * What the record says while (and after) the loop runs: its status, how long
  * it has taken, which model answered, and every exchange as it is attributed.
- * The trace only exists once the loop ends, so the exchange log is the live
- * signal — each scope names the stage and sample that made the call.
+ * The trace grows one finished iteration at a time, so between iterations the
+ * exchange log is the live signal — each scope names the stage and sample
+ * that made the call.
  */
 export function RunProgress({ run }: RunProgressProps) {
   const live = run.status === 'running';

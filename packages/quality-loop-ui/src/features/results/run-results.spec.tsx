@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as stories from './run-results.stories';
 
-const { Revised, Escalated, TwoIterations } = composeStories(stories);
+const { Revised, Escalated, TwoIterations, Running } = composeStories(stories);
 
 describe('RunResults', () => {
   it('[QLU-3] renders the decision, gates, scores, criteria, findings, remediations and the artifact', () => {
@@ -65,5 +65,13 @@ describe('RunResults', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: /Iteration 1/ }));
     expect(screen.getByText(/overall 65.2 is below acceptAt 80/)).toBeTruthy();
+  });
+
+  it('[QLU-2] a run still going shows the iterations finished so far as its standing, never a stop', () => {
+    renderWithTheme(<Running />);
+
+    expect(screen.getByText(/still running · best so far iteration 1 of 1 finished/)).toBeTruthy();
+    expect(screen.queryByText(/stopped:/)).toBeNull();
+    expect(screen.getByRole('tab', { name: /Iteration 1/ })).toBeTruthy();
   });
 });

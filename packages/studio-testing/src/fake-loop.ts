@@ -260,14 +260,15 @@ export class FakeLoop {
   /**
    * Record the iterations a still-running run has finished so far, as the
    * loop publishes them: the run stays `running`, its trace holds only
-   * those iterations, and a later `complete` or `fail` settles it. The list
-   * reads as `complete`'s does — an adopting run's iteration 1 is the
-   * adopted one and the list describes what follows.
+   * those iterations with no stop reason, and a later `complete` or `fail`
+   * settles it. The list reads as `complete`'s does — an adopting run's
+   * iteration 1 is the adopted one and the list describes what follows.
    */
   progress(runId: string, iterations: readonly FakeIteration[] = []): void {
     const run = this.require(runId);
     if (run.status !== 'running') throw new Error(`fake quality loop run ${runId} has settled`);
-    run.trace = this.traceOf(runId, iterations);
+    const trace = this.traceOf(runId, iterations);
+    run.trace = trace === null ? null : { ...trace, stopReason: null };
   }
 
   fail(runId: string, message: string): void {
@@ -339,8 +340,10 @@ export class FakeLoop {
         `adopt: run ${adopt.runId} ran ${source.pipeline}, not ${request.pipeline}`,
       );
     }
-    if (source.trace === null)
+    // Its status, not its trace: a running run's iterations so far are not a verdict to adopt.
+    if (source.status !== 'complete' || source.trace === null) {
       throw new LoopRefused(400, `adopt: run ${adopt.runId} never completed`);
+    }
     const iteration = source.trace.iterations[adopt.iteration - 1];
     if (!iteration) {
       throw new LoopRefused(400, `adopt: run ${adopt.runId} has no iteration ${adopt.iteration}`);

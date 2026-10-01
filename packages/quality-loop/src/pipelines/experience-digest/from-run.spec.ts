@@ -69,7 +69,7 @@ describe('composing an experience record from a finished run', () => {
     expect(record.omitted).toEqual({ findings: 0, criteria: 0 });
   });
 
-  it('[QL-15] a single-iteration run has no transition and no delta; a run without a trace is nothing yet', () => {
+  it('[QL-15] a single-iteration run has no transition and no delta; a run without a settled trace is nothing yet', () => {
     const run = sampleRun();
     const [first] = sampleIterations();
     const single = fromRun({
@@ -82,6 +82,10 @@ describe('composing an experience record from a finished run', () => {
     expect(single?.findings.every((f) => f.transitions.length === 0)).toBe(true);
 
     expect(fromRun(sampleRun({ status: 'running', trace: null }))).toBeNull();
+    // A run still going publishes its iterations so far, with no stop: nothing to learn yet.
+    expect(
+      fromRun({ ...run, status: 'running', trace: { ...traceOf(run), stopReason: null } }),
+    ).toBeNull();
   });
 
   it('[QL-15] findings beyond the cap are counted, not silently dropped', () => {

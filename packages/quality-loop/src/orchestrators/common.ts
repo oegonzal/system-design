@@ -63,9 +63,13 @@ export const skipped = (reason: string, note: string | null = null): StepResult<
   note,
 });
 
-/** A child that ran to a trace; anything else is a run the step cannot read. */
+/**
+ * A child that completed with its trace settled; anything else — a failed
+ * run, or a running one whose trace is only its progress so far — is a run
+ * the step cannot read.
+ */
 export const completed = (child: QualityRunDto): child is QualityRunDto & { trace: RunTrace } =>
-  child.status !== 'failed' && child.trace !== null;
+  child.status === 'complete' && child.trace !== null;
 
 /** The step's failure when its child did not complete, in the child's own words. */
 export const runFailed = (child: QualityRunDto): StepResult<never> => ({

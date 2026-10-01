@@ -1,8 +1,9 @@
 /**
- * Rows back into the wire record — the inverse of `toRows`. Inputs may arrive
- * in any order; every list is sorted by its own key here. Rows come in with
- * the entity's own fields spread over them, so what reaches the wire is
- * picked by name, never by leaving fields out.
+ * Rows back into the wire record — the inverse of `toRows`, and of
+ * `progressRows` while the run is still running. Inputs may arrive in any
+ * order; every list is sorted by its own key here. Rows come in with the
+ * entity's own fields spread over them, so what reaches the wire is picked
+ * by name, never by leaving fields out.
  */
 import type {
   ConfirmedFinding,
@@ -11,6 +12,7 @@ import type {
   QualityRunDto,
 } from '@sysdesign/contracts';
 
+import { progressOf } from '../../../core/loop/progress';
 import { toIso, toIsoOrNull } from './conventions';
 import {
   byPosition,
@@ -78,7 +80,11 @@ function iterationFromRows(
   };
 }
 
-/** The trace, when the header says the run settled one. */
+/**
+ * The trace: settled, when the header says the run recorded one; the run so
+ * far, while it is still running — the iterations its progress wrote, with
+ * the standing the loop itself would publish over them; otherwise none.
+ */
 function traceFromRows(
   run: QualityRunRow,
   criteria: readonly CriterionRow[],
@@ -86,12 +92,9 @@ function traceFromRows(
   findings: readonly FindingRow[],
   results: readonly ResultRow[],
 ): QualityRunDto['trace'] {
-  if (run.finalDecision === null || run.stopReason === null || run.bestIteration === null) {
-    return null;
-  }
   const findingsByIteration = groupBy(findings, (row) => row.iterationId);
   const resultsByIteration = groupBy(results, (row) => row.iterationId);
-  return {
+  const head = {
     pipeline: { id: run.pipeline, version: run.pipelineVersion ?? '' },
     contract: {
       goal: run.request.goal,
@@ -99,20 +102,27 @@ function traceFromRows(
         .sort(byPosition)
         .map(({ criterionId, kind, statement }) => ({ id: criterionId, kind, statement })),
     },
-    iterations: [...iterations]
-      .sort((a, b) => a.iteration - b.iteration)
-      .map((row) =>
-        iterationFromRows(
-          row,
-          findingsByIteration.get(row.id) ?? [],
-          resultsByIteration.get(row.id) ?? [],
-        ),
-      ),
-    bestIteration: run.bestIteration,
-    finalDecision: run.finalDecision,
-    stopReason: run.stopReason,
-    lessons: run.lessons ?? [],
   };
+  const recorded = [...iterations]
+    .sort((a, b) => a.iteration - b.iteration)
+    .map((row) =>
+      iterationFromRows(
+        row,
+        findingsByIteration.get(row.id) ?? [],
+        resultsByIteration.get(row.id) ?? [],
+      ),
+    );
+  if (run.finalDecision !== null && run.stopReason !== null && run.bestIteration !== null) {
+    return {
+      ...head,
+      iterations: recorded,
+      bestIteration: run.bestIteration,
+      finalDecision: run.finalDecision,
+      stopReason: run.stopReason,
+      lessons: run.lessons ?? [],
+    };
+  }
+  return run.status === 'running' ? progressOf(head, recorded) : null;
 }
 
 export function fromRows(

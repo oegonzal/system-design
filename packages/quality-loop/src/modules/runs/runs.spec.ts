@@ -457,7 +457,7 @@ describe('the HTTP surface', () => {
     }
   });
 
-  it('[QL-13] a running run records each iteration as it lands, and its close replaces them with the whole run', async () => {
+  it('[QL-13] a running run records each iteration as it lands, GET /runs/:id shows them with no stop reason, and its close replaces them with the whole run', async () => {
     // Iteration 1 judges c1 partial and revises; the model then waits at the
     // gate before the revision, holding the run in flight after one iteration.
     const model = sequencedLlm(
@@ -498,6 +498,21 @@ describe('the HTTP surface', () => {
       expect(first).toMatchObject({ iteration: 1, mode: 'initial' });
       expect(first.decision.finalDecision).toBe('revise');
 
+      // [QL-12] The wire carries the run so far: the finished iteration and the
+      // loop's standing after it, with no stop reason while the run is running.
+      const live = (await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${id}`)).data;
+      expect(live).toMatchObject({ status: 'running', finishedAt: null });
+      expect(live.trace).toMatchObject({
+        pipeline: { id: 'tiny' },
+        contract: { goal: '# Goal', criteria: [{ id: 'c1', kind: 'must', statement: 'has text' }] },
+        bestIteration: 1,
+        finalDecision: 'revise',
+        stopReason: null,
+        lessons: [],
+      });
+      expect(live.trace?.iterations.map((iteration) => iteration.mode)).toEqual(['initial']);
+      expect(live.trace?.iterations[0]?.rendered).toBe('[text] made\n[part.1] one');
+
       gated.release();
       let run = (await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${id}`)).data;
       for (let attempt = 0; attempt < 100 && run.status !== 'complete'; attempt++) {
@@ -508,6 +523,7 @@ describe('the HTTP surface', () => {
         'initial',
         'revise',
       ]);
+      expect(run.trace?.stopReason).not.toBeNull();
       // One snapshot of rows: the close replaced the progress, never added to it.
       const fork = em.fork();
       expect(await fork.find(QualityRunIteration, { run: id })).toHaveLength(2);

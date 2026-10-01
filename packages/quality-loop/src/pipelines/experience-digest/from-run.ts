@@ -215,10 +215,13 @@ export function fit(record: ExperienceRecord, budget = GOAL_MAX_BYTES): Experien
   return current;
 }
 
-/** Null until the run has a trace: a running or failed-before-loop run teaches nothing yet. */
+/**
+ * Null until the run has settled a trace: a run still going (its trace has
+ * no stop reason yet) or one that failed before the loop teaches nothing yet.
+ */
 export function fromRun(run: QualityRunDto, options: ComposeOptions = {}): ExperienceRecord | null {
   const { trace } = run;
-  if (trace === null || trace.iterations.length === 0) return null;
+  if (trace === null || trace.stopReason === null || trace.iterations.length === 0) return null;
 
   const criteria = collectCriteria(trace);
   const criterionAlias = new Map(criteria.map((criterion) => [criterion.id, criterion.alias]));

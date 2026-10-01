@@ -21,7 +21,6 @@ import type { LlmClient } from '@sysdesign/llm';
 
 import type { RunProgress, TaskContract } from '../contracts';
 import { annotate, noteRemediations } from '../evidence/annotate';
-import { deriveLessons } from '../evidence/lessons';
 import { normalize } from '../evidence/normalize';
 import { validatePipeline, type PipelineDefinition } from '../pipeline';
 import {
@@ -34,6 +33,7 @@ import {
 } from '../ports';
 import { LENSES_STAGE, stageDiagnostic } from '../stages/shared';
 import { materialize } from './materialize';
+import { beats, progressOf } from './progress';
 import { rubricProblems } from './rubric';
 import { mapConcurrent } from './scoped-llm';
 
@@ -124,7 +124,12 @@ export async function runLoop<T>(
     now,
   };
 
+  const head = {
+    pipeline: { id: definition.id, version: definition.version },
+    contract: { goal: input.goal, criteria: contract.criteria },
+  };
   const iterations: IterationTrace<T>[] = [];
+  let standing: RunProgress<T> | null = null;
   let best: IterationTrace<T> | null = null;
   let stalled = 0;
   let mode: IterationMode =
@@ -145,7 +150,8 @@ export async function runLoop<T>(
     } else {
       stalled += 1;
     }
-    onIteration?.(progressOf(loop, iterations, best));
+    standing = progressOf(head, iterations);
+    if (standing !== null) onIteration?.(standing);
 
     const next = afterDecision(entry, stages, policy.loop.plateauAfter, stalled, {
       last: iteration === maxIterations,
@@ -154,29 +160,10 @@ export async function runLoop<T>(
     else mode = next.mode;
   }
 
-  const { lessons, ...standing } = progressOf(loop, iterations, best);
-  return { ...standing, stopReason: stop ?? 'max-iterations', lessons };
-}
-
-/**
- * The run so far, from the iterations recorded and the best among them —
- * what every listener is handed and what the final trace adds its stop to.
- * The iterations are a copy: a host may keep it while the loop goes on.
- */
-function progressOf<T>(
-  loop: Loop<T>,
-  iterations: readonly IterationTrace<T>[],
-  best: IterationTrace<T> | null,
-): RunProgress<T> {
-  const last = iterations[iterations.length - 1];
-  return {
-    pipeline: { id: loop.definition.id, version: loop.definition.version },
-    contract: { goal: loop.input.goal, criteria: loop.contract.criteria },
-    iterations: [...iterations],
-    bestIteration: (best ?? last).iteration,
-    finalDecision: last.decision.finalDecision,
-    lessons: deriveLessons(iterations),
-  };
+  // The budget is at least one iteration, so the loop always stands somewhere.
+  if (standing === null) throw new Error(`pipeline ${definition.id}: no iteration ran`);
+  // What every listener was handed last, plus why the loop stopped.
+  return { ...standing, stopReason: stop ?? 'max-iterations' };
 }
 
 /**
@@ -420,10 +407,6 @@ async function runWave<T>(
     evaluators: results.flatMap((result) => result.evaluator ?? []),
   };
 }
-
-/** The strict-better gate: a revision keeps the crown only by beating it. */
-const beats = <T>(entry: IterationTrace<T>, best: IterationTrace<T> | null): boolean =>
-  best === null || entry.decision.scores.overall > best.decision.scores.overall;
 
 /**
  * What the decision means for the loop: a terminal decision stops it with

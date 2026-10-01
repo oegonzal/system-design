@@ -358,13 +358,16 @@ describe('runLoop', () => {
     );
 
     expect(events).toEqual(['progress 1', 'produce', 'progress 2']);
-    // The starting point is listed at once, as the loop stood after it.
-    expect(published[0]).not.toHaveProperty('stopReason');
-    expect(published[0]).toMatchObject({ bestIteration: 1, finalDecision: 'revise', lessons: [] });
+    // The starting point is listed at once, as the loop stood after it — not yet stopped.
+    expect(published[0]).toMatchObject({
+      bestIteration: 1,
+      finalDecision: 'revise',
+      stopReason: null,
+      lessons: [],
+    });
     expect(published[0].iterations.map((iteration) => iteration.mode)).toEqual(['adopted']);
-    const { stopReason, ...standing } = trace;
-    expect(stopReason).toBe('accepted');
-    expect(published[1]).toEqual(standing);
+    expect(trace.stopReason).toBe('accepted');
+    expect(published[1]).toEqual({ ...trace, stopReason: null });
   });
 
   it('[QL-9] stops on a plateau when revisions stop improving', async () => {

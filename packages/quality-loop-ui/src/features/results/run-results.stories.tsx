@@ -24,3 +24,8 @@ export const Escalated: Story = { args: { trace: traceOf(makeEscalatedRun()) } }
 
 /** Revise, then accept — with the lessons the loop drew across the two. */
 export const TwoIterations: Story = { args: { trace: traceOf(makeTwoIterationRun()) } };
+
+/** Still running: the iteration finished so far, as the loop published it — no stop yet. */
+export const Running: Story = {
+  args: { trace: { ...traceOf(makeRun()), stopReason: null } },
+};

@@ -23,9 +23,15 @@ export interface RunResultsProps {
 /**
  * The run's verdict and one tab per iteration, opening on the best one.
  * Mount it keyed by run id so a new run starts on its own best iteration.
+ * While the run is still going the trace holds the iterations finished so
+ * far: the verdict is its standing, and it says so rather than a stop.
  */
 export function RunResults({ trace }: RunResultsProps) {
   const [selected, setSelected] = useState(String(trace.bestIteration));
+  const standing =
+    trace.stopReason === null
+      ? `still running · best so far iteration ${trace.bestIteration} of ${trace.iterations.length} finished`
+      : `stopped: ${trace.stopReason} · best iteration ${trace.bestIteration} of ${trace.iterations.length}`;
 
   return (
     <Stack gap={5}>
@@ -33,8 +39,7 @@ export function RunResults({ trace }: RunResultsProps) {
         <Heading level={2}>Results</Heading>
         <Badge tone={DECISION_TONE[trace.finalDecision]}>{trace.finalDecision}</Badge>
         <Text as="span" tone="secondary">
-          stopped: {trace.stopReason} · best iteration {trace.bestIteration} of{' '}
-          {trace.iterations.length} · {trace.contract.criteria.length} criteria
+          {standing} · {trace.contract.criteria.length} criteria
         </Text>
       </Stack>
 

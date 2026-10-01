@@ -146,6 +146,13 @@ describe('reconcile', () => {
     expect(report.overall).toEqual({ n: 3, min: 75, max: 75, mean: 75, range: 0 });
   });
 
+  it('[QL-19] a run still going counts as a run, but has no stop reason to tally', () => {
+    const going = outputsOf({ ...traceOf(), stopReason: null });
+    const report = reconcile([going, run({ stopReason: 'max-iterations' })], 'produced');
+    expect(report.runs).toBe(2);
+    expect(report.stopReasons).toEqual({ 'max-iterations': 1 });
+  });
+
   it('[QL-19] a run without a decision still counts, and contributes no scores', () => {
     const bare = outputsOf({ ...traceOf(), iterations: [], bestIteration: 0 });
     const report = reconcile([bare, run({ overall: 60 })], 'produced');
