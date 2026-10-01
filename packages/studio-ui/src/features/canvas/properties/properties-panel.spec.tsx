@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
+import { CANVAS_COPY } from '../copy';
 import { PropertiesPanel } from './properties-panel';
 
 function renderPanel(seed?: (store: CanvasStore) => void, graph: CanvasGraph = makeGraph()) {
@@ -31,6 +32,26 @@ describe('PropertiesPanel', () => {
   it('shows an empty state when nothing is selected', () => {
     renderPanel();
     expect(screen.getByText(/select a block or connection/i)).toBeTruthy();
+  });
+
+  it('[UX-2] while the canvas is read-only the selection can be inspected and nothing in it edited', async () => {
+    const user = userEvent.setup();
+    const store = renderPanel((seeded) => {
+      seeded.getState().select('n-3');
+      seeded.getState().setReadOnly(true);
+    });
+
+    expect(screen.getByTestId('properties-readonly').textContent).toBe(CANVAS_COPY.readOnly);
+    const fields = screen.getByTestId('properties-fields') as HTMLFieldSetElement;
+    expect(fields.disabled).toBe(true);
+    const label = screen.getByLabelText('Label') as HTMLInputElement;
+    expect(label.value).toBe('Orders DB');
+    expect(label.matches(':disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Add operation' }).matches(':disabled')).toBe(true);
+    expect(screen.getByTestId('delete-selected').matches(':disabled')).toBe(true);
+
+    await user.click(screen.getByTestId('delete-selected'));
+    expect(store.getState().nodes).toHaveLength(3);
   });
 
   // A blank label is legal on the wire but reads as nothing in the diagram, in

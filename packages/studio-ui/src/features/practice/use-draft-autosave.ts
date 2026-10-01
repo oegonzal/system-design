@@ -4,7 +4,7 @@ import { useDebouncedValue, useLatestRequest } from '@sysdesign/web-kit';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
-import type { CanvasState, CanvasStore } from '../canvas/canvas-store';
+import type { CanvasStore } from '../canvas/canvas-store';
 import type { DraftSaveStatus } from '../canvas/draft-status';
 
 /** How long the canvas must sit still before an edit is saved. */
@@ -18,24 +18,13 @@ export interface DraftAutosave {
   settle(): Promise<void>;
 }
 
-/** The store slices a draft is made of — a change to any of them is a new version of it. */
-const DRAFT_SLICES = [
-  'nodes',
-  'edges',
-  'bindings',
-  'narrativeOverview',
-  'componentRationales',
-  'criterionNarrations',
-] as const satisfies readonly (keyof CanvasState)[];
-
-const draftChanged = (state: CanvasState, previous: CanvasState): boolean =>
-  DRAFT_SLICES.some((slice) => state[slice] !== previous[slice]);
-
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
 
 /**
  * Keeps the unsubmitted canvas on the server as the author works. Every
- * change to a draft slice while the canvas is dirty is a new version; the
+ * change to the store's `contentVersion` while the canvas is dirty is a new
+ * version — so selecting a block, React Flow measuring one, or a finding's
+ * highlight is never a draft to save — and so is the canvas turning dirty. The
  * version that has sat still for the delay is saved, last write wins, and
  * a newer version supersedes a save still in flight. `settle()` is how a
  * submit or coach start makes sure the server has the latest draft first —
@@ -64,7 +53,7 @@ export function useDraftAutosave(
     () =>
       storeApi.subscribe((state, previous) => {
         setDirty(state.dirty);
-        if (state.dirty && (draftChanged(state, previous) || !previous.dirty)) {
+        if (state.dirty && (state.contentVersion !== previous.contentVersion || !previous.dirty)) {
           versionRef.current += 1;
           setVersion(versionRef.current);
         }

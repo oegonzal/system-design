@@ -1,4 +1,4 @@
-import type { CanvasEdge, CanvasGraph, CanvasNode } from '@sysdesign/contracts';
+import type { CanvasEdge, CanvasGraph, CanvasNode, NodeOperation } from '@sysdesign/contracts';
 
 import type { SdEdge, SdNode } from './types';
 
@@ -18,18 +18,27 @@ function gridPosition(index: number): { x: number; y: number } {
   };
 }
 
+/**
+ * An operation row is a declaration once it has a name — the schema's own
+ * floor. A row whose name is still empty is one being typed: the editor keeps
+ * it, the wire never sees it.
+ */
+export const isDeclaredOperation = (operation: NodeOperation): boolean => operation.name.length > 0;
+
 /** The operation names a connection between these two nodes may legally carry. */
 function declaredOnEitherEnd(source: SdNode | undefined, target: SdNode | undefined): Set<string> {
   return new Set(
     [...(source?.data.operations ?? []), ...(target?.data.operations ?? [])]
-      .map((operation) => operation.name)
-      .filter((name) => name.length > 0),
+      .filter(isDeclaredOperation)
+      .map((operation) => operation.name),
   );
 }
 
 /**
- * Serialize the working canvas to the wire shape. Positions are rounded to
- * ints so a drag by half a pixel never dirties a stored revision diff, and a
+ * Serialize the working canvas to the wire shape — the one projection both
+ * the draft and a submit go through. Positions are rounded to ints so a drag
+ * by half a pixel never dirties a stored revision diff; an operation row with
+ * no name yet is left out, so a half-typed row never costs a save; and a
  * carry naming an operation neither endpoint still declares is dropped — the
  * API refuses it, and the author already sees it as a stale chip.
  */
@@ -51,8 +60,9 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
     if (node.data.responsibilities && node.data.responsibilities.length > 0) {
       out.responsibilities = [...node.data.responsibilities];
     }
-    if (node.data.operations && node.data.operations.length > 0) {
-      out.operations = node.data.operations.map((operation) => ({ ...operation }));
+    const operations = (node.data.operations ?? []).filter(isDeclaredOperation);
+    if (operations.length > 0) {
+      out.operations = operations.map((operation) => ({ ...operation }));
     }
     return out;
   });

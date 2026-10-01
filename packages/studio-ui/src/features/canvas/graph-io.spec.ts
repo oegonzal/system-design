@@ -1,3 +1,4 @@
+import { canvasGraphSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
@@ -85,6 +86,35 @@ describe('graph-io', () => {
     expect(serialized.edges.find((edge) => edge.id === 'e-1')?.carries).toEqual(['PlaceOrder']);
     // e-4: queue → worker, OrderPlaced declared on the source; Vanished on neither.
     expect(serialized.edges.find((edge) => edge.id === 'e-4')?.carries).toEqual(['OrderPlaced']);
+  });
+
+  it('[UX-15] leaves an operation row with no name yet off the wire, so the draft still passes the schema', () => {
+    const { nodes, edges } = fromCanvasGraph(makeInterfaceGraph());
+    const typing = nodes.map((node) =>
+      node.id === 'n-3'
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              operations: [...(node.data.operations ?? []), { name: '', kind: 'query' as const }],
+            },
+          }
+        : node,
+    );
+
+    const serialized = toCanvasGraph(typing, edges);
+
+    expect(serialized.nodes.find((node) => node.id === 'n-3')?.operations).toEqual(
+      makeInterfaceGraph().nodes[2]?.operations,
+    );
+    expect(canvasGraphSchema.safeParse(serialized).success).toBe(true);
+
+    // A node whose only row is still unnamed declares nothing at all.
+    const onlyBlank = toCanvasGraph(
+      [{ ...nodes[0], data: { ...nodes[0].data, operations: [{ name: '' }] } }],
+      [],
+    );
+    expect(onlyBlank.nodes[0]).not.toHaveProperty('operations');
   });
 
   it('auto-grids nodes stored without a position', () => {

@@ -5,12 +5,13 @@ import {
   kindsInCategory,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { createCanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
+import { CANVAS_COPY } from '../copy';
 import { Palette } from './palette';
 
 function renderPalette() {
@@ -76,6 +77,20 @@ describe('Palette', () => {
 
     const [first, second] = store.getState().nodes;
     expect(first.position).not.toEqual(second.position);
+  });
+
+  it('[UX-2] while the canvas is read-only every entry is disabled and adds nothing', async () => {
+    const user = userEvent.setup();
+    const store = renderPalette();
+    act(() => store.getState().setReadOnly(true));
+
+    const entry = screen.getByTestId('palette-queue') as HTMLButtonElement;
+    expect(entry.disabled).toBe(true);
+    expect(entry.getAttribute('draggable')).toBe('false');
+    expect(screen.getByTestId('blocks-hint').textContent).toBe(CANVAS_COPY.readOnly);
+    await user.click(entry);
+
+    expect(store.getState().nodes).toHaveLength(0);
   });
 
   it('[UX-4] shows one level-3 heading per non-empty category, in contract order', () => {

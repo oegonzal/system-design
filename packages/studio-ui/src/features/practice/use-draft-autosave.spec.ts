@@ -90,6 +90,49 @@ describe('useDraftAutosave', () => {
     expect(draftBodies(fetchMock)).toHaveLength(1);
   });
 
+  it('[UX-15] a selection, a measured size or a highlight on a dirty canvas is not a new draft — nothing is re-saved', async () => {
+    const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
+    const store = createCanvasStore();
+    store.getState().loadDraft({ graph: makeGraph(), brief: null, narrative: null });
+    const hook = renderHook(() => useDraftAutosave('session-1', store, true));
+    act(() => {
+      store.getState().addNode('cache');
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+    expect(hook.result.current.status).toBe('saved');
+
+    act(() => {
+      store.getState().select('n-1');
+      store.getState().onNodesChange([{ type: 'select', id: 'n-1', selected: true }]);
+      store
+        .getState()
+        .onNodesChange([{ type: 'dimensions', id: 'n-1', dimensions: { width: 160, height: 48 } }]);
+      store.getState().setHighlight({ nodeIds: ['n-2'], edgeIds: [], severity: 'high' });
+    });
+    expect(hook.result.current.status).toBe('saved');
+    expect(hook.result.current.pending).toBe(false);
+    await advance(DRAFT_AUTOSAVE_DELAY_MS * 2);
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+  });
+
+  it('[UX-15] an undo is an edit like any other: the draft it leaves is saved', async () => {
+    const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
+    const store = createCanvasStore(makeGraph());
+    renderHook(() => useDraftAutosave('session-1', store, true));
+
+    act(() => {
+      store.getState().addNode('cache');
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+    act(() => {
+      store.getState().undo();
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+
+    expect(draftBodies(fetchMock).map((body) => body.graph.nodes.length)).toEqual([4, 3]);
+  });
+
   it('reports a save that did not land, keeps the draft pending, and retries on the next edit', async () => {
     const { fetchMock } = stubApi([
       {

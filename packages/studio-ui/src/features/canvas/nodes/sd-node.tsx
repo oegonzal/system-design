@@ -6,6 +6,7 @@ import { transient } from '@sysdesign/design-system';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
+import { NODE_WIDTH } from '../geometry';
 import type { SdNode as SdNodeModel } from '../types';
 import { NODE_ICONS } from './node-icons';
 
@@ -17,8 +18,8 @@ const Root = styled('div', transient)<{
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.space[3]}px;
-  min-width: 132px;
-  max-width: 220px;
+  min-width: ${NODE_WIDTH.min}px;
+  max-width: ${NODE_WIDTH.max}px;
   padding: ${({ theme }) => `${theme.space[3]}px ${theme.space[4]}px`};
   border-radius: ${({ theme }) => theme.radius.md};
   background: ${({ theme }) => theme.color.bg.surface};

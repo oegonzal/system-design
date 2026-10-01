@@ -34,6 +34,11 @@ export const Filtered: Story = {
   },
 };
 
+/** A revision on screen: every entry is disabled and the hint says how to edit again. */
+export const ReadOnly: Story = {
+  decorators: [withCanvasStore((store) => store.getState().setReadOnly(true))],
+};
+
 const BoundedColumn480 = styled.div`
   height: 480px;
   display: flex;

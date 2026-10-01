@@ -64,9 +64,8 @@ test(
 
     await step(page, ' 6 — Improve along the finding: add a read replica', async () => {
       // Dropped at an exact spot, clear of the column the first three occupy:
-      // a fourth staggered click-add lands under the pannable minimap, and a
-      // drop beside the service covers its connection handle — nodes are
-      // about 250px wide, so the replica goes left of and between the rows.
+      // a drop beside the service would cover its connection handle, so the
+      // replica goes left of and between the rows.
       await canvas.dragFromPalette('replica', 40, 140); // n-4
       await expect(canvas.node('n-4')).toHaveAttribute('data-kind', 'replica');
       await canvas.connect('n-2', 'n-4'); // e-3: the service reads from the replica

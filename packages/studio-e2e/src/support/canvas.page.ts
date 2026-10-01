@@ -74,8 +74,9 @@ export class CanvasPage {
 
   /**
    * The click path: every palette entry is a real button, and clicking adds
-   * the block at a staggered default spot. Consecutive adds overlap, so specs
-   * follow each add with `moveNode` before adding the next.
+   * the block in the free slot nearest the visible centre — on screen, and
+   * never over another block. Specs still `moveNode` each add to a known spot
+   * so the layout they connect is deterministic.
    */
   async addFromPalette(kind: NodeKind): Promise<void> {
     await this.paletteItem(kind).click();
@@ -93,8 +94,7 @@ export class CanvasPage {
    * The drag path. Playwright's mouse cannot produce HTML5 drag-and-drop, so
    * this dispatches the real DragEvent + DataTransfer sequence the palette
    * and canvas exchange. It is the same store action as the click path, plus
-   * an exact position — which is what a fourth block needs: the click path's
-   * staggered spot for it lies under the pannable minimap.
+   * an exact position, for a block that must land beside a particular one.
    */
   async dragFromPalette(kind: NodeKind, x: number, y: number): Promise<void> {
     await expect(this.paletteItem(kind)).toBeVisible();
@@ -124,10 +124,9 @@ export class CanvasPage {
   // --- the canvas surface --------------------------------------------------
 
   /**
-   * Drag a node to a point given relative to the canvas frame. Grabs near the
-   * node's top-left corner, not its centre: the centre of a freshly staggered
-   * add can land under the (pannable, so pointer-eating) minimap in the
-   * canvas's bottom-right corner.
+   * Drag a node to a point given relative to the canvas frame. Grabs the
+   * node by its icon, near the top-left corner, so the press lands on the
+   * block itself rather than on a connection handle.
    */
   async moveNode(id: string, to: { x: number; y: number }): Promise<void> {
     const node = this.node(id);

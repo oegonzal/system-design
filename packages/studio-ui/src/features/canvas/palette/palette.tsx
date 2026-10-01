@@ -13,6 +13,7 @@ import { Heading, Stack, Text, TextField, transient } from '@sysdesign/design-sy
 import { useState, type DragEvent } from 'react';
 
 import { useCanvasStore } from '../canvas-store-context';
+import { CANVAS_COPY } from '../copy';
 import { NODE_ICONS } from '../nodes/node-icons';
 
 export const NODE_DRAG_MIME = 'application/sysdesign-node';
@@ -75,13 +76,18 @@ const KindButton = styled('button', transient)<{ $kind: NodeKind }>`
   text-align: left;
   cursor: grab;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: ${({ theme }) => theme.color.bg.subtle};
   }
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.color.border.focus};
     outline-offset: 1px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    color: ${({ theme }) => theme.color.text.muted};
   }
 `;
 
@@ -119,8 +125,10 @@ export interface PaletteProps {
  * matching the filter) renders nothing rather than an empty shelf.
  *
  * Every entry is both draggable (drop on the canvas for exact placement) and
- * a real button (click/Enter adds at a staggered center-ish spot) — the
- * keyboard path and the e2e path are the same code path.
+ * a real button (click/Enter adds it in the free slot nearest the visible
+ * centre — the store decides where) — the keyboard path and the e2e path are
+ * the same code path. While the canvas is read-only every entry is disabled;
+ * the store would refuse the add anyway.
  *
  * The filter is view state, not canvas state: it narrows what the sidebar
  * shows and touches nothing in the store. Testid discipline: only kind
@@ -129,6 +137,7 @@ export interface PaletteProps {
  */
 export function Palette({ className }: PaletteProps) {
   const addNode = useCanvasStore((state) => state.addNode);
+  const readOnly = useCanvasStore((state) => state.readOnly);
   const [query, setQuery] = useState('');
   const normalized = query.trim().toLowerCase();
 
@@ -145,8 +154,8 @@ export function Palette({ className }: PaletteProps) {
   return (
     <Root aria-label="Building blocks" className={className}>
       <Heading level={2}>Blocks</Heading>
-      <Text size="sm" tone="muted">
-        Drag onto the canvas, or press Enter to add.
+      <Text size="sm" tone="muted" data-testid="blocks-hint">
+        {readOnly ? CANVAS_COPY.readOnly : 'Drag onto the canvas, or press Enter to add.'}
       </Text>
       <TextField
         label="Filter blocks"
@@ -176,7 +185,8 @@ export function Palette({ className }: PaletteProps) {
                     type="button"
                     $kind={kind}
                     title={NODE_KIND_GUIDE[kind].what}
-                    draggable
+                    disabled={readOnly}
+                    draggable={!readOnly}
                     onDragStart={(event) => handleDragStart(event, kind)}
                     onClick={() => addNode(kind)}
                     data-testid={`palette-${kind}`}

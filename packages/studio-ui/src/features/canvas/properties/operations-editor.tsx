@@ -18,6 +18,8 @@ import {
   TextField,
 } from '@sysdesign/design-system';
 
+import { isDeclaredOperation } from '../graph-io';
+
 export interface OperationsEditorProps {
   operations: NodeOperation[];
   onChange: (operations: NodeOperation[]) => void;
@@ -39,13 +41,13 @@ const DuplicateWarning = styled(Text)`
 
 /**
  * Indexes of every operation sharing a name with another. Exact and
- * case-sensitive to mirror the API's referential validator; empty names are
- * rows still being typed, not duplicates.
+ * case-sensitive to mirror the API's referential validator; rows still being
+ * typed are not declarations yet, so not duplicates either.
  */
 function duplicateIndexes(operations: NodeOperation[]): Set<number> {
   const byName = new Map<string, number[]>();
   operations.forEach((operation, index) => {
-    if (operation.name.length === 0) return;
+    if (!isDeclaredOperation(operation)) return;
     byName.set(operation.name, [...(byName.get(operation.name) ?? []), index]);
   });
   const duplicates = new Set<number>();

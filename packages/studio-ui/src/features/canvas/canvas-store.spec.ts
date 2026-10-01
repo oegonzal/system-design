@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeCriteria, makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
-import { createCanvasStore } from './canvas-store';
+import {
+  createCanvasStore,
+  HISTORY_LIMIT,
+  selectCanRedo,
+  selectCanUndo,
+  type CanvasStore,
+} from './canvas-store';
+import { NODE_ASSUMED_HEIGHT, NODE_WIDTH } from './geometry';
 
 const criteria = makeCriteria();
 
@@ -11,8 +18,8 @@ describe('canvas-store', () => {
 
     const node = store.getState().addNode('database');
 
-    expect(node.id).toBe('n-1');
-    expect(node.data.label).toBe('Database');
+    expect(node?.id).toBe('n-1');
+    expect(node?.data.label).toBe('Database');
     expect(store.getState().nodes).toHaveLength(1);
     expect(store.getState().selectedId).toBe('n-1');
     expect(store.getState().dirty).toBe(true);
@@ -20,9 +27,9 @@ describe('canvas-store', () => {
 
   it('[UX-2] connects two nodes with a sync edge and rejects self-loops and duplicates', () => {
     const store = createCanvasStore();
-    const a = store.getState().addNode('service');
-    const b = store.getState().addNode('database');
-    const connection = { source: a.id, target: b.id, sourceHandle: null, targetHandle: null };
+    store.getState().addNode('service');
+    store.getState().addNode('database');
+    const connection = { source: 'n-1', target: 'n-2', sourceHandle: null, targetHandle: null };
 
     store.getState().onConnect(connection);
     expect(store.getState().edges).toHaveLength(1);
@@ -36,7 +43,7 @@ describe('canvas-store', () => {
     // Self-loop — rejected.
     store
       .getState()
-      .onConnect({ source: a.id, target: a.id, sourceHandle: null, targetHandle: null });
+      .onConnect({ source: 'n-1', target: 'n-1', sourceHandle: null, targetHandle: null });
     expect(store.getState().edges).toHaveLength(1);
   });
 
@@ -409,6 +416,247 @@ describe('canvas-store', () => {
       store.getState().select('n-3');
       store.getState().removeSelected();
       expect(store.getState().serializeBrief(criteria)).toBeNull();
+    });
+  });
+
+  describe('placing a block', () => {
+    it('[UX-2] centres a click-added block on the visible centre the canvas reports', () => {
+      const store = createCanvasStore();
+      store.getState().attachViewport({ centre: () => ({ x: 1000, y: 600 }) });
+
+      const node = store.getState().addNode('cache');
+
+      expect(node?.position).toEqual({
+        x: 1000 - NODE_WIDTH.max / 2,
+        y: 600 - NODE_ASSUMED_HEIGHT / 2,
+      });
+    });
+
+    it('[UX-2] staggers consecutive adds by at least a block, so none covers another', () => {
+      const store = createCanvasStore();
+      store.getState().attachViewport({ centre: () => ({ x: 400, y: 300 }) });
+
+      for (const kind of ['client', 'cdn', 'dns', 'service'] as const)
+        store.getState().addNode(kind);
+
+      const positions = store.getState().nodes.map((node) => node.position);
+      for (const [index, a] of positions.entries()) {
+        for (const b of positions.slice(index + 1)) {
+          const apart =
+            Math.abs(a.x - b.x) >= NODE_WIDTH.max || Math.abs(a.y - b.y) >= NODE_ASSUMED_HEIGHT;
+          expect(apart).toBe(true);
+        }
+      }
+    });
+
+    it('a dropped block lands exactly where it was dropped', () => {
+      const store = createCanvasStore();
+      store.getState().addNode('queue', { x: 12, y: 34 });
+      expect(store.getState().nodes[0]?.position).toEqual({ x: 12, y: 34 });
+    });
+  });
+
+  describe('content version', () => {
+    it('[UX-15] counts edits, and never a selection, a measured size or a highlight', () => {
+      const store = createCanvasStore(makeGraph());
+      const version = () => store.getState().contentVersion;
+      const start = version();
+
+      store.getState().select('n-1');
+      store.getState().onNodesChange([{ type: 'select', id: 'n-1', selected: true }]);
+      store
+        .getState()
+        .onNodesChange([{ type: 'dimensions', id: 'n-1', dimensions: { width: 160, height: 48 } }]);
+      store.getState().setHighlight({ nodeIds: ['n-3'], edgeIds: [], severity: 'high' });
+      store.getState().clearHighlight();
+      expect(version()).toBe(start);
+      expect(store.getState().dirty).toBe(false);
+
+      store.getState().updateNode('n-1', { label: 'Browser' });
+      expect(version()).toBe(start + 1);
+      store.getState().setNarrativeOverview('Reads are cached.');
+      expect(version()).toBe(start + 2);
+    });
+  });
+
+  describe('read-only', () => {
+    it('[UX-2] refuses every author edit while set, whichever control asks', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().setBindingClaim('c1', 'before');
+      store.getState().setReadOnly(true);
+      const before = store.getState();
+
+      expect(store.getState().addNode('cache')).toBeNull();
+      store.getState().updateNode('n-1', { label: 'changed' });
+      store.getState().updateEdge('e-1', { kind: 'async' });
+      store
+        .getState()
+        .onConnect({ source: 'n-3', target: 'n-1', sourceHandle: null, targetHandle: null });
+      store.getState().onNodesChange([
+        { type: 'position', id: 'n-1', position: { x: 999, y: 999 } },
+        { type: 'remove', id: 'n-2' },
+      ]);
+      store.getState().onEdgesChange([{ type: 'remove', id: 'e-1' }]);
+      store.getState().select('n-2');
+      store.getState().removeSelected();
+      store.getState().clear();
+      store.getState().setBindingClaim('c1', 'after');
+      store.getState().toggleBindingNode('c1', 'n-1');
+      store.getState().setNarrativeOverview('changed');
+      store.getState().setComponentRationale('n-1', 'changed');
+      store.getState().undo();
+
+      const after = store.getState();
+      expect(after.nodes.map((node) => [node.id, node.data.label, node.position])).toEqual(
+        before.nodes.map((node) => [node.id, node.data.label, node.position]),
+      );
+      expect(after.edges).toEqual(before.edges);
+      expect(after.bindings).toEqual(before.bindings);
+      expect(after.narrativeOverview).toBe('');
+      expect(after.componentRationales).toEqual([]);
+      expect(after.contentVersion).toBe(before.contentVersion);
+      expect(selectCanUndo(after)).toBe(false);
+    });
+
+    it('still selects, highlights and loads — a revision on screen can be looked at', () => {
+      const store = createCanvasStore();
+      store.getState().setReadOnly(true);
+
+      store.getState().setGraph(makeGraph());
+      store.getState().onNodesChange([{ type: 'select', id: 'n-2', selected: true }]);
+      store.getState().select('n-2');
+      store.getState().setHighlight({ nodeIds: ['n-3'], edgeIds: [], severity: 'low' });
+
+      expect(store.getState().nodes).toHaveLength(3);
+      expect(store.getState().selectedId).toBe('n-2');
+      expect(store.getState().nodes.find((node) => node.id === 'n-2')?.selected).toBe(true);
+      expect(store.getState().highlight?.nodeIds).toEqual(['n-3']);
+
+      store.getState().setReadOnly(false);
+      expect(store.getState().addNode('cache')).not.toBeNull();
+    });
+  });
+
+  describe('undo and redo', () => {
+    const labels = (store: CanvasStore) => store.getState().nodes.map((node) => node.data.label);
+
+    it('[UX-2] walks edits back and forth, and a new edit forgets what was undone', () => {
+      const store = createCanvasStore();
+      store.getState().addNode('service');
+      store.getState().addNode('database');
+      expect(selectCanUndo(store.getState())).toBe(true);
+      expect(selectCanRedo(store.getState())).toBe(false);
+
+      store.getState().undo();
+      expect(labels(store)).toEqual(['Service']);
+      expect(store.getState().selectedId).toBeNull();
+      expect(store.getState().dirty).toBe(true);
+      expect(selectCanRedo(store.getState())).toBe(true);
+
+      store.getState().redo();
+      expect(labels(store)).toEqual(['Service', 'Database']);
+
+      store.getState().undo();
+      store.getState().addNode('cache');
+      expect(selectCanRedo(store.getState())).toBe(false);
+      expect(labels(store)).toEqual(['Service', 'Cache']);
+    });
+
+    it('[UX-2] a typed label is one step, and so is a whole drag', () => {
+      const store = createCanvasStore(makeGraph());
+      for (const label of ['C', 'Ch', 'Che', 'Checkout']) {
+        store.getState().updateNode('n-2', { label });
+      }
+      store
+        .getState()
+        .onNodesChange([
+          { type: 'position', id: 'n-1', position: { x: 10, y: 10 }, dragging: true },
+        ]);
+      store
+        .getState()
+        .onNodesChange([
+          { type: 'position', id: 'n-1', position: { x: 20, y: 20 }, dragging: true },
+        ]);
+      store
+        .getState()
+        .onNodesChange([
+          { type: 'position', id: 'n-1', position: { x: 30, y: 30 }, dragging: false },
+        ]);
+      expect(store.getState().history.past).toHaveLength(2);
+
+      store.getState().undo();
+      expect(store.getState().nodes[0]?.position).toEqual(makeGraph().nodes[0]?.position);
+      expect(labels(store)[1]).toBe('Checkout');
+      store.getState().undo();
+      expect(labels(store)[1]).toBe('Order Service');
+    });
+
+    it('[UX-2] a deleted block comes back with its connections in one step', () => {
+      const store = createCanvasStore(makeGraph());
+
+      store.getState().removeElements({ nodeIds: ['n-2'], edgeIds: [] });
+      expect(store.getState().nodes.map((node) => node.id)).toEqual(['n-1', 'n-3']);
+      expect(store.getState().edges).toHaveLength(0);
+
+      store.getState().undo();
+      expect(store.getState().nodes.map((node) => node.id)).toEqual(['n-1', 'n-2', 'n-3']);
+      expect(store.getState().edges.map((edge) => edge.id)).toEqual(['e-1', 'e-2']);
+    });
+
+    it('[UX-2] Clear is one step back to the diagram, and keeps the brief and narrative', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().setNarrativeOverview('kept');
+
+      store.getState().clear();
+      expect(store.getState().nodes).toHaveLength(0);
+      expect(store.getState().narrativeOverview).toBe('kept');
+
+      store.getState().undo();
+      expect(store.getState().nodes).toHaveLength(3);
+    });
+
+    it('covers the brief and narrative too, and repaints the live highlight on what it restores', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().setBindingClaim('c1', 'claim');
+      store.getState().removeElements({ nodeIds: ['n-3'], edgeIds: [] });
+      store.getState().setHighlight({ nodeIds: ['n-3'], edgeIds: [], severity: 'high' });
+
+      store.getState().undo();
+      expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.severity).toBe('high');
+      store.getState().undo();
+      expect(store.getState().bindings).toEqual([]);
+    });
+
+    it('keeps at most HISTORY_LIMIT steps, and a load starts a new history', () => {
+      const store = createCanvasStore();
+      for (let index = 0; index < HISTORY_LIMIT + 5; index += 1) {
+        store.getState().addNode('service');
+      }
+      expect(store.getState().history.past).toHaveLength(HISTORY_LIMIT);
+
+      store.getState().setGraph(makeGraph());
+      expect(selectCanUndo(store.getState())).toBe(false);
+      expect(selectCanRedo(store.getState())).toBe(false);
+    });
+  });
+
+  describe('fit requests', () => {
+    it('asks for a fit on every load that draws something, and when asked', () => {
+      expect(createCanvasStore().getState().fitRequest).toBe(0);
+      const store = createCanvasStore(makeGraph());
+      expect(store.getState().fitRequest).toBe(1);
+
+      store.getState().setGraph(makeGraph());
+      expect(store.getState().fitRequest).toBe(2);
+      store.getState().setGraph({ nodes: [], edges: [] });
+      expect(store.getState().fitRequest).toBe(2);
+      store.getState().loadDraft({ graph: makeGraph(), brief: null, narrative: null });
+      expect(store.getState().fitRequest).toBe(3);
+      store.getState().requestFit();
+      expect(store.getState().fitRequest).toBe(4);
+      // An edit is not a load: the author's view stays where it is.
+      store.getState().addNode('cache');
+      expect(store.getState().fitRequest).toBe(4);
     });
   });
 });

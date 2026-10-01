@@ -86,3 +86,14 @@ export const EdgeStaleCarrySelected: Story = {
     }),
   ],
 };
+
+/** A revision on screen: the service can be inspected, and every control is disabled. */
+export const ReadOnly: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeInterfaceGraph());
+      store.getState().select('n-3');
+      store.getState().setReadOnly(true);
+    }),
+  ],
+};
