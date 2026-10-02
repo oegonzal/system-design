@@ -1,6 +1,8 @@
 import type { IsoDateString } from '@sysdesign/contracts';
 
 import type { InspectorAction, Provenance } from './action';
+import { changesOf, type JsonChange } from './changes';
+import { diffOf } from './differ';
 import { reduce } from './reduce';
 import { digest } from './signature';
 import { emptyState, type InspectorState } from './state';
@@ -19,6 +21,12 @@ import { emptyState, type InspectorState } from './state';
  *
  * Selection is by key, never by position, so trimming the front of the log can
  * never move what a reader is looking at.
+ *
+ * Each entry also carries its own answer to "what did this change": the delta
+ * is computed and decoded once, here, when the entry is appended — never per
+ * render. The clock-free version is computed alongside it rather than on demand,
+ * because a reader toggling "ignore timings" is comparing the two and should not
+ * wait for a thousand diffs to find out.
  */
 
 /** The log's bound. Past it the oldest entries fold into the baseline state. */
@@ -35,6 +43,10 @@ export interface TimelineEntry {
   corrected: boolean;
   /** The state after this action. */
   after: InspectorState;
+  /** What this action changed, decoded once when it was appended. */
+  changes: readonly JsonChange[];
+  /** The same, with the fields that only say *when* set aside. */
+  untimedChanges: readonly JsonChange[];
 }
 
 export interface Timeline {
@@ -112,7 +124,8 @@ export function recordActions(
     const corrected = seen !== undefined;
     const key = corrected ? `${action.key}@${ordinal}` : action.key;
     const recorded = corrected ? { ...action, key } : action;
-    state = reduce(state, recorded);
+    const before = state;
+    state = reduce(before, recorded);
     entries.push({
       ordinal,
       action: recorded,
@@ -120,6 +133,8 @@ export function recordActions(
       at: action.at ?? observedAt,
       corrected,
       after: state,
+      changes: changesOf(diffOf(before, state), before, state),
+      untimedChanges: changesOf(diffOf(before, state, true), before, state),
     });
     signatures.set(action.key, signature);
     if (corrected) signatures.set(key, signature);

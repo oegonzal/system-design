@@ -99,6 +99,76 @@ export default [
     rules: { ...config.rules },
   })),
   {
+    /**
+     * The run inspector's layering, enforced rather than described.
+     *
+     * `model/` is pure: it is specced without a DOM and must stay reachable
+     * from a node test, so nothing React-, Emotion-, Next- or network-shaped
+     * may enter it. `view/` is presentational and has to render in the
+     * catalog, where `@sysdesign/web-kit`'s barrel would drag the Next runtime
+     * in; it also must not reach the differ directly, because a delta's
+     * encoding is decoded in exactly one place.
+     *
+     * Only the container may know about the router, the API and the clock, and
+     * it is the one file in neither folder.
+     */
+    files: ['packages/quality-loop-ui/src/features/inspector/model/**/*.ts'],
+    ignores: ['**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react', message: 'The inspector model is pure; keep React in view/.' },
+            { name: 'next/navigation', message: 'The inspector model knows no router.' },
+            { name: '@emotion/styled', message: 'The inspector model renders nothing.' },
+            {
+              name: '@sysdesign/design-system',
+              message: 'The inspector model renders nothing.',
+            },
+            {
+              name: '@sysdesign/web-kit',
+              message: 'The inspector model fetches nothing and polls nothing.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/api/client', '../../../api/*'],
+              message: 'The inspector model takes the wire as an argument; it never reads it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/quality-loop-ui/src/features/inspector/view/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@sysdesign/web-kit',
+              message:
+                "The barrel imports next/navigation, which does not exist in the catalog's builder.",
+            },
+            {
+              name: 'jsondiffpatch',
+              message: "A delta's encoding is decoded in model/changes.ts and nowhere else.",
+            },
+          ],
+          patterns: [
+            {
+              group: ['**/api/client', '../../../api/*', '**/model/differ'],
+              message: 'A view takes what it shows as props.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: [
       'packages/studio-ui/**/*.ts',
       'packages/studio-ui/**/*.tsx',
