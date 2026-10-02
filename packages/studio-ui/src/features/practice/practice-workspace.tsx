@@ -349,8 +349,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   // The session, or the revision being graded, went away under the page —
   // whichever poll was the first to be told. One fact, one state: the page
   // is its not-found, not a grade still "running" beside a failure.
-  const vanished = polling.gone ?? slot.gone ?? improve.gone;
-  const pageFailure = loadFailure ?? vanished;
+  const polledAway = polling.gone ?? slot.gone ?? improve.gone;
   const exportRun = useRunExport();
   const canvasEmpty = useCanvasStore((state) => state.nodes.length === 0);
   const completedFor = useRef<string | null>(null);
@@ -358,9 +357,15 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const readOnly = viewingRevision !== null;
   const promptArchived = prompt?.status === 'archived';
   // The draft is the author's only while it is on screen and the page is up
-  // — and there is nowhere to save it once the session is gone.
+  // — and there is nowhere to save it once the session is gone, which a save
+  // may be the first to find out: the hook sends no more after that.
+  const autosave = useDraftAutosave(
+    sessionId,
+    storeApi,
+    !readOnly && !loading && loadFailure === null && polledAway === null,
+  );
+  const pageFailure = loadFailure ?? polledAway ?? autosave.gone;
   const pageUp = !loading && pageFailure === null;
-  const autosave = useDraftAutosave(sessionId, storeApi, !readOnly && pageUp);
   useLeaveGuard(autosave.pending && pageUp, LEAVE_WHILE_SAVING);
   useDocumentTitle(prompt ? pageTitle(prompt.title) : null);
 

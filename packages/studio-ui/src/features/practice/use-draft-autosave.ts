@@ -1,11 +1,12 @@
 'use client';
 
-import { useDebouncedValue, useLatestRequest } from '@sysdesign/web-kit';
+import { useDebouncedValue, useLatestRequest, type ApiError } from '@sysdesign/web-kit';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
 import type { CanvasStore } from '../canvas/canvas-store';
 import type { DraftSaveStatus } from '../canvas/draft-status';
+import { subjectGone } from '../evaluation/missing-read';
 
 /** How long the canvas must sit still before an edit is saved. */
 export const DRAFT_AUTOSAVE_DELAY_MS = 1500;
@@ -16,9 +17,21 @@ export interface DraftAutosave {
   pending: boolean;
   /** Saves what is unsaved now, without waiting out the debounce; resolves once the server answered. */
   settle(): Promise<void>;
+  /**
+   * The session no longer exists: the 404 a save was answered with. There is
+   * nowhere left to keep the draft, so no save follows it — and the page's
+   * subject is gone, which is the page's to say, not a failed save's.
+   */
+  gone: ApiError | null;
 }
 
 type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
+
+/** A save that did not land: which version, and whether it was the session that was missing rather than the save that failed. */
+interface SaveFailure {
+  version: number;
+  gone: ApiError | null;
+}
 
 /**
  * Keeps the unsubmitted canvas on the server as the author works. Every
@@ -32,7 +45,8 @@ type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
  * submit or coach start makes sure the server has the latest draft first —
  * and, because it saves the current version, a debounce that fires after
  * it has nothing left to send. Off while a revision is on screen: what is
- * shown then is not the author's draft.
+ * shown then is not the author's draft. A save the server answers with "no
+ * such session" is the last one: the session is `gone`, not the save failed.
  */
 export function useDraftAutosave(
   sessionId: string,
@@ -43,9 +57,10 @@ export function useDraftAutosave(
   const [dirty, setDirty] = useState(() => storeApi.getState().dirty);
   const [phase, setPhase] = useState<SavePhase>('idle');
   const [savedVersion, setSavedVersion] = useState(0);
-  const [failedVersion, setFailedVersion] = useState<number | null>(null);
+  const [failure, setFailure] = useState<SaveFailure | null>(null);
   const versionRef = useRef(0);
   const savedRef = useRef(0);
+  const goneRef = useRef<ApiError | null>(null);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const inFlight = useRef<{ target: number; promise: Promise<void> } | null>(null);
@@ -72,8 +87,14 @@ export function useDraftAutosave(
   const save = useCallback(
     (target: number): Promise<void> => {
       if (inFlight.current?.target === target) return inFlight.current.promise;
-      // Versions only grow: one no newer than what the server holds has nothing to send.
-      if (!enabledRef.current || target <= savedRef.current || !storeApi.getState().dirty) {
+      // Versions only grow: one no newer than what the server holds has nothing
+      // to send — and a session that is gone takes nothing at all.
+      if (
+        goneRef.current !== null ||
+        !enabledRef.current ||
+        target <= savedRef.current ||
+        !storeApi.getState().dirty
+      ) {
         return Promise.resolve();
       }
       const { id, signal } = latest.begin();
@@ -84,13 +105,17 @@ export function useDraftAutosave(
           if (!latest.isCurrent(id)) return;
           savedRef.current = target;
           setSavedVersion(target);
-          setFailedVersion(null);
+          setFailure(null);
           setPhase('saved');
         })
         .catch((error: unknown) => {
           if (latest.isStale(id, error)) return;
-          setFailedVersion(target);
-          setPhase('failed');
+          // A session that is gone is not a save that failed: nothing is in
+          // flight any more, and nothing will be.
+          const gone = subjectGone(error);
+          goneRef.current = gone;
+          setFailure({ version: target, gone });
+          setPhase(gone === null ? 'failed' : 'idle');
         })
         .finally(() => {
           if (inFlight.current?.target === target) inFlight.current = null;
@@ -109,15 +134,17 @@ export function useDraftAutosave(
   const settle = useCallback(() => save(versionRef.current), [save]);
 
   const pending = dirty && (version !== savedVersion || phase === 'saving');
+  const failed = failure !== null && failure.gone === null && failure.version === version;
   const status: DraftSaveStatus = !dirty
     ? 'clean'
     : phase === 'saving'
       ? 'saving'
-      : failedVersion === version
+      : failed
         ? 'failed'
         : version !== savedVersion
           ? 'unsaved'
           : 'saved';
+  const gone = failure?.gone ?? null;
 
-  return useMemo(() => ({ status, pending, settle }), [status, pending, settle]);
+  return useMemo(() => ({ status, pending, settle, gone }), [status, pending, settle, gone]);
 }

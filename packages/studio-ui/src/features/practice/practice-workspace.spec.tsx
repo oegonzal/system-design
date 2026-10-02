@@ -475,6 +475,25 @@ describe('PracticeWorkspace when its session vanishes', () => {
     expect(screen.getByTestId('notice-back').getAttribute('href')).toBe('/');
   });
 
+  it('[UX-12] turns into the same not-found when a draft save is the first to find the session gone — no "draft not saved", no alert', async () => {
+    stubApi([
+      { method: 'PUT', path: `/api/sessions/${SESSION}/draft`, ...GONE },
+      ...sessionRoutes({}).filter((route) => route.method !== 'PUT'),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByTestId('palette-cache'));
+    expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Practice session not found' }, { timeout: 4000 }),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('draft-status')).toBeNull();
+    expect(screen.queryByTestId('submit-error')).toBeNull();
+    expect(screen.queryByText(`Session ${SESSION} not found`)).toBeNull();
+    expect(screen.getByTestId('notice-back').getAttribute('href')).toBe('/');
+  });
+
   it('[UX-12] turns into the same not-found when an action is the first to find the session gone', async () => {
     stubApi([
       { method: 'POST', path: `/api/sessions/${SESSION}/revisions`, ...GONE },

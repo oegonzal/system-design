@@ -212,6 +212,60 @@ describe('useDraftAutosave', () => {
     expect(hook.result.current.status).toBe('saved');
   });
 
+  it('[UX-12] a save the server answers with "no such session" says the session is gone — not a failed save — and is the last one sent', async () => {
+    const { fetchMock } = stubApi([
+      {
+        method: 'PUT',
+        path: DRAFT_PATH,
+        status: 404,
+        body: { statusCode: 404, message: 'Session session-1 not found', missing: 'session' },
+      },
+    ]);
+    const store = createCanvasStore(makeGraph());
+    const hook = renderHook(() => useDraftAutosave('session-1', store, true));
+    expect(hook.result.current.gone).toBeNull();
+
+    act(() => {
+      store.getState().addNode('cache');
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+    expect(hook.result.current.gone?.status).toBe(404);
+    expect(hook.result.current.status).toBe('unsaved');
+
+    // Nowhere left to keep the draft: no edit, and no settle, sends another.
+    act(() => {
+      store.getState().addNode('queue');
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS * 2);
+    await act(async () => {
+      await hook.result.current.settle();
+    });
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+  });
+
+  it('[UX-12] a 404 that does not say the session is gone is a failed save like any other', async () => {
+    stubApi([
+      {
+        method: 'PUT',
+        path: DRAFT_PATH,
+        status: 404,
+        body: { statusCode: 404, message: 'Cannot PUT /api/sessions/session-1/draft' },
+      },
+    ]);
+    const store = createCanvasStore(makeGraph());
+    const hook = renderHook(() => useDraftAutosave('session-1', store, true));
+
+    act(() => {
+      store.getState().addNode('cache');
+    });
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+
+    expect(hook.result.current.gone).toBeNull();
+    expect(hook.result.current.status).toBe('failed');
+    expect(hook.result.current.pending).toBe(true);
+  });
+
   it('saves nothing while disabled — a revision on screen is not the draft — and catches up once enabled', async () => {
     const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
     const store = createCanvasStore(makeGraph());
