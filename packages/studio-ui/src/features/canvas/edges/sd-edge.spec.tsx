@@ -2,7 +2,7 @@ import { DEFAULT_APPEARANCE_SETTINGS } from '@sysdesign/contracts';
 import { createTheme } from '@sysdesign/design-system';
 import { installDomShims, renderWithTheme } from '@sysdesign/web-testing';
 import { Position, ReactFlow } from '@xyflow/react';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { overlaps, type Box, type Size } from '../geometry';
@@ -36,24 +36,28 @@ function plainNode(id: string, y: number): SdNodeModel {
   };
 }
 
-function renderEdge(
-  edge: Partial<SdEdgeModel>,
+const connection = (edge: Partial<SdEdgeModel>): SdEdgeModel => ({
+  id: 'e-1',
+  type: 'sd',
+  source: 'n-1',
+  target: 'n-2',
+  data: { kind: 'sync' },
+  ...edge,
+});
+
+function renderEdges(
+  edges: SdEdgeModel[],
   nodes: SdNodeModel[] = [plainNode('n-1', 0), plainNode('n-2', 200)],
 ) {
-  const full: SdEdgeModel = {
-    id: 'e-1',
-    type: 'sd',
-    source: 'n-1',
-    target: 'n-2',
-    data: { kind: 'sync' },
-    ...edge,
-  };
   renderWithTheme(
     <div style={{ width: 800, height: 600 }}>
-      <ReactFlow nodes={nodes} edges={[full]} nodeTypes={nodeTypes} edgeTypes={edgeTypes} />
+      <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} />
     </div>,
   );
 }
+
+const renderEdge = (edge: Partial<SdEdgeModel>, nodes?: SdNodeModel[]) =>
+  renderEdges([connection(edge)], nodes);
 
 /** jsdom lays nothing out: give the pill a size, and leave everything else the shims' pane-sized default. */
 function layOutPills(size: Size) {
@@ -138,6 +142,30 @@ describe('SdEdge', () => {
     const blockBottom = between.position.y + BLOCK.height;
     expect(box.y).toBeGreaterThanOrEqual(blockBottom);
     expect(box.y - blockBottom).toBeLessThan(pillSize.height / 2);
+  });
+
+  it('[UX-10] keeps two pills off each other: the later connection’s pill moves along its line to the nearest place clear of the earlier one, on screen and in the PDF that copies it', async () => {
+    const pillSize = { width: 60, height: 20 };
+    layOutPills(pillSize);
+    // Two connections between the same blocks: one line, so both pills start at one middle.
+    renderEdges([
+      connection({ id: 'e-1', label: 'reads' }),
+      connection({ id: 'e-2', label: 'writes' }),
+    ]);
+
+    const first = await screen.findByTestId('edge-pill-e-1');
+    const second = await screen.findByTestId('edge-pill-e-2');
+    await waitFor(() => {
+      expect(overlaps(pillBox(first, pillSize), pillBox(second, pillSize))).toBe(false);
+    });
+    const blocks = [plainNode('n-1', 0), plainNode('n-2', 200)].map((node) => ({
+      ...node.position,
+      ...BLOCK,
+    }));
+    expect(blocks.some((block) => overlaps(pillBox(second, pillSize), block))).toBe(false);
+    // The connection drawn first keeps the middle of the gap between the blocks.
+    const firstBox = pillBox(first, pillSize);
+    expect(firstBox.y + firstBox.height / 2).toBeCloseTo((BLOCK.height + 200) / 2, -1);
   });
 
   it('leaves the pill in the middle of the line when no block is under it', async () => {

@@ -1,16 +1,32 @@
-import { getBezierPath, Position } from '@xyflow/react';
+import { getBezierPath, Position, type XYPosition } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { overlaps, type Box, type Size } from '../geometry';
-import { connectionCurve, curvePath, pillPoint, pointAt, type ConnectionEnds } from './edge-path';
+import { grown, overlaps, type Box, type Size } from '../geometry';
+import {
+  connectionCurve,
+  curvePath,
+  PILL_GAP,
+  placePills,
+  pointAt,
+  type ConnectionEnds,
+  type Curve,
+  type PillAsk,
+} from './edge-path';
 
 const pill: Size = { width: 60, height: 20 };
 
-const pillBox = (point: { x: number; y: number }): Box => ({
-  x: point.x - pill.width / 2,
-  y: point.y - pill.height / 2,
-  ...pill,
+const pillBox = (point: { x: number; y: number }, size: Size = pill): Box => ({
+  x: point.x - size.width / 2,
+  y: point.y - size.height / 2,
+  ...size,
 });
+
+/** One pill placed alone among the blocks: the place `placePills` gives the only pill it is asked for. */
+function pillPoint(curve: Curve, size: Size | null, blocks: readonly Box[]) {
+  const place = placePills([{ id: 'only', curve, size }], blocks).get('only');
+  if (place === undefined) throw new Error('the pill was not placed');
+  return place;
+}
 
 /** A block's bottom handle to another's top handle, straight down. */
 const down: ConnectionEnds = {
@@ -58,7 +74,7 @@ describe('connectionCurve', () => {
   );
 });
 
-describe('pillPoint', () => {
+describe('placePills — one pill among the blocks', () => {
   const curve = connectionCurve(down);
   const sourceBlock: Box = { x: 134, y: 20, width: 132, height: 51 };
   const targetBlock: Box = { x: 134, y: 340, width: 132, height: 51 };
@@ -99,5 +115,127 @@ describe('pillPoint', () => {
 
     expect(pillPoint(curve, pill, [wall])).toEqual(pointAt(curve, 0.5));
     expect(pillPoint(curve, { width: 0, height: 0 }, [wall])).toEqual(pointAt(curve, 0.5));
+    expect(pillPoint(curve, null, [wall])).toEqual(pointAt(curve, 0.5));
+  });
+});
+
+describe('placePills — pills among each other', () => {
+  const sourceBlock: Box = { x: 134, y: 20, width: 132, height: 51 };
+  const targetBlock: Box = { x: 134, y: 340, width: 132, height: 51 };
+  const blocks = [sourceBlock, targetBlock];
+  /** A second connection beside `down`, close enough that two pills at the same height collide. */
+  const beside = connectionCurve({
+    ...down,
+    source: { x: 230, y: 71 },
+    target: { x: 230, y: 340 },
+  });
+  const first = connectionCurve(down);
+  const wide: Size = { width: 120, height: 20 };
+
+  /** The two pills' boxes where `placePills` put them, in the order asked. */
+  function placedBoxes(
+    asks: readonly [PillAsk, PillAsk],
+    places: Map<string, XYPosition>,
+  ): [Box, Box] {
+    const boxOf = ({ id, size }: PillAsk): Box => {
+      const place = places.get(id);
+      if (place === undefined || size === null) throw new Error(`${id} was not placed`);
+      return pillBox(place, size);
+    };
+    return [boxOf(asks[0]), boxOf(asks[1])];
+  }
+
+  /** How much of `box` lies under `other`. */
+  const coveredBy = (box: Box, other: Box): number =>
+    Math.max(Math.min(box.x + box.width, other.x + other.width) - Math.max(box.x, other.x), 0) *
+    Math.max(Math.min(box.y + box.height, other.y + other.height) - Math.max(box.y, other.y), 0);
+
+  it('moves a pill whose middle an earlier pill covers along its own line, to the nearest place clear of that pill and every block', () => {
+    const asks: [PillAsk, PillAsk] = [
+      { id: 'e-1', curve: first, size: wide },
+      { id: 'e-2', curve: beside, size: wide },
+    ];
+    // At their middles the two labels would sit on each other.
+    expect(overlaps(pillBox(pointAt(first, 0.5), wide), pillBox(pointAt(beside, 0.5), wide))).toBe(
+      true,
+    );
+
+    const places = placePills(asks, blocks);
+    const [earlier, later] = placedBoxes(asks, places);
+
+    // The first asked keeps the middle; the second leaves it, on its own line, with a gap between them.
+    expect(places.get('e-1')).toEqual(pointAt(first, 0.5));
+    expect(places.get('e-2')?.x).toBeCloseTo(230);
+    expect(overlaps(grown(later, PILL_GAP), earlier)).toBe(false);
+    expect(blocks.some((block) => overlaps(later, block))).toBe(false);
+    // The nearest such place: within a step of the gap it has to keep.
+    const apart = Math.max(
+      earlier.y - (later.y + later.height),
+      later.y - (earlier.y + earlier.height),
+    );
+    expect(apart).toBeGreaterThanOrEqual(PILL_GAP);
+    expect(apart - PILL_GAP).toBeLessThan(wide.height / 2);
+  });
+
+  it('places in the order asked, so the connection asked first keeps its place and a later one finds room around it', () => {
+    const forward = placePills(
+      [
+        { id: 'e-1', curve: first, size: wide },
+        { id: 'e-2', curve: beside, size: wide },
+      ],
+      blocks,
+    );
+    const backward = placePills(
+      [
+        { id: 'e-2', curve: beside, size: wide },
+        { id: 'e-1', curve: first, size: wide },
+      ],
+      blocks,
+    );
+
+    expect(forward.get('e-1')).toEqual(pointAt(first, 0.5));
+    expect(backward.get('e-2')).toEqual(pointAt(beside, 0.5));
+    expect(backward.get('e-1')).not.toEqual(pointAt(first, 0.5));
+  });
+
+  it('keeps a pill that has no size yet out of the question: it covers nothing until it is laid out', () => {
+    const places = placePills(
+      [
+        { id: 'e-1', curve: first, size: null },
+        { id: 'e-2', curve: beside, size: wide },
+      ],
+      blocks,
+    );
+
+    expect(places.get('e-1')).toEqual(pointAt(first, 0.5));
+    expect(places.get('e-2')).toEqual(pointAt(beside, 0.5));
+  });
+
+  it('where no place on the line is clear of the pills, takes the one they cover least — still clear of every block', () => {
+    // A short drop between two blocks, crossed at its middle by a tall pill on a sideways line.
+    const top: Box = { x: 134, y: 20, width: 132, height: 51 };
+    const bottom: Box = { x: 134, y: 140, width: 132, height: 51 };
+    const short = connectionCurve({ ...down, target: { x: 200, y: 140 } });
+    const across = connectionCurve({
+      source: { x: 60, y: 105 },
+      sourceSide: Position.Right,
+      target: { x: 340, y: 105 },
+      targetSide: Position.Left,
+    });
+    const tall: Size = { width: 60, height: 40 };
+    const asks: [PillAsk, PillAsk] = [
+      { id: 'across', curve: across, size: tall },
+      { id: 'short', curve: short, size: pill },
+    ];
+
+    const places = placePills(asks, [top, bottom]);
+    const [crossing, crowded] = placedBoxes(asks, places);
+
+    expect([top, bottom].some((block) => overlaps(crowded, block))).toBe(false);
+    // Crowded, but not hidden under the crossing pill where the middle would have put it.
+    expect(coveredBy(crowded, crossing)).toBeGreaterThan(0);
+    expect(coveredBy(crowded, crossing)).toBeLessThan(
+      coveredBy(pillBox(pointAt(short, 0.5)), crossing) / 2,
+    );
   });
 });

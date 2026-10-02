@@ -196,6 +196,32 @@ export class CanvasPage {
     ).toBeVisible();
   }
 
+  /** A connection's pill: its carried operations or its label, drawn on its line. */
+  edgePill(id: string): Locator {
+    return this.page.getByTestId(`edge-pill-${id}`);
+  }
+
+  /** No two of these connections' pills overlap on screen: every label is read whole. */
+  async expectPillsApart(edgeIds: readonly string[]): Promise<void> {
+    const overlapping = async (): Promise<string[]> => {
+      const boxes = await Promise.all(edgeIds.map((id) => this.edgePill(id).boundingBox()));
+      const pairs: string[] = [];
+      boxes.forEach((a, i) => {
+        boxes.slice(i + 1).forEach((b, offset) => {
+          if (a === null || b === null) return;
+          const apart =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          if (!apart) pairs.push(`${edgeIds[i]} × ${edgeIds[i + 1 + offset]}`);
+        });
+      });
+      return pairs;
+    };
+    await expect.poll(overlapping).toEqual([]);
+  }
+
   /** A finding's highlight paints its severity onto the elements it names. */
   async expectNodeHighlighted(id: string, severity: Severity): Promise<void> {
     await expect(this.node(id)).toHaveAttribute('data-severity', severity);

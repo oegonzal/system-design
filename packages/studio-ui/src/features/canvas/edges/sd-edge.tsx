@@ -4,18 +4,13 @@ import { css, keyframes, useTheme, type Theme } from '@emotion/react';
 import styled from '@emotion/styled';
 import type { EdgeKind, Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
-import {
-  BaseEdge,
-  EdgeLabelRenderer,
-  useStore,
-  type EdgeProps,
-  type ReactFlowState,
-} from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import { memo, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 
-import type { Box, Size } from '../geometry';
+import type { Size } from '../geometry';
 import type { SdEdge as SdEdgeModel } from '../types';
-import { connectionCurve, curvePath, pillPoint, type Curve } from './edge-path';
+import { connectionCurve, curvePath, type Curve } from './edge-path';
+import { usePillPlace } from './pill-layout';
 
 /** Async edges drift their dashes — data flowing, not a call waiting. */
 const dashFlow = keyframes`
@@ -78,30 +73,6 @@ const LabelChip = styled.div`
   font-family: ${({ theme }) => theme.font.family.base};
 `;
 
-type FlowNodes = ReactFlowState['nodes'];
-
-/** Every measured block's box, computed once per node list however many pills ask. */
-const boxesByNodes = new WeakMap<FlowNodes, Box[]>();
-
-/**
- * The blocks a pill has to keep clear of, as React Flow measured them. The
- * same array for the same node list, so a pill re-renders when a block
- * moves or resizes and not when the view pans.
- */
-function selectBlockBoxes(state: ReactFlowState): Box[] {
-  const cached = boxesByNodes.get(state.nodes);
-  if (cached) return cached;
-  const boxes = state.nodes.flatMap((node) =>
-    node.measured?.width && node.measured.height
-      ? [{ ...node.position, width: node.measured.width, height: node.measured.height }]
-      : [],
-  );
-  boxesByNodes.set(state.nodes, boxes);
-  return boxes;
-}
-
-const UNMEASURED: Size = { width: 0, height: 0 };
-
 /** The size the pill is laid out at, in flow units (unscaled by the zoom); null until it is in the page. */
 function useLaidOutSize(element: HTMLElement | null, text: string): Size | null {
   const [size, setSize] = useState<Size | null>(null);
@@ -129,15 +100,15 @@ function useLaidOutSize(element: HTMLElement | null, text: string): Size | null 
 }
 
 /**
- * The connection's pill, centred on its line where no block is under it.
- * Its place is inline style on the chip, like the line's stroke: a copy of
- * the diagram (the PDF) keeps it where the screen shows it.
+ * The connection's pill, centred on its line where no block and no other
+ * pill is under it (`usePillPlace`). Its place is inline style on the chip,
+ * like the line's stroke: a copy of the diagram (the PDF) keeps it where the
+ * screen shows it.
  */
 function EdgePill({ id, curve, text }: { id: string; curve: Curve; text: string }) {
-  const blocks = useStore(selectBlockBoxes);
   const [chip, setChip] = useState<HTMLDivElement | null>(null);
   const size = useLaidOutSize(chip, text);
-  const point = useMemo(() => pillPoint(curve, size ?? UNMEASURED, blocks), [curve, size, blocks]);
+  const point = usePillPlace(id, curve, size);
   return (
     <EdgeLabelRenderer>
       <LabelChip

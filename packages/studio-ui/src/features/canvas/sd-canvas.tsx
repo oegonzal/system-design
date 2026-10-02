@@ -69,10 +69,11 @@ const CanvasFrame = styled.div`
     overflow: hidden;
   }
 
-  /* A connection's pill keeps clear of the blocks wherever its line has the
-     room (\`pillPoint\`); where it has none the pill is drawn above them, so it
-     is still read — on screen and in the exported PDF. A block being dragged
-     or selected (React Flow lifts it) still passes over it. */
+  /* A connection's pill keeps clear of the blocks and of the other pills
+     wherever its line has the room (\`placePills\`); where it has none the
+     pill is drawn above the blocks, so it is still read — on screen and in
+     the exported PDF. A block being dragged or selected (React Flow lifts
+     it) still passes over it. */
   .react-flow__edgelabel-renderer {
     z-index: 1;
   }

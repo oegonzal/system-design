@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { NODE_KIND_CATEGORIES, NODE_KINDS } from '@sysdesign/contracts';
 
-import { openPracticeSession } from '../support/canvas.page';
+import { createPracticeSession, saveDraft } from '../support/backend';
+import { CanvasPage, openPracticeSession } from '../support/canvas.page';
 
 /**
  * The interactive canvas, against the real workspace: each test arranges its
@@ -143,5 +144,38 @@ test.describe('interactive design canvas', () => {
     await page.getByTestId('config-key').fill('replicas');
     await expect(page.getByTestId('config-error')).toContainText('already set');
     await expect(page.getByTestId('config-add')).toBeDisabled();
+  });
+
+  test('[UX-2] two connections whose lines cross in one gap keep their labels apart', async ({
+    page,
+    request,
+  }) => {
+    // Two rows of blocks joined corner to corner: both lines cross the gap
+    // between the rows at one point, where both pills would sit.
+    const { session } = await createPracticeSession(request);
+    await saveDraft(request, session.id, {
+      graph: {
+        nodes: [
+          { id: 'n-1', kind: 'client', label: 'Client', position: { x: 0, y: 0 } },
+          { id: 'n-2', kind: 'gateway', label: 'API Gateway', position: { x: 320, y: 0 } },
+          { id: 'n-3', kind: 'service', label: 'Service', position: { x: 0, y: 220 } },
+          { id: 'n-4', kind: 'database', label: 'Database', position: { x: 320, y: 220 } },
+        ],
+        edges: [
+          { id: 'e-1', source: 'n-2', target: 'n-3', kind: 'sync', label: 'route' },
+          { id: 'e-2', source: 'n-1', target: 'n-4', kind: 'sync', label: 'reads and writes' },
+        ],
+      },
+      brief: null,
+      narrative: null,
+    });
+
+    const canvas = new CanvasPage(page);
+    await page.goto(`/practice/${session.id}`);
+    await canvas.ready();
+    await canvas.expectNodeCount(4);
+    await canvas.expectEdgePill('route');
+    await canvas.expectEdgePill('reads and writes');
+    await canvas.expectPillsApart(['e-1', 'e-2']);
   });
 });
