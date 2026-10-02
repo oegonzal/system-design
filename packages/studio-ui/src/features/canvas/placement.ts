@@ -1,13 +1,12 @@
+import { nearestFreePlace } from '@sysdesign/contracts';
 import type { XYPosition } from '@xyflow/react';
 
 import { revealShift } from './framing';
 import {
-  contains,
-  grown,
+  centredOn,
   NODE_FOOTPRINT,
   NODE_GAP,
   NODE_MIN_FOOTPRINT,
-  overlaps,
   type Box,
   type Size,
 } from './geometry';
@@ -16,9 +15,10 @@ import type { SdNode } from './types';
 /**
  * Where a block goes. When the author did not say: the free place nearest
  * the middle of what they can see, and beside it only when nothing they can
- * see is free. When they did (a drop): where they let go of it. Pure, so the
- * store can apply it to every add and a spec can pin it down without a
- * browser.
+ * see is free — found by the contract's one free-place search, the same one
+ * that lays out a coach's revision. When they did (a drop): where they let
+ * go of it. Pure, so the store can apply it to every add and a spec can pin
+ * it down without a browser.
  */
 
 /**
@@ -45,11 +45,6 @@ export function boxOf(node: SdNode): Box {
   };
 }
 
-/** Two boxes closer than the gap: a block placed there would sit on the other's handles. */
-function crowds(a: Box, b: Box): boolean {
-  return overlaps(grown(a, NODE_GAP), b);
-}
-
 /** The room a new block is given: the largest any block on the canvas takes, never less than assumed. */
 function footprint(nodes: readonly SdNode[]): Size {
   return nodes.reduce<Size>(
@@ -60,60 +55,6 @@ function footprint(nodes: readonly SdNode[]): Size {
     NODE_FOOTPRINT,
   );
 }
-
-/**
- * The free corner nearest `origin` for a block of `size` — inside `within`
- * when one is given, anywhere otherwise. Null when `within` has no room.
- *
- * The nearest free place is `origin` itself, or it touches what is in the
- * way: it sits one gap off a block's edge (or on the area's own edge) on one
- * axis or both. So those edges, crossed, are every candidate there is — no
- * grid to fall between, and no search radius to run out of. Ties go below,
- * then right: a column grows downward from where the author looks.
- */
-function nearestFree(
-  origin: XYPosition,
-  size: Size,
-  taken: readonly Box[],
-  within: Box | null,
-): XYPosition | null {
-  // Only a block within a gap of the area can crowd a place inside it.
-  const near = within === null ? taken : taken.filter((box) => crowds(within, box));
-  const xs = new Set([origin.x]);
-  const ys = new Set([origin.y]);
-  for (const box of near) {
-    xs.add(box.x + box.width + NODE_GAP).add(box.x - NODE_GAP - size.width);
-    ys.add(box.y + box.height + NODE_GAP).add(box.y - NODE_GAP - size.height);
-  }
-  if (within !== null) {
-    xs.add(within.x).add(within.x + within.width - size.width);
-    ys.add(within.y).add(within.y + within.height - size.height);
-  }
-
-  let best: XYPosition | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const x of xs) {
-    for (const y of ys) {
-      const distance = Math.hypot(x - origin.x, y - origin.y);
-      const nearer =
-        best === null ||
-        distance < bestDistance ||
-        (distance === bestDistance && (y > best.y || (y === best.y && x > best.x)));
-      if (!nearer) continue;
-      const slot = { x, y, ...size };
-      if (within !== null && !contains(within, slot)) continue;
-      if (near.some((box) => crowds(slot, box))) continue;
-      best = { x, y };
-      bestDistance = distance;
-    }
-  }
-  return best;
-}
-
-const centredOn = (point: XYPosition, size: Size): XYPosition => ({
-  x: point.x - size.width / 2,
-  y: point.y - size.height / 2,
-});
 
 const centreOf = (box: Box): XYPosition => ({
   x: box.x + box.width / 2,
@@ -130,11 +71,12 @@ const centreOf = (box: Box): XYPosition => ({
 export function placeBlock(nodes: readonly SdNode[], visible: Box | null): Placement {
   const size = footprint(nodes);
   const taken = nodes.map(boxOf);
-  const origin = centredOn(visible === null ? FALLBACK_ANCHOR : centreOf(visible), size);
-  const onScreen = visible === null ? null : nearestFree(origin, size, taken, visible);
+  const { x, y } = centredOn(visible === null ? FALLBACK_ANCHOR : centreOf(visible), size);
+  const ask = { origin: { x, y }, size, taken, gap: NODE_GAP };
+  const onScreen = visible === null ? null : nearestFreePlace({ ...ask, within: visible });
   if (onScreen !== null) return { position: onScreen, size, visible: true };
   // Unbounded, there is always room: at the least, one gap past the outermost block.
-  const anywhere = nearestFree(origin, size, taken, null) ?? origin;
+  const anywhere = nearestFreePlace(ask) ?? ask.origin;
   return { position: anywhere, size, visible: visible === null };
 }
 

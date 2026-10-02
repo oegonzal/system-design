@@ -1,6 +1,6 @@
 import { Position, type XYPosition } from '@xyflow/react';
 
-import { overlaps, type Box, type Size } from '../geometry';
+import { centredOn, overlaps, type Box, type Size } from '../geometry';
 
 /**
  * The line a connection is drawn along, and where its pill sits on it. The
@@ -92,12 +92,6 @@ function stepsAlong({ from, fromControl, toControl, to }: Curve, pill: Size): nu
   const stride = Math.min(pill.width, pill.height) / 2;
   return Math.max(Math.ceil((3 * longestLeg) / stride), 1);
 }
-
-const centredOn = (point: XYPosition, size: Size): Box => ({
-  x: point.x - size.width / 2,
-  y: point.y - size.height / 2,
-  ...size,
-});
 
 /**
  * Where a connection's pill is centred: the middle of the line, or — when a

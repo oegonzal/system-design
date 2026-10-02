@@ -4,6 +4,7 @@ import {
   LAYOUT_BLOCK,
   LAYOUT_ORIGIN,
   LAYOUT_PITCH,
+  LAYOUT_ROW_COST,
   layoutGraph,
   positionsOf,
   type CanvasPosition,
@@ -62,7 +63,7 @@ describe('layoutGraph', () => {
     expect(layoutGraph(stripped, positionsOf(graph))).toEqual(graph);
   });
 
-  it('places a new block beside the blocks it joins — after its callers, before its callees, between the two — and never on one', () => {
+  it('places a new block down the flow from the blocks it joins — under its callers, over its callees, between the two — and never on one', () => {
     const base = authored();
     const coached: CanvasGraph = {
       nodes: [
@@ -84,29 +85,65 @@ describe('layoutGraph', () => {
     const at = (id: string) => laid.nodes.find((n) => n.id === id)?.position;
 
     for (const original of base.nodes) expect(at(original.id)).toEqual(original.position);
-    // After its one caller: a column to the right of the database.
-    expect(at('ai-replica')).toEqual({ x: 900 + LAYOUT_PITCH.x, y: 0 });
-    // Before its one callee: a column to the left of the client.
-    expect(at('ai-waf')).toEqual({ x: 0 - LAYOUT_PITCH.x, y: 0 });
-    // Between gateway (300) and service (600): the midpoint is taken by neither, so the slot under it.
+    // A block's handles are on its top and bottom, so a connection reads
+    // down the canvas. Under its one caller: the row below the database.
+    expect(at('ai-replica')).toEqual({ x: 900, y: LAYOUT_PITCH.y });
+    // Over its one callee: the row above the client.
+    expect(at('ai-waf')).toEqual({ x: 0, y: 0 - LAYOUT_PITCH.y });
+    // Between gateway (300) and service (600): the midpoint is taken by both,
+    // and a row down costs less than the two columns to the row's far end.
     expect(at('ai-lb')).toEqual({ x: 450, y: LAYOUT_PITCH.y });
     expect(laid.nodes.map((n) => n.id)).toEqual(coached.nodes.map((n) => n.id));
     expect(laid.edges).toEqual(coached.edges);
     expectNoOverlap(laid);
   });
 
-  it('lays out a graph with no positions at all: a path reads left to right, a fan-out stacks, and nothing overlaps', () => {
+  it('lays out a graph with no positions at all: a path reads top to bottom, a fan-out spreads across its row, and nothing overlaps', () => {
     const laid = layoutGraph({
-      nodes: ['a', 'b', 'c1', 'c2', 'c3', 'lonely'].map((id) => node(id)),
-      edges: [edge('a', 'b'), edge('b', 'c1'), edge('b', 'c2'), edge('b', 'c3')],
+      nodes: ['a', 'b', 'c1', 'c2', 'c3', 'c4', 'lonely'].map((id) => node(id)),
+      edges: [edge('a', 'b'), edge('b', 'c1'), edge('b', 'c2'), edge('b', 'c3'), edge('b', 'c4')],
     });
     const at = (id: string) => laid.nodes.find((n) => n.id === id)?.position;
     expect(at('a')).toEqual(LAYOUT_ORIGIN);
-    expect(at('b')).toEqual({ x: LAYOUT_PITCH.x, y: 0 });
-    expect(at('c1')).toEqual({ x: 2 * LAYOUT_PITCH.x, y: 0 });
-    expect(at('c2')).toEqual({ x: 2 * LAYOUT_PITCH.x, y: LAYOUT_PITCH.y });
-    // Connected to nothing: a row of its own, under everything placed.
-    expect(at('lonely')?.y).toBeGreaterThan(at('c2')?.y ?? 0);
+    expect(at('b')).toEqual({ x: 0, y: LAYOUT_PITCH.y });
+    // The callees of one caller share its row below, growing right, then left.
+    expect(at('c1')).toEqual({ x: 0, y: 2 * LAYOUT_PITCH.y });
+    expect(at('c2')).toEqual({ x: LAYOUT_PITCH.x, y: 2 * LAYOUT_PITCH.y });
+    expect(at('c3')).toEqual({ x: -LAYOUT_PITCH.x, y: 2 * LAYOUT_PITCH.y });
+    expect(at('c4')).toEqual({ x: 2 * LAYOUT_PITCH.x, y: 2 * LAYOUT_PITCH.y });
+    // Connected to nothing: a column of its own, beside everything placed, from the top.
+    expect(at('lonely')).toEqual({ x: 3 * LAYOUT_PITCH.x, y: 0 });
+    expectNoOverlap(laid);
+  });
+
+  it('a block whose slot is taken goes a column over before a row down, and a row down before two columns over', () => {
+    // Two callers in one row, each with a callee under it; a third callee of
+    // the first caller finds its slot taken by the second caller's callee.
+    const laid = layoutGraph(
+      {
+        nodes: [
+          node('p', { x: 0, y: 0 }),
+          node('q', { x: LAYOUT_PITCH.x, y: 0 }),
+          node('p1', { x: 0, y: LAYOUT_PITCH.y }),
+          node('q1', { x: LAYOUT_PITCH.x, y: LAYOUT_PITCH.y }),
+          node('ai-p2'),
+        ],
+        edges: [edge('p', 'p1'), edge('q', 'q1'), edge('p', 'ai-p2')],
+      },
+      new Map([
+        ['p', { x: 0, y: 0 }],
+        ['q', { x: LAYOUT_PITCH.x, y: 0 }],
+        ['p1', { x: 0, y: LAYOUT_PITCH.y }],
+        ['q1', { x: LAYOUT_PITCH.x, y: LAYOUT_PITCH.y }],
+      ]),
+    );
+    // Wanted one right of p1 (taken by q1): the next column over beats a row down.
+    expect(laid.nodes.find((n) => n.id === 'ai-p2')?.position).toEqual({
+      x: 2 * LAYOUT_PITCH.x,
+      y: LAYOUT_PITCH.y,
+    });
+    expect(LAYOUT_ROW_COST).toBeGreaterThan(1);
+    expect(LAYOUT_ROW_COST).toBeLessThanOrEqual(2);
     expectNoOverlap(laid);
   });
 

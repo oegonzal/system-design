@@ -1,10 +1,12 @@
+import { nearestFreePlace, type CanvasSize, type PlaceDistance } from './canvas-geometry';
 import type { CanvasGraph, CanvasNode } from './canvas.schema';
 
 /**
- * Where a block goes when nobody said: beside the blocks it is connected to,
- * in a free slot. A position is presentation — no lens reads it and no grade
- * depends on it — so it is the studio's to give, never a model's: the coach
- * revises a canvas it was shown as text, and what it returns has no layout.
+ * Where a block goes when nobody said: under the blocks that call it, over
+ * the ones it calls, in a free slot. A position is presentation — no lens
+ * reads it and no grade depends on it — so it is the studio's to give, never
+ * a model's: the coach revises a canvas it was shown as text, and what it
+ * returns has no layout.
  * The API lays an imported revision out with this before it stores it, and
  * the canvas lays out any stored graph that still lacks positions the same
  * way, so the two can never place a block differently.
@@ -35,10 +37,28 @@ export const LAYOUT_PITCH = { x: 340, y: 136 } as const;
 /** Where the first block goes on a canvas with nothing placed. */
 export const LAYOUT_ORIGIN: CanvasPosition = { x: 0, y: 0 };
 
-/** Two blocks closer than the gap: one would sit on the other's handles. */
-const crowds = (a: CanvasPosition, b: CanvasPosition): boolean =>
-  Math.abs(a.x - b.x) < LAYOUT_BLOCK.width + LAYOUT_BLOCK.gap &&
-  Math.abs(a.y - b.y) < LAYOUT_BLOCK.height + LAYOUT_BLOCK.gap;
+/**
+ * How much dearer a step down a row is than a step across a column when a
+ * block looks for a free place near where it belongs: a block pushed out of
+ * its row goes a column over before it goes a row down, and a row down
+ * before two columns over — so a block squeezed between two of its
+ * neighbours in one row lands just under them, never at the row's far end.
+ */
+export const LAYOUT_ROW_COST = 2;
+
+/**
+ * The room one slot gives a block: a pitch less the gap, so two slots a
+ * pitch apart are exactly one gap clear of each other. Every placed block is
+ * taken to fill its room, whatever it is drawn at.
+ */
+const ROOM: CanvasSize = {
+  width: LAYOUT_PITCH.x - LAYOUT_BLOCK.gap,
+  height: LAYOUT_PITCH.y - LAYOUT_BLOCK.gap,
+};
+
+/** Distance in slots, a row costing `LAYOUT_ROW_COST` columns. */
+const inSlots: PlaceDistance = (dx, dy) =>
+  Math.hypot(dx / LAYOUT_PITCH.x, (dy / LAYOUT_PITCH.y) * LAYOUT_ROW_COST);
 
 const centroid = (points: readonly CanvasPosition[]): CanvasPosition => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
@@ -46,45 +66,22 @@ const centroid = (points: readonly CanvasPosition[]): CanvasPosition => ({
 });
 
 /**
- * The slots of one ring around an anchor, in slot units, nearest first. Ties
- * go below, then right, then left, then above — a column grows downward from
- * where its neighbours are.
+ * Which column the n-th block of a row takes, counting from the one its
+ * neighbour sits in: the middle, then one right, one left, two right, two
+ * left — a row grows outward from where it was started, both ways.
  */
-function ringOffsets(ring: number): [number, number][] {
-  const offsets: [number, number][] = [];
-  for (let row = -ring; row <= ring; row += 1) {
-    for (let col = -ring; col <= ring; col += 1) {
-      if (Math.max(Math.abs(row), Math.abs(col)) === ring) offsets.push([col, row]);
-    }
-  }
-  return offsets.sort(
-    ([colA, rowA], [colB, rowB]) =>
-      Math.hypot(colA, rowA) - Math.hypot(colB, rowB) || rowB - rowA || colB - colA,
-  );
-}
-
-/** The free slot nearest `anchor`: the first, ring by ring, that crowds no placed block. */
-function freeSlotNear(anchor: CanvasPosition, placed: readonly CanvasPosition[]): CanvasPosition {
-  // A placed block crowds at most four slots, so a ring this wide always holds a free one.
-  const widest = Math.ceil(Math.sqrt(placed.length)) + 1;
-  for (let ring = 0; ring <= widest; ring += 1) {
-    for (const [col, row] of ringOffsets(ring)) {
-      const slot = {
-        x: Math.round(anchor.x + col * LAYOUT_PITCH.x),
-        y: Math.round(anchor.y + row * LAYOUT_PITCH.y),
-      };
-      if (!placed.some((position) => crowds(slot, position))) return slot;
-    }
-  }
-  return { x: Math.round(anchor.x), y: Math.round(anchor.y) };
-}
+const spread = (nth: number): number => (nth === 0 ? 0 : Math.ceil(nth / 2) * (nth % 2 ? 1 : -1));
 
 /**
- * Where a block wants to be, from the placed blocks it is connected to: one
- * column after the ones that call it, one column before the ones it calls,
- * between the two when it has both — a block put into the middle of a path
- * lands in the middle of it. With no placed neighbour it starts a new row
- * under everything placed, or the canvas itself.
+ * Where a block wants to be, from the placed blocks it is connected to. A
+ * block's handles are on its top (what calls it) and bottom (what it calls),
+ * so a path reads down the canvas: a block goes the row under the ones that
+ * call it, the row over the ones it calls, between the two when it has both
+ * — a block put into the middle of a path lands in the middle of it. Beside
+ * the siblings already there: the callees of its caller spread across their
+ * row, right then left, as the callers of its callee do. With no placed
+ * neighbour it starts a new column beside everything placed, or the canvas
+ * itself.
  */
 function anchorFor(
   node: CanvasNode,
@@ -96,29 +93,55 @@ function anchorFor(
       const position = placed.get(id);
       return position ? [position] : [];
     });
-  const callers = placedAt(
-    graph.edges.filter((edge) => edge.target === node.id).map((edge) => edge.source),
-  );
-  const callees = placedAt(
-    graph.edges.filter((edge) => edge.source === node.id).map((edge) => edge.target),
-  );
+  const callerIds = graph.edges
+    .filter((edge) => edge.target === node.id)
+    .map((edge) => edge.source);
+  const calleeIds = graph.edges
+    .filter((edge) => edge.source === node.id)
+    .map((edge) => edge.target);
+  const callers = placedAt(callerIds);
+  const callees = placedAt(calleeIds);
+  /** How many placed blocks already share one of these neighbours on the given side. */
+  const siblings = (neighbours: readonly string[], side: 'source' | 'target'): number =>
+    new Set(
+      graph.edges
+        .filter((edge) => neighbours.includes(edge[side === 'source' ? 'source' : 'target']))
+        .map((edge) => edge[side === 'source' ? 'target' : 'source'])
+        .filter((id) => id !== node.id && placed.has(id)),
+    ).size;
   if (callers.length > 0 && callees.length > 0) {
     return centroid([centroid(callers), centroid(callees)]);
   }
   if (callers.length > 0) {
     const from = centroid(callers);
-    return { x: from.x + LAYOUT_PITCH.x, y: from.y };
+    const column = spread(siblings(callerIds, 'source'));
+    return { x: from.x + column * LAYOUT_PITCH.x, y: from.y + LAYOUT_PITCH.y };
   }
   if (callees.length > 0) {
     const to = centroid(callees);
-    return { x: to.x - LAYOUT_PITCH.x, y: to.y };
+    const column = spread(siblings(calleeIds, 'target'));
+    return { x: to.x + column * LAYOUT_PITCH.x, y: to.y - LAYOUT_PITCH.y };
   }
   const all = [...placed.values()];
   if (all.length === 0) return LAYOUT_ORIGIN;
   return {
-    x: Math.min(...all.map((position) => position.x)),
-    y: Math.max(...all.map((position) => position.y)) + LAYOUT_PITCH.y,
+    x: Math.max(...all.map((position) => position.x)) + LAYOUT_PITCH.x,
+    y: Math.min(...all.map((position) => position.y)),
   };
+}
+
+/** The free slot nearest `anchor`, measured in slots, that crowds no placed block's room. */
+function freeSlotNear(anchor: CanvasPosition, placed: readonly CanvasPosition[]): CanvasPosition {
+  const origin = { x: Math.round(anchor.x), y: Math.round(anchor.y) };
+  return (
+    nearestFreePlace({
+      origin,
+      size: ROOM,
+      taken: placed.map((position) => ({ ...position, ...ROOM })),
+      gap: LAYOUT_BLOCK.gap,
+      distance: inSlots,
+    }) ?? origin
+  );
 }
 
 /** Each node's own stored position, by id — the layout a graph already has. */
@@ -133,8 +156,8 @@ export const positionsOf = (graph: CanvasGraph): Map<string, CanvasPosition> =>
  * `graph` with every node positioned. A node `keep` holds a position for
  * stays exactly there — by default the position each node already has — and
  * every other node is placed in the free slot nearest its connected
- * neighbours, the best-connected first, so a new block lands beside the ones
- * it joins and never on top of one. Nodes, edges and their order are
+ * neighbours, the best-connected first, so a new block lands under the ones
+ * that call it, over the ones it calls, and never on top of one. Nodes, edges and their order are
  * untouched: only `position` is written.
  */
 export function layoutGraph(

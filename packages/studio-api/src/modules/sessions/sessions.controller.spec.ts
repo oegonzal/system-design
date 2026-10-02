@@ -983,7 +983,7 @@ describe('sessions', () => {
     });
 
     // The coach reads the canvas as text and returns no layout — or one it made up.
-    it('[DEL-3] an import keeps the author’s layout: every surviving block stays where it was, a new one is laid beside the blocks it joins, and no position is the model’s', async () => {
+    it('[DEL-3] an import keeps the author’s layout: every surviving block stays where it was, a new one is laid under the blocks that call it, and no position is the model’s', async () => {
       const { sessionId } = await startSession();
       const authored = validGraph();
       authored.nodes = authored.nodes.map((node, index) => ({
@@ -1020,9 +1020,9 @@ describe('sessions', () => {
 
       const second = await graphOf(done.body.data.iterations[1].revisionId);
       for (const node of authored.nodes) expect(at(second, node.id)).toEqual(node.position);
-      // Beside the database it replicates: one column on, clear of every other block.
+      // Under the database it replicates: the row below, clear of every other block.
       const replica = at(second, 'ai-replica');
-      expect(replica).toEqual({ x: 800 + LAYOUT_PITCH.x, y: 80 });
+      expect(replica).toEqual({ x: 800, y: 80 + LAYOUT_PITCH.y });
       // What was judged is what is stored — order and all — with only positions added.
       expect(second.nodes.map(({ position: _p, ...node }) => node)).toEqual(
         revised.graph.nodes.map(({ position: _p, ...node }) => node),
@@ -1032,7 +1032,9 @@ describe('sessions', () => {
       const third = await graphOf(done.body.data.iterations[2].revisionId);
       expect(at(third, 'ai-replica')).toEqual(replica);
       for (const node of authored.nodes) expect(at(third, node.id)).toEqual(node.position);
-      expect(at(third, 'ai-cache')).toEqual({ x: 400 + LAYOUT_PITCH.x, y: 80 + LAYOUT_PITCH.y });
+      // Under the API, beside its first callee's column — where the replica
+      // already sits — so the nearest free slot in that row, one column left of it.
+      expect(at(third, 'ai-cache')).toEqual({ x: 800 - LAYOUT_PITCH.x, y: 80 + LAYOUT_PITCH.y });
     });
 
     it('[DEL-3] each iteration lists its confirmed findings grounded on the design it judged, so its reason can name them', async () => {
