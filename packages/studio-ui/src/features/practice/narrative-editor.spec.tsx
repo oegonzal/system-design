@@ -1,6 +1,6 @@
 import { NARRATION_OVERVIEW_MAX_LENGTH, NARRATION_PROSE_MAX_LENGTH } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -93,5 +93,25 @@ describe('NarrativeEditor', () => {
     expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_MAX_LENGTH);
     expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_MAX_LENGTH);
     expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_MAX_LENGTH);
+  });
+
+  it('[UX-8] says how much of a slot’s limit is left as it nears, and that it was reached — a walkthrough never just stops taking words', () => {
+    const store = renderEditor((seeded) => {
+      seeded.getState().setNarrativeOverview('Reads and writes are split.');
+      seeded.getState().setComponentRationale('n-3', 'x'.repeat(NARRATION_PROSE_MAX_LENGTH - 7));
+    });
+    // Far from its limit, a slot says nothing; within the last stretch, it counts down.
+    expect(screen.getAllByText(/characters? left/).map((count) => count.textContent)).toEqual([
+      '7 characters left',
+    ]);
+    const rationale = screen.getByTestId('narrative-rationale-n-3');
+    expect(rationale.getAttribute('aria-describedby')).toContain(`${rationale.id}-limit`);
+
+    act(() => store.getState().setNarrativeOverview('x'.repeat(NARRATION_OVERVIEW_MAX_LENGTH)));
+    expect(
+      screen.getByText(
+        `Limit reached — ${NARRATION_OVERVIEW_MAX_LENGTH.toLocaleString('en-US')} characters at most.`,
+      ),
+    ).toBeTruthy();
   });
 });

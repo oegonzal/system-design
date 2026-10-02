@@ -193,4 +193,24 @@ describe('OperationsEditor', () => {
       OPERATION_NOTES_MAX_LENGTH,
     );
   });
+
+  it('[UX-5] says a note is read by the graders, and how much of its limit is left as it nears', () => {
+    renderWithTheme(
+      <Harness
+        initial={[
+          { name: 'placeOrder', kind: 'command' },
+          { name: 'publish', kind: 'event', notes: 'x'.repeat(OPERATION_NOTES_MAX_LENGTH - 3) },
+        ]}
+      />,
+    );
+    const empty = within(screen.getByTestId('operation-row-0'));
+    expect((empty.getByLabelText('Notes') as HTMLInputElement).placeholder).toContain(
+      'Read by the graders',
+    );
+    expect(empty.queryByText(/characters? left/)).toBeNull();
+
+    expect(
+      within(screen.getByTestId('operation-row-1')).getByText('3 characters left'),
+    ).toBeTruthy();
+  });
 });

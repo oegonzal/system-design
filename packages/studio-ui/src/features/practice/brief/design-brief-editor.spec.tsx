@@ -1,4 +1,4 @@
-import type { CanvasGraph } from '@sysdesign/contracts';
+import { BINDING_CLAIM_MAX_LENGTH, type CanvasGraph } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -168,5 +168,15 @@ describe('DesignBriefEditor', () => {
     );
     expect(screen.getByTestId('criteria-normalizing').textContent).toContain('normalized');
     expect(screen.queryByTestId(/^binding-row-/)).toBeNull();
+  });
+  it('[UX-6] says how much of a claim’s limit is left as it nears — a claim is never cut off unsaid', () => {
+    renderEditor((store) => {
+      store.getState().setBindingClaim('c1', 'x'.repeat(BINDING_CLAIM_MAX_LENGTH - 4));
+      store.getState().setBindingClaim('c2', 'The cache absorbs repeat reads.');
+    });
+
+    const row = within(screen.getByTestId('binding-row-c1'));
+    expect(row.getByText('4 characters left')).toBeTruthy();
+    expect(within(screen.getByTestId('binding-row-c2')).queryByText(/characters? left/)).toBeNull();
   });
 });

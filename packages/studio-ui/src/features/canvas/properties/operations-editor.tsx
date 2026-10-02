@@ -34,6 +34,9 @@ const Row = styled.div`
   border-radius: ${({ theme }) => theme.radius.md};
 `;
 
+/** What a note is for, said in the empty field: it is read with the design, not kept beside it. */
+const NOTES_PLACEHOLDER = 'Read by the graders — e.g. retries, ordering, what it guarantees';
+
 /** Severity ink on the surface: a caution, not a blocker. */
 const DuplicateWarning = styled(Text)`
   color: ${({ theme }) => theme.color.severity.medium.fg};
@@ -132,10 +135,14 @@ export function OperationsEditor({ operations, onChange }: OperationsEditorProps
               checked={operation.idempotent === true}
               onChange={(event) => patchRow(index, { idempotent: event.target.checked })}
             />
+            {/* A note is part of the design: the graders and the coach read it
+                whole, so the empty field says so; the field itself counts
+                down as its limit nears rather than stopping without a word. */}
             <TextField
               label="Notes"
               value={operation.notes ?? ''}
               maxLength={OPERATION_NOTES_MAX_LENGTH}
+              placeholder={NOTES_PLACEHOLDER}
               onChange={(event) => patchRow(index, { notes: event.target.value })}
             />
             {duplicates.has(index) ? (
