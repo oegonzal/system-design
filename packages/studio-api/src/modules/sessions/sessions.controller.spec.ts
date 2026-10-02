@@ -656,6 +656,16 @@ describe('sessions', () => {
       });
     });
 
+    it('[QL-32] a coach with no iteration to revise in still asks to recall, and the loop says it skipped', async () => {
+      const { sessionId } = await startSession();
+      // One iteration over the draft: it is graded, never revised. The studio
+      // asks anyway — whether a run can use lessons is the loop's call.
+      await startImprove(sessionId, { ...submission(), maxIterations: 1 });
+      expect(h.loop.startRequests[0]).toMatchObject({ recall: true, maxIterations: 1 });
+      const read = await readImprove(sessionId, 'fake-run-1');
+      expect(read.body.data.recall).toEqual(recallWithout('no-produce-iteration'));
+    });
+
     it('[DEL-3] a failed coach run teaches nothing: it has no trace to digest', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, { ...submission(), maxIterations: 2 });

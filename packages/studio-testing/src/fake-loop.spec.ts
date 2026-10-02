@@ -56,7 +56,7 @@ describe('FakeLoop', () => {
     loop.complete(runId, 'auto');
     expect(loop.getRun(runId)?.recall?.count).toBe(FAKE_RECALLED_LESSONS.length);
 
-    const scripted = loop.startRun(request({ recall: true })).runId;
+    const scripted = loop.startRun(request({ recall: true, maxIterations: 2 })).runId;
     loop.recall(scripted, recallWithout('store-empty'));
     loop.settle(scripted);
     expect(loop.getRun(scripted)?.recall).toMatchObject({ status: 'empty', reason: 'store-empty' });
@@ -65,6 +65,21 @@ describe('FakeLoop', () => {
     loop.settle(grade);
     expect(loop.getRun(grade)?.recall).toBeNull();
     expect(() => loop.recall(grade)).toThrow(/did not ask to recall/);
+  });
+
+  it('[QL-32] a run that asks to recall but can never call its producer is skipped as it opens, as the loop records it', () => {
+    const loop = new FakeLoop();
+    // One iteration over a supplied artifact: it is judged, never revised.
+    const judged = loop.startRun(request({ recall: true, maxIterations: 1 })).runId;
+    expect(loop.getRun(judged)?.recall).toEqual(recallWithout('no-produce-iteration'));
+    loop.progress(judged, []);
+    loop.settle(judged);
+    expect(loop.getRun(judged)?.recall).toMatchObject({
+      status: 'skipped',
+      reason: 'no-produce-iteration',
+      recallRunId: null,
+      count: 0,
+    });
   });
 
   it('starts a run running, records the request, and settles it by the goal’s scenario — none means the stub’s own grade', () => {

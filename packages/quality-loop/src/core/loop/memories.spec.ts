@@ -1,3 +1,4 @@
+import { mayProduce } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
@@ -87,5 +88,54 @@ describe('advisory memories', () => {
     const producer = exchanges.find((exchange) => exchange.scope === 'producer');
     expect(producer?.user).toContain('# Goal');
     expect(producer?.user).not.toContain(MEMORIES_HEADING);
+  });
+});
+
+describe('whether a run can ever call its producer', () => {
+  const ARTIFACT = { text: 'given', parts: ['one'] };
+
+  /** Run the briefed pipeline and count the producer's calls. */
+  const producerCalls = async (input: Parameters<typeof runPipeline>[1]) => {
+    const exchanges: LlmExchange[] = [];
+    const trace = await runPipeline(briefed(), input, {
+      llm: revisingModel(),
+      sink: (exchange) => exchanges.push(exchange),
+      now: clock,
+    });
+    return {
+      trace,
+      calls: exchanges.filter((exchange) => exchange.scope === 'producer').length,
+    };
+  };
+
+  it('[QL-32] the contract’s mayProduce agrees with the loop: no producer call is ever made when it says none can be', async () => {
+    const goal = 'Make a thing.';
+    const first = await producerCalls({ goal, maxIterations: 1 });
+    const criteria = first.trace.contract.criteria;
+    const cases = [
+      // Produces from nothing: iteration 1 calls the producer.
+      { input: { goal, maxIterations: 1 }, adopted: false, produces: true },
+      // A supplied artifact, judged once and never revised.
+      { input: { goal, output: ARTIFACT, maxIterations: 1 }, adopted: false, produces: false },
+      // A supplied artifact with room to revise it: iteration 2 produces.
+      { input: { goal, output: ARTIFACT, maxIterations: 2 }, adopted: false, produces: true },
+      // An adopted iteration, taken as it is and never revised.
+      {
+        input: { goal, criteria, adopted: first.trace.iterations[0], maxIterations: 1 },
+        adopted: true,
+        produces: false,
+      },
+    ];
+    for (const { input, adopted, produces } of cases) {
+      const said = mayProduce({
+        outputProvided: 'output' in input,
+        adoptedFrom: adopted ? { runId: 'earlier', iteration: 1 } : null,
+        maxIterations: input.maxIterations,
+      });
+      expect(said, JSON.stringify(input)).toBe(produces);
+      const { calls } = await producerCalls(input);
+      if (produces) expect(calls, JSON.stringify(input)).toBeGreaterThan(0);
+      else expect(calls, JSON.stringify(input)).toBe(0);
+    }
   });
 });

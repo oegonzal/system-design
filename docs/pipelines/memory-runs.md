@@ -1461,7 +1461,11 @@ The path, end to end:
 2. **The run opens at once.** `RunsService.start` refuses `recall` for a
    pipeline whose producer does not declare `consumes: ['memories']` (400,
    before any row), opens the row with `recall: { status: 'recalling' }` and
-   answers 202.
+   answers 202. A run that can never call its producer — a supplied draft or
+   an adopted grade with one iteration, so nothing is ever revised — opens
+   `skipped` with `no-produce-iteration` instead and recalls nothing: the
+   studio still asks on every coach start, and the loop decides from the
+   request (`openingRecall` in contracts).
 3. **The runs layer recalls, before the loop.** `perform` calls whatever recall
    is bound in the runs module's `RunRecallSlot`. The memory module's
    `MemoryRunRecall` binds itself there at init; the runs module never imports

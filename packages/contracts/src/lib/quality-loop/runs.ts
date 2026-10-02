@@ -57,6 +57,21 @@ export interface QualityRunRequestSummary {
 }
 
 /**
+ * Whether a run as requested could ever call its producer. Iteration 1
+ * produces unless it judges a supplied artifact or adopts a recorded
+ * iteration, and every later iteration may revise — so a run that starts
+ * from an artifact with a budget of one iteration never produces. Read from
+ * the request alone, before the run does anything; the loop's spec pins that
+ * it agrees.
+ */
+export const mayProduce = ({
+  outputProvided,
+  adoptedFrom,
+  maxIterations,
+}: Pick<QualityRunRequestSummary, 'outputProvided' | 'adoptedFrom' | 'maxIterations'>): boolean =>
+  (!outputProvided && adoptedFrom === null) || maxIterations > 1;
+
+/**
  * One run as the service reports it; `exchanges` grow live. While `status` is
  * `running`, `trace` holds the iterations finished so far with `stopReason`
  * null — null itself until the first iteration lands — and it is settled,

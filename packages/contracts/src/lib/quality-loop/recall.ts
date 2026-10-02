@@ -4,6 +4,7 @@
  * them, and the lessons its producer was handed. A run asks for it with
  * `StartQualityRunRequest.recall`; the record is null on a run that did not.
  */
+import { mayProduce, type QualityRunRequestSummary } from './runs';
 
 /**
  * Where a run's recall stands. `recalling` while it runs — the run has not
@@ -18,11 +19,12 @@ export type RunRecallStatus = (typeof RUN_RECALL_STATUSES)[number];
 /**
  * Why a recall handed the producer nothing, and which of the two outcomes
  * that is — one table, so the status is never decided apart from the reason.
- * The memory steps' own reasons where they apply, plus the two only a run's
- * recall can give: no recall bound in this process, and an error it did not
- * expect.
+ * The memory steps' own reasons where they apply, plus the three only a run's
+ * recall can give: a run that can never call its producer, no recall bound in
+ * this process, and an error it did not expect.
  */
 export const RUN_RECALL_REASON_STATUS = {
+  'no-produce-iteration': 'skipped',
   'recall-unavailable': 'skipped',
   'embeddings-disabled': 'skipped',
   'store-unavailable': 'skipped',
@@ -94,6 +96,20 @@ export const recallWithout = (
   count: 0,
   lessons: [],
 });
+
+/**
+ * The recall a run records as it opens, decided from its request alone: none
+ * when it did not ask; `skipped` with `no-produce-iteration` when it can never
+ * call its producer (`mayProduce`) — lessons reach no other stage, so recalling
+ * them would brief nobody, and no recall run is opened; `recalling` otherwise.
+ */
+export const openingRecall = (
+  asked: boolean,
+  request: QualityRunRequestSummary,
+): RunRecallDto | null => {
+  if (!asked) return null;
+  return mayProduce(request) ? recallInProgress() : recallWithout('no-produce-iteration');
+};
 
 /** A recall that handed the producer these lessons. */
 export const recallOf = (

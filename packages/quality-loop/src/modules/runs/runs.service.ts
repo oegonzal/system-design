@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  openingRecall,
   recallInProgress,
   recallWithout,
   sameRubric,
@@ -228,6 +229,13 @@ export class RunsService {
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
   ): Promise<RunRecord> {
+    const summary: RunRecord['request'] = {
+      goal: request.goal,
+      outputProvided: request.output !== undefined,
+      criteriaProvided: request.criteria !== undefined,
+      adoptedFrom: request.adopt ?? null,
+      maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
+    };
     const record: RunRecord = {
       runId: makeRunId(Date.now(), 'quality'),
       pipeline: request.pipeline,
@@ -236,16 +244,12 @@ export class RunsService {
       finishedAt: null,
       llm: this.availability(),
       git: gitContext(),
-      request: {
-        goal: request.goal,
-        outputProvided: request.output !== undefined,
-        criteriaProvided: request.criteria !== undefined,
-        adoptedFrom: request.adopt ?? null,
-        maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
-      },
-      // Recalling from the moment the row exists: a reader polling a run that
-      // asked sees it is recalling before it sees anything else move.
-      recall: request.recall === true ? recallInProgress() : null,
+      request: summary,
+      // Decided from the request as the row opens. A run that asked is
+      // recalling from the moment the row exists, so a reader polling it sees
+      // that before anything else moves — unless it can never call its
+      // producer, the only stage lessons reach: that one is skipped at once.
+      recall: openingRecall(request.recall === true, summary),
       trace: null,
       exchanges: [],
       error: null,
@@ -264,7 +268,8 @@ export class RunsService {
     record: RunRecord,
     publish: (recall: RunRecallDto) => void,
   ): Promise<AdvisoryMemory[]> {
-    if (record.recall === null) return [];
+    // Not asked, or settled as the row opened: nothing to recall.
+    if (record.recall?.status !== 'recalling') return [];
     const bound = this.recall.bound;
     let outcome: RunRecallDto;
     if (bound === null) {

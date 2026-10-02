@@ -3,7 +3,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
 import { QualityRun, truncateTestTables } from '@sysdesign/db';
 import { DbModule } from '@sysdesign/nest-kit';
-import { readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -113,9 +113,10 @@ const settled = (url: string, id: string) =>
     (run) => run.status !== 'running',
   );
 
-/** Every prompt a run's stages sent, by scope, as its dump recorded them. */
+/** Every prompt a run's stages sent, by scope, as its dump recorded them — none for a run that called no stage. */
 const promptsOf = (runId: string): { scope: string; user: string }[] => {
   const dir = join(DUMP_DIR, runId, '05-llm');
+  if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name) => name.endsWith('.user.txt'))
     .map((name) => ({
@@ -216,6 +217,53 @@ describe('a run that recalls lessons for its producer', () => {
     expect(await em.fork().count(QualityRun, {})).toBe(before);
     const malformed = await postJson(url, '/runs', { pipeline: 'coach', goal: GOAL, recall: 1 });
     expect(malformed.status).toBe(400);
+  });
+
+  it('[QL-32] a run that can never call its producer recalls nothing: skipped as it opens, no recall run', async () => {
+    const recallRuns = async () =>
+      (await getJson<Page<QualityRunSummaryDto>>(url, `/runs?pipeline=${MEMORY_RECALL_ID}`)).meta
+        .total;
+    const before = await recallRuns();
+    const skipped = {
+      status: 'skipped',
+      reason: 'no-produce-iteration',
+      note: null,
+      recallRunId: null,
+      count: 0,
+      lessons: [],
+    };
+
+    // A supplied artifact judged once: iteration 1 takes it as provided, and
+    // there is no iteration 2 to revise it in.
+    const judged = await start(url, {
+      pipeline: 'coach',
+      goal: GOAL,
+      output: { text: 'given', parts: ['one'] },
+      maxIterations: 1,
+      recall: true,
+    });
+    expect((await runOf(url, judged)).recall).toEqual(skipped);
+    const run = await settled(url, judged);
+    expect(run.status).toBe('complete');
+    expect(run.recall).toEqual(skipped);
+
+    // An adopted iteration with a budget of one: taken as it is, never revised.
+    const adopted = await start(url, {
+      pipeline: 'coach',
+      goal: GOAL,
+      criteria: run.trace?.contract.criteria,
+      adopt: { runId: judged, iteration: 1 },
+      maxIterations: 1,
+      recall: true,
+    });
+    const adopting = await settled(url, adopted);
+    expect(adopting.status).toBe('complete');
+    expect(adopting.recall).toEqual(skipped);
+
+    for (const runId of [judged, adopted]) {
+      expect(promptsOf(runId).map((prompt) => prompt.scope)).not.toContain('producer');
+    }
+    expect(await recallRuns()).toBe(before);
   });
 
   it('[QL-32] a store that cannot answer costs the coach its lessons, never the run', async () => {

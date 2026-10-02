@@ -1,5 +1,5 @@
 import {
-  recallInProgress,
+  openingRecall,
   sameRubric,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
@@ -32,9 +32,10 @@ import {
  * by calling `complete`/`fail`, the stub by `settle` after a delay — and a
  * scenario keyed by a run's goal lets a browser test script its own run
  * without touching anyone else's. No timers here: when a run settles is the
- * transport's call. A run that asks to recall opens `recalling`, as the loop
- * records it, and its recall settles — to the fake's fixed lessons unless a
- * spec says otherwise — before any iteration lands.
+ * transport's call. A run that asks to recall opens as the loop records it —
+ * `recalling`, or skipped at once when it can never call its producer — and a
+ * recalling one settles, to the fake's fixed lessons unless a spec says
+ * otherwise, before any iteration lands.
  */
 
 /** What a scripted run does when it settles, keyed by the run's goal. */
@@ -169,6 +170,13 @@ export class FakeLoop {
     this.requests.set(runId, request);
     if (adopted !== null) this.adoptions.set(runId, adopted);
     const startedAt = this.now();
+    const summary: QualityRunDto['request'] = {
+      goal: request.goal,
+      outputProvided: request.output !== undefined,
+      criteriaProvided: request.criteria !== undefined,
+      adoptedFrom: request.adopt ?? null,
+      maxIterations: request.maxIterations ?? 1,
+    };
     this.runs.set(runId, {
       runId,
       pipeline: request.pipeline,
@@ -176,14 +184,9 @@ export class FakeLoop {
       startedAt,
       finishedAt: null,
       llm: this.llm,
-      request: {
-        goal: request.goal,
-        outputProvided: request.output !== undefined,
-        criteriaProvided: request.criteria !== undefined,
-        adoptedFrom: request.adopt ?? null,
-        maxIterations: request.maxIterations ?? 1,
-      },
-      recall: request.recall === true ? recallInProgress() : null,
+      request: summary,
+      // The loop's own rule, from the contract: decided from the request.
+      recall: openingRecall(request.recall === true, summary),
       trace: null,
       exchanges: exchangesOf(this.startExchanges, startedAt),
       error: null,

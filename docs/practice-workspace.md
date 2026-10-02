@@ -63,7 +63,8 @@ and **see results / iterate**.
   anything, the loop recalls lessons from earlier runs for the prompt and
   hands them to the coach only — the graders never see them — so the panel
   first says it is recalling, then **Recalled N lessons from earlier runs**
-  with the list behind **Show lessons**, or why there were none. Progress
+  with the list behind **Show lessons**, or why there were none — with one
+  iteration there is nothing to revise, so the coach recalls none. Progress
   shows the model calls as they happen; the newest coaching run is restored
   when the page reloads. Each row is the **starting point**, **imported** (it beat every
   earlier one and landed in the timeline as an **AI** revision), **not
