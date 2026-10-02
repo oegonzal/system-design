@@ -34,11 +34,17 @@ const maxScrollLeft = (view: RowView): number => Math.max(0, view.contentWidth -
 const clamp = (scrollLeft: number, view: RowView): number =>
   Math.min(Math.max(0, scrollLeft), maxScrollLeft(view));
 
-/** Which ends of the row run past the view — where an edge affordance belongs. */
-export function hiddenEnds(view: RowView): HiddenEnds {
+/**
+ * Which ends of the row run past the view by more than `sliver` — where an
+ * edge affordance belongs. An end that hides no more than that is treated as
+ * the row's end: the fade and arrow would cover more of the row than the
+ * overflow they announce. Never closer than a pixel, for the sub-pixel scroll.
+ */
+export function hiddenEnds(view: RowView, sliver = 0): HiddenEnds {
+  const slack = Math.max(AT_END_SLACK, sliver);
   return {
-    start: view.scrollLeft > AT_END_SLACK,
-    end: view.scrollLeft < maxScrollLeft(view) - AT_END_SLACK,
+    start: view.scrollLeft > slack,
+    end: view.scrollLeft < maxScrollLeft(view) - slack,
   };
 }
 

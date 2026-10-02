@@ -120,7 +120,7 @@ describe('Tabs', () => {
      * layout settle. A browser tells of a scroll on a later frame, never
      * inside the write: `scrolled()` is that frame.
      */
-    function layOut() {
+    function layOut(viewWidth = VIEW_WIDTH) {
       const tablist = screen.getByRole('tablist');
       const tabs = screen.getAllByRole('tab');
       tabs.forEach((tab, index) => {
@@ -130,13 +130,13 @@ describe('Tabs', () => {
       const scroller = tablist.parentElement as HTMLElement;
       const contentWidth = tabs.length * TAB_WIDTH;
       let scrollLeft = 0;
-      Object.defineProperty(scroller, 'clientWidth', { configurable: true, value: VIEW_WIDTH });
+      Object.defineProperty(scroller, 'clientWidth', { configurable: true, value: viewWidth });
       Object.defineProperty(scroller, 'scrollWidth', { configurable: true, value: contentWidth });
       Object.defineProperty(scroller, 'scrollLeft', {
         configurable: true,
         get: () => scrollLeft,
         set: (next: number) => {
-          scrollLeft = Math.min(Math.max(0, next), Math.max(0, contentWidth - VIEW_WIDTH));
+          scrollLeft = Math.min(Math.max(0, next), Math.max(0, contentWidth - viewWidth));
         },
       });
       act(() => layoutWatchers.forEach((settle) => settle()));
@@ -202,6 +202,28 @@ describe('Tabs', () => {
       layOut();
       expect(edge('start')).toBeNull();
       expect(edge('end')).toBeNull();
+    });
+
+    it('treats a row past the view by no more than a tab’s padding as fitting: no fade, no arrow, whichever tab is chosen', () => {
+      const two = SIX.slice(0, 2);
+      // 3 px over, as the dock at 560 px: the overflow is inside the last tab's padding.
+      const { rerender } = renderWithTheme(row('prompt', 'scroll', two));
+      const { scrolled } = layOut(2 * TAB_WIDTH - 3);
+      expect(edge('start')).toBeNull();
+      expect(edge('end')).toBeNull();
+
+      rerender(row('brief', 'scroll', two));
+      scrolled();
+      expect(edge('start')).toBeNull();
+      expect(edge('end')).toBeNull();
+    });
+
+    it('marks an end once it hides more than a tab’s padding', () => {
+      renderWithTheme(row('prompt', 'scroll', SIX.slice(0, 2)));
+      // A tab's inline padding is `theme.space[4]`, 12 px: 13 px over cuts into a label.
+      layOut(2 * TAB_WIDTH - 13);
+      expect(edge('start')).toBeNull();
+      expect(edge('end')).not.toBeNull();
     });
 
     it('pages toward an end on its edge button, a view less the edges at a time', () => {
@@ -284,6 +306,26 @@ describe('hiddenEnds', () => {
     expect(hiddenEnds({ scrollLeft: 0, width: 200, contentWidth: 200 })).toEqual({
       start: false,
       end: false,
+    });
+  });
+
+  it('treats an end past the view by no more than the sliver given as the row’s end', () => {
+    expect(hiddenEnds({ scrollLeft: 0, width: 478, contentWidth: 481 }, 12)).toEqual({
+      start: false,
+      end: false,
+    });
+    expect(hiddenEnds({ scrollLeft: 3, width: 478, contentWidth: 481 }, 12)).toEqual({
+      start: false,
+      end: false,
+    });
+    expect(hiddenEnds({ scrollLeft: 0, width: 478, contentWidth: 491 }, 12)).toEqual({
+      start: false,
+      end: true,
+    });
+    // Never closer than the sub-pixel slack, whatever the sliver.
+    expect(hiddenEnds({ scrollLeft: 0.5, width: 200, contentWidth: 600 }, 0)).toEqual({
+      start: false,
+      end: true,
     });
   });
 });

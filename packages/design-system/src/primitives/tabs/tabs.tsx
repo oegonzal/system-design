@@ -123,6 +123,14 @@ const OneRowList = styled(List)`
  */
 const EDGE_SPACE = 6 satisfies SpaceIndex;
 
+/**
+ * A tab's padding either side of its label, as a step of the space scale.
+ * The tab's own inset, and the most of a row an end may hide without an edge
+ * affordance: an end past the view by no more than this cuts into a tab's
+ * padding, never its label, so the row reads as fitting there.
+ */
+const TAB_INLINE_SPACE = 4 satisfies SpaceIndex;
+
 /** The scroller and the edge buttons laid over its ends; never shrunk by a column flex parent, so the row keeps its height in a dock. */
 const Strip = styled.div`
   position: relative;
@@ -287,14 +295,16 @@ export function TabList({ overflow = 'wrap', ...props }: TabListProps) {
   // tablist whose tabs would all throw.
   const { value } = useTabsContext('TabList');
   const scroller = useRef<HTMLDivElement>(null);
-  const edge = useTheme().space[EDGE_SPACE];
+  const { space } = useTheme();
+  const edge = space[EDGE_SPACE];
+  const sliver = space[TAB_INLINE_SPACE];
   const [hidden, setHidden] = useState<HiddenEnds>(NONE_HIDDEN);
 
   /** Reads which ends hold more; the same answer keeps the same state, so a scroll re-renders only when an end changes. */
   const measure = () => {
     const strip = scroller.current;
     if (!strip) return;
-    const next = hiddenEnds(viewOf(strip));
+    const next = hiddenEnds(viewOf(strip), sliver);
     setHidden((current) =>
       current.start === next.start && current.end === next.end ? current : next,
     );
@@ -316,7 +326,7 @@ export function TabList({ overflow = 'wrap', ...props }: TabListProps) {
     resized.observe(strip);
     if (strip.firstElementChild) resized.observe(strip.firstElementChild);
     return () => resized.disconnect();
-  }, [overflow, edge]);
+  }, [overflow, edge, sliver]);
 
   if (overflow === 'wrap') return <List role="tablist" onKeyDown={moveFocus} {...props} />;
 
@@ -341,7 +351,7 @@ export interface TabProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 }
 
 const TabButton = styled('button', transient)<{ $selected: boolean }>`
-  padding: ${({ theme }) => `${theme.space[2]}px ${theme.space[4]}px`};
+  padding: ${({ theme }) => `${theme.space[2]}px ${theme.space[TAB_INLINE_SPACE]}px`};
   border: none;
   border-radius: ${({ theme }) => `${theme.radius.sm} ${theme.radius.sm} 0 0`};
   background: transparent;
