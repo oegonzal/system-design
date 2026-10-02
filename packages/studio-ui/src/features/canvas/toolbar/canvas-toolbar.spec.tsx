@@ -16,8 +16,6 @@ function renderToolbar(store: CanvasStore, props: Partial<CanvasToolbarProps> = 
       <CanvasToolbar
         onSubmit={vi.fn()}
         submitting={false}
-        revisionStatus={null}
-        revisionNumber={null}
         onExport={vi.fn()}
         exporting={false}
         {...props}
@@ -83,11 +81,7 @@ describe('CanvasToolbar', () => {
   it('keeps the draft badge’s place at one width through every status — every label laid out unseen, and only the current one said', () => {
     const labels = ['unsaved draft', 'saving draft…', 'draft saved', 'draft not saved'];
     for (const draftStatus of DRAFT_SAVE_STATUSES) {
-      const view = renderToolbar(createCanvasStore(makeGraph()), {
-        draftStatus,
-        revisionStatus: 'complete',
-        revisionNumber: 1,
-      });
+      const view = renderToolbar(createCanvasStore(makeGraph()), { draftStatus });
 
       const slot = screen.getByTestId('draft-slot');
       // The widths: generated content on hidden badges, so no label is in the text or the accessibility tree twice.
@@ -100,33 +94,17 @@ describe('CanvasToolbar', () => {
       const badge = screen.queryByTestId('draft-status');
       if (draftStatus === 'clean') expect(badge).toBeNull();
       else expect(labels).toContain(badge?.textContent);
-      // The slot comes last, so its unused room is never a hole in the row.
+      // The slot comes last in the toolbar itself, so its unused room is never a hole in the row.
+      expect(slot.parentElement?.getAttribute('role')).toBe('toolbar');
       expect(slot.parentElement?.lastElementChild).toBe(slot);
-      expect(slot.parentElement?.textContent).toContain('submitted #1');
       view.unmount();
     }
   });
 
-  it('[DEL-3] names its revision badge as the author’s latest submission — never a label for what the canvas shows', () => {
-    const store = createCanvasStore(makeGraph());
-    // A revision is on the canvas read-only; the badge is still about the submission.
-    store.getState().setReadOnly(true);
-    const graded = renderToolbar(store, { revisionStatus: 'complete', revisionNumber: 1 });
-    const badge = screen.getByTestId('submission-status');
-    expect(badge.textContent).toBe('submitted #1 · graded');
-    expect(badge.getAttribute('title')).toBe('Your latest submission, revision #1: graded');
-    expect(badge.getAttribute('data-revision')).toBe('1');
-    expect(badge.getAttribute('data-status')).toBe('complete');
-    graded.unmount();
-
-    const failed = renderToolbar(store, { revisionStatus: 'failed', revisionNumber: 3 });
-    expect(screen.getByTestId('submission-status').textContent).toBe(
-      'submitted #3 · grading failed',
-    );
-    failed.unmount();
-
-    renderToolbar(store);
+  it('[DEL-3] holds nothing of the session’s status: the submission badge is beside the title, not among the canvas’s controls', () => {
+    renderToolbar(createCanvasStore(makeGraph()), { grading: true });
     expect(screen.queryByTestId('submission-status')).toBeNull();
+    expect(button('submit-revision').disabled).toBe(true);
   });
 
   it('[UX-16] a read-only canvas leaves nothing to submit, clear or undo', () => {

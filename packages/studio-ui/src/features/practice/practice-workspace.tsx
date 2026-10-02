@@ -69,6 +69,7 @@ import { PromptPane } from '../prompts/prompt-pane';
 import { usePromptCriteria } from '../prompts/use-prompt-criteria';
 import { DesignBriefEditor } from './brief/design-brief-editor';
 import { NarrativeEditor } from './narrative-editor';
+import { SubmissionStatus } from './submission-status';
 import { useDraftAutosave } from './use-draft-autosave';
 import { useSessionInFlight } from './use-session-in-flight';
 
@@ -233,6 +234,15 @@ const DockPanel = styled(TabPanel)`
   &[hidden] {
     display: none;
   }
+`;
+
+/** The session's title and, beside it, its status: the latest submission and its grade. */
+const TitleRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => `${theme.space[2]}px ${theme.space[4]}px`};
 `;
 
 const ReadOnlyBanner = styled.div`
@@ -715,10 +725,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     );
   }
 
-  // Submit and the toolbar's badge are about the session, not the revision on
-  // screen: its newest submission — the badge names it as that — live while
-  // it is the one being polled, and whatever run holds its grading slot — the
-  // server's word, or the coach this tab is watching revise.
+  // Submit and the submission badge are about the session, not the revision
+  // on screen: its newest submission — the badge names it as that — live
+  // while it is the one being polled, and whatever run holds its grading slot
+  // — the server's word, or the coach this tab is watching revise.
   const latest = latestUserRevision(revisions);
   const polled = latest !== null && latest.id === feedback?.id;
   // A grade the grader no longer has did not arrive, whatever the record's
@@ -776,7 +786,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
 
   return (
     <WorkspaceRoot>
-      <Heading level={1}>{prompt?.title ?? 'Practice session'}</Heading>
+      <TitleRow>
+        <Heading level={1}>{prompt?.title ?? 'Practice session'}</Heading>
+        <SubmissionStatus revisionNumber={latest?.revisionNumber ?? null} status={latestStatus} />
+      </TitleRow>
       <Layout>
         <SideColumn>
           <WorkspacePalette />
@@ -787,8 +800,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           <CanvasToolbar
             onSubmit={() => void handleSubmit()}
             submitting={submitting}
-            revisionStatus={latestStatus}
-            revisionNumber={latest?.revisionNumber ?? null}
+            grading={latestStatus === 'running'}
             promptArchived={promptArchived}
             submitBlockedReason={blockedReason}
             draftStatus={autosave.status}
