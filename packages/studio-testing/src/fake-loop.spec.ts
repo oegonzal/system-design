@@ -146,7 +146,7 @@ describe('FakeLoop', () => {
       stage: 'criteria',
       reason: 'llm-failed',
     });
-    expect((caught as DerivationFailed).llm.model).toBe('fake-model');
+    expect((caught as DerivationFailed).llm?.model).toBe('fake-model');
   });
 
   it('a scripted iteration with a blocking validator report reads as blocked, exactly as the real loop records it', () => {

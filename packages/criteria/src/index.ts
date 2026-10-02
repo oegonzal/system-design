@@ -592,6 +592,17 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',
   },
+  // Quality-loop client (packages/loop-client)
+  {
+    id: 'LC-1',
+    statement:
+      "One port onto the quality loop serves every program that asks it to judge: its HTTP adapter unwraps the envelope, answers a 404 on a read as null, and raises transport-agnostic errors — unreachable, timed out, refused with the loop's own message and the route, or a derivation that yielded no rubric — under declared timeouts, so a consumer that serves HTTP maps them onto its gateway statuses in one place.",
+  },
+  {
+    id: 'LC-2',
+    statement:
+      "A run awaited through the client is judged alive by its heartbeat against the loop's own stale window, never by its exchange count or status; a run the loop no longer has is lost, one whose beat has stopped is stale, and an orchestration is awaited the same way through the child run its running step has open.",
+  },
   // Browser session (packages/browser-session)
   {
     id: 'BRW-6',

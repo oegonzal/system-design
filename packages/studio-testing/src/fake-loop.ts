@@ -1,11 +1,11 @@
 import {
   openingRecall,
-  sameRubric,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
   type IterationTrace,
   type LlmModelDto,
-  type LlmExchangeSummaryDto,
+  type OrchestrationRunDto,
+  type OrchestrationRunStartedDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
   type QualityLoopHealthDto,
@@ -13,10 +13,20 @@ import {
   type QualityRunStartedDto,
   type RunHeartbeatDto,
   type RunRecallDto,
+  type StartOrchestrationFromRunRequest,
+  type StartOrchestrationRequest,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
+import { resolveAdoption } from './fake-adoption';
+import {
+  exchangesOf,
+  FAKE_LOOP_HEARTBEAT,
+  type FakeLoopOptions,
+  type RunScenario,
+} from './fake-loop-options';
+import { FakeOrchestrations } from './fake-orchestrations';
 import { fakeRecalled } from './fake-recall';
 import { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 import {
@@ -40,46 +50,17 @@ import {
  * otherwise, before any iteration lands.
  */
 
-/** What a scripted run does when it settles, keyed by the run's goal. */
-export type RunScenario =
-  | { outcome: 'complete'; iterations?: FakeIteration[]; once?: boolean }
-  | { outcome: 'fail'; message: string; once?: boolean }
-  | { outcome: 'refuse'; status?: number; message?: string; once?: boolean };
-
-export interface FakeLoopOptions {
-  model?: string;
-  /** `fake-run` → `fake-run-1`, `fake-run-2`, …; the stub uses a per-process prefix. */
-  runIdPrefix?: string;
-  pipelineVersion?: string;
-  library?: readonly PromptLibraryDocumentDto[];
-  /** When set, any other pipeline is refused with 404, as the real loop does. */
-  knownPipelines?: readonly string[];
-  /** Exchange scopes a run starts with, so a live signal exists before it settles. */
-  startExchanges?: readonly string[];
-  now?: () => string;
-  /** The pace `health` reports; the loop's own defaults unless a spec says otherwise. */
-  heartbeat?: RunHeartbeatDto;
-}
-
-/** The loop's default pace: a beat a minute, a run given up after three silent minutes. */
-const FAKE_LOOP_HEARTBEAT: RunHeartbeatDto = { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 };
-
-const exchangesOf = (scopes: readonly string[], at: string): LlmExchangeSummaryDto[] =>
-  scopes.map((scope, index) => ({
-    scope,
-    ordinal: index + 1,
-    outcome: 'ok' as const,
-    durationMs: 10,
-    startedAt: at,
-  }));
-
 export class FakeLoop {
   readonly runs = new Map<string, QualityRunDto>();
   readonly requests = new Map<string, StartQualityRunRequest>();
   readonly startRequests: StartQualityRunRequest[] = [];
   readonly criteriaRequests: DeriveCriteriaRequest[] = [];
-  /** Run ids the studio asked the memory orchestrator to digest, in order. */
-  readonly digested: string[] = [];
+  /** The orchestrations started through the fake, and the run ids handed over from-run. */
+  readonly orchestrations = new FakeOrchestrations({
+    prefix: () => this.prefix,
+    now: () => this.now(),
+    runOf: (runId) => this.runs.get(runId) ?? null,
+  });
   llm: LlmModelDto;
   unreachable = false;
   /** The model answers, and derives nothing: `POST /criteria` is a 503 with the diagnostic. */
@@ -123,7 +104,7 @@ export class FakeLoop {
     this.sequence = 0;
     this.runs.clear();
     this.requests.clear();
-    this.digested.length = 0;
+    this.orchestrations.reset();
     this.adoptions.clear();
     this.startRequests.length = 0;
     this.criteriaRequests.length = 0;
@@ -172,7 +153,7 @@ export class FakeLoop {
       this.consume(request.goal, scenario);
       throw new LoopRefused(scenario.status ?? 400, scenario.message ?? 'the loop refused the run');
     }
-    const adopted = request.adopt === undefined ? null : this.resolveAdoption(request);
+    const adopted = request.adopt === undefined ? null : resolveAdoption(request, this.runs);
 
     this.startRequests.push(request);
     const runId = `${this.prefix}-${++this.sequence}`;
@@ -206,19 +187,41 @@ export class FakeLoop {
     return { runId, status: 'running' };
   }
 
-  /**
-   * `POST /orchestrations/memory/from-run` — digest a finished run and store
-   * what the digest endorsed. The fake records the ask and answers with an
-   * orchestration id; no steps are simulated, because the studio only fires it.
-   */
-  digestRun(runId: string): { orchestrationRunId: string; status: 'running' } {
+  /** `POST /orchestrations/:orchestrator` — start an orchestration on a goal; it runs until a spec settles it. */
+  startOrchestration(
+    orchestrator: string,
+    request: StartOrchestrationRequest,
+  ): OrchestrationRunStartedDto {
     if (this.unreachable) throw new LoopUnreachable();
-    if (!this.runs.has(runId)) throw new LoopRefused(404, `run ${runId} not found`);
-    this.digested.push(runId);
-    return {
-      orchestrationRunId: `${this.prefix}-digest-${this.digested.length}`,
-      status: 'running',
-    };
+    return this.orchestrations.start(orchestrator, request);
+  }
+
+  /**
+   * `POST /orchestrations/:orchestrator/from-run` — a finished run stands in
+   * for the orchestrator's target. The fake records the ask and answers with
+   * an orchestration id; no step is simulated, because a caller only fires it.
+   */
+  startOrchestrationFromRun(
+    orchestrator: string,
+    request: StartOrchestrationFromRunRequest,
+  ): OrchestrationRunStartedDto {
+    if (this.unreachable) throw new LoopUnreachable();
+    return this.orchestrations.startFromRun(orchestrator, request);
+  }
+
+  getOrchestration(orchestrationRunId: string): OrchestrationRunDto | null {
+    if (this.unreachable) throw new LoopUnreachable();
+    return this.orchestrations.get(orchestrationRunId);
+  }
+
+  /** The studio's digest, as it fires it: the memory orchestrator from a finished run. */
+  digestRun(runId: string): OrchestrationRunStartedDto {
+    return this.startOrchestrationFromRun('memory', { runId });
+  }
+
+  /** Run ids handed to an orchestrator from-run, in order — what the studio asked to have digested. */
+  get digested(): readonly string[] {
+    return this.orchestrations.digested;
   }
 
   getRun(runId: string): QualityRunDto | null {
@@ -366,39 +369,6 @@ export class FakeLoop {
     if (this.known !== null && !this.known.includes(pipeline)) {
       throw new LoopRefused(404, `unknown pipeline: ${pipeline}`);
     }
-  }
-
-  /** The recorded iteration an adopting run starts from, or the loop's refusal. */
-  private resolveAdoption(request: StartQualityRunRequest): IterationTrace {
-    const adopt = request.adopt;
-    if (!adopt) throw new Error('no adopt on the request');
-    const source = this.runs.get(adopt.runId);
-    if (!source) throw new LoopRefused(404, `adopt: unknown run ${adopt.runId}`);
-    if (source.pipeline !== request.pipeline) {
-      throw new LoopRefused(
-        400,
-        `adopt: run ${adopt.runId} ran ${source.pipeline}, not ${request.pipeline}`,
-      );
-    }
-    // Its status, not its trace: a running run's iterations so far are not a
-    // verdict to adopt yet; a stopped run's recorded ones are final.
-    if (source.status === 'running') {
-      throw new LoopRefused(400, `adopt: run ${adopt.runId} is still running`);
-    }
-    if (source.trace === null) {
-      throw new LoopRefused(400, `adopt: run ${adopt.runId} recorded no iteration`);
-    }
-    const iteration = source.trace.iterations[adopt.iteration - 1];
-    if (!iteration) {
-      throw new LoopRefused(400, `adopt: run ${adopt.runId} has no iteration ${adopt.iteration}`);
-    }
-    if (
-      request.criteria === undefined ||
-      !sameRubric(request.criteria, source.trace.contract.criteria)
-    ) {
-      throw new LoopRefused(400, 'adopt: the rubric differs from the adopted run’s');
-    }
-    return iteration;
   }
 
   private require(runId: string): QualityRunDto {
