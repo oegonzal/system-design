@@ -84,7 +84,8 @@ describe('PracticeWorkspace on open', () => {
     expect(screen.getByTestId('narrative-rationale-d-1')).toBeTruthy();
     expect(screen.getByTestId('narrative-rationale-d-2')).toBeTruthy();
     expect(screen.queryByTestId('narrative-rationale-n-1')).toBeNull();
-    expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
+    // A draft the server handed back is saved work: nothing to write until it is edited.
+    expect(screen.getByTestId('draft-status').textContent).toBe('draft saved');
     expect(screen.queryByTestId('readonly-banner')).toBeNull();
     expect(screen.getByText(/rev #2 · graded/)).toBeTruthy();
     // The draft is the canvas; no revision body is fetched (its grade still is).

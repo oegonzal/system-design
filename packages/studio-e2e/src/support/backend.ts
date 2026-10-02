@@ -10,6 +10,7 @@ import type {
   PromptStatus,
   QualityRunStartedDto,
   SaveStarStoryRequest,
+  SessionDraft,
   StarStoryDto,
 } from '@sysdesign/contracts';
 
@@ -209,6 +210,18 @@ export async function getSession(
   sessionId: string,
 ): Promise<DesignSessionDto> {
   return unwrap(await request.get(`${API_URL}/sessions/${sessionId}`));
+}
+
+/** Keeps `draft` as the session's unsubmitted canvas, the way the workspace's autosave does. */
+export async function saveDraft(
+  request: APIRequestContext,
+  sessionId: string,
+  draft: SessionDraft,
+): Promise<void> {
+  const response = await request.put(`${API_URL}/sessions/${sessionId}/draft`, { data: draft });
+  if (!response.ok()) {
+    throw new Error(`${response.url()} → ${response.status()}: ${await response.text()}`);
+  }
 }
 
 /** Every revision of a session, newest first, as the timeline lists them. */

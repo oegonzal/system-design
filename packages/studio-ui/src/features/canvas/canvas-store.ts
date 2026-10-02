@@ -123,6 +123,12 @@ export interface CanvasState extends CanvasContent {
   readOnly: boolean;
   /** Bumped to ask the canvas on screen to frame the whole diagram; `SdCanvas` honours each bump. */
   fitRequest: number;
+  /**
+   * The content version the server's draft is known to match: set when a
+   * draft is restored, so the autosave never writes back what it was just
+   * handed. Any edit or load moves `contentVersion` past it.
+   */
+  restoredVersion: number | null;
   history: CanvasHistory;
   viewport: CanvasViewport | null;
   highlight: HighlightState | null;
@@ -185,7 +191,8 @@ export interface CanvasState extends CanvasContent {
   /**
    * Restores an unsubmitted draft — graph, brief and narrative together. The
    * canvas is dirty afterwards, unlike `setGraph`: a draft is unsubmitted
-   * work, and the toolbar should say so.
+   * work, and the toolbar should say so. It is also saved work — the server
+   * just handed it over — which `restoredVersion` records.
    */
   loadDraft(draft: SessionDraft): void;
   /**
@@ -412,6 +419,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       contentVersion: 0,
       readOnly: false,
       fitRequest: initialGraph.nodes.length > 0 ? 1 : 0,
+      restoredVersion: null,
       history: EMPTY_HISTORY,
       viewport: null,
       narrativeOverview: '',
@@ -741,14 +749,16 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       },
 
       loadDraft(draft) {
+        const restored = loaded({
+          ...fromCanvasGraph(draft.graph),
+          bindings: draft.brief?.bindings.map((binding) => ({ ...binding })) ?? [],
+          narrativeOverview: draft.narrative?.overview ?? '',
+          componentRationales: draft.narrative?.componentRationales ?? [],
+          criterionNarrations: draft.narrative?.criterionNarrations ?? [],
+        });
         set({
-          ...loaded({
-            ...fromCanvasGraph(draft.graph),
-            bindings: draft.brief?.bindings.map((binding) => ({ ...binding })) ?? [],
-            narrativeOverview: draft.narrative?.overview ?? '',
-            componentRationales: draft.narrative?.componentRationales ?? [],
-            criterionNarrations: draft.narrative?.criterionNarrations ?? [],
-          }),
+          ...restored,
+          restoredVersion: restored.contentVersion ?? null,
           selectedId: null,
           highlight: null,
           dirty: true,

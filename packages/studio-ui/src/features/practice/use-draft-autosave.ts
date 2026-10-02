@@ -24,7 +24,9 @@ type SavePhase = 'idle' | 'saving' | 'saved' | 'failed';
  * Keeps the unsubmitted canvas on the server as the author works. Every
  * change to the store's `contentVersion` while the canvas is dirty is a new
  * version — so selecting a block, React Flow measuring one, or a finding's
- * highlight is never a draft to save — and so is the canvas turning dirty. The
+ * highlight is never a draft to save — and so is the canvas turning dirty. A
+ * draft restored from the server is the one version that starts out saved:
+ * opening a session writes nothing. The
  * version that has sat still for the delay is saved, last write wins, and
  * a newer version supersedes a save still in flight. `settle()` is how a
  * submit or coach start makes sure the server has the latest draft first —
@@ -53,9 +55,15 @@ export function useDraftAutosave(
     () =>
       storeApi.subscribe((state, previous) => {
         setDirty(state.dirty);
-        if (state.dirty && (state.contentVersion !== previous.contentVersion || !previous.dirty)) {
-          versionRef.current += 1;
-          setVersion(versionRef.current);
+        if (!state.dirty) return;
+        if (state.contentVersion === previous.contentVersion && previous.dirty) return;
+        versionRef.current += 1;
+        setVersion(versionRef.current);
+        // A draft the server just handed back is already there: nothing to
+        // write until the author edits it.
+        if (state.restoredVersion === state.contentVersion) {
+          savedRef.current = versionRef.current;
+          setSavedVersion(versionRef.current);
         }
       }),
     [storeApi],
@@ -64,7 +72,8 @@ export function useDraftAutosave(
   const save = useCallback(
     (target: number): Promise<void> => {
       if (inFlight.current?.target === target) return inFlight.current.promise;
-      if (!enabledRef.current || target === savedRef.current || !storeApi.getState().dirty) {
+      // Versions only grow: one no newer than what the server holds has nothing to send.
+      if (!enabledRef.current || target <= savedRef.current || !storeApi.getState().dirty) {
         return Promise.resolve();
       }
       const { id, signal } = latest.begin();

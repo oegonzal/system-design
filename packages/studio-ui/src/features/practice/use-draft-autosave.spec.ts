@@ -116,6 +116,57 @@ describe('useDraftAutosave', () => {
     expect(draftBodies(fetchMock)).toHaveLength(1);
   });
 
+  it('[UX-15] a restored draft is saved work: opening a session writes nothing, and the first edit is the first save', async () => {
+    const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
+    const store = createCanvasStore();
+    // As the workspace mounts it: off while the session loads, on once the draft is on the canvas.
+    const hook = renderHook(({ enabled }) => useDraftAutosave('session-1', store, enabled), {
+      initialProps: { enabled: false },
+    });
+
+    act(() => {
+      store.getState().loadDraft({ graph: makeGraph(), brief: null, narrative: null });
+    });
+    hook.rerender({ enabled: true });
+    expect(hook.result.current.status).toBe('saved');
+    expect(hook.result.current.pending).toBe(false);
+    await advance(DRAFT_AUTOSAVE_DELAY_MS * 2);
+    expect(draftBodies(fetchMock)).toHaveLength(0);
+    expect(hook.result.current.status).toBe('saved');
+
+    // settle() — a submit, a coach start — has nothing to send either.
+    await act(async () => {
+      await hook.result.current.settle();
+    });
+    expect(draftBodies(fetchMock)).toHaveLength(0);
+
+    act(() => {
+      store.getState().addNode('cache');
+    });
+    expect(hook.result.current.status).toBe('unsaved');
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+    expect(draftBodies(fetchMock)[0].graph.nodes).toHaveLength(4);
+  });
+
+  it('[UX-15] a revision restored as the draft is not saved work: it is written once', async () => {
+    const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
+    const store = createCanvasStore();
+    const hook = renderHook(() => useDraftAutosave('session-1', store, true));
+
+    act(() => {
+      store.getState().loadDraft({ graph: makeGraph(), brief: null, narrative: null });
+      // A revision loaded over the draft, then handed back as the draft.
+      store.getState().setGraph(makeGraph());
+      store.getState().markDirty();
+    });
+    expect(hook.result.current.status).toBe('unsaved');
+    await advance(DRAFT_AUTOSAVE_DELAY_MS);
+
+    expect(draftBodies(fetchMock)).toHaveLength(1);
+    expect(hook.result.current.status).toBe('saved');
+  });
+
   it('[UX-15] an undo is an edit like any other: the draft it leaves is saved', async () => {
     const { fetchMock } = stubApi([{ method: 'PUT', path: DRAFT_PATH, status: 204 }]);
     const store = createCanvasStore(makeGraph());

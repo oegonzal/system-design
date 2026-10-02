@@ -221,6 +221,8 @@ describe('canvas-store', () => {
       ]);
       expect(store.getState().narrativeOverview).toBe('');
       expect(store.getState().dirty).toBe(true);
+      // …and saved work: the version it loaded as is the one the server holds.
+      expect(store.getState().restoredVersion).toBe(store.getState().contentVersion);
       // Round trip: what was restored is what would be saved again.
       expect(store.getState().serializeDraft().brief).toEqual({
         version: 1,

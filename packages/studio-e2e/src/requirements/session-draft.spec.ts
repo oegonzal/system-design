@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 import { AppNav } from '../support/app-nav';
-import { getSession } from '../support/backend';
-import { buildNaiveDesign, openPracticeSession } from '../support/canvas.page';
+import { createPracticeSession, getSession, saveDraft } from '../support/backend';
+import { buildNaiveDesign, CanvasPage, openPracticeSession } from '../support/canvas.page';
 
 /**
  * The unsubmitted canvas is a draft kept with the session. It autosaves
- * shortly after the last edit, comes back on reload ahead of any revision,
+ * shortly after the last edit, comes back on reload ahead of any revision —
+ * framed on screen, and as saved work, so opening a session writes nothing —
  * is cleared by the submit it became, and the workspace asks before a
  * pending save is lost to a navigation.
  */
@@ -24,16 +25,59 @@ test.describe('the session draft', () => {
     expect(saved.draft?.graph.nodes.map((node) => node.id)).toEqual(['n-1', 'n-2', 'n-3']);
 
     // Back after a reload as the draft — not as a read-only revision — and
-    // saved again once, since a restored draft is unsaved work until it is.
+    // already saved: the server just handed it over, so nothing is written
+    // back and the session keeps the time of its last real edit.
+    const draftSaves = canvas.watchDraftSaves();
     await page.reload();
     await canvas.ready();
     await canvas.expectNodeCount(3);
     await expect(canvas.readOnlyBanner).toHaveCount(0);
     await canvas.expectDraftStatus('saved');
+    expect(draftSaves()).toBe(0);
+    expect((await getSession(request, sessionId)).updatedAt).toBe(saved.updatedAt);
 
     await canvas.submit();
     await canvas.expectEvaluationComplete(1);
     await expect.poll(async () => (await getSession(request, sessionId)).draft).toBeNull();
+  });
+
+  test('[UX-15] a session reopened on its draft frames the whole diagram, and the first edit is the first save', async ({
+    page,
+    request,
+  }) => {
+    // A draft drawn far from the canvas's origin: at the resting view none of
+    // it would be on screen.
+    const { session } = await createPracticeSession(request);
+    await saveDraft(request, session.id, {
+      graph: {
+        nodes: [
+          { id: 'n-1', kind: 'client', label: 'Client', position: { x: 1400, y: 900 } },
+          { id: 'n-2', kind: 'service', label: 'Service', position: { x: 1660, y: 1080 } },
+          { id: 'n-3', kind: 'database', label: 'Database', position: { x: 1920, y: 1260 } },
+        ],
+        edges: [
+          { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+          { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync' },
+        ],
+      },
+      brief: null,
+      narrative: null,
+    });
+
+    const canvas = new CanvasPage(page);
+    const draftSaves = canvas.watchDraftSaves();
+    await page.goto(`/practice/${session.id}`);
+    await canvas.ready();
+    await canvas.expectNodeCount(3);
+    await canvas.expectDiagramFramed(['n-1', 'n-2', 'n-3']);
+    await canvas.expectDraftStatus('saved');
+    expect(draftSaves()).toBe(0);
+
+    // A block added by click lands in view too, and is the first thing saved.
+    await canvas.addFromPalette('cache'); // n-4
+    await canvas.expectDiagramFramed(['n-4']);
+    await canvas.expectDraftStatus('saved');
+    expect(draftSaves()).toBe(1);
   });
 
   test('[UX-15] leaving while a save is pending asks first; once saved, leaving is free', async ({

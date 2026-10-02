@@ -74,9 +74,9 @@ export class CanvasPage {
 
   /**
    * The click path: every palette entry is a real button, and clicking adds
-   * the block in the free slot nearest the visible centre — on screen, and
-   * never over another block. Specs still `moveNode` each add to a known spot
-   * so the layout they connect is deterministic.
+   * the block in the free place nearest the middle of what is visible — on
+   * screen, and never over another block. Specs still `moveNode` each add to
+   * a known spot so the layout they connect is deterministic.
    */
   async addFromPalette(kind: NodeKind): Promise<void> {
     await this.paletteItem(kind).click();
@@ -95,6 +95,8 @@ export class CanvasPage {
    * this dispatches the real DragEvent + DataTransfer sequence the palette
    * and canvas exchange. It is the same store action as the click path, plus
    * an exact position, for a block that must land beside a particular one.
+   * `x`/`y` are the block's top-left corner on the pane; a point at or past
+   * the pane's edge is pulled back until the block is on it.
    */
   async dragFromPalette(kind: NodeKind, x: number, y: number): Promise<void> {
     await expect(this.paletteItem(kind)).toBeVisible();
@@ -291,6 +293,28 @@ export class CanvasPage {
     await expect(this.draftStatus).toHaveAttribute('data-status', status, {
       timeout: DRAFT_TIMEOUT,
     });
+  }
+
+  /**
+   * Counts the draft saves the page sends from here on; the returned reader
+   * gives the count so far. For asserting that something wrote nothing.
+   */
+  watchDraftSaves(): () => number {
+    let saves = 0;
+    this.page.on('request', (request) => {
+      if (request.method() === 'PUT' && new URL(request.url()).pathname.endsWith('/draft')) {
+        saves += 1;
+      }
+    });
+    return () => saves;
+  }
+
+  /** Every block is on screen in full: inside the canvas frame, whatever the pan and zoom. */
+  async expectDiagramFramed(nodeIds: readonly string[]): Promise<void> {
+    for (const id of nodeIds) {
+      // Not quite 1: a framed diagram may be scaled, and a scaled edge lands between pixels.
+      await expect(this.node(id)).toBeInViewport({ ratio: 0.99 });
+    }
   }
 
   /** The banner over a loaded revision; its one control hands the design back as a draft. */
