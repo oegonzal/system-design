@@ -20,3 +20,10 @@ export function humanizeToken(token: string): string {
  * finding rather than as a title. The id itself stays the lens's identity.
  */
 export const lensName = (lens: string): string => humanizeToken(lens).toLowerCase();
+
+/**
+ * A count with its noun, singular or plural as the count says — `1 fix`,
+ * `10 fixes` — so no sentence the studio writes reads `fix(es)`.
+ */
+export const counted = (count: number, one: string, many: string): string =>
+  `${count} ${count === 1 ? one : many}`;

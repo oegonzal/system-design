@@ -30,6 +30,9 @@ import {
 const graph = makeGraph();
 const prompt = makePrompt();
 const criteria = makeCriteria();
+/** Feedback about the revision the canvas — so the exported diagram — still shows. */
+const onCanvas = (revisionNumber: number) =>
+  ({ revisionNumber, origin: 'user', onCanvas: true }) as const;
 
 describe('promptMarkdown', () => {
   it('[UX-10] renders the markdown verbatim followed by the criteria table', () => {
@@ -127,7 +130,7 @@ describe('feedbackMarkdown', () => {
         }),
       ],
     });
-    const md = feedbackMarkdown(evaluation, criteria, 2);
+    const md = feedbackMarkdown(evaluation, criteria, onCanvas(2));
     expect(md).toContain('# Feedback — revision #2');
     expect(md).toContain('**72/100 · revise**');
     expect(md).toContain('## Dimensions');
@@ -150,6 +153,11 @@ describe('feedbackMarkdown', () => {
       overall: 72.6,
       dimensions: { coverage: 79.5, compliance: null },
       decisionReason: `blockers to fix: ${finding.id}, c3`,
+      decisionBasis: {
+        factor: 'policy-allowed',
+        remediations: 2,
+        criteria: { assessed: 5, total: 5 },
+      },
       findings: [finding],
       criterionResults: [
         makeCriterionResult({
@@ -161,7 +169,7 @@ describe('feedbackMarkdown', () => {
       ],
     });
 
-    const md = feedbackMarkdown(evaluation, criteria, 2);
+    const md = feedbackMarkdown(evaluation, criteria, onCanvas(2));
 
     expect(md).toContain(`**${formatScore(72.6)}/100 · revise**`);
     expect(md).toContain('**73/100 · revise**');
@@ -199,7 +207,7 @@ describe('feedbackMarkdown', () => {
         ],
       }),
       criteria,
-      1,
+      onCanvas(1),
     );
 
     expect(md).toContain(
@@ -236,7 +244,7 @@ describe('feedbackMarkdown', () => {
         ],
       }),
       criteria,
-      1,
+      onCanvas(1),
     );
 
     expect(md).toContain(
@@ -250,14 +258,14 @@ describe('feedbackMarkdown', () => {
   });
 
   it('[DEL-4] says the caveats the panel says: the lens samples a grade was computed without, and a coach’s stop in its own sentence — nothing for a plain grade', () => {
-    const plain = feedbackMarkdown(makeEvaluation(), criteria, 1);
+    const plain = feedbackMarkdown(makeEvaluation(), criteria, onCanvas(1));
     expect(plain).not.toMatch(/stopped|iteration budget|lens sample/i);
 
     const degraded = [{ stage: 'critic.explanation', sample: 2, reason: 'llm-failed' }] as const;
     const md = feedbackMarkdown(
       makeEvaluation({ iteration: 3, stopReason: 'max-iterations', degraded: [...degraded] }),
       criteria,
-      3,
+      onCanvas(3),
     );
     expect(md).toContain(STOPPED_COPY['max-iterations']);
     expect(md).not.toMatch(/max.iterations/i);
@@ -267,12 +275,78 @@ describe('feedbackMarkdown', () => {
     );
   });
 
+  it('[DEL-8] words the decision as the panel does — never the controller’s "remediation(s)"', () => {
+    const md = feedbackMarkdown(
+      makeEvaluation({
+        decisionReason: '10 remediation(s) to apply',
+        decisionBasis: { factor: 'route', remediations: 10, criteria: { assessed: 5, total: 5 } },
+      }),
+      criteria,
+      onCanvas(6),
+    );
+    expect(md).toContain('Below the accept threshold — 10 fixes to make.');
+    expect(md).not.toContain('remediation');
+  });
+
+  it('[UX-15] says, as the tab does, when the diagram is the draft rather than the revision the feedback is about', () => {
+    const drafted = feedbackMarkdown(makeEvaluation(), criteria, {
+      revisionNumber: 10,
+      origin: 'user',
+      onCanvas: false,
+    });
+    expect(drafted).toContain('# Feedback — revision #10');
+    expect(drafted).toContain(
+      '_The canvas shows your draft, not this revision. The diagram in this export is the draft._',
+    );
+    // Said even when the grade is not there to read: the diagram is still the draft.
+    expect(
+      feedbackMarkdown(makeEvaluation({ status: 'failed' }), criteria, {
+        revisionNumber: 10,
+        origin: 'user',
+        onCanvas: false,
+      }),
+    ).toContain('The diagram in this export is the draft.');
+    expect(feedbackMarkdown(makeEvaluation(), criteria, onCanvas(10))).not.toContain('draft');
+    // Nothing submitted: feedback about no revision.
+    const unsubmitted = feedbackMarkdown(null, criteria, null);
+    expect(unsubmitted).toContain('# Feedback\n');
+    expect(unsubmitted).not.toContain('revision #');
+  });
+
+  it('[UX-18] prints a grade that earned no score as the panel says it — no number, decision or dimension, why, and no lens’s words on what nobody settled', () => {
+    const md = feedbackMarkdown(
+      makeEvaluation({
+        overall: null,
+        unscored: 'unassessed',
+        decision: 'escalate',
+        decisionReason: 'only 0% of criteria assessed; unassessed: c1, c3',
+        decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 2 } },
+        dimensions: { coverage: null, quality_attributes: null },
+        degraded: [{ stage: 'evaluator.quality', sample: 1, reason: 'llm-failed' }],
+        criterionResults: [
+          makeCriterionResult({ result: 'unassessed', confidence: null, rationale: 'looks fine' }),
+        ],
+        findings: [],
+      }),
+      criteria,
+      onCanvas(1),
+    );
+    expect(md).toContain('**This revision couldn’t be graded**');
+    expect(md).toContain('The lenses assessed 0 of 2 criteria — too few to score the design.');
+    expect(md).toContain(
+      '1 lens sample did not answer: evaluator quality #1 (the model did not answer).',
+    );
+    expect(md).not.toMatch(/\/100|escalate|## Dimensions|score stands|only 0%/);
+    expect(md).toContain('| Unassessed | — | — |');
+    expect(md).not.toContain('looks fine');
+  });
+
   it('says not-graded in words when the evaluation is absent, running or failed — never a status token', () => {
-    expect(feedbackMarkdown(null, criteria, 1)).toContain('_Not graded yet._');
-    const running = feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, 1);
+    expect(feedbackMarkdown(null, criteria, onCanvas(1))).toContain('_Not graded yet._');
+    const running = feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, onCanvas(1));
     expect(running).toContain('Not graded yet — grading is still running.');
     expect(running).not.toContain('status:');
-    expect(feedbackMarkdown(makeEvaluation({ status: 'failed' }), criteria, 1)).toContain(
+    expect(feedbackMarkdown(makeEvaluation({ status: 'failed' }), criteria, onCanvas(1))).toContain(
       'grading failed for this revision',
     );
   });
@@ -313,6 +387,24 @@ describe('revisionsMarkdown', () => {
     expect(rows[0]).toBe('| 1 | 20 | reject | graded |');
     expect(rows[1]).toBe('| 2 (AI) | 80 | accept | graded |');
     expect(rows[2]).toBe('| 3 | — | — | grading… |');
+  });
+
+  it('[UX-18] prints a grade that earned no score as not assessed — no score, no decision', () => {
+    const md = revisionsMarkdown([
+      makeRevisionSummary({
+        revisionNumber: 1,
+        evaluation: {
+          runId: 'r',
+          iteration: 1,
+          status: 'complete',
+          overall: null,
+          decision: 'escalate',
+        },
+      }),
+    ]);
+    expect(md.split('\n').filter((line) => /^\| \d/.test(line))).toEqual([
+      '| 1 | — | — | not assessed |',
+    ]);
   });
 
   it('says None with no revisions', () => {

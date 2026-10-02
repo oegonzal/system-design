@@ -39,6 +39,13 @@ const Line = styled.div`
 `;
 
 /**
+ * Whether a lens settled the criterion. One no lens settled is shown as that
+ * and nothing more — no confidence, no lens's words beside it, which would
+ * read as a verdict that was then thrown away.
+ */
+const settled = (row: CriterionResultDto): boolean => row.result !== 'unassessed';
+
+/**
  * One stacked row per criterion the evaluators judged: the statement, the
  * settled result with the confidence behind it, and the evaluator's reason
  * on its own line, read with the labels of the places it names — cited as
@@ -74,13 +81,17 @@ export function CriterionResultsList({ results, criteria }: CriterionResultsList
           </Line>
           <Line>
             <Badge tone={RESULT_TONE[row.result]}>{humanizeToken(row.result).toLowerCase()}</Badge>
-            <Text as="span" size="sm" tone="muted">
-              {row.confidence ? `${row.confidence} confidence` : '—'}
-            </Text>
+            {settled(row) ? (
+              <Text as="span" size="sm" tone="muted">
+                {row.confidence ? `${row.confidence} confidence` : '—'}
+              </Text>
+            ) : null}
           </Line>
-          <WrappingText size="sm" tone="secondary" data-testid="criterion-rationale">
-            {row.rationale !== null ? lensProse(row.rationale, proseLocations(row)) : '—'}
-          </WrappingText>
+          {settled(row) ? (
+            <WrappingText size="sm" tone="secondary" data-testid="criterion-rationale">
+              {row.rationale !== null ? lensProse(row.rationale, proseLocations(row)) : '—'}
+            </WrappingText>
+          ) : null}
         </Row>
       ))}
     </Stack>

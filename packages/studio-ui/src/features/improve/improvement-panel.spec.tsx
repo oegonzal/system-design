@@ -1,6 +1,7 @@
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
+  describeUnassessedBase,
   MAX_IMPROVE_ITERATIONS,
   PROMPT_COPY,
 } from '@sysdesign/contracts';
@@ -141,7 +142,6 @@ describe('ImprovementPanel', () => {
             mode: 'revise',
             overall: 70,
             decision: 'revise',
-            reason: 'no better than iteration 2',
             revisionId: null,
           }),
           makeImproveIteration({
@@ -167,7 +167,7 @@ describe('ImprovementPanel', () => {
     const lower = screen.getByTestId('improve-iteration-3');
     expect(lower.textContent).toContain('not better');
     expect(within(lower).getByTestId('improve-iteration-reason').textContent).toBe(
-      'no better than iteration 2',
+      'Below the accept threshold — 1 fix to make.',
     );
     const refused = screen.getByTestId('improve-iteration-4');
     expect(refused.textContent).toContain('refused');
@@ -285,7 +285,16 @@ describe('ImprovementPanel', () => {
     });
     const reasonText =
       'blockers to fix: contradiction|binding.2,edge.5, unbacked_claim|binding.9,narration.2, c3';
-    const iteration = makeImproveIteration({ reason: reasonText, findings: [contradiction] });
+    const iteration = makeImproveIteration({
+      reason: reasonText,
+      // A gate that names its blockers keeps its sentence, with each one named.
+      decisionBasis: {
+        factor: 'policy-allowed',
+        remediations: 3,
+        criteria: { assessed: 5, total: 5 },
+      },
+      findings: [contradiction],
+    });
     const run = makeImproveRun({ iterations: [iteration] });
     const criteria = makeCriteria();
     renderPanel({ criteria, run, isPolling: true });
@@ -299,6 +308,67 @@ describe('ImprovementPanel', () => {
       'blockers to fix: Contradiction (Brief: c2; Order Service → Orders DB), unbacked_claim|binding.9,narration.2, “p99 read latency stays under 200 ms”',
     );
     expect(getComputedStyle(reason).overflowWrap).toBe('anywhere');
+  });
+
+  it('[DEL-8] words a row’s decision from what settled it — never the controller’s "N remediation(s) to apply"', () => {
+    renderPanel({
+      isPolling: true,
+      run: makeImproveRun({
+        iterations: [
+          makeImproveIteration({
+            reason: '10 remediation(s) to apply',
+            decisionBasis: {
+              factor: 'route',
+              remediations: 10,
+              criteria: { assessed: 5, total: 5 },
+            },
+          }),
+        ],
+      }),
+    });
+    expect(screen.getByTestId('improve-iteration-reason').textContent).toBe(
+      'Below the accept threshold — 10 fixes to make.',
+    );
+  });
+
+  it('[UX-18] a judged row the lenses could not settle reads "not assessed" — no score, no verdict — and says why', () => {
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'escalated',
+        iterations: [
+          makeImproveIteration({
+            iteration: 1,
+            overall: null,
+            unscored: 'unassessed',
+            decision: 'escalate',
+            reason: 'only 0% of criteria assessed; unassessed: c1, c2, c3, c4, c5',
+            decisionBasis: {
+              factor: 'evidence',
+              remediations: 0,
+              criteria: { assessed: 0, total: 5 },
+            },
+          }),
+        ],
+      }),
+    });
+
+    const row = screen.getByTestId('improve-iteration-1');
+    expect(within(row).getByTestId('improve-iteration-unscored').textContent).toBe('not assessed');
+    expect(within(row).queryByTestId('improve-iteration-decision')).toBeNull();
+    expect(row.textContent).toContain('—');
+    expect(within(row).getByTestId('improve-iteration-reason').textContent).toBe(
+      'Not scored — the lenses assessed 0 of 5 criteria, too few for a verdict.',
+    );
+  });
+
+  it('[UX-18] is off with why when the revision it would start from has a grade that is no verdict', () => {
+    const reason = describeUnassessedBase(1);
+    renderPanel({ blockedReason: reason });
+    const start = screen.getByTestId('improve-run') as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    expect(start.title).toBe(reason);
+    expect(screen.getByTestId('improver-unavailable').textContent).toBe(reason);
   });
 
   it('[DEL-3] a coach that produced nothing to judge says so — the stop is its miss, never a verdict on the design', () => {
@@ -461,6 +531,41 @@ describe('ImprovementPanel', () => {
     expect(within(lessons[1]).getByTestId('coach-recall-caveat').textContent).toBe(
       'Keep in mind: learned on a different prompt',
     );
+  });
+
+  it('[QL-32] [QL-34] says what the recall searched for beside the prompt — the starting grade’s defects — next to the lessons', () => {
+    const { unmount } = renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        recall: makeRecall({
+          focus: {
+            runId: 'run-1',
+            iteration: 1,
+            findings: [
+              { type: 'unhandled_failure', severity: 'high', rationale: 'one replica' },
+              { type: 'unhandled_failure', severity: 'high', rationale: 'one cache' },
+              { type: 'data_integrity', severity: 'medium', rationale: null },
+            ],
+            criteria: [
+              { criterionId: 'c1', statement: 'Reads stay fast', result: 'fail' },
+              { criterionId: 'c4', statement: 'Counts lag by minutes', result: 'partial' },
+            ],
+          },
+        }),
+      }),
+    });
+    expect(screen.getByTestId('coach-recall-summary').textContent).toBe(
+      'Recalled 2 lessons from earlier runs for the coach',
+    );
+    // Beside the list, not behind its toggle: each kind of defect once, then each shortfall.
+    expect(screen.getByTestId('coach-recall-focus').textContent).toBe(
+      'Searched for what the starting grade found wrong: unhandled failure, data integrity, c1 not met, and c4 met in part.',
+    );
+    unmount();
+
+    // A recall over the prompt alone names no focus.
+    renderPanel({ run: makeImproveRun({ status: 'complete', recall: makeRecall() }) });
+    expect(screen.queryByTestId('coach-recall-focus')).toBeNull();
   });
 
   it('[QL-32] says plainly when the coach ran without lessons, and nothing when the run never recalled', () => {

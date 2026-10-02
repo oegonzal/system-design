@@ -4,7 +4,7 @@ import styled from '@emotion/styled';
 import type { EvaluationDto, SuccessCriterion } from '@sysdesign/contracts';
 import { Badge, DECISION_TONE, Meter, Stack, Text } from '@sysdesign/design-system';
 
-import { humanizeReason } from './decision-reason';
+import { decisionInWords } from './decision-reason';
 import { degradedNote } from './degraded';
 import { humanizeToken } from './humanize';
 import { formatScore } from './score';
@@ -43,18 +43,28 @@ export interface ScoreSummaryProps {
 }
 
 /**
- * The headline: the controller's overall score, its decision and the
- * controller's own sentence for it — every finding and criterion it cites
- * named as the record names it — why the coach stopped when this grade is
- * the one that ended its run (a plain grade carries no stop reason, and
- * nothing is shown), which lens samples the grade was computed without, and
- * one meter per dimension the pipeline declared. The dimension names are the pipeline's own — whatever keys
- * arrive are what render, in the order the loop reported them. Purely
+ * The headline of a grade with a score: the controller's overall score, its
+ * decision and why, in the reader's words (`decisionInWords`) — every
+ * finding and criterion it cites named as the record names it — why the
+ * coach stopped when this grade is the one that ended its run (a plain grade
+ * carries no stop reason, and nothing is shown), which lens samples the grade
+ * was computed without, and one meter per dimension the pipeline declared.
+ * The dimension names are the pipeline's own — whatever keys arrive are what
+ * render, in the order the loop reported them. A grade that earned no score
+ * is not one to headline: the panel says why in its place. Purely
  * presentational — Storybook-safe.
  */
 export function ScoreSummary({ evaluation, criteria = NO_CRITERIA }: ScoreSummaryProps) {
   const dimensions = Object.entries(evaluation.dimensions);
   const degraded = degradedNote(evaluation.degraded);
+  const reason = decisionInWords(
+    {
+      decision: evaluation.decision,
+      reason: evaluation.decisionReason,
+      basis: evaluation.decisionBasis,
+    },
+    { findings: evaluation.findings, criteria },
+  );
 
   return (
     <Stack gap={5} data-testid="score-summary">
@@ -69,9 +79,9 @@ export function ScoreSummary({ evaluation, criteria = NO_CRITERIA }: ScoreSummar
           </Badge>
         ) : null}
       </ScoreRow>
-      {evaluation.decisionReason ? (
+      {reason ? (
         <WrappingText size="sm" tone="muted" data-testid="decision-reason">
-          {humanizeReason(evaluation.decisionReason, { findings: evaluation.findings, criteria })}
+          {reason}
         </WrappingText>
       ) : null}
       {evaluation.stopReason ? (

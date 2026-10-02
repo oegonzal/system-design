@@ -25,7 +25,9 @@ test.describe('exporting a run', () => {
       String(NAIVE_DESIGN_SCORE),
     );
 
-    const path = await canvas.exportRun();
+    const { path, filename } = await canvas.exportRun();
+    // Named by the diagram it holds: the canvas shows revision #1 as graded.
+    expect(filename).toMatch(/-rev1\.zip$/);
 
     // Open the zip and assert each artifact is its own file, as asked.
     const { default: JSZip } = await import('jszip');
@@ -60,5 +62,29 @@ test.describe('exporting a run', () => {
 
     const revisions = await zip.files['revisions.md'].async('string');
     expect(revisions).toContain(`| 1 | ${NAIVE_DESIGN_SCORE} | revise | graded |`);
+  });
+
+  test('[UX-10] [UX-15] an export of an edited canvas is named after the draft and says its diagram is the draft, not the revision its feedback is about', async ({
+    page,
+    request,
+  }) => {
+    const { canvas } = await openPracticeSession(page, request);
+    await buildNaiveDesign(canvas);
+    await canvas.submit();
+    await canvas.expectEvaluationComplete(1);
+
+    // One edit: the canvas is a draft now, while the feedback stays revision #1's.
+    await canvas.addFromPalette('cache');
+    await expect(canvas.feedbackOffCanvas).toBeVisible();
+
+    const { path, filename } = await canvas.exportRun();
+    expect(filename).toMatch(/-draft\.zip$/);
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(readFileSync(path));
+    const feedback = await zip.files['feedback.md'].async('string');
+    expect(feedback).toContain('# Feedback — revision #1');
+    expect(feedback).toContain(
+      '_The canvas shows your draft, not this revision. The diagram in this export is the draft._',
+    );
   });
 });

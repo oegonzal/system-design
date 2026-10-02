@@ -1,3 +1,4 @@
+import { describeUnassessedBase } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import {
@@ -96,6 +97,11 @@ export const Stopped: Story = {
           decision: 'revise',
           // The reason cites the finding by its key; the row names it by its type and place.
           reason: 'blockers to fix: unhandled_failure|node.3',
+          decisionBasis: {
+            factor: 'policy-allowed',
+            remediations: 1,
+            criteria: { assessed: 5, total: 5 },
+          },
           findings: [makeFinding()],
           revisionId: null,
         }),
@@ -118,7 +124,12 @@ export const Refused: Story = {
           iteration: 2,
           overall: 83,
           decision: 'accept',
-          reason: 'at or above the accept threshold of 75',
+          reason: 'overall 83 ≥ 75',
+          decisionBasis: {
+            factor: 'accept-threshold',
+            remediations: 0,
+            criteria: { assessed: 5, total: 5 },
+          },
           outcome: 'refused',
           problems: [
             'binding c2 names node n-9, which the canvas does not draw',
@@ -257,6 +268,35 @@ export const RecalledLessons: Story = {
       ],
     }),
   },
+};
+
+/** Started from a graded revision: the lessons were searched for what its grade found wrong, and the panel says so beside them. */
+export const RecalledForItsDefects: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'max-iterations',
+      recall: makeRecall({
+        focus: {
+          runId: 'run-1',
+          iteration: 2,
+          findings: [
+            { type: 'unhandled_failure', severity: 'high', rationale: 'one replica serves reads' },
+            { type: 'scale_mismatch', severity: 'medium', rationale: null },
+          ],
+          criteria: [{ criterionId: 'c4', statement: 'p99 redirect under 50 ms', result: 'fail' }],
+        },
+      }),
+      iterations: [
+        makeImproveIteration({ iteration: 1, mode: 'adopted', overall: 58, decision: 'revise' }),
+      ],
+    }),
+  },
+};
+
+/** The revision on the canvas was not assessed: there is no grade to start from, and the coach says so. */
+export const BaseNotAssessed: Story = {
+  args: { blockedReason: describeUnassessedBase(1) },
 };
 
 /** Recall could not run — no lesson store reachable — and the coach went on without lessons. */

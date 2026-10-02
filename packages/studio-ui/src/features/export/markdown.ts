@@ -10,12 +10,14 @@ import type {
 } from '@sysdesign/contracts';
 import { markdownCell, nodeLabel, proseLocations } from '@sysdesign/contracts';
 
-import { humanizeReason } from '../evaluation/decision-reason';
+import { decisionInWords } from '../evaluation/decision-reason';
 import { degradedNote } from '../evaluation/degraded';
+import { OFF_CANVAS_COPY, type FeedbackSubject } from '../evaluation/feedback-subject';
 import { humanizeToken, lensName } from '../evaluation/humanize';
 import { lensProse } from '../evaluation/lens-prose';
-import { formatScore, GRADE_STATUS_LABEL } from '../evaluation/score';
+import { cachedStandingOf, formatScore, GRADE_STANDING_LABEL } from '../evaluation/score';
 import { STOPPED_COPY } from '../evaluation/stop-reason';
+import { unscoredNote } from '../evaluation/unscored';
 import { humanizeKind } from '../prompts/criteria';
 
 /**
@@ -28,10 +30,12 @@ import { humanizeKind } from '../prompts/criteria';
  * label or statement the author actually reads, every wire token (a criterion
  * kind, a dimension, a result, a lens) is printed in the words the studio
  * shows it in, and every score and grading status is printed the way the
- * studio prints it (`formatScore`, `GRADE_STATUS_LABEL`) — the export is the
- * panel's words, on paper: the same sentence for a coach's stop
- * (`STOPPED_COPY`), the same caveat for a grade computed without some of its
- * lens samples (`degradedNote`), the same prose for every rationale
+ * studio prints it (`formatScore`, `GRADE_STANDING_LABEL`) — the export is
+ * the panel's words, on paper: the same sentence for a decision
+ * (`decisionInWords`) and a coach's stop (`STOPPED_COPY`), the same caveat
+ * for a grade computed without some of its lens samples (`degradedNote`), for
+ * one that earned no score (`unscoredNote`) and for a canvas that has moved
+ * on to the draft (`OFF_CANVAS_COPY`), the same prose for every rationale
  * (`lensProse`).
  */
 
@@ -191,19 +195,24 @@ export function narrativeMarkdown(
   return joinLines(lines);
 }
 
+/** Where the exported diagram stands against the revision the feedback is about, as the panel says it. */
+const DRAFT_DIAGRAM = `${OFF_CANVAS_COPY} The diagram in this export is the draft.`;
+
 /**
  * The graph is not consulted: every location a finding cites arrives already
  * labelled by the grader, so the export reads the same words as the panel —
  * a finding is where its lens cited, and its prose reads every place it
- * names, cited or merely mentioned, by label.
+ * names, cited or merely mentioned, by label. A grade that earned no score
+ * prints no number, decision or dimension: it says why, as the panel does.
  */
 export function feedbackMarkdown(
   evaluation: EvaluationDto | null,
   criteria: readonly SuccessCriterion[],
-  revisionNumber: number | null,
+  subject: FeedbackSubject | null,
 ): string {
-  const heading = revisionNumber !== null ? ` — revision #${revisionNumber}` : '';
+  const heading = subject !== null ? ` — revision #${subject.revisionNumber}` : '';
   const lines: string[] = [`# Feedback${heading}`, ``];
+  if (subject !== null && !subject.onCanvas) lines.push(`_${DRAFT_DIAGRAM}_`, ``);
   if (!evaluation) {
     lines.push(UNGRADED.absent);
     return joinLines(lines);
@@ -212,39 +221,52 @@ export function feedbackMarkdown(
     lines.push(UNGRADED[evaluation.status]);
     return joinLines(lines);
   }
-  lines.push(`**${formatScore(evaluation.overall)}/100 · ${evaluation.decision ?? '—'}**`, ``);
-  if (evaluation.decisionReason) {
-    lines.push(
-      humanizeReason(evaluation.decisionReason, { findings: evaluation.findings, criteria }),
-      ``,
+  const unscored = unscoredNote(evaluation);
+  if (unscored !== null) {
+    lines.push(`**${unscored.title}**`, ``, unscored.body, ``);
+  } else {
+    lines.push(`**${formatScore(evaluation.overall)}/100 · ${evaluation.decision ?? '—'}**`, ``);
+    const reason = decisionInWords(
+      {
+        decision: evaluation.decision,
+        reason: evaluation.decisionReason,
+        basis: evaluation.decisionBasis,
+      },
+      { findings: evaluation.findings, criteria },
     );
-  }
-  if (evaluation.stopReason) {
-    lines.push(STOPPED_COPY[evaluation.stopReason], ``);
-  }
-  const degraded = degradedNote(evaluation.degraded);
-  if (degraded !== null) {
-    lines.push(`_${degraded}_`, ``);
-  }
+    if (reason) lines.push(reason, ``);
+    if (evaluation.stopReason) {
+      lines.push(STOPPED_COPY[evaluation.stopReason], ``);
+    }
+    const degraded = degradedNote(evaluation.degraded);
+    if (degraded !== null) {
+      lines.push(`_${degraded}_`, ``);
+    }
 
-  lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);
-  for (const [key, value] of Object.entries(evaluation.dimensions)) {
-    lines.push(
-      `| ${humanizeToken(key)} | ${value === null ? 'Not assessed' : formatScore(value)} |`,
-    );
+    lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);
+    for (const [key, value] of Object.entries(evaluation.dimensions)) {
+      lines.push(
+        `| ${humanizeToken(key)} | ${value === null ? 'Not assessed' : formatScore(value)} |`,
+      );
+    }
+    lines.push(``);
   }
 
   const statements = criterionStatements(criteria);
-  lines.push(``, `## Criteria`, ``);
+  lines.push(`## Criteria`, ``);
   if (evaluation.criterionResults.length > 0) {
     lines.push(`| Criterion | Result | Confidence | Rationale |`, `| --- | --- | --- | --- |`);
     for (const row of evaluation.criterionResults) {
       const statement = statements.get(row.criterionId);
+      // A criterion no lens settled carries no lens's words, as on the panel.
+      const settled = row.result !== 'unassessed';
       lines.push(
         `| ${row.criterionId}${statement ? ` — ${markdownCell(statement)}` : ''} | ${humanizeToken(
           row.result,
-        )} | ${row.confidence ?? '—'} | ${
-          row.rationale ? markdownCell(lensProse(row.rationale, proseLocations(row))) : '—'
+        )} | ${(settled && row.confidence) || '—'} | ${
+          settled && row.rationale
+            ? markdownCell(lensProse(row.rationale, proseLocations(row)))
+            : '—'
         } |`,
       );
     }
@@ -286,10 +308,13 @@ export function revisionsMarkdown(revisions: DesignRevisionSummaryDto[]): string
   lines.push(`| Rev | Score | Decision | Status |`, `| --- | --- | --- | --- |`);
   for (const rev of [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)) {
     const grade = rev.evaluation;
+    const standing = grade === null ? null : cachedStandingOf(grade);
+    // A grade that earned no score has no decision to print: it is no verdict.
+    const decision = standing === 'unscored' ? null : grade?.decision;
     lines.push(
       `| ${rev.revisionNumber}${rev.origin === 'assistant' ? ' (AI)' : ''} | ${formatScore(
         grade?.overall,
-      )} | ${grade?.decision ?? '—'} | ${grade ? GRADE_STATUS_LABEL[grade.status] : '—'} |`,
+      )} | ${decision ?? '—'} | ${standing === null ? '—' : GRADE_STANDING_LABEL[standing]} |`,
     );
   }
   return joinLines(lines);

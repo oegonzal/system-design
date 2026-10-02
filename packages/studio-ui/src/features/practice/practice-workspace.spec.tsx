@@ -1,4 +1,4 @@
-import { describeInFlight } from '@sysdesign/contracts';
+import { describeInFlight, describeUnassessedBase } from '@sysdesign/contracts';
 import { renderWithTheme, stubApi, type StubRoute } from '@sysdesign/web-testing';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -349,6 +349,61 @@ describe('PracticeWorkspace grading a revision again', () => {
     expect(screen.getAllByTestId(/^revision-chip-/)).toHaveLength(1);
   });
 
+  it('[UX-18] a grade the lenses could not settle reads as no verdict everywhere — the feedback, the badge, the chip — the coach refuses it, and it is graded again in place', async () => {
+    const UNSCORED_REF = { ...FAILED_REF, status: 'complete', decision: 'escalate' } as const;
+    const unassessed = makeEvaluation({
+      overall: null,
+      unscored: 'unassessed',
+      decision: 'escalate',
+      decisionReason: 'only 0% of criteria assessed; unassessed: c1, c2, c3',
+      decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 3 } },
+      dimensions: { coverage: null, quality_attributes: null, compliance: null },
+      degraded: [{ stage: 'evaluator.requirements', sample: 1, reason: 'llm-failed' }],
+    });
+    const { calls } = stubApi([
+      {
+        method: 'POST',
+        path: EVALUATION_PATH,
+        status: 202,
+        body: { data: makeRevision({ evaluation: RUNNING_REF }) },
+      },
+      {
+        path: EVALUATION_PATH,
+        sequence: [
+          { data: unassessed },
+          { data: makeEvaluation({ runId: 'run-2', overall: 81, decision: 'accept' }) },
+        ],
+      },
+      ...sessionRoutes({ revisions: [makeRevisionSummary({ evaluation: UNSCORED_REF })] }),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
+    const notice = await screen.findByTestId('evaluation-unscored');
+    expect(notice.textContent).toContain('This revision couldn’t be graded');
+    expect(screen.queryByTestId('overall-score')).toBeNull();
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #1 · not assessed');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Revisions' }));
+    const chip = screen.getByTestId('revision-chip-1');
+    expect(within(chip).getByTestId('revision-unscored').textContent).toBe('not assessed');
+    expect(within(chip).queryByTestId('revision-decision')).toBeNull();
+    expect(within(chip).queryByTestId('revision-score')).toBeNull();
+
+    // No grade for the coach to start from: off, with why, before the API would refuse it.
+    await userEvent.click(screen.getByRole('tab', { name: 'Coach' }));
+    const start = screen.getByTestId('improve-run') as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    expect(screen.getByTestId('improver-unavailable').textContent).toBe(describeUnassessedBase(1));
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Feedback' }));
+    await userEvent.click(within(notice).getByTestId('retry-evaluation'));
+    expect((await screen.findByTestId('overall-score')).textContent).toBe('81');
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #1 · graded');
+    const posts = calls.filter((call) => call.method === 'POST').map((call) => call.url);
+    expect(posts).toEqual(['/api/revisions/rev-1/evaluation']);
+  });
+
   it('[UX-17] says a refused re-grade in the server’s words, and leaves the failed grade on show', async () => {
     const refusal = 'Revision #1 already has a grade — there is nothing to grade again.';
     stubApi([
@@ -509,6 +564,8 @@ describe('PracticeWorkspace when its session vanishes', () => {
     expect(await screen.findByRole('heading', { name: 'Practice session not found' })).toBeTruthy();
     expect(screen.queryByTestId('submit-error')).toBeNull();
     expect(screen.queryByText(`Session ${SESSION} not found`)).toBeNull();
+    // The tab, named after the prompt while the session was up, names the dead end now.
+    expect(document.title).toBe('Practice session not found · System Design Studio');
   });
 });
 

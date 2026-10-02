@@ -31,14 +31,33 @@ describe('ScoreSummary', () => {
     }
   });
 
-  it('[EVAL-1] shows the decision reason under the headline', () => {
+  it('[EVAL-1] [DEL-8] shows the decision’s reason under the headline, in the reader’s words — never the controller’s "remediation(s)"', () => {
     const { unmount } = renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
     expect(screen.getByTestId('decision-reason').textContent).toBe(
-      'below the accept threshold of 75',
+      'Below the accept threshold — 1 fix to make.',
     );
     unmount();
 
-    renderWithTheme(<ScoreSummary evaluation={makeEvaluation({ decisionReason: null })} />);
+    const routed = renderWithTheme(
+      <ScoreSummary
+        evaluation={makeEvaluation({
+          decisionReason: '10 remediation(s) to apply',
+          decisionBasis: {
+            factor: 'route',
+            remediations: 10,
+            criteria: { assessed: 9, total: 10 },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByTestId('decision-reason').textContent).toBe(
+      'Below the accept threshold — 10 fixes to make.',
+    );
+    routed.unmount();
+
+    renderWithTheme(
+      <ScoreSummary evaluation={makeEvaluation({ decisionReason: null, decisionBasis: null })} />,
+    );
     expect(screen.queryByTestId('decision-reason')).toBeNull();
   });
 
@@ -57,6 +76,11 @@ describe('ScoreSummary', () => {
         evaluation={makeEvaluation({
           decision: 'revise',
           decisionReason: 'blockers to fix: contradiction|binding.2,edge.5, c3',
+          decisionBasis: {
+            factor: 'policy-allowed',
+            remediations: 2,
+            criteria: { assessed: 5, total: 5 },
+          },
           findings: [finding],
         })}
         criteria={makeCriteria()}

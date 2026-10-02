@@ -63,6 +63,29 @@ describe('useEvaluationPolling', () => {
     expect(fetchMock.mock.calls.length).toBe(callsAtCompletion);
   });
 
+  it('[UX-18] announces a grade that earned no score as no verdict — never a 0, never its escalation', async () => {
+    stubApi([
+      {
+        path: EVAL_PATH,
+        sequence: [
+          {
+            data: makeEvaluation({
+              overall: null,
+              unscored: 'unassessed',
+              decision: 'escalate',
+              dimensions: { coverage: null },
+            }),
+          },
+        ],
+      },
+    ]);
+
+    const hook = renderHook(() => useEvaluationPolling('rev-1'));
+    await advance(0);
+    expect(hook.result.current.message).toBe('This revision couldn’t be graded.');
+    expect(hook.result.current.message).not.toMatch(/escalate|\/100/);
+  });
+
   it('[DEL-4] keeps polling a recorded grade until its run settles, so the stop reason arrives', async () => {
     const recorded = makeEvaluation({ settled: false, stopReason: null });
     const settled = makeEvaluation({ settled: true, stopReason: 'max-iterations' });

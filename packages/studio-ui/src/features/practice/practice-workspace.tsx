@@ -47,16 +47,15 @@ import type { DraftSaveStatus } from '../canvas/draft-status';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
-import {
-  EvaluationPanel,
-  type FeedbackSubject,
-  type UngradedReason,
-} from '../evaluation/evaluation-panel';
+import { EvaluationPanel, type UngradedReason } from '../evaluation/evaluation-panel';
+import type { FeedbackSubject } from '../evaluation/feedback-subject';
 import { subjectGone } from '../evaluation/missing-read';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
+import { cachedStandingOf, standingOf, type GradeStanding } from '../evaluation/score';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { useRunExport } from '../export/use-run-export';
 import { earlierRunBest } from '../improve/coach-history';
+import { coachStart, type CoachStart } from '../improve/coach-start';
 import { ImprovementPanel } from '../improve/improvement-panel';
 import {
   CHECKING,
@@ -378,7 +377,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const pageFailure = loadFailure ?? polledAway ?? autosave.gone;
   const pageUp = !loading && pageFailure === null;
   useLeaveGuard(autosave.pending && pageUp, LEAVE_WHILE_SAVING);
-  useDocumentTitle(prompt ? pageTitle(prompt.title) : null);
+  // Named after the prompt only while the page shows it: a dead end names itself.
+  useDocumentTitle(prompt && pageFailure === null ? pageTitle(prompt.title) : null);
 
   // The store is the one read-only switch: every control that edits the
   // canvas, the palette, the properties, the brief and the narrative reads it,
@@ -571,9 +571,50 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     }
   }, [feedback, holdSlot, restartGrade, reportFailure]);
 
+  // Where a revision's grade stands: the poll's word for the revision the
+  // feedback follows — a grade the grader no longer has did not arrive,
+  // whatever the record's last word was — and the timeline's for any other.
+  const standingOfRevision = (revision: {
+    id: string;
+    evaluation: RevisionEvaluationRef | null;
+  }): GradeStanding | null => {
+    const polled = revision.id === feedback?.id;
+    if (polled && polling.lost) return 'failed';
+    if (polled && polling.evaluation !== null) return standingOf(polling.evaluation);
+    return revision.evaluation === null ? null : cachedStandingOf(revision.evaluation);
+  };
+  // What the canvas shows, as a revision: the one loaded read-only, or the
+  // one the feedback is about while the canvas has not been edited since it
+  // was opened on it or submitted as it. Once there is a draft — restored
+  // from the server, restored from a revision, or one edit old — the canvas
+  // shows no revision, whichever one the feedback tab still reads.
+  const canvasRevision = viewingRevision ?? (autosave.status === 'clean' ? feedback : null);
+  const canvasRevisionId = canvasRevision?.id ?? null;
+  const feedbackSubject: FeedbackSubject | null =
+    feedback === null
+      ? null
+      : {
+          revisionNumber: feedback.revisionNumber,
+          origin: feedback.origin,
+          onCanvas: feedback.id === canvasRevisionId,
+        };
+  // What a coach start would hand over: the revision on the canvas, adopted,
+  // when its grade is a verdict; the draft, submitted first, otherwise — or
+  // nothing, when the revision's grade earned no score.
+  const start: CoachStart = coachStart(
+    canvasRevision === null
+      ? null
+      : {
+          id: canvasRevision.id,
+          revisionNumber: canvasRevision.revisionNumber,
+          standing: standingOfRevision(canvasRevision),
+        },
+  );
+
   // Export the run as one zip: the diagram as a PDF plus prompt/narrative/brief/
-  // feedback/revisions each as a separate .md. Reads whatever revision is on
-  // screen — the live draft, or an older revision being viewed.
+  // feedback/revisions each as a separate .md. The diagram is the canvas — the
+  // live draft, or a revision being viewed — and the feedback the revision the
+  // tab follows; the export says which, as the tab does.
   const handleExport = useCallback(async () => {
     if (!prompt) return;
     setExporting(true);
@@ -585,46 +626,39 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         ...readDraft(),
         evaluation: polling.evaluation,
         revisions,
-        revisionNumber: (viewingRevision ?? feedback)?.revisionNumber ?? null,
+        subject: feedbackSubject,
       });
     } catch (error) {
       setFailure(actionError("Couldn't export the run", error, 'Nothing was downloaded.'));
     } finally {
       setExporting(false);
     }
-  }, [
-    prompt,
-    criteria,
-    readDraft,
-    revisions,
-    polling.evaluation,
-    viewingRevision,
-    feedback,
-    exportRun,
-  ]);
+  }, [prompt, criteria, readDraft, revisions, polling.evaluation, feedbackSubject, exportRun]);
 
-  // Hand the canvas to the coach. An unedited, graded revision on screen is
-  // handed over as it is — the loop adopts its grade as the starting point and
-  // no revision is duplicated. An edited draft is persisted as the base
-  // revision first (so what the coach improved is on the record). Either way
-  // the loop then revises in the background — the coach tab follows the
-  // iterations.
+  // Hand the canvas to the coach. An unedited revision whose grade is a
+  // verdict is handed over as it is — the loop adopts its grade as the
+  // starting point and no revision is duplicated. An edited draft is
+  // persisted as the base revision first (so what the coach improved is on
+  // the record). Either way the loop then revises in the background — the
+  // coach tab follows the iterations. A revision whose grade earned no score
+  // is no starting point: the coach control is off and says so.
   const handleStartImprove = useCallback(
     async (maxIterations: number) => {
-      const loaded = viewingRevision ?? feedback;
-      const graded =
-        loaded !== null && (polling.evaluation?.status ?? loaded.evaluation?.status) === 'complete';
-      const fromRevision = !storeApi.getState().dirty && loaded !== null && graded;
-      const question = fromRevision
-        ? `Hand revision #${loaded.revisionNumber} to the coach? Its grade is reused as the starting point.`
-        : 'Hand this design to the coach? Your current draft is submitted as a revision first.';
+      if (start.from === 'refused') return;
+      const question =
+        start.from === 'revision'
+          ? `Hand revision #${start.revisionNumber} to the coach? Its grade is reused as the starting point.`
+          : 'Hand this design to the coach? Your current draft is submitted as a revision first.';
       if (!window.confirm(question)) return;
       setStartingImprove(true);
       setFailure(null);
       try {
         let started;
-        if (fromRevision) {
-          started = await api.startImprove(sessionId, { baseRevisionId: loaded.id, maxIterations });
+        if (start.from === 'revision') {
+          started = await api.startImprove(sessionId, {
+            baseRevisionId: start.revisionId,
+            maxIterations,
+          });
         } else {
           await autosave.settle();
           started = await api.startImprove(sessionId, { ...readDraft(), maxIterations });
@@ -634,10 +668,11 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         holdSlot({
           kind: 'coach',
           runId: started.runId,
-          revisionNumber: fromRevision ? loaded.revisionNumber : started.revision.revisionNumber,
+          revisionNumber:
+            start.from === 'revision' ? start.revisionNumber : started.revision.revisionNumber,
           state: 'running',
         });
-        if (!fromRevision) {
+        if (start.from !== 'revision') {
           storeApi.getState().markClean();
           setFeedback(toTarget(started.revision));
           setViewingRevision(null);
@@ -652,17 +687,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setStartingImprove(false);
       }
     },
-    [
-      sessionId,
-      readDraft,
-      storeApi,
-      viewingRevision,
-      feedback,
-      polling.evaluation,
-      autosave,
-      holdSlot,
-      reportFailure,
-    ],
+    [sessionId, readDraft, storeApi, start, autosave, holdSlot, reportFailure],
   );
 
   const handleSelectFinding = useCallback(
@@ -731,18 +756,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   // while it is the one being polled, and whatever run holds its grading slot
   // — the server's word, or the coach this tab is watching revise.
   const latest = latestUserRevision(revisions);
-  const polled = latest !== null && latest.id === feedback?.id;
-  // A grade the grader no longer has did not arrive, whatever the record's
-  // last word was: the stored status stays `running` until someone can read
-  // the run, and nothing is running it.
-  const latestStatus =
-    latest === null
-      ? null
-      : polled && polling.lost
-        ? 'failed'
-        : polled && polling.evaluation !== null
-          ? polling.evaluation.status
-          : (latest.evaluation?.status ?? null);
+  const latestStanding = latest === null ? null : standingOfRevision(latest);
   const coaching = improve.run !== null && improve.run.status === 'running' ? improve.run : null;
   const coachBase = revisions.find((candidate) => candidate.id === coaching?.baseRevisionId);
   const holder: SessionInFlightDto | null =
@@ -769,27 +783,17 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           : null;
   // A grade starts under the rules a submit obeys: one run per session, and none on an archived prompt.
   const gradeBlockedReason = blockedReason ?? (promptArchived ? PROMPT_COPY.archived : null);
-  // What the canvas shows, as a revision: the one loaded read-only, or the
-  // one the feedback is about while the canvas has not been edited since it
-  // was opened on it or submitted as it. Once there is a draft — restored
-  // from the server, restored from a revision, or one edit old — the canvas
-  // shows no revision, whichever one the feedback tab still reads.
-  const canvasRevisionId =
-    viewingRevision?.id ?? (autosave.status === 'clean' ? (feedback?.id ?? null) : null);
-  const feedbackSubject: FeedbackSubject | null =
-    feedback === null
-      ? null
-      : {
-          revisionNumber: feedback.revisionNumber,
-          origin: feedback.origin,
-          onCanvas: feedback.id === canvasRevisionId,
-        };
+  // The coach starts under the same slot, and never from a grade that is no verdict.
+  const coachBlockedReason = blockedReason ?? (start.from === 'refused' ? start.reason : null);
 
   return (
     <WorkspaceRoot>
       <TitleRow>
         <Heading level={1}>{prompt?.title ?? 'Practice session'}</Heading>
-        <SubmissionStatus revisionNumber={latest?.revisionNumber ?? null} status={latestStatus} />
+        <SubmissionStatus
+          revisionNumber={latest?.revisionNumber ?? null}
+          standing={latestStanding}
+        />
       </TitleRow>
       <Layout>
         <SideColumn>
@@ -801,7 +805,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           <CanvasToolbar
             onSubmit={() => void handleSubmit()}
             submitting={submitting}
-            grading={latestStatus === 'running'}
+            grading={latestStanding === 'running'}
             promptArchived={promptArchived}
             submitBlockedReason={blockedReason}
             draftStatus={autosave.status}
@@ -888,7 +892,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 starting={startingImprove}
                 canvasEmpty={canvasEmpty}
                 promptArchived={promptArchived}
-                blockedReason={blockedReason}
+                blockedReason={coachBlockedReason}
                 criteria={criteria}
                 earlierBest={earlierBest}
                 onStart={(maxIterations) => void handleStartImprove(maxIterations)}

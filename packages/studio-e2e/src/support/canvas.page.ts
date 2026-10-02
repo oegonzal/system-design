@@ -381,20 +381,36 @@ export class CanvasPage {
     });
   }
 
+  /**
+   * The toolbar's badge for a grade that earned no score — "not assessed" —
+   * and the feedback dock's word on it in place of a score: never a 0, never
+   * a decision that would read as a verdict.
+   */
+  async expectEvaluationUnscored(revisionNumber: number): Promise<void> {
+    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'unscored', {
+      timeout: EVAL_TIMEOUT,
+    });
+    await this.feedbackTab.click();
+    await expect(this.unscoredGrade).toBeVisible({ timeout: EVAL_TIMEOUT });
+    await expect(this.page.getByTestId('overall-score')).toHaveCount(0);
+    await expect(this.page.getByTestId('decision-badge')).toHaveCount(0);
+  }
+
   /** The feedback dock's way back from a failed grade: the same revision, graded again in place. */
   async retryEvaluation(): Promise<void> {
     await this.feedbackTab.click();
     await this.page.getByTestId('retry-evaluation').click();
   }
 
-  /** One click, one download: the run as a zip. */
-  async exportRun(): Promise<string> {
+  /** One click, one download: the run as a zip, where it landed and what it is called. */
+  async exportRun(): Promise<{ path: string; filename: string }> {
     const [download] = await Promise.all([
       this.page.waitForEvent('download'),
       this.page.getByTestId('export-run').click(),
     ]);
-    expect(download.suggestedFilename()).toMatch(/\.zip$/);
-    return download.path();
+    const filename = download.suggestedFilename();
+    expect(filename).toMatch(/\.zip$/);
+    return { path: await download.path(), filename };
   }
 
   // --- the dock ------------------------------------------------------------
@@ -585,7 +601,15 @@ export class CanvasPage {
     await expect(this.criterionResult(criterionId)).toHaveAttribute('data-result', result);
   }
 
-  /** The controller's own sentence for its decision, under the score. */
+  /**
+   * A grade that earned no score, said in place of the score: why, and the
+   * way to grade the revision again.
+   */
+  get unscoredGrade(): Locator {
+    return this.page.getByTestId('evaluation-unscored');
+  }
+
+  /** Why the decision was made, under the score, in the reader's words. */
   get decisionReason(): Locator {
     return this.page.getByTestId('decision-reason');
   }

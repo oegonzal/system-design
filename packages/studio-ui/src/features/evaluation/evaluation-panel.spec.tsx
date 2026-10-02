@@ -24,7 +24,7 @@ function renderPanel(overrides: Partial<EvaluationPanelProps> = {}) {
 }
 
 describe('EvaluationPanel', () => {
-  it('[UX-17] a revision with no grade to show says why — never graded, or its grade lost — and offers to grade it in place; an escalation without a score explains itself', async () => {
+  it('[UX-17] a revision with no grade to show says why — never graded, or its grade lost — and offers to grade it in place', async () => {
     const user = userEvent.setup();
     const onRegrade = vi.fn();
     const never = renderPanel({ ungraded: 'never', onRegrade });
@@ -47,13 +47,78 @@ describe('EvaluationPanel', () => {
     expect(screen.queryByTestId('grading-duration')).toBeNull();
     expect(screen.queryByTestId('evaluation-error')).toBeNull();
     lost.unmount();
+  });
 
+  it('[UX-18] a grade the lenses could not settle says it couldn’t be graded and why, offers to grade it again — never a 0/100, an escalation or "the score stands"', async () => {
+    const user = userEvent.setup();
+    const onRegrade = vi.fn();
     renderPanel({
-      evaluation: makeEvaluation({ decision: 'escalate', overall: null, dimensions: {} }),
+      onRegrade,
+      evaluation: makeEvaluation({
+        overall: null,
+        unscored: 'unassessed',
+        decision: 'escalate',
+        decisionReason: 'only 0% of criteria assessed; unassessed: c1, c2, c3, c4, c5',
+        decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 5 } },
+        dimensions: { coverage: null, quality_attributes: null, compliance: null },
+        degraded: [
+          { stage: 'critic.explanation', sample: 2, reason: 'llm-failed' },
+          { stage: 'evaluator.requirements', sample: 1, reason: 'llm-failed' },
+        ],
+        criterionResults: [
+          {
+            criterionId: 'c1',
+            result: 'unassessed',
+            confidence: null,
+            rationale: null,
+            locations: [],
+            mentions: [],
+          },
+        ],
+      }),
     });
-    expect(screen.getByTestId('evaluation-escalated').textContent).toContain('without a score');
-    expect(screen.getByTestId('evaluation-escalated').textContent).not.toMatch(/[A-Z]{3,}_[A-Z_]+/);
-    expect(screen.getByTestId('overall-score').textContent).toBe('—');
+
+    const notice = screen.getByTestId('evaluation-unscored');
+    expect(notice.getAttribute('data-reason')).toBe('unassessed');
+    expect(notice.textContent).toContain('This revision couldn’t be graded');
+    expect(notice.textContent).toContain('The lenses assessed 0 of 5 criteria — too few to score');
+    expect(notice.textContent).toContain(
+      '2 lens samples did not answer: critic explanation #2 (the model did not answer), evaluator requirements #1 (the model did not answer).',
+    );
+    // No headline: no number, no decision, no meters, and nothing standing on the lenses that answered.
+    expect(screen.queryByTestId('score-summary')).toBeNull();
+    expect(screen.queryByTestId('overall-score')).toBeNull();
+    expect(screen.queryByTestId('decision-badge')).toBeNull();
+    expect(screen.queryAllByRole('meter')).toHaveLength(0);
+    expect(screen.getByTestId('evaluation-panel').textContent).not.toContain('score stands');
+    expect(screen.getByTestId('evaluation-panel').textContent).not.toContain('escalate');
+    // A criterion nobody settled is shown as that, with no lens's words beside it.
+    const row = screen.getByTestId('criterion-result-c1');
+    expect(row.getAttribute('data-result')).toBe('unassessed');
+    expect(within(row).queryByTestId('criterion-rationale')).toBeNull();
+
+    const regrade = within(notice).getByTestId('retry-evaluation');
+    expect(regrade.textContent).toBe('Grade this revision again');
+    await user.click(regrade);
+    expect(onRegrade).toHaveBeenCalledTimes(1);
+  });
+
+  it('[UX-18] a grade with nothing to judge says so, with no score and nothing to grade again', () => {
+    renderPanel({
+      evaluation: makeEvaluation({
+        overall: null,
+        unscored: 'no-artifact',
+        decision: 'escalate',
+        decisionReason: 'no artifact to judge',
+        decisionBasis: { factor: 'artifact', remediations: 0, criteria: { assessed: 0, total: 5 } },
+        dimensions: {},
+      }),
+    });
+    const notice = screen.getByTestId('evaluation-unscored');
+    expect(notice.getAttribute('data-reason')).toBe('no-artifact');
+    expect(notice.textContent).toContain('There was nothing to grade');
+    expect(screen.queryByTestId('retry-evaluation')).toBeNull();
+    expect(screen.queryByTestId('overall-score')).toBeNull();
   });
 
   it('[UX-15] says whose feedback it shows, marks a revision the coach wrote, and says when the canvas has moved on to the draft', () => {
@@ -86,11 +151,11 @@ describe('EvaluationPanel', () => {
 
     expect(screen.getByTestId('overall-score').textContent).toBe('72');
     expect(screen.getByTestId('decision-reason').textContent).toBe(
-      'below the accept threshold of 75',
+      'Below the accept threshold — 1 fix to make.',
     );
     expect(screen.getByRole('list', { name: 'Criterion results' })).toBeTruthy();
     expect(screen.getByTestId('findings-list')).toBeTruthy();
-    expect(screen.queryByTestId('evaluation-escalated')).toBeNull();
+    expect(screen.queryByTestId('evaluation-unscored')).toBeNull();
   });
 
   it('idles with the submit copy, spins while running with how long it takes, and offers to grade a failed revision again', () => {

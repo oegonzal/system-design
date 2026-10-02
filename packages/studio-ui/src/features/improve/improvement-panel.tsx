@@ -25,10 +25,10 @@ import {
 } from '@sysdesign/design-system';
 import { useState } from 'react';
 
-import { humanizeReason } from '../evaluation/decision-reason';
+import { decisionInWords } from '../evaluation/decision-reason';
 import { FailureDetail } from '../evaluation/failure-detail';
 import { SILENCE_BODY, silenceCopy, useLiveness } from '../evaluation/liveness';
-import { formatScore } from '../evaluation/score';
+import { formatScore, GRADE_STANDING_LABEL } from '../evaluation/score';
 import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { WrappingText } from '../evaluation/wrapping-text';
 import { coachProgress } from './coach-progress';
@@ -53,7 +53,9 @@ export interface ImprovementPanelProps {
   promptArchived?: boolean;
   /**
    * Why the session takes no coach start right now — a run already holds its
-   * grading slot (`describeInFlight`). Disables the start and says why.
+   * grading slot (`describeInFlight`), or the revision the coach would start
+   * from has a grade that is no verdict (`describeUnassessedBase`). Disables
+   * the start and says why.
    */
   blockedReason?: string | null;
   /** The prompt's rubric, so a criterion a reason cites reads as its statement. */
@@ -164,18 +166,21 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * imported into the timeline when it beat everything before it, left where
  * it was when it did not, refused when the studio would not store it, or
  * missing when the coach produced nothing. Each row that was judged says why
- * the controller decided as it did, naming the findings and criteria it
- * cites the way the feedback summary names them — from the iteration's own
- * findings, placed on the design it judged; a row with nothing to judge says
- * only that. A run that failed says so in the author's terms, with the run's
- * own error one click down. A live run says how long it has been going,
- * counted from its own start, and warns once it has gone quiet past the
- * loop's own pace rather than spinning in silence. Before any of it, the
- * coach may have been handed lessons from earlier runs: the panel says how
- * many, and lists them on request. The iteration count reads the run's own
- * budget while there is a run, and the author's choice for the next one.
- * Pure props, Storybook-safe; the workspace owns polling and the
- * load-revision flow.
+ * the controller decided as it did, in the reader's words, naming the
+ * findings and criteria it cites the way the feedback summary names them —
+ * from the iteration's own findings, placed on the design it judged; a row
+ * the lenses could not settle reads "not assessed" rather than a verdict, and
+ * a row with nothing to judge says only that. A run that failed says so in
+ * the author's terms, with the run's own error one click down. A live run
+ * says how long it has been going, counted from its own start, and warns once
+ * it has gone quiet past the loop's own pace rather than spinning in silence.
+ * Before any of it, the coach may have been handed lessons from earlier runs:
+ * the panel says how many and what they were searched for, and lists them on
+ * request. A start the session refuses — a run holds its slot, or the
+ * revision on the canvas has no grade to start from — is off, and says why.
+ * The iteration count reads the run's own budget while there is a run, and
+ * the author's choice for the next one. Pure props, Storybook-safe; the
+ * workspace owns polling and the load-revision flow.
  */
 export function ImprovementPanel({
   run,
@@ -304,6 +309,18 @@ export function ImprovementPanel({
         <IterationList data-testid="improvement-trajectory">
           {run.iterations.map((iteration) => {
             const row = OUTCOME_ROW[iteration.outcome];
+            // Judged, yet no verdict: the lenses settled too little to score it.
+            const unscored = row.judged && iteration.unscored !== null;
+            const reason = row.judged
+              ? decisionInWords(
+                  {
+                    decision: iteration.decision,
+                    reason: iteration.reason,
+                    basis: iteration.decisionBasis,
+                  },
+                  { findings: iteration.findings, criteria },
+                )
+              : null;
             return (
               <IterationRow
                 key={iteration.iteration}
@@ -315,7 +332,11 @@ export function ImprovementPanel({
                     #{iteration.iteration}
                   </Text>
                   <ScoreCell>{formatScore(iteration.overall)}</ScoreCell>
-                  {row.judged && iteration.decision ? (
+                  {unscored ? (
+                    <Badge tone="neutral" data-testid="improve-iteration-unscored">
+                      {GRADE_STANDING_LABEL.unscored}
+                    </Badge>
+                  ) : row.judged && iteration.decision ? (
                     <Badge
                       tone={DECISION_TONE[iteration.decision]}
                       data-testid="improve-iteration-decision"
@@ -330,14 +351,14 @@ export function ImprovementPanel({
                     </Badge>
                   ) : null}
                 </IterationLine>
-                {row.judged && iteration.reason !== null ? (
+                {reason !== null ? (
                   <WrappingText
                     as="span"
                     size="sm"
                     tone="muted"
                     data-testid="improve-iteration-reason"
                   >
-                    {humanizeReason(iteration.reason, { findings: iteration.findings, criteria })}
+                    {reason}
                   </WrappingText>
                 ) : null}
                 {iteration.outcome === 'refused' && iteration.problems.length > 0 ? (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeCriteria, makeFinding } from '../../testing/fixtures';
-import { findingName, humanizeReason } from './decision-reason';
+import { decisionInWords, findingName, humanizeReason } from './decision-reason';
 
 const CONTRADICTION = makeFinding({
   id: 'contradiction|binding.2,edge.5',
@@ -61,5 +61,83 @@ describe('findingName', () => {
     expect(findingName(makeFinding({ ...CONTRADICTION, mentions: [mentioned] }))).toBe(
       'Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync))',
     );
+  });
+});
+
+describe('decisionInWords', () => {
+  const basis = (factor: string | null, remediations: number, assessed = 5, total = 5) => ({
+    factor,
+    remediations,
+    criteria: { assessed, total },
+  });
+
+  it('[DEL-8] words the route’s decision from what it selected — never "N remediation(s) to apply"', () => {
+    const say = (remediations: number, decision: 'revise' | 'retry' | 'escalate') =>
+      decisionInWords(
+        {
+          decision,
+          reason: `${remediations} remediation(s) to apply`,
+          basis: basis('route', remediations),
+        },
+        {},
+      );
+    expect(say(10, 'revise')).toBe('Below the accept threshold — 10 fixes to make.');
+    expect(say(1, 'revise')).toBe('Below the accept threshold — 1 fix to make.');
+    expect(say(3, 'retry')).toBe(
+      'Below the accept threshold — 3 fixes, each calling for a fresh attempt.',
+    );
+    expect(say(0, 'escalate')).toBe(
+      'Below the accept threshold, with no fix the lenses could point to — it needs a person’s judgement.',
+    );
+    expect(say(10, 'revise')).not.toContain('(s)');
+  });
+
+  it('[DEL-8] words the evidence gate’s decision from the criteria assessed of how many', () => {
+    expect(
+      decisionInWords(
+        {
+          decision: 'escalate',
+          reason: 'only 20% of criteria assessed; unassessed: c2, c3, c4, c5',
+          basis: basis('evidence', 0, 1, 5),
+        },
+        {},
+      ),
+    ).toBe('Not scored — the lenses assessed 1 of 5 criteria, too few for a verdict.');
+  });
+
+  it('[DEL-8] reads a step it has no words for as the controller’s sentence, every id it cites named', () => {
+    expect(
+      decisionInWords(
+        {
+          decision: 'revise',
+          reason: 'blockers to fix: contradiction|binding.2,edge.5, c3',
+          basis: basis('policy-allowed', 2),
+        },
+        { findings: [CONTRADICTION], criteria: makeCriteria() },
+      ),
+    ).toBe(
+      'blockers to fix: Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync)), “p99 read latency stays under 200 ms”',
+    );
+    // A trace with no deciding step, or a gate a pipeline composed of its own: the sentence stands.
+    expect(
+      decisionInWords(
+        { decision: 'accept', reason: 'stub: 3 nodes → 64', basis: basis(null, 0) },
+        {},
+      ),
+    ).toBe('stub: 3 nodes → 64');
+    expect(
+      decisionInWords(
+        {
+          decision: 'revise',
+          reason: 'below the floor 60: coverage 55',
+          basis: basis('dimension-floor', 1),
+        },
+        {},
+      ),
+    ).toBe('below the floor 60: coverage 55');
+  });
+
+  it('says nothing for a grade with no decision to word', () => {
+    expect(decisionInWords({ decision: null, reason: null, basis: null }, {})).toBeNull();
   });
 });

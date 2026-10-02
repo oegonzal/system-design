@@ -1,11 +1,11 @@
 'use client';
 
-import type {
-  EvaluationDto,
-  EvaluationFindingDto,
-  RevisionOrigin,
-  RunHeartbeatDto,
-  SuccessCriterion,
+import {
+  regradable,
+  type EvaluationDto,
+  type EvaluationFindingDto,
+  type RunHeartbeatDto,
+  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
   Alert,
@@ -20,9 +20,11 @@ import {
 
 import { CriterionResultsList } from './criterion-results-list';
 import { FailureDetail } from './failure-detail';
+import { OFF_CANVAS_COPY, type FeedbackSubject } from './feedback-subject';
 import { FindingsList } from './findings-list';
 import { SILENCE_BODY, silenceCopy, useLiveness } from './liveness';
 import { ScoreSummary } from './score-summary';
+import { unscoredNote } from './unscored';
 
 /**
  * Why a revision on show has no grade to poll: `never` — it was stored before
@@ -31,19 +33,6 @@ import { ScoreSummary } from './score-summary';
  */
 export const UNGRADED_REASONS = ['never', 'lost'] as const;
 export type UngradedReason = (typeof UNGRADED_REASONS)[number];
-
-/**
- * Whose feedback the tab shows. The feedback follows a revision; the canvas
- * may have moved on to the draft — a revision restored as the draft, a
- * session opened on a saved one — and the tab says so rather than let a
- * score read as the verdict on what is drawn now.
- */
-export interface FeedbackSubject {
-  revisionNumber: number;
-  origin: RevisionOrigin;
-  /** Whether the canvas shows this revision as it was graded; false once it shows the draft. */
-  onCanvas: boolean;
-}
 
 export interface EvaluationPanelProps {
   /** The revision the feedback is about; null before anything was submitted. */
@@ -87,13 +76,6 @@ export interface EvaluationPanelProps {
   onSelectFinding: (finding: EvaluationFindingDto) => void;
 }
 
-/** What the tab says when the canvas no longer shows the revision its feedback is about. */
-const OFF_CANVAS_COPY = 'The canvas shows your draft, not this revision.';
-
-/** An escalation without a score: the lenses could not reach a verdict. */
-const ESCALATED_COPY =
-  'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
-
 /** A revision with no grade to show, to its author: why, and that grading it changes nothing else. */
 const UNGRADED_COPY: Record<UngradedReason, string> = {
   never:
@@ -122,12 +104,14 @@ const DURATION_HINT = 'Grading usually takes a few minutes';
  * the loop's own pace rather than a spinner that says nothing, failed →
  * what happened in the author's terms, the
  * run's own error one click down, and the way back, complete → the score
- * summary, the criterion results and the findings. An escalation with no
- * score says why before showing what the lenses did find; a revision with
- * no grade to show says why in place of the idle copy. The way back from a
- * grade that failed, was lost or never ran is the same one: grade this
- * revision again, where it stands. The LiveRegion is mounted unconditionally
- * so status changes are announced, not just rendered.
+ * summary, the criterion results and the findings. A grade that earned no
+ * score says so in place of the summary — why, and never a 0 or a decision
+ * that would read as a verdict — before showing what the lenses did find; a
+ * revision with no grade to show says why in place of the idle copy. The way
+ * back from a grade that failed, was lost, never ran or could not be settled
+ * is the same one: grade this revision again, where it stands. The
+ * LiveRegion is mounted unconditionally so status changes are announced,
+ * not just rendered.
  */
 export function EvaluationPanel({
   subject = null,
@@ -158,11 +142,7 @@ export function EvaluationPanel({
     running,
     heartbeat,
   );
-  const escalated =
-    evaluation !== null &&
-    evaluation.status === 'complete' &&
-    evaluation.decision === 'escalate' &&
-    evaluation.overall === null;
+  const unscored = status === 'complete' && evaluation ? unscoredNote(evaluation) : null;
 
   const regrade = (label: string) => (
     <Button
@@ -243,12 +223,21 @@ export function EvaluationPanel({
 
       {status === 'complete' && evaluation ? (
         <>
-          {escalated ? (
-            <Text size="sm" tone="secondary" data-testid="evaluation-escalated">
-              {ESCALATED_COPY}
-            </Text>
-          ) : null}
-          <ScoreSummary evaluation={evaluation} criteria={criteria} />
+          {unscored !== null ? (
+            <Alert
+              tone="warn"
+              title={unscored.title}
+              data-testid="evaluation-unscored"
+              data-reason={evaluation.unscored ?? undefined}
+            >
+              <Stack gap={3} align="start">
+                <span>{unscored.body}</span>
+                {regradable(evaluation) ? regrade('Grade this revision again') : null}
+              </Stack>
+            </Alert>
+          ) : (
+            <ScoreSummary evaluation={evaluation} criteria={criteria} />
+          )}
           <Stack gap={2}>
             <Heading level={3}>Criteria</Heading>
             <CriterionResultsList results={evaluation.criterionResults} criteria={criteria} />

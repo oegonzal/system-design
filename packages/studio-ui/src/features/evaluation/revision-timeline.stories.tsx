@@ -108,3 +108,35 @@ export const GradesThatNeverArrived: Story = {
     feedbackRevisionId: 'rev-2',
   },
 };
+
+/** A grade the lenses could not settle: "not assessed", never a 0 or its escalation, beside a real grade of the same design. */
+export const NotAssessed: Story = {
+  args: {
+    revisions: [
+      makeRevisionSummary({
+        id: 'rev-1',
+        revisionNumber: 1,
+        evaluation: {
+          runId: 'run-1',
+          iteration: 1,
+          status: 'complete',
+          overall: null,
+          decision: 'escalate',
+        },
+      }),
+      makeRevisionSummary({
+        id: 'rev-2',
+        revisionNumber: 2,
+        evaluation: {
+          runId: 'run-2',
+          iteration: 1,
+          status: 'complete',
+          overall: 56,
+          decision: 'revise',
+        },
+      }),
+    ],
+    activeRevisionId: 'rev-1',
+    feedbackRevisionId: 'rev-1',
+  },
+};

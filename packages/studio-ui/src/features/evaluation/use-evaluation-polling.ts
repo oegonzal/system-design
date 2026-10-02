@@ -6,6 +6,7 @@ import { usePolledResource, type ApiError } from '@sysdesign/web-kit';
 import { api } from '../../api/client';
 import { goneRead, isMissing, readOrMissing, type ReadOutcome } from './missing-read';
 import { formatScore } from './score';
+import { unscoredNote } from './unscored';
 
 export const POLL_INTERVAL_MS = 1200;
 /** Backoff ceiling while the API cannot be reached — it restarts, the tab does not give up. */
@@ -54,6 +55,9 @@ function describe(
     case 'running':
       return 'Evaluation running…';
     case 'complete': {
+      // A grade that earned no score is no verdict: its decision is not announced as one.
+      const note = unscoredNote(evaluation);
+      if (note !== null) return `${note.title}.`;
       const score = evaluation.overall !== null ? ` — ${formatScore(evaluation.overall)}/100` : '';
       const decision = evaluation.decision ? ` · ${evaluation.decision}` : '';
       return `Evaluation complete${score}${decision}.`;

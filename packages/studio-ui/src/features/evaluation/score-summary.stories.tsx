@@ -35,13 +35,15 @@ export const NotAssessed: Story = {
   },
 };
 
-/** The loop escalated without a score — no meters, no number. */
+/** Escalated with a score: below the threshold, and nothing the lenses could point to as a fix. */
 export const Escalated: Story = {
   args: {
     evaluation: makeEvaluation({
-      overall: null,
+      overall: 48,
       decision: 'escalate',
-      dimensions: {},
+      decisionReason: 'below the accept threshold with nothing the producer can act on',
+      decisionBasis: { factor: 'route', remediations: 0, criteria: { assessed: 5, total: 5 } },
+      findings: [],
     }),
   },
 };
@@ -53,6 +55,11 @@ export const BlockersAndMissingLenses: Story = {
     evaluation: makeEvaluation({
       overall: 12.1,
       decisionReason: 'blockers to fix: contradiction|binding.2,edge.5,narration.2, c3',
+      decisionBasis: {
+        factor: 'policy-allowed',
+        remediations: 2,
+        criteria: { assessed: 5, total: 5 },
+      },
       findings: [
         makeFinding({
           id: 'contradiction|binding.2,edge.5,narration.2',

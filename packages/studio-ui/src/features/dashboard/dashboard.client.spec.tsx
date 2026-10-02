@@ -104,6 +104,25 @@ describe('Dashboard', () => {
     expect(score.textContent).toBe('73/100');
   });
 
+  it('[UX-18] reads a latest grade that earned no score as not assessed — no score, no decision', async () => {
+    stubApi([
+      EXPERIENCES,
+      {
+        path: '/api/sessions',
+        body: {
+          data: [makeSession({ latestOverall: null, latestDecision: 'escalate' })],
+          meta: { total: 1, limit: RECENT_SESSIONS_PAGE, offset: 0 },
+        },
+      },
+    ]);
+
+    renderWithTheme(<Dashboard />);
+
+    expect((await screen.findByTestId('session-unscored')).textContent).toBe('not assessed');
+    expect(screen.queryByTestId('session-score')).toBeNull();
+    expect(screen.queryByTestId('session-decision')).toBeNull();
+  });
+
   it('names each session by its prompt with a readable status, and pages through the rest', async () => {
     const user = userEvent.setup();
     const total = RECENT_SESSIONS_PAGE + 3;

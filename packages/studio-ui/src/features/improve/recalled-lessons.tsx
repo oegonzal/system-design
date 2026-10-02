@@ -1,7 +1,13 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { RunRecallDto, RunRecallReason } from '@sysdesign/contracts';
+import {
+  tokenWords,
+  type RecallFocusCriterionDto,
+  type RecallFocusDto,
+  type RunRecallDto,
+  type RunRecallReason,
+} from '@sysdesign/contracts';
 import {
   Disclosure,
   DisclosureButton,
@@ -10,6 +16,7 @@ import {
   Text,
 } from '@sysdesign/design-system';
 
+import { counted } from '../evaluation/humanize';
 import { WrappingText } from '../evaluation/wrapping-text';
 
 /**
@@ -48,6 +55,32 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
  */
 const LESSON_LABEL = { serves: 'Where it helps', caveat: 'Keep in mind' } as const;
 
+/** How a criterion the starting grade fell short on fell short, in words. Every shortfall the contract names. */
+const SHORTFALL_WORDS: Record<RecallFocusCriterionDto['result'], string> = {
+  fail: 'not met',
+  partial: 'met in part',
+};
+
+const listed = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
+
+/**
+ * What the recall searched for beside the prompt, in one line: each kind of
+ * defect the starting grade confirmed, worst first, then each criterion it
+ * fell short on and how. Null when it searched for the prompt alone — a run
+ * that did not start from a judged revision has no defects to name.
+ */
+function focusLine(focus: RecallFocusDto | null): string | null {
+  if (focus === null) return null;
+  const defects = [...new Set(focus.findings.map((finding) => tokenWords(finding.type)))];
+  const shortfalls = focus.criteria.map(
+    (criterion) => `${criterion.criterionId} ${SHORTFALL_WORDS[criterion.result]}`,
+  );
+  const searched = [...defects, ...shortfalls];
+  return searched.length === 0
+    ? null
+    : `Searched for what the starting grade found wrong: ${listed.format(searched)}.`;
+}
+
 /** The summary row and, under it, the list the disclosure shows and hides. */
 const Recalled = styled(Disclosure)`
   display: flex;
@@ -79,11 +112,13 @@ export interface RecalledLessonsProps {
 }
 
 /**
- * What the coach was handed from earlier runs: how many lessons, and — on
- * request — each one in the curator's words with the part of the prompt it
- * serves and, when the lesson was learned somewhere unlike this prompt, what
- * to keep in mind about it. Settled recalls only: while the loop is still recalling, the
- * panel's progress line says so. Only the coach saw these; the grade did not.
+ * What the coach was handed from earlier runs: how many lessons, what they
+ * were searched for — the starting grade's defects, when the coach started
+ * from one — and, on request, each one in the curator's words with the part
+ * of the prompt it serves and, when the lesson was learned somewhere unlike
+ * this prompt, what to keep in mind about it. Settled recalls only: while the
+ * loop is still recalling, the panel's progress line says so. Only the coach
+ * saw these; the grade did not.
  */
 export function RecalledLessons({ recall }: RecalledLessonsProps) {
   if (recall === null || recall.status === 'recalling') return null;
@@ -97,17 +132,22 @@ export function RecalledLessons({ recall }: RecalledLessonsProps) {
     );
   }
 
-  const count = recall.lessons.length;
+  const focus = focusLine(recall.focus);
   return (
     <Recalled data-testid="coach-recall" data-status="recalled">
       <Stack direction="row" gap={3} align="center" wrap>
         <Text as="span" size="sm" tone="secondary" data-testid="coach-recall-summary">
-          {`Recalled ${count} ${count === 1 ? 'lesson' : 'lessons'} from earlier runs for the coach`}
+          {`Recalled ${counted(recall.lessons.length, 'lesson', 'lessons')} from earlier runs for the coach`}
         </Text>
         <DisclosureButton variant="ghost" size="sm" data-testid="coach-recall-toggle">
           {(open) => (open ? 'Hide lessons' : 'Show lessons')}
         </DisclosureButton>
       </Stack>
+      {focus !== null ? (
+        <WrappingText size="sm" tone="muted" data-testid="coach-recall-focus">
+          {focus}
+        </WrappingText>
+      ) : null}
       <DisclosurePanel as={LessonList} data-testid="coach-recall-lessons">
         {recall.lessons.map((lesson) => (
           <LessonItem key={lesson.ref} data-testid="coach-recall-lesson">

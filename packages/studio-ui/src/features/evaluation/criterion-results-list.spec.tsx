@@ -33,8 +33,29 @@ describe('CriterionResultsList', () => {
 
     expect(screen.getByTestId('criterion-result-c3').getAttribute('data-result')).toBe('fail');
     const unassessed = screen.getByTestId('criterion-result-c4');
-    expect(unassessed.textContent).toContain('—');
+    expect(within(unassessed).getByText('unassessed')).toBeTruthy();
     expect(unassessed.textContent).not.toContain('confidence');
+  });
+
+  it('[UX-18] shows a criterion no lens settled as that and nothing more — no confidence, no lens’s words beside it', () => {
+    renderWithTheme(
+      <CriterionResultsList
+        results={[
+          makeCriterionResult({
+            criterionId: 'c4',
+            result: 'unassessed',
+            confidence: null,
+            // A lone sample's words, as a grade read before the API dropped them carried.
+            rationale: 'the read path looks fine',
+          }),
+        ]}
+        criteria={makeCriteria()}
+      />,
+    );
+    const row = screen.getByTestId('criterion-result-c4');
+    expect(within(row).queryByTestId('criterion-rationale')).toBeNull();
+    expect(row.textContent).not.toContain('the read path looks fine');
+    expect(row.textContent).not.toContain('—');
   });
 
   it('[EVAL-2] reads the rationale with the labels of the places it names in place of the positional ids, and wraps what no label covers', () => {

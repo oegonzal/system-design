@@ -1,7 +1,7 @@
 import { tokenWords } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { humanizeToken } from './humanize';
+import { counted, humanizeToken } from './humanize';
 
 describe('humanizeToken', () => {
   it('turns a snake, kebab, dotted or spaced token into a capitalised phrase', () => {
@@ -22,5 +22,13 @@ describe('humanizeToken', () => {
     for (const token of ['data_integrity', 'max-iterations', 'critic.scale', 'a__b']) {
       expect(humanizeToken(token).toLowerCase()).toBe(tokenWords(token));
     }
+  });
+});
+
+describe('counted', () => {
+  it('[DEL-8] puts the noun in the number the count says — never "(s)"', () => {
+    expect(counted(1, 'fix', 'fixes')).toBe('1 fix');
+    expect(counted(10, 'fix', 'fixes')).toBe('10 fixes');
+    expect(counted(0, 'lesson', 'lessons')).toBe('0 lessons');
   });
 });

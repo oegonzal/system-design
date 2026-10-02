@@ -4,7 +4,7 @@ import styled from '@emotion/styled';
 import type { DesignRevisionSummaryDto } from '@sysdesign/contracts';
 import { Badge, DECISION_TONE, Stack, Text, transient } from '@sysdesign/design-system';
 
-import { formatScore } from './score';
+import { cachedStandingOf, formatScore, GRADE_STANDING_LABEL } from './score';
 
 export interface RevisionTimelineProps {
   revisions: DesignRevisionSummaryDto[];
@@ -61,14 +61,16 @@ const Score = styled.span`
 
 /**
  * One chip per revision — `#n score decision` — newest first, an AI badge on
- * every revision the coach wrote. A grade still running says so; one that
- * failed says so, and one the grader lost — the studio's own word on it,
- * `evaluation.error` — reads "grade lost", with the sentence as its title.
- * The one the canvas shows is `aria-current` and says "on canvas"; when the
- * canvas shows the draft instead, no chip is current, and the revision whose
- * grade the feedback tab still shows says "feedback shown". Selecting a chip
- * loads that revision read-only; the workspace owns that flow, this
- * component only reports the click. Presentational — Storybook-safe.
+ * every revision the coach wrote. A grade that earned no score reads "not
+ * assessed", never its decision, which would read as a verdict on a design
+ * nobody judged. A grade still running says so; one that failed says so, and
+ * one the grader lost — the studio's own word on it, `evaluation.error` —
+ * reads "grade lost", with the sentence as its title. The one the canvas
+ * shows is `aria-current` and says "on canvas"; when the canvas shows the
+ * draft instead, no chip is current, and the revision whose grade the
+ * feedback tab still shows says "feedback shown". Selecting a chip loads that
+ * revision read-only; the workspace owns that flow, this component only
+ * reports the click. Presentational — Storybook-safe.
  */
 export function RevisionTimeline({
   revisions,
@@ -90,6 +92,7 @@ export function RevisionTimeline({
     <Stack direction="row" gap={2} wrap data-testid="revision-timeline">
       {ordered.map((revision) => {
         const grade = revision.evaluation;
+        const standing = grade === null ? null : cachedStandingOf(grade);
         const active = revision.id === activeRevisionId;
         const place = active ? 'canvas' : revision.id === feedbackRevisionId ? 'feedback' : null;
         return (
@@ -106,7 +109,11 @@ export function RevisionTimeline({
             {grade?.overall !== null && grade?.overall !== undefined ? (
               <Score data-testid="revision-score">{formatScore(grade.overall)}</Score>
             ) : null}
-            {grade?.decision ? (
+            {standing === 'unscored' ? (
+              <Badge tone="neutral" data-testid="revision-unscored">
+                {GRADE_STANDING_LABEL.unscored}
+              </Badge>
+            ) : grade?.decision ? (
               <Badge tone={DECISION_TONE[grade.decision]} data-testid="revision-decision">
                 {grade.decision}
               </Badge>

@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { QUALITY_RUN_STATUSES } from '@sysdesign/contracts';
 
-import { formatScore, GRADE_STATUS_LABEL, NO_SCORE } from './score';
+import { makeEvaluation } from '../../testing/fixtures';
+import {
+  cachedStandingOf,
+  formatScore,
+  GRADE_STANDING_LABEL,
+  NO_SCORE,
+  standingOf,
+  type GradeStanding,
+} from './score';
 
 describe('formatScore', () => {
   it('[EVAL-1] prints whole points, the precision the dimension meters show', () => {
@@ -18,11 +26,29 @@ describe('formatScore', () => {
   });
 });
 
-describe('GRADE_STATUS_LABEL', () => {
-  it('words every status a grading run can have, and prints none as its wire token', () => {
-    for (const status of QUALITY_RUN_STATUSES) {
-      expect(GRADE_STATUS_LABEL[status]).toBeTruthy();
-      expect(GRADE_STATUS_LABEL[status]).not.toBe(status);
+describe('GRADE_STANDING_LABEL', () => {
+  it('words every standing a grade can have, and prints none as its wire token', () => {
+    const standings: GradeStanding[] = [...QUALITY_RUN_STATUSES, 'unscored'];
+    for (const standing of standings) {
+      expect(GRADE_STANDING_LABEL[standing]).toBeTruthy();
+      expect(GRADE_STANDING_LABEL[standing]).not.toBe(standing);
     }
+  });
+});
+
+describe('a grade’s standing', () => {
+  it('[UX-18] reads a complete grade that earned no score as unscored — never "graded" — and a real 0 as graded', () => {
+    expect(standingOf(makeEvaluation({ unscored: 'unassessed', overall: null }))).toBe('unscored');
+    expect(standingOf(makeEvaluation({ unscored: 'no-artifact', overall: null }))).toBe('unscored');
+    expect(standingOf(makeEvaluation({ overall: 0 }))).toBe('complete');
+    expect(standingOf(makeEvaluation({ status: 'failed' }))).toBe('failed');
+  });
+
+  it('[UX-18] reads the same from a revision’s cached grade, whose missing score on a complete grade is the unscored mark', () => {
+    const ref = { runId: 'run-1', iteration: 1, decision: 'escalate' } as const;
+    expect(cachedStandingOf({ ...ref, status: 'complete', overall: null })).toBe('unscored');
+    expect(cachedStandingOf({ ...ref, status: 'complete', overall: 0 })).toBe('complete');
+    expect(cachedStandingOf({ ...ref, status: 'running', overall: null })).toBe('running');
+    expect(cachedStandingOf({ ...ref, status: 'failed', overall: null })).toBe('failed');
   });
 });

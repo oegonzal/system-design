@@ -10,6 +10,7 @@ import type {
   SuccessCriterion,
 } from '@sysdesign/contracts';
 
+import type { FeedbackSubject } from '../evaluation/feedback-subject';
 import { diagramToPdfBlob, type DiagramCapture } from './diagram-pdf';
 import {
   briefMarkdown,
@@ -28,7 +29,11 @@ export interface RunExportInput {
   brief: DesignBrief | null;
   evaluation: EvaluationDto | null;
   revisions: DesignRevisionSummaryDto[];
-  revisionNumber: number | null;
+  /**
+   * The revision the feedback is about, and whether the canvas — the
+   * exported diagram — still shows it; null before anything was submitted.
+   */
+  subject: FeedbackSubject | null;
 }
 
 function slugify(title: string): string {
@@ -40,6 +45,14 @@ function slugify(title: string): string {
       .slice(0, 60) || 'design'
   );
 }
+
+/**
+ * What the bundle holds, as its name says it: the revision the diagram is,
+ * or the draft — a canvas edited since, or never submitted — never a
+ * revision the diagram is not, nor one that does not exist.
+ */
+export const bundleName = (title: string, subject: FeedbackSubject | null): string =>
+  `${slugify(title)}-${subject?.onCanvas ? `rev${subject.revisionNumber}` : 'draft'}.zip`;
 
 function triggerDownload(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -69,7 +82,7 @@ export async function exportRun(
   zip.file('prompt.md', promptMarkdown(input.prompt, input.criteria));
   zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
   zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
-  zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.criteria, input.revisionNumber));
+  zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.criteria, input.subject));
   zip.file('revisions.md', revisionsMarkdown(input.revisions));
 
   // Best-effort: a diagram-capture hiccup must never cost the Markdown export.
@@ -81,5 +94,5 @@ export async function exportRun(
   }
 
   const blob = await zip.generateAsync({ type: 'blob' });
-  triggerDownload(blob, `${slugify(input.prompt.title)}-rev${input.revisionNumber ?? 0}.zip`);
+  triggerDownload(blob, bundleName(input.prompt.title, input.subject));
 }

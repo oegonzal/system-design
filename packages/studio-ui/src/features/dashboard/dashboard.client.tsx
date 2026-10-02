@@ -23,7 +23,7 @@ import { api } from '../../api/client';
 import { LoadMore } from '../../components/load-more';
 import { RetryAlert } from '../../components/retry-alert';
 import { humanizeToken } from '../evaluation/humanize';
-import { formatScore } from '../evaluation/score';
+import { cachedStandingOf, formatScore, GRADE_STANDING_LABEL } from '../evaluation/score';
 import { usePromptGeneration } from '../prompts/use-prompt-generation';
 
 /** How many sessions the dashboard shows at a time; the rest are a click away. */
@@ -48,6 +48,14 @@ const SessionLink = styled(Link)`
 `;
 
 function SessionCard({ session }: { session: DesignSessionDto }) {
+  // The latest grade's standing, read the way a revision's cached grade is.
+  const standing =
+    session.latestEvaluationStatus === null
+      ? null
+      : cachedStandingOf({
+          status: session.latestEvaluationStatus,
+          overall: session.latestOverall,
+        });
   return (
     <SessionLink href={`/practice/${session.id}`} data-testid="session-card">
       <Surface padding={4}>
@@ -62,7 +70,11 @@ function SessionCard({ session }: { session: DesignSessionDto }) {
                 {`${formatScore(session.latestOverall)}/100`}
               </Badge>
             ) : null}
-            {session.latestDecision ? (
+            {standing === 'unscored' ? (
+              <Badge tone="neutral" data-testid="session-unscored">
+                {GRADE_STANDING_LABEL.unscored}
+              </Badge>
+            ) : session.latestDecision ? (
               <Badge tone={DECISION_TONE[session.latestDecision]} data-testid="session-decision">
                 {humanizeToken(session.latestDecision)}
               </Badge>
