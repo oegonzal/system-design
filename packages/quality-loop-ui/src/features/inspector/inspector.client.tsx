@@ -13,7 +13,7 @@ import {
   Text,
 } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { api } from '../../api/client';
 import { useLink } from '../../components/link-context';
@@ -84,6 +84,21 @@ export function InspectorClient() {
   const [shown, setShown] = useState<ReadonlySet<ActionGroup>>(ALL_GROUPS);
   const [ignoreTimings, setIgnoreTimings] = useState(false);
   const [picker, setPicker] = useState(watchingOrchestration ? 'orchestrations' : 'runs');
+
+  // Both lists are read once, so a reader watching one record would never see the
+  // next one appear. They are read again the moment the followed record ends,
+  // which is when a new one is most likely to exist — the same rule the run page
+  // already follows for its own recent list.
+  const wasPolling = useRef(false);
+  const reloadRuns = runs.reload;
+  const reloadOrchestrations = orchestrations.reload;
+  useEffect(() => {
+    const ended = wasPolling.current && !isPolling;
+    wasPolling.current = isPolling;
+    if (!ended) return;
+    reloadRuns();
+    reloadOrchestrations();
+  }, [isPolling, reloadRuns, reloadOrchestrations]);
 
   // The transcript: which model call is open, and which of its files is being
   // read. Both are local rather than in the URL — a prompt is something a reader

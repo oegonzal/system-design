@@ -13,6 +13,7 @@ import {
   makeOrchestration,
   makePipeline,
   makeRun,
+  makeRunSummary,
   makeTwoIterationRun,
   ORCHESTRATION_CHILD_IDS,
   RUN_SUMMARIES,
@@ -549,6 +550,47 @@ describe('InspectorClient', () => {
     expect(labels[0]).toContain('Orchestration opened');
     // And the log is read as one snapshot again, not as a continuation.
     expect(screen.getByRole('status').textContent).toContain('read back out of one recorded');
+  });
+
+  it('[QLU-11] the pickers are read again when the followed run ends, so the next one appears', async () => {
+    // Someone watching a run-through leaves this page open. Reading the lists
+    // once would freeze them: the run they are following ends and the one that
+    // started after it never shows up.
+    const later = makeRunSummary({
+      runId: '2026-10-02T09-00-00-000-newrun-quality',
+      status: 'running',
+      finalDecision: null,
+      stopReason: null,
+      overall: null,
+    });
+    stubApi([
+      {
+        path: '/runs',
+        // First read: the three it already knows. Second read, after the followed
+        // run ends: a fourth that started meanwhile.
+        sequence: [
+          { data: RUN_SUMMARIES, meta: { total: 3, limit: 30, offset: 0 } },
+          { data: [later, ...RUN_SUMMARIES], meta: { total: 4, limit: 30, offset: 0 } },
+        ],
+      },
+      PIPELINES,
+      ORCHESTRATIONS,
+      {
+        path: `/runs/${complete.runId}`,
+        sequence: [{ data: open }, { data: complete }],
+      },
+    ]);
+    setMockSearchParams({ run: complete.runId });
+    renderWithTheme(<InspectorClient />);
+    await advance(0);
+
+    const picker = () => screen.getByRole('table', { name: 'Runs to inspect' });
+    expect(picker().querySelectorAll('tbody tr')).toHaveLength(RUN_SUMMARIES.length);
+
+    // The run reaches its end, polling stops, and the lists are read again.
+    await advance(1200);
+    await advance(1200);
+    expect(picker().querySelectorAll('tbody tr')).toHaveLength(RUN_SUMMARIES.length + 1);
   });
 
   it('[QLU-5] with no run named, it asks for one rather than guessing', async () => {
