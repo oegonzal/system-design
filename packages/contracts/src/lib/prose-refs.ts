@@ -155,6 +155,48 @@ export function substituteRefs(prose: string, glossary: ReadonlyMap<string, stri
   );
 }
 
+/**
+ * Whether the text between two mentions lists them together — a comma, a
+ * slash, an arrow, a space, never a word and never a clause's stop — as a
+ * lens writes a path of refs (`edge.1,edge.2`, `edge.1 → edge.2`): a run of
+ * places, read as one. "node.5; node.5 is unsharded" is two clauses.
+ */
+export const listedTogether = (gap: string): boolean => /^[\s,/→⇒>–—-]+$/u.test(gap);
+
+/** Where a key written beside a ref sits: before it, or after it, and where reading resumes. */
+export type KeyBeside =
+  { side: 'before'; keyEnd: number; resume: number } | { side: 'after'; resume: number };
+
+/**
+ * Where prose writes a part's own key right beside the ref that names it —
+ * `edge.15/e-6`, `node.12 (n-6)`, `n-6/node.12`, `ai-db-replica (node.4)`,
+ * `ai-db-replica, node.4` — so one part is named twice. `span` is the ref's
+ * mention (`start`–`end`) within what is still unread (`from`–`to`). A key
+ * before the ref ends at `keyEnd`; reading resumes at `resume`, past a key
+ * after it — and past the parenthesis a separator opened, which it owns.
+ * Null when the key is not right beside the ref. The key is matched as the
+ * author wrote it, as a whole token.
+ */
+export function keyBeside(
+  prose: string,
+  span: { from: number; start: number; end: number; to: number },
+  key: string,
+): KeyBeside | null {
+  const token = escapeRegExp(key);
+  const ahead = prose.slice(span.end, span.to);
+  const follows =
+    new RegExp(`^\\s*[/,]\\s*${token}(?![\\w.-])`).exec(ahead) ??
+    new RegExp(`^\\s*\\(\\s*${token}\\s*\\)`).exec(ahead);
+  if (follows) return { side: 'after', resume: span.end + follows[0].length };
+  const behind = prose.slice(span.from, span.start);
+  const precedes = new RegExp(`(?<![\\w.-])${token}(\\s*[/,]\\s*|\\s*\\(\\s*)$`).exec(behind);
+  if (!precedes) return null;
+  const keyEnd = span.from + precedes.index + key.length;
+  if (!(precedes[1] ?? '').includes('(')) return { side: 'before', keyEnd, resume: span.end };
+  const closing = /^\s*\)/.exec(ahead);
+  return closing ? { side: 'before', keyEnd, resume: span.end + closing[0].length } : null;
+}
+
 /** The words of a text, folded: letters and digits, split on everything else. */
 const wordsOf = (text: string): string[] => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 

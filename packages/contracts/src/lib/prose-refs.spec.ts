@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  keyBeside,
+  listedTogether,
   locationRefPattern,
   nameClaims,
+  proseSays,
   refIdsIn,
   refMentions,
   substituteRefs,
   substituteTokens,
-  proseSays,
   tokenWords,
 } from './prose-refs';
 
@@ -154,5 +156,35 @@ describe('nameClaims', () => {
     // A name the reader did not hand in is never said, and neither is one of no words.
     expect(claimed('the Client polls', ['DB'], ['Client'])).toEqual([false]);
     expect(claimed('anything', ['  '], ['  '])).toEqual([false]);
+  });
+});
+
+describe('two refs listed together, and a key beside its ref', () => {
+  it('[EVAL-2] lists refs together across punctuation and arrows, never across a word or a clause stop', () => {
+    expect([', ', ',', '/', ' → ', '->', ' '].every(listedTogether)).toBe(true);
+    expect([' and ', '; ', ' then ', ''].some(listedTogether)).toBe(false);
+  });
+
+  it('[EVAL-2] finds the part’s own key right beside its ref, before or after, owning a parenthesis it opened', () => {
+    const at = (prose: string, ref: string) => {
+      const start = prose.indexOf(ref);
+      return { from: 0, start, end: start + ref.length, to: prose.length };
+    };
+    const after = 'ending at edge.15/e-6, the ack';
+    expect(keyBeside(after, at(after, 'edge.15'), 'e-6')).toEqual({
+      side: 'after',
+      resume: after.indexOf(','),
+    });
+    const before = 'omits n-6 (node.12) on writes';
+    expect(keyBeside(before, at(before, 'node.12'), 'n-6')).toEqual({
+      side: 'before',
+      keyEnd: before.indexOf('n-6') + 3,
+      resume: before.indexOf(')') + 1,
+    });
+    // A key inside a longer one, or one that opened a parenthesis it never closes, is no pair.
+    expect(keyBeside('xn-6/node.12', at('xn-6/node.12', 'node.12'), 'n-6')).toBeNull();
+    expect(
+      keyBeside('n-6 (node.12 and more', at('n-6 (node.12 and more', 'node.12'), 'n-6'),
+    ).toBeNull();
   });
 });

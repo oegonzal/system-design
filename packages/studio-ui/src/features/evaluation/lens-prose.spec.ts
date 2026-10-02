@@ -41,8 +41,9 @@ describe('lensProse', () => {
     expect(
       lensProse('Rationale.3 asserts the client polls; Narration.1 claims multi-AZ.', locations),
     ).toBe('Client rationale (n-1) asserts the client polls; c5 narration claims multi-AZ.');
+    // A run is a path: its ends read by their keys, never one full label each.
     expect(lensProse('the path edge.1-2 carries the read', locations)).toBe(
-      'the path e-1 · n-1 → n-5 (sync) to e-2 · n-5 → n-12 (sync) carries the read',
+      'the path e-1 to e-2 carries the read',
     );
   });
 

@@ -158,7 +158,7 @@ describe('substituteLocationRefs', () => {
   // The recorded artifact: "edge.1-2" became "e-1 · n-1 → n-5 (sync)-2".
   it('[EVAL-2] reads a run of refs as its two ends, never as one label with a number left over', () => {
     expect(substituteLocationRefs('the unexplained gateway (edge.1-2, node.5)', refs)).toBe(
-      'the unexplained gateway (e-1 · n-1 → n-5 (sync) to e-2 · n-5 → n-4 (sync), n-5 · database · Orders DB)',
+      'the unexplained gateway (e-1 to e-2, n-5)',
     );
   });
 
@@ -221,6 +221,93 @@ describe('substituteLocationRefs', () => {
     expect(substituteLocationRefs('the DB (node.7) replicates to node.9', nested)).toBe(
       'the DB (n-7) replicates to n-9 · database · DB',
     );
+  });
+
+  describe('a path, and a part named twice', () => {
+    // Revision #8–#9 of the click-counter session, as the panel read them.
+    const path: LocatedRef[] = [
+      { ref: 'edge.1', label: 'e-1 · n-1 → n-2 (sync)', part: 'edge', key: 'e-1' },
+      { ref: 'edge.2', label: 'e-2 · n-2 → ai-lb (sync)', part: 'edge', key: 'e-2' },
+      {
+        ref: 'edge.3',
+        label: 'ai-e-lb-svc · ai-lb → n-3 (sync)',
+        part: 'edge',
+        key: 'ai-e-lb-svc',
+      },
+      { ref: 'edge.5', label: 'e-4 · n-3 → n-4 (sync)', part: 'edge', key: 'e-4' },
+      { ref: 'edge.15', label: 'e-6 · n-4 → n-6 (sync)', part: 'edge', key: 'e-6' },
+      {
+        ref: 'edge.20',
+        label: 'ai-e-stats-read · n-3 → ai-counts-store (sync)',
+        part: 'edge',
+        key: 'ai-e-stats-read',
+      },
+      {
+        ref: 'node.12',
+        label: 'n-6 · replica · Links DB Sync Standby',
+        part: 'node',
+        key: 'n-6',
+        name: 'Links DB Sync Standby',
+      },
+      {
+        ref: 'node.13',
+        label: 'ai-db-replica · replica · Links DB Read Replicas',
+        part: 'node',
+        key: 'ai-db-replica',
+        name: 'Links DB Read Replicas',
+      },
+      {
+        ref: 'rationale.10',
+        label: 'Links DB Sync Standby rationale (n-6)',
+        part: 'rationale',
+        key: 'n-6',
+      },
+    ];
+    const read = (prose: string) => substituteLocationRefs(prose, path);
+
+    it('[EVAL-2] a path written as a list of refs reads as its parts’ keys, never one full label per hop', () => {
+      expect(read('every redirect crosses (edge.1,edge.2,edge.3,edge.5,edge.15)')).toBe(
+        'every redirect crosses (e-1,e-2,ai-e-lb-svc,e-4,e-6)',
+      );
+      expect(read('the hot path edge.1→edge.2→edge.3 holds no cache')).toBe(
+        'the hot path e-1→e-2→ai-e-lb-svc holds no cache',
+      );
+      // Refs a sentence joins with words are each introduced in full.
+      expect(read('edge.1 and later edge.15 are sync')).toBe(
+        'e-1 · n-1 → n-2 (sync) and later e-6 · n-4 → n-6 (sync) are sync',
+      );
+    });
+
+    it('[EVAL-2] a ref written beside its part’s own key names the part once — the key, and the name when unsaid', () => {
+      expect(read('(ending at edge.15/e-6, the sync standby ack)')).toBe(
+        '(ending at e-6, the sync standby ack)',
+      );
+      expect(read('reads n-3→ai-e-stats-read (edge.20) on every redirect')).toBe(
+        'reads n-3→ai-e-stats-read on every redirect',
+      );
+      expect(read('the read path omits ai-db-replica (node.13)')).toBe(
+        'the read path omits ai-db-replica (Links DB Read Replicas)',
+      );
+      expect(read('replicas (ai-db-replica, node.13) lag')).toBe(
+        'replicas (ai-db-replica, Links DB Read Replicas) lag',
+      );
+      expect(read('node.12 (n-6) acks every write')).toBe(
+        'Links DB Sync Standby (n-6) acks every write',
+      );
+      // A key nobody wrote beside the ref is no pair: "n-6 is" is a sentence, not a name.
+      expect(read('n-6 is the standby; node.12 acks')).toBe(
+        'n-6 is the standby; n-6 · replica · Links DB Sync Standby acks',
+      );
+    });
+
+    it('[EVAL-2] a key a label has already said is said: a part named in a rationale’s label reads by its key after', () => {
+      expect(read('Rationale.10 relies on the sync standby (n-6/node.12)')).toBe(
+        'Links DB Sync Standby rationale (n-6) relies on the sync standby (n-6)',
+      );
+      expect(read('Rationale.10 relies on node.12')).toBe(
+        'Links DB Sync Standby rationale (n-6) relies on n-6',
+      );
+    });
   });
 
   it('every part has a short label, built from its key and what it is', () => {
