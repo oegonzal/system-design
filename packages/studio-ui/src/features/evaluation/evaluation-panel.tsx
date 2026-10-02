@@ -18,9 +18,9 @@ import {
 } from '@sysdesign/design-system';
 
 import { CriterionResultsList } from './criterion-results-list';
-import { useElapsed } from './elapsed';
 import { FailureDetail } from './failure-detail';
 import { FindingsList } from './findings-list';
+import { SILENCE_BODY, silenceCopy, useLiveness } from './liveness';
 import { ScoreSummary } from './score-summary';
 
 /**
@@ -58,7 +58,12 @@ export interface EvaluationPanelProps {
   criteria: SuccessCriterion[];
   /** Why the loaded revision has no grade to show; null when it has one, or is waiting for it. */
   ungraded?: UngradedReason | null;
-  /** When the grade on show started; the running state counts from it. */
+  /**
+   * When the grade on show started, as far as the page knows — when the
+   * revision was stored, or when this tab sent it to be graded again. The
+   * run's own start, once the poll has read it, is what the clock counts
+   * from; this stands in until then.
+   */
   startedAt?: string | null;
   /**
    * Grade the revision on show again, in place: the same revision, a fresh
@@ -105,8 +110,10 @@ const DURATION_HINT = 'Grading usually takes a few minutes';
 /**
  * The feedback dock: first whose feedback it is — the revision by number,
  * and a line when the canvas has moved on to the draft — then running →
- * spinner with how long it usually takes and
- * how long it has taken, failed → what happened in the author's terms, the
+ * spinner with how long it usually takes and how long it has taken, counted
+ * from the run's own start, and a warning once the run has gone quiet past
+ * the studio's tolerance rather than a spinner that says nothing, failed →
+ * what happened in the author's terms, the
  * run's own error one click down, and the way back, complete → the score
  * summary, the criterion results and the findings. An escalation with no
  * score says why before showing what the lenses did find; a revision with
@@ -134,7 +141,10 @@ export function EvaluationPanel({
     (status === 'running' || (evaluation === null && isPolling)) &&
     error === null &&
     ungraded === null;
-  const elapsed = useElapsed(startedAt, running);
+  const { elapsed, silentMinutes } = useLiveness(
+    { startedAt: evaluation?.startedAt ?? startedAt, heartbeatAt: evaluation?.heartbeatAt ?? null },
+    running,
+  );
   const escalated =
     evaluation !== null &&
     evaluation.status === 'complete' &&
@@ -195,6 +205,16 @@ export function EvaluationPanel({
           <Text size="sm" tone="muted" data-testid="grading-duration">
             {elapsed !== null ? `${DURATION_HINT} — ${elapsed} so far.` : `${DURATION_HINT}.`}
           </Text>
+          {silentMinutes !== null ? (
+            <Alert
+              tone="warn"
+              title={silenceCopy(silentMinutes)}
+              data-testid="grading-silence"
+              data-minutes={silentMinutes}
+            >
+              {SILENCE_BODY}
+            </Alert>
+          ) : null}
         </Stack>
       ) : null}
 

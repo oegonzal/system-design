@@ -195,6 +195,26 @@ export const NoArtifact: Story = {
   },
 };
 
+/** Minutes before the story rendered — the one clock-relative value, for a run that is live now. */
+const minutesAgo = (minutes: number): string =>
+  new Date(Date.now() - minutes * 60_000).toISOString();
+
+/** Live, and quiet too long: the run's last sign of life is minutes old, and the panel says so instead of spinning. */
+export const GraderGoneQuiet: Story = {
+  args: {
+    run: makeImproveRun({
+      exchangeCount: 5,
+      startedAt: minutesAgo(9),
+      heartbeatAt: minutesAgo(4),
+      iterations: [
+        makeImproveIteration({ iteration: 1, mode: 'provided', overall: 64, decision: 'revise' }),
+      ],
+    }),
+    isPolling: true,
+    message: 'Coaching — iteration 2 of 3, 5 model calls so far.',
+  },
+};
+
 /** A grade holds the session: the coach is off, in the session's own words. */
 export const BlockedByGrade: Story = {
   args: {

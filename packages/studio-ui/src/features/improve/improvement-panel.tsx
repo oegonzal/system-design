@@ -27,6 +27,7 @@ import { useState } from 'react';
 
 import { humanizeReason } from '../evaluation/decision-reason';
 import { FailureDetail } from '../evaluation/failure-detail';
+import { SILENCE_BODY, silenceCopy, useLiveness } from '../evaluation/liveness';
 import { formatScore } from '../evaluation/score';
 import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { WrappingText } from '../evaluation/wrapping-text';
@@ -167,12 +168,14 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * cites the way the feedback summary names them — from the iteration's own
  * findings, placed on the design it judged; a row with nothing to judge says
  * only that. A run that failed says so in the author's terms, with the run's
- * own error one click down. Before any of it, the coach may have been handed
- * lessons from earlier runs: the panel says how many, and lists them on
- * request. The iteration count
- * reads the run's own budget while there is a run, and the author's choice
- * for the next one. Pure props, Storybook-safe; the workspace owns polling
- * and the load-revision flow.
+ * own error one click down. A live run says how long it has been going,
+ * counted from its own start, and warns once it has gone quiet past the
+ * studio's tolerance rather than spinning in silence. Before any of it, the
+ * coach may have been handed lessons from earlier runs: the panel says how
+ * many, and lists them on request. The iteration count reads the run's own
+ * budget while there is a run, and the author's choice for the next one.
+ * Pure props, Storybook-safe; the workspace owns polling and the
+ * load-revision flow.
  */
 export function ImprovementPanel({
   run,
@@ -192,6 +195,10 @@ export function ImprovementPanel({
   const [chosen, setChosen] = useState<number | null>(null);
   const live = run !== null && run.status === 'running';
   const active = starting || isPolling || live;
+  const { elapsed, silentMinutes } = useLiveness(
+    { startedAt: run?.startedAt ?? null, heartbeatAt: run?.heartbeatAt ?? null },
+    live,
+  );
   // A live run's budget is what it is; otherwise the author's pick, or the last run's.
   const iterations = live
     ? run.maxIterations
@@ -254,11 +261,28 @@ export function ImprovementPanel({
       </Stack>
 
       {active ? (
-        <Stack direction="row" gap={3} align="center">
-          <Spinner label="" />
-          <Text size="sm" tone="secondary" data-testid="improve-progress">
-            {run !== null ? `${coachProgress(run)}…` : 'Submitting your draft to the coach…'}
-          </Text>
+        <Stack gap={2}>
+          <Stack direction="row" gap={3} align="center">
+            <Spinner label="" />
+            <Text size="sm" tone="secondary" data-testid="improve-progress">
+              {run !== null ? `${coachProgress(run)}…` : 'Submitting your draft to the coach…'}
+            </Text>
+          </Stack>
+          {live && elapsed !== null ? (
+            <Text size="sm" tone="muted" data-testid="coach-duration">
+              {`${elapsed} since the coach started.`}
+            </Text>
+          ) : null}
+          {live && silentMinutes !== null ? (
+            <Alert
+              tone="warn"
+              title={silenceCopy(silentMinutes)}
+              data-testid="coach-silence"
+              data-minutes={silentMinutes}
+            >
+              {SILENCE_BODY}
+            </Alert>
+          ) : null}
         </Stack>
       ) : null}
 

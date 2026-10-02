@@ -98,16 +98,34 @@ describe('EvaluationPanel', () => {
     expect(screen.getByText('Submit your design to have the quality loop grade it.')).toBeTruthy();
     unmount();
 
+    // The clock counts from the run's own start, not from when the page
+    // thought the grade began — a reload, a re-grade — once the poll has it.
     const running = renderPanel({
-      evaluation: makeEvaluation({ status: 'running', overall: null, decision: null }),
+      evaluation: makeEvaluation({
+        status: 'running',
+        overall: null,
+        decision: null,
+        startedAt: new Date(Date.now() - 75_000).toISOString(),
+        heartbeatAt: new Date(Date.now() - 5_000).toISOString(),
+      }),
       isPolling: true,
-      startedAt: new Date(Date.now() - 75_000).toISOString(),
+      startedAt: new Date(Date.now() - 600_000).toISOString(),
     });
     expect(screen.getByText('The lenses are reading your design…')).toBeTruthy();
     expect(screen.getByTestId('grading-duration').textContent).toMatch(
       /^Grading usually takes a few minutes — 1:1\d so far\.$/,
     );
+    expect(screen.queryByTestId('grading-silence')).toBeNull();
     running.unmount();
+
+    // Before the poll has read the run, the page's own word on the start stands in.
+    const unread = renderPanel({
+      evaluation: null,
+      isPolling: true,
+      startedAt: new Date(Date.now() - 75_000).toISOString(),
+    });
+    expect(screen.getByTestId('grading-duration').textContent).toMatch(/ — 1:1\d so far\.$/);
+    unread.unmount();
 
     const unstamped = renderPanel({ evaluation: null, isPolling: true });
     expect(screen.getByTestId('grading-duration').textContent).toBe(
@@ -126,6 +144,29 @@ describe('EvaluationPanel', () => {
     expect(detail.textContent).toContain('the run failed');
     expect(screen.getByTestId('retry-evaluation').textContent).toBe('Grade this revision again');
     expect(screen.queryByTestId('grading-duration')).toBeNull();
+  });
+
+  it('[EVAL-1] says the grader has not reported, and for how long, once a running grade’s heartbeat has gone stale — never a silent spinner', () => {
+    renderPanel({
+      evaluation: makeEvaluation({
+        status: 'running',
+        overall: null,
+        decision: null,
+        startedAt: new Date(Date.now() - 400_000).toISOString(),
+        heartbeatAt: new Date(Date.now() - 190_000).toISOString(),
+      }),
+      isPolling: true,
+    });
+
+    const silence = screen.getByTestId('grading-silence');
+    expect(silence.getAttribute('role')).toBe('alert');
+    expect(silence.textContent).toContain('The grader has not reported for 3 minutes.');
+    expect(silence.textContent).toContain('gives the run up');
+    expect(silence.getAttribute('data-minutes')).toBe('3');
+    expect(screen.getByTestId('grading-duration').textContent).toMatch(/ — 6:[34]\d so far\.$/);
+    // Still running: the spinner and its line stay, and nothing calls the grade failed.
+    expect(screen.getByText('The lenses are reading your design…')).toBeTruthy();
+    expect(screen.queryByTestId('evaluation-error')).toBeNull();
   });
 
   it('[UX-17] the grade-again control is off while its request is on the way, and off with the session’s reason while a run holds the slot', () => {

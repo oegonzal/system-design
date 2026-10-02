@@ -178,6 +178,42 @@ describe('ImprovementPanel', () => {
     expect(screen.queryByTestId('load-best-revision')).toBeNull();
   });
 
+  it('[EVAL-1] a live run says how long it has been going from its own start, and says when the grader has gone quiet', () => {
+    const fresh = renderPanel({
+      run: makeImproveRun({
+        startedAt: new Date(Date.now() - 95_000).toISOString(),
+        heartbeatAt: new Date(Date.now() - 20_000).toISOString(),
+      }),
+      isPolling: true,
+    });
+    expect(screen.getByTestId('coach-duration').textContent).toMatch(
+      /^1:3\d since the coach started\.$/,
+    );
+    expect(screen.queryByTestId('coach-silence')).toBeNull();
+    fresh.unmount();
+
+    const quiet = renderPanel({
+      run: makeImproveRun({
+        startedAt: new Date(Date.now() - 500_000).toISOString(),
+        heartbeatAt: new Date(Date.now() - 250_000).toISOString(),
+      }),
+      isPolling: true,
+    });
+    const silence = screen.getByTestId('coach-silence');
+    expect(silence.textContent).toContain('The grader has not reported for 4 minutes.');
+    expect(silence.getAttribute('data-minutes')).toBe('4');
+    expect(screen.getByTestId('improve-progress').textContent).toContain('Coaching');
+    expect(screen.queryByTestId('improvement-error')).toBeNull();
+    quiet.unmount();
+
+    // A run that has ended keeps no clock and raises no alarm, however old its last beat.
+    renderPanel({
+      run: makeImproveRun({ status: 'complete', stopReason: 'max-iterations' }),
+    });
+    expect(screen.queryByTestId('coach-duration')).toBeNull();
+    expect(screen.queryByTestId('coach-silence')).toBeNull();
+  });
+
   it('[UX-11] a run started from a graded revision shows its starting point as a reused grade', () => {
     renderPanel({
       run: makeImproveRun({
