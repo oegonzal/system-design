@@ -15,8 +15,38 @@ function attemptUnload(): boolean {
   return event.defaultPrevented;
 }
 
+/**
+ * jsdom has no Navigation API: stand in the one thing the guard reads from
+ * it — the target `navigate` events are dispatched on.
+ */
+function installNavigation(): EventTarget {
+  const navigation = new EventTarget();
+  Object.defineProperty(window, 'navigation', { configurable: true, value: navigation });
+  return navigation;
+}
+
+interface AttemptedNavigation {
+  navigationType?: NavigationType;
+  cancelable?: boolean;
+  hashChange?: boolean;
+}
+
+/** Fires the browser's navigate event — a same-document Back unless told otherwise — and answers whether a guard held it. */
+function attemptNavigation(
+  navigation: EventTarget,
+  { navigationType = 'traverse', cancelable = true, hashChange = false }: AttemptedNavigation = {},
+): boolean {
+  const event = Object.assign(new Event('navigate', { cancelable }), {
+    navigationType,
+    hashChange,
+  });
+  navigation.dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
+  Reflect.deleteProperty(window, 'navigation');
 });
 
 describe('useLeaveGuard', () => {
@@ -81,6 +111,58 @@ describe('useConfirmLeave', () => {
     page.rerender({ saving: false, dirty: false });
     confirm.mockClear();
     expect(page.result.current()).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeaveGuardProvider', () => {
+  const UNSAVED = 'Your draft has unsaved changes. Leave anyway?';
+
+  it('asks before a Back or Forward leaves a blocking page, and holds it when the author refuses', () => {
+    const navigation = installNavigation();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const page = renderHook(({ dirty }) => useLeaveGuard(dirty, UNSAVED), {
+      wrapper,
+      initialProps: { dirty: false },
+    });
+
+    // Nothing unsaved: the traversal goes, unasked.
+    expect(attemptNavigation(navigation)).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+
+    page.rerender({ dirty: true });
+    expect(attemptNavigation(navigation)).toBe(true);
+    expect(confirm).toHaveBeenLastCalledWith(UNSAVED);
+
+    confirm.mockReturnValue(true);
+    expect(attemptNavigation(navigation)).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks only about a traversal it can hold and that leaves the page', () => {
+    const navigation = installNavigation();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderHook(() => useLeaveGuard(true, UNSAVED), { wrapper });
+
+    // A link's own navigation asked already, through useConfirmLeave.
+    expect(attemptNavigation(navigation, { navigationType: 'push' })).toBe(false);
+    expect(attemptNavigation(navigation, { navigationType: 'replace' })).toBe(false);
+    // Another document is beforeunload's to ask about; the browser allows no hold here.
+    expect(attemptNavigation(navigation, { cancelable: false })).toBe(false);
+    // A fragment change stays on the page.
+    expect(attemptNavigation(navigation, { hashChange: true })).toBe(false);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('stops asking once the shell is gone', () => {
+    const navigation = installNavigation();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const page = renderHook(() => useLeaveGuard(true, UNSAVED), { wrapper });
+    expect(attemptNavigation(navigation)).toBe(true);
+
+    page.unmount();
+    confirm.mockClear();
+    expect(attemptNavigation(navigation)).toBe(false);
     expect(confirm).not.toHaveBeenCalled();
   });
 });
