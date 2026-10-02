@@ -8,7 +8,7 @@ import {
   type NodeConfigEntry,
 } from '@sysdesign/contracts';
 import { Badge, Button, Stack, Text, TextField } from '@sysdesign/design-system';
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 
 import { ChipRemoveButton } from './chip-remove-button';
 import {
@@ -41,6 +41,32 @@ const Key = styled.span`
 const Value = styled.span`
   font-family: ${({ theme }) => theme.font.family.mono};
   overflow-wrap: anywhere;
+`;
+
+/**
+ * The draft's Key and Value, side by side where the panel has the room and
+ * each on its own line where it has not. Aligned at the top, so a message
+ * one field shows under its input moves nothing beside it.
+ */
+const DraftFields = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.space[2]}px;
+`;
+
+/** The width a draft field asks for before the row shares out what is left. */
+const DRAFT_FIELD_BASIS = '10rem';
+
+/**
+ * One draft field, sized by the row and never by what it says under its
+ * input: every field grows from one basis by an equal share, so Key and
+ * Value are always one width, and a count or a limit message wraps inside
+ * the field instead of widening it.
+ */
+const DraftField = styled.div`
+  flex: 1 1 ${DRAFT_FIELD_BASIS};
+  min-width: 0;
 `;
 
 /** Severity ink on the surface: a caution, not a blocker. */
@@ -76,6 +102,12 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
     setKey('');
     setValue('');
   };
+  // Enter in either field adds the draft, as the button does.
+  const addOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    add();
+  };
 
   return (
     <Stack gap={3} data-testid="config-editor">
@@ -103,35 +135,33 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
         </Text>
       )}
 
-      <Stack direction="row" gap={2} align="end" wrap>
-        <TextField
-          label="Key"
-          data-testid="config-key"
-          value={key}
-          maxLength={NODE_CONFIG_KEY_MAX_LENGTH}
-          disabled={atCap}
-          placeholder="e.g. replicas"
-          onChange={(event) => setKey(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            add();
-          }}
-        />
-        <TextField
-          label="Value"
-          data-testid="config-value"
-          value={value}
-          maxLength={NODE_CONFIG_STRING_VALUE_MAX_LENGTH}
-          disabled={atCap}
-          placeholder="3, true, or text"
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            add();
-          }}
-        />
+      <DraftFields>
+        <DraftField>
+          <TextField
+            label="Key"
+            data-testid="config-key"
+            value={key}
+            maxLength={NODE_CONFIG_KEY_MAX_LENGTH}
+            disabled={atCap}
+            placeholder="e.g. replicas"
+            onChange={(event) => setKey(event.target.value)}
+            onKeyDown={addOnEnter}
+          />
+        </DraftField>
+        <DraftField>
+          <TextField
+            label="Value"
+            data-testid="config-value"
+            value={value}
+            maxLength={NODE_CONFIG_STRING_VALUE_MAX_LENGTH}
+            disabled={atCap}
+            placeholder="3, true, or text"
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={addOnEnter}
+          />
+        </DraftField>
+      </DraftFields>
+      <Stack direction="row">
         <Button variant="subtle" onClick={add} disabled={!canAdd} data-testid="config-add">
           Add
         </Button>

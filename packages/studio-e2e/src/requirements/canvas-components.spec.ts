@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { NODE_KIND_CATEGORIES, NODE_KINDS } from '@sysdesign/contracts';
+import {
+  NODE_CONFIG_STRING_VALUE_MAX_LENGTH,
+  NODE_KIND_CATEGORIES,
+  NODE_KINDS,
+} from '@sysdesign/contracts';
 
 import { createPracticeSession, saveDraft } from '../support/backend';
 import { CanvasPage, openPracticeSession } from '../support/canvas.page';
@@ -144,6 +148,18 @@ test.describe('interactive design canvas', () => {
     await page.getByTestId('config-key').fill('replicas');
     await expect(page.getByTestId('config-error')).toContainText('already set');
     await expect(page.getByTestId('config-add')).toBeDisabled();
+
+    // The draft's two fields keep one width whatever they say under them: the
+    // limit message wraps inside Value instead of widening it past Key.
+    const key = page.getByTestId('config-key');
+    const value = page.getByTestId('config-value');
+    const width = async (field: typeof key) => (await field.boundingBox())?.width;
+    const before = await width(value);
+    expect(before).toBe(await width(key));
+    await value.fill('x'.repeat(NODE_CONFIG_STRING_VALUE_MAX_LENGTH));
+    await expect(canvas.properties.getByText(/Limit reached/)).toBeVisible();
+    expect(await width(value)).toBe(before);
+    expect(await width(key)).toBe(before);
   });
 
   test('[UX-2] two connections whose lines cross in one gap keep their labels apart', async ({
