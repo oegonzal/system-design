@@ -40,8 +40,13 @@ and **see results / iterate**.
 
 ### See results / iterate
 
-- **Feedback** — the graded result of the current revision, straight from the
-  quality loop: the **overall score** with the controller's **decision**
+- **Feedback** — the graded result of one revision, straight from the quality
+  loop. The tab says first whose feedback it is — **Feedback for revision #2**,
+  with an **AI** badge when the coach wrote it — and, once the canvas has moved
+  on to the draft (a revision restored as the draft, a session reopened on a
+  saved one), **The canvas shows your draft, not this revision.** so a score
+  never reads as the verdict on what is drawn now. Then the **overall score**
+  with the controller's **decision**
   (accept / revise / retry / escalate / reject) and its own **reason**, one
   **meter per dimension** the pipeline declares (coverage, quality attributes,
   compliance — "Not assessed" when nothing earned it, and the overall stays
@@ -53,14 +58,24 @@ and **see results / iterate**.
   labels substituted into the rationale; click one and its nodes and edges
   highlight on the canvas. A lens writes positions the way a person would —
   `Rationale.3` at the start of a sentence, `edge.1-2` for a run — and every
-  one the revision has is read as its label. While the run is in flight the
-  tab polls; while the loop is unreachable it says so. A grade that **failed**
-  — the model went away, or the loop restarted under it — is graded again
-  **in place**: the same revision, a fresh run, no second copy of the design
-  in the timeline (`POST /revisions/:id/evaluation`, refused while a grade is
-  running or once one stands). A revision stored before grading moved to the
-  loop, or whose run the grader no longer has, has no evaluation; the tab says
-  so and offers the same re-grade. A plain grade shows no "stop reason": one
+  one the revision has is read as its label — and so is a place the
+  rationale merely mentions, which reads by its label too but is no chip of
+  the finding's and highlights nothing: a finding is where its lens cited.
+  While the run is in flight the tab polls and counts how long the grade has
+  taken from the run's own start (so a reload or a re-grade counts right),
+  and if the run's last sign of life — its heartbeat — is more than two
+  minutes old it says **The grader has not reported for N minutes.** rather
+  than spinning in silence: the loop gives such a run up after its stale
+  window and marks it failed, and it can be graded again from here. While the
+  loop is unreachable the tab says so. A grade that **failed** — the model
+  went away, or the loop restarted under it — says **Grading stopped
+  unexpectedly** in the author's terms, with the run's own error folded under
+  **Technical details**, and is graded again **in place**: the same revision,
+  a fresh run, no second copy of the design in the timeline
+  (`POST /revisions/:id/evaluation`, refused while a grade is running or
+  once one stands). A revision stored before grading moved to the loop, or
+  whose run the grader no longer has, has no evaluation; the tab says so and
+  offers the same re-grade. A plain grade shows no "stop reason": one
   judgement always ends on its one iteration. Only a coach's last revision
   says why the coach stopped, when it ran out of iterations or of progress.
 - **Coach** — hand your design to the loop with a number of iterations. From
@@ -72,30 +87,53 @@ and **see results / iterate**.
   hands them to the coach only — the graders never see them — so the panel
   first says it is recalling, then **Recalled N lessons from earlier runs**
   with the list behind **Show lessons**, or why there were none — with one
-  iteration there is nothing to revise, so the coach recalls none. Progress
-  shows the model calls as they happen; the newest coaching run is restored
-  when the page reloads. Each row is the **starting point**, **imported** (it beat every
-  earlier one and landed in the timeline as an **AI** revision), **not
-  better**, or **refused** with the problems the studio found — every row
-  with the controller's reason. An imported revision keeps your layout: the
+  iteration there is nothing to revise, so the coach recalls none, and a
+  review that could not settle what to check the lessons against, or
+  produced nothing to go on, says so in its own words. Progress shows the
+  iteration under way and the model calls as they happen, how long the run
+  has been going from its own start, and — as on the Feedback tab — **The
+  grader has not reported for N minutes.** once its heartbeat is stale; the
+  newest coaching run is restored when the page reloads. Each row is the
+  **starting point** (**grade reused** when the loop adopted a revision's
+  grade instead of grading it again), **imported** (it beat every earlier one
+  and landed in the timeline as an **AI** revision), **not better**,
+  **refused** with the problems the studio found, or **no revision
+  produced** — the coach's miss, never a verdict on your design — every
+  judged row with the controller's decision and reason, naming the findings
+  and criteria it cites the way the feedback does. A run that fails says
+  **The coach stopped unexpectedly** with its own error under **Technical
+  details**, and the previous run's best revision stays one click away. An
+  imported revision keeps your layout: the
   coach reads the canvas as text and returns no positions, so every block
   that survived stays where you put it and each block the coach added is
   placed beside the blocks it connects to, never on top of one. **Load best**
   puts the best import on the canvas read-only. Disabled, with the reason,
   while the loop is unreachable.
 - **Revisions** — the version history: one chip per revision, newest first,
-  with its score, decision and status, and an **AI** badge on coach-authored
-  ones. Click a chip to load that revision onto the canvas read-only: Submit,
-  Clear and the Brief and Narrative editors lock until **Restore as draft**
-  puts it back as your own.
+  with its score, decision and status — **grading…** while its run goes,
+  **failed** when the run failed, **grade lost** when the grader no longer
+  has the run (the chip's title says so, and the Feedback tab offers the
+  re-grade) — and an **AI** badge on coach-authored ones. The chip the
+  canvas shows is marked current and says **on canvas**; when the canvas
+  shows the draft instead, no chip is current, and the revision whose grade
+  the Feedback tab still shows says **feedback shown**. Click a chip to load
+  that revision onto the canvas read-only: Submit, Clear and the Brief and
+  Narrative editors lock until **Restore as draft** puts it back as your own.
 
-_(Above the canvas, the toolbar holds the actions: **Submit for evaluation**,
-**Clear**, **Fit view** and **Export** — a zip of the diagram PDF plus
-per-artifact Markdown — and the **draft badge**: unsaved, saving draft…,
-draft saved, draft not saved. The canvas autosaves to the session a moment
-after you stop editing, is restored ahead of the latest revision when the
-workspace opens, and is cleared by the submit or coach start it became; a
-navigation while a save is still pending asks first.)_
+_(Beside the page's title sits the session's status: **submitted #2 ·
+graded** — your latest submission, named as that so it never reads as a
+label for whatever the canvas shows, with **grading…** or **grading failed**
+in place of **graded** while its grade runs or after it failed. Above the
+canvas, the toolbar holds the actions: **Submit for grading**, **Undo**,
+**Redo**, **Clear**, **Fit view** and **Export** — a zip of the diagram PDF
+plus per-artifact Markdown — and the **draft badge**: unsaved draft, saving
+draft…, draft saved, draft not saved. The canvas autosaves to the session a
+moment after you stop editing, is restored ahead of the latest revision when
+the workspace opens, and is cleared by the submit or coach start it became;
+a navigation while a save is still pending asks first, and a save that finds
+the session gone turns the page into its not-found. Blocks are selected one
+at a time by a click, several at once by ⌘-click or Ctrl-click; the
+Properties panel edits the one last clicked.)_
 
 ## The Properties panel
 
@@ -112,8 +150,10 @@ it shows the edge's **kind** (sync or async), a label, and what it **carries**.
   (command, query, event, stream), whether it is idempotent, a note. The
   graders and the coach read a note whole, up to the 200 characters the panel
   accepts, so it is the place to state an operation's contract — its retry,
-  its ordering, its acknowledgement. An edge may **carry** any operation
-  declared on either of its endpoints; the panel offers exactly those.
+  its ordering, its acknowledgement; the field says so under itself while
+  you type, and counts down as the limit nears. An edge may **carry** any
+  operation declared on either of its endpoints; the panel offers exactly
+  those.
 
 ## Brief vs Narrative
 
