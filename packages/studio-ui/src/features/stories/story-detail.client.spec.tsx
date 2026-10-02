@@ -84,6 +84,36 @@ describe('StoryDetail', () => {
     observer.disconnect();
   });
 
+  it('[STAR-1] a save that stores nothing new still lands: the fields show what was stored, "Saved" shows, and the guard lets go', async () => {
+    const user = userEvent.setup();
+    const stored = makeStory();
+    const puts: unknown[] = [];
+    stubApi([
+      ...LINK_OPTIONS,
+      { path: '/api/star-stories/story-1', body: { data: stored } },
+      {
+        method: 'PUT',
+        path: '/api/star-stories/story-1',
+        handler: ({ init }) => {
+          puts.push(JSON.parse(String(init?.body)));
+          // Trimmed, the request is the stored story: nothing is written, updatedAt stands.
+          return { body: { data: stored } };
+        },
+      },
+    ]);
+    renderWithTheme(<StoryDetail storyId="story-1" />);
+
+    await user.type(await screen.findByLabelText('Result'), '   ');
+    // Spaces the save rule trims are not unsaved edits.
+    expect(leaving()).toBe(false);
+    await user.click(screen.getByTestId('save-story'));
+
+    expect(await screen.findByTestId('story-saved')).toBeTruthy();
+    expect(puts).toHaveLength(1);
+    expect((screen.getByLabelText('Result') as HTMLTextAreaElement).value).toBe(stored.result);
+    expect(leaving()).toBe(false);
+  });
+
   it('[STAR-1] tells a refused save beside Save, as an alert', async () => {
     const user = userEvent.setup();
     stubApi([
@@ -105,6 +135,18 @@ describe('StoryDetail', () => {
       'A story with that title already exists',
     );
     expect(screen.getByRole('alert')).toBe(screen.getByTestId('story-save-error'));
+  });
+
+  it('names the tab after the story, and keeps it named when the route’s own title lands late', async () => {
+    stubApi([...LINK_OPTIONS, { path: '/api/star-stories/story-1', body: { data: makeStory() } }]);
+    renderWithTheme(<StoryDetail storyId="story-1" />);
+
+    const named = 'The replica that saved the on-sale · System Design Studio';
+    await waitFor(() => expect(document.title).toBe(named));
+    // The race a direct load can lose: the story arrived first, the route's metadata second.
+    const routeTitle = document.querySelector('title') as HTMLTitleElement;
+    routeTitle.textContent = 'STAR story · System Design Studio';
+    await waitFor(() => expect(document.title).toBe(named));
   });
 
   it('[UX-12] calls a missing or malformed story not found, with the way back to the stories', async () => {

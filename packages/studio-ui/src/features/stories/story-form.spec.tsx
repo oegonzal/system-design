@@ -158,6 +158,36 @@ describe('StoryForm', () => {
     expect(onDirtyChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('counts as unsaved only what a save would store differently — never a space the save rule trims', async () => {
+    const user = userEvent.setup();
+    const onDirtyChange = vi.fn();
+    renderWithTheme(
+      <StoryForm
+        initial={makeStory({ tags: ['postgres', 'scaling'] })}
+        saved
+        onSave={vi.fn()}
+        onDirtyChange={onDirtyChange}
+      />,
+    );
+
+    await user.type(screen.getByLabelText('Result'), '   ');
+    await user.type(screen.getByLabelText('Title'), ' ');
+    expect(onDirtyChange).not.toHaveBeenCalledWith(true);
+    expect(screen.getByTestId('story-saved')).toBeTruthy();
+
+    // The same tags typed another way are the same tags, once they are all there again.
+    const tags = screen.getByLabelText('Tags (comma separated)');
+    await user.clear(tags);
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    await user.type(tags, 'postgres,scaling , postgres');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByTestId('story-saved')).toBeTruthy();
+
+    await user.type(screen.getByLabelText('Result'), 'and stayed there.');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+    expect(screen.queryByTestId('story-saved')).toBeNull();
+  });
+
   it('shows a delete button only when a handler is supplied', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();

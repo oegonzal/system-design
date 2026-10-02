@@ -19,7 +19,7 @@ import {
 } from '@sysdesign/design-system';
 import { useEffect, useId, useState } from 'react';
 
-import { checkStory, parseTags, type StoryField } from './story-rule';
+import { checkStory, parseTags, type StoryCheck, type StoryField } from './story-rule';
 
 export interface StoryFormProps {
   /** Existing story when editing; omit for a blank create form. */
@@ -57,7 +57,17 @@ interface StoryValues {
   experienceId: string;
 }
 
-const valuesOf = (story?: StarStoryDto): StoryValues => ({
+/** A story's content, as a stored story or a save request carries it. */
+type StoryContent = Pick<
+  SaveStarStoryRequest,
+  'title' | 'situation' | 'task' | 'action' | 'result'
+> & {
+  tags: readonly string[];
+  promptId?: string | null;
+  experienceId?: string | null;
+};
+
+const valuesOf = (story?: StoryContent): StoryValues => ({
   title: story?.title ?? '',
   situation: story?.situation ?? '',
   task: story?.task ?? '',
@@ -89,6 +99,17 @@ const payloadOf = (values: StoryValues): SaveStarStoryRequest => ({
 });
 
 /**
+ * What a save of these values would store, as values: the save rule's own
+ * reading of them — trimmed — where it accepts them, and what was typed
+ * while it refuses them. "Unsaved" is a difference between two of these,
+ * never between two typings: a trailing space is not an edit.
+ */
+const storedAs = (payload: SaveStarStoryRequest, check: StoryCheck): StoryValues =>
+  valuesOf(check.accepted ?? payload);
+
+const STORY_VALUE_KEYS = Object.keys(valuesOf()) as (keyof StoryValues)[];
+
+/**
  * The STAR editor. Deliberately free of `next/navigation` and API calls —
  * containers own persistence, routing and the leave guard (told through
  * `onDirtyChange`), which keeps this form pure enough for Storybook and unit
@@ -98,7 +119,9 @@ const payloadOf = (values: StoryValues): SaveStarStoryRequest => ({
  * why it is refused beside itself — once it was visited, or as soon as it
  * holds something the rule refuses (a tag too long, too many tags) — and a
  * disabled Save says what is still missing. A failed save and a finished
- * one are told beside Save, where the author is looking.
+ * one are told beside Save, where the author is looking. Unsaved is the
+ * same rule's judgement: the form holds edits only while a save would store
+ * something other than what it started from.
  */
 export function StoryForm({
   initial,
@@ -114,13 +137,16 @@ export function StoryForm({
   const reasonId = useId();
   const [values, setValues] = useState<StoryValues>(() => valuesOf(initial));
   const [visited, setVisited] = useState<ReadonlySet<StoryField>>(() => new Set());
-  const [initialValues] = useState(() => valuesOf(initial));
+  const [storedInitially] = useState(() => {
+    const payload = payloadOf(valuesOf(initial));
+    return storedAs(payload, checkStory(payload));
+  });
 
-  const check = checkStory(payloadOf(values));
+  const payload = payloadOf(values);
+  const check = checkStory(payload);
   const valid = check.accepted !== null;
-  const dirty = (Object.keys(values) as (keyof StoryValues)[]).some(
-    (key) => values[key] !== initialValues[key],
-  );
+  const stored = storedAs(payload, check);
+  const dirty = STORY_VALUE_KEYS.some((key) => stored[key] !== storedInitially[key]);
 
   useEffect(() => {
     onDirtyChange?.(dirty);
