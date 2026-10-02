@@ -17,7 +17,7 @@ import {
  * database: the same lane always gets the same ports, a different lane gets
  * its own, and no lane's ports can be a developer's server or another of the
  * suite's own. When two lane names do hash alike, the global setup's proof
- * refuses the run: the API it found must write into the suite's database.
+ * refuses the run: the API it found must read the suite's database.
  */
 
 /** Every port a developer's stack binds: the APIs, the loop, govcon, the web clients, Postgres, Qdrant. */
@@ -74,45 +74,68 @@ describe('e2e lane ports', () => {
   });
 });
 
-describe('the proof that the API under test writes into the suite database', () => {
+describe('the proof that the API under test reads the suite database', () => {
   const stack = {
     apiUrl: 'http://localhost:3281/api',
     ports: e2ePortsFor('sysdesign_test_recall'),
     database: 'sysdesign_test_recall',
   };
 
-  /** An API that answers `status`, and a database that holds whatever the API saved only when `shared`. */
+  /**
+   * The suite's database, keeping the stories planted in it by id, and an API
+   * that answers `status` — reading that database when `shared`, another
+   * lane's (which holds none of them) when not. Every request the API is sent
+   * is kept, so a write can be seen.
+   */
   const world = (status: number, shared: boolean) => {
-    const saved: string[] = [];
-    const send = (async (_url: string, init?: RequestInit) => {
-      saved.push((JSON.parse(String(init?.body)) as { title: string }).title);
-      return new Response(null, { status });
-    }) as typeof fetch;
-    const reader = {
-      query: async (_sql: string, values: unknown[]) => ({
-        rowCount: shared && saved.includes(String(values[0])) ? 1 : 0,
-      }),
+    const suite = new Map<string, string>();
+    const statements: string[] = [];
+    const db = {
+      query: async (sql: string, values: unknown[]) => {
+        statements.push(sql.split(' ')[0] ?? '');
+        if (sql.startsWith('insert')) suite.set(String(values[0]), String(values[1]));
+        else suite.delete(String(values[0]));
+      },
     };
-    return { send, reader, saved };
+    const sent: { url: string; method: string; body: unknown }[] = [];
+    const send = (async (url: string, init?: RequestInit) => {
+      sent.push({ url, method: init?.method ?? 'GET', body: init?.body ?? null });
+      const title = shared ? suite.get(url.split('/').at(-1) ?? '') : undefined;
+      if (status !== 200) return new Response(null, { status });
+      if (title === undefined) return new Response(null, { status: 404 });
+      return Response.json({ data: { title } });
+    }) as typeof fetch;
+    return { db, send, sent, suite, statements };
   };
 
-  it('passes when the story the API saved is in the suite database', async () => {
-    const { send, reader, saved } = world(201, true);
-    await expect(proveApiDatabase(stack, reader, send)).resolves.toBeUndefined();
-    expect(saved).toHaveLength(1);
+  it('passes when the API answers the story planted in the suite database, then removes it', async () => {
+    const { db, send, sent, suite, statements } = world(200, true);
+    await expect(proveApiDatabase(stack, db, send)).resolves.toBeUndefined();
+    expect(sent).toEqual([
+      {
+        url: expect.stringMatching(/^http:\/\/localhost:3281\/api\/star-stories\/[\w-]+$/),
+        method: 'GET',
+        body: null,
+      },
+    ]);
+    expect(statements).toEqual(['insert', 'delete']);
+    expect(suite.size).toBe(0);
   });
 
-  it('refuses another lane’s API, naming the database and the ports to free', async () => {
-    const { send, reader } = world(201, false);
-    await expect(proveApiDatabase(stack, reader, send)).rejects.toThrow(
-      /does not write into "sysdesign_test_recall".*:3281, :4381 and :3184/s,
+  it('refuses another lane’s API, naming the database and the ports to free, having sent it only a read', async () => {
+    const { db, send, sent, suite } = world(200, false);
+    await expect(proveApiDatabase(stack, db, send)).rejects.toThrow(
+      /does not read "sysdesign_test_recall".*:3281, :4381 and :3184/s,
     );
+    expect(sent.map((request) => [request.method, request.body])).toEqual([['GET', null]]);
+    expect(suite.size).toBe(0);
   });
 
-  it('refuses an API that will not save the story', async () => {
-    const { send, reader } = world(503, true);
-    await expect(proveApiDatabase(stack, reader, send)).rejects.toThrow(
+  it('refuses an API that will not answer, and still removes the probe', async () => {
+    const { db, send, suite } = world(503, true);
+    await expect(proveApiDatabase(stack, db, send)).rejects.toThrow(
       /refused the lane proof \(503\)/,
     );
+    expect(suite.size).toBe(0);
   });
 });

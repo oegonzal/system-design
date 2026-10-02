@@ -232,8 +232,9 @@ A lane gets ports of its own, derived from its name
 runs the API on :3281, the UI on :4381 and the stub on :3184, so two checkouts
 on different lanes run side by side and never reuse each other's servers.
 Should two lane names ever derive the same ports, the global setup refuses the
-run: it saves a story through the API it found and reads it back from its own
-database before it resets anything. They build into their own outputs too (`packages/studio-api/dist/e2e`,
+run: it plants a story in its own database, asks the API it found for it, and
+removes it again before it resets anything — the API is sent that one read,
+never a write into another lane's database. They build into their own outputs too (`packages/studio-api/dist/e2e`,
 `packages/studio-ui/.next-e2e`), so a dev server running from the same
 checkout is neither reused nor rebuilt under it. Leave the dev stack running;
 the suite needs only Postgres (`pnpm stack:db`). Locally it reuses a server on

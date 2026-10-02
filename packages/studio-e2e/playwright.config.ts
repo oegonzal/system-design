@@ -38,7 +38,7 @@ const DB_NAME = suiteDatabase();
  * ports are derived from the suite's database (`stack.ts`), so
  * `reuseExistingServer` — kept locally, so a re-run skips a cold start — can
  * only reuse a server an earlier run of this suite on this lane left up. The
- * global setup proves the API it found writes into `DB_NAME` before any test
+ * global setup proves the API it found reads `DB_NAME` before any test
  * runs. The stub reads its own port from `stack.ts`, so it is handed the same
  * `DB_NAME` as the API.
  */

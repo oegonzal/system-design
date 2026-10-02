@@ -26,10 +26,11 @@ import { API_URL, E2E_PORTS, suiteDatabase } from './stack';
  * them, so an empty table is seeded via the same `pnpm db:seed` a developer
  * would run, not asserted as a failure.
  *
- * Before anything is reset, the API under test proves it writes into this
- * database (`proveApiDatabase`): Playwright starts the servers before this
- * runs and reuses whatever already answers on the suite's ports, so a server
- * another lane left there is refused here rather than tested against.
+ * Before anything is reset, the API under test proves it reads this database
+ * (`proveApiDatabase`): Playwright starts the servers before this runs and
+ * reuses whatever already answers on the suite's ports, so a server another
+ * lane left there is refused here rather than tested against — sent one read,
+ * never a write into its lane's database.
  *
  * Grades live in the quality loop, not here: the suite's stub keeps its runs
  * in memory and starts empty with every run of the suite.

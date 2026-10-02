@@ -13,8 +13,8 @@ import { e2ePortsFor } from './lane-ports';
  * own database. Nor do two lanes share servers: the ports are derived from the
  * suite's database (`lane-ports.ts`), so a checkout on `sysdesign_test_<lane>`
  * runs beside one on `sysdesign_test`. Should two lane names ever hash to the
- * same ports, the global setup proves the API it found writes into this
- * suite's database and refuses the run when it does not. Running the suite
+ * same ports, the global setup proves the API it found reads this suite's
+ * database and refuses the run when it does not. Running the suite
  * therefore needs no dev server stopped, only Postgres up.
  */
 
