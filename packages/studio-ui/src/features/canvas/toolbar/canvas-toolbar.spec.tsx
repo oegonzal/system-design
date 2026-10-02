@@ -7,10 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeGraph } from '../../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
+import { DRAFT_SAVE_STATUSES } from '../draft-status';
 import { CanvasToolbar, type CanvasToolbarProps } from './canvas-toolbar';
 
 function renderToolbar(store: CanvasStore, props: Partial<CanvasToolbarProps> = {}) {
-  renderWithTheme(
+  return renderWithTheme(
     <CanvasStoreProvider store={store}>
       <CanvasToolbar
         onSubmit={vi.fn()}
@@ -77,6 +78,33 @@ describe('CanvasToolbar', () => {
     await user.click(button('canvas-fit'));
 
     expect(store.getState().fitRequest).toBe(before + 1);
+  });
+
+  it('keeps the draft badge’s place at one width through every status — every label laid out unseen, and only the current one said', () => {
+    const labels = ['unsaved draft', 'saving draft…', 'draft saved', 'draft not saved'];
+    for (const draftStatus of DRAFT_SAVE_STATUSES) {
+      const view = renderToolbar(createCanvasStore(makeGraph()), {
+        draftStatus,
+        revisionStatus: 'complete',
+        revisionNumber: 1,
+      });
+
+      const slot = screen.getByTestId('draft-slot');
+      // The widths: generated content on hidden badges, so no label is in the text or the accessibility tree twice.
+      const widths = [...slot.querySelectorAll<HTMLElement>('[data-label]')];
+      expect(widths.map((width) => width.dataset['label'])).toEqual(labels);
+      expect(widths.every((width) => width.getAttribute('aria-hidden') === 'true')).toBe(true);
+      expect(widths.every((width) => getComputedStyle(width).visibility === 'hidden')).toBe(true);
+      expect(widths.map((width) => width.textContent)).toEqual(['', '', '', '']);
+
+      const badge = screen.queryByTestId('draft-status');
+      if (draftStatus === 'clean') expect(badge).toBeNull();
+      else expect(labels).toContain(badge?.textContent);
+      // The slot comes last, so its unused room is never a hole in the row.
+      expect(slot.parentElement?.lastElementChild).toBe(slot);
+      expect(slot.parentElement?.textContent).toContain('rev #1');
+      view.unmount();
+    }
   });
 
   it('[UX-16] a read-only canvas leaves nothing to submit, clear or undo', () => {

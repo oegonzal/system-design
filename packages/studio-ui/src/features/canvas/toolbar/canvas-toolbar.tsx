@@ -1,5 +1,6 @@
 'use client';
 
+import styled from '@emotion/styled';
 import { PROMPT_COPY, type QualityRunStatus } from '@sysdesign/contracts';
 import { Badge, type BadgeTone, Button, Toolbar } from '@sysdesign/design-system';
 
@@ -38,6 +39,42 @@ const DRAFT_BADGE: Record<DraftSaveStatus, { tone: BadgeTone; label: string } | 
   failed: { tone: 'critical', label: 'draft not saved' },
 };
 
+/** Every label the draft badge can show: its slot is as wide as the widest of them, whatever it says. */
+const DRAFT_LABELS = Object.values(DRAFT_BADGE).flatMap((badge) => (badge ? [badge.label] : []));
+
+/** The badges, kept together: they wrap under the buttons as one group or not at all. */
+const Status = styled.div`
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[3]}px;
+`;
+
+/**
+ * The draft badge's place. Every label it can show is laid out in the same
+ * cell, unseen, so the slot keeps one width through every status — the row
+ * never rewraps, and the canvas under it never jumps, because an edit turned
+ * `draft saved` into `unsaved draft`.
+ */
+const DraftSlot = styled.span`
+  display: inline-grid;
+  justify-items: start;
+  align-items: center;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+`;
+
+/** One label's width, without its words: the text is generated content, so nothing reads or finds it. */
+const LabelWidth = styled(Badge)`
+  visibility: hidden;
+
+  &::after {
+    content: attr(data-label);
+  }
+`;
+
 /**
  * The canvas instrument panel. Submit is the page's one solid button; Clear
  * confirms through `window.confirm` — the design system has no Dialog
@@ -45,7 +82,9 @@ const DRAFT_BADGE: Record<DraftSaveStatus, { tone: BadgeTone; label: string } | 
  * is one undo step like every other edit. Fit view asks the canvas to frame
  * the diagram the same way a load does. The coach has its own dock tab, so
  * no Improve button lives here. The draft badge reports the autosave;
- * without one the canvas's own dirty flag stands in.
+ * without one the canvas's own dirty flag stands in. The badges come last —
+ * the session's latest revision, then the draft in its fixed slot — so the
+ * toolbar's layout is the same in every draft status.
  */
 export function CanvasToolbar({
   onSubmit,
@@ -126,16 +165,23 @@ export function CanvasToolbar({
       >
         {exporting ? 'Exporting…' : 'Export'}
       </Button>
-      {draftBadge !== null ? (
-        <Badge tone={draftBadge.tone} data-testid="draft-status" data-status={draftStatus}>
-          {draftBadge.label}
-        </Badge>
-      ) : null}
-      {revisionStatus && revisionNumber !== null ? (
-        <Badge tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}>
-          {`rev #${revisionNumber} · ${GRADE_STATUS_LABEL[revisionStatus]}`}
-        </Badge>
-      ) : null}
+      <Status>
+        {revisionStatus && revisionNumber !== null ? (
+          <Badge tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}>
+            {`rev #${revisionNumber} · ${GRADE_STATUS_LABEL[revisionStatus]}`}
+          </Badge>
+        ) : null}
+        <DraftSlot data-testid="draft-slot">
+          {DRAFT_LABELS.map((label) => (
+            <LabelWidth key={label} aria-hidden data-label={label} />
+          ))}
+          {draftBadge !== null ? (
+            <Badge tone={draftBadge.tone} data-testid="draft-status" data-status={draftStatus}>
+              {draftBadge.label}
+            </Badge>
+          ) : null}
+        </DraftSlot>
+      </Status>
     </Toolbar>
   );
 }
