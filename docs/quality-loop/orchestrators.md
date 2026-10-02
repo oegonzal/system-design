@@ -3,7 +3,7 @@
 A single quality run answers one question: is this artifact any good? An orchestrator answers questions that need several quality runs — _does this answer get better if it remembers what earlier quality runs learned_, _which
 judge does this brief belong to_, _would I get this score again_, _do the judges even agree_.
 
-This page covers what each of the four is for, how its steps actually work, and what a real recorded orchestration run looks like. Every trace below is a real row from the local database, not an invention.
+This page covers what each of the four is for, how its steps actually work, and what a real recorded orchestration run looks like. Every trace below is a real row from the local database, not an invention. Section 2 is the exception: it shows how the studio's grading, coach and prompt generation — plain quality runs, not orchestrations — turn into iterations and revisions, and its traces are real dumps under `static/runs/`, not database rows.
 
 ## 1. What an orchestrator is
 
@@ -314,7 +314,442 @@ The scope boundary in one line: **an orchestration record answers "what did this
 do", and a quality run's own record answers "what did that pipeline find".** Neither nests inside
 the other; the step's `runIds` is the join.
 
-## 2. The reasons, and who writes them
+## 2. How the studio's grading, coach and prompt generation use runs, iterations and revisions
+
+None of the studio's three flows is itself an orchestration. A Submit and a prompt generation each
+start exactly one **quality run** of one pipeline. A coach start opens two: the coach's own quality
+run and, unless the recall is skipped, a `memory-recall` quality run that names the coach run as
+its parent. Of the studio's own rows, only a revision (`design_revision`) points at a (quality run,
+iteration) pair. A generated prompt has no run or iteration pointer: its `prompt_generation` row is
+keyed by the run id and points at the claimed prompt, and the prompt is a copy of the best
+iteration's draft. Everything below the quality run in section 1's ladder still holds. What
+the studio adds is one more word, **revision**, and most of the confusion comes from reading a
+revision as an iteration, or an iteration as a revision.
+
+The coach also reads from and writes to the lesson store. The recall picks lessons for its producer
+before iteration 1. After the coach quality run completes, the first studio read of it — a poll —
+hands it to `POST /orchestrations/memory/from-run`, whose memory orchestration opens an
+`experience-digest` quality run over it and stores what it taught (section 4). If nobody polls,
+nothing is digested.
+
+### Three questions, answered first
+
+- **Does each coach iteration feed the next?** Only while it wins. Each coach iteration's producer
+  revises the **best** design so far, with the **best** iteration's fixes, and the best is not
+  always the iteration just before. The chain moves forward only while each iteration beats the
+  best. An iteration that does not is discarded, design and fixes alike, and the next one gets the
+  same briefing again — byte-identical in 22-30-00 below — plus, if the loser was blocked by a
+  validator, that validator's notes as refusals. The producer works from the original
+  submission only while it is still the best. The judges grade every iteration from scratch: they
+  never see an earlier grade or what the producer was asked to fix.
+- **Is the coach applying the fixes?** Yes. Its producer is handed every remediation the best
+  iteration selected, each with its rationale, and told to "Return the WHOLE artifact again with
+  every remediation applied". Nothing checks them one by one; the only verdict is the next grade.
+  In 18-01-11, iteration 2 was handed the grade's 15 fixes. Its grade moved c7 to pass and c4 and
+  c9 from fail to partial, left the other five targeted criteria where they were, and the score
+  rose from 55.6 to 57.8.
+- **What does "Below the accept threshold — N fixes to make." mean on a coach revision?** N counts
+  the open problems that **that revision's own grade** found: its criteria that settled fail or
+  partial, its confirmed findings marked `fixable_local` or `requires_retry`, and one per validator
+  that reported problems. A finding
+  reconciled to one of those criteria is counted twice, once on each side. It is not a count of
+  fixes the coach skipped: after 18-01-11's revision, the 17 were 9 findings, all with new keys, and
+  the 8 criteria still short. Only the count reaches the UI.
+
+### The vocabulary
+
+| Term                              | What it is                                                                                                                                                                                                                                                       | Where it lives                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| **quality run**                   | One pipeline on one goal: a grade, a coach, or a prompt generation.                                                                                                                                                                                              | A row in `quality_run`, and `static/runs/<runId>/`.                               |
+| **iteration**                     | One produce, judge, decide cycle inside a quality run. `maxIterations` counts iteration 1 too.                                                                                                                                                                   | `trace.iterations[k - 1]`, and `04-iterations/0k/` in the dump.                   |
+| **mode**                          | How an iteration got its artifact. See the next table.                                                                                                                                                                                                           | `iteration.mode`                                                                  |
+| **artifact**                      | What one iteration judged: a canvas (graph, brief, narrative) or a prompt draft.                                                                                                                                                                                 | `iteration.artifact`                                                              |
+| **decision**                      | The controller's verdict on one iteration — accept, revise, retry, escalate or reject — with its overall score and the gate or route that settled it. Deterministic: no model decides.                                                                           | `iteration.decision`                                                              |
+| **remediation**, the UI's **fix** | One thing the producer could act on, selected from that iteration's evidence, with a prose note. "N fixes" is a count of these.                                                                                                                                  | `decision.selectedRemediations`; with notes, `remediations.json`                  |
+| **best iteration**                | The iteration with the strictly highest overall score so far. A tie keeps the earlier one.                                                                                                                                                                       | `trace.bestIteration`                                                             |
+| **revision**                      | A studio row: one version of the design in the session timeline, pointing at the one (quality run, iteration) that grades it. Origin `user` — a Submit, or the draft a coach starts from — or `assistant`, badged **AI**: a coach iteration the studio imported. | `design_revision`, by `qualityRunId` and `qualityIteration`                       |
+| **coaching run**                  | The studio's row for one coach start: its quality run, its base revision, its budget.                                                                                                                                                                            | `coaching_run`                                                                    |
+| **recall**                        | Lessons from earlier quality runs, picked once before a coach's iteration 1 by a child `memory-recall` quality run, and given to every producer call in it. Never to the lenses. A grade never recalls; the coach section says when a coach does not.            | the quality run's `recall`; the producer's "Lessons from earlier runs (advisory)" |
+
+| Mode       | Iteration | Producer called?                                             | What gets judged                                                                                               |
+| ---------- | --------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `provided` | 1         | no                                                           | the caller's artifact, exactly as handed in — a Submit, or a coach's draft                                     |
+| `adopted`  | 1         | no, and no lens runs either                                  | nothing: a recorded iteration of an earlier quality run is copied verbatim, decision and remediations included |
+| `initial`  | 1         | yes, from the goal                                           | the producer's first artifact — prompt generation                                                              |
+| `revise`   | 2 and on  | yes, from the best artifact so far and its remediations      | the rewrite, from scratch                                                                                      |
+| `retry`    | 2 and on  | yes, from the goal, with the best's remediations as pitfalls | the new attempt, from scratch                                                                                  |
+
+There is no `fresh` mode; "a fresh attempt" is how the code describes `retry`. After iteration 1,
+an iteration's mode is the previous iteration's decision when that decision was revise or retry.
+The canvas pipeline's controller never decides retry, so every coach iteration after the base is a
+`revise`.
+
+Three rules hold in every flow below:
+
+- **The judges start from scratch each iteration.** Critics see the goal, the whole rubric, the
+  current artifact, its locations and its validation results. Evaluators see the goal, only the
+  criteria of their own kinds, the artifact, its locations, and the findings the critics confirmed
+  in the same iteration: both studio pipelines declare their evaluators `consumes: ['findings']`,
+  so they run as a second wave after the critics. Only critics see validation results. Neither ever
+  sees an earlier iteration, a score, or what the producer was asked to fix.
+- **The rubric is fixed before the quality run starts, except in prompt generation.** A grade or a
+  coach is handed the prompt's rubric verbatim and never derives one. That rubric is built once per
+  prompt: from the draft for a generated prompt, which is never re-derived; for an authored or
+  imported prompt through `POST /criteria` when it is created (`ensureCriteria` only fills a rubric
+  that is still empty), and it can be re-derived or replaced by rewriting the markdown until a
+  session cites it. Only design-prompt derives its rubric inside the run.
+- **The producer never sees a score.** It sees the goal, every criterion's id, kind and statement —
+  never which ones passed — any recalled lessons, and on a revise the best artifact with that
+  iteration's remediation notes.
+
+### Grading: Submit is one judgement
+
+```text
+  Submit
+     |
+     v
+  quality run    system-design-canvas · goal = the prompt's markdown · criteria = its rubric
+     |           output = the canvas · maxIterations 1 · no recall
+     v
+  iteration 1    provided — no producer call; the lenses judge the canvas as handed in
+     |           -> a decision, an overall score and N remediations, stored on the iteration
+     v
+  stops          max-iterations when decided revise; accepted, rejected or escalated otherwise.
+     |           the UI shows no stop reason for a grade: a grade finishing is not news
+     |
+     v
+  revision #n    origin user, pointing at (this quality run, iteration 1); the saved draft clears
+```
+
+With an artifact supplied and a budget of one, the quality run can never call its producer, so
+nothing applies the remediations it selects. The author does not see them either, only their count
+N. The notes are producer input, and they reach a producer only if a coach later adopts this
+iteration — remediations and all — as its iteration 1. Otherwise the author works from the Feedback
+tab's failing criteria and findings, which overlap the list but are not it.
+
+The revision row stores a pointer and a cache of status, overall and decision. Its Feedback tab is
+read live from that iteration. "Grade again" starts a fresh one-iteration quality run and repoints
+the same revision. It is allowed when the grade failed or is unscored as `unassessed`
+(`regradable`), never for a grade unscored as `no-artifact`, and always for a revision with no
+grade at all: the grader no longer has its run, or it was stored before grading moved to the loop.
+
+#### What "Below the accept threshold — N fixes to make." means
+
+The UI words it from what settled the decision; it never reads the controller's sentence. It picks
+this wording when the deciding step is the route (factor `route`), the decision is revise, and at
+least one remediation was selected. The route decides only when no gate did: no blocking validator,
+enough criteria assessed, nothing blocking, and an overall below `acceptAt` (75) but not below
+`rejectBelow` (30). In the canvas pipeline it also covers the route's retry turned revise ("N
+remediation(s), all requiring a fresh attempt — applied as a revision"). When something else
+settles the decision, a canvas row reads differently:
+
+| What settled it                                 | The row reads                                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| a blocker a revision can fix (`policy-allowed`) | "Blocked by … — to fix before it can be accepted."                                                   |
+| an `unfixable` blocker                          | "Blocked by … — no revision can fix that, so it is rejected."                                        |
+| a `requires_user` blocker                       | "Blocked by … — it needs a person’s judgement."                                                      |
+| a blocking validator                            | "Failed N structural checks — to fix before it can be accepted."                                     |
+| an overall below 30                             | "Below the reject floor of 30 — far enough off to need reworking, not touching up."                  |
+| the route, with no remediation selected         | "Below the accept threshold, with no fix the lenses could point to — it needs a person’s judgement." |
+
+N is the length of **that iteration's own** remediation list. Everything below is included, worst
+first, with no cap and no deduplication:
+
+| Source              | Selected when                                         | The note the producer reads                |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| a confirmed finding | its fixability is `fixable_local` or `requires_retry` | the first critic rationale given for it    |
+| a criterion         | it settled `fail` (high) or `partial` (medium)        | `<statement>: <first evaluator rationale>` |
+| a validator         | it reported problems, warn gate included              | its problem messages                       |
+
+Findings marked `requires_user` or `unfixable`, and criteria that passed, never become fixes.
+
+So N is what the judges still found in **this** artifact. It is not a count of fixes the coach
+applied, and after a coach revision it is mostly new critique of that revision. It also overcounts
+distinct problems. A finding is reconciled to the first criterion it names that settled fail or
+partial; it is charged once in the score, but listed twice here, once as the finding and once as
+the criterion. The studio API receives the whole list from the loop, notes included, but its own
+DTO reduces it to a count, so the UI shows only N. The nearest thing to the list is the Feedback
+tab's failing criteria and findings.
+
+### Coach: one quality run, a base, and at most `maxIterations` − 1 revisions
+
+```text
+  Improve
+     |   unedited revision, grade complete and scored  -> adopt its (quality run, iteration)
+     |   edited canvas, or nothing graded to adopt      -> store the draft as revision #n, user
+     v
+  quality run    system-design-canvas · the same goal and rubric as the grade
+     |           maxIterations = the request's, default 3, at most 10 · recall on
+     v
+  recall         a memory-recall quality run, the coach run its parent, unless skipped (below);
+     |           its lessons go into every producer call below
+     v
+  iteration 1    the base — adopted (copied verbatim, not judged again)
+     |                   or provided (the draft, judged now: this is its grade)
+     v
+  iteration k    revise — the producer rewrites the BEST artifact so far,
+     |           applying the BEST iteration's remediations; the lenses judge it from scratch
+     |           beats every earlier score?   yes -> imported as an AI revision; the new best
+     |                                        no  -> not-better; nothing stored; best unchanged
+     |           (an iteration with no score is no-artifact or unassessed, never not-better)
+     v
+  stops          accepted · rejected · escalated · plateau · max-iterations
+     v
+  digest         on the first studio poll that sees it complete, the memory orchestrator
+                 (section 4) opens an experience-digest quality run over it
+```
+
+**Iteration 1 is the base, never a coach revision.** Adopting copies the graded iteration's
+artifact, ledger, decision and remediations, and no lens runs; the base's own grade is untouched.
+From a draft, the draft is stored as a new user revision first, and iteration 1 is its grade. An
+unedited revision whose grade was unassessed is refused: there is no score to improve on.
+
+**The recall can be skipped.** No recall run opens when embeddings are disabled, the embedding call
+fails, the store is unavailable, empty or returns no hits, `memory-recall` is not registered, or no
+recall is bound to the runs service, nor for a run that can never call its producer — a budget of
+
+1. When the base was adopted, the recall is focused on the defects the base
+   iteration's grade found.
+
+**What iteration k's producer is given**, for k of 2 or more, in this order:
+
+1. the goal — the prompt's markdown — and the rubric's criteria;
+2. the recalled lessons, the same in every iteration of the quality run;
+3. under "Your previous artifact", the **best** artifact so far, which is not necessarily
+   iteration k − 1's;
+4. under "Remediations to apply", **every** remediation note of that best iteration;
+5. only when iteration k − 1 was blocked by a validator and did not become best, that iteration's
+   validator notes, as refusals;
+6. the instruction "Return the WHOLE artifact again with every remediation applied and everything
+   that was not criticised preserved."
+
+It sees every criterion, passed or not, but never which ones passed. It never sees a score, a
+finding marked `requires_user` or `unfixable`, or what a losing iteration's judges said, refusals
+apart.
+
+**Do fixes accumulate from one iteration to the next?** Only while each revision wins, as the
+answers at the top of this section say. If iteration 2 beats the base, iteration 3 revises
+iteration 2's canvas against iteration 2's remediations. If it does not, iteration 2's canvas and
+remediations are dropped from the briefing, and iteration 3 gets exactly what iteration 2 got: the
+base and the base's remediations, plus iteration 2's validator notes as refusals if a validator
+blocked it. Each grade's remediations are a new list, not the old one with
+items crossed off.
+
+**Lessons are a record, not feedback.** The loop re-derives the lessons — `resolved`, `persisted`,
+`improved`, `regressed` — into the live trace after every iteration, not only at the end. None of
+them is fed back to the producer.
+
+**When it stops.** Accept, reject and escalate end the quality run whatever budget is left, and
+escalate includes a producer that returned nothing to judge. Otherwise it stops on a plateau
+(`plateauAfter` 2: two iterations in a row that did not beat the best) or when the budget runs out.
+The budget counts the base, so the default of 3 allows at most two revisions, and a base that
+neither of them beats ends as `plateau` when the last one is decided revise (an escalate or reject
+on it ends the run as `escalated` or `rejected` instead).
+
+**Which iterations become AI revisions.** On every poll the studio walks the iterations in order:
+
+| Outcome                     | When                                                                                                                                                                       | Stored                                                                                                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`                      | iteration 1                                                                                                                                                                | it is the base revision                                                                                                                                                       |
+| `imported`                  | scored above every earlier scored iteration, and the artifact passes the studio's checks                                                                                   | an `assistant` revision at (quality run, k); blocks already placed keep the base's or an earlier import's position, only new blocks are placed, and no model position is used |
+| `not-better`                | scored, but not above the best so far                                                                                                                                      | nothing                                                                                                                                                                       |
+| `unassessed`, `no-artifact` | too few criteria assessed, or nothing produced. A canvas a validator blocked is `unassessed` too: no lens judged it, yet the loop decides revise and goes on with refusals | nothing                                                                                                                                                                       |
+| `refused`                   | it would be imported, but the artifact is not a valid submission                                                                                                           | nothing; the problems are listed                                                                                                                                              |
+
+The loop crowns its best by the same strict rule, so the AI revisions are normally exactly the
+canvases the next iteration revised. The one exception is a `refused` iteration: it still raises
+the studio's bar and is still the loop's best, so the next revision builds on a design the timeline
+never showed. Revision numbers are not iteration numbers: each new revision is the session's
+highest number plus one. A coach started from revision #4, when #4 is the session's newest, that
+imports iterations 2 and 3 creates #5 and #6.
+
+**Across coach quality runs.** Load an AI revision, leave it unedited, and start the coach again:
+the new quality run adopts that revision's iteration, so coach quality runs chain. "Restore as
+draft" turns the revision's content into an editable draft instead, so the next coach start or
+Submit creates a new user revision and grades that content again. The canvas stays editable while a
+coach runs; those edits are saved as the draft and never reach the running coach.
+
+### Prompt generation: one quality run of at most two iterations
+
+```text
+  Generate a prompt (from an experience)
+     |
+     v
+  quality run    design-prompt · goal = the experience rendered as markdown
+     |           maxIterations 2 · no criteria, no output, no recall
+     v
+  derive         once: up to 12 criteria of kinds fidelity, gradeability, scope
+     v
+  iteration 1    initial — the producer drafts from the goal and those criteria
+     |           accept, reject or escalate -> stops here
+     v
+  iteration 2    revise — iteration 1's draft and all of its remediations
+     |           or retry — start again from the goal, those remediations shown as pitfalls
+     v
+  claim          the BEST iteration's draft, whatever its decision, becomes a Prompt:
+                 markdown rendered from the draft · rubric = one criterion per draft row
+```
+
+The studio asks for two iterations, and two is also the pipeline's own budget. "Writes, is
+criticised, and rewrites once" is the best case: there is a second iteration only when the first
+is decided revise or retry. This pipeline uses the STANDARD controller, so unlike the coach it can
+retry. A plateau can never stop it, because at two iterations at most one can stall.
+
+Iteration 2 revises iteration 1's draft — iteration 1 is necessarily the best at that point —
+against all of iteration 1's remediations, and is judged against the same derived criteria. The
+studio then claims `trace.bestIteration`, which is iteration 2 only if it scored strictly higher.
+It does not check the decision.
+
+Two different rubrics are involved:
+
+- the **design-prompt rubric** (fidelity, gradeability, scope) judges the draft, and stays with
+  that quality run;
+- the **canvas rubric** stored on the Prompt is built from the draft's own rows: one criterion per
+  functional requirement, non-functional row, scale row and constraint, `c1…cN`, at most 24. Every
+  later grade and coach on the prompt is judged against it.
+
+The author never sees the iterations, scores or decisions. The UI says "Writing a prompt from your
+experience…" and then opens the prompt.
+
+Two recorded quality runs show both outcomes. In `2026-10-01T01-35-58-485-f41f79-quality`,
+iteration 1 scored 70 and was held by blocker c12, so it was revised with its 12 remediations — 6
+findings and 6 criteria; two `requires_user` findings were left out. Iteration 2 scored 75, cleared
+the blocker, and was accepted. In `2026-09-30T02-47-07-680-d435e0-quality` the rewrite went the
+other way: 79.3 held by blocker c10, then 70, so the draft the studio claims is iteration 1's,
+which was never accepted.
+
+### A worked example: one grade and four coach quality runs
+
+One session, as recorded under `static/runs/` on 2026-10-02. Ids are shown without their
+`2026-10-02T` prefix and `-quality` suffix, and each block is one quality run.
+
+```text
+quality run          kind   # mode      score decision  fixes
+17-52-51-261-14477b  grade  1 provided  55.6  revise    15 fixes   no producer call
+    adopted as iteration 1 by 18-01-11
+18-01-11-209-88e8c4  coach  1 adopted   55.6  revise    15 fixes
+                            2 revise    57.8  revise    17 fixes   new best
+                            3 revise     0    escalate             no artifact: 3 attempts hit the old 300 s cap
+    its iteration 2 adopted as iteration 1 by 18-58-32, 21-53-19 and 22-30-00
+18-58-32-016-060007  coach  1 adopted   57.8  revise    17 fixes
+                            2 revise     0    escalate             no artifact: 3 schema misses
+21-53-19-213-9c5d54  coach  the same: 57.8, then no artifact after 3 schema misses
+22-30-00-513-ec64a6  coach  1 adopted   57.8  revise    17 fixes
+                            2 revise    55.6  revise    17 fixes   not better, dropped
+                            3 revise    64.4  revise    13 fixes   new best; 2 critical findings block it
+```
+
+The studio's database was not read for this. Which iterations it imported as AI revisions follows
+from the rule above applied to these scores: 18-01-11's iteration 2 and 22-30-00's iteration 3.
+
+**The grade selected 15 fixes and applied none.** They are 7 findings and 8 criteria that settled
+fail or partial, and each of the 7 findings was reconciled to one of those 8 criteria — 5 to c2 or
+c3, which settled partial, and 2 to c4, which failed — so each finding also stands beside its
+criterion in the list. The dump holds no producer exchange.
+
+**18-01-11's iteration 2 applied them.** Its producer was handed the graded canvas, exactly those
+15 notes, and 6 recalled lessons. It doubled the design — 5 to 10 nodes, 4 to 15 edges, 3 to 9 brief
+bindings — and kept every id the author had used. Against the 15, the next grade shows:
+
+| Targeted   | Next grade                                                                                                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------- |
+| 8 criteria | c7 now passes; c4 and c9 went from fail to partial; the other 5 did not move                                    |
+| 7 findings | all 7 keys read `resolved`; by type, 6 of the 7 recur among iteration 2's 9 findings — all but `bad_assumption` |
+
+Whether each finding was fixed, partly fixed or not is a reading of the rationales; the record
+does not say. The score rose from 55.6 to 57.8, and one criterion nobody targeted fell (c1, pass to
+partial). Judging the new canvas from scratch, the critics confirmed 9 findings, all with new keys,
+and 8 of them were against mechanisms the coach had added: the replica, the queue, the aggregator,
+the monitoring. Those 9 and the 8 criteria still short are the **17** in "Below the accept
+threshold — 17 fixes to make." That is critique of the revision, not a backlog it skipped. Iteration 3 then revised
+iteration 2, the best, against those 17, but all three attempts were cut off at about 302 seconds,
+so there was nothing to judge, the decision was escalate, and the quality run stopped. That
+recording predates a change: it ran at commit 2924192, with the producer's `maxTokens` at 28,000, a
+fixed 300 s cap on every call, and three attempts. The cap has since been replaced. A call's limit
+now derives from its declared `maxTokens` — 32,000 at 25 tokens/s plus 30 s, about 1,310 s — and
+a timeout gets two attempts.
+
+**The next two coach quality runs never had a revision judged.** Both adopted 18-01-11's
+iteration 2. In each, the producer made three attempts with identical prompts, and every reply was
+refused as a schema miss, mostly for strings over the schema's length limits. Each escalated at
+iteration 2.
+
+**22-30-00 shows the best, not the latest, being revised.** Iteration 2 scored 55.6, below the
+adopted 57.8, so its canvas and its 17 remediations were dropped. Iteration 3's briefing is
+byte-identical to iteration 2's — the same adopted canvas, the same 17 notes, the same lessons — so
+it is a second, independent attempt at the same revision. It scored 64.4 and became best. Against
+the base, c1 went from partial to pass and no other criterion moved. Its grade confirmed five
+findings, two of them critical. None carried over: all five are new keys, judged from scratch, and
+none matches a finding of the adopted base or of iteration 2. The two critical ones made the
+policy-allowed gate settle the decision rather than the route, so the row reads "Blocked by …"
+rather than "N fixes". The quality run then stopped on max-iterations, and its 13 remediations
+were never applied.
+
+### Known gaps
+
+Found while tracing these flows. Each is in the code, and the recorded quality run that shows it is
+named where there is one.
+
+- **"N fixes" overcounts, and is never listed.** Remediations are not deduplicated against
+  reconciliation, so a finding charged to a criterion appears beside that criterion, and warn-gate
+  validator problems and every partial criterion count too. The studio API receives the whole list
+  from the loop, notes included, but its own DTO reduces it to a count, so only the count reaches
+  the UI: the author cannot see which fixes the number means, and nothing shows what the coach
+  changed.
+- **A losing revision's critique is dropped from the next briefing.** The next iteration gets the
+  best's briefing again, byte-identical in 22-30-00. With the default budget, a lost iteration 2
+  makes iteration 3 a second try at the same revision. The critique itself stays in the trace and
+  the dump, and the memory digest reads it; a blocked loser's validator notes still reach the
+  producer, as refusals.
+- **"Your previous artifact" is the best one.** The heading reads as the previous iteration's, but
+  after a revision that did not win it is older, and may be the author's own canvas.
+- **Lessons compare neighbours, by exact key.** `resolved` and `persisted` compare each iteration
+  with the one just before it, not with the best it revised: 22-30-00 records iteration 3's lessons
+  as "2→3" for a revision of iteration 1. A finding's key is its type plus the exact sorted set of
+  locations it cites. Positional refs to the author's blocks survive appended blocks, so a finding
+  that cites the same set again reads `persisted`; one whose cited set changed reads `resolved`,
+  whether or not the defect went away. All 7 of 18-01-11's base findings read `resolved`, yet 6 of
+  their 7 types recur among iteration 2's 9 findings: contradiction, scale_mismatch,
+  topology_defect, unhandled_failure, data_integrity and operability_gap.
+- **One empty producer ends the coach.** No artifact makes the artifact gate escalate, which is
+  terminal, so any budget left is never used. Attempts within one producer call send byte-identical
+  prompts, and a schema miss's reason is not fed back: 18-58-32 and 21-53-19 each made three
+  identical attempts and stopped at iteration 2. Two of 21-53-19's three attempts reported 40,173
+  and 37,449 output tokens, and 22-30-00's successful iteration-3 producer call reported 37,276, all
+  against a declared `maxTokens` of 32,000. The definition's comment says a coached canvas has
+  taken up to 26.0k output tokens.
+- **Best is the overall score alone.** A blocked iteration can stay best over a later, lower-scoring
+  one that was accepted, and prompt generation claims the best draft without checking its decision.
+  `2026-09-30T02-47-07-680-d435e0-quality` claims an unaccepted draft, while the design-prompt
+  definition's comment says the draft is rendered "once the loop accepts it".
+- **Mode and prior can come from different iterations.** The next mode is the last iteration's
+  decision, but the prior artifact and remediations are the best's. With at least three iterations
+  under a controller that can decide retry, an iteration decided retry that is not the best — a
+  validator block, say — makes the next one a retry with no prior, though the best could have been
+  revised. The studio's flows cannot meet it: the coach's REVISE_ONLY never retries, and in prompt
+  generation iteration 2's mode comes from iteration 1, which is necessarily the best. The `[QL-25]`
+  spec's tiny pipeline meets it with three iterations: the comment at `run-pipeline.spec.ts:251-252`
+  says iteration 3 "revises the best", while line 253 asserts mode `retry`.
+- **A refused import is still the loop's best.** An iteration the studio will not store still
+  raises its bar and is still what the loop revises next. Separately, the coach panel says every
+  revision "that beats the last" lands in the timeline; the rule is beating every earlier scored
+  iteration.
+- **The budget counts the base.** The default of 3 is at most two revisions, while the contract
+  comment at `sessions.ts:202-203` says the loop "revises up to `maxIterations` times". The dropdown
+  offers 1, which can never revise, and a coach can be started from a base already accepted,
+  rejected or escalated, which stops at iteration 1.
+- **A manifest's `overall` is the last iteration's.** 18-01-11's manifest says 0 while its best
+  scored 57.8. Read `bestIteration` instead.
+- **A criterion's fix note may quote the wrong sample.** The note takes the first evaluator
+  sample's rationale for that criterion, whatever result that sample gave, so with two samples it
+  can quote one that said pass. The recorded quality runs show it: in 6 of 259 fail or partial
+  criterion fixes across the non-adopted canvas iterations, the quoted first sample had said pass.
+  In `2026-10-02T02-23-28-712-73afe7-quality` iteration 1, c1 settled partial, and its note quotes
+  sample 1's pass rationale ("binding.1's path … ends at n-4 with a real INSERT …") while sample 2
+  said partial. The spec's `criterion c1: it is there` does not show it: the tiny pipeline's
+  evaluator takes one sample, and that sample said partial.
+
+## 3. The reasons, and who writes them
 
 Seven reasons belong to the runner and are available to every orchestrator. Only four of them are
 ever chosen _by_ the runner.
@@ -332,7 +767,7 @@ ever chosen _by_ the runner.
 Each orchestrator then declares its own, and may not redeclare one of the runner's. Those are listed
 with each orchestrator below.
 
-## 3. `memory` — give a quality run the lessons of earlier runs
+## 4. `memory` — give a quality run the lessons of earlier runs
 
 **Use it when** you want a quality run both to benefit from and to contribute to the lesson store. The two
 directions are independent: a recall that gets refused still leaves a target quality run that digests and stores, and a target that scores badly still digests.
@@ -419,7 +854,7 @@ Across the sixteen memory orchestration runs recorded under the current code:
 Fourteen of sixteen went end to end. The recall funnel is stable: always 16 candidates, at most 8
 kept, and between 0 and 7 usable.
 
-## 4. `router` — let the registry pick the judge
+## 5. `router` — let the registry pick the judge
 
 **Use it when** you have a brief and do not want to decide which judge grades it.
 
@@ -584,7 +1019,7 @@ of a routing decision a human needs to audit.
 If you want the decision without the judging quality run, `POST /router/report` does the classification and stops.
 Same routes, same classifier, no child quality run, no cost beyond the one call.
 
-## 5. `calibration` — would I get this number again?
+## 6. `calibration` — would I get this number again?
 
 **Use it when** you are about to trust a single quality run's score. It runs the same brief through the same
 pipeline N times and reports the spread. Everything varies: the producer writes a different artifact
@@ -631,7 +1066,7 @@ because the dimension that wobbles carries only a fifth of the weight. That is t
 compare findings at key level at all — the samples hold no artifact in common, so a shared key would
 mean nothing.
 
-## 6. `second-opinion` — do the judges agree?
+## 7. `second-opinion` — do the judges agree?
 
 **Use it when** an artifact already exists and the question is about the judges rather than the
 writer. One artifact is held fixed and judged again by fresh panels. The producer never runs, so the
@@ -679,7 +1114,7 @@ and not others**, and `seenBy [0]` means only the original recorded quality run 
 That is the useful result: the score is reproducible while the reasoning behind it is not especially.
 Judges converge on the grade and diverge on the details. You would never see this from one quality run, and calibration cannot show it either.
 
-## 7. Choosing between the two panels
+## 8. Choosing between the two panels
 
 They look alike and answer different questions. The difference is one declared word in the reconcile
 step.
@@ -699,7 +1134,7 @@ contested findings, and every second opinion reports between 20 and 37 of them.
 Run calibration first to learn whether the number is stable. If it is not, run a second opinion on
 one artifact to learn whether the instability is the writer or the judges.
 
-## 8. When things go wrong
+## 9. When things go wrong
 
 The record is designed so that a half-hour orchestration never goes silent. Three shapes to
 recognise:
@@ -727,7 +1162,7 @@ is left exactly as it was. A stale row is only reclaimed when no child quality r
 the step's output. The reason vocabulary is closed on purpose: a step cannot invent an explanation
 that no reader of the record will understand.
 
-## 9. Running them
+## 10. Running them
 
 ```bash
 # the service; it refuses to boot without a Claude Code subscription login
