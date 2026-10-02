@@ -1,7 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { HTMLAttributes } from 'react';
+import type { DetailsHTMLAttributes } from 'react';
 
 const Fold = styled.details`
   font-size: ${({ theme }) => theme.font.size.sm};
@@ -23,7 +23,7 @@ const Line = styled.p`
   overflow-wrap: anywhere;
 `;
 
-export interface FailureDetailProps extends HTMLAttributes<HTMLDetailsElement> {
+export interface FailureDetailProps extends DetailsHTMLAttributes<HTMLDetailsElement> {
   /** The run's own word on what went wrong, verbatim — written for whoever operates the grader. */
   detail: string;
 }
