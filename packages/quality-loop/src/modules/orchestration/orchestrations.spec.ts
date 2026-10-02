@@ -250,9 +250,6 @@ describe('the memory orchestration over the three pipelines', () => {
     expect((await fetch(`${url}/orchestrations/${crypto.randomUUID()}`)).status).toBe(404);
   });
 
-  // Starting a composed-goal pipeline as a target is refused: recall would
-  // rewrite a goal another program composed. Digesting a FINISHED one is a
-  // different question — the target stands in, nothing runs it — and it is how
   it('[QL-16] a digest that derived no rubric is reported as never judged — `no-rubric` — not as a digest that fell short', async () => {
     // The live failure this rule exists for: the deriver missed the schema on
     // every attempt, the digest ran with no criteria, its controller escalated
@@ -288,6 +285,9 @@ describe('the memory orchestration over the three pipelines', () => {
     }
   });
 
+  // Starting a composed-goal pipeline as a target is refused: recall would
+  // rewrite a goal another program composed. Digesting a FINISHED one is a
+  // different question — the target stands in, nothing runs it — and it is how
   // the studio's own runs reach the store. The digest child of the run above is
   // itself a composed-goal run, so it proves the path without a studio.
   it('[QL-17] a finished composed-goal run can be digested, though it could never be started as a target', async () => {
