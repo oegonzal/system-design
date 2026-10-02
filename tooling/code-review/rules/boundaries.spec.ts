@@ -34,7 +34,7 @@ describe('the dependency matrix', () => {
     ['govcon-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['loop-client', ['contracts']],
     ['studio-testing', ['contracts', 'loop-client']],
-    ['studio-api', ['contracts', 'db', 'nest-kit', 'studio-testing']],
+    ['studio-api', ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing']],
     ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit']],
     ['govcon', ['contracts', 'db', 'nest-kit']],
     [

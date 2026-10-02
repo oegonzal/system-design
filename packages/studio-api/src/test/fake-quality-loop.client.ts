@@ -1,4 +1,3 @@
-import { BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
@@ -13,23 +12,22 @@ import type {
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import {
-  DerivationFailed,
   FakeLoop,
-  LoopRefused,
-  LoopUnreachable,
+  FakeLoopClient,
   type FakeIteration,
   type RunScenario,
 } from '@sysdesign/studio-testing';
 
+import { answer } from '../modules/quality-loop/loop-exceptions';
 import { QualityLoopClient } from '../modules/quality-loop/quality-loop.client';
 
 /**
  * The quality loop as the studio's specs see it: `@sysdesign/studio-testing`'s
  * fake loop behind the client port. Runs start `running` and finish when the
  * spec says so, rubrics come from the goal's headings, and every request is
- * kept so a spec can assert what the studio asked for. This adapter owns only
- * the mapping of the fake's typed errors onto the exceptions the real HTTP
- * client would raise.
+ * kept so a spec can assert what the studio asked for. The fake's errors are
+ * the shared client's own, mapped here by the same table production uses, so
+ * a spec sees exactly the exceptions the real HTTP client would raise.
  */
 export class FakeQualityLoopClient extends QualityLoopClient {
   readonly core = new FakeLoop({
@@ -62,6 +60,8 @@ export class FakeQualityLoopClient extends QualityLoopClient {
       },
     ],
   });
+
+  private readonly inner = new FakeLoopClient(this.core);
 
   get runs(): Map<string, QualityRunDto> {
     return this.core.runs;
@@ -128,31 +128,31 @@ export class FakeQualityLoopClient extends QualityLoopClient {
   }
 
   health(): Promise<QualityLoopHealthDto> {
-    return this.answer(() => this.core.health());
+    return answer(() => this.inner.health());
   }
 
   deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto> {
-    return this.answer(() => this.core.deriveCriteria(request));
+    return answer(() => this.inner.deriveCriteria(request));
   }
 
   startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto> {
-    return this.answer(() => this.core.startRun(request));
+    return answer(() => this.inner.startRun(request));
   }
 
   getRun(runId: string): Promise<QualityRunDto | null> {
-    return this.answer(() => this.core.getRun(runId));
+    return answer(() => this.inner.getRun(runId));
   }
 
   listPrompts(): Promise<PromptLibraryEntryDto[]> {
-    return this.answer(() => this.core.listPrompts());
+    return answer(() => this.inner.listPrompts());
   }
 
   getPrompt(id: string): Promise<PromptLibraryDocumentDto | null> {
-    return this.answer(() => this.core.getPrompt(id));
+    return answer(() => this.inner.getPrompt(id));
   }
 
   digestRun(runId: string): Promise<OrchestrationRunStartedDto> {
-    return this.answer(() => this.core.digestRun(runId));
+    return answer(() => this.inner.startOrchestrationFromRun('memory', { runId }));
   }
 
   /** Run ids the studio asked to have digested, in order. */
@@ -190,28 +190,5 @@ export class FakeQualityLoopClient extends QualityLoopClient {
   /** The loop no longer has the run: a read of it is the real client's null. */
   forget(runId: string): void {
     this.core.forget(runId);
-  }
-
-  /** The fake's typed errors as the real client's exceptions; anything else is the spec's own. */
-  private answer<T>(call: () => T): Promise<T> {
-    try {
-      return Promise.resolve(call());
-    } catch (error) {
-      // A grader nobody can reach is unavailable, as the HTTP client reports it.
-      if (error instanceof LoopUnreachable) {
-        throw new ServiceUnavailableException(error.message);
-      }
-      if (error instanceof DerivationFailed) {
-        throw new ServiceUnavailableException({
-          message: error.message,
-          llm: error.llm,
-          diagnostic: error.diagnostic,
-        });
-      }
-      if (error instanceof LoopRefused) {
-        throw new BadGatewayException(`the quality loop refused: ${error.status} ${error.message}`);
-      }
-      throw error;
-    }
   }
 }
