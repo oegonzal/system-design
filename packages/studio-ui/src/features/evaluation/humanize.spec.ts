@@ -1,3 +1,4 @@
+import { tokenWords } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { humanizeToken } from './humanize';
@@ -15,5 +16,11 @@ describe('humanizeToken', () => {
     expect(humanizeToken('some_future-type')).toBe('Some future type');
     expect(humanizeToken('evaluator.quality_v2')).toBe('Evaluator quality v2');
     expect(humanizeToken('')).toBe('');
+  });
+
+  it('is the contract’s separator grammar, capitalised — the one a lens’s prose is worded by', () => {
+    for (const token of ['data_integrity', 'max-iterations', 'critic.scale', 'a__b']) {
+      expect(humanizeToken(token).toLowerCase()).toBe(tokenWords(token));
+    }
   });
 });
