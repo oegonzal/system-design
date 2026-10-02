@@ -161,19 +161,33 @@ describe('substituteLocationRefs', () => {
   });
 
   // "Orders DB (n-5 · database · Orders DB) models no such sub-entities".
-  it('[EVAL-2] gives the short label where the sentence names the part beside the ref, and on every later mention', () => {
+  it('[EVAL-2] gives the short label wherever the sentence already says the part’s name, and on every later mention', () => {
     expect(substituteLocationRefs('Orders DB (node.5) models no such sub-entities', refs)).toBe(
       'Orders DB (n-5) models no such sub-entities',
     );
     expect(substituteLocationRefs('node.5 — Orders DB — holds no shard key', refs)).toBe(
       'n-5 — Orders DB — holds no shard key',
     );
-    // Named elsewhere in the sentence is not beside it: the full label stands.
-    expect(substituteLocationRefs('the client polls node.1 for seats', refs)).toBe(
-      'the client polls n-1 · client · Client for seats',
+    // The name said anywhere in the sentence, not only beside the ref: a rule over the words.
+    expect(substituteLocationRefs('the Orders DB at node.5 has no shard key', refs)).toBe(
+      'the Orders DB at n-5 has no shard key',
     );
+    expect(substituteLocationRefs('node.5 (the Orders DB) has no shard key', refs)).toBe(
+      'n-5 (the Orders DB) has no shard key',
+    );
+    expect(substituteLocationRefs('The Orders DB primary (node.5) is unsharded', refs)).toBe(
+      'The Orders DB primary (n-5) is unsharded',
+    );
+    expect(substituteLocationRefs('the client polls node.1 for seats', refs)).toBe(
+      'the client polls n-1 for seats',
+    );
+    // Said by no word of the sentence: the full label stands, once.
     expect(substituteLocationRefs('no shard config in node.5; node.5 is unsharded', refs)).toBe(
       'no shard config in n-5 · database · Orders DB; n-5 is unsharded',
+    );
+    // A part with no name of its own is introduced in full, whatever the sentence says.
+    expect(substituteLocationRefs('the c1 binding (binding.1) is wrong', refs)).toBe(
+      'the c1 binding (c1 binding (n-5)) is wrong',
     );
   });
 

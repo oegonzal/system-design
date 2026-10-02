@@ -1,6 +1,6 @@
 import type { DesignSubmission } from './canvas.schema';
 import { nodeLabel } from './node-label';
-import { joinMention, refIdsIn, replaceRefs, writtenBeside } from './prose-refs';
+import { joinMention, proseSays, refIdsIn, replaceRefs } from './prose-refs';
 
 /**
  * Every addressable part of a submission, numbered by position — the one
@@ -147,24 +147,23 @@ export const shortLocationLabel = (location: Pick<LocatedRef, 'part' | 'key' | '
  * A lens's prose with every place it cites — in either case, runs and lists
  * included — replaced by that place's label, so the author reads "Orders DB"
  * where the model wrote a position. A place gets its full label the first
- * time the prose reaches it and its short one after that, and its short one
- * from the start where the prose names the part right beside the ref —
- * "Orders DB (node.5)" reads "Orders DB (n-5)", never the name twice. A ref
- * `locations` does not hold is left as written.
+ * time the prose reaches it and its short one after that — and its short one
+ * from the start when the prose already says the part's name anywhere:
+ * "Orders DB (node.5)" reads "Orders DB (n-5)", "the Orders DB at node.5"
+ * reads "the Orders DB at n-5", never the name twice. A ref `locations` does
+ * not hold is left as written.
  */
 export function substituteLocationRefs(prose: string, locations: readonly LocatedRef[]): string {
   const byRef = new Map(locations.map((location) => [location.ref, location]));
   const introduced = new Set<string>();
-  return replaceRefs(prose, [...byRef.keys()], (mention) => {
-    const end = mention.index + mention.text.length;
-    return joinMention(mention, (ref) => {
+  return replaceRefs(prose, [...byRef.keys()], (mention) =>
+    joinMention(mention, (ref) => {
       const location = byRef.get(ref);
       if (location === undefined) return ref;
       const said =
-        introduced.has(ref) ||
-        (location.name !== undefined && writtenBeside(prose, mention.index, end, location.name));
+        introduced.has(ref) || (location.name !== undefined && proseSays(prose, location.name));
       introduced.add(ref);
       return said ? shortLocationLabel(location) : location.label;
-    });
-  });
+    }),
+  );
 }

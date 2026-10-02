@@ -6,8 +6,8 @@ import {
   refMentions,
   substituteRefs,
   substituteTokens,
+  proseSays,
   tokenWords,
-  writtenBeside,
 } from './prose-refs';
 
 const ids = [
@@ -101,16 +101,16 @@ describe('substituteTokens', () => {
   });
 });
 
-describe('writtenBeside', () => {
-  it('finds the words just before or just after a span, through punctuation only', () => {
-    const prose = 'Orders DB (node.5) and node.1 — the Client';
-    const span = (text: string): [number, number] => {
-      const start = prose.indexOf(text);
-      return [start, start + text.length];
-    };
-    expect(writtenBeside(prose, ...span('node.5'), 'orders db')).toBe(true);
-    expect(writtenBeside(prose, ...span('node.1'), 'Orders DB')).toBe(false);
-    expect(writtenBeside(prose, ...span('node.1'), 'the Client')).toBe(true);
-    expect(writtenBeside(prose, ...span('node.5'), '  ')).toBe(false);
+describe('proseSays', () => {
+  it('finds a name anywhere in the prose, as whole words in either case, through any punctuation', () => {
+    expect(proseSays('the Orders DB at node.5', 'Orders DB')).toBe(true);
+    expect(proseSays('node.5 (the orders db)', 'Orders DB')).toBe(true);
+    expect(proseSays('The Orders DB primary (node.5)', 'Orders DB')).toBe(true);
+    expect(proseSays('the Orders-DB, sharded', 'Orders DB')).toBe(true);
+    // Part of a word is not the word; the words out of order are not the name.
+    expect(proseSays('the Reorders DB', 'Orders DB')).toBe(false);
+    expect(proseSays('the DB of orders', 'Orders DB')).toBe(false);
+    expect(proseSays('node.1 — the Client', 'Orders DB')).toBe(false);
+    expect(proseSays('anything', '  ')).toBe(false);
   });
 });

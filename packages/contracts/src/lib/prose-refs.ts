@@ -155,23 +155,23 @@ export function substituteRefs(prose: string, glossary: ReadonlyMap<string, stri
   );
 }
 
-/** What may stand between a ref and the words beside it: spaces, brackets, quotes, a dash, a colon, a comma. */
-const BESIDE = '[\\s()\\[\\]"\u201c\u201d\u2018\u2019\'`\u2014\u2013:,-]*';
+/** The words of a text, folded: letters and digits, split on everything else. */
+const wordsOf = (text: string): string[] => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 
 /**
- * Whether `words` are written directly beside the span `[start, end)` of
- * `prose` — just before it or just after it, as whole words in either case,
- * with nothing between but punctuation: "Orders DB (node.5)", "node.5 —
- * Orders DB". How a reader tells that a sentence has already said what the
- * ref at that span is.
+ * Whether `prose` says `name` anywhere — as whole words in order, in either
+ * case, whatever punctuation stands between or around them: "the Orders DB
+ * at node.5", "node.5 (the Orders DB)" and "The Orders DB primary (node.5)"
+ * all say "Orders DB". How a reader tells that a sentence has already said
+ * what a part is, wherever in the sentence it said it. A rule over the words,
+ * never over where the ref sits: a name is said once, and the sentence has
+ * said it.
  */
-export function writtenBeside(prose: string, start: number, end: number, words: string): boolean {
-  const literal = escapeRegExp(words.trim());
-  if (literal.length === 0) return false;
-  return (
-    new RegExp(`(?<!\\w)${literal}${BESIDE}$`, 'i').test(prose.slice(0, start)) ||
-    new RegExp(`^${BESIDE}${literal}(?!\\w)`, 'i').test(prose.slice(end))
-  );
+export function proseSays(prose: string, name: string): boolean {
+  const said = wordsOf(name);
+  if (said.length === 0) return false;
+  const words = wordsOf(prose);
+  return words.some((_, index) => said.every((word, offset) => words[index + offset] === word));
 }
 
 /** `data_integrity` → `data integrity`: a wire token as the words it is made of, for the middle of a sentence. */
