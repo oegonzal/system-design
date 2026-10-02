@@ -131,16 +131,25 @@ class PriorityQueue<T> implements PriorityQueueInterface<T> {
     }
 
     async peek() {
-        if ( this.queue.length > 0 ) {
-            return new Promise(
-                (resolve: (value:T) => void) => resolve( this.queue[this.queue.length - 1].payload )
-            );
-        } else {
-            await this.waiters[this.waiters.length - 1];
-            return this.queue[this.queue.length - 1].payload;
 
-            // return await this.firstItem;
+        while( this.queue.length === 0 ) {
+            const deferred = new Deferred<void>();
+            this.waiters.push( deferred );
+            await deferred.promise;
         }
+
+        return this.queue[this.queue.length - 1].payload;
+
+        // if ( this.queue.length > 0 ) {
+        //     return new Promise(
+        //         (resolve: (value:T) => void) => resolve( this.queue[this.queue.length - 1].payload )
+        //     );
+        // } else {
+        //     await this.waiters[this.waiters.length - 1];
+        //     return this.queue[this.queue.length - 1].payload;
+
+        //     // return await this.firstItem;
+        // }
     }
 
     async pop() {
@@ -151,19 +160,19 @@ class PriorityQueue<T> implements PriorityQueueInterface<T> {
             await deferred.promise;
         }
 
-        if ( this.queue.length > 0 ) {
-            const item = this.queue.pop();
-            return new Promise(
-                (resolve: (value:T) => void) => resolve( item!.payload )
-            );
-        } else {
-            
-            
-            await this.waiters[this.waiters.length - 1];
-            return this.queue.pop()!.payload;
+        const item = this.queue.pop();
+        return item!.payload;
 
-            // return await this.firstItem;
-        }
+        // if ( this.queue.length > 0 ) {
+        //     const item = this.queue.pop();
+        //     return new Promise(
+        //         (resolve: (value:T) => void) => resolve( item!.payload )
+        //     );
+        // } else {
+        //     await this.waiters[this.waiters.length - 1];
+        //     return this.queue.pop()!.payload;
+        //     // return await this.firstItem;
+        // }
     }
 }
 

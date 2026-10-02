@@ -1,0 +1,419 @@
+# `packages/quality-loop`, folder by folder
+
+A reference for finding your way around the package: what each folder is for, what the files inside
+it are called, and what they export.
+
+The package is one generic quality-control loop — a producer makes an artifact, critics look for
+defects, evaluators judge it against criteria, and a deterministic controller decides what happens
+next. A pipeline is **data**: vocabularies, markdown personas, a decision policy, and one output
+shape. When a model judges, it answers only in enumerated categories and ordinals — never a score —
+so every number and the final decision belong to the policy. Every run writes a Postgres row and a
+dump folder.
+
+It is an Nx application, so there is no `package.json` and no barrel file to read. Its public surface
+is the HTTP API on port 3003, two CLI commands, and the dump layout. `src/main.ts` picks one of three
+modes from the first argument — `run`, `replay`, or anything else meaning serve — and `src/boot.ts`
+refuses to start without a model login before Nest loads.
+
+## The shape of a run
+
+```text
+  goal markdown        a prompt file, or a goal composed by pipelines/<id>/input.ts
+        |
+        v
+  derive-criteria      core/stages/derive-criteria.ts        criteria c1..cN, ids assigned here
+        |
+        v
+  producer             core/stages/llm-producer.ts           the artifact
+        |              (or supplied, or adopted from an earlier run - no model call)
+        v
+  validators           core/stages/schema-validator.ts       always runs first
+        |              + pipelines/<id>/validators.ts        a blocking failure skips every lens
+        v
+  critics              core/stages/llm-critic.ts             findings: type, severity, confidence
+  evaluators           core/stages/llm-evaluator.ts          pass | partial | fail | not_applicable
+        |              A lens declaring consumes: [] runs in the first wave from the artifact
+        |              alone. A non-empty consumes puts it in a later wave, shown only what
+        |              the normaliser confirmed.
+        v
+  normalize            core/evidence/normalize.ts            the ledger: ids, enums and counts
+        |              admits, keys structurally, confirms by agreement across samples
+        v
+  controller           core/controllers/                     accept | revise | retry |
+        |              scores first, then gates in a fixed order    escalate | reject
+        |
+        +-- revise --> back to the producer with the remediations, up to maxIterations
+        |
+        v
+  the run closes       a Postgres row   modules/runs/persistence/
+                       a dump folder    dump/ written to static/runs/<runId>/
+```
+
+## `src/` at a glance
+
+| Folder           | What it is                                                                      |
+| ---------------- | ------------------------------------------------------------------------------- |
+| `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
+| `pipelines/`     | The six pipelines, one folder each, plus the registry.                          |
+| `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
+| `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
+| `cli/`           | The two command-line entry points, `run` and `replay`.                          |
+| `dump/`          | The layout of a run's dump folder, built purely in memory.                      |
+| `types/`         | One ambient declaration so a persona can be imported as `*.md?raw`.             |
+| `boot.ts`        | `commandOf` picks the mode; `preflight` refuses to start without a model login. |
+| `main.ts`        | Dispatches to the CLI or boots the HTTP app on `QUALITY_LOOP_PORT` (3003).      |
+
+## `core/` — the engine
+
+Everything here is pure. The clock arrives as an injected `now`, the model as a port. This is not a
+convention: `tooling/quality-loop-guarantees.spec.ts` walks every non-spec file under `core/` and
+fails the build on `Date.now`, `Math.random`, `node:fs` or `process.env`, on a number appearing in
+the judging schemas under `core/stages/`, and on the normaliser or a controller touching prose.
+
+### The four loose files
+
+| File            | What it does                                                            | Exports                                                                                                                                                   |
+| --------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pipeline.ts`   | Defines what a pipeline is, and fails boot on a malformed one.          | `PipelineDefinition`, `LensSpec`, `EvaluatorSpec`, `ProducerSpec`, `StageSpec`, `validatePipeline`, `describePipeline`                                    |
+| `policy.ts`     | Refuses a malformed decision policy before it can grade anything.       | `STANDARD_SCORING`, `validatePolicy`                                                                                                                      |
+| `ports.ts`      | The interfaces the loop runs over — stages, stores, the run repository. | `Producer`, `Critic`, `Evaluator`, `CriteriaDeriver`, `Validator`, `Controller`, `Stages`, `TraceStore`, `ExchangeSink`, `RunRepository`, `emptyUpstream` |
+| `arithmetic.ts` | The three numeric idioms, so a replayed decision compares byte-equal.   | `sum`, `round1`, `round4`                                                                                                                                 |
+
+`PipelineDefinition<T>` is the interface everything else is written against: `id`, `version`,
+`description`, `goalSource`, `task` (criterion kinds, finding types, the output shape), then
+`deriveCriteria`, `producer`, `validators`, `critics`, `evaluators`, `controller` and `policy`.
+Nothing outside a pipeline folder may import a concrete pipeline — the registry hands out
+`PipelineDefinition<unknown>`.
+
+`validatePipeline` runs at boot and again at every run: lens ids unique and not reserved, every
+criterion kind judged by exactly one evaluator, no lens consuming evidence no earlier wave produces,
+a valid controller projection, and the output schema convertible to JSON Schema. `Controller.decide`
+is synchronous by contract, which is how "the controller never awaits a model" is held by the type
+rather than by review.
+
+### `core/contracts/` — the vocabulary of a task
+
+| File              | What it does                                                           | Exports                                                                                        |
+| ----------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `task.ts`         | The pipeline's code half: parse, address and render an artifact.       | `OutputShape`, `TaskSpec`, `TaskContract`, `GOAL_MAX_BYTES`, `goalBytes`                       |
+| `output-shape.ts` | The layout habits every output shape shares.                           | `numbered`, `section`, `numberedSection`                                                       |
+| `goal-index.ts`   | Reads a codec's bookkeeping from the last fenced JSON block of a goal. | `readFencedIndex`, `FENCE_OPEN`, `FENCE_CLOSE`                                                 |
+| `validation.ts`   | The shape of an exact, blocking check a pipeline brings.               | `indexedValidator`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
+| `run-record.ts`   | One run as the service holds it, and as the wire sees it.              | `RunRecord`, `toRunDto`, `summariseExchange`                                                   |
+
+A validator reads the fenced index, never prose, and reports nothing on a malformed artifact — the
+schema validator owns that report.
+
+### `core/controllers/` — the deterministic decider
+
+| File                 | What it does                                                 | Exports                                                                                                                           |
+| -------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `context.ts`         | Prices the ledger once into the context every gate reads.    | `buildContext`, `GateContext`, `Scored`                                                                                           |
+| `compose.ts`         | Turns ordered gates plus one route into a controller.        | `composeController`, `Gate`, `Route`, `Verdict`, `Settled`, `ControllerParts`, `projectStep`, `SCORES_FACTOR`                     |
+| `gates.ts`           | The six standard gates and the standard route.               | `artifact`, `validators`, `evidence`, `policyAllowed`, `acceptThreshold`, `rejectFloor`, `byRemediations`, `settleByRemediations` |
+| `dimension-floor.ts` | Keeps an artifact in the loop when one dimension is failing. | `dimensionFloor`, `DIMENSION_FLOOR_FACTOR`                                                                                        |
+| `index.ts`           | The named strategies, and the registry `replay` compares.    | `STANDARD`, `DIMENSION_FLOOR`, `CONTROLLERS`                                                                                      |
+
+A gate observes the context and gives a verdict; it never edits it. `composeController` validates at
+module load, so a malformed composition fails at boot.
+
+### `core/evidence/` — reports become a ledger
+
+| File           | What it does                                                             | Exports                                                                                            |
+| -------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `ordering.ts`  | Stable orderings and the conservative median.                            | `medianLevel`, `compareFindings`, `compareStrings`, `severityRank`, `unique`, the four rank tables |
+| `identity.ts`  | Decides what counts as the same defect — structurally, never by wording. | `findingKey`, `sameDefect`, `admitRefs`                                                            |
+| `normalize.ts` | Admits, keys, confirms by agreement, merges by median, reconciles.       | `normalize`, `NormalizeInput`                                                                      |
+| `annotate.ts`  | Attaches prose after the fact, for readers and the producer.             | `annotate`, `noteRemediations`, `unannotated`                                                      |
+| `lessons.ts`   | What the run taught across its iterations.                               | `deriveLessons`                                                                                    |
+
+`normalize.ts` is the tier boundary: a later-wave lens sees only what was confirmed, never a raw
+report. The evaluator's advisory verdict is recorded and goes no further, so flipping it cannot move
+a decision.
+
+### `core/loop/` — the iteration engine
+
+| File              | What it does                                                            | Exports                                         |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------- |
+| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat. | `runPipeline`, `runLoop`, `RunInput`, `RunDeps` |
+| `materialize.ts`  | Definition plus model client becomes concrete stages.                   | `materialize`, `materializeCriteria`            |
+| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.       | `rubricProblems`                                |
+| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.       | `scopeLlm`, `mapConcurrent`                     |
+
+A new iteration has to be strictly better to be crowned. An adopted iteration is cloned and runs no
+stage. The output shape's `normalize` is applied only to a produced artifact, never to a supplied
+one.
+
+### `core/outputs/` — reading a finished run
+
+| File             | What it does                                                         | Exports                             |
+| ---------------- | -------------------------------------------------------------------- | ----------------------------------- |
+| `run-outputs.ts` | The standard projections: best iteration, artifact, ledger, lessons. | `outputsOf`, `admits`, `RunOutputs` |
+| `reconcile.ts`   | Where several runs agreed and where they did not.                    | `reconcile`, `spread`               |
+
+Everything downstream reads a finished run through here and never re-derives "the best iteration".
+`reconcile` reports disagreement and never judges it — a threshold would be policy, and policy lives
+on a pipeline.
+
+### `core/stages/` — the only folder that talks to a model
+
+| File                  | What it does                                                  | Exports                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared.ts`           | Stage names, diagnostics, one sample per scoped client.       | `CRITERIA_STAGE`, `PRODUCER_STAGE`, `LENSES_STAGE`, `diagnostic`, `stageDiagnostic`, `skipped`, `sampleEach`                                                                                            |
+| `prompting.ts`        | The engine's half of every prompt, section by section.        | `systemPrompt`, `goalSection`, `kindsSection`, `typesSection`, `criteriaSection`, `artifactSection`, `locationsSection`, `validationSection`, `remediationsSection`, `upstreamSections`, `joinSections` |
+| `schemas.ts`          | The only zod a model sees, built per request over real ids.   | `criteriaSchema`, `findingsSchema`, `evaluationSchema`, `enumTuple`                                                                                                                                     |
+| `derive-criteria.ts`  | One structured extraction of criteria from the goal.          | `createCriteriaDeriver`                                                                                                                                                                                 |
+| `llm-producer.ts`     | The generator. Sees criteria and remediations, never a score. | `createLlmProducer`                                                                                                                                                                                     |
+| `llm-critic.ts`       | The defect-oriented lens, enum-locked.                        | `createLlmCritic`                                                                                                                                                                                       |
+| `llm-evaluator.ts`    | The criteria-oriented lens.                                   | `createLlmEvaluator`                                                                                                                                                                                    |
+| `schema-validator.ts` | The one validator every pipeline runs first.                  | `createSchemaValidator`                                                                                                                                                                                 |
+
+The goal reaches the model through `goalSection` and nowhere else. A failed completion becomes a
+diagnostic, never evidence.
+
+### `core/testing/` — shared spec builders
+
+| File          | What it does                                                    | Exports                                                                                                                                     |
+| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llm.ts`      | Fake model clients that answer by schema match.                 | `fakeLlm`, `sequencedLlm`, `gatedLlm`                                                                                                       |
+| `pipeline.ts` | The tiny pipeline, the standing proof the core assumes nothing. | `tinyPipeline`, `tinyPolicy`, `scriptedProducer`, `scriptedCritic`, `scriptedEvaluator`, `scriptedStages`, `criterion`, `finding`, `result` |
+| `trace.ts`    | Builders for ledgers, decisions, traces and run records.        | `ledger`, `decision`, `traceOf`, `runDto`, `runRecord`, `evidence`, `confirmed`                                                             |
+| `fixtures.ts` | Small shared builders.                                          | `fill`, `contractOf`, `jsonSchemaTypes`                                                                                                     |
+
+These are pure and import nothing from vitest, so they compile under the app tsconfig even though
+only specs use them.
+
+## `pipelines/` — the six pipelines
+
+### The folder layout, once
+
+Every pipeline is `src/pipelines/<id>/` and repeats the same shape.
+
+| File                 | Always | What it is                                                                       |
+| -------------------- | ------ | -------------------------------------------------------------------------------- |
+| `definition.ts`      | yes    | The exported `PipelineDefinition`. Pure data apart from its imports.             |
+| `lenses/*.md`        | yes    | One markdown persona per stage, imported `?raw`. The filename is the lens id.    |
+| `output.ts`          | yes    | The output shape: a zod schema, `locate` for positional ids, `render`.           |
+| `definition.spec.ts` | yes    | Validity, a JSON-round-trippable summary, personas long enough to be real.       |
+| `input.ts`           | 2 of 6 | A codec, when the goal is more than a prompt. Renders a typed input to markdown. |
+| `validators.ts`      | 4 of 6 | Deterministic checks, each gating `block` or `warn`. Never read prose.           |
+| `testing.ts`         | 4 of 6 | Pure sample builders shared by the folder's specs.                               |
+| `run.spec.ts`        | 4 of 6 | An end-to-end loop spec over a fake model.                                       |
+| `controller.ts`      | 1 of 6 | Only when the pipeline has a decision rule of its own.                           |
+| `from-run.ts`        | 1 of 6 | Only `experience-digest`: a finished run becomes the next pipeline's input.      |
+
+### The six
+
+**`system-design/`** — produces a structured design answer (summary, assumptions, components, flows,
+data model, tradeoffs, risks, capacity) from a markdown prompt, for a person practising. Four
+criterion kinds, seven finding types. Three critics and two evaluators, all in one wave. Dimensions:
+completeness, quality attributes, compliance, soundness. Standard controller, no validators, accept
+at 80 — the highest in the package.
+
+**`agentic-design/`** — produces a design for a workflow of agents, tools and rules. Four critics in
+wave one, three evaluators in wave two, every one of them sampled twice. Its producer deliberately
+does _not_ see the criteria. Every declared dimension earns from a criterion kind, which its spec
+asserts. The clean two-wave example.
+
+**`memory-recall/`** — produces a memory pack: a verdict on each recalled chunk, the insight each
+kept chunk lends, and the needs nothing served. Written for the next producer in a memory
+orchestration, never for a person. Uses the `DIMENSION_FLOOR` controller, the only non-standard
+library controller in use, and two blocking validators built from the goal's fenced index.
+
+**`experience-digest/`** — produces the memories a finished run is worth, each resting on cited
+evidence. Three critics, one evaluator judging both kinds. Its `from-run.ts` composes the input from
+engine facts only — confirmed findings, selected remediations, per-iteration decisions — so nothing
+is judged there.
+
+**`system-design-canvas/`** — judges or coaches the author's React-Flow graph, the brief binding each
+criterion to the parts holding it, and the narrative. This is the grade a user sees in the studio.
+The largest vocabulary, twelve finding types, five critics. Its own controller, `REVISE_ONLY`, which
+no path can make decide `retry` — a retry would replace the author's canvas with the model's.
+
+**`design-prompt/`** — produces a practice prompt from an engineer's experience: title, scenario,
+functional requirements, an NFR table, a scale table, constraints. The smallest pipeline — two
+critics, one evaluator, one sample each, the only warn-only validator. Its gated finding is
+`brand_leak`, the one defect no score can offset.
+
+### The registry
+
+`pipelines/index.ts` imports the six definitions, erases their type parameter and exports `PIPELINES`
+keyed by id. Exactly one place consumes it: `modules/runs/pipelines.module.ts`, which provides it as
+`PIPELINES_TOKEN`. Adding a pipeline is a folder, one line in `index.ts`, and one line in the ordered
+list in `index.spec.ts`. Nothing in `core/` changes.
+
+## `modules/` — the NestJS layer
+
+### `modules/app/`
+
+Boots and configures the served application. `AppModule` imports the database, janitor, runs,
+prompts, memory, router and orchestration modules. `HealthController` answers `GET /health` with the
+bound model, so reaching it proves a model is wired. `configure-app.ts` exports `configureApp` and
+`CORS_ORIGIN`, used by `main.ts` and by the HTTP specs so they boot identically. `ReplayModule` is
+the slim context for the replay command: database and pipelines only, no model, no janitor.
+
+### `modules/http/`
+
+Three helpers the controllers share, no Nest module: `orNotFound` for 404s, `goalRequestSchema` with
+`MAX_GOAL_LENGTH`, and `testing.ts`, the integration harness whose defaults force a fake model, a
+disabled embedding client and an in-memory store so a developer's `.env` can never make a suite call
+a real provider.
+
+### `modules/janitor/`
+
+One sweeper. `RunJanitor` sweeps at boot and then on an interval, failing rows whose heartbeat went
+stale. `stale-after.ts` exports `runStaleAfterMs` — the one strict env validator in the package,
+rejecting anything but a positive integer for `QUALITY_LOOP_RUN_STALE_AFTER_MS`, default ten minutes.
+Token: `RUN_JANITOR_OPTIONS`. A failed row is written `INTERRUPTED`; a late close on such a row
+overwrites it with the truth.
+
+### `modules/memory/`
+
+Owns the memory tier's adapters. Tokens: `EMBEDDING_CLIENT`, `EMBEDDING_CACHE`, `MEMORY_STORE`,
+`QUERY_PROBES`, `MEMORY_PORTS`.
+
+| File                                       | What it does                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `qdrant/qdrant-memory-store.ts`            | The vector store adapter.                                          |
+| `qdrant/collection.ts`                     | Collection naming by model, width and index generation; payloads.  |
+| `persistence/mikro-orm-embedding-cache.ts` | Caches embeddings by model and content hash.                       |
+| `query-probes/llm-query-probes.ts`         | Turns a goal into retrieval probes with one structured model call. |
+| `memory.service.ts`                        | Re-index and the retrieval report.                                 |
+
+Two routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons.
+`POST /memory/retrieval-report` shows store availability, each probe's own ranking and the fused
+candidate list, without running a pipeline. Without an OpenAI key the tier degrades to disabled
+rather than failing.
+
+### `modules/orchestration/`
+
+Runs and records orchestrations. Tokens: `ORCHESTRATOR_HOSTS`, `ORCHESTRATION_RUN_REPOSITORY`.
+`ORCHESTRATOR_HOSTS` is the only place a declaration meets its adapters. `OrchestrationService`
+admits a request, resolves the iteration budget, starts a heartbeat and drives the generic runner.
+`OrchestrationRecordModule` is the record alone, so the janitor and the memory module can import it
+without pulling in the hosts.
+
+Routes: `POST /orchestrations/:orchestrator` and `POST /orchestrations/:orchestrator/from-run` both
+answer 202; `GET /orchestrations` is a filtered page; `GET /orchestrations/:id` returns one, its
+steps put back into declaration order.
+
+### `modules/prompts/`
+
+Serves the markdown prompt library the UI picks goals from. `FilePromptLibrary` walks the prompts
+directory on every request; the id is the path without `.md`, the title the first heading. Token:
+`PROMPT_LIBRARY`. Routes: `GET /prompts` and `GET /prompts/*id`. Touches the filesystem only.
+
+### `modules/router/`
+
+The brief classifier and the no-run report. `LlmBriefClassifier` makes one structured call with its
+choices locked to the registered route ids and returns null on any failure. Tokens:
+`BRIEF_CLASSIFIER`, `ROUTER_PORTS`. Route: `POST /router/report` returns the candidate routes, the
+pipeline that would be chosen, and why — without running anything.
+
+### `modules/runs/`
+
+The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`,
+`RUN_REPOSITORY`.
+
+| File                      | What it does                                                           |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `runs.service.ts`         | Starts, runs, dumps and closes a run. Also exports `heartbeatTicker`.  |
+| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`.                      |
+| `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                          |
+| `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                    |
+| `run-request.ts`          | The request schemas, including the adopt and output rules.             |
+| `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.           |
+| `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository. |
+
+A run opens as a `running` header with a heartbeat, records each model exchange as it goes, and
+closes in a single pessimistic-write transaction that inserts every criterion, iteration, finding and
+result. So a run is either fully recorded or still running for the janitor to reclaim. Mapping is
+pure and round-trips. Reading a finished run goes through `core/outputs/`.
+
+## `orchestrators/` — compositions over pipelines
+
+An orchestrator is data: which pipelines run, in what order, what each step needs from the ones
+before it, and the closed set of reasons its steps may give. One generic runner executes any of them.
+`index.ts` exports `ORCHESTRATORS`; `common.ts` holds what more than one of them declares —
+`refuseInternal`, `bareRequest`, `runTarget`, `briefRoutes` — none of which the runner applies.
+
+### The shared machinery
+
+**`runner/`** is not an orchestrator but the engine that executes one. `definition.ts` is the data
+model (`OrchestratorStep`, `OrchestratorDefinition`, `validateOrchestrator`), `run-orchestration.ts`
+the single loop, `record.ts` and `ledger.ts` the step record that is written whole at the end. A step
+can only run a pipeline it declared, and an undeclared reason is rejected.
+
+**`panel/`** is the two step factories the two panel orchestrators share: `panelStep` runs a pipeline
+several times over, `reconcileStep` reads those runs and reports where they disagree.
+
+### The four
+
+| Orchestrator     | Steps                         | Run it when                                                                   |
+| ---------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `memory`         | recall, target, digest, store | You want a run to benefit from, and contribute to, what earlier runs learned. |
+| `router`         | classify, judge               | You have a brief and do not want to choose the pipeline yourself.             |
+| `calibration`    | panel, reconcile              | You want to measure end-to-end variance before trusting a score.              |
+| `second-opinion` | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree. |
+
+`memory/` is the largest: `recall/` builds the query, fuses the hits and injects what the recall run
+endorsed into the goal; `digest/` reads what the digest run endorsed; `store/` chunks it and indexes
+it. All four orchestrators are reachable over HTTP only — there is no CLI subcommand for them.
+
+## `cli/`, `dump/`, `types/`
+
+`cli/run.ts` reads a goal file, boots the same context the HTTP surface uses, executes one run,
+prints a JSON summary and exits by the decision. `cli/replay.ts` re-decides every recorded iteration
+of a pipeline's runs under every controller in the registry, under the pipeline's current policy, and
+calls no model — it is how two strategies get compared on recorded evidence instead of by feel.
+`cli/args.ts` is the shared flag parser.
+
+`dump/build-run-dump.ts` and `dump/render-run-markdown.ts` build the dump folder in memory; neither
+touches the disk. The layout is the contract later analysis reads: `manifest.json`, `run.md`, the
+goal, the contract, the pipeline, a numbered folder per iteration, every prompt and response under
+`05-llm/`, and the lessons. The writer is `modules/runs/dump-trace-store.ts`.
+
+`types/raw.d.ts` is one ambient declaration for `*.md?raw`, which is what lets a lens persona live as
+a markdown file beside its pipeline.
+
+## Running it
+
+```bash
+# one run from the command line; builds first, prints the dump path
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+
+# judge a supplied artifact instead of producing one
+pnpm quality-loop:run --pipeline system-design --goal prompt.md --output answer.json --iterations 1
+
+# the service on :3003, and the service plus its web client
+pnpm quality-loop:serve
+pnpm quality:start
+```
+
+```bash
+# the orchestrators are HTTP only
+curl -s -X POST localhost:3003/orchestrations/router \
+  -H 'content-type: application/json' -d '{"goal":"# Prompt ..."}'
+
+curl -s -X POST localhost:3003/orchestrations/calibration \
+  -H 'content-type: application/json' \
+  -d '{"pipeline":"agentic-design","goal":"# Prompt ...","samples":3,"maxIterations":1}'
+
+curl -s -X POST localhost:3003/orchestrations/second-opinion/from-run \
+  -H 'content-type: application/json' -d '{"runId":"<a finished run id>","samples":3}'
+```
+
+```bash
+# re-decide recorded runs under every controller; no model is called
+node packages/quality-loop/dist/main.js replay --pipeline system-design --limit 50
+```
+
+```bash
+# the package's own specs: one vitest project, files run one at a time
+pnpm exec nx test quality-loop
+pnpm exec nx run-many -t lint typecheck test build -p quality-loop
+
+# the purity and guarantee specs live in tooling/, which belongs to no Nx project,
+# so nx never reaches them and they are a separate command
+pnpm test:tooling
+```

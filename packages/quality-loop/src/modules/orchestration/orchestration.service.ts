@@ -74,6 +74,7 @@ export class OrchestrationService {
     orchestrator: string,
     request: StartOrchestrationRequest,
   ): Promise<OrchestrationRunDto> {
+    // BOOKMARK - great example for really drilling down on IoC understanding **personal note**
     const host = this.host(orchestrator);
     const normalized = this.admit(host, request);
     const record = await this.open(host, normalized, null);
