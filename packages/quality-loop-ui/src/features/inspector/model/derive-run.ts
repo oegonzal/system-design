@@ -162,15 +162,21 @@ export function deriveRun(
         });
       }
 
-      if (iteration.validation.length > 0) {
-        actions.push({
-          type: 'validation/ran',
-          key: `validation#${runId}#${n}`,
-          label: `Validators ran — ${plural(iteration.validation.length, 'report')}`,
-          scope: at(n),
-          reports: iteration.validation,
-        });
-      }
+      // Emitted even when empty. An iteration with no artifact records no
+      // validation at all, and skipping the action then left the PREVIOUS
+      // iteration's reports standing as though they were this one's — the
+      // validators table said "no report" for nothing and showed stale problems
+      // as current. An empty list is a fact about this iteration, so it is one.
+      actions.push({
+        type: 'validation/ran',
+        key: `validation#${runId}#${n}`,
+        label:
+          iteration.validation.length === 0
+            ? 'No validator ran'
+            : `Validators ran — ${plural(iteration.validation.length, 'report')}`,
+        scope: at(n),
+        reports: iteration.validation,
+      });
 
       iteration.critics.forEach((outcome, index) => {
         const cell = cellOf(outcome, 'critic', n);

@@ -22,6 +22,11 @@ const Pane = styled.pre`
   border: 1px solid ${({ theme }) => theme.color.border.subtle};
   border-radius: ${({ theme }) => theme.radius.md};
   padding: ${({ theme }) => theme.space[3]}px;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.color.border.focus};
+    outline-offset: 2px;
+  }
 `;
 
 const Line = styled.span<{ $kind: 'same' | 'added' | 'removed' }>`
@@ -68,7 +73,9 @@ export function TextDiff({ before, after, label = 'Rendered artifact' }: TextDif
           {counts.same} unchanged
         </Text>
       </Stack>
-      <Pane aria-label={label}>
+      {/* Focusable: it scrolls sideways and holds nothing focusable of its own,
+          so a keyboard-only reader could not reach the lines past the edge. */}
+      <Pane aria-label={label} tabIndex={0}>
         {lines.map((line) => (
           // A line's identity is which line it is on each side: a same line has
           // both numbers, a removal only the old one, an addition only the new.

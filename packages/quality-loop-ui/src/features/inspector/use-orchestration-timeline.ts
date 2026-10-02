@@ -73,14 +73,20 @@ export function useOrchestrationTimeline(
 
   const [children, setChildren] = useState<Record<string, QualityRunDto>>({});
   const [unread, setUnread] = useState(0);
-  const held = useRef<string | null>(null);
+  /** Which orchestration the log currently holds; compared, never assumed. */
+  const logged = useRef<string | null>(null);
+  /** The snapshot the log was opened from — everything folded in from it is reconstructed. */
+  const openedFrom = useRef<OrchestrationRunDto | null>(null);
   const reading = useRef(new Set<string>());
 
   useEffect(() => {
-    held.current = orchestrationRunId;
     reading.current = new Set();
+    /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect --
+       a different orchestration shares no children with the last one, which only
+       an effect on the identity can notice */
     setChildren({});
     setUnread(0);
+    /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
   }, [orchestrationRunId]);
 
   // Read the children that have not been read, bounded, selected one first.
@@ -89,6 +95,8 @@ export function useOrchestrationTimeline(
     const flow = dataFlow(reduceAll(emptyState(), deriveOrchestration(orchestration)), {});
     const wanted = childrenToRead(flow, selectedRunId);
     const all = flow.steps.flatMap((step) => step.runIds);
+    /* eslint-disable-next-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect --
+       how many the read bound left out is a fact about the snapshot that just arrived */
     setUnread(Math.max(0, all.length - wanted.length));
     const missing = wanted.filter((runId) => !reading.current.has(runId));
     if (missing.length === 0) return;
@@ -111,27 +119,42 @@ export function useOrchestrationTimeline(
   }, [orchestration, selectedRunId]);
 
   const [timeline, setTimeline] = useState<Timeline>(emptyTimeline);
-  const first = useRef(true);
   useEffect(() => {
     if (orchestrationRunId === null) {
       /* eslint-disable-next-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect --
          a log with no orchestration to hold is empty, which only an effect can notice */
       setTimeline(emptyTimeline());
-      first.current = true;
+      logged.current = null;
+      openedFrom.current = null;
       return;
     }
     if (orchestration === null) return;
+    // Which orchestration the LOG holds, compared every time — not a one-way
+    // "have we started" flag. Moving from one orchestration to another never
+    // passes through null (the picker replaces the query parameter), so a flag
+    // that only reset on null left the new orchestration's actions appended to
+    // the old one's: the rail kept both, the provenance count described two runs
+    // glued together, and the first new action was diffed against the previous
+    // orchestration's final state — a transition that never happened.
     const merged =
       selectedChild === null ? children : { ...children, [selectedChild.runId]: selectedChild };
     const actions = deriveOrchestration(orchestration, { children: merged });
-    const wasFirst = first.current;
-    first.current = false;
+    const opening = logged.current !== orchestration.orchestrationRunId;
+    if (opening) {
+      logged.current = orchestration.orchestrationRunId;
+      openedFrom.current = orchestration;
+    }
+    // Reconstructed means "read out of the snapshot the reader was handed". The
+    // children are read in a second request, but they belong to that same
+    // snapshot — so provenance stays reconstructed until a poll brings a new one,
+    // rather than calling a child fetched half a second later "seen arriving".
+    const fromOpeningSnapshot = openedFrom.current === orchestration;
     const observedAt = new Date().toISOString();
     /* eslint-disable-next-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect --
        folding an arriving snapshot into the log is precisely this effect's contract */
     setTimeline((current) =>
-      recordActions(wasFirst ? emptyTimeline() : current, actions, {
-        provenance: wasFirst ? 'reconstructed' : 'recorded',
+      recordActions(opening ? emptyTimeline() : current, actions, {
+        provenance: fromOpeningSnapshot ? 'reconstructed' : 'recorded',
         observedAt,
       }),
     );

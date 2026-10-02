@@ -91,6 +91,11 @@ function ContributionRow({ item }: { item: Contribution }) {
                 confirmed by {item.lenses.join(', ')}
               </Text>
             )}
+            {item.confirmedElsewhere && (
+              // Agreement is counted within one lens, so this lens did not clear
+              // the bar — another one did, and the hit count is that lens's.
+              <Badge tone="medium">another lens&apos;s agreement, not this one&apos;s</Badge>
+            )}
             {item.reconciledTo !== null && (
               <Badge tone="accent">already charged to {item.reconciledTo}</Badge>
             )}
@@ -127,6 +132,7 @@ function SampleBlock({ sample, minHits }: { sample: LensSample; minHits: number 
           {sample.sample === null ? 'the lens' : `sample ${sample.sample}`}
         </Heading>
         {sample.missing && <Badge tone="high">nothing recorded</Badge>}
+        {sample.stale && <Badge tone="medium">last reported in iteration {sample.iteration}</Badge>}
         {sample.diagnostic !== null && (
           <>
             <Badge tone={sample.diagnostic.reason === 'not-applicable' ? 'neutral' : 'critical'}>
@@ -148,11 +154,23 @@ function SampleBlock({ sample, minHits }: { sample: LensSample; minHits: number 
           could not reach the {minHits}-sample bar.
         </Text>
       )}
+      {sample.stale && (
+        <Text tone="secondary" size="sm">
+          This lens did not report in the iteration being read — an iteration with no artifact asks
+          no lens anything. What it said in iteration {sample.iteration} is not shown against this
+          iteration&apos;s ledger, because nothing in that ledger was built from it.
+        </Text>
+      )}
       {sample.items.length > 0 && (
         <Stack as="ul" gap={0} style={{ margin: 0, padding: 0 }}>
-          {sample.items.map((item) => (
+          {/* Position IS the identity of a row here: this is a model's own list,
+              and a recorded critic sample really did report two different
+              defects with the same type and the same locations, so nothing in
+              the item itself tells them apart. */}
+          {sample.items.map((item, position) => (
             <ContributionRow
-              key={item.kind === 'finding' ? item.ownKey : item.criterionId}
+              // eslint-disable-next-line @eslint-react/no-array-index-key -- see above
+              key={`${position}:${item.kind === 'finding' ? item.ownKey : item.criterionId}`}
               item={item}
             />
           ))}

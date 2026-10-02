@@ -64,7 +64,9 @@ describe('identifying an array element across two states', () => {
       for (const { path, items } of arraysIn(state)) {
         if (isOpaquePath(path)) continue;
         if (items.every(primitive)) continue;
-        const identities = items.map((item) => identityOf(item));
+        // The index is passed because a model-authored list is identified by
+        // position as well: asking without one is asking an unanswerable question.
+        const identities = items.map((item, index) => identityOf(item, index));
         // Defined: a shape the probe table knows. Unique: two elements of one
         // array can never be mistaken for each other.
         expect(identities, `at ${path.join('.')}`).not.toContain(undefined);
@@ -113,7 +115,11 @@ describe('identifying an array element across two states', () => {
     expect(before('DiscardedItem', 'ConfirmedFinding')).toBe(true);
     expect(before('DecisionStep', 'ControllerSummary')).toBe(true);
 
-    expect(identityOf({ key: 'f|x', position: 0 })).toBe('penalty:f|x#0');
+    // Keyed by the finding it priced and NOT by its rank: the rank is recomputed
+    // each iteration, so embedding it made a penalty that survived a revision
+    // read as removed and re-added.
+    expect(identityOf({ key: 'f|x', position: 0 })).toBe('penalty:f|x');
+    expect(identityOf({ key: 'f|x', position: 2 })).toBe('penalty:f|x');
     expect(identityOf({ lens: 'critic.a', key: 'f|x', reason: 'below-min-hits' })).toBe(
       'discarded:critic.a|f|x',
     );
@@ -128,5 +134,33 @@ describe('identifying an array element across two states', () => {
     expect(identityOf([1, 2])).toBeUndefined();
     expect(identityOf(null)).toBeUndefined();
     expect(identityOf('text')).toBeUndefined();
+  });
+
+  it('[QLU-7] a list a MODEL authored is identified by position too, because nothing else can', () => {
+    // Observed in a recorded run: one critic sample reported two different
+    // defects with the same type and the same locations. Two elements of one
+    // array sharing an identity is not cosmetic — the differ treats them as one
+    // element, so a change to either can be attributed to the other.
+    const first = { type: 'topology_defect', severity: 'high', locationRefs: ['edge.4', 'node.3'] };
+    const second = { ...first, severity: 'low', rationale: 'a different defect' };
+    expect(identityOf(first, 0)).not.toBe(identityOf(second, 1));
+    expect(objectHash(first, 0)).not.toBe(objectHash(second, 1));
+    // Without an index there is nothing to tell them apart, and answering
+    // anyway would be the collision this exists to prevent.
+    expect(identityOf(first)).toBeUndefined();
+
+    // An evaluator's own result is the same case; the engine's criterion shapes
+    // are not, and keep a path that points at the criterion rather than a slot.
+    expect(identityOf({ criterionId: 'c2', result: 'pass', rationale: 'because' }, 3)).toBe(
+      'criterion:c2#3',
+    );
+    expect(identityOf({ criterionId: 'c2', kind: 'scale', hits: 2 }, 3)).toBe('criterion:c2');
+    expect(identityOf({ criterionId: 'c2', kind: 'scale', weight: 1, value: 1 }, 7)).toBe(
+      'criterion:c2',
+    );
+    // A validator's problem list carries no guarantee either.
+    expect(identityOf({ severity: 'high', message: 'same text' }, 0)).toBe(
+      'problem:high|same text#0',
+    );
   });
 });

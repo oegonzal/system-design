@@ -50,6 +50,20 @@ export const makeIteration = (overrides: Partial<IterationTrace> = {}): Iteratio
             criterionIds: [],
             rationale: 'The summary promises sub-second freshness the design never shows.',
           },
+          // A SECOND finding of the same type at the same location, and a
+          // different defect. Recorded runs really do this — a critic sample on
+          // 2026-09-30 reported `topology_defect|edge.4,node.3,node.5` twice —
+          // and nothing in the contract prevents it, because this is a model's
+          // own list. It is in the fixture so the identity walk has to cope.
+          {
+            type: 'unsupported_claim',
+            severity: 'low',
+            confidence: 'low',
+            fixability: 'requires_user',
+            locationRefs: ['summary'],
+            criterionIds: [],
+            rationale: 'The summary also claims a replica the component list never mentions.',
+          },
         ],
       },
       diagnostic: null,

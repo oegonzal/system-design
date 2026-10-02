@@ -68,6 +68,25 @@ describe('the declared policy beside what it did', () => {
     expect(soundness?.penalisedBy).toEqual(['unsupported_claim']);
   });
 
+  it('[QLU-10] a score the floor produced is not printed as a subtraction', () => {
+    // The engine clamps `base - penaltyTotal` to the score range, so once the
+    // penalties exceed the base the subtraction and the score genuinely differ —
+    // and writing them as an equation states something false.
+    const trace = traceOf();
+    const floored = dimensionRows(makePipeline().policy, {
+      ...trace,
+      dimensions: trace.dimensions.map((dimension) =>
+        dimension.dimension === 'soundness'
+          ? { ...dimension, base: 100, penaltyTotal: 140, score: 0 }
+          : dimension,
+      ),
+    });
+    expect(floored.find((row) => row.dimension === 'soundness')?.floored).toBe(true);
+    // An ordinary dimension is not flagged, so the equation still reads as one.
+    expect(floored.find((row) => row.dimension === 'completeness')?.floored).toBe(false);
+    expect(dimensionRows(makePipeline().policy, traceOf()).every((row) => !row.floored)).toBe(true);
+  });
+
   it('[QLU-10] names a dimension no criterion kind can earn credit in', () => {
     // Such a dimension starts at 100 and only ever falls: it carries weight
     // without carrying information, which the engine's own rules forbid.

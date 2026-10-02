@@ -1,4 +1,13 @@
-import { Badge, Heading, Meter, Stack, Surface, Table, Text } from '@sysdesign/design-system';
+import {
+  Alert,
+  Badge,
+  Heading,
+  Meter,
+  Stack,
+  Surface,
+  Table,
+  Text,
+} from '@sysdesign/design-system';
 
 import { GATE_TONE, STEP_TONE } from '../../results/tones';
 import type { DimensionRow, GateRow, PolicyNumbers, ValidatorRow } from '../model/policy-view';
@@ -21,11 +30,31 @@ export interface PolicyPanelProps {
   validators: readonly ValidatorRow[];
   /** The overall this iteration reached, for reading against the thresholds. */
   overall: number | null;
+  /**
+   * Set when the registry's pipeline version is not the one that graded this run.
+   * The numbers below are then today's, not the ones that decided — which a
+   * reader comparing a grade to a threshold has to be told.
+   */
+  drift?: { graded: string; registry: string } | null;
 }
 
-export function PolicyPanel({ numbers, gates, dimensions, validators, overall }: PolicyPanelProps) {
+export function PolicyPanel({
+  numbers,
+  gates,
+  dimensions,
+  validators,
+  overall,
+  drift = null,
+}: PolicyPanelProps) {
   return (
     <Stack gap={5}>
+      {drift !== null && (
+        <Alert tone="warn" title="These are not the numbers that graded this run">
+          The run was graded under pipeline version {drift.graded}; the registry now serves{' '}
+          {drift.registry}. Every declared figure below is the current one, so read a threshold
+          against this grade with that in mind.
+        </Alert>
+      )}
       <Surface as="section" aria-label="The declared policy">
         <Stack gap={3}>
           <Stack direction="row" gap={3} align="baseline" wrap>
@@ -179,9 +208,14 @@ export function PolicyPanel({ numbers, gates, dimensions, validators, overall }:
                   </tbody>
                 </Table>
               )}
+              {/* Not written as an equation when it is not one: the engine clamps
+                  the result to the score range, so once the penalties exceed the
+                  base the subtraction and the score genuinely differ. */}
               <Text tone="muted" size="sm">
-                base {pct(dimension.base)} − penalties {dimension.penaltyTotal} ={' '}
-                {pct(dimension.score)}
+                base {pct(dimension.base)} − penalties {dimension.penaltyTotal}
+                {dimension.floored
+                  ? `, which is ${dimension.base === null ? '—' : dimension.base - dimension.penaltyTotal}, held at the floor of ${pct(dimension.score)}`
+                  : ` = ${pct(dimension.score)}`}
                 {dimension.clampScale !== 1
                   ? ` (scaled ×${dimension.clampScale} by the clamp)`
                   : ''}

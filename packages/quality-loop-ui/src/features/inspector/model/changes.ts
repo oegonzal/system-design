@@ -74,9 +74,9 @@ const at = (value: unknown, key: string | number): unknown =>
     ? undefined
     : (value as Record<string | number, unknown>)[key];
 
-/** An element's name in a path: its domain identity, or its index. */
+/** An element's name in a path: its identity, or its index. */
 const elementLabel = (element: unknown, index: number): string =>
-  identityOf(element) ?? String(index);
+  identityOf(element, index) ?? String(index);
 
 const element = (element: unknown, index: number): PathSegment => ({
   label: elementLabel(element, index),

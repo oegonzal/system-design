@@ -98,6 +98,12 @@ export interface DimensionRow {
   maxPerDimension: number;
   score: number | null;
   /**
+   * True when the penalties exceeded the base and the engine's score floor is
+   * what produced the score. `base - penaltyTotal` is then NOT the score, so a
+   * view must not print the subtraction as an equation.
+   */
+  floored: boolean;
+  /**
    * Whether any criterion kind lands credit here. A dimension nothing can earn
    * credit in starts at 100 and only ever falls, so it carries weight without
    * carrying information — which the engine's own rules forbid declaring.
@@ -139,6 +145,10 @@ export function dimensionRows(
       clampScale: entry?.clampScale ?? 1,
       maxPerDimension,
       score: entry?.score ?? null,
+      floored:
+        entry?.base != null &&
+        entry.score != null &&
+        entry.base - entry.penaltyTotal < entry.score - 0.05,
       earnable: earns.has(dimension),
       penalisedBy: Object.entries(policy?.findingTypes ?? {})
         .filter(([, type]) => type.dimension === dimension)

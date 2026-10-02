@@ -21,6 +21,12 @@ const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 export interface ExchangeListProps {
   invocations: readonly Invocation[];
   totals: InvocationTotals;
+  /**
+   * True when these are the run's calls rather than the calls as of one action —
+   * which is the only honest reading, since a call cannot be placed in the loop's
+   * order. Says so, so a reader scrubbing the rail is not misled.
+   */
+  wholeRun?: boolean;
   /** Which call is open, by the two fields that identify one. */
   selected?: { runId: string; ordinal: number } | null;
   onSelect?: (call: Invocation) => void;
@@ -29,14 +35,21 @@ export interface ExchangeListProps {
 export function ExchangeList({
   invocations,
   totals,
+  wholeRun = false,
   selected = null,
   onSelect,
 }: ExchangeListProps) {
   if (invocations.length === 0) {
+    // The panel still names itself: a heading that appears only when there is
+    // something to list leaves the empty state with no context at all.
     return (
-      <Text tone="muted" size="sm">
-        No model call has been recorded at this point in the run.
-      </Text>
+      <Stack gap={2}>
+        <Heading level={2}>Model calls</Heading>
+        <Text tone="muted" size="sm">
+          This run recorded no model call. A run that failed before it asked anything, or one whose
+          calls were never written, both read this way.
+        </Text>
+      </Stack>
     );
   }
   // An orchestration's log holds several runs' calls, so the run is a column
@@ -55,6 +68,13 @@ export function ExchangeList({
           {seconds(totals.totalMs)} of model time
         </Text>
       </Stack>
+      {wholeRun && (
+        <Text tone="secondary" size="sm">
+          Every call this run made, wherever you are in the rail. A call&apos;s ordinal counts
+          attempts rather than iterations, so no call can be placed in the loop&apos;s order — which
+          is why these are not filtered to the selected action.
+        </Text>
+      )}
       <Table aria-label="Model calls">
         <thead>
           <tr>

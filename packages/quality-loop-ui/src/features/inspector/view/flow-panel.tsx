@@ -160,9 +160,11 @@ function StepBlock({
                 : 'Runs stood in for this step'}
             </Heading>
             <Text tone="secondary" size="sm">
-              This step never ran — the record stamps no start — so the{' '}
-              {step.standIns.length === 1 ? 'run' : 'runs'} below were supplied rather than opened
-              here, and the steps after it read what they produced.
+              This step never ran — the record stamps no start — so{' '}
+              {step.standIns.length === 1
+                ? 'the run below was supplied'
+                : 'the runs below were supplied'}{' '}
+              rather than opened here, and the steps after it read what they produced.
             </Text>
             {step.standIns.map((child) => (
               <ChildRow

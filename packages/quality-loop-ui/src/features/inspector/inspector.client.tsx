@@ -27,7 +27,7 @@ import { inspectHref } from './model/inspect-link';
 import { lensContributions } from './model/lens-contributions';
 import { dimensionRows, gateRows, policyNumbers, validatorRows } from './model/policy-view';
 import { groupsPresent, timelineRows } from './model/select';
-import { beforeOf, entryByKey, type Timeline } from './model/timeline';
+import { beforeOf, entryByKey, latestState, type Timeline } from './model/timeline';
 import { OrchestrationPicker } from './orchestration-picker';
 import { RunPicker } from './run-picker';
 import { useInspectTarget } from './use-inspect-target';
@@ -80,12 +80,10 @@ export function InspectorClient() {
   const error = watchingOrchestration ? orchSide.error : runSide.error;
   const isPolling = watchingOrchestration ? orchSide.isPolling : runSide.isPolling;
   const unreachable = watchingOrchestration ? orchSide.unreachable : runSide.unreachable;
-  const run = watchingOrchestration ? orchSide.selectedChild : runSide.run;
-  const pipeline =
-    run === null ? null : (pipelines.data?.find((entry) => entry.id === run.pipeline) ?? null);
 
   const [shown, setShown] = useState<ReadonlySet<ActionGroup>>(ALL_GROUPS);
   const [ignoreTimings, setIgnoreTimings] = useState(false);
+  const [picker, setPicker] = useState(watchingOrchestration ? 'orchestrations' : 'runs');
 
   // The transcript: which model call is open, and which of its files is being
   // read. Both are local rather than in the URL — a prompt is something a reader
@@ -149,8 +147,33 @@ export function InspectorClient() {
     readonly { id: string; label: string; content: ReactNode }[] | undefined => {
     const state = selected?.row.entry.after ?? null;
     if (state === null) return undefined;
-    const invocations = invocationsOf(state.exchanges);
+    // Every other panel reads the state the selected action produced. The model
+    // calls cannot: an exchange's ordinal counts attempts, so no call can be
+    // placed in the loop's order and "the calls as of this action" would mean
+    // nothing. They are read from the whole log instead — which is also what
+    // makes a prompt reachable from anywhere in the rail rather than only from
+    // the tail where the call actions land.
+    const invocations = invocationsOf(latestState(timeline).exchanges);
     const flow = dataFlow(state, orchSide.children);
+    // The pipeline that graded the run whose decision is ON SCREEN — read from
+    // the state the selected action produced, not from whichever child the URL
+    // happens to name. An orchestration's log nests several runs, and resolving
+    // from the followed child left every declared number blank whenever no child
+    // was named, while showing that child's policy beside another run's decision
+    // when one was.
+    const pipeline =
+      state.run === null
+        ? null
+        : (pipelines.data?.find((entry) => entry.id === state.run?.pipeline) ?? null);
+    // (14) The registry serves the pipeline as it is NOW. A run graded under an
+    // earlier version was graded by different numbers, and the panel says so
+    // rather than presenting today's policy as the one that decided.
+    const policyDrift =
+      pipeline !== null &&
+      state.contract.pipelineVersion !== null &&
+      pipeline.version !== state.contract.pipelineVersion
+        ? { graded: state.contract.pipelineVersion, registry: pipeline.version }
+        : null;
     return [
       ...(state.orchestration === null
         ? []
@@ -184,6 +207,7 @@ export function InspectorClient() {
             dimensions={dimensionRows(pipeline?.policy ?? null, state.decision?.trace ?? null)}
             validators={validatorRows(pipeline, state.validation)}
             overall={state.decision?.scores.overall ?? null}
+            drift={policyDrift}
           />
         ),
       },
@@ -207,6 +231,7 @@ export function InspectorClient() {
             <ExchangeList
               invocations={invocations}
               totals={invocationTotals(invocations)}
+              wholeRun
               selected={
                 openCall === null
                   ? null
@@ -219,7 +244,15 @@ export function InspectorClient() {
               files={
                 openCall === null
                   ? []
-                  : filesForCall(dump.data ?? [], openCall.scope, openCall.attempts[0].ordinal)
+                  : filesForCall(
+                      dump.data ?? [],
+                      openCall.scope,
+                      // Every attempt, not the first: the dump keys its files by
+                      // each attempt's own ordinal, so asking for the first
+                      // ordinal of a retried call answers for the attempt that
+                      // failed and hides the reply that was used.
+                      openCall.attempts.map((attempt) => attempt.ordinal),
+                    )
               }
               open={dumpFile.data}
               loadingList={openCall !== null && dump.loading}
@@ -235,7 +268,8 @@ export function InspectorClient() {
     ];
   }, [
     selected,
-    pipeline,
+    timeline,
+    pipelines.data,
     orchSide.children,
     orchSide.unread,
     target,
@@ -273,10 +307,11 @@ export function InspectorClient() {
             agreement, how the evidence became a number, what changed between iterations — or an
             orchestration to read its steps and the runs they opened.
           </Text>
-          <Tabs
-            value={watchingOrchestration ? 'orchestrations' : 'runs'}
-            onChange={() => undefined}
-          >
+          {/* Which picker is open is the reader's own choice, not a function
+              of what is selected — slaving it to the target made the
+              orchestration list unreachable until an orchestration was already
+              being inspected. A link naming one still opens on it. */}
+          <Tabs value={picker} onChange={setPicker}>
             <TabList aria-label="What to inspect">
               <Tab value="runs">Quality runs</Tab>
               <Tab value="orchestrations">Orchestrations</Tab>

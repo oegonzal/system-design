@@ -53,7 +53,7 @@ const Branch = styled.details`
 function membersOf(value: unknown): [PathSegment, unknown][] {
   if (Array.isArray(value)) {
     return value.map((item, index) => [
-      { label: identityOf(item) ?? String(index), kind: 'element' as const },
+      { label: identityOf(item, index) ?? String(index), kind: 'element' as const },
       item,
     ]);
   }

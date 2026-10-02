@@ -59,6 +59,10 @@ export function parseLlmFileName(basename: string): LlmFileName | null {
 export interface DumpFileRef extends RunDumpEntryDto {
   /** What this file holds, from the writer's own stem. */
   kind: DumpFileKind | 'other';
+  /** Which attempt of the call this file belongs to, 1-based. */
+  attempt: number;
+  /** The attempt's own ordinal, as the row and the file name both carry it. */
+  ordinal: number;
 }
 
 /** The order a reader wants a call's files in: what was asked, then what came back. */
@@ -70,20 +74,33 @@ const KIND_ORDER: readonly (DumpFileKind | 'other')[] = [
   'other',
 ];
 
-/** The files of one model call, by the two fields its row records. */
+/**
+ * The files of one model call — of EVERY attempt of it.
+ *
+ * The dump writes a set of files per attempt, keyed by that attempt's own
+ * ordinal. Asking for one ordinal therefore answers for one attempt, and asking
+ * for the first answers for the attempt that failed: the reply that was actually
+ * used would be unreachable. So a call is asked for by all of its ordinals, and
+ * each file says which attempt it belongs to.
+ */
 export function filesForCall(
   entries: readonly RunDumpEntryDto[],
   scope: string,
-  ordinal: number,
+  ordinals: readonly number[],
 ): DumpFileRef[] {
+  const wanted = new Map(ordinals.map((ordinal, index) => [ordinal, index + 1]));
   return entries
     .flatMap((entry) => {
       if (!entry.path.startsWith(LLM_FOLDER)) return [];
       const parsed = parseLlmFileName(entry.path.slice(LLM_FOLDER.length));
-      if (parsed === null || parsed.scope !== scope || parsed.ordinal !== ordinal) return [];
-      return [{ ...entry, kind: parsed.kind }];
+      if (parsed === null || parsed.scope !== scope) return [];
+      const attempt = wanted.get(parsed.ordinal);
+      if (attempt === undefined) return [];
+      return [{ ...entry, kind: parsed.kind, attempt, ordinal: parsed.ordinal }];
     })
-    .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+    .sort(
+      (a, b) => a.attempt - b.attempt || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind),
+    );
 }
 
 export interface DumpFolder {

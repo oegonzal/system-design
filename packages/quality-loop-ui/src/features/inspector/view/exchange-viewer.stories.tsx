@@ -45,7 +45,7 @@ const LISTING = [
   { path: `05-llm/03.${SCOPE}.3.response.json`, bytes: 1800 },
 ];
 
-const files = filesForCall(LISTING, SCOPE, 3);
+const files = filesForCall(LISTING, SCOPE, [3]);
 
 const base = {
   invocation: call,

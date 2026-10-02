@@ -42,7 +42,10 @@ export function reduce(state: InspectorState, action: InspectorAction): Inspecto
       return { ...state, artifact: action.artifact };
 
     case 'artifact/absent':
-      return { ...state, artifact: null };
+      // Validation goes with it. Validators run ON an artifact, so an iteration
+      // with none recorded no reports — and leaving the last iteration's standing
+      // showed its problems as though this iteration had just found them.
+      return { ...state, artifact: null, validation: [] };
 
     case 'validation/ran':
       return { ...state, validation: action.reports };

@@ -19,11 +19,17 @@ export const OUTCOME_TONE: Record<LlmExchangeOutcome, BadgeTone> = {
   error: 'critical',
 };
 
+/**
+ * `passed` is the engine's word for "this gate did not decide, carry on" — never
+ * for "this is good". A score below the accept bar passes the accept gate on its
+ * way to the reject floor, and colouring that green told the reader the opposite
+ * of what happened. Only the step that actually decided is given accent.
+ */
 export const STEP_TONE: Record<DecisionStep['outcome'], BadgeTone> = {
   computed: 'neutral',
-  passed: 'success',
+  passed: 'neutral',
   decided: 'accent',
-  skipped: 'neutral',
+  skipped: 'low',
 };
 
 export const GATE_TONE: Record<'open' | 'closed', BadgeTone> = {

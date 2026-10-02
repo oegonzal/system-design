@@ -33,6 +33,13 @@ import { lensCellKey, type InspectorState, type LensCell } from './state';
 
 export interface FindingContribution {
   kind: 'finding';
+  /**
+   * True when the group this joined was confirmed by OTHER lenses only. Agreement
+   * is counted within one lens, so this sample's own lens did not clear the bar —
+   * saying "confirmed" without that distinction credits one lens's agreement to
+   * another's sample.
+   */
+  confirmedElsewhere: boolean;
   /** The structural key for this sample's own refs. Not the group's. */
   ownKey: string;
   type: string;
@@ -76,6 +83,14 @@ export interface LensSample {
   sample: number | null;
   /** The iteration the cell came from — older than the current one means it did not report again. */
   iteration: number | null;
+  /**
+   * True when this cell was written by an EARLIER iteration than the one being
+   * read. Its items are then shown as what that iteration said and are NOT
+   * joined to the current ledger — joining them produced rows badged "no ledger
+   * entry matches" for findings that were perfectly well accounted for, one
+   * iteration ago.
+   */
+  stale: boolean;
   /** Why this sample produced nothing, when it produced nothing. */
   diagnostic: Diagnostic | null;
   /** True when the declaration expects this sample but nothing was recorded for it. */
@@ -138,6 +153,10 @@ function findingItems(cell: LensCell, state: InspectorState): FindingContributio
       criterionIds: raw.criterionIds,
       rationale: raw.rationale,
       fate: fateOfFinding(confirmed, discard),
+      // The group's hits and confirming lenses belong to the group, not to this
+      // sample: agreement is counted within one lens, so a group this lens did
+      // not confirm was carried by somebody else.
+      confirmedElsewhere: confirmed !== undefined && !confirmed.lenses.includes(cell.lens),
       groupKey,
       detail: discard?.detail ?? null,
       reconciledTo: confirmed?.reconciledTo ?? null,
@@ -193,19 +212,35 @@ function contributionOf(
   for (let sample = 1; sample <= expected; sample += 1) numbers.add(sample);
   for (const cell of observed) numbers.add(cell.sample);
 
+  const current = state.iteration?.number ?? null;
   const samples = [...numbers]
     .sort((a, b) => (a ?? 0) - (b ?? 0))
     .map((sample): LensSample => {
       const cell = cells.get(lensCellKey(lens, sample));
       if (cell === undefined) {
-        return { sample, iteration: null, diagnostic: null, missing: true, items: [] };
+        return {
+          sample,
+          iteration: null,
+          diagnostic: null,
+          missing: true,
+          stale: false,
+          items: [],
+        };
       }
+      const stale = current !== null && cell.iteration < current;
       return {
         sample,
         iteration: cell.iteration,
         diagnostic: cell.diagnostic,
         missing: false,
-        items: kind === 'critic' ? findingItems(cell, state) : resultItems(cell, state),
+        stale,
+        // A cell from an earlier iteration is not joined to this iteration's
+        // ledger: nothing in that ledger was built from it.
+        items: stale
+          ? []
+          : kind === 'critic'
+            ? findingItems(cell, state)
+            : resultItems(cell, state),
       };
     });
 

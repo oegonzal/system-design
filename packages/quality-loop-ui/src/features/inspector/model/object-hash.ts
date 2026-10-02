@@ -19,17 +19,39 @@ import { subjectLabel } from '../../results/select';
  * be identified as the finding it priced.
  *
  * There are two shapes the client genuinely cannot know: a pipeline's own
- * artifact and an orchestrator's own step report. For those the honest fallback
- * is position. The library's own `matchByPosition` option cannot deliver it —
- * once an `objectHash` is supplied, an element whose hash comes back undefined
- * is treated as matching nothing at all, so every element of an unknown array
- * would read as removed and re-added. The fallback therefore lives *inside* the
- * hash: an unrecognised element is identified by its index, which matches
- * position to position and nothing else.
+ * artifact and an orchestrator's own step report. For an element of those the
+ * fallback is position. The library's own `matchByPosition` option cannot
+ * deliver it — once an `objectHash` is supplied, an element whose hash comes
+ * back undefined is treated as matching nothing at all, so every element of an
+ * unknown array would read as removed and re-added. The fallback therefore lives
+ * *inside* the hash: an unrecognised element is identified by its index, which
+ * matches position to position and nothing else.
+ *
+ * Note what `OPAQUE_PATHS` does and does not do. The differ asks for an identity
+ * with no path, so these probes DO run inside those subtrees: an element of a
+ * pipeline's artifact that happens to carry an `id` is identified by it, which is
+ * usually right and occasionally lucky. `OPAQUE_PATHS` is therefore a labelling
+ * fact for the reader — "this shape belongs to another layer" — and not a
+ * boundary the differ enforces. The protection that matters is the coverage
+ * walk, which asserts uniqueness inside those subtrees too.
  *
  * `identityOf` keeps the honest answer — `undefined` for a shape with no domain
  * identity — because a printed path should say `[3]` rather than pretend the
  * third element has a name.
+ *
+ * One more distinction, learned from real records rather than reasoned out: a
+ * field signature identifies an element only where something GUARANTEES it is
+ * unique. The engine's normalised output does — a confirmed finding's key is a
+ * map key, a criterion appears once per rubric entry, a dimension once per
+ * policy weight. **A model's own list guarantees nothing.** A critic really did
+ * report two different defects with the same type and the same locations in one
+ * sample (`topology_defect|edge.4,node.3,node.5`, twice, in a recorded run), and
+ * two such elements sharing an identity is not a cosmetic problem: the differ
+ * treats them as one element, so a change to one can be attributed to the other.
+ *
+ * So the three shapes a model authors are identified by their POSITION as well
+ * as their fields. They never reorder — an iteration once recorded is final — so
+ * position costs nothing and removes the collision.
  */
 
 /**
@@ -65,6 +87,12 @@ export interface HashProbe {
   /** The fields whose presence together mean "this is that shape". */
   discriminators: readonly string[];
   hash: (row: Row) => string;
+  /**
+   * True for a list a MODEL authored, where nothing guarantees two elements
+   * differ in the fields above. Such an element is identified by its position as
+   * well, since that is the only thing that distinguishes it.
+   */
+  positional?: boolean;
 }
 
 const present = (row: Row, fields: readonly string[]): boolean =>
@@ -81,9 +109,14 @@ const refs = (value: unknown): string =>
  */
 export const HASH_PROBES: readonly HashProbe[] = [
   {
+    // Keyed by the finding it priced, NOT by its rank. `position` is the
+    // element's own 0-based place in the dimension's list and is recomputed each
+    // iteration, so including it made a penalty that survived a revision read as
+    // removed and re-added — and hid the one thing worth seeing, that its decay
+    // multiplier moved because something above it went away.
     shape: 'PenaltyTrace',
     discriminators: ['key', 'position'],
-    hash: (row) => `penalty:${String(row['key'])}#${String(row['position'])}`,
+    hash: (row) => `penalty:${String(row['key'])}`,
   },
   {
     shape: 'DiscardedItem',
@@ -96,7 +129,20 @@ export const HASH_PROBES: readonly HashProbe[] = [
     hash: (row) => `finding:${String(row['key'])}`,
   },
   {
-    shape: 'CriterionEvidence | CriterionTrace | RawCriterionResult',
+    // An evaluator's own list. Only this shape carries a rationale, which is
+    // what separates it from the engine's two criterion shapes below — and it
+    // needs separating, because nothing stops a model judging one criterion
+    // twice in a single reply.
+    shape: 'RawCriterionResult',
+    discriminators: ['criterionId', 'rationale'],
+    positional: true,
+    hash: (row) => `criterion:${String(row['criterionId'])}`,
+  },
+  {
+    // The engine's own: one entry per rubric criterion, per dimension. The id
+    // identifies it, which is what keeps a printed path pointing at `c2` rather
+    // than at wherever `c2` currently sits.
+    shape: 'CriterionEvidence | CriterionTrace',
     discriminators: ['criterionId'],
     hash: (row) => `criterion:${String(row['criterionId'])}`,
   },
@@ -151,13 +197,18 @@ export const HASH_PROBES: readonly HashProbe[] = [
     hash: (row) => `exchange:${String(row['scope'])}#${String(row['ordinal'])}`,
   },
   {
+    // A critic's own list: two entries really can share a type and a location
+    // set and still be different defects, so position is part of the identity.
     shape: 'RawFinding',
     discriminators: ['type', 'severity', 'locationRefs'],
+    positional: true,
     hash: (row) => `raw:${String(row['type'])}|${refs(row['locationRefs'])}`,
   },
   {
+    // A validator's own list: nothing stops two identical problems.
     shape: 'ValidationProblem',
     discriminators: ['severity', 'message'],
+    positional: true,
     hash: (row) => `problem:${String(row['severity'])}|${String(row['message'])}`,
   },
   {
@@ -176,16 +227,25 @@ export const HASH_PROBES: readonly HashProbe[] = [
 export const probeFor = (row: Row): HashProbe | undefined =>
   HASH_PROBES.find((probe) => present(row, probe.discriminators));
 
-/** An element's domain identity, or `undefined` for a shape this client does not know. */
-export function identityOf(item: unknown): string | undefined {
+/**
+ * An element's identity, or `undefined` for a shape this client does not know.
+ *
+ * A positional shape needs the index to be identified at all: without one there
+ * is nothing to tell two otherwise-identical elements apart, and answering
+ * anyway would be the collision this exists to prevent.
+ */
+export function identityOf(item: unknown, index?: number): string | undefined {
   if (item === null || typeof item !== 'object' || Array.isArray(item)) return undefined;
   const row = item as Row;
-  return probeFor(row)?.hash(row);
+  const probe = probeFor(row);
+  if (probe === undefined) return undefined;
+  if (probe.positional !== true) return probe.hash(row);
+  return index === undefined ? undefined : `${probe.hash(row)}#${index}`;
 }
 
 /**
- * What the differ matches array elements by: the domain identity where there is
- * one, and the element's own position where there is not.
+ * What the differ matches array elements by: the identity where there is one,
+ * and the element's own position where there is not.
  */
 export const objectHash = (item: object, index?: number): string =>
-  identityOf(item) ?? `@${index ?? 0}`;
+  identityOf(item, index) ?? `@${index ?? 0}`;

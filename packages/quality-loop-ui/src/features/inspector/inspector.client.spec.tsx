@@ -356,6 +356,64 @@ describe('InspectorClient', () => {
     expect(screen.getByText(/only edges drawn are blocks the record names/)).toBeTruthy();
   });
 
+  it('[QLU-12] the orchestration picker can be opened without one already being inspected', async () => {
+    // Slaving the open picker to the selected target made the orchestration list
+    // unreachable: a reader with no orchestration in the URL could never get to
+    // one, so the only way in was to hand-write the query string.
+    stubApi([
+      RUNS,
+      PIPELINES,
+      {
+        path: '/orchestrations',
+        body: { data: [makeOrchestration()], meta: { total: 1, limit: 30, offset: 0 } },
+      },
+    ]);
+    setMockSearchParams({});
+    renderWithTheme(<InspectorClient />);
+    await advance(0);
+
+    expect(screen.queryByRole('table', { name: 'Orchestrations to inspect' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Orchestrations' }));
+    await advance(0);
+    const table = screen.getByRole('table', { name: 'Orchestrations to inspect' });
+    expect(table.textContent).toContain('calibration');
+    // And the run picker is still one click away.
+    fireEvent.click(screen.getByRole('tab', { name: 'Quality runs' }));
+    await advance(0);
+    expect(screen.getByRole('table', { name: 'Runs to inspect' })).toBeTruthy();
+  });
+
+  it('[QLU-13] the model calls are the run’s own log, reachable from anywhere in the rail', async () => {
+    stubApi([
+      RUNS,
+      PIPELINES,
+      ORCHESTRATIONS,
+      { path: `/runs/${complete.runId}`, body: { data: complete } },
+      { path: `/runs/${complete.runId}/dump`, body: { data: [] } },
+    ]);
+    setMockSearchParams({ run: complete.runId });
+    const { rerender } = renderWithTheme(<InspectorClient />);
+    await advance(0);
+
+    // Select the FIRST action. The call actions land at the tail of the log, so a
+    // panel filtered to the selected action would be empty here — and a reader
+    // could reach a prompt only from the end. A call's ordinal counts attempts,
+    // so it cannot be placed in the loop's order at all; the honest reading is
+    // the whole run's calls, wherever the rail sits.
+    const first = within(rail()).getAllByRole('button')[0];
+    fireEvent.click(first);
+    setMockSearchParams({ run: complete.runId, action: lastSelectedKey() ?? '' });
+    await act(async () => {
+      rerender(<InspectorClient />);
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Model calls' }));
+    await advance(0);
+    const table = screen.getByRole('table', { name: 'Model calls' });
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(complete.exchanges.length);
+    expect(screen.getByText(/wherever you are in the rail/)).toBeTruthy();
+  });
+
   it('[QLU-13] opens the prompt that produced a named finding, read out of the dump', async () => {
     const PROMPT = '# Goal\n\nThe worker polls every five minutes.';
     stubApi([
@@ -440,6 +498,57 @@ describe('InspectorClient', () => {
     // The listing is still there: a missing dump costs the transcript, not the run.
     expect(screen.getByRole('table', { name: 'Model calls' })).toBeTruthy();
     expect(screen.getByText(/no dump recorded/)).toBeTruthy();
+  });
+
+  it('[QLU-12] moving to another orchestration starts a new log, not a continuation of the last', async () => {
+    // Moving between orchestrations never passes through "nothing selected", so a
+    // flag that only reset on nothing left the new one's actions appended to the
+    // old one's: the rail kept both, the provenance count described two runs
+    // glued together, and the first new action was diffed against the previous
+    // orchestration's final state — a transition that never happened.
+    const first = makeOrchestration();
+    const second = makeOrchestration({
+      orchestrationRunId: '11111111-2222-3333-4444-555555555555',
+      orchestrator: 'second-opinion',
+      finishedAt: '2026-09-06T00:20:00.000Z',
+    });
+    stubApi([
+      RUNS,
+      PIPELINES,
+      {
+        path: '/orchestrations',
+        body: { data: [first, second], meta: { total: 2, limit: 30, offset: 0 } },
+      },
+      { path: `/orchestrations/${first.orchestrationRunId}`, body: { data: first } },
+      { path: `/orchestrations/${second.orchestrationRunId}`, body: { data: second } },
+      ...ORCHESTRATION_CHILD_IDS.map((runId) => ({
+        path: `/runs/${runId}`,
+        body: { data: { ...makeRun(), runId } },
+      })),
+    ]);
+
+    setMockSearchParams({ orchestration: first.orchestrationRunId });
+    const { rerender } = renderWithTheme(<InspectorClient />);
+    await advance(0);
+    await advance(0);
+    const firstRows = within(rail()).getAllByRole('button').length;
+    expect(firstRows).toBeGreaterThan(3);
+
+    setMockSearchParams({ orchestration: second.orchestrationRunId });
+    await act(async () => {
+      rerender(<InspectorClient />);
+    });
+    await advance(0);
+    await advance(0);
+
+    const rows = within(rail()).getAllByRole('button');
+    const labels = rows.map((row) => row.textContent ?? '');
+    // Nothing from the orchestration no longer named in the URL survives.
+    expect(labels.some((label) => label.includes('second-opinion'))).toBe(true);
+    expect(labels.some((label) => label.includes('calibration'))).toBe(false);
+    expect(labels[0]).toContain('Orchestration opened');
+    // And the log is read as one snapshot again, not as a continuation.
+    expect(screen.getByRole('status').textContent).toContain('read back out of one recorded');
   });
 
   it('[QLU-5] with no run named, it asks for one rather than guessing', async () => {

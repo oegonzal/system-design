@@ -35,7 +35,19 @@ const NO_PANELS: readonly { id: string; label: string; content: ReactNode }[] = 
 
 export function DiffView({ before, after, changes, panels = NO_PANELS }: DiffViewProps) {
   const renderedChanged = changes.some((change) => change.path === RENDERED_PATH);
-  const [tab, setTab] = useState('changes');
+  const [chosen, setChosen] = useState('changes');
+  // The rendered-text tab exists only for an action that moved the artifact's
+  // text. Holding a choice that is no longer offered left every panel hidden and
+  // the detail pane blank, so a tab that is not on offer falls back to the one
+  // that always is.
+  const offered = [
+    'changes',
+    'state',
+    ...(renderedChanged ? ['text'] : []),
+    ...panels.map((p) => p.id),
+  ];
+  const tab = offered.includes(chosen) ? chosen : 'changes';
+  const setTab = setChosen;
 
   return (
     <Tabs value={tab} onChange={setTab}>

@@ -72,13 +72,19 @@ describe('reading a run out as actions', () => {
       'run/opened',
       'contract/derived',
       'iteration/began',
-      // No artifact, so no validators ran and no lens was asked.
       'artifact/absent',
+      // Emitted even though nothing validated: an empty list is a fact about
+      // THIS iteration, and skipping the action left the previous iteration's
+      // reports standing as though they were this one's.
+      'validation/ran',
       'ledger/normalised',
       'decision/decided',
       'iteration/ended',
       'run/standing',
     ]);
+    expect(actions.find((action) => action.type === 'validation/ran')?.label).toBe(
+      'No validator ran',
+    );
     const state = reduceAll(emptyState(), actions);
     expect(state.artifact).toBeNull();
     expect(state.ledger.diagnostics).toHaveLength(3);

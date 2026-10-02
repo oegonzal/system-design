@@ -84,6 +84,7 @@ export function ExchangeViewer({
       </Text>
     );
   }
+  const multipleAttempts = new Set(files.map((file) => file.attempt)).size > 1;
   return (
     <Stack gap={4}>
       <Stack direction="row" gap={2} align="baseline" wrap>
@@ -112,10 +113,17 @@ export function ExchangeViewer({
         </Text>
       )}
 
+      {multipleAttempts && (
+        <Text tone="secondary" size="sm">
+          This call was asked {invocation.attempts.length} times. Each attempt wrote its own prompt
+          and reply, so both what failed and what finally answered are here.
+        </Text>
+      )}
       {files.length > 0 && (
         <Table aria-label={`Files for ${invocation.scope}`}>
           <thead>
             <tr>
+              {multipleAttempts && <th>Attempt</th>}
               <th>What it is</th>
               <th>File</th>
               <th>Size</th>
@@ -124,6 +132,17 @@ export function ExchangeViewer({
           <tbody>
             {files.map((file) => (
               <tr key={file.path} aria-current={open?.path === file.path ? 'true' : undefined}>
+                {multipleAttempts && (
+                  <td>
+                    <Badge
+                      tone={file.attempt === files[files.length - 1].attempt ? 'success' : 'medium'}
+                    >
+                      {file.attempt === files[files.length - 1].attempt
+                        ? `${file.attempt} — the one used`
+                        : String(file.attempt)}
+                    </Badge>
+                  </td>
+                )}
                 <td>{KIND_LABEL[file.kind]}</td>
                 <td>
                   <Button variant="ghost" onClick={() => onOpenFile(file.path)}>
