@@ -6,6 +6,8 @@
 import type { Diagnostic, DiagnosticReason, LensOutcome } from '@sysdesign/contracts';
 import type { LlmClient, StructuredRequest } from '@sysdesign/llm';
 
+import type { LensUnit } from '../ports';
+
 export const CRITERIA_STAGE = 'criteria';
 export const PRODUCER_STAGE = 'producer';
 export const LENSES_STAGE = 'lenses';
@@ -33,25 +35,30 @@ export const skipped = <R>(
 ): LensOutcome<R> => ({ report: null, diagnostic: diagnostic(stage, sample, reason, detail) });
 
 /**
- * The same request to each sample's client in turn, one outcome per sample: a
- * report shaped by `report`, or the diagnostic that says why there is none.
- * Sequential on purpose — the clients are already scoped one per sample.
+ * One unit per sample: the same request to that sample's own client, becoming
+ * a report shaped by `report` or the diagnostic that says why there is none.
+ *
+ * The sample number comes from the client's position and is fixed here, before
+ * anything is in flight — never from the order answers arrive. Agreement is
+ * counted across a lens's own sample numbers, so two samples that renumbered
+ * themselves by arrival could collide and silence the lens they came from.
  */
-export async function sampleEach<Response, R>(
+export function sampleUnits<Response, R>(
   lensId: string,
   clients: readonly LlmClient[],
   request: StructuredRequest<Response>,
   report: (sample: number, response: Response) => R,
-): Promise<LensOutcome<R>[]> {
-  const outcomes: LensOutcome<R>[] = [];
-  for (const [index, llm] of clients.entries()) {
+): LensUnit<R>[] {
+  return clients.map((llm, index) => async () => {
     const sample = index + 1;
     const response = await llm.completeStructured(request);
-    outcomes.push(
-      response === null
-        ? skipped(lensId, sample, 'llm-failed')
-        : { report: report(sample, response), diagnostic: null },
-    );
-  }
-  return outcomes;
+    return response === null
+      ? skipped(lensId, sample, 'llm-failed')
+      : { report: report(sample, response), diagnostic: null };
+  });
 }
+
+/** A lens that cannot run at all still plans one unit, carrying its diagnostic. */
+export const planned = <R>(outcome: LensOutcome<R>): LensUnit<R>[] => [
+  () => Promise.resolve(outcome),
+];

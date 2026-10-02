@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { LlmCall } from '@sysdesign/llm';
 import { emptyUpstream, type LensContext } from '../ports';
-import { criterion, fakeLlm, result, tinyPipeline, type TinyOutput } from '../testing';
+import { criterion, fakeLlm, result, runLens, tinyPipeline, type TinyOutput } from '../testing';
 import { createLlmEvaluator } from './llm-evaluator';
 
 const definition = tinyPipeline();
@@ -44,14 +44,20 @@ describe('createLlmEvaluator', () => {
       ],
       results: [],
     };
-    await createLlmEvaluator<TinyOutput>({ ...definition.evaluators[0], consumes: ['findings'] }, [
-      llm,
-    ]).run({ ...ctx, upstream });
+    await runLens(
+      createLlmEvaluator<TinyOutput>({ ...definition.evaluators[0], consumes: ['findings'] }, [
+        llm,
+      ]),
+      { ...ctx, upstream },
+    );
     expect(calls[0].user).toContain('# Confirmed upstream defects');
     expect(calls[0].user).toContain('[medium] gap at text → criteria c1');
     expect(calls[0].user).toContain('the text is thin');
 
-    await createLlmEvaluator<TinyOutput>(definition.evaluators[0], [llm]).run({ ...ctx, upstream });
+    await runLens(createLlmEvaluator<TinyOutput>(definition.evaluators[0], [llm]), {
+      ...ctx,
+      upstream,
+    });
     expect(calls[1].user).not.toContain('upstream');
   });
 
@@ -64,13 +70,13 @@ describe('createLlmEvaluator', () => {
       { ...definition.evaluators[0], criterionKinds: ['must'] },
       [llm],
     );
-    expect((await mustOnly.run(ctx))[0].diagnostic?.reason).toBe('llm-failed');
+    expect((await runLens(mustOnly, ctx))[0].diagnostic?.reason).toBe('llm-failed');
 
     const niceOnly = createLlmEvaluator<TinyOutput>(
       { ...definition.evaluators[0], criterionKinds: ['nice'] },
       [llm],
     );
-    expect((await niceOnly.run(ctx))[0].report).toMatchObject({
+    expect((await runLens(niceOnly, ctx))[0].report).toMatchObject({
       evaluatorId: 'evaluator.tiny',
       sample: 1,
       advisoryVerdict: 'accept',
@@ -82,7 +88,7 @@ describe('createLlmEvaluator', () => {
       { ...definition.evaluators[0], criterionKinds: ['nice'] },
       [fakeLlm()],
     );
-    const outcomes = await evaluator.run({
+    const outcomes = await runLens(evaluator, {
       ...ctx,
       contract: { ...ctx.contract, criteria: [criterion('c1')] },
     });

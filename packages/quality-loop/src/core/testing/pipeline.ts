@@ -160,12 +160,15 @@ export const scriptedCritic = (
   return {
     id,
     consumes,
-    run: () => {
+    // Planned once per iteration, exactly as the real lens is, so a spec that
+    // counts lens calls still counts iterations.
+    plan: () => {
       const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
-      return Promise.resolve(
-        samples.map((findings, index) =>
-          reported<CriticReport>({ criticId: id, sample: index + 1, findings: [...findings] }),
-        ),
+      return samples.map(
+        (findings, index) => () =>
+          Promise.resolve(
+            reported<CriticReport>({ criticId: id, sample: index + 1, findings: [...findings] }),
+          ),
       );
     },
   };
@@ -181,21 +184,28 @@ export const scriptedEvaluator = (
   return {
     id,
     consumes,
-    run: () => {
+    plan: () => {
       const samples = perIteration[Math.min(call++, perIteration.length - 1)] ?? [];
-      return Promise.resolve(
-        samples.map((results, index) =>
-          reported<EvaluationReport>({
-            evaluatorId: id,
-            sample: index + 1,
-            results: [...results],
-            advisoryVerdict,
-          }),
-        ),
+      return samples.map(
+        (results, index) => () =>
+          Promise.resolve(
+            reported<EvaluationReport>({
+              evaluatorId: id,
+              sample: index + 1,
+              results: [...results],
+              advisoryVerdict,
+            }),
+          ),
       );
     },
   };
 };
+
+/** Every sample of one lens, run together — what a spec wants when it is testing the lens, not the schedule. */
+export const runLens = <R>(
+  lens: { plan: (ctx: never) => readonly (() => Promise<R>)[] },
+  ctx: unknown,
+): Promise<R[]> => Promise.all(lens.plan(ctx as never).map((unit) => unit()));
 
 // ---- a whole loop, scripted ----------------------------------------------------
 

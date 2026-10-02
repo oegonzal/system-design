@@ -81,18 +81,36 @@ export interface LensContext<T> {
   upstream: UpstreamEvidenceBundle;
 }
 
-/** One outcome per sample, in sample order. */
+/**
+ * One sample's work: the call it makes, and the outcome it becomes. Never
+ * throws — the model client answers null rather than rejecting.
+ */
+export type LensUnit<R> = () => Promise<LensOutcome<R>>;
+
+/**
+ * A lens says what its samples are; the loop decides how many run at once.
+ *
+ * `plan` is synchronous on purpose: every prompt in a wave is built before any
+ * call is issued, so a malformed lens is a failure at the start of the wave
+ * rather than halfway through it. And a lens cannot schedule itself, so the
+ * pipeline's declared concurrency is a bound the loop enforces rather than
+ * one each lens has to remember to respect.
+ *
+ * One unit per sample, in sample order — the number a sample is planned with
+ * is the number it reports, because agreement is counted across a lens's own
+ * samples and a sample that renumbered itself would be counted as another.
+ */
 export interface Critic<T> {
   readonly id: string;
   /** Declared upstream evidence; the runner schedules the lens after it exists. */
   readonly consumes: readonly UpstreamEvidence[];
-  run(ctx: LensContext<T>): Promise<LensOutcome<CriticReport>[]>;
+  plan(ctx: LensContext<T>): readonly LensUnit<CriticReport>[];
 }
 
 export interface Evaluator<T> {
   readonly id: string;
   readonly consumes: readonly UpstreamEvidence[];
-  run(ctx: LensContext<T>): Promise<LensOutcome<EvaluationReport>[]>;
+  plan(ctx: LensContext<T>): readonly LensUnit<EvaluationReport>[];
 }
 
 export type CriteriaDeriver = (

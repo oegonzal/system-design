@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { emptyUpstream, type LensContext } from '../ports';
-import { criterion, fakeLlm, finding, tinyPipeline, type TinyOutput } from '../testing';
+import { criterion, fakeLlm, finding, runLens, tinyPipeline, type TinyOutput } from '../testing';
 import { createLlmCritic } from './llm-critic';
 
 const definition = tinyPipeline();
@@ -20,7 +20,7 @@ describe('createLlmCritic', () => {
     const critic = createLlmCritic(definition.critics[0], definition.task, [
       fakeLlm({ findings: [finding({ locationRefs: ['ghost'] })] }),
     ]);
-    expect(await critic.run(ctx)).toEqual([
+    expect(await runLens(critic, ctx)).toEqual([
       {
         report: null,
         diagnostic: expect.objectContaining({
@@ -42,7 +42,7 @@ describe('createLlmCritic', () => {
       fakeLlm(),
       good,
     ]);
-    const outcomes = await critic.run(ctx);
+    const outcomes = await runLens(critic, ctx);
     expect(outcomes.map((outcome) => outcome.report?.sample ?? outcome.diagnostic?.reason)).toEqual(
       [1, 'llm-failed', 3],
     );

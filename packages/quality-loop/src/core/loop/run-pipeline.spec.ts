@@ -32,10 +32,10 @@ describe('runLoop', () => {
     ]);
     const firstWave: Critic<TinyOutput> = {
       ...critic,
-      run: (ctx) => {
+      plan: (ctx) => {
         order.push('critic');
         seen.push(ctx.upstream);
-        return critic.run(ctx);
+        return critic.plan(ctx);
       },
     };
     const later = scriptedEvaluator(
@@ -46,10 +46,10 @@ describe('runLoop', () => {
     );
     const secondWave: Evaluator<TinyOutput> = {
       ...later,
-      run: (ctx) => {
+      plan: (ctx) => {
         order.push('evaluator');
         seen.push(ctx.upstream);
-        return later.run(ctx);
+        return later.plan(ctx);
       },
     };
     const trace = await runLoop(
@@ -128,7 +128,7 @@ describe('runLoop', () => {
     const critic = scriptedCritic('critic.tiny', [[[]]]);
     const counted = {
       ...critic,
-      run: (ctx: Parameters<typeof critic.run>[0]) => (lensCalls++, critic.run(ctx)),
+      plan: (ctx: Parameters<typeof critic.plan>[0]) => (lensCalls++, critic.plan(ctx)),
     };
     const trace = await runLoop(
       scriptedStages({ critics: [counted] }),
@@ -273,7 +273,7 @@ describe('runLoop', () => {
     const critic = scriptedCritic('critic.tiny', [[[]]]);
     const counted = {
       ...critic,
-      run: (ctx: Parameters<typeof critic.run>[0]) => (lensCalls++, critic.run(ctx)),
+      plan: (ctx: Parameters<typeof critic.plan>[0]) => (lensCalls++, critic.plan(ctx)),
     };
     const scripted = scriptedProducer([DRAFT_2]);
     let derived = 0;

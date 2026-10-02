@@ -22,7 +22,7 @@ import {
   validationSection,
 } from './prompting';
 import { enumTuple, findingsSchema } from './schemas';
-import { sampleEach, skipped } from './shared';
+import { planned, sampleUnits, skipped } from './shared';
 
 export function createLlmCritic<T>(
   spec: LensSpec,
@@ -32,10 +32,10 @@ export function createLlmCritic<T>(
   return {
     id: spec.id,
     consumes: spec.consumes,
-    run(ctx: LensContext<T>) {
+    plan(ctx: LensContext<T>) {
       const types = enumTuple(Object.keys(task.findingTypes));
       if (!types) {
-        return Promise.resolve([skipped(spec.id, null, 'not-applicable', 'no finding types')]);
+        return planned(skipped(spec.id, null, 'not-applicable', 'no finding types'));
       }
 
       const request = {
@@ -58,7 +58,7 @@ export function createLlmCritic<T>(
         maxTokens: spec.maxTokens,
       };
 
-      return sampleEach(spec.id, clients, request, (sample, response): CriticReport => ({
+      return sampleUnits(spec.id, clients, request, (sample, response): CriticReport => ({
         criticId: spec.id,
         sample,
         findings: response.findings,

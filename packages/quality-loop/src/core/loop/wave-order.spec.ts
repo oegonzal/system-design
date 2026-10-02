@@ -38,16 +38,15 @@ const sameDefect = (rationale: string): RawFinding =>
 const delayed = (id: string, settleAfter: number): Critic<TinyOutput> => ({
   id,
   consumes: [],
-  run: async () => {
-    for (let turn = 0; turn < settleAfter; turn += 1) await Promise.resolve();
-    return [1, 2].map((sample) =>
-      reported<CriticReport>({
+  plan: () =>
+    [1, 2].map((sample) => async () => {
+      for (let turn = 0; turn < settleAfter; turn += 1) await Promise.resolve();
+      return reported<CriticReport>({
         criticId: id,
         sample,
         findings: [sameDefect(`${id} sample ${sample} says so`)],
-      }),
-    );
-  },
+      });
+    }),
 });
 
 /** Three lenses, two samples each, one shared defect; `order` decides who answers first. */
@@ -111,6 +110,57 @@ describe('a wave of lenses', () => {
     expect(inverted.iterations[0].ledger).toEqual(forward.iterations[0].ledger);
     expect(inverted.iterations[0].decision).toEqual(forward.iterations[0].decision);
     expect(inverted.finalDecision).toBe(forward.finalDecision);
+  });
+
+  it('[QL-26] the samples of one lens are independent units, so they share the wave’s slots', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const watched = (id: string): Critic<TinyOutput> => ({
+      id,
+      consumes: [],
+      plan: () =>
+        [1, 2, 3].map((sample) => async () => {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await Promise.resolve();
+          inFlight -= 1;
+          return reported<CriticReport>({
+            criticId: id,
+            sample,
+            findings: [sameDefect(`${id} sample ${sample}`)],
+          });
+        }),
+    });
+
+    await runLoop(
+      scriptedStages({ critics: [watched('critic.solo')], evaluators: [] }),
+      tinyPipeline({
+        critics: [
+          {
+            id: 'critic.solo',
+            persona: 'You find gaps.',
+            samples: 3,
+            maxItems: 4,
+            maxTokens: 500,
+            consumes: [],
+          },
+        ],
+        evaluators: [],
+        policy: {
+          ...tinyPolicy(),
+          evidence: { minHits: 2, minAssessedShare: 0 },
+          loop: { ...tinyPolicy().loop, concurrency: 3 },
+        },
+      }),
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+
+    // One lens, three samples, a declared limit of three. Scheduling the lens
+    // would have run them one after another and never exceeded one in flight,
+    // whatever the limit said — the pipeline's number is now a bound on calls
+    // rather than on lenses.
+    expect(peak).toBe(3);
   });
 
   it('[QL-26] a sample keeps its planned number, so agreement across samples is unchanged', async () => {

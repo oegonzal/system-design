@@ -99,9 +99,10 @@ interface Loop<T> {
 
 type Judged = { critics: LensOutcome<CriticReport>[]; evaluators: LensOutcome<EvaluationReport>[] };
 
+/** One sample's outcome, tagged by which half of the wave it came from. */
 type LensResult =
-  | { critic: LensOutcome<CriticReport>[]; evaluator?: undefined }
-  | { evaluator: LensOutcome<EvaluationReport>[]; critic?: undefined };
+  | { critic: LensOutcome<CriticReport>; evaluator?: undefined }
+  | { evaluator: LensOutcome<EvaluationReport>; critic?: undefined };
 
 export async function runLoop<T>(
   stages: Stages<T>,
@@ -386,7 +387,22 @@ async function runLensWaves<T>(
   };
 }
 
-/** One wave of lenses, concurrently, results in declaration order. */
+/**
+ * One wave, every lens SAMPLE an independent unit, at most `concurrency` in
+ * flight, results in declaration order.
+ *
+ * The unit is the sample rather than the lens because a lens's samples have
+ * nothing to say to each other: they are separate draws whose agreement is the
+ * signal. Scheduling the lens meant one slot carried a lens's samples one
+ * after another, so a wave finished at the pace of its slowest lens rather
+ * than its slowest call, with the other slots idle.
+ *
+ * Every prompt is built first, by `plan`, and `mapConcurrent` writes each
+ * result back into its own position — so what comes out is ordered by
+ * declaration and ascending sample whatever order the answers arrived in.
+ * `wave-order.spec.ts` is the guard on that, and it is load-bearing: three
+ * things downstream read this array's order, and all three reach the grade.
+ */
 async function runWave<T>(
   critics: readonly Critic<T>[],
   evaluators: readonly Evaluator<T>[],
@@ -394,17 +410,19 @@ async function runWave<T>(
   concurrency: number,
 ): Promise<Judged> {
   const units: (() => Promise<LensResult>)[] = [
-    ...critics.map((critic) => async (): Promise<LensResult> => ({
-      critic: await critic.run(ctx),
-    })),
-    ...evaluators.map((evaluator) => async (): Promise<LensResult> => ({
-      evaluator: await evaluator.run(ctx),
-    })),
+    ...critics.flatMap((critic) =>
+      critic.plan(ctx).map((unit) => async (): Promise<LensResult> => ({ critic: await unit() })),
+    ),
+    ...evaluators.flatMap((evaluator) =>
+      evaluator
+        .plan(ctx)
+        .map((unit) => async (): Promise<LensResult> => ({ evaluator: await unit() })),
+    ),
   ];
   const results = await mapConcurrent(units, concurrency, (run) => run());
   return {
-    critics: results.flatMap((result) => result.critic ?? []),
-    evaluators: results.flatMap((result) => result.evaluator ?? []),
+    critics: results.flatMap((result) => (result.critic ? [result.critic] : [])),
+    evaluators: results.flatMap((result) => (result.evaluator ? [result.evaluator] : [])),
   };
 }
 

@@ -19,7 +19,7 @@ import {
   upstreamSections,
 } from './prompting';
 import { enumTuple, evaluationSchema } from './schemas';
-import { sampleEach, skipped } from './shared';
+import { planned, sampleUnits, skipped } from './shared';
 
 export function createLlmEvaluator<T>(
   spec: EvaluatorSpec,
@@ -28,15 +28,13 @@ export function createLlmEvaluator<T>(
   return {
     id: spec.id,
     consumes: spec.consumes,
-    run(ctx: LensContext<T>) {
+    plan(ctx: LensContext<T>) {
       const criteria = ctx.contract.criteria.filter((criterion) =>
         spec.criterionKinds.includes(criterion.kind),
       );
       const ids = enumTuple(criteria.map((criterion) => criterion.id));
       if (!ids) {
-        return Promise.resolve([
-          skipped(spec.id, null, 'not-applicable', 'no criteria of its kinds'),
-        ]);
+        return planned(skipped(spec.id, null, 'not-applicable', 'no criteria of its kinds'));
       }
 
       const request = {
@@ -56,7 +54,7 @@ export function createLlmEvaluator<T>(
         maxTokens: spec.maxTokens,
       };
 
-      return sampleEach(spec.id, clients, request, (sample, response): EvaluationReport => ({
+      return sampleUnits(spec.id, clients, request, (sample, response): EvaluationReport => ({
         evaluatorId: spec.id,
         sample,
         results: response.results,
