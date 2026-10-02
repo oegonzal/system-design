@@ -365,6 +365,50 @@ describe('ImprovementPanel', () => {
     );
   });
 
+  it('[UX-18] a coach revision the lenses could not assess is not compared — never "not better" — and its stop is a miss, not a person’s call', () => {
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        stopReason: 'escalated',
+        iterations: [
+          makeImproveIteration({ iteration: 1, overall: 58 }),
+          makeImproveIteration({
+            iteration: 2,
+            mode: 'revise',
+            overall: null,
+            unscored: 'unassessed',
+            decision: 'escalate',
+            reason: 'only 20% of criteria assessed; unassessed: c2, c3, c4, c5',
+            decisionBasis: {
+              factor: 'evidence',
+              facts: {},
+              remediations: 0,
+              criteria: { assessed: 1, total: 5 },
+            },
+            outcome: 'unassessed',
+            revisionId: null,
+          }),
+        ],
+      }),
+    });
+
+    const row = screen.getByTestId('improve-iteration-2');
+    expect(row.getAttribute('data-outcome')).toBe('unassessed');
+    expect(within(row).getByTestId('improve-iteration-unscored').textContent).toBe('not assessed');
+    expect(row.textContent).toContain('not compared');
+    expect(row.textContent).not.toContain('not better');
+    expect(within(row).queryByTestId('improve-iteration-decision')).toBeNull();
+    expect(within(row).getByTestId('improve-iteration-reason').textContent).toBe(
+      'Not scored — the lenses assessed 1 of 5 criteria, too few for a verdict.',
+    );
+    const stopped = screen.getByTestId('improvement-stopped').textContent ?? '';
+    expect(stopped).toBe(
+      'The lenses could not assess the coach’s last revision, so the coach stopped there — try again.',
+    );
+    expect(stopped).not.toContain('needs a person');
+    expect(screen.queryByTestId('load-best-revision')).toBeNull();
+  });
+
   it('[UX-18] is off with why when the revision it would start from has a grade that is no verdict', () => {
     const reason = describeUnassessedBase(1);
     renderPanel({ blockedReason: reason });

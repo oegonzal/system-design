@@ -209,6 +209,35 @@ export const NoArtifact: Story = {
   },
 };
 
+/** The lenses could not assess the coach's revision: not assessed, not compared, and the stop says it was a miss. */
+export const Unassessed: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'escalated',
+      iterations: [
+        makeImproveIteration({ iteration: 1, overall: 58 }),
+        makeImproveIteration({
+          iteration: 2,
+          mode: 'revise',
+          overall: null,
+          unscored: 'unassessed',
+          decision: 'escalate',
+          reason: 'only 20% of criteria assessed; unassessed: c2, c3, c4, c5',
+          decisionBasis: {
+            factor: 'evidence',
+            facts: {},
+            remediations: 0,
+            criteria: { assessed: 1, total: 5 },
+          },
+          outcome: 'unassessed',
+          revisionId: null,
+        }),
+      ],
+    }),
+  },
+};
+
 /** Minutes before the story rendered — the clock-relative values, for a run that is live now. */
 const minutesAgo = (minutes: number): string =>
   new Date(Date.now() - minutes * 60_000).toISOString();

@@ -1,5 +1,5 @@
 import { BadGatewayException } from '@nestjs/common';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
@@ -25,9 +25,10 @@ import {
   type ListRevisionsResponse,
   type ListSessionsResponse,
   type StartImproveResponse,
+  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import { CoachingRun, DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
-import { FAKE_RECALLED_LESSONS, fakeRecalled } from '@sysdesign/studio-testing';
+import { FAKE_RECALLED_LESSONS, fakeRecalled, type FakeIteration } from '@sysdesign/studio-testing';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
 import { authoredPrompt } from '../prompts/prompts.controller.spec';
@@ -99,6 +100,31 @@ const coached = (): DesignSubmission => {
     },
   };
 };
+
+/**
+ * An iteration the loop's evidence gate found too thin for a verdict: no lens
+ * settled a criterion, so the controller escalated over a number that is no
+ * score — as on a grade during a provider outage.
+ */
+const unassessedIteration = (
+  criteria: readonly SuccessCriterion[],
+  overrides: Partial<FakeIteration> = {},
+): FakeIteration => ({
+  overall: 0,
+  decision: 'escalate',
+  evidenceSufficient: false,
+  dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
+  criteria: criteria.map((criterion) => ({
+    criterionId: criterion.id,
+    kind: criterion.kind,
+    result: 'unassessed' as const,
+    hits: 0,
+    confidence: 'none' as const,
+    locationRefs: [],
+  })),
+  reason: 'only 0% of criteria assessed',
+  ...overrides,
+});
 
 describe('sessions', () => {
   let h: Harness;
@@ -630,23 +656,7 @@ describe('sessions', () => {
       const { prompt, sessionId } = await startSession();
       const { body: created } = await submit(sessionId, submission());
       // Every lens sample failed: the evidence gate escalated with nothing assessed.
-      h.loop.complete('fake-run-1', [
-        {
-          overall: 0,
-          decision: 'escalate',
-          evidenceSufficient: false,
-          dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
-          criteria: prompt.criteria.map((criterion) => ({
-            criterionId: criterion.id,
-            kind: criterion.kind,
-            result: 'unassessed' as const,
-            hits: 0,
-            confidence: 'none' as const,
-            locationRefs: [],
-          })),
-          reason: 'only 0% of criteria assessed',
-        },
-      ]);
+      h.loop.complete('fake-run-1', [unassessedIteration(prompt.criteria)]);
       const grade = (await evaluation(created.data.id)).body.data;
       expect(grade).toMatchObject({
         status: 'complete',
@@ -1622,6 +1632,31 @@ describe('sessions', () => {
       expect(list.body.meta.total).toBe(1);
     });
 
+    it('[UX-18] an iteration the lenses could not assess is its own outcome: unscored, compared with nothing, never “not better”', async () => {
+      const { prompt, sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 3 });
+      h.loop.complete('fake-run-1', [
+        { overall: 58, decision: 'revise' },
+        unassessedIteration(prompt.criteria, { artifact: coached() }),
+        // A lower score after it is still held against the 58 it never beat.
+        { overall: 40, decision: 'revise', artifact: coached() },
+      ]);
+      const { body } = await readImprove(sessionId, 'fake-run-1');
+      const [, unassessed, lower] = body.data.iterations;
+      expect(unassessed).toMatchObject({
+        iteration: 2,
+        overall: null,
+        unscored: 'unassessed',
+        decision: 'escalate',
+        outcome: 'unassessed',
+        problems: [],
+        revisionId: null,
+      });
+      expect(lower).toMatchObject({ iteration: 3, overall: 40, outcome: 'not-better' });
+      const list = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(list.body.meta.total).toBe(1);
+    });
+
     it('404s for a run that is not this session’s, 400 for more iterations than the loop allows', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
@@ -1710,8 +1745,84 @@ describe('sessions', () => {
         latestRevisionNumber: 2,
         latestEvaluationStatus: 'running',
       });
-      // A list row costs no grader read: what holds the slot is a single session's to say.
+      // What holds the slot is a single session's to say: a list row never asks the grader.
       expect(sessions.body.data[0]).not.toHaveProperty('inFlight');
+    });
+
+    // A cache written before a grade that assessed too little stopped earning
+    // a number: the controller's 0 and its escalation, as an older studio
+    // stored them when it read the grade.
+    const cacheAsBefore = (runId: string, overall: number) =>
+      h.em
+        .fork()
+        .nativeUpdate(
+          DesignRevision,
+          { qualityRunId: runId },
+          { evaluationStatus: 'complete', overall, decision: 'escalate' },
+        );
+
+    it('[UX-18] a standing cached before an unassessed grade stopped earning a number is brought up to date by the lists, each grade read once', async () => {
+      const stale = await startSession();
+      await submit(stale.sessionId, submission());
+      h.loop.complete('fake-run-1', [unassessedIteration(stale.prompt.criteria)]);
+      const verdict = await startSession();
+      await submit(verdict.sessionId, submission());
+      h.loop.complete('fake-run-2', [{ overall: 40, decision: 'escalate' }]);
+      await cacheAsBefore('fake-run-1', 0);
+      await cacheAsBefore('fake-run-2', 40);
+
+      const reads = vi.spyOn(h.loop, 'getRun');
+      try {
+        const sessions = await call<ListSessionsResponse>(`${h.url}/sessions`);
+        const row = (id: string) => sessions.body.data.find((session) => session.id === id);
+        // No number, so no verdict: every surface reads it "not assessed".
+        expect(row(stale.sessionId)).toMatchObject({
+          latestOverall: null,
+          latestDecision: 'escalate',
+          latestEvaluationStatus: 'complete',
+        });
+        // An escalation that is a verdict keeps its number.
+        expect(row(verdict.sessionId)).toMatchObject({
+          latestOverall: 40,
+          latestDecision: 'escalate',
+        });
+        expect(reads.mock.calls.map(([runId]) => runId).sort()).toEqual([
+          'fake-run-1',
+          'fake-run-2',
+        ]);
+
+        // Read once: no list, timeline or session read asks about either again.
+        reads.mockClear();
+        await call(`${h.url}/sessions`);
+        const timeline = await call<ListRevisionsResponse>(
+          `${h.url}/sessions/${stale.sessionId}/revisions`,
+        );
+        expect(timeline.body.data[0].evaluation).toMatchObject({
+          overall: null,
+          decision: 'escalate',
+        });
+        const session = await call<GetSessionResponse>(`${h.url}/sessions/${verdict.sessionId}`);
+        expect(session.body.data.latestOverall).toBe(40);
+        expect(reads).not.toHaveBeenCalled();
+      } finally {
+        reads.mockRestore();
+      }
+    });
+
+    it('[UX-18] a list never waits on a grader that cannot answer to bring a standing up to date: it answers from the cache, and the next read does it', async () => {
+      const { prompt, sessionId } = await startSession();
+      await submit(sessionId, submission());
+      h.loop.complete('fake-run-1', [unassessedIteration(prompt.criteria)]);
+      await cacheAsBefore('fake-run-1', 0);
+
+      h.loop.unreachable = true;
+      const down = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(down.status).toBe(200);
+      expect(down.body.data[0].evaluation).toMatchObject({ overall: 0, decision: 'escalate' });
+
+      h.loop.unreachable = false;
+      const up = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(up.body.data[0].evaluation).toMatchObject({ overall: null, decision: 'escalate' });
     });
 
     it('filters sessions by promptId', async () => {

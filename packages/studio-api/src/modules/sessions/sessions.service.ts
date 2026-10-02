@@ -125,7 +125,11 @@ export class SessionsService {
         orderBy: { updatedAt: 'desc', id: 'asc' },
       },
     );
-    return [sessions.map(withLatest), total];
+    const page = sessions.map(withLatest);
+    await this.evaluations.refreshStandings(
+      page.flatMap(({ latestRevision }) => latestRevision ?? []),
+    );
+    return [page, total];
   }
 
   async findOne(id: string): Promise<SessionDetail> {
@@ -144,7 +148,11 @@ export class SessionsService {
       populate: ['revisions', 'prompt'],
     });
     if (!session) throw notFound('session', `Session ${id} not found`);
-    return withLatest(session);
+    const found = withLatest(session);
+    if (found.latestRevision !== null) {
+      await this.evaluations.refreshStandings([found.latestRevision]);
+    }
+    return found;
   }
 
   private async detail(found: SessionWithLatest): Promise<SessionDetail> {
@@ -445,11 +453,13 @@ export class SessionsService {
   ): Promise<[DesignRevision[], number]> {
     const session = await this.em.findOne(DesignSession, sessionId);
     if (!session) throw notFound('session', `Session ${sessionId} not found`);
-    return this.em.findAndCount(
+    const [revisions, total] = await this.em.findAndCount(
       DesignRevision,
       { session: sessionId },
       { limit: query.limit, offset: query.offset, orderBy: { revisionNumber: 'desc' } },
     );
+    await this.evaluations.refreshStandings(revisions);
+    return [revisions, total];
   }
 }
 

@@ -145,7 +145,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-3',
     statement:
-      "The coach is a revise run recorded on its session: it starts from the draft, stored as the author's revision, or from a graded revision whose recorded grade the loop adopts verbatim; every iteration that beat the ones before it is imported once, as soon as the loop has recorded it, as an assistant revision with its own grade; one the studio would refuse is reported refused with its problems and never stored, and one with no artifact is reported as such, unscored; while the run is in flight the session takes no submit and no second coach, and says so.",
+      "The coach is a revise run recorded on its session: it starts from the draft, stored as the author's revision, or from a graded revision whose recorded grade the loop adopts verbatim; every iteration that beat the ones before it is imported once, as soon as the loop has recorded it, as an assistant revision with its own grade; one the studio would refuse is reported refused with its problems and never stored, one with no artifact is reported as such, unscored, and one whose revision the lenses assessed too little is reported unassessed — compared with nothing, never “not better”; while the run is in flight the session takes no submit and no second coach, and says so.",
   },
   {
     id: 'DEL-4',

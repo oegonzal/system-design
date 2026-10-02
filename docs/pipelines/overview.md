@@ -155,9 +155,12 @@ iteration whose score beat all before it as an `assistant` revision
 `(runId, k)`, once — the unique pair on the row makes a concurrent poll
 harmless — after parsing its artifact with the same schema and validators a
 submission passes. Every iteration is reported with its score, decision, the
-controller's reason and an outcome: `base`, `imported`, `not-better`, or
-`refused` with the problems the studio found (logged, never repaired, never
-stored). A failed run marks the base revision failed only when the base is
+controller's reason, what settled the decision as data, and an outcome:
+`base`, `imported`, `not-better`, `refused` with the problems the studio
+found (logged, never repaired, never stored), or — for an iteration that
+earned no score, which is compared with nothing — `unassessed` when the
+lenses assessed too little of it and `no-artifact` when the coach produced
+nothing. A failed run marks the base revision failed only when the base is
 its own — an adopted base keeps the grade of the run it came from.
 
 ---

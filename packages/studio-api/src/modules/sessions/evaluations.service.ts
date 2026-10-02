@@ -4,8 +4,12 @@ import { describeLostGrade, type EvaluationDto } from '@sysdesign/contracts';
 import { DesignRevision } from '@sysdesign/db';
 
 import { notFound } from '../../common/not-found';
-import { QualityLoopClient } from '../quality-loop/quality-loop.client';
+import { isLoopUnavailable, QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { toEvaluationDto } from './evaluation.mapper';
+
+/** One grade a revision points at: the row and the run iteration, since a re-grade repoints the row. */
+const gradeOf = (revision: DesignRevision): string =>
+  `${revision.id}@${revision.qualityRunId}#${revision.qualityIteration}`;
 
 /**
  * A revision's grade, read from the loop. The row caches the terminal
@@ -16,6 +20,9 @@ import { toEvaluationDto } from './evaluation.mapper';
  */
 @Injectable()
 export class EvaluationsService {
+  /** The grades this process has read from the loop: their cache is written by the rule it runs. */
+  private readonly read = new Set<string>();
+
   constructor(
     private readonly em: EntityManager,
     private readonly loop: QualityLoopClient,
@@ -57,6 +64,7 @@ export class EvaluationsService {
       throw notFound('evaluation', `Revision #${revision.revisionNumber} has no evaluation`);
     }
     const run = await this.loop.getRun(revision.qualityRunId);
+    this.read.add(gradeOf(revision));
     if (!run) {
       if (revision.evaluationStatus === null || revision.evaluationStatus === 'running') {
         revision.evaluationStatus = 'failed';
@@ -86,5 +94,41 @@ export class EvaluationsService {
       await em.flush();
     }
     return dto;
+  }
+
+  /**
+   * Bring the cached standings a list shows up to the grades they cache. A
+   * cache written before a grade that assessed too little stopped earning a
+   * number (`EvaluationDto.unscored`) still holds the controller's number,
+   * and its `escalate` — the evidence gate's decision — reads as a verdict on
+   * every chip, row and export that shows it until someone opens that grade.
+   * Only a complete, scored escalation can be such a cache, so each one this
+   * process has not read is read once (`syncRevision`), which rewrites it if
+   * the grade earned no score; one that is a verdict stays as it was and is
+   * not asked about again. A list never waits on the loop for this: a loop
+   * that cannot answer ends the pass, the list answers from the cache, and a
+   * later read tries again.
+   */
+  async refreshStandings(revisions: Iterable<DesignRevision>): Promise<void> {
+    for (const revision of revisions) {
+      if (!this.mayCacheAnOldStanding(revision)) continue;
+      try {
+        await this.syncRevision(revision);
+      } catch (error) {
+        if (isLoopUnavailable(error)) return;
+        throw error;
+      }
+    }
+  }
+
+  private mayCacheAnOldStanding(revision: DesignRevision): boolean {
+    return (
+      revision.qualityRunId !== null &&
+      revision.qualityIteration !== null &&
+      revision.evaluationStatus === 'complete' &&
+      revision.overall !== null &&
+      revision.decision === 'escalate' &&
+      !this.read.has(gradeOf(revision))
+    );
   }
 }

@@ -99,12 +99,15 @@ const ScoreCell = styled.span`
 
 /**
  * What the last iteration's outcome says about the stop, when it says more
- * than the stop reason: a coach that produced nothing to judge is the
- * coach's miss, never a verdict on the author's design. Read ahead of
+ * than the stop reason: a coach that produced nothing to judge, or whose
+ * revision the lenses could not assess, stopped on a miss — never a verdict
+ * on the author's design, and nothing a person must settle. Read ahead of
  * `STOPPED_COPY`.
  */
 const STOPPED_BY_OUTCOME: Partial<Record<ImproveIterationOutcome, string>> = {
   'no-artifact': 'The coach could not produce a revision this time — try again.',
+  unassessed:
+    'The lenses could not assess the coach’s last revision, so the coach stopped there — try again.',
 };
 
 /** A booted loop always has a model, so the grader is only ever "unreachable". */
@@ -113,10 +116,13 @@ const UNREACHABLE_COPY = 'The coach cannot reach the quality loop right now.';
 /**
  * What became of each iteration in the studio, as a chip, and whether its
  * row carries the controller's verdict — its decision and its reason. Every
- * outcome the contract names. An iteration that produced nothing was never
- * judged: the loop still records a decision for it ("escalate — no artifact
- * to judge"), but that is its bookkeeping, and the chip already says what
- * happened in the author's words.
+ * outcome the contract names. A revision the lenses assessed too little to
+ * score was judged — its row says "not assessed" and why — but there is no
+ * number to hold against the others, so it was not compared, and its chip
+ * says so rather than "not better". An iteration that produced nothing was
+ * never judged: the loop still records a decision for it ("escalate — no
+ * artifact to judge"), but that is its bookkeeping, and the chip already
+ * says what happened in the author's words.
  */
 const OUTCOME_ROW: Record<
   ImproveIterationOutcome,
@@ -125,6 +131,7 @@ const OUTCOME_ROW: Record<
   base: { tone: 'neutral', label: 'starting point', judged: true },
   imported: { tone: 'success', label: 'imported', judged: true },
   'not-better': { tone: 'neutral', label: 'not better', judged: true },
+  unassessed: { tone: 'neutral', label: 'not compared', judged: true },
   refused: { tone: 'critical', label: 'refused', judged: true },
   'no-artifact': { tone: 'neutral', label: 'no revision produced', judged: false },
 };
@@ -164,8 +171,9 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * starting point — the author's draft graded, or a graded revision whose
  * grade the loop adopted; every later row is one of the coach's revisions,
  * imported into the timeline when it beat everything before it, left where
- * it was when it did not, refused when the studio would not store it, or
- * missing when the coach produced nothing. Each row that was judged says why
+ * it was when it did not, not compared when the lenses could not assess it,
+ * refused when the studio would not store it, or missing when the coach
+ * produced nothing. Each row that was judged says why
  * the controller decided as it did, in the reader's words, naming the
  * findings and criteria it cites the way the feedback summary names them —
  * from the iteration's own findings, placed on the design it judged; a row

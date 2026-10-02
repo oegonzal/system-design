@@ -228,14 +228,17 @@ export const MAX_IMPROVE_ITERATIONS = MAX_QUALITY_RUN_ITERATIONS;
 /**
  * What became of one iteration in the studio: the base the run started from,
  * an assistant revision imported because it beat every earlier one, a lower
- * score left where it was, an artifact the studio would not store, or no
- * artifact at all — the coach produced nothing to judge, so nothing was
- * scored and the design is not to blame.
+ * score left where it was, a revision the lenses assessed too little to
+ * score — so it was compared with nothing, never found "not better" — an
+ * artifact the studio would not store, or no artifact at all — the coach
+ * produced nothing to judge, so nothing was scored and the design is not to
+ * blame.
  */
 export const IMPROVE_ITERATION_OUTCOMES = [
   'base',
   'imported',
   'not-better',
+  'unassessed',
   'refused',
   'no-artifact',
 ] as const;

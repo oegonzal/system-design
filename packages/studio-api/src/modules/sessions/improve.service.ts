@@ -23,23 +23,29 @@ import {
   type StartImproveDto,
   type StartImproveRequest,
   type SuccessCriterion,
+  type UnscoredReason,
 } from '@sysdesign/contracts';
 import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sysdesign/db';
 
 import { notFound } from '../../common/not-found';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { recordCoachingStatus } from './coaching-status';
-import {
-  decisionBasisOf,
-  findingsOf,
-  iterationGrade,
-  locationIndex,
-  unscoredReason,
-} from './evaluation.mapper';
+import { decisionBasisOf, findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
 import { SessionsService, type RevisionCache } from './sessions.service';
 import { submissionProblems } from './submission';
+
+/**
+ * What became of a later iteration that earned no score: there is no number
+ * to hold against the ones before it, so it is compared with nothing, and its
+ * outcome says why — the coach produced nothing, or the lenses assessed too
+ * little of what it produced. Never "not better": that is a verdict.
+ */
+const UNSCORED_OUTCOME: Readonly<Record<UnscoredReason, ImproveIterationOutcome>> = {
+  'no-artifact': 'no-artifact',
+  unassessed: 'unassessed',
+};
 
 /**
  * The coach: the same run as a grade, allowed to iterate, whose producer is
@@ -255,7 +261,7 @@ export class ImproveService {
     const layout = positionsOf(base.graph);
     let bestBefore = Number.NEGATIVE_INFINITY;
     for (const it of recorded) {
-      const { overall, decision } = iterationGrade(it);
+      const { overall, unscored, decision } = iterationGrade(it);
       const cache: RevisionCache = { status: 'complete', overall, decision };
       // What the iteration judged, when it is a submission: its findings are
       // grounded on it, and it is what an import would store.
@@ -271,9 +277,9 @@ export class ImproveService {
       } else if ((revision = stored.get(it.iteration) ?? null) !== null) {
         outcome = 'imported';
         writeCache(revision, cache);
-      } else if (it.artifact === null) {
-        // The coach produced nothing to judge: no score, and no verdict on the design.
-        outcome = 'no-artifact';
+      } else if (unscored !== null) {
+        // Nothing scored to compare: no verdict on the design, and none against the others.
+        outcome = UNSCORED_OUTCOME[unscored];
       } else if (overall !== null && overall > bestBefore) {
         const imported = await this.import(
           sessionId,
@@ -299,7 +305,7 @@ export class ImproveService {
         iteration: it.iteration,
         mode: it.mode,
         overall,
-        unscored: unscoredReason(it),
+        unscored,
         decision: it.decision.finalDecision,
         reason: it.decision.reason,
         decisionBasis: decisionBasisOf(it),

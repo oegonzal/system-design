@@ -47,10 +47,13 @@ and **see results / iterate**.
   saved one), **The canvas shows your draft, not this revision.** so a score
   never reads as the verdict on what is drawn now. Then the **overall score**
   with the controller's **decision**
-  (accept / revise / retry / escalate / reject) and its own **reason**, one
+  (accept / revise / retry / escalate / reject) and why, in plain words
+  worded from what settled it — **Below the accept threshold — 3 fixes to
+  make.**, **Blocked by** the findings and criteria it names, **Below the
+  reject floor of 30**, **At or above the accept threshold of 75** — never
+  the controller's own sentence, one
   **meter per dimension** the pipeline declares (coverage, quality attributes,
-  compliance — "Not assessed" when nothing earned it, and the overall stays
-  empty rather than zero when nothing was assessed at all), a **result per
+  compliance — "Not assessed" when nothing earned it), a **result per
   criterion** (pass / partial / fail, a stacked list), and the **findings**:
   each with its severity, the lenses that confirmed it, its type, the criteria
   it names, the lens's rationale, and the places it points at, **labelled** —
@@ -61,6 +64,14 @@ and **see results / iterate**.
   one the revision has is read as its label — and so is a place the
   rationale merely mentions, which reads by its label too but is no chip of
   the finding's and highlights nothing: a finding is where its lens cited.
+  A grade made without some of its lens samples says which did not answer
+  and that the score stands on the ones that did. A grade whose lenses
+  assessed too few of the criteria to score the design is no verdict: in
+  place of a score and a decision the tab says **This revision couldn’t be
+  graded** — how many of the criteria the lenses assessed, which lens samples
+  did not answer, and that nothing there is a verdict on the design — with
+  **Grade this revision again**, which grades it again in place as a failed
+  grade is.
   While the run is in flight the tab polls and counts how long the grade has
   taken from the run's own start (so a reload or a re-grade counts right),
   and if the run's last sign of life — its heartbeat — has missed two of the
@@ -86,13 +97,19 @@ and **see results / iterate**.
   the draft: it is stored as your revision and graded as the starting point.
   From a graded revision — when the canvas is clean and the loaded revision's
   grade is complete — the loop reuses that grade as the starting point instead
-  of grading it again, and nothing is stored twice. Before the coach revises
+  of grading it again, and nothing is stored twice. A revision whose grade was
+  not assessed is no starting point — the coach would measure every revision
+  against a number that was never a score — so the coach is off and says
+  why: grade it again, then coach it. Before the coach revises
   anything, the loop recalls lessons from earlier runs for the prompt — and,
   starting from a graded revision, for what that grade found wrong with it —
   and hands them to the coach only — the graders never see them — so the panel
-  first says it is recalling, then **Recalled N lessons from earlier runs**
-  with the list behind **Show lessons**, or why there were none — with one
-  iteration there is nothing to revise, so the coach recalls none, and a
+  first says it is recalling, then **Recalled N lessons from earlier runs for
+  the coach** with the list behind **Show lessons** — and, when it started
+  from a graded revision, **Searched for what the starting grade found
+  wrong:** each kind of defect that grade confirmed and each criterion it fell
+  short on (`c3 not met`, `c4 met in part`) — or why there were none — with
+  one iteration there is nothing to revise, so the coach recalls none, and a
   review that could not settle what to check the lessons against, or
   produced nothing to go on, says so in its own words. Progress shows the
   iteration under way and the model calls as they happen, how long the run
@@ -102,10 +119,14 @@ and **see results / iterate**.
   **starting point** (**grade reused** when the loop adopted a revision's
   grade instead of grading it again), **imported** (it beat every earlier one
   and landed in the timeline as an **AI** revision), **not better**,
+  **not assessed** · **not compared** (the lenses could not assess that
+  revision, so there was no score to hold against the others),
   **refused** with the problems the studio found, or **no revision
   produced** — the coach's miss, never a verdict on your design — every
-  judged row with the controller's decision and reason, naming the findings
-  and criteria it cites the way the feedback does. A run that fails says
+  judged row with the controller's decision and why, in the same words as
+  the feedback, naming the findings and criteria it cites. A run whose last
+  revision could not be assessed says so and stopped there — a miss to try
+  again, not a call for a person. A run that fails says
   **The coach stopped unexpectedly** with its own error under **Technical
   details**, and the previous run's best revision stays one click away. An
   imported revision keeps your layout: the
@@ -116,7 +137,8 @@ and **see results / iterate**.
   while the loop is unreachable.
 - **Revisions** — the version history: one chip per revision, newest first,
   with its score, decision and status — **grading…** while its run goes,
-  **failed** when the run failed, **grade lost** when the grader no longer
+  **not assessed** in place of a score and a decision when its grade earned
+  none, **failed** when the run failed, **grade lost** when the grader no longer
   has the run (the chip's title says so, and the Feedback tab offers the
   re-grade) — and an **AI** badge on coach-authored ones. The chip the
   canvas shows is marked current and says **on canvas**; when the canvas
@@ -127,12 +149,19 @@ and **see results / iterate**.
 
 _(Beside the page's title sits the session's status: **submitted #2 ·
 graded** — your latest submission, named as that so it never reads as a
-label for whatever the canvas shows, with **grading…** or **grading failed**
-in place of **graded** while its grade runs or after it failed. Above the
-canvas, the toolbar holds the actions: **Submit for grading**, **Undo**,
-**Redo**, **Clear**, **Fit view** and **Export** — a zip of the diagram PDF
-plus per-artifact Markdown — and the **draft badge**: unsaved draft, saving
-draft…, draft saved, draft not saved. The canvas autosaves to the session a
+label for whatever the canvas shows, with **grading…**, **not assessed** or
+**grading failed** in place of **graded** while its grade runs, when it
+earned no score, or after it failed. Above the canvas, the toolbar holds
+the actions — **Submit for grading**, **Undo**, **Redo**, **Clear**, **Fit
+view** and **Export** — and the **draft badge**: unsaved draft, saving
+draft…, draft saved, draft not saved. **Export** downloads a zip of the
+diagram PDF plus per-artifact Markdown, named for what the diagram is:
+`…-rev2.zip` for the revision on the canvas, `…-draft.zip` when the canvas
+shows the draft. When that draft has moved on from the revision whose
+feedback is shown, the feedback file opens with the panel's own caveat
+(**The canvas shows your draft, not this revision. The diagram in this
+export is the draft.**), and every file says what the panel says, a grade
+that was not assessed included. The canvas autosaves to the session a
 moment after you stop editing, is restored ahead of the latest revision when
 the workspace opens, and is cleared by the submit or coach start it became;
 a navigation while a save is still pending asks first, and a save that finds
@@ -221,8 +250,10 @@ the engine validates at boot — says how:
 4. **Gates come before the number.** A `critical` finding, a confirmed
    constraint violation or a failed constraint criterion blocks an accept
    however high the score; at or above the accept threshold the decision is
-   `accept`, below the reject floor `retry`, and in between `revise` with the
-   remediations the coach would apply.
+   `accept`, and below it `revise` with the remediations the coach would
+   apply — below the reject floor as well, where the design needs reworking
+   rather than touching up: the canvas pipeline never answers `retry`, since
+   a design you drew is revised, never started over.
 
 There is no letter grade and no cap the studio adds: what you see is the
 loop's decision and its trace.
