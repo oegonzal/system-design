@@ -98,6 +98,26 @@ export const Busy: Story = {
   decorators: [withCanvasStore((store) => store.getState().setGraph(BUSY))],
 };
 
+const CROSSING: CanvasGraph = {
+  nodes: [
+    { id: 'n-1', kind: 'client', label: 'Client', position: { x: 200, y: 20 } },
+    { id: 'n-2', kind: 'cdn', label: 'Edge CDN', position: { x: 190, y: 180 } },
+    { id: 'n-3', kind: 'dns', label: 'DNS', position: { x: 200, y: 340 } },
+  ],
+  edges: [
+    { id: 'e-1', source: 'n-1', target: 'n-3', kind: 'sync', label: 'resolve' },
+    { id: 'e-2', source: 'n-1', target: 'n-2', kind: 'sync', label: 'static assets' },
+  ],
+};
+
+/**
+ * A connection whose midpoint falls on a third block: the pill moves along
+ * the line until it is clear of every block, so no title is covered.
+ */
+export const PillClearOfBlocks: Story = {
+  decorators: [withCanvasStore((store) => store.getState().setGraph(CROSSING))],
+};
+
 function RevisionLoader() {
   const store = useCanvasStoreApi();
   const [viewing, setViewing] = useState(false);

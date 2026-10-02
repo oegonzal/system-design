@@ -4,10 +4,18 @@ import { css, keyframes, useTheme, type Theme } from '@emotion/react';
 import styled from '@emotion/styled';
 import type { EdgeKind, Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
-import { memo, type CSSProperties } from 'react';
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  useStore,
+  type EdgeProps,
+  type ReactFlowState,
+} from '@xyflow/react';
+import { memo, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 
+import type { Box, Size } from '../geometry';
 import type { SdEdge as SdEdgeModel } from '../types';
+import { connectionCurve, curvePath, pillPoint, type Curve } from './edge-path';
 
 /** Async edges drift their dashes — data flowing, not a call waiting. */
 const dashFlow = keyframes`
@@ -70,6 +78,79 @@ const LabelChip = styled.div`
   font-family: ${({ theme }) => theme.font.family.base};
 `;
 
+type FlowNodes = ReactFlowState['nodes'];
+
+/** Every measured block's box, computed once per node list however many pills ask. */
+const boxesByNodes = new WeakMap<FlowNodes, Box[]>();
+
+/**
+ * The blocks a pill has to keep clear of, as React Flow measured them. The
+ * same array for the same node list, so a pill re-renders when a block
+ * moves or resizes and not when the view pans.
+ */
+function selectBlockBoxes(state: ReactFlowState): Box[] {
+  const cached = boxesByNodes.get(state.nodes);
+  if (cached) return cached;
+  const boxes = state.nodes.flatMap((node) =>
+    node.measured?.width && node.measured.height
+      ? [{ ...node.position, width: node.measured.width, height: node.measured.height }]
+      : [],
+  );
+  boxesByNodes.set(state.nodes, boxes);
+  return boxes;
+}
+
+const UNMEASURED: Size = { width: 0, height: 0 };
+
+/** The size the pill is laid out at, in flow units (unscaled by the zoom); null until it is in the page. */
+function useLaidOutSize(element: HTMLElement | null, text: string): Size | null {
+  const [size, setSize] = useState<Size | null>(null);
+  // Before paint, so the pill is never seen on a block it is about to leave.
+  useLayoutEffect(() => {
+    if (element === null) return;
+    const next = { width: element.offsetWidth, height: element.offsetHeight };
+    setSize((current) =>
+      current?.width === next.width && current.height === next.height ? current : next,
+    );
+  }, [element, text]);
+  // And again whenever the layout changes it — a font that arrived late.
+  useEffect(() => {
+    if (element === null) return;
+    const observer = new ResizeObserver(() => {
+      const next = { width: element.offsetWidth, height: element.offsetHeight };
+      setSize((current) =>
+        current?.width === next.width && current.height === next.height ? current : next,
+      );
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return size;
+}
+
+/**
+ * The connection's pill, centred on its line where no block is under it.
+ * Its place is inline style on the chip, like the line's stroke: a copy of
+ * the diagram (the PDF) keeps it where the screen shows it.
+ */
+function EdgePill({ id, curve, text }: { id: string; curve: Curve; text: string }) {
+  const blocks = useStore(selectBlockBoxes);
+  const [chip, setChip] = useState<HTMLDivElement | null>(null);
+  const size = useLaidOutSize(chip, text);
+  const point = useMemo(() => pillPoint(curve, size ?? UNMEASURED, blocks), [curve, size, blocks]);
+  return (
+    <EdgeLabelRenderer>
+      <LabelChip
+        ref={setChip}
+        data-testid={`edge-pill-${id}`}
+        style={{ transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)` }}
+      >
+        {text}
+      </LabelChip>
+    </EdgeLabelRenderer>
+  );
+}
+
 function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   const {
     id,
@@ -86,14 +167,16 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   } = props;
   const theme = useTheme();
 
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-  });
+  const curve = useMemo(
+    () =>
+      connectionCurve({
+        source: { x: sourceX, y: sourceY },
+        sourceSide: sourcePosition,
+        target: { x: targetX, y: targetY },
+        targetSide: targetPosition,
+      }),
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition],
+  );
 
   const kind = data?.kind ?? 'sync';
   const severity = data?.severity ?? null;
@@ -118,19 +201,11 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
     >
       <BaseEdge
         id={id}
-        path={path}
+        path={curvePath(curve)}
         markerEnd={markerEnd}
         style={edgeStroke(theme, { kind, severity, selected })}
       />
-      {pill !== null ? (
-        <EdgeLabelRenderer>
-          <LabelChip
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-          >
-            {pill}
-          </LabelChip>
-        </EdgeLabelRenderer>
-      ) : null}
+      {pill !== null ? <EdgePill id={id} curve={curve} text={pill} /> : null}
     </EdgeGroup>
   );
 }
