@@ -21,6 +21,7 @@ import { useCallback, useEffect, type DragEvent } from 'react';
 
 import { useCanvasStore } from './canvas-store-context';
 import { SdEdge } from './edges/sd-edge';
+import { flowVariableDeclarations } from './flow-theme';
 import { MINIMAP_SIZE, revealShift, viewArea } from './framing';
 import { SdNode } from './nodes/sd-node';
 import { NODE_DRAG_MIME } from './palette/palette';
@@ -49,12 +50,7 @@ const FIT_ICON = (
   </svg>
 );
 
-/**
- * React Flow's chrome is painted from the theme in either mode: these are the
- * variables its stylesheet reads, so the controls, minimap, handles,
- * connection line and arrowheads follow the design tokens rather than its
- * own light palette (or its dark one, which `colorMode` would otherwise pick).
- */
+/** The canvas's frame; React Flow's chrome inside it is painted from the theme (`flowVariables`). */
 const CanvasFrame = styled.div`
   width: 100%;
   height: 100%;
@@ -64,28 +60,7 @@ const CanvasFrame = styled.div`
   overflow: hidden;
   background: ${({ theme }) => theme.color.bg.surface};
 
-  --xy-background-pattern-color: ${({ theme }) => theme.color.border.default};
-  --xy-edge-stroke: ${({ theme }) => theme.color.border.default};
-  --xy-edge-stroke-selected: ${({ theme }) => theme.color.border.focus};
-  --xy-connectionline-stroke: ${({ theme }) => theme.color.border.focus};
-  --xy-handle-background-color: ${({ theme }) => theme.color.border.default};
-  --xy-handle-border-color: ${({ theme }) => theme.color.bg.surface};
-  --xy-controls-button-background-color: ${({ theme }) => theme.color.bg.surface};
-  --xy-controls-button-background-color-hover: ${({ theme }) => theme.color.bg.subtle};
-  --xy-controls-button-color: ${({ theme }) => theme.color.text.secondary};
-  --xy-controls-button-color-hover: ${({ theme }) => theme.color.text.primary};
-  --xy-controls-button-border-color: ${({ theme }) => theme.color.border.subtle};
-  --xy-controls-box-shadow: ${({ theme }) => theme.shadow.sm};
-  --xy-minimap-background-color: ${({ theme }) => theme.color.bg.surface};
-  /* Translucent, so the blocks outside the visible area still show through. */
-  --xy-minimap-mask-background-color: color-mix(
-    in srgb,
-    ${({ theme }) => theme.color.bg.subtle} 70%,
-    transparent
-  );
-  --xy-minimap-mask-stroke-color: ${({ theme }) => theme.color.border.default};
-  /* Attribution stays (free tier); just keep it readable on our surface. */
-  --xy-attribution-background-color: transparent;
+  ${({ theme }) => flowVariableDeclarations(theme)}
 
   .react-flow__controls,
   .react-flow__minimap {
@@ -94,9 +69,10 @@ const CanvasFrame = styled.div`
     overflow: hidden;
   }
 
-  /* A connection's pill is drawn above the blocks, so one whose midpoint falls
-     under a block is still read — on screen and in the exported PDF. A block
-     being dragged or selected (React Flow lifts it) still passes over it. */
+  /* A connection's pill keeps clear of the blocks wherever its line has the
+     room (\`pillPoint\`); where it has none the pill is drawn above them, so it
+     is still read — on screen and in the exported PDF. A block being dragged
+     or selected (React Flow lifts it) still passes over it. */
   .react-flow__edgelabel-renderer {
     z-index: 1;
   }

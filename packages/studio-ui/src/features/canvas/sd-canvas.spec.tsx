@@ -1,3 +1,5 @@
+import { COLOR_MODES, DEFAULT_APPEARANCE_SETTINGS, type ColorMode } from '@sysdesign/contracts';
+import { createTheme } from '@sysdesign/design-system';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { act, createEvent, fireEvent, screen } from '@testing-library/react';
 import { ReactFlowProvider, useStoreApi } from '@xyflow/react';
@@ -17,7 +19,7 @@ const PANE = { width: 800, height: 600 };
 type FlowStore = ReturnType<typeof useStoreApi>;
 
 /** The canvas as the workspace mounts it — inside the page's React Flow provider — plus a handle on React Flow's own store. */
-function mountCanvas(store: CanvasStore) {
+function mountCanvas(store: CanvasStore, settings?: { colorMode: ColorMode }) {
   const handle: { flow: FlowStore | null } = { flow: null };
   function Probe() {
     handle.flow = useStoreApi();
@@ -30,6 +32,7 @@ function mountCanvas(store: CanvasStore) {
         <Probe />
       </CanvasStoreProvider>
     </ReactFlowProvider>,
+    { settings },
   );
   const flow = () => {
     if (!handle.flow) throw new Error('React Flow store not captured');
@@ -140,4 +143,18 @@ describe('SdCanvas', () => {
     );
     expect(marked).toEqual([]);
   });
+
+  it.each(COLOR_MODES)(
+    'paints React Flow’s surface from the theme in %s mode, never from its own palette',
+    (colorMode) => {
+      const theme = createTheme({ ...DEFAULT_APPEARANCE_SETTINGS, colorMode });
+      const { surface } = mountCanvas(createCanvasStore(), { colorMode });
+
+      const frame = screen.getByTestId('sd-canvas');
+      expect(getComputedStyle(frame).getPropertyValue('--xy-background-color')).toBe(
+        theme.color.bg.surface,
+      );
+      expect(surface().classList.contains(colorMode)).toBe(true);
+    },
+  );
 });
