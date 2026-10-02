@@ -3,6 +3,7 @@ import { act, createEvent, fireEvent, screen } from '@testing-library/react';
 import { ReactFlowProvider, useStoreApi } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
+import { makeGraph } from '../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
 import { viewArea } from './framing';
@@ -121,5 +122,22 @@ describe('SdCanvas', () => {
     mountCanvas(store);
 
     expect(store.getState().viewport?.area()).toEqual(viewArea(PANE, [0, 0, 1]));
+  });
+
+  it('a click on the empty pane clears the selection — the properties panel shows nothing, and nothing on the canvas is marked', () => {
+    const store = createCanvasStore(makeGraph());
+    const { surface } = mountCanvas(store);
+    act(() => store.getState().select('e-2'));
+    expect(store.getState().selectedId).toBe('e-2');
+
+    const pane = surface().querySelector<HTMLElement>('.react-flow__pane');
+    if (!pane) throw new Error('no pane');
+    fireEvent.click(pane);
+
+    expect(store.getState().selectedId).toBeNull();
+    const marked = [...store.getState().nodes, ...store.getState().edges].filter(
+      (element) => element.selected,
+    );
+    expect(marked).toEqual([]);
   });
 });

@@ -99,6 +99,12 @@ export interface CanvasViewport {
 }
 
 export interface CanvasState extends CanvasContent {
+  /**
+   * The element the properties panel edits. It follows the `selected` flags
+   * React Flow draws by — whatever selects or deselects on the canvas (a
+   * click, a key, a drag, a click on the empty pane) moves it, and `select`
+   * moves the flags with it — so the panel and the canvas never disagree.
+   */
   selectedId: string | null;
   /** Unsaved-draft flag: set by edits, cleared by setGraph/markClean. */
   dirty: boolean;
@@ -123,7 +129,7 @@ export interface CanvasState extends CanvasContent {
 
   setGraph(graph: CanvasGraph): void;
   /**
-   * Author edit; the new block is selected. `position` drops it there
+   * Author edit; the new block is the selection. `position` drops it there
    * (kept on the pane); without one it takes the free place nearest the
    * middle of what is visible, clear of every other block — and when nothing
    * visible is free, the nearest free place beside it, which the view then
@@ -245,6 +251,40 @@ function paintSeverity<T extends SdNode | SdEdge>(
 
 const unselected = <T extends SdNode | SdEdge>(element: T): T =>
   element.selected ? { ...element, selected: false } : element;
+
+/**
+ * The elements with exactly `id` flagged selected — what `selectedId` looks
+ * like on the canvas. The same array when the flags already say so.
+ */
+function marked<T extends SdNode | SdEdge>(elements: T[], id: string | null): T[] {
+  const stale = (element: T): boolean => (element.selected ?? false) !== (element.id === id);
+  if (!elements.some(stale)) return elements;
+  return elements.map((element) =>
+    stale(element) ? ({ ...element, selected: element.id === id } as T) : element,
+  );
+}
+
+/**
+ * `selectedId` after React Flow reported `changes`: the element it just
+ * selected; or, when the one the panel shows was deselected or removed,
+ * whatever is still selected (`remaining`, the elements after the changes),
+ * else nothing.
+ */
+function selectionAfter(
+  changes: readonly (NodeChange<SdNode> | EdgeChange<SdEdge>)[],
+  selectedId: string | null,
+  remaining: readonly (SdNode | SdEdge)[],
+): string | null {
+  let next = selectedId;
+  for (const change of changes) {
+    if (change.type === 'select' && change.selected) next = change.id;
+    else if ((change.type === 'select' || change.type === 'remove') && change.id === next) {
+      next = null;
+    }
+  }
+  if (next !== null || next === selectedId) return next;
+  return remaining.find((element) => element.selected)?.id ?? null;
+}
 
 function contentOf(state: CanvasContent): CanvasContent {
   return {
@@ -390,7 +430,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       },
 
       addNode(kind, position) {
-        const { nodes, readOnly, viewport } = get();
+        const { nodes, edges, readOnly, viewport } = get();
         if (readOnly) return null;
         const area = viewport?.area() ?? null;
         const placed: Placement =
@@ -405,22 +445,27 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
           id: nextId('n', nodes),
           type: 'sd',
           position: placed.position,
+          selected: true,
           data: { kind, label: DEFAULT_NODE_LABELS[kind] },
         };
-        commit({ nodes: [...nodes, node], selectedId: node.id });
+        commit({
+          nodes: [...nodes.map(unselected), node],
+          edges: edges.map(unselected),
+          selectedId: node.id,
+        });
         if (!placed.visible) viewport?.reveal({ ...placed.position, ...placed.size });
         return node;
       },
 
       onNodesChange(changes) {
-        const { nodes, selectedId, readOnly } = get();
+        const { nodes, edges, selectedId, readOnly } = get();
         const permitted = readOnly ? changes.filter(isViewChange) : changes;
         if (permitted.length === 0) return;
         const next = applyNodeChanges<SdNode>(permitted, nodes);
-        const removed = permitted.some(
-          (change) => change.type === 'remove' && change.id === selectedId,
-        );
-        const patch = { nodes: next, ...(removed ? { selectedId: null } : {}) };
+        const patch = {
+          nodes: next,
+          selectedId: selectionAfter(permitted, selectedId, [...next, ...edges]),
+        };
         const edits = permitted.filter((change) => !isViewChange(change));
         if (edits.length === 0) {
           set(patch);
@@ -445,15 +490,13 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       },
 
       onEdgesChange(changes) {
-        const { edges, selectedId, readOnly } = get();
+        const { nodes, edges, selectedId, readOnly } = get();
         const permitted = readOnly ? changes.filter(isViewChange) : changes;
         if (permitted.length === 0) return;
-        const removed = permitted.some(
-          (change) => change.type === 'remove' && change.id === selectedId,
-        );
+        const next = applyEdgeChanges<SdEdge>(permitted, edges);
         const patch = {
-          edges: applyEdgeChanges<SdEdge>(permitted, edges),
-          ...(removed ? { selectedId: null } : {}),
+          edges: next,
+          selectedId: selectionAfter(permitted, selectedId, [...nodes, ...next]),
         };
         if (permitted.every(isViewChange)) set(patch);
         else commit(patch);
@@ -567,7 +610,8 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       },
 
       select(id) {
-        set({ selectedId: id });
+        const { nodes, edges } = get();
+        set({ selectedId: id, nodes: marked(nodes, id), edges: marked(edges, id) });
       },
 
       setHighlight(highlight) {

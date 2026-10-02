@@ -519,6 +519,70 @@ describe('canvas-store', () => {
     });
   });
 
+  describe('selection', () => {
+    const selectedFlags = (store: CanvasStore) =>
+      [...store.getState().nodes, ...store.getState().edges]
+        .filter((element) => element.selected)
+        .map((element) => element.id);
+
+    it('select marks exactly that element on the canvas, and select(null) none', () => {
+      const store = createCanvasStore(makeGraph());
+
+      store.getState().select('n-1');
+      store.getState().select('e-2');
+      expect(store.getState().selectedId).toBe('e-2');
+      expect(selectedFlags(store)).toEqual(['e-2']);
+
+      store.getState().select(null);
+      expect(store.getState().selectedId).toBeNull();
+      expect(selectedFlags(store)).toEqual([]);
+    });
+
+    it('a newly added block is the one selected, on the canvas as in the panel', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().select('e-1');
+
+      const node = store.getState().addNode('cache');
+
+      expect(store.getState().selectedId).toBe(node?.id);
+      expect(selectedFlags(store)).toEqual([node?.id]);
+    });
+
+    it('follows what React Flow selects — a key or a drag selects without any click', () => {
+      const store = createCanvasStore(makeGraph());
+
+      store.getState().onEdgesChange([{ type: 'select', id: 'e-1', selected: true }]);
+      expect(store.getState().selectedId).toBe('e-1');
+
+      // Selecting a block deselects the connection: two reports, either order.
+      store.getState().onNodesChange([{ type: 'select', id: 'n-2', selected: true }]);
+      store.getState().onEdgesChange([{ type: 'select', id: 'e-1', selected: false }]);
+      expect(store.getState().selectedId).toBe('n-2');
+    });
+
+    it('clears when React Flow deselects the element the panel shows — a click on the empty pane, Escape', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().select('e-2');
+
+      store.getState().onEdgesChange([{ type: 'select', id: 'e-2', selected: false }]);
+
+      expect(store.getState().selectedId).toBeNull();
+      expect(selectedFlags(store)).toEqual([]);
+    });
+
+    it('falls back to what is still selected when one of several is deselected', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().onNodesChange([
+        { type: 'select', id: 'n-1', selected: true },
+        { type: 'select', id: 'n-2', selected: true },
+      ]);
+      expect(store.getState().selectedId).toBe('n-2');
+
+      store.getState().onNodesChange([{ type: 'select', id: 'n-2', selected: false }]);
+      expect(store.getState().selectedId).toBe('n-1');
+    });
+  });
+
   describe('content version', () => {
     it('[UX-15] counts edits, and never a selection, a measured size or a highlight', () => {
       const store = createCanvasStore(makeGraph());
