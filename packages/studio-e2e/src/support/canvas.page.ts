@@ -518,6 +518,16 @@ export class CanvasPage {
     await expect(this.page.getByTestId('score-summary')).toBeVisible({ timeout: EVAL_TIMEOUT });
   }
 
+  /** Whose feedback the tab shows: the revision by number, badged when the coach wrote it. */
+  get feedbackSubject(): Locator {
+    return this.page.getByTestId('feedback-subject');
+  }
+
+  /** The feedback tab's line for a canvas that has moved on to the draft; absent while it shows the revision. */
+  get feedbackOffCanvas(): Locator {
+    return this.page.getByTestId('feedback-off-canvas');
+  }
+
   async expectOverall(score: number): Promise<void> {
     await expect(this.page.getByTestId('overall-score')).toHaveText(String(score));
   }

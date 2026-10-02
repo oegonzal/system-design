@@ -65,15 +65,31 @@ test.describe('the AI coach', () => {
     await canvas.expectNodeCount(4);
     await expect(canvas.readOnlyBanner).toContainText('revision #2');
     await canvas.expectSubmitDisabled();
+    // Three places, each naming its subject: the canvas and the feedback are
+    // on the coach's revision, the toolbar still reports the author's own.
+    await expect(canvas.feedbackSubject).toContainText('revision #2');
+    await expect(canvas.feedbackOffCanvas).toHaveCount(0);
+    await expect(canvas.submissionStatus(1)).toHaveAttribute('data-status', 'complete');
+    await canvas.revisionsTab.click();
+    await expect(canvas.revisionChip(2)).toHaveAttribute('aria-current', 'true');
+    await expect(canvas.revisionChip(1)).not.toHaveAttribute('aria-current');
     await canvas.narrativeTab.click();
     await expect(canvas.narrativeOverview).toBeDisabled();
     await canvas.briefTab.click();
     await expect(canvas.bindingClaim('c1')).toBeDisabled();
 
-    // Restored as a draft, the same design is the author's to edit and submit again.
+    // Restored as a draft, the same design is the author's to edit and submit
+    // again — and the canvas no longer shows a revision: no chip is current,
+    // and the feedback says it is about #2, not about what is drawn now.
     await canvas.restoreAsDraft();
     await expect(page.getByTestId('submit-revision')).toBeEnabled();
+    await canvas.narrativeTab.click();
     await expect(canvas.narrativeOverview).toBeEnabled();
+    await canvas.revisionsTab.click();
+    await expect(canvas.revisionChip(2)).not.toHaveAttribute('aria-current');
+    await expect(canvas.revisionChip(2)).toContainText('feedback shown');
+    await canvas.feedbackTab.click();
+    await expect(canvas.feedbackOffCanvas).toBeVisible();
   });
 
   test('[DEL-3] coaching a graded revision adopts its grade as the starting point: no second grade, no duplicate revision, one new AI revision', async ({
