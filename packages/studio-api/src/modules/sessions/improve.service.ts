@@ -283,11 +283,11 @@ export class ImproveService {
     void this.loop
       .digestRun(runId)
       .then(async ({ orchestrationRunId }) => {
-        await this.em.nativeUpdate(
-          CoachingRun,
-          { runId },
-          { digestOrchestrationId: orchestrationRunId },
-        );
+        // A fork, not the request's manager: this resolves after the response,
+        // when the request context it belonged to is gone.
+        await this.em
+          .fork()
+          .nativeUpdate(CoachingRun, { runId }, { digestOrchestrationId: orchestrationRunId });
         this.logger.log(`coach run ${runId} handed to memory run ${orchestrationRunId}`);
       })
       .catch((error: unknown) => {
