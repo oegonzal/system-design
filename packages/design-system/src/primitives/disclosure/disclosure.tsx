@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { transient } from '../../theme/styled';
 import { Button, type ButtonProps } from '../button/button';
 
 interface DisclosureContextValue {
@@ -86,8 +87,22 @@ export interface DisclosureButtonProps extends Omit<ButtonProps, 'children'> {
 }
 
 /**
+ * The state a sighted reader sees: a chevron that points along the row while
+ * the panel is folded and turns down toward it while it shows. A label alone
+ * looks the same open and shut, and `aria-expanded` reaches only assistive
+ * technology. Decorative — the button's name stays its words.
+ */
+const Chevron = styled('svg', transient)<{ $open: boolean }>`
+  flex-shrink: 0;
+  transform: rotate(${({ $open }) => ($open ? 90 : 0)}deg);
+  transition: transform ${({ theme }) => theme.motion.duration.fast}
+    ${({ theme }) => theme.motion.easing.standard};
+`;
+
+/**
  * The control: a `Button` (every variant and size) that says whether the
- * panel shows (`aria-expanded`) and which panel it is (`aria-controls`).
+ * panel shows (`aria-expanded`) and which panel it is (`aria-controls`), and
+ * shows it with a chevron ahead of its words, whatever they say.
  * It opens from the keyboard as any button does.
  */
 export function DisclosureButton({ children, onClick, ...rest }: DisclosureButtonProps) {
@@ -103,6 +118,24 @@ export function DisclosureButton({ children, onClick, ...rest }: DisclosureButto
       }}
       {...rest}
     >
+      <Chevron
+        $open={open}
+        width="12"
+        height="12"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+        data-disclosure-chevron=""
+      >
+        <path
+          d="M6 3l5 5-5 5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Chevron>
       {typeof children === 'function' ? children(open) : children}
     </Button>
   );

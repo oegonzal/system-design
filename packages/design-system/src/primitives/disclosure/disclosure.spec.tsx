@@ -37,6 +37,20 @@ describe('Disclosure', () => {
     expect(panel()?.hidden).toBe(true);
   });
 
+  it('shows its state on screen as well: a chevron that turns toward the panel while it shows, whatever the label says', () => {
+    renderWithTheme(<Folded />);
+    const button = screen.getByRole('button', { name: 'Technical details' });
+    const chevron = () => button.querySelector('[data-disclosure-chevron]') as SVGElement;
+    // Decorative: the button is still named by its words alone.
+    expect(chevron().getAttribute('aria-hidden')).toBe('true');
+    expect(getComputedStyle(chevron()).transform).toBe('rotate(0deg)');
+
+    fireEvent.click(button);
+    expect(getComputedStyle(chevron()).transform).toBe('rotate(90deg)');
+    fireEvent.click(button);
+    expect(getComputedStyle(chevron()).transform).toBe('rotate(0deg)');
+  });
+
   it('can start open, and tells its button what it says while open', () => {
     const opened = renderWithTheme(<Opened />);
     expect(
