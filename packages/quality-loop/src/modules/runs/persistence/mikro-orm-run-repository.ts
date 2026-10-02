@@ -5,6 +5,7 @@ import type {
   LlmExchangeSummaryDto,
   QualityRunDto,
   QualityRunSummaryDto,
+  RunRecallDto,
 } from '@sysdesign/contracts';
 import {
   QualityRun,
@@ -54,6 +55,17 @@ export class MikroOrmRunRepository implements RunRepository {
         QualityRun,
         { id: runId, status: 'running' },
         { exchanges, exchangeCount: exchanges.length, heartbeatAt: now, updatedAt: now },
+      );
+  }
+
+  async recordRecall(runId: string, recall: RunRecallDto): Promise<void> {
+    const now = new Date();
+    await this.em
+      .fork()
+      .nativeUpdate(
+        QualityRun,
+        { id: runId, status: 'running' },
+        { recall, heartbeatAt: now, updatedAt: now },
       );
   }
 

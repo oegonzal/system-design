@@ -3,6 +3,7 @@ import type { LlmModelDto } from '../llm-model';
 import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
 import type { SuccessCriterion } from './evidence';
+import type { RunRecallDto, RunRecallSummaryDto } from './recall';
 import type { Decision, StopReason } from './vocab';
 
 export const QUALITY_RUN_STATUSES = ['running', 'complete', 'failed'] as const;
@@ -72,6 +73,12 @@ export interface QualityRunDto {
   finishedAt: IsoDateString | null;
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
+  /**
+   * The lessons recalled for the goal before the run produced — `recalling`
+   * from the moment the run opens until they are in — and the producer saw
+   * exactly `recall.lessons`. Null when the run did not ask to recall.
+   */
+  recall: RunRecallDto | null;
   trace: RunTrace | null;
   exchanges: LlmExchangeSummaryDto[];
   error: RunErrorDto | null;
@@ -102,6 +109,15 @@ export interface StartQualityRunRequest {
    * else is refused with 400.
    */
   adopt?: AdoptedIterationRef;
+  /**
+   * Recall lessons from earlier runs for the goal before producing, and hand
+   * them to the producer alone: the deriver, the critics and the evaluators
+   * never see them. Curated by a recorded memory-recall run; a recall that
+   * cannot run or finds nothing never fails this one, and `recall` on the run
+   * says what happened. Refused (400) for a pipeline whose producer does not
+   * consume memories.
+   */
+  recall?: boolean;
 }
 
 /** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */
@@ -130,6 +146,8 @@ export interface QualityRunSummaryDto {
   criteria: number;
   exchangeCount: number;
   llm: LlmModelDto;
+  /** The run's recall without its lessons; null when it did not ask to recall. */
+  recall: RunRecallSummaryDto | null;
 }
 
 /** `GET /runs` — newest first; `limit` defaults to DEFAULT_LIST_LIMIT, capped at MAX_LIST_LIMIT. */

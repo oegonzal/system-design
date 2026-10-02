@@ -84,8 +84,13 @@ export interface OrchestrationRunStartedDto {
  * target pipeline is named (declared per orchestrator — required by one that
  * takes a target, refused by one that chooses its own) and how many samples a
  * panel step runs. Which inputs reach which step is the orchestrator's business.
+ * A run's own `recall` is not one of them: the memory orchestrator recalls as a
+ * step of its own, and no other orchestrator composes a coach.
  */
-export interface StartOrchestrationRequest extends Omit<StartQualityRunRequest, 'pipeline'> {
+export interface StartOrchestrationRequest extends Omit<
+  StartQualityRunRequest,
+  'pipeline' | 'recall'
+> {
   pipeline?: string;
   samples?: number;
 }

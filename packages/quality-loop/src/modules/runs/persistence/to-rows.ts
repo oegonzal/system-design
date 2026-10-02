@@ -27,6 +27,7 @@ function headerOf(record: RunRecord, dto: QualityRunDto): QualityRunRow {
     exchangeCount: dto.exchanges.length,
     llm: dto.llm,
     request: dto.request,
+    recall: dto.recall,
     git: record.git,
     exchanges: dto.exchanges,
     lessons: settled?.lessons ?? null,

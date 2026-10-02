@@ -96,6 +96,14 @@ export class QualityRun {
   @Property({ type: 'json' })
   request!: Contracts.QualityRunRequestSummary;
 
+  /**
+   * What the run recalled before it produced, lessons included — written as
+   * it moves, like `exchanges`, so a reader sees `recalling` while it runs.
+   * Null when the run did not ask to recall.
+   */
+  @Property({ type: 'json', nullable: true })
+  recall: Contracts.RunRecallDto | null = null;
+
   @Property({ type: 'json' })
   git!: QualityRunGit;
 

@@ -25,6 +25,7 @@ import type {
   QualityRunStatus,
   RemediationNote,
   RunErrorDto,
+  RunRecallDto,
   Severity,
   StopReason,
   ValidationReport,
@@ -43,6 +44,7 @@ export interface QualityRunRow {
   exchangeCount: number;
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
+  recall: RunRecallDto | null;
   git: GitContext;
   exchanges: LlmExchangeSummaryDto[];
   lessons: Lesson[] | null;

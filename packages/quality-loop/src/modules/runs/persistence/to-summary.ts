@@ -1,5 +1,5 @@
 /** The list row: the header plus the two counts the repository supplies. */
-import type { QualityRunSummaryDto } from '@sysdesign/contracts';
+import { recallSummary, type QualityRunSummaryDto } from '@sysdesign/contracts';
 
 import { toIso, toIsoOrNull } from './conventions';
 import type { QualityRunRow } from './rows';
@@ -22,5 +22,6 @@ export function toSummary(
     criteria: counts.criteria,
     exchangeCount: run.exchangeCount,
     llm: run.llm,
+    recall: run.recall ? recallSummary(run.recall) : null,
   };
 }

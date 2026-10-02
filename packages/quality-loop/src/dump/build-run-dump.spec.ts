@@ -1,3 +1,4 @@
+import { recallOf, recallWithout } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { RunRecord } from '../core/contracts';
@@ -31,6 +32,7 @@ const record = (overrides: Partial<RunRecord>): RunRecord => ({
     adoptedFrom: null,
     maxIterations: 3,
   },
+  recall: null,
   trace: null,
   exchanges: [],
   error: null,
@@ -172,6 +174,45 @@ describe('buildRunDump', () => {
     expect(page).toContain(
       '- `producer` #1 — schema-miss, 5 ms, 4 in / 21122 out — SchemaMiss: no complete JSON object in the reply',
     );
+  });
+
+  it('[QL-32] a run that recalled records the lessons its producer saw, where they came from, and why there were none', () => {
+    const lesson = {
+      ref: 'm2',
+      serves: 'the read path',
+      insight: 'Cache the read path before sharding it.',
+      caveat: 'the earlier run had no POS feed',
+      text: 'When reads dominate, cache before you shard.',
+      sourceRunId: 'earlier-quality',
+    };
+    const recall = recallOf([lesson], 'recall-quality');
+    const dump = buildRunDump(record({ recall }), null);
+    expect(dump.files.map((file) => file.path)).toContain('recall.json');
+    expect(JSON.parse(content(dump, 'recall.json'))).toEqual(recall);
+    expect(JSON.parse(content(dump, 'manifest.json'))).toMatchObject({
+      recall: { status: 'recalled', count: 1, recallRunId: 'recall-quality', reason: null },
+    });
+    const page = content(dump, 'run.md');
+    expect(page).toContain('## Recall');
+    expect(page).toContain(
+      'recalled · 1 lesson(s) handed to the producer · recall run recall-quality',
+    );
+    expect(page).toContain(
+      '- [m2] Cache the read path before sharding it. — serves: the read path; caveat: the earlier run had no POS feed (from run earlier-quality)',
+    );
+
+    const skipped = buildRunDump(
+      record({ recall: recallWithout('embeddings-disabled', 'no-key') }),
+      null,
+    );
+    expect(content(skipped, 'run.md')).toContain(
+      'skipped (embeddings-disabled: no-key) · 0 lesson(s) handed to the producer',
+    );
+    // A run that never asked to recall says nothing about it.
+    const plain = buildRunDump(record({}), null);
+    expect(plain.files.map((file) => file.path)).not.toContain('recall.json');
+    expect(content(plain, 'run.md')).not.toContain('## Recall');
+    expect(JSON.parse(content(plain, 'manifest.json'))).toMatchObject({ recall: null });
   });
 
   it('[QL-10] a run that failed before any trace still gets a manifest, the goal and the error', () => {

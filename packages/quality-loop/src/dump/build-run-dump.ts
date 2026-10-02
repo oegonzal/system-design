@@ -5,7 +5,7 @@
  *
  * NOTE FOR READERS: these files contain the goal and the model's prose verbatim.
  */
-import type { IterationTrace, PipelineSummary } from '@sysdesign/contracts';
+import { recallSummary, type IterationTrace, type PipelineSummary } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import {
   capText,
@@ -55,6 +55,7 @@ function manifestOf(record: RunRecord) {
     criteria: trace?.contract.criteria.length ?? 0,
     criteriaProvided: record.request.criteriaProvided,
     adoptedFrom: record.request.adoptedFrom,
+    recall: record.recall === null ? null : recallSummary(record.recall),
     exchangeCount: record.exchanges.length,
     error: record.error,
     note: 'Contains the goal and the model’s prose verbatim.',
@@ -148,6 +149,8 @@ export function buildRunDump(record: RunRecord, pipeline: PipelineSummary | null
     { path: '01-goal.md', content: withNewline(record.request.goal) },
     { path: '02-contract.json', content: json(trace?.contract.criteria ?? null) },
     { path: '03-pipeline.json', content: json(pipeline) },
+    // What the producer was handed before it produced, and where it came from.
+    ...(record.recall === null ? [] : [{ path: 'recall.json', content: json(record.recall) }]),
     ...(trace?.iterations ?? []).flatMap(iterationFiles),
     ...record.exchanges.flatMap(exchangeFiles),
     { path: '06-lessons.json', content: json(trace?.lessons ?? []) },

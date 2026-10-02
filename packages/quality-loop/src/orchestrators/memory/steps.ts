@@ -5,7 +5,6 @@
  * the target; the target's failure is the one that ends the run.
  */
 import type { MemoryContextDto, MemoryStepReason, QualityRunDto } from '@sysdesign/contracts';
-import { describeError } from '@sysdesign/run-dump';
 
 import { outputsOf } from '../../core/outputs';
 import { fromRun } from '../../pipelines/experience-digest/from-run';
@@ -13,19 +12,13 @@ import {
   EXPERIENCE_DIGEST_ID,
   renderGoal as renderRecord,
 } from '../../pipelines/experience-digest/input';
-import {
-  MAX_CANDIDATES,
-  MEMORY_RECALL_ID,
-  renderGoal as renderQuery,
-} from '../../pipelines/memory-recall/input';
+import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { completed, requestInput, runFailed, runTarget, skipped } from '../common';
 import type { StepContext, StepResult } from '../runner/definition';
 import { memoriesToStore, type Digested } from './digest/read-digest';
 import type { MemoryPorts } from './ports';
-import { fuse } from './recall/fusion';
 import { bareGoal, withMemory } from './recall/inject';
-import { buildQuery, probesOf, probeTexts, queryText, type FusedHit } from './recall/query';
-import { readPack } from './recall/read-pack';
+import { recallMemory } from './recall/recall-memory';
 import { indexMemories } from './store/index-memories';
 
 /** What each step hands on. `store` yields nothing: it is the end of the line. */
@@ -46,57 +39,27 @@ const skip = (
 
 const contextOf = (ctx: Ctx): MemoryContextDto => ctx.context as unknown as MemoryContextDto;
 
-/** Why a recall cannot run at all — no embeddings, no store, nothing stored, no pipeline — or null when it can. */
-function recallReadiness(ctx: Ctx): StepResult<never> | null {
-  const context = contextOf(ctx);
-  if (!ctx.ports.embeddings.enabled) return skip('embeddings-disabled', context.embedding.reason);
-  if (!context.store.ready) {
-    return skip('store-unavailable', context.store.note ?? context.store.reason);
-  }
-  if (context.store.chunks === 0) return skip('store-empty');
-  if (ctx.acceptAtOf(MEMORY_RECALL_ID) === null) {
-    return skip('pipeline-unavailable', MEMORY_RECALL_ID);
-  }
-  return null;
-}
-
-/** Recall memory for the goal; yields the goal the target should run with, or nothing. */
+/**
+ * Recall memory for the goal — the one recall a run's own producer briefing
+ * shares — and yield the goal the target should run with, memory appended
+ * within the goal budget, or nothing.
+ */
 export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
-  const notReady = recallReadiness(ctx);
-  if (notReady !== null) return notReady;
-  const { embeddings, store, probes } = ctx.ports;
   const goal = ctx.request.goal;
-  const acceptAt = ctx.acceptAtOf(MEMORY_RECALL_ID) ?? 0;
-
-  const query = queryText(goal);
-  // The goal is always probe zero; derived conditions only widen the net.
-  const texts = probeTexts(goal, await probes.derive(query));
-  const embedded = await embeddings.embed(texts);
-  if (embedded === null) {
-    return { status: 'failed', reason: 'embedding-failed', counts: { probes: texts.length } };
+  const recalled = await recallMemory(ctx.ports, {
+    goal,
+    store: contextOf(ctx).store,
+    acceptAt: ctx.acceptAtOf(MEMORY_RECALL_ID),
+    execute: (input) => ctx.execute(input),
+  });
+  if (recalled.status !== 'complete') {
+    const { status, reason, note } = recalled;
+    const counts = recalled.status === 'failed' ? recalled.counts : undefined;
+    return { status, reason, note, ...(counts === undefined ? {} : { counts }) };
   }
-  let hits: FusedHit[];
-  try {
-    hits = fuse(await store.searchMany(probesOf(embedded.vectors, MAX_CANDIDATES)), MAX_CANDIDATES);
-  } catch (error) {
-    return { status: 'failed', reason: 'store-unavailable', note: describeError(error).message };
-  }
-  if (hits.length === 0) return skip('store-empty');
-
-  const child = await ctx.execute({ goal: renderQuery(buildQuery(query, texts, hits)) });
-  if (!completed(child)) return runFailed(child);
-  const readout = readPack(outputsOf(child.trace), hits, acceptAt);
-  const counts = {
-    probes: texts.length,
-    candidates: hits.length,
-    kept: readout.kept,
-    usable: readout.usable.length,
-    injected: 0,
-  };
-  if (!readout.admitted) return { status: 'complete', reason: 'not-accepted', counts };
-  if (readout.usable.length === 0)
-    return { status: 'complete', reason: 'no-usable-memory', counts };
-  const composed = withMemory(goal, readout.usable);
+  const counts = { ...recalled.counts, injected: 0 };
+  if (recalled.reason !== null) return { status: 'complete', reason: recalled.reason, counts };
+  const composed = withMemory(goal, recalled.usable);
   if (composed === null) return { status: 'complete', reason: 'goal-at-budget', counts };
   return {
     status: 'complete',

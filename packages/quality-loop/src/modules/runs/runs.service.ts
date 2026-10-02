@@ -1,5 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  recallInProgress,
+  recallWithout,
   sameRubric,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
@@ -7,21 +9,34 @@ import {
   type PipelineSummary,
   type QualityRunDto,
   type QualityRunSummaryDto,
+  type RunRecallDto,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import type { LlmClient, LlmExchange } from '@sysdesign/llm';
 import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
-import { summariseExchange, type RunProgress, type RunRecord } from '../../core/contracts';
+import {
+  summariseExchange,
+  toRunDto,
+  type RunProgress,
+  type RunRecord,
+} from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
-import type { RunListQuery, RunRepository, TraceStore } from '../../core/ports';
+import type { AdvisoryMemory, RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
 import type { RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
-import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY, TRACE_STORE } from './tokens';
+import { briefingOf, type RunRecallSlot } from './recall/run-recall';
+import {
+  PIPELINES_TOKEN,
+  QUALITY_LOOP_LLM,
+  RUN_RECALL_SLOT,
+  RUN_REPOSITORY,
+  TRACE_STORE,
+} from './tokens';
 
 /**
  * Runs. A run is minutes long on the subscription client, so HTTP starts one
@@ -41,6 +56,7 @@ export class RunsService {
     @Inject(TRACE_STORE) private readonly traces: TraceStore,
     @Inject(RUN_REPOSITORY) private readonly repository: RunRepository,
     @Inject(RUN_JANITOR_OPTIONS) private readonly janitor: RunJanitorOptions,
+    @Inject(RUN_RECALL_SLOT) private readonly recall: RunRecallSlot,
   ) {
     // A malformed pipeline fails boot, never a run.
     for (const definition of registry.values()) validatePipeline(definition);
@@ -91,6 +107,7 @@ export class RunsService {
   async start(request: StartQualityRunRequest): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     this.assertRubric(request, definition);
+    this.assertRecall(request, definition);
     const adopted = await this.resolveAdoption(request, definition);
     const record = await this.open(request, definition);
     void this.perform(record, request, definition, adopted);
@@ -108,6 +125,7 @@ export class RunsService {
   ): Promise<RunRecord> {
     const definition = this.resolve(request.pipeline);
     this.assertRubric(request, definition);
+    this.assertRecall(request, definition);
     const adopted = await this.resolveAdoption(request, definition);
     const record = await this.open(request, definition);
     onOpened?.(record);
@@ -181,6 +199,24 @@ export class RunsService {
     }
   }
 
+  /**
+   * Lessons a producer could never be handed are refused before any row
+   * exists — the pipe's own 400 shape. Recall is for a producer that declares
+   * it consumes memories; nothing else in a run can receive them.
+   */
+  private assertRecall(
+    request: StartQualityRunRequest,
+    definition: PipelineDefinition<unknown>,
+  ): void {
+    if (request.recall !== true || definition.producer.consumes.includes('memories')) return;
+    throw new BadRequestException({
+      message: 'invalid recall',
+      issues: [
+        { path: 'recall', message: `${definition.id}'s producer does not consume memories` },
+      ],
+    });
+  }
+
   /** Which model backs this process — a booted loop always has one. */
   private availability(): RunRecord['llm'] {
     return { model: this.llm.model };
@@ -205,12 +241,52 @@ export class RunsService {
         adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
       },
+      // Recalling from the moment the row exists: a reader polling a run that
+      // asked sees it is recalling before it sees anything else move.
+      recall: request.recall === true ? recallInProgress() : null,
       trace: null,
       exchanges: [],
       error: null,
     };
     await this.repository.open(record, definition.version);
     return record;
+  }
+
+  /**
+   * The lessons a run that asked to recall hands its producer — and never a
+   * reason to fail it. The recall run is an ordinary child run, recorded on
+   * this one as soon as it opens; whatever the recall comes to, or whatever
+   * it throws, is published on the run, and the run goes on with what it got.
+   */
+  private async recallLessons(
+    record: RunRecord,
+    publish: (recall: RunRecallDto) => void,
+  ): Promise<AdvisoryMemory[]> {
+    if (record.recall === null) return [];
+    const bound = this.recall.bound;
+    let outcome: RunRecallDto;
+    if (bound === null) {
+      outcome = recallWithout('recall-unavailable');
+    } else {
+      let recallRunId: string | null = null;
+      const execute = async (child: StartQualityRunRequest): Promise<QualityRunDto> =>
+        toRunDto(
+          await this.execute(child, (opened) => {
+            recallRunId = opened.runId;
+            publish({ ...recallInProgress(), recallRunId });
+          }),
+        );
+      try {
+        outcome = await bound.recall(record.request.goal, execute);
+      } catch (error) {
+        outcome = recallWithout('errored', describeError(error).message, recallRunId);
+      }
+    }
+    publish(outcome);
+    this.logger.log(
+      `run ${record.runId}: recall ${outcome.status}${outcome.reason ? ` (${outcome.reason})` : ''}, ${outcome.count} lesson(s)${outcome.recallRunId ? ` from ${outcome.recallRunId}` : ''}`,
+    );
+    return briefingOf(outcome.lessons);
   }
 
   private async perform(
@@ -250,7 +326,13 @@ export class RunsService {
       record.trace = progress;
       write('progress', () => this.repository.recordProgress(record.runId, progress));
     };
+    // Each move of the recall is published the same way, before any stage runs.
+    const onRecall = (recall: RunRecallDto) => {
+      record.recall = recall;
+      write('recall', () => this.repository.recordRecall(record.runId, recall));
+    };
     try {
+      const memories = await this.recallLessons(record, onRecall);
       record.trace = await runPipeline(
         definition,
         {
@@ -259,6 +341,7 @@ export class RunsService {
           maxIterations: request.maxIterations,
           criteria: request.criteria,
           adopted,
+          memories,
         },
         { llm: this.llm, sink, now: Date.now, onIteration },
       );

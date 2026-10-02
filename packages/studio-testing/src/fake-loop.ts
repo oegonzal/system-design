@@ -178,6 +178,7 @@ export class FakeLoop {
         adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? 1,
       },
+      recall: null,
       trace: null,
       exchanges: exchangesOf(this.startExchanges, startedAt),
       error: null,

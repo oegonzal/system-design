@@ -26,6 +26,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
     adoptedFrom: null,
     maxIterations: 1,
   },
+  recall: null,
   trace: null,
   exchanges: [],
   error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,

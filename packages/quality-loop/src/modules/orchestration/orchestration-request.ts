@@ -16,12 +16,15 @@ const samples = z.number().int().min(1).max(MAX_PANEL_SAMPLES).optional();
  * itself: the target is optional here because an orchestrator that chooses
  * its own pipeline refuses one (and one that takes a target requires it —
  * the service enforces the declaration), and `samples` sizes a panel step.
- * Which of them reach which step is the orchestrator's business.
+ * Which of them reach which step is the orchestrator's business. A run's own
+ * `recall` is not among them: the memory orchestrator recalls as a step.
  */
-export const orchestrationRequestSchema = runRequestShape.omit({ adopt: true }).extend({
-  pipeline: z.string().min(1).optional(),
-  samples,
-});
+export const orchestrationRequestSchema = runRequestShape
+  .omit({ adopt: true, recall: true })
+  .extend({
+    pipeline: z.string().min(1).optional(),
+    samples,
+  });
 
 /** The body of `POST /orchestrations/:orchestrator/from-run`: an already persisted run to start from. */
 export const fromRunRequestSchema = z.strictObject({

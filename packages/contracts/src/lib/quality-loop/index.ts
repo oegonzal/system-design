@@ -11,5 +11,6 @@ export * from './criteria';
 export * from './prompt-library';
 export * from './orchestration';
 export * from './memory';
+export * from './recall';
 export * from './panel';
 export * from './router';

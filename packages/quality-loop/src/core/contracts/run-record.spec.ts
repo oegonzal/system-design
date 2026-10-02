@@ -37,6 +37,7 @@ const record: RunRecord = {
     adoptedFrom: null,
     maxIterations: 1,
   },
+  recall: null,
   trace: null,
   exchanges: [exchange],
   error: { name: 'Error', message: 'boom', stack: null },
@@ -60,6 +61,7 @@ describe('toRunDto', () => {
         adoptedFrom: null,
         maxIterations: 1,
       },
+      recall: null,
       trace: null,
       error: { name: 'Error', message: 'boom', stack: null },
       exchanges: [

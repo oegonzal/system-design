@@ -126,6 +126,7 @@ export const runDto = (
     adoptedFrom: null,
     maxIterations: 1,
   },
+  recall: null,
   trace,
   exchanges: [],
   error: trace === null ? { name: 'Boom', message: 'the model went away', stack: null } : null,

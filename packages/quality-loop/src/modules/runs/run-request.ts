@@ -24,7 +24,8 @@ export const providedCriterionSchema = z.strictObject({
  * whether it fits the pipeline is the service's check, after the shape.
  * `adopt` names a recorded iteration to start from; whether it exists and
  * matches is the service's check too — here only the shape and the two
- * rules a body can break on its own.
+ * rules a body can break on its own. `recall` asks for lessons for the
+ * producer; whether the pipeline's producer can take them is the service's.
  */
 export const runRequestShape = z.strictObject({
   pipeline: z.string().min(1),
@@ -38,6 +39,7 @@ export const runRequestShape = z.strictObject({
       iteration: z.number().int().min(1).max(MAX_QUALITY_RUN_ITERATIONS),
     })
     .optional(),
+  recall: z.boolean().optional(),
 });
 
 /** The shape with the two rules a body can break on its own; a request that extends the shape adds its own. */

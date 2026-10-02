@@ -1,3 +1,4 @@
+import { recallInProgress, recallOf } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../../core/contracts';
@@ -198,6 +199,38 @@ describe('the run rows', () => {
       criteria: 2,
       exchangeCount: 2,
       llm: { model: 'test-model' },
+      recall: null,
     });
+  });
+
+  it('[QL-32] a recall and the lessons the producer saw round-trip unchanged; the list row keeps it without them', () => {
+    const recall = recallOf(
+      [
+        {
+          ref: 'm1',
+          serves: 'the list read',
+          insight: 'Own the store the list page reads from.',
+          caveat: null,
+          text: 'serve the list from a store the page owns',
+          sourceRunId: 'earlier-quality',
+        },
+      ],
+      'recall-quality',
+    );
+    const rows = toRows(fullRecord({ recall }));
+    expect(rows.run.recall).toEqual(recall);
+    expect(roundtrip(rows).recall).toEqual(recall);
+    expect(roundtrip(rows)).toEqual(toRunDto(fullRecord({ recall })));
+    expect(toSummary(rows.run, { iterations: 1, criteria: 2 }).recall).toEqual({
+      status: 'recalled',
+      reason: null,
+      note: null,
+      recallRunId: 'recall-quality',
+      count: 1,
+    });
+    // Still recalling when the row was read: the marker round-trips too.
+    expect(
+      roundtrip(toRows(fullRecord({ status: 'running', recall: recallInProgress() }))).recall,
+    ).toEqual(recallInProgress());
   });
 });

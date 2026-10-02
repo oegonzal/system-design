@@ -22,6 +22,7 @@ import type {
   QualityRunDto,
   QualityRunSummaryDto,
   RemediationNote,
+  RunRecallDto,
   SuccessCriterion,
   UpstreamEvidence,
   ValidationReport,
@@ -192,6 +193,12 @@ export interface RunRepository {
    * empty until `close`.
    */
   recordProgress(runId: string, progress: RunProgress): Promise<void>;
+  /**
+   * What the run's recall has come to so far — the recall run's id once it
+   * opens, then the outcome — replacing the last, and only while the row is
+   * still `running`.
+   */
+  recordRecall(runId: string, recall: RunRecallDto): Promise<void>;
   /**
    * The terminal write, in one transaction: the header, and — when the record
    * settled a trace — every child row, replacing any progress. A record that

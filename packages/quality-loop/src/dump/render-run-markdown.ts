@@ -94,6 +94,30 @@ function lessonsSection(trace: RunTrace): string[] {
   ];
 }
 
+/**
+ * What the run recalled for its producer, and the lessons the producer saw —
+ * the curator's words, each with the run it came from. Nothing when the run
+ * did not ask to recall.
+ */
+function recallSection(record: RunRecord): string[] {
+  const { recall } = record;
+  if (recall === null) return [];
+  const why =
+    recall.reason === null ? '' : ` (${recall.reason}${recall.note ? `: ${recall.note}` : ''})`;
+  const from = recall.recallRunId === null ? '' : ` · recall run ${recall.recallRunId}`;
+  return [
+    `## Recall`,
+    ``,
+    `${recall.status}${why} · ${recall.count} lesson(s) handed to the producer${from}`,
+    ``,
+    ...recall.lessons.map(
+      (lesson) =>
+        `- [${lesson.ref}] ${lesson.insight} — serves: ${lesson.serves}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (from run ${lesson.sourceRunId})`,
+    ),
+    ...(recall.lessons.length > 0 ? [``] : []),
+  ];
+}
+
 /** One line per exchange — with the recorded reason when it failed — or the reason there were none. */
 function modelCallsSection(record: RunRecord): string[] {
   if (record.exchanges.length === 0) return [`None — no stage reached the model.`, ``];
@@ -113,6 +137,7 @@ export function renderRunMarkdown(record: RunRecord, headline: RunHeadline): str
     ``,
     `${record.finishedAt ?? record.startedAt} · ${headline.status} · ${headline.durationMs} ms · pipeline ${record.pipeline}`,
     ``,
+    ...recallSection(record),
   ];
   if (trace) {
     lines.push(

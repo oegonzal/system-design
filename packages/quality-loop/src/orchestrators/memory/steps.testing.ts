@@ -41,6 +41,7 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
     adoptedFrom: null,
     maxIterations: 1,
   },
+  recall: null,
   trace,
   exchanges: [],
   error: failed ? { name: 'Boom', message: 'the model went away', stack: null } : null,

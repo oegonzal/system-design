@@ -20,6 +20,7 @@ import { OrchestrationRecordModule } from '../orchestration/orchestration-record
 import { RunsModule } from '../runs/runs.module';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { MemoryController } from './memory.controller';
+import { MemoryRunRecall } from './memory-run-recall';
 import { MemoryService } from './memory.service';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
 import { LlmQueryProbes } from './query-probes/llm-query-probes';
@@ -69,14 +70,17 @@ const memoryPorts = (
 
 /**
  * The memory orchestrator's adapters — embeddings, the vector store, the
- * query probes — and the two tools that need them without a run: the
- * re-index and the retrieval report. The run itself is an orchestration.
+ * query probes — the two tools that need them without a run, the re-index
+ * and the retrieval report, and the recall a run asks for its own producer,
+ * which binds itself into the runs module's slot. The memory run itself is
+ * an orchestration.
  */
 @Module({
   imports: [RunsModule, OrchestrationRecordModule, MikroOrmModule.forFeature([MemoryEmbedding])],
   controllers: [MemoryController],
   providers: [
     MemoryService,
+    MemoryRunRecall,
     // The environment decides once, at boot: OPENAI_API_KEY, else a disabled
     // client that carries its reason — the memory tier is optional.
     { provide: EMBEDDING_CLIENT, useFactory: createEmbeddingClientFromEnv },
