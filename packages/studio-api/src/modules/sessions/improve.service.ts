@@ -183,6 +183,12 @@ export class ImproveService {
       { populate: ['baseRevision', 'session.prompt'] },
     );
     if (!coaching) {
+      // The same answer every read under a session gives when the session is
+      // gone — a page about a session that no longer exists is gone with it —
+      // and only when it is there is the run the thing that is missing.
+      if ((await this.em.count(DesignSession, { id: sessionId })) === 0) {
+        throw notFound('session', `Session ${sessionId} not found`);
+      }
       throw notFound('coaching-run', `no coaching run ${runId} in session ${sessionId}`);
     }
     const run = await this.loop.getRun(runId);

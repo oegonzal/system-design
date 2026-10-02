@@ -531,6 +531,8 @@ describe('sessions', () => {
       // The grade of a revision that is gone says the same thing the revision does.
       expect(await missing(`/revisions/${UNKNOWN_UUID}/evaluation`)).toBe('404 revision');
       expect(await missing(`/sessions/${sessionId}/improve/no-such-run`)).toBe('404 coaching-run');
+      // A coaching run under a session that is gone is the session's 404, like every read under it.
+      expect(await missing(`/sessions/${UNKNOWN_UUID}/improve/no-such-run`)).toBe('404 session');
 
       const { body: created } = await submit(sessionId, submission());
       h.loop.forget('fake-run-1');
