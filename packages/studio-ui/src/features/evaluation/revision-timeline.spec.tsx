@@ -44,4 +44,38 @@ describe('RevisionTimeline', () => {
     await userEvent.click(screen.getByTestId('revision-chip-1'));
     expect(onSelect).toHaveBeenCalledWith(revisions[0]);
   });
+
+  it('[UX-15] calls a chip current only when the canvas shows that revision, and says apart whose feedback is on show', () => {
+    // A revision on the canvas, its own feedback beside it: one chip, both things.
+    const viewing = renderWithTheme(
+      <RevisionTimeline
+        revisions={revisions}
+        activeRevisionId="rev-2"
+        feedbackRevisionId="rev-2"
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('revision-chip-2').getAttribute('aria-current')).toBe('true');
+    expect(screen.getAllByTestId('revision-place').map((place) => place.textContent)).toEqual([
+      'on canvas',
+    ]);
+    viewing.unmount();
+
+    // The canvas shows the draft: nothing is current, and the feedback's revision says so.
+    renderWithTheme(
+      <RevisionTimeline
+        revisions={revisions}
+        activeRevisionId={null}
+        feedbackRevisionId="rev-1"
+        onSelect={vi.fn()}
+      />,
+    );
+    for (const chip of screen.getAllByRole('button')) {
+      expect(chip.hasAttribute('aria-current')).toBe(false);
+    }
+    const feedback = screen.getByTestId('revision-chip-1');
+    expect(feedback.getAttribute('data-place')).toBe('feedback');
+    expect(feedback.textContent).toContain('feedback shown');
+    expect(screen.getByTestId('revision-chip-2').hasAttribute('data-place')).toBe(false);
+  });
 });

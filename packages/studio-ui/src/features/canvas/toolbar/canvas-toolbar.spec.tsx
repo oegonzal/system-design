@@ -102,9 +102,31 @@ describe('CanvasToolbar', () => {
       else expect(labels).toContain(badge?.textContent);
       // The slot comes last, so its unused room is never a hole in the row.
       expect(slot.parentElement?.lastElementChild).toBe(slot);
-      expect(slot.parentElement?.textContent).toContain('rev #1');
+      expect(slot.parentElement?.textContent).toContain('submitted #1');
       view.unmount();
     }
+  });
+
+  it('[DEL-3] names its revision badge as the author’s latest submission — never a label for what the canvas shows', () => {
+    const store = createCanvasStore(makeGraph());
+    // A revision is on the canvas read-only; the badge is still about the submission.
+    store.getState().setReadOnly(true);
+    const graded = renderToolbar(store, { revisionStatus: 'complete', revisionNumber: 1 });
+    const badge = screen.getByTestId('submission-status');
+    expect(badge.textContent).toBe('submitted #1 · graded');
+    expect(badge.getAttribute('title')).toBe('Your latest submission, revision #1: graded');
+    expect(badge.getAttribute('data-revision')).toBe('1');
+    expect(badge.getAttribute('data-status')).toBe('complete');
+    graded.unmount();
+
+    const failed = renderToolbar(store, { revisionStatus: 'failed', revisionNumber: 3 });
+    expect(screen.getByTestId('submission-status').textContent).toBe(
+      'submitted #3 · grading failed',
+    );
+    failed.unmount();
+
+    renderToolbar(store);
+    expect(screen.queryByTestId('submission-status')).toBeNull();
   });
 
   it('[UX-16] a read-only canvas leaves nothing to submit, clear or undo', () => {

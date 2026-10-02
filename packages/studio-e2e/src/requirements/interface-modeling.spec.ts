@@ -40,6 +40,6 @@ test.describe('interface modeling', () => {
     // The declarations survive the wire: the API accepts the revision (no
     // 4xx), so the toolbar's revision badge appears.
     await canvas.submit();
-    await expect(page.getByText(/rev #1/)).toBeVisible();
+    await expect(canvas.submissionStatus(1)).toBeVisible();
   });
 });

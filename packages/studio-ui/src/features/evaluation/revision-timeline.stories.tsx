@@ -66,5 +66,11 @@ export const ImprovingTrail: Story = {
       }),
     ],
     activeRevisionId: 'rev-3',
+    feedbackRevisionId: 'rev-3',
   },
+};
+
+/** The canvas shows the draft: no chip is current, and the feedback tab's revision says whose grade is on show. */
+export const DraftOnCanvas: Story = {
+  args: { ...ImprovingTrail.args, activeRevisionId: null, feedbackRevisionId: 'rev-3' },
 };

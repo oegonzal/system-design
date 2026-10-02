@@ -40,7 +40,7 @@ test.describe('the grader, unreachable', () => {
     await buildNaiveDesign(canvas);
     await canvas.submit();
     await expect(canvas.submitError).toContainText('unreachable');
-    await expect(page.getByText('rev #1')).toHaveCount(0);
+    await expect(canvas.submissionStatus(1)).toHaveCount(0);
     expect(await listRevisions(request, session.id)).toEqual([]);
 
     // Back up: the same page, reloaded, offers the coach and grades the sketch

@@ -8,10 +8,24 @@ import { formatScore } from './score';
 
 export interface RevisionTimelineProps {
   revisions: DesignRevisionSummaryDto[];
-  /** The revision currently loaded on the canvas, if any. */
+  /**
+   * The revision the canvas shows as it was stored — one loaded read-only, or
+   * the one the canvas was opened on or submitted as and has not been edited
+   * since. Null once the canvas shows the draft.
+   */
   activeRevisionId?: string | null;
+  /** The revision whose grade the feedback tab shows — which need not be the one on the canvas. */
+  feedbackRevisionId?: string | null;
   onSelect: (revision: DesignRevisionSummaryDto) => void;
 }
+
+/**
+ * How a chip says which revision the workspace is on. The canvas and the
+ * feedback tab are two places: restoring a revision as the draft, or opening
+ * a session on a saved draft, leaves the feedback on a revision the canvas no
+ * longer shows — and a chip must not call that one current.
+ */
+const PLACE_LABEL = { canvas: 'on canvas', feedback: 'feedback shown' } as const;
 
 const Chip = styled('button', transient)<{ $active: boolean }>`
   display: inline-flex;
@@ -47,11 +61,19 @@ const Score = styled.span`
 
 /**
  * One chip per revision — `#n score decision` — newest first, an AI badge on
- * every revision the coach wrote; the one on the canvas is `aria-current`.
- * Selecting a chip loads that revision read-only; the workspace owns that flow, this component only reports the
- * click. Presentational — Storybook-safe.
+ * every revision the coach wrote. The one the canvas shows is `aria-current`
+ * and says "on canvas"; when the canvas shows the draft instead, no chip is
+ * current, and the revision whose grade the feedback tab still shows says
+ * "feedback shown". Selecting a chip loads that revision read-only; the
+ * workspace owns that flow, this component only reports the click.
+ * Presentational — Storybook-safe.
  */
-export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: RevisionTimelineProps) {
+export function RevisionTimeline({
+  revisions,
+  activeRevisionId = null,
+  feedbackRevisionId = null,
+  onSelect,
+}: RevisionTimelineProps) {
   if (revisions.length === 0) {
     return (
       <Text size="sm" tone="muted">
@@ -67,6 +89,7 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
       {ordered.map((revision) => {
         const grade = revision.evaluation;
         const active = revision.id === activeRevisionId;
+        const place = active ? 'canvas' : revision.id === feedbackRevisionId ? 'feedback' : null;
         return (
           <Chip
             key={revision.id}
@@ -75,6 +98,7 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
             aria-current={active ? 'true' : undefined}
             onClick={() => onSelect(revision)}
             data-testid={`revision-chip-${revision.revisionNumber}`}
+            data-place={place ?? undefined}
           >
             #{revision.revisionNumber}
             {grade?.overall !== null && grade?.overall !== undefined ? (
@@ -90,6 +114,11 @@ export function RevisionTimeline({ revisions, activeRevisionId, onSelect }: Revi
               <Badge tone="critical">failed</Badge>
             ) : null}
             {revision.origin === 'assistant' ? <Badge tone="accent">AI</Badge> : null}
+            {place !== null ? (
+              <Badge tone="neutral" data-testid="revision-place">
+                {PLACE_LABEL[place]}
+              </Badge>
+            ) : null}
           </Chip>
         );
       })}

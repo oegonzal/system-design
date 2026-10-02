@@ -1,7 +1,21 @@
 'use client';
 
-import type { EvaluationDto, EvaluationFindingDto, SuccessCriterion } from '@sysdesign/contracts';
-import { Alert, Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
+import type {
+  EvaluationDto,
+  EvaluationFindingDto,
+  RevisionOrigin,
+  SuccessCriterion,
+} from '@sysdesign/contracts';
+import {
+  Alert,
+  Badge,
+  Button,
+  Heading,
+  LiveRegion,
+  Spinner,
+  Stack,
+  Text,
+} from '@sysdesign/design-system';
 
 import { CriterionResultsList } from './criterion-results-list';
 import { useElapsed } from './elapsed';
@@ -17,7 +31,22 @@ import { ScoreSummary } from './score-summary';
 export const UNGRADED_REASONS = ['never', 'lost'] as const;
 export type UngradedReason = (typeof UNGRADED_REASONS)[number];
 
+/**
+ * Whose feedback the tab shows. The feedback follows a revision; the canvas
+ * may have moved on to the draft — a revision restored as the draft, a
+ * session opened on a saved one — and the tab says so rather than let a
+ * score read as the verdict on what is drawn now.
+ */
+export interface FeedbackSubject {
+  revisionNumber: number;
+  origin: RevisionOrigin;
+  /** Whether the canvas shows this revision as it was graded; false once it shows the draft. */
+  onCanvas: boolean;
+}
+
 export interface EvaluationPanelProps {
+  /** The revision the feedback is about; null before anything was submitted. */
+  subject?: FeedbackSubject | null;
   /** Output of `useEvaluationPolling` — the workspace owns the hook. */
   evaluation: EvaluationDto | null;
   /** The failed run's own error, verbatim — the operator's line, shown folded under the author's. */
@@ -46,6 +75,9 @@ export interface EvaluationPanelProps {
   onSelectFinding: (finding: EvaluationFindingDto) => void;
 }
 
+/** What the tab says when the canvas no longer shows the revision its feedback is about. */
+const OFF_CANVAS_COPY = 'The canvas shows your draft, not this revision.';
+
 /** An escalation without a score: the lenses could not reach a verdict. */
 const ESCALATED_COPY =
   'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
@@ -71,7 +103,9 @@ const FAILED_COPY = {
 const DURATION_HINT = 'Grading usually takes a few minutes';
 
 /**
- * The feedback dock: running → spinner with how long it usually takes and
+ * The feedback dock: first whose feedback it is — the revision by number,
+ * and a line when the canvas has moved on to the draft — then running →
+ * spinner with how long it usually takes and
  * how long it has taken, failed → what happened in the author's terms, the
  * run's own error one click down, and the way back, complete → the score
  * summary, the criterion results and the findings. An escalation with no
@@ -82,6 +116,7 @@ const DURATION_HINT = 'Grading usually takes a few minutes';
  * so status changes are announced, not just rendered.
  */
 export function EvaluationPanel({
+  subject = null,
   evaluation,
   error,
   isPolling,
@@ -121,6 +156,22 @@ export function EvaluationPanel({
   return (
     <Stack gap={5} data-testid="evaluation-panel">
       <LiveRegion message={message} />
+
+      {subject !== null ? (
+        <Stack gap={1} data-testid="feedback-subject" data-on-canvas={subject.onCanvas}>
+          <Stack direction="row" gap={2} align="center" wrap>
+            <Text as="span" size="sm" tone="secondary">
+              Feedback for revision #{subject.revisionNumber}
+            </Text>
+            {subject.origin === 'assistant' ? <Badge tone="accent">AI</Badge> : null}
+          </Stack>
+          {!subject.onCanvas ? (
+            <Text size="sm" tone="muted" data-testid="feedback-off-canvas">
+              {OFF_CANVAS_COPY}
+            </Text>
+          ) : null}
+        </Stack>
+      ) : null}
 
       {ungraded !== null ? (
         <Stack gap={3} data-testid="evaluation-ungraded" data-reason={ungraded}>

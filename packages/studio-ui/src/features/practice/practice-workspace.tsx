@@ -9,6 +9,7 @@ import {
   type EvaluationFindingDto,
   type PromptDto,
   type RevisionEvaluationRef,
+  type RevisionOrigin,
   type SessionInFlightDto,
 } from '@sysdesign/contracts';
 import {
@@ -46,7 +47,11 @@ import type { DraftSaveStatus } from '../canvas/draft-status';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
-import { EvaluationPanel, type UngradedReason } from '../evaluation/evaluation-panel';
+import {
+  EvaluationPanel,
+  type FeedbackSubject,
+  type UngradedReason,
+} from '../evaluation/evaluation-panel';
 import { subjectGone } from '../evaluation/missing-read';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
@@ -263,6 +268,7 @@ export function PracticeWorkspace({ sessionId }: PracticeWorkspaceProps) {
 interface FeedbackTarget {
   id: string;
   revisionNumber: number;
+  origin: RevisionOrigin;
   evaluation: RevisionEvaluationRef | null;
   /** When its grade started: when it was stored, or when this tab sent it to be graded again. */
   gradingSince: string;
@@ -270,11 +276,12 @@ interface FeedbackTarget {
 
 /** A revision as the feedback tab's subject; its grade started when it was stored unless said otherwise. */
 const toTarget = (
-  revision: Pick<DesignRevisionSummaryDto, 'id' | 'revisionNumber' | 'evaluation' | 'createdAt'>,
+  revision: DesignRevisionSummaryDto | DesignRevisionDto,
   gradingSince: string = revision.createdAt,
 ): FeedbackTarget => ({
   id: revision.id,
   revisionNumber: revision.revisionNumber,
+  origin: revision.origin,
   evaluation: revision.evaluation,
   gradingSince,
 });
@@ -704,9 +711,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   }
 
   // Submit and the toolbar's badge are about the session, not the revision on
-  // screen: its newest submission, live while it is the one being polled, and
-  // whatever run holds its grading slot — the server's word, or the coach
-  // this tab is watching revise.
+  // screen: its newest submission — the badge names it as that — live while
+  // it is the one being polled, and whatever run holds its grading slot — the
+  // server's word, or the coach this tab is watching revise.
   const latest = latestUserRevision(revisions);
   const latestStatus =
     latest === null
@@ -740,6 +747,21 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           : null;
   // A grade starts under the rules a submit obeys: one run per session, and none on an archived prompt.
   const gradeBlockedReason = blockedReason ?? (promptArchived ? PROMPT_COPY.archived : null);
+  // What the canvas shows, as a revision: the one loaded read-only, or the
+  // one the feedback is about while the canvas has not been edited since it
+  // was opened on it or submitted as it. Once there is a draft — restored
+  // from the server, restored from a revision, or one edit old — the canvas
+  // shows no revision, whichever one the feedback tab still reads.
+  const canvasRevisionId =
+    viewingRevision?.id ?? (autosave.status === 'clean' ? (feedback?.id ?? null) : null);
+  const feedbackSubject: FeedbackSubject | null =
+    feedback === null
+      ? null
+      : {
+          revisionNumber: feedback.revisionNumber,
+          origin: feedback.origin,
+          onCanvas: feedback.id === canvasRevisionId,
+        };
 
   return (
     <WorkspaceRoot>
@@ -782,8 +804,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
 
         <Dock as="aside" padding={5} aria-label="Session details">
           <DockTabs value={tab} onChange={setTab}>
-            {/* Six tabs in a narrow dock: one row that scrolls sideways, and keeps
-                the selected tab in view when a submit opens Feedback from code. */}
+            {/* Six tabs in a narrow dock: one row that scrolls sideways. The row
+                itself shows which ends hold more tabs — a fade under an arrow
+                that pages toward them — and keeps the selected tab whole and
+                clear of those ends, also when a submit opens Feedback from code. */}
             <TabList aria-label="Session panels" overflow="scroll">
               <Tab value="prompt">Prompt</Tab>
               <Tab value="brief">Brief</Tab>
@@ -815,6 +839,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             </DockPanel>
             <DockPanel value="feedback">
               <EvaluationPanel
+                subject={feedbackSubject}
                 evaluation={polling.evaluation}
                 error={polling.error}
                 isPolling={polling.isPolling}
@@ -848,7 +873,8 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
             <DockPanel value="revisions">
               <RevisionTimeline
                 revisions={revisions}
-                activeRevisionId={viewingRevision?.id ?? feedback?.id ?? null}
+                activeRevisionId={canvasRevisionId}
+                feedbackRevisionId={feedback?.id ?? null}
                 onSelect={(summary) => void handleSelectRevision(summary)}
               />
             </DockPanel>

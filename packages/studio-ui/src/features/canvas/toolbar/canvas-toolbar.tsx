@@ -14,6 +14,11 @@ export interface CanvasToolbarProps {
   onSubmit: () => void;
   /** True while the POST is in flight or the grading run is still running. */
   submitting: boolean;
+  /**
+   * The author's latest submission and where its grade stands — the session's
+   * word, whatever the canvas shows: a revision loaded read-only, or a draft
+   * restored from one, is not what this badge is about, and it says so.
+   */
   revisionStatus: QualityRunStatus | null;
   revisionNumber: number | null;
   /** The session's prompt is archived: the studio refuses a submit until it is back. */
@@ -83,8 +88,9 @@ const LabelWidth = styled(Badge)`
  * the diagram the same way a load does. The coach has its own dock tab, so
  * no Improve button lives here. The draft badge reports the autosave;
  * without one the canvas's own dirty flag stands in. The badges come last —
- * the session's latest revision, then the draft in its fixed slot — so the
- * toolbar's layout is the same in every draft status.
+ * the author's latest submission, named as that (`submitted #2 · graded`) so
+ * it never reads as a label for whatever the canvas shows, then the draft in
+ * its fixed slot — so the toolbar's layout is the same in every draft status.
  */
 export function CanvasToolbar({
   onSubmit,
@@ -119,7 +125,7 @@ export function CanvasToolbar({
   };
 
   return (
-    <Toolbar aria-label="Canvas actions" gap={3}>
+    <Toolbar aria-label="Canvas actions" gap={2}>
       <Button
         variant="solid"
         onClick={onSubmit}
@@ -167,8 +173,14 @@ export function CanvasToolbar({
       </Button>
       <Status>
         {revisionStatus && revisionNumber !== null ? (
-          <Badge tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}>
-            {`rev #${revisionNumber} · ${GRADE_STATUS_LABEL[revisionStatus]}`}
+          <Badge
+            tone={revisionStatus === 'failed' ? 'critical' : 'neutral'}
+            title={`Your latest submission, revision #${revisionNumber}: ${GRADE_STATUS_LABEL[revisionStatus]}`}
+            data-testid="submission-status"
+            data-revision={revisionNumber}
+            data-status={revisionStatus}
+          >
+            {`submitted #${revisionNumber} · ${GRADE_STATUS_LABEL[revisionStatus]}`}
           </Badge>
         ) : null}
         <DraftSlot data-testid="draft-slot">

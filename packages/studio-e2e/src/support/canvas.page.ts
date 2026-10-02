@@ -328,13 +328,25 @@ export class CanvasPage {
   }
 
   /**
+   * The toolbar's badge for the author's latest submission (`submitted #n ·
+   * graded`): which revision, and where its grade stands. Addressed by the
+   * revision it names, so a spec waits for *that* submission's badge — and by
+   * its status as data, never by the words.
+   */
+  submissionStatus(revisionNumber: number): Locator {
+    return this.page.locator(
+      `[data-testid="submission-status"][data-revision="${revisionNumber}"]`,
+    );
+  }
+
+  /**
    * The toolbar's badge for a run that failed, plus the feedback dock's
    * explanation — the author's sentence, with the run's own error folded
    * under it — and its grade-again control. The badge is the authoritative
    * signal that *this* revision failed.
    */
   async expectEvaluationFailed(revisionNumber: number, message: string): Promise<void> {
-    await expect(this.page.getByText(`rev #${revisionNumber} · grading failed`)).toBeVisible({
+    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'failed', {
       timeout: EVAL_TIMEOUT,
     });
     await this.feedbackTab.click();
@@ -494,12 +506,12 @@ export class CanvasPage {
 
   /**
    * Waits until the given revision is graded and its score summary is on
-   * screen. The toolbar badge (`rev #n · graded`) is the authoritative signal
-   * that *this* revision finished — the score summary alone could still be
-   * showing the previous one during a resubmit.
+   * screen. The toolbar badge (`submitted #n · graded`) is the authoritative
+   * signal that *this* revision finished — the score summary alone could
+   * still be showing the previous one during a resubmit.
    */
   async expectEvaluationComplete(revisionNumber: number): Promise<void> {
-    await expect(this.page.getByText(`rev #${revisionNumber} · graded`)).toBeVisible({
+    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'complete', {
       timeout: EVAL_TIMEOUT,
     });
     await this.feedbackTab.click();

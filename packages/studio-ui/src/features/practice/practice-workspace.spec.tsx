@@ -86,8 +86,10 @@ describe('PracticeWorkspace on open', () => {
     expect(screen.queryByTestId('narrative-rationale-n-1')).toBeNull();
     // A draft the server handed back is saved work: nothing to write until it is edited.
     expect(screen.getByTestId('draft-status').textContent).toBe('draft saved');
+    // The canvas shows that draft, so no revision is current — the feedback is about #2, and says so.
+    expect(screen.getByTestId('feedback-off-canvas')).toBeTruthy();
     expect(screen.queryByTestId('readonly-banner')).toBeNull();
-    expect(screen.getByText(/rev #2 · graded/)).toBeTruthy();
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #2 · graded');
     // The draft is the canvas; no revision body is fetched (its grade still is).
     expect(withDraft.calls.some((call) => /^\/api\/revisions\/[^/]+$/.test(call.url))).toBe(false);
     first.unmount();
@@ -143,6 +145,51 @@ describe('PracticeWorkspace on open', () => {
     expect((screen.getByTestId('palette-cache') as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByTestId('narrative-overview') as HTMLTextAreaElement).disabled).toBe(false);
     expect(screen.getByTestId('draft-status').textContent).toBe('unsaved draft');
+  });
+
+  it('[UX-15] says which revision the canvas shows and whose feedback is on show — and tells them apart once the canvas is the draft', async () => {
+    const revisions = [
+      makeRevisionSummary({ id: 'rev-2', revisionNumber: 2, origin: 'assistant' }),
+      makeRevisionSummary(),
+    ];
+    stubApi([
+      {
+        path: '/api/revisions/rev-2',
+        body: { data: makeRevision({ id: 'rev-2', revisionNumber: 2, origin: 'assistant' }) },
+      },
+      ...sessionRoutes({ revisions }),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Revisions' }));
+
+    // Opened on the author's latest revision, unedited: it is what the canvas shows.
+    expect(screen.getByTestId('revision-chip-1').getAttribute('aria-current')).toBe('true');
+    expect(screen.getByTestId('feedback-subject').textContent).toContain('revision #1');
+    expect(screen.queryByTestId('feedback-off-canvas')).toBeNull();
+
+    // The coach's revision loaded read-only: the canvas and the feedback both move to it,
+    // while the toolbar still reports the author's own latest submission, named as that.
+    await userEvent.click(screen.getByTestId('revision-chip-2'));
+    expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
+    await userEvent.click(screen.getByRole('tab', { name: 'Revisions' }));
+    expect(screen.getByTestId('revision-chip-2').getAttribute('aria-current')).toBe('true');
+    expect(screen.getByTestId('revision-chip-1').hasAttribute('aria-current')).toBe(false);
+    expect(screen.getByTestId('feedback-subject').textContent).toContain('revision #2');
+    expect(screen.getByTestId('feedback-subject').textContent).toContain('AI');
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #1 · graded');
+
+    // Restored as the draft: the canvas shows no revision any more. No chip is
+    // current, and the feedback says it is about #2, not what is drawn now.
+    await userEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    for (const chip of screen.getAllByTestId(/^revision-chip-/)) {
+      expect(chip.hasAttribute('aria-current')).toBe(false);
+    }
+    expect(screen.getByTestId('revision-chip-2').getAttribute('data-place')).toBe('feedback');
+    expect(screen.getByTestId('feedback-off-canvas').textContent).toBe(
+      'The canvas shows your draft, not this revision.',
+    );
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #1 · graded');
   });
 
   it('[UX-11] seeds the coach panel from the session’s newest coaching run on open', async () => {
@@ -284,14 +331,16 @@ describe('PracticeWorkspace grading a revision again', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
     const failed = await screen.findByTestId('evaluation-error');
     expect(failed.textContent).toContain('the model went away');
-    expect(screen.getByText('rev #1 · grading failed')).toBeTruthy();
+    expect(screen.getByTestId('submission-status').textContent).toBe(
+      'submitted #1 · grading failed',
+    );
 
     await userEvent.click(screen.getByTestId('retry-evaluation'));
 
     // The new run's grade lands on the same revision.
     expect((await screen.findByTestId('overall-score')).textContent).toBe('81');
     expect(screen.queryByTestId('evaluation-error')).toBeNull();
-    expect(screen.getByText('rev #1 · graded')).toBeTruthy();
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #1 · graded');
     const posts = calls.filter((call) => call.method === 'POST').map((call) => call.url);
     expect(posts).toEqual(['/api/revisions/rev-1/evaluation']);
 
@@ -406,12 +455,14 @@ describe('PracticeWorkspace when its session vanishes', () => {
     ]);
 
     renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
-    expect(await screen.findByText('rev #1 · grading…')).toBeTruthy();
+    expect((await screen.findByTestId('submission-status')).textContent).toBe(
+      'submitted #1 · grading…',
+    );
 
     expect(
       await screen.findByRole('heading', { name: 'Practice session not found' }, { timeout: 4000 }),
     ).toBeTruthy();
-    expect(screen.queryByText(/grading…/)).toBeNull();
+    expect(screen.queryByTestId('submission-status')).toBeNull();
     expect(screen.queryByTestId('evaluation-error')).toBeNull();
     expect(screen.queryByTestId('retry-evaluation')).toBeNull();
     expect(screen.queryByText(/Revision rev-1 not found/)).toBeNull();
@@ -546,7 +597,7 @@ describe('PracticeWorkspace while a run holds the session', () => {
     expect(await screen.findByTestId('readonly-banner')).toBeTruthy();
 
     // The badge and the gate follow the session's newest submission, not revision #1 on screen.
-    expect(screen.getByText('rev #2 · grading…')).toBeTruthy();
+    expect(screen.getByTestId('submission-status').textContent).toBe('submitted #2 · grading…');
     await userEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
     const submit = screen.getByTestId('submit-revision') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);

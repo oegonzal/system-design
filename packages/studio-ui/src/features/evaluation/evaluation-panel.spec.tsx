@@ -56,6 +56,31 @@ describe('EvaluationPanel', () => {
     expect(screen.getByTestId('overall-score').textContent).toBe('—');
   });
 
+  it('[UX-15] says whose feedback it shows, marks a revision the coach wrote, and says when the canvas has moved on to the draft', () => {
+    const onCanvas = renderPanel({
+      subject: { revisionNumber: 2, origin: 'assistant', onCanvas: true },
+      evaluation: makeEvaluation(),
+    });
+    const subject = screen.getByTestId('feedback-subject');
+    expect(subject.textContent).toContain('Feedback for revision #2');
+    expect(subject.textContent).toContain('AI');
+    expect(screen.queryByTestId('feedback-off-canvas')).toBeNull();
+    onCanvas.unmount();
+
+    const drafted = renderPanel({
+      subject: { revisionNumber: 1, origin: 'user', onCanvas: false },
+      evaluation: makeEvaluation(),
+    });
+    expect(screen.getByTestId('feedback-subject').textContent).not.toContain('AI');
+    expect(screen.getByTestId('feedback-off-canvas').textContent).toBe(
+      'The canvas shows your draft, not this revision.',
+    );
+    drafted.unmount();
+
+    renderPanel();
+    expect(screen.queryByTestId('feedback-subject')).toBeNull();
+  });
+
   it('[EVAL-1] a complete grade renders the headline, the criterion list and the findings', () => {
     renderPanel({ evaluation: makeEvaluation() });
 
