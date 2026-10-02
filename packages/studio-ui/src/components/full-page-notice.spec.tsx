@@ -14,6 +14,16 @@ describe('FullPageNotice', () => {
     expect(screen.getByText('It may have been removed.')).toBeTruthy();
   });
 
+  it('[UX-12] names the tab as its heading does, for as long as it shows', () => {
+    document.title = 'STAR story · System Design Studio';
+    const { unmount } = renderWithTheme(
+      <FullPageNotice title="STAR story not found" message="It may have been removed." />,
+    );
+    expect(document.title).toBe('STAR story not found · System Design Studio');
+    unmount();
+    expect(document.title).toBe('STAR story · System Design Studio');
+  });
+
   it('renders a Back link to the given href when backHref is set, named for where it leads', () => {
     const { unmount } = renderWithTheme(<FullPageNotice title="Gone" message="—" backHref="/" />);
     const back = screen.getByTestId('notice-back');

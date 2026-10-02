@@ -18,6 +18,8 @@ test.describe('practice session not found', () => {
 
     await expect(page.getByRole('heading', { name: 'Practice session not found' })).toBeVisible();
     await expect(page.getByText(`Session ${bogus} not found`)).toHaveCount(0);
+    // The tab names the dead end as the page does, never the route's generic "Practice".
+    await expect(page).toHaveTitle('Practice session not found · System Design Studio');
 
     const back = page.getByTestId('notice-back');
     await expect(back).toBeVisible();

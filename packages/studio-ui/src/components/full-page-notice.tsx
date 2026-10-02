@@ -2,7 +2,10 @@
 
 import styled from '@emotion/styled';
 import { Button, Heading, Stack, Surface, Text } from '@sysdesign/design-system';
+import { useDocumentTitle } from '@sysdesign/web-kit';
 import Link from 'next/link';
+
+import { pageTitle } from '../app/nav';
 
 export interface FullPageNoticeProps {
   /** The heading — a short, plain statement of what happened. */
@@ -46,8 +49,10 @@ const BackLink = styled(Link)`
  * The full-page status surface for a page that cannot show its content: a
  * missing resource, a load that failed, an address no route answers. One
  * place for the pattern, so a dead end always offers a way forward instead
- * of a raw server message. A page that loads one resource reaches it through
- * `LoadFailureNotice`, which decides between missing and failed.
+ * of a raw server message, and names the tab as its heading does — never the
+ * route's generic title for a subject that is not there. A page that loads
+ * one resource reaches it through `LoadFailureNotice`, which decides between
+ * missing and failed.
  */
 export function FullPageNotice({
   title,
@@ -56,6 +61,7 @@ export function FullPageNotice({
   backHref,
   backLabel = 'Back to the dashboard',
 }: FullPageNoticeProps) {
+  useDocumentTitle(pageTitle(title));
   return (
     <Wrap>
       <Surface padding={6} data-testid="full-page-notice">

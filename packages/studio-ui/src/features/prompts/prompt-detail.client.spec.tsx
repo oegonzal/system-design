@@ -96,6 +96,8 @@ describe('PromptDetail', () => {
     renderWithTheme(<PromptDetail promptId="not-a-uuid" />);
 
     expect(await screen.findByRole('heading', { name: 'Prompt not found' })).toBeTruthy();
+    // The tab says what the page says, not the route's generic "Prompt".
+    expect(document.title).toBe('Prompt not found · System Design Studio');
     expect(screen.queryByText(/uuid is expected/)).toBeNull();
     expect(screen.queryByTestId('notice-retry')).toBeNull();
     const back = screen.getByTestId('notice-back');
