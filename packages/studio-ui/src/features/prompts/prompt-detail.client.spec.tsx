@@ -53,6 +53,14 @@ describe('PromptDetail', () => {
     await waitFor(() =>
       expect(document.title).toBe('Design an order-history service · System Design Studio'),
     );
+
+    // The route's own title, committed after the prompt arrived — the race a
+    // direct load can lose — does not take the tab back.
+    const routeTitle = document.querySelector('title') as HTMLTitleElement;
+    routeTitle.textContent = 'Prompt · System Design Studio';
+    await waitFor(() =>
+      expect(document.title).toBe('Design an order-history service · System Design Studio'),
+    );
   });
 
   it('[UX-14] says why re-derive is off once sessions fix the rubric, and why practice is off while archived', async () => {
