@@ -32,8 +32,10 @@ import {
 } from '@xyflow/react';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import type { ViewArea } from './framing';
+import { NODE_MIN_FOOTPRINT, type Box } from './geometry';
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
-import { FALLBACK_ANCHOR, freeSlotNear } from './placement';
+import { dropPosition, placeBlock, type Placement } from './placement';
 import type { SdEdge, SdNode } from './types';
 
 export interface HighlightState {
@@ -90,8 +92,10 @@ export interface CanvasHistory {
  * while it is mounted; without it, the store falls back to fixed defaults.
  */
 export interface CanvasViewport {
-  /** The visible centre in flow coordinates, or null while the canvas has no size. */
-  centre(): XYPosition | null;
+  /** What the author can see, in flow coordinates, or null while the canvas has no size. */
+  area(): ViewArea | null;
+  /** Moves the view the least distance that shows `box` in full; the zoom stays. */
+  reveal(box: Box): void;
 }
 
 export interface CanvasState extends CanvasContent {
@@ -119,9 +123,11 @@ export interface CanvasState extends CanvasContent {
 
   setGraph(graph: CanvasGraph): void;
   /**
-   * Author edit. `position` drops the block exactly there; without one it
-   * takes the free slot nearest the visible centre, so it is on screen and
-   * never covers another block. Null when read-only.
+   * Author edit; the new block is selected. `position` drops it there
+   * (kept on the pane); without one it takes the free place nearest the
+   * middle of what is visible, clear of every other block — and when nothing
+   * visible is free, the nearest free place beside it, which the view then
+   * moves to show. Null when read-only.
    */
   addNode(kind: NodeKind, position?: XYPosition): SdNode | null;
   onNodesChange(changes: NodeChange<SdNode>[]): void;
@@ -386,13 +392,23 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       addNode(kind, position) {
         const { nodes, readOnly, viewport } = get();
         if (readOnly) return null;
+        const area = viewport?.area() ?? null;
+        const placed: Placement =
+          position === undefined
+            ? placeBlock(nodes, area?.clear ?? null)
+            : {
+                position: dropPosition(position, area?.pane ?? null),
+                size: NODE_MIN_FOOTPRINT,
+                visible: true,
+              };
         const node: SdNode = {
           id: nextId('n', nodes),
           type: 'sd',
-          position: position ?? freeSlotNear(viewport?.centre() ?? FALLBACK_ANCHOR, nodes),
+          position: placed.position,
           data: { kind, label: DEFAULT_NODE_LABELS[kind] },
         };
         commit({ nodes: [...nodes, node], selectedId: node.id });
+        if (!placed.visible) viewport?.reveal({ ...placed.position, ...placed.size });
         return node;
       },
 

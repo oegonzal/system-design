@@ -8,23 +8,25 @@ import { NODE_KINDS, type NodeKind } from '@sysdesign/contracts';
 import {
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
   useReactFlow,
   useStoreApi,
-  type FitViewOptions,
   type OnBeforeDelete,
 } from '@xyflow/react';
-import { useCallback, useEffect, useRef, type DragEvent } from 'react';
+import { useCallback, useEffect, type DragEvent } from 'react';
 
 import { useCanvasStore } from './canvas-store-context';
 import { SdEdge } from './edges/sd-edge';
+import { MINIMAP_SIZE, revealShift, viewArea } from './framing';
 import { SdNode } from './nodes/sd-node';
 import { NODE_DRAG_MIME } from './palette/palette';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from './types';
 import { useCanvasShortcuts } from './use-canvas-shortcuts';
+import { useFitRequests } from './use-fit-requests';
 
 /**
  * Module scope, and it matters: a nodeTypes object recreated per render makes
@@ -40,28 +42,12 @@ const defaultEdgeOptions = {
 
 const deleteKeyCodes = ['Backspace', 'Delete'];
 
-/** The minimap's size — drawn at this, and kept clear by every fit. */
-const MINIMAP_SIZE = { width: 140, height: 96 };
-/** The margin React Flow's stylesheet puts around each panel (`.react-flow__panel`). */
-const PANEL_MARGIN = 15;
-/** Room between a framed diagram and the frame's edge. */
-const FIT_MARGIN = 24;
-
-/**
- * How every fit frames the diagram — on load, from the toolbar, from the
- * zoom controls. Never past 100%, so a lone block is not blown up to fill
- * the frame; and the bottom band the minimap and the zoom controls sit in is
- * kept clear, so no block lands under them.
- */
-const FIT_VIEW_OPTIONS: FitViewOptions = {
-  maxZoom: 1,
-  padding: {
-    top: `${FIT_MARGIN}px`,
-    left: `${FIT_MARGIN}px`,
-    right: `${FIT_MARGIN}px`,
-    bottom: `${MINIMAP_SIZE.height + PANEL_MARGIN + FIT_MARGIN}px`,
-  },
-};
+/** The frame-the-diagram glyph, drawn as React Flow's own controls are: the four corners of a frame. */
+const FIT_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 30" aria-hidden focusable="false">
+    <path d="M3.692 4.63c0-.53.4-.938.939-.938h5.215V0H4.708C2.13 0 0 2.054 0 4.63v5.216h3.692V4.631zM27.354 0h-5.2v3.692h5.17c.53 0 .984.4.984.939v5.215H32V4.631A4.624 4.624 0 0027.354 0zm.954 24.83c0 .532-.4.94-.939.94h-5.215v3.768h5.215c2.577 0 4.631-2.13 4.631-4.707v-5.139h-3.692v5.139zm-23.677.94c-.531 0-.939-.4-.939-.94v-5.138H0v5.139c0 2.577 2.13 4.707 4.708 4.707h5.138V25.77H4.631z" />
+  </svg>
+);
 
 /**
  * React Flow's chrome is painted from the theme in either mode: these are the
@@ -127,7 +113,6 @@ export function SdCanvas() {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const readOnly = useCanvasStore((state) => state.readOnly);
-  const fitRequest = useCanvasStore((state) => state.fitRequest);
   const onNodesChange = useCanvasStore((state) => state.onNodesChange);
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
@@ -136,34 +121,32 @@ export function SdCanvas() {
   const select = useCanvasStore((state) => state.select);
   const clearHighlight = useCanvasStore((state) => state.clearHighlight);
   const attachViewport = useCanvasStore((state) => state.attachViewport);
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const requestFit = useCanvasStore((state) => state.requestFit);
+  const { screenToFlowPosition, setViewport } = useReactFlow();
   const flow = useStoreApi<SdNodeModel, SdEdgeModel>();
   useCanvasShortcuts();
+  useFitRequests();
 
-  // The store asks where the author is looking when it places a block.
+  // The store asks what the author can see when it places a block, and has
+  // the view moved when the only free place was out of sight.
   useEffect(() => {
+    const area = () => {
+      const { width, height, transform } = flow.getState();
+      return viewArea({ width, height }, transform);
+    };
     attachViewport({
-      centre() {
-        const {
-          width,
-          height,
-          transform: [x, y, zoom],
-        } = flow.getState();
-        if (width === 0 || height === 0) return null;
-        return { x: (width / 2 - x) / zoom, y: (height / 2 - y) / zoom };
+      area,
+      reveal(box) {
+        const visible = area();
+        if (visible === null) return;
+        const shift = revealShift(box, visible.clear);
+        if (shift.x === 0 && shift.y === 0) return;
+        const [x, y, zoom] = flow.getState().transform;
+        void setViewport({ x: x - shift.x * zoom, y: y - shift.y * zoom, zoom });
       },
     });
     return () => attachViewport(null);
-  }, [attachViewport, flow]);
-
-  // Each fit request is honoured once — including one made before the canvas
-  // mounted (a load). React Flow holds the fit until the blocks are measured.
-  const honouredFit = useRef(0);
-  useEffect(() => {
-    if (fitRequest === honouredFit.current) return;
-    honouredFit.current = fitRequest;
-    void fitView(FIT_VIEW_OPTIONS);
-  }, [fitRequest, fitView]);
+  }, [attachViewport, flow, setViewport]);
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
@@ -230,7 +213,17 @@ export function SdCanvas() {
         deleteKeyCode={readOnly ? null : deleteKeyCodes}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
-        <Controls showInteractive={false} fitViewOptions={FIT_VIEW_OPTIONS} />
+        {/* Fit is the store's request, like the toolbar's: one way to frame the diagram. */}
+        <Controls showInteractive={false} showFitView={false}>
+          <ControlButton
+            className="react-flow__controls-fitview"
+            onClick={requestFit}
+            title="Fit view"
+            aria-label="Fit view"
+          >
+            {FIT_ICON}
+          </ControlButton>
+        </Controls>
         <MiniMap<SdNodeModel> pannable style={MINIMAP_SIZE} nodeColor={minimapNodeColor} />
       </ReactFlow>
     </CanvasFrame>

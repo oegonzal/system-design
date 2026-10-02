@@ -7,8 +7,18 @@ import {
   selectCanRedo,
   selectCanUndo,
   type CanvasStore,
+  type CanvasViewport,
 } from './canvas-store';
-import { NODE_ASSUMED_HEIGHT, NODE_WIDTH } from './geometry';
+import { viewArea } from './framing';
+import {
+  contains,
+  NODE_FOOTPRINT,
+  NODE_GAP,
+  NODE_MIN_FOOTPRINT,
+  overlaps,
+  type Box,
+} from './geometry';
+import { boxOf } from './placement';
 
 const criteria = makeCriteria();
 
@@ -420,39 +430,92 @@ describe('canvas-store', () => {
   });
 
   describe('placing a block', () => {
-    it('[UX-2] centres a click-added block on the visible centre the canvas reports', () => {
+    /** A canvas on screen: an 800 × 600 pane at 100%, unpanned, that records what it is asked to show. */
+    function attachCanvas(store: CanvasStore, pane = { width: 800, height: 600 }) {
+      const revealed: Box[] = [];
+      const viewport: CanvasViewport = {
+        area: () => viewArea(pane, [0, 0, 1]),
+        reveal: (box) => revealed.push(box),
+      };
+      store.getState().attachViewport(viewport);
+      const clear = viewport.area()?.clear;
+      if (!clear) throw new Error('the test pane has no size');
+      return { revealed, clear };
+    }
+
+    it('[UX-2] centres a click-added block in what the canvas reports the author can see in full', () => {
       const store = createCanvasStore();
-      store.getState().attachViewport({ centre: () => ({ x: 1000, y: 600 }) });
+      const { clear, revealed } = attachCanvas(store);
 
       const node = store.getState().addNode('cache');
 
       expect(node?.position).toEqual({
-        x: 1000 - NODE_WIDTH.max / 2,
-        y: 600 - NODE_ASSUMED_HEIGHT / 2,
+        x: clear.width / 2 - NODE_FOOTPRINT.width / 2,
+        y: clear.height / 2 - NODE_FOOTPRINT.height / 2,
       });
+      expect(revealed).toEqual([]);
     });
 
-    it('[UX-2] staggers consecutive adds by at least a block, so none covers another', () => {
+    it('[UX-2] keeps consecutive adds a gap clear of each other and on screen', () => {
       const store = createCanvasStore();
-      store.getState().attachViewport({ centre: () => ({ x: 400, y: 300 }) });
+      const { clear, revealed } = attachCanvas(store);
 
       for (const kind of ['client', 'cdn', 'dns', 'service'] as const)
         store.getState().addNode(kind);
 
-      const positions = store.getState().nodes.map((node) => node.position);
-      for (const [index, a] of positions.entries()) {
-        for (const b of positions.slice(index + 1)) {
-          const apart =
-            Math.abs(a.x - b.x) >= NODE_WIDTH.max || Math.abs(a.y - b.y) >= NODE_ASSUMED_HEIGHT;
-          expect(apart).toBe(true);
+      const boxes = store.getState().nodes.map(boxOf);
+      for (const [index, a] of boxes.entries()) {
+        expect(contains(clear, a)).toBe(true);
+        for (const b of boxes.slice(index + 1)) {
+          const grown = {
+            x: a.x - NODE_GAP,
+            y: a.y - NODE_GAP,
+            width: a.width + NODE_GAP * 2,
+            height: a.height + NODE_GAP * 2,
+          };
+          expect(overlaps(grown, b)).toBe(false);
         }
       }
+      expect(revealed).toEqual([]);
     });
 
-    it('a dropped block lands exactly where it was dropped', () => {
+    it('[UX-2] on a canvas with no visible room left, adds beside what is visible and has the view show the new block', () => {
+      const store = createCanvasStore();
+      // A pane with room for exactly one block that nothing floats over.
+      const { clear, revealed } = attachCanvas(store, {
+        width: NODE_FOOTPRINT.width + NODE_GAP,
+        height: 200,
+      });
+
+      const first = store.getState().addNode('client');
+      expect(first && contains(clear, boxOf(first))).toBe(true);
+      expect(revealed).toEqual([]);
+
+      const second = store.getState().addNode('service');
+      expect(second && contains(clear, boxOf(second))).toBe(false);
+      expect(second && first && overlaps(boxOf(second), boxOf(first))).toBe(false);
+      expect(revealed).toEqual([{ ...second?.position, ...NODE_FOOTPRINT }]);
+    });
+
+    it('[UX-2] a dropped block lands exactly where it was dropped', () => {
       const store = createCanvasStore();
       store.getState().addNode('queue', { x: 12, y: 34 });
       expect(store.getState().nodes[0]?.position).toEqual({ x: 12, y: 34 });
+
+      const { revealed } = attachCanvas(store);
+      store.getState().addNode('cache', { x: 300, y: 500 });
+      // Under the minimap's band is still on the pane: the author chose it.
+      expect(store.getState().nodes[1]?.position).toEqual({ x: 300, y: 500 });
+      expect(revealed).toEqual([]);
+    });
+
+    it('[UX-2] a drop past the pane’s edge is pulled back onto it, never left out of sight', () => {
+      const store = createCanvasStore();
+      attachCanvas(store, { width: 692, height: 600 });
+
+      const node = store.getState().addNode('cache', { x: 780, y: 280 });
+
+      expect(node?.position).toEqual({ x: 692 - NODE_MIN_FOOTPRINT.width, y: 280 });
     });
   });
 
