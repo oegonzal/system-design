@@ -7,7 +7,7 @@ import type {
 import type { InspectorAction } from './action';
 import { deriveRun } from './derive-run';
 import { digest } from './signature';
-import type { StepRow } from './state';
+import type { StepRow, StepState } from './state';
 
 /**
  * One snapshot of an orchestration run read out as actions, with each child
@@ -21,6 +21,12 @@ import type { StepRow } from './state';
  * They change for different reasons — counts tick up as work lands, a child
  * appears the moment it opens — and keeping them apart means each is a mutation
  * a reader can point at, rather than one blurred row.
+ *
+ * Opening the record seeds every declared step as pending. The step ids and
+ * their order are the orchestrator's own declaration and never change, so the
+ * action stays final — and the column is complete from the first snapshot, which
+ * is what lets a reader see the step that has not run yet rather than only the
+ * ones that have.
  */
 
 const STEP_TYPE = {
@@ -36,6 +42,19 @@ const STEP_VERB = {
   skipped: 'skipped',
   failed: 'failed',
 } as const;
+
+/** A declared step before anything has happened to it. */
+const pendingOf = (stepId: string): StepState => ({
+  stepId,
+  status: 'pending',
+  reason: null,
+  note: null,
+  counts: {},
+  report: null,
+  startedAt: null,
+  finishedAt: null,
+  runIds: [],
+});
 
 const rowOf = (stepId: string, step: OrchestrationStepDto): StepRow => ({
   stepId,
@@ -86,7 +105,9 @@ export function deriveOrchestration(
         finishedAt: null,
         status: 'running',
         context: run.context,
-        steps: {},
+        // The declared ids, in declared order: immutable, so this action is
+        // written once and the column is whole from the start.
+        steps: Object.fromEntries(Object.keys(run.steps).map((id) => [id, pendingOf(id)])),
         error: null,
       },
     },

@@ -12,9 +12,12 @@ export default meta;
 
 type Story = StoryObj<typeof ExchangeList>;
 
+const RUN_ID = makeRun().runId;
+
 const withRetries = [
-  ...makeRun().exchanges.map((exchange) => ({ ...exchange, attempt: 1 })),
+  ...makeRun().exchanges.map((exchange) => ({ ...exchange, attempt: 1, runId: RUN_ID })),
   {
+    runId: RUN_ID,
     scope: 'critic.requirements.s1',
     ordinal: 5,
     outcome: 'schema-miss' as const,
@@ -24,6 +27,7 @@ const withRetries = [
     errorName: 'schema-miss',
   },
   {
+    runId: RUN_ID,
     scope: 'critic.requirements.s1',
     ordinal: 6,
     outcome: 'ok' as const,
@@ -36,7 +40,9 @@ const withRetries = [
 /** One call per stage, each answered first time. */
 export const EveryCallAnswered: Story = {
   args: (() => {
-    const invocations = invocationsOf(makeRun().exchanges);
+    const invocations = invocationsOf(
+      makeRun().exchanges.map((exchange) => ({ ...exchange, runId: RUN_ID })),
+    );
     return { invocations, totals: invocationTotals(invocations) };
   })(),
 };

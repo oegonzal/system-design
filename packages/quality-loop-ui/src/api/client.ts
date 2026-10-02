@@ -1,10 +1,14 @@
 import type {
+  GetOrchestrationRunResponse,
   GetPromptLibraryDocumentResponse,
   GetQualityRunResponse,
+  ListOrchestrationRunsQuery,
+  ListOrchestrationRunsResponse,
   ListPipelinesResponse,
   ListPromptLibraryResponse,
   ListQualityRunsQuery,
   ListQualityRunsResponse,
+  OrchestrationRunDto,
   PipelineSummary,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
@@ -52,5 +56,27 @@ export const api = {
 
   async getRun(runId: string, opts: GetOptions = {}): Promise<QualityRunDto> {
     return unwrap(await request<GetQualityRunResponse>(`/runs/${encodeURIComponent(runId)}`, opts));
+  },
+
+  async listOrchestrations(
+    query: ListOrchestrationRunsQuery = {},
+    opts: GetOptions = {},
+  ): Promise<ListOrchestrationRunsResponse> {
+    return request<ListOrchestrationRunsResponse>(
+      `/orchestrations${toQueryString({ ...query })}`,
+      opts,
+    );
+  },
+
+  async getOrchestration(
+    orchestrationRunId: string,
+    opts: GetOptions = {},
+  ): Promise<OrchestrationRunDto> {
+    return unwrap(
+      await request<GetOrchestrationRunResponse>(
+        `/orchestrations/${encodeURIComponent(orchestrationRunId)}`,
+        opts,
+      ),
+    );
   },
 };

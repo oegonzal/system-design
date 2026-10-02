@@ -1,9 +1,10 @@
-import type { LlmExchangeSummaryDto } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { invocationsOf, invocationTotals } from './exchange-invocations';
+import type { ExchangeEntry } from './state';
 
-const row = (over: Partial<LlmExchangeSummaryDto>): LlmExchangeSummaryDto => ({
+const row = (over: Partial<ExchangeEntry>): ExchangeEntry => ({
+  runId: 'run-1',
   scope: 'producer',
   ordinal: 1,
   outcome: 'ok',
@@ -66,6 +67,19 @@ describe('grouping attempts into calls', () => {
       ]),
     );
     expect(totals).toEqual({ calls: 2, attempts: 3, retried: 1, failed: 1, totalMs: 3000 });
+  });
+
+  it('[QLU-12] two runs that both opened the same stage stay two calls, not a phantom retry', () => {
+    // An orchestration's log holds every child's calls in one list, and two
+    // samples of one pipeline both open `producer` at ordinal 1.
+    const invocations = invocationsOf([
+      row({ runId: 'child-a', scope: 'producer', ordinal: 1, attempt: 1 }),
+      row({ runId: 'child-b', scope: 'producer', ordinal: 1, attempt: 1 }),
+    ]);
+    expect(invocations.map((call) => [call.runId, call.attempts.length, call.retried])).toEqual([
+      ['child-a', 1, false],
+      ['child-b', 1, false],
+    ]);
   });
 
   it('[QLU-9] no call is empty, and no exchanges means no calls', () => {

@@ -1,25 +1,39 @@
 'use client';
 
-import { Alert, Heading, Spinner, Stack, Surface, Text } from '@sysdesign/design-system';
+import {
+  Alert,
+  Heading,
+  Spinner,
+  Stack,
+  Surface,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  Text,
+} from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 
 import { api } from '../../api/client';
 import { useLink } from '../../components/link-context';
 import { EvidencePanel } from '../results/evidence-panel';
 import { criteriaRows, findingGroups } from '../results/select';
 import { ACTION_GROUPS, type ActionGroup } from './model/action';
+import { dataFlow, flowTotals } from './model/data-flow';
 import { invocationsOf, invocationTotals } from './model/exchange-invocations';
 import { inspectHref } from './model/inspect-link';
 import { lensContributions } from './model/lens-contributions';
 import { dimensionRows, gateRows, policyNumbers, validatorRows } from './model/policy-view';
 import { groupsPresent, timelineRows } from './model/select';
-import type { InspectorState } from './model/state';
-import { beforeOf, entryByKey } from './model/timeline';
+import { beforeOf, entryByKey, type Timeline } from './model/timeline';
+import { OrchestrationPicker } from './orchestration-picker';
 import { RunPicker } from './run-picker';
 import { useInspectTarget } from './use-inspect-target';
+import { useOrchestrationTimeline } from './use-orchestration-timeline';
 import { useRunTimeline } from './use-run-timeline';
 import { ExchangeList } from './view/exchange-list';
+import { FlowPanel } from './view/flow-panel';
 import { Inspector } from './view/inspector';
 import { LensPanel } from './view/lens-panel';
 import { PolicyPanel } from './view/policy-panel';
@@ -33,20 +47,38 @@ const ALL_GROUPS = new Set(Object.keys(ACTION_GROUPS) as ActionGroup[]);
  * router, the API or the clock.
  *
  * What is being inspected lives in the URL; which action is selected lives there
- * too, so a link reopens the same moment. Everything else below this is
+ * too, so a link reopens the same moment. Everything below this is
  * presentational and takes what it shows as props.
+ *
+ * A quality run and an orchestration are the same reading with different roots:
+ * an orchestration's log nests each child run's own actions under the step that
+ * opened it, and `?run=` then names which child is being followed. Both hooks are
+ * always called — one of them with nothing to read — because that is what the
+ * rules of hooks require and what keeps the branch here rather than inside them.
  *
  * Following is a consequence of selection rather than a mode of its own: with no
  * action named, the latest is shown and keeps being the latest; naming one pins
- * it. That is why scrolling never detaches anybody — a scroll heuristic fights
- * momentum scrolling and would detach a reader who was only reading.
+ * it. That is why scrolling never detaches anybody.
  */
 export function InspectorClient() {
   const { target, point } = useInspectTarget();
   const Link = useLink();
   const runs = useResource((signal) => api.listRuns({ limit: RECENT_LIMIT }, { signal }), []);
-  const { timeline, run, error, isPolling, unreachable } = useRunTimeline(target.run);
+  const orchestrations = useResource(
+    (signal) => api.listOrchestrations({ limit: RECENT_LIMIT }, { signal }),
+    [],
+  );
   const pipelines = useResource((signal) => api.listPipelines({ signal }), []);
+
+  const watchingOrchestration = target.orchestration !== null;
+  const runSide = useRunTimeline(watchingOrchestration ? null : target.run);
+  const orchSide = useOrchestrationTimeline(target.orchestration, target.run);
+
+  const timeline: Timeline = watchingOrchestration ? orchSide.timeline : runSide.timeline;
+  const error = watchingOrchestration ? orchSide.error : runSide.error;
+  const isPolling = watchingOrchestration ? orchSide.isPolling : runSide.isPolling;
+  const unreachable = watchingOrchestration ? orchSide.unreachable : runSide.unreachable;
+  const run = watchingOrchestration ? orchSide.selectedChild : runSide.run;
   const pipeline =
     run === null ? null : (pipelines.data?.find((entry) => entry.id === run.pipeline) ?? null);
 
@@ -85,11 +117,30 @@ export function InspectorClient() {
 
   // The panels read the state the selected action produced, which is what makes
   // the rail a scrubber over the whole run rather than a log of it.
-  const panels = useMemo(() => {
-    const state: InspectorState | null = selected?.row.entry.after ?? null;
+  const panels = useMemo(():
+    readonly { id: string; label: string; content: ReactNode }[] | undefined => {
+    const state = selected?.row.entry.after ?? null;
     if (state === null) return undefined;
     const invocations = invocationsOf(state.exchanges);
+    const flow = dataFlow(state, orchSide.children);
     return [
+      ...(state.orchestration === null
+        ? []
+        : [
+            {
+              id: 'flow',
+              label: 'Steps',
+              content: (
+                <FlowPanel
+                  flow={flow}
+                  totals={flowTotals(flow)}
+                  unread={orchSide.unread}
+                  hrefForChild={(runId) => inspectHref({ ...target, run: runId, action: null })}
+                  link={Link}
+                />
+              ),
+            },
+          ]),
       {
         id: 'lenses',
         label: 'Lenses',
@@ -126,7 +177,7 @@ export function InspectorClient() {
         content: <ExchangeList invocations={invocations} totals={invocationTotals(invocations)} />,
       },
     ];
-  }, [selected, pipeline]);
+  }, [selected, pipeline, orchSide.children, orchSide.unread, target, Link]);
 
   const reconstructed = timeline.entries.filter(
     (entry) => entry.provenance === 'reconstructed',
@@ -137,32 +188,60 @@ export function InspectorClient() {
       ? `All ${reconstructed} actions were read back out of one recorded snapshot. Their order and their payloads are what the engine declared; the times shown are only the ones the record itself carries.`
       : `${reconstructed} actions were read out of the first snapshot — faithful about what happened and about its order, not about wall-clock time. The other ${recorded} were seen arriving, and carry the moment they were observed.`;
 
+  const nothingChosen = target.run === null && target.orchestration === null;
+
   return (
     <Stack gap={6}>
-      <Surface as="section" aria-label="Runs to inspect">
+      <Surface as="section" aria-label="What to inspect">
         <Stack gap={4}>
-          <Heading level={2}>Inspect a run</Heading>
+          <Heading level={2}>Inspect</Heading>
           <Text tone="secondary" size="sm">
-            Pick a run to read its machinery: what each lens answered, what survived agreement, how
-            the evidence became a number, and what changed from one iteration to the next.
+            Pick a quality run to read its machinery — what each lens answered, what survived
+            agreement, how the evidence became a number, what changed between iterations — or an
+            orchestration to read its steps and the runs they opened.
           </Text>
-          {runs.data ? (
-            <RunPicker
-              runs={runs.data.data}
-              selectedRunId={target.run}
-              hrefFor={(runId) => inspectHref({ ...target, run: runId, action: null })}
-              link={Link}
-            />
-          ) : runs.error ? (
-            <Alert tone="danger">{runs.error}</Alert>
-          ) : (
-            <Spinner label="Loading runs" />
-          )}
+          <Tabs
+            value={watchingOrchestration ? 'orchestrations' : 'runs'}
+            onChange={() => undefined}
+          >
+            <TabList aria-label="What to inspect">
+              <Tab value="runs">Quality runs</Tab>
+              <Tab value="orchestrations">Orchestrations</Tab>
+            </TabList>
+            <TabPanel value="runs">
+              {runs.data ? (
+                <RunPicker
+                  runs={runs.data.data}
+                  selectedRunId={watchingOrchestration ? null : target.run}
+                  hrefFor={(runId) => inspectHref({ run: runId })}
+                  link={Link}
+                />
+              ) : runs.error ? (
+                <Alert tone="danger">{runs.error}</Alert>
+              ) : (
+                <Spinner label="Loading runs" />
+              )}
+            </TabPanel>
+            <TabPanel value="orchestrations">
+              {orchestrations.data ? (
+                <OrchestrationPicker
+                  orchestrations={orchestrations.data.data}
+                  selectedId={target.orchestration}
+                  hrefFor={(id) => inspectHref({ orchestration: id })}
+                  link={Link}
+                />
+              ) : orchestrations.error ? (
+                <Alert tone="danger">{orchestrations.error}</Alert>
+              ) : (
+                <Spinner label="Loading orchestrations" />
+              )}
+            </TabPanel>
+          </Tabs>
         </Stack>
       </Surface>
 
-      {target.run === null ? (
-        <Alert tone="info">Select a run above to read what the loop did.</Alert>
+      {nothingChosen ? (
+        <Alert tone="info">Select a run or an orchestration above to read what it did.</Alert>
       ) : (
         <Stack gap={4}>
           {error !== null && <Alert tone="danger">{error}</Alert>}
@@ -173,7 +252,7 @@ export function InspectorClient() {
             </Alert>
           )}
           {timeline.entries.length === 0 ? (
-            <Spinner label="Reading the run" />
+            <Spinner label="Reading the record" />
           ) : (
             <Inspector
               rows={rows}

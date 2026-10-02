@@ -69,6 +69,11 @@ export function DiffView({ before, after, changes, panels = NO_PANELS }: DiffVie
           />
         </TabPanel>
       )}
+      {panels.map((panel) => (
+        <TabPanel key={panel.id} value={panel.id}>
+          {panel.content}
+        </TabPanel>
+      ))}
     </Tabs>
   );
 }

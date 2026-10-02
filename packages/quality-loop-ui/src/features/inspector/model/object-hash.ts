@@ -137,6 +137,15 @@ export const HASH_PROBES: readonly HashProbe[] = [
       `diagnostic:${String(row['stage'])}#${row['sample'] == null ? '-' : String(row['sample'])}#${String(row['reason'])}`,
   },
   {
+    // An orchestration's log holds every child's exchanges in one list, and
+    // `(scope, ordinal)` repeats across children — so the run is part of the
+    // identity, and this probe must precede the bare one.
+    shape: 'ExchangeEntry',
+    discriminators: ['runId', 'scope', 'ordinal'],
+    hash: (row) =>
+      `exchange:${String(row['runId'])}#${String(row['scope'])}#${String(row['ordinal'])}`,
+  },
+  {
     shape: 'LlmExchangeSummaryDto',
     discriminators: ['scope', 'ordinal'],
     hash: (row) => `exchange:${String(row['scope'])}#${String(row['ordinal'])}`,

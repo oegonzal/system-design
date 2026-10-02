@@ -39,6 +39,10 @@ export function ExchangeList({
       </Text>
     );
   }
+  // An orchestration's log holds several runs' calls, so the run is a column
+  // only when there is more than one of them to tell apart.
+  const runs = new Set(invocations.map((call) => call.runId));
+  const showRun = runs.size > 1;
   return (
     <Stack gap={4}>
       <Stack direction="row" gap={2} align="center" wrap>
@@ -54,6 +58,7 @@ export function ExchangeList({
       <Table aria-label="Model calls">
         <thead>
           <tr>
+            {showRun && <th>Run</th>}
             <th>Stage</th>
             <th>Outcome</th>
             <th>Attempts</th>
@@ -66,7 +71,17 @@ export function ExchangeList({
             const ordinal = call.attempts[0].ordinal;
             const selected = selectedOrdinal === ordinal;
             return (
-              <tr key={`${call.scope}#${ordinal}`} aria-current={selected ? 'true' : undefined}>
+              <tr
+                key={`${call.runId}#${call.scope}#${ordinal}`}
+                aria-current={selected ? 'true' : undefined}
+              >
+                {showRun && (
+                  <td>
+                    <Text as="span" tone="muted" size="sm">
+                      …{call.runId.slice(-12)}
+                    </Text>
+                  </td>
+                )}
                 <td>
                   {onSelect === undefined ? (
                     <Text as="span" size="sm">

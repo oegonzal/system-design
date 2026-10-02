@@ -261,7 +261,7 @@ export function deriveRun(
       label: `Model call ${exchange.scope} #${exchange.ordinal} — ${exchange.outcome}${exchange.errorName == null ? '' : ` (${exchange.errorName})`}`,
       scope: at(),
       at: exchange.startedAt,
-      exchange,
+      exchange: { ...exchange, runId },
     });
   }
 

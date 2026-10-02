@@ -1,4 +1,6 @@
-import type { LlmExchangeOutcome, LlmExchangeSummaryDto } from '@sysdesign/contracts';
+import type { LlmExchangeOutcome } from '@sysdesign/contracts';
+
+import type { ExchangeEntry } from './state';
 
 /**
  * Model calls grouped into invocations — one call and every attempt of it.
@@ -12,13 +14,20 @@ import type { LlmExchangeOutcome, LlmExchangeSummaryDto } from '@sysdesign/contr
  * This is also why an exchange is never attributed to an iteration: with
  * ordinals counting attempts, any arithmetic from ordinal to iteration breaks on
  * the first retry. The scope is what a reader joins on instead.
+ *
+ * Grouping is per run as well as per scope. An orchestration's log holds every
+ * child's calls in one list, and two samples of one pipeline both open `producer`
+ * at ordinal 1 — so grouping by scope alone would fuse two separate calls from
+ * two separate runs into one invocation with a phantom retry.
  */
 
 export interface Invocation {
+  /** The run this call belongs to. */
+  runId: string;
   /** The stage that was asked — `producer`, `critic.scale.s2`. */
   scope: string;
   /** Every attempt of this one call, in the order they were made. */
-  attempts: LlmExchangeSummaryDto[];
+  attempts: ExchangeEntry[];
   /** What the last attempt produced: how the call ended. */
   outcome: LlmExchangeOutcome;
   /** Time across every attempt, which is what the call actually cost. */
@@ -30,9 +39,10 @@ export interface Invocation {
   retried: boolean;
 }
 
-const invocationOf = (attempts: LlmExchangeSummaryDto[]): Invocation => {
+const invocationOf = (attempts: ExchangeEntry[]): Invocation => {
   const last = attempts[attempts.length - 1];
   return {
+    runId: last.runId,
     scope: last.scope,
     attempts,
     outcome: last.outcome,
@@ -50,21 +60,24 @@ const invocationOf = (attempts: LlmExchangeSummaryDto[]): Invocation => {
  * The exchanges as invocations. Rows are grouped by scope and split at every
  * first attempt, so two separate calls to one stage stay two invocations.
  */
-export function invocationsOf(exchanges: readonly LlmExchangeSummaryDto[]): Invocation[] {
-  const open = new Map<string, LlmExchangeSummaryDto[]>();
-  const done: LlmExchangeSummaryDto[][] = [];
-  for (const exchange of [...exchanges].sort((a, b) => a.ordinal - b.ordinal)) {
-    const held = open.get(exchange.scope);
+export function invocationsOf(exchanges: readonly ExchangeEntry[]): Invocation[] {
+  const open = new Map<string, ExchangeEntry[]>();
+  const done: ExchangeEntry[][] = [];
+  const within = (exchange: ExchangeEntry): string => `${exchange.runId}|${exchange.scope}`;
+  for (const exchange of [...exchanges].sort(
+    (a, b) => (a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0) || a.ordinal - b.ordinal,
+  )) {
+    const held = open.get(within(exchange));
     // An absent attempt is a row from before retries existed: one attempt, so
     // it both closes whatever was open and stands alone.
     const starts = exchange.attempt === undefined || exchange.attempt <= 1;
     if (held !== undefined && starts) {
       done.push(held);
-      open.delete(exchange.scope);
+      open.delete(within(exchange));
     }
-    const current = open.get(exchange.scope) ?? [];
+    const current = open.get(within(exchange)) ?? [];
     current.push(exchange);
-    open.set(exchange.scope, current);
+    open.set(within(exchange), current);
   }
   for (const attempts of open.values()) done.push(attempts);
   return done.map(invocationOf).sort((a, b) => a.attempts[0].ordinal - b.attempts[0].ordinal);

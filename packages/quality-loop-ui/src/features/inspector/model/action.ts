@@ -2,7 +2,6 @@ import type {
   EvidenceLedger,
   IsoDateString,
   IterationMode,
-  LlmExchangeSummaryDto,
   QualityControlDecision,
   RemediationNote,
   RunErrorDto,
@@ -12,6 +11,7 @@ import type {
 import type {
   ArtifactState,
   ContractState,
+  ExchangeEntry,
   LensCell,
   OrchestrationState,
   RunHeader,
@@ -83,7 +83,7 @@ export type InspectorAction = ActionBase &
     | { type: 'iteration/ended'; iteration: number; durationMs: number }
     | { type: 'run/standing'; standing: StandingState }
     | { type: 'run/failed'; error: RunErrorDto }
-    | { type: 'exchange/recorded'; exchange: LlmExchangeSummaryDto }
+    | { type: 'exchange/recorded'; exchange: ExchangeEntry }
     | { type: 'orchestration/opened'; orchestration: OrchestrationState }
     | { type: 'step/started'; step: StepRow }
     | { type: 'step/opened-run'; stepId: string; runId: string }

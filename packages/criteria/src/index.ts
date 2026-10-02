@@ -349,6 +349,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "The whole declared decision policy sits beside what it did this iteration: each controller factor with the parameters it was composed with and the trace's own outcome and detail, a declared gate the iteration never reached named as unreached, the engine's own reserved factor named as the engine's, each dimension's arithmetic from base through every penalty's list price, decay multiplier and clamp to its score, a dimension no criterion kind can earn credit in called out, and the validator the engine injects labelled rather than treated as a surprise.",
   },
+  {
+    id: 'QLU-11',
+    statement:
+      'A run still open is followed by its own status with no server change: the latest action is shown and keeps being the latest until a row is selected, selecting one detaches and offers the way back with how many arrived since, the way back clears the named action rather than pinning the newest, scrolling never detaches anybody, a finished run is not followed at all, and the log says how many of its actions it is showing when a filter or its own bound has cut them.',
+  },
+  {
+    id: 'QLU-12',
+    statement:
+      "An orchestration reads as its declared steps in order — every one of them, including a step that has not run — with what each published for the steps after it, the child runs it opened and each child's own verdict, and the child runs' own actions nested under the step that opened them. The only edges drawn are the blocks the record proves, naming the step that blocked; the orchestrator's declared dependencies are not published and nothing else is inferred, which the view says. The orchestration and the child being inspected are followed; every other child is read once, bounded, the selected one first, and a child left unread is listed as unread.",
+  },
   // Govcon web client (packages/govcon-ui)
   {
     id: 'GOVU-1',

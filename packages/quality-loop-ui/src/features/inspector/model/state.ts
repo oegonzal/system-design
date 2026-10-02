@@ -45,6 +45,19 @@ import type {
  * silently passed off as current.
  */
 
+/**
+ * One model call as the log holds it: the wire's row plus the run it belongs to.
+ *
+ * The run id is not decoration. An orchestration's log carries every child run's
+ * exchanges in one list, and `(scope, ordinal)` repeats across children — two
+ * samples of one pipeline both open `producer` at ordinal 1 — so without the run
+ * id two different calls would share an identity, and a diff would match one
+ * child's call to another's.
+ */
+export interface ExchangeEntry extends LlmExchangeSummaryDto {
+  runId: string;
+}
+
 /** One lens sample's contribution: what it answered, or why it answered nothing. */
 export interface LensCell {
   /** The lens id — `critic.grounding`, `evaluator.requirements`. */
@@ -173,7 +186,7 @@ export interface InspectorState {
   standing: StandingState | null;
   /** Why the run threw, when it did. Independent of the standing it never reached. */
   failure: RunErrorDto | null;
-  exchanges: LlmExchangeSummaryDto[];
+  exchanges: ExchangeEntry[];
 }
 
 /** An empty ledger — the shape `decide` would see before anything normalised. */
