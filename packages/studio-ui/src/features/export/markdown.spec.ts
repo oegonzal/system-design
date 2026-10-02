@@ -210,6 +210,45 @@ describe('feedbackMarkdown', () => {
     expect(md).not.toContain('data_integrity');
   });
 
+  it('[UX-10] reads a place a rationale merely mentions by its label, and lists a finding only where its lens cited', () => {
+    const mentioned = {
+      ref: 'edge.2',
+      label: 'e-2 · n-2 → n-3 (sync)',
+      part: 'edge',
+      key: 'e-2',
+    } as const;
+    const md = feedbackMarkdown(
+      makeEvaluation({
+        findings: [
+          makeFinding({
+            rationale: 'node.3 has no replica, so the read along edge.2 stops at it.',
+            mentions: [mentioned],
+          }),
+        ],
+        criterionResults: [
+          makeCriterionResult({
+            criterionId: 'c3',
+            result: 'fail',
+            rationale: 'The read along edge.2 ends at one primary.',
+            locations: [],
+            mentions: [mentioned],
+          }),
+        ],
+      }),
+      criteria,
+      1,
+    );
+
+    expect(md).toContain(
+      '- **[high · critic architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
+    );
+    expect(md).toContain(
+      '  n-3 · database · Orders DB has no replica, so the read along e-2 · n-2 → n-3 (sync) stops at it.',
+    );
+    expect(md).toContain('| The read along e-2 · n-2 → n-3 (sync) ends at one primary. |');
+    expect(md).not.toContain('edge.2');
+  });
+
   it('[DEL-4] says the caveats the panel says: the lens samples a grade was computed without, and a coach’s stop in its own sentence — nothing for a plain grade', () => {
     const plain = feedbackMarkdown(makeEvaluation(), criteria, 1);
     expect(plain).not.toMatch(/stopped|iteration budget|lens sample/i);

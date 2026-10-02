@@ -74,6 +74,36 @@ describe('FindingsList', () => {
     expect(claim.textContent).not.toContain('binding.2 claims');
   });
 
+  it('[EVAL-2] a place the rationale merely mentions reads by its label in the prose, and is neither a chip nor a place the finding highlights', async () => {
+    const onSelect = vi.fn();
+    renderWithTheme(
+      <FindingsList
+        findings={[
+          makeFinding({
+            id: 'f-mention',
+            rationale: 'node.3 has no replica, so the read along edge.2 stops at it.',
+            mentions: [
+              { ref: 'edge.2', label: 'e-2 · n-2 → n-3 (sync)', part: 'edge', key: 'e-2' },
+            ],
+          }),
+        ]}
+        onSelect={onSelect}
+      />,
+    );
+
+    const item = screen.getByTestId('finding-f-mention');
+    expect(item.textContent).toContain(
+      'n-3 · database · Orders DB has no replica, so the read along e-2 · n-2 → n-3 (sync) stops at it.',
+    );
+    expect(
+      within(item)
+        .getAllByTestId('finding-location')
+        .map((chip) => chip.textContent),
+    ).toEqual(['n-3 · database · Orders DB']);
+    await userEvent.click(screen.getByTestId('finding-select-f-mention'));
+    expect(onSelect.mock.calls[0][0].edgeIds).toEqual([]);
+  });
+
   it('[EVAL-2] reads a rationale that capitalises a ref, or names a finding type, in the author’s words', () => {
     renderWithTheme(
       <FindingsList

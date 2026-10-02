@@ -1,3 +1,4 @@
+import { describeLostGrade } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -43,6 +44,65 @@ describe('RevisionTimeline', () => {
 
     await userEvent.click(screen.getByTestId('revision-chip-1'));
     expect(onSelect).toHaveBeenCalledWith(revisions[0]);
+  });
+
+  it('[UX-17] says a grade the grader lost apart from one that failed, with the studio’s sentence as its title', () => {
+    renderWithTheme(
+      <RevisionTimeline
+        revisions={[
+          makeRevisionSummary({
+            id: 'rev-3',
+            revisionNumber: 3,
+            evaluation: {
+              runId: 'run-3',
+              iteration: 1,
+              status: 'failed',
+              overall: null,
+              decision: null,
+              error: describeLostGrade(3),
+            },
+          }),
+          makeRevisionSummary({
+            id: 'rev-2',
+            revisionNumber: 2,
+            evaluation: {
+              runId: 'run-2',
+              iteration: 1,
+              status: 'failed',
+              overall: null,
+              decision: null,
+            },
+          }),
+          makeRevisionSummary({
+            id: 'rev-1',
+            revisionNumber: 1,
+            evaluation: {
+              runId: 'run-1',
+              iteration: 1,
+              status: 'running',
+              overall: null,
+              decision: null,
+            },
+          }),
+        ]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const lost = screen
+      .getByTestId('revision-chip-3')
+      .querySelector('[data-testid="revision-grade-failed"]');
+    expect(lost?.textContent).toBe('grade lost');
+    expect(lost?.getAttribute('title')).toBe(
+      'The grader no longer has the run that graded revision #3 — grade it again to get a verdict.',
+    );
+    const failed = screen
+      .getByTestId('revision-chip-2')
+      .querySelector('[data-testid="revision-grade-failed"]');
+    expect(failed?.textContent).toBe('failed');
+    expect(failed?.hasAttribute('title')).toBe(false);
+    expect(screen.getByTestId('revision-chip-1').textContent).toContain('grading…');
+    expect(screen.queryAllByTestId('revision-score')).toHaveLength(0);
   });
 
   it('[UX-15] calls a chip current only when the canvas shows that revision, and says apart whose feedback is on show', () => {

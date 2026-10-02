@@ -1,3 +1,4 @@
+import { describeLostGrade } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { makeRevisionSummary } from '../../testing/fixtures';
@@ -73,4 +74,37 @@ export const ImprovingTrail: Story = {
 /** The canvas shows the draft: no chip is current, and the feedback tab's revision says whose grade is on show. */
 export const DraftOnCanvas: Story = {
   args: { ...ImprovingTrail.args, activeRevisionId: null, feedbackRevisionId: 'rev-3' },
+};
+
+/** Two grades that never arrived: one the run failed, one the grader lost — the studio's sentence is the chip's title. */
+export const GradesThatNeverArrived: Story = {
+  args: {
+    revisions: [
+      makeRevisionSummary({
+        id: 'rev-1',
+        revisionNumber: 1,
+        evaluation: {
+          runId: 'run-1',
+          iteration: 1,
+          status: 'failed',
+          overall: null,
+          decision: null,
+        },
+      }),
+      makeRevisionSummary({
+        id: 'rev-2',
+        revisionNumber: 2,
+        evaluation: {
+          runId: 'run-2',
+          iteration: 1,
+          status: 'failed',
+          overall: null,
+          decision: null,
+          error: describeLostGrade(2),
+        },
+      }),
+    ],
+    activeRevisionId: 'rev-2',
+    feedbackRevisionId: 'rev-2',
+  },
 };

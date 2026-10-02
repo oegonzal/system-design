@@ -102,6 +102,37 @@ describe('CriterionResultsList', () => {
     );
   });
 
+  it('[EVAL-2] reads a place the rationale merely mentions by its label too — the cited places stay the row’s evidence', () => {
+    renderWithTheme(
+      <CriterionResultsList
+        results={[
+          makeCriterionResult({
+            criterionId: 'c1',
+            rationale: 'binding.1 traces the read; node.3 answers it from one primary.',
+            locations: [{ ref: 'binding.1', label: 'c1 ← n-2, n-3', part: 'binding', key: 'c1' }],
+            mentions: [
+              {
+                ref: 'node.3',
+                label: 'n-3 · database · Orders DB',
+                part: 'node',
+                key: 'n-3',
+                name: 'Orders DB',
+              },
+            ],
+          }),
+        ]}
+        criteria={makeCriteria()}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId('criterion-result-c1')).getByTestId('criterion-rationale')
+        .textContent,
+    ).toBe(
+      'c1 ← n-2, n-3 traces the read; n-3 · database · Orders DB answers it from one primary.',
+    );
+  });
+
   it('falls back to the bare id for a criterion the rubric no longer lists', () => {
     renderWithTheme(
       <CriterionResultsList results={[makeCriterionResult({ criterionId: 'c9' })]} criteria={[]} />,

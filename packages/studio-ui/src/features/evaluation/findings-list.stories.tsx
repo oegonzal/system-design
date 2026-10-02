@@ -48,7 +48,10 @@ export const CompleteWithFindings: Story = {
         ],
         nodeIds: ['n-2'],
         locationRefs: ['node.2'],
-        rationale: 'Nothing watches node.2; the goal asks for observability.',
+        // A place the rationale only mentions reads by its label, but is no chip of the finding's.
+        mentions: [{ ref: 'edge.2', label: 'e-2 · n-2 → n-3 (sync)', part: 'edge', key: 'e-2' }],
+        rationale:
+          'Nothing watches node.2, or the calls it makes along edge.2; the goal asks for observability.',
       }),
     ],
   },

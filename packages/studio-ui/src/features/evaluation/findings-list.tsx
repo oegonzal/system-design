@@ -2,6 +2,7 @@
 
 import styled from '@emotion/styled';
 import {
+  proseLocations,
   SEVERITIES,
   type EvaluationFindingDto,
   type Severity,
@@ -96,10 +97,13 @@ const reconciledTitle = (criterionId: string, statement: string | undefined): st
  * Every chip is a fact from the ledger, in words — which lenses confirmed it
  * (the lens id as its title), how sure they were, how fixable it is, which
  * criterion already counts it, which criteria it names, and where on the
- * design it points, by label rather than position. The type is the title.
- * The rationale reads with the same labels in place of the ids the lens
- * wrote. Clicking a title highlights the affected elements on the canvas.
- * Presentational — everything stateful arrives through props.
+ * design it points, by label rather than position — the places the lens
+ * cited, which are the finding's. The type is the title. The rationale reads
+ * with labels in place of the ids the lens wrote: those places and every
+ * place it merely mentions (`proseLocations`), which a sentence may name
+ * without the finding being about it. Clicking a title highlights the
+ * affected elements on the canvas. Presentational — everything stateful
+ * arrives through props.
  */
 export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: FindingsListProps) {
   if (findings.length === 0) {
@@ -158,7 +162,7 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                 </TitleButton>
                 <WrappingText size="sm" tone="secondary">
                   {finding.rationale !== null
-                    ? lensProse(finding.rationale, finding.locations)
+                    ? lensProse(finding.rationale, proseLocations(finding))
                     : 'No rationale was recorded for this finding.'}
                 </WrappingText>
                 {finding.criterionIds.length > 0 || finding.locations.length > 0 ? (

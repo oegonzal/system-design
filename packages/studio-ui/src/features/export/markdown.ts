@@ -8,7 +8,7 @@ import type {
   QualityRunStatus,
   SuccessCriterion,
 } from '@sysdesign/contracts';
-import { markdownCell, nodeLabel } from '@sysdesign/contracts';
+import { markdownCell, nodeLabel, proseLocations } from '@sysdesign/contracts';
 
 import { humanizeReason } from '../evaluation/decision-reason';
 import { degradedNote } from '../evaluation/degraded';
@@ -193,7 +193,9 @@ export function narrativeMarkdown(
 
 /**
  * The graph is not consulted: every location a finding cites arrives already
- * labelled by the grader, so the export reads the same words as the panel.
+ * labelled by the grader, so the export reads the same words as the panel —
+ * a finding is where its lens cited, and its prose reads every place it
+ * names, cited or merely mentioned, by label.
  */
 export function feedbackMarkdown(
   evaluation: EvaluationDto | null,
@@ -242,7 +244,7 @@ export function feedbackMarkdown(
         `| ${row.criterionId}${statement ? ` — ${markdownCell(statement)}` : ''} | ${humanizeToken(
           row.result,
         )} | ${row.confidence ?? '—'} | ${
-          row.rationale ? markdownCell(lensProse(row.rationale, row.locations)) : '—'
+          row.rationale ? markdownCell(lensProse(row.rationale, proseLocations(row))) : '—'
         } |`,
       );
     }
@@ -259,7 +261,9 @@ export function feedbackMarkdown(
         `- **[${finding.severity} · ${finding.lenses.map(lensName).join(', ')} · ${humanizeToken(finding.type)}]**${
           where ? ` (${where})` : ''
         }${criteriaCited ? ` — ${criteriaCited}` : ''}`,
-        ...(finding.rationale ? [`  ${lensProse(finding.rationale, finding.locations)}`] : []),
+        ...(finding.rationale
+          ? [`  ${lensProse(finding.rationale, proseLocations(finding))}`]
+          : []),
       );
     }
   } else {

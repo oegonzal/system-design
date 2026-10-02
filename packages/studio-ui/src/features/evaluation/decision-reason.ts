@@ -10,7 +10,7 @@ import { humanizeToken } from './humanize';
 export type Glossary = ReadonlyMap<string, string>;
 
 /** The part of a finding a reader names it by. */
-export type NamedFinding = Pick<EvaluationFindingDto, 'id' | 'type' | 'locations' | 'locationRefs'>;
+export type NamedFinding = Pick<EvaluationFindingDto, 'id' | 'type' | 'locations'>;
 
 /** The records a decision's sentence may cite, as structured data. */
 export interface ReasonVocabulary {
@@ -21,14 +21,14 @@ export interface ReasonVocabulary {
 /**
  * A finding as a reader names it: its type in words, then the places it is
  * about, by label. Those are the places its lens cited — what the loop keys
- * the finding by — never every place its rationale goes on to mention, which
- * `locations` also holds: a name is short, and the rationale says the rest.
+ * the finding by, and all `locations` holds — never a place its rationale
+ * merely mentions (`mentions`): a name is short, and the rationale says the
+ * rest.
  */
 export function findingName(finding: NamedFinding): string {
   const type = humanizeToken(finding.type);
-  const cited = finding.locations.filter((location) => finding.locationRefs.includes(location.ref));
-  if (cited.length === 0) return type;
-  return `${type} (${cited.map((location) => location.label).join('; ')})`;
+  if (finding.locations.length === 0) return type;
+  return `${type} (${finding.locations.map((location) => location.label).join('; ')})`;
 }
 
 /**

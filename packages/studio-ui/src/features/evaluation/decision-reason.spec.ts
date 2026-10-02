@@ -50,7 +50,7 @@ describe('findingName', () => {
     expect(findingName({ ...CONTRADICTION, locations: [] })).toBe('Contradiction');
   });
 
-  it('[EVAL-2] names a finding by the places its lens cited, not by every place its rationale mentions', () => {
+  it('[EVAL-2] names a finding by the places its lens cited, not by a place its rationale merely mentions', () => {
     const mentioned = {
       ref: 'node.3',
       label: 'n-3 · database · Orders DB',
@@ -58,8 +58,8 @@ describe('findingName', () => {
       key: 'n-3',
       name: 'Orders DB',
     } as const;
-    expect(
-      findingName({ ...CONTRADICTION, locations: [...CONTRADICTION.locations, mentioned] }),
-    ).toBe('Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync))');
+    expect(findingName(makeFinding({ ...CONTRADICTION, mentions: [mentioned] }))).toBe(
+      'Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync))',
+    );
   });
 });

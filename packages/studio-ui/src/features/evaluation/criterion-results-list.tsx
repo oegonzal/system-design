@@ -1,7 +1,11 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { CriterionResultDto, SuccessCriterion } from '@sysdesign/contracts';
+import {
+  proseLocations,
+  type CriterionResultDto,
+  type SuccessCriterion,
+} from '@sysdesign/contracts';
 import { Badge, RESULT_TONE, Stack, Text } from '@sysdesign/design-system';
 
 import { humanizeToken } from './humanize';
@@ -37,10 +41,11 @@ const Line = styled.div`
 /**
  * One stacked row per criterion the evaluators judged: the statement, the
  * settled result with the confidence behind it, and the evaluator's reason
- * on its own line, read with the labels of the places it names in place of
- * the positional ids the model wrote. Stacked rather than tabular so a long statement and a
- * long reason both wrap inside the dock instead of squeezing four columns
- * into it. Purely presentational — Storybook-safe.
+ * on its own line, read with the labels of the places it names — cited as
+ * evidence or merely mentioned (`proseLocations`) — in place of the
+ * positional ids the model wrote. Stacked rather than tabular so a long
+ * statement and a long reason both wrap inside the dock instead of
+ * squeezing four columns into it. Purely presentational — Storybook-safe.
  */
 export function CriterionResultsList({ results, criteria }: CriterionResultsListProps) {
   if (results.length === 0) {
@@ -74,7 +79,7 @@ export function CriterionResultsList({ results, criteria }: CriterionResultsList
             </Text>
           </Line>
           <WrappingText size="sm" tone="secondary" data-testid="criterion-rationale">
-            {row.rationale !== null ? lensProse(row.rationale, row.locations) : '—'}
+            {row.rationale !== null ? lensProse(row.rationale, proseLocations(row)) : '—'}
           </WrappingText>
         </Row>
       ))}
