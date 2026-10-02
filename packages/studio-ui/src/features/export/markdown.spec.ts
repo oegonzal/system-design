@@ -180,6 +180,34 @@ describe('feedbackMarkdown', () => {
     expect(md).not.toContain('critic.architecture');
   });
 
+  it('[UX-10] words a rationale as the panel does: a capitalised ref by its label, a place already named by its short one, a finding type in words', () => {
+    const finding = makeFinding({
+      rationale: 'Node.3 is the one primary; the data_integrity defect follows from it.',
+    });
+    const md = feedbackMarkdown(
+      makeEvaluation({
+        findings: [finding],
+        criterionResults: [
+          makeCriterionResult({
+            criterionId: 'c3',
+            result: 'fail',
+            rationale: 'Orders DB (node.3) has no replica, per the unhandled_failure finding.',
+            locations: finding.locations,
+          }),
+        ],
+      }),
+      criteria,
+      1,
+    );
+
+    expect(md).toContain(
+      '  n-3 · database · Orders DB is the one primary; the data integrity defect follows from it.',
+    );
+    expect(md).toContain('| Orders DB (n-3) has no replica, per the unhandled failure finding. |');
+    expect(md).not.toMatch(/node\.3/i);
+    expect(md).not.toContain('data_integrity');
+  });
+
   it('says not-graded in words when the evaluation is absent, running or failed — never a status token', () => {
     expect(feedbackMarkdown(null, criteria, 1)).toContain('_Not graded yet._');
     const running = feedbackMarkdown(makeEvaluation({ status: 'running' }), criteria, 1);

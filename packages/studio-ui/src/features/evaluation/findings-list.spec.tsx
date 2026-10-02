@@ -74,6 +74,26 @@ describe('FindingsList', () => {
     expect(claim.textContent).not.toContain('binding.2 claims');
   });
 
+  it('[EVAL-2] reads a rationale that capitalises a ref, or names a finding type, in the author’s words', () => {
+    renderWithTheme(
+      <FindingsList
+        findings={[
+          makeFinding({
+            id: 'f-prose',
+            rationale: 'Node.3 has no replica, which the unhandled_failure above already charges.',
+          }),
+        ]}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const item = screen.getByTestId('finding-f-prose');
+    expect(item.textContent).toContain(
+      'n-3 · database · Orders DB has no replica, which the unhandled failure above already charges.',
+    );
+    expect(item.textContent).not.toContain('Node.3');
+  });
+
   it('chips the criteria a finding names, carrying the statement as a title', () => {
     renderWithTheme(
       <FindingsList findings={findings} criteria={makeCriteria()} onSelect={vi.fn()} />,

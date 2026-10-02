@@ -10,6 +10,7 @@ const CONTRADICTION = makeFinding({
     { ref: 'binding.2', label: 'c2 binding (n-3)', part: 'binding', key: 'c2' },
     { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
   ],
+  locationRefs: ['binding.2', 'edge.5'],
 });
 
 describe('humanizeReason', () => {
@@ -31,10 +32,34 @@ describe('humanizeReason', () => {
     );
     expect(humanizeReason('blockers to fix: c9', {})).toBe('blockers to fix: c9');
   });
+
+  it('[EVAL-2] rewrites an id only as a whole token, and never re-reads a name it put in place', () => {
+    expect(
+      humanizeReason('blockers to fix: contradiction|binding.2,edge.5, c4, c41', {
+        findings: [CONTRADICTION],
+        criteria: [{ id: 'c4', kind: 'functional', statement: 'A c4 order survives a restart' }],
+      }),
+    ).toBe(
+      'blockers to fix: Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync)), “A c4 order survives a restart”, c41',
+    );
+  });
 });
 
 describe('findingName', () => {
   it('reads a finding with no grounded place as its type alone', () => {
     expect(findingName({ ...CONTRADICTION, locations: [] })).toBe('Contradiction');
+  });
+
+  it('[EVAL-2] names a finding by the places its lens cited, not by every place its rationale mentions', () => {
+    const mentioned = {
+      ref: 'node.3',
+      label: 'n-3 · database · Orders DB',
+      part: 'node',
+      key: 'n-3',
+      name: 'Orders DB',
+    } as const;
+    expect(
+      findingName({ ...CONTRADICTION, locations: [...CONTRADICTION.locations, mentioned] }),
+    ).toBe('Contradiction (c2 binding (n-3); e-5 · n-2 → n-3 (sync))');
   });
 });

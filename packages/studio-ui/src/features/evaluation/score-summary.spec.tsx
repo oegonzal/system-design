@@ -34,6 +34,7 @@ describe('ScoreSummary', () => {
         { ref: 'binding.2', label: 'c2 binding (n-3)', part: 'binding', key: 'c2' },
         { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
       ],
+      locationRefs: ['binding.2', 'edge.5'],
     });
     renderWithTheme(
       <ScoreSummary

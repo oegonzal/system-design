@@ -5,7 +5,7 @@ import type { CriterionResultDto, SuccessCriterion } from '@sysdesign/contracts'
 import { Badge, RESULT_TONE, Stack, Text } from '@sysdesign/design-system';
 
 import { humanizeToken } from './humanize';
-import { substituteLocationLabels } from './location-labels';
+import { lensProse } from './lens-prose';
 import { WrappingText } from './wrapping-text';
 
 export interface CriterionResultsListProps {
@@ -74,7 +74,7 @@ export function CriterionResultsList({ results, criteria }: CriterionResultsList
             </Text>
           </Line>
           <WrappingText size="sm" tone="secondary" data-testid="criterion-rationale">
-            {row.rationale !== null ? substituteLocationLabels(row.rationale, row.locations) : '—'}
+            {row.rationale !== null ? lensProse(row.rationale, row.locations) : '—'}
           </WrappingText>
         </Row>
       ))}

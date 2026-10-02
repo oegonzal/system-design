@@ -239,6 +239,7 @@ describe('ImprovementPanel', () => {
         { ref: 'binding.2', label: 'Brief: c2', part: 'binding', key: 'c2' },
         { ref: 'edge.5', label: 'Order Service → Orders DB', part: 'edge', key: 'e-5' },
       ],
+      locationRefs: ['binding.2', 'edge.5'],
     });
     const reasonText =
       'blockers to fix: contradiction|binding.2,edge.5, unbacked_claim|binding.9,narration.2, c3';

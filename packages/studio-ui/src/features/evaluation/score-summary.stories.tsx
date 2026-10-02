@@ -64,6 +64,7 @@ export const BlockersAndMissingLenses: Story = {
             { ref: 'edge.5', label: 'e-5 · n-2 → n-3 (sync)', part: 'edge', key: 'e-5' },
             { ref: 'narration.2', label: 'c2 narration', part: 'narration', key: 'c2' },
           ],
+          locationRefs: ['binding.2', 'edge.5', 'narration.2'],
         }),
       ],
       degraded: [

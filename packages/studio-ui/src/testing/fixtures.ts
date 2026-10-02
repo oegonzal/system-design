@@ -331,7 +331,15 @@ export function makeFinding(overrides: Partial<EvaluationFindingDto> = {}): Eval
     confidence: 'high',
     fixability: 'fixable_local',
     criterionIds: ['c3'],
-    locations: [{ ref: 'node.3', label: 'n-3 · database · Orders DB', part: 'node', key: 'n-3' }],
+    locations: [
+      {
+        ref: 'node.3',
+        label: 'n-3 · database · Orders DB',
+        part: 'node',
+        key: 'n-3',
+        name: 'Orders DB',
+      },
+    ],
     nodeIds: ['n-3'],
     edgeIds: [],
     locationRefs: ['node.3'],

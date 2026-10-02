@@ -12,7 +12,7 @@ import { markdownCell, nodeLabel } from '@sysdesign/contracts';
 
 import { humanizeReason } from '../evaluation/decision-reason';
 import { humanizeToken, lensName } from '../evaluation/humanize';
-import { substituteLocationLabels } from '../evaluation/location-labels';
+import { lensProse } from '../evaluation/lens-prose';
 import { formatScore, GRADE_STATUS_LABEL } from '../evaluation/score';
 import { humanizeKind } from '../prompts/criteria';
 
@@ -233,7 +233,7 @@ export function feedbackMarkdown(
         `| ${row.criterionId}${statement ? ` — ${markdownCell(statement)}` : ''} | ${humanizeToken(
           row.result,
         )} | ${row.confidence ?? '—'} | ${
-          row.rationale ? markdownCell(substituteLocationLabels(row.rationale, row.locations)) : '—'
+          row.rationale ? markdownCell(lensProse(row.rationale, row.locations)) : '—'
         } |`,
       );
     }
@@ -250,9 +250,7 @@ export function feedbackMarkdown(
         `- **[${finding.severity} · ${finding.lenses.map(lensName).join(', ')} · ${humanizeToken(finding.type)}]**${
           where ? ` (${where})` : ''
         }${criteriaCited ? ` — ${criteriaCited}` : ''}`,
-        ...(finding.rationale
-          ? [`  ${substituteLocationLabels(finding.rationale, finding.locations)}`]
-          : []),
+        ...(finding.rationale ? [`  ${lensProse(finding.rationale, finding.locations)}`] : []),
       );
     }
   } else {

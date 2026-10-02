@@ -10,7 +10,7 @@ import {
 import { Badge, Heading, Stack, Text } from '@sysdesign/design-system';
 
 import { humanizeToken, lensName } from './humanize';
-import { substituteLocationLabels } from './location-labels';
+import { lensProse } from './lens-prose';
 import { WrappingText } from './wrapping-text';
 
 export interface FindingsListProps {
@@ -158,7 +158,7 @@ export function FindingsList({ findings, criteria = NO_CRITERIA, onSelect }: Fin
                 </TitleButton>
                 <WrappingText size="sm" tone="secondary">
                   {finding.rationale !== null
-                    ? substituteLocationLabels(finding.rationale, finding.locations)
+                    ? lensProse(finding.rationale, finding.locations)
                     : 'No rationale was recorded for this finding.'}
                 </WrappingText>
                 {finding.criterionIds.length > 0 || finding.locations.length > 0 ? (

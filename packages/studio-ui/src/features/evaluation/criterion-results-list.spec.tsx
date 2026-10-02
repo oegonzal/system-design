@@ -64,6 +64,44 @@ describe('CriterionResultsList', () => {
     expect(within(row).getByText('not applicable')).toBeTruthy();
   });
 
+  it('[EVAL-2] reads a ref the lens capitalised, a place the sentence already names and a finding type as words — never a position or a wire token', () => {
+    renderWithTheme(
+      <CriterionResultsList
+        results={[
+          makeCriterionResult({
+            criterionId: 'c3',
+            result: 'partial',
+            rationale:
+              'Rationale.1 asserts a replica; Orders DB (node.3) models none, per the data_integrity defect.',
+            locations: [
+              {
+                ref: 'rationale.1',
+                label: 'Orders DB rationale (n-3)',
+                part: 'rationale',
+                key: 'n-3',
+              },
+              {
+                ref: 'node.3',
+                label: 'n-3 · database · Orders DB',
+                part: 'node',
+                key: 'n-3',
+                name: 'Orders DB',
+              },
+            ],
+          }),
+        ]}
+        criteria={makeCriteria()}
+      />,
+    );
+
+    expect(
+      within(screen.getByTestId('criterion-result-c3')).getByTestId('criterion-rationale')
+        .textContent,
+    ).toBe(
+      'Orders DB rationale (n-3) asserts a replica; Orders DB (n-3) models none, per the data integrity defect.',
+    );
+  });
+
   it('falls back to the bare id for a criterion the rubric no longer lists', () => {
     renderWithTheme(
       <CriterionResultsList results={[makeCriterionResult({ criterionId: 'c9' })]} criteria={[]} />,
