@@ -75,8 +75,10 @@ const DOCK_TABS = ['Prompt', 'Brief', 'Narrative', 'Feedback', 'Coach', 'Revisio
 
 /**
  * Six tabs in a narrow dock: one row that scrolls sideways rather than a
- * second row. The selected tab stays in view however it was chosen — the
- * button selects the last one from code, as a page does after a submit.
+ * second row. An end that holds more tabs fades out under an arrow that
+ * pages toward them, and the selected tab stays wholly in view, clear of
+ * those edges, however it was chosen — the button selects the last one from
+ * code, as a page does after a submit.
  */
 export const OneScrollingRow: Story = {
   render: function OneScrollingRowStory() {
