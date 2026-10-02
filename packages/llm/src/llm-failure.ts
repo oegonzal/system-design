@@ -117,6 +117,20 @@ export interface LlmRetryPolicy {
  * for: four of six pipelines confirm a defect only when one lens sees it in
  * two of its own samples, so a lost sample does not merely thin the evidence,
  * it silences that lens entirely.
+ *
+ * A timeout gets one more ask, not two. A call's limit is its whole declared
+ * answer at the slowest pace the model has measurably kept
+ * (`callTimeLimitMs`), so outliving it says the attempt was wedged, not that
+ * the answer was long — and a wedged attempt is what an immediate retry
+ * recovers. Measured on the fixed 300 s cap this replaces (static/runs,
+ * 2026-10-02): of the nine calls it cut outside the provider outage, eight
+ * answered on the very next ask, six of them validly (4–21k tokens in
+ * 45–245 s); the ninth was a coach whose answer was simply longer than the
+ * cap, which a declared limit now fits. A third ask after two timeouts
+ * recovered none of the five calls that reached one. Those third asks were a
+ * mistake besides: the SDK reports our abort as a plain `Error`, so a timeout
+ * was read as a broken pipe and given every attempt — whether our own abort
+ * fired is now read from its signal.
  */
 export const DEFAULT_RETRY_POLICY: LlmRetryPolicy = {
   attempts: 3,

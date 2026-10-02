@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
 import { criteriaSchema } from '../../core/stages/schemas';
-import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
+import { boundsBelowMeasured, capsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { memoryPackOutput } from './output';
 import { samplePack } from './testing';
@@ -65,6 +65,21 @@ describe('the memory-recall pipeline', () => {
       'gaps[]': 200,
     };
     expect(boundsBelowMeasured(memoryPackOutput.schema, measured)).toEqual([]);
+  });
+
+  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+    // The most output tokens, thinking included, each stage wrote across the
+    // recorded recall runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
+    // also the call's time limit, so one a stage outwrites is a call cut short.
+    const measured: Record<string, number> = {
+      criteria: 963,
+      producer: 6_863,
+      'critic.relevance': 7_134,
+      'critic.grounding': 15_092,
+      'evaluator.coverage': 3_636,
+      'evaluator.admissibility': 2_325,
+    };
+    expect(capsBelowMeasured(MEMORY_RECALL, measured)).toEqual([]);
   });
 
   it('[QL-6] the pack a model answers with contains no number', () => {

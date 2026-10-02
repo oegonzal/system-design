@@ -1,6 +1,14 @@
-import type { SDKAssistantMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z, type ZodIssue, type ZodType } from 'zod';
 
+import {
+  assertCallTimePolicy,
+  CALL_TIME_POLICY,
+  callTimeLimitMs,
+  describeCallLimit,
+  watchDeadline,
+  type CallTimePolicy,
+} from './call-time-limit';
 import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import { InFlightGate } from './in-flight-gate';
@@ -20,8 +28,8 @@ export const SCHEMA_MISS = 'SchemaMiss';
 /** The model report when no model is pinned: the subscription's own choice. */
 export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
 
-/** A subscription call spawns a local agent turn — minutes, not milliseconds. */
-export const CLAUDE_AGENT_TIMEOUT_MS = 300_000;
+/** The `error.name` a call is recorded under when its own limit ended it. */
+export const TIMED_OUT = 'Timeout';
 
 /**
  * Output-token ceiling for one API call of the spawned turn, thinking
@@ -263,6 +271,10 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   private readonly retry: LlmRetryPolicy;
   /** Injected so a spec waits on nothing. */
   private readonly pause: (ms: number) => Promise<void>;
+  /** How long a call may take, from what it declares. */
+  private readonly limits: CallTimePolicy;
+  /** The wall clock a limit is watched on, and how often; injected so a spec runs in milliseconds. */
+  private readonly clock: { now?: () => number; tickMs?: number };
 
   constructor(
     options: {
@@ -272,6 +284,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       gate?: InFlightGate;
       retry?: LlmRetryPolicy;
       sleep?: (ms: number) => Promise<void>;
+      limits?: CallTimePolicy;
+      clock?: { now?: () => number; tickMs?: number };
     } = {},
   ) {
     this.requestedModel = options.model;
@@ -282,6 +296,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
     this.retry = options.retry ?? DEFAULT_RETRY_POLICY;
     this.pause =
       options.sleep ?? ((ms) => new Promise<void>((wake) => setTimeout(wake, ms).unref?.()));
+    this.limits = assertCallTimePolicy(options.limits ?? CALL_TIME_POLICY);
+    this.clock = options.clock ?? {};
   }
 
   withRecorder(sink: LlmCallSink): LlmClient {
@@ -292,6 +308,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       gate: this.gate,
       retry: this.retry,
       sleep: this.pause,
+      limits: this.limits,
+      clock: this.clock,
     });
   }
 
@@ -350,6 +368,16 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       });
     };
 
+    // The limit this call runs under, from what it declares. Our abort is a
+    // fact this adapter knows first-hand, so whether it fired is read from the
+    // signal — never from the name of whatever the SDK threw afterwards, which
+    // is a plain `Error` ("process aborted by user") and read as a broken pipe.
+    const abort = new AbortController();
+    const timedOut = (cause?: string): LlmCall['error'] => ({
+      name: TIMED_OUT,
+      message: `no answer within ${describeCallLimit(maxTokens, this.limits)}${cause ? `: ${cause}` : ''}`,
+    });
+
     try {
       // Inside the try: an unconvertible schema must yield null, not reject —
       // the LlmClient contract is "null on any failure".
@@ -366,10 +394,16 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       const query = this.run ?? (await import('@anthropic-ai/claude-agent-sdk')).query;
 
       // A hard backstop: interrupt() is cooperative and cannot end a wedged
-      // subprocess, so an AbortController drives the SDK's real kill path.
-      const abort = new AbortController();
-      const timer = setTimeout(() => abort.abort(), CLAUDE_AGENT_TIMEOUT_MS);
-      timer.unref?.();
+      // subprocess, so an AbortController drives the SDK's real kill path at
+      // the limit — and the call stops waiting a grace later whether or not
+      // the stream has ended, so it never outlives its limit by more.
+      const deadline = watchDeadline({
+        limitMs: callTimeLimitMs(maxTokens, this.limits),
+        graceMs: this.limits.graceMs,
+        onLimit: () => abort.abort(),
+        now: this.clock.now,
+        tickMs: this.clock.tickMs,
+      });
 
       const turn = query({
         prompt,
@@ -394,56 +428,50 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         },
       });
 
-      const transcript = new TurnTranscript();
-      let resultText: string | null = null;
-      let stopReason: string | null = null;
-      // A turn that ended on an API error (an expired token, a rate limit)
-      // still arrives as a result: keep the CLI's own reason for the record.
-      let failure: LlmCall['error'] = null;
-      let assistantError: string | null = null;
-      let usage: LlmCall['usage'] = null;
-      let sawResult = false;
+      const reading = readTurn(turn);
+      let read: TurnRead;
       try {
-        for await (const message of turn) {
-          if (message.type === 'assistant') {
-            transcript.add(message);
-            if (message.error) assistantError = message.error;
-          }
-          if (message.type === 'result') {
-            sawResult = true;
-            stopReason = message.stop_reason ?? null;
-            if (message.subtype === 'success' && !message.is_error) resultText = message.result;
-            else
-              failure = {
-                name: assistantError ?? message.subtype,
-                message:
-                  message.subtype === 'success'
-                    ? message.result
-                    : message.errors.join('; ') || message.subtype,
-              };
-            const u = (message as { usage?: { input_tokens?: number; output_tokens?: number } })
-              .usage;
-            if (u) {
-              usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
-            }
-          }
+        const settled = await Promise.race([reading, deadline.abandoned.then(() => null)]);
+        if (settled === null) {
+          // Past the limit and its grace, and the stream still open: whatever
+          // it would say now is no answer. Its late settling is swallowed.
+          reading.catch(() => undefined);
+          turn.close?.();
+          kind = 'timeout';
+          record({
+            outcome: 'error',
+            text: null,
+            response: null,
+            error: timedOut('the turn did not end after its abort'),
+            usage: null,
+            stopReason: null,
+          });
+          return { value: null, kind };
         }
-      } catch (error) {
-        // The CLI exits non-zero after an error result and the SDK rethrows
-        // that exit; the result already carries the reason worth recording.
-        if (!sawResult) throw error;
+        read = settled;
       } finally {
-        clearTimeout(timer);
+        deadline.stop();
       }
+      const { transcript, resultText, stopReason, failure, assistantError, usage } = read;
 
       if (resultText === null) {
         // `failure.name` is whichever closed vocabulary spoke: the assistant's
-        // error when there was one, else the result's subtype.
+        // error when there was one, else the result's subtype — unless our
+        // own abort is what ended the turn.
+        const aborted = abort.signal.aborted;
         kind = classifyFailure({
+          aborted,
           assistantError: failure?.name ?? null,
           resultSubtype: failure?.name ?? null,
         });
-        record({ outcome: 'error', text: null, response: null, error: failure, usage, stopReason });
+        record({
+          outcome: 'error',
+          text: null,
+          response: null,
+          error: aborted ? timedOut(failure?.message) : failure,
+          usage,
+          stopReason,
+        });
         return { value: null, kind };
       }
       // The whole turn first; `result` alone only when the turn streamed no
@@ -482,21 +510,79 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       return { value: extraction.ok ? extraction.value : null, kind };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      kind = classifyFailure({
-        noResult: true,
-        aborted: err.name === 'AbortError' || err.name === 'TimeoutError',
-      });
+      const aborted = abort.signal.aborted;
+      kind = classifyFailure({ noResult: true, aborted });
       record({
         outcome: 'error',
         text: null,
         response: null,
-        error: { name: err.name, message: err.message },
+        error: aborted ? timedOut(err.message) : { name: err.name, message: err.message },
         usage: null,
         stopReason: null,
       });
       return { value: null, kind };
     }
   }
+}
+
+/** What one turn said, read to its end. */
+interface TurnRead {
+  transcript: TurnTranscript;
+  resultText: string | null;
+  stopReason: string | null;
+  /**
+   * A turn that ended on an API error (an expired token, a rate limit) still
+   * arrives as a result: the CLI's own reason, kept for the record.
+   */
+  failure: LlmCall['error'];
+  assistantError: string | null;
+  usage: LlmCall['usage'];
+}
+
+/**
+ * Read a turn's messages to the end. It rejects only when the stream broke
+ * before a result arrived: the CLI exits non-zero after an error result and
+ * the SDK rethrows that exit, but the result already carries the reason worth
+ * recording.
+ */
+async function readTurn(turn: AsyncIterable<SDKMessage>): Promise<TurnRead> {
+  const read: TurnRead = {
+    transcript: new TurnTranscript(),
+    resultText: null,
+    stopReason: null,
+    failure: null,
+    assistantError: null,
+    usage: null,
+  };
+  let sawResult = false;
+  try {
+    for await (const message of turn) {
+      if (message.type === 'assistant') {
+        read.transcript.add(message);
+        if (message.error) read.assistantError = message.error;
+      }
+      if (message.type === 'result') {
+        sawResult = true;
+        read.stopReason = message.stop_reason ?? null;
+        if (message.subtype === 'success' && !message.is_error) read.resultText = message.result;
+        else
+          read.failure = {
+            name: read.assistantError ?? message.subtype,
+            message:
+              message.subtype === 'success'
+                ? message.result
+                : message.errors.join('; ') || message.subtype,
+          };
+        const u = (message as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+        if (u) {
+          read.usage = { inputTokens: u.input_tokens ?? 0, outputTokens: u.output_tokens ?? 0 };
+        }
+      }
+    }
+  } catch (error) {
+    if (!sawResult) throw error;
+  }
+  return read;
 }
 
 function safeJson(value: string): unknown {

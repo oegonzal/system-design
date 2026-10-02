@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { boundsBelowMeasured } from '../../core/testing';
+import { boundsBelowMeasured, capsBelowMeasured, declaredCaps } from '../../core/testing';
 import { AGENTIC_DESIGN } from './definition';
 import { agenticDesignOutput, type AgenticDesign } from './output';
 
@@ -102,17 +102,8 @@ describe('the agentic-design pipeline', () => {
       'evaluator.interfaces': 4_008,
       'evaluator.properties': 2_513,
     };
-    const declared: Record<string, number> = Object.fromEntries([
-      ['criteria', AGENTIC_DESIGN.deriveCriteria.maxTokens],
-      ['producer', AGENTIC_DESIGN.producer.maxTokens],
-      ...[...AGENTIC_DESIGN.critics, ...AGENTIC_DESIGN.evaluators].map(
-        (lens) => [lens.id, lens.maxTokens] as const,
-      ),
-    ]);
-    expect(Object.keys(declared).sort()).toEqual(Object.keys(measured).sort());
-    for (const [stage, tokens] of Object.entries(measured)) {
-      expect(declared[stage], stage).toBeGreaterThan(tokens);
-    }
+    expect(capsBelowMeasured(AGENTIC_DESIGN, measured)).toEqual([]);
+    expect(Object.keys(declaredCaps(AGENTIC_DESIGN)).sort()).toEqual(Object.keys(measured).sort());
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

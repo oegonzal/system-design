@@ -126,12 +126,14 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // advice under their own heading; the lenses never see them, so a lesson
   // can shape a revision and never a grade. It still revises against the
   // remediations the panel selected, never against a score. Every cap is
-  // sized from the recorded runs (the spec holds the measurements): a full
-  // coached canvas has taken up to 21.1k output tokens, thinking included,
-  // critics up to 9.8k and evaluators up to 6.8k.
+  // sized from the recorded runs (the spec holds the measurements), and each
+  // is also the call's time limit (`callTimeLimitMs`), so a cap a stage
+  // outwrites is a call cut short: a coached canvas has taken up to 26.0k
+  // output tokens, thinking included, critics up to 25.4k on a dense
+  // diagram and evaluators up to 12.0k.
   producer: {
     persona: producer,
-    maxTokens: 28000,
+    maxTokens: 32000,
     consumes: ['criteria', 'memories'],
   },
 
@@ -145,7 +147,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 30000,
     },
     {
       id: 'critic.architecture',
@@ -153,7 +155,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 12,
-      maxTokens: 14000,
+      maxTokens: 30000,
     },
     {
       id: 'critic.scale',
@@ -161,7 +163,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 8,
-      maxTokens: 12000,
+      maxTokens: 30000,
     },
     {
       id: 'critic.explanation',
@@ -169,7 +171,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 30000,
     },
     {
       id: 'critic.scenarios',
@@ -177,7 +179,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 8,
-      maxTokens: 12000,
+      maxTokens: 30000,
     },
   ],
 
@@ -197,7 +199,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: ['findings'],
       maxItems: CANVAS_MAX_CRITERIA,
-      maxTokens: 9000,
+      maxTokens: 16000,
       criterionKinds: ['non_functional', 'scale'],
     },
   ],

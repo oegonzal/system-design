@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
 import { criteriaSchema } from '../../core/stages/schemas';
-import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
+import { boundsBelowMeasured, capsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { EXPERIENCE_DIGEST } from './definition';
 import { experienceDigestOutput } from './output';
 import { sampleDigest } from './testing';
@@ -96,6 +96,23 @@ describe('the experience-digest pipeline', () => {
     expect(persona).not.toMatch(/Name the aliases and iterations/);
     // The deriver has measurably written 6,783 output tokens for one record.
     expect(EXPERIENCE_DIGEST.deriveCriteria.maxTokens).toBeGreaterThan(6783);
+  });
+
+  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+    // The most output tokens, thinking included, each stage wrote across the
+    // recorded digest runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
+    // also the call's time limit, so one a stage outwrites is a call cut
+    // short — as the producer was, at a fixed 300 s, on 2026-10-02. The
+    // producer's figure is an answer the schema missed.
+    const measured: Record<string, number> = {
+      criteria: 7_684,
+      producer: 31_719,
+      'critic.attribution': 26_918,
+      'critic.provenance': 27_805,
+      'critic.transfer': 19_963,
+      'evaluator.attribution': 13_321,
+    };
+    expect(capsBelowMeasured(EXPERIENCE_DIGEST, measured)).toEqual([]);
   });
 
   it('[QL-6] the digest a model answers with contains no number', () => {

@@ -1,0 +1,380 @@
+[
+  {
+    "run": "2026-09-22T19-34-58-775-f3ceba-quality",
+    "call": "07.critic.requirements.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 7491,
+    "durationMs": 101452
+  },
+  {
+    "run": "2026-09-22T20-12-44-904-b6128a-quality",
+    "call": "08.critic.soundness.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 7130,
+    "durationMs": 94002
+  },
+  {
+    "run": "2026-09-22T20-22-28-653-b53301-quality",
+    "call": "04.critic.contracts.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 7454,
+    "durationMs": 90948
+  },
+  {
+    "run": "2026-09-22T20-35-46-889-f568d3-quality",
+    "call": "15.evaluator.properties.s2.1",
+    "maxTokens": 8000,
+    "outputTokens": 2513,
+    "durationMs": 32374
+  },
+  {
+    "run": "2026-09-22T21-00-21-140-a4bda7-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 25024,
+    "durationMs": 285612
+  },
+  {
+    "run": "2026-09-22T21-29-18-686-bdb203-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 24180,
+    "durationMs": 275281
+  },
+  {
+    "run": "2026-09-22T22-10-15-047-04d745-quality",
+    "call": "12.evaluator.interfaces.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 4008,
+    "durationMs": 55208
+  },
+  {
+    "run": "2026-09-22T22-31-34-042-3ebeaa-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 24927,
+    "durationMs": 286075
+  },
+  {
+    "run": "2026-09-22T22-55-05-729-fd78dd-quality",
+    "call": "09.critic.generality.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 4882,
+    "durationMs": 84869
+  },
+  {
+    "run": "2026-09-23T00-33-56-602-ce13bd-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 5450,
+    "durationMs": 73040
+  },
+  {
+    "run": "2026-09-23T01-02-17-868-014669-quality",
+    "call": "13.evaluator.requirements.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 3753,
+    "durationMs": 58367
+  },
+  {
+    "run": "2026-09-23T01-43-21-360-adbe35-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 676,
+    "durationMs": 12014
+  },
+  {
+    "run": "2026-09-23T01-43-21-360-adbe35-quality",
+    "call": "08.evaluator.coverage.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 3512,
+    "durationMs": 48132
+  },
+  {
+    "run": "2026-09-23T01-57-24-125-3c22ca-quality",
+    "call": "19.evaluator.attribution.s2.2",
+    "maxTokens": 8000,
+    "outputTokens": 1739,
+    "durationMs": 228304
+  },
+  {
+    "run": "2026-09-23T02-40-40-962-d0c4e7-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 1203,
+    "durationMs": 15450
+  },
+  {
+    "run": "2026-09-23T02-40-40-962-d0c4e7-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 26054,
+    "durationMs": 283569
+  },
+  {
+    "run": "2026-09-23T02-40-40-962-d0c4e7-quality",
+    "call": "10.critic.generality.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 6591,
+    "durationMs": 87951
+  },
+  {
+    "run": "2026-09-30T02-47-07-680-d435e0-quality",
+    "call": "04.critic.gradeability.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 4482,
+    "durationMs": 59021
+  },
+  {
+    "run": "2026-09-30T02-56-13-899-c621ea-quality",
+    "call": "05.critic.requirements.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 1529,
+    "durationMs": 27352
+  },
+  {
+    "run": "2026-09-30T03-02-25-790-4c71dc-quality",
+    "call": "41.evaluator.requirements.s1.3",
+    "maxTokens": 4000,
+    "outputTokens": 1074,
+    "durationMs": 19044
+  },
+  {
+    "run": "2026-09-30T07-22-40-427-66d321-quality",
+    "call": "15.evaluator.requirements.s2.1",
+    "maxTokens": 4000,
+    "outputTokens": 1528,
+    "durationMs": 33829
+  },
+  {
+    "run": "2026-09-30T08-09-44-190-5957f4-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 560,
+    "durationMs": 9278
+  },
+  {
+    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 848,
+    "durationMs": 11433
+  },
+  {
+    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 10213,
+    "durationMs": 145228
+  },
+  {
+    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
+    "call": "07.critic.scale.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 8301,
+    "durationMs": 114114
+  },
+  {
+    "run": "2026-09-30T17-09-35-359-09d4dd-quality",
+    "call": "04.critic.soundness.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 7551,
+    "durationMs": 101390
+  },
+  {
+    "run": "2026-09-30T17-29-46-084-618bde-quality",
+    "call": "03.critic.requirements.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 7423,
+    "durationMs": 104568
+  },
+  {
+    "run": "2026-09-30T17-33-22-837-3e965d-quality",
+    "call": "06.evaluator.requirements.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 1111,
+    "durationMs": 15745
+  },
+  {
+    "run": "2026-09-30T17-33-22-837-3e965d-quality",
+    "call": "07.evaluator.quality.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 2142,
+    "durationMs": 26137
+  },
+  {
+    "run": "2026-10-01T01-35-58-485-f41f79-quality",
+    "call": "05.evaluator.prompt.s1.1",
+    "maxTokens": 6000,
+    "outputTokens": 5700,
+    "durationMs": 51453
+  },
+  {
+    "run": "2026-10-01T01-35-58-485-f41f79-quality",
+    "call": "06.producer.2",
+    "maxTokens": 8000,
+    "outputTokens": 6693,
+    "durationMs": 60908
+  },
+  {
+    "run": "2026-10-01T01-35-58-485-f41f79-quality",
+    "call": "08.critic.fidelity.s1.2",
+    "maxTokens": 8000,
+    "outputTokens": 7592,
+    "durationMs": 78039
+  },
+  {
+    "run": "2026-10-02T01-03-40-842-fd6be0-quality",
+    "call": "01.producer.1",
+    "maxTokens": 28000,
+    "outputTokens": 22709,
+    "durationMs": 207074
+  },
+  {
+    "run": "2026-10-02T02-58-52-647-1258ee-quality",
+    "call": "05.critic.attribution.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 25603,
+    "durationMs": 247549
+  },
+  {
+    "run": "2026-10-02T03-07-43-385-651606-quality",
+    "call": "02.critic.architecture.s1.1",
+    "maxTokens": 14000,
+    "outputTokens": 25362,
+    "durationMs": 275926
+  },
+  {
+    "run": "2026-10-02T03-07-43-385-651606-quality",
+    "call": "06.critic.architecture.s2.1",
+    "maxTokens": 14000,
+    "outputTokens": 23468,
+    "durationMs": 268230
+  },
+  {
+    "run": "2026-10-02T03-07-43-385-651606-quality",
+    "call": "13.evaluator.requirements.s2.1",
+    "maxTokens": 9000,
+    "outputTokens": 6541,
+    "durationMs": 70004
+  },
+  {
+    "run": "2026-10-02T03-45-15-407-39004c-quality",
+    "call": "11.critic.explanation.s1.2",
+    "maxTokens": 12000,
+    "outputTokens": 25094,
+    "durationMs": 255197
+  },
+  {
+    "run": "2026-10-02T04-05-51-133-b5567f-quality",
+    "call": "03.critic.requirements.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 14634,
+    "durationMs": 280900
+  },
+  {
+    "run": "2026-10-02T04-05-51-133-b5567f-quality",
+    "call": "14.evaluator.quality.s2.1",
+    "maxTokens": 9000,
+    "outputTokens": 11958,
+    "durationMs": 127586
+  },
+  {
+    "run": "2026-10-02T04-22-11-795-956564-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 3377,
+    "durationMs": 145661
+  },
+  {
+    "run": "2026-10-02T04-40-37-205-75f4cc-quality",
+    "call": "02.critic.requirements.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 24678,
+    "durationMs": 261560
+  },
+  {
+    "run": "2026-10-02T04-40-37-205-75f4cc-quality",
+    "call": "07.critic.scale.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 24646,
+    "durationMs": 282553
+  },
+  {
+    "run": "2026-10-02T04-22-11-795-956564-quality",
+    "call": "17.critic.provenance.s1.2",
+    "maxTokens": 12000,
+    "outputTokens": 27805,
+    "durationMs": 257507
+  },
+  {
+    "run": "2026-10-02T04-22-11-795-956564-quality",
+    "call": "22.critic.transfer.s2.2",
+    "maxTokens": 12000,
+    "outputTokens": 19963,
+    "durationMs": 200636
+  },
+  {
+    "run": "2026-10-02T05-03-56-730-a0120c-quality",
+    "call": "11.critic.scenarios.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 17494,
+    "durationMs": 214215
+  },
+  {
+    "run": "2026-10-02T05-39-33-370-17c0d8-quality",
+    "call": "04.critic.attribution.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 26346,
+    "durationMs": 254318
+  },
+  {
+    "run": "2026-10-02T05-39-33-370-17c0d8-quality",
+    "call": "11.producer.2",
+    "maxTokens": 16000,
+    "outputTokens": 26677,
+    "durationMs": 266099
+  },
+  {
+    "run": "2026-10-02T05-39-33-370-17c0d8-quality",
+    "call": "13.critic.attribution.s2.2",
+    "maxTokens": 12000,
+    "outputTokens": 24065,
+    "durationMs": 240153
+  },
+  {
+    "run": "2026-10-02T09-39-25-001-96701c-quality",
+    "call": "23.evaluator.quality.s2.2",
+    "maxTokens": 9000,
+    "outputTokens": 2706,
+    "durationMs": 116457
+  },
+  {
+    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
+    "call": "04.critic.relevance.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 7134,
+    "durationMs": 80951
+  },
+  {
+    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
+    "call": "10.critic.grounding.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 15092,
+    "durationMs": 166948
+  },
+  {
+    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
+    "call": "08.evaluator.admissibility.s1.1",
+    "maxTokens": 8000,
+    "outputTokens": 2155,
+    "durationMs": 24983
+  },
+  {
+    "run": "2026-10-02T18-33-36-045-8e573f-quality",
+    "call": "05.critic.attribution.s2.1",
+    "maxTokens": 12000,
+    "outputTokens": 26918,
+    "durationMs": 259567
+  }
+]

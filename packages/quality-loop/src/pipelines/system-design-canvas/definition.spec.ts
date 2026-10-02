@@ -7,7 +7,12 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { boundsBelowMeasured, proseBounds } from '../../core/testing';
+import {
+  boundsBelowMeasured,
+  capsBelowMeasured,
+  declaredCaps,
+  proseBounds,
+} from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import { canvasOutput } from './output';
 import { sampleSubmission } from './testing';
@@ -49,30 +54,26 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
-  it('[QL-1] every declared output cap is above what its stage has measurably written', () => {
+  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
     // The most output tokens, thinking included, each stage wrote across the
-    // recorded canvas runs (2026-09-30 – 2026-10-01). The coach's figure is a
-    // whole turn the client had to resume past its old 16k ceiling.
+    // recorded canvas runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
+    // also the call's time limit, so one a stage outwrites is a call cut short.
+    // The coach's figure is a revision the schema missed; the critics' are a
+    // 16-block, 35-connection diagram.
     const measured: Record<string, number> = {
-      producer: 21_122,
-      'critic.requirements': 5_329,
-      'critic.architecture': 9_849,
-      'critic.scale': 6_629,
-      'critic.explanation': 7_230,
-      'critic.scenarios': 7_580,
-      'evaluator.requirements': 4_588,
-      'evaluator.quality': 6_754,
+      producer: 26_049,
+      'critic.requirements': 24_678,
+      'critic.architecture': 25_362,
+      'critic.scale': 24_646,
+      'critic.explanation': 25_094,
+      'critic.scenarios': 17_494,
+      'evaluator.requirements': 6_541,
+      'evaluator.quality': 11_958,
     };
-    const declared: Record<string, number> = Object.fromEntries([
-      ['producer', SYSTEM_DESIGN_CANVAS.producer.maxTokens],
-      ...[...SYSTEM_DESIGN_CANVAS.critics, ...SYSTEM_DESIGN_CANVAS.evaluators].map(
-        (lens) => [lens.id, lens.maxTokens] as const,
-      ),
-    ]);
-    expect(Object.keys(declared).sort()).toEqual(Object.keys(measured).sort());
-    for (const [stage, tokens] of Object.entries(measured)) {
-      expect(declared[stage], stage).toBeGreaterThan(tokens);
-    }
+    expect(capsBelowMeasured(SYSTEM_DESIGN_CANVAS, measured)).toEqual([]);
+    // Every stage that writes is measured; its rubric is the author's prompt's.
+    const { criteria: _supplied, ...writing } = declaredCaps(SYSTEM_DESIGN_CANVAS);
+    expect(Object.keys(writing).sort()).toEqual(Object.keys(measured).sort());
   });
 
   it('[QL-4] every string bound the coach writes into sits above the longest it has measurably written', () => {

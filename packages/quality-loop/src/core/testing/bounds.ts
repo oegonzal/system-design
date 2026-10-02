@@ -50,3 +50,39 @@ export function boundsBelowMeasured(
     return bound > longest ? [] : [`${path}: bound ${bound} ≤ measured ${longest}`];
   });
 }
+
+/** The stages of a definition that declare an output cap, as a spec names them. */
+interface CappedStages {
+  deriveCriteria: { maxTokens: number };
+  producer: { maxTokens: number };
+  critics: readonly { id: string; maxTokens: number }[];
+  evaluators: readonly { id: string; maxTokens: number }[];
+}
+
+/** Every declared output cap by stage: `criteria`, `producer`, then each lens by id. */
+export const declaredCaps = (definition: CappedStages): Record<string, number> =>
+  Object.fromEntries([
+    ['criteria', definition.deriveCriteria.maxTokens],
+    ['producer', definition.producer.maxTokens],
+    ...[...definition.critics, ...definition.evaluators].map(
+      (lens) => [lens.id, lens.maxTokens] as const,
+    ),
+  ]);
+
+/**
+ * The stages whose declared output cap is not above the most they have
+ * measurably written — empty when every cap clears its measurement — and any
+ * measured stage the definition no longer declares. A cap is also the call's
+ * time limit (`callTimeLimitMs`), so one a stage outwrites is a call cut short.
+ */
+export function capsBelowMeasured(
+  definition: CappedStages,
+  measured: Readonly<Record<string, number>>,
+): string[] {
+  const caps = declaredCaps(definition);
+  return Object.entries(measured).flatMap(([stage, most]) => {
+    const cap = caps[stage];
+    if (cap === undefined) return [`${stage}: no such stage`];
+    return cap > most ? [] : [`${stage}: cap ${cap} ≤ measured ${most}`];
+  });
+}

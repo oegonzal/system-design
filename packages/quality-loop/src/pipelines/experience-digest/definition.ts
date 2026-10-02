@@ -58,11 +58,12 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     output: experienceDigestOutput,
   },
 
-  // Sized from the recorded runs: the deriver has written 6,783 output tokens
-  // for a sixteen-criterion record, and a cap a stage exceeds is a truncation
-  // bug waiting for whichever client enforces it.
+  // Sized from the recorded runs (the spec holds the measurements): a cap is
+  // also the call's time limit (`callTimeLimitMs`), so a cap a stage
+  // outwrites is a call cut short. The deriver has written 7,684 output
+  // tokens for one record, the producer 31,719, the critics up to 27,805.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 8000 },
-  producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
+  producer: { persona: producer, maxTokens: 32000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
 
@@ -73,7 +74,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 32000,
     },
     {
       id: 'critic.provenance',
@@ -81,7 +82,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 32000,
     },
     {
       id: 'critic.transfer',
@@ -89,7 +90,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 24000,
     },
   ],
 
@@ -100,7 +101,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: MAX_CRITERIA,
-      maxTokens: 8000,
+      maxTokens: 16000,
       criterionKinds: ['signal', 'transition'],
     },
   ],

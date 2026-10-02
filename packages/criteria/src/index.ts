@@ -323,6 +323,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A coach run recalls lessons for its prompt and hands them to its producer alone: they are curated by a recorded memory-recall run, shown under their own advisory heading to a producer that declares it consumes memories and never to the deriver, a critic or an evaluator, and recorded on the run with their provenance — recalled, empty or skipped, with the reason, the recall run and the lessons the producer saw — while a recall that cannot run or finds nothing never fails the coach, a grade never recalls, and the coach panel says what was recalled.',
   },
+  {
+    id: 'QL-33',
+    statement:
+      'A provider call runs under a time limit derived from what it declares — its whole declared answer at the slowest pace the recorded runs measured, plus a fixed overhead — and no successful recorded call would have outlived it: the limit is watched on the wall clock, the turn is aborted when it passes and abandoned a grace later whether or not it has ended, and an abort is read as a timeout from its own signal — never from the name of the error the SDK throws — and asked again once.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
