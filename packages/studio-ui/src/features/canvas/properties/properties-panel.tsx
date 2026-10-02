@@ -20,6 +20,7 @@ import { ConfigEditor } from './config-editor';
 import { EdgeCarriesField } from './edge-carries-field';
 import { OperationsEditor } from './operations-editor';
 import { ResponsibilitiesEditor } from './responsibilities-editor';
+import { useDescriptionInView } from './use-description-in-view';
 
 const Root = styled.aside`
   display: flex;
@@ -77,6 +78,9 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
   const updateEdge = useCanvasStore((state) => state.updateEdge);
   const removeSelected = useCanvasStore((state) => state.removeSelected);
   const readOnly = useCanvasStore((state) => state.readOnly);
+  // The panel scrolls inside the dock: a field typed at its bottom edge keeps
+  // its hint and its countdown in view with it.
+  const descriptionInView = useDescriptionInView();
 
   if (selectedId === null || (!node && !edge)) {
     return (
@@ -93,7 +97,12 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
   const targetNode = edge ? nodes.find((candidate) => candidate.id === edge.target) : undefined;
 
   return (
-    <Root aria-label="Properties" data-testid="properties-panel" className={className}>
+    <Root
+      aria-label="Properties"
+      data-testid="properties-panel"
+      className={className}
+      {...descriptionInView}
+    >
       <Heading level={2}>Properties</Heading>
       {readOnly ? (
         <Text size="sm" tone="muted" data-testid="properties-readonly">

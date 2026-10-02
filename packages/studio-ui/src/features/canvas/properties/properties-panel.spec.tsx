@@ -1,5 +1,6 @@
 import {
   DEFAULT_NODE_LABELS,
+  OPERATION_NOTES_MAX_LENGTH,
   NODE_KINDS,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
@@ -7,9 +8,9 @@ import {
   type CanvasGraph,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
@@ -258,5 +259,56 @@ describe('PropertiesPanel · interface contracts', () => {
     expect(screen.getByTestId('responsibilities-guide').textContent).toContain(
       'what this component owns',
     );
+  });
+
+  describe('a field at the panel’s bottom edge', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    /** Every element scrolled into view, in order — `scrollIntoView` is called on the element it reveals. */
+    function watchScrolls() {
+      const scrolled: Element[] = [];
+      vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
+        scrolled.push(this);
+      });
+      return scrolled;
+    }
+
+    const describedBy = (control: HTMLElement): HTMLElement[] =>
+      (control.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .flatMap((id) => document.getElementById(id) ?? []);
+
+    it('brings the field’s hint into view with it when the field is focused', async () => {
+      const user = userEvent.setup();
+      renderInterfacePanel((seeded) => seeded.getState().select('n-3'));
+      const scrolled = watchScrolls();
+      const notes = within(screen.getByTestId('operation-row-0')).getByLabelText('Notes');
+
+      await user.click(notes);
+
+      const [hint] = describedBy(notes);
+      expect(hint?.textContent).toMatch(/graders/i);
+      await waitFor(() => expect(scrolled).toContain(hint));
+      // The control last, so a field taller than the panel keeps what is typed in.
+      expect(scrolled.at(-1)).toBe(notes);
+    });
+
+    it('brings the countdown into view as it appears while the author types toward the limit', async () => {
+      const user = userEvent.setup();
+      renderInterfacePanel((seeded) => seeded.getState().select('n-3'));
+      const notes = within(screen.getByTestId('operation-row-0')).getByLabelText('Notes');
+      await user.click(notes);
+      await user.clear(notes);
+      const scrolled = watchScrolls();
+
+      await user.paste('x'.repeat(OPERATION_NOTES_MAX_LENGTH - 12));
+
+      const count = await screen.findByText('12 characters left');
+      expect(describedBy(notes)).toContain(count);
+      await waitFor(() => expect(scrolled).toContain(count));
+      expect(scrolled.at(-1)).toBe(notes);
+    });
   });
 });
