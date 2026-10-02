@@ -2,7 +2,7 @@ import type { IterationTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fromRun } from './from-run';
-import { MAX_FINDINGS } from './input';
+import { MAX_FINDINGS, MAX_FINDING_CRITERIA, MAX_FINDING_REFS } from './input';
 import { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun } from './testing';
 
 const traceOf = (run: ReturnType<typeof sampleRun>) => {
@@ -105,5 +105,34 @@ describe('composing an experience record from a finished run', () => {
     const record = fromRun({ ...run, trace: { ...traceOf(run), iterations: [many, second] } });
     expect(record?.findings).toHaveLength(MAX_FINDINGS);
     expect(record?.omitted.findings).toBe(6);
+  });
+
+  // A canvas finding spans a dozen places at once — bindings, edges, narrations
+  // and the nodes they concern. The record declares both bounds and nothing
+  // parses it at runtime, so they are held where it is assembled.
+  it('[QL-15] a wide finding is held to the refs and criteria the record declares', () => {
+    const run = sampleRun();
+    const [first, second] = sampleIterations();
+    const wide: IterationTrace = {
+      ...first,
+      ledger: {
+        ...first.ledger,
+        findings: [
+          {
+            ...first.ledger.findings[0],
+            locationRefs: Array.from(
+              { length: MAX_FINDING_REFS + 8 },
+              (_, index) => `flow.${index + 1}`,
+            ),
+            criterionIds: Array.from({ length: MAX_FINDING_CRITERIA + 1 }, () => 'c1'),
+          },
+        ],
+      },
+    };
+    const record = fromRun({ ...run, trace: { ...traceOf(run), iterations: [wide, second] } });
+    expect(record?.findings[0].locationRefs).toHaveLength(MAX_FINDING_REFS);
+    expect(record?.findings[0].criteria).toHaveLength(MAX_FINDING_CRITERIA);
+    // The widest refs are kept in order, not sampled.
+    expect(record?.findings[0].locationRefs[0]).toBe('flow.1');
   });
 });

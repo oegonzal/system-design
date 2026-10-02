@@ -100,6 +100,8 @@ export class FakeLoop {
   readonly requests = new Map<string, StartQualityRunRequest>();
   readonly startRequests: StartQualityRunRequest[] = [];
   readonly criteriaRequests: DeriveCriteriaRequest[] = [];
+  /** Run ids the studio asked the memory orchestrator to digest, in order. */
+  readonly digested: string[] = [];
   llm: LlmModelDto;
   unreachable = false;
   /** The model answers, and derives nothing: `POST /criteria` is a 503 with the diagnostic. */
@@ -141,6 +143,7 @@ export class FakeLoop {
     this.sequence = 0;
     this.runs.clear();
     this.requests.clear();
+    this.digested.length = 0;
     this.adoptions.clear();
     this.startRequests.length = 0;
     this.criteriaRequests.length = 0;
@@ -215,6 +218,21 @@ export class FakeLoop {
       error: null,
     });
     return { runId, status: 'running' };
+  }
+
+  /**
+   * `POST /orchestrations/memory/from-run` — digest a finished run and store
+   * what the digest endorsed. The fake records the ask and answers with an
+   * orchestration id; no steps are simulated, because the studio only fires it.
+   */
+  digestRun(runId: string): { orchestrationRunId: string; status: 'running' } {
+    if (this.unreachable) throw new LoopUnreachable();
+    if (!this.runs.has(runId)) throw new LoopRefused(404, `run ${runId} not found`);
+    this.digested.push(runId);
+    return {
+      orchestrationRunId: `${this.prefix}-digest-${this.digested.length}`,
+      status: 'running',
+    };
   }
 
   getRun(runId: string): QualityRunDto | null {

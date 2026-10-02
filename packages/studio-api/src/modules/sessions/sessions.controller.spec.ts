@@ -566,6 +566,38 @@ describe('sessions', () => {
     const readImprove = (sessionId: string, runId: string) =>
       call<GetImproveRunResponse>(`${h.url}/sessions/${sessionId}/improve/${runId}`);
 
+    // A coach run iterated, so its trace carries the transitions a digest can
+    // reason over. It is the one studio run worth teaching the memory store,
+    // and the moment it settles is the one moment to do it.
+    it('[DEL-3] a coach run is handed to the memory orchestrator once, when it settles, and never while it runs', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 2 });
+
+      await readImprove(sessionId, 'fake-run-1');
+      expect(h.loop.digested).toEqual([]);
+
+      h.loop.complete('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+      ]);
+      await readImprove(sessionId, 'fake-run-1');
+      expect(h.loop.digested).toEqual(['fake-run-1']);
+
+      // The status leaves `running` exactly once, so a later poll teaches nothing twice.
+      await readImprove(sessionId, 'fake-run-1');
+      expect(h.loop.digested).toEqual(['fake-run-1']);
+    });
+
+    it('[DEL-3] a failed coach run teaches nothing: it has no trace to digest', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 2 });
+
+      h.loop.fail('fake-run-1', 'the model went away');
+      const done = await readImprove(sessionId, 'fake-run-1');
+      expect(done.body.data.status).toBe('failed');
+      expect(h.loop.digested).toEqual([]);
+    });
+
     it('[DEL-3] the draft becomes the author’s revision, and each iteration that beat every earlier one is imported once as the coach’s', async () => {
       const { prompt, sessionId } = await startSession();
 

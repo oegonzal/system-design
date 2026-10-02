@@ -171,7 +171,11 @@ export class ImproveService {
     const run = await this.loop.getRun(runId);
     if (!run) throw new NotFoundException(`Run ${runId} not found`);
     // A finished run is recorded as such, so the session reads without asking again.
-    recordCoachingStatus(coaching, run.status);
+    const settled = recordCoachingStatus(coaching, run.status);
+    // …and the one moment it settles is the one moment to teach the store. A
+    // coach run iterated, so its trace carries the transitions a digest reasons
+    // over; a failed one has no trace to read.
+    if (settled && run.status === 'complete') this.teach(runId);
 
     const base = coaching.baseRevision;
     // The base's grade is this run's own only on the draft path; an adopted
@@ -259,6 +263,23 @@ export class ImproveService {
     }
     await this.em.flush();
     return { ...header, iterations };
+  }
+
+  /**
+   * Hand a finished coach run to the memory orchestrator, which digests it into
+   * reusable lessons and embeds them for later runs to recall. Fire and forget:
+   * the studio is answering a poll, the digest is minutes of the loop's own
+   * work, and a store that is down must never cost the author their feedback.
+   */
+  private teach(runId: string): void {
+    void this.loop
+      .digestRun(runId)
+      .then(({ orchestrationRunId }) => {
+        this.logger.log(`coach run ${runId} handed to memory run ${orchestrationRunId}`);
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(`coach run ${runId} not digested: ${String(error)}`);
+      });
   }
 
   /**

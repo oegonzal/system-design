@@ -7,6 +7,7 @@ import type {
   ApiResponse,
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
+  OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityRunDto,
@@ -104,6 +105,19 @@ export class HttpQualityLoopClient extends QualityLoopClient {
     const answer = await this.call('GET', '/prompts', undefined, READ_TIMEOUT_MS);
     if (answer.status !== 200) throw this.refused('GET /prompts', answer);
     return data<PromptLibraryEntryDto[]>(answer.body);
+  }
+
+  async digestRun(runId: string): Promise<OrchestrationRunStartedDto> {
+    const answer = await this.call(
+      'POST',
+      '/orchestrations/memory/from-run',
+      { runId },
+      READ_TIMEOUT_MS,
+    );
+    if (answer.status === 202 || answer.status === 200) {
+      return data<OrchestrationRunStartedDto>(answer.body);
+    }
+    throw this.refused('POST /orchestrations/memory/from-run', answer);
   }
 
   async getPrompt(id: string): Promise<PromptLibraryDocumentDto | null> {

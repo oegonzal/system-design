@@ -220,6 +220,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       setTimeout(() => loop.settle(started.runId), COMPLETION_DELAY_MS);
       return send(res, 202, { data: started });
     }
+    // The studio hands a finished coach run to the memory orchestrator. The
+    // stub only has to accept it; nothing downstream of the studio reads it.
+    if (method === 'POST' && path === '/orchestrations/memory/from-run') {
+      const body = await readJson(req);
+      if (!isRecord(body) || typeof body['runId'] !== 'string') {
+        return badRequest(res, 'runId is required');
+      }
+      return send(res, 202, { data: loop.digestRun(body['runId']) });
+    }
     if (method === 'GET' && path === '/runs') {
       loop.health();
       return send(res, 200, { data: [], meta: { total: 0, limit: 50, offset: 0 } });

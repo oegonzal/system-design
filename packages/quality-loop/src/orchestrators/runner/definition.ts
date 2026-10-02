@@ -86,10 +86,15 @@ export interface OrchestratorDefinition<O extends object = Record<string, unknow
   reasons: readonly string[];
   /** The request as the record and every step should see it — a goal stripped of what a previous run appended, say. */
   normalize?: (request: StartOrchestrationRequest) => StartOrchestrationRequest;
-  /** A request the orchestrator will not run, and why; null when acceptable. Checked before a row exists. */
+  /**
+   * A request the orchestrator will not run, and why; null when acceptable.
+   * Checked before a row exists. `stood` says a step stands in for the target,
+   * so no target run will happen — a reason about running one does not apply.
+   */
   refuse?: (
     request: StartOrchestrationRequest,
     pipelines: readonly PipelineSummary[],
+    stood?: boolean,
   ) => string | null;
   /** What the run observed at open, recorded on the row for every step to read. */
   context(ports: P): Promise<Record<string, unknown>>;

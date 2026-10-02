@@ -5,6 +5,7 @@ import type {
   LlmModelDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
+  OrchestrationRunStartedDto,
   QualityRunDto,
   QualityRunStartedDto,
   StartQualityRunRequest,
@@ -149,6 +150,15 @@ export class FakeQualityLoopClient extends QualityLoopClient {
 
   getPrompt(id: string): Promise<PromptLibraryDocumentDto | null> {
     return this.answer(() => this.core.getPrompt(id));
+  }
+
+  digestRun(runId: string): Promise<OrchestrationRunStartedDto> {
+    return this.answer(() => this.core.digestRun(runId));
+  }
+
+  /** Run ids the studio asked to have digested, in order. */
+  get digested(): readonly string[] {
+    return this.core.digested;
   }
 
   /** Model calls made so far, for a spec that reads progress while the run is still running. */

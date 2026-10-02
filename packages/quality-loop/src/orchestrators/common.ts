@@ -23,13 +23,18 @@ import type { StepContext, StepResult } from './runner/definition';
  * declares a composed goal — a memory step's, the studio's — is not one. Read
  * from the registry's summaries, never from a list of ids kept here; an
  * unregistered id is the service's 404, which comes first.
+ *
+ * It says nothing when the target stands in. The reason is about composing a
+ * goal for a run about to start, and a stood-in target never runs: a finished
+ * run of a composed-goal pipeline is still a run the later steps can read.
  */
 export const refuseInternal = (
   request: StartOrchestrationRequest,
   pipelines: readonly PipelineSummary[],
+  stood = false,
 ): string | null => {
   const target =
-    request.pipeline === undefined
+    request.pipeline === undefined || stood
       ? undefined
       : pipelines.find((summary) => summary.id === request.pipeline);
   return target?.goalSource === 'composed'

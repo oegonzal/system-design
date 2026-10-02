@@ -223,4 +223,42 @@ describe('the memory orchestration over the three pipelines', () => {
     expect(byPipeline.meta.total).toBe(0);
     expect((await fetch(`${url}/orchestrations/${crypto.randomUUID()}`)).status).toBe(404);
   });
+
+  // Starting a composed-goal pipeline as a target is refused: recall would
+  // rewrite a goal another program composed. Digesting a FINISHED one is a
+  // different question — the target stands in, nothing runs it — and it is how
+  // the studio's own runs reach the store. The digest child of the run above is
+  // itself a composed-goal run, so it proves the path without a studio.
+  it('[QL-17] a finished composed-goal run can be digested, though it could never be started as a target', async () => {
+    const first = (
+      (await (await fetch(`${url}/orchestrations?limit=10`)).json()) as Page<OrchestrationRunDto>
+    ).data.at(-1);
+    const digestRunId = first?.steps['digest'].runIds[0];
+    if (!digestRunId) throw new Error('the first run must have digested something');
+
+    const digestRun = (
+      (await (await fetch(`${url}/runs/${digestRunId}`)).json()) as Envelope<{ pipeline: string }>
+    ).data;
+    expect(digestRun.pipeline).toBe('experience-digest');
+
+    // Refused as a target…
+    const asTarget = await postJson(url, '/orchestrations/memory', {
+      pipeline: 'experience-digest',
+      goal: GOAL,
+    });
+    expect(asTarget.status).toBe(400);
+    expect(((await asTarget.json()) as { message: string }).message).toMatch(/not a target/);
+
+    // …admitted from the finished run.
+    const started = await postJson(url, '/orchestrations/memory/from-run', { runId: digestRunId });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
+    const record = await settle(data.orchestrationRunId);
+    expect(record.steps['target']).toMatchObject({
+      status: 'skipped',
+      reason: 'provided-run',
+      runIds: [digestRunId],
+    });
+    expect(record.steps['digest'].status).not.toBe('pending');
+  });
 });

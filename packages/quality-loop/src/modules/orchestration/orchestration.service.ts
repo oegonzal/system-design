@@ -94,15 +94,18 @@ export class OrchestrationService {
   ): Promise<OrchestrationRunDto> {
     const host = this.host(orchestrator);
     const source = orNotFound(await this.runs.get(body.runId), `run ${body.runId} not found`);
-    const normalized = this.admit(host, {
-      ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
-      goal: source.request.goal,
-      maxIterations: source.request.maxIterations,
-      ...(body.samples === undefined ? {} : { samples: body.samples }),
-    });
-    const provided = host.definition.steps.some((step) => step.provided !== undefined)
-      ? source
-      : null;
+    const stands = host.definition.steps.some((step) => step.provided !== undefined);
+    const normalized = this.admit(
+      host,
+      {
+        ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
+        goal: source.request.goal,
+        maxIterations: source.request.maxIterations,
+        ...(body.samples === undefined ? {} : { samples: body.samples }),
+      },
+      stands,
+    );
+    const provided = stands ? source : null;
     const record = await this.open(host, normalized, provided);
     void this.perform(host, record, normalized, provided);
     return record;
@@ -120,12 +123,13 @@ export class OrchestrationService {
   private admit(
     host: OrchestratorHost,
     request: StartOrchestrationRequest,
+    stood = false,
   ): StartOrchestrationRequest {
     const normalized = host.definition.normalize?.(request) ?? request;
     assertTargetDeclared(host, normalized);
     // A named target must be registered — the same 404 a run would get.
     if (normalized.pipeline !== undefined) this.runs.summary(normalized.pipeline);
-    const refusal = host.definition.refuse?.(normalized, this.runs.pipelines());
+    const refusal = host.definition.refuse?.(normalized, this.runs.pipelines(), stood);
     if (refusal !== null && refusal !== undefined) throw new BadRequestException(refusal);
     return normalized;
   }

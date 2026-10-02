@@ -24,6 +24,8 @@ import {
   DIGEST_RULES,
   MAX_CRITERIA_ITEMS,
   MAX_FINDINGS,
+  MAX_FINDING_CRITERIA,
+  MAX_FINDING_REFS,
   MAX_MEMORIES,
   PROMPT_MAX,
   RATIONALE_MAX,
@@ -108,8 +110,11 @@ const fresh = (
   severity: finding.severity,
   confidence: finding.confidence,
   fixability: finding.fixability,
-  locationRefs: [...finding.locationRefs],
-  criteria: finding.criterionIds.map(aliasOf),
+  // The record declares both bounds and nothing parses it at runtime, so they
+  // are held here. A canvas finding routinely spans a dozen refs — the widest
+  // few are the ones a reader needs, and the line is what the digest reads.
+  locationRefs: finding.locationRefs.slice(0, MAX_FINDING_REFS),
+  criteria: finding.criterionIds.slice(0, MAX_FINDING_CRITERIA).map(aliasOf),
   lenses: [...finding.lenses],
   iterations: [],
   rationale: null,

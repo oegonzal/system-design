@@ -3,6 +3,7 @@ import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
   LlmModelDto,
+  OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityRunDto,
@@ -49,4 +50,11 @@ export abstract class QualityLoopClient {
   abstract listPrompts(): Promise<PromptLibraryEntryDto[]>;
   /** Null when the library holds no such document. */
   abstract getPrompt(id: string): Promise<PromptLibraryDocumentDto | null>;
+  /**
+   * Hand a finished run to the memory orchestrator, which digests it into
+   * reusable lessons and embeds them. Nothing is re-run and nothing is judged
+   * again: the run stands in for the orchestrator's target step. Answers the
+   * orchestration's own id.
+   */
+  abstract digestRun(runId: string): Promise<OrchestrationRunStartedDto>;
 }
