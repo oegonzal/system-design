@@ -405,32 +405,31 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         tickMs: this.clock.tickMs,
       });
 
-      const turn = query({
-        prompt,
-        options: {
-          systemPrompt: request.system,
-          ...(this.requestedModel ? { model: this.requestedModel } : {}),
-          maxTurns: 1,
-          tools: NO_TOOLS,
-          permissionMode: 'default',
-          // No project/user settings, skills or MCP servers leak into a
-          // scoring-adjacent call; nothing about this run is persisted to disk.
-          settingSources: [],
-          persistSession: false,
-          abortController: abort,
-          // `env` REPLACES the subprocess environment, so spread the current
-          // one and only raise the output cap — the login credentials the SDK
-          // reads live in process.env / the config dir and must be preserved.
-          env: {
-            ...subscriptionEnv(process.env),
-            CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(OUTPUT_TOKEN_CEILING),
-          },
-        },
-      });
-
-      const reading = readTurn(turn);
       let read: TurnRead;
       try {
+        const turn = query({
+          prompt,
+          options: {
+            systemPrompt: request.system,
+            ...(this.requestedModel ? { model: this.requestedModel } : {}),
+            maxTurns: 1,
+            tools: NO_TOOLS,
+            permissionMode: 'default',
+            // No project/user settings, skills or MCP servers leak into a
+            // scoring-adjacent call; nothing about this run is persisted to disk.
+            settingSources: [],
+            persistSession: false,
+            abortController: abort,
+            // `env` REPLACES the subprocess environment, so spread the current
+            // one and only raise the output cap — the login credentials the SDK
+            // reads live in process.env / the config dir and must be preserved.
+            env: {
+              ...subscriptionEnv(process.env),
+              CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(OUTPUT_TOKEN_CEILING),
+            },
+          },
+        });
+        const reading = readTurn(turn);
         const settled = await Promise.race([reading, deadline.abandoned.then(() => null)]);
         if (settled === null) {
           // Past the limit and its grace, and the stream still open: whatever
