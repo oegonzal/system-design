@@ -21,10 +21,20 @@ export const TEST_DATABASE_NAME = 'sysdesign_test';
  * `_` and a lane of lower-case letters, digits and underscores — a name
  * Postgres takes unquoted. Built from the declared name, never spelled twice.
  */
-const DISPOSABLE = new RegExp(`^${TEST_DATABASE_NAME}(?:_[a-z0-9_]+)?$`);
+const DISPOSABLE = new RegExp(`^${TEST_DATABASE_NAME}(?:_([a-z0-9_]+))?$`);
 
 /** True for the test database and for a lane of it; false for every other name. */
 export const isTestDatabase = (name: string): boolean => DISPOSABLE.test(name);
+
+/**
+ * The lane a test database names — `recall` for `sysdesign_test_recall` — or
+ * null for the test database itself. Any other name is refused: it names no
+ * lane, because it is not a test database.
+ */
+export function testDatabaseLane(name: string): string | null {
+  assertTestDatabase(name, 'name the lane of');
+  return DISPOSABLE.exec(name)?.[1] ?? null;
+}
 
 /**
  * Refuse, naming the database, unless it is disposable. Called by everything

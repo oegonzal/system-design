@@ -139,7 +139,7 @@ dump under `static/runs/`.
 pnpm exec nx run-many -t lint typecheck test build --all   # the full local gate
 pnpm db:migrate && pnpm db:seed                            # schema + reference data
 pnpm db:migrate:check                                      # entities vs migrations drift
-pnpm exec nx run studio-e2e:e2e                            # end-to-end in Chrome: chromium, narrow, grader-down (its own API :3200, UI :4300 and stub :3103 auto-start; the dev stack can stay up)
+pnpm exec nx run studio-e2e:e2e                            # end-to-end in Chrome: chromium, narrow, grader-down (its own API :3200, UI :4300 and stub :3103 auto-start — a DB_NAME lane gets ports of its own; the dev stack can stay up)
 pnpm review:code --staged --profile=quick                  # what the pre-commit hook runs
 pnpm test:stories                                          # render every story, both modes
 pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md

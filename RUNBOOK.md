@@ -220,15 +220,22 @@ stops the suite instead of wiping your practice history. CI runs on `sysdesign_t
 server. None of them reaches a model: studio-api's specs bind a fake loop
 client, the loop's specs a fake model, and the e2e suite a stub quality loop.
 
-The e2e suite runs its own servers on its own ports — the API on :3200, the UI
-on :4300 and the stub quality loop on :3103
+The e2e suite runs its own servers on its own ports — on `sysdesign_test`, the
+API on :3200, the UI on :4300 and the stub quality loop on :3103
 (`packages/studio-e2e/src/support/stack.ts`) — none of which the dev stack
 uses, so Playwright can never reuse a dev server that writes into `sysdesign`.
-They build into their own outputs too (`packages/studio-api/dist/e2e`,
+A lane gets ports of its own, derived from its name
+(`packages/studio-e2e/src/support/lane-ports.ts`): `DB_NAME=sysdesign_test_recall`
+runs the API on :3281, the UI on :4381 and the stub on :3184, so two checkouts
+on different lanes run side by side and never reuse each other's servers.
+Should two lane names ever derive the same ports, the global setup refuses the
+run: it saves a story through the API it found and reads it back from its own
+database before it resets anything. They build into their own outputs too (`packages/studio-api/dist/e2e`,
 `packages/studio-ui/.next-e2e`), so a dev server running from the same
 checkout is neither reused nor rebuilt under it. Leave the dev stack running;
 the suite needs only Postgres (`pnpm stack:db`). Locally it reuses a server on
-its own ports that an earlier run left up, so a re-run skips the cold start.
+its own lane's ports that an earlier run left up, so a re-run skips the cold
+start.
 
 ## Notes / gotchas
 

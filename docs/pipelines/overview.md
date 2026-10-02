@@ -171,7 +171,7 @@ import `@sysdesign/llm`
 `QualityLoopClient` port (`packages/studio-api/src/modules/quality-loop/`),
 an abstract class with one HTTP adapter that maps the loop's failures to
 `502` / `503` / `504`, a fake bound in the API's specs, and a stub server the
-e2e suite starts on `:3103` — both over the one `FakeLoop` in
+e2e suite starts on `:3103` (a lane's own port on a `sysdesign_test_<lane>`) — both over the one `FakeLoop` in
 `packages/studio-testing`. Availability is a proxy of the loop's own
 (`GET /grading/availability`): a booted loop always has a model, so the
 answer names it or is 503 because the loop is unreachable, and the UI

@@ -34,9 +34,13 @@ const DB_NAME = suiteDatabase();
  * reaches it through the same `QUALITY_LOOP_URL` it would use for the real
  * service, so the API under test is exactly the production wiring.
  *
- * Every server is on the suite's own port (`stack.ts`), never a dev server's,
- * so `reuseExistingServer` — kept locally, so a re-run skips a cold start —
- * can only reuse a server an earlier run of this suite left up.
+ * Every server is on the suite's own port, never a dev server's, and the
+ * ports are derived from the suite's database (`stack.ts`), so
+ * `reuseExistingServer` — kept locally, so a re-run skips a cold start — can
+ * only reuse a server an earlier run of this suite on this lane left up. The
+ * global setup proves the API it found writes into `DB_NAME` before any test
+ * runs. The stub reads its own port from `stack.ts`, so it is handed the same
+ * `DB_NAME` as the API.
  */
 const REUSE = !process.env.CI;
 
@@ -108,6 +112,7 @@ export default defineConfig({
       reuseExistingServer: REUSE,
       cwd: workspaceRoot,
       timeout: 60_000,
+      env: { DB_NAME },
     },
     {
       command: `pnpm exec vite build --config packages/studio-api/vite.config.ts --outDir ${API_OUT_DIR} && node packages/studio-api/${API_OUT_DIR}/main.js`,

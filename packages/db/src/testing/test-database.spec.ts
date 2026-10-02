@@ -2,7 +2,12 @@ import type { EntityManager } from '@mikro-orm/postgresql';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ensureDatabase } from './ensure-database';
-import { assertTestDatabase, isTestDatabase, TEST_DATABASE_NAME } from './test-database';
+import {
+  assertTestDatabase,
+  isTestDatabase,
+  TEST_DATABASE_NAME,
+  testDatabaseLane,
+} from './test-database';
 import { truncateTestTables } from './truncate-test-tables';
 
 /**
@@ -47,6 +52,15 @@ describe('the test database guard', () => {
     ]) {
       expect(isTestDatabase(name), name).toBe(false);
     }
+  });
+
+  it('reads the lane a test database names, and refuses to read one from any other', () => {
+    expect(testDatabaseLane('sysdesign_test')).toBeNull();
+    expect(testDatabaseLane('sysdesign_test_recall')).toBe('recall');
+    expect(testDatabaseLane('sysdesign_test_ci_2')).toBe('ci_2');
+    expect(() => testDatabaseLane('sysdesign')).toThrow(
+      /Refusing to name the lane of database "sysdesign"/,
+    );
   });
 
   it('refuses any other database with an error that names it and the way out', () => {

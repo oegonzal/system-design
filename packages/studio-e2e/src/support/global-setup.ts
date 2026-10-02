@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { connectionSettings } from '@sysdesign/db/connection';
 import { Client } from 'pg';
 
-import { suiteDatabase } from './stack';
+import { proveApiDatabase } from './api-database-proof';
+import { API_URL, E2E_PORTS, suiteDatabase } from './stack';
 
 /**
  * Makes the suite's database exist, migrated and seeded, then clears the
@@ -24,6 +25,11 @@ import { suiteDatabase } from './stack';
  * their own root. Experiences are seeded reference data — the generator needs
  * them, so an empty table is seeded via the same `pnpm db:seed` a developer
  * would run, not asserted as a failure.
+ *
+ * Before anything is reset, the API under test proves it writes into this
+ * database (`proveApiDatabase`): Playwright starts the servers before this
+ * runs and reuses whatever already answers on the suite's ports, so a server
+ * another lane left there is refused here rather than tested against.
  *
  * Grades live in the quality loop, not here: the suite's stub keeps its runs
  * in memory and starts empty with every run of the suite.
@@ -58,6 +64,8 @@ export default async function globalSetup(): Promise<void> {
     if (Number(result.rows[0].count) === 0) {
       execSync('pnpm db:seed', { cwd: repoRoot, env, stdio: 'inherit' });
     }
+
+    await proveApiDatabase({ apiUrl: API_URL, ports: E2E_PORTS, database }, client);
 
     await client.query('truncate table "prompt" cascade');
     await client.query('truncate table "prompt_generation" cascade');
