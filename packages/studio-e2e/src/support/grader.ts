@@ -44,6 +44,8 @@ export interface GraderRequests {
     pipeline: string;
     goal: string;
     adopt: { runId: string; iteration: number } | null;
+    /** Whether the run asked the loop to recall lessons for its producer. */
+    recall: boolean;
   }[];
   criteriaRequests: { pipeline: string; goal: string }[];
 }

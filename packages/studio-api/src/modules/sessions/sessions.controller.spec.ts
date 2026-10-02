@@ -4,6 +4,7 @@ import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
   PROMPT_COPY,
+  recallWithout,
   type ApiErrorResponse,
   type CanvasGraph,
   type ConfirmedFinding,
@@ -23,6 +24,7 @@ import {
   type StartImproveResponse,
 } from '@sysdesign/contracts';
 import { CoachingRun, DesignRevision, DesignSession, Prompt } from '@sysdesign/db';
+import { FAKE_RECALLED_LESSONS, fakeRecalled } from '@sysdesign/studio-testing';
 
 import { call, createHarness, resetDesignData, type Harness } from '../../test/harness';
 import { authoredPrompt } from '../prompts/prompts.controller.spec';
@@ -607,6 +609,53 @@ describe('sessions', () => {
       expect(h.loop.digested).toEqual(['fake-run-1']);
     });
 
+    it('[QL-32] every coach start recalls for its producer and says what it was handed; a grade never recalls', async () => {
+      const { sessionId } = await startSession();
+      // A grade: the author's submit asks for no lessons.
+      await submit(sessionId, submission());
+      expect(h.loop.startRequests[0]).not.toHaveProperty('recall');
+      h.loop.complete('fake-run-1', [{ overall: 60, decision: 'revise' }]);
+
+      // From the draft: the run asks to recall, and says so while it does.
+      await startImprove(sessionId, { ...submission(), maxIterations: 2 });
+      expect(h.loop.startRequests[1]).toMatchObject({ recall: true, output: submission() });
+      const recalling = await readImprove(sessionId, 'fake-run-2');
+      expect(recalling.body.data).toMatchObject({
+        status: 'running',
+        iterations: [],
+        recall: { status: 'recalling', count: 0, lessons: [] },
+      });
+
+      // Once the lessons are in, the run reads them back with their provenance.
+      h.loop.recall('fake-run-2');
+      const recalled = await readImprove(sessionId, 'fake-run-2');
+      expect(recalled.body.data.recall).toEqual(fakeRecalled('fake-run-2'));
+      expect(recalled.body.data.recall?.lessons.map((lesson) => lesson.insight)).toEqual(
+        FAKE_RECALLED_LESSONS.map((lesson) => lesson.insight),
+      );
+
+      // The lessons change nothing about how the run is read: it settles as any coach run does.
+      h.loop.complete('fake-run-2', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+      ]);
+      const graded = (await readImprove(sessionId, 'fake-run-2')).body.data;
+      expect(graded.status).toBe('complete');
+      expect(graded.recall?.status).toBe('recalled');
+
+      // From a graded revision: the adopting run asks to recall too, and a
+      // recall that found nothing is said as such.
+      const base = graded.iterations[1]?.revisionId ?? '';
+      await startImprove(sessionId, { baseRevisionId: base, maxIterations: 2 });
+      expect(h.loop.startRequests[2]).toMatchObject({ recall: true, adopt: { iteration: 2 } });
+      h.loop.recall('fake-run-3', recallWithout('store-empty'));
+      expect((await readImprove(sessionId, 'fake-run-3')).body.data.recall).toMatchObject({
+        status: 'empty',
+        reason: 'store-empty',
+        count: 0,
+      });
+    });
+
     it('[DEL-3] a failed coach run teaches nothing: it has no trace to digest', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, { ...submission(), maxIterations: 2 });
@@ -807,6 +856,7 @@ describe('sessions', () => {
         criteria: expect.any(Array),
         maxIterations: 2,
         adopt: { runId: 'fake-run-1', iteration: 1 },
+        recall: true,
       });
       expect(h.loop.startRequests[1]).not.toHaveProperty('output');
       const draftAfter = await call<GetSessionDraftResponse>(

@@ -8,6 +8,7 @@ import type {
   OrchestrationRunStartedDto,
   QualityRunDto,
   QualityRunStartedDto,
+  RunRecallDto,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import {
@@ -159,6 +160,11 @@ export class FakeQualityLoopClient extends QualityLoopClient {
   /** Run ids the studio asked to have digested, in order. */
   get digested(): readonly string[] {
     return this.core.digested;
+  }
+
+  /** Settle a recalling run's recall — the fake's fixed lessons, or the outcome given. */
+  recall(runId: string, outcome?: RunRecallDto): void {
+    this.core.recall(runId, outcome);
   }
 
   /** Model calls made so far, for a spec that reads progress while the run is still running. */

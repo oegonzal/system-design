@@ -1,8 +1,15 @@
-import { CANVAS_PIPELINE_ID, type StartQualityRunRequest } from '@sysdesign/contracts';
+import {
+  CANVAS_PIPELINE_ID,
+  recallInProgress,
+  recallOf,
+  recallWithout,
+  type StartQualityRunRequest,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
 import { FakeLoop } from './fake-loop';
+import { FAKE_RECALLED_LESSONS, fakeRecallRunId } from './fake-recall';
 import { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 
 const GOAL = [
@@ -37,6 +44,29 @@ const request = (overrides: Partial<StartQualityRunRequest> = {}): StartQualityR
 });
 
 describe('FakeLoop', () => {
+  it('[QL-32] a run that asks to recall opens recalling and settles to the fixed lessons before any iteration lands; one that did not never recalls', () => {
+    const loop = new FakeLoop();
+    const { runId } = loop.startRun(request({ recall: true, maxIterations: 2 }));
+    expect(loop.getRun(runId)?.recall).toEqual(recallInProgress());
+
+    loop.progress(runId, []);
+    expect(loop.getRun(runId)?.recall).toEqual(
+      recallOf(FAKE_RECALLED_LESSONS, fakeRecallRunId(runId)),
+    );
+    loop.complete(runId, 'auto');
+    expect(loop.getRun(runId)?.recall?.count).toBe(FAKE_RECALLED_LESSONS.length);
+
+    const scripted = loop.startRun(request({ recall: true })).runId;
+    loop.recall(scripted, recallWithout('store-empty'));
+    loop.settle(scripted);
+    expect(loop.getRun(scripted)?.recall).toMatchObject({ status: 'empty', reason: 'store-empty' });
+
+    const grade = loop.startRun(request()).runId;
+    loop.settle(grade);
+    expect(loop.getRun(grade)?.recall).toBeNull();
+    expect(() => loop.recall(grade)).toThrow(/did not ask to recall/);
+  });
+
   it('starts a run running, records the request, and settles it by the goal’s scenario — none means the stub’s own grade', () => {
     const loop = new FakeLoop();
     expect(loop.startRun(request())).toEqual({ runId: 'fake-run-1', status: 'running' });

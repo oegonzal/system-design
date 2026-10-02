@@ -32,7 +32,8 @@ import { SessionsService, type RevisionCache } from './sessions.service';
 import { submissionProblems } from './submission';
 
 /**
- * The coach: the same run as a grade, allowed to iterate. It starts from
+ * The coach: the same run as a grade, allowed to iterate, whose producer is
+ * handed the lessons the loop recalls for the prompt first. It starts from
  * the draft — stored first as the author's own revision and graded as
  * iteration 1 — or from a graded revision, whose recorded grade the loop
  * adopts verbatim as iteration 1 so nothing is graded twice or stored
@@ -81,6 +82,7 @@ export class ImproveService {
         prompt,
         { output: submission },
         maxIterations,
+        'coach',
       );
       const base = await createRevision(em, sessionId, submission, 'user', {
         runId: started.runId,
@@ -138,7 +140,12 @@ export class ImproveService {
     return this.sessions.withSessionLock(sessionId, async (em, session, prompt) => {
       this.sessions.assertSessionOpen(session, prompt);
       await this.sessions.assertNoGradeInFlight(em, session);
-      const started = await this.sessions.startGradingRun(prompt, { adopt }, maxIterations);
+      const started = await this.sessions.startGradingRun(
+        prompt,
+        { adopt },
+        maxIterations,
+        'coach',
+      );
       em.persist(
         em.create(CoachingRun, {
           runId: started.runId,
@@ -191,6 +198,8 @@ export class ImproveService {
       exchangeCount: run.exchanges.length,
       stopReason: run.status === 'complete' ? (run.trace?.stopReason ?? null) : null,
       error: run.error?.message ?? null,
+      // What the coach was handed before it revised, as the loop recorded it.
+      recall: run.recall ?? null,
     };
     if (recorded.length === 0) {
       if (run.status === 'failed' && ownsBase && base.evaluationStatus !== 'failed') {

@@ -6,5 +6,6 @@
  * the stub; no runtime file may import it.
  */
 export { FakeLoop, type FakeLoopOptions, type RunScenario } from './fake-loop';
+export { FAKE_RECALLED_LESSONS, fakeRecalled, fakeRecallRunId } from './fake-recall';
 export { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 export type { FakeIteration } from './trace-builders';

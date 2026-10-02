@@ -14,6 +14,7 @@ import {
   makeFinding,
   makeImproveIteration,
   makeImproveRun,
+  makeRecall,
   makeRevisionSummary,
 } from '../../testing/fixtures';
 import { humanizeReason } from '../evaluation/decision-reason';
@@ -355,5 +356,82 @@ describe('ImprovementPanel', () => {
     });
     expect(screen.getByTestId('improvement-stopped').textContent).toContain('iteration budget');
     expect(screen.queryByTestId('load-best-revision')).toBeNull();
+  });
+
+  it('[QL-32] says the coach is recalling lessons before anything else moves, then how many it was handed, listed on request', async () => {
+    const user = userEvent.setup();
+    const recalling = makeImproveRun({
+      iterations: [],
+      recall: makeRecall({ status: 'recalling', count: 0, lessons: [], recallRunId: null }),
+    });
+    const { rerender } = renderPanel({ run: recalling, isPolling: true });
+    expect(screen.getByTestId('improve-progress').textContent).toContain(
+      'recalling lessons from earlier runs',
+    );
+    expect(screen.queryByTestId('coach-recall')).toBeNull();
+
+    const recalled = makeImproveRun({ recall: makeRecall() });
+    rerender(
+      <ImprovementPanel
+        run={recalled}
+        error={null}
+        isPolling
+        message=""
+        availability={LIVE}
+        onStart={noop}
+        onLoadRevision={noop}
+      />,
+    );
+    expect(screen.getByTestId('improve-progress').textContent).not.toContain('recalling');
+    expect(screen.getByTestId('coach-recall-summary').textContent).toBe(
+      'Recalled 2 lessons from earlier runs for the coach',
+    );
+    const list = screen.getByTestId('coach-recall-lessons');
+    expect(list.hidden).toBe(true);
+
+    const toggle = screen.getByTestId('coach-recall-toggle');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(list.hidden).toBe(false);
+    const lessons = within(list).getAllByTestId('coach-recall-lesson');
+    expect(lessons.map((lesson) => lesson.textContent)).toEqual([
+      'Put a cache in front of the primary database before adding read replicas.Helps with the read path',
+      'Say what the queue absorbs when the downstream service slows down.Helps with failure handling — note: learned on a different prompt',
+    ]);
+  });
+
+  it('[QL-32] says plainly when the coach ran without lessons, and nothing when the run never recalled', () => {
+    const { unmount } = renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        recall: makeRecall({
+          status: 'skipped',
+          reason: 'store-unavailable',
+          count: 0,
+          lessons: [],
+        }),
+      }),
+    });
+    const skipped = screen.getByTestId('coach-recall');
+    expect(skipped.dataset['status']).toBe('skipped');
+    expect(skipped.textContent).toBe(
+      'The coach ran without lessons from earlier runs: the lesson store could not be reached.',
+    );
+    unmount();
+
+    const empty = renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        recall: makeRecall({ status: 'empty', reason: 'store-empty', count: 0, lessons: [] }),
+      }),
+    });
+    expect(screen.getByTestId('coach-recall').textContent).toContain(
+      'No lessons from earlier runs',
+    );
+    empty.unmount();
+
+    renderPanel({ run: makeImproveRun({ status: 'complete', recall: null }) });
+    expect(screen.queryByTestId('coach-recall')).toBeNull();
   });
 });

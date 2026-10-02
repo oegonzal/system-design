@@ -564,6 +564,22 @@ export class CanvasPage {
     return this.coachIteration(iteration).getByTestId('improve-iteration-reason');
   }
 
+  /** How many lessons from earlier runs the coach was handed, as the panel says it. */
+  get coachRecallSummary(): Locator {
+    return this.page.getByTestId('coach-recall-summary');
+  }
+
+  /** The recalled lessons, one per row — hidden until `showRecalledLessons`. */
+  get recalledLessons(): Locator {
+    return this.page.getByTestId('coach-recall-lesson');
+  }
+
+  async showRecalledLessons(): Promise<void> {
+    const toggle = this.page.getByTestId('coach-recall-toggle');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+
   /** The coach panel's report of a run that failed. */
   get coachError(): Locator {
     return this.page.getByTestId('improvement-error');

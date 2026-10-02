@@ -59,9 +59,13 @@ and **see results / iterate**.
   the draft: it is stored as your revision and graded as the starting point.
   From a graded revision — when the canvas is clean and the loaded revision's
   grade is complete — the loop reuses that grade as the starting point instead
-  of grading it again, and nothing is stored twice. Progress shows the model
-  calls as they happen; the newest coaching run is restored when the page
-  reloads. Each row is the **starting point**, **imported** (it beat every
+  of grading it again, and nothing is stored twice. Before the coach revises
+  anything, the loop recalls lessons from earlier runs for the prompt and
+  hands them to the coach only — the graders never see them — so the panel
+  first says it is recalling, then **Recalled N lessons from earlier runs**
+  with the list behind **Show lessons**, or why there were none. Progress
+  shows the model calls as they happen; the newest coaching run is restored
+  when the page reloads. Each row is the **starting point**, **imported** (it beat every
   earlier one and landed in the timeline as an **AI** revision), **not
   better**, or **refused** with the problems the studio found — every row
   with the controller's reason. **Load best** puts the best import on the

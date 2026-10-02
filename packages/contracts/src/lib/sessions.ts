@@ -9,6 +9,7 @@ import type { ApiListResponse, ApiResponse } from './envelope';
 import type { EvaluationFindingDto } from './evaluations';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
+import type { RunRecallDto } from './quality-loop/recall';
 import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
 import type { Decision, IterationMode, StopReason } from './quality-loop/vocab';
 
@@ -239,6 +240,13 @@ export interface ImproveRunDto {
   /** Why the run stopped; null until it has completed. */
   stopReason: StopReason | null;
   error: string | null;
+  /**
+   * The lessons from earlier runs the coach was handed — `recalling` until
+   * they are in, then recalled with the list, or empty or skipped with the
+   * reason. Only the coach saw them; no grade did. Null for a run that did
+   * not recall.
+   */
+  recall: RunRecallDto | null;
 }
 
 export interface StartImproveDto {

@@ -1,4 +1,5 @@
 import {
+  recallInProgress,
   sameRubric,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
@@ -9,10 +10,12 @@ import {
   type PromptLibraryEntryDto,
   type QualityRunDto,
   type QualityRunStartedDto,
+  type RunRecallDto,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
+import { fakeRecalled } from './fake-recall';
 import { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 import {
   autoIterations,
@@ -29,7 +32,9 @@ import {
  * by calling `complete`/`fail`, the stub by `settle` after a delay — and a
  * scenario keyed by a run's goal lets a browser test script its own run
  * without touching anyone else's. No timers here: when a run settles is the
- * transport's call.
+ * transport's call. A run that asks to recall opens `recalling`, as the loop
+ * records it, and its recall settles — to the fake's fixed lessons unless a
+ * spec says otherwise — before any iteration lands.
  */
 
 /** What a scripted run does when it settles, keyed by the run's goal. */
@@ -178,7 +183,7 @@ export class FakeLoop {
         adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? 1,
       },
-      recall: null,
+      recall: request.recall === true ? recallInProgress() : null,
       trace: null,
       exchanges: exchangesOf(this.startExchanges, startedAt),
       error: null,
@@ -216,6 +221,18 @@ export class FakeLoop {
     return this.library.find((document) => document.id === id) ?? null;
   }
 
+  /**
+   * Settle a recalling run's recall — to the fake's fixed lessons, or to the
+   * outcome a spec gives — while the run itself stays as it is. A run that
+   * did not ask to recall has nothing to settle.
+   */
+  recall(runId: string, outcome?: RunRecallDto): void {
+    const run = this.require(runId);
+    if (run.recall === null)
+      throw new Error(`fake quality loop run ${runId} did not ask to recall`);
+    run.recall = outcome ?? fakeRecalled(runId);
+  }
+
   /** Model calls made so far, for a reader that shows progress while the run is still running. */
   exchanges(runId: string, count: number): void {
     const run = this.require(runId);
@@ -236,6 +253,7 @@ export class FakeLoop {
     iterations: readonly FakeIteration[] | 'default' | 'auto' = 'default',
   ): void {
     const run = this.require(runId);
+    this.recalled(run);
     run.status = 'complete';
     run.finishedAt = this.now();
     run.trace = this.traceOf(runId, iterations);
@@ -251,6 +269,7 @@ export class FakeLoop {
   progress(runId: string, iterations: readonly FakeIteration[] = []): void {
     const run = this.require(runId);
     if (run.status !== 'running') throw new Error(`fake quality loop run ${runId} has settled`);
+    this.recalled(run);
     const trace = this.traceOf(runId, iterations);
     run.trace = trace === null ? null : { ...trace, stopReason: null };
   }
@@ -262,6 +281,7 @@ export class FakeLoop {
    */
   fail(runId: string, message: string): void {
     const run = this.require(runId);
+    this.recalled(run);
     run.status = 'failed';
     run.finishedAt = this.now();
     run.error = { name: 'Error', message, stack: null };
@@ -313,6 +333,11 @@ export class FakeLoop {
     // Nothing finished yet is no trace at all, as the loop publishes it.
     if (traced.length === 0) return null;
     return runTrace(run.pipeline, this.version, run.request.goal, criteria, traced);
+  }
+
+  /** The loop recalls before anything else moves: a run still recalling settles to the fixed lessons first. */
+  private recalled(run: QualityRunDto): void {
+    if (run.recall?.status === 'recalling') run.recall = fakeRecalled(run.runId);
   }
 
   private consume(goal: string, scenario: RunScenario): void {

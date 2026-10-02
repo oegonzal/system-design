@@ -4,6 +4,7 @@ import {
   makeFinding,
   makeImproveIteration,
   makeImproveRun,
+  makeRecall,
   makeRevisionSummary,
 } from '../../testing/fixtures';
 import { ImprovementPanel } from './improvement-panel';
@@ -198,5 +199,58 @@ export const NoArtifact: Story = {
 export const BlockedByGrade: Story = {
   args: {
     blockedReason: 'Revision #2 is still being graded — wait for its verdict.',
+  },
+};
+
+/** Just started: the loop is recalling lessons from earlier runs before the coach revises anything. */
+export const Recalling: Story = {
+  args: {
+    run: makeImproveRun({
+      exchangeCount: 1,
+      iterations: [],
+      recall: makeRecall({ status: 'recalling', count: 0, lessons: [], recallRunId: null }),
+    }),
+    isPolling: true,
+    message: 'Coaching — recalling lessons from earlier runs for the coach.',
+  },
+};
+
+/** The coach was handed two lessons from earlier runs; the list opens on request. */
+export const RecalledLessons: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'max-iterations',
+      recall: makeRecall(),
+      iterations: [
+        makeImproveIteration({ iteration: 1, mode: 'provided', overall: 64, decision: 'revise' }),
+        makeImproveIteration({
+          iteration: 2,
+          mode: 'revise',
+          overall: 72,
+          decision: 'revise',
+          outcome: 'imported',
+          revisionId: 'rev-2',
+        }),
+      ],
+    }),
+  },
+};
+
+/** Recall could not run — no lesson store reachable — and the coach went on without lessons. */
+export const RecallSkipped: Story = {
+  args: {
+    run: makeImproveRun({
+      status: 'complete',
+      stopReason: 'max-iterations',
+      recall: makeRecall({
+        status: 'skipped',
+        reason: 'store-unavailable',
+        note: 'connect ECONNREFUSED',
+        count: 0,
+        lessons: [],
+        recallRunId: null,
+      }),
+    }),
   },
 };

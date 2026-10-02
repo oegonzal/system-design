@@ -124,9 +124,11 @@ attributes and compliance, and decides. The studio reads the run back,
 grounds each finding onto the canvas by label and part, keeps the
 controller's reason, and caches the terminal score. The coach is the same
 run with more iterations, started from the draft or from a graded revision
-whose recorded grade the loop adopts as iteration 1; every iteration that
-beat the ones before it is imported once as an assistant revision, and
-every coaching run is recorded on its session. Prompt generation is the
+whose recorded grade the loop adopts as iteration 1; before it revises, the
+loop recalls lessons from earlier runs for the prompt and hands them to the
+coach alone (never to a grade's judges), and the panel lists them. Every
+iteration that beat the ones before it is imported once as an assistant
+revision, and every coaching run is recorded on its session. Prompt generation is the
 loop's `design-prompt` pipeline over a rendered experience. Every run
 persists in `quality_run*`, heartbeats while it runs, and writes a full
 dump under `static/runs/`.

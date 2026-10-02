@@ -22,15 +22,17 @@ Two facts organise everything below:
    instance of `PipelineDefinition` is for. A fourth pipeline was registered
    later — `agentic-design`, §1.1 — for a reason that has nothing to do with
    memory: a second judging domain.
-2. **The producer only ever sees the goal.** `core/stages/llm-producer.ts`
-   assembles `# Goal` and `# Success criteria` and nothing else. Every design
-   decision below follows from that one fact: the input codecs, the advisory
-   section appended to the goal, the byte budget, and aliases used as engine
-   location ids. The curator is reached the same way — the conditions a search
-   ran under arrive inside its goal as a `## Retrieved under` list. The one
-   model call in a memory run that is not a pipeline stage is the probe
-   derivation, which has no `quality_run` row and surfaces only as
-   `counts.probes`.
+2. **A memory run reaches its target through the goal.** For a memory run,
+   `core/stages/llm-producer.ts` assembles `# Goal` and `# Success criteria`
+   and nothing else. Every design decision below follows from that one fact:
+   the input codecs, the advisory section appended to the goal, the byte
+   budget, and aliases used as engine location ids. The curator is reached the
+   same way — the conditions a search ran under arrive inside its goal as a
+   `## Retrieved under` list. The one model call in a memory run that is not a
+   pipeline stage is the probe derivation, which has no `quality_run` row and
+   surfaces only as `counts.probes`. Since then a second path exists that does
+   not touch the goal at all: a run that asks to recall hands the same curated
+   lessons to its producer alone, as a briefing no lens can receive (§15).
 
 ---
 
@@ -1438,3 +1440,56 @@ difference it could detect.
 **Dimensions.** Means across the fifteen: compliance 71.7, interfaces
 63.3, completeness 63.2, soundness 59.2. Soundness is where the gated
 `leaky_generality` lives, and it held every run for revise.
+
+---
+
+## 15. Recall for a coach's producer, not its judges
+
+The memory orchestrator puts what it recalled into the target's goal, and
+every stage reads the goal: the deriver, the critics and the evaluators judge
+a run whose brief now carries remembered evidence. For a studio coach run that
+is the wrong reader. The coach's rubric is the prompt's, fixed once and cited
+by id across runs, and a lesson that reached a critic could move a grade the
+author is meant to trust. So the studio's coach recalls a second way, decided
+by the owner: lessons for the prompt go to the coach's **producer** and to
+nothing else, and a grade (a user's submit) never recalls.
+
+The path, end to end:
+
+1. **The studio asks.** Every coach start — from the draft or from a graded
+   revision — posts its run with `recall: true`; a submit never does.
+2. **The run opens at once.** `RunsService.start` refuses `recall` for a
+   pipeline whose producer does not declare `consumes: ['memories']` (400,
+   before any row), opens the row with `recall: { status: 'recalling' }` and
+   answers 202.
+3. **The runs layer recalls, before the loop.** `perform` calls whatever recall
+   is bound in the runs module's `RunRecallSlot`. The memory module's
+   `MemoryRunRecall` binds itself there at init; the runs module never imports
+   the memory module, which already imports it, so there is no cycle, and a
+   process without memory records `skipped` / `recall-unavailable`.
+4. **The same recall as the orchestrator's.** `MemoryRunRecall` asks the store
+   how it stands now, then runs `recallMemory` — the function the orchestrator's
+   recall step also calls: probes, one embedding batch, one search, the
+   `memory-recall` run as an ordinary recorded child (its id lands on the coach
+   run the moment it opens), and the curated pack read back with `readPack`.
+5. **The producer is briefed.** The usable lessons become the engine's
+   `memories` input. The producer sees them under
+   `# Lessons from earlier runs (advisory)` — after the criteria, before what
+   to fix — with a lead that they are advice, never requirements. The deriver,
+   critics and evaluators are never shown them.
+6. **Provenance.** `QualityRunDto.recall` — `recalled` with the lessons
+   (`ref`, `serves`, `insight`, `caveat`, the stored `text`, the `sourceRunId`),
+   or `empty` / `skipped` with a closed reason and the recall run's id where one
+   ran — is on the row (`quality_run.recall`), the list row (without the
+   lessons), the dump (`recall.json`, `run.md`) and, verbatim, in the producer's
+   own prompt under `05-llm/`. The studio's coach panel shows the count and the
+   list.
+7. **Nothing fails the coach.** No key, a store that is down or empty, a recall
+   run that fails or endorses nothing, or an error nobody expected: each is
+   recorded with its reason and the coach runs without lessons.
+
+What this does not settle is whether the lessons help. §14 measured injection
+into the goal at n = 15 and found it inert against those judges; this path
+leaves the judges untouched by construction, so a paired comparison — coach
+runs with and without recall on the same prompts, read off `recall.lessons`
+and the iterations' scores — is the experiment that would answer it.

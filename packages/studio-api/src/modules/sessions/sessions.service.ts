@@ -19,6 +19,7 @@ import {
   type SessionDraft,
   type SessionInFlightDto,
   type SessionStatus,
+  type StartQualityRunRequest,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
@@ -47,6 +48,17 @@ export interface RevisionCache {
 
 /** What a grading run is started over: the submission itself, or a recorded iteration to adopt. */
 export type RunSource = { output: DesignSubmission } | { adopt: AdoptedIterationRef };
+
+/**
+ * What each kind of run asks of the loop beyond the run itself. A coach
+ * recalls lessons from earlier runs for its producer — the lenses never see
+ * them; a grade never recalls, so an author's score rests on the prompt alone.
+ */
+const RUN_KINDS = {
+  grade: {},
+  coach: { recall: true },
+} as const satisfies Record<string, Pick<StartQualityRunRequest, 'recall'>>;
+export type RunKind = keyof typeof RUN_KINDS;
 
 /**
  * Who asks which run holds the slot. A `write` must know: the grader is
@@ -278,11 +290,15 @@ export class SessionsService {
     }
   }
 
-  /** One `system-design-canvas` run on the prompt's fixed rubric: over a submission, or from a recorded iteration. */
+  /**
+   * One `system-design-canvas` run on the prompt's fixed rubric: over a
+   * submission, or from a recorded iteration — a grade, or a coach.
+   */
   startGradingRun(
     prompt: Prompt,
     source: RunSource,
     maxIterations: number,
+    kind: RunKind = 'grade',
   ): Promise<QualityRunStartedDto> {
     if (prompt.criteria.length === 0) {
       throw new ServiceUnavailableException(
@@ -295,6 +311,7 @@ export class SessionsService {
       criteria: prompt.criteria,
       maxIterations,
       ...source,
+      ...RUN_KINDS[kind],
     });
   }
 

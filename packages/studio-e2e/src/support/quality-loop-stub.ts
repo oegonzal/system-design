@@ -23,7 +23,8 @@ import { E2E_PORTS, GRADER_HOST } from './stack';
  * points that at this process instead of the real service: every route the
  * studio's client calls answers here with the same envelopes, and a run
  * completes on its own a moment after it starts with a trace that is a pure
- * function of the request — no model, no network, no database. That is what
+ * function of the request — no model, no network, no database — and a run that
+ * asks to recall is handed the fake's two fixed lessons. That is what
  * makes a grade in a spec a literal (`64` for three nodes) rather than a
  * range.
  *
@@ -40,7 +41,8 @@ import { E2E_PORTS, GRADER_HOST } from './stack';
  *     PUT    /__stub/health { unreachable }          global — every route, /health included,
  *                                                    drops the socket; only the serial
  *                                                    grader-down project may flip it
- *     GET    /__stub/requests                        the goals every run and derivation asked for
+ *     GET    /__stub/requests                        the goals every run and derivation asked for,
+ *                                                    and whether each run asked to recall
  *     POST   /__stub/reset                           runs, requests and scenarios, gone
  *
  * It listens on the suite's own grader port (`stack.ts`), which
@@ -153,11 +155,12 @@ async function control(
   }
   if (method === 'GET' && path === '/__stub/requests') {
     send(res, 200, {
-      startRequests: [...loop.requests].map(([runId, { pipeline, goal, adopt }]) => ({
+      startRequests: [...loop.requests].map(([runId, { pipeline, goal, adopt, recall }]) => ({
         runId,
         pipeline,
         goal,
         adopt: adopt ?? null,
+        recall: recall === true,
       })),
       criteriaRequests: loop.criteriaRequests.map(({ pipeline, goal }) => ({ pipeline, goal })),
     });

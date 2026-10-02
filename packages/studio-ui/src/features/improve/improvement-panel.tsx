@@ -31,6 +31,7 @@ import { formatScore } from '../evaluation/score';
 import { WrappingText } from '../evaluation/wrapping-text';
 import { coachProgress } from './coach-progress';
 import type { GraderAvailability } from './grader-availability';
+import { RecalledLessons } from './recalled-lessons';
 
 export interface ImprovementPanelProps {
   /** Output of `useImproveRunPolling` — the workspace owns the hook. */
@@ -152,7 +153,9 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * missing when the coach produced nothing. Each row says why the controller
  * decided as it did, naming the findings and criteria it cites the way the
  * feedback summary names them — from the iteration's own findings, placed
- * on the design it judged. The iteration count
+ * on the design it judged. Before any of it, the coach may have been handed
+ * lessons from earlier runs: the panel says how many, and lists them on
+ * request. The iteration count
  * reads the run's own budget while there is a run, and the author's choice
  * for the next one. Pure props, Storybook-safe; the workspace owns polling
  * and the load-revision flow.
@@ -250,6 +253,8 @@ export function ImprovementPanel({
           {error}
         </Alert>
       ) : null}
+
+      {run !== null ? <RecalledLessons recall={run.recall} /> : null}
 
       {run !== null && run.iterations.length > 0 ? (
         <IterationList data-testid="improvement-trajectory">

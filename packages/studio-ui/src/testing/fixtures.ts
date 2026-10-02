@@ -16,6 +16,7 @@ import type {
   PromptDto,
   PromptGenerationDto,
   PromptLibraryDocumentDto,
+  RunRecallDto,
   StarStoryDto,
   SuccessCriterion,
 } from '@sysdesign/contracts';
@@ -415,6 +416,37 @@ export function makeImproveIteration(
   };
 }
 
+/** A recall that handed the coach two lessons, as the loop records one. */
+export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto {
+  const lessons = overrides.lessons ?? [
+    {
+      ref: 'm1',
+      serves: 'the read path',
+      insight: 'Put a cache in front of the primary database before adding read replicas.',
+      caveat: null,
+      text: 'When reads dominate, cache before you replicate.',
+      sourceRunId: 'run-earlier',
+    },
+    {
+      ref: 'm2',
+      serves: 'failure handling',
+      insight: 'Say what the queue absorbs when the downstream service slows down.',
+      caveat: 'learned on a different prompt',
+      text: 'Name the failure a queue absorbs, or it absorbs nothing.',
+      sourceRunId: 'run-earlier',
+    },
+  ];
+  return {
+    status: 'recalled',
+    reason: null,
+    note: null,
+    recallRunId: 'run-recall',
+    count: lessons.length,
+    lessons,
+    ...overrides,
+  };
+}
+
 export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveRunDto {
   return {
     runId: 'run-2',
@@ -427,6 +459,7 @@ export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveR
     iterations: [makeImproveIteration()],
     stopReason: null,
     error: null,
+    recall: null,
     ...overrides,
   };
 }

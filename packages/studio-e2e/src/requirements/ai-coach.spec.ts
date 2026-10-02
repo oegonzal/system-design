@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { FAKE_RECALLED_LESSONS } from '@sysdesign/studio-testing';
 
 import { coachingRuns, listRevisions } from '../support/backend';
 import {
@@ -120,6 +121,40 @@ test.describe('the AI coach', () => {
     expect(secondRun.baseRevisionId).toBe(
       revisions.find((revision) => revision.revisionNumber === 2)?.id,
     );
+  });
+
+  test('[QL-32] the coach is handed lessons from earlier runs and the panel lists them; a submit never asks for any', async ({
+    page,
+    request,
+  }) => {
+    const { canvas, sessionId } = await openPracticeSession(page, request);
+    await buildNaiveDesign(canvas);
+    await canvas.submit();
+    await canvas.expectEvaluationComplete(1);
+
+    await canvas.startCoach(2);
+    await canvas.expectCoachStopped();
+    await expect(canvas.coachRecallSummary).toHaveText(
+      `Recalled ${FAKE_RECALLED_LESSONS.length} lessons from earlier runs for the coach`,
+    );
+    await expect(canvas.recalledLessons.first()).toBeHidden();
+    await canvas.showRecalledLessons();
+    await expect(canvas.recalledLessons).toHaveCount(FAKE_RECALLED_LESSONS.length);
+    for (const [index, lesson] of FAKE_RECALLED_LESSONS.entries()) {
+      await expect(canvas.recalledLessons.nth(index)).toContainText(lesson.insight);
+      await expect(canvas.recalledLessons.nth(index)).toContainText(lesson.serves);
+    }
+
+    // What the studio asked the grader: the coach run recalls, the author's grade does not.
+    const [coachRun] = await coachingRuns(request, sessionId);
+    const graded = (await listRevisions(request, sessionId)).find(
+      (revision) => revision.revisionNumber === 1,
+    );
+    const { startRequests } = await graderRequests(request);
+    const asked = (runId: string | null | undefined) =>
+      startRequests.find((started) => started.runId === runId)?.recall;
+    expect(asked(coachRun.runId)).toBe(true);
+    expect(asked(graded?.evaluation?.runId)).toBe(false);
   });
 
   test('[UX-11] a coaching run that fails is reported failed, imports nothing, and its base revision shows failed', async ({
