@@ -101,6 +101,37 @@ describe('useImproveRunPolling', () => {
     expect(fetchMock.mock.calls.length).toBe(callsAtFailure);
   });
 
+  it('[UX-12] tells a run the grader no longer has from a session that is gone: one is the coach’s stop, the other the page’s', async () => {
+    const lostRun = stubApi([
+      {
+        path: RUN_PATH,
+        status: 404,
+        body: { statusCode: 404, message: 'Coaching run run-2 not found', missing: 'coaching-run' },
+      },
+    ]);
+    const lost = renderHook(() => useImproveRunPolling('session-1', 'run-2'));
+    await advance(0);
+    expect(lost.result.current.error).toBe('Coaching run run-2 not found');
+    expect(lost.result.current.gone).toBeNull();
+    expect(lost.result.current.isPolling).toBe(false);
+    await advance(IMPROVE_POLL_BACKOFF_MAX_MS * 2);
+    expect(lostRun.fetchMock.mock.calls.length).toBe(1);
+    lost.unmount();
+    vi.unstubAllGlobals();
+
+    stubApi([
+      {
+        path: RUN_PATH,
+        status: 404,
+        body: { statusCode: 404, message: 'Session session-1 not found', missing: 'session' },
+      },
+    ]);
+    const gone = renderHook(() => useImproveRunPolling('session-1', 'run-2'));
+    await advance(0);
+    expect(gone.result.current.gone?.status).toBe(404);
+    expect(gone.result.current.run).toBeNull();
+  });
+
   it('never gives up on a long run — status-driven, not clock-capped', async () => {
     const { fetchMock } = stubApi([
       {

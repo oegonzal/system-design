@@ -103,7 +103,7 @@ describe('PracticeWorkspace on open', () => {
     expect(withoutDraft.calls.some((call) => call.url === '/api/revisions/rev-3')).toBe(false);
   });
 
-  it('[DEL-4] a legacy latest revision shows the notice and fetches no evaluation', async () => {
+  it('[DEL-4] a latest revision that was never graded shows the notice and fetches no evaluation', async () => {
     const { calls } = stubApi(
       sessionRoutes({
         revisions: [makeRevisionSummary({ evaluation: null })],
@@ -114,7 +114,7 @@ describe('PracticeWorkspace on open', () => {
     renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
-    expect(screen.getByTestId('evaluation-legacy')).toBeTruthy();
+    expect(screen.getByTestId('evaluation-ungraded').getAttribute('data-reason')).toBe('never');
     expect(screen.getByTestId('retry-evaluation')).toBeTruthy();
     expect(calls.some((call) => call.url.endsWith('/evaluation'))).toBe(false);
   });
@@ -240,6 +240,198 @@ describe('PracticeWorkspace on open', () => {
     expect((await screen.findByTestId('improve-iteration-1')).textContent).toContain(
       'grade reused',
     );
+  });
+});
+
+describe('PracticeWorkspace grading a revision again', () => {
+  const FAILED_REF = {
+    runId: 'run-1',
+    iteration: 1,
+    status: 'failed',
+    overall: null,
+    decision: null,
+  } as const;
+  const RUNNING_REF = { ...FAILED_REF, runId: 'run-2', status: 'running' } as const;
+  const EVALUATION_PATH = /^\/api\/revisions\/rev-1\/evaluation$/;
+  const ungradedBody = { overall: null, decision: null, dimensions: {}, findings: [] };
+
+  it('[UX-17] re-grades a failed revision in place: the same revision, a fresh run, and no second revision submitted', async () => {
+    const { calls } = stubApi([
+      {
+        method: 'POST',
+        path: EVALUATION_PATH,
+        status: 202,
+        body: { data: makeRevision({ evaluation: RUNNING_REF }) },
+      },
+      {
+        path: EVALUATION_PATH,
+        sequence: [
+          {
+            data: makeEvaluation({
+              ...ungradedBody,
+              status: 'failed',
+              criterionResults: [],
+              error: 'the model went away',
+            }),
+          },
+          { data: makeEvaluation({ runId: 'run-2', overall: 81, decision: 'accept' }) },
+        ],
+      },
+      ...sessionRoutes({ revisions: [makeRevisionSummary({ evaluation: FAILED_REF })] }),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
+    const failed = await screen.findByTestId('evaluation-error');
+    expect(failed.textContent).toContain('the model went away');
+    expect(screen.getByText('rev #1 · grading failed')).toBeTruthy();
+
+    await userEvent.click(screen.getByTestId('retry-evaluation'));
+
+    // The new run's grade lands on the same revision.
+    expect((await screen.findByTestId('overall-score')).textContent).toBe('81');
+    expect(screen.queryByTestId('evaluation-error')).toBeNull();
+    expect(screen.getByText('rev #1 · graded')).toBeTruthy();
+    const posts = calls.filter((call) => call.method === 'POST').map((call) => call.url);
+    expect(posts).toEqual(['/api/revisions/rev-1/evaluation']);
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Revisions' }));
+    expect(screen.getAllByTestId(/^revision-chip-/)).toHaveLength(1);
+  });
+
+  it('[UX-17] says a refused re-grade in the server’s words, and leaves the failed grade on show', async () => {
+    const refusal = 'Revision #1 already has a grade — there is nothing to grade again.';
+    stubApi([
+      {
+        method: 'POST',
+        path: EVALUATION_PATH,
+        status: 409,
+        body: { statusCode: 409, message: refusal },
+      },
+      {
+        path: EVALUATION_PATH,
+        body: {
+          data: makeEvaluation({
+            ...ungradedBody,
+            status: 'failed',
+            criterionResults: [],
+            error: 'the model went away',
+          }),
+        },
+      },
+      ...sessionRoutes({ revisions: [makeRevisionSummary({ evaluation: FAILED_REF })] }),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
+    await userEvent.click(await screen.findByTestId('retry-evaluation'));
+
+    const alert = await screen.findByTestId('submit-error');
+    expect(within(alert).getByText("Couldn't grade this revision again")).toBeTruthy();
+    expect(alert.textContent).toContain(refusal);
+    expect(screen.getByTestId('evaluation-error')).toBeTruthy();
+  });
+
+  it('[UX-17] offers the same re-grade for a revision whose grade the grader no longer has', async () => {
+    const { calls } = stubApi([
+      {
+        method: 'POST',
+        path: EVALUATION_PATH,
+        status: 202,
+        body: { data: makeRevision({ evaluation: RUNNING_REF }) },
+      },
+      {
+        path: EVALUATION_PATH,
+        handler: ({ count }) =>
+          count === 0
+            ? {
+                status: 404,
+                body: {
+                  statusCode: 404,
+                  message: 'Revision rev-1 has no evaluation the grader can read',
+                  missing: 'evaluation',
+                },
+              }
+            : { body: { data: makeEvaluation({ runId: 'run-2', overall: 81 }) } },
+      },
+      ...sessionRoutes({}),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Feedback' }));
+    const notice = await screen.findByTestId('evaluation-ungraded');
+    expect(notice.getAttribute('data-reason')).toBe('lost');
+    // The revision is there: this is not the page's not-found, and not a failure.
+    expect(screen.queryByRole('heading', { name: 'Practice session not found' })).toBeNull();
+    expect(screen.queryByTestId('evaluation-error')).toBeNull();
+
+    await userEvent.click(screen.getByTestId('retry-evaluation'));
+
+    expect((await screen.findByTestId('overall-score')).textContent).toBe('81');
+    expect(screen.queryByTestId('evaluation-ungraded')).toBeNull();
+    expect(calls.filter((call) => call.method === 'POST')).toHaveLength(1);
+  });
+});
+
+describe('PracticeWorkspace when its session vanishes', () => {
+  const GONE = {
+    status: 404,
+    body: { statusCode: 404, message: `Session ${SESSION} not found`, missing: 'session' },
+  };
+
+  it('[UX-12] turns into the one not-found when the revision being graded is gone — no "grading…" beside a failure, no retry that cannot succeed', async () => {
+    const running = {
+      runId: 'run-1',
+      iteration: 1,
+      status: 'running',
+      overall: null,
+      decision: null,
+    } as const;
+    stubApi([
+      {
+        path: /^\/api\/revisions\/rev-1\/evaluation$/,
+        handler: ({ count }) =>
+          count === 0
+            ? {
+                body: {
+                  data: makeEvaluation({ status: 'running', overall: null, decision: null }),
+                },
+              }
+            : {
+                status: 404,
+                body: { statusCode: 404, message: 'Revision rev-1 not found', missing: 'revision' },
+              },
+      },
+      ...sessionRoutes({ revisions: [makeRevisionSummary({ evaluation: running })] }),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    expect(await screen.findByText('rev #1 · grading…')).toBeTruthy();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Practice session not found' }, { timeout: 4000 }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/grading…/)).toBeNull();
+    expect(screen.queryByTestId('evaluation-error')).toBeNull();
+    expect(screen.queryByTestId('retry-evaluation')).toBeNull();
+    expect(screen.queryByText(/Revision rev-1 not found/)).toBeNull();
+    expect(screen.getByTestId('notice-back').getAttribute('href')).toBe('/');
+  });
+
+  it('[UX-12] turns into the same not-found when an action is the first to find the session gone', async () => {
+    stubApi([
+      { method: 'POST', path: `/api/sessions/${SESSION}/revisions`, ...GONE },
+      ...sessionRoutes({}),
+    ]);
+
+    renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
+    const submit = await screen.findByTestId('submit-revision');
+    await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(submit);
+
+    expect(await screen.findByRole('heading', { name: 'Practice session not found' })).toBeTruthy();
+    expect(screen.queryByTestId('submit-error')).toBeNull();
+    expect(screen.queryByText(`Session ${SESSION} not found`)).toBeNull();
   });
 });
 

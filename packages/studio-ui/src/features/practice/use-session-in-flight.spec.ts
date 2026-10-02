@@ -72,6 +72,38 @@ describe('useSessionInFlight', () => {
     expect(hook.result.current.inFlight).toBeNull();
   });
 
+  it('[UX-12] a session that vanishes while a run holds its slot is gone — the slot does not read "running" forever', async () => {
+    const { calls } = stubApi([
+      {
+        path: SESSION_PATH,
+        handler: ({ count }) =>
+          count === 0
+            ? { body: { data: makeSession({ inFlight: GRADE }) } }
+            : {
+                status: 404,
+                body: {
+                  statusCode: 404,
+                  message: 'Session session-1 not found',
+                  missing: 'session',
+                },
+              },
+      },
+    ]);
+    const hook = renderHook(() => useSessionInFlight('session-1'));
+    act(() => hook.result.current.hold(GRADE));
+    await advance(0);
+    expect(hook.result.current.inFlight).toEqual(GRADE);
+    expect(hook.result.current.gone).toBeNull();
+
+    await advance(IN_FLIGHT_POLL_INTERVAL_MS);
+    expect(hook.result.current.gone?.status).toBe(404);
+    expect(hook.result.current.inFlight).toBeNull();
+
+    const settled = calls.length;
+    await advance(IN_FLIGHT_POLL_INTERVAL_MS * 3);
+    expect(calls).toHaveLength(settled);
+  });
+
   it('[DEL-3] reports a different run the server says holds the slot', async () => {
     const coach = { kind: 'coach', runId: 'run-3', revisionNumber: 2, state: 'running' } as const;
     stubApi([{ path: SESSION_PATH, body: { data: makeSession({ inFlight: coach }) } }]);

@@ -9,6 +9,14 @@ import { FailureDetail } from './failure-detail';
 import { FindingsList } from './findings-list';
 import { ScoreSummary } from './score-summary';
 
+/**
+ * Why a revision on show has no grade to poll: `never` — it was stored before
+ * grading moved to the quality loop, so no run was ever started for it;
+ * `lost` — a run was, and the grader no longer has it.
+ */
+export const UNGRADED_REASONS = ['never', 'lost'] as const;
+export type UngradedReason = (typeof UNGRADED_REASONS)[number];
+
 export interface EvaluationPanelProps {
   /** Output of `useEvaluationPolling` — the workspace owns the hook. */
   evaluation: EvaluationDto | null;
@@ -19,12 +27,22 @@ export interface EvaluationPanelProps {
   message: string;
   /** The prompt's rubric, so criterion ids read as statements. */
   criteria: SuccessCriterion[];
-  /** The loaded revision was stored before grading was delegated — it has no evaluation to poll. */
-  legacy?: boolean;
-  /** When the graded revision was stored — the grade started then; the running state counts from it. */
+  /** Why the loaded revision has no grade to show; null when it has one, or is waiting for it. */
+  ungraded?: UngradedReason | null;
+  /** When the grade on show started; the running state counts from it. */
   startedAt?: string | null;
-  /** There is no retry endpoint: retrying a failed grade is resubmitting the draft. */
-  onRetry: () => void;
+  /**
+   * Grade the revision on show again, in place: the same revision, a fresh
+   * run of its stored design — never a second revision with the same content.
+   */
+  onRegrade: () => void;
+  /** True while that request is on its way. */
+  regrading?: boolean;
+  /**
+   * Why the session takes no grade right now — a run holds its slot, its
+   * prompt is archived. Disables the grade-again control and is its title.
+   */
+  regradeBlockedReason?: string | null;
   onSelectFinding: (finding: EvaluationFindingDto) => void;
 }
 
@@ -32,9 +50,12 @@ export interface EvaluationPanelProps {
 const ESCALATED_COPY =
   'The quality loop escalated this design without a score — its lenses could not reach a verdict.';
 
-/** A revision from before grading moved to the loop: nothing to poll, only to resubmit. */
-const LEGACY_COPY =
-  'This revision was stored before grading moved to the quality loop, so it has no evaluation. Resubmit it to grade it.';
+/** A revision with no grade to show, to its author: why, and that grading it changes nothing else. */
+const UNGRADED_COPY: Record<UngradedReason, string> = {
+  never:
+    'This revision was stored before grading moved to the quality loop, so it was never graded. Grade it now — the revision stays as it is.',
+  lost: 'The grader no longer has this revision’s grade. Grade it again — the revision stays as it is.',
+};
 
 /**
  * A grade that failed, to its author: what happened to the revision. The
@@ -43,7 +64,7 @@ const LEGACY_COPY =
  */
 const FAILED_COPY = {
   title: 'Grading stopped unexpectedly',
-  body: 'This revision was not graded. Your design is kept exactly as you submitted it.',
+  body: 'This revision was not graded. Grade it again — the revision stays as it is.',
 } as const;
 
 /** What a wait costs: several lenses read the design, each a model call. */
@@ -52,12 +73,13 @@ const DURATION_HINT = 'Grading usually takes a few minutes';
 /**
  * The feedback dock: running → spinner with how long it usually takes and
  * how long it has taken, failed → what happened in the author's terms, the
- * run's own error one click down, and the resubmit, complete → the score
+ * run's own error one click down, and the way back, complete → the score
  * summary, the criterion results and the findings. An escalation with no
- * score says why before showing what the lenses did find; a legacy revision
- * says it has nothing to show and offers the resubmit instead of the idle
- * copy. The LiveRegion is mounted unconditionally so status changes are
- * announced, not just rendered.
+ * score says why before showing what the lenses did find; a revision with
+ * no grade to show says why in place of the idle copy. The way back from a
+ * grade that failed, was lost or never ran is the same one: grade this
+ * revision again, where it stands. The LiveRegion is mounted unconditionally
+ * so status changes are announced, not just rendered.
  */
 export function EvaluationPanel({
   evaluation,
@@ -65,13 +87,18 @@ export function EvaluationPanel({
   isPolling,
   message,
   criteria,
-  legacy = false,
+  ungraded = null,
   startedAt = null,
-  onRetry,
+  onRegrade,
+  regrading = false,
+  regradeBlockedReason = null,
   onSelectFinding,
 }: EvaluationPanelProps) {
   const status = evaluation?.status ?? null;
-  const running = (status === 'running' || (evaluation === null && isPolling)) && error === null;
+  const running =
+    (status === 'running' || (evaluation === null && isPolling)) &&
+    error === null &&
+    ungraded === null;
   const elapsed = useElapsed(startedAt, running);
   const escalated =
     evaluation !== null &&
@@ -79,18 +106,26 @@ export function EvaluationPanel({
     evaluation.decision === 'escalate' &&
     evaluation.overall === null;
 
+  const regrade = (label: string) => (
+    <Button
+      variant="subtle"
+      onClick={onRegrade}
+      disabled={regrading || regradeBlockedReason !== null}
+      title={regradeBlockedReason ?? undefined}
+      data-testid="retry-evaluation"
+    >
+      {regrading ? 'Sending it to the grader…' : label}
+    </Button>
+  );
+
   return (
     <Stack gap={5} data-testid="evaluation-panel">
       <LiveRegion message={message} />
 
-      {legacy ? (
-        <Stack gap={3} data-testid="evaluation-legacy">
-          <Text size="sm">{LEGACY_COPY}</Text>
-          <div>
-            <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
-              Resubmit for grading
-            </Button>
-          </div>
+      {ungraded !== null ? (
+        <Stack gap={3} data-testid="evaluation-ungraded" data-reason={ungraded}>
+          <Text size="sm">{UNGRADED_COPY[ungraded]}</Text>
+          <div>{regrade('Grade this revision')}</div>
         </Stack>
       ) : evaluation === null && error === null && !isPolling ? (
         <Text size="sm" tone="muted">
@@ -117,9 +152,7 @@ export function EvaluationPanel({
           <Stack gap={3} align="start">
             <span>{FAILED_COPY.body}</span>
             <FailureDetail detail={error} />
-            <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
-              Resubmit for grading
-            </Button>
+            {regrade('Grade this revision again')}
           </Stack>
         </Alert>
       ) : null}

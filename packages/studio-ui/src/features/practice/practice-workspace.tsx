@@ -3,6 +3,7 @@
 import styled from '@emotion/styled';
 import {
   describeInFlight,
+  PROMPT_COPY,
   type DesignRevisionDto,
   type DesignRevisionSummaryDto,
   type EvaluationFindingDto,
@@ -45,7 +46,8 @@ import type { DraftSaveStatus } from '../canvas/draft-status';
 import { Palette } from '../canvas/palette/palette';
 import { PropertiesPanel } from '../canvas/properties/properties-panel';
 import { CanvasToolbar } from '../canvas/toolbar/canvas-toolbar';
-import { EvaluationPanel } from '../evaluation/evaluation-panel';
+import { EvaluationPanel, type UngradedReason } from '../evaluation/evaluation-panel';
+import { subjectGone } from '../evaluation/missing-read';
 import { RevisionTimeline } from '../evaluation/revision-timeline';
 import { useEvaluationPolling } from '../evaluation/use-evaluation-polling';
 import { useRunExport } from '../export/use-run-export';
@@ -262,15 +264,19 @@ interface FeedbackTarget {
   id: string;
   revisionNumber: number;
   evaluation: RevisionEvaluationRef | null;
-  /** When it was stored — its grade started then. */
-  createdAt: string;
+  /** When its grade started: when it was stored, or when this tab sent it to be graded again. */
+  gradingSince: string;
 }
 
-const toTarget = (revision: FeedbackTarget): FeedbackTarget => ({
+/** A revision as the feedback tab's subject; its grade started when it was stored unless said otherwise. */
+const toTarget = (
+  revision: Pick<DesignRevisionSummaryDto, 'id' | 'revisionNumber' | 'evaluation' | 'createdAt'>,
+  gradingSince: string = revision.createdAt,
+): FeedbackTarget => ({
   id: revision.id,
   revisionNumber: revision.revisionNumber,
   evaluation: revision.evaluation,
-  createdAt: revision.createdAt,
+  gradingSince,
 });
 
 /** The run a fresh submission's grade holds the session's slot with — running, since it just started. */
@@ -320,25 +326,35 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const [exporting, setExporting] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [startingImprove, setStartingImprove] = useState(false);
+  const [regrading, setRegrading] = useState(false);
   const [availability, setAvailability] = useState<GraderAvailability>(CHECKING);
 
   const promptCriteria = usePromptCriteria(prompt);
   const { criteria } = promptCriteria;
-  // A legacy revision has nothing to poll: asking would only 404.
+  // A revision that was never graded has nothing to poll: asking would only 404.
   const polling = useEvaluationPolling(
     feedback && feedback.evaluation !== null ? feedback.id : null,
   );
+  const restartGrade = polling.restart;
   const improve = useImproveRunPolling(sessionId, activeRunId);
-  const { inFlight, hold: holdSlot, recheck: recheckSlot } = useSessionInFlight(sessionId);
+  const slot = useSessionInFlight(sessionId);
+  const { inFlight, hold: holdSlot, recheck: recheckSlot } = slot;
+  // The session, or the revision being graded, went away under the page —
+  // whichever poll was the first to be told. One fact, one state: the page
+  // is its not-found, not a grade still "running" beside a failure.
+  const vanished = polling.gone ?? slot.gone ?? improve.gone;
+  const pageFailure = loadFailure ?? vanished;
   const exportRun = useRunExport();
   const canvasEmpty = useCanvasStore((state) => state.nodes.length === 0);
   const completedFor = useRef<string | null>(null);
   const acceptedSeen = useRef(0);
   const readOnly = viewingRevision !== null;
   const promptArchived = prompt?.status === 'archived';
-  // The draft is the author's only while it is on screen and the page is up.
-  const autosave = useDraftAutosave(sessionId, storeApi, !readOnly && !loading);
-  useLeaveGuard(autosave.pending, LEAVE_WHILE_SAVING);
+  // The draft is the author's only while it is on screen and the page is up
+  // — and there is nowhere to save it once the session is gone.
+  const pageUp = !loading && pageFailure === null;
+  const autosave = useDraftAutosave(sessionId, storeApi, !readOnly && pageUp);
+  useLeaveGuard(autosave.pending && pageUp, LEAVE_WHILE_SAVING);
   useDocumentTitle(prompt ? pageTitle(prompt.title) : null);
 
   // The store is the one read-only switch: every control that edits the
@@ -416,6 +432,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     };
   }, []);
 
+  // An action the server refused. One that found the session itself gone is
+  // not a refusal to report beside the canvas: the page has no subject left.
+  const reportFailure = useCallback((title: string, error: unknown, fallback: string) => {
+    if (subjectGone(error) !== null) setLoadFailure(error);
+    else setFailure(actionError(title, error, fallback));
+  }, []);
+
   const refreshRevisions = useCallback(() => {
     void api
       .listRevisions(sessionId)
@@ -491,13 +514,39 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       ]);
       setTab('feedback');
     } catch (error) {
-      setFailure(
-        actionError("Couldn't submit for grading", error, 'The revision was not submitted.'),
-      );
+      reportFailure("Couldn't submit for grading", error, 'The revision was not submitted.');
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId, readDraft, autosave, storeApi, holdSlot]);
+  }, [sessionId, readDraft, autosave, storeApi, holdSlot, reportFailure]);
+
+  // The way back from a grade that failed, was lost or never ran: the same
+  // revision, graded again where it stands. The server starts a fresh run of
+  // the stored design and repoints the revision at it — no second revision,
+  // and the draft is not touched — so what changes here is only whose run the
+  // feedback polls and when it started.
+  const handleRegrade = useCallback(async () => {
+    if (feedback === null) return;
+    setRegrading(true);
+    setFailure(null);
+    try {
+      const revision = await api.regradeRevision(feedback.id);
+      const regraded = toTarget(revision, new Date().toISOString());
+      holdSlot(gradeSlot(revision));
+      setFeedback(regraded);
+      setViewingRevision((viewing) => (viewing?.id === revision.id ? regraded : viewing));
+      setRevisions((current) =>
+        current.map((candidate) =>
+          candidate.id === revision.id ? toSummary(revision) : candidate,
+        ),
+      );
+      restartGrade();
+    } catch (error) {
+      reportFailure("Couldn't grade this revision again", error, 'The revision was not graded.');
+    } finally {
+      setRegrading(false);
+    }
+  }, [feedback, holdSlot, restartGrade, reportFailure]);
 
   // Export the run as one zip: the diagram as a PDF plus prompt/narrative/brief/
   // feedback/revisions each as a separate .md. Reads whatever revision is on
@@ -575,7 +624,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
           ]);
         }
       } catch (error) {
-        setFailure(actionError("Couldn't start the coach", error, 'The coach did not start.'));
+        reportFailure("Couldn't start the coach", error, 'The coach did not start.');
       } finally {
         setStartingImprove(false);
       }
@@ -589,6 +638,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       polling.evaluation,
       autosave,
       holdSlot,
+      reportFailure,
     ],
   );
 
@@ -620,12 +670,10 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
         setFeedback(toTarget(revision));
         setTab('feedback');
       } catch (error) {
-        setFailure(
-          actionError("Couldn't load that revision", error, 'The canvas was left as it was.'),
-        );
+        reportFailure("Couldn't load that revision", error, 'The canvas was left as it was.');
       }
     },
-    [storeApi, autosave.status],
+    [storeApi, autosave.status, reportFailure],
   );
 
   const handleRestoreAsDraft = useCallback(() => {
@@ -642,11 +690,13 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     );
   }
 
-  if (loadFailure !== null) {
+  // What the open could not read, or what went missing afterwards: the same
+  // notice either way, and nothing of the workspace beside it.
+  if (pageFailure !== null) {
     return (
       <LoadFailureNotice
         noun="practice session"
-        error={loadFailure}
+        error={pageFailure}
         onRetry={handleRetryLoad}
         exit={{ href: '/', label: 'Back to the dashboard' }}
       />
@@ -678,7 +728,18 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
       : null);
   const blockedReason = holder !== null ? describeInFlight(holder) : null;
   const earlierBest = improve.run !== null ? earlierRunBest(revisions, improve.run.runId) : null;
-  const legacy = feedback !== null && feedback.evaluation === null;
+  // No grade to show for the revision on the feedback tab, and why: no run
+  // was ever started for it, or the grader no longer has the one that was.
+  const ungraded: UngradedReason | null =
+    feedback === null
+      ? null
+      : feedback.evaluation === null
+        ? 'never'
+        : polling.lost
+          ? 'lost'
+          : null;
+  // A grade starts under the rules a submit obeys: one run per session, and none on an archived prompt.
+  const gradeBlockedReason = blockedReason ?? (promptArchived ? PROMPT_COPY.archived : null);
 
   return (
     <WorkspaceRoot>
@@ -759,9 +820,11 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 isPolling={polling.isPolling}
                 message={polling.message}
                 criteria={criteria}
-                legacy={legacy}
-                startedAt={feedback?.createdAt ?? null}
-                onRetry={() => void handleSubmit()}
+                ungraded={ungraded}
+                startedAt={feedback?.gradingSince ?? null}
+                onRegrade={() => void handleRegrade()}
+                regrading={regrading}
+                regradeBlockedReason={gradeBlockedReason}
                 onSelectFinding={handleSelectFinding}
               />
             </DockPanel>

@@ -1,9 +1,10 @@
 'use client';
 
 import type { ImproveRunDto } from '@sysdesign/contracts';
-import { usePolledResource } from '@sysdesign/web-kit';
+import { usePolledResource, type ApiError } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
+import { goneRead, isMissing, readOrMissing, type ReadOutcome } from '../evaluation/missing-read';
 import { formatScore } from '../evaluation/score';
 import { coachProgress } from './coach-progress';
 
@@ -22,6 +23,8 @@ export interface ImproveRunPollingResult {
   message: string;
   /** Iterations imported as revisions so far — the workspace refreshes the timeline when this grows. */
   acceptedCount: number;
+  /** The run's session no longer exists: the 404 that said so. The page's subject went with it. */
+  gone: ApiError | null;
 }
 
 function describe(
@@ -47,9 +50,16 @@ function describe(
   }
 }
 
-const isTerminal = (run: ImproveRunDto) => run.status === 'complete' || run.status === 'failed';
-const terminalError = (run: ImproveRunDto) =>
-  run.status === 'failed' ? (run.error ?? 'The coach run failed.') : null;
+type RunRead = ReadOutcome<ImproveRunDto>;
+
+const isTerminal = (read: RunRead) =>
+  isMissing(read) || read.found.status === 'complete' || read.found.status === 'failed';
+// A run the grader no longer has stopped as surely as one that failed; the
+// server's sentence for it is the operator's line either way.
+const terminalError = (read: RunRead) => {
+  if (isMissing(read)) return read.error.message;
+  return read.found.status === 'failed' ? (read.found.error ?? 'The coach run failed.') : null;
+};
 
 /**
  * Polls a coach run until it reaches a terminal status — `usePolledResource`
@@ -62,19 +72,21 @@ export function useImproveRunPolling(
   runId: string | null,
 ): ImproveRunPollingResult {
   const {
-    resource: run,
+    resource: read,
     error,
     isPolling,
     unreachable,
   } = usePolledResource({
     key: runId,
-    fetch: (key, signal) => api.getImprove(sessionId, key, { signal }),
+    fetch: (key, signal) => readOrMissing(api.getImprove(sessionId, key, { signal })),
     isTerminal,
     terminalError,
     intervalMs: IMPROVE_POLL_INTERVAL_MS,
     backoffMaxMs: IMPROVE_POLL_BACKOFF_MAX_MS,
     unreachableAfter: IMPROVE_UNREACHABLE_AFTER,
   });
+
+  const run = read !== null && !isMissing(read) ? read.found : null;
 
   return {
     run,
@@ -83,5 +95,6 @@ export function useImproveRunPolling(
     message: describe(run, error, isPolling, unreachable),
     acceptedCount:
       run?.iterations.filter((iteration) => iteration.outcome === 'imported').length ?? 0,
+    gone: goneRead(read),
   };
 }

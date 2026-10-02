@@ -328,8 +328,9 @@ export class CanvasPage {
   }
 
   /**
-   * The toolbar's badge for a run the loop lost, plus the feedback dock's
-   * explanation with its resubmit control. The badge is the authoritative
+   * The toolbar's badge for a run that failed, plus the feedback dock's
+   * explanation — the author's sentence, with the run's own error folded
+   * under it — and its grade-again control. The badge is the authoritative
    * signal that *this* revision failed.
    */
   async expectEvaluationFailed(revisionNumber: number, message: string): Promise<void> {
@@ -342,7 +343,7 @@ export class CanvasPage {
     });
   }
 
-  /** The feedback dock's way back from a failed grade: the same design, as a new revision. */
+  /** The feedback dock's way back from a failed grade: the same revision, graded again in place. */
   async retryEvaluation(): Promise<void> {
     await this.feedbackTab.click();
     await this.page.getByTestId('retry-evaluation').click();

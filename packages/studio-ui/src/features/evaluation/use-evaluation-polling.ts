@@ -1,9 +1,10 @@
 'use client';
 
 import type { EvaluationDto } from '@sysdesign/contracts';
-import { usePolledResource } from '@sysdesign/web-kit';
+import { usePolledResource, type ApiError } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
+import { goneRead, isMissing, readOrMissing, type ReadOutcome } from './missing-read';
 import { formatScore } from './score';
 
 export const POLL_INTERVAL_MS = 1200;
@@ -20,6 +21,17 @@ export interface EvaluationPollingResult {
    * announcement and the panel put in the author's words.
    */
   error: string | null;
+  /**
+   * The revision — or its whole session — no longer exists: the 404 that said
+   * so. The page's subject went with it; nothing here is left to show.
+   */
+  gone: ApiError | null;
+  /**
+   * The revision is there, but the studio can read no grade for it — the
+   * grader no longer has its run. Nothing failed, and nothing is running:
+   * there is only a revision to grade again.
+   */
+  lost: boolean;
   isPolling: boolean;
   /** For a LiveRegion — the consumer renders it so announcements have a home. */
   message: string;
@@ -30,10 +42,12 @@ export interface EvaluationPollingResult {
 function describe(
   evaluation: EvaluationDto | null,
   error: string | null,
+  lost: boolean,
   isPolling: boolean,
   unreachable: boolean,
 ): string {
   if (error !== null) return 'Grading stopped unexpectedly.';
+  if (lost) return 'This revision has no grade to show.';
   if (unreachable) return 'Cannot reach the API — retrying…';
   if (evaluation === null) return isPolling ? 'Checking evaluation status…' : '';
   switch (evaluation.status) {
@@ -49,24 +63,31 @@ function describe(
   }
 }
 
+type GradeRead = ReadOutcome<EvaluationDto>;
+
+// A 404 is an answer about the grade, not a failed poll: what is missing —
+// the revision, or only its grade — decides what the page does next.
 const fetchEvaluation = (revisionId: string, signal: AbortSignal) =>
-  api.getEvaluation(revisionId, { signal });
+  readOrMissing(api.getEvaluation(revisionId, { signal }));
 // The run, not the iteration: a grade recorded while its run goes on still
 // waits for the stop reason only the run's end can give it.
-const isTerminal = (evaluation: EvaluationDto) => evaluation.settled;
-const terminalError = (evaluation: EvaluationDto) =>
-  evaluation.status === 'failed' ? (evaluation.error ?? 'Evaluation failed.') : null;
+const isTerminal = (read: GradeRead) => isMissing(read) || read.found.settled;
+const terminalError = (read: GradeRead) =>
+  !isMissing(read) && read.found.status === 'failed'
+    ? (read.found.error ?? 'The grading run failed.')
+    : null;
 
 /**
  * Polls the grade for a revision until its run settles — `usePolledResource`
  * with this domain's copy. Settled-driven, not
  * clock-capped: only the quality loop knows how long its lenses take, and
- * `error` (with the resubmit button it drives) is reserved for a run that
- * actually failed, never for an unreachable API.
+ * `error` (with the grade-again button it drives) is reserved for a run that
+ * actually failed, never for an unreachable API. A grade that is not there
+ * is neither: the revision is `gone`, or its grade is `lost`.
  */
 export function useEvaluationPolling(revisionId: string | null): EvaluationPollingResult {
   const {
-    resource: evaluation,
+    resource: read,
     error,
     isPolling,
     unreachable,
@@ -81,11 +102,17 @@ export function useEvaluationPolling(revisionId: string | null): EvaluationPolli
     unreachableAfter: UNREACHABLE_AFTER,
   });
 
+  const evaluation = read !== null && !isMissing(read) ? read.found : null;
+  const gone = goneRead(read);
+  const lost = read !== null && isMissing(read) && gone === null;
+
   return {
     evaluation,
     error,
+    gone,
+    lost,
     isPolling,
-    message: describe(evaluation, error, isPolling, unreachable),
+    message: describe(evaluation, error, lost, isPolling, unreachable),
     restart,
   };
 }

@@ -182,18 +182,57 @@ describe('useEvaluationPolling', () => {
     expect(fetchMock.mock.calls.length).toBe(UNREACHABLE_AFTER + 1);
   });
 
-  it('a 404 is a fact about the grade, not the connection — terminal', async () => {
+  it('[UX-17] a 404 for the grade alone is a fact about the grade, not the connection — terminal, and lost rather than failed', async () => {
     const { fetchMock } = stubApi([
-      { path: EVAL_PATH, status: 404, body: { message: 'no such evaluation' } },
+      {
+        path: EVAL_PATH,
+        status: 404,
+        body: { statusCode: 404, message: 'no such evaluation', missing: 'evaluation' },
+      },
     ]);
 
     const hook = renderHook(() => useEvaluationPolling('rev-1'));
     await advance(0);
 
-    expect(hook.result.current.error).toContain('no such evaluation');
+    // Nothing failed and nothing is running: the revision has no grade to read.
+    expect(hook.result.current.lost).toBe(true);
+    expect(hook.result.current.gone).toBeNull();
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.evaluation).toBeNull();
+    expect(hook.result.current.message).toBe('This revision has no grade to show.');
     expect(hook.result.current.isPolling).toBe(false);
     await advance(POLL_BACKOFF_MAX_MS * 2);
     expect(fetchMock.mock.calls.length).toBe(1);
+  });
+
+  it('[UX-12] a revision that vanishes mid-poll is gone — not a running grade, not a failed one', async () => {
+    const { fetchMock } = stubApi([
+      {
+        path: EVAL_PATH,
+        handler: ({ count }) =>
+          count === 0
+            ? { body: envelope('running') }
+            : {
+                status: 404,
+                body: { statusCode: 404, message: 'Revision rev-1 not found', missing: 'revision' },
+              },
+      },
+    ]);
+
+    const hook = renderHook(() => useEvaluationPolling('rev-1'));
+    await advance(0);
+    expect(hook.result.current.evaluation?.status).toBe('running');
+
+    await advance(POLL_INTERVAL_MS);
+    expect(hook.result.current.gone?.status).toBe(404);
+    expect(hook.result.current.lost).toBe(false);
+    expect(hook.result.current.error).toBeNull();
+    // The last "running" does not outlive the revision it was about.
+    expect(hook.result.current.evaluation).toBeNull();
+    expect(hook.result.current.isPolling).toBe(false);
+    const calls = fetchMock.mock.calls.length;
+    await advance(POLL_BACKOFF_MAX_MS * 2);
+    expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
   it('restart begins a fresh poll cycle', async () => {

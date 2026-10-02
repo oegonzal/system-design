@@ -16,7 +16,7 @@ function renderPanel(overrides: Partial<EvaluationPanelProps> = {}) {
       isPolling={false}
       message=""
       criteria={makeCriteria()}
-      onRetry={noop}
+      onRegrade={noop}
       onSelectFinding={noop}
       {...overrides}
     />,
@@ -24,17 +24,29 @@ function renderPanel(overrides: Partial<EvaluationPanelProps> = {}) {
 }
 
 describe('EvaluationPanel', () => {
-  it('[DEL-4] a legacy revision shows the no-evaluation notice with a resubmit, and an escalation without a score explains itself', async () => {
+  it('[UX-17] a revision with no grade to show says why — never graded, or its grade lost — and offers to grade it in place; an escalation without a score explains itself', async () => {
     const user = userEvent.setup();
-    const onRetry = vi.fn();
-    const { unmount } = renderPanel({ legacy: true, onRetry });
+    const onRegrade = vi.fn();
+    const never = renderPanel({ ungraded: 'never', onRegrade });
 
-    const notice = screen.getByTestId('evaluation-legacy');
-    expect(notice.textContent).toContain('has no evaluation');
+    const notice = screen.getByTestId('evaluation-ungraded');
+    expect(notice.getAttribute('data-reason')).toBe('never');
+    expect(notice.textContent).toContain('was never graded');
+    expect(notice.textContent).toContain('the revision stays as it is');
     expect(screen.queryByText('Submit your design to have the quality loop grade it.')).toBeNull();
+    expect(screen.getByTestId('retry-evaluation').textContent).toBe('Grade this revision');
     await user.click(screen.getByTestId('retry-evaluation'));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-    unmount();
+    expect(onRegrade).toHaveBeenCalledTimes(1);
+    never.unmount();
+
+    // A grade the grader lost is not a run still going: no spinner, the same way back.
+    const lost = renderPanel({ ungraded: 'lost', isPolling: false, onRegrade });
+    expect(screen.getByTestId('evaluation-ungraded').textContent).toContain(
+      'no longer has this revision’s grade',
+    );
+    expect(screen.queryByTestId('grading-duration')).toBeNull();
+    expect(screen.queryByTestId('evaluation-error')).toBeNull();
+    lost.unmount();
 
     renderPanel({
       evaluation: makeEvaluation({ decision: 'escalate', overall: null, dimensions: {} }),
@@ -56,7 +68,7 @@ describe('EvaluationPanel', () => {
     expect(screen.queryByTestId('evaluation-escalated')).toBeNull();
   });
 
-  it('idles with the submit copy, spins while running with how long it takes, and offers a resubmit on a failed run', () => {
+  it('idles with the submit copy, spins while running with how long it takes, and offers to grade a failed revision again', () => {
     const { unmount } = renderPanel();
     expect(screen.getByText('Submit your design to have the quality loop grade it.')).toBeTruthy();
     unmount();
@@ -87,7 +99,21 @@ describe('EvaluationPanel', () => {
     const detail = within(alert).getByTestId('failure-detail') as HTMLDetailsElement;
     expect(detail.open).toBe(false);
     expect(detail.textContent).toContain('the run failed');
-    expect(screen.getByTestId('retry-evaluation')).toBeTruthy();
+    expect(screen.getByTestId('retry-evaluation').textContent).toBe('Grade this revision again');
     expect(screen.queryByTestId('grading-duration')).toBeNull();
+  });
+
+  it('[UX-17] the grade-again control is off while its request is on the way, and off with the session’s reason while a run holds the slot', () => {
+    const sending = renderPanel({ error: 'the run failed', regrading: true });
+    const busy = screen.getByTestId('retry-evaluation') as HTMLButtonElement;
+    expect(busy.disabled).toBe(true);
+    expect(busy.textContent).toBe('Sending it to the grader…');
+    sending.unmount();
+
+    const reason = 'The coach is still revising from revision #1 — wait for it to finish.';
+    renderPanel({ error: 'the run failed', regradeBlockedReason: reason });
+    const blocked = screen.getByTestId('retry-evaluation') as HTMLButtonElement;
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.title).toBe(reason);
   });
 });
