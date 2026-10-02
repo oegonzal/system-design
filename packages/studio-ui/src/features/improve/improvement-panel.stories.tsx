@@ -150,7 +150,7 @@ export const Failed: Story = {
   args: {
     run: makeImproveRun({ status: 'failed', error: 'the producer refused', iterations: [] }),
     error: 'the producer refused',
-    message: 'Coach problem: the producer refused',
+    message: 'The coach stopped unexpectedly.',
   },
 };
 

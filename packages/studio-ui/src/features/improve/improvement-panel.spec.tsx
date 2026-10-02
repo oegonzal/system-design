@@ -283,6 +283,15 @@ describe('ImprovementPanel', () => {
     expect(missing.getAttribute('data-outcome')).toBe('no-artifact');
     expect(missing.textContent).toContain('no revision produced');
     expect(missing.textContent).toContain('—');
+    // Nothing was judged: the loop's own decision and reason for the empty
+    // iteration are its bookkeeping, and the chip has already said it.
+    expect(missing.textContent).not.toContain('no artifact');
+    expect(within(missing).queryByTestId('improve-iteration-decision')).toBeNull();
+    expect(within(missing).queryByTestId('improve-iteration-reason')).toBeNull();
+    expect(
+      within(screen.getByTestId('improve-iteration-1')).getByTestId('improve-iteration-decision')
+        .textContent,
+    ).toBe('revise');
     expect(screen.getByTestId('improve-iteration-1').textContent).toContain('12');
     expect(screen.getByTestId('improve-iteration-1').textContent).not.toContain('12.1');
     expect(screen.getByTestId('improvement-stopped').textContent).toBe(
@@ -303,11 +312,13 @@ describe('ImprovementPanel', () => {
     expect(stopped).not.toContain('could not score');
   });
 
-  it('[UX-11] a failed run is reported as a failure, and the previous run’s best stays one click away', async () => {
+  it('[UX-11] a failed run is reported in the author’s terms with the run’s own error folded under it, and the previous run’s best stays one click away', async () => {
     const onLoadRevision = vi.fn();
+    const operatorLine =
+      "the run's heartbeat went stale — the process that owned it died or stalled";
     renderPanel({
-      run: makeImproveRun({ status: 'failed', iterations: [], error: 'the model went away' }),
-      error: 'the model went away',
+      run: makeImproveRun({ status: 'failed', iterations: [], error: operatorLine }),
+      error: operatorLine,
       earlierBest: makeRevisionSummary({
         id: 'rev-4',
         revisionNumber: 4,
@@ -325,8 +336,11 @@ describe('ImprovementPanel', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert.getAttribute('data-testid')).toBe('improvement-error');
-    expect(alert.textContent).toContain('The coach run failed');
-    expect(alert.textContent).toContain('the model went away');
+    expect(alert.textContent).toContain('The coach stopped unexpectedly');
+    expect(alert.textContent).toContain('try again');
+    const detail = within(alert).getByTestId('failure-detail') as HTMLDetailsElement;
+    expect(detail.open).toBe(false);
+    expect(detail.textContent).toContain(operatorLine);
     expect(screen.getByTestId('earlier-best').textContent).toContain('revision #4, scored 80');
     await userEvent.click(screen.getByTestId('load-earlier-best'));
     expect(onLoadRevision).toHaveBeenCalledWith('rev-4');

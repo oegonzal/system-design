@@ -15,6 +15,7 @@ export const IMPROVE_UNREACHABLE_AFTER = 3;
 
 export interface ImproveRunPollingResult {
   run: ImproveRunDto | null;
+  /** A failed run's own error, verbatim — the operator's line; the announcement says it in the author's words. */
   error: string | null;
   isPolling: boolean;
   /** For a LiveRegion — the consumer renders it so announcements have a home. */
@@ -29,7 +30,7 @@ function describe(
   isPolling: boolean,
   unreachable: boolean,
 ): string {
-  if (error !== null) return `Coach problem: ${error}`;
+  if (error !== null) return 'The coach stopped unexpectedly.';
   if (unreachable) return 'Cannot reach the API — retrying…';
   if (run === null) return isPolling ? 'Checking the coach…' : '';
   switch (run.status) {
@@ -42,7 +43,7 @@ function describe(
       return `Coach finished${scores.length > 0 ? ` — best score ${formatScore(Math.max(...scores))}` : ''}.`;
     }
     case 'failed':
-      return 'Coach failed.';
+      return 'The coach stopped unexpectedly.';
   }
 }
 

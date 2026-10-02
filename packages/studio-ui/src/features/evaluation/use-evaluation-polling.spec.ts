@@ -98,6 +98,8 @@ describe('useEvaluationPolling', () => {
 
     expect(hook.result.current.evaluation?.status).toBe('failed');
     expect(hook.result.current.error).toBe('Critic exploded');
+    // The run's own error is kept for the fold; the announcement is the author's sentence.
+    expect(hook.result.current.message).toBe('Grading stopped unexpectedly.');
     expect(hook.result.current.isPolling).toBe(false);
 
     const callsAtFailure = fetchMock.mock.calls.length;

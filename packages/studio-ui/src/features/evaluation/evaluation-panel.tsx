@@ -5,12 +5,14 @@ import { Alert, Button, Heading, LiveRegion, Spinner, Stack, Text } from '@sysde
 
 import { CriterionResultsList } from './criterion-results-list';
 import { useElapsed } from './elapsed';
+import { FailureDetail } from './failure-detail';
 import { FindingsList } from './findings-list';
 import { ScoreSummary } from './score-summary';
 
 export interface EvaluationPanelProps {
   /** Output of `useEvaluationPolling` — the workspace owns the hook. */
   evaluation: EvaluationDto | null;
+  /** The failed run's own error, verbatim — the operator's line, shown folded under the author's. */
   error: string | null;
   isPolling: boolean;
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
@@ -34,12 +36,23 @@ const ESCALATED_COPY =
 const LEGACY_COPY =
   'This revision was stored before grading moved to the quality loop, so it has no evaluation. Resubmit it to grade it.';
 
+/**
+ * A grade that failed, to its author: what happened to the revision. The
+ * run's own error is the operator's line, shown folded under it
+ * (`FailureDetail`).
+ */
+const FAILED_COPY = {
+  title: 'Grading stopped unexpectedly',
+  body: 'This revision was not graded. Your design is kept exactly as you submitted it.',
+} as const;
+
 /** What a wait costs: several lenses read the design, each a model call. */
 const DURATION_HINT = 'Grading usually takes a few minutes';
 
 /**
  * The feedback dock: running → spinner with how long it usually takes and
- * how long it has taken, failed → the error + resubmit, complete → the score
+ * how long it has taken, failed → what happened in the author's terms, the
+ * run's own error one click down, and the resubmit, complete → the score
  * summary, the criterion results and the findings. An escalation with no
  * score says why before showing what the lenses did find; a legacy revision
  * says it has nothing to show and offers the resubmit instead of the idle
@@ -100,9 +113,10 @@ export function EvaluationPanel({
       ) : null}
 
       {error !== null ? (
-        <Alert tone="danger" title="Grading failed" data-testid="evaluation-error">
+        <Alert tone="danger" title={FAILED_COPY.title} data-testid="evaluation-error">
           <Stack gap={3} align="start">
-            <span>{error}</span>
+            <span>{FAILED_COPY.body}</span>
+            <FailureDetail detail={error} />
             <Button variant="subtle" onClick={onRetry} data-testid="retry-evaluation">
               Resubmit for grading
             </Button>

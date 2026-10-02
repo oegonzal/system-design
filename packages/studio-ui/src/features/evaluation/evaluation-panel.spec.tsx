@@ -1,5 +1,5 @@
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -81,8 +81,12 @@ describe('EvaluationPanel', () => {
     renderPanel({ error: 'the run failed' });
     const alert = screen.getByRole('alert');
     expect(alert.getAttribute('data-testid')).toBe('evaluation-error');
-    expect(alert.textContent).toContain('Grading failed');
-    expect(alert.textContent).toContain('the run failed');
+    // The author's sentence leads; the run's own error is kept, folded under it.
+    expect(alert.textContent).toContain('Grading stopped unexpectedly');
+    expect(alert.textContent).toContain('This revision was not graded.');
+    const detail = within(alert).getByTestId('failure-detail') as HTMLDetailsElement;
+    expect(detail.open).toBe(false);
+    expect(detail.textContent).toContain('the run failed');
     expect(screen.getByTestId('retry-evaluation')).toBeTruthy();
     expect(screen.queryByTestId('grading-duration')).toBeNull();
   });

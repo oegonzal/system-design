@@ -14,7 +14,11 @@ export const UNREACHABLE_AFTER = 3;
 
 export interface EvaluationPollingResult {
   evaluation: EvaluationDto | null;
-  /** A TERMINAL problem — the run failed, or cannot exist. Never a transient outage. */
+  /**
+   * A TERMINAL problem — the run failed, or cannot exist. Never a transient
+   * outage. The run's own error, verbatim: the operator's line, which the
+   * announcement and the panel put in the author's words.
+   */
   error: string | null;
   isPolling: boolean;
   /** For a LiveRegion — the consumer renders it so announcements have a home. */
@@ -29,7 +33,7 @@ function describe(
   isPolling: boolean,
   unreachable: boolean,
 ): string {
-  if (error !== null) return `Evaluation problem: ${error}`;
+  if (error !== null) return 'Grading stopped unexpectedly.';
   if (unreachable) return 'Cannot reach the API — retrying…';
   if (evaluation === null) return isPolling ? 'Checking evaluation status…' : '';
   switch (evaluation.status) {
@@ -41,7 +45,7 @@ function describe(
       return `Evaluation complete${score}${decision}.`;
     }
     case 'failed':
-      return 'Evaluation failed.';
+      return 'Grading stopped unexpectedly.';
   }
 }
 

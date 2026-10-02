@@ -26,6 +26,7 @@ import {
 import { useState } from 'react';
 
 import { humanizeReason } from '../evaluation/decision-reason';
+import { FailureDetail } from '../evaluation/failure-detail';
 import { formatScore } from '../evaluation/score';
 import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { WrappingText } from '../evaluation/wrapping-text';
@@ -36,6 +37,7 @@ import { RecalledLessons } from './recalled-lessons';
 export interface ImprovementPanelProps {
   /** Output of `useImproveRunPolling` — the workspace owns the hook. */
   run: ImproveRunDto | null;
+  /** The failed run's own error, verbatim — the operator's line, shown folded under the author's. */
   error: string | null;
   isPolling: boolean;
   /** Announcement string from the polling hook; rendered into a LiveRegion here. */
@@ -105,14 +107,34 @@ const STOPPED_BY_OUTCOME: Partial<Record<ImproveIterationOutcome, string>> = {
 /** A booted loop always has a model, so the grader is only ever "unreachable". */
 const UNREACHABLE_COPY = 'The coach cannot reach the quality loop right now.';
 
-/** What became of each iteration in the studio, as a chip. Every outcome the contract names. */
-const OUTCOME_CHIP: Record<ImproveIterationOutcome, { tone: BadgeTone; label: string }> = {
-  base: { tone: 'neutral', label: 'starting point' },
-  imported: { tone: 'success', label: 'imported' },
-  'not-better': { tone: 'neutral', label: 'not better' },
-  refused: { tone: 'critical', label: 'refused' },
-  'no-artifact': { tone: 'neutral', label: 'no revision produced' },
+/**
+ * What became of each iteration in the studio, as a chip, and whether its
+ * row carries the controller's verdict — its decision and its reason. Every
+ * outcome the contract names. An iteration that produced nothing was never
+ * judged: the loop still records a decision for it ("escalate — no artifact
+ * to judge"), but that is its bookkeeping, and the chip already says what
+ * happened in the author's words.
+ */
+const OUTCOME_ROW: Record<
+  ImproveIterationOutcome,
+  { tone: BadgeTone; label: string; judged: boolean }
+> = {
+  base: { tone: 'neutral', label: 'starting point', judged: true },
+  imported: { tone: 'success', label: 'imported', judged: true },
+  'not-better': { tone: 'neutral', label: 'not better', judged: true },
+  refused: { tone: 'critical', label: 'refused', judged: true },
+  'no-artifact': { tone: 'neutral', label: 'no revision produced', judged: false },
 };
+
+/**
+ * A run that failed, to its author: what happened and what to do. The run's
+ * own error — a stale heartbeat, a model that went away — is the operator's
+ * line, shown folded under it (`FailureDetail`).
+ */
+const FAILED_COPY = {
+  title: 'The coach stopped unexpectedly',
+  body: 'Your design and its revisions are as they were — try again.',
+} as const;
 
 /** The imported iteration with the highest score — the one worth loading. */
 function bestImported(run: ImproveRunDto): ImproveIterationDto | null {
@@ -140,10 +162,12 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * grade the loop adopted; every later row is one of the coach's revisions,
  * imported into the timeline when it beat everything before it, left where
  * it was when it did not, refused when the studio would not store it, or
- * missing when the coach produced nothing. Each row says why the controller
- * decided as it did, naming the findings and criteria it cites the way the
- * feedback summary names them — from the iteration's own findings, placed
- * on the design it judged. Before any of it, the coach may have been handed
+ * missing when the coach produced nothing. Each row that was judged says why
+ * the controller decided as it did, naming the findings and criteria it
+ * cites the way the feedback summary names them — from the iteration's own
+ * findings, placed on the design it judged; a row with nothing to judge says
+ * only that. A run that failed says so in the author's terms, with the run's
+ * own error one click down. Before any of it, the coach may have been handed
  * lessons from earlier runs: the panel says how many, and lists them on
  * request. The iteration count
  * reads the run's own budget while there is a run, and the author's choice
@@ -239,8 +263,9 @@ export function ImprovementPanel({
       ) : null}
 
       {error !== null ? (
-        <Alert tone="danger" title="The coach run failed" data-testid="improvement-error">
-          {error}
+        <Alert tone="danger" title={FAILED_COPY.title} data-testid="improvement-error">
+          <span>{FAILED_COPY.body}</span>
+          <FailureDetail detail={error} />
         </Alert>
       ) : null}
 
@@ -249,7 +274,7 @@ export function ImprovementPanel({
       {run !== null && run.iterations.length > 0 ? (
         <IterationList data-testid="improvement-trajectory">
           {run.iterations.map((iteration) => {
-            const chip = OUTCOME_CHIP[iteration.outcome];
+            const row = OUTCOME_ROW[iteration.outcome];
             return (
               <IterationRow
                 key={iteration.iteration}
@@ -261,17 +286,22 @@ export function ImprovementPanel({
                     #{iteration.iteration}
                   </Text>
                   <ScoreCell>{formatScore(iteration.overall)}</ScoreCell>
-                  {iteration.decision ? (
-                    <Badge tone={DECISION_TONE[iteration.decision]}>{iteration.decision}</Badge>
+                  {row.judged && iteration.decision ? (
+                    <Badge
+                      tone={DECISION_TONE[iteration.decision]}
+                      data-testid="improve-iteration-decision"
+                    >
+                      {iteration.decision}
+                    </Badge>
                   ) : null}
-                  <Badge tone={chip.tone}>{chip.label}</Badge>
+                  <Badge tone={row.tone}>{row.label}</Badge>
                   {iteration.mode === 'adopted' ? (
                     <Badge tone="neutral" data-testid="improve-iteration-adopted">
                       grade reused
                     </Badge>
                   ) : null}
                 </IterationLine>
-                {iteration.reason !== null ? (
+                {row.judged && iteration.reason !== null ? (
                   <WrappingText
                     as="span"
                     size="sm"

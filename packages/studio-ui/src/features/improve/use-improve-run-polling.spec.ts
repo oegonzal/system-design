@@ -92,6 +92,8 @@ describe('useImproveRunPolling', () => {
     await advance(0);
 
     expect(hook.result.current.error).toContain('no model');
+    // The run's own error is kept for the fold; the announcement is the author's sentence.
+    expect(hook.result.current.message).toBe('The coach stopped unexpectedly.');
     expect(hook.result.current.isPolling).toBe(false);
 
     const callsAtFailure = fetchMock.mock.calls.length;
