@@ -52,6 +52,7 @@
     "@qdrant/js-client-rest": "^1.19.0",
     "@xyflow/react": "^12.3.0",
     "html-to-image": "^1.11.13",
+    "jsondiffpatch": "^0.7.6",
     "jspdf": "^2.5.2",
     "jszip": "^3.10.1",
     "next": "^15.1.0",

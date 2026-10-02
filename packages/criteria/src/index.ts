@@ -324,6 +324,21 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every route the client offers is named once as data: the nav bar, each page\'s title and what a navigation announces read the same table, the current route is marked, and what the inspector is pointed at lives in the URL — a target and its link are exact inverses, with every spelling of "nothing selected" producing one link.',
   },
+  {
+    id: 'QLU-6',
+    statement:
+      "A run is read out as the sequence of things that happened over one working memory — the engine's declared order, every action labelled by the orchestration, step, quality run and iteration it belongs to — and beginning an iteration clears nothing, so a criterion that moved from fail to pass is one changed row rather than two unrelated ones.",
+  },
+  {
+    id: 'QLU-7',
+    statement:
+      "Any two states are compared at any depth with arrays addressed by domain identity rather than position: every array the loop's own shapes reach is identified uniquely (proved by walking a state, not asserted), the two shapes belonging to a pipeline or an orchestrator are declared and fall back to position, a reorder reads as a move, the rendered artifact is compared line by line, and the diff agrees with the engine's own lessons about the same transition.",
+  },
+  {
+    id: 'QLU-8',
+    statement:
+      'The log is append-only and says where each entry came from: an action read out of a snapshot is reconstructed and carries only the time the wire gave it, one a poll revealed is recorded, a payload that changed under a key already seen is appended as a correction rather than edited, and an entry keeps its position and its key however much the log grows — and the log is bounded, with what is trimmed folded into a baseline so no surviving entry’s comparison changes and nothing trimmed can reappear.',
+  },
   // Govcon web client (packages/govcon-ui)
   {
     id: 'GOVU-1',
