@@ -14,7 +14,7 @@ import {
   QualityRunIteration,
 } from '@sysdesign/db';
 
-import type { RunProgress, RunRecord } from '../../../core/contracts';
+import { isSettled, type RunProgress, type RunRecord } from '../../../core/contracts';
 import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/ports';
 import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
@@ -80,16 +80,17 @@ export class MikroOrmRunRepository implements RunRepository {
 
   async close(record: RunRecord): Promise<CloseOutcome> {
     const rows = toRows(record);
-    const settled = record.trace !== null;
+    const settled = isSettled(record.trace);
     return this.em.fork().transactional(async (tem) => {
       const { id, pipelineVersion, ...header } = rows.run;
       const row = await tem.findOne(QualityRun, { id }, { lockMode: LockMode.PESSIMISTIC_WRITE });
       if (row === null) return 'refused';
       const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
       if (row.status !== 'running' && !reclaimable) return 'refused';
-      // A run that ended without a trace (the loop threw) has nothing to put in
-      // place of what its progress recorded: those iterations are final and
-      // stand, and so does the version its open wrote.
+      // A run that ended without a settled trace (the loop threw, holding at
+      // most the progress it already published) has nothing to put in place
+      // of what its progress recorded: those iterations are final and stand,
+      // and so does the version its open wrote.
       tem.assign(row, {
         ...header,
         ...(settled ? { pipelineVersion } : {}),

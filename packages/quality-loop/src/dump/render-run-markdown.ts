@@ -29,10 +29,17 @@ const iterationRow = (iteration: IterationTrace<unknown>): string => {
   ]);
 };
 
+/**
+ * Why the loop stopped — or, with no stop reason, how the run ended without
+ * one: still running, or failed after the iterations below were recorded.
+ */
+const stoppedLine = (trace: RunTrace, status: string): string =>
+  trace.stopReason !== null ? `stopped: ${trace.stopReason}` : `${status}, no stop reason`;
+
 /** The verdict, every iteration as a row, and the last iteration's dimensions. */
-function traceSection(trace: RunTrace): string[] {
+function traceSection(trace: RunTrace, status: string): string[] {
   const last = trace.iterations[trace.iterations.length - 1];
-  const stopped = trace.stopReason === null ? 'still running' : `stopped: ${trace.stopReason}`;
+  const stopped = stoppedLine(trace, status);
   return [
     `**${trace.finalDecision}** (${stopped}) · overall ${last.decision.scores.overall}/100 · best iteration ${trace.bestIteration}`,
     ``,
@@ -108,7 +115,11 @@ export function renderRunMarkdown(record: RunRecord, headline: RunHeadline): str
     ``,
   ];
   if (trace) {
-    lines.push(...traceSection(trace), ...diagnosticsSection(trace), ...lessonsSection(trace));
+    lines.push(
+      ...traceSection(trace, headline.status),
+      ...diagnosticsSection(trace),
+      ...lessonsSection(trace),
+    );
   }
   if (record.error) {
     lines.push(`## Failed`, ``, '```', record.error.message, '```', ``);

@@ -1,29 +1,35 @@
 /** The record as rows: a header, the contract's criteria, and each iteration with its ledger split out. */
 import type { IterationTrace, QualityRunDto, SuccessCriterion } from '@sysdesign/contracts';
 
-import { toRunDto, type RunProgress, type RunRecord } from '../../../core/contracts';
+import { isSettled, toRunDto, type RunProgress, type RunRecord } from '../../../core/contracts';
 import { toDate, toDateOrNull } from './conventions';
 import type { CriterionRow, QualityRunRow, RunRows } from './rows';
 
-/** The header row: the run as listed, plus what the trace settled. */
+/**
+ * The header row: the run as listed, plus what the trace settled. Progress —
+ * a running run's, or what a failed one recorded — settled nothing, so its
+ * standing stays in the iteration rows and the header says no verdict.
+ */
 function headerOf(record: RunRecord, dto: QualityRunDto): QualityRunRow {
   const trace = dto.trace;
-  const best = trace?.iterations.find((entry) => entry.iteration === trace.bestIteration) ?? null;
+  const settled = isSettled(trace) ? trace : null;
+  const best =
+    settled?.iterations.find((entry) => entry.iteration === settled.bestIteration) ?? null;
   return {
     id: dto.runId,
     pipeline: dto.pipeline,
     pipelineVersion: trace?.pipeline.version ?? null,
     status: dto.status,
-    finalDecision: trace?.finalDecision ?? null,
-    stopReason: trace?.stopReason ?? null,
+    finalDecision: settled?.finalDecision ?? null,
+    stopReason: settled?.stopReason ?? null,
     overall: best?.decision.scores.overall ?? null,
-    bestIteration: trace?.bestIteration ?? null,
+    bestIteration: settled?.bestIteration ?? null,
     exchangeCount: dto.exchanges.length,
     llm: dto.llm,
     request: dto.request,
     git: record.git,
     exchanges: dto.exchanges,
-    lessons: trace?.lessons ?? null,
+    lessons: settled?.lessons ?? null,
     error: dto.error,
     startedAt: toDate(dto.startedAt),
     finishedAt: toDateOrNull(dto.finishedAt),

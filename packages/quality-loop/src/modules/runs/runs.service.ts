@@ -242,9 +242,14 @@ export class RunsService {
       write('exchange', () => this.repository.recordExchange(record.runId, summaries));
     };
     // Each finished iteration is published as it lands — an adopted one at
-    // once — so a reader sees the run's progress, not only its end.
-    const onIteration = (progress: RunProgress) =>
+    // once — so a reader sees the run's progress, not only its end. The
+    // record holds it too: an orchestration reading this run in memory sees
+    // what the row says, and a run that throws later still dumps the
+    // iterations it recorded, with their standing and no stop reason.
+    const onIteration = (progress: RunProgress) => {
+      record.trace = progress;
       write('progress', () => this.repository.recordProgress(record.runId, progress));
+    };
     try {
       record.trace = await runPipeline(
         definition,

@@ -14,7 +14,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { RunRecord } from '../../core/contracts';
+import { toRunDto, type RunRecord } from '../../core/contracts';
 import { progressOf } from '../../core/loop/progress';
 import type { RunRepository } from '../../core/ports';
 import { fakeLlm, gatedLlm, result, sequencedLlm, tinyPipeline } from '../../core/testing';
@@ -28,6 +28,7 @@ import {
 } from '../http/testing';
 import { RunJanitor } from '../janitor/run-janitor';
 import { readSnapshot } from './persistence/snapshot';
+import { RunsService } from './runs.service';
 import { fullIteration, fullRecord, fullTrace } from './persistence/testing';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY } from './tokens';
 
@@ -609,6 +610,64 @@ describe('the HTTP surface', () => {
     }
   });
 
+  it('[QL-13] a run that throws after recording an iteration keeps it in memory and in its dump, with its standing and no stop reason', async () => {
+    const gated = gatedLlm(revisingModel(), CALLS_IN_ITERATION_1);
+    const owner = await bootApp([[QUALITY_LOOP_LLM, gated], tinyOnly()]);
+    try {
+      let held: RunRecord | null = null;
+      const running = owner.app
+        .get(RunsService)
+        .execute({ pipeline: 'tiny', goal: '# Goal', maxIterations: 2 }, (opened) => {
+          held = opened;
+        });
+      // The record an orchestration reads in memory carries the progress the row does.
+      const live = await pollUntil(
+        () => Promise.resolve(held === null ? null : toRunDto(held)),
+        (run) => run?.trace?.iterations.length === 1,
+      );
+      expect(live).toMatchObject({
+        status: 'running',
+        trace: { bestIteration: 1, finalDecision: 'revise', stopReason: null },
+      });
+
+      // The model dies before iteration 2: the loop throws, and the run fails.
+      gated.fail(new Error('the model went away'));
+      const record = await running;
+      expect(record).toMatchObject({ status: 'failed', error: { message: 'the model went away' } });
+      expect(record.trace).toEqual(live?.trace);
+      // The row agrees, and its header claims no verdict the loop never reached.
+      const stored = await getJson<Envelope<QualityRunDto>>(owner.url, `/runs/${record.runId}`);
+      expect(stored.data.trace).toEqual(record.trace);
+      const listed = await getJson<Page<QualityRunSummaryDto>>(owner.url, '/runs?status=failed');
+      expect(listed.data.find((run) => run.runId === record.runId)).toMatchObject({
+        iterations: 1,
+        finalDecision: null,
+        stopReason: null,
+        overall: null,
+      });
+
+      // The dump is the audit trail: what was recorded is in it.
+      const runDir = join(DUMP_DIR, record.runId);
+      const manifest = JSON.parse(readFileSync(join(runDir, 'manifest.json'), 'utf8')) as Record<
+        string,
+        unknown
+      >;
+      expect(manifest).toMatchObject({
+        status: 'failed',
+        iterations: 1,
+        bestIteration: 1,
+        finalDecision: 'revise',
+        stopReason: null,
+      });
+      expect(existsSync(join(runDir, '04-iterations/01/decision.json'))).toBe(true);
+      expect(readFileSync(join(runDir, 'run.md'), 'utf8')).toContain(
+        '**revise** (failed, no stop reason)',
+      );
+    } finally {
+      await owner.app.close();
+    }
+  });
+
   it('[QL-13] the repository writes a close with no trace and the janitor’s sweep as the header alone: the recorded iterations stand', async () => {
     const repository = app.get<RunRepository>(RUN_REPOSITORY);
     const trace = fullTrace({
@@ -635,6 +694,21 @@ describe('the HTTP surface', () => {
     const failed = await repository.find('threw-quality');
     expect(failed).toMatchObject({ status: 'failed', error: { message: 'the model went away' } });
     expect(failed?.trace).toEqual(progress);
+
+    // Nor does a close carrying the progress the run last published — what the
+    // service hands it — since progress settles nothing.
+    await recorded('threw-with-progress');
+    expect(await repository.close({ ...threw('threw-with-progress'), trace: progress })).toBe(
+      'closed',
+    );
+    expect((await repository.find('threw-with-progress'))?.trace).toEqual(progress);
+    const [listed] = await repository.list({ status: 'failed', limit: 50, offset: 0 });
+    expect(listed.find((run) => run.runId === 'threw-with-progress')).toMatchObject({
+      iterations: 2,
+      finalDecision: null,
+      stopReason: null,
+      overall: null,
+    });
 
     // The janitor fails a stale row's header; the owner's late close then reclaims it, still with no trace.
     await recorded('swept-quality');
