@@ -20,7 +20,6 @@ export const Accept: Story = {
     evaluation: makeEvaluation({
       overall: 91,
       decision: 'accept',
-      stopReason: 'accepted',
       dimensions: { coverage: 95, quality_attributes: 88, compliance: 100 },
     }),
   },
@@ -42,7 +41,6 @@ export const Escalated: Story = {
     evaluation: makeEvaluation({
       overall: null,
       decision: 'escalate',
-      stopReason: 'escalated',
       dimensions: {},
     }),
   },
@@ -75,13 +73,19 @@ export const BlockersAndMissingLenses: Story = {
   },
 };
 
+/** The revision a coaching run ended on: the grade says why the coach stopped, in the coach's words. */
+export const CoachStoppedHere: Story = {
+  args: {
+    evaluation: makeEvaluation({ iteration: 3, overall: 68, stopReason: 'plateau' }),
+  },
+};
+
 /** A rejected design — every meter in the danger band. */
 export const Reject: Story = {
   args: {
     evaluation: makeEvaluation({
       overall: 22,
       decision: 'reject',
-      stopReason: 'rejected',
       dimensions: { coverage: 15, quality_attributes: 20, compliance: 30 },
     }),
   },

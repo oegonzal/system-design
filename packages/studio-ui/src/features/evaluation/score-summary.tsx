@@ -8,6 +8,7 @@ import { humanizeReason } from './decision-reason';
 import { degradedNote } from './degraded';
 import { humanizeToken } from './humanize';
 import { formatScore } from './score';
+import { STOPPED_COPY } from './stop-reason';
 import { WrappingText } from './wrapping-text';
 
 const ScoreRow = styled.div`
@@ -44,9 +45,10 @@ export interface ScoreSummaryProps {
 /**
  * The headline: the controller's overall score, its decision and the
  * controller's own sentence for it — every finding and criterion it cites
- * named as the record names it — why the loop stopped, which lens samples
- * the grade was computed without, and one meter per dimension the pipeline
- * declared. The dimension names are the pipeline's own — whatever keys
+ * named as the record names it — why the coach stopped when this grade is
+ * the one that ended its run (a plain grade carries no stop reason, and
+ * nothing is shown), which lens samples the grade was computed without, and
+ * one meter per dimension the pipeline declared. The dimension names are the pipeline's own — whatever keys
  * arrive are what render, in the order the loop reported them. Purely
  * presentational — Storybook-safe.
  */
@@ -66,15 +68,15 @@ export function ScoreSummary({ evaluation, criteria = NO_CRITERIA }: ScoreSummar
             {evaluation.decision}
           </Badge>
         ) : null}
-        {evaluation.stopReason ? (
-          <Badge tone="neutral" data-testid="stop-reason">
-            {humanizeToken(evaluation.stopReason)}
-          </Badge>
-        ) : null}
       </ScoreRow>
       {evaluation.decisionReason ? (
         <WrappingText size="sm" tone="muted" data-testid="decision-reason">
           {humanizeReason(evaluation.decisionReason, { findings: evaluation.findings, criteria })}
+        </WrappingText>
+      ) : null}
+      {evaluation.stopReason ? (
+        <WrappingText size="sm" tone="muted" data-testid="stop-reason">
+          {STOPPED_COPY[evaluation.stopReason]}
         </WrappingText>
       ) : null}
       {degraded !== null ? (

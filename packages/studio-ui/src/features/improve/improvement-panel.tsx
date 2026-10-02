@@ -9,7 +9,6 @@ import {
   type ImproveIterationDto,
   type ImproveIterationOutcome,
   type ImproveRunDto,
-  type StopReason,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
@@ -28,6 +27,7 @@ import { useState } from 'react';
 
 import { humanizeReason } from '../evaluation/decision-reason';
 import { formatScore } from '../evaluation/score';
+import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { WrappingText } from '../evaluation/wrapping-text';
 import { coachProgress } from './coach-progress';
 import type { GraderAvailability } from './grader-availability';
@@ -91,16 +91,6 @@ const ScoreCell = styled.span`
   color: ${({ theme }) => theme.color.text.primary};
   min-width: 3.5em;
 `;
-
-/** Why the loop stopped, in the author's terms. Every reason the contract names. */
-const STOPPED_COPY: Record<StopReason, string> = {
-  accepted: 'The coach reached a design the loop accepts.',
-  rejected: 'The coach rejected the design outright — its revisions could not lift it.',
-  escalated:
-    'The coach stopped and escalated — the loop needs a person to judge what its last revision left open.',
-  plateau: 'The coach plateaued — its last revisions stopped improving the score.',
-  'max-iterations': 'The coach used its iteration budget.',
-};
 
 /**
  * What the last iteration's outcome says about the stop, when it says more

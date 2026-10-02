@@ -389,7 +389,8 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
       makeCriterionResult({ criterionId: 'c4', result: 'partial', confidence: 'low' }),
       makeCriterionResult({ criterionId: 'c5', result: 'pass', confidence: 'high' }),
     ],
-    stopReason: 'max-iterations',
+    // A plain grade carries no stop reason: the API tells one only when it is news.
+    stopReason: null,
     degraded: [],
     error: null,
     ...overrides,

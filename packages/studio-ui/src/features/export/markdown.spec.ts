@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { humanizeReason } from '../evaluation/decision-reason';
+import { degradedNote } from '../evaluation/degraded';
 import { formatScore } from '../evaluation/score';
+import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { humanizeKind } from '../prompts/criteria';
 
 import {
@@ -206,6 +208,24 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('| Orders DB (n-3) has no replica, per the unhandled failure finding. |');
     expect(md).not.toMatch(/node\.3/i);
     expect(md).not.toContain('data_integrity');
+  });
+
+  it('[DEL-4] says the caveats the panel says: the lens samples a grade was computed without, and a coach’s stop in its own sentence — nothing for a plain grade', () => {
+    const plain = feedbackMarkdown(makeEvaluation(), criteria, 1);
+    expect(plain).not.toMatch(/stopped|iteration budget|lens sample/i);
+
+    const degraded = [{ stage: 'critic.explanation', sample: 2, reason: 'llm-failed' }] as const;
+    const md = feedbackMarkdown(
+      makeEvaluation({ iteration: 3, stopReason: 'max-iterations', degraded: [...degraded] }),
+      criteria,
+      3,
+    );
+    expect(md).toContain(STOPPED_COPY['max-iterations']);
+    expect(md).not.toMatch(/max.iterations/i);
+    expect(md).toContain(`_${degradedNote(degraded)}_`);
+    expect(md).toContain(
+      'Graded with 1 lens sample missing — critic explanation #2 (the model did not answer)',
+    );
   });
 
   it('says not-graded in words when the evaluation is absent, running or failed — never a status token', () => {

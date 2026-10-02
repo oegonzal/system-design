@@ -11,9 +11,11 @@ import type {
 import { markdownCell, nodeLabel } from '@sysdesign/contracts';
 
 import { humanizeReason } from '../evaluation/decision-reason';
+import { degradedNote } from '../evaluation/degraded';
 import { humanizeToken, lensName } from '../evaluation/humanize';
 import { lensProse } from '../evaluation/lens-prose';
 import { formatScore, GRADE_STATUS_LABEL } from '../evaluation/score';
+import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { humanizeKind } from '../prompts/criteria';
 
 /**
@@ -27,7 +29,10 @@ import { humanizeKind } from '../prompts/criteria';
  * kind, a dimension, a result, a lens) is printed in the words the studio
  * shows it in, and every score and grading status is printed the way the
  * studio prints it (`formatScore`, `GRADE_STATUS_LABEL`) — the export is the
- * panel's words, on paper.
+ * panel's words, on paper: the same sentence for a coach's stop
+ * (`STOPPED_COPY`), the same caveat for a grade computed without some of its
+ * lens samples (`degradedNote`), the same prose for every rationale
+ * (`lensProse`).
  */
 
 const NONE = '_None._';
@@ -213,7 +218,11 @@ export function feedbackMarkdown(
     );
   }
   if (evaluation.stopReason) {
-    lines.push(`_Stopped: ${humanizeToken(evaluation.stopReason).toLowerCase()}._`, ``);
+    lines.push(STOPPED_COPY[evaluation.stopReason], ``);
+  }
+  const degraded = degradedNote(evaluation.degraded);
+  if (degraded !== null) {
+    lines.push(`_${degraded}_`, ``);
   }
 
   lines.push(`## Dimensions`, ``, `| Dimension | Score |`, `| --- | --- |`);

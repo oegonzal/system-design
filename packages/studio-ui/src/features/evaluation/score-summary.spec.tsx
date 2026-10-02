@@ -5,14 +5,30 @@ import { describe, expect, it } from 'vitest';
 import { makeCriteria, makeEvaluation, makeFinding } from '../../testing/fixtures';
 import { formatScore } from './score';
 import { ScoreSummary } from './score-summary';
+import { STOPPED_COPY } from './stop-reason';
 
 describe('ScoreSummary', () => {
-  it('[EVAL-1] shows the overall score, the decision and why the loop stopped', () => {
+  it('[EVAL-1] shows the overall score and the decision', () => {
     renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
 
     expect(screen.getByTestId('overall-score').textContent).toBe('72');
     expect(screen.getByTestId('decision-badge').textContent).toBe('revise');
-    expect(screen.getByTestId('stop-reason').textContent).toBe('Max iterations');
+  });
+
+  it('[DEL-4] says nothing about a stop on a plain grade, and says a coach’s stop in the coach’s own sentence — never the loop’s token', () => {
+    const { unmount } = renderWithTheme(<ScoreSummary evaluation={makeEvaluation()} />);
+    expect(screen.queryByTestId('stop-reason')).toBeNull();
+    unmount();
+
+    for (const stopReason of ['plateau', 'max-iterations'] as const) {
+      const coached = renderWithTheme(
+        <ScoreSummary evaluation={makeEvaluation({ iteration: 3, stopReason })} />,
+      );
+      const stop = screen.getByTestId('stop-reason').textContent ?? '';
+      expect(stop).toBe(STOPPED_COPY[stopReason]);
+      expect(stop).not.toMatch(/max.iterations/i);
+      coached.unmount();
+    }
   });
 
   it('[EVAL-1] shows the decision reason under the headline', () => {
@@ -134,7 +150,6 @@ describe('ScoreSummary', () => {
         evaluation={makeEvaluation({
           overall: null,
           decision: 'escalate',
-          stopReason: 'escalated',
           dimensions: {},
         })}
       />,
