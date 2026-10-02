@@ -126,6 +126,7 @@ export const runDto = (
     adoptedFrom: null,
     maxIterations: 1,
   },
+  parentRunId: null,
   recall: null,
   trace,
   exchanges: [],

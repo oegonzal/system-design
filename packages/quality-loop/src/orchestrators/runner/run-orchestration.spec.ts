@@ -26,6 +26,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
     adoptedFrom: null,
     maxIterations: 1,
   },
+  parentRunId: null,
   recall: null,
   trace: null,
   exchanges: [],

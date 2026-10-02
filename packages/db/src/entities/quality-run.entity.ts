@@ -1,5 +1,12 @@
 import type { Opt } from '@mikro-orm/core';
-import { Check, Entity, Index, PrimaryKey, Property } from '@mikro-orm/decorators/legacy';
+import {
+  Check,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryKey,
+  Property,
+} from '@mikro-orm/decorators/legacy';
 import type * as Contracts from '@sysdesign/contracts';
 
 type ContractStatuses = (typeof Contracts)['QUALITY_RUN_STATUSES'];
@@ -95,6 +102,16 @@ export class QualityRun {
 
   @Property({ type: 'json' })
   request!: Contracts.QualityRunRequestSummary;
+
+  /**
+   * The run this one was opened for, when a run composed it — the
+   * memory-recall run a run's recall opens points at that run. Held as the
+   * parent's id; set-null on delete, so a child outlives a parent removed
+   * later. Null for a run started on its own.
+   */
+  @Index()
+  @ManyToOne(() => QualityRun, { nullable: true, mapToPk: true, deleteRule: 'set null' })
+  parentRun: string | null = null;
 
   /**
    * What the run recalled before it produced, lessons included — written as

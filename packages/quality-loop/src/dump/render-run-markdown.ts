@@ -137,6 +137,7 @@ export function renderRunMarkdown(record: RunRecord, headline: RunHeadline): str
     ``,
     `${record.finishedAt ?? record.startedAt} · ${headline.status} · ${headline.durationMs} ms · pipeline ${record.pipeline}`,
     ``,
+    ...(record.parentRunId === null ? [] : [`Opened for run ${record.parentRunId}.`, ``]),
     ...recallSection(record),
   ];
   if (trace) {

@@ -1477,7 +1477,8 @@ The path, end to end:
    how it stands now, then runs `recallMemory` — the function the orchestrator's
    recall step also calls: probes, one embedding batch, one search, the
    `memory-recall` run as an ordinary recorded child (its id lands on the coach
-   run the moment it opens), and the curated pack read back with `readPack`.
+   run the moment it opens, and the child's own row names the coach run as its
+   `parentRunId`), and the curated pack read back with `readPack`.
 5. **The producer is briefed.** The usable lessons become the engine's
    `memories` input. The producer sees them under
    `# Lessons from earlier runs (advisory)` — after the criteria, before what

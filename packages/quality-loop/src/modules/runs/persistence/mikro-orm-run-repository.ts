@@ -20,7 +20,7 @@ import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/po
 import type { RunRecallRecorder } from '../recall/run-recall';
 import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
-import type { RunRows } from './rows';
+import type { QualityRunRow, RunRows } from './rows';
 import { readSnapshot } from './snapshot';
 import { progressRows, toRows } from './to-rows';
 import { toSummary } from './to-summary';
@@ -44,7 +44,13 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
 
   async open(record: RunRecord, pipelineVersion: string): Promise<void> {
     const em = this.em.fork();
-    em.create(QualityRun, { ...toRows(record).run, pipelineVersion, heartbeatAt: new Date() });
+    const { parentRunId, ...header } = toRows(record).run;
+    em.create(QualityRun, {
+      ...header,
+      parentRun: parentRunId,
+      pipelineVersion,
+      heartbeatAt: new Date(),
+    });
     await em.flush();
   }
 
@@ -95,7 +101,8 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
     const rows = toRows(record);
     const settled = isSettled(record.trace);
     return this.em.fork().transactional(async (tem) => {
-      const { id, pipelineVersion, ...header } = rows.run;
+      // The parent is the open's to write: a run is opened for its parent once.
+      const { id, pipelineVersion, parentRunId: _opened, ...header } = rows.run;
       const row = await tem.findOne(QualityRun, { id }, { lockMode: LockMode.PESSIMISTIC_WRITE });
       if (row === null) return 'refused';
       const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
@@ -125,7 +132,7 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
         em.find(QualityRunCriterionResult, { run: runId }, { orderBy: { position: 'asc' } }),
       ]);
       return fromRows(
-        run,
+        headerRow(run),
         criteria.map((row) => ({ ...row, runId })),
         iterations.map((row) => ({ ...row, runId })),
         findings.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
@@ -145,7 +152,7 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
       em,
       runs.map((run) => run.id),
     );
-    return [runs.map((run) => toSummary(run, counts(run.id))), total];
+    return [runs.map((run) => toSummary(headerRow(run), counts(run.id))), total];
   }
 
   async failStale(before: Date): Promise<number> {
@@ -159,6 +166,9 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
       );
   }
 }
+
+/** The header entity as its row: the parent relation flattened to the id the row names it by. */
+const headerRow = (run: QualityRun): QualityRunRow => ({ ...run, parentRunId: run.parentRun });
 
 /**
  * The run's criteria and iterations, replacing whatever an earlier snapshot

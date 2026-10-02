@@ -41,6 +41,7 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
     adoptedFrom: null,
     maxIterations: 1,
   },
+  parentRunId: null,
   recall: null,
   trace,
   exchanges: [],

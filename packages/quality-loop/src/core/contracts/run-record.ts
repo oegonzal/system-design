@@ -55,8 +55,19 @@ export const summariseExchange = ({
 
 /** The wire projection, picked field by field: prompts, responses and git stay in the dump. */
 export function toRunDto(record: RunRecord): QualityRunDto {
-  const { runId, pipeline, status, startedAt, finishedAt, llm, request, recall, trace, error } =
-    record;
+  const {
+    runId,
+    pipeline,
+    status,
+    startedAt,
+    finishedAt,
+    llm,
+    request,
+    parentRunId,
+    recall,
+    trace,
+    error,
+  } = record;
   return {
     runId,
     pipeline,
@@ -65,6 +76,7 @@ export function toRunDto(record: RunRecord): QualityRunDto {
     finishedAt,
     llm,
     request,
+    parentRunId,
     recall,
     trace,
     error,

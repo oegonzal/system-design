@@ -233,4 +233,16 @@ describe('the run rows', () => {
       roundtrip(toRows(fullRecord({ status: 'running', recall: recallInProgress() }))).recall,
     ).toEqual(recallInProgress());
   });
+
+  it('[QL-32] the run a run was opened for round-trips; a row from before the column reads as none', () => {
+    const child = fullRecord({ parentRunId: '2026-09-05T23-59-59-000-def456-quality' });
+    const rows = toRows(child);
+    expect(rows.run.parentRunId).toBe('2026-09-05T23-59-59-000-def456-quality');
+    expect(roundtrip(rows)).toEqual(toRunDto(child));
+
+    const { parentRunId: _absent, ...older } = toRows(fullRecord()).run;
+    expect(
+      roundtrip({ ...toRows(fullRecord()), run: older as typeof rows.run }).parentRunId,
+    ).toBeNull();
+  });
 });

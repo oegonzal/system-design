@@ -44,6 +44,7 @@ export interface QualityRunRow {
   exchangeCount: number;
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
+  parentRunId: string | null;
   recall: RunRecallDto | null;
   git: GitContext;
   exchanges: LlmExchangeSummaryDto[];

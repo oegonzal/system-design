@@ -148,6 +148,7 @@ export function fromRows(
       criteriaProvided: run.request.criteriaProvided ?? false,
       adoptedFrom: run.request.adoptedFrom ?? null,
     },
+    parentRunId: run.parentRunId ?? null,
     // Null on every run that did not ask to recall, every row older than recall included.
     recall: run.recall ?? null,
     trace: traceFromRows(run, criteria, iterations, findings, results),

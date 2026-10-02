@@ -221,6 +221,7 @@ export const sampleRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto
       adoptedFrom: null,
       maxIterations: 3,
     },
+    parentRunId: null,
     recall: null,
     trace: {
       pipeline: { id: 'system-design', version: '1.0.0' },

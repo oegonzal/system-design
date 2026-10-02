@@ -89,6 +89,15 @@ export interface QualityRunDto {
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
   /**
+   * The run this one was opened for, when a run composed it: the memory-recall
+   * run a run's recall opens names that run, as the run names it back in
+   * `recall.recallRunId`. Null for a run started on its own — and for an
+   * orchestration's children, which the orchestration's own record lists.
+   * Never asked for: it follows from what a run declared (its producer
+   * consumes memories, and it asked to recall).
+   */
+  parentRunId: string | null;
+  /**
    * The lessons recalled for the goal before the run produced — `recalling`
    * from the moment the run opens until they are in — and the producer saw
    * exactly `recall.lessons`. Null when the run did not ask to recall.

@@ -55,6 +55,7 @@ function manifestOf(record: RunRecord) {
     criteria: trace?.contract.criteria.length ?? 0,
     criteriaProvided: record.request.criteriaProvided,
     adoptedFrom: record.request.adoptedFrom,
+    parentRunId: record.parentRunId,
     recall: record.recall === null ? null : recallSummary(record.recall),
     exchangeCount: record.exchanges.length,
     error: record.error,

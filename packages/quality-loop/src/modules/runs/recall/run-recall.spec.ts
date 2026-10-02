@@ -171,6 +171,14 @@ describe('a run that recalls lessons for its producer', () => {
     const recallRun = await runOf(url, recallRunId);
     expect(recallRun).toMatchObject({ pipeline: MEMORY_RECALL_ID, status: 'complete' });
     expect(recallRun.recall).toBeNull();
+    // The composition, as data both ways: the run names its recall run, and
+    // the recall run names the run it was opened for — in its row and its dump.
+    expect(run.parentRunId).toBeNull();
+    expect(recallRun.parentRunId).toBe(runId);
+    const childManifest = JSON.parse(
+      readFileSync(join(DUMP_DIR, recallRunId, 'manifest.json'), 'utf8'),
+    ) as { parentRunId: string | null };
+    expect(childManifest.parentRunId).toBe(runId);
 
     // The producer saw them under their own heading; the deriver, the critic
     // and the evaluator never saw a word of them.
@@ -335,7 +343,11 @@ describe('a recall in flight, and one that finds nothing', () => {
       expect(recalling).toMatchObject({ status: 'running', trace: null });
       expect(recalling.recall).toMatchObject({ status: 'recalling', count: 0, lessons: [] });
       const child = await runOf(url, recalling.recall?.recallRunId ?? '');
-      expect(child).toMatchObject({ pipeline: MEMORY_RECALL_ID, status: 'running' });
+      expect(child).toMatchObject({
+        pipeline: MEMORY_RECALL_ID,
+        status: 'running',
+        parentRunId: runId,
+      });
 
       llm.release();
       const run = await settled(url, runId);

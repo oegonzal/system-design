@@ -185,6 +185,8 @@ export class FakeLoop {
       finishedAt: null,
       llm: this.llm,
       request: summary,
+      // The loop opens a run for another only to recall for it, and the fake recalls none.
+      parentRunId: null,
       // The loop's own rule, from the contract: decided from the request.
       recall: openingRecall(request.recall === true, summary),
       trace: null,

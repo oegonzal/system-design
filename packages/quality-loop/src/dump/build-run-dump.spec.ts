@@ -32,6 +32,7 @@ const record = (overrides: Partial<RunRecord>): RunRecord => ({
     adoptedFrom: null,
     maxIterations: 3,
   },
+  parentRunId: null,
   recall: null,
   trace: null,
   exchanges: [],
@@ -213,6 +214,18 @@ describe('buildRunDump', () => {
     expect(plain.files.map((file) => file.path)).not.toContain('recall.json');
     expect(content(plain, 'run.md')).not.toContain('## Recall');
     expect(JSON.parse(content(plain, 'manifest.json'))).toMatchObject({ recall: null });
+  });
+
+  it('[QL-32] a run opened for another names it, in its manifest and on its page; one started on its own does not', () => {
+    const child = buildRunDump(record({ parentRunId: 'coach-quality' }), null);
+    expect(JSON.parse(content(child, 'manifest.json'))).toMatchObject({
+      parentRunId: 'coach-quality',
+    });
+    expect(content(child, 'run.md')).toContain('Opened for run coach-quality.');
+
+    const own = buildRunDump(record({}), null);
+    expect(JSON.parse(content(own, 'manifest.json'))).toMatchObject({ parentRunId: null });
+    expect(content(own, 'run.md')).not.toContain('Opened for run');
   });
 
   it('[QL-10] a run that failed before any trace still gets a manifest, the goal and the error', () => {

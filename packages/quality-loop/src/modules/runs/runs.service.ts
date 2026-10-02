@@ -112,7 +112,7 @@ export class RunsService {
     this.assertRubric(request, definition);
     this.assertRecall(request, definition);
     const adopted = await this.resolveAdoption(request, definition);
-    const record = await this.open(request, definition);
+    const record = await this.open(request, definition, null);
     void this.perform(record, request, definition, adopted);
     return record;
   }
@@ -122,7 +122,21 @@ export class RunsService {
    * hands the record over as soon as its row exists, so a caller chaining runs
    * can publish the child's id while it is still in flight.
    */
-  async execute(
+  execute(
+    request: StartQualityRunRequest,
+    onOpened?: (record: RunRecord) => void,
+  ): Promise<RunRecord> {
+    return this.executeFor(null, request, onOpened);
+  }
+
+  /**
+   * `execute`, for a run opened by another: the child's row names its parent
+   * from the moment it exists. Only this service opens one — a run's recall
+   * — so the link follows from what the parent declared and is never asked
+   * for on the wire.
+   */
+  private async executeFor(
+    parentRunId: string | null,
     request: StartQualityRunRequest,
     onOpened?: (record: RunRecord) => void,
   ): Promise<RunRecord> {
@@ -130,7 +144,7 @@ export class RunsService {
     this.assertRubric(request, definition);
     this.assertRecall(request, definition);
     const adopted = await this.resolveAdoption(request, definition);
-    const record = await this.open(request, definition);
+    const record = await this.open(request, definition, parentRunId);
     onOpened?.(record);
     await this.perform(record, request, definition, adopted);
     return record;
@@ -228,6 +242,7 @@ export class RunsService {
   private async open(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
+    parentRunId: string | null,
   ): Promise<RunRecord> {
     const summary: RunRecord['request'] = {
       goal: request.goal,
@@ -245,6 +260,7 @@ export class RunsService {
       llm: this.availability(),
       git: gitContext(),
       request: summary,
+      parentRunId,
       // Decided from the request as the row opens. A run that asked is
       // recalling from the moment the row exists, so a reader polling it sees
       // that before anything else moves — unless it can never call its
@@ -260,9 +276,10 @@ export class RunsService {
 
   /**
    * The lessons a run that asked to recall hands its producer — and never a
-   * reason to fail it. The recall run is an ordinary child run, recorded on
-   * this one as soon as it opens; whatever the recall comes to, or whatever
-   * it throws, is published on the run, and the run goes on with what it got.
+   * reason to fail it. The recall run is an ordinary run opened for this one:
+   * it names this run as its parent, and this run names it as soon as it
+   * opens. Whatever the recall comes to, or whatever it throws, is published
+   * on the run, and the run goes on with what it got.
    */
   private async recallLessons(
     record: RunRecord,
@@ -278,7 +295,7 @@ export class RunsService {
       let recallRunId: string | null = null;
       const execute = async (child: StartQualityRunRequest): Promise<QualityRunDto> =>
         toRunDto(
-          await this.execute(child, (opened) => {
+          await this.executeFor(record.runId, child, (opened) => {
             recallRunId = opened.runId;
             publish({ ...recallInProgress(), recallRunId });
           }),

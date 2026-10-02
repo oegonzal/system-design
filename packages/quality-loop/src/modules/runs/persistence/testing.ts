@@ -183,6 +183,7 @@ export const fullRecord = (overrides: Partial<RunRecord> = {}): RunRecord => ({
     adoptedFrom: null,
     maxIterations: 1,
   },
+  parentRunId: null,
   recall: null,
   trace: fullTrace(),
   exchanges: [fullExchange('criteria'), fullExchange('producer')],
