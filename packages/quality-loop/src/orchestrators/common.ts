@@ -24,9 +24,10 @@ import type { StepContext, StepResult } from './runner/definition';
  * from the registry's summaries, never from a list of ids kept here; an
  * unregistered id is the service's 404, which comes first.
  *
- * It says nothing when the target stands in. The reason is about composing a
- * goal for a run about to start, and a stood-in target never runs: a finished
- * run of a composed-goal pipeline is still a run the later steps can read.
+ * It says nothing when `stood` — which the service sets only where EVERY step
+ * that would run the target stands in. The reason is about composing a goal for
+ * a run about to start; where none will start, a finished run of a
+ * composed-goal pipeline is still a run the later steps can read.
  */
 export const refuseInternal = (
   request: StartOrchestrationRequest,

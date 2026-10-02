@@ -94,7 +94,14 @@ export class OrchestrationService {
   ): Promise<OrchestrationRunDto> {
     const host = this.host(orchestrator);
     const source = orNotFound(await this.runs.get(body.runId), `run ${body.runId} not found`);
-    const stands = host.definition.steps.some((step) => step.provided !== undefined);
+    // Two different questions. Which run to seed: any step that stands in wants
+    // it. Whether the composed-goal refusal may be waived: EVERY step that
+    // would run the target must stand in, or one of them still runs it —
+    // `second-opinion` stands in for its first judge and still runs a panel.
+    const seeds = host.definition.steps.some((step) => step.provided !== undefined);
+    const stands = host.definition.steps.every(
+      (step) => typeof step.pipeline !== 'function' || step.provided !== undefined,
+    );
     const normalized = this.admit(
       host,
       {
@@ -105,7 +112,7 @@ export class OrchestrationService {
       },
       stands,
     );
-    const provided = stands ? source : null;
+    const provided = seeds ? source : null;
     const record = await this.open(host, normalized, provided);
     void this.perform(host, record, normalized, provided);
     return record;

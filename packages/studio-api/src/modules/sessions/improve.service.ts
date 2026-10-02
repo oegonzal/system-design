@@ -16,6 +16,7 @@ import {
   type ImproveIterationDto,
   type ImproveIterationOutcome,
   type ImproveRunDto,
+  type QualityRunStatus,
   type StartImproveDto,
   type StartImproveRequest,
   type SuccessCriterion,
@@ -171,11 +172,7 @@ export class ImproveService {
     const run = await this.loop.getRun(runId);
     if (!run) throw new NotFoundException(`Run ${runId} not found`);
     // A finished run is recorded as such, so the session reads without asking again.
-    const settled = recordCoachingStatus(coaching, run.status);
-    // …and the one moment it settles is the one moment to teach the store. A
-    // coach run iterated, so its trace carries the transitions a digest reasons
-    // over; a failed one has no trace to read.
-    if (settled && run.status === 'complete') this.teach(runId);
+    recordCoachingStatus(coaching, run.status);
 
     const base = coaching.baseRevision;
     // The base's grade is this run's own only on the draft path; an adopted
@@ -200,6 +197,7 @@ export class ImproveService {
         base.evaluationStatus = 'failed';
       }
       await this.em.flush();
+      this.teach(coaching, run.status);
       return { ...header, iterations: [] };
     }
 
@@ -262,19 +260,34 @@ export class ImproveService {
       if (overall !== null) bestBefore = Math.max(bestBefore, overall);
     }
     await this.em.flush();
+    this.teach(coaching, run.status);
     return { ...header, iterations };
   }
 
   /**
-   * Hand a finished coach run to the memory orchestrator, which digests it into
-   * reusable lessons and embeds them for later runs to recall. Fire and forget:
-   * the studio is answering a poll, the digest is minutes of the loop's own
-   * work, and a store that is down must never cost the author their feedback.
+   * Hand a settled coach run to the memory orchestrator, which digests it into
+   * reusable lessons and embeds them for later runs to recall. A coach run is
+   * the one that iterates, so its trace carries the transitions a digest
+   * reasons over; a failed one has no trace to read.
+   *
+   * Fire and forget, and guarded by the row rather than by the status
+   * transition: the studio is answering a poll, the digest is minutes of the
+   * loop's own work, and a store that is down must never cost the author their
+   * feedback. Two polls landing within the same instant could both offer the
+   * run; the store replaces a run's chunks under the same ids, so the cost of
+   * that is a wasted digest and never a wrong corpus.
    */
-  private teach(runId: string): void {
+  private teach(coaching: CoachingRun, observed: QualityRunStatus): void {
+    if (observed !== 'complete' || coaching.digestOrchestrationId !== null) return;
+    const { runId } = coaching;
     void this.loop
       .digestRun(runId)
-      .then(({ orchestrationRunId }) => {
+      .then(async ({ orchestrationRunId }) => {
+        await this.em.nativeUpdate(
+          CoachingRun,
+          { runId },
+          { digestOrchestrationId: orchestrationRunId },
+        );
         this.logger.log(`coach run ${runId} handed to memory run ${orchestrationRunId}`);
       })
       .catch((error: unknown) => {

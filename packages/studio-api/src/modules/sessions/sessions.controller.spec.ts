@@ -583,7 +583,26 @@ describe('sessions', () => {
       await readImprove(sessionId, 'fake-run-1');
       expect(h.loop.digested).toEqual(['fake-run-1']);
 
-      // The status leaves `running` exactly once, so a later poll teaches nothing twice.
+      // The row records it, so a later poll teaches nothing twice.
+      await readImprove(sessionId, 'fake-run-1');
+      expect(h.loop.digested).toEqual(['fake-run-1']);
+    });
+
+    // The workspace polls the session every three seconds and the coach run
+    // every one and a half, and both reads ask the loop and record a settled
+    // status. Whichever lands first consumes the transition — so the hand-off
+    // cannot hang off it.
+    it('[DEL-3] a session read that settles the coach run first does not cost the hand-off', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, { ...submission(), maxIterations: 2 });
+
+      h.loop.complete('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: coached() },
+      ]);
+      await call(`${h.url}/sessions/${sessionId}`);
+      expect(h.loop.digested).toEqual([]);
+
       await readImprove(sessionId, 'fake-run-1');
       expect(h.loop.digested).toEqual(['fake-run-1']);
     });

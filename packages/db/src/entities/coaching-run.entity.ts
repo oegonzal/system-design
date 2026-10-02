@@ -51,6 +51,15 @@ export class CoachingRun {
   @Property({ type: 'text' })
   status: Opt<Contracts.QualityRunStatus> = 'running';
 
+  /**
+   * The memory run this coach run was handed to, once it settled complete —
+   * null until then, and the record that it has been taught from. A column
+   * rather than the status transition, because two readers observe that
+   * transition and either may be the one to see it first.
+   */
+  @Property({ type: 'varchar', length: 80, nullable: true })
+  digestOrchestrationId: string | null = null;
+
   @Property({ type: 'timestamptz' })
   startedAt: Opt<Date> = new Date();
 }
