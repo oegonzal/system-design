@@ -211,6 +211,8 @@ export class ImproveService {
       status: run.status,
       startedAt: run.startedAt,
       heartbeatAt: run.heartbeatAt,
+      // The server's clock as it read the run: what the reader measures the two above against.
+      readAt: new Date().toISOString(),
       llm: run.llm,
       exchangeCount: run.exchanges.length,
       stopReason: run.status === 'complete' ? (run.trace?.stopReason ?? null) : null,

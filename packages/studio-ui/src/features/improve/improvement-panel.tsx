@@ -32,7 +32,7 @@ import { formatScore } from '../evaluation/score';
 import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { WrappingText } from '../evaluation/wrapping-text';
 import { coachProgress } from './coach-progress';
-import type { GraderAvailability } from './grader-availability';
+import { heartbeatOf, type GraderAvailability } from './grader-availability';
 import { RecalledLessons } from './recalled-lessons';
 
 export interface ImprovementPanelProps {
@@ -170,7 +170,7 @@ const ITERATION_OPTIONS = Array.from({ length: MAX_IMPROVE_ITERATIONS }, (_, ind
  * only that. A run that failed says so in the author's terms, with the run's
  * own error one click down. A live run says how long it has been going,
  * counted from its own start, and warns once it has gone quiet past the
- * studio's tolerance rather than spinning in silence. Before any of it, the
+ * loop's own pace rather than spinning in silence. Before any of it, the
  * coach may have been handed lessons from earlier runs: the panel says how
  * many, and lists them on request. The iteration count reads the run's own
  * budget while there is a run, and the author's choice for the next one.
@@ -196,8 +196,13 @@ export function ImprovementPanel({
   const live = run !== null && run.status === 'running';
   const active = starting || isPolling || live;
   const { elapsed, silentMinutes } = useLiveness(
-    { startedAt: run?.startedAt ?? null, heartbeatAt: run?.heartbeatAt ?? null },
+    {
+      startedAt: run?.startedAt ?? null,
+      heartbeatAt: run?.heartbeatAt ?? null,
+      readAt: run?.readAt ?? null,
+    },
     live,
+    heartbeatOf(availability),
   );
   // A live run's budget is what it is; otherwise the author's pick, or the last run's.
   const iterations = live

@@ -60,6 +60,7 @@ import { earlierRunBest } from '../improve/coach-history';
 import { ImprovementPanel } from '../improve/improvement-panel';
 import {
   CHECKING,
+  heartbeatOf,
   reachable,
   UNREACHABLE,
   type GraderAvailability,
@@ -870,6 +871,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
                 criteria={criteria}
                 ungraded={ungraded}
                 startedAt={feedback?.gradingSince ?? null}
+                heartbeat={heartbeatOf(availability)}
                 onRegrade={() => void handleRegrade()}
                 regrading={regrading}
                 regradeBlockedReason={gradeBlockedReason}

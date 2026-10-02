@@ -1,12 +1,13 @@
 // The quality loop's wire contract: vocabularies, evidence, decisions, the run
 // as the service reports it, the pipeline summary, the prompt library,
-// orchestration runs and each orchestrator's own types.
+// orchestration runs and each orchestrator's own types, and what `/health` says.
 export * from './vocab';
 export * from './evidence';
 export * from './decision';
 export * from './pipeline';
 export * from './run-dump';
 export * from './runs';
+export * from './health';
 export * from './criteria';
 export * from './prompt-library';
 export * from './orchestration';

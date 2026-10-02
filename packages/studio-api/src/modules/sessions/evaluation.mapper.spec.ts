@@ -13,6 +13,9 @@ const graph: CanvasGraph = {
   edges: [{ id: 'e-1', source: 'client', target: 'api', kind: 'sync' }],
 };
 
+/** When the studio read the run, on its own clock. */
+const READ_AT = '2026-09-29T00:07:00.000Z';
+
 /** The graded submission: the graph, one binding and one narration the lens can cite. */
 const submission: DesignSubmission = {
   graph,
@@ -107,7 +110,7 @@ async function finishedRun(): Promise<QualityRunDto> {
 describe('toEvaluationDto', () => {
   it('[DEL-4] grounds every cited ref onto the graded submission with its part, key and label — a place the prose merely names is a mention, never the finding’s — keeps every ref verbatim, carries the decision reason, and borrows the lens’s words when the wire has none', async () => {
     const run = await finishedRun();
-    const dto = toEvaluationDto(run, 1, submission);
+    const dto = toEvaluationDto(run, 1, submission, READ_AT);
 
     expect(dto).toMatchObject({
       status: 'complete',
@@ -195,7 +198,7 @@ describe('toEvaluationDto', () => {
         detail: 'no criteria of its kinds',
       },
     });
-    expect(toEvaluationDto(run, 1, submission).degraded).toEqual([
+    expect(toEvaluationDto(run, 1, submission, READ_AT).degraded).toEqual([
       { stage: 'critic.scale', sample: 2, reason: 'llm-failed' },
       { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped' },
     ]);
@@ -218,20 +221,20 @@ describe('toEvaluationDto', () => {
     if (!run?.trace) throw new Error('the fake completes synchronously');
     expect(run.trace.stopReason).toBe('max-iterations');
 
-    expect(toEvaluationDto(run, 1, submission)).toMatchObject({
+    expect(toEvaluationDto(run, 1, submission, READ_AT)).toMatchObject({
       overall: 12,
       stopReason: null,
       settled: true,
     });
     // The run could revise and used its budget: news on the iteration it ended on.
-    expect(toEvaluationDto(run, 2, submission)).toMatchObject({
+    expect(toEvaluationDto(run, 2, submission, READ_AT)).toMatchObject({
       status: 'complete',
       settled: true,
       overall: 30,
       stopReason: 'max-iterations',
     });
     run.trace.stopReason = 'plateau';
-    expect(toEvaluationDto(run, 2, submission).stopReason).toBe('plateau');
+    expect(toEvaluationDto(run, 2, submission, READ_AT).stopReason).toBe('plateau');
 
     // A stop the last decision caused is the decision's to state — and no artifact earns no score.
     loop.complete(runId, [
@@ -241,7 +244,7 @@ describe('toEvaluationDto', () => {
     const escalated = await loop.getRun(runId);
     if (!escalated?.trace) throw new Error('the fake completes synchronously');
     escalated.trace.stopReason = 'escalated';
-    expect(toEvaluationDto(escalated, 2, submission)).toMatchObject({
+    expect(toEvaluationDto(escalated, 2, submission, READ_AT)).toMatchObject({
       status: 'complete',
       overall: null,
       decision: 'escalate',
@@ -264,7 +267,7 @@ describe('toEvaluationDto', () => {
 
     expect(iterationStatus(run, 1)).toBe('complete');
     // Recorded, so final — but whether it ends the run, and why, waits for the run.
-    expect(toEvaluationDto(run, 1, submission)).toMatchObject({
+    expect(toEvaluationDto(run, 1, submission, READ_AT)).toMatchObject({
       status: 'complete',
       settled: false,
       overall: 40,
@@ -272,7 +275,7 @@ describe('toEvaluationDto', () => {
       error: null,
     });
     expect(iterationStatus(run, 2)).toBe('running');
-    expect(toEvaluationDto(run, 2, submission)).toMatchObject({
+    expect(toEvaluationDto(run, 2, submission, READ_AT)).toMatchObject({
       status: 'running',
       settled: false,
       overall: null,
@@ -283,14 +286,14 @@ describe('toEvaluationDto', () => {
     loop.fail(runId, 'the model went away');
     const failed = await loop.getRun(runId);
     if (!failed) throw new Error('the fake keeps every run');
-    expect(toEvaluationDto(failed, 1, submission)).toMatchObject({
+    expect(toEvaluationDto(failed, 1, submission, READ_AT)).toMatchObject({
       status: 'complete',
       settled: true,
       overall: 40,
       stopReason: null,
       error: null,
     });
-    expect(toEvaluationDto(failed, 2, submission)).toMatchObject({
+    expect(toEvaluationDto(failed, 2, submission, READ_AT)).toMatchObject({
       status: 'failed',
       settled: true,
       error: 'the model went away',
@@ -308,19 +311,19 @@ describe('toEvaluationDto', () => {
         overall: 0,
       },
     };
-    const dto = toEvaluationDto(run, 1, submission);
+    const dto = toEvaluationDto(run, 1, submission, READ_AT);
     expect(dto.overall).toBeNull();
     expect(dto.decision).toBe('revise');
     it.decision = {
       ...it.decision,
       scores: { dimensions: { coverage: 80, compliance: null }, overall: 32 },
     };
-    expect(toEvaluationDto(run, 1, submission).overall).toBe(32);
+    expect(toEvaluationDto(run, 1, submission, READ_AT).overall).toBe(32);
   });
 
   it('[DEL-4] a run without a trace is its status with nothing invented; an iteration the run never reached is failed', async () => {
     const run = await finishedRun();
-    const missing = toEvaluationDto(run, 2, submission);
+    const missing = toEvaluationDto(run, 2, submission, READ_AT);
     expect(missing).toMatchObject({
       status: 'failed',
       error: 'the run has no iteration 2',
@@ -328,11 +331,12 @@ describe('toEvaluationDto', () => {
     });
 
     const running: QualityRunDto = { ...run, status: 'running', trace: null, finishedAt: null };
-    expect(toEvaluationDto(running, 1, submission)).toEqual({
+    expect(toEvaluationDto(running, 1, submission, READ_AT)).toEqual({
       runId: run.runId,
       iteration: 1,
       startedAt: run.startedAt,
       heartbeatAt: run.heartbeatAt,
+      readAt: READ_AT,
       status: 'running',
       settled: false,
       llm: run.llm,

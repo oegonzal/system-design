@@ -258,6 +258,8 @@ export interface ImproveRunDto {
   startedAt: IsoDateString;
   /** The run's last sign of life (`QualityRunDto.heartbeatAt`): what tells a live coach from a dead one still saying `running`. */
   heartbeatAt: IsoDateString;
+  /** When the studio read the run, on the server's clock — as on `EvaluationDto.readAt`. */
+  readAt: IsoDateString;
   llm: LlmModelDto;
   /** Model calls made so far — a live signal between iterations. */
   exchangeCount: number;

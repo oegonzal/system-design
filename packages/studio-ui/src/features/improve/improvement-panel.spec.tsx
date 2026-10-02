@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   makeCriteria,
   makeFinding,
+  makeHeartbeat,
   makeImproveIteration,
   makeImproveRun,
   makeRecall,
@@ -21,7 +22,7 @@ import { humanizeReason } from '../evaluation/decision-reason';
 import { ImprovementPanel, type ImprovementPanelProps } from './improvement-panel';
 
 const noop = () => undefined;
-const LIVE = { status: 'reachable', model: 'claude' } as const;
+const LIVE = { status: 'reachable', model: 'claude', heartbeat: makeHeartbeat() } as const;
 
 function renderPanel(overrides: Partial<ImprovementPanelProps> = {}) {
   return renderWithTheme(
@@ -183,6 +184,7 @@ describe('ImprovementPanel', () => {
       run: makeImproveRun({
         startedAt: new Date(Date.now() - 95_000).toISOString(),
         heartbeatAt: new Date(Date.now() - 20_000).toISOString(),
+        readAt: new Date().toISOString(),
       }),
       isPolling: true,
     });
@@ -192,10 +194,14 @@ describe('ImprovementPanel', () => {
     expect(screen.queryByTestId('coach-silence')).toBeNull();
     fresh.unmount();
 
+    // On the server's clock, an hour ahead of the page's: the page would
+    // have read this beat as in its future, and the silence as none.
+    const server = Date.now() + 3_600_000;
     const quiet = renderPanel({
       run: makeImproveRun({
-        startedAt: new Date(Date.now() - 500_000).toISOString(),
-        heartbeatAt: new Date(Date.now() - 250_000).toISOString(),
+        startedAt: new Date(server - 500_000).toISOString(),
+        heartbeatAt: new Date(server - 250_000).toISOString(),
+        readAt: new Date(server).toISOString(),
       }),
       isPolling: true,
     });

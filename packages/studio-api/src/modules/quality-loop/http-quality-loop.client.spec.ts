@@ -91,7 +91,11 @@ describe('HttpQualityLoopClient', () => {
   it('reads health unwrapped, and a library document by a path id encoded segment by segment', async () => {
     const { fetch, calls } = scripted(({ url }) =>
       url.endsWith('/health')
-        ? json(200, { status: 'ok', llm: { model: 'm' } })
+        ? json(200, {
+            status: 'ok',
+            llm: { model: 'm' },
+            heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
+          })
         : url.endsWith('/prompts/agentic/workflow%20graph')
           ? json(200, { data: { id: 'agentic/workflow graph', title: 't', markdown: '# t' } })
           : json(404, {}),
@@ -101,6 +105,7 @@ describe('HttpQualityLoopClient', () => {
     expect(await client.health()).toEqual({
       status: 'ok',
       llm: { model: 'm' },
+      heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
     });
     expect((await client.getPrompt('agentic/workflow graph'))?.title).toBe('t');
     expect(calls[1]?.url).toBe('http://loop/prompts/agentic/workflow%20graph');

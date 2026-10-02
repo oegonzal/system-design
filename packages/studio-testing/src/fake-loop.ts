@@ -8,8 +8,10 @@ import {
   type LlmExchangeSummaryDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
+  type QualityLoopHealthDto,
   type QualityRunDto,
   type QualityRunStartedDto,
+  type RunHeartbeatDto,
   type RunRecallDto,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
@@ -55,7 +57,12 @@ export interface FakeLoopOptions {
   /** Exchange scopes a run starts with, so a live signal exists before it settles. */
   startExchanges?: readonly string[];
   now?: () => string;
+  /** The pace `health` reports; the loop's own defaults unless a spec says otherwise. */
+  heartbeat?: RunHeartbeatDto;
 }
+
+/** The loop's default pace: a beat a minute, a run given up after three silent minutes. */
+const FAKE_LOOP_HEARTBEAT: RunHeartbeatDto = { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 };
 
 const exchangesOf = (scopes: readonly string[], at: string): LlmExchangeSummaryDto[] =>
   scopes.map((scope, index) => ({
@@ -86,6 +93,7 @@ export class FakeLoop {
   private readonly known: readonly string[] | null;
   private readonly startExchanges: readonly string[];
   private readonly now: () => string;
+  private readonly heartbeat: RunHeartbeatDto;
   private readonly scenarios = new Map<string, RunScenario>();
   private readonly adoptions = new Map<string, IterationTrace>();
   private sequence = 0;
@@ -97,6 +105,7 @@ export class FakeLoop {
     this.known = options.knownPipelines ?? null;
     this.startExchanges = options.startExchanges ?? [];
     this.now = options.now ?? (() => '2026-09-29T00:00:00.000Z');
+    this.heartbeat = options.heartbeat ?? FAKE_LOOP_HEARTBEAT;
     this.library = [...(options.library ?? [])];
     this.llm = { model: this.model };
   }
@@ -125,9 +134,9 @@ export class FakeLoop {
     this.failNextStart = null;
   }
 
-  health(): { status: 'ok'; llm: LlmModelDto } {
+  health(): QualityLoopHealthDto {
     if (this.unreachable) throw new LoopUnreachable();
-    return { status: 'ok', llm: this.llm };
+    return { status: 'ok', llm: this.llm, heartbeat: this.heartbeat };
   }
 
   deriveCriteria(request: DeriveCriteriaRequest): DerivedCriteriaDto {

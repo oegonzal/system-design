@@ -63,10 +63,14 @@ and **see results / iterate**.
   the finding's and highlights nothing: a finding is where its lens cited.
   While the run is in flight the tab polls and counts how long the grade has
   taken from the run's own start (so a reload or a re-grade counts right),
-  and if the run's last sign of life — its heartbeat — is more than two
-  minutes old it says **The grader has not reported for N minutes.** rather
-  than spinning in silence: the loop gives such a run up after its stale
-  window and marks it failed, and it can be graded again from here. While the
+  and if the run's last sign of life — its heartbeat — has missed two of the
+  beats the loop says its runs keep (two minutes at the loop's defaults; the
+  pace comes with the grader's availability) it says **The grader has not
+  reported for N minutes.** rather than spinning in silence. The heartbeat is
+  measured on the server's clock, never the page's, so a machine whose clock
+  is off neither raises the warning nor hides it. The loop gives such a run
+  up after its stale window and marks it failed, and it can be graded again
+  from here. While the
   loop is unreachable the tab says so. A grade that **failed** — the model
   went away, or the loop restarted under it — says **Grading stopped
   unexpectedly** in the author's terms, with the run's own error folded under

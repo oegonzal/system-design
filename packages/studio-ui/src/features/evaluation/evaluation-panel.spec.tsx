@@ -3,7 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { makeCriteria, makeEvaluation } from '../../testing/fixtures';
+import { makeCriteria, makeEvaluation, makeHeartbeat } from '../../testing/fixtures';
 import { EvaluationPanel, type EvaluationPanelProps } from './evaluation-panel';
 
 const noop = () => undefined;
@@ -107,9 +107,11 @@ describe('EvaluationPanel', () => {
         decision: null,
         startedAt: new Date(Date.now() - 75_000).toISOString(),
         heartbeatAt: new Date(Date.now() - 5_000).toISOString(),
+        readAt: new Date().toISOString(),
       }),
       isPolling: true,
       startedAt: new Date(Date.now() - 600_000).toISOString(),
+      heartbeat: makeHeartbeat(),
     });
     expect(screen.getByText('The lenses are reading your design…')).toBeTruthy();
     expect(screen.getByTestId('grading-duration').textContent).toMatch(
@@ -147,16 +149,23 @@ describe('EvaluationPanel', () => {
   });
 
   it('[EVAL-1] says the grader has not reported, and for how long, once a running grade’s heartbeat has gone stale — never a silent spinner', () => {
-    renderPanel({
-      evaluation: makeEvaluation({
-        status: 'running',
-        overall: null,
-        decision: null,
-        startedAt: new Date(Date.now() - 400_000).toISOString(),
-        heartbeatAt: new Date(Date.now() - 190_000).toISOString(),
-      }),
-      isPolling: true,
+    // On the server's clock, an hour behind the page's: the grade is read
+    // against the server's own instant, never the page's.
+    const server = Date.now() - 3_600_000;
+    const quiet = makeEvaluation({
+      status: 'running',
+      overall: null,
+      decision: null,
+      startedAt: new Date(server - 400_000).toISOString(),
+      heartbeatAt: new Date(server - 190_000).toISOString(),
+      readAt: new Date(server).toISOString(),
     });
+    // Until the page knows the loop's pace, it claims no silence.
+    const paceless = renderPanel({ evaluation: quiet, isPolling: true });
+    expect(screen.queryByTestId('grading-silence')).toBeNull();
+    paceless.unmount();
+
+    renderPanel({ evaluation: quiet, isPolling: true, heartbeat: makeHeartbeat() });
 
     const silence = screen.getByTestId('grading-silence');
     expect(silence.getAttribute('role')).toBe('alert');

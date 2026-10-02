@@ -1,3 +1,5 @@
+import type { RunHeartbeatDto } from '@sysdesign/contracts';
+
 /**
  * How long a running row may go without a heartbeat before the janitor calls
  * it dead. Read once from the environment; a value that is not a positive
@@ -16,6 +18,8 @@ export const RUN_STALE_AFTER_VAR = 'QUALITY_LOOP_RUN_STALE_AFTER_MS';
 export const DEFAULT_RUN_STALE_AFTER_MS = 180_000;
 /** How many heartbeats fit in one threshold: the ticker's interval is the threshold over this. */
 export const HEARTBEATS_PER_STALE_THRESHOLD = 3;
+/** The least a ticker waits between beats, however short the threshold. */
+export const MIN_HEARTBEAT_EVERY_MS = 1000;
 
 export interface RunJanitorOptions {
   /** A running row whose heartbeat is older than this is failed. */
@@ -40,3 +44,19 @@ export function runJanitorOptionsFromEnv(env: NodeJS.ProcessEnv = process.env): 
   const staleAfterMs = runStaleAfterMs(env);
   return { staleAfterMs, intervalMs: staleAfterMs };
 }
+
+/**
+ * How often a run in flight beats: `HEARTBEATS_PER_STALE_THRESHOLD` times per
+ * threshold, never faster than `MIN_HEARTBEAT_EVERY_MS` — the one cadence the
+ * ticker keeps and `GET /health` reports.
+ */
+export const heartbeatEveryMs = (staleAfterMs: number): number =>
+  Math.max(MIN_HEARTBEAT_EVERY_MS, Math.round(staleAfterMs / HEARTBEATS_PER_STALE_THRESHOLD));
+
+/** The pace the loop's runs keep, from the janitor's own options: what `GET /health` tells a reader. */
+export const runHeartbeat = ({
+  staleAfterMs,
+}: Pick<RunJanitorOptions, 'staleAfterMs'>): RunHeartbeatDto => ({
+  heartbeatEveryMs: heartbeatEveryMs(staleAfterMs),
+  staleAfterMs,
+});

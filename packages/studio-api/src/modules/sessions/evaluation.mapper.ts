@@ -14,6 +14,7 @@ import {
   type EvaluationFindingDto,
   type EvaluationLocationDto,
   type EvaluationReport,
+  type IsoDateString,
   type IterationTrace,
   type LensOutcome,
   type QualityRunDto,
@@ -36,18 +37,22 @@ import {
  * keeps the ones it recorded. Only the stop reason waits for the run to
  * stop, so the DTO says whether it has (`settled`) — and carries the reason
  * only when it is news to the grade's reader (`gradeStopReason`): a plain
- * grade ending on its one iteration is a grade finishing, not a stop.
+ * grade ending on its one iteration is a grade finishing, not a stop. The
+ * instant the run was read is the caller's to say (`readAt`), on the
+ * server's clock, so a reader measures the run's times against it.
  */
 export function toEvaluationDto(
   run: QualityRunDto,
   iteration: number,
   submission: DesignSubmission,
+  readAt: IsoDateString,
 ): EvaluationDto {
   const header = {
     runId: run.runId,
     iteration,
     startedAt: run.startedAt,
     heartbeatAt: run.heartbeatAt,
+    readAt,
     settled: run.status !== 'running',
     llm: run.llm,
   };

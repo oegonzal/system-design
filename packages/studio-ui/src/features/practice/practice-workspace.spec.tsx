@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   makeEvaluation,
+  makeHeartbeat,
   makeImproveIteration,
   makeImproveRun,
   makePrompt,
@@ -20,7 +21,7 @@ const SESSION_PATH = new RegExp(`^/api/sessions/${SESSION}$`);
 const AVAILABILITY = {
   method: 'GET',
   path: '/api/grading/availability',
-  body: { data: { model: 'test-model' } },
+  body: { data: { model: 'test-model', heartbeat: makeHeartbeat() } },
 };
 
 /** A session with one graded revision, and whatever the case adds. */

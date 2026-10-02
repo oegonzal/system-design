@@ -16,6 +16,7 @@ import type {
   PromptDto,
   PromptGenerationDto,
   PromptLibraryDocumentDto,
+  RunHeartbeatDto,
   RunRecallDto,
   StarStoryDto,
   SuccessCriterion,
@@ -28,6 +29,11 @@ import type {
  */
 
 const AT = '2026-08-20T12:00:00.000Z';
+
+/** The pace the loop reports by default: a beat a minute, a run given up after three silent minutes. */
+export function makeHeartbeat(overrides: Partial<RunHeartbeatDto> = {}): RunHeartbeatDto {
+  return { heartbeatEveryMs: 60_000, staleAfterMs: 180_000, ...overrides };
+}
 
 /** The rubric every fixture cites: two functional, one quality, one scale, one constraint. */
 export function makeCriteria(): SuccessCriterion[] {
@@ -372,6 +378,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     iteration: 1,
     startedAt: AT,
     heartbeatAt: AT,
+    readAt: AT,
     status,
     // A running grade's run is still going; a terminal one's has stopped.
     settled: status !== 'running',
@@ -469,6 +476,7 @@ export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveR
     status: 'running',
     startedAt: AT,
     heartbeatAt: AT,
+    readAt: AT,
     llm: { model: 'test-model' },
     exchangeCount: 4,
     iterations: [makeImproveIteration()],

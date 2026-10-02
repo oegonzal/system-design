@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import {
   makeFinding,
+  makeHeartbeat,
   makeImproveIteration,
   makeImproveRun,
   makeRecall,
@@ -17,7 +18,7 @@ const meta: Meta<typeof ImprovementPanel> = {
     error: null,
     isPolling: false,
     message: '',
-    availability: { status: 'reachable', model: 'claude' },
+    availability: { status: 'reachable', model: 'claude', heartbeat: makeHeartbeat() },
     onStart: () => undefined,
     onLoadRevision: () => undefined,
   },
@@ -195,7 +196,7 @@ export const NoArtifact: Story = {
   },
 };
 
-/** Minutes before the story rendered — the one clock-relative value, for a run that is live now. */
+/** Minutes before the story rendered — the clock-relative values, for a run that is live now. */
 const minutesAgo = (minutes: number): string =>
   new Date(Date.now() - minutes * 60_000).toISOString();
 
@@ -206,6 +207,7 @@ export const GraderGoneQuiet: Story = {
       exchangeCount: 5,
       startedAt: minutesAgo(9),
       heartbeatAt: minutesAgo(4),
+      readAt: minutesAgo(0),
       iterations: [
         makeImproveIteration({ iteration: 1, mode: 'provided', overall: 64, decision: 'revise' }),
       ],

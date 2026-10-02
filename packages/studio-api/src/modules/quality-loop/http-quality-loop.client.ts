@@ -10,12 +10,13 @@ import type {
   OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
+  QualityLoopHealthDto,
   QualityRunDto,
   QualityRunStartedDto,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
-import { QualityLoopClient, type QualityLoopHealth } from './quality-loop.client';
+import { QualityLoopClient } from './quality-loop.client';
 
 /** A read or a start answers at once; deriving a rubric is one model call and may take minutes. */
 export const READ_TIMEOUT_MS = 15_000;
@@ -61,10 +62,10 @@ export class HttpQualityLoopClient extends QualityLoopClient {
     super();
   }
 
-  async health(): Promise<QualityLoopHealth> {
+  async health(): Promise<QualityLoopHealthDto> {
     const answer = await this.call('GET', '/health', undefined, READ_TIMEOUT_MS);
     if (answer.status !== 200) throw this.refused('GET /health', answer);
-    return answer.body as QualityLoopHealth;
+    return answer.body as QualityLoopHealthDto;
   }
 
   async deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto> {

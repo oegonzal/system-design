@@ -2,6 +2,7 @@ import type { ApiResponse } from './envelope';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString } from './primitives';
 import type { EvidenceResult } from './quality-loop/evidence';
+import type { RunHeartbeatDto } from './quality-loop/health';
 import type { LocatedRef } from './submission-locations';
 import type { QualityRunStatus } from './quality-loop/runs';
 import type {
@@ -99,6 +100,12 @@ export interface EvaluationDto {
   /** The run's last sign of life (`QualityRunDto.heartbeatAt`): what tells a live grade from a dead one still saying `running`. */
   heartbeatAt: IsoDateString;
   /**
+   * When the studio read the run, on the server's clock: what a reader
+   * measures `startedAt` and `heartbeatAt` against, so its own clock, however
+   * far off, can neither raise a silence nor hide one.
+   */
+  readAt: IsoDateString;
+  /**
    * This iteration's grade: complete once the run has recorded it — a coach's
    * earlier iterations finish while it is still revising — otherwise the
    * run's own state, and failed when the run ended without it.
@@ -139,3 +146,14 @@ export interface EvaluationDto {
 }
 
 export type GetEvaluationResponse = ApiResponse<EvaluationDto>;
+
+/**
+ * `GET /grading/availability`: the grader — and so the coach — can run, on
+ * this model, and its runs keep this pace (the loop's own, passed through). A
+ * 503 when it cannot.
+ */
+export interface GradingAvailabilityDto {
+  model: string;
+  heartbeat: RunHeartbeatDto;
+}
+export type GetGradingAvailabilityResponse = ApiResponse<GradingAvailabilityDto>;

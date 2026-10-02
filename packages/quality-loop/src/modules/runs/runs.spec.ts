@@ -214,9 +214,11 @@ describe('the HTTP surface', () => {
     const unknown = await postJson(url, '/runs', { pipeline: 'nope', goal: 'g' });
     expect(unknown.status).toBe(404);
     expect((await fetch(`${url}/runs/missing`)).status).toBe(404);
+    // The pace is the janitor's own, as the suite booted it: the production threshold.
     expect((await (await fetch(`${url}/health`)).json()) as unknown).toEqual({
       status: 'ok',
       llm: { model: 'test-model' },
+      heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
     });
   });
 

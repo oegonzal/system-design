@@ -68,11 +68,12 @@ export class EvaluationsService {
       return null;
     }
 
-    const dto = toEvaluationDto(run, revision.qualityIteration, {
-      graph: revision.graph,
-      brief: revision.brief,
-      narrative: revision.narrative,
-    });
+    const dto = toEvaluationDto(
+      run,
+      revision.qualityIteration,
+      { graph: revision.graph, brief: revision.brief, narrative: revision.narrative },
+      new Date().toISOString(),
+    );
     if (
       dto.status !== 'running' &&
       (revision.evaluationStatus !== dto.status ||

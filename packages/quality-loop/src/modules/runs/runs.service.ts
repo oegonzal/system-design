@@ -28,7 +28,7 @@ import type { AdvisoryMemory, RunListQuery, RunRepository, TraceStore } from '..
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
-import { HEARTBEATS_PER_STALE_THRESHOLD, type RunJanitorOptions } from '../janitor/stale-after';
+import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import { briefingOf, type RunRecallRecorder, type RunRecallSlot } from './recall/run-recall';
 import {
@@ -408,20 +408,17 @@ export class RunsService {
 }
 
 /**
- * An unref'd interval that refreshes a running row's heartbeat a few times
- * per stale threshold (`HEARTBEATS_PER_STALE_THRESHOLD`), so a long model
- * call never lets the janitor mistake a live run for a dead one. Never
- * awaited; a failed write is only logged.
+ * An unref'd interval that refreshes a running row's heartbeat at the loop's
+ * one cadence (`heartbeatEveryMs`, a few beats per stale threshold), so a
+ * long model call never lets the janitor mistake a live run for a dead one.
+ * Never awaited; a failed write is only logged.
  */
 export function heartbeatTicker(
   beat: () => Promise<void>,
   staleAfterMs: number,
   warn: (error: unknown) => void,
 ): { stop(): void } {
-  const timer = setInterval(
-    () => void beat().catch(warn),
-    Math.max(1000, staleAfterMs / HEARTBEATS_PER_STALE_THRESHOLD),
-  );
+  const timer = setInterval(() => void beat().catch(warn), heartbeatEveryMs(staleAfterMs));
   timer.unref();
   return { stop: () => clearInterval(timer) };
 }

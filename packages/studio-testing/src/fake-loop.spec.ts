@@ -117,6 +117,15 @@ describe('FakeLoop', () => {
     expect(() => loop.startRun(request())).toThrow(LoopRefused);
     expect(loop.startRequests).toHaveLength(0);
 
+    // Up, it reports the loop's default pace, or the one it was given.
+    expect(loop.health()).toEqual({
+      status: 'ok',
+      llm: { model: 'fake-model' },
+      heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
+    });
+    const brisk = { heartbeatEveryMs: 1_000, staleAfterMs: 3_000 };
+    expect(new FakeLoop({ heartbeat: brisk }).health().heartbeat).toEqual(brisk);
+
     loop.unreachable = true;
     expect(() => loop.health()).toThrow(LoopUnreachable);
     expect(() => loop.getRun('x')).toThrow(LoopUnreachable);

@@ -6,6 +6,7 @@ import type {
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   OrchestrationRunStartedDto,
+  QualityLoopHealthDto,
   QualityRunDto,
   QualityRunStartedDto,
   RunRecallDto,
@@ -20,10 +21,7 @@ import {
   type RunScenario,
 } from '@sysdesign/studio-testing';
 
-import {
-  QualityLoopClient,
-  type QualityLoopHealth,
-} from '../modules/quality-loop/quality-loop.client';
+import { QualityLoopClient } from '../modules/quality-loop/quality-loop.client';
 
 /**
  * The quality loop as the studio's specs see it: `@sysdesign/studio-testing`'s
@@ -129,7 +127,7 @@ export class FakeQualityLoopClient extends QualityLoopClient {
     this.core.scenario(goal, scenario);
   }
 
-  health(): Promise<QualityLoopHealth> {
+  health(): Promise<QualityLoopHealthDto> {
     return this.answer(() => this.core.health());
   }
 

@@ -2,20 +2,14 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
-  LlmModelDto,
   OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
+  QualityLoopHealthDto,
   QualityRunDto,
   QualityRunStartedDto,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
-
-/** What `GET /health` answers: liveness and which model backs the loop — a booted loop always names one. */
-export interface QualityLoopHealth {
-  status: string;
-  llm: LlmModelDto;
-}
 
 /**
  * The statuses every adapter of this port raises when the loop cannot answer
@@ -41,7 +35,8 @@ export const isLoopUnavailable = (error: unknown): boolean =>
  * bound in production and a fake in the specs, and nothing else changes.
  */
 export abstract class QualityLoopClient {
-  abstract health(): Promise<QualityLoopHealth>;
+  /** The loop's `GET /health` as it answered — an older build may leave out what a newer one reports. */
+  abstract health(): Promise<QualityLoopHealthDto>;
   /** The derive stage alone. Throws 503 (with the loop's diagnostic) when the model derived nothing. */
   abstract deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto>;
   abstract startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto>;

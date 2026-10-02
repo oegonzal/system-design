@@ -846,6 +846,24 @@ describe('sessions', () => {
       expect(h.loop.digested).toEqual(['fake-run-1']);
     });
 
+    // The page's clock is the author's machine's: a quiet run is judged
+    // against the server's own instant, stamped as it read the run.
+    it('[EVAL-1] stamps the server’s clock on a coach run and on its grade as it reads them', async () => {
+      const { sessionId } = await startSession();
+      const { body: started } = await startImprove(sessionId, {
+        ...submission(),
+        maxIterations: 2,
+      });
+      const before = Date.now();
+      const coach = (await readImprove(sessionId, 'fake-run-1')).body.data;
+      const grade = (await evaluation(started.data.revision.id)).body.data;
+      const after = Date.now();
+      for (const { readAt } of [coach, grade]) {
+        expect(Date.parse(readAt)).toBeGreaterThanOrEqual(before);
+        expect(Date.parse(readAt)).toBeLessThanOrEqual(after);
+      }
+    });
+
     it('[QL-32] every coach start recalls for its producer and says what it was handed; a grade never recalls', async () => {
       const { sessionId } = await startSession();
       // A grade: the author's submit asks for no lessons.

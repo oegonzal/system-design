@@ -4,6 +4,7 @@ import type {
   EvaluationDto,
   EvaluationFindingDto,
   RevisionOrigin,
+  RunHeartbeatDto,
   SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
@@ -66,6 +67,12 @@ export interface EvaluationPanelProps {
    */
   startedAt?: string | null;
   /**
+   * The pace the grader's runs keep, as the loop reports it — what a quiet
+   * grade is judged by. Null until the page knows it, and then no silence is
+   * claimed.
+   */
+  heartbeat?: RunHeartbeatDto | null;
+  /**
    * Grade the revision on show again, in place: the same revision, a fresh
    * run of its stored design — never a second revision with the same content.
    */
@@ -112,7 +119,7 @@ const DURATION_HINT = 'Grading usually takes a few minutes';
  * and a line when the canvas has moved on to the draft — then running →
  * spinner with how long it usually takes and how long it has taken, counted
  * from the run's own start, and a warning once the run has gone quiet past
- * the studio's tolerance rather than a spinner that says nothing, failed →
+ * the loop's own pace rather than a spinner that says nothing, failed →
  * what happened in the author's terms, the
  * run's own error one click down, and the way back, complete → the score
  * summary, the criterion results and the findings. An escalation with no
@@ -131,6 +138,7 @@ export function EvaluationPanel({
   criteria,
   ungraded = null,
   startedAt = null,
+  heartbeat = null,
   onRegrade,
   regrading = false,
   regradeBlockedReason = null,
@@ -142,8 +150,13 @@ export function EvaluationPanel({
     error === null &&
     ungraded === null;
   const { elapsed, silentMinutes } = useLiveness(
-    { startedAt: evaluation?.startedAt ?? startedAt, heartbeatAt: evaluation?.heartbeatAt ?? null },
+    {
+      startedAt: evaluation?.startedAt ?? startedAt,
+      heartbeatAt: evaluation?.heartbeatAt ?? null,
+      readAt: evaluation?.readAt ?? null,
+    },
     running,
+    heartbeat,
   );
   const escalated =
     evaluation !== null &&
