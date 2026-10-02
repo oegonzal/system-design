@@ -31,3 +31,19 @@ export const Numeric: Story = {
 export const Invalid: Story = {
   args: { defaultValue: '', error: 'A service needs a name.', required: true },
 };
+
+/**
+ * A capped field says how much is left once the value is within the last
+ * tenth of its `maxLength` — nothing before that — so the cap never cuts
+ * text off unsaid. The count describes the control; entering the last
+ * stretch is announced once.
+ */
+export const NearLimit: Story = { args: { maxLength: 20, defaultValue: 'order-history-read' } };
+
+/** At the cap the count turns to a warning that names the limit, and reaching it is announced. */
+export const AtLimit: Story = { args: { maxLength: 20, defaultValue: 'order-history-reader' } };
+
+/** `limitNotice="always"`: the count from the first character, for a field where length is the point. */
+export const CountedThroughout: Story = {
+  args: { maxLength: 40, limitNotice: 'always', defaultValue: 'checkout' },
+};

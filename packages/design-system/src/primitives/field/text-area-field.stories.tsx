@@ -23,3 +23,8 @@ export const Disabled: Story = { args: { disabled: true, defaultValue: 'read onl
 
 /** A refused value: the reason under the control, which is marked invalid and described by it. */
 export const Invalid: Story = { args: { error: 'Say how a request travels.', required: true } };
+
+/** A capped area says how much is left as its `maxLength` nears, like the single-line field. */
+export const NearLimit: Story = {
+  args: { maxLength: 60, defaultValue: 'Requests enter through the gateway and fan out to shards' },
+};

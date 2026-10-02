@@ -1,13 +1,18 @@
 import { composeStories } from '@storybook/react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-field.stories';
 
-const { Default, ExplicitId, Disabled, Numeric, Invalid } = composeStories(stories);
+const { Default, ExplicitId, Disabled, Numeric, Invalid, NearLimit, AtLimit, CountedThroughout } =
+  composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
+
+/** A limited field's own polite region, and what it last said. */
+const announcer = () => document.querySelector('[aria-live="polite"]');
+const announced = () => announcer()?.textContent;
 
 describe('TextField', () => {
   it('associates the label with the input', () => {
@@ -52,5 +57,89 @@ describe('TextField', () => {
     const input = screen.getByLabelText('Iterations') as HTMLInputElement;
     expect(input.type).toBe('number');
     expect(input.max).toBe('10');
+  });
+
+  describe('with a maxLength', () => {
+    /** What describes the control, as one string per description. */
+    const descriptionsOf = (input: HTMLElement) =>
+      (input.getAttribute('aria-describedby') ?? '')
+        .split(' ')
+        .filter((id) => id.length > 0)
+        .map((id) => document.getElementById(id)?.textContent);
+
+    it('says nothing while there is room, and has its announcer waiting', () => {
+      renderWithTheme(<Default maxLength={20} defaultValue="checkout" />);
+      expect(screen.queryByText(/left$/)).toBeNull();
+      expect(screen.getByLabelText('Service name').hasAttribute('aria-describedby')).toBe(false);
+      expect(announced()).toBe('');
+    });
+
+    it('counts what is left once the limit nears, describes the control by it, and announces the stretch once', () => {
+      renderWithTheme(<NearLimit />);
+      const input = screen.getByLabelText('Service name');
+      expect(descriptionsOf(input)).toEqual(['2 characters left']);
+      expect(announced()).toBe('Nearing the limit of 20 characters.');
+
+      // One more character: the count moves, the announcement does not.
+      fireEvent.change(input, { target: { value: 'order-history-reads' } });
+      expect(descriptionsOf(input)).toEqual(['1 character left']);
+      expect(announced()).toBe('Nearing the limit of 20 characters.');
+    });
+
+    it('says the limit is reached, by name, and announces it', () => {
+      renderWithTheme(<AtLimit />);
+      expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual([
+        'Limit reached — 20 characters at most.',
+      ]);
+      expect(announced()).toBe('Limit of 20 characters reached.');
+    });
+
+    it('follows an uncontrolled field as it is typed into, and still calls the caller’s onChange', () => {
+      const onChange = vi.fn();
+      renderWithTheme(<Default maxLength={20} onChange={onChange} />);
+      const input = screen.getByLabelText('Service name');
+
+      fireEvent.change(input, { target: { value: 'order-history-reader' } });
+      expect(descriptionsOf(input)).toEqual(['Limit reached — 20 characters at most.']);
+      expect(onChange).toHaveBeenCalledTimes(1);
+
+      fireEvent.change(input, { target: { value: 'orders' } });
+      expect(descriptionsOf(input)).toEqual([]);
+      expect(announced()).toBe('');
+    });
+
+    it('measures a controlled field by its value', () => {
+      const { rerender } = renderWithTheme(<Default maxLength={20} value="orders" readOnly />);
+      expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual([]);
+
+      rerender(<Default maxLength={20} value="order-history-read" readOnly />);
+      expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual(['2 characters left']);
+    });
+
+    it('counts from the first character when asked to, and announces nothing until the limit nears', () => {
+      renderWithTheme(<CountedThroughout />);
+      expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual(['32 characters left']);
+      expect(announced()).toBe('');
+    });
+
+    it('keeps the count beside the caller’s description and the reason a value is refused', () => {
+      renderWithTheme(
+        <NearLimit aria-describedby="hint" error="That name is taken." id="service-name" />,
+      );
+      expect(screen.getByLabelText('Service name').getAttribute('aria-describedby')).toBe(
+        'hint service-name-limit service-name-error',
+      );
+    });
+
+    it('leaves the cap unspoken when told never to speak of it', () => {
+      renderWithTheme(<AtLimit limitNotice="never" />);
+      expect(screen.getByLabelText('Service name').hasAttribute('aria-describedby')).toBe(false);
+      expect(announcer()).toBeNull();
+    });
+  });
+
+  it('has no announcer without a maxLength', () => {
+    renderWithTheme(<Default />);
+    expect(announcer()).toBeNull();
   });
 });
