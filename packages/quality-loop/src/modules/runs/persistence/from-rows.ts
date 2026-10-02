@@ -140,6 +140,7 @@ export function fromRows(
     status: run.status,
     startedAt: toIso(run.startedAt),
     finishedAt: toIsoOrNull(run.finishedAt),
+    heartbeatAt: toIso(run.heartbeatAt),
     llm: run.llm,
     // Rows written before a run could carry its rubric have no flag: it was
     // derived; before a run could adopt an iteration, none was adopted.

@@ -35,6 +35,7 @@ function headerOf(record: RunRecord, dto: QualityRunDto): QualityRunRow {
     error: dto.error,
     startedAt: toDate(dto.startedAt),
     finishedAt: toDateOrNull(dto.finishedAt),
+    heartbeatAt: toDate(dto.heartbeatAt),
   };
 }
 

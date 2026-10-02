@@ -331,6 +331,8 @@ describe('toEvaluationDto', () => {
     expect(toEvaluationDto(running, 1, submission)).toEqual({
       runId: run.runId,
       iteration: 1,
+      startedAt: run.startedAt,
+      heartbeatAt: run.heartbeatAt,
       status: 'running',
       settled: false,
       llm: run.llm,

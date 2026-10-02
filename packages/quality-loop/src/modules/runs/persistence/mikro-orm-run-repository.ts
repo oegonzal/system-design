@@ -45,12 +45,8 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
   async open(record: RunRecord, pipelineVersion: string): Promise<void> {
     const em = this.em.fork();
     const { parentRunId, ...header } = toRows(record).run;
-    em.create(QualityRun, {
-      ...header,
-      parentRun: parentRunId,
-      pipelineVersion,
-      heartbeatAt: new Date(),
-    });
+    // The header carries the heartbeat: a row opens alive as of its start.
+    em.create(QualityRun, { ...header, parentRun: parentRunId, pipelineVersion });
     await em.flush();
   }
 

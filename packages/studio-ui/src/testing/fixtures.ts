@@ -370,6 +370,8 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
   return {
     runId: 'run-1',
     iteration: 1,
+    startedAt: AT,
+    heartbeatAt: AT,
     status,
     // A running grade's run is still going; a terminal one's has stopped.
     settled: status !== 'running',
@@ -465,6 +467,8 @@ export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveR
     baseRevisionId: 'rev-1',
     maxIterations: 3,
     status: 'running',
+    startedAt: AT,
+    heartbeatAt: AT,
     llm: { model: 'test-model' },
     exchangeCount: 4,
     iterations: [makeImproveIteration()],

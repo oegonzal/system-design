@@ -257,6 +257,8 @@ export class RunsService {
       status: 'running',
       startedAt: new Date().toISOString(),
       finishedAt: null,
+      // Alive as of its start; every beat and every write moves it, and the finish settles it.
+      heartbeatAt: new Date().toISOString(),
       llm: this.availability(),
       git: gitContext(),
       request: summary,
@@ -321,8 +323,16 @@ export class RunsService {
   ): Promise<void> {
     // The row is alive while this process says so: a model call can run for
     // minutes with no exchange to record, so the heartbeat ticks on its own.
+    // The record keeps the same beat, so what an in-memory reader is handed
+    // says the same as the row.
+    const beat = () => {
+      record.heartbeatAt = new Date().toISOString();
+    };
     const ticker = heartbeatTicker(
-      () => this.repository.heartbeat(record.runId),
+      () => {
+        beat();
+        return this.repository.heartbeat(record.runId);
+      },
       this.janitor.staleAfterMs,
       (error) => this.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
     );
@@ -330,6 +340,7 @@ export class RunsService {
     // slow database never stalls a model call, and a failed write is logged.
     let writes: Promise<void> = Promise.resolve();
     const write = (what: string, task: () => Promise<void>) => {
+      beat();
       writes = writes
         .then(task)
         .catch((error: unknown) =>
@@ -377,6 +388,7 @@ export class RunsService {
     } finally {
       ticker.stop();
       record.finishedAt = new Date().toISOString();
+      record.heartbeatAt = record.finishedAt;
       this.traces.save(record, describePipeline(definition));
       await writes;
       try {

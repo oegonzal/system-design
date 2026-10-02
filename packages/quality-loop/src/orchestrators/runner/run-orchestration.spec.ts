@@ -18,6 +18,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
   status: failed ? 'failed' : 'complete',
   startedAt: '2026-09-09T00:00:00.000Z',
   finishedAt: '2026-09-09T00:01:00.000Z',
+  heartbeatAt: '2026-09-09T00:01:00.000Z',
   llm: { model: 'test-model' },
   request: {
     goal: 'g',

@@ -15,6 +15,7 @@ export function toSummary(
     status: run.status,
     startedAt: toIso(run.startedAt),
     finishedAt: toIsoOrNull(run.finishedAt),
+    heartbeatAt: toIso(run.heartbeatAt),
     finalDecision: run.finalDecision,
     stopReason: run.stopReason,
     overall: run.overall,

@@ -212,6 +212,7 @@ export const sampleRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto
     status: 'complete',
     startedAt: '2026-09-06T22:43:36.266Z',
     finishedAt: '2026-09-06T22:49:00.000Z',
+    heartbeatAt: '2026-09-06T22:49:00.000Z',
     llm: { model: 'claude-code/subscription' },
     request: {
       goal: '# Prompt — Serve an order history\n\nList past orders.',

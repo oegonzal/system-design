@@ -183,6 +183,7 @@ export class FakeLoop {
       status: 'running',
       startedAt,
       finishedAt: null,
+      heartbeatAt: startedAt,
       llm: this.llm,
       request: summary,
       // The loop opens a run for another only to recall for it, and the fake recalls none.
@@ -261,6 +262,7 @@ export class FakeLoop {
     this.recalled(run);
     run.status = 'complete';
     run.finishedAt = this.now();
+    run.heartbeatAt = run.finishedAt;
     run.trace = this.traceOf(runId, iterations);
   }
 
@@ -277,6 +279,7 @@ export class FakeLoop {
     this.recalled(run);
     const trace = this.traceOf(runId, iterations);
     run.trace = trace === null ? null : { ...trace, stopReason: null };
+    run.heartbeatAt = this.now();
   }
 
   /**
@@ -289,6 +292,7 @@ export class FakeLoop {
     this.recalled(run);
     run.status = 'failed';
     run.finishedAt = this.now();
+    run.heartbeatAt = run.finishedAt;
     run.error = { name: 'Error', message, stack: null };
   }
 

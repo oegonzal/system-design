@@ -52,6 +52,7 @@ export interface QualityRunRow {
   error: RunErrorDto | null;
   startedAt: Date;
   finishedAt: Date | null;
+  heartbeatAt: Date;
 }
 
 export interface CriterionRow {

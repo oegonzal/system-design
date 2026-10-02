@@ -174,6 +174,7 @@ export const fullRecord = (overrides: Partial<RunRecord> = {}): RunRecord => ({
   status: 'complete',
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:00:05.000Z',
+  heartbeatAt: '2026-09-06T00:00:05.000Z',
   llm: { model: 'test-model' },
   git: { branch: 'main', headSha: 'abc' },
   request: {

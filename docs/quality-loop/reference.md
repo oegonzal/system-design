@@ -265,7 +265,9 @@ One sweeper. `RunJanitor` sweeps at boot and then on an interval, failing rows w
 stale. `stale-after.ts` exports `runStaleAfterMs` — the one strict env validator in the package,
 rejecting anything but a positive integer for `QUALITY_LOOP_RUN_STALE_AFTER_MS`, default three minutes.
 Token: `RUN_JANITOR_OPTIONS`. A failed row is written `INTERRUPTED`; a late close on such a row
-overwrites it with the truth.
+overwrites it with the truth. The heartbeat is on the wire as `heartbeatAt` on a run and its list
+row — refreshed on every write and on the ticker while it runs, settled to the finish once it has —
+so a reader can tell a live run from a killed one still saying `running` before the sweep does.
 
 ### `modules/memory/`
 

@@ -28,6 +28,7 @@ const record: RunRecord = {
   status: 'failed',
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:00:01.000Z',
+  heartbeatAt: '2026-09-06T00:00:01.000Z',
   llm: { model: 'test-model' },
   git: { branch: 'main', headSha: 'abc' },
   request: {
@@ -54,6 +55,7 @@ describe('toRunDto', () => {
       status: 'failed',
       startedAt: '2026-09-06T00:00:00.000Z',
       finishedAt: '2026-09-06T00:00:01.000Z',
+      heartbeatAt: '2026-09-06T00:00:01.000Z',
       llm: { model: 'test-model' },
       request: {
         goal: '# Goal',

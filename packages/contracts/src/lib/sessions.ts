@@ -254,6 +254,10 @@ export interface ImproveRunDto {
   baseRevisionId: Uuid;
   maxIterations: number;
   status: QualityRunStatus;
+  /** When the run started — what a timer counts from, on a reload as on a start. */
+  startedAt: IsoDateString;
+  /** The run's last sign of life (`QualityRunDto.heartbeatAt`): what tells a live coach from a dead one still saying `running`. */
+  heartbeatAt: IsoDateString;
   llm: LlmModelDto;
   /** Model calls made so far — a live signal between iterations. */
   exchangeCount: number;

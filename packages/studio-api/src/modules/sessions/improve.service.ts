@@ -209,6 +209,8 @@ export class ImproveService {
       baseRevisionId: base.id,
       maxIterations: coaching.maxIterations,
       status: run.status,
+      startedAt: run.startedAt,
+      heartbeatAt: run.heartbeatAt,
       llm: run.llm,
       exchangeCount: run.exchanges.length,
       stopReason: run.status === 'complete' ? (run.trace?.stopReason ?? null) : null,

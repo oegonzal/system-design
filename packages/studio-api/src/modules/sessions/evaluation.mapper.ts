@@ -43,7 +43,14 @@ export function toEvaluationDto(
   iteration: number,
   submission: DesignSubmission,
 ): EvaluationDto {
-  const header = { runId: run.runId, iteration, settled: run.status !== 'running', llm: run.llm };
+  const header = {
+    runId: run.runId,
+    iteration,
+    startedAt: run.startedAt,
+    heartbeatAt: run.heartbeatAt,
+    settled: run.status !== 'running',
+    llm: run.llm,
+  };
   const it = run.trace?.iterations[iteration - 1];
   if (it === undefined) {
     const status = iterationStatus(run, iteration);

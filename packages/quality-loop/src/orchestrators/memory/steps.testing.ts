@@ -32,6 +32,7 @@ export const childRun = (pipeline: string, trace: RunTrace | null, failed = fals
   status: failed || trace === null ? 'failed' : 'complete',
   startedAt: '2026-09-07T00:00:00.000Z',
   finishedAt: '2026-09-07T00:01:00.000Z',
+  heartbeatAt: '2026-09-07T00:01:00.000Z',
   llm: { model: 'test-model' },
   request: {
     goal: trace?.contract.goal ?? GOAL,

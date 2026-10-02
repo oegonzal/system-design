@@ -26,6 +26,7 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
   status: 'complete',
   startedAt: '2026-09-06T00:00:00.000Z',
   finishedAt: '2026-09-06T00:05:17.000Z',
+  heartbeatAt: '2026-09-06T00:05:17.000Z',
   llm: { model: 'test-model' },
   request: {
     goal: PROMPT_MARKDOWN,

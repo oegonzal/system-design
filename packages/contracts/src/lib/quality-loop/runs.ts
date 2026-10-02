@@ -103,6 +103,14 @@ export interface QualityRunDto {
   status: QualityRunStatus;
   startedAt: IsoDateString;
   finishedAt: IsoDateString | null;
+  /**
+   * When the process running it last said it was alive: refreshed on every
+   * write and on a ticker of its own several times per stale window while it
+   * runs, and the moment it finished once it has. The honest sign of life — a
+   * killed run keeps `status: running` for the whole stale window, and this
+   * is what stops moving.
+   */
+  heartbeatAt: IsoDateString;
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
   /**
@@ -186,6 +194,8 @@ export interface QualityRunSummaryDto {
   status: QualityRunStatus;
   startedAt: IsoDateString;
   finishedAt: IsoDateString | null;
+  /** As on `QualityRunDto.heartbeatAt`: the last sign of life from the process running it. */
+  heartbeatAt: IsoDateString;
   finalDecision: Decision | null;
   stopReason: StopReason | null;
   /** The best iteration's overall score; null until the loop ends. */

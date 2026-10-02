@@ -412,7 +412,8 @@ describe('the HTTP surface', () => {
         startedAt: new Date(),
         heartbeatAt,
       });
-    header('stale-quality', new Date(Date.now() - 2 * HOURS));
+    const lastBeat = new Date(Date.now() - 2 * HOURS);
+    header('stale-quality', lastBeat);
     header('live-quality', new Date());
     await fork.flush();
 
@@ -420,13 +421,22 @@ describe('the HTTP surface', () => {
     try {
       const read = async (id: string) =>
         (await getJson<Envelope<QualityRunDto>>(third.url, `/runs/${id}`)).data;
+      // The sweep writes the finish; the last beat stays what it was — the
+      // honest sign of when the process that owned the run was last seen.
       expect(await read('stale-quality')).toMatchObject({
         status: 'failed',
         trace: null,
         error: { name: 'Interrupted', stack: null },
         finishedAt: expect.any(String),
+        heartbeatAt: lastBeat.toISOString(),
       });
-      expect(await read('live-quality')).toMatchObject({ status: 'running', error: null });
+      const live = await read('live-quality');
+      expect(live).toMatchObject({ status: 'running', error: null });
+      expect(Date.parse(live.heartbeatAt)).toBeGreaterThanOrEqual(Date.parse(live.startedAt) - 1);
+      const listed = (await getJson<Page<QualityRunSummaryDto>>(third.url, '/runs')).data;
+      expect(listed.find((row) => row.runId === 'stale-quality')?.heartbeatAt).toBe(
+        lastBeat.toISOString(),
+      );
 
       // The janitor sweeps again on its interval; asked by hand, it fails what went stale since.
       await fork.nativeUpdate(

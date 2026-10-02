@@ -1,5 +1,6 @@
 import type { ApiResponse } from './envelope';
 import type { LlmModelDto } from './llm-model';
+import type { IsoDateString } from './primitives';
 import type { EvidenceResult } from './quality-loop/evidence';
 import type { LocatedRef } from './submission-locations';
 import type { QualityRunStatus } from './quality-loop/runs';
@@ -93,6 +94,10 @@ export interface EvaluationDto {
   runId: string;
   /** Which iteration of the run this revision is: 1 for a submission, k for a coach revision. */
   iteration: number;
+  /** When the run grading it started — what a timer counts from, on a reload as on a submit. */
+  startedAt: IsoDateString;
+  /** The run's last sign of life (`QualityRunDto.heartbeatAt`): what tells a live grade from a dead one still saying `running`. */
+  heartbeatAt: IsoDateString;
   /**
    * This iteration's grade: complete once the run has recorded it — a coach's
    * earlier iterations finish while it is still revising — otherwise the
