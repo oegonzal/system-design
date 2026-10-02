@@ -62,6 +62,21 @@ export const STOP_REASONS = [
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
+/**
+ * What ended the loop, reason by reason. `decision`: the controller's last
+ * decision did — accept, reject, escalate — and the decision beside the stop
+ * already says so. `budget`: the loop ran out of iterations, or of progress,
+ * with a design it could still have revised. Exhaustive, so a new reason is
+ * classified where it is declared; `gradeStopReason` reads it.
+ */
+export const STOP_REASON_CAUSES = {
+  accepted: 'decision',
+  rejected: 'decision',
+  escalated: 'decision',
+  plateau: 'budget',
+  'max-iterations': 'budget',
+} as const satisfies Record<StopReason, 'decision' | 'budget'>;
+
 export const PRODUCE_MODES = ['initial', 'revise', 'retry'] as const;
 export type ProduceMode = (typeof PRODUCE_MODES)[number];
 

@@ -4,7 +4,7 @@ import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
 import type { SuccessCriterion } from './evidence';
 import type { RunRecallDto, RunRecallSummaryDto } from './recall';
-import type { Decision, StopReason } from './vocab';
+import { STOP_REASON_CAUSES, type Decision, type StopReason } from './vocab';
 
 export const QUALITY_RUN_STATUSES = ['running', 'complete', 'failed'] as const;
 export type QualityRunStatus = (typeof QUALITY_RUN_STATUSES)[number];
@@ -70,6 +70,23 @@ export const mayProduce = ({
   maxIterations,
 }: Pick<QualityRunRequestSummary, 'outputProvided' | 'adoptedFrom' | 'maxIterations'>): boolean =>
   (!outputProvided && adoptedFrom === null) || maxIterations > 1;
+
+/**
+ * The stop reason worth telling the reader of a grade, or null when the stop
+ * is only the ordinary end of what the run was asked for. A stop the last
+ * decision caused is said by the decision beside it. A stop on the budget is
+ * news only on a run that could revise (`mayProduce`) — a coach that used its
+ * iterations, or stopped improving. A run asked to judge once always ends on
+ * its budget of one: that is a grade finishing, not a limit its author met.
+ * The run's own record keeps its reason either way.
+ */
+export const gradeStopReason = (
+  stopReason: StopReason | null,
+  request: Pick<QualityRunRequestSummary, 'outputProvided' | 'adoptedFrom' | 'maxIterations'>,
+): StopReason | null =>
+  stopReason !== null && STOP_REASON_CAUSES[stopReason] === 'budget' && mayProduce(request)
+    ? stopReason
+    : null;
 
 /**
  * One run as the service reports it; `exchanges` grow live. While `status` is

@@ -35,7 +35,9 @@ test.describe('the grading feedback', () => {
 
     await canvas.expectOverall(NAIVE_DESIGN_SCORE);
     await canvas.expectDecision('revise');
-    await expect(page.getByTestId('stop-reason')).toHaveText('Max iterations');
+    // One judgement ends on its one iteration: that is a grade finishing,
+    // not a stop worth telling, so nothing stands beside the decision.
+    await expect(page.getByTestId('stop-reason')).toHaveCount(0);
 
     // One meter per dimension the pipeline declared, none "not assessed".
     for (const dimension of ['coverage', 'quality_attributes', 'compliance']) {

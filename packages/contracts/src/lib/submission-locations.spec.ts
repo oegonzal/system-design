@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { DesignSubmission } from './canvas.schema';
-import { locationIdsIn, locationRefPattern, submissionLocations } from './submission-locations';
+import {
+  locationIdsIn,
+  shortLocationLabel,
+  submissionLocations,
+  substituteLocationRefs,
+  type LocatedRef,
+} from './submission-locations';
 
 const submission = (): DesignSubmission => ({
   graph: {
@@ -29,15 +35,27 @@ const submission = (): DesignSubmission => ({
 describe('submissionLocations', () => {
   it('[EVAL-2] locates every part positionally with its label, part and the author’s own key', () => {
     expect(submissionLocations(submission())).toEqual([
-      { id: 'node.1', label: 'n-1 · client · Client', part: 'node', key: 'n-1' },
-      { id: 'node.2', label: 'n-2 · service · Orders API', part: 'node', key: 'n-2' },
-      { id: 'edge.1', label: 'e-1 · n-1 → n-2 (sync)', part: 'edge', key: 'e-1' },
-      { id: 'binding.1', label: 'c1 binding (n-2)', part: 'binding', key: 'c1' },
+      { id: 'node.1', label: 'n-1 · client · Client', part: 'node', key: 'n-1', name: 'Client' },
+      {
+        id: 'node.2',
+        label: 'n-2 · service · Orders API',
+        part: 'node',
+        key: 'n-2',
+        name: 'Orders API',
+      },
+      { id: 'edge.1', label: 'e-1 · n-1 → n-2 (sync)', part: 'edge', key: 'e-1', name: null },
+      { id: 'binding.1', label: 'c1 binding (n-2)', part: 'binding', key: 'c1', name: null },
       // Numbered unfiltered: a binding the validator would refuse keeps its position.
-      { id: 'binding.2', label: 'c99 binding (n-1)', part: 'binding', key: 'c99' },
-      { id: 'overview', label: 'Overview', part: 'overview', key: null },
-      { id: 'rationale.1', label: 'Orders API rationale (n-2)', part: 'rationale', key: 'n-2' },
-      { id: 'narration.1', label: 'c1 narration', part: 'narration', key: 'c1' },
+      { id: 'binding.2', label: 'c99 binding (n-1)', part: 'binding', key: 'c99', name: null },
+      { id: 'overview', label: 'Overview', part: 'overview', key: null, name: null },
+      {
+        id: 'rationale.1',
+        label: 'Orders API rationale (n-2)',
+        part: 'rationale',
+        key: 'n-2',
+        name: null,
+      },
+      { id: 'narration.1', label: 'c1 narration', part: 'narration', key: 'c1', name: null },
     ]);
   });
 
@@ -71,6 +89,7 @@ describe('submissionLocations', () => {
       label: 'n-1 · kv-store · KV Store',
       part: 'node',
       key: 'n-1',
+      name: 'KV Store',
     });
   });
 
@@ -97,13 +116,77 @@ describe('locationIdsIn', () => {
     ).toEqual(['narration.1', 'edge.1', 'node.2']);
   });
 
-  it('matches whole ids only — `node.1` never inside `node.12` or `xnode.1`', () => {
-    const many = Array.from({ length: 12 }, (_, index) => ({ id: `node.${index + 1}` }));
-    expect(locationIdsIn('node.12 then node.1, never xnode.1 or node.1a', many)).toEqual([
-      'node.12',
+  it('[EVAL-2] answers an id as listed however the sentence cased it, and a run by every member', () => {
+    expect(locationIdsIn('Narration.1 claims what Node.1-2 cannot do', located)).toEqual([
+      'narration.1',
       'node.1',
+      'node.2',
     ]);
     expect(locationIdsIn('anything', [])).toEqual([]);
-    expect(locationRefPattern([])).toBeNull();
+  });
+});
+
+describe('substituteLocationRefs', () => {
+  const refs: LocatedRef[] = [
+    { ref: 'node.1', label: 'n-1 · client · Client', part: 'node', key: 'n-1', name: 'Client' },
+    {
+      ref: 'node.5',
+      label: 'n-5 · database · Orders DB',
+      part: 'node',
+      key: 'n-5',
+      name: 'Orders DB',
+    },
+    { ref: 'edge.1', label: 'e-1 · n-1 → n-5 (sync)', part: 'edge', key: 'e-1' },
+    { ref: 'edge.2', label: 'e-2 · n-5 → n-4 (sync)', part: 'edge', key: 'e-2' },
+    { ref: 'binding.1', label: 'c1 binding (n-5)', part: 'binding', key: 'c1' },
+    { ref: 'rationale.3', label: 'Client rationale (n-1)', part: 'rationale', key: 'n-1' },
+    { ref: 'narration.1', label: 'c5 narration', part: 'narration', key: 'c5' },
+    { ref: 'overview', label: 'Overview', part: 'overview', key: null },
+  ];
+
+  it('[EVAL-2] puts a label where a lens wrote a position, however the sentence cased it', () => {
+    expect(
+      substituteLocationRefs('Rationale.3 asserts polling; Narration.1 claims multi-AZ.', refs),
+    ).toBe('Client rationale (n-1) asserts polling; c5 narration claims multi-AZ.');
+    expect(substituteLocationRefs('node.9 and nodeX1 are no part', refs)).toBe(
+      'node.9 and nodeX1 are no part',
+    );
+  });
+
+  // The recorded artifact: "edge.1-2" became "e-1 · n-1 → n-5 (sync)-2".
+  it('[EVAL-2] reads a run of refs as its two ends, never as one label with a number left over', () => {
+    expect(substituteLocationRefs('the unexplained gateway (edge.1-2, node.5)', refs)).toBe(
+      'the unexplained gateway (e-1 · n-1 → n-5 (sync) to e-2 · n-5 → n-4 (sync), n-5 · database · Orders DB)',
+    );
+  });
+
+  // "Orders DB (n-5 · database · Orders DB) models no such sub-entities".
+  it('[EVAL-2] gives the short label where the sentence names the part beside the ref, and on every later mention', () => {
+    expect(substituteLocationRefs('Orders DB (node.5) models no such sub-entities', refs)).toBe(
+      'Orders DB (n-5) models no such sub-entities',
+    );
+    expect(substituteLocationRefs('node.5 — Orders DB — holds no shard key', refs)).toBe(
+      'n-5 — Orders DB — holds no shard key',
+    );
+    // Named elsewhere in the sentence is not beside it: the full label stands.
+    expect(substituteLocationRefs('the client polls node.1 for seats', refs)).toBe(
+      'the client polls n-1 · client · Client for seats',
+    );
+    expect(substituteLocationRefs('no shard config in node.5; node.5 is unsharded', refs)).toBe(
+      'no shard config in n-5 · database · Orders DB; n-5 is unsharded',
+    );
+  });
+
+  it('every part has a short label, built from its key and what it is', () => {
+    expect(refs.map(shortLocationLabel)).toEqual([
+      'n-1',
+      'n-5',
+      'e-1',
+      'e-2',
+      'c1 binding',
+      'n-1 rationale',
+      'c5 narration',
+      'Overview',
+    ]);
   });
 });

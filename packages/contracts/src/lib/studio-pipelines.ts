@@ -43,5 +43,28 @@ const isCanvasCriterionKind = (kind: string): kind is CanvasCriterionKind =>
 export const canvasCriterionKindLabel = (kind: string): string | null =>
   isCanvasCriterionKind(kind) ? CANVAS_CRITERION_KIND_LABELS[kind] : null;
 
+/**
+ * The canvas pipeline's finding types — what a critic may call a defect.
+ * Declared once for the same reason the kinds are: the pipeline definition
+ * (`satisfies`) says what each means and prices it, and the studio words them
+ * wherever a lens wrote the token into a sentence. The pipeline's own records
+ * stay open to the engine.
+ */
+export const CANVAS_FINDING_TYPES = [
+  'missing_requirement',
+  'constraint_violation',
+  'scale_mismatch',
+  'unhandled_failure',
+  'data_integrity',
+  'topology_defect',
+  'interface_defect',
+  'operability_gap',
+  'unbacked_claim',
+  'unexplained_component',
+  'contradiction',
+  'bad_assumption',
+] as const;
+export type CanvasFindingType = (typeof CANVAS_FINDING_TYPES)[number];
+
 /** The canvas pipeline's `maxCriteria`; a rubric above it is refused by the loop. */
 export const CANVAS_MAX_CRITERIA = 24;

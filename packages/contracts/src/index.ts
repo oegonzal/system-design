@@ -31,6 +31,7 @@ export * from './lib/narration-validator';
 export * from './lib/brief-repair';
 export * from './lib/narration-repair';
 export * from './lib/submission-repair';
+export * from './lib/prose-refs';
 export * from './lib/submission-locations';
 export * from './lib/node-guide';
 export * from './lib/star-stories';

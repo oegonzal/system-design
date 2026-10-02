@@ -407,7 +407,8 @@ describe('sessions', () => {
         overall: 64,
         decision: 'revise',
         dimensions: { coverage: 70, quality_attributes: 52, compliance: 100 },
-        stopReason: 'max-iterations',
+        // A plain grade ends on its one iteration; that is not a stop worth telling.
+        stopReason: null,
       });
       expect(done.body.data.findings).toEqual([
         {
@@ -418,7 +419,9 @@ describe('sessions', () => {
           confidence: 'high',
           fixability: 'fixable_local',
           criterionIds: ['c2'],
-          locations: [{ ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' }],
+          locations: [
+            { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
+          ],
           nodeIds: ['api'],
           edgeIds: [],
           locationRefs: ['node.2'],

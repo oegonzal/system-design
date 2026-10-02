@@ -1,7 +1,7 @@
 import type { ApiResponse } from './envelope';
 import type { LlmModelDto } from './llm-model';
 import type { EvidenceResult } from './quality-loop/evidence';
-import type { SubmissionPart } from './submission-locations';
+import type { LocatedRef } from './submission-locations';
 import type { QualityRunStatus } from './quality-loop/runs';
 import type {
   AxisFactorLevel,
@@ -22,14 +22,7 @@ import type {
  */
 
 /** One place a finding cites, joined back onto the graded submission. */
-export interface EvaluationLocationDto {
-  /** The positional id the lens cited, verbatim: `node.3`, `binding.1`, `overview`, … */
-  ref: string;
-  label: string;
-  part: SubmissionPart;
-  /** The author's own id for the part — a node id, an edge id, a criterion id; null for the overview. */
-  key: string | null;
-}
+export type EvaluationLocationDto = LocatedRef;
 
 export interface EvaluationFindingDto {
   /** The loop's structural key for the defect — stable across polls. */
@@ -41,7 +34,11 @@ export interface EvaluationFindingDto {
   confidence: AxisFactorLevel;
   fixability: Fixability;
   criterionIds: string[];
-  /** Every cited ref the stored revision could place, with its label and the author's key. */
+  /**
+   * Every place the lens pointed at that the stored revision could place —
+   * the refs it cited, then the ids its rationale names — with its label and
+   * the author's key.
+   */
   locations: EvaluationLocationDto[];
   /** The `locations` of part `node` / `edge`, by the author's ids — what the canvas highlights. */
   nodeIds: string[];
@@ -101,7 +98,13 @@ export interface EvaluationDto {
   dimensions: Record<string, number | null>;
   findings: EvaluationFindingDto[];
   criterionResults: CriterionResultDto[];
-  /** Why the run stopped — only on the iteration that ended a completed run; null on every earlier one. */
+  /**
+   * Why the run stopped, when that is news to the reader of this grade
+   * (`gradeStopReason`): a coach run that used its budget or stopped
+   * improving, on the iteration that ended it. Null on every earlier
+   * iteration, on a stop the decision already states, and on a plain grade —
+   * one judgement always ends on its budget of one.
+   */
   stopReason: StopReason | null;
   /**
    * The lens samples of this iteration that should have answered and did not

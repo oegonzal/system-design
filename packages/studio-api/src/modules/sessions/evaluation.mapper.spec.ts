@@ -75,7 +75,7 @@ async function finishedRun(): Promise<QualityRunDto> {
             fixability: 'fixable_local',
             locationRefs: ['node.2'],
             criterionIds: ['c2'],
-            rationale: 'three instances at 500 rps cannot carry 2,000',
+            rationale: 'Node.2 runs three instances at 500 rps; node.3 cannot absorb the rest',
           },
         ],
       },
@@ -106,7 +106,8 @@ async function finishedRun(): Promise<QualityRunDto> {
 
 describe('toEvaluationDto', () => {
   it('[DEL-4] grounds every cited ref onto the graded submission with its part, key and label, keeps every ref verbatim, carries the decision reason, and borrows the lens’s words when the wire has none', async () => {
-    const dto = toEvaluationDto(await finishedRun(), 1, submission);
+    const run = await finishedRun();
+    const dto = toEvaluationDto(run, 1, submission);
 
     expect(dto).toMatchObject({
       status: 'complete',
@@ -114,25 +115,30 @@ describe('toEvaluationDto', () => {
       decision: 'revise',
       decisionReason: 'fake',
       dimensions: { coverage: 80, quality_attributes: 40, compliance: null },
-      stopReason: 'max-iterations',
+      // One judgement ends on its budget of one: the run says so, the grade does not.
+      stopReason: null,
       error: null,
     });
+    expect(run.trace?.stopReason).toBe('max-iterations');
     expect(dto.findings).toEqual([
       expect.objectContaining({
         id: 'scale_mismatch|binding.1,edge.1,node.2,node.9',
         locations: [
           { ref: 'binding.1', label: 'c1 binding (api)', part: 'binding', key: 'c1' },
           { ref: 'edge.1', label: 'e-1 · client → api (sync)', part: 'edge', key: 'e-1' },
-          { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' },
+          { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
           // node.9 names nothing on the revision and is placed nowhere.
           { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
+          // Named by the lens's words and never cited: placed all the same, so
+          // the sentence reads in labels. `Node.2` is node.2, already placed.
+          { ref: 'node.3', label: 'db · database · DB', part: 'node', key: 'db', name: 'DB' },
         ],
-        nodeIds: ['api'],
+        nodeIds: ['api', 'db'],
         edgeIds: ['e-1'],
         locationRefs: ['binding.1', 'edge.1', 'node.2', 'node.9', 'narration.1'],
         criterionIds: ['c2'],
         lenses: ['critic.scale'],
-        rationale: 'three instances at 500 rps cannot carry 2,000',
+        rationale: 'Node.2 runs three instances at 500 rps; node.3 cannot absorb the rest',
         reconciledTo: 'c2',
       }),
     ]);
@@ -146,7 +152,7 @@ describe('toEvaluationDto', () => {
         // The sample's own ref, then every id its prose names that the revision has — so the
         // studio can read the prose in labels. node.12 names nothing here and is not invented.
         locations: [
-          { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api' },
+          { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
           { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
           { ref: 'edge.1', label: 'e-1 · client → api (sync)', part: 'edge', key: 'e-1' },
         ],
@@ -182,7 +188,7 @@ describe('toEvaluationDto', () => {
     ]);
   });
 
-  it('[DEL-4] why the run stopped belongs to the iteration that ended it, never to an earlier one', async () => {
+  it('[DEL-4] why a coach stopped belongs to the iteration that ended it — never to an earlier one, and never when the decision already says it', async () => {
     const loop = new FakeQualityLoopClient();
     const { runId } = await loop.startRun({
       pipeline: 'system-design-canvas',
@@ -193,24 +199,40 @@ describe('toEvaluationDto', () => {
     });
     loop.complete(runId, [
       { overall: 12, decision: 'revise' },
-      { overall: 0, decision: 'escalate', artifact: null },
+      { overall: 30, decision: 'revise', artifact: submission },
     ]);
     const run = await loop.getRun(runId);
     if (!run?.trace) throw new Error('the fake completes synchronously');
-    run.trace.stopReason = 'escalated';
+    expect(run.trace.stopReason).toBe('max-iterations');
 
     expect(toEvaluationDto(run, 1, submission)).toMatchObject({
       overall: 12,
       stopReason: null,
       settled: true,
     });
-    // The iteration that ended the run carries the reason — and no artifact earns no score.
+    // The run could revise and used its budget: news on the iteration it ended on.
     expect(toEvaluationDto(run, 2, submission)).toMatchObject({
       status: 'complete',
       settled: true,
+      overall: 30,
+      stopReason: 'max-iterations',
+    });
+    run.trace.stopReason = 'plateau';
+    expect(toEvaluationDto(run, 2, submission).stopReason).toBe('plateau');
+
+    // A stop the last decision caused is the decision's to state — and no artifact earns no score.
+    loop.complete(runId, [
+      { overall: 12, decision: 'revise' },
+      { overall: 0, decision: 'escalate', artifact: null },
+    ]);
+    const escalated = await loop.getRun(runId);
+    if (!escalated?.trace) throw new Error('the fake completes synchronously');
+    escalated.trace.stopReason = 'escalated';
+    expect(toEvaluationDto(escalated, 2, submission)).toMatchObject({
+      status: 'complete',
       overall: null,
       decision: 'escalate',
-      stopReason: 'escalated',
+      stopReason: null,
     });
   });
 

@@ -1,5 +1,6 @@
 import {
   DIAGNOSTIC_DEGRADES,
+  gradeStopReason,
   locationIdsIn,
   submissionLocations,
   type ConfirmedFinding,
@@ -33,7 +34,9 @@ import {
  * run's trace holds the iterations finished so far, so a coach's earlier
  * iterations read complete while it is still revising, and a run that failed
  * keeps the ones it recorded. Only the stop reason waits for the run to
- * stop, so the DTO says whether it has (`settled`).
+ * stop, so the DTO says whether it has (`settled`) — and carries the reason
+ * only when it is news to the grade's reader (`gradeStopReason`): a plain
+ * grade ending on its one iteration is a grade finishing, not a stop.
  */
 export function toEvaluationDto(
   run: QualityRunDto,
@@ -70,7 +73,9 @@ export function toEvaluationDto(
     dimensions: { ...it.decision.scores.dimensions },
     findings: findingsOf(it, index),
     criterionResults: it.ledger.criteria.map((row) => toCriterionResult(row, it, index)),
-    stopReason: endedRun(run, iteration) ? (run.trace?.stopReason ?? null) : null,
+    stopReason: endedRun(run, iteration)
+      ? gradeStopReason(run.trace?.stopReason ?? null, run.request)
+      : null,
     degraded: degradedSamples(it),
     error: null,
   };
@@ -134,14 +139,29 @@ const endedRun = (run: QualityRunDto, iteration: number): boolean =>
 const nothingAssessed = (dimensions: Record<string, number | null>): boolean =>
   Object.values(dimensions).every((value) => value === null);
 
-/** The refs the stored revision can place, each with its label, part and the author's key. */
+/**
+ * Every place a lens points at: the refs it cited, then the ids its prose
+ * names — in any case, runs and lists included, by the contract's grammar —
+ * each once, so a reader is shown a label wherever the model wrote a position.
+ */
+const cited = (
+  refs: readonly string[],
+  prose: string | null,
+  index: ReadonlyMap<string, SubmissionLocation>,
+): string[] => [
+  ...new Set([...refs, ...(prose === null ? [] : locationIdsIn(prose, [...index.values()]))]),
+];
+
+/** The refs the stored revision can place, each with its label, part, the author's key and the part's name. */
 const placed = (
   refs: readonly string[],
   index: ReadonlyMap<string, SubmissionLocation>,
 ): EvaluationLocationDto[] =>
   refs.flatMap((ref) => {
     const location = index.get(ref);
-    return location ? [{ ref, label: location.label, part: location.part, key: location.key }] : [];
+    if (!location) return [];
+    const { label, part, key, name } = location;
+    return [{ ref, label, part, key, ...(name !== null ? { name } : {}) }];
   });
 
 const toFinding = (
@@ -149,8 +169,12 @@ const toFinding = (
   it: IterationTrace,
   index: ReadonlyMap<string, SubmissionLocation>,
 ): EvaluationFindingDto => {
-  // A ref the stored revision cannot place is kept verbatim in `locationRefs` and nowhere else.
-  const locations = placed(finding.locationRefs, index);
+  const rationale = finding.rationale ?? criticRationale(it.critics, finding);
+  // Every place the lens cited, then every one its words name besides — a
+  // sentence may say "stops at edge.4" of an edge it never cited. A ref the
+  // stored revision cannot place is kept verbatim in `locationRefs` and
+  // nowhere else.
+  const locations = placed(cited(finding.locationRefs, rationale, index), index);
   const keysOf = (part: EvaluationLocationDto['part']) =>
     locations.flatMap((location) =>
       location.part === part && location.key !== null ? [location.key] : [],
@@ -167,7 +191,7 @@ const toFinding = (
     nodeIds: keysOf('node'),
     edgeIds: keysOf('edge'),
     locationRefs: [...finding.locationRefs],
-    rationale: finding.rationale ?? criticRationale(it.critics, finding),
+    rationale,
     reconciledTo: finding.reconciledTo,
   };
 };
@@ -183,15 +207,12 @@ function toCriterionResult(
   index: ReadonlyMap<string, SubmissionLocation>,
 ): CriterionResultDto {
   const said = firstSaid(it.evaluators, row.criterionId);
-  const cited = said
-    ? [...new Set([...said.locationRefs, ...locationIdsIn(said.rationale, [...index.values()])])]
-    : [];
   return {
     criterionId: row.criterionId,
     result: row.result,
     confidence: row.confidence,
     rationale: said?.rationale ?? null,
-    locations: placed(cited, index),
+    locations: said ? placed(cited(said.locationRefs, said.rationale, index), index) : [],
   };
 }
 

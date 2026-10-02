@@ -26,6 +26,7 @@ import {
   CANVAS_MAX_CRITERIA,
   CANVAS_PIPELINE_ID,
   type CanvasCriterionKind,
+  type CanvasFindingType,
 } from '@sysdesign/contracts';
 
 import type { PipelineDefinition } from '../../core/pipeline';
@@ -58,7 +59,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   task: {
     // The kinds are the contract's declaration (`CANVAS_CRITERION_KINDS`),
     // which a generated prompt's rubric is built from; `satisfies` keeps the
-    // two from drifting while the record stays open to the engine.
+    // two from drifting while the record stays open to the engine. The
+    // finding types are declared there too (`CANVAS_FINDING_TYPES`): the
+    // studio words them where a lens wrote the token into a sentence.
     criterionKinds: {
       functional:
         'A capability the system must provide: a request it serves, data it ingests, a job it runs.',
@@ -106,7 +109,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       bad_assumption:
         'A design decision resting on something the goal does not say and would not grant.',
-    },
+    } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
     output: canvasOutput,
   },
@@ -234,7 +237,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       unexplained_component: { dimension: 'coverage', gate: false },
       contradiction: { dimension: 'coverage', gate: false },
       bad_assumption: { dimension: 'quality_attributes', gate: false },
-    },
+    } satisfies Record<CanvasFindingType, { dimension: string; gate: boolean }>,
 
     ...STANDARD_SCORING,
 

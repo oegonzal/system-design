@@ -135,7 +135,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-4',
     statement:
-      "The grade the studio shows is the run's, read for one iteration and grounded by position onto the graded graph; the studio invents no score, decision or dimension, says which lens samples answered nothing, gives the stop reason only to the iteration that ended the run, and caches only the terminal scalars.",
+      "The grade the studio shows is the run's, read for one iteration and grounded by position onto the graded graph; the studio invents no score, decision or dimension, says which lens samples answered nothing, gives a stop reason only to the iteration that ended a run that could revise — never to a plain grade, which always ends on its one iteration, and never when the decision already says it — and caches only the terminal scalars.",
   },
   {
     id: 'DEL-5',

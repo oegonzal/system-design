@@ -1,5 +1,6 @@
 import {
   CANVAS_CRITERION_KINDS,
+  CANVAS_FINDING_TYPES,
   CANVAS_MAX_CRITERIA,
   submissionLocations,
 } from '@sysdesign/contracts';
@@ -30,6 +31,11 @@ describe('the system-design-canvas pipeline', () => {
     ]);
     expect(Object.keys(SYSTEM_DESIGN_CANVAS.policy.criterionKinds)).toEqual([
       ...CANVAS_CRITERION_KINDS,
+    ]);
+    // `satisfies` refuses a missing type; this refuses an extra one the contract never named.
+    expect(Object.keys(SYSTEM_DESIGN_CANVAS.task.findingTypes)).toEqual([...CANVAS_FINDING_TYPES]);
+    expect(Object.keys(SYSTEM_DESIGN_CANVAS.policy.findingTypes)).toEqual([
+      ...CANVAS_FINDING_TYPES,
     ]);
     expect(SYSTEM_DESIGN_CANVAS.task.maxCriteria).toBe(CANVAS_MAX_CRITERIA);
     for (const evaluator of SYSTEM_DESIGN_CANVAS.evaluators) {
