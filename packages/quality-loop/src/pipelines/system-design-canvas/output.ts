@@ -11,6 +11,13 @@
  * prints the author's id beside every positional one so a reader can join
  * them. The numbering is the contract's `submissionLocations`, so the studio
  * joins a finding back onto the stored revision with the same function.
+ *
+ * The two numberings look alike and are not: an author's `e-4` is whichever
+ * edge was drawn fourth, and may sit at `edge.5`. So a binding's path is
+ * printed on a line of its own, every hop led by the id to cite with the
+ * author's id and the two nodes it joins beside it, and the line says where
+ * the walk starts and ends — nothing about a path is left to be counted or
+ * joined by eye.
  */
 import {
   designSubmissionSchema,
@@ -18,6 +25,7 @@ import {
   renderNodeLine,
   repairSubmission,
   submissionLocations,
+  type CanvasGraph,
   type DesignSubmission,
 } from '@sysdesign/contracts';
 
@@ -32,6 +40,41 @@ function positional<I extends { id: string }>(items: readonly I[], prefix: strin
     const position = byId.get(id);
     return position === undefined ? id : `${id} (${position})`;
   };
+}
+
+/** What the brief's hops read from: each edge by the author's id, with the positional id a lens cites. */
+function edgeIndex(graph: CanvasGraph) {
+  return new Map(
+    graph.edges.map((item, index) => [item.id, { ref: `edge.${index + 1}`, edge: item }]),
+  );
+}
+
+/**
+ * A binding's traced path, as its own line: `path, 2 edges, n-1 (node.1) to
+ * n-3 (node.3): edge.1 (e-1: n-1 -> n-2) → edge.4 (e-3: n-2 -> n-3)`. Each
+ * hop leads with the id to cite and repeats the Edges section's own words for
+ * it. A hop naming no drawn edge says so and the summary is left out — where
+ * a broken walk starts and ends is not the render's to guess.
+ */
+function renderPath(
+  path: readonly string[],
+  edges: ReturnType<typeof edgeIndex>,
+  node: (id: string) => string,
+): string {
+  const hops = path.map((id) => edges.get(id));
+  const first = hops[0];
+  const last = hops[hops.length - 1];
+  const span =
+    first !== undefined && last !== undefined
+      ? `, ${node(first.edge.source)} to ${node(last.edge.target)}`
+      : '';
+  const walk = path.map((id, index) => {
+    const hop = hops[index];
+    return hop === undefined
+      ? `${id} (no such edge)`
+      : `${hop.ref} (${id}: ${hop.edge.source} -> ${hop.edge.target})`;
+  });
+  return `    path, ${path.length} ${path.length === 1 ? 'edge' : 'edges'}${span}: ${walk.join(' → ')}`;
 }
 
 export const canvasOutput: OutputShape<CanvasSubmission> = {
@@ -56,10 +99,10 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
   render: (submission) => {
     const { graph, brief, narrative } = submission;
     const node = positional(graph.nodes, 'node');
-    const edge = positional(graph.edges, 'edge');
+    const edges = edgeIndex(graph);
     const overview = narrative?.overview?.trim() ?? '';
     const lines: string[] = [
-      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the brief and narrative refer to those.',
+      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite.',
       '',
       '## Nodes',
       ...graph.nodes.map((item, index) => `[node.${index + 1}] ${renderNodeLine(item).trim()}`),
@@ -73,13 +116,12 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
       lines.push('(none submitted)');
     } else {
       lines.push(
-        ...brief.bindings.map((binding, index) => {
-          const path =
-            binding.path !== undefined && binding.path.length > 0
-              ? ` · path ${binding.path.map(edge).join(' → ')}`
-              : '';
-          return `[binding.${index + 1}] ${binding.criterionId} ← ${binding.nodeIds.map(node).join(', ')}${path}: ${JSON.stringify(binding.claim)}`;
-        }),
+        ...brief.bindings.flatMap((binding, index) => [
+          `[binding.${index + 1}] ${binding.criterionId} ← ${binding.nodeIds.map(node).join(', ')}: ${JSON.stringify(binding.claim)}`,
+          ...(binding.path !== undefined && binding.path.length > 0
+            ? [renderPath(binding.path, edges, node)]
+            : []),
+        ]),
       );
     }
     lines.push('', '## Narrative');

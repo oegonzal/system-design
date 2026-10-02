@@ -130,12 +130,68 @@ describe('the system-design-canvas pipeline', () => {
     // narrative refer to them, so a reader can join the two.
     expect(rendered).toContain('[node.3] node service-1 kind=service');
     expect(rendered).toContain(
-      '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11)',
+      '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11): ',
     );
-    expect(rendered).toContain('path edge-1 (edge.1) → edge-2 (edge.2) → edge-3 (edge.3)');
+    expect(rendered).toContain(
+      '    path, 3 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> gateway-1) → edge.2 (edge-2: gateway-1 -> service-1) → edge.3 (edge-3: service-1 -> database-1)',
+    );
     expect(rendered).toContain('[rationale.1] service-1 (node.3):');
     expect(rendered).toContain('[narration.1] c1:');
     expect(canvasOutput.schema.safeParse(submission).success).toBe(true);
+  });
+
+  // A recorded grade (2026-10-02) said a binding's path "stops at edge.4" when
+  // it ended on edge.6: the author's `e-3` sat at `edge.4`, `e-4` at `edge.5`,
+  // and the path was one run of ids inside a long line. A hop now leads with
+  // the id to cite and names the nodes it joins, and the line says where the
+  // walk ends, so neither numbering has to be counted.
+  it('[QL-21] a binding’s path is its own line: every hop by the id to cite with its endpoints, and where the walk starts and ends', () => {
+    const rendered = canvasOutput.render({
+      graph: {
+        nodes: [
+          { id: 'n-1', kind: 'client', label: 'Client' },
+          { id: 'n-3', kind: 'service', label: 'Links' },
+          { id: 'n-5', kind: 'cache', label: 'Cache' },
+          { id: 'ai-db-replica', kind: 'replica', label: 'Replicas' },
+        ],
+        edges: [
+          { id: 'e-1', source: 'n-1', target: 'n-3', kind: 'sync' },
+          { id: 'ai-e-new', source: 'n-3', target: 'n-5', kind: 'async' },
+          // The author's third and fourth edges, drawn before the coach's: their names lag their positions.
+          { id: 'e-3', source: 'n-3', target: 'n-5', kind: 'sync' },
+          { id: 'e-4', source: 'n-3', target: 'ai-db-replica', kind: 'sync' },
+        ],
+      },
+      brief: {
+        version: 1,
+        bindings: [
+          { criterionId: 'c2', nodeIds: ['n-3', 'n-5'], path: ['e-1', 'e-3'], claim: 'cache hit' },
+          { criterionId: 'c5', nodeIds: ['n-3'], path: ['e-1', 'e-4'], claim: 'fallback read' },
+          { criterionId: 'c7', nodeIds: ['n-5'], claim: 'sized for every link' },
+          { criterionId: 'c9', nodeIds: ['n-3'], path: ['e-1', 'gone'], claim: 'a broken walk' },
+        ],
+      },
+      narrative: null,
+    });
+    const lines = rendered.split('\n');
+    const under = (binding: string) => lines[lines.findIndex((l) => l.startsWith(binding)) + 1];
+
+    expect(under('[binding.1]')).toBe(
+      '    path, 2 edges, n-1 (node.1) to n-5 (node.3): edge.1 (e-1: n-1 -> n-3) → edge.3 (e-3: n-3 -> n-5)',
+    );
+    expect(under('[binding.2]')).toBe(
+      '    path, 2 edges, n-1 (node.1) to ai-db-replica (node.4): edge.1 (e-1: n-1 -> n-3) → edge.4 (e-4: n-3 -> ai-db-replica)',
+    );
+    // No path, no line: the next line is the next binding.
+    expect(under('[binding.3]')).toMatch(/^\[binding\.4\] /);
+    // A hop no edge answers to is named as such, and the walk's ends are not guessed.
+    expect(under('[binding.4]')).toBe(
+      '    path, 2 edges: edge.1 (e-1: n-1 -> n-3) → gone (no such edge)',
+    );
+    // The claim closes the binding's own line; the path never rides inside it.
+    expect(lines.find((l) => l.startsWith('[binding.2]'))).toBe(
+      '[binding.2] c5 ← n-3 (node.2): "fallback read"',
+    );
   });
 
   it('[QL-21] a submission without a brief or a narrative says so, and exposes nothing to cite there', () => {

@@ -1,4 +1,4 @@
-import { NODE_MAX_OPERATIONS } from './canvas';
+import { NODE_MAX_OPERATIONS, OPERATION_NOTES_MAX_LENGTH } from './canvas';
 import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
 import { nodeLabel } from './node-label';
 
@@ -23,26 +23,33 @@ import { nodeLabel } from './node-label';
  * blocking validator enforces it.
  */
 export const MAX_SERIALIZED_OPS = NODE_MAX_OPERATIONS;
-/** Notes are context, not content — clip them before they dominate the line. */
-export const MAX_SERIALIZED_NOTE_LENGTH = 60;
+/**
+ * A note is printed whole. It is where an author states the contract of an
+ * operation — its retry, its ordering, its acknowledgement — and a lens that
+ * reads half of one reports the other half missing; the coach, which revises
+ * from this same text, would hand back the half it was shown. Pinned to the
+ * schema's own bound for the reason the operation cap is: the render never
+ * cuts what the schema admits.
+ */
+export const MAX_SERIALIZED_NOTE_LENGTH = OPERATION_NOTES_MAX_LENGTH;
 
 /**
- * `command placeOrder idem (Validates inventory first)` — kind when stated,
- * name, an idempotency marker only when the author stated one either way,
- * clipped notes in parens.
+ * `command placeOrder idem note="Validates inventory first"` — kind when
+ * stated, name, an idempotency marker only when the author stated one either
+ * way, and the note quoted as a label is, so its own punctuation never reads
+ * as the end of the operation. Past the schema's bound — a length no valid
+ * submission has — the note is cut and says so.
  */
 function renderOperation(operation: NodeOperation): string {
   const kind = operation.kind !== undefined ? `${operation.kind} ` : '';
   const idempotency =
     typeof operation.idempotent === 'boolean' ? (operation.idempotent ? ' idem' : ' non-idem') : '';
-  const notes =
-    operation.notes !== undefined && operation.notes.length > 0
-      ? ` (${
-          operation.notes.length > MAX_SERIALIZED_NOTE_LENGTH
-            ? `${operation.notes.slice(0, MAX_SERIALIZED_NOTE_LENGTH)}…`
-            : operation.notes
-        })`
-      : '';
+  const written = operation.notes ?? '';
+  const shown =
+    written.length > MAX_SERIALIZED_NOTE_LENGTH
+      ? `${written.slice(0, MAX_SERIALIZED_NOTE_LENGTH)}…`
+      : written;
+  const notes = shown.length > 0 ? ` note=${JSON.stringify(shown)}` : '';
   return `${kind}${operation.name}${idempotency}${notes}`;
 }
 

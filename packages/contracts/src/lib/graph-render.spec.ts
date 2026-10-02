@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { NODE_MAX_OPERATIONS } from './canvas';
-import { MAX_SERIALIZED_OPS, renderEdgeLine, renderNodeLine } from './graph-render';
+import { NODE_MAX_OPERATIONS, OPERATION_NOTES_MAX_LENGTH } from './canvas';
+import { nodeOperationSchema } from './canvas.schema';
+import {
+  MAX_SERIALIZED_NOTE_LENGTH,
+  MAX_SERIALIZED_OPS,
+  renderEdgeLine,
+  renderNodeLine,
+} from './graph-render';
 
 describe('renderNodeLine', () => {
   it('prints id, kind, label, config as one object, roles and operations', () => {
@@ -21,7 +27,7 @@ describe('renderNodeLine', () => {
         ],
       }),
     ).toBe(
-      '  node n-2 kind=service label="Order API" config={"replicas":3,"autoscaling":true} roles=[owns orders] ops=[command placeOrder idem (keyed by cart id); listOrders]',
+      '  node n-2 kind=service label="Order API" config={"replicas":3,"autoscaling":true} roles=[owns orders] ops=[command placeOrder idem note="keyed by cart id"; listOrders]',
     );
   });
 
@@ -52,6 +58,39 @@ describe('renderNodeLine', () => {
       operations: Array.from({ length: MAX_SERIALIZED_OPS + 2 }, (_, i) => ({ name: `op${i}` })),
     });
     expect(line).toContain('…+2 more');
+  });
+
+  // A lens reported "no stated producer ack/retry contract" for an operation
+  // whose note stated one past the sixtieth character: it was shown the first
+  // sixty. The coach revises from the same text, so a cut note is also a note
+  // the coach hands back cut.
+  it('prints a note whole at the longest the schema admits, quoted so its punctuation is its own', () => {
+    const notes =
+      `${'published async after the 302 is sent; idempotent producer with acks=all (retries on) '.repeat(3)}`
+        .slice(0, OPERATION_NOTES_MAX_LENGTH - 1)
+        .concat(')');
+    expect(notes).toHaveLength(OPERATION_NOTES_MAX_LENGTH);
+    expect(nodeOperationSchema.safeParse({ name: 'click_event', notes }).success).toBe(true);
+    const line = renderNodeLine({
+      id: 'n-1',
+      kind: 'event-stream',
+      label: 'Clicks',
+      operations: [{ name: 'click_event', kind: 'event', notes }, { name: 'next' }],
+    });
+    expect(line).toContain(`ops=[event click_event note=${JSON.stringify(notes)}; next]`);
+    expect(line).not.toContain('…');
+    // The whole defence, as for the operation cap: one number, declared by the schema.
+    expect(MAX_SERIALIZED_NOTE_LENGTH).toBe(OPERATION_NOTES_MAX_LENGTH);
+  });
+
+  it('cuts a note only past the bound the schema enforces, and marks the cut', () => {
+    const line = renderNodeLine({
+      id: 'n-1',
+      kind: 'service',
+      label: 'Orders',
+      operations: [{ name: 'op', notes: 'x'.repeat(MAX_SERIALIZED_NOTE_LENGTH + 5) }],
+    });
+    expect(line).toContain(`note="${'x'.repeat(MAX_SERIALIZED_NOTE_LENGTH)}…"`);
   });
 
   it("stands a blank label in with its kind's own name, so no reader prints nothing", () => {
