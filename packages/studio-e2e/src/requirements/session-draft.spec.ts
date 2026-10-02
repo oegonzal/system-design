@@ -80,6 +80,39 @@ test.describe('the session draft', () => {
     expect(draftSaves()).toBe(1);
   });
 
+  test('[UX-15] a draft too large to frame whole opens on its blocks, never on a blank canvas', async ({
+    page,
+    request,
+  }) => {
+    // A cluster near the origin and one block dropped 3,000 units away: framed
+    // whole it would need a zoom below the floor, and centring it at the
+    // floor shows only the empty space between them.
+    const cluster = [0, 1, 2, 3, 4, 5].map((index) => ({
+      id: `n-${index + 1}`,
+      kind: 'service' as const,
+      label: `Service ${index + 1}`,
+      position: { x: (index % 3) * 260, y: Math.floor(index / 3) * 180 },
+    }));
+    const { session } = await createPracticeSession(request);
+    await saveDraft(request, session.id, {
+      graph: {
+        nodes: [
+          ...cluster,
+          { id: 'n-7', kind: 'cache', label: 'Far cache', position: { x: 3623, y: 2633 } },
+        ],
+        edges: [],
+      },
+      brief: null,
+      narrative: null,
+    });
+
+    const canvas = new CanvasPage(page);
+    await page.goto(`/practice/${session.id}`);
+    await canvas.ready();
+    await canvas.expectNodeCount(7);
+    await canvas.expectDiagramFramed(cluster.map((node) => node.id));
+  });
+
   test('[UX-15] leaving while a save is pending asks first; once saved, leaving is free', async ({
     page,
     request,

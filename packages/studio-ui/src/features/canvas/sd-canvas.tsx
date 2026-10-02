@@ -22,7 +22,7 @@ import { useCallback, useEffect, type DragEvent } from 'react';
 import { useCanvasStore } from './canvas-store-context';
 import { SdEdge } from './edges/sd-edge';
 import { flowVariableDeclarations } from './flow-theme';
-import { MINIMAP_SIZE, revealShift, viewArea } from './framing';
+import { FIT_ZOOM, MINIMAP_SIZE, revealShift, viewArea } from './framing';
 import { SdNode } from './nodes/sd-node';
 import { NODE_DRAG_MIME } from './palette/palette';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from './types';
@@ -187,6 +187,8 @@ export function SdCanvas() {
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
         colorMode={theme.mode}
+        // The floor every fit frames at, so the zoom-out control stops where a fit does.
+        minZoom={FIT_ZOOM.min}
         defaultMarkerColor={theme.color.border.default}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

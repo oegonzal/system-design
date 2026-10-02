@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { makeGraph } from '../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
-import { viewArea } from './framing';
+import { FIT_ZOOM, viewArea } from './framing';
 import { NODE_MIN_FOOTPRINT } from './geometry';
 import { NODE_DRAG_MIME } from './palette/palette';
 import { SdCanvas } from './sd-canvas';
@@ -124,6 +124,12 @@ describe('SdCanvas', () => {
     dropBlock(surface(), 'client', { x: 100, y: 100 });
 
     expect(store.getState().nodes).toEqual([]);
+  });
+
+  it('stops zooming out where a fit stops: the canvas’s zoom floor is the one every fit frames at', () => {
+    const { flow } = mountCanvas(createCanvasStore(makeGraph()));
+
+    expect(flow().minZoom).toBe(FIT_ZOOM.min);
   });
 
   it('lends the store its view of the screen while mounted', () => {

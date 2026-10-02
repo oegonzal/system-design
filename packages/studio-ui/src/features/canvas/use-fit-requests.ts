@@ -1,10 +1,17 @@
 'use client';
 
-import { useNodesInitialized, useReactFlow, useStore, type Viewport } from '@xyflow/react';
+import {
+  useNodesInitialized,
+  useReactFlow,
+  useStore,
+  useStoreApi,
+  type Viewport,
+} from '@xyflow/react';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { useCanvasStore, useCanvasStoreApi } from './canvas-store-context';
-import { FIT_VIEW_OPTIONS } from './framing';
+import { frameFor } from './framing';
+import { measuredBoxes } from './geometry';
 
 /** The view a fit produced, and the content it framed. */
 interface Framing {
@@ -18,6 +25,9 @@ const sameView = (a: Viewport, b: Viewport): boolean =>
 /**
  * Honours the store's fit requests — a load, the toolbar, the zoom controls.
  *
+ * - A fit frames the measured blocks by `frameFor`: the whole diagram where
+ *   it fits, and where it is too large for the zoom floor as much of it as
+ *   the pane holds from its top — never a blank pane, never the top cut off.
  * - A request waits until there is something to frame it in and by: the pane
  *   has a size and every block is measured. So one made before the canvas
  *   mounted (a session opening) is honoured once React Flow can frame it,
@@ -36,7 +46,8 @@ export function useFitRequests(): void {
   const store = useCanvasStoreApi();
   const fitRequest = useCanvasStore((state) => state.fitRequest);
   const empty = useCanvasStore((state) => state.nodes.length === 0);
-  const { fitView, getViewport } = useReactFlow();
+  const { setViewport, getViewport } = useReactFlow();
+  const flow = useStoreApi();
   const measured = useNodesInitialized();
   const paneWidth = useStore((state) => state.width);
   const paneHeight = useStore((state) => state.height);
@@ -50,14 +61,17 @@ export function useFitRequests(): void {
 
   const frame = useCallback(() => {
     const { contentVersion } = store.getState();
+    const { nodes, width, height } = flow.getState();
+    const viewport = frameFor(measuredBoxes(nodes), { width, height });
+    if (viewport === null) return;
     framing.current = 'pending';
     resizedMeanwhile.current = false;
-    void fitView(FIT_VIEW_OPTIONS).then(() => {
+    void setViewport(viewport).then(() => {
       framing.current = { viewport: getViewport(), contentVersion };
       // The pane changed size under the fit: what it framed for is gone.
       if (resizedMeanwhile.current) frame();
     });
-  }, [fitView, getViewport, store]);
+  }, [flow, getViewport, setViewport, store]);
 
   useEffect(
     () => () => {

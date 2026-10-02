@@ -7,30 +7,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeGraph } from '../../testing/fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
-import { FIT_VIEW_OPTIONS } from './framing';
+import { frameFor } from './framing';
 import { useFitRequests } from './use-fit-requests';
+
+type View = { x: number; y: number; zoom: number };
 
 /**
  * React Flow as the hook sees it, scripted: whether the pane has a size and
- * the blocks are measured, where the view is, and every fit asked of it —
- * which stays on its way until the spec lands it.
+ * the blocks are measured, the blocks it measured, where the view is, and
+ * every view a fit asked of it — which stays on its way until the spec
+ * lands it.
  */
 const flow = vi.hoisted(() => {
   const state = {
     measured: false,
     width: 0,
     height: 0,
-    viewport: { x: 0, y: 0, zoom: 1 },
-    fits: [] as { options: unknown; land: () => void }[],
+    nodes: [] as {
+      position: { x: number; y: number };
+      measured: { width: number; height: number };
+    }[],
+    viewport: { x: 0, y: 0, zoom: 1 } as View,
+    fits: [] as { viewport: View; land: () => void }[],
   };
   const api = {
-    fitView: (options: unknown) =>
+    setViewport: (viewport: View) =>
       new Promise<boolean>((resolve) => {
         state.fits.push({
-          options,
+          viewport,
           land: () => {
-            // A fit moves the view; where to depends on the pane it framed for.
-            state.viewport = { x: state.width / 10, y: state.height / 10, zoom: 1 };
+            state.viewport = viewport;
             resolve(true);
           },
         });
@@ -43,6 +49,7 @@ const flow = vi.hoisted(() => {
 vi.mock('@xyflow/react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@xyflow/react')>()),
   useReactFlow: () => flow.api,
+  useStoreApi: () => ({ getState: () => flow.state }),
   useNodesInitialized: () => flow.state.measured,
   useStore: (selector: (state: { width: number; height: number }) => unknown) =>
     selector(flow.state),
@@ -65,6 +72,13 @@ async function landFit() {
   });
 }
 
+/** Two blocks React Flow has measured: what every fit here frames. */
+const blocks = [
+  { position: { x: 0, y: 0 }, measured: { width: 160, height: 56 } },
+  { position: { x: 320, y: 200 }, measured: { width: 160, height: 56 } },
+];
+const boxes = blocks.map(({ position, measured }) => ({ ...position, ...measured }));
+
 const ready = { measured: true, width: 800, height: 600 };
 
 beforeEach(() => {
@@ -72,6 +86,7 @@ beforeEach(() => {
     measured: false,
     width: 0,
     height: 0,
+    nodes: blocks,
     viewport: { x: 0, y: 0, zoom: 1 },
     fits: [],
   });
@@ -90,8 +105,8 @@ describe('useFitRequests', () => {
     flow.state.measured = true;
     hook.rerender();
     expect(flow.state.fits).toHaveLength(1);
-    // Never past 100%, and clear of the band the minimap and controls sit in.
-    expect(flow.state.fits[0]?.options).toBe(FIT_VIEW_OPTIONS);
+    // The view `frameFor` gives the measured blocks in this pane.
+    expect(flow.state.fits[0]?.viewport).toEqual(frameFor(boxes, { width: 800, height: 600 }));
 
     hook.rerender();
     expect(flow.state.fits).toHaveLength(1);
@@ -136,6 +151,7 @@ describe('useFitRequests', () => {
     flow.state.height = 542;
     hook.rerender();
     expect(flow.state.fits).toHaveLength(2);
+    expect(flow.state.fits[1]?.viewport).toEqual(frameFor(boxes, { width: 800, height: 542 }));
     await landFit();
     hook.rerender();
     expect(flow.state.fits).toHaveLength(2);

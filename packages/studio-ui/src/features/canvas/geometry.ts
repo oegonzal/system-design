@@ -1,4 +1,4 @@
-import { LAYOUT_BLOCK, type CanvasSize as Size } from '@sysdesign/contracts';
+import { LAYOUT_BLOCK, type CanvasBox as Box, type CanvasSize as Size } from '@sysdesign/contracts';
 
 /**
  * How much room a block takes. The numbers are the contract's `LAYOUT_BLOCK`
@@ -34,3 +34,22 @@ export const NODE_FOOTPRINT: Size = { width: NODE_WIDTH.max, height: NODE_ASSUME
 
 /** The least a block can take: what must stay on screen for it to be seen and grabbed. */
 export const NODE_MIN_FOOTPRINT: Size = { width: NODE_WIDTH.min, height: NODE_ASSUMED_HEIGHT };
+
+/** A block as the canvas holds it once laid out: where it is, and the size it was measured at. */
+export interface PlacedBlock {
+  position: { x: number; y: number };
+  measured?: { width?: number; height?: number };
+}
+
+/**
+ * Every measured block's box, in flow coordinates — what a pill keeps clear
+ * of and what a fit frames. A block not yet measured has no box: it is in
+ * neither question until it has a size.
+ */
+export function measuredBoxes(blocks: readonly PlacedBlock[]): Box[] {
+  return blocks.flatMap(({ position, measured }) =>
+    measured?.width && measured.height
+      ? [{ ...position, width: measured.width, height: measured.height }]
+      : [],
+  );
+}
