@@ -339,6 +339,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The log is append-only and says where each entry came from: an action read out of a snapshot is reconstructed and carries only the time the wire gave it, one a poll revealed is recorded, a payload that changed under a key already seen is appended as a correction rather than edited, and an entry keeps its position and its key however much the log grows — and the log is bounded, with what is trimmed folded into a baseline so no surviving entry’s comparison changes and nothing trimmed can reappear.',
   },
+  {
+    id: 'QLU-9',
+    statement:
+      "Every lens's contribution is readable: its declared samples, item cap, token bound and what it consumes beside what each sample actually answered, each item joined to what the ledger did with it — confirmed, charged to a criterion instead, discarded with the normaliser's own count, or inadmissible — with the agreement rule printed beside it, a declared sample that recorded nothing shown as lost, a lens the registry does not list still shown, and the raw-to-merged edge marked as derived because the wire does not carry it. Model calls are counted as calls rather than attempts, so a retry reads as one call asked twice.",
+  },
+  {
+    id: 'QLU-10',
+    statement:
+      "The whole declared decision policy sits beside what it did this iteration: each controller factor with the parameters it was composed with and the trace's own outcome and detail, a declared gate the iteration never reached named as unreached, the engine's own reserved factor named as the engine's, each dimension's arithmetic from base through every penalty's list price, decay multiplier and clamp to its score, a dimension no criterion kind can earn credit in called out, and the validator the engine injects labelled rather than treated as a surprise.",
+  },
   // Govcon web client (packages/govcon-ui)
   {
     id: 'GOVU-1',

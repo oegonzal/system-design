@@ -1,5 +1,5 @@
 import { Stack, Tab, TabList, TabPanel, Tabs, Text } from '@sysdesign/design-system';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { JsonChange } from '../model/changes';
 import type { InspectorState } from '../model/state';
@@ -15,6 +15,10 @@ import { TextDiff } from './text-diff';
  * mention — and `Text` appears only when the rendered artifact is one of the
  * things that moved, because that is the one field a whole-value comparison
  * fails to explain.
+ *
+ * The panels after those read the same state this action produced rather than
+ * the latest, which is what makes the rail a scrubber: pick a moment, then read
+ * the lenses, the policy or the ledger as of that moment.
  */
 
 const RENDERED_PATH = 'artifact.rendered';
@@ -23,9 +27,13 @@ export interface DiffViewProps {
   before: InspectorState;
   after: InspectorState;
   changes: readonly JsonChange[];
+  /** Further ways to read the state this action produced, each a tab of its own. */
+  panels?: readonly { id: string; label: string; content: ReactNode }[];
 }
 
-export function DiffView({ before, after, changes }: DiffViewProps) {
+const NO_PANELS: readonly { id: string; label: string; content: ReactNode }[] = [];
+
+export function DiffView({ before, after, changes, panels = NO_PANELS }: DiffViewProps) {
   const renderedChanged = changes.some((change) => change.path === RENDERED_PATH);
   const [tab, setTab] = useState('changes');
 
@@ -35,6 +43,11 @@ export function DiffView({ before, after, changes }: DiffViewProps) {
         <Tab value="changes">Changes ({changes.length})</Tab>
         <Tab value="state">State</Tab>
         {renderedChanged && <Tab value="text">Rendered text</Tab>}
+        {panels.map((panel) => (
+          <Tab key={panel.id} value={panel.id}>
+            {panel.label}
+          </Tab>
+        ))}
       </TabList>
       <TabPanel value="changes">
         <ChangeList changes={changes} />

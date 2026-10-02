@@ -6,14 +6,23 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { api } from '../../api/client';
 import { useLink } from '../../components/link-context';
+import { EvidencePanel } from '../results/evidence-panel';
+import { criteriaRows, findingGroups } from '../results/select';
 import { ACTION_GROUPS, type ActionGroup } from './model/action';
+import { invocationsOf, invocationTotals } from './model/exchange-invocations';
 import { inspectHref } from './model/inspect-link';
+import { lensContributions } from './model/lens-contributions';
+import { dimensionRows, gateRows, policyNumbers, validatorRows } from './model/policy-view';
 import { groupsPresent, timelineRows } from './model/select';
+import type { InspectorState } from './model/state';
 import { beforeOf, entryByKey } from './model/timeline';
 import { RunPicker } from './run-picker';
 import { useInspectTarget } from './use-inspect-target';
 import { useRunTimeline } from './use-run-timeline';
+import { ExchangeList } from './view/exchange-list';
 import { Inspector } from './view/inspector';
+import { LensPanel } from './view/lens-panel';
+import { PolicyPanel } from './view/policy-panel';
 
 const RECENT_LIMIT = 30;
 
@@ -36,7 +45,10 @@ export function InspectorClient() {
   const { target, point } = useInspectTarget();
   const Link = useLink();
   const runs = useResource((signal) => api.listRuns({ limit: RECENT_LIMIT }, { signal }), []);
-  const { timeline, error, isPolling, unreachable } = useRunTimeline(target.run);
+  const { timeline, run, error, isPolling, unreachable } = useRunTimeline(target.run);
+  const pipelines = useResource((signal) => api.listPipelines({ signal }), []);
+  const pipeline =
+    run === null ? null : (pipelines.data?.find((entry) => entry.id === run.pipeline) ?? null);
 
   const [shown, setShown] = useState<ReadonlySet<ActionGroup>>(ALL_GROUPS);
   const [ignoreTimings, setIgnoreTimings] = useState(false);
@@ -70,6 +82,51 @@ export function InspectorClient() {
 
   const onSelect = useCallback((key: string) => point({ action: key }), [point]);
   const onFollow = useCallback(() => point({ action: null }), [point]);
+
+  // The panels read the state the selected action produced, which is what makes
+  // the rail a scrubber over the whole run rather than a log of it.
+  const panels = useMemo(() => {
+    const state: InspectorState | null = selected?.row.entry.after ?? null;
+    if (state === null) return undefined;
+    const invocations = invocationsOf(state.exchanges);
+    return [
+      {
+        id: 'lenses',
+        label: 'Lenses',
+        content: <LensPanel contributions={lensContributions(state, pipeline)} />,
+      },
+      {
+        id: 'policy',
+        label: 'Policy',
+        content: (
+          <PolicyPanel
+            numbers={policyNumbers(pipeline?.policy ?? null)}
+            gates={gateRows(pipeline?.controller ?? null, state.decision?.trace ?? null)}
+            dimensions={dimensionRows(pipeline?.policy ?? null, state.decision?.trace ?? null)}
+            validators={validatorRows(pipeline, state.validation)}
+            overall={state.decision?.scores.overall ?? null}
+          />
+        ),
+      },
+      {
+        id: 'ledger',
+        label: 'Ledger',
+        content: (
+          <EvidencePanel
+            rows={criteriaRows(state.contract.criteria, state.ledger.criteria)}
+            groups={findingGroups(state.ledger.findings, state.remediations)}
+            remediations={state.remediations}
+            diagnostics={state.ledger.diagnostics}
+          />
+        ),
+      },
+      {
+        id: 'calls',
+        label: 'Model calls',
+        content: <ExchangeList invocations={invocations} totals={invocationTotals(invocations)} />,
+      },
+    ];
+  }, [selected, pipeline]);
 
   const reconstructed = timeline.entries.filter(
     (entry) => entry.provenance === 'reconstructed',
@@ -134,6 +191,7 @@ export function InspectorClient() {
               behind={Math.max(0, timeline.entries.length - 1 - index)}
               onFollow={onFollow}
               provenanceNote={provenanceNote}
+              panels={panels}
             />
           )}
         </Stack>

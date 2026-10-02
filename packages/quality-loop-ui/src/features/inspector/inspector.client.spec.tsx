@@ -9,7 +9,7 @@ import {
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeRun, makeTwoIterationRun, RUN_SUMMARIES } from '../../testing/fixtures';
+import { makePipeline, makeRun, makeTwoIterationRun, RUN_SUMMARIES } from '../../testing/fixtures';
 import { InspectorClient } from './inspector.client';
 
 vi.mock('next/navigation', async () => {
@@ -43,6 +43,7 @@ const RUNS = {
   path: '/runs',
   body: { data: RUN_SUMMARIES, meta: { total: 3, limit: 30, offset: 0 } },
 };
+const PIPELINES = { path: '/pipelines', body: { data: [makePipeline()] } };
 
 async function advance(ms: number) {
   await act(async () => {
@@ -70,7 +71,7 @@ const lastSelectedKey = (): string | null =>
 
 describe('InspectorClient', () => {
   it('[QLU-5] reads what to inspect from the URL and writes a selection back to it', async () => {
-    stubApi([RUNS, { path: `/runs/${complete.runId}`, body: { data: complete } }]);
+    stubApi([RUNS, PIPELINES, { path: `/runs/${complete.runId}`, body: { data: complete } }]);
     setMockSearchParams({ run: complete.runId });
     renderWithTheme(<InspectorClient />);
     await advance(0);
@@ -84,7 +85,7 @@ describe('InspectorClient', () => {
   });
 
   it('[QLU-6] shows one action at a time, with what it changed in the loop’s memory', async () => {
-    stubApi([RUNS, { path: `/runs/${complete.runId}`, body: { data: complete } }]);
+    stubApi([RUNS, PIPELINES, { path: `/runs/${complete.runId}`, body: { data: complete } }]);
     setMockSearchParams({ run: complete.runId });
     const { rerender } = renderWithTheme(<InspectorClient />);
     await advance(0);
@@ -170,7 +171,7 @@ describe('InspectorClient', () => {
   });
 
   it('[QLU-5] with no run named, it asks for one rather than guessing', async () => {
-    stubApi([RUNS]);
+    stubApi([RUNS, PIPELINES]);
     setMockSearchParams({});
     renderWithTheme(<InspectorClient />);
     await advance(0);

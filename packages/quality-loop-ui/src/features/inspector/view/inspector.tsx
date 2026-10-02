@@ -1,5 +1,7 @@
 import { Alert, Badge, Heading, Stack, Surface, Text } from '@sysdesign/design-system';
 
+import type { ReactNode } from 'react';
+
 import type { ActionGroup } from '../model/action';
 import type { TimelineRow } from '../model/select';
 import type { InspectorState } from '../model/state';
@@ -37,6 +39,12 @@ export interface InspectorProps {
   onFollow(): void;
   /** A banner above everything — how much of this log is reconstructed. */
   provenanceNote: string;
+  /**
+   * Further readings of the selected action's state — the lenses, the policy,
+   * the ledger, the model calls. Built by the container, since each is a join
+   * against something the state alone does not carry.
+   */
+  panels?: readonly { id: string; label: string; content: ReactNode }[];
 }
 
 export function Inspector({
@@ -55,6 +63,7 @@ export function Inspector({
   behind,
   onFollow,
   provenanceNote,
+  panels,
 }: InspectorProps) {
   return (
     <Stack gap={5}>
@@ -105,6 +114,7 @@ export function Inspector({
                   before={selected.before}
                   after={selected.row.entry.after}
                   changes={selected.row.changes}
+                  panels={panels}
                 />
               </Stack>
             </Surface>
