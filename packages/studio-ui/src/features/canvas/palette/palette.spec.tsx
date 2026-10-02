@@ -47,6 +47,25 @@ describe('Palette', () => {
     expect(landmark.classList.contains('probe')).toBe(true);
   });
 
+  it('sticks each category heading flush to the top of the scroll area: the area has no top padding of its own for entries to show through', () => {
+    renderPalette();
+
+    const scrollArea = screen.getByRole('complementary', { name: 'Building blocks' });
+    expect(getComputedStyle(scrollArea).overflowY).toBe('auto');
+    expect(getComputedStyle(scrollArea).paddingTop).toBe('0px');
+    // The panel's top inset is the title's, and scrolls away with it.
+    const title = screen.getByRole('heading', { level: 2, name: 'Blocks' }).parentElement;
+    expect(title && getComputedStyle(title).paddingTop).not.toBe('0px');
+
+    for (const category of NODE_KIND_CATEGORIES.filter(
+      ({ id }) => kindsInCategory(id).length > 0,
+    )) {
+      const header = screen.getByRole('heading', { level: 3, name: category.label }).parentElement;
+      expect(header && getComputedStyle(header).position).toBe('sticky');
+      expect(header && getComputedStyle(header).top).toBe('0px');
+    }
+  });
+
   it('[UX-7] every palette entry carries its guide sentence as hover text', () => {
     renderPalette();
 

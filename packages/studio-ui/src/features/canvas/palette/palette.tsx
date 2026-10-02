@@ -18,15 +18,25 @@ import { NODE_ICONS } from '../nodes/node-icons';
 
 export const NODE_DRAG_MIME = 'application/sysdesign-node';
 
+/**
+ * The scroll area has no top padding of its own — the title carries it. A
+ * sticky header sticks to its scroll area's padding edge, so padding here
+ * would leave a band above each stuck header that the entries show through.
+ */
 const Root = styled.aside`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space[3]}px;
-  padding: ${({ theme }) => theme.space[4]}px;
+  padding: ${({ theme }) => `0 ${theme.space[4]}px ${theme.space[4]}px`};
   background: ${({ theme }) => theme.color.bg.surface};
   border: 1px solid ${({ theme }) => theme.color.border.subtle};
   border-radius: ${({ theme }) => theme.radius.lg};
   overflow-y: auto;
+`;
+
+/** The panel's top inset, scrolled away with the title rather than held by the scroll area. */
+const Title = styled.div`
+  padding-top: ${({ theme }) => theme.space[4]}px;
 `;
 
 const CategorySection = styled.section`
@@ -36,9 +46,9 @@ const CategorySection = styled.section`
 `;
 
 /**
- * Sticks to the top of the aside's own scroll while its section passes by —
- * the surface background and z-index keep the kind buttons sliding *under*
- * it rather than through it.
+ * Sticks flush to the top of the aside's own scroll while its section passes
+ * by — the surface background and z-index keep the kind buttons sliding
+ * *under* it rather than through it.
  */
 const CategoryHeader = styled.div`
   position: sticky;
@@ -125,8 +135,8 @@ export interface PaletteProps {
  * matching the filter) renders nothing rather than an empty shelf.
  *
  * Every entry is both draggable (drop on the canvas for exact placement) and
- * a real button (click/Enter adds it in the free slot nearest the visible
- * centre — the store decides where) — the keyboard path and the e2e path are
+ * a real button (click/Enter adds it in the free place nearest the middle of
+ * what is visible — the store decides where) — the keyboard path and the e2e path are
  * the same code path. While the canvas is read-only every entry is disabled;
  * the store would refuse the add anyway.
  *
@@ -153,7 +163,9 @@ export function Palette({ className }: PaletteProps) {
 
   return (
     <Root aria-label="Building blocks" className={className}>
-      <Heading level={2}>Blocks</Heading>
+      <Title>
+        <Heading level={2}>Blocks</Heading>
+      </Title>
       <Text size="sm" tone="muted" data-testid="blocks-hint">
         {readOnly ? CANVAS_COPY.readOnly : 'Drag onto the canvas, or press Enter to add.'}
       </Text>
