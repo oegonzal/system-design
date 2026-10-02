@@ -1,21 +1,24 @@
+import { LAYOUT_BLOCK } from '@sysdesign/contracts';
+
 /**
- * How much room a block takes, declared once. `SdNode` sizes itself from
- * these and the store places new blocks by them, so a block can never be
- * drawn wider than placement assumes.
+ * How much room a block takes. The numbers are the contract's `LAYOUT_BLOCK`
+ * — the one block the API lays a coach's revision out by — so `SdNode` sizes
+ * itself, the store places new blocks and a stored graph is laid out by the
+ * same block: one can never be drawn wider than any placement assumed.
  */
 
 /** A block's width range: it grows with its label up to `max`, then truncates. */
-export const NODE_WIDTH = { min: 132, max: 220 } as const;
+export const NODE_WIDTH = { min: 132, max: LAYOUT_BLOCK.width } as const;
 
 /**
  * The height assumed for a block React Flow has not measured yet: the icon
  * row's two text lines inside the block's padding, rounded up. Placement
  * reads a measured height whenever there is one.
  */
-export const NODE_ASSUMED_HEIGHT = 56;
+export const NODE_ASSUMED_HEIGHT = LAYOUT_BLOCK.height;
 
 /** The clear space kept between a placed block and its neighbours: room for a handle and a connection. */
-export const NODE_GAP = 24;
+export const NODE_GAP = LAYOUT_BLOCK.gap;
 
 export interface Size {
   width: number;

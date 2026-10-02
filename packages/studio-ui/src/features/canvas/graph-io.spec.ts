@@ -1,8 +1,11 @@
-import { canvasGraphSchema } from '@sysdesign/contracts';
+import { canvasGraphSchema, LAYOUT_BLOCK, layoutGraph } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
+import { grown, NODE_FOOTPRINT, NODE_GAP, overlaps } from './geometry';
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
+import { boxOf } from './placement';
+import type { SdNode } from './types';
 
 describe('graph-io', () => {
   it('[UX-3] round-trips a graph through React Flow shape and back, edge kinds included', () => {
@@ -117,17 +120,58 @@ describe('graph-io', () => {
     expect(onlyBlank.nodes[0]).not.toHaveProperty('operations');
   });
 
-  it('auto-grids nodes stored without a position', () => {
-    const { nodes } = fromCanvasGraph({
-      nodes: [
-        { id: 'a', kind: 'service', label: 'A' },
-        { id: 'b', kind: 'service', label: 'B' },
-      ],
-      edges: [],
+  describe('nodes stored without a position', () => {
+    const unplaced = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `ai-${index + 1}`,
+        kind: 'service' as const,
+        // As long as a label gets: the widest a block is ever drawn.
+        label: `Service ${index + 1} with a label long enough to reach the widest a block can be`,
+      }));
+
+    /** No two blocks closer than the gap, even at their widest and before any is measured. */
+    function expectClearOfEachOther(nodes: readonly SdNode[]) {
+      const boxes = nodes.map(boxOf);
+      for (const [index, a] of boxes.entries()) {
+        for (const b of boxes.slice(index + 1)) {
+          expect(overlaps(grown(a, NODE_GAP), b), `${nodes[index]?.id} crowds another block`).toBe(
+            false,
+          );
+        }
+      }
+    }
+
+    it('are laid out by the contract’s layout — the one the API gives a coach’s revision — so none overlaps another, however long the labels', () => {
+      const graph = {
+        nodes: unplaced(9),
+        edges: [
+          { id: 'e-1', source: 'ai-1', target: 'ai-2', kind: 'sync' as const },
+          { id: 'e-2', source: 'ai-2', target: 'ai-3', kind: 'sync' as const },
+        ],
+      };
+
+      const { nodes } = fromCanvasGraph(graph);
+
+      expect(nodes.map((node) => node.position)).toEqual(
+        layoutGraph(graph).nodes.map((node) => node.position),
+      );
+      expectClearOfEachOther(nodes);
     });
 
-    expect(nodes[0].position).not.toEqual(nodes[1].position);
-    expect(nodes.every((node) => Number.isFinite(node.position.x))).toBe(true);
+    it('never move the nodes that were placed, and never land on them — what the author arranged stays where it is', () => {
+      const placed = makeGraph().nodes;
+      const { nodes } = fromCanvasGraph({ nodes: [...placed, ...unplaced(5)], edges: [] });
+
+      expect(nodes.slice(0, placed.length).map((node) => node.position)).toEqual(
+        placed.map((node) => node.position),
+      );
+      expectClearOfEachOther(nodes);
+    });
+
+    it('the canvas draws and places by the block the layout assumes', () => {
+      expect(NODE_FOOTPRINT).toEqual({ width: LAYOUT_BLOCK.width, height: LAYOUT_BLOCK.height });
+      expect(NODE_GAP).toBe(LAYOUT_BLOCK.gap);
+    });
   });
 
   it('drops an edge whose endpoint is no longer on the canvas', () => {

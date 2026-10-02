@@ -1,4 +1,11 @@
-import type { CanvasEdge, CanvasGraph, CanvasNode, NodeOperation } from '@sysdesign/contracts';
+import {
+  LAYOUT_ORIGIN,
+  layoutGraph,
+  type CanvasEdge,
+  type CanvasGraph,
+  type CanvasNode,
+  type NodeOperation,
+} from '@sysdesign/contracts';
 
 import type { SdEdge, SdNode } from './types';
 
@@ -7,16 +14,6 @@ import type { SdEdge, SdNode } from './types';
  * React Flow's node/edge types. Everything here is pure — the store calls
  * these, components never do.
  */
-
-/** Fallback layout for nodes stored without a position (a coach's new node, an old revision). */
-const GRID = { columns: 4, originX: 60, originY: 60, stepX: 220, stepY: 140 };
-
-function gridPosition(index: number): { x: number; y: number } {
-  return {
-    x: GRID.originX + (index % GRID.columns) * GRID.stepX,
-    y: GRID.originY + Math.floor(index / GRID.columns) * GRID.stepY,
-  };
-}
 
 /**
  * An operation row is a declaration once it has a name — the schema's own
@@ -86,12 +83,18 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
   return { nodes: outNodes, edges: outEdges };
 }
 
-/** Hydrate a stored graph into React Flow elements. Missing positions auto-grid. */
+/**
+ * Hydrate a stored graph into React Flow elements. A node stored without a
+ * position (an old revision, a node nothing placed) is given one by the
+ * contract's `layoutGraph` — the layout the API gives a coach's revision —
+ * beside the nodes it connects to and a whole block clear of every other;
+ * a node that has a position keeps it exactly.
+ */
 export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: SdEdge[] } {
-  const nodes: SdNode[] = graph.nodes.map((node, index) => ({
+  const nodes: SdNode[] = layoutGraph(graph).nodes.map((node) => ({
     id: node.id,
     type: 'sd',
-    position: node.position ?? gridPosition(index),
+    position: node.position ?? LAYOUT_ORIGIN,
     data: {
       kind: node.kind,
       label: node.label,
