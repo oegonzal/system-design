@@ -20,6 +20,17 @@ import type {
 
 import type { AdvisoryMemory } from '../../../core/ports';
 
+/**
+ * Where a run's recall is written as it moves — the recall run's id once it
+ * opens, then the outcome — replacing the last, and only while the row is
+ * still `running`. The runs module's own port, beside the core's
+ * `RunRepository`: the engine never records, reads or interprets a recall,
+ * so its ports do not name one.
+ */
+export interface RunRecallRecorder {
+  recordRecall(runId: string, recall: RunRecallDto): Promise<void>;
+}
+
 /** Run one child to completion — the runs service's own `execute`, so the child is an ordinary recorded run. */
 export type ChildRunner = (request: StartQualityRunRequest) => Promise<QualityRunDto>;
 

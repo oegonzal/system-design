@@ -95,6 +95,21 @@ describe('quality-loop guarantees', () => {
     ]);
   });
 
+  it('the core names no recall contract: a run recalls in the runs module, never in the engine', () => {
+    // The engine takes advisory memories as `{ ref, text }` and knows nothing
+    // of where they came from; recording a recall is the runs module's port.
+    // Every name the recall contract exports is read from the contract itself,
+    // so a name added there is guarded here without a second list.
+    const contract = read(join(REPO, 'packages/contracts/src/lib/quality-loop/recall.ts'));
+    const names = [...contract.matchAll(/export (?:const|interface|type|function) (\w+)/g)].map(
+      ([, name]) => name,
+    );
+    expect(names).toEqual(expect.arrayContaining(['RunRecallDto', 'recallOf']));
+    const naming = new RegExp(`\\b(?:${names.join('|')})\\b`);
+    const offenders = files.filter((path) => naming.test(read(path)));
+    expect(offenders.map(relative)).toEqual([]);
+  });
+
   it('the goal reaches the model through the prompting module only', () => {
     const readers = files.filter(
       (path) => /goalSection\(/.test(read(path)) && !path.endsWith('prompting.ts'),

@@ -17,6 +17,7 @@ import {
 
 import { isSettled, type RunProgress, type RunRecord } from '../../../core/contracts';
 import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/ports';
+import type { RunRecallRecorder } from '../recall/run-recall';
 import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
 import { fromRows } from './from-rows';
 import type { RunRows } from './rows';
@@ -38,7 +39,7 @@ import { toSummary } from './to-summary';
  * sweep write the header alone, so an iteration once recorded is final.
  */
 @Injectable()
-export class MikroOrmRunRepository implements RunRepository {
+export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
   constructor(private readonly em: EntityManager) {}
 
   async open(record: RunRecord, pipelineVersion: string): Promise<void> {

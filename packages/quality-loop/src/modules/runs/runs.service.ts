@@ -29,10 +29,11 @@ import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
 import type { RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
-import { briefingOf, type RunRecallSlot } from './recall/run-recall';
+import { briefingOf, type RunRecallRecorder, type RunRecallSlot } from './recall/run-recall';
 import {
   PIPELINES_TOKEN,
   QUALITY_LOOP_LLM,
+  RUN_RECALL_RECORDER,
   RUN_RECALL_SLOT,
   RUN_REPOSITORY,
   TRACE_STORE,
@@ -57,6 +58,7 @@ export class RunsService {
     @Inject(RUN_REPOSITORY) private readonly repository: RunRepository,
     @Inject(RUN_JANITOR_OPTIONS) private readonly janitor: RunJanitorOptions,
     @Inject(RUN_RECALL_SLOT) private readonly recall: RunRecallSlot,
+    @Inject(RUN_RECALL_RECORDER) private readonly recalls: RunRecallRecorder,
   ) {
     // A malformed pipeline fails boot, never a run.
     for (const definition of registry.values()) validatePipeline(definition);
@@ -329,7 +331,7 @@ export class RunsService {
     // Each move of the recall is published the same way, before any stage runs.
     const onRecall = (recall: RunRecallDto) => {
       record.recall = recall;
-      write('recall', () => this.repository.recordRecall(record.runId, recall));
+      write('recall', () => this.recalls.recordRecall(record.runId, recall));
     };
     try {
       const memories = await this.recallLessons(record, onRecall);

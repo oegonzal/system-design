@@ -7,3 +7,5 @@ export const RUN_REPOSITORY = Symbol('RUN_REPOSITORY');
 export const RUN_DUMP_DIR = Symbol('RUN_DUMP_DIR');
 /** The slot a module that can recall binds itself into — see `recall/run-recall.ts`. */
 export const RUN_RECALL_SLOT = Symbol('RUN_RECALL_SLOT');
+/** Where a run's recall is recorded — the runs module's own port, kept out of the core's `RunRepository`. */
+export const RUN_RECALL_RECORDER = Symbol('RUN_RECALL_RECORDER');
