@@ -12,6 +12,7 @@ import {
 import { graderRequests } from '../support/grader';
 import { ORDER_HISTORY_DOCUMENT } from '../support/library-fixtures';
 import { PromptsPage } from '../support/prompts.page';
+import { uniqueName } from '../support/unique';
 
 /**
  * The three ways a prompt comes to exist — drafted by the grader's prompt
@@ -101,6 +102,49 @@ test.describe('prompts', () => {
     ).toBeVisible();
     await expect(prompts.promptCards.filter({ hasText: 'authored' })).toHaveCount(0);
     await expect(prompts.promptCards.filter({ hasText: 'generated' })).toHaveCount(0);
+  });
+
+  test('[UX-13] a prompt opened at its own address names the tab after itself', async ({
+    page,
+    request,
+  }) => {
+    // A direct load, not a navigation from the list: the route's generic
+    // title arrives with the page, and the prompt's own has to win over it.
+    const prompt = await authorPrompt(request, { title: uniqueName('Titled prompt') });
+    const prompts = new PromptsPage(page);
+    await prompts.openDetail(prompt.id);
+
+    await expect(page).toHaveTitle(`${prompt.title} · System Design Studio`);
+  });
+
+  test('[UX-13] Back on a composer with unsaved words asks first, stays when refused, and leaves when allowed', async ({
+    page,
+  }) => {
+    const prompts = new PromptsPage(page);
+    await prompts.open();
+    await prompts.openComposer();
+    await page.getByRole('tab', { name: 'Write' }).click();
+    await page.getByTestId('compose-title').fill('Half a prompt');
+
+    // The browser's own Back, driven from the page: the guard asks before the
+    // address moves. The handler is registered first — a dialog nobody
+    // answers freezes the page.
+    let asked: string | null = null;
+    page.once('dialog', (dialog) => {
+      asked = dialog.message();
+      void dialog.dismiss();
+    });
+    await page.evaluate(() => history.back());
+    await expect.poll(() => asked).toContain('has not been saved');
+    await expect(page).toHaveURL(/\/prompts\/new$/);
+    await expect(page.getByTestId('compose-title')).toHaveValue('Half a prompt');
+
+    // A refusal spends the page's right to hold the next Back; touching the
+    // page earns it back, and this time the author lets it go.
+    await page.getByTestId('compose-title').fill('Half a prompt, still');
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.evaluate(() => history.back());
+    await page.waitForURL(/\/prompts$/);
   });
 
   test('[UX-14] a written prompt’s criteria show as chips grouped by kind, and can be re-derived while nothing was graded against them', async ({

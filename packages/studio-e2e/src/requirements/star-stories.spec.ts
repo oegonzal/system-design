@@ -58,6 +58,18 @@ test.describe('STAR story repository', () => {
     await expect(stories.storyCard(alphaTitle)).toHaveCount(0);
   });
 
+  test('[UX-13] a story opened at its own address names the tab after itself', async ({
+    page,
+    request,
+  }) => {
+    const title = uniqueName('Titled story');
+    const story = await createStory(request, { title, ...STORY_BODY, tags: [] });
+
+    await page.goto(`/stories/${story.id}`);
+
+    await expect(page).toHaveTitle(`${title} · System Design Studio`);
+  });
+
   test('[STAR-3] a story links to a prompt and an experience', async ({ page, request }) => {
     const prompt = await authorPrompt(request, { title: uniqueName('Linked prompt') });
     const experience = await ticketingExperience(request);
