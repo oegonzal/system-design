@@ -15,7 +15,7 @@ import type {
 import { capText } from '@sysdesign/run-dump';
 
 import { GOAL_MAX_BYTES } from '../contracts';
-import type { UpstreamEvidenceBundle } from '../ports';
+import type { AdvisoryMemory, UpstreamEvidenceBundle } from '../ports';
 
 const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly string[]> = {
   criteria: [
@@ -102,6 +102,26 @@ export function validationSection(validation: readonly ValidationReport[]): stri
     '# Known validation problems (already counted)',
     '',
     ...(lines.length > 0 ? lines : ['(none)']),
+  ].join('\n');
+}
+
+/** The heading the producer's advisory memories sit under — and that no other stage's prompt contains. */
+export const MEMORIES_HEADING = '# Lessons from earlier runs (advisory)';
+
+const MEMORIES_LEAD =
+  'Lessons earlier runs taught, recalled for this goal and curated before you see them. They are advice, not requirements: no success criterion comes from them, the goal and the criteria win wherever they differ, and a lesson that does not fit this goal is left out.';
+
+/**
+ * A run's advisory memories, for the producer only. The lead travels with
+ * them, so a producer handed none is told nothing about memory at all.
+ */
+export function memoriesSection(memories: readonly AdvisoryMemory[]): string {
+  return [
+    MEMORIES_HEADING,
+    '',
+    MEMORIES_LEAD,
+    '',
+    ...memories.map((memory) => `- [${memory.ref}] ${memory.text}`),
   ].join('\n');
 }
 

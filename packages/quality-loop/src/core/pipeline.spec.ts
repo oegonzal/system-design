@@ -44,6 +44,31 @@ describe('validatePipeline', () => {
     ).toThrow(/unique/);
   });
 
+  it('[QL-32] a producer may be briefed with memories; a lens has no way to ask for them', () => {
+    const base = tinyPipeline();
+    const briefed = tinyPipeline({
+      producer: { ...base.producer, consumes: ['criteria', 'memories'] },
+    });
+    expect(() => validatePipeline(asAny(briefed))).not.toThrow();
+    expect(describePipeline(asAny(briefed)).producer).toEqual({
+      consumes: ['criteria', 'memories'],
+    });
+    expect(() =>
+      validatePipeline(
+        asAny(tinyPipeline({ critics: [{ ...base.critics[0], consumes: ['memories' as never] }] })),
+      ),
+    ).toThrow(/consumes unknown evidence memories/);
+    expect(() =>
+      validatePipeline(
+        asAny(
+          tinyPipeline({
+            evaluators: [{ ...base.evaluators[0], consumes: ['memories' as never] }],
+          }),
+        ),
+      ),
+    ).toThrow(/consumes unknown evidence memories/);
+  });
+
   it('[QL-1] refuses a lens consuming evidence nothing produces before it, and evidence it does not know', () => {
     const base = tinyPipeline();
     expect(() =>

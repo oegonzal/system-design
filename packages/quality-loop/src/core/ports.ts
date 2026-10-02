@@ -31,6 +31,20 @@ import type { LlmExchange } from '@sysdesign/llm';
 
 import type { RunProgress, RunRecord, TaskContract } from './contracts';
 
+/**
+ * A lesson a run was handed before it started, for its producer alone. The
+ * engine neither knows nor asks where it came from — a memory store, a
+ * person — and never interprets it: it is shown verbatim, under its own
+ * advisory heading, to a producer that declared it consumes `memories`, and
+ * to no other stage. It is not part of the contract, so no criterion, finding
+ * or score can rest on it.
+ */
+export interface AdvisoryMemory {
+  /** How the host names it, so a reader of the prompt can trace it back. */
+  ref: string;
+  text: string;
+}
+
 export interface ProducerInput<T> {
   contract: TaskContract<T>;
   mode: ProduceMode;
@@ -42,6 +56,8 @@ export interface ProducerInput<T> {
    * became best. `remediations` are the best iteration's and cannot say it.
    */
   refusals: RemediationNote[];
+  /** The run's advisory memories, the same on every call; empty when it was handed none. */
+  memories: readonly AdvisoryMemory[];
 }
 
 export interface Produced<T> {

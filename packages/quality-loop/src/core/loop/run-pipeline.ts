@@ -25,6 +25,7 @@ import { normalize } from '../evidence/normalize';
 import { validatePipeline, type PipelineDefinition } from '../pipeline';
 import {
   emptyUpstream,
+  type AdvisoryMemory,
   type Critic,
   type Evaluator,
   type ExchangeSink,
@@ -50,6 +51,12 @@ export interface RunInput {
    * service (same pipeline and version, equal rubric), never by the loop.
    */
   adopted?: IterationTrace;
+  /**
+   * Advisory lessons for the producer alone, on every call it makes. Refused
+   * unless the pipeline's producer declares it consumes `memories`; never
+   * shown to the deriver or a lens, and never part of the contract.
+   */
+  memories?: readonly AdvisoryMemory[];
 }
 
 /**
@@ -76,6 +83,9 @@ export async function runPipeline<T>(
   const problems = input.criteria ? rubricProblems(input.criteria, definition.task) : [];
   if (problems.length > 0) {
     throw new Error(`pipeline ${definition.id}: rubric rejected: ${problems.join('; ')}`);
+  }
+  if ((input.memories?.length ?? 0) > 0 && !definition.producer.consumes.includes('memories')) {
+    throw new Error(`pipeline ${definition.id}: its producer does not consume memories`);
   }
   return runLoop(
     materialize(definition, deps.llm, deps.sink),
@@ -302,6 +312,7 @@ async function produceOrAdopt<T>(
     prior: mode === 'revise' ? (best?.artifact ?? null) : null,
     remediations: best?.remediations ?? [],
     refusals: refusalsOf(previous, best),
+    memories: loop.input.memories ?? [],
   });
   const { output } = loop.definition.task;
   const artifact =

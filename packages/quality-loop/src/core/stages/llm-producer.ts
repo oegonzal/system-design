@@ -1,19 +1,20 @@
 /**
- * The generator. It sees the goal, the criteria and — on a revise or retry —
- * the remediations the policy selected, in the lenses' own words, and why a
- * validator refused its last attempt, when one did. It never sees a score:
- * the producer improves against reasons, not against a number.
+ * The generator. It sees the goal, the criteria, any advisory memories the run
+ * was handed, and — on a revise or retry — the remediations the policy
+ * selected, in the lenses' own words, and why a validator refused its last
+ * attempt, when one did. It never sees a score: the producer improves against
+ * reasons, not against a number.
  */
-import type { ProduceMode, RemediationNote } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { TaskContract, TaskSpec } from '../contracts';
+import type { TaskSpec } from '../contracts';
 import type { ProducerSpec } from '../pipeline';
-import type { Producer } from '../ports';
+import type { Producer, ProducerInput } from '../ports';
 import {
   criteriaSection,
   goalSection,
   joinSections,
+  memoriesSection,
   remediationsSection,
   systemPrompt,
 } from './prompting';
@@ -31,21 +32,21 @@ const INSTRUCTIONS = {
 
 /**
  * What the producer is briefed with: the goal, the criteria if it consumes
- * them, on a revise its previous artifact and what to fix, on a retry what to
+ * them, the run's advisory memories if it consumes those and was handed any,
+ * on a revise its previous artifact and what to fix, on a retry what to
  * avoid, and the instruction for the mode.
  */
 function briefing<T>(
   task: TaskSpec<T>,
   spec: ProducerSpec,
-  contract: TaskContract<T>,
-  mode: ProduceMode,
-  prior: T | null,
-  remediations: readonly RemediationNote[],
-  refusals: readonly RemediationNote[],
+  { contract, mode, prior, remediations, refusals, memories }: ProducerInput<T>,
 ): { sections: string[]; clipped: boolean } {
   const goal = goalSection(contract.goal);
   const sections = [goal.text];
   if (spec.consumes.includes('criteria')) sections.push(criteriaSection(contract.criteria));
+  if (spec.consumes.includes('memories') && memories.length > 0) {
+    sections.push(memoriesSection(memories));
+  }
   if (mode === 'revise' && prior !== null) {
     sections.push(
       ['# Your previous artifact', '', task.output.render(prior)].join('\n'),
@@ -65,8 +66,8 @@ export function createLlmProducer<T>(
   llm: LlmClient,
 ): Producer<T> {
   return {
-    async produce({ contract, mode, prior, remediations, refusals }) {
-      const briefed = briefing(task, spec, contract, mode, prior, remediations, refusals);
+    async produce(input) {
+      const briefed = briefing(task, spec, input);
       const output = await llm.completeStructured({
         system: systemPrompt('producer', spec.persona),
         user: joinSections(...briefed.sections),

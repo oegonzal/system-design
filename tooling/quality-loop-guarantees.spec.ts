@@ -83,6 +83,18 @@ describe('quality-loop guarantees', () => {
     expect(offenders.map(relative)).toEqual([]);
   });
 
+  it('advisory memories reach the producer and no other stage', () => {
+    // A lesson may shape an artifact; it may never shape a grade. Every stage
+    // builds its prompt from the prompting module's sections, so the one call
+    // site of the memories section is the whole of who can see them.
+    const readers = files.filter(
+      (path) => /memoriesSection\(/.test(read(path)) && !path.endsWith('prompting.ts'),
+    );
+    expect(readers.map(relative)).toEqual([
+      'packages/quality-loop/src/core/stages/llm-producer.ts',
+    ]);
+  });
+
   it('the goal reaches the model through the prompting module only', () => {
     const readers = files.filter(
       (path) => /goalSection\(/.test(read(path)) && !path.endsWith('prompting.ts'),

@@ -90,8 +90,14 @@ export type GoalSource = (typeof GOAL_SOURCES)[number];
 export const UPSTREAM_EVIDENCE = ['findings', 'results'] as const;
 export type UpstreamEvidence = (typeof UPSTREAM_EVIDENCE)[number];
 
-/** What the producer is briefed with beyond the goal. Empty means the goal alone. */
-export const PRODUCER_BRIEFING = ['criteria'] as const;
+/**
+ * What the producer is briefed with beyond the goal. Empty means the goal
+ * alone. `criteria`: the rubric the run is judged against. `memories`:
+ * advisory lessons the run was handed before it started — shown to the
+ * producer under their own heading, never to the deriver, a critic or an
+ * evaluator, so they can inform an artifact and never a grade.
+ */
+export const PRODUCER_BRIEFING = ['criteria', 'memories'] as const;
 export type ProducerBriefing = (typeof PRODUCER_BRIEFING)[number];
 
 /** `block` stops the iteration before any model call; `warn` only informs. */

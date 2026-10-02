@@ -118,15 +118,18 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
   // The coach. It sees the criteria WITH their ids: a binding names a
   // criterion by id, and the author may have left one unbound — without the
-  // ids the coach can only guess, and `references` refuses a guess. It still
-  // revises against the remediations the panel selected, never against a
-  // score. Every cap is sized from the recorded runs (the spec holds the
-  // measurements): a full coached canvas has taken up to 21.1k output tokens,
-  // thinking included, critics up to 9.8k and evaluators up to 6.8k.
+  // ids the coach can only guess, and `references` refuses a guess. A coach
+  // run that recalled lessons for its prompt hands them to the coach too, as
+  // advice under their own heading; the lenses never see them, so a lesson
+  // can shape a revision and never a grade. It still revises against the
+  // remediations the panel selected, never against a score. Every cap is
+  // sized from the recorded runs (the spec holds the measurements): a full
+  // coached canvas has taken up to 21.1k output tokens, thinking included,
+  // critics up to 9.8k and evaluators up to 6.8k.
   producer: {
     persona: producer,
     maxTokens: 28000,
-    consumes: ['criteria'],
+    consumes: ['criteria', 'memories'],
   },
 
   validators: [referencesValidator, structureValidator],

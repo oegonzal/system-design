@@ -308,6 +308,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The dump is served read-only under the run that owns it: a sorted listing with byte counts, one file by the exact name the listing gave, and a prompt the run record deliberately leaves out of its trace readable there. Being rooted under the run means it neither shadows the run record nor is shadowed by it, and a missing dump or an unknown name is a 404 that says only that.',
   },
+  {
+    id: 'QL-32',
+    statement:
+      'A coach run recalls lessons for its prompt and hands them to its producer alone: they are curated by a recorded memory-recall run, shown under their own advisory heading to a producer that declares it consumes memories and never to the deriver, a critic or an evaluator, and recorded on the run with their provenance — recalled, empty or skipped, with the reason, the recall run and the lessons the producer saw — while a recall that cannot run or finds nothing never fails the coach, a grade never recalls, and the coach panel says what was recalled.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
