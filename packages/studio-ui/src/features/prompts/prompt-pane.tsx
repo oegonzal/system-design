@@ -66,7 +66,7 @@ export function PromptPane({
           </Badge>
           {prompt.status === 'archived' ? (
             <Badge tone="neutral" data-testid="prompt-archived">
-              archived
+              {humanizeToken(prompt.status)}
             </Badge>
           ) : null}
         </Stack>

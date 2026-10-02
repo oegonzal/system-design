@@ -67,6 +67,26 @@ describe('PromptsBrowser', () => {
     });
   });
 
+  it('badges a prompt’s source and an archived prompt’s status in the same words', async () => {
+    stubApi([
+      EXPERIENCES,
+      promptsRoute([
+        makePrompt({ id: 'prompt-1', source: 'generated', status: 'archived' }),
+        makePrompt({ id: 'prompt-2', title: 'Design a rate limiter' }),
+      ]),
+    ]);
+
+    renderWithTheme(<PromptsBrowser />);
+
+    const [archived, active] = within(await screen.findByTestId('prompt-list')).getAllByRole(
+      'listitem',
+    );
+    expect(within(archived).getByText('Generated')).toBeTruthy();
+    expect(within(archived).getByText('Archived')).toBeTruthy();
+    expect(within(active).getByText('Authored')).toBeTruthy();
+    expect(within(active).queryByText(/archived/i)).toBeNull();
+  });
+
   it('says when no prompt matches the filters, and clears them in one click', async () => {
     const user = userEvent.setup();
     setMockSearchParams({ source: 'generated' });

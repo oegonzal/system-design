@@ -242,7 +242,9 @@ export function PromptsBrowser() {
                       {prompt.criteria.length > 0 ? (
                         <Badge tone="accent">{prompt.criteria.length} criteria</Badge>
                       ) : null}
-                      {prompt.status === 'archived' ? <Badge tone="neutral">archived</Badge> : null}
+                      {prompt.status === 'archived' ? (
+                        <Badge tone="neutral">{humanizeToken(prompt.status)}</Badge>
+                      ) : null}
                       <Text as="span" size="sm" tone="muted">
                         {new Date(prompt.createdAt).toLocaleDateString('en-US')}
                       </Text>

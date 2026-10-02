@@ -57,7 +57,7 @@ describe('PromptPane', () => {
 
   it('[UX-14] badges an archived prompt', () => {
     renderWithTheme(<PromptPane prompt={makePrompt({ status: 'archived' })} />);
-    expect(screen.getByTestId('prompt-archived').textContent).toBe('archived');
+    expect(screen.getByTestId('prompt-archived').textContent).toBe('Archived');
   });
 
   it('[UX-14] shows the normalizing state while the rubric is derived', () => {

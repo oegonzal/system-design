@@ -21,7 +21,7 @@ test.describe('an archived prompt', () => {
     await canvas.ready();
 
     await canvas.promptTab.click();
-    await expect(canvas.promptArchivedBadge).toHaveText('archived');
+    await expect(canvas.promptArchivedBadge).toHaveText('Archived');
     await buildNaiveDesign(canvas);
     await canvas.expectSubmitDisabled();
     await canvas.expectCoachDisabled(/archived/);
