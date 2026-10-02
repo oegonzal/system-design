@@ -35,11 +35,18 @@ export interface EvaluationFindingDto {
   fixability: Fixability;
   criterionIds: string[];
   /**
-   * Every place the lens pointed at that the stored revision could place —
-   * the refs it cited, then the ids its rationale names — with its label and
-   * the author's key.
+   * Every place the lens CITED that the stored revision could place — the
+   * finding's ground, each with its label and the author's key. What the
+   * chips show, what the canvas highlights, where an export says it is.
    */
   locations: EvaluationLocationDto[];
+  /**
+   * Places the rationale names besides the ones it cited, placed the same
+   * way — so its prose reads in labels (`proseLocations`), and for nothing
+   * else: a sentence that says "stops at edge.4" of an edge it never cited
+   * does not make edge.4 the finding's.
+   */
+  mentions: EvaluationLocationDto[];
   /** The `locations` of part `node` / `edge`, by the author's ids — what the canvas highlights. */
   nodeIds: string[];
   edgeIds: string[];
@@ -55,13 +62,24 @@ export interface CriterionResultDto {
   result: EvidenceResult;
   confidence: AxisFactorLevel | null;
   rationale: string | null;
-  /**
-   * Every place the rationale's lens cited — by ref, or by naming a positional
-   * id in its prose — that the stored revision could place, so a reader sees
-   * the label where the model wrote `edge.5`.
-   */
+  /** Every place the rationale's sample cited as its evidence that the stored revision could place. */
   locations: EvaluationLocationDto[];
+  /** Places the rationale names besides the cited ones — for reading its prose in labels, nothing else. */
+  mentions: EvaluationLocationDto[];
 }
+
+/**
+ * Every place a lens's prose may name, for substituting labels into it: the
+ * ones it cited and the ones it merely mentioned, each once. A glossary for
+ * the words, never a list of where the finding is.
+ */
+export const proseLocations = ({
+  locations,
+  mentions,
+}: Pick<
+  EvaluationFindingDto | CriterionResultDto,
+  'locations' | 'mentions'
+>): EvaluationLocationDto[] => [...locations, ...mentions];
 
 /** A lens sample that should have answered and did not: the grade stands on the samples that did. */
 export interface DegradedSampleDto {

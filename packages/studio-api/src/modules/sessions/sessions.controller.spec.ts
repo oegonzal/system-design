@@ -422,6 +422,7 @@ describe('sessions', () => {
           locations: [
             { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
           ],
+          mentions: [],
           nodeIds: ['api'],
           edgeIds: [],
           locationRefs: ['node.2'],

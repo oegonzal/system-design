@@ -340,6 +340,7 @@ export function makeFinding(overrides: Partial<EvaluationFindingDto> = {}): Eval
         name: 'Orders DB',
       },
     ],
+    mentions: [],
     nodeIds: ['n-3'],
     edgeIds: [],
     locationRefs: ['node.3'],
@@ -359,6 +360,7 @@ export function makeCriterionResult(
     confidence: 'high',
     rationale: 'The binding traces the read from the client to the orders database.',
     locations: [],
+    mentions: [],
     ...overrides,
   };
 }

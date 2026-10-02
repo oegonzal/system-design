@@ -105,7 +105,7 @@ async function finishedRun(): Promise<QualityRunDto> {
 }
 
 describe('toEvaluationDto', () => {
-  it('[DEL-4] grounds every cited ref onto the graded submission with its part, key and label, keeps every ref verbatim, carries the decision reason, and borrows the lens’s words when the wire has none', async () => {
+  it('[DEL-4] grounds every cited ref onto the graded submission with its part, key and label — a place the prose merely names is a mention, never the finding’s — keeps every ref verbatim, carries the decision reason, and borrows the lens’s words when the wire has none', async () => {
     const run = await finishedRun();
     const dto = toEvaluationDto(run, 1, submission);
 
@@ -129,11 +129,14 @@ describe('toEvaluationDto', () => {
           { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
           // node.9 names nothing on the revision and is placed nowhere.
           { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
-          // Named by the lens's words and never cited: placed all the same, so
-          // the sentence reads in labels. `Node.2` is node.2, already placed.
+        ],
+        // Named by the lens's words and never cited: placed so the sentence
+        // reads in labels, and nowhere else. `Node.2` is node.2, already cited.
+        mentions: [
           { ref: 'node.3', label: 'db · database · DB', part: 'node', key: 'db', name: 'DB' },
         ],
-        nodeIds: ['api', 'db'],
+        // The canvas highlights what was cited; the mentioned db is not lit.
+        nodeIds: ['api'],
         edgeIds: ['e-1'],
         locationRefs: ['binding.1', 'edge.1', 'node.2', 'node.9', 'narration.1'],
         criterionIds: ['c2'],
@@ -143,16 +146,26 @@ describe('toEvaluationDto', () => {
       }),
     ]);
     expect(dto.criterionResults).toEqual([
-      { criterionId: 'c1', result: 'pass', confidence: 'high', rationale: null, locations: [] },
+      {
+        criterionId: 'c1',
+        result: 'pass',
+        confidence: 'high',
+        rationale: null,
+        locations: [],
+        mentions: [],
+      },
       {
         criterionId: 'c2',
         result: 'partial',
         confidence: 'high',
         rationale: 'sized, but narration.1 says peak while edge.1 and node.12 carry none',
-        // The sample's own ref, then every id its prose names that the revision has — so the
-        // studio can read the prose in labels. node.12 names nothing here and is not invented.
+        // The sample's own evidence, then every id its prose names besides that the revision
+        // has — so the studio can read the prose in labels. node.12 names nothing here and is
+        // not invented.
         locations: [
           { ref: 'node.2', label: 'api · service · API', part: 'node', key: 'api', name: 'API' },
+        ],
+        mentions: [
           { ref: 'narration.1', label: 'c2 narration', part: 'narration', key: 'c2' },
           { ref: 'edge.1', label: 'e-1 · client → api (sync)', part: 'edge', key: 'e-1' },
         ],

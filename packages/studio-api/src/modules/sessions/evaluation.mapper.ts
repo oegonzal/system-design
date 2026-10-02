@@ -139,19 +139,6 @@ const endedRun = (run: QualityRunDto, iteration: number): boolean =>
 const nothingAssessed = (dimensions: Record<string, number | null>): boolean =>
   Object.values(dimensions).every((value) => value === null);
 
-/**
- * Every place a lens points at: the refs it cited, then the ids its prose
- * names — in any case, runs and lists included, by the contract's grammar —
- * each once, so a reader is shown a label wherever the model wrote a position.
- */
-const cited = (
-  refs: readonly string[],
-  prose: string | null,
-  index: ReadonlyMap<string, SubmissionLocation>,
-): string[] => [
-  ...new Set([...refs, ...(prose === null ? [] : locationIdsIn(prose, [...index.values()]))]),
-];
-
 /** The refs the stored revision can place, each with its label, part, the author's key and the part's name. */
 const placed = (
   refs: readonly string[],
@@ -164,17 +151,39 @@ const placed = (
     return [{ ref, label, part, key, ...(name !== null ? { name } : {}) }];
   });
 
+/**
+ * Where a lens pointed, in two lists that are never merged. `locations` is
+ * what it CITED — by ref — that the revision can place: the finding's ground.
+ * `mentions` is every other place its prose names — in any case, runs and
+ * lists included, by the contract's grammar — placed the same way, so the
+ * sentence reads in labels: a lens that says "stops at edge.4" of an edge it
+ * never cited has not found anything at edge.4. A ref the revision cannot
+ * place is kept verbatim in `locationRefs` and nowhere else.
+ */
+const pointed = (
+  refs: readonly string[],
+  prose: string | null,
+  index: ReadonlyMap<string, SubmissionLocation>,
+): { locations: EvaluationLocationDto[]; mentions: EvaluationLocationDto[] } => {
+  const cited = new Set(refs);
+  const named = prose === null ? [] : locationIdsIn(prose, [...index.values()]);
+  return {
+    locations: placed([...cited], index),
+    mentions: placed(
+      named.filter((ref) => !cited.has(ref)),
+      index,
+    ),
+  };
+};
+
 const toFinding = (
   finding: ConfirmedFinding,
   it: IterationTrace,
   index: ReadonlyMap<string, SubmissionLocation>,
 ): EvaluationFindingDto => {
   const rationale = finding.rationale ?? criticRationale(it.critics, finding);
-  // Every place the lens cited, then every one its words name besides — a
-  // sentence may say "stops at edge.4" of an edge it never cited. A ref the
-  // stored revision cannot place is kept verbatim in `locationRefs` and
-  // nowhere else.
-  const locations = placed(cited(finding.locationRefs, rationale, index), index);
+  const { locations, mentions } = pointed(finding.locationRefs, rationale, index);
+  // The canvas highlights what the finding is about: the cited places only.
   const keysOf = (part: EvaluationLocationDto['part']) =>
     locations.flatMap((location) =>
       location.part === part && location.key !== null ? [location.key] : [],
@@ -188,6 +197,7 @@ const toFinding = (
     fixability: finding.fixability,
     criterionIds: [...finding.criterionIds],
     locations,
+    mentions,
     nodeIds: keysOf('node'),
     edgeIds: keysOf('edge'),
     locationRefs: [...finding.locationRefs],
@@ -198,8 +208,8 @@ const toFinding = (
 
 /**
  * One rubric row with the words of the first evaluator sample that gave
- * any, and every place that sample cited — its refs, then the ids its prose
- * names — so the prose reads in labels rather than positions.
+ * any: the places that sample cited as its evidence, and the ones its prose
+ * names besides, so the prose reads in labels rather than positions.
  */
 function toCriterionResult(
   row: CriterionEvidence,
@@ -207,12 +217,16 @@ function toCriterionResult(
   index: ReadonlyMap<string, SubmissionLocation>,
 ): CriterionResultDto {
   const said = firstSaid(it.evaluators, row.criterionId);
+  const { locations, mentions } = said
+    ? pointed(said.locationRefs, said.rationale, index)
+    : { locations: [], mentions: [] };
   return {
     criterionId: row.criterionId,
     result: row.result,
     confidence: row.confidence,
     rationale: said?.rationale ?? null,
-    locations: said ? placed(cited(said.locationRefs, said.rationale, index), index) : [],
+    locations,
+    mentions,
   };
 }
 
