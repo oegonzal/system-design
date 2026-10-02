@@ -61,6 +61,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A practice URL for a session that no longer exists shows a graceful not-found with a way back to the dashboard, never a raw server error; a transient load failure offers a retry instead.',
   },
+  {
+    id: 'UX-13',
+    statement:
+      "A detail page names the browser tab after what it shows — a prompt's or a story's own title — also when it is opened at its own address; and an in-app navigation away from unsaved words, the browser's Back included, asks first and leaves only when allowed.",
+  },
   // Prompt generation from experience
   {
     id: 'GEN-1',
