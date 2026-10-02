@@ -329,6 +329,11 @@ export const CRITERIA: readonly Criterion[] = [
       'A provider call runs under a time limit derived from what it declares — its whole declared answer at the slowest pace the recorded runs measured, plus a fixed overhead — and no successful recorded call would have outlived it: the limit is watched on the wall clock, the turn is aborted when it passes and abandoned a grace later whether or not it has ended, and an abort is read as a timeout from its own signal — never from the name of the error the SDK throws — and asked again once.',
   },
   {
+    id: 'QL-34',
+    statement:
+      "A coach run that adopts a graded iteration recalls for what is wrong with it now: that iteration's confirmed findings and its failing and partial criteria are searched as probes of their own and handed, as their own delimited section, to the probe deriver and to the curator, and the recall's provenance records them; the producer alone is handed the kept lessons, the judges never, and a recall with no base is the same prompt-only recall the memory orchestrator runs.",
+  },
+  {
     id: 'QL-35',
     statement:
       "A stored lesson carries the decision and number of the iteration it was learned from rather than the run's final decision, so an escalation that a later iteration without an artifact caused never marks a lesson from a judged one, and the curator reads each lesson's own iteration's decision.",

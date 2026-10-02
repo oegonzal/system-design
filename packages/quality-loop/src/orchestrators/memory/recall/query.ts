@@ -6,7 +6,9 @@
 import { capText } from '@sysdesign/run-dump';
 
 import {
+  focusAlias,
   MAX_CANDIDATES,
+  MAX_FOCUS,
   MAX_KEPT,
   memoryQuerySchema,
   probeAlias,
@@ -22,20 +24,59 @@ export const queryText = (goal: string): string => capText(goal, QUERY_MAX_BYTES
 
 /** A hit after fusion, with the probes that surfaced it. */
 export interface FusedHit extends MemoryHit {
-  /** Indices into the probe texts; 0 is the prompt itself. */
+  /** Indices into the searched texts (`ProbeSet.texts`); 0 is the prompt itself. */
   probes: number[];
 }
 
 /**
- * The texts a recall searches under: the goal first — so the fused list can
- * only add to what a bare search would have found — then the derived
- * conditions, stripped of blanks and repeats. An empty probe is not merely
- * useless: the provider rejects it and the whole batch comes back null.
- * Bounded by a slice, not by a greedy pack, so the count is exactly stated.
+ * The texts a recall searches under, each kept with the alias a candidate
+ * cites it by: the goal first — so the fused list can only add to what a bare
+ * search would have found — then the defects it was asked to focus on, then
+ * the derived conditions, each group stripped of blanks and of anything
+ * already searched. An empty probe is not merely useless: the provider
+ * rejects it and the whole batch comes back null. Bounded by a slice, not by
+ * a greedy pack, so the count is exactly stated.
  */
-export function probeTexts(goal: string, derived: readonly string[]): string[] {
-  const trimmed = [queryText(goal), ...derived].map((text) => text.trim());
-  return [...new Set(trimmed.filter((text) => text.length > 0))].slice(0, MAX_PROBES + 1);
+export interface ProbeSet {
+  /** Everything searched, in order: the goal, the focus, the derived conditions. */
+  texts: string[];
+  /** The focus lines kept, in order: `d1`, `d2`… */
+  focus: string[];
+  /** The derived conditions kept, in order: `p1`, `p2`… */
+  derived: string[];
+}
+
+export function probeSet(
+  goal: string,
+  derived: readonly string[],
+  focus: readonly string[] = [],
+): ProbeSet {
+  const head = queryText(goal).trim();
+  const seen = new Set([head]);
+  const fresh = (texts: readonly string[], max: number): string[] => {
+    const kept: string[] = [];
+    for (const text of texts.map((candidate) => candidate.trim())) {
+      if (kept.length === max) break;
+      if (text.length === 0 || seen.has(text)) continue;
+      seen.add(text);
+      kept.push(text);
+    }
+    return kept;
+  };
+  const focused = fresh(focus, MAX_FOCUS);
+  const conditions = fresh(derived, MAX_PROBES);
+  return { texts: [head, ...focused, ...conditions], focus: focused, derived: conditions };
+}
+
+/** The texts alone, for a search with no focus. */
+export const probeTexts = (goal: string, derived: readonly string[]): string[] =>
+  probeSet(goal, derived).texts;
+
+/** The alias a candidate cites the searched text at `index` by; none for the goal, which is not information. */
+export function searchAlias(set: ProbeSet, index: number): string | null {
+  if (index <= 0 || index >= set.texts.length) return null;
+  const inFocus = index - 1;
+  return inFocus < set.focus.length ? focusAlias(inFocus) : probeAlias(inFocus - set.focus.length);
 }
 
 /**
@@ -58,29 +99,27 @@ export function probesOf(vectors: readonly (readonly number[])[], limit: number)
 export const probeOf = (listIndex: number): number => Math.floor(listIndex / VECTOR_NAMES.length);
 
 /**
- * The query the curator judges: the whole prompt, the candidates, and — for
- * each — the derived conditions it was retrieved under. `probes[0]` is the
- * prompt itself and is never listed, since "this came back on the prompt" is
- * not information.
+ * The query the curator judges: the whole prompt, what is wrong with the
+ * answer it is about when the recall was focused, the candidates, and — for
+ * each — the defects and derived conditions it was retrieved under. The
+ * prompt itself is never cited, since "this came back on the prompt" is not
+ * information.
  */
 export function buildQuery(
   query: string,
-  probes: readonly string[],
+  probes: ProbeSet,
   hits: readonly FusedHit[],
 ): MemoryQuery {
-  // `probes[0]` is the prompt; only the derived conditions are worth naming.
-  const derived = probes.slice(1);
   return memoryQuerySchema.parse({
     query,
     rules: [...RECALL_RULES],
-    probes: derived,
+    focus: probes.focus,
+    probes: probes.derived,
     maxKept: MAX_KEPT,
     candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
       text: hit.text,
       source: hit.source,
-      matched: hit.probes.flatMap((index) =>
-        index === 0 || derived[index - 1] === undefined ? [] : [probeAlias(index - 1)],
-      ),
+      matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
     })),
   });
 }

@@ -14,7 +14,7 @@ import type {
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { contentHash, type MemoryHit } from './ports';
-import { buildQuery, type FusedHit } from './recall/query';
+import { buildQuery, probeSet, type FusedHit } from './recall/query';
 
 export const FAKE_MODEL = 'fake-embedding';
 
@@ -167,7 +167,7 @@ export function readoutTrace(input: ReadoutInput): RunTrace {
 export function recallInput(hits: readonly MemoryHit[] = recallHits()): ReadoutInput {
   return {
     pipeline: 'memory-recall',
-    goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
+    goal: renderQuery(buildQuery(GOAL, probeSet(GOAL, []), fused(hits))),
     artifact: samplePack(),
     locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
     criteria: [{ id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' }],

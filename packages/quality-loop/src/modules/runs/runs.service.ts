@@ -30,6 +30,7 @@ import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
 import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
+import type { RecallBase } from '../../orchestrators/memory/recall/focus';
 import { briefingOf, type RunRecallRecorder, type RunRecallSlot } from './recall/run-recall';
 import {
   PIPELINES_TOKEN,
@@ -286,6 +287,7 @@ export class RunsService {
   private async recallLessons(
     record: RunRecord,
     publish: (recall: RunRecallDto) => void,
+    base: RecallBase | undefined,
   ): Promise<AdvisoryMemory[]> {
     // Not asked, or settled as the row opened: nothing to recall.
     if (record.recall?.status !== 'recalling') return [];
@@ -303,7 +305,7 @@ export class RunsService {
           }),
         );
       try {
-        outcome = await bound.recall(record.request.goal, execute);
+        outcome = await bound.recall(record.request.goal, execute, base);
       } catch (error) {
         outcome = recallWithout('errored', describeError(error).message, recallRunId);
       }
@@ -367,7 +369,12 @@ export class RunsService {
       write('recall', () => this.recalls.recordRecall(record.runId, recall));
     };
     try {
-      const memories = await this.recallLessons(record, onRecall);
+      // A run that adopted a judged iteration recalls for what is wrong with it.
+      const base =
+        adopted !== undefined && request.adopt !== undefined
+          ? { runId: request.adopt.runId, iteration: adopted, criteria: request.criteria ?? [] }
+          : undefined;
+      const memories = await this.recallLessons(record, onRecall, base);
       record.trace = await runPipeline(
         definition,
         {

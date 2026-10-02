@@ -87,8 +87,9 @@ and **see results / iterate**.
   From a graded revision — when the canvas is clean and the loaded revision's
   grade is complete — the loop reuses that grade as the starting point instead
   of grading it again, and nothing is stored twice. Before the coach revises
-  anything, the loop recalls lessons from earlier runs for the prompt and
-  hands them to the coach only — the graders never see them — so the panel
+  anything, the loop recalls lessons from earlier runs for the prompt — and,
+  starting from a graded revision, for what that grade found wrong with it —
+  and hands them to the coach only — the graders never see them — so the panel
   first says it is recalling, then **Recalled N lessons from earlier runs**
   with the list behind **Show lessons**, or why there were none — with one
   iteration there is nothing to revise, so the coach recalls none, and a

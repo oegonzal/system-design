@@ -26,8 +26,14 @@ const QUERY_MAX = 16_000;
 const CHUNK_MAX = 1_200;
 const RULE_MAX = 300;
 const MAX_RULES = 8;
-const PROBE_MAX = 240;
+export const PROBE_MAX = 240;
 const MAX_QUERY_PROBES = 6;
+/**
+ * Defects of the answer the query is about, one per lesson the curator may
+ * keep, so each kept lesson can answer a different one. A focus line is
+ * searched as a probe is, so it is bounded as one.
+ */
+export const MAX_FOCUS = MAX_KEPT;
 
 export const CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
 
@@ -48,6 +54,12 @@ const queryShape = z.strictObject({
   query: z.string().min(1).max(QUERY_MAX),
   /** Prose rules about what may be kept; each derives an admissibility criterion. */
   rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
+  /**
+   * What is wrong with the answer the query is about, when it was judged
+   * before: its confirmed defects and the criteria it fell short on, worst
+   * first. Searched under as the probes are, and cited by alias the same way.
+   */
+  focus: z.array(z.string().min(1).max(PROBE_MAX)).max(MAX_FOCUS).default([]),
   /** The conditions the retriever searched under, listed once and cited by alias. */
   probes: z.array(z.string().min(1).max(PROBE_MAX)).max(MAX_QUERY_PROBES).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
@@ -57,12 +69,15 @@ const queryShape = z.strictObject({
         text: z.string().min(1).max(CHUNK_MAX),
         source: chunkSourceSchema,
         /**
-         * Aliases of the probes that surfaced this chunk. Empty means it came
-         * back on the query as a whole. It says why the chunk is here, never
-         * that it is useful — that is the pipeline's judgement, and the
-         * retriever has no opinion worth deferring to.
+         * Aliases of the defects and probes that surfaced this chunk. Empty
+         * means it came back on the query as a whole. It says why the chunk
+         * is here, never that it is useful — that is the pipeline's
+         * judgement, and the retriever has no opinion worth deferring to.
          */
-        matched: z.array(z.string().min(1).max(ALIAS_MAX)).max(MAX_QUERY_PROBES).default([]),
+        matched: z
+          .array(z.string().min(1).max(ALIAS_MAX))
+          .max(MAX_FOCUS + MAX_QUERY_PROBES)
+          .default([]),
       }),
     )
     .min(1)
@@ -101,6 +116,14 @@ export const alias = (position: number): string => `m${position + 1}`;
 /** The same, for the conditions a search ran under. */
 export const probeAlias = (position: number): string => `p${position + 1}`;
 
+/** The same, for the defects a search was focused on. */
+export const focusAlias = (position: number): string => `d${position + 1}`;
+
+/** The marker of the focus section; the lead says what it is for. */
+const FOCUS_HEADING = '## What is wrong now';
+const FOCUS_LEAD =
+  'The query is about an answer that was judged before. These are its confirmed defects and the criteria it fell short on, worst first: a candidate that bears on one of them serves the query.';
+
 const provenance = (id: string, source: ChunkSource): string =>
   `### [${id}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}`;
 
@@ -120,6 +143,16 @@ export function renderGoal(input: MemoryQuery): string {
     '',
     input.query.trim(),
     '',
+    ...(input.focus.length > 0
+      ? [
+          FOCUS_HEADING,
+          '',
+          FOCUS_LEAD,
+          '',
+          ...input.focus.map((line, position) => `- [${focusAlias(position)}] ${line.trim()}`),
+          '',
+        ]
+      : []),
     '## Candidates',
     '',
     ...input.candidates.flatMap((candidate, position) => [

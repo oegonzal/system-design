@@ -7,7 +7,11 @@
  * then used for — a goal section, a producer briefing — is the caller's.
  * Every way it can hand on nothing is a closed reason.
  */
-import type { MemoryStoreAvailabilityDto, QualityRunDto } from '@sysdesign/contracts';
+import type {
+  MemoryStoreAvailabilityDto,
+  QualityRunDto,
+  RecallFocusDto,
+} from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import type { RunInput } from '../../../core/loop/run-pipeline';
@@ -20,7 +24,8 @@ import {
 import { completed } from '../../common';
 import type { MemoryPorts } from '../ports';
 import { fuse } from './fusion';
-import { buildQuery, probesOf, probeTexts, queryText, type FusedHit } from './query';
+import { focusLines } from './focus';
+import { buildQuery, probeSet, probesOf, queryText, type FusedHit } from './query';
 import { readPack, type UsableMemory } from './read-pack';
 import { UNADMITTED_REASON, type UnadmittedReason } from '../unadmitted';
 
@@ -33,6 +38,12 @@ export interface RecallAsk {
   acceptAt: number | null;
   /** Run memory-recall over the composed query, to completion. */
   execute(input: RunInput): Promise<QualityRunDto>;
+  /**
+   * What is wrong with the answer the goal is about, when it was judged
+   * before (`focusOf`): searched beside the goal and shown to the curator.
+   * Absent for a recall over the goal alone — the memory orchestrator's.
+   */
+  focus?: RecallFocusDto | null;
 }
 
 /** How many texts were searched, how many came back, and what the curator made of them. */
@@ -92,8 +103,10 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
   const acceptAt = ask.acceptAt ?? 0;
 
   const query = queryText(ask.goal);
-  // The goal is always probe zero; derived conditions only widen the net.
-  const texts = probeTexts(ask.goal, await probes.derive(query));
+  // The goal is always probe zero; the focus and the derived conditions only
+  // widen the net.
+  const searched = probeSet(ask.goal, await probes.derive(query), focusLines(ask.focus ?? null));
+  const texts = searched.texts;
   const embedded = await embeddings.embed(texts);
   if (embedded === null) {
     return {
@@ -117,7 +130,7 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
   }
   if (hits.length === 0) return { status: 'skipped', reason: 'store-empty', note: null };
 
-  const child = await ask.execute({ goal: renderQuery(buildQuery(query, texts, hits)) });
+  const child = await ask.execute({ goal: renderQuery(buildQuery(query, searched, hits)) });
   if (!completed(child)) {
     return {
       status: 'failed',

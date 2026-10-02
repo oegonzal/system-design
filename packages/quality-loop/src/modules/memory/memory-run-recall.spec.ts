@@ -3,6 +3,7 @@ import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../core/contracts';
+import { confirmed, evidence, ledger, traceOf } from '../../core/testing';
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
 import { childRun, memoryPorts } from '../../orchestrators/memory/steps.testing';
@@ -83,6 +84,57 @@ describe("the memory module's recall for a run's producer", () => {
     });
   });
 
+  it('[QL-34] recalls for what is wrong with the iteration a run adopted, and records that focus', async () => {
+    const [iteration] = traceOf({
+      ledger: ledger({
+        findings: [
+          confirmed({
+            key: 'unhandled_failure|node.3',
+            type: 'unhandled_failure',
+            severity: 'high',
+            rationale: 'No fallback when the order store is down.',
+          }),
+        ],
+        criteria: [evidence({ criterionId: 'c1', result: 'fail' })],
+      }),
+    }).iterations;
+    const base = {
+      runId: 'run-adopted',
+      iteration,
+      criteria: [{ id: 'c1', kind: 'functional', statement: 'List orders newest first.' }],
+    };
+    const { asked, execute } = runner(childRun('memory-recall', curated()));
+    const recall = new MemoryRunRecall(memoryPorts(), registry(), new RunRecallSlot());
+    const recalled = await recall.recall(GOAL, execute, base);
+
+    // The curator reads the defects in their own section of its query…
+    expect(asked[0].goal).toContain('## What is wrong now');
+    expect(asked[0].goal).toContain(
+      '- [d1] unhandled failure (high): No fallback when the order store is down.',
+    );
+    expect(asked[0].goal).toContain('- [d2] c1 fail: List orders newest first.');
+    // …and the run records what its recall was focused on.
+    expect(recalled).toMatchObject({ status: 'recalled', count: 2 });
+    expect(recalled.focus).toEqual({
+      runId: 'run-adopted',
+      iteration: 1,
+      findings: [
+        {
+          type: 'unhandled_failure',
+          severity: 'high',
+          rationale: 'No fallback when the order store is down.',
+        },
+      ],
+      criteria: [{ criterionId: 'c1', statement: 'List orders newest first.', result: 'fail' }],
+    });
+
+    // A run that adopted nothing recalls for its prompt alone.
+    const bare = runner(childRun('memory-recall', curated()));
+    const unfocused = await recall.recall(GOAL, bare.execute);
+    expect(bare.asked[0].goal).not.toContain('## What is wrong now');
+    expect(unfocused.focus).toBeNull();
+  });
+
   it('[QL-32] says why it handed on nothing, empty or skipped, in the closed vocabulary', async () => {
     const recallWith = (
       ports: Parameters<typeof memoryPorts>[0] = {},
@@ -122,6 +174,7 @@ describe("the memory module's recall for a run's producer", () => {
       recallRunId: 'memory-recall-run',
       count: 0,
       lessons: [],
+      focus: null,
     });
     expect(
       await recallWith({

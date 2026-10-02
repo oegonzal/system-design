@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { renderGoal as renderQuery } from '../../../pipelines/memory-recall/input';
 import { MAX_PROBES } from '../ports';
-import { fused, hitOf } from '../testing';
-import { buildQuery, probesOf, probeTexts, queryText } from './query';
+import { fused, GOAL as PROMPT, hitOf } from '../testing';
+import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
 
 describe('the recall query', () => {
   it('[QL-16] is the goal head under the byte cap, and a maximal query still renders under the goal budget', () => {
@@ -12,7 +12,7 @@ describe('the recall query', () => {
     const wide = Array.from({ length: 17 }, (_, index) =>
       hitOf('y'.repeat(1_200), `run-${index}`, 'memory.1'),
     );
-    const query = buildQuery(queryText(long), [queryText(long)], fused(wide));
+    const query = buildQuery(queryText(long), probeSet(long, []), fused(wide));
     expect(query.candidates).toHaveLength(16);
     expect(() => renderQuery(query)).not.toThrow();
   });
@@ -55,5 +55,40 @@ describe('the probe set a recall searches under', () => {
     expect(probes.slice(0, 2).map((probe) => probe.limit)).toEqual([16, 16]);
     // The derived probes share the budget, so widening does not multiply the payload.
     expect(probes.slice(2).map((probe) => probe.limit)).toEqual([6, 6, 6, 6]);
+  });
+});
+
+describe('a probe set focused on the defects of an adopted iteration', () => {
+  const defects = [
+    'unhandled failure (high): no fallback on a cache outage',
+    'c3 fail: lose no count',
+  ];
+  const derived = ['a latency budget crosses a vendor hop', defects[0]];
+
+  it('[QL-34] searches the goal, then the defects, then the derived conditions — a repeat searched once', () => {
+    const set = probeSet(PROMPT, derived, defects);
+    expect(set.texts).toEqual([queryText(PROMPT), ...defects, derived[0]]);
+    expect(set.focus).toEqual(defects);
+    expect(set.derived).toEqual([derived[0]]);
+    expect([0, 1, 2, 3].map((index) => searchAlias(set, index))).toEqual([null, 'd1', 'd2', 'p1']);
+  });
+
+  it('[QL-34] the curator’s query lists the defects and says which surfaced each candidate', () => {
+    const set = probeSet(PROMPT, derived, defects);
+    const [first, second] = fused(
+      [
+        hitOf('keep serving from the database', 'run-a', 'memory.1'),
+        hitOf('x', 'run-b', 'memory.1'),
+      ],
+      [0, 1, 3],
+    );
+    const query = buildQuery(queryText(PROMPT), set, [first, { ...second, probes: [0] }]);
+    expect(query.focus).toEqual(defects);
+    expect(query.probes).toEqual([derived[0]]);
+    expect(query.candidates.map((candidate) => candidate.matched)).toEqual([['d1', 'p1'], []]);
+    const goal = renderQuery(query);
+    expect(goal).toContain(`## What is wrong now`);
+    expect(goal).toContain(`- [d1] ${defects[0]}`);
+    expect(goal).toContain('Retrieved under d1, p1.');
   });
 });

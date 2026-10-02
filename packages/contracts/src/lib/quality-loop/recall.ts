@@ -4,7 +4,9 @@
  * them, and the lessons its producer was handed. A run asks for it with
  * `StartQualityRunRequest.recall`; the record is null on a run that did not.
  */
+import type { EvidenceResult } from './evidence';
 import { mayProduce, type QualityRunRequestSummary } from './runs';
+import type { Severity } from './vocab';
 
 /**
  * Where a run's recall stands. `recalling` while it runs — the run has not
@@ -58,6 +60,38 @@ export interface RecalledLessonDto {
   sourceRunId: string;
 }
 
+/** A defect a recall searched for: one confirmed finding of the iteration the run started from. */
+export interface RecallFocusFindingDto {
+  /** The finding's type, as its pipeline declares it (`unhandled_failure`). */
+  type: string;
+  severity: Severity;
+  /** The first words a critic gave it, capped; null when none did. */
+  rationale: string | null;
+}
+
+/** A criterion the iteration the run started from failed, or met only in part. */
+export interface RecallFocusCriterionDto {
+  criterionId: string;
+  /** What the criterion asks, capped. */
+  statement: string;
+  result: Extract<EvidenceResult, 'fail' | 'partial'>;
+}
+
+/**
+ * What a recall searched for beyond its prompt: what was wrong with the
+ * iteration the run started from — its confirmed findings, worst first, and
+ * the criteria it fell short on — so the lessons recalled target the defects
+ * the producer is about to revise. Null on a recall over the prompt alone: a
+ * run that did not start from a judged iteration has none to name.
+ */
+export interface RecallFocusDto {
+  /** The run and iteration the defects were read from. */
+  runId: string;
+  iteration: number;
+  findings: RecallFocusFindingDto[];
+  criteria: RecallFocusCriterionDto[];
+}
+
 /** The recall as a list row carries it: everything but the lessons. */
 export interface RunRecallSummaryDto {
   status: RunRecallStatus;
@@ -74,6 +108,11 @@ export interface RunRecallSummaryDto {
 export interface RunRecallDto extends RunRecallSummaryDto {
   /** Exactly what the producer was handed, in the order it saw them. */
   lessons: RecalledLessonDto[];
+  /**
+   * The defects the recall searched for beside the prompt — null when it
+   * searched for the prompt alone, and on every record older than the focus.
+   */
+  focus: RecallFocusDto | null;
 }
 
 /** The recall a run records as it opens, before anything is known. */
@@ -84,6 +123,7 @@ export const recallInProgress = (): RunRecallDto => ({
   recallRunId: null,
   count: 0,
   lessons: [],
+  focus: null,
 });
 
 /** A recall that handed the producer nothing, its status read from the reason. */
@@ -98,6 +138,7 @@ export const recallWithout = (
   recallRunId,
   count: 0,
   lessons: [],
+  focus: null,
 });
 
 /**
@@ -125,7 +166,14 @@ export const recallOf = (
   recallRunId,
   count: lessons.length,
   lessons: [...lessons],
+  focus: null,
 });
+
+/** A recall's record with the defects it searched for beside its prompt. */
+export const withRecallFocus = (
+  recall: RunRecallDto,
+  focus: RecallFocusDto | null,
+): RunRecallDto => ({ ...recall, focus });
 
 /** The list row's view of a recall, picked field by field: everything but the lessons. */
 export const recallSummary = (recall: RunRecallDto): RunRecallSummaryDto => ({

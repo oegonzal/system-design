@@ -463,6 +463,7 @@ export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto 
     recallRunId: 'run-recall',
     count: lessons.length,
     lessons,
+    focus: null,
     ...overrides,
   };
 }

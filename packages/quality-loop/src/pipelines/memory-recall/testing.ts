@@ -5,6 +5,7 @@
 import {
   RECALL_RULES,
   MAX_CANDIDATES,
+  MAX_FOCUS,
   MAX_KEPT,
   type ChunkSource,
   type MemoryQuery,
@@ -42,6 +43,7 @@ export const sampleQuery = (overrides: Partial<MemoryQuery> = {}): MemoryQuery =
     '| Reads/s | 150 |',
   ].join('\n'),
   rules: [...RECALL_RULES],
+  focus: [],
   probes: ['a read path depends on one upstream that can go down'],
   maxKept: 2,
   candidates: [
@@ -96,11 +98,20 @@ export const samplePack = (overrides: Partial<MemoryPack> = {}): MemoryPack => (
 export const maximalQuery = (): MemoryQuery => ({
   query: fill(16_000),
   rules: Array.from({ length: 8 }, () => fill(300)),
+  focus: Array.from({ length: MAX_FOCUS }, () => fill(240)),
   probes: Array.from({ length: 6 }, () => fill(240)),
   maxKept: MAX_KEPT,
   candidates: Array.from({ length: MAX_CANDIDATES }, () => ({
     text: fill(1_200),
     source: source({ runId: fill(80), pipeline: fill(80), ref: fill(200), when: fill(40) }),
-    matched: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+    matched: [
+      ...Array.from({ length: MAX_FOCUS }, (_, index) => `d${index + 1}`),
+      'p1',
+      'p2',
+      'p3',
+      'p4',
+      'p5',
+      'p6',
+    ],
   })),
 });

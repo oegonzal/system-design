@@ -22,6 +22,7 @@ import type {
 } from '@sysdesign/contracts';
 
 import type { AdvisoryMemory } from '../../../core/ports';
+import type { RecallBase } from '../../../orchestrators/memory/recall/focus';
 
 /**
  * Where a run's recall is written as it moves — the recall run's id once it
@@ -40,10 +41,12 @@ export type ChildRunner = (request: StartQualityRunRequest) => Promise<QualityRu
 export interface RunRecall {
   /**
    * Lessons for a goal, curated by a run `execute` opens — or the closed
-   * reason there are none. It may throw: the runs service records that as
-   * `errored`, and the run goes on without lessons.
+   * reason there are none. `base` is the judged iteration the run starts
+   * from, when it adopted one: the lessons are then recalled for what is
+   * wrong with it, not for the goal alone. It may throw: the runs service
+   * records that as `errored`, and the run goes on without lessons.
    */
-  recall(goal: string, execute: ChildRunner): Promise<RunRecallDto>;
+  recall(goal: string, execute: ChildRunner, base?: RecallBase): Promise<RunRecallDto>;
 }
 
 /** Where a module that can recall binds itself. One binding per process. */

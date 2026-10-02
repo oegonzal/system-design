@@ -14,7 +14,7 @@ import {
   recallHits,
 } from '../testing';
 import { bareGoal, MEMORY_HEADING, withMemory } from './inject';
-import { buildQuery } from './query';
+import { buildQuery, probeSet } from './query';
 import { readPack } from './read-pack';
 
 const hits = recallHits();
@@ -41,7 +41,7 @@ describe('memory in the goal', () => {
     });
     const trace = readoutTrace({
       pipeline: 'memory-recall',
-      goal: renderQuery(buildQuery(GOAL, [GOAL], fused(hits))),
+      goal: renderQuery(buildQuery(GOAL, probeSet(GOAL, []), fused(hits))),
       artifact: pack,
       locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
       criteria: [
