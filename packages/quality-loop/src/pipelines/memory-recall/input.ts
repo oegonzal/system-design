@@ -119,8 +119,12 @@ export const probeAlias = (position: number): string => `p${position + 1}`;
 /** The same, for the defects a search was focused on. */
 export const focusAlias = (position: number): string => `d${position + 1}`;
 
-/** The marker of the focus section; the lead says what it is for. */
-const FOCUS_HEADING = '## What is wrong now';
+/**
+ * The marker of the focus section, wherever a model is shown one — the
+ * curator's query here, and the probe deriver's task; the lead says what it
+ * is for.
+ */
+export const FOCUS_HEADING = '## What is wrong now';
 const FOCUS_LEAD =
   'The query is about an answer that was judged before. These are its confirmed defects and the criteria it fell short on, worst first: a candidate that bears on one of them serves the query.';
 

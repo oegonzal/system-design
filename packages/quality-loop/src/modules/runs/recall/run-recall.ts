@@ -15,14 +15,15 @@
  * one; replay boots neither module and starts no run.
  */
 import type {
+  IterationTrace,
   QualityRunDto,
   RecalledLessonDto,
   RunRecallDto,
   StartQualityRunRequest,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
 
 import type { AdvisoryMemory } from '../../../core/ports';
-import type { RecallBase } from '../../../orchestrators/memory/recall/focus';
 
 /**
  * Where a run's recall is written as it moves — the recall run's id once it
@@ -37,6 +38,18 @@ export interface RunRecallRecorder {
 
 /** Run one child to completion — the runs service's own `execute`, so the child is an ordinary recorded run. */
 export type ChildRunner = (request: StartQualityRunRequest) => Promise<QualityRunDto>;
+
+/**
+ * The judged iteration a run starts from, with the rubric it was judged
+ * against: what the runs service hands a recall when the run adopted one.
+ * Declared beside the port that takes it, so whatever binds the slot reads
+ * the runs module's own shape.
+ */
+export interface RecallBase {
+  runId: string;
+  iteration: IterationTrace;
+  criteria: readonly SuccessCriterion[];
+}
 
 export interface RunRecall {
   /**

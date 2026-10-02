@@ -14,3 +14,10 @@ headline find one lesson between them, while one probe per obligation finds
 several. Take the demands from the goal itself, including the ones stated only
 in a table row or a constraint, and never invent a requirement it does not
 make. Say nothing about what the answer should do.
+
+The goal may be followed by what is wrong now: the confirmed defects of an
+answer already judged against it, and the criteria that answer fell short on.
+Those lines are searched as they stand, so write what they cannot reach: the
+situation in this goal that produces each defect, as a condition like any
+other. When the goal makes more demands than you have probes for, those
+situations come first.

@@ -104,8 +104,10 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
 
   const query = queryText(ask.goal);
   // The goal is always probe zero; the focus and the derived conditions only
-  // widen the net.
-  const searched = probeSet(ask.goal, await probes.derive(query), focusLines(ask.focus ?? null));
+  // widen the net. The deriver is shown the focus too, so the conditions it
+  // writes reach for the lessons about what is wrong now, not the goal alone.
+  const focus = focusLines(ask.focus ?? null);
+  const searched = probeSet(ask.goal, await probes.derive(query, focus), focus);
   const texts = searched.texts;
   const embedded = await embeddings.embed(texts);
   if (embedded === null) {

@@ -2,6 +2,7 @@ import type { LlmClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { noQueryProbes } from '../../../orchestrators/memory/steps.testing';
+import { FOCUS_HEADING } from '../../../pipelines/memory-recall/input';
 import { LlmQueryProbes } from './llm-query-probes';
 
 const client = (completeStructured: LlmClient['completeStructured']): LlmClient => ({
@@ -37,5 +38,32 @@ describe('deriving what to search under', () => {
       'a p99 target crosses a hop you do not control',
     ]);
     expect(seen).toEqual(['# Prompt']);
+  });
+
+  it('[QL-34] shows what is wrong now after the goal, as its own section under the heading the curator reads', async () => {
+    const seen: string[] = [];
+    const probes = new LlmQueryProbes(
+      client((request) => {
+        seen.push(request.user);
+        return Promise.resolve({ probes: [] } as never);
+      }),
+    );
+
+    await probes.derive('# Prompt\n', [
+      'unhandled failure (high): no fallback for a cache outage',
+      'c1 fail: Redirect within 50 ms at p99.',
+    ]);
+    await probes.derive('# Prompt', []);
+    expect(seen).toEqual([
+      [
+        '# Prompt',
+        '',
+        FOCUS_HEADING,
+        '',
+        '- unhandled failure (high): no fallback for a cache outage',
+        '- c1 fail: Redirect within 50 ms at p99.',
+      ].join('\n'),
+      '# Prompt',
+    ]);
   });
 });

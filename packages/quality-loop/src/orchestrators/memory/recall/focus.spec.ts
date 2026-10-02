@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { confirmed, evidence, ledger, traceOf } from '../../../core/testing';
+import type { RecallBase } from '../../../modules/runs/recall/run-recall';
 import { MAX_FOCUS } from '../../../pipelines/memory-recall/input';
 import {
   FOCUS_LINE_MAX,
@@ -8,7 +9,6 @@ import {
   focusOf,
   MAX_FOCUS_CRITERIA,
   MAX_FOCUS_FINDINGS,
-  type RecallBase,
 } from './focus';
 
 const CRITERIA = [

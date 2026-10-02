@@ -21,6 +21,7 @@ import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
 import { MAX_PROBES, type QueryProbes } from '../../../orchestrators/memory/ports';
+import { FOCUS_HEADING } from '../../../pipelines/memory-recall/input';
 import persona from './probes.md?raw';
 
 const PROBE_MAX = 240;
@@ -34,17 +35,27 @@ const probesSchema = z.strictObject({
     .describe('One condition per demand the goal makes, in the register of a stored condition.'),
 });
 
+/**
+ * What the deriver reads: the goal, then — when the answer it is about was
+ * judged before — what is wrong with it now, as its own section under the
+ * heading the curator's query uses for the same lines.
+ */
+const renderTask = (goal: string, focus: readonly string[]): string =>
+  focus.length === 0
+    ? goal
+    : [goal.trimEnd(), '', FOCUS_HEADING, '', ...focus.map((line) => `- ${line}`)].join('\n');
+
 export class LlmQueryProbes implements QueryProbes {
   constructor(
     private readonly client: LlmClient,
     private readonly warn: (message: string) => void = () => undefined,
   ) {}
 
-  async derive(goal: string): Promise<string[]> {
+  async derive(goal: string, focus: readonly string[] = []): Promise<string[]> {
     try {
       const answer = await this.client.completeStructured({
         system: persona,
-        user: goal,
+        user: renderTask(goal, focus),
         schema: probesSchema,
         maxTokens: PROBES_MAX_TOKENS,
       });

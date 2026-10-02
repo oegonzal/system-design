@@ -30,8 +30,12 @@ import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
 import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
-import type { RecallBase } from '../../orchestrators/memory/recall/focus';
-import { briefingOf, type RunRecallRecorder, type RunRecallSlot } from './recall/run-recall';
+import {
+  briefingOf,
+  type RecallBase,
+  type RunRecallRecorder,
+  type RunRecallSlot,
+} from './recall/run-recall';
 import {
   PIPELINES_TOKEN,
   QUALITY_LOOP_LLM,

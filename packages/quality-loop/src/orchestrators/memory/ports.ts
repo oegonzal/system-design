@@ -94,11 +94,14 @@ export const MAX_PROBES = 6;
 /** What a recall asks for the conditions of the goal it is about to answer. */
 export interface QueryProbes {
   /**
-   * Conditions to search under, beyond the goal itself. Empty is a valid
-   * answer and the only failure mode: a recall with no derived probes is a
-   * recall over the goal alone, which is what it did before there were any.
+   * Conditions to search under, beyond the goal itself. `focus` is what is
+   * wrong with the answer the goal is about, when it was judged before
+   * (`focusLines`) — the conditions then reach for the lessons about those
+   * defects as well as the goal's own demands. Empty is a valid answer and
+   * the only failure mode: a recall with no derived probes is a recall over
+   * the goal (and its focus) alone, which is what it did before there were any.
    */
-  derive(goal: string): Promise<string[]>;
+  derive(goal: string, focus?: readonly string[]): Promise<string[]>;
 }
 
 /** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */

@@ -9,12 +9,12 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { RunRecallDto } from '@sysdesign/contracts';
 
 import type { MemoryPorts } from '../../orchestrators/memory/ports';
-import { focusOf, type RecallBase } from '../../orchestrators/memory/recall/focus';
+import { focusOf } from '../../orchestrators/memory/recall/focus';
 import { bareGoal } from '../../orchestrators/memory/recall/inject';
 import { provenanceOf } from '../../orchestrators/memory/recall/provenance';
 import { recallMemory } from '../../orchestrators/memory/recall/recall-memory';
 import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
-import type { ChildRunner, RunRecall, RunRecallSlot } from '../runs/recall/run-recall';
+import type { ChildRunner, RecallBase, RunRecall, RunRecallSlot } from '../runs/recall/run-recall';
 import { RunsService } from '../runs/runs.service';
 import { RUN_RECALL_SLOT } from '../runs/tokens';
 import { MEMORY_PORTS } from './tokens';

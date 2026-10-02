@@ -14,15 +14,14 @@ import {
   SEVERITIES,
   tokenWords,
   type CriterionEvidence,
-  type IterationTrace,
   type RecallFocusCriterionDto,
   type RecallFocusDto,
   type RecallFocusFindingDto,
-  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
 import { annotate } from '../../../core/evidence/annotate';
+import type { RecallBase } from '../../../modules/runs/recall/run-recall';
 import { MAX_FOCUS, PROBE_MAX } from '../../../pipelines/memory-recall/input';
 
 /**
@@ -38,13 +37,6 @@ export const MAX_FOCUS_CRITERIA = MAX_FOCUS - MAX_FOCUS_FINDINGS;
 
 /** One focus line, as searched and as the curator reads it: a probe's length. */
 export const FOCUS_LINE_MAX = PROBE_MAX;
-
-/** The iteration a run starts from, with the rubric it was judged against. */
-export interface RecallBase {
-  runId: string;
-  iteration: IterationTrace;
-  criteria: readonly SuccessCriterion[];
-}
 
 const cap = (text: string): string => capText(text.trim(), FOCUS_LINE_MAX).text;
 

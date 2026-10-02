@@ -5,7 +5,7 @@ import { toRunDto } from '../../../core/contracts';
 import { confirmed, evidence, ledger, traceOf } from '../../../core/testing';
 import { readIndex, MAX_CANDIDATES } from '../../../pipelines/memory-recall/input';
 import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
-import { contentHash, type MemoryPorts, type StoredChunk } from '../ports';
+import { contentHash, type MemoryPorts, type QueryProbes, type StoredChunk } from '../ports';
 import { childRun, memoryContext, memoryPorts } from '../steps.testing';
 import { ACCEPT_AT, acceptedRecall, GOAL } from '../testing';
 import { focusLines, focusOf } from './focus';
@@ -138,5 +138,18 @@ describe('a recall focused on the iteration a coach starts from', () => {
     const { recalled, query } = await recallWith(memoryPorts(), false);
     expect(query).not.toContain('## What is wrong now');
     if (recalled.status === 'complete') expect(recalled.counts.probes).toBe(1);
+  });
+
+  it('[QL-34] hands the probe deriver the same defects, so its conditions reach for what is wrong now', async () => {
+    const asked: (readonly string[] | undefined)[] = [];
+    const probes: QueryProbes = {
+      derive: (_goal, focus) => {
+        asked.push(focus);
+        return Promise.resolve([]);
+      },
+    };
+    await recallWith(memoryPorts({ probes }), true);
+    await recallWith(memoryPorts({ probes }), false);
+    expect(asked).toEqual([focusLines(focus()), []]);
   });
 });
