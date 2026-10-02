@@ -41,7 +41,11 @@ jobs:
       DB_PORT: '5432'
       DB_USERNAME: admin
       DB_PASSWORD: admin
-      DB_NAME: sysdesign
+      # The test database, not the service's own: every suite truncates, and
+      # every truncating path refuses a database that is not a test one
+      # (packages/db/src/testing/test-database.ts). `db:migrate` and the
+      # harnesses create it on the service's server.
+      DB_NAME: sysdesign_test
       QDRANT_URL: http://localhost:6333
       NEXT_TELEMETRY_DISABLED: '1'
 

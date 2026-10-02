@@ -1,7 +1,7 @@
 /// <reference types='vitest' />
 import { defineConfig } from 'vitest/config';
 
-import { nestBuildConfig } from '../../vite.nest';
+import { nestBuildConfig, testDatabaseEnv } from '../../vite.nest';
 
 export default defineConfig({
   root: __dirname,
@@ -11,13 +11,12 @@ export default defineConfig({
     root: __dirname,
     environment: 'node',
 
-    // The suites truncate tables between tests, so they get their own
-    // database unless the environment (CI) pins one — the harness creates and
-    // migrates it on first boot. The quality loop is never reached: the
-    // harness binds a fake client, so no URL is set here.
-    env: {
-      DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
-    },
+    // The suites truncate tables between tests, so they run against the
+    // test database (or a lane of it the environment names) — the harness
+    // creates and migrates it on first boot, and refuses any other. The
+    // quality loop is never reached: the harness binds a fake client, so no
+    // URL is set here.
+    env: testDatabaseEnv(),
 
     // These suites are integration-level and share one Postgres. Several
     // reset state by truncating `prompt` (cascading through sessions,

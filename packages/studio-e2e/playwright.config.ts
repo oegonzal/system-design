@@ -2,8 +2,7 @@ import { workspaceRoot } from '@nx/devkit';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { defineConfig, devices } from '@playwright/test';
 
-/* For CI, you may want to set BASE_URL to the deployed application. */
-const baseURL = process.env['BASE_URL'] || 'http://localhost:4200';
+import { API_URL, E2E_PORTS, GRADER_URL, suiteDatabase, UI_URL } from './src/support/stack';
 
 /**
  * Demo mode: the same tests, paced so a human can follow them.
@@ -21,12 +20,12 @@ const DEMO = !!process.env['DEMO'];
  * The suite never starts Postgres: the local stack provides the server at
  * the connection defaults `@sysdesign/db` declares, and CI's `DB_*` variables
  * reach the API server and the global setup unchanged. What the suite owns is
- * the *database*: it defaults to its own `sysdesign_test` (created, migrated
- * and seeded by `global-setup.ts`), so an e2e run never truncates the
- * developer's real practice history. CI pins `DB_NAME` explicitly and keeps
- * its ephemeral service database.
+ * the *database* — the test database, or a lane of it the environment names
+ * (created, migrated and seeded by `global-setup.ts`) — and reading it here
+ * refuses any other before a single server starts, so an e2e run never writes
+ * into, or truncates, the developer's real practice history.
  */
-const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
+const DB_NAME = suiteDatabase();
 
 /**
  * The grader is a stub, not the real quality loop: every grade in the suite
@@ -34,9 +33,22 @@ const DB_NAME = process.env['DB_NAME'] ?? 'sysdesign_test';
  * completes in 400 ms, and no model or network is involved. The studio API
  * reaches it through the same `QUALITY_LOOP_URL` it would use for the real
  * service, so the API under test is exactly the production wiring.
+ *
+ * Every server is on the suite's own port (`stack.ts`), never a dev server's,
+ * so `reuseExistingServer` — kept locally, so a re-run skips a cold start —
+ * can only reuse a server an earlier run of this suite left up.
  */
-const QUALITY_LOOP_STUB_PORT = process.env['QUALITY_LOOP_STUB_PORT'] ?? '3103';
-const QUALITY_LOOP_URL = `http://127.0.0.1:${QUALITY_LOOP_STUB_PORT}`;
+const REUSE = !process.env.CI;
+
+/**
+ * Nor does the suite share a build output with a dev server running from the
+ * same checkout: the API is built once into its own folder and run from
+ * there (the dev API's `node --watch` restarts on any write to its
+ * `dist/main.js`), and the UI's `next dev` compiles into its own distDir (two
+ * dev servers on one `.next-dev` corrupt each other's chunks).
+ */
+const API_OUT_DIR = 'dist/e2e';
+const UI_DIST_DIR = '.next-e2e';
 
 /** The one spec that takes the stub grader down; it must never share a phase with the others. */
 const GRADER_DOWN = /grader-down\.spec\.ts$/;
@@ -58,7 +70,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
 
   use: {
-    baseURL,
+    baseURL: UI_URL,
     headless: !DEMO,
 
     /**
@@ -92,27 +104,35 @@ export default defineConfig({
   webServer: [
     {
       command: `pnpm exec tsx --tsconfig tsconfig.base.json packages/studio-e2e/src/support/quality-loop-stub.ts`,
-      url: `${QUALITY_LOOP_URL}/health`,
-      reuseExistingServer: !process.env.CI,
+      url: `${GRADER_URL}/health`,
+      reuseExistingServer: REUSE,
       cwd: workspaceRoot,
       timeout: 60_000,
-      env: { QUALITY_LOOP_STUB_PORT },
     },
     {
-      command: 'pnpm exec nx run studio-api:serve',
-      url: 'http://localhost:3000/api/health',
-      reuseExistingServer: !process.env.CI,
+      command: `pnpm exec vite build --config packages/studio-api/vite.config.ts --outDir ${API_OUT_DIR} && node packages/studio-api/${API_OUT_DIR}/main.js`,
+      url: `${API_URL}/health`,
+      reuseExistingServer: REUSE,
       cwd: workspaceRoot,
       timeout: 180_000,
-      env: { DB_NAME, QUALITY_LOOP_URL },
+      env: {
+        PORT: String(E2E_PORTS.api),
+        CORS_ORIGIN: UI_URL,
+        DB_NAME,
+        QUALITY_LOOP_URL: GRADER_URL,
+      },
     },
     {
-      command: 'pnpm exec nx run studio-ui:serve',
-      url: 'http://localhost:4200',
-      reuseExistingServer: !process.env.CI,
+      command: `pnpm exec nx run studio-ui:serve --port=${E2E_PORTS.ui}`,
+      url: UI_URL,
+      reuseExistingServer: REUSE,
       cwd: workspaceRoot,
       timeout: 180_000,
-      env: { NEXT_TELEMETRY_DISABLED: '1' },
+      env: {
+        NEXT_DIST_DIR: UI_DIST_DIR,
+        NEXT_PUBLIC_API_URL: API_URL,
+        NEXT_TELEMETRY_DISABLED: '1',
+      },
     },
   ],
 

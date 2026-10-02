@@ -1,5 +1,5 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ensureDatabase, GovconSourceCall, ormOptions } from '@sysdesign/db';
+import { ensureDatabase, GovconSourceCall, ormOptions, truncateTestTables } from '@sysdesign/db';
 
 import type { LedgerEntry } from '../../../core/ports';
 import { MikroOrmSourceCallLog } from './mikro-orm-source-call-log';
@@ -29,11 +29,11 @@ describe('the source call log in Postgres', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(GovconSourceCall, {});
+    await truncateTestTables(orm.em, [GovconSourceCall]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconSourceCall, {});
+    await truncateTestTables(orm.em, [GovconSourceCall]);
     await orm.close(true);
   });
 

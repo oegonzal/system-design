@@ -17,6 +17,7 @@ export default [
       '**/dist/**',
       '**/.next/**',
       '**/.next-dev/**',
+      '**/.next-e2e/**',
       '**/out-tsc/**',
       '**/storybook-static/**',
       '**/vite.config.*',

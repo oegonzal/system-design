@@ -1,5 +1,5 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ensureDatabase, MemoryEmbedding, ormOptions } from '@sysdesign/db';
+import { ensureDatabase, MemoryEmbedding, ormOptions, truncateTestTables } from '@sysdesign/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { MikroOrmEmbeddingCache } from './mikro-orm-embedding-cache';
@@ -10,11 +10,11 @@ describe('the embedding cache in the run database', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(MemoryEmbedding, {});
+    await truncateTestTables(orm.em, [MemoryEmbedding]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(MemoryEmbedding, {});
+    await truncateTestTables(orm.em, [MemoryEmbedding]);
     await orm.close(true);
   });
 

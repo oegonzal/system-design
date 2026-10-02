@@ -1,13 +1,13 @@
 /// <reference types='vitest' />
 import { defineConfig } from 'vitest/config';
 
-import { nestBuildConfig } from '../../vite.nest';
+import { nestBuildConfig, testDatabaseEnv } from '../../vite.nest';
 
 /** The specs that need Postgres: the persistence adapters and the HTTP surface. */
 const DB_SPECS = ['src/**/persistence/*.spec.ts', 'src/modules/app/http.spec.ts'];
 
 const env = {
-  DB_NAME: process.env['DB_NAME'] ?? 'sysdesign_test',
+  ...testDatabaseEnv(),
   // Nx loads a developer's `.env` for local tasks; no suite may ever spend a real request.
   SAM_GOV_API_KEY: '',
 };

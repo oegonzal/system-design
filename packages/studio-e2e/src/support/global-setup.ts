@@ -4,15 +4,18 @@ import { join } from 'node:path';
 import { connectionSettings } from '@sysdesign/db/connection';
 import { Client } from 'pg';
 
+import { suiteDatabase } from './stack';
+
 /**
  * Makes the suite's database exist, migrated and seeded, then clears the
  * mutable state once, before the suite.
  *
- * The database defaults to `sysdesign_test` (mirroring `playwright.config.ts`,
- * which hands the same name to the API server) so an e2e run never truncates
- * the developer's real practice history — `truncate prompt cascade` takes
- * sessions and revisions with it. CI pins `DB_NAME` explicitly and is
- * unaffected.
+ * The database is `suiteDatabase()` — the same one `playwright.config.ts`
+ * hands the API server — and it refuses anything but a test database before
+ * this connects, so an e2e run can never truncate the developer's practice
+ * history: `truncate prompt cascade` takes sessions and revisions with it.
+ * The guard is `truncateTestTables`'s, applied here by hand only because this
+ * file runs under Playwright's transform, which cannot load the entities.
  *
  * Sessions and revisions hang off `prompt` by foreign key, so one
  * `truncate … cascade` resets the practice side. A prompt generation row is
@@ -26,7 +29,7 @@ import { Client } from 'pg';
  * in memory and starts empty with every run of the suite.
  */
 export default async function globalSetup(): Promise<void> {
-  const database = process.env['DB_NAME'] ?? 'sysdesign_test';
+  const database = suiteDatabase();
   const { host, port, user, password } = connectionSettings(process.env);
 
   // Create the database if it does not exist yet (42P04 = already there).

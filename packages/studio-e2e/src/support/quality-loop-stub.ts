@@ -14,6 +14,7 @@ import {
 } from '@sysdesign/studio-testing';
 
 import { LIBRARY } from './library-fixtures';
+import { E2E_PORTS, GRADER_HOST } from './stack';
 
 /**
  * The quality loop, stubbed over HTTP for the e2e suite.
@@ -42,12 +43,15 @@ import { LIBRARY } from './library-fixtures';
  *     GET    /__stub/requests                        the goals every run and derivation asked for
  *     POST   /__stub/reset                           runs, requests and scenarios, gone
  *
- *     QUALITY_LOOP_STUB_PORT=3103 pnpm exec tsx --tsconfig tsconfig.base.json \
+ * It listens on the suite's own grader port (`stack.ts`), which
+ * `playwright.config.ts` hands the API under test as its `QUALITY_LOOP_URL`:
+ *
+ *     pnpm exec tsx --tsconfig tsconfig.base.json \
  *       packages/studio-e2e/src/support/quality-loop-stub.ts
  */
 
-const PORT = Number(process.env['QUALITY_LOOP_STUB_PORT'] ?? 3103);
-const HOST = '127.0.0.1';
+const PORT = E2E_PORTS.grader;
+const HOST = GRADER_HOST;
 
 /** How long a run stays `running` before its trace lands. */
 const COMPLETION_DELAY_MS = 400;

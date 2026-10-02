@@ -13,6 +13,8 @@ import type {
   StarStoryDto,
 } from '@sysdesign/contracts';
 
+import { API_URL } from './stack';
+
 /**
  * Thin typed helpers over the real API, for arranging state the test under
  * way is not about. A canvas spec needs a practice session to exist; driving
@@ -23,8 +25,6 @@ import type {
  * Every rubric here is the stub grader's: one criterion per bullet or table
  * row of the markdown, kinded by section, ids `c1…cN` in document order.
  */
-
-export const API_URL = process.env['API_URL'] ?? 'http://localhost:3000/api';
 
 async function unwrap<T>(response: APIResponse): Promise<T> {
   if (!response.ok()) {

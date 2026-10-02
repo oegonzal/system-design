@@ -5,7 +5,14 @@ import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { ExperienceProfileDto } from '@sysdesign/contracts';
-import { ensureDatabase, ExperienceProfile } from '@sysdesign/db';
+import {
+  ensureDatabase,
+  ExperienceProfile,
+  Prompt,
+  PromptGeneration,
+  StarStory,
+  truncateTestTables,
+} from '@sysdesign/db';
 
 import { configureApp } from '../common/configure-app';
 import { AppModule } from '../modules/app/app.module';
@@ -31,9 +38,9 @@ export interface Harness {
  * context included.
  */
 export async function createHarness(): Promise<Harness> {
-  // The suite's database (sysdesign_test by default — vite.config.ts) is
-  // created and migrated on first use, so `nx test` never needs the dev
-  // database and never truncates it.
+  // The suite's database (the test database by default — vite.config.ts) is
+  // created and migrated on first use, and any other is refused here, so
+  // `nx test` never needs the dev database and can never truncate it.
   await ensureDatabase();
 
   const loop = new FakeQualityLoopClient();
@@ -80,19 +87,18 @@ async function ensureSeeded(em: EntityManager): Promise<void> {
 }
 
 /**
- * Wipes everything the tests create. Truncating `prompt` cascades through
- * design_session, design_revision and prompt_generation (and any story
- * linked to a prompt); `star_story` is truncated for the unlinked rest. The
- * seeded experiences deliberately survive, and the fake grader forgets.
+ * Wipes everything the tests create — in a test database only, which
+ * `truncateTestTables` checks on the connection itself. Truncating `prompt`
+ * cascades through design_session, design_revision and prompt_generation (and
+ * any story linked to a prompt); an unclaimed generation and an unlinked
+ * story are truncated in their own right. The seeded experiences deliberately
+ * survive, and the fake grader forgets.
  */
 export async function resetDesignData(
   em: EntityManager,
   loop?: FakeQualityLoopClient,
 ): Promise<void> {
-  const connection = em.fork().getConnection();
-  await connection.execute('truncate table "prompt" cascade');
-  await connection.execute('truncate table "prompt_generation" cascade');
-  await connection.execute('truncate table "star_story" cascade');
+  await truncateTestTables(em, [Prompt, PromptGeneration, StarStory]);
   loop?.reset();
 }
 

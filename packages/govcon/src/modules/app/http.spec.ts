@@ -28,6 +28,7 @@ import {
   GovconSavedSearch,
   GovconSearchProfile,
   GovconSourceCall,
+  truncateTestTables,
 } from '@sysdesign/db';
 
 import type { BudgetPolicy } from '../../core/budget';
@@ -125,13 +126,15 @@ async function boot() {
 }
 
 const truncate = async (em: EntityManager) => {
-  await em.fork().nativeDelete(GovconSourceCall, {});
-  await em.fork().nativeDelete(GovconAward, {});
-  await em.fork().nativeDelete(GovconEntity, {});
-  await em.fork().nativeDelete(GovconBid, {});
-  await em.fork().nativeDelete(GovconOpportunity, {});
-  await em.fork().nativeDelete(GovconSavedSearch, {});
-  await em.fork().nativeDelete(GovconSearchProfile, {});
+  await truncateTestTables(em, [
+    GovconSourceCall,
+    GovconAward,
+    GovconEntity,
+    GovconBid,
+    GovconOpportunity,
+    GovconSavedSearch,
+    GovconSearchProfile,
+  ]);
 };
 
 const send = (url: string, method: string, path: string, body?: unknown) =>

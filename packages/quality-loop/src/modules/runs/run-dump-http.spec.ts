@@ -1,12 +1,12 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, RunDumpEntryDto, RunDumpFileDto } from '@sysdesign/contracts';
-import { ensureDatabase } from '@sysdesign/db';
+import { ensureDatabase, QualityRun, truncateTestTables } from '@sysdesign/db';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm, result, tinyPipeline } from '../../core/testing';
-import { bootApp, claimDumpDir, getJson, truncate, type Envelope } from '../http/testing';
+import { bootApp, claimDumpDir, getJson, type Envelope } from '../http/testing';
 import { RunsService } from './runs.service';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM } from './tokens';
 
@@ -16,7 +16,7 @@ import { PIPELINES_TOKEN, QUALITY_LOOP_LLM } from './tokens';
  * that it neither shadows `GET /runs/:id` nor is shadowed by it.
  */
 
-const TABLES = ['quality_run'];
+const TABLES = [QualityRun];
 const RUBRIC = [{ id: 'c1', kind: 'must', statement: 'has text' }];
 
 const passing = () =>
@@ -40,7 +40,7 @@ describe('reading a run’s dump over HTTP', () => {
       [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])],
     ]));
     em = app.get(EntityManager);
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     const record = await app
       .get(RunsService)
       .execute({ pipeline: 'tiny', goal: '# Goal', criteria: RUBRIC });
@@ -48,7 +48,7 @@ describe('reading a run’s dump over HTTP', () => {
   });
 
   afterAll(async () => {
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     await app.close();
     rmSync(dumps, { recursive: true, force: true });
   });

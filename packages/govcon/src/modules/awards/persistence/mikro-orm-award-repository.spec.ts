@@ -1,6 +1,6 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { awardOf } from '@sysdesign/contracts';
-import { ensureDatabase, GovconAward, ormOptions } from '@sysdesign/db';
+import { ensureDatabase, GovconAward, ormOptions, truncateTestTables } from '@sysdesign/db';
 
 import type { AwardFilter } from '../../../core/ports';
 import { MikroOrmAwardRepository } from './mikro-orm-award-repository';
@@ -11,11 +11,11 @@ describe('the award repository in Postgres', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(GovconAward, {});
+    await truncateTestTables(orm.em, [GovconAward]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconAward, {});
+    await truncateTestTables(orm.em, [GovconAward]);
     await orm.close(true);
   });
 

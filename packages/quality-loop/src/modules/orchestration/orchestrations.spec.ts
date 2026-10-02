@@ -1,7 +1,14 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
-import { ensureDatabase, MemoryEmbedding } from '@sysdesign/db';
+import {
+  ensureDatabase,
+  MemoryEmbedding,
+  OrchestrationRun,
+  OrchestrationRunChild,
+  QualityRun,
+  truncateTestTables,
+} from '@sysdesign/db';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -13,7 +20,6 @@ import {
   claimDumpDir,
   getJson,
   postJson,
-  truncate,
   type Envelope,
   type Page,
 } from '../http/testing';
@@ -23,7 +29,7 @@ import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { CANNED, settledOrchestration } from './testing';
 
 const DUMP_DIR = claimDumpDir('orchestration');
-const TABLES = ['orchestration_run_child', 'orchestration_run', 'memory_embedding', 'quality_run'];
+const TABLES = [OrchestrationRunChild, OrchestrationRun, MemoryEmbedding, QualityRun];
 
 const embeddings = fakeEmbeddings();
 const store = new InMemoryMemoryStore();
@@ -45,11 +51,11 @@ describe('the memory orchestration over the three pipelines', () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });

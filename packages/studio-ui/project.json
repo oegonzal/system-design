@@ -9,7 +9,8 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "packages/studio-ui",
-        "command": "next dev -p 4200"
+        "command": "next dev -p {args.port}",
+        "port": 4200
       }
     },
     "build": {
@@ -37,5 +38,6 @@
         "command": "tsc --noEmit -p tsconfig.json"
       }
     }
-  }
+  },
+  "// serve": "next dev on 4200 unless --port says otherwise; the e2e suite starts its own UI with --port so it never shares a developer's dev server."
 }

@@ -202,23 +202,29 @@ run that lives outside the database entirely.
 
 ## Tests never touch your runs
 
-Integration suites (`nx test studio-api`, `nx test quality-loop`) and the e2e
-suite truncate tables between tests — so they default to their **own database,
-`sysdesign_test`**, created and migrated automatically on the same Postgres
-server. Your
-`sysdesign` practice history is never truncated by a test run. CI pins
-`DB_NAME` explicitly and keeps its ephemeral service database. None of them
-reaches a model: studio-api's specs bind a fake loop client, the loop's specs
-a fake model, and Playwright starts a stub quality-loop server on :3103.
+Every suite that touches Postgres — `nx test studio-api`, `quality-loop` and
+`govcon`, and the e2e suite — empties tables between tests, so they run
+against their **own database, `sysdesign_test`**, created and migrated
+automatically on the same Postgres server. A `DB_NAME` of the form
+`sysdesign_test_<lane>` gives a worktree or a parallel job a lane of its own.
+Any other name is refused, with the database named in the error: the
+harnesses' `ensureDatabase` refuses at boot, `truncateTestTables` asks the
+connection which database it is on before it deletes, and the e2e config and
+global setup refuse before a server starts. A `DB_NAME=sysdesign` left in a
+shell or in the `.env` Nx loads therefore stops the suite instead of wiping
+your practice history. CI runs on `sysdesign_test` too, on its service's
+server. None of them reaches a model: studio-api's specs bind a fake loop
+client, the loop's specs a fake model, and the e2e suite a stub quality loop.
 
-One caveat: Playwright reuses already-running dev servers locally. A reused dev
-API points at `sysdesign` while the suite prepared `sysdesign_test`, so specs
-may fail confusingly (your data still safe — nothing truncates `sysdesign`).
-The `serve` targets are two plain processes (`vite build --watch` and
-`node --watch`) that need no Nx daemon, so a dev API you left running is
-rebuilt on every edit — and is still the one Playwright reuses. Stop the dev
-servers before `nx e2e studio-e2e` — Ctrl-C `pnpm stack:up`, or `tilt down` —
-and leave the stores up: the suite needs Postgres (`pnpm stack:db`).
+The e2e suite runs its own servers on its own ports — the API on :3200, the UI
+on :4300 and the stub quality loop on :3103
+(`packages/studio-e2e/src/support/stack.ts`) — none of which the dev stack
+uses, so Playwright can never reuse a dev server that writes into `sysdesign`.
+They build into their own outputs too (`packages/studio-api/dist/e2e`,
+`packages/studio-ui/.next-e2e`), so a dev server running from the same
+checkout is neither reused nor rebuilt under it. Leave the dev stack running;
+the suite needs only Postgres (`pnpm stack:db`). Locally it reuses a server on
+its own ports that an earlier run left up, so a re-run skips the cold start.
 
 ## Notes / gotchas
 

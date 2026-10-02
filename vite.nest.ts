@@ -1,5 +1,8 @@
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 
+// By path, not alias: a Vite config is loaded before any plugin resolves one.
+import { TEST_DATABASE_NAME } from './packages/db/src/testing/test-database';
+
 /**
  * Shared Vite build shape for the NestJS apps (studio-api, quality-loop, govcon).
  *
@@ -60,4 +63,15 @@ export function nestBuildConfig() {
       noExternal: true as const,
     },
   };
+}
+
+/**
+ * The database a Nest app's suites run against: the disposable test database
+ * unless the environment names one — a lane of its own, or CI's. Whatever it
+ * names, `ensureDatabase` and `truncateTestTables` refuse anything that is not
+ * a test database, so a `DB_NAME` pointing at real data stops the suite at
+ * boot rather than wiping it.
+ */
+export function testDatabaseEnv(): { DB_NAME: string } {
+  return { DB_NAME: process.env['DB_NAME'] ?? TEST_DATABASE_NAME };
 }

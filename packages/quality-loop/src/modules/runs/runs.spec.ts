@@ -8,6 +8,7 @@ import {
   QualityRunCriterionResult,
   QualityRunFinding,
   QualityRunIteration,
+  truncateTestTables,
 } from '@sysdesign/db';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,7 +23,6 @@ import {
   claimDumpDir,
   getJson,
   postJson,
-  truncate,
   type Envelope,
   type Page,
 } from '../http/testing';
@@ -32,7 +32,7 @@ import { fullIteration, fullRecord, fullTrace } from './persistence/testing';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, RUN_REPOSITORY } from './tokens';
 
 const DUMP_DIR = claimDumpDir('quality-loop');
-const TABLES = ['quality_run'];
+const TABLES = [QualityRun];
 
 const tinyOnly = () => [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])] as const;
 
@@ -106,11 +106,11 @@ describe('the HTTP surface', () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });

@@ -23,3 +23,5 @@ export * from './entities/star-story.entity';
 export * from './orm.options';
 export * from './revision-factory';
 export * from './testing/ensure-database';
+export * from './testing/test-database';
+export * from './testing/truncate-test-tables';

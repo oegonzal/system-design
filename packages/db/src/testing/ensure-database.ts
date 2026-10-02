@@ -6,27 +6,32 @@ import { Client } from 'pg';
 
 import { connectionSettings } from '../connection';
 import { ormOptions } from '../orm.options';
+import { assertTestDatabase } from './test-database';
 
 /**
- * Test support: make the configured database exist and be migrated, so suites
- * can point `DB_NAME` at a dedicated test database (`sysdesign_test`) instead
- * of truncating whatever the developer's dev database holds. Creating is a
- * one-time race the duplicate-database error absorbs; migrating is the same
- * idempotent `migration:up` the CLI runs.
+ * Test support: make the configured database exist and be migrated — and
+ * refuse, before connecting anywhere, unless it is a test database. Every
+ * suite that touches Postgres calls this first, so one pointed at someone's
+ * data (a `DB_NAME` from CI, a shell, or the `.env` Nx loads) stops at boot
+ * with the database named, before a single row is written or truncated.
+ * Creating is a one-time race the duplicate-database error absorbs;
+ * migrating is the same idempotent `migration:up` the CLI runs.
  *
- * Memoised per process — every harness calls it, only the first one pays.
+ * The guard runs on every call; the work is memoised per process — every
+ * harness calls it, only the first one pays.
  */
 let ensured: Promise<void> | null = null;
 
-export function ensureDatabase(): Promise<void> {
-  ensured ??= createAndMigrate();
-  return ensured;
-}
-
-async function createAndMigrate(): Promise<void> {
+export async function ensureDatabase(): Promise<void> {
   // Read the environment at call time: `ormOptions` snapshots it at import,
   // and the maintenance connection must not depend on module load order.
   const connection = connectionSettings(process.env);
+  assertTestDatabase(connection.dbName, 'prepare');
+  ensured ??= createAndMigrate(connection);
+  return ensured;
+}
+
+async function createAndMigrate(connection: ReturnType<typeof connectionSettings>): Promise<void> {
   const { host, port, user, password, dbName } = connection;
 
   const client = new Client({ host, port, user, password, database: 'postgres' });

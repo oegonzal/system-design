@@ -1,5 +1,11 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ensureDatabase, GovconSavedSearch, GovconSearchProfile, ormOptions } from '@sysdesign/db';
+import {
+  ensureDatabase,
+  GovconSavedSearch,
+  GovconSearchProfile,
+  ormOptions,
+  truncateTestTables,
+} from '@sysdesign/db';
 
 import { must, tinyProfile } from '../../../core/testing';
 import { MikroOrmProfileRepository } from './mikro-orm-profile-repository';
@@ -16,13 +22,11 @@ describe('the profile and saved-search repositories in Postgres', () => {
   });
 
   beforeEach(async () => {
-    await orm.em.fork().nativeDelete(GovconSavedSearch, {});
-    await orm.em.fork().nativeDelete(GovconSearchProfile, {});
+    await truncateTestTables(orm.em, [GovconSavedSearch, GovconSearchProfile]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconSavedSearch, {});
-    await orm.em.fork().nativeDelete(GovconSearchProfile, {});
+    await truncateTestTables(orm.em, [GovconSavedSearch, GovconSearchProfile]);
     await orm.close(true);
   });
 

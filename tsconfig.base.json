@@ -12,6 +12,7 @@
       "@sysdesign/criteria": ["./packages/criteria/src/index.ts"],
       "@sysdesign/db": ["./packages/db/src/index.ts"],
       "@sysdesign/db/connection": ["./packages/db/src/connection.ts"],
+      "@sysdesign/db/test-database": ["./packages/db/src/testing/test-database.ts"],
       "@sysdesign/design-system": ["./packages/design-system/src/index.ts"],
       "@sysdesign/llm": ["./packages/llm/src/index.ts"],
       "@sysdesign/nest-kit": ["./packages/nest-kit/src/index.ts"],

@@ -1,5 +1,11 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ensureDatabase, GovconBid, GovconOpportunity, ormOptions } from '@sysdesign/db';
+import {
+  ensureDatabase,
+  GovconBid,
+  GovconOpportunity,
+  ormOptions,
+  truncateTestTables,
+} from '@sysdesign/db';
 
 import { opportunityOf } from '../../../core/testing';
 import { MikroOrmBidRepository } from './mikro-orm-bid-repository';
@@ -13,13 +19,11 @@ describe('the bid repository in Postgres', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(GovconBid, {});
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconBid, GovconOpportunity]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconBid, {});
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconBid, GovconOpportunity]);
     await orm.close(true);
   });
 

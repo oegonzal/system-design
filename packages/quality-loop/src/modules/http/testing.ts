@@ -1,13 +1,13 @@
 /**
  * The harness the HTTP suites share: a dump directory of the suite's own, the
- * real application over a real port with the providers a suite fakes, the
- * tables it truncates, and the two ways it talks to the app. The dump
+ * real application over a real port with the providers a suite fakes, and the
+ * two ways it talks to the app. Tables are emptied through `@sysdesign/db`'s
+ * `truncateTestTables`, which refuses any database but a test one. The dump
  * directory is read when the application boots, so a suite claims its own
  * before calling `bootApp`.
  */
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { EntityManager } from '@mikro-orm/postgresql';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -62,13 +62,6 @@ export async function bootApp(
   await app.listen(0);
   return { app, url: await app.getUrl() };
 }
-
-/** Empty the tables a suite writes, cascading to what references them. */
-export const truncate = (em: EntityManager, tables: readonly string[]): Promise<unknown> =>
-  em
-    .fork()
-    .getConnection()
-    .execute(`truncate table ${tables.map((table) => `"${table}"`).join(', ')} cascade`);
 
 export const postJson = (url: string, path: string, body: unknown): Promise<Response> =>
   fetch(`${url}${path}`, {

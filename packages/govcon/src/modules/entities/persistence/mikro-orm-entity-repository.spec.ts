@@ -1,6 +1,6 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { entityOf } from '@sysdesign/contracts';
-import { ensureDatabase, GovconEntity, ormOptions } from '@sysdesign/db';
+import { ensureDatabase, GovconEntity, ormOptions, truncateTestTables } from '@sysdesign/db';
 
 import { MikroOrmEntityRepository } from './mikro-orm-entity-repository';
 
@@ -10,11 +10,11 @@ describe('the entity repository in Postgres', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(GovconEntity, {});
+    await truncateTestTables(orm.em, [GovconEntity]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconEntity, {});
+    await truncateTestTables(orm.em, [GovconEntity]);
     await orm.close(true);
   });
 

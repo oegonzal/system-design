@@ -24,7 +24,7 @@
 
 load('./tilt/toolchain.Tiltfile', 'tool_env')
 
-watch_settings(ignore=['.nx/**', '**/.next/**', '**/.next-dev/**', 'packages/**/vite.config.ts.timestamp-*.mjs'])
+watch_settings(ignore=['.nx/**', '**/.next/**', '**/.next-dev/**', '**/.next-e2e/**', 'packages/**/vite.config.ts.timestamp-*.mjs'])
 
 include('./tilt/stores/Tiltfile')
 include('./packages/studio-api/Tiltfile')

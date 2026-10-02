@@ -1,14 +1,20 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
-import { ensureDatabase, OrchestrationRun } from '@sysdesign/db';
+import {
+  ensureDatabase,
+  OrchestrationRun,
+  OrchestrationRunChild,
+  QualityRun,
+  truncateTestTables,
+} from '@sysdesign/db';
 import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
 import { GOAL } from '../../orchestrators/memory/testing';
-import { bootApp, claimDumpDir, postJson, truncate, type Envelope } from '../http/testing';
+import { bootApp, claimDumpDir, postJson, type Envelope } from '../http/testing';
 import { InMemoryMemoryStore } from '../memory/testing';
 import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
@@ -17,7 +23,7 @@ import { CANNED, settledOrchestration } from './testing';
 import { ORCHESTRATION_RUN_REPOSITORY } from './tokens';
 
 const DUMP_DIR = claimDumpDir('orchestration-http');
-const TABLES = ['orchestration_run_child', 'orchestration_run', 'quality_run'];
+const TABLES = [OrchestrationRunChild, OrchestrationRun, QualityRun];
 
 /** What the fake answers the brief classifier with: the schema is locked to the registered routes. */
 const ROUTE = { pipeline: 'system-design', rationale: 'a system to design' };
@@ -40,11 +46,11 @@ describe('the orchestrations HTTP surface', () => {
     await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     await app.close();
     rmSync(DUMP_DIR, { recursive: true, force: true });
   });

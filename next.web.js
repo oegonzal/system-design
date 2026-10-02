@@ -15,15 +15,21 @@ const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
  *   Storybook) uses Emotion's JSX runtime (`jsxImportSource`) instead.
  * - `distDir` is `.next-dev` under `next dev` and `.next` otherwise, so a
  *   build never clobbers the running dev server's chunks (nor the reverse).
- *   `next-env.d.ts` is regenerated per distDir and stays untracked; the two
- *   stable references live in each app's `src/next-types.d.ts`.
+ *   `NEXT_DIST_DIR` overrides both for a server that must share nothing with
+ *   either: the e2e suite's own UI builds into `.next-e2e`, so it can run
+ *   beside a developer's dev server in the same checkout. Each of the three
+ *   is ignored everywhere `.next` is, and listed in the app's tsconfig, which
+ *   Next would otherwise rewrite to add it. `next-env.d.ts` is regenerated
+ *   per distDir and stays untracked; the two stable references live in each
+ *   app's `src/next-types.d.ts`.
  *
  * @param {string} phase
  * @returns {import('next').NextConfig}
  */
 module.exports = (phase) => ({
   reactStrictMode: true,
-  distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
+  distDir:
+    process.env.NEXT_DIST_DIR ?? (phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next'),
   outputFileTracingRoot: __dirname,
   compiler: {
     emotion: true,

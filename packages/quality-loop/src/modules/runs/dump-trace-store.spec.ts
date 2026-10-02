@@ -1,19 +1,19 @@
 import { Logger, type INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto } from '@sysdesign/contracts';
-import { ensureDatabase, QualityRunIteration } from '@sysdesign/db';
+import { ensureDatabase, QualityRun, QualityRunIteration, truncateTestTables } from '@sysdesign/db';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { fakeLlm, result, tinyPipeline } from '../../core/testing';
-import { bootApp, getJson, truncate, type Envelope } from '../http/testing';
+import { bootApp, getJson, type Envelope } from '../http/testing';
 import { DumpTraceStore } from './dump-trace-store';
 import { RunsService } from './runs.service';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
 
-const TABLES = ['quality_run'];
+const TABLES = [QualityRun];
 const RUBRIC = [{ id: 'c1', kind: 'must', statement: 'has text' }];
 
 /** One pass over a supplied rubric: an artifact, no findings, the criterion met. */
@@ -41,11 +41,11 @@ describe('a dump the disk refuses', () => {
       [TRACE_STORE, new DumpTraceStore(blocked)],
     ]));
     em = app.get(EntityManager);
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
   });
 
   afterAll(async () => {
-    await truncate(em, TABLES);
+    await truncateTestTables(em, TABLES);
     await app.close();
     rmSync(root, { recursive: true, force: true });
   });

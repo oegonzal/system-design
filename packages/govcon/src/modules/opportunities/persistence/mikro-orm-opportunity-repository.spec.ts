@@ -1,5 +1,5 @@
 import { MikroORM, PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ensureDatabase, GovconOpportunity, ormOptions } from '@sysdesign/db';
+import { ensureDatabase, GovconOpportunity, ormOptions, truncateTestTables } from '@sysdesign/db';
 
 import type { CandidateFilter } from '../../../core/ports';
 import { opportunityOf } from '../../../core/testing';
@@ -13,11 +13,11 @@ describe('the opportunity repository in Postgres', () => {
   beforeAll(async () => {
     await ensureDatabase();
     orm = await MikroORM.init({ driver: PostgreSqlDriver, ...ormOptions });
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconOpportunity]);
   });
 
   afterAll(async () => {
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconOpportunity]);
     await orm.close(true);
   });
 
@@ -60,7 +60,7 @@ describe('the opportunity repository in Postgres', () => {
 
   it('[GOV-9] [GOV-6] stores a description once, finds it back, and keeps it through a re-pull', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconOpportunity]);
     await repository.upsertMany([opportunityOf({ noticeId: 'd' })], t1);
     expect(await repository.findDescription('d')).toBeNull();
     expect(await repository.findDescription('missing')).toBeNull();
@@ -76,7 +76,7 @@ describe('the opportunity repository in Postgres', () => {
 
   it('[GOV-6] [GOV-15] filters candidates in SQL — activity, deadlines, set-asides, types, codes, text — newest first and bounded', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
-    await orm.em.fork().nativeDelete(GovconOpportunity, {});
+    await truncateTestTables(orm.em, [GovconOpportunity]);
     await repository.upsertMany(
       [
         opportunityOf({ noticeId: 'open', postedAt: '2026-09-20T00:00:00.000Z' }),

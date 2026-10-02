@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
 
-import { API_URL, createPracticeSession, listRevisions } from '../support/backend';
+import { createPracticeSession, listRevisions } from '../support/backend';
 import { buildNaiveDesign, CanvasPage } from '../support/canvas.page';
 import { setGraderUnreachable } from '../support/grader';
+import { API_URL } from '../support/stack';
 
 /**
  * The grader is a service the studio reaches over one port, and it can be

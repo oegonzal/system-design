@@ -3,5 +3,6 @@ storybook-static
 .nx
 .next
 .next-dev
+.next-e2e
 pnpm-lock.yaml
 packages/db/src/migrations

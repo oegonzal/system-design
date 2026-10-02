@@ -3,6 +3,7 @@ import type { PromptDto } from '@sysdesign/contracts';
 import type { RunScenario } from '@sysdesign/studio-testing';
 
 import { authorPrompt, AUTHORED_MARKDOWN, AUTHORED_TITLE } from './backend';
+import { GRADER_URL } from './stack';
 import { uniqueName } from './unique';
 
 /**
@@ -13,8 +14,6 @@ import { uniqueName } from './unique';
  * switch has no such key: it is global, and only the serial `grader-down`
  * project may flip it.
  */
-
-export const GRADER_URL = `http://127.0.0.1:${process.env['QUALITY_LOOP_STUB_PORT'] ?? '3103'}`;
 
 async function ok(
   response: Promise<{ ok(): boolean; status(): number; url(): string }>,
