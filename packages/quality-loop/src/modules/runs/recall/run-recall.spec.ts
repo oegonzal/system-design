@@ -207,6 +207,13 @@ describe('a run that recalls lessons for its producer', () => {
       recallRunId,
       count: 2,
     });
+    // And the list names the composition too: the recall run as opened for this one.
+    expect(page.data[0]?.parentRunId).toBeNull();
+    const recallRows = await getJson<Page<QualityRunSummaryDto>>(
+      url,
+      `/runs?pipeline=${MEMORY_RECALL_ID}`,
+    );
+    expect(recallRows.data.find((row) => row.runId === recallRunId)?.parentRunId).toBe(runId);
   });
 
   it('[QL-32] a run that does not ask never recalls, and a grade-only pipeline is refused before any row', async () => {

@@ -199,6 +199,7 @@ describe('the run rows', () => {
       criteria: 2,
       exchangeCount: 2,
       llm: { model: 'test-model' },
+      parentRunId: null,
       recall: null,
     });
   });
@@ -234,15 +235,18 @@ describe('the run rows', () => {
     ).toEqual(recallInProgress());
   });
 
-  it('[QL-32] the run a run was opened for round-trips; a row from before the column reads as none', () => {
+  it('[QL-32] the run a run was opened for round-trips and is on its list row; a row from before the column reads as none', () => {
     const child = fullRecord({ parentRunId: '2026-09-05T23-59-59-000-def456-quality' });
     const rows = toRows(child);
     expect(rows.run.parentRunId).toBe('2026-09-05T23-59-59-000-def456-quality');
     expect(roundtrip(rows)).toEqual(toRunDto(child));
+    expect(toSummary(rows.run, { iterations: 1, criteria: 2 }).parentRunId).toBe(
+      '2026-09-05T23-59-59-000-def456-quality',
+    );
 
     const { parentRunId: _absent, ...older } = toRows(fullRecord()).run;
-    expect(
-      roundtrip({ ...toRows(fullRecord()), run: older as typeof rows.run }).parentRunId,
-    ).toBeNull();
+    const olderRow = older as typeof rows.run;
+    expect(roundtrip({ ...toRows(fullRecord()), run: olderRow }).parentRunId).toBeNull();
+    expect(toSummary(olderRow, { iterations: 1, criteria: 2 }).parentRunId).toBeNull();
   });
 });

@@ -110,6 +110,7 @@ export const makeRunSummary = (
   criteria: 2,
   exchangeCount: 4,
   llm: { model: 'test-model' },
+  parentRunId: null,
   recall: null,
   ...overrides,
 });

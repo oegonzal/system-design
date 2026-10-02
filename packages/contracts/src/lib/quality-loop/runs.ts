@@ -170,6 +170,8 @@ export interface QualityRunSummaryDto {
   criteria: number;
   exchangeCount: number;
   llm: LlmModelDto;
+  /** The run this one was opened for, as on `QualityRunDto.parentRunId`: a list of recall runs names the run each served. */
+  parentRunId: string | null;
   /** The run's recall without its lessons; null when it did not ask to recall. */
   recall: RunRecallSummaryDto | null;
 }

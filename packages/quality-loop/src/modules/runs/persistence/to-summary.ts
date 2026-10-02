@@ -22,6 +22,8 @@ export function toSummary(
     criteria: counts.criteria,
     exchangeCount: run.exchangeCount,
     llm: run.llm,
+    // A row from before the column has none.
+    parentRunId: run.parentRunId ?? null,
     recall: run.recall ? recallSummary(run.recall) : null,
   };
 }
