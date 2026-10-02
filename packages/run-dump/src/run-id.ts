@@ -9,8 +9,11 @@
  *
  * Clock and randomness are parameters, both so this is testable and because the
  * engine promises neither — this lives in the app layer for that reason.
+ *
+ * `quality` is a quality-loop run; `session` is a browser session's trace,
+ * laid out by that package the way the loop lays out its own.
  */
-export const RUN_KINDS = ['quality'] as const;
+export const RUN_KINDS = ['quality', 'session'] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
 export function makeRunStamp(now: number, random: () => number = Math.random): string {

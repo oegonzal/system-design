@@ -36,6 +36,16 @@ export interface DumpFile {
   content: string;
 }
 
+/** A file that is not text — a screenshot — written as its bytes. */
+export interface DumpBytes {
+  /** Relative to the run folder. */
+  path: string;
+  bytes: Uint8Array;
+}
+
+const payloadOf = (file: DumpFile | DumpBytes): string | Uint8Array =>
+  'bytes' in file ? file.bytes : file.content;
+
 export interface BuiltDump {
   runId: string;
   files: DumpFile[];
@@ -53,22 +63,42 @@ export interface WriteResult {
 }
 
 /**
+ * Files under `dir/<runId>`, each through a temp name and a rename, and no
+ * index row: for a writer that fills a folder as it goes — a browser session
+ * writing one step at a time — and indexes it once at the end. Throws when a
+ * write fails.
+ */
+export function writeDumpFiles(
+  runId: string,
+  files: readonly (DumpFile | DumpBytes)[],
+  dir: string,
+): WriteResult {
+  const runDir = join(dir, runId);
+
+  for (const file of files) {
+    const target = join(runDir, file.path);
+    mkdirSync(dirname(target), { recursive: true });
+    const temp = `${target}.tmp`;
+    writeFileSync(temp, payloadOf(file));
+    renameSync(temp, target);
+  }
+
+  return { runDir };
+}
+
+/** The claim that a folder is complete — one flat line, appended once the folder is whole. */
+export function appendIndexRow(indexRow: string, dir: string): void {
+  appendFileSync(join(dir, INDEX_FILE), indexRow);
+}
+
+/**
  * Every file under `dir/<runId>`, then the index row. Throws when a write
  * fails, leaving that run unindexed — a caller in a `finally` must catch.
  */
 export function writeDump(dump: BuiltDump, dir: string): WriteResult {
-  const runDir = join(dir, dump.runId);
-
-  for (const file of dump.files) {
-    const target = join(runDir, file.path);
-    mkdirSync(dirname(target), { recursive: true });
-    const temp = `${target}.tmp`;
-    writeFileSync(temp, file.content);
-    renameSync(temp, target);
-  }
-
-  appendFileSync(join(dir, INDEX_FILE), dump.indexRow);
-  return { runDir };
+  const result = writeDumpFiles(dump.runId, dump.files, dir);
+  appendIndexRow(dump.indexRow, dir);
+  return result;
 }
 
 let git: GitContext | null = null;

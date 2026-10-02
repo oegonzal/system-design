@@ -348,6 +348,26 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A stored lesson carries the decision and number of the iteration it was learned from rather than the run's final decision, so an escalation that a later iteration without an artifact caused never marks a lesson from a judged one, and the curator reads each lesson's own iteration's decision.",
   },
+  {
+    id: 'QL-36',
+    statement:
+      'A step plan is a closed-vocabulary artifact judged once against a session rubric: a plan that cites a ref the page did not offer, acts on a disabled or hidden element, or places a terminal action anywhere but last is blocked before any lens; every non-accept is handed back as escalate; and the caller executes only the unfaulted prefix of an admitted plan whose policy gate is open.',
+  },
+  {
+    id: 'QL-37',
+    statement:
+      'Field answers list every field the goal listed exactly once and cite evidence only by listed alias; a value the field cannot take is a located warning the lenses and the caller both read; a field a confirmed finding points at is never filled by the caller; and a field the page hides is left blank whatever the model decided.',
+  },
+  {
+    id: 'QL-39',
+    statement:
+      "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads.",
+  },
+  {
+    id: 'QL-40',
+    statement:
+      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
@@ -571,5 +591,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'GOV-19',
     statement:
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',
+  },
+  // Browser session (packages/browser-session)
+  {
+    id: 'BRW-6',
+    statement:
+      "A session's trace is written incrementally through the shared run-dump plumbing — each step's files land through a temp name and a rename, bytes as well as text — and the index row that claims the folder complete is appended once, when the session is whole.",
   },
 ] as const;

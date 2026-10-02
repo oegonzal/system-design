@@ -4,9 +4,16 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeRunId, makeRunStamp } from './run-id';
+import { isRunId, makeRunId, makeRunStamp } from './run-id';
 import { capText, describeError, jsonSafe, MAX_TEXT_BYTES } from './serialize';
-import { gitContext, INDEX_FILE, writeDump, type BuiltDump } from './write-dump';
+import {
+  appendIndexRow,
+  gitContext,
+  INDEX_FILE,
+  writeDump,
+  writeDumpFiles,
+  type BuiltDump,
+} from './write-dump';
 
 // Stands in for git, so the spec can count what `gitContext` spawns.
 const execFileSync = vi.hoisted(() => vi.fn(() => 'main\n'));
@@ -57,6 +64,13 @@ describe('makeRunStamp', () => {
   it('names a dump folder by its stamp and kind', () => {
     const now = Date.parse('2026-09-01T07:20:05.880Z');
     expect(makeRunId(now, 'quality', () => 0)).toBe(`${makeRunStamp(now, () => 0)}-quality`);
+  });
+
+  it("[BRW-6] mints and reads back a browser session's id by the same grammar as a run's", () => {
+    const id = makeRunId(Date.parse('2026-10-02T21:00:00.000Z'), 'session', () => 0.5);
+    expect(id.endsWith('-session')).toBe(true);
+    expect(isRunId(id)).toBe(true);
+    expect(isRunId(id.replace('-session', '-browser'))).toBe(false);
   });
 });
 
@@ -129,6 +143,35 @@ describe('writeDump', () => {
     // The row is appended last, so a failed write leaves nothing claiming to be
     // a complete run.
     expect(existsSync(join(blocked, INDEX_FILE))).toBe(false);
+  });
+});
+
+describe('writeDumpFiles', () => {
+  it('[BRW-6] writes bytes as well as text, through the same temp-and-rename, and indexes nothing', () => {
+    const dir = tempDir();
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const { runDir } = writeDumpFiles(
+      'x-session',
+      [
+        { path: '01-steps/01/screenshot.png', bytes: png },
+        { path: '01-steps/01/plan.json', content: '{}' },
+      ],
+      dir,
+    );
+    expect(new Uint8Array(readFileSync(join(runDir, '01-steps/01/screenshot.png')))).toEqual(png);
+    expect(readdirSync(join(runDir, '01-steps/01')).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+    expect(existsSync(join(dir, INDEX_FILE))).toBe(false);
+  });
+
+  it('[BRW-6] lets a writer fill a folder step by step and claim it complete once', () => {
+    const dir = tempDir();
+    writeDumpFiles('x-session', [{ path: '01-steps/01/plan.json', content: '{}' }], dir);
+    writeDumpFiles('x-session', [{ path: '01-steps/02/plan.json', content: '{}' }], dir);
+    appendIndexRow(`${JSON.stringify({ runId: 'x-session', kind: 'session' })}\n`, dir);
+
+    expect(readdirSync(join(dir, 'x-session', '01-steps'))).toEqual(['01', '02']);
+    const rows = readFileSync(join(dir, INDEX_FILE), 'utf8').split('\n').filter(Boolean);
+    expect(rows).toHaveLength(1);
   });
 });
 
