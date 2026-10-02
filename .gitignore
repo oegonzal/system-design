@@ -49,6 +49,11 @@ tooling/node_modules/
 # Quality-loop run dumps — local by default, unbounded, and full of author prose.
 /static/runs/
 
+# Browser session traces, the persistent Chrome profiles they sign in with, and the ingest manifest.
+/static/sessions/
+/static/browser-profiles/
+/static/memory-ingest/
+
 # Playwright output
 test-output/
 playwright-report/

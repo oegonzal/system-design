@@ -19,6 +19,10 @@ export const NEST_EXTERNALS = [
   // binary (an optional platform package) relative to its own installed path,
   // which an inlined copy under dist/ cannot do.
   /^@anthropic-ai\//,
+  // Playwright stays external for the same reason: it locates its browsers and
+  // its driver relative to its own installed path.
+  /^playwright(\/|$)/,
+  /^playwright-core(\/|$)/,
   /^@mikro-orm\//,
   // The Qdrant client rides on undici; both stay runtime requires.
   /^@qdrant\//,
@@ -40,8 +44,13 @@ export const NEST_EXTERNALS = [
  */
 const watching = process.argv.includes('--watch') || process.argv.includes('-w');
 
+export interface NestBuildOptions {
+  /** Externals one package alone needs — a native or CJS-only reader — beside the shared list. */
+  externals?: readonly (string | RegExp)[];
+}
+
 /** `build` + `ssr` blocks for a single-entry CJS Nest bundle. */
-export function nestBuildConfig() {
+export function nestBuildConfig(options: NestBuildOptions = {}) {
   return {
     plugins: [nxViteTsPaths()],
     build: {
@@ -56,7 +65,7 @@ export function nestBuildConfig() {
           format: 'cjs' as const,
           entryFileNames: '[name].js',
         },
-        external: NEST_EXTERNALS,
+        external: [...NEST_EXTERNALS, ...(options.externals ?? [])],
       },
     },
     ssr: {

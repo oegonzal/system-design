@@ -28,6 +28,8 @@ import type { ChangedFile } from './index';
  *   studio-api     -> contracts, db, nest-kit, studio-testing (specs and the test folder only)
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
+ *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, studio-testing (specs only)   a Playwright session the loop decides for
+ *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -51,6 +53,8 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'studio-api': ['contracts', 'db', 'nest-kit', 'studio-testing'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
   govcon: ['contracts', 'db', 'nest-kit'],
+  'browser-session': ['contracts', 'db', 'nest-kit', 'run-dump', 'loop-client', 'studio-testing'],
+  'memory-ingest': ['contracts', 'loop-client', 'studio-testing'],
   storybook: null,
   'studio-e2e': null,
 };
