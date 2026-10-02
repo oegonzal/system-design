@@ -1,6 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
 import type { PromptLibraryEntryDto } from '@sysdesign/contracts';
-import { ensureDatabase } from '@sysdesign/db';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -20,7 +19,6 @@ describe('GET /prompts', () => {
   let url: string;
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await bootApp(
       [
         [QUALITY_LOOP_LLM, fakeLlm()],

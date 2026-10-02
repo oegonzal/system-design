@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, QualityRunSummaryDto, RunTrace } from '@sysdesign/contracts';
 import {
-  ensureDatabase,
   QualityRun,
   QualityRunCriterion,
   QualityRunCriterionResult,
@@ -104,7 +103,6 @@ describe('the HTTP surface', () => {
   };
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
     await truncateTestTables(em, TABLES);

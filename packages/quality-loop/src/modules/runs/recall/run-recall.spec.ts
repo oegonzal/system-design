@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
-import { ensureDatabase, QualityRun, truncateTestTables } from '@sysdesign/db';
+import { QualityRun, truncateTestTables } from '@sysdesign/db';
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -122,6 +122,10 @@ const promptsOf = (runId: string): { scope: string; user: string }[] => {
     }));
 };
 
+// Every describe below dumps into the one directory this file claimed, so it
+// goes once they all have run — never after the first, under the next.
+afterAll(() => rmSync(DUMP_DIR, { recursive: true, force: true }));
+
 describe('a run that recalls lessons for its producer', () => {
   let app: INestApplication;
   let url: string;
@@ -129,7 +133,6 @@ describe('a run that recalls lessons for its producer', () => {
   const store = seededStore();
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await bootApp([
       [QUALITY_LOOP_LLM, fakeLlm(...COACH_ANSWERS, ...RECALL_ANSWERS)],
       ...memoryOverrides(store),
@@ -141,7 +144,6 @@ describe('a run that recalls lessons for its producer', () => {
   afterAll(async () => {
     await truncateTestTables(em, TABLES);
     await app.close();
-    rmSync(DUMP_DIR, { recursive: true, force: true });
   });
 
   it('[QL-32] recalls through a recorded memory-recall run and hands the curated lessons to the producer alone', async () => {

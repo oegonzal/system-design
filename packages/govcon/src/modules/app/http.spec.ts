@@ -95,6 +95,8 @@ const SEARCHES = [
 const AWARD = awardDraftOf({ externalId: 'SPE4A726P0123-0' });
 
 async function boot() {
+  // Before anything connects: a database that is not a test one is refused here.
+  await ensureDatabase();
   const scripted = scriptedSearch('sam.gov', PAGES);
   const contractAwards = scriptedContractAwards([awardPageOf([AWARD])]);
   const spendingAwards = scriptedSpendingAwards([
@@ -154,7 +156,6 @@ describe('the govcon HTTP surface', () => {
   let scripted: ReturnType<typeof scriptedSearch>;
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url, scripted } = await boot());
     em = app.get(EntityManager);
   });

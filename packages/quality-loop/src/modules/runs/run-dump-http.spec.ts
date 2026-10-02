@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, RunDumpEntryDto, RunDumpFileDto } from '@sysdesign/contracts';
-import { ensureDatabase, QualityRun, truncateTestTables } from '@sysdesign/db';
+import { QualityRun, truncateTestTables } from '@sysdesign/db';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -34,7 +34,6 @@ describe('reading a run’s dump over HTTP', () => {
   let runId: string;
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await bootApp([
       [QUALITY_LOOP_LLM, passing()],
       [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])],

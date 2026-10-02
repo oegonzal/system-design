@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
 import {
-  ensureDatabase,
   OrchestrationRun,
   OrchestrationRunChild,
   QualityRun,
@@ -43,7 +42,6 @@ describe('the orchestrations HTTP surface', () => {
   let targetRunId: string | null = null;
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
     await truncateTestTables(em, TABLES);

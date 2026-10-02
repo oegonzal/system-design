@@ -1,8 +1,11 @@
 /**
  * The harness the HTTP suites share: a dump directory of the suite's own, the
  * real application over a real port with the providers a suite fakes, and the
- * two ways it talks to the app. Tables are emptied through `@sysdesign/db`'s
- * `truncateTestTables`, which refuses any database but a test one. The dump
+ * two ways it talks to the app. `bootApp` guards the database itself, before
+ * anything connects: `ensureDatabase` refuses any database but a test one, so
+ * no suite can boot the app against someone's data, whatever it remembers to
+ * call first. Tables are emptied through `@sysdesign/db`'s
+ * `truncateTestTables`, which asks the connection the same question. The dump
  * directory is read when the application boots, so a suite claims its own
  * before calling `bootApp`.
  */
@@ -11,6 +14,7 @@ import { Test } from '@nestjs/testing';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ensureDatabase } from '@sysdesign/db';
 import { DisabledEmbeddingClient } from '@sysdesign/llm';
 
 import { fakeLlm } from '../../core/testing';
@@ -46,11 +50,16 @@ const DEFAULT_OVERRIDES = (): ProviderOverride[] => [
   [RUN_JANITOR_OPTIONS, { staleAfterMs: 600_000, intervalMs: null }],
 ];
 
-/** The real modules over real HTTP; a fresh instance shares nothing but the database. */
+/**
+ * The real modules over real HTTP; a fresh instance shares nothing but the
+ * database — a test one, created and migrated on first use, and refused
+ * otherwise before the application module is even loaded.
+ */
 export async function bootApp(
   overrides: readonly ProviderOverride[],
   env?: NodeJS.ProcessEnv,
 ): Promise<{ app: INestApplication; url: string }> {
+  await ensureDatabase();
   const { AppModule } = await import('../app/app.module');
   const { configureApp } = await import('../app/configure-app');
   let builder = Test.createTestingModule({ imports: [AppModule] });

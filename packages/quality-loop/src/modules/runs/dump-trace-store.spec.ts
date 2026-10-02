@@ -1,7 +1,7 @@
 import { Logger, type INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto } from '@sysdesign/contracts';
-import { ensureDatabase, QualityRun, QualityRunIteration, truncateTestTables } from '@sysdesign/db';
+import { QualityRun, QualityRunIteration, truncateTestTables } from '@sysdesign/db';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,7 +34,6 @@ describe('a dump the disk refuses', () => {
 
   beforeAll(async () => {
     writeFileSync(blocked, 'x');
-    await ensureDatabase();
     ({ app, url } = await bootApp([
       [QUALITY_LOOP_LLM, passing()],
       [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])],

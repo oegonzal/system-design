@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
 import {
-  ensureDatabase,
   MemoryEmbedding,
   OrchestrationRun,
   OrchestrationRunChild,
@@ -48,7 +47,6 @@ describe('the memory orchestration over the three pipelines', () => {
   let em: EntityManager;
 
   beforeAll(async () => {
-    await ensureDatabase();
     ({ app, url } = await boot());
     em = app.get(EntityManager);
     await truncateTestTables(em, TABLES);

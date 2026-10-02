@@ -208,11 +208,15 @@ against their **own database, `sysdesign_test`**, created and migrated
 automatically on the same Postgres server. A `DB_NAME` of the form
 `sysdesign_test_<lane>` gives a worktree or a parallel job a lane of its own.
 Any other name is refused, with the database named in the error: the
-harnesses' `ensureDatabase` refuses at boot, `truncateTestTables` asks the
-connection which database it is on before it deletes, and the e2e config and
-global setup refuse before a server starts. A `DB_NAME=sysdesign` left in a
-shell or in the `.env` Nx loads therefore stops the suite instead of wiping
-your practice history. CI runs on `sysdesign_test` too, on its service's
+harnesses (`bootApp`, `createHarness`) call `ensureDatabase` before they boot
+anything, `truncateTestTables` asks the connection which database it is on
+before it deletes, and the e2e config and global setup refuse before a server
+starts. `pnpm test:tooling` keeps it that way: test code that boots an app or
+an ORM must guard first, in the same file, and only the guarded doors may
+empty a table (`truncate`, an unfiltered `delete from`, `drop`, an empty
+`nativeDelete` filter, or the schema generator's clear, refresh and drop).
+A `DB_NAME=sysdesign` left in a shell or in the `.env` Nx loads therefore
+stops the suite instead of wiping your practice history. CI runs on `sysdesign_test` too, on its service's
 server. None of them reaches a model: studio-api's specs bind a fake loop
 client, the loop's specs a fake model, and the e2e suite a stub quality loop.
 
