@@ -1,6 +1,10 @@
-import { NODE_CONFIG_MAX_KEYS, type NodeConfigEntry } from '@sysdesign/contracts';
+import {
+  NODE_CONFIG_MAX_KEYS,
+  NODE_CONFIG_STRING_VALUE_MAX_LENGTH,
+  type NodeConfigEntry,
+} from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -118,6 +122,29 @@ describe('ConfigEditor', () => {
     expect((screen.getByTestId('config-add') as HTMLButtonElement).disabled).toBe(true);
     expect(
       screen.getByText(new RegExp(`${NODE_CONFIG_MAX_KEYS} of ${NODE_CONFIG_MAX_KEYS}`)),
+    ).toBeTruthy();
+  });
+
+  it('[UX-9] says how much of a value’s limit is left as it nears, and that it was reached — a long value is never cut off unsaid', () => {
+    renderWithTheme(<Harness />);
+    const value = screen.getByTestId('config-value');
+    const editor = within(screen.getByTestId('config-editor'));
+
+    fireEvent.change(value, {
+      target: { value: 'buffers up to 64 MB while the stream is unreachable' },
+    });
+    expect(editor.queryByText(/characters? left/)).toBeNull();
+
+    fireEvent.change(value, {
+      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_MAX_LENGTH - 5) },
+    });
+    expect(editor.getByText('5 characters left')).toBeTruthy();
+
+    fireEvent.change(value, { target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_MAX_LENGTH) } });
+    expect(
+      editor.getByText(
+        `Limit reached — ${NODE_CONFIG_STRING_VALUE_MAX_LENGTH} characters at most.`,
+      ),
     ).toBeTruthy();
   });
 });
