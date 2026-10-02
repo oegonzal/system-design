@@ -12,7 +12,6 @@ import {
   DECISIONS,
   FIXABILITIES,
   SEVERITIES,
-  CRITERION_STATEMENT_MAX_LENGTH,
 } from '@sysdesign/contracts';
 
 export type EnumTuple = [string, ...string[]];
@@ -30,7 +29,6 @@ const refs = (ids: readonly string[], max: number, description: string) => {
   );
 };
 
-const STATEMENT_MAX = CRITERION_STATEMENT_MAX_LENGTH;
 /**
  * Above the longest rationale any lens has measurably written (695
  * characters, a critic, across every recorded run): a rationale past it is a
@@ -44,7 +42,12 @@ const MAX_CRITERION_REFS = 4;
 /** How many artifact parts one result may cite as evidence. */
 const MAX_EVIDENCE_REFS = 6;
 
-export function criteriaSchema(kinds: EnumTuple, maxCriteria: number) {
+/**
+ * The deriver's answer: at most `maxCriteria`, each statement within the
+ * task's bound (`criterionLengthBound`) — stated to the model in words as well as
+ * in the schema, since a statement past it discards the whole rubric.
+ */
+export function criteriaSchema(kinds: EnumTuple, maxCriteria: number, statementMax: number) {
   return z.strictObject({
     criteria: z
       .array(
@@ -53,9 +56,9 @@ export function criteriaSchema(kinds: EnumTuple, maxCriteria: number) {
           statement: z
             .string()
             .min(1)
-            .max(STATEMENT_MAX)
+            .max(statementMax)
             .describe(
-              'One checkable sentence, in the goal’s own terms. Never invent a requirement.',
+              `One checkable sentence, in the goal’s own terms, within ${statementMax} characters. Never invent a requirement.`,
             ),
         }),
       )

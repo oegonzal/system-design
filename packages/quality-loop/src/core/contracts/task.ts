@@ -1,4 +1,8 @@
-import type { ArtifactLocation, SuccessCriterion } from '@sysdesign/contracts';
+import {
+  CRITERION_STATEMENT_MAX_LENGTH,
+  type ArtifactLocation,
+  type SuccessCriterion,
+} from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
 /** Enough for any prompt a person would write; a larger goal is clipped and traced. */
@@ -38,8 +42,29 @@ export interface TaskSpec<T> {
 
   readonly maxCriteria: number;
 
+  /**
+   * The longest statement the deriver may write — and a supplied rubric may
+   * carry. The contract's bound unless declared: a pipeline whose record
+   * genuinely needs longer statements sizes its own from measured runs, with
+   * headroom, since a statement past the bound discards the whole rubric.
+   */
+  readonly maxStatementLength?: number;
+
   readonly output: OutputShape<T>;
 }
+
+/** The length a task holds every criterion statement to: its own bound, or the contract's. */
+export const criterionLengthBound = (task: Pick<TaskSpec<unknown>, 'maxStatementLength'>): number =>
+  task.maxStatementLength ?? CRITERION_STATEMENT_MAX_LENGTH;
+
+/** The ids of the criteria whose statement runs past the task's bound. */
+export const overlongCriteria = (
+  criteria: readonly SuccessCriterion[],
+  task: Pick<TaskSpec<unknown>, 'maxStatementLength'>,
+): string[] =>
+  criteria
+    .filter((criterion) => criterion.statement.length > criterionLengthBound(task))
+    .map((criterion) => criterion.id);
 
 /** The task contract for one run: the spec plus the goal and its derived criteria. */
 export interface TaskContract<T> extends TaskSpec<T> {

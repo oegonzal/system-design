@@ -19,6 +19,14 @@ import { experienceDigestOutput, type ExperienceDigest } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
 const MAX_CRITERIA = 16;
+/**
+ * The longest statement the deriver may write. Above the longest it has
+ * measurably written (751 characters, across the recorded runs to
+ * 2026-10-02 — and that was a second mode of a persona that asked for
+ * aliases and iterations, not a ceiling), with headroom: a statement past
+ * the bound discards the whole rubric, and three identical retries with it.
+ */
+const MAX_STATEMENT_LENGTH = 1200;
 
 export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   id: EXPERIENCE_DIGEST_ID,
@@ -46,10 +54,14 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       duplicate_memory: 'Two memories teaching the same thing.',
     },
     maxCriteria: MAX_CRITERIA,
+    maxStatementLength: MAX_STATEMENT_LENGTH,
     output: experienceDigestOutput,
   },
 
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
+  // Sized from the recorded runs: the deriver has written 6,783 output tokens
+  // for a sixteen-criterion record, and a cap a stage exceeds is a truncation
+  // bug waiting for whichever client enforces it.
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 8000 },
   producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,

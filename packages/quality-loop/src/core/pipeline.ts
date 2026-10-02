@@ -13,11 +13,16 @@ import type {
   ProducerBriefing,
   UpstreamEvidence,
 } from '@sysdesign/contracts';
-import { GOAL_SOURCES, PRODUCER_BRIEFING, UPSTREAM_EVIDENCE } from '@sysdesign/contracts';
+import {
+  GOAL_SOURCES,
+  MAX_PROVIDED_STATEMENT_LENGTH,
+  PRODUCER_BRIEFING,
+  UPSTREAM_EVIDENCE,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
-import type { TaskSpec } from './contracts';
+import { criterionLengthBound, type TaskSpec } from './contracts';
 import { validatePolicy } from './policy';
 import type { Controller, Validator } from './ports';
 
@@ -160,6 +165,11 @@ function checkTask(definition: Definition, fail: Fail): void {
   const validatorIds = definition.validators.map((validator) => validator.id);
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
+  // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it judged.
+  const bound = criterionLengthBound(definition.task);
+  if (!(Number.isInteger(bound) && bound >= 1 && bound <= MAX_PROVIDED_STATEMENT_LENGTH)) {
+    fail(`task.maxStatementLength must be an integer from 1 to ${MAX_PROVIDED_STATEMENT_LENGTH}`);
+  }
 }
 
 /**
@@ -236,6 +246,7 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
       criterionKinds: { ...task.criterionKinds },
       findingTypes: { ...task.findingTypes },
       maxCriteria: task.maxCriteria,
+      maxStatementLength: criterionLengthBound(task),
     },
     producer: { consumes: [...definition.producer.consumes] },
     validators: definition.validators.map(({ id, gate }) => ({ id, gate })),

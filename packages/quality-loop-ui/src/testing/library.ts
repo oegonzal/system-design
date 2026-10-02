@@ -42,6 +42,7 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
       unsupported_claim: 'A claim the design makes without showing how.',
     },
     maxCriteria: 20,
+    maxStatementLength: 400,
   },
   producer: { consumes: ['criteria'] },
   controller: {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { criterionLengthBound } from '../contracts';
 import type { Stages } from '../ports';
 import {
   criterion,
@@ -36,6 +37,15 @@ describe('rubricProblems', () => {
     expect(rubricProblems(many, task)).toEqual([
       `${many.length} criteria supplied; this pipeline allows ${task.maxCriteria}`,
     ]);
+  });
+
+  it('[QL-20] holds a supplied statement to the bound the pipeline’s own deriver is held to', () => {
+    const bound = criterionLengthBound(task);
+    const long = criterion('c1', 'must', 'x'.repeat(bound + 1));
+    expect(rubricProblems([long, criterion('c2')], task)).toEqual([
+      `criterion c1 is longer than the ${bound} characters this pipeline allows`,
+    ]);
+    expect(rubricProblems([long], { ...task, maxStatementLength: bound + 1 })).toEqual([]);
   });
 });
 

@@ -2,11 +2,13 @@
  * The task contract's criteria come from the goal itself: one structured
  * extraction, classified into the pipeline's kinds. Ids are assigned here,
  * positionally, so the model never authors an identifier and the policy can
- * price a kind without trusting a name.
+ * price a kind without trusting a name. A reply with any statement past the
+ * task's bound is a schema miss: the rubric is refused whole, never cut, and
+ * the stage reports `llm-failed` rather than judging against part of one.
  */
 import type { LlmClient } from '@sysdesign/llm';
 
-import type { TaskSpec } from '../contracts';
+import { criterionLengthBound, type TaskSpec } from '../contracts';
 import type { StageSpec } from '../pipeline';
 import type { CriteriaDeriver } from '../ports';
 import { goalSection, joinSections, kindsSection, systemPrompt } from './prompting';
@@ -31,7 +33,7 @@ export function createCriteriaDeriver<T>(
     const response = await llm.completeStructured({
       system: systemPrompt('criteria', spec.persona),
       user: joinSections(kindsSection(task.criterionKinds), goalText.text),
-      schema: criteriaSchema(kinds, task.maxCriteria),
+      schema: criteriaSchema(kinds, task.maxCriteria, criterionLengthBound(task)),
       maxTokens: spec.maxTokens,
     });
     if (response === null) {

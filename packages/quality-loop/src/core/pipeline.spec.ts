@@ -1,3 +1,7 @@
+import {
+  CRITERION_STATEMENT_MAX_LENGTH,
+  MAX_PROVIDED_STATEMENT_LENGTH,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from './pipeline';
@@ -138,6 +142,21 @@ describe('validatePipeline', () => {
       'route',
     ]);
     expect(JSON.stringify(summary)).not.toContain('persona');
+  });
+
+  it('[QL-2] projects the statement bound its deriver is held to — the contract’s unless declared — and refuses one a caller could never hand back', () => {
+    expect(describePipeline(asAny(tinyPipeline())).task.maxStatementLength).toBe(
+      CRITERION_STATEMENT_MAX_LENGTH,
+    );
+    const declared = tinyPipeline();
+    declared.task = { ...declared.task, maxStatementLength: 1200 };
+    expect(describePipeline(asAny(declared)).task.maxStatementLength).toBe(1200);
+    expect(() => validatePipeline(asAny(declared))).not.toThrow();
+    for (const bound of [0, 1.5, MAX_PROVIDED_STATEMENT_LENGTH + 1]) {
+      const malformed = tinyPipeline();
+      malformed.task = { ...malformed.task, maxStatementLength: bound };
+      expect(() => validatePipeline(asAny(malformed))).toThrow(/maxStatementLength/);
+    }
   });
 
   it('[QL-24] declares its goal source, refuses one it does not know, and projects it into the summary', () => {

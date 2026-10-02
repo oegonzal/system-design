@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { criteriaSchema } from '../../core/stages/schemas';
 import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import { memoryPackOutput } from './output';
@@ -17,6 +19,20 @@ describe('the memory-recall pipeline', () => {
     expect(MEMORY_RECALL.deriveCriteria.persona.length).toBeGreaterThan(80);
     expect(MEMORY_RECALL.producer.persona).toContain('memory-recall');
     expect(summary.validators.map((validator) => validator.id)).toEqual(['references', 'limits']);
+  });
+
+  it('[QL-2] its deriver keeps the contract’s statement bound, above the longest it has measurably written', () => {
+    // 286 characters across the recorded runs (static/runs, to 2026-10-02):
+    // the persona asks for the query's own numbers and wording, never for
+    // every alias, so no bound of its own is declared.
+    expect(MEMORY_RECALL.task.maxStatementLength).toBeUndefined();
+    const kinds = Object.keys(MEMORY_RECALL.task.criterionKinds) as [string, ...string[]];
+    const schema = criteriaSchema(
+      kinds,
+      MEMORY_RECALL.task.maxCriteria,
+      criterionLengthBound(MEMORY_RECALL.task),
+    );
+    expect(boundsBelowMeasured(schema, { 'criteria[].statement': 286 })).toEqual([]);
   });
 
   it('[QL-4] every location the pack exposes is printed verbatim where a judge reads it', () => {

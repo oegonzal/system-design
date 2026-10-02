@@ -163,6 +163,13 @@ export interface StartQualityRunRequest {
 
 /** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */
 export const MAX_PROVIDED_CRITERIA = 64;
+/**
+ * HTTP-edge cap on a supplied statement, and the most a pipeline may declare
+ * for its own (`maxStatementLength`): a rubric a pipeline derives must be one
+ * a caller can hand back, to adopt an iteration it judged. The pipeline's own
+ * bound is the real limit.
+ */
+export const MAX_PROVIDED_STATEMENT_LENGTH = 2000;
 
 export const DEFAULT_QUALITY_RUN_ITERATIONS = 1;
 /** A request may shorten a pipeline's loop, never lengthen it past this. */

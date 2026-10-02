@@ -13,7 +13,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { toRunDto, type RunRecord } from '../../core/contracts';
+import { criterionLengthBound, toRunDto, type RunRecord } from '../../core/contracts';
 import { progressOf } from '../../core/loop/progress';
 import type { RunRepository } from '../../core/ports';
 import { fakeLlm, gatedLlm, result, sequencedLlm, tinyPipeline } from '../../core/testing';
@@ -259,6 +259,14 @@ describe('the HTTP surface', () => {
         kind: 'must',
         statement: 's',
       })),
+      // Within the edge's cap, past the pipeline's own bound: the service's 400, same path.
+      [
+        {
+          id: 'c1',
+          kind: 'must',
+          statement: 'x'.repeat(criterionLengthBound(tinyPipeline().task) + 1),
+        },
+      ],
     ]) {
       const response = await postJson(url, '/runs', { pipeline: 'tiny', goal: 'g', criteria });
       expect(response.status).toBe(400);

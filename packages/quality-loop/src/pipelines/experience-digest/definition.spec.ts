@@ -1,6 +1,9 @@
+import { CRITERION_STATEMENT_MAX_LENGTH } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { criteriaSchema } from '../../core/stages/schemas';
 import { boundsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
 import { EXPERIENCE_DIGEST } from './definition';
 import { experienceDigestOutput } from './output';
@@ -68,6 +71,31 @@ describe('the experience-digest pipeline', () => {
       'memories[].appliesWhen': 235,
     };
     expect(boundsBelowMeasured(experienceDigestOutput.schema, measured)).toEqual([]);
+  });
+
+  it('[QL-2] its deriver’s statement bound sits above the longest it has measurably written, and its persona asks for concision', () => {
+    // The longest statement the digest's deriver has written across the
+    // recorded runs (static/runs, to 2026-10-02): 751 characters, in a
+    // record whose rubric was refused whole for it, three attempts running.
+    // The persona that asked for every alias and iteration is gone; the
+    // bound is still sized above what it produced, since one statement past
+    // it discards the rubric and no lens runs.
+    const kinds = Object.keys(EXPERIENCE_DIGEST.task.criterionKinds) as [string, ...string[]];
+    const schema = criteriaSchema(
+      kinds,
+      EXPERIENCE_DIGEST.task.maxCriteria,
+      criterionLengthBound(EXPERIENCE_DIGEST.task),
+    );
+    expect(boundsBelowMeasured(schema, { 'criteria[].statement': 751 })).toEqual([]);
+    expect(describePipeline(EXPERIENCE_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
+      CRITERION_STATEMENT_MAX_LENGTH,
+    );
+    const persona = EXPERIENCE_DIGEST.deriveCriteria.persona;
+    expect(persona).toMatch(/one concise sentence/);
+    expect(persona).toMatch(/longer than the schema allows/);
+    expect(persona).not.toMatch(/Name the aliases and iterations/);
+    // The deriver has measurably written 6,783 output tokens for one record.
+    expect(EXPERIENCE_DIGEST.deriveCriteria.maxTokens).toBeGreaterThan(6783);
   });
 
   it('[QL-6] the digest a model answers with contains no number', () => {

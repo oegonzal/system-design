@@ -1,21 +1,25 @@
 import {
   CRITERION_ID_MAX_LENGTH,
   CRITERION_KIND_MAX_LENGTH,
-  CRITERION_STATEMENT_MAX_LENGTH,
   DEFAULT_LIST_LIMIT,
   MAX_LIST_LIMIT,
   MAX_PROVIDED_CRITERIA,
+  MAX_PROVIDED_STATEMENT_LENGTH,
   MAX_QUALITY_RUN_ITERATIONS,
   QUALITY_RUN_STATUSES,
 } from '@sysdesign/contracts';
 import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
 
-/** One criterion of a supplied rubric; the caps are the persisted row's. */
+/**
+ * One criterion of a supplied rubric; the id and kind caps are the persisted
+ * row's, the statement's is the edge's — the pipeline's own bound is the
+ * service's check, with the rest of the rubric's fit.
+ */
 export const providedCriterionSchema = z.strictObject({
   id: z.string().min(1).max(CRITERION_ID_MAX_LENGTH),
   kind: z.string().min(1).max(CRITERION_KIND_MAX_LENGTH),
-  statement: z.string().min(1).max(CRITERION_STATEMENT_MAX_LENGTH),
+  statement: z.string().min(1).max(MAX_PROVIDED_STATEMENT_LENGTH),
 });
 
 /**

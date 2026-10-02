@@ -57,6 +57,8 @@ export interface PipelineSummary {
     criterionKinds: Record<string, string>;
     findingTypes: Record<string, string>;
     maxCriteria: number;
+    /** The longest statement the deriver may write, and a supplied rubric may carry. */
+    maxStatementLength: number;
   };
   producer: { consumes: string[] };
   validators: { id: string; gate: string }[];
