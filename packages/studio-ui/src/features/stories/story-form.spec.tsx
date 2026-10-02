@@ -188,6 +188,49 @@ describe('StoryForm', () => {
     expect(screen.queryByTestId('story-saved')).toBeNull();
   });
 
+  it('[STAR-1] is busy, not disabled, while a save is on its way: Save keeps the focus and a second press sends nothing', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const { rerender } = renderWithTheme(<StoryForm initial={makeStory()} onSave={onSave} />);
+    const save = screen.getByTestId('save-story') as HTMLButtonElement;
+    save.focus();
+
+    rerender(<StoryForm initial={makeStory()} onSave={onSave} saving />);
+    expect(save.disabled).toBe(false);
+    expect(save.getAttribute('aria-disabled')).toBe('true');
+    expect(save.textContent).toBe('Saving…');
+    expect(document.activeElement).toBe(save);
+    await user.keyboard('{Enter}');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('[STAR-1] starts again in place from the story a save stored: its fields show it, nothing is unsaved, and the focus stays put', async () => {
+    const user = userEvent.setup();
+    const onDirtyChange = vi.fn();
+    const before = makeStory();
+    const { rerender } = renderWithTheme(
+      <StoryForm initial={before} onSave={vi.fn()} onDirtyChange={onDirtyChange} />,
+    );
+    const title = screen.getByLabelText('Title') as HTMLInputElement;
+    await user.type(title, '  again  ');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    // The container hands over what was stored — trimmed.
+    rerender(
+      <StoryForm
+        initial={makeStory({ title: `${before.title} again` })}
+        onSave={vi.fn()}
+        onDirtyChange={onDirtyChange}
+        saved
+      />,
+    );
+    expect(screen.getByLabelText('Title')).toBe(title);
+    expect(title.value).toBe(`${before.title} again`);
+    expect(document.activeElement).toBe(title);
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+    expect(screen.getByTestId('story-saved')).toBeTruthy();
+  });
+
   it('shows a delete button only when a handler is supplied', async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();

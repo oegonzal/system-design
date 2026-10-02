@@ -114,6 +114,40 @@ describe('StoryDetail', () => {
     expect(leaving()).toBe(false);
   });
 
+  it('[STAR-1] keeps the author’s place across a save: Save keeps the focus, and so does the field Enter was pressed in', async () => {
+    const user = userEvent.setup();
+    let saves = 0;
+    stubApi([
+      ...LINK_OPTIONS,
+      { path: '/api/star-stories/story-1', body: { data: makeStory() } },
+      {
+        method: 'PUT',
+        path: '/api/star-stories/story-1',
+        handler: ({ init }) => {
+          saves += 1;
+          const sent = JSON.parse(String(init?.body)) as { title: string };
+          return { body: { data: makeStory({ title: sent.title }) } };
+        },
+      },
+    ]);
+    renderWithTheme(<StoryDetail storyId="story-1" />);
+
+    await user.type(await screen.findByLabelText('Title'), ' again');
+    const save = screen.getByTestId('save-story');
+    save.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByTestId('story-saved')).toBeTruthy();
+    // The same control, still focused — not a fresh form's in its place.
+    expect(screen.getByTestId('save-story')).toBe(save);
+    expect(document.activeElement).toBe(save);
+
+    const title = screen.getByLabelText('Title');
+    await user.type(title, '!{Enter}');
+    await waitFor(() => expect(saves).toBe(2));
+    expect(await screen.findByTestId('story-saved')).toBeTruthy();
+    expect(document.activeElement).toBe(title);
+  });
+
   it('[STAR-1] tells a refused save beside Save, as an alert', async () => {
     const user = userEvent.setup();
     stubApi([
@@ -161,6 +195,8 @@ describe('StoryDetail', () => {
     renderWithTheme(<StoryDetail storyId="not-a-uuid" />);
 
     expect(await screen.findByRole('heading', { name: 'STAR story not found' })).toBeTruthy();
+    // The tab says what the page says, not the route's generic "STAR story".
+    expect(document.title).toBe('STAR story not found · System Design Studio');
     expect(screen.queryByText(/uuid is expected/)).toBeNull();
     expect(screen.queryByTestId('notice-retry')).toBeNull();
     const back = screen.getByTestId('notice-back');

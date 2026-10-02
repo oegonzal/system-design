@@ -27,7 +27,7 @@ export const Edit: Story = {
   },
 };
 
-/** Mid-save: the button reads Saving… and locks. */
+/** Mid-save: the button reads Saving… and is busy — locked, yet still holding the focus it had. */
 export const Saving: Story = {
   args: {
     initial: makeStory(),

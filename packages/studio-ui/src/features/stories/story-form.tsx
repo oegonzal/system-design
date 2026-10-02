@@ -22,7 +22,11 @@ import { useEffect, useId, useState } from 'react';
 import { checkStory, parseTags, type StoryCheck, type StoryField } from './story-rule';
 
 export interface StoryFormProps {
-  /** Existing story when editing; omit for a blank create form. */
+  /**
+   * Existing story when editing; omit for a blank create form. A container
+   * hands over a new one when a save lands — the story as stored — and the
+   * form starts again from it, in place.
+   */
   initial?: StarStoryDto;
   /** Options for the optional prompt/experience links. */
   prompts?: PromptDto[];
@@ -107,6 +111,12 @@ const payloadOf = (values: StoryValues): SaveStarStoryRequest => ({
 const storedAs = (payload: SaveStarStoryRequest, check: StoryCheck): StoryValues =>
   valuesOf(check.accepted ?? payload);
 
+/** What a save of a story as it stands would store — "unsaved" is measured from here. */
+const storedOf = (story?: StoryContent): StoryValues => {
+  const payload = payloadOf(valuesOf(story));
+  return storedAs(payload, checkStory(payload));
+};
+
 const STORY_VALUE_KEYS = Object.keys(valuesOf()) as (keyof StoryValues)[];
 
 /**
@@ -119,9 +129,11 @@ const STORY_VALUE_KEYS = Object.keys(valuesOf()) as (keyof StoryValues)[];
  * why it is refused beside itself — once it was visited, or as soon as it
  * holds something the rule refuses (a tag too long, too many tags) — and a
  * disabled Save says what is still missing. A failed save and a finished
- * one are told beside Save, where the author is looking. Unsaved is the
- * same rule's judgement: the form holds edits only while a save would store
- * something other than what it started from.
+ * one are told beside Save, where the author is looking, and the focus
+ * stays where the author left it. Unsaved is the same rule's judgement: the
+ * form holds edits only while a save would store something other than what
+ * it started from — `initial`, which a container replaces with the story a
+ * save stored.
  */
 export function StoryForm({
   initial,
@@ -137,10 +149,18 @@ export function StoryForm({
   const reasonId = useId();
   const [values, setValues] = useState<StoryValues>(() => valuesOf(initial));
   const [visited, setVisited] = useState<ReadonlySet<StoryField>>(() => new Set());
-  const [storedInitially] = useState(() => {
-    const payload = payloadOf(valuesOf(initial));
-    return storedAs(payload, checkStory(payload));
-  });
+  const [storedInitially, setStoredInitially] = useState(() => storedOf(initial));
+  // A new story to start from — the one a save just stored — is a fresh
+  // start: the fields show what was stored, trimmed, and edits start from
+  // there. In place, never by remounting the form, so the control the author
+  // saved from keeps the focus.
+  const [startedFrom, setStartedFrom] = useState(initial);
+  if (startedFrom !== initial) {
+    setStartedFrom(initial);
+    setValues(valuesOf(initial));
+    setVisited(new Set());
+    setStoredInitially(storedOf(initial));
+  }
 
   const payload = payloadOf(values);
   const check = checkStory(payload);
@@ -253,10 +273,13 @@ export function StoryForm({
           </Alert>
         ) : null}
         <Stack direction="row" gap={3} align="center" wrap>
+          {/* Busy, not inapplicable, while a save is on its way: it stays
+              focusable, so the author's place survives the save. */}
           <Button
             type="submit"
             variant="solid"
-            disabled={!valid || saving}
+            disabled={!valid}
+            aria-disabled={saving || undefined}
             aria-describedby={reason !== null ? reasonId : undefined}
             data-testid="save-story"
           >

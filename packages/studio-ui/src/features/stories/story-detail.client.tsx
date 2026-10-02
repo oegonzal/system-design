@@ -30,8 +30,6 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  /** How many saves have landed — what makes each one a fresh form. */
-  const [savesLanded, setSavesLanded] = useState(0);
   useDocumentTitle(story ? pageTitle(story.title) : null);
   useLeaveGuard(dirty && !saving, LEAVE_UNSAVED_STORY);
 
@@ -43,7 +41,6 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
     setAnnouncement('');
     try {
       loaded.replace(await api.updateStory(storyId, payload));
-      setSavesLanded((landed) => landed + 1);
       setSaved(true);
       setAnnouncement('Story saved.');
     } catch (caught) {
@@ -88,13 +85,12 @@ export function StoryDetail({ storyId }: StoryDetailProps) {
       <LiveRegion message={announcement} />
       <Surface padding={6}>
         {/*
-          Every save that lands is a fresh form: its fields show what was
-          stored — trimmed — and its edits start from there. The story's own
-          `updatedAt` cannot key it: a save that stores nothing new leaves
-          it standing.
+          Every save that lands hands the form the story it stored — a new
+          one even when nothing new was stored — and the form starts again
+          from it in place: its fields show what was stored, trimmed, and the
+          focus stays on the control the author saved from.
         */}
         <StoryForm
-          key={savesLanded}
           initial={story}
           prompts={prompts}
           experiences={experiences}

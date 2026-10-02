@@ -70,6 +70,25 @@ test.describe('STAR story repository', () => {
     await expect(page).toHaveTitle(`${title} · System Design Studio`);
   });
 
+  test('[STAR-1] a save from the keyboard keeps the author’s place: the focus stays on Save', async ({
+    page,
+    request,
+  }) => {
+    const title = uniqueName('Keyboard-saved story');
+    const story = await createStory(request, { title, ...STORY_BODY, tags: [] });
+    const stories = new StoriesPage(page);
+    await page.goto(`/stories/${story.id}`);
+
+    await stories.form.getByLabel('Result').fill(`${STORY_BODY.result} Twice over.`);
+    const save = page.getByTestId('save-story');
+    await save.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('story-saved')).toBeVisible();
+    // The browser moves the focus off a control that is disabled or removed;
+    // a busy Save is neither, so the next Tab goes on from where the author was.
+    await expect(save).toBeFocused();
+  });
+
   test('[STAR-3] a story links to a prompt and an experience', async ({ page, request }) => {
     const prompt = await authorPrompt(request, { title: uniqueName('Linked prompt') });
     const experience = await ticketingExperience(request);
