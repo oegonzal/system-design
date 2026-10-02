@@ -213,8 +213,11 @@ anything, `truncateTestTables` asks the connection which database it is on
 before it deletes, and the e2e config and global setup refuse before a server
 starts. `pnpm test:tooling` keeps it that way: test code that boots an app or
 an ORM must guard first, in the same file, and only the guarded doors may
-empty a table (`truncate`, an unfiltered `delete from`, `drop`, an empty
-`nativeDelete` filter, or the schema generator's clear, refresh and drop).
+empty a table: in SQL (`truncate`, an unfiltered `delete from`, `drop`), or
+through the ORM (a query builder's `truncate()`, its `delete()` with no
+`where` along the chain, `nativeDelete` with an empty `{}` filter, or the
+schema generator's clear, refresh and drop). It reads the syntax tree, so a
+filter passed in a variable is beyond it.
 A `DB_NAME=sysdesign` left in a shell or in the `.env` Nx loads therefore
 stops the suite instead of wiping your practice history. CI runs on `sysdesign_test` too, on its service's
 server. None of them reaches a model: studio-api's specs bind a fake loop
