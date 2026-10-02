@@ -8,11 +8,15 @@ import {
   createQualityLoopLlmFromEnv,
   describeModelProvider,
   IN_FLIGHT_VAR,
+  MAX_ATTEMPTS_VAR,
+  MAX_TIMEOUT_ATTEMPTS_VAR,
   maxInFlight,
+  retryPolicyFromEnv,
   MissingModelProviderError,
 } from './create-client';
 import { DisabledEmbeddingClient, embeddingAvailability } from './embedding-client';
 import { DEFAULT_GATE_POLICY } from './in-flight-gate';
+import { DEFAULT_RETRY_POLICY } from './llm-failure';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
@@ -21,6 +25,33 @@ const account = (overrides: Partial<ClaudeAccount>): ClaudeAccount => ({
   tokenSource: null,
   apiKeySource: null,
   ...overrides,
+});
+
+describe('the retry budget', () => {
+  it('[QL-28] defaults when unset, takes an override, and refuses the rest by name', () => {
+    expect(retryPolicyFromEnv({})).toEqual(DEFAULT_RETRY_POLICY);
+    expect(retryPolicyFromEnv({ [MAX_ATTEMPTS_VAR]: '1' }).attempts).toBe(1);
+    expect(retryPolicyFromEnv({ [MAX_ATTEMPTS_VAR]: '5' }).attempts).toBe(5);
+
+    for (const bad of ['0', '-1', '2.5', 'twice']) {
+      expect(() => retryPolicyFromEnv({ [MAX_ATTEMPTS_VAR]: bad })).toThrow(MAX_ATTEMPTS_VAR);
+    }
+  });
+
+  it('[QL-28] a timeout allowance larger than the whole budget is refused, naming both', () => {
+    expect(() =>
+      retryPolicyFromEnv({ [MAX_ATTEMPTS_VAR]: '2', [MAX_TIMEOUT_ATTEMPTS_VAR]: '3' }),
+    ).toThrow(/LLM_MAX_TIMEOUT_ATTEMPTS \(3\) cannot exceed LLM_MAX_ATTEMPTS \(2\)/);
+  });
+
+  it('[QL-28] setting one attempt turns the retry off, carrying the timeout allowance down with it', () => {
+    const off = retryPolicyFromEnv({ [MAX_ATTEMPTS_VAR]: '1' });
+
+    expect(off.attempts).toBe(1);
+    // The allowance follows rather than having to be set twice.
+    expect(off.timeoutAttempts).toBe(1);
+    expect(off.retryKinds).toEqual(DEFAULT_RETRY_POLICY.retryKinds);
+  });
 });
 
 describe('the process ceiling', () => {

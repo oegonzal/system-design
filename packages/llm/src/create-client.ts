@@ -4,6 +4,7 @@ import { describeAccount, readClaudeAccount, signedIn, type ClaudeAccount } from
 import { ClaudeAgentLlmClient, SUBSCRIPTION_MODEL_LABEL } from './claude-agent-client';
 import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-client';
 import { DEFAULT_GATE_POLICY, providerGate } from './in-flight-gate';
+import { DEFAULT_RETRY_POLICY, type LlmRetryPolicy } from './llm-failure';
 import type { LlmClient } from './llm-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
@@ -66,25 +67,60 @@ export async function assertSubscriptionLogin(
  */
 export const IN_FLIGHT_VAR = 'LLM_MAX_IN_FLIGHT';
 
+/** Attempts per call, the first included. One means the seam does not retry. */
+export const MAX_ATTEMPTS_VAR = 'LLM_MAX_ATTEMPTS';
+
+/** Attempts allowed when our own bound is what stopped the turn; each costs that bound. */
+export const MAX_TIMEOUT_ATTEMPTS_VAR = 'LLM_MAX_TIMEOUT_ATTEMPTS';
+
 export class LlmSettingError extends Error {
   override readonly name = 'LlmSetting';
 }
 
 /** A positive integer, or the declared default; anything else is refused by name. */
-export function maxInFlight(env: NodeJS.ProcessEnv = process.env): number {
-  const raw = env[IN_FLIGHT_VAR];
-  if (raw === undefined || raw === '') return DEFAULT_GATE_POLICY.ceiling;
+function positiveInteger(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new LlmSettingError(`${IN_FLIGHT_VAR} must be an integer of at least 1, got ${raw}`);
+    throw new LlmSettingError(`${name} must be an integer of at least 1, got ${raw}`);
   }
   return parsed;
+}
+
+export const maxInFlight = (env: NodeJS.ProcessEnv = process.env): number =>
+  positiveInteger(env, IN_FLIGHT_VAR, DEFAULT_GATE_POLICY.ceiling);
+
+/**
+ * The retry budget, overlaid on the declared policy. Lowering the whole budget
+ * lowers the timeout allowance with it — one knob should not have to be set
+ * twice — but setting the two against each other is a mistake worth naming.
+ */
+export function retryPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): LlmRetryPolicy {
+  const attempts = positiveInteger(env, MAX_ATTEMPTS_VAR, DEFAULT_RETRY_POLICY.attempts);
+  const asked = env[MAX_TIMEOUT_ATTEMPTS_VAR];
+  const timeoutAttempts = positiveInteger(
+    env,
+    MAX_TIMEOUT_ATTEMPTS_VAR,
+    DEFAULT_RETRY_POLICY.timeoutAttempts,
+  );
+  if (asked !== undefined && asked !== '' && timeoutAttempts > attempts) {
+    throw new LlmSettingError(
+      `${MAX_TIMEOUT_ATTEMPTS_VAR} (${timeoutAttempts}) cannot exceed ${MAX_ATTEMPTS_VAR} (${attempts})`,
+    );
+  }
+  return {
+    ...DEFAULT_RETRY_POLICY,
+    attempts,
+    timeoutAttempts: Math.min(timeoutAttempts, attempts),
+  };
 }
 
 export function createQualityLoopLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
   return new ClaudeAgentLlmClient({
     model: env['LLM_MODEL'] || undefined,
     gate: providerGate({ ceiling: maxInFlight(env) }),
+    retry: retryPolicyFromEnv(env),
   });
 }
 

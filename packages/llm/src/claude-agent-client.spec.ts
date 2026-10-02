@@ -11,6 +11,10 @@ import {
 } from './claude-agent-client';
 import type { LlmCall } from './exchange';
 import { InFlightGate } from './in-flight-gate';
+import { DEFAULT_RETRY_POLICY } from './llm-failure';
+
+/** A client that does not retry, for the specs that are about one call's record. */
+const ONCE = { ...DEFAULT_RETRY_POLICY, attempts: 1 };
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
 
@@ -131,6 +135,112 @@ function scripted(messages: readonly unknown[], thenThrow?: Error) {
 }
 
 const answer = z.object({ answer: z.string() });
+
+describe('a call that failed once', () => {
+  const good = '{"answer":"hi"}';
+  const bad = '{"answer":42}';
+
+  /** A transport whose successive calls replay successive scripts. */
+  const sequence = (scripts: readonly (readonly unknown[])[]) => {
+    const prompts: string[] = [];
+    let call = 0;
+    const run = ((params: { prompt?: string; options?: Record<string, unknown> }) => {
+      prompts.push(String(params.prompt ?? ''));
+      const messages = scripts[Math.min(call++, scripts.length - 1)];
+      return (async function* () {
+        yield* messages;
+      })();
+    }) as unknown as ClaudeQuery;
+    return { run, prompts, calls: () => call };
+  };
+
+  const errored = (error: string) => [
+    said('m-1', '', { error }),
+    { type: 'result', subtype: 'error_during_execution', is_error: true, errors: [error] },
+  ];
+
+  it('[QL-28] a schema miss is asked again at once, and both attempts are on the record', async () => {
+    const calls: LlmCall[] = [];
+    const script = sequence([[succeeded(bad)], [succeeded(good)]]);
+    const answered = await new ClaudeAgentLlmClient({ query: script.run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+
+    expect(answered).toEqual({ answer: 'hi' });
+    expect(calls.map((call) => [call.attempt, call.outcome])).toEqual([
+      [1, 'schema-miss'],
+      [2, 'ok'],
+    ]);
+    // The ask is identical: nothing the model wrote comes back to it, so the
+    // second attempt is another independent draw rather than a correction.
+    expect(script.prompts[0]).toBe(script.prompts[1]);
+  });
+
+  it('[QL-28] the first attempt stays visible, so the miss rate is still measurable', async () => {
+    const calls: LlmCall[] = [];
+    await new ClaudeAgentLlmClient({ query: sequence([[succeeded(bad)], [succeeded(good)]]).run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+
+    expect(calls[0]).toMatchObject({ attempt: 1, outcome: 'schema-miss', response: null });
+    expect(calls.filter((call) => call.outcome === 'schema-miss')).toHaveLength(1);
+  });
+
+  it('[QL-28] a refused credential is never asked twice', async () => {
+    const calls: LlmCall[] = [];
+    const script = sequence([errored('authentication_failed')]);
+    const answered = await new ClaudeAgentLlmClient({ query: script.run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+
+    expect(answered).toBeNull();
+    // One ask, because a credential does not become valid in a second.
+    expect(script.calls()).toBe(1);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('[QL-28] a strained provider is asked again, after waiting', async () => {
+    const waits: number[] = [];
+    const script = sequence([errored('overloaded'), [succeeded(good)]]);
+    const answered = await new ClaudeAgentLlmClient({
+      query: script.run,
+      sleep: async (ms) => void waits.push(ms),
+    }).completeStructured({ system: 's', user: 'u', schema: answer });
+
+    expect(answered).toEqual({ answer: 'hi' });
+    expect(waits).toEqual([DEFAULT_RETRY_POLICY.backoffMs]);
+  });
+
+  it('[QL-28] the attempts are bounded, and the last failure is reported honestly', async () => {
+    const calls: LlmCall[] = [];
+    const script = sequence([[succeeded(bad)]]);
+    const answered = await new ClaudeAgentLlmClient({
+      query: script.run,
+      sleep: async () => undefined,
+    })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+
+    expect(answered).toBeNull();
+    expect(script.calls()).toBe(DEFAULT_RETRY_POLICY.attempts);
+    expect(calls.map((call) => call.attempt)).toEqual([1, 2, 3]);
+    expect(calls.every((call) => call.outcome === 'schema-miss')).toBe(true);
+  });
+
+  it('[QL-28] each attempt takes its own permit rather than holding one across the wait', async () => {
+    const gate = new InFlightGate({ policy: { ceiling: 1 } });
+    const held: number[] = [];
+    const script = sequence([errored('overloaded'), [succeeded(good)]]);
+    await new ClaudeAgentLlmClient({
+      query: script.run,
+      gate,
+      sleep: async () => void held.push(gate.snapshot().inFlight),
+    }).completeStructured({ system: 's', user: 'u', schema: answer });
+
+    // Nothing is in flight while we wait out a strained provider.
+    expect(held).toEqual([0]);
+  });
+});
 
 describe('the subscription client under the process gate', () => {
   const ok = [{ type: 'result', subtype: 'success', is_error: false, result: '{"answer":"hi"}' }];
@@ -329,7 +439,7 @@ describe('the subscription client reads the whole turn', () => {
     const calls: LlmCall[] = [];
     const record = (call: LlmCall) => calls.push(call);
     const cut = scripted([said('m-1', '"id":"n-2"}]}'), succeeded('"id":"n-2"}]}')]);
-    await new ClaudeAgentLlmClient({ query: cut.run })
+    await new ClaudeAgentLlmClient({ query: cut.run, retry: ONCE })
       .withRecorder(record)
       .completeStructured({ system: 's', user: 'u', schema: graph });
     expect(calls[0]).toMatchObject({
@@ -340,11 +450,13 @@ describe('the subscription client reads the whole turn', () => {
 
     const long = JSON.stringify({ answer: 'far past the bound' });
     const over = scripted([said('m-1', long), succeeded(long)]);
-    await new ClaudeAgentLlmClient({ query: over.run }).withRecorder(record).completeStructured({
-      system: 's',
-      user: 'u',
-      schema: z.object({ answer: z.string().max(4) }),
-    });
+    await new ClaudeAgentLlmClient({ query: over.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({
+        system: 's',
+        user: 'u',
+        schema: z.object({ answer: z.string().max(4) }),
+      });
     expect(calls[1]).toMatchObject({
       outcome: 'schema-miss',
       text: long,

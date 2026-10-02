@@ -4,6 +4,14 @@ import { z, type ZodIssue, type ZodType } from 'zod';
 import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import { InFlightGate } from './in-flight-gate';
+import {
+  backoffFor,
+  classifyFailure,
+  DEFAULT_RETRY_POLICY,
+  retryable,
+  type LlmFailureKind,
+  type LlmRetryPolicy,
+} from './llm-failure';
 import type { LlmClient, StructuredRequest } from './llm-client';
 
 /** The `error.name` a schema miss is recorded under; its message is the schema's own complaint. */
@@ -252,6 +260,9 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
   private readonly run: ClaudeQuery | undefined;
   /** Admission to the provider. A twin shares it: it shares the transport. */
   private readonly gate: InFlightGate;
+  private readonly retry: LlmRetryPolicy;
+  /** Injected so a spec waits on nothing. */
+  private readonly pause: (ms: number) => Promise<void>;
 
   constructor(
     options: {
@@ -259,6 +270,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       sink?: LlmCallSink;
       query?: ClaudeQuery;
       gate?: InFlightGate;
+      retry?: LlmRetryPolicy;
+      sleep?: (ms: number) => Promise<void>;
     } = {},
   ) {
     this.requestedModel = options.model;
@@ -266,6 +279,9 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
     this.sink = options.sink ?? null;
     this.run = options.query;
     this.gate = options.gate ?? new InFlightGate();
+    this.retry = options.retry ?? DEFAULT_RETRY_POLICY;
+    this.pause =
+      options.sleep ?? ((ms) => new Promise<void>((wake) => setTimeout(wake, ms).unref?.()));
   }
 
   withRecorder(sink: LlmCallSink): LlmClient {
@@ -274,28 +290,48 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       sink,
       query: this.run,
       gate: this.gate,
+      retry: this.retry,
+      sleep: this.pause,
     });
   }
 
   /**
-   * One call, under one permit. Everything timed — the stamp, the duration and
-   * the abort timer — begins after admission, so a queue behind a busy provider
-   * is never charged to the call and can never turn a healthy answer into a
-   * timeout. The wait itself is recorded instead.
+   * One answer, or null once the attempts the policy allows are spent.
+   *
+   * A retry happens here, immediately, inside the call its caller is already
+   * awaiting — never gathered up and re-run later. That matters upstream: a
+   * lens sample is one call and must stay one outcome, because the loop counts
+   * agreement across a lens's own samples, so a retry that arrived as an extra
+   * sample would inflate what agreement means.
+   *
+   * Each attempt takes its own permit and gives it back, so a wait for a
+   * strained provider is spent queueing rather than holding a slot shut. Each
+   * is recorded in its own right, so the rate of first-attempt failures stays
+   * exactly as visible as it was before there was a second attempt.
    */
-  completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
-    return this.gate.run(({ queuedMs }) => this.callOnce(request, queuedMs));
+  async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+    for (let attempt = 1; ; attempt += 1) {
+      const { value, kind } = await this.gate.run(({ queuedMs }) =>
+        this.callOnce(request, queuedMs, attempt),
+      );
+      if (kind === null) return value;
+      if (!retryable(kind, attempt, this.retry)) return null;
+      const pause = backoffFor(kind, attempt, this.retry);
+      if (pause > 0) await this.pause(pause);
+    }
   }
 
-  private async callOnce<T>(request: StructuredRequest<T>, queuedMs: number): Promise<T | null> {
+  private async callOnce<T>(
+    request: StructuredRequest<T>,
+    queuedMs: number,
+    attempt: number,
+  ): Promise<{ value: T | null; kind: LlmFailureKind | null }> {
     const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
     const startedAt = new Date();
     const started = Date.now();
     let jsonSchema = '';
 
-    // One call records one attempt today; the loop below is where a retry will
-    // advance it, so every reader already sees the field.
-    const attempt = 1;
+    let kind: LlmFailureKind | null = null;
     const record = (
       call: Pick<LlmCall, 'outcome' | 'text' | 'response' | 'error' | 'usage' | 'stopReason'>,
     ): void => {
@@ -401,8 +437,14 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       }
 
       if (resultText === null) {
+        // `failure.name` is whichever closed vocabulary spoke: the assistant's
+        // error when there was one, else the result's subtype.
+        kind = classifyFailure({
+          assistantError: failure?.name ?? null,
+          resultSubtype: failure?.name ?? null,
+        });
         record({ outcome: 'error', text: null, response: null, error: failure, usage, stopReason });
-        return null;
+        return { value: null, kind };
       }
       // The whole turn first; `result` alone only when the turn streamed no
       // text of its own, or what it streamed does not hold the answer.
@@ -411,6 +453,12 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
       if (!extraction.ok && written !== resultText) {
         const fromResult = parseStructured(resultText, request.schema);
         if (fromResult.ok) extraction = fromResult;
+      }
+      if (!extraction.ok) {
+        // A reply the model truncated is not the same failure as a reply that
+        // simply broke a bound, and only one of them is worth re-asking in the
+        // same breath; the assistant's own `max_output_tokens` says which.
+        kind = classifyFailure({ assistantError, schemaMiss: true });
       }
       record(
         extraction.ok
@@ -431,9 +479,13 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
               stopReason,
             },
       );
-      return extraction.ok ? extraction.value : null;
+      return { value: extraction.ok ? extraction.value : null, kind };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
+      kind = classifyFailure({
+        noResult: true,
+        aborted: err.name === 'AbortError' || err.name === 'TimeoutError',
+      });
       record({
         outcome: 'error',
         text: null,
@@ -442,7 +494,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         usage: null,
         stopReason: null,
       });
-      return null;
+      return { value: null, kind };
     }
   }
 }

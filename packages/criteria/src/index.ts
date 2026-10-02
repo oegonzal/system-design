@@ -288,6 +288,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "One gate admits every provider call this process makes, so a pipeline's declared concurrency and the number of runs in flight cannot multiply into an unbounded number of subprocesses: it admits in arrival order up to a declared ceiling, frees its permit even when the call throws, never rejects of its own accord, and reports the wait so queueing is charged to neither the call's duration nor its timeout.",
   },
+  {
+    id: 'QL-28',
+    statement:
+      "A call the provider failed is asked again immediately, in place, up to a declared number of attempts: what may be retried is a table over the provider's own closed error vocabularies rather than a search through its prose, a rejected request — a refused credential, an invalid ask, a spent budget — is never asked twice, a strained provider is given a bounded pause and holds no permit while it is waited out, and every attempt is recorded in its own right so the rate of first-attempt failures stays as visible as it was.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
