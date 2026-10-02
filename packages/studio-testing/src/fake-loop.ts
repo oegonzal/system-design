@@ -2,7 +2,6 @@ import {
   sameRubric,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
-  type Diagnostic,
   type IterationTrace,
   type LlmModelDto,
   type LlmExchangeSummaryDto,
@@ -14,6 +13,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
+import { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 import {
   autoIterations,
   DEFAULT_ITERATIONS,
@@ -37,41 +37,6 @@ export type RunScenario =
   | { outcome: 'complete'; iterations?: FakeIteration[]; once?: boolean }
   | { outcome: 'fail'; message: string; once?: boolean }
   | { outcome: 'refuse'; status?: number; message?: string; once?: boolean };
-
-/** The loop's socket is dead: the adapter answers as the real client would to no answer at all. */
-export class LoopUnreachable extends Error {
-  constructor() {
-    super('the quality loop is unreachable: fake');
-    this.name = 'LoopUnreachable';
-  }
-}
-
-/** The loop answered, and refused. */
-export class LoopRefused extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'LoopRefused';
-  }
-
-  get body(): { statusCode: number; message: string } {
-    return { statusCode: this.status, message: this.message };
-  }
-}
-
-/** A derivation yielded no rubric — the loop's 503, never an empty list. */
-export class DerivationFailed extends Error {
-  constructor(
-    message: string,
-    readonly llm: LlmModelDto,
-    readonly diagnostic: Diagnostic | null,
-  ) {
-    super(message);
-    this.name = 'DerivationFailed';
-  }
-}
 
 export interface FakeLoopOptions {
   model?: string;

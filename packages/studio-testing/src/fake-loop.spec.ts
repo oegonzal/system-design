@@ -2,7 +2,8 @@ import { CANVAS_PIPELINE_ID, type StartQualityRunRequest } from '@sysdesign/cont
 import { describe, expect, it } from 'vitest';
 
 import { criteriaFromMarkdown } from './criteria-from-markdown';
-import { DerivationFailed, FakeLoop, LoopRefused, LoopUnreachable } from './fake-loop';
+import { FakeLoop } from './fake-loop';
+import { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 
 const GOAL = [
   '# Order history',

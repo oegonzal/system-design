@@ -5,12 +5,6 @@
  * markdown the same way. Imported only by specs, the studio's test folder and
  * the stub; no runtime file may import it.
  */
-export {
-  DerivationFailed,
-  FakeLoop,
-  LoopRefused,
-  LoopUnreachable,
-  type FakeLoopOptions,
-  type RunScenario,
-} from './fake-loop';
+export { FakeLoop, type FakeLoopOptions, type RunScenario } from './fake-loop';
+export { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';
 export type { FakeIteration } from './trace-builders';
