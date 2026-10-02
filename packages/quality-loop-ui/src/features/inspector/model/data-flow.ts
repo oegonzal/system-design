@@ -16,6 +16,14 @@ import type { InspectorState, StepState } from './state';
  * The flow a reader actually asks about is visible without the graph anyway: a
  * step publishes a report, the steps after it read from what was published, and
  * the children a step opened are listed as it opens them.
+ *
+ * One distinction the record draws and a reader must not lose: a step can name a
+ * run it never opened. Where a provided run stands in for a step, the runner
+ * settles that step with the source run's id and never starts it — so the record
+ * stamps no `startedAt`. That is the test used here, because it is what the
+ * record means rather than a guess from a reason an orchestrator chose its own
+ * name for: **a step with no start never ran, so the runs it names stood in for
+ * it.** A step that did run opened the runs it names.
  */
 
 /** A skip whose reason names the step that blocked it — the only edge the record proves. */
@@ -42,7 +50,12 @@ export interface ChildSummary {
 export interface FlowStep extends StepState {
   /** Position in the orchestrator's declared order, as the record lists them. */
   order: number;
+  /** Whether the step ran at all. The record stamps a start only when it did. */
+  ran: boolean;
+  /** The runs this step opened. Empty for a step that never ran. */
   children: ChildSummary[];
+  /** The runs that stood in for this step, which it never opened. */
+  standIns: ChildSummary[];
   /** The step that blocked this one, when the record names one. */
   blockedBy: string | null;
   /** The steps this one blocked. */
@@ -107,20 +120,30 @@ export function dataFlow(
     pipeline: orchestration?.pipeline ?? null,
     partial: true,
     edges,
-    steps: steps.map((step, order) => ({
-      ...step,
-      order,
-      children: step.runIds.map((runId) => childOf(runId, children[runId])),
-      blockedBy: edges.find((edge) => edge.to === step.stepId)?.from ?? null,
-      blocked: edges.filter((edge) => edge.from === step.stepId).map((edge) => edge.to),
-      published: step.report,
-    })),
+    steps: steps.map((step, order) => {
+      const ran = step.startedAt !== null;
+      const named = step.runIds.map((runId) => childOf(runId, children[runId]));
+      return {
+        ...step,
+        order,
+        ran,
+        children: ran ? named : [],
+        standIns: ran ? [] : named,
+        blockedBy: edges.find((edge) => edge.to === step.stepId)?.from ?? null,
+        blocked: edges.filter((edge) => edge.from === step.stepId).map((edge) => edge.to),
+        published: step.report,
+      };
+    }),
   };
 }
 
 export interface FlowTotals {
   steps: number;
+  /** Runs the orchestration opened. */
   children: number;
+  /** Runs that stood in for a step, which it never opened. */
+  standIns: number;
+  /** How many of either have not been read. */
   unread: number;
   byStatus: Record<OrchestrationStepStatus, number>;
 }
@@ -135,19 +158,24 @@ export const flowTotals = (flow: DataFlow): FlowTotals => {
   };
   for (const step of flow.steps) byStatus[step.status] += 1;
   const children = flow.steps.flatMap((step) => step.children);
+  const standIns = flow.steps.flatMap((step) => step.standIns);
   return {
     steps: flow.steps.length,
     children: children.length,
-    unread: children.filter((child) => child.unread).length,
+    standIns: standIns.length,
+    unread: [...children, ...standIns].filter((child) => child.unread).length,
     byStatus,
   };
 };
 
 /**
- * Which child runs are worth reading, and in what order. The one being inspected
- * comes first because it is the one a reader is waiting on; the rest follow in
- * the order their steps opened them, bounded so an orchestration of many samples
+ * Which runs are worth reading, and in what order. The one being inspected comes
+ * first because it is the one a reader is waiting on; the rest follow in the
+ * order their steps named them, bounded so an orchestration of many samples
  * cannot turn one page into a hundred requests.
+ *
+ * A run that stood in for a step is read too: it is a real run, and what stood in
+ * is exactly what a reader of a skipped step wants to see.
  */
 export const MAX_CHILDREN_READ = 12;
 

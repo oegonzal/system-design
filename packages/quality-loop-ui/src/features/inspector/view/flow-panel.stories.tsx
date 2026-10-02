@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import {
+  makeMemoryOrchestration,
   makeOrchestration,
   makeRunningOrchestration,
   makeTwoIterationRun,
+  MEMORY_SOURCE_RUN_ID,
   ORCHESTRATION_CHILD_IDS,
 } from '../../../testing/fixtures';
 import { dataFlow, flowTotals } from '../model/data-flow';
@@ -75,3 +77,14 @@ export const Blocked: Story = {
 
 /** Children beyond the read bound: listed by id and said to be unread. */
 export const ChildrenNotRead: Story = { args: argsFor(makeOrchestration(), {}, 4) };
+
+/**
+ * A memory orchestration over a settled run. Two steps were settled at open
+ * because a provided run stands in for them, so `target` names a run it never
+ * opened — the one shape a step ledger can read falsely if it calls that a child.
+ */
+export const RunStoodIn: Story = {
+  args: argsFor(makeMemoryOrchestration(), {
+    [MEMORY_SOURCE_RUN_ID]: { ...makeTwoIterationRun(), runId: MEMORY_SOURCE_RUN_ID },
+  }),
+};

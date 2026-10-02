@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  makeMemoryOrchestration,
   makeOrchestration,
   makeRunningOrchestration,
   makeTwoIterationRun,
+  MEMORY_SOURCE_RUN_ID,
   ORCHESTRATION_CHILD_IDS,
 } from '../../../testing/fixtures';
 import { childrenToRead, dataFlow, flowTotals, MAX_CHILDREN_READ } from './data-flow';
@@ -61,6 +63,35 @@ describe('an orchestration as a column of steps', () => {
     expect(flowOf().steps[0].blockedBy).toBeNull();
   });
 
+  it('[QLU-12] a step that never ran did not open the run it names — that run stood in', () => {
+    // Where a provided run stands in for a step, the runner settles the step with
+    // that run's id and never starts it, so the record stamps no start. Reading
+    // the id as a child would say a skipped step opened a run, which is false.
+    const flow = flowOf(makeMemoryOrchestration());
+    const byId = Object.fromEntries(flow.steps.map((step) => [step.stepId, step]));
+    expect(flow.steps.map((step) => [step.stepId, step.ran])).toEqual([
+      ['recall', false],
+      ['target', false],
+      ['digest', true],
+      ['store', true],
+    ]);
+    expect(byId['target'].children).toEqual([]);
+    expect(byId['target'].standIns.map((child) => child.runId)).toEqual([MEMORY_SOURCE_RUN_ID]);
+    // A step that did run owns the runs it names.
+    expect(byId['digest'].standIns).toEqual([]);
+    expect(byId['digest'].children).toHaveLength(1);
+    expect(flowTotals(flow)).toMatchObject({ steps: 4, children: 1, standIns: 1, unread: 2 });
+    // And a stand-in is never mistaken for a block: the reason is the
+    // orchestrator's own, and only the runner's blocking reasons draw an edge.
+    expect(flow.edges).toEqual([]);
+  });
+
+  it('[QLU-12] a run that stood in is still worth reading, so it is in the read list', () => {
+    const flow = flowOf(makeMemoryOrchestration());
+    expect(childrenToRead(flow, null)).toContain(MEMORY_SOURCE_RUN_ID);
+    expect(childrenToRead(flow, MEMORY_SOURCE_RUN_ID)[0]).toBe(MEMORY_SOURCE_RUN_ID);
+  });
+
   it('[QLU-12] a child not yet read is listed by id and said to be unread', () => {
     const run = makeTwoIterationRun();
     const flow = flowOf(makeOrchestration(), {
@@ -76,7 +107,7 @@ describe('an orchestration as a column of steps', () => {
       overall: 100,
     });
     expect(rest.every((child) => child.unread)).toBe(true);
-    expect(flowTotals(flow)).toMatchObject({ steps: 2, children: 3, unread: 2 });
+    expect(flowTotals(flow)).toMatchObject({ steps: 2, children: 3, standIns: 0, unread: 2 });
   });
 
   it('[QLU-12] a pending step is counted but publishes nothing', () => {

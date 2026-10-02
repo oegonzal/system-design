@@ -111,3 +111,78 @@ export const makeRunningOrchestration = (): OrchestrationRunDto => {
     },
   });
 };
+
+/**
+ * A memory orchestration over a settled run: `recall` and `target` both settled
+ * at open because a provided run stands in for them, then `digest` and `store`.
+ *
+ * The shape worth having a fixture for is `target`: skipped, carrying the source
+ * run's id, and with no `startedAt` — a step that names a run it never opened.
+ */
+export const MEMORY_SOURCE_RUN_ID = '2026-10-02T02-39-17-636-b94aa4-quality';
+
+export const makeMemoryOrchestration = (
+  overrides: Partial<OrchestrationRunDto> = {},
+): OrchestrationRunDto => ({
+  orchestrationRunId: '9b2e41aa-6c0d-4f1e-8a77-51c3de90bb14',
+  orchestrator: 'memory',
+  pipeline: 'system-design-canvas',
+  status: 'complete',
+  startedAt: '2026-10-02T02:50:00.000Z',
+  finishedAt: '2026-10-02T02:53:12.000Z',
+  request: {
+    goal: '',
+    outputProvided: false,
+    criteriaProvided: true,
+    adoptedFrom: null,
+    maxIterations: 1,
+    samples: null,
+  },
+  context: { available: ['experience-digest'], unavailable: [] },
+  steps: {
+    recall: {
+      status: 'skipped',
+      reason: 'provided-run',
+      runIds: [],
+      note: null,
+      counts: {},
+      report: null,
+      // Settled at open, so it never started.
+      startedAt: null,
+      finishedAt: '2026-10-02T02:50:00.000Z',
+    },
+    target: {
+      status: 'skipped',
+      reason: 'provided-run',
+      // The source run stood in; this step opened nothing.
+      runIds: [MEMORY_SOURCE_RUN_ID],
+      note: null,
+      counts: {},
+      report: null,
+      startedAt: null,
+      finishedAt: '2026-10-02T02:50:00.000Z',
+    },
+    digest: {
+      status: 'complete',
+      reason: null,
+      runIds: ['2026-10-02T02-50-01-004-7c91de-quality'],
+      note: null,
+      counts: { lessons: 5 },
+      report: null,
+      startedAt: '2026-10-02T02:50:01.000Z',
+      finishedAt: '2026-10-02T02:52:40.000Z',
+    },
+    store: {
+      status: 'complete',
+      reason: null,
+      runIds: [],
+      note: null,
+      counts: { stored: 5, skipped: 0 },
+      report: null,
+      startedAt: '2026-10-02T02:52:40.000Z',
+      finishedAt: '2026-10-02T02:53:12.000Z',
+    },
+  },
+  error: null,
+  ...overrides,
+});

@@ -25,6 +25,11 @@ import { STEP_STATUS_TONE } from './tones';
  * The graph is partial and says so: an orchestrator's declared `needs` relation
  * is not published, so a block the record names is drawn and nothing else is
  * guessed at.
+ *
+ * A step can name a run it never opened — where a provided run stands in for a
+ * step, the runner settles the step with that run's id and never starts it. Those
+ * are listed as what stood in, never as what the step opened, because a skipped
+ * step that reads as having opened a run is simply false.
  */
 
 const Column = styled.ol`
@@ -133,8 +138,33 @@ function StepBlock({
 
         {step.children.length > 0 && (
           <Stack gap={2}>
-            <Heading level={4}>Opened {step.children.length} runs</Heading>
+            <Heading level={4}>
+              Opened {step.children.length} {step.children.length === 1 ? 'run' : 'runs'}
+            </Heading>
             {step.children.map((child) => (
+              <ChildRow
+                key={child.runId}
+                child={child}
+                href={hrefForChild === undefined ? null : hrefForChild(child.runId)}
+                link={link}
+              />
+            ))}
+          </Stack>
+        )}
+
+        {step.standIns.length > 0 && (
+          <Stack gap={2}>
+            <Heading level={4}>
+              {step.standIns.length === 1
+                ? 'A run stood in for this step'
+                : 'Runs stood in for this step'}
+            </Heading>
+            <Text tone="secondary" size="sm">
+              This step never ran — the record stamps no start — so the{' '}
+              {step.standIns.length === 1 ? 'run' : 'runs'} below were supplied rather than opened
+              here, and the steps after it read what they produced.
+            </Text>
+            {step.standIns.map((child) => (
               <ChildRow
                 key={child.runId}
                 child={child}
@@ -178,8 +208,17 @@ export function FlowPanel({ flow, totals, unread, hrefForChild, link }: FlowPane
       <Stack direction="row" gap={2} align="baseline" wrap>
         <Heading level={2}>{flow.orchestrator ?? 'Orchestration'}</Heading>
         {flow.pipeline !== null && <Badge tone="accent">target {flow.pipeline}</Badge>}
-        <Badge tone="neutral">{totals.steps} steps</Badge>
-        <Badge tone="neutral">{totals.children} child runs</Badge>
+        <Badge tone="neutral">
+          {totals.steps} {totals.steps === 1 ? 'step' : 'steps'}
+        </Badge>
+        <Badge tone="neutral">
+          {totals.children} child {totals.children === 1 ? 'run' : 'runs'}
+        </Badge>
+        {totals.standIns > 0 && (
+          <Badge tone="accent">
+            {totals.standIns} stood in{totals.children === 0 ? ' — nothing was opened' : ''}
+          </Badge>
+        )}
         {totals.unread > 0 && <Badge tone="low">{totals.unread} not read</Badge>}
       </Stack>
       <Alert tone="info" title="What is drawn">
@@ -188,7 +227,7 @@ export function FlowPanel({ flow, totals, unread, hrefForChild, link }: FlowPane
         The orchestrator&apos;s own dependency declaration is not published, so nothing else is
         inferred.
         {unread > 0
-          ? ` ${unread} further child runs were not read, so their own actions are not in this log.`
+          ? ` ${unread} further ${unread === 1 ? 'run was' : 'runs were'} not read, so ${unread === 1 ? 'its' : 'their'} own actions are not in this log.`
           : ''}
       </Alert>
       <Column>
