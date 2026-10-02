@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
+  LAYOUT_PITCH,
   PROMPT_COPY,
   recallWithout,
   type ApiErrorResponse,
@@ -764,6 +765,59 @@ describe('sessions', () => {
       });
       const imported = await call<GetRevisionResponse>(`${h.url}/revisions/${second.revisionId}`);
       expect(imported.body.data.graph.nodes.map((n) => n.id)).toContain('ai-replica');
+    });
+
+    // The coach reads the canvas as text and returns no layout — or one it made up.
+    it('[DEL-3] an import keeps the author’s layout: every surviving block stays where it was, a new one is laid beside the blocks it joins, and no position is the model’s', async () => {
+      const { sessionId } = await startSession();
+      const authored = validGraph();
+      authored.nodes = authored.nodes.map((node, index) => ({
+        ...node,
+        position: { x: index * 400, y: 80 },
+      }));
+      await startImprove(sessionId, { ...submission(authored), maxIterations: 3 });
+
+      const revised = coached();
+      revised.graph.nodes = revised.graph.nodes.map(({ position: _dropped, ...node }) =>
+        // A position the model invented for an author's block is not the author's.
+        node.id === 'api' ? { ...node, position: { x: -999, y: -999 } } : node,
+      );
+      const further: DesignSubmission = {
+        ...revised,
+        graph: {
+          nodes: [...revised.graph.nodes, { id: 'ai-cache', kind: 'cache', label: 'Cache' }],
+          edges: [
+            ...revised.graph.edges,
+            { id: 'ai-e-cache', source: 'api', target: 'ai-cache', kind: 'sync' },
+          ],
+        },
+      };
+      h.loop.complete('fake-run-1', [
+        { overall: 60, decision: 'revise' },
+        { overall: 72, decision: 'revise', artifact: revised },
+        { overall: 80, decision: 'accept', artifact: further },
+      ]);
+      const done = await readImprove(sessionId, 'fake-run-1');
+      const graphOf = async (revisionId: string | null) =>
+        (await call<GetRevisionResponse>(`${h.url}/revisions/${revisionId}`)).body.data.graph;
+      const at = (graph: CanvasGraph, id: string) =>
+        graph.nodes.find((node) => node.id === id)?.position;
+
+      const second = await graphOf(done.body.data.iterations[1].revisionId);
+      for (const node of authored.nodes) expect(at(second, node.id)).toEqual(node.position);
+      // Beside the database it replicates: one column on, clear of every other block.
+      const replica = at(second, 'ai-replica');
+      expect(replica).toEqual({ x: 800 + LAYOUT_PITCH.x, y: 80 });
+      // What was judged is what is stored — order and all — with only positions added.
+      expect(second.nodes.map(({ position: _p, ...node }) => node)).toEqual(
+        revised.graph.nodes.map(({ position: _p, ...node }) => node),
+      );
+
+      // The next import finds the coach's own block where the last one put it.
+      const third = await graphOf(done.body.data.iterations[2].revisionId);
+      expect(at(third, 'ai-replica')).toEqual(replica);
+      for (const node of authored.nodes) expect(at(third, node.id)).toEqual(node.position);
+      expect(at(third, 'ai-cache')).toEqual({ x: 400 + LAYOUT_PITCH.x, y: 80 + LAYOUT_PITCH.y });
     });
 
     it('[DEL-3] each iteration lists its confirmed findings grounded on the design it judged, so its reason can name them', async () => {

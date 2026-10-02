@@ -15,6 +15,7 @@ export * from './lib/envelope';
 export * from './lib/appearance';
 export * from './lib/canvas';
 export * from './lib/canvas.schema';
+export * from './lib/canvas-layout';
 export * from './lib/design-prompt.schema';
 export * from './lib/experiences';
 export * from './lib/prompts';

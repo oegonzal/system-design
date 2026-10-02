@@ -10,7 +10,10 @@ import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
   designSubmissionSchema,
+  layoutGraph,
   MAX_IMPROVE_ITERATIONS,
+  positionsOf,
+  type CanvasPosition,
   type CoachingRunSummaryDto,
   type DesignSubmission,
   type ImproveIterationDto,
@@ -41,7 +44,11 @@ import { submissionProblems } from './submission';
  * once as an assistant revision when the run is read — while it runs, as
  * soon as the loop has recorded the iteration — so a timeline shows the
  * author's design and the coach's improvements in one sequence, each with
- * its own grade. Every run is recorded on the session, so a reloaded
+ * its own grade. An import keeps the author's layout: the coach revises a
+ * canvas it read as text and returns none, so every block that survived
+ * stays where the author (or an earlier import) put it and a new one is laid
+ * beside the blocks it joins — positions are the studio's, never judged and
+ * never the model's. Every run is recorded on the session, so a reloaded
  * workspace finds what to poll.
  */
 @Injectable()
@@ -217,6 +224,10 @@ export class ImproveService {
     );
     const criteria = coaching.session.prompt.criteria;
     const iterations: ImproveIterationDto[] = [];
+    // Where each block sits, as the run's revisions have it so far: the
+    // base's layout, then every import's on top, so a block the coach added
+    // in one iteration is where it was in the next.
+    const layout = positionsOf(base.graph);
     let bestBefore = Number.NEGATIVE_INFINITY;
     for (const it of recorded) {
       const cache: RevisionCache = { status: 'complete', ...iterationGrade(it) };
@@ -246,6 +257,7 @@ export class ImproveService {
           submission,
           criteria,
           cache,
+          layout,
         );
         if ('revision' in imported) {
           revision = imported.revision;
@@ -254,6 +266,9 @@ export class ImproveService {
           outcome = 'refused';
           problems = imported.problems;
         }
+      }
+      if (revision !== null) {
+        for (const [id, position] of positionsOf(revision.graph)) layout.set(id, position);
       }
       iterations.push({
         iteration: it.iteration,
@@ -309,7 +324,10 @@ export class ImproveService {
    * artifact is a submission the studio itself would accept. The loop
    * repairs what it can before judging, so what arrives here is what was
    * judged; a coach that still drew an edge to nowhere is refused with the
-   * reasons, logged, and never stored — the studio repairs nothing.
+   * reasons, logged, and never stored — the studio repairs nothing. What it
+   * does add is where each block sits: `layout` for the ones that have a
+   * place already, a free slot beside its neighbours for each new one, and
+   * never a position the model wrote.
    */
   private async import(
     sessionId: string,
@@ -318,6 +336,7 @@ export class ImproveService {
     submission: DesignSubmission | null,
     criteria: readonly SuccessCriterion[],
     cache: RevisionCache,
+    layout: ReadonlyMap<string, CanvasPosition>,
   ): Promise<{ revision: DesignRevision } | { problems: string[] }> {
     if (submission === null) {
       this.logger.warn(`run ${runId} iteration ${iteration}: artifact is not a submission`);
@@ -334,7 +353,7 @@ export class ImproveService {
       return {
         revision: await this.sessions.persistRevision(
           sessionId,
-          submission,
+          { ...submission, graph: layoutGraph(submission.graph, layout) },
           'assistant',
           { runId, iteration },
           cache,
