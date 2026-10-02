@@ -9,6 +9,7 @@
 import type { PanelAlignment, PanelReportDto, QualityRunDto } from '@sysdesign/contracts';
 import { DEFAULT_PANEL_SAMPLES } from '@sysdesign/contracts';
 
+import { mapConcurrent } from '../../core/loop/scoped-llm';
 import { outputsOf, reconcile } from '../../core/outputs';
 import type { RunInput } from '../../core/loop/run-pipeline';
 import { completed, skipped } from '../common';
@@ -18,46 +19,74 @@ import type { StepContext, StepResult } from '../runner/definition';
 export type PanelSource = { input: RunInput } | { skip: string; note?: string | null };
 
 /**
- * Run each declared pipeline `samples` times over one input. Sequential on
- * purpose: every sample is a whole run on the subscription client, and one
- * at a time is the rule there. A failed sample is counted, not fatal, unless
- * none completed — then the panel is the run's failure.
+ * Samples are independent by construction — the whole point of a panel is that
+ * nothing passes between them — so a declared number of them run at once. The
+ * number is small and declared per orchestrator rather than computed: every
+ * sample is a whole run, each wanting its own pipeline's worth of calls, and
+ * what the provider will actually bear is the process gate's business, not an
+ * orchestrator's guess.
+ *
+ * What is NOT concurrent is how the results are read. `mapConcurrent` writes
+ * each child back into its own position, so the runs handed on, the ids
+ * recorded and the error carried are all functions of the sample's index and
+ * not of which sample happened to finish first. That matters: the reconcile
+ * report's `seenBy` indexes this array, so a settle-ordered panel would
+ * silently re-label which run saw which finding.
  */
 interface Sampled {
   runs: QualityRunDto[];
   failed: number;
   lastError: QualityRunDto['error'];
+  /** Every child attempted, in sample order — failures included. */
+  runIds: string[];
 }
 
-/** Every declared pipeline `samples` times over one input, one child after another. */
+/** Every declared pipeline `samples` times over one input, a few at a time. */
 async function runSamples<O extends object, P>(
   ctx: StepContext<O, P>,
   input: RunInput,
   samples: number,
+  concurrency: number,
 ): Promise<Sampled> {
-  const sampled: Sampled = { runs: [], failed: 0, lastError: null };
-  for (const pipeline of ctx.pipelines) {
-    for (let sample = 0; sample < samples; sample += 1) {
-      const child = await ctx.execute(input, pipeline);
-      if (completed(child)) {
-        sampled.runs.push(child);
-      } else {
-        sampled.failed += 1;
-        sampled.lastError = child.error;
-      }
+  const units = ctx.pipelines.flatMap((pipeline) =>
+    Array.from({ length: samples }, () => pipeline),
+  );
+  const children = await mapConcurrent(units, concurrency, (pipeline) =>
+    ctx.execute(input, pipeline),
+  );
+  const sampled: Sampled = { runs: [], failed: 0, lastError: null, runIds: [] };
+  for (const child of children) {
+    sampled.runIds.push(child.runId);
+    if (completed(child)) sampled.runs.push(child);
+    else {
+      sampled.failed += 1;
+      // The last by sample index, not the last to settle: a panel must report
+      // the same failure however its samples were interleaved.
+      sampled.lastError = child.error;
     }
   }
   return sampled;
 }
 
+/** How many samples a panel runs at once unless its orchestrator declares otherwise. */
+export const DEFAULT_PANEL_CONCURRENCY = 2;
+
 export const panelStep =
-  <O extends object, P>(source: (ctx: StepContext<O, P>) => PanelSource) =>
+  <O extends object, P>(
+    source: (ctx: StepContext<O, P>) => PanelSource,
+    options: { concurrency?: number } = {},
+  ) =>
   async (ctx: StepContext<O, P>): Promise<StepResult<QualityRunDto[]>> => {
     const from = source(ctx);
     if ('skip' in from) return skipped(from.skip, from.note);
 
     const samples = ctx.request.samples ?? DEFAULT_PANEL_SAMPLES;
-    const { runs, failed, lastError } = await runSamples(ctx, from.input, samples);
+    const { runs, failed, lastError, runIds } = await runSamples(
+      ctx,
+      from.input,
+      samples,
+      options.concurrency ?? DEFAULT_PANEL_CONCURRENCY,
+    );
     const counts = { lenses: ctx.pipelines.length, samples, completed: runs.length, failed };
     const shortfall = `${failed} of ${runs.length + failed} sample(s) failed`;
     if (runs.length === 0) {
@@ -66,6 +95,7 @@ export const panelStep =
         reason: 'run-failed',
         note: shortfall,
         counts,
+        runIds,
         error: lastError ?? {
           name: 'PanelFailed',
           message: 'no sample produced a trace',
@@ -74,9 +104,16 @@ export const panelStep =
       };
     }
     if (failed > 0) {
-      return { status: 'complete', reason: 'sample-failed', note: shortfall, counts, output: runs };
+      return {
+        status: 'complete',
+        reason: 'sample-failed',
+        note: shortfall,
+        counts,
+        runIds,
+        output: runs,
+      };
     }
-    return { status: 'complete', counts, output: runs };
+    return { status: 'complete', counts, runIds, output: runs };
   };
 
 /**

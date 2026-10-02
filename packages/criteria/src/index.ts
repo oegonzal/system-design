@@ -293,6 +293,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A call the provider failed is asked again immediately, in place, up to a declared number of attempts: what may be retried is a table over the provider's own closed error vocabularies rather than a search through its prose, a rejected request — a refused credential, an invalid ask, a spent budget — is never asked twice, a strained provider is given a bounded pause and holds no permit while it is waited out, and every attempt is recorded in its own right so the rate of first-attempt failures stays as visible as it was.",
   },
+  {
+    id: 'QL-29',
+    statement:
+      "A panel runs a declared few of its samples at once and reads them positionally: the runs it hands on, the child ids it records and the failure it reports are functions of the sample index rather than of which sample settled first, so the reconcile report's indices keep meaning what they meant.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

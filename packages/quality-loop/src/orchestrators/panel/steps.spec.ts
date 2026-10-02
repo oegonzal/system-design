@@ -45,6 +45,93 @@ function contextOf(
 
 const source = (): PanelSource => ({ input: { goal: 'g', maxIterations: 1 } });
 
+describe('a panel whose samples run together', () => {
+  /** Resolves each sample after a delay inverse to its index, so completion inverts order. */
+  const inverted = (count: number) => {
+    const executed: string[] = [];
+    const ctx = fakeStepContext<Outputs, unknown>(
+      undefined,
+      async (_input, _pipeline) => {
+        const index = executed.length;
+        executed.push(`s${index + 1}`);
+        for (let turn = 0; turn < (count - index) * 3; turn += 1) await Promise.resolve();
+        return judged(`r-${index + 1}`, 70 + index);
+      },
+      { request: { pipeline: 'tiny', goal: 'g', samples: count }, pipelines: ['tiny'] },
+    );
+    return ctx;
+  };
+
+  it('[QL-29] hands the runs on by sample index, never by which finished first', async () => {
+    const step = panelStep<Outputs, unknown>(() => ({ input: { goal: 'g' } }));
+    const result = await step(inverted(3));
+
+    // The reconcile report's seenBy indexes this array, so settle order here
+    // would silently re-label which run saw which finding.
+    expect(result.output?.map((run) => run.runId)).toEqual(['r-1', 'r-2', 'r-3']);
+    expect(result.counts).toMatchObject({ samples: 3, completed: 3, failed: 0 });
+  });
+
+  it('[QL-29] records every child it attempted, in sample order', async () => {
+    const step = panelStep<Outputs, unknown>(() => ({ input: { goal: 'g' } }));
+    const result = await step(inverted(3));
+
+    expect(result.runIds).toEqual(['r-1', 'r-2', 'r-3']);
+  });
+
+  it('[QL-29] runs no more at once than it declares', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const ctx = fakeStepContext<Outputs, unknown>(
+      undefined,
+      async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await Promise.resolve();
+        inFlight -= 1;
+        return judged('r', 70);
+      },
+      { request: { pipeline: 'tiny', goal: 'g', samples: 5 }, pipelines: ['tiny'] },
+    );
+    await panelStep<Outputs, unknown>(() => ({ input: { goal: 'g' } }), { concurrency: 2 })(ctx);
+
+    // Every sample is a whole run wanting its own pipeline's worth of calls, so
+    // the fan-out stays small and declared; the process gate owns the rest.
+    expect(peak).toBe(2);
+  });
+
+  it('[QL-29] reports the last failure by sample index, not by whoever settled last', async () => {
+    const ctx = fakeStepContext<Outputs, unknown>(
+      undefined,
+      async (_input, _pipeline) => {
+        const index = seen.length;
+        seen.push(index);
+        for (let turn = 0; turn < (3 - index) * 3; turn += 1) await Promise.resolve();
+        return index === 2
+          ? {
+              ...judged(`r-3`, 0),
+              trace: null,
+              error: { name: 'Late', message: 'third', stack: null },
+            }
+          : index === 0
+            ? {
+                ...judged('r-1', 0),
+                trace: null,
+                error: { name: 'Early', message: 'first', stack: null },
+              }
+            : judged('r-2', 70);
+      },
+      { request: { pipeline: 'tiny', goal: 'g', samples: 3 }, pipelines: ['tiny'] },
+    );
+    const seen: number[] = [];
+    const result = await panelStep<Outputs, unknown>(() => ({ input: { goal: 'g' } }))(ctx);
+
+    expect(result.reason).toBe('sample-failed');
+    // Sample 3 failed last by index even though sample 1 failed first in time.
+    expect(result.note).toBe('2 of 3 sample(s) failed');
+  });
+});
+
 describe('panelStep', () => {
   it('[QL-19] runs each declared pipeline `samples` times, one after another, and hands the runs on', async () => {
     const { ctx, executed } = contextOf((call) => judged(`r-${call}`, 70 + call), {
