@@ -403,7 +403,10 @@ describe('PracticeWorkspace grading a revision again', () => {
               }
             : { body: { data: makeEvaluation({ runId: 'run-2', overall: 81 }) } },
       },
-      ...sessionRoutes({}),
+      // The record's last word on the run was "running": nobody could read it since.
+      ...sessionRoutes({
+        revisions: [makeRevisionSummary({ evaluation: { ...FAILED_REF, status: 'running' } })],
+      }),
     ]);
 
     renderWithTheme(<PracticeWorkspace sessionId={SESSION} />);
@@ -413,6 +416,9 @@ describe('PracticeWorkspace grading a revision again', () => {
     // The revision is there: this is not the page's not-found, and not a failure.
     expect(screen.queryByRole('heading', { name: 'Practice session not found' })).toBeNull();
     expect(screen.queryByTestId('evaluation-error')).toBeNull();
+    // Nothing is grading it: the toolbar does not say "grading…", and Submit is not held.
+    expect(screen.getByTestId('submission-status').getAttribute('data-status')).toBe('failed');
+    expect((screen.getByTestId('submit-revision') as HTMLButtonElement).disabled).toBe(false);
 
     await userEvent.click(screen.getByTestId('retry-evaluation'));
 

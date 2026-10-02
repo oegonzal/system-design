@@ -715,12 +715,18 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   // it is the one being polled, and whatever run holds its grading slot — the
   // server's word, or the coach this tab is watching revise.
   const latest = latestUserRevision(revisions);
+  const polled = latest !== null && latest.id === feedback?.id;
+  // A grade the grader no longer has did not arrive, whatever the record's
+  // last word was: the stored status stays `running` until someone can read
+  // the run, and nothing is running it.
   const latestStatus =
     latest === null
       ? null
-      : latest.id === feedback?.id && polling.evaluation !== null
-        ? polling.evaluation.status
-        : (latest.evaluation?.status ?? null);
+      : polled && polling.lost
+        ? 'failed'
+        : polled && polling.evaluation !== null
+          ? polling.evaluation.status
+          : (latest.evaluation?.status ?? null);
   const coaching = improve.run !== null && improve.run.status === 'running' ? improve.run : null;
   const coachBase = revisions.find((candidate) => candidate.id === coaching?.baseRevisionId);
   const holder: SessionInFlightDto | null =
