@@ -103,6 +103,14 @@ describe('the memory steps', () => {
       status: 'complete',
       reason: 'no-usable-memory',
     });
+    const unjudged = recallTrace('escalate');
+    expect(
+      await recall(
+        ctx(
+          child('memory-recall', { ...unjudged, contract: { ...unjudged.contract, criteria: [] } }),
+        ),
+      ),
+    ).toMatchObject({ status: 'complete', reason: 'no-rubric', counts: { usable: 0 } });
     expect(
       await recall(ctx(child('memory-recall', recallTrace()), { goal: 'x'.repeat(64_000) })),
     ).toMatchObject({ status: 'complete', reason: 'goal-at-budget' });
@@ -181,6 +189,42 @@ describe('the memory steps', () => {
     );
     expect(belowTheBar).toMatchObject({ status: 'complete', reason: 'not-accepted' });
     expect(belowTheBar.output).toBeUndefined();
+
+    // A digest that derived no rubric was never judged: the step says so,
+    // with what the digest proposed, and never calls it a shortfall.
+    const judgedAgainstNothing = digestTraceFor(source, 'escalate');
+    const noRubric = await digest(
+      ctx(
+        child('experience-digest', {
+          ...judgedAgainstNothing,
+          contract: { ...judgedAgainstNothing.contract, criteria: [] },
+        }),
+        { outputs: { target: source } },
+      ),
+    );
+    expect(noRubric).toMatchObject({
+      status: 'complete',
+      reason: 'no-rubric',
+      counts: { memories: 1, kept: 0 },
+    });
+    expect(noRubric.output).toBeUndefined();
+    const [only] = judgedAgainstNothing.iterations;
+    const noArtifact = await digest(
+      ctx(
+        child('experience-digest', {
+          ...judgedAgainstNothing,
+          iterations: [
+            { ...only, artifact: null, ledger: { ...only.ledger, artifactPresent: false } },
+          ],
+        }),
+        { outputs: { target: source } },
+      ),
+    );
+    expect(noArtifact).toMatchObject({
+      status: 'complete',
+      reason: 'no-artifact',
+      counts: { memories: 0, kept: 0 },
+    });
     expect(
       await digest(ctx(child('experience-digest', null, true), { outputs: { target: source } })),
     ).toMatchObject({ status: 'failed', reason: 'run-failed' });

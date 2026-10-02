@@ -8,6 +8,7 @@ import {
   QualityRun,
   truncateTestTables,
 } from '@sysdesign/db';
+import type { LlmClient } from '@sysdesign/llm';
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -33,13 +34,34 @@ const TABLES = [OrchestrationRunChild, OrchestrationRun, MemoryEmbedding, Qualit
 const embeddings = fakeEmbeddings();
 const store = new InMemoryMemoryStore();
 
+/**
+ * The model behind the booted app, swappable between runs: every canned
+ * answer by default, and a spec that needs the model to miss one stage
+ * points it at a fake without that answer for the duration.
+ */
+const model: { current: LlmClient } = { current: fakeLlm(...CANNED) };
+const switchable: LlmClient = {
+  get model() {
+    return model.current.model;
+  },
+  completeStructured: (request) => model.current.completeStructured(request),
+};
+
 /** The real modules over real HTTP with the REAL pipeline registry; only the model and the store are fakes. */
 const boot = () =>
   bootApp([
-    [QUALITY_LOOP_LLM, fakeLlm(...CANNED)],
+    [QUALITY_LOOP_LLM, switchable],
     [EMBEDDING_CLIENT, embeddings],
     [MEMORY_STORE, store],
   ]);
+
+/** A digest's criteria answer: the one canned object whose kinds are the digest's. */
+const isDigestCriteria = (answer: unknown): boolean =>
+  typeof answer === 'object' &&
+  answer !== null &&
+  'criteria' in answer &&
+  Array.isArray(answer.criteria) &&
+  answer.criteria.some((item: { kind?: string }) => item.kind === 'signal');
 
 describe('the memory orchestration over the three pipelines', () => {
   let app: INestApplication;
@@ -231,6 +253,41 @@ describe('the memory orchestration over the three pipelines', () => {
   // Starting a composed-goal pipeline as a target is refused: recall would
   // rewrite a goal another program composed. Digesting a FINISHED one is a
   // different question — the target stands in, nothing runs it — and it is how
+  it('[QL-16] a digest that derived no rubric is reported as never judged — `no-rubric` — not as a digest that fell short', async () => {
+    // The live failure this rule exists for: the deriver missed the schema on
+    // every attempt, the digest ran with no criteria, its controller escalated
+    // at zero, and the orchestration said `not-accepted, kept 0 of 8`.
+    const first = (await getJson<Page<OrchestrationRunDto>>(url, '/orchestrations')).data.at(-1);
+    const targetRunId = first?.steps['target'].runIds[0];
+    if (!targetRunId) throw new Error('the first run must have a target');
+    model.current = fakeLlm(...CANNED.filter((answer) => !isDigestCriteria(answer)));
+    try {
+      const started = await postJson(url, '/orchestrations/memory/from-run', {
+        runId: targetRunId,
+      });
+      expect(started.status).toBe(202);
+      const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
+      const record = await settle(data.orchestrationRunId);
+
+      expect(record.status).toBe('complete');
+      expect(record.steps['digest']).toMatchObject({
+        status: 'complete',
+        reason: 'no-rubric',
+        counts: { memories: 2, kept: 0 },
+      });
+      expect(record.steps['store']).toMatchObject({
+        status: 'skipped',
+        reason: 'upstream-skipped',
+        note: 'digest',
+      });
+      const digest = await run(record.steps['digest'].runIds[0] ?? null);
+      expect(digest.status).toBe('complete');
+      expect(digest.trace?.contract.criteria).toEqual([]);
+    } finally {
+      model.current = fakeLlm(...CANNED);
+    }
+  });
+
   // the studio's own runs reach the store. The digest child of the run above is
   // itself a composed-goal run, so it proves the path without a studio.
   it('[QL-17] a finished composed-goal run can be digested, though it could never be started as a target', async () => {

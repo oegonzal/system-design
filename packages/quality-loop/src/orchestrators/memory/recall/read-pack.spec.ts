@@ -24,7 +24,7 @@ describe('reading a recall', () => {
       hits,
       ACCEPT_AT,
     );
-    expect(belowTheBar).toEqual({ admitted: false, kept: 2, usable: [] });
+    expect(belowTheBar).toEqual({ admission: 'fell-short', kept: 2, usable: [] });
   });
 
   it('[QL-16] a pack that cleared the bar is drawn on even though the loop ran out of iterations', () => {
@@ -39,7 +39,7 @@ describe('reading a recall', () => {
 
     const readout = readPack(outOfIterations, hits, ACCEPT_AT);
 
-    expect(readout.admitted).toBe(true);
+    expect(readout.admission).toBe('admitted');
     // m2 is the one a finding names, and it is the only one withheld.
     expect(readout.usable.map((item) => item.alias)).toEqual(['m1']);
   });
@@ -52,6 +52,27 @@ describe('reading a recall', () => {
       validatorsPassed: false,
     });
 
-    expect(readPack(broken, hits, ACCEPT_AT)).toEqual({ admitted: false, kept: 2, usable: [] });
+    expect(readPack(broken, hits, ACCEPT_AT)).toEqual({
+      admission: 'fell-short',
+      kept: 2,
+      usable: [],
+    });
+  });
+
+  it('[QL-16] a pack curated against no rubric endorses nothing, and says it was never judged', () => {
+    const unjudged = readoutTrace({
+      ...recallInput(),
+      decision: 'escalate',
+      overall: 0,
+      criteria: [],
+      results: [],
+      findings: [],
+    });
+
+    expect(readPack(unjudged, hits, ACCEPT_AT)).toEqual({
+      admission: 'no-rubric',
+      kept: 2,
+      usable: [],
+    });
   });
 });

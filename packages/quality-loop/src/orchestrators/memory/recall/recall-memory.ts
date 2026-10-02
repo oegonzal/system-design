@@ -22,6 +22,7 @@ import type { MemoryPorts } from '../ports';
 import { fuse } from './fusion';
 import { buildQuery, probesOf, probeTexts, queryText, type FusedHit } from './query';
 import { readPack, type UsableMemory } from './read-pack';
+import { UNADMITTED_REASON, type UnadmittedReason } from '../unadmitted';
 
 export interface RecallAsk {
   /** The goal to recall for, taken bare: memory a previous run appended is not part of it. */
@@ -46,7 +47,8 @@ export interface RecallCounts {
  * What came of it. `skipped`: it could not start. `failed`: it started and
  * broke, `runId` naming the recall run when the break was that run.
  * `complete`: the recall run finished, and `usable` is what it endorsed —
- * empty, with the reason, when it endorsed nothing.
+ * empty, with the reason, when it endorsed nothing: judged and short of the
+ * bar, or never judged at all, which the reason keeps apart.
  */
 export type Recalled =
   | {
@@ -64,7 +66,7 @@ export type Recalled =
     }
   | {
       status: 'complete';
-      reason: 'not-accepted' | 'no-usable-memory' | null;
+      reason: UnadmittedReason | 'no-usable-memory' | null;
       counts: RecallCounts;
       runId: string;
       usable: UsableMemory[];
@@ -131,10 +133,11 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
     kept: readout.kept,
     usable: readout.usable.length,
   };
-  const reason = !readout.admitted
-    ? 'not-accepted'
-    : readout.usable.length === 0
-      ? 'no-usable-memory'
-      : null;
+  const reason =
+    readout.admission !== 'admitted'
+      ? UNADMITTED_REASON[readout.admission]
+      : readout.usable.length === 0
+        ? 'no-usable-memory'
+        : null;
   return { status: 'complete', reason, counts, runId: child.runId, usable: readout.usable };
 }

@@ -417,37 +417,41 @@ uses; the memory module's own boot hook only verifies the store and logs.
 
 Two closed vocabularies, so a client maps a tone rather than parsing prose.
 The runner's seven (`ORCHESTRATION_REASONS`) belong to every orchestrator; the
-memory orchestrator declares nine more (`MEMORY_STEP_REASONS`), and a step
+memory orchestrator declares eleven more (`MEMORY_STEP_REASONS`), and a step
 that gives any other reason is failed `errored` on the spot. A step is
 `pending`, `running`, `complete`, `skipped` or `failed`; `complete` with a
 reason means the step ran and had no effect.
 
-| Reason                 | Whose  | Raised when                                                                     | What to do                                                                         |
-| ---------------------- | ------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `upstream-failed`      | runner | a step this one `needs` failed; `note` names it                                 | fix the named step; for memory, a failed target ends the run                       |
-| `upstream-skipped`     | runner | a step this one `needs` yielded nothing — skipped, or complete with a reason    | read the named step's own reason; `store` after a `not-accepted` digest reads this |
-| `run-failed`           | runner | the step's child run ended `failed`                                             | read the child at `GET /runs/:id`; `note` carries its message                      |
-| `pipeline-unavailable` | runner | the step's declared pipeline is not registered                                  | the registry lost an entry, or a spec overrode it                                  |
-| `provided-run`         | runner | a `/from-run` start; the step's stand-in was written at open                    | expected; the run already happened                                                 |
-| `interrupted`          | runner | at boot — the process died mid-run                                              | re-run; completed children are still persisted                                     |
-| `errored`              | runner | an unexpected throw closed the run, or a step gave an undeclared reason         | `note` carries the message; this one is a bug                                      |
-| `embeddings-disabled`  | memory | recall, digest — no `OPENAI_API_KEY` (the embedding client carries `no-key`)    | put the key in `.env`; the target still ran                                        |
-| `store-unavailable`    | memory | recall, store — `verify()` said not ready, or a call threw                      | `pnpm stack:db`; `context.store.note` carries the cause                            |
-| `store-empty`          | memory | recall — the collection holds nothing, or the fused list came back empty        | seed past runs, or re-index them if the generation moved (§6)                      |
-| `embedding-failed`     | memory | recall, store — the provider returned nothing after one retry                   | check the `llm: embeddings request failed` line for status and body                |
-| `not-accepted`         | memory | recall, digest — `admits()` said no: a gate failed, or the score missed the bar | read the child; the name predates the rule and now means unadmitted                |
-| `no-usable-memory`     | memory | recall — admitted, but nothing survived: no kept chunk, or a finding names each | the pack faulted itself; better memory has to be stored first                      |
-| `goal-at-budget`       | memory | recall — the goal alone already fills the 64,000-byte budget                    | shorten the prompt if memory matters more than its tail                            |
-| `nothing-to-digest`    | memory | digest — the source run has no trace                                            | it never produced one; nothing to learn                                            |
-| `no-memories`          | memory | digest — admitted, but a finding names every memory                             | the digest faulted its own proposals                                               |
+| Reason                 | Whose  | Raised when                                                                                             | What to do                                                                         |
+| ---------------------- | ------ | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `upstream-failed`      | runner | a step this one `needs` failed; `note` names it                                                         | fix the named step; for memory, a failed target ends the run                       |
+| `upstream-skipped`     | runner | a step this one `needs` yielded nothing — skipped, or complete with a reason                            | read the named step's own reason; `store` after a `not-accepted` digest reads this |
+| `run-failed`           | runner | the step's child run ended `failed`                                                                     | read the child at `GET /runs/:id`; `note` carries its message                      |
+| `pipeline-unavailable` | runner | the step's declared pipeline is not registered                                                          | the registry lost an entry, or a spec overrode it                                  |
+| `provided-run`         | runner | a `/from-run` start; the step's stand-in was written at open                                            | expected; the run already happened                                                 |
+| `interrupted`          | runner | at boot — the process died mid-run                                                                      | re-run; completed children are still persisted                                     |
+| `errored`              | runner | an unexpected throw closed the run, or a step gave an undeclared reason                                 | `note` carries the message; this one is a bug                                      |
+| `embeddings-disabled`  | memory | recall, digest — no `OPENAI_API_KEY` (the embedding client carries `no-key`)                            | put the key in `.env`; the target still ran                                        |
+| `store-unavailable`    | memory | recall, store — `verify()` said not ready, or a call threw                                              | `pnpm stack:db`; `context.store.note` carries the cause                            |
+| `store-empty`          | memory | recall — the collection holds nothing, or the fused list came back empty                                | seed past runs, or re-index them if the generation moved (§6)                      |
+| `embedding-failed`     | memory | recall, store — the provider returned nothing after one retry                                           | check the `llm: embeddings request failed` line for status and body                |
+| `not-accepted`         | memory | recall, digest — `admission()` said `fell-short`: judged, and a gate failed or the score missed the bar | read the child; the name predates the rule and now means unadmitted                |
+| `no-rubric`            | memory | recall, digest — the child derived no criteria, so no lens judged it                                    | read the child's `criteria` exchanges: a deriver that missed its schema            |
+| `no-artifact`          | memory | recall, digest — the child produced nothing to judge                                                    | read the child's `producer` exchanges                                              |
+| `no-usable-memory`     | memory | recall — admitted, but nothing survived: no kept chunk, or a finding names each                         | the pack faulted itself; better memory has to be stored first                      |
+| `goal-at-budget`       | memory | recall — the goal alone already fills the 64,000-byte budget                                            | shorten the prompt if memory matters more than its tail                            |
+| `nothing-to-digest`    | memory | digest — the source run has no trace                                                                    | it never produced one; nothing to learn                                            |
+| `no-memories`          | memory | digest — admitted, but a finding names every memory                                                     | the digest faulted its own proposals                                               |
 
 Two shapes are worth naming. **`skipped` is not failure** — the whole memory
 half is optional, and a run whose memory steps read `embeddings-disabled` and
 `upstream-skipped` still produced its answer.
 
 And **`not-accepted` no longer means what its name says.** The rule it reports
-is `admits()` (`core/outputs/`), and an `accept` is only one of the ways
-past it. A run is drawn on when its best iteration cleared `artifactPresent`,
+is `admission()` (`core/outputs/`), and an `accept` is only one of the ways
+past it. It is also only ever a verdict: a child that was never judged — no
+rubric derived, nothing produced — says `no-rubric` or `no-artifact` instead,
+so a deriver's schema miss is never read as a digest that fell short. A run is drawn on when its best iteration cleared `artifactPresent`,
 `validatorsPassed` and `evidenceSufficient` and scored at or above that
 pipeline's own `acceptAt`. `policyAllowed` is deliberately **not** required,
 because it goes false the moment any blocker is open anywhere — and the item

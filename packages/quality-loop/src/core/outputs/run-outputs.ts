@@ -44,20 +44,42 @@ export function outputsOf<T>(trace: RunTrace<T>): RunOutputs<T> {
 }
 
 /**
- * Whether a finished run's best iteration may be drawn on at all.
+ * What a caller that would draw on a finished run's best iteration is told.
+ * `admitted`: it may. `fell-short`: it was judged, and a gate or the bar said
+ * no. The other two are not verdicts at all — `no-rubric`: no criteria were
+ * derived or supplied, so no lens had anything to judge against; `no-artifact`:
+ * no iteration ran, or the best one produced nothing. Kept apart so "nothing
+ * was judged" never reads as "judged and found wanting".
+ */
+export const ADMISSIONS = ['admitted', 'fell-short', 'no-rubric', 'no-artifact'] as const;
+export type Admission = (typeof ADMISSIONS)[number];
+
+/**
+ * Whether a finished run's best iteration may be drawn on, and when not,
+ * which of the three ways it may not.
  *
- * An `accept` always may. Short of that, the loop's judgement is honoured
- * where it is item-specific — a faulted item is excluded by the caller — but a
- * run is not withheld wholesale merely because the iteration budget ran out
+ * An `accept` always may. A run with no rubric, or no artifact, was never
+ * judged: its controller's zero is not a score, and it says so here rather
+ * than as a shortfall. Short of those, the loop's judgement is honoured where
+ * it is item-specific — a faulted item is excluded by the caller — but a run
+ * is not withheld wholesale merely because the iteration budget ran out
  * before someone else's blocker closed. `policyAllowed` is the one gate
  * deliberately not required: it is false whenever any blocker is open, and a
  * blocker on the summary would otherwise veto every memory beneath it. The
  * three gates that make the artifact and its score mean anything are required.
  */
-export function admits(outputs: RunOutputs, acceptAt: number): boolean {
-  if (outputs.trace.finalDecision === 'accept') return true;
-  if (outputs.decision === null) return false;
+export function admission(outputs: RunOutputs, acceptAt: number): Admission {
+  if (outputs.trace.finalDecision === 'accept') return 'admitted';
+  if (outputs.trace.contract.criteria.length === 0) return 'no-rubric';
+  if (outputs.ledger === null || !outputs.ledger.artifactPresent) return 'no-artifact';
+  if (outputs.decision === null) return 'fell-short';
   const { gates, scores } = outputs.decision;
-  if (!gates.artifactPresent || !gates.validatorsPassed || !gates.evidenceSufficient) return false;
-  return scores.overall >= acceptAt;
+  if (!gates.artifactPresent || !gates.validatorsPassed || !gates.evidenceSufficient) {
+    return 'fell-short';
+  }
+  return scores.overall >= acceptAt ? 'admitted' : 'fell-short';
 }
+
+/** Whether a finished run's best iteration may be drawn on at all — `admission`, as a yes or no. */
+export const admits = (outputs: RunOutputs, acceptAt: number): boolean =>
+  admission(outputs, acceptAt) === 'admitted';

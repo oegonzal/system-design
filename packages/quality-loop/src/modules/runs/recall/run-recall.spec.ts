@@ -365,8 +365,10 @@ describe('a recall in flight, and one that finds nothing', () => {
     }
   });
 
-  it('[QL-32] a recall the curator does not endorse is empty, names its run, and the coach goes on', async () => {
-    // No answer for memory-recall's stages: its run escalates, endorsing nothing.
+  it('[QL-32] a recall the curator could not judge is skipped as never judged, names its run, and the coach goes on', async () => {
+    // No answer for memory-recall's stages: its run derives no rubric and
+    // escalates at zero. That is no verdict on the lessons — the recall is
+    // skipped `no-rubric`, never "empty" as if the curator had read them.
     const { app, url } = await bootApp([
       [QUALITY_LOOP_LLM, fakeLlm(...COACH_ANSWERS)],
       ...memoryOverrides(seededStore()),
@@ -377,8 +379,8 @@ describe('a recall in flight, and one that finds nothing', () => {
       const run = await settled(url, runId);
       expect(run.status).toBe('complete');
       expect(run.recall).toMatchObject({
-        status: 'empty',
-        reason: 'not-accepted',
+        status: 'skipped',
+        reason: 'no-rubric',
         count: 0,
         lessons: [],
       });

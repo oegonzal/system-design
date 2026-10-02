@@ -178,10 +178,12 @@ export function recallInput(hits: readonly MemoryHit[] = recallHits()): ReadoutI
 
 export const acceptedRecall = (): RunTrace => readoutTrace(recallInput());
 
-/** An experience-digest run over the digest given, its goal already rendered. */
+/** An experience-digest run over the digest given, its goal already rendered, judged against one criterion. */
 export const digestInput = (digest: unknown, goal: string): ReadoutInput => ({
   pipeline: 'experience-digest',
   goal,
   artifact: digest,
   locations: ['summary', 'memory.1', 'f2', 'r2'],
+  criteria: [{ id: 'c1', kind: 'signal', statement: 'accounts for r1 passing at i1' }],
+  results: [passed('c1', 'signal', ['memory.1'])],
 });

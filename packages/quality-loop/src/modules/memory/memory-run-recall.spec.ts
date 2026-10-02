@@ -104,6 +104,17 @@ describe("the memory module's recall for a run's producer", () => {
       reason: 'store-empty',
       recallRunId: null,
     });
+    // Curated against no rubric: not a verdict on the lessons, so skipped, not empty.
+    const unjudged = curated('revise');
+    expect(
+      await recallWith(
+        {},
+        childRun('memory-recall', {
+          ...unjudged,
+          contract: { ...unjudged.contract, criteria: [] },
+        }),
+      ),
+    ).toMatchObject({ status: 'skipped', reason: 'no-rubric', recallRunId: 'memory-recall-run' });
     expect(await recallWith({}, childRun('memory-recall', null, true))).toEqual({
       status: 'skipped',
       reason: 'run-failed',

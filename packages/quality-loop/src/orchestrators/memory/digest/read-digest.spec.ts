@@ -33,14 +33,12 @@ describe('reading a digest', () => {
       unused: ['r2'],
     });
     const trace = readoutTrace({
-      pipeline: 'experience-digest',
-      goal,
-      artifact: digest,
+      ...digestInput(digest, goal),
       locations: ['summary', 'memory.1', 'memory.2', 'r2'],
       findings: [faulting('run_specific', ['memory.2'])],
     });
     expect(memoriesToStore(trace, ACCEPT_AT)).toEqual({
-      admitted: true,
+      admission: 'admitted',
       proposed: 2,
       memories: [
         {
@@ -60,8 +58,23 @@ describe('reading a digest', () => {
       overall: 50,
     });
     expect(memoriesToStore(belowTheBar, ACCEPT_AT)).toEqual({
-      admitted: false,
+      admission: 'fell-short',
       proposed: 2,
+      memories: [],
+    });
+  });
+
+  it('[QL-16] a digest judged against no rubric proposes its memories and endorses none, and says it was not judged', () => {
+    const digest = sampleDigest();
+    const unjudged = readoutTrace({
+      ...digestInput(digest, composedGoal()),
+      decision: 'escalate',
+      overall: 0,
+      criteria: [],
+    });
+    expect(memoriesToStore(unjudged, ACCEPT_AT)).toEqual({
+      admission: 'no-rubric',
+      proposed: digest.memories.length,
       memories: [],
     });
   });
@@ -81,7 +94,7 @@ describe('reading a digest', () => {
 
     const readout = memoriesToStore(faultedSummary, ACCEPT_AT);
 
-    expect(readout.admitted).toBe(true);
+    expect(readout.admission).toBe('admitted');
     expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
   });
 });

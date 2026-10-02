@@ -10,8 +10,9 @@ import { mayProduce, type QualityRunRequestSummary } from './runs';
  * Where a run's recall stands. `recalling` while it runs — the run has not
  * produced yet. `recalled`: the producer was handed at least one lesson.
  * `empty`: recall ran and found nothing worth handing on. `skipped`: it could
- * not run. Only `recalled` hands the producer anything, and none of them
- * fails the run.
+ * not run — or ran and could not be judged, which is no verdict on what it
+ * found. Only `recalled` hands the producer anything, and none of them fails
+ * the run.
  */
 export const RUN_RECALL_STATUSES = ['recalling', 'recalled', 'empty', 'skipped'] as const;
 export type RunRecallStatus = (typeof RUN_RECALL_STATUSES)[number];
@@ -31,6 +32,8 @@ export const RUN_RECALL_REASON_STATUS = {
   'pipeline-unavailable': 'skipped',
   'embedding-failed': 'skipped',
   'run-failed': 'skipped',
+  'no-rubric': 'skipped',
+  'no-artifact': 'skipped',
   errored: 'skipped',
   'store-empty': 'empty',
   'not-accepted': 'empty',

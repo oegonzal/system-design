@@ -3,7 +3,7 @@
  * memories no confirmed finding names, with their evidence resolved through
  * the index the digest's goal carries. Over engine facts, never over prose.
  */
-import { admits, type RunOutputs } from '../../../core/outputs';
+import { admission, type Admission, type RunOutputs } from '../../../core/outputs';
 import { readIndex as readDigestIndex } from '../../../pipelines/experience-digest/input';
 import { experienceDigestSchema } from '../../../pipelines/experience-digest/output';
 import type { EvidenceRef } from '../ports';
@@ -16,8 +16,8 @@ export interface MemoryToStore {
 }
 
 export interface DigestReadout {
-  /** Whether the run cleared `admits` at all; false means nothing was even considered. */
-  admitted: boolean;
+  /** What `admission` said of the run; anything but `admitted` means no memory was even considered. */
+  admission: Admission;
   /** How many memories the digest proposed, faulted or not. */
   proposed: number;
   memories: MemoryToStore[];
@@ -32,11 +32,13 @@ export interface Digested {
 export function memoriesToStore(outputs: RunOutputs, acceptAt: number): DigestReadout {
   const { best } = outputs;
   const digest = best === null ? null : experienceDigestSchema.safeParse(best.artifact);
-  if (best === null || !digest?.success) return { admitted: false, proposed: 0, memories: [] };
-  const proposed = digest.data.memories.length;
+  const proposed = digest?.success ? digest.data.memories.length : 0;
+  const verdict = admission(outputs, acceptAt);
+  if (verdict !== 'admitted') return { admission: verdict, proposed, memories: [] };
   const index = readDigestIndex(outputs.trace.contract.goal);
-  if (index === null || !admits(outputs, acceptAt)) {
-    return { admitted: false, proposed, memories: [] };
+  // Admitted, yet not a digest this reader can resolve: nothing of it is drawn on.
+  if (best === null || !digest?.success || index === null) {
+    return { admission: 'fell-short', proposed, memories: [] };
   }
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
@@ -56,5 +58,5 @@ export function memoriesToStore(outputs: RunOutputs, acceptAt: number): DigestRe
       },
     ];
   });
-  return { admitted: true, proposed, memories };
+  return { admission: 'admitted', proposed, memories };
 }

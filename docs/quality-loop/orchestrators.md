@@ -348,7 +348,7 @@ directions are independent: a recall that gets refused still leaves a target qua
         |   are "usable", ranked by how many passing criteria cited them
         |   output: the goal + a "## Remembered evidence (advisory)" section
         |   skips : embeddings-disabled | store-unavailable | store-empty
-        |   completes with no output: not-accepted | no-usable-memory | goal-at-budget
+        |   completes with no output: not-accepted | no-rubric | no-artifact | no-usable-memory | goal-at-budget
         v
   [target]  runs the pipeline you asked for          <-- the deliverable
         |   on the composed goal, or the bare one when recall gave nothing
@@ -358,7 +358,7 @@ directions are independent: a recall that gets refused still leaves a target qua
         |   strips the injected section back off first, so memory is never re-digested
         |   reduces the target quality run to lessons over engine facts only
         |   output: the memories that run endorsed
-        |   completes with no output: not-accepted | no-memories
+        |   completes with no output: not-accepted | no-rubric | no-artifact | no-memories
         v
   [store]   no pipeline — writes to the vector store
             one chunk per memory, two vectors each (its condition, its lesson)
@@ -366,7 +366,11 @@ directions are independent: a recall that gets refused still leaves a target qua
 ```
 
 Its own reasons are `embeddings-disabled`, `store-unavailable`, `store-empty`, `embedding-failed`,
-`not-accepted`, `no-usable-memory`, `goal-at-budget`, `nothing-to-digest`, `no-memories`.
+`not-accepted`, `no-rubric`, `no-artifact`, `no-usable-memory`, `goal-at-budget`,
+`nothing-to-digest`, `no-memories`. The middle three are the engine's `admission` in the
+orchestrator's words: `not-accepted` is a verdict (judged, and short of the bar or a gate);
+`no-rubric` and `no-artifact` mean the child was never judged, and are kept apart so a
+deriver's schema miss is never read as a digest that fell short.
 
 ### A real orchestration run that went all the way through
 

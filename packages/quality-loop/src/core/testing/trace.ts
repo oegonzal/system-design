@@ -9,6 +9,7 @@ import type {
   QualityControlDecision,
   QualityRunDto,
   RunTrace,
+  SuccessCriterion,
 } from '@sysdesign/contracts';
 
 import type { RunRecord } from '../contracts';
@@ -78,13 +79,15 @@ export function traceOf<T = unknown>(
     stopReason?: RunTrace['stopReason'];
     iterations?: number;
     goal?: string;
+    /** The rubric the run was judged against; none unless given — an unjudged run, to `admission`. */
+    criteria?: SuccessCriterion[];
   } = {},
 ): RunTrace<T> {
   const judged = overrides.decision ?? decision();
   const count = overrides.iterations ?? 1;
   return {
     pipeline: { id: 'tiny', version: '0.0.1' },
-    contract: { goal: overrides.goal ?? 'g', criteria: [] },
+    contract: { goal: overrides.goal ?? 'g', criteria: overrides.criteria ?? [] },
     iterations: Array.from({ length: count }, (_, index) => ({
       iteration: index + 1,
       mode: index === 0 ? 'initial' : 'revise',

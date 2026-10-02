@@ -28,6 +28,10 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
   'embedding-failed':
     'The coach ran without lessons from earlier runs: the search for them failed.',
   'run-failed': 'The coach ran without lessons from earlier runs: reviewing them failed.',
+  'no-rubric':
+    'The coach ran without lessons from earlier runs: the review could not settle what to check them against.',
+  'no-artifact':
+    'The coach ran without lessons from earlier runs: the review produced nothing to go on.',
   errored: 'The coach ran without lessons from earlier runs: recall hit an error.',
 };
 

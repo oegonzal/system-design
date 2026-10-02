@@ -20,6 +20,7 @@ import type { MemoryPorts } from './ports';
 import { bareGoal, withMemory } from './recall/inject';
 import { recallMemory } from './recall/recall-memory';
 import { indexMemories } from './store/index-memories';
+import { UNADMITTED_REASON } from './unadmitted';
 
 /** What each step hands on. `store` yields nothing: it is the end of the line. */
 export interface MemoryOutputs {
@@ -72,7 +73,11 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
 export const target = (ctx: Ctx): Promise<StepResult<QualityRunDto>> =>
   runTarget(ctx, requestInput(ctx.request, ctx.outputs.recall?.goal ?? ctx.request.goal));
 
-/** Digest the finished target; yields what the digest endorsed, or nothing with the reason. */
+/**
+ * Digest the finished target; yields what the digest endorsed, or nothing
+ * with the reason — and a digest that was never judged (no rubric derived,
+ * nothing produced) says that, never `not-accepted`.
+ */
 export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
   const source = ctx.outputs.target;
   if (source === undefined) return skip('upstream-skipped', 'target');
@@ -94,9 +99,11 @@ export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
 
   const child = await ctx.execute({ goal: renderRecord(record) });
   if (!completed(child)) return runFailed(child);
-  const { admitted, proposed, memories } = memoriesToStore(outputsOf(child.trace), acceptAt);
+  const { admission, proposed, memories } = memoriesToStore(outputsOf(child.trace), acceptAt);
   const counts = { memories: proposed, kept: memories.length };
-  if (!admitted) return { status: 'complete', reason: 'not-accepted', counts };
+  if (admission !== 'admitted') {
+    return { status: 'complete', reason: UNADMITTED_REASON[admission], counts };
+  }
   if (memories.length === 0) return { status: 'complete', reason: 'no-memories', counts };
   return { status: 'complete', counts, output: { digestRunId: child.runId, memories } };
 }

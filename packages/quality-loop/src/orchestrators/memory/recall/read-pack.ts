@@ -6,7 +6,7 @@
  */
 import type { EvidenceLedger } from '@sysdesign/contracts';
 
-import { admits, type RunOutputs } from '../../../core/outputs';
+import { admission, type Admission, type RunOutputs } from '../../../core/outputs';
 import { alias } from '../../../pipelines/memory-recall/input';
 import { memoryPackSchema, type MemoryPack } from '../../../pipelines/memory-recall/output';
 import type { MemoryHit } from '../ports';
@@ -20,8 +20,8 @@ export interface UsableMemory {
 }
 
 export interface RecallReadout {
-  /** Whether the run cleared `admits` at all; false means nothing was even considered. */
-  admitted: boolean;
+  /** What `admission` said of the run; anything but `admitted` means no chunk was even considered. */
+  admission: Admission;
   /** How many chunks the pack kept, faulted or not. */
   kept: number;
   usable: UsableMemory[];
@@ -46,9 +46,11 @@ export function readPack(
 ): RecallReadout {
   const { best } = outputs;
   const pack = best === null ? null : memoryPackSchema.safeParse(best.artifact);
-  if (best === null || !pack?.success) return { admitted: false, kept: 0, usable: [] };
-  const kept = pack.data.kept.length;
-  if (!admits(outputs, acceptAt)) return { admitted: false, kept, usable: [] };
+  const kept = pack?.success ? pack.data.kept.length : 0;
+  const verdict = admission(outputs, acceptAt);
+  if (verdict !== 'admitted') return { admission: verdict, kept, usable: [] };
+  // Admitted, yet not a pack this reader can resolve: nothing of it is drawn on.
+  if (best === null || !pack?.success) return { admission: 'fell-short', kept, usable: [] };
   const faulted = faultedRefs(best.ledger);
   const supportOf = supportIn(best.ledger);
   const byAlias = new Map(hits.map((hit, position) => [alias(position), hit]));
@@ -59,5 +61,5 @@ export function readPack(
       return hit ? [{ alias: item.chunk, kept: item, hit, support: supportOf(item.chunk) }] : [];
     })
     .sort((a, b) => b.support - a.support);
-  return { admitted: true, kept, usable };
+  return { admission: 'admitted', kept, usable };
 }
