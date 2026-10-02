@@ -263,7 +263,7 @@ a real provider.
 
 One sweeper. `RunJanitor` sweeps at boot and then on an interval, failing rows whose heartbeat went
 stale. `stale-after.ts` exports `runStaleAfterMs` — the one strict env validator in the package,
-rejecting anything but a positive integer for `QUALITY_LOOP_RUN_STALE_AFTER_MS`, default ten minutes.
+rejecting anything but a positive integer for `QUALITY_LOOP_RUN_STALE_AFTER_MS`, default three minutes.
 Token: `RUN_JANITOR_OPTIONS`. A failed row is written `INTERRUPTED`; a late close on such a row
 overwrites it with the truth.
 

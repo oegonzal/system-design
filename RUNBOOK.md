@@ -100,8 +100,9 @@ rubric, and a rewrite that cannot be derived leaves the prompt as it was.
 
 A running run heartbeats its row, and the served loop's janitor sweeps at boot
 and on an interval, failing as `Interrupted` only rows whose heartbeat is older
-than `QUALITY_LOOP_RUN_STALE_AFTER_MS` (default `600000`, ten minutes; the
-heartbeat is written every third of it). A run another process is still
+than `QUALITY_LOOP_RUN_STALE_AFTER_MS` (default `180000`, three minutes; the
+heartbeat is a ticker of its own, written every third of it whatever the
+model is doing). A run another process is still
 driving is left alone, so `pnpm quality-loop:run` beside the service is safe.
 A loop restarted mid-run leaves its row `running` until the threshold passes;
 then the row is failed and the revision shows failed — and if the original

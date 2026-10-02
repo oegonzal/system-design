@@ -18,6 +18,7 @@ import { ensureDatabase } from '@sysdesign/db';
 import { DisabledEmbeddingClient } from '@sysdesign/llm';
 
 import { fakeLlm } from '../../core/testing';
+import { DEFAULT_RUN_STALE_AFTER_MS } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import { InMemoryMemoryStore } from '../memory/testing';
 import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
@@ -47,7 +48,7 @@ const DEFAULT_OVERRIDES = (): ProviderOverride[] => [
   [QUALITY_LOOP_LLM, fakeLlm()],
   [EMBEDDING_CLIENT, new DisabledEmbeddingClient('no-key')],
   [MEMORY_STORE, new InMemoryMemoryStore(null)],
-  [RUN_JANITOR_OPTIONS, { staleAfterMs: 600_000, intervalMs: null }],
+  [RUN_JANITOR_OPTIONS, { staleAfterMs: DEFAULT_RUN_STALE_AFTER_MS, intervalMs: null }],
 ];
 
 export interface BootOptions {
