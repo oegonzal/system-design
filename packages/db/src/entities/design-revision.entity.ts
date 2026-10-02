@@ -104,6 +104,15 @@ export class DesignRevision {
   @Property({ type: 'text', nullable: true })
   evaluationStatus: Contracts.QualityRunStatus | null = null;
 
+  /**
+   * Why the studio itself called the grade off, in the author's terms —
+   * the grader no longer has the run — beside the `failed` it cached for it.
+   * Null for every grade the grader reported, and cleared when the revision
+   * is graded again.
+   */
+  @Property({ type: 'text', nullable: true })
+  evaluationError: string | null = null;
+
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();
 }

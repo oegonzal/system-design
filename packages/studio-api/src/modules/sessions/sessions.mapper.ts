@@ -30,6 +30,7 @@ export const toEvaluationRef = (r: DesignRevision): RevisionEvaluationRef | null
         status: r.evaluationStatus ?? 'running',
         overall: r.overall,
         decision: r.decision,
+        ...(r.evaluationError !== null ? { error: r.evaluationError } : {}),
       };
 
 /** Full revision, graph included. */

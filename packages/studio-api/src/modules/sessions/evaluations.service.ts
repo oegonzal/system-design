@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { EvaluationDto } from '@sysdesign/contracts';
+import { describeLostGrade, type EvaluationDto } from '@sysdesign/contracts';
 import { DesignRevision } from '@sysdesign/db';
 
 import { notFound } from '../../common/not-found';
@@ -34,10 +34,7 @@ export class EvaluationsService {
     }
     const evaluation = await this.syncRevision(revision);
     if (evaluation === null) {
-      throw notFound(
-        'evaluation',
-        `The grader no longer has the run that graded revision #${revision.revisionNumber}`,
-      );
+      throw notFound('evaluation', describeLostGrade(revision.revisionNumber));
     }
     return evaluation;
   }
@@ -48,7 +45,9 @@ export class EvaluationsService {
    * must know whether a grade is still in flight before acting on it. Null
    * when the loop does not have the run — it never recorded it, or its store
    * lost it: there is no grade to read, and no run to wait on. Each caller
-   * says what that means to it; the cache is left as it was.
+   * says what that means to it. A grade still awaited is then recorded as
+   * failed, with why in the author's terms, so nothing reads "grading…" for a
+   * run nothing is running; a grade already terminal keeps what it had.
    */
   async syncRevision(
     revision: DesignRevision,
@@ -58,7 +57,16 @@ export class EvaluationsService {
       throw notFound('evaluation', `Revision #${revision.revisionNumber} has no evaluation`);
     }
     const run = await this.loop.getRun(revision.qualityRunId);
-    if (!run) return null;
+    if (!run) {
+      if (revision.evaluationStatus === null || revision.evaluationStatus === 'running') {
+        revision.evaluationStatus = 'failed';
+        revision.overall = null;
+        revision.decision = null;
+        revision.evaluationError = describeLostGrade(revision.revisionNumber);
+        await em.flush();
+      }
+      return null;
+    }
 
     const dto = toEvaluationDto(run, revision.qualityIteration, {
       graph: revision.graph,

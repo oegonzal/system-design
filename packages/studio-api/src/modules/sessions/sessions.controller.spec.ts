@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
+  describeLostGrade,
   LAYOUT_PITCH,
   PROMPT_COPY,
   recallWithout,
@@ -656,11 +657,22 @@ describe('sessions', () => {
       const { sessionId } = await startSession();
       const { body: created } = await submit(sessionId, submission());
       h.loop.forget('fake-run-1');
+      // Read first, so the loss is on record — and the re-grade clears it.
+      expect((await evaluation(created.data.id)).status).toBe(404);
       const lost = await regrade(created.data.id);
       expect(lost.status).toBe(202);
-      expect(lost.body.data.evaluation).toMatchObject({ runId: 'fake-run-2', status: 'running' });
+      expect(lost.body.data.evaluation).toEqual({
+        runId: 'fake-run-2',
+        iteration: 1,
+        status: 'running',
+        overall: null,
+        decision: null,
+      });
       h.loop.complete('fake-run-2');
       await evaluation(created.data.id);
+      const regraded = await call<GetRevisionResponse>(`${h.url}/revisions/${created.data.id}`);
+      expect(regraded.body.data.evaluation).toMatchObject({ status: 'complete', overall: 64 });
+      expect(regraded.body.data.evaluation).not.toHaveProperty('error');
 
       const fork = h.em.fork();
       const legacy = fork.create(DesignRevision, {
@@ -753,9 +765,18 @@ describe('sessions', () => {
       const read = await call<GetSessionResponse>(`${h.url}/sessions/${sessionId}`);
       expect(read.status).toBe(200);
       expect(read.body.data.inFlight).toBeNull();
-      // The cache is left as it was: the studio invents no outcome for a run it cannot see.
+      // Nothing is grading it: the grade awaited is recorded as one that did
+      // not arrive, with why in the author's terms, so no list says "grading…".
+      expect(read.body.data.latestEvaluationStatus).toBe('failed');
       const revision = await call<GetRevisionResponse>(`${h.url}/revisions/${graded.data.id}`);
-      expect(revision.body.data.evaluation?.status).toBe('running');
+      expect(revision.body.data.evaluation).toEqual({
+        runId: 'fake-run-1',
+        iteration: 1,
+        status: 'failed',
+        overall: null,
+        decision: null,
+        error: describeLostGrade(1),
+      });
 
       const coach = await call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
         method: 'POST',

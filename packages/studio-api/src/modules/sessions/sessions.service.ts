@@ -209,6 +209,7 @@ export class SessionsService {
       revision.evaluationStatus = 'running';
       revision.overall = null;
       revision.decision = null;
+      revision.evaluationError = null;
       return revision;
     });
   }

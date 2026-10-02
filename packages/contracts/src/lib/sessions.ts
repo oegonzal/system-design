@@ -36,7 +36,18 @@ export interface RevisionEvaluationRef {
   status: QualityRunStatus;
   overall: number | null;
   decision: Decision | null;
+  /**
+   * Why the grade failed, in the author's terms, when the studio itself
+   * called it off — the grader no longer has the run (`describeLostGrade`) —
+   * so a timeline can say so without the grader. Absent for a grade the
+   * grader reported, whose own error is on the evaluation.
+   */
+  error?: string;
 }
+
+/** Why a grade the grader lost did not arrive: the API's record of it and its 404 alike. */
+export const describeLostGrade = (revisionNumber: number): string =>
+  `The grader no longer has the run that graded revision #${revisionNumber} — grade it again to get a verdict.`;
 
 export interface DesignSessionDto {
   id: Uuid;
