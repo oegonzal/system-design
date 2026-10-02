@@ -36,6 +36,7 @@ export function dimensionFloor(floor: number): Gate {
         ok: false,
         decision: routed.decision,
         reason: `below the floor ${floor}: ${named}; ${routed.reason}`,
+        facts: { floor, dimensions: below.map((entry) => entry.dimension) },
       };
     },
   };

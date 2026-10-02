@@ -124,6 +124,58 @@ describe('the standard controller', () => {
     expect(noCriteria.gates.evidenceSufficient).toBe(false);
   });
 
+  it('[QL-8] a deciding gate records what it decided on as data: the numbers it compared, the ids it named', () => {
+    const policy = tinyPolicy();
+    const decidedOn = (decision: QualityControlDecision) =>
+      decision.trace.steps.find((step) => step.outcome === 'decided')?.facts;
+    const perfect = [evidence({})];
+
+    expect(decidedOn(decide(ledger({ criteria: perfect }), policy))).toEqual({
+      overall: 100,
+      acceptAt: 80,
+    });
+    expect(decidedOn(decide(ledger({ criteria: [evidence({ result: 'fail' })] }), policy))).toEqual(
+      { overall: 0, floor: 35 },
+    );
+    expect(
+      decidedOn(
+        decide(
+          ledger({ criteria: perfect, findings: [confirmed({ severity: 'critical' })] }),
+          policy,
+        ),
+      ),
+    ).toEqual({ findings: ['gap|text'], criteria: [] });
+    expect(
+      decidedOn(
+        decide(
+          ledger({
+            validation: [
+              {
+                validatorId: 'schema',
+                gate: 'block',
+                problems: [{ severity: 'critical', locationRefs: [], message: 'bad' }],
+              },
+            ],
+          }),
+          policy,
+        ),
+      ),
+    ).toEqual({ validators: ['schema'] });
+
+    // The route's basis is the remediations it selected, already on the decision;
+    // a step that passed or was skipped decided nothing.
+    const routed = decide(
+      ledger({
+        criteria: [...perfect, evidence({ criterionId: 'c2', kind: 'nice', result: 'partial' })],
+        findings: [confirmed({ type: 'wrong', key: 'wrong|text' })],
+      }),
+      policy,
+    );
+    expect(routed.trace.steps.find((step) => step.outcome === 'decided')?.factor).toBe('route');
+    expect(decidedOn(routed)).toBeUndefined();
+    expect(routed.trace.steps.filter((step) => step.facts !== undefined)).toEqual([]);
+  });
+
   it('[QL-8] a blocking finding never accepts and routes by fixability', () => {
     const perfect = [evidence({ criterionId: 'c1' })];
     const route = (fixability: ConfirmedFinding['fixability']) =>

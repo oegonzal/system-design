@@ -152,14 +152,16 @@ export function unscoredReason(it: IterationTrace): UnscoredReason | null {
 
 /**
  * What settled an iteration's decision, as data: the controller step that
- * decided, how many remediations it selected, how many criteria were
- * assessed. The reader words it; the controller's sentence stays its trace's.
+ * decided and what it decided on, how many remediations it selected, how
+ * many criteria were assessed. The reader words it; the controller's
+ * sentence stays its trace's.
  */
 export function decisionBasisOf(it: IterationTrace): DecisionBasisDto {
   const decided = it.decision.trace.steps.find((step) => step.outcome === 'decided');
   const { criteria } = it.ledger;
   return {
     factor: decided?.factor ?? null,
+    facts: decided?.facts ?? {},
     remediations: it.decision.selectedRemediations.length,
     criteria: {
       assessed: criteria.filter((row) => row.result !== 'unassessed').length,

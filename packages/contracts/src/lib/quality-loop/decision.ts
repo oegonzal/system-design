@@ -63,6 +63,14 @@ export interface DimensionTrace {
 }
 
 /**
+ * What a decision step decided on, as data: the numbers it compared and the
+ * ids it named. Open, like the factor that records it — each gate says what
+ * its own decision rests on — so a reader words a decision from these rather
+ * than from `detail`, the controller's sentence for its trace.
+ */
+export type DecisionFacts = Readonly<Record<string, number | string | boolean | readonly string[]>>;
+
+/**
  * One consulted factor of a decision. `factor` is open, like criterion kinds
  * and finding types: a controller is composed of gates, and a pipeline may
  * compose one from gates of its own. `scores` is the one reserved factor —
@@ -73,6 +81,8 @@ export interface DecisionStep {
   factor: string;
   outcome: 'computed' | 'passed' | 'decided' | 'skipped';
   detail: string;
+  /** What the step decided on; absent where it recorded none, and on traces from before steps carried any. */
+  facts?: DecisionFacts;
 }
 
 export interface DecisionTrace {

@@ -59,7 +59,12 @@ describe('EvaluationPanel', () => {
         unscored: 'unassessed',
         decision: 'escalate',
         decisionReason: 'only 0% of criteria assessed; unassessed: c1, c2, c3, c4, c5',
-        decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 5 } },
+        decisionBasis: {
+          factor: 'evidence',
+          facts: {},
+          remediations: 0,
+          criteria: { assessed: 0, total: 5 },
+        },
         dimensions: { coverage: null, quality_attributes: null, compliance: null },
         degraded: [
           { stage: 'critic.explanation', sample: 2, reason: 'llm-failed' },
@@ -110,7 +115,12 @@ describe('EvaluationPanel', () => {
         unscored: 'no-artifact',
         decision: 'escalate',
         decisionReason: 'no artifact to judge',
-        decisionBasis: { factor: 'artifact', remediations: 0, criteria: { assessed: 0, total: 5 } },
+        decisionBasis: {
+          factor: 'artifact',
+          facts: {},
+          remediations: 0,
+          criteria: { assessed: 0, total: 5 },
+        },
         dimensions: {},
       }),
     });

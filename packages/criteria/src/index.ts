@@ -170,7 +170,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'DEL-8',
     statement:
-      "What settled a grade's decision reaches the studio as data — the controller step that decided, how many remediations it selected, how many of the criteria were assessed — so the decision is worded where it is read rather than shown as the controller's own sentence.",
+      "What settled a grade's decision reaches the studio as data — the controller step that decided, what it decided on (the score and the threshold or floor it was held to, the blockers it named), how many remediations it selected, how many of the criteria were assessed — so the decision is worded where it is read rather than shown as the controller's own sentence.",
   },
   // Quality-control loop (packages/quality-loop)
   {
@@ -211,7 +211,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-8',
     statement:
-      'Gates and routing are ordered and deterministic — artifact, validators, evidence, blockers, accept threshold, reject floor, fixability route — each step traced, and a blocking finding never accepts.',
+      'Gates and routing are ordered and deterministic — artifact, validators, evidence, blockers, accept threshold, reject floor, fixability route — each step traced, a gate that decides with what it decided on as data (the numbers it compared, the ids it named), and a blocking finding never accepts.',
   },
   {
     id: 'QL-9',

@@ -42,7 +42,12 @@ export const Escalated: Story = {
       overall: 48,
       decision: 'escalate',
       decisionReason: 'below the accept threshold with nothing the producer can act on',
-      decisionBasis: { factor: 'route', remediations: 0, criteria: { assessed: 5, total: 5 } },
+      decisionBasis: {
+        factor: 'route',
+        facts: {},
+        remediations: 0,
+        criteria: { assessed: 5, total: 5 },
+      },
       findings: [],
     }),
   },
@@ -57,6 +62,7 @@ export const BlockersAndMissingLenses: Story = {
       decisionReason: 'blockers to fix: contradiction|binding.2,edge.5,narration.2, c3',
       decisionBasis: {
         factor: 'policy-allowed',
+        facts: {},
         remediations: 2,
         criteria: { assessed: 5, total: 5 },
       },

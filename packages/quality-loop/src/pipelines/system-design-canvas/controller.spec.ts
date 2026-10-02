@@ -48,6 +48,11 @@ describe('the canvas controller', () => {
     const decided = REVISE_ONLY.decide(blocker, policy);
     expect(decided.finalDecision).toBe('revise');
     expect(decided.reason).toContain('never restarted');
+    // What the gate decided on is the gate's, whatever this controller makes of its decision.
+    const decidedOn = (ledgerIn: typeof blocker) =>
+      REVISE_ONLY.decide(ledgerIn, policy).trace.steps.find((step) => step.outcome === 'decided')
+        ?.facts;
+    expect(decidedOn(blocker)).toEqual({ findings: ['gap|text'], criteria: [] });
 
     const blocked = ledger({
       validation: [
@@ -84,5 +89,6 @@ describe('the canvas controller', () => {
     });
     expect(STANDARD.decide(floor, policy).finalDecision).toBe('retry');
     expect(REVISE_ONLY.decide(floor, policy).finalDecision).toBe('revise');
+    expect(decidedOn(floor)).toMatchObject({ floor: policy.thresholds.rejectBelow });
   });
 });

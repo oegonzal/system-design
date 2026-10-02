@@ -1,6 +1,7 @@
 import type { ApiResponse } from './envelope';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString } from './primitives';
+import type { DecisionFacts } from './quality-loop/decision';
 import type { EvidenceResult } from './quality-loop/evidence';
 import type { RunHeartbeatDto } from './quality-loop/health';
 import type { LocatedRef } from './submission-locations';
@@ -106,6 +107,12 @@ export interface DecisionBasisDto {
    * that recorded no deciding step.
    */
   factor: string | null;
+  /**
+   * What the deciding step decided on (`DecisionStep.facts`) — the score and
+   * the threshold or floor it was held to, the blockers it named — keyed as
+   * that step records them; empty when it recorded none.
+   */
+  facts: DecisionFacts;
   /** How many remediations the controller selected for the producer to apply. */
   remediations: number;
   /** How many of the iteration's criteria a lens assessed, of how many. */

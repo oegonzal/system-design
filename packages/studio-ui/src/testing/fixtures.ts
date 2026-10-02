@@ -388,7 +388,12 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
     decision: 'revise',
     // The controller's sentence and what settled it, as the route writes them together.
     decisionReason: '1 remediation(s) to apply',
-    decisionBasis: { factor: 'route', remediations: 1, criteria: { assessed: 5, total: 5 } },
+    decisionBasis: {
+      factor: 'route',
+      facts: {},
+      remediations: 1,
+      criteria: { assessed: 5, total: 5 },
+    },
     dimensions: { coverage: 80, quality_attributes: 60, compliance: 90 },
     findings: [makeFinding()],
     criterionResults: [
@@ -432,7 +437,12 @@ export function makeImproveIteration(
     unscored: null,
     decision: 'revise',
     reason: '1 remediation(s) to apply',
-    decisionBasis: { factor: 'route', remediations: 1, criteria: { assessed: 5, total: 5 } },
+    decisionBasis: {
+      factor: 'route',
+      facts: {},
+      remediations: 1,
+      criteria: { assessed: 5, total: 5 },
+    },
     findings: [],
     problems: [],
     ...overrides,

@@ -1,15 +1,16 @@
 /**
  * A controller composed from gates. Each gate reads the context and either
- * passes with a detail or settles a decision with a reason; the first to
- * settle wins and every later one is recorded as skipped. The route is the
- * gate that always settles, typed so that a composed controller can never
- * end undecided. Same context, same verdicts, always: a gate is a pure
- * function of what it is shown.
+ * passes with a detail or settles a decision with a reason — and, as data,
+ * what it decided on — the first to settle wins and every later one is
+ * recorded as skipped. The route is the gate that always settles, typed so
+ * that a composed controller can never end undecided. Same context, same
+ * verdicts, always: a gate is a pure function of what it is shown.
  */
 import type {
   ControllerParams,
   ControllerSummary,
   Decision,
+  DecisionFacts,
   DecisionPolicy,
   DecisionStep,
   EvidenceLedger,
@@ -20,13 +21,14 @@ import { round1, round4 } from '../arithmetic';
 import type { Controller } from '../ports';
 import { buildContext, type GateContext, type Scored } from './context';
 
-export type Verdict =
-  { ok: true; detail: string } | { ok: false; decision: Decision; reason: string };
-
 export interface Settled {
   decision: Decision;
   reason: string;
+  /** What the decision rests on, recorded on its step (`DecisionStep.facts`). */
+  facts?: DecisionFacts;
 }
+
+export type Verdict = { ok: true; detail: string } | ({ ok: false } & Settled);
 
 export interface Gate {
   readonly factor: string;
@@ -71,7 +73,12 @@ function validateParts(id: string, parts: ControllerParts): void {
   if (new Set(factors).size !== factors.length) fail('factors must be unique');
 }
 
-type Record = (factor: string, outcome: DecisionStep['outcome'], detail: string) => void;
+type Record = (
+  factor: string,
+  outcome: DecisionStep['outcome'],
+  detail: string,
+  facts?: DecisionFacts,
+) => void;
 
 /** Gates in order until one settles, every later one skipped; the route settles what no gate did. */
 function consultGates(parts: ControllerParts, ctx: GateContext, record: Record): Settled {
@@ -85,8 +92,9 @@ function consultGates(parts: ControllerParts, ctx: GateContext, record: Record):
     if (verdict.ok) {
       record(gate.factor, 'passed', verdict.detail);
     } else {
-      settled = { decision: verdict.decision, reason: verdict.reason };
-      record(gate.factor, 'decided', verdict.reason);
+      const { ok: _settled, ...decided } = verdict;
+      settled = decided;
+      record(gate.factor, 'decided', verdict.reason, verdict.facts);
     }
   }
   if (settled) {
@@ -94,7 +102,7 @@ function consultGates(parts: ControllerParts, ctx: GateContext, record: Record):
     return settled;
   }
   const routed = parts.route.settle(ctx);
-  record(parts.route.factor, 'decided', routed.reason);
+  record(parts.route.factor, 'decided', routed.reason, routed.facts);
   return routed;
 }
 
@@ -110,8 +118,8 @@ export function composeController(id: string, parts: ControllerParts): Controlle
   const decide = (ledger: EvidenceLedger, policy: DecisionPolicy): QualityControlDecision => {
     const ctx = buildContext(ledger, policy);
     const trace: DecisionStep[] = [];
-    const record: Record = (factor, outcome, detail) => {
-      trace.push({ order: trace.length + 1, factor, outcome, detail });
+    const record: Record = (factor, outcome, detail, facts) => {
+      trace.push({ order: trace.length + 1, factor, outcome, detail, ...(facts ? { facts } : {}) });
     };
 
     const assessedCount = ctx.scored.dimensions.filter((entry) => entry.score !== null).length;

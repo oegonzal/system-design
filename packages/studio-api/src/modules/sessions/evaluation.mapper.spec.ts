@@ -369,7 +369,7 @@ describe('toEvaluationDto', () => {
     });
   });
 
-  it('[DEL-8] says what settled the decision as data: the deciding step, the remediations selected, the criteria assessed', async () => {
+  it('[DEL-8] says what settled the decision as data: the deciding step and what it decided on, the remediations selected, the criteria assessed', async () => {
     const run = await finishedRun();
     if (!run.trace) throw new Error('the fake completes synchronously');
     const [it] = run.trace.iterations;
@@ -406,8 +406,34 @@ describe('toEvaluationDto', () => {
     };
     expect(toEvaluationDto(run, 1, submission, READ_AT).decisionBasis).toEqual({
       factor: 'route',
+      facts: {},
       remediations: 2,
       criteria: { assessed: it.ledger.criteria.length, total: it.ledger.criteria.length },
+    });
+
+    // A gate that held the score to a number records both, and the basis carries them as recorded.
+    it.decision = {
+      ...it.decision,
+      finalDecision: 'revise',
+      reason: 'overall 25 below the floor 30 (revised, never restarted)',
+      trace: {
+        ...it.decision.trace,
+        steps: [
+          { order: 1, factor: 'scores', outcome: 'computed', detail: 'overall 25' },
+          {
+            order: 2,
+            factor: 'reject-floor',
+            outcome: 'decided',
+            detail: 'overall 25 below the floor 30 (revised, never restarted)',
+            facts: { overall: 25, floor: 30 },
+          },
+          { order: 3, factor: 'route', outcome: 'skipped', detail: 'not reached' },
+        ],
+      },
+    };
+    expect(toEvaluationDto(run, 1, submission, READ_AT).decisionBasis).toMatchObject({
+      factor: 'reject-floor',
+      facts: { overall: 25, floor: 30 },
     });
   });
 

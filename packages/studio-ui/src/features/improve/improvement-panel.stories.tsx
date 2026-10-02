@@ -99,6 +99,7 @@ export const Stopped: Story = {
           reason: 'blockers to fix: unhandled_failure|node.3',
           decisionBasis: {
             factor: 'policy-allowed',
+            facts: {},
             remediations: 1,
             criteria: { assessed: 5, total: 5 },
           },
@@ -127,6 +128,7 @@ export const Refused: Story = {
           reason: 'overall 83 ≥ 75',
           decisionBasis: {
             factor: 'accept-threshold',
+            facts: {},
             remediations: 0,
             criteria: { assessed: 5, total: 5 },
           },

@@ -3,19 +3,19 @@
  * always consulted, in the order `STANDARD` declares them. Each is a pure
  * reading of the context; none knows its position or its neighbours, so a
  * pipeline may compose them in another order, leave one out, or put one of
- * its own between them.
+ * its own between them. A gate that settles records what it decided on as
+ * facts — the numbers it compared, the ids it named — beside its sentence.
  */
-import type { Gate, Route, Settled } from './compose';
+import type { Gate, Route, Settled, Verdict } from './compose';
 import type { GateContext } from './context';
 
 const percent = (share: number): number => Math.round(share * 100);
 
-/** Every open blocker by name: finding keys first, then the gating criteria that failed. */
-const blockerNames = (ctx: GateContext): string =>
-  [
-    ...ctx.blocking.findings.map((finding) => finding.key),
-    ...ctx.blocking.criteria.map((entry) => entry.criterionId),
-  ].join(', ');
+/** Every open blocker, by the id its record keys it with: finding keys, then the gating criteria that failed. */
+const blockers = (ctx: GateContext) => ({
+  findings: ctx.blocking.findings.map((finding) => finding.key),
+  criteria: ctx.blocking.criteria.map((entry) => entry.criterionId),
+});
 
 export const artifact: Gate = {
   factor: 'artifact',
@@ -34,6 +34,7 @@ export const validators: Gate = {
           ok: false,
           decision: 'retry',
           reason: `blocked by validator(s) ${ctx.blocking.validators.map((report) => report.validatorId).join(', ')}`,
+          facts: { validators: ctx.blocking.validators.map((report) => report.validatorId) },
         },
 };
 
@@ -70,21 +71,22 @@ export const policyAllowed: Gate = {
     }
     const { findings, criteria } = ctx.blocking;
     const fixabilities = findings.map((finding) => finding.fixability);
-    const named = blockerNames(ctx);
-    if (fixabilities.includes('unfixable')) {
-      return { ok: false, decision: 'reject', reason: `unfixable blocker: ${named}` };
-    }
+    const facts = blockers(ctx);
+    const named = [...facts.findings, ...facts.criteria].join(', ');
+    const settle = (decision: Settled['decision'], reason: string): Verdict => ({
+      ok: false,
+      decision,
+      reason,
+      facts,
+    });
+    if (fixabilities.includes('unfixable')) return settle('reject', `unfixable blocker: ${named}`);
     if (fixabilities.includes('requires_user')) {
-      return { ok: false, decision: 'escalate', reason: `a blocker needs a person: ${named}` };
+      return settle('escalate', `a blocker needs a person: ${named}`);
     }
     if (criteria.length === 0 && fixabilities.every((f) => f === 'requires_retry')) {
-      return {
-        ok: false,
-        decision: 'retry',
-        reason: `blockers require a fresh attempt: ${named}`,
-      };
+      return settle('retry', `blockers require a fresh attempt: ${named}`);
     }
-    return { ok: false, decision: 'revise', reason: `blockers to fix: ${named}` };
+    return settle('revise', `blockers to fix: ${named}`);
   },
 };
 
@@ -95,7 +97,12 @@ export const acceptThreshold: Gate = {
     const { acceptAt } = ctx.policy.thresholds;
     return overall < acceptAt
       ? { ok: true, detail: `overall ${overall} below ${acceptAt}` }
-      : { ok: false, decision: 'accept', reason: `overall ${overall} ≥ ${acceptAt}` };
+      : {
+          ok: false,
+          decision: 'accept',
+          reason: `overall ${overall} ≥ ${acceptAt}`,
+          facts: { overall, acceptAt },
+        };
   },
 };
 
@@ -111,6 +118,7 @@ export const rejectFloor: Gate = {
           ok: false,
           decision: 'retry',
           reason: `overall ${overall} below the floor ${rejectBelow}`,
+          facts: { overall, floor: rejectBelow },
         };
   },
 };

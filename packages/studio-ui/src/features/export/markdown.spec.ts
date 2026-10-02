@@ -155,6 +155,7 @@ describe('feedbackMarkdown', () => {
       decisionReason: `blockers to fix: ${finding.id}, c3`,
       decisionBasis: {
         factor: 'policy-allowed',
+        facts: {},
         remediations: 2,
         criteria: { assessed: 5, total: 5 },
       },
@@ -279,7 +280,12 @@ describe('feedbackMarkdown', () => {
     const md = feedbackMarkdown(
       makeEvaluation({
         decisionReason: '10 remediation(s) to apply',
-        decisionBasis: { factor: 'route', remediations: 10, criteria: { assessed: 5, total: 5 } },
+        decisionBasis: {
+          factor: 'route',
+          facts: {},
+          remediations: 10,
+          criteria: { assessed: 5, total: 5 },
+        },
       }),
       criteria,
       onCanvas(6),
@@ -320,7 +326,12 @@ describe('feedbackMarkdown', () => {
         unscored: 'unassessed',
         decision: 'escalate',
         decisionReason: 'only 0% of criteria assessed; unassessed: c1, c3',
-        decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 2 } },
+        decisionBasis: {
+          factor: 'evidence',
+          facts: {},
+          remediations: 0,
+          criteria: { assessed: 0, total: 2 },
+        },
         dimensions: { coverage: null, quality_attributes: null },
         degraded: [{ stage: 'evaluator.quality', sample: 1, reason: 'llm-failed' }],
         criterionResults: [

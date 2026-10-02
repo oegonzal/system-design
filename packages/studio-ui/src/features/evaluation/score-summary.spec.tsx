@@ -44,6 +44,7 @@ describe('ScoreSummary', () => {
           decisionReason: '10 remediation(s) to apply',
           decisionBasis: {
             factor: 'route',
+            facts: {},
             remediations: 10,
             criteria: { assessed: 9, total: 10 },
           },
@@ -78,6 +79,7 @@ describe('ScoreSummary', () => {
           decisionReason: 'blockers to fix: contradiction|binding.2,edge.5, c3',
           decisionBasis: {
             factor: 'policy-allowed',
+            facts: {},
             remediations: 2,
             criteria: { assessed: 5, total: 5 },
           },

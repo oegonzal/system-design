@@ -290,6 +290,7 @@ describe('ImprovementPanel', () => {
       // A gate that names its blockers keeps its sentence, with each one named.
       decisionBasis: {
         factor: 'policy-allowed',
+        facts: {},
         remediations: 3,
         criteria: { assessed: 5, total: 5 },
       },
@@ -319,6 +320,7 @@ describe('ImprovementPanel', () => {
             reason: '10 remediation(s) to apply',
             decisionBasis: {
               factor: 'route',
+              facts: {},
               remediations: 10,
               criteria: { assessed: 5, total: 5 },
             },
@@ -345,6 +347,7 @@ describe('ImprovementPanel', () => {
             reason: 'only 0% of criteria assessed; unassessed: c1, c2, c3, c4, c5',
             decisionBasis: {
               factor: 'evidence',
+              facts: {},
               remediations: 0,
               criteria: { assessed: 0, total: 5 },
             },

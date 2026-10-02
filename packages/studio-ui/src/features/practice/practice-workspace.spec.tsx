@@ -356,7 +356,12 @@ describe('PracticeWorkspace grading a revision again', () => {
       unscored: 'unassessed',
       decision: 'escalate',
       decisionReason: 'only 0% of criteria assessed; unassessed: c1, c2, c3',
-      decisionBasis: { factor: 'evidence', remediations: 0, criteria: { assessed: 0, total: 3 } },
+      decisionBasis: {
+        factor: 'evidence',
+        facts: {},
+        remediations: 0,
+        criteria: { assessed: 0, total: 3 },
+      },
       dimensions: { coverage: null, quality_attributes: null, compliance: null },
       degraded: [{ stage: 'evaluator.requirements', sample: 1, reason: 'llm-failed' }],
     });

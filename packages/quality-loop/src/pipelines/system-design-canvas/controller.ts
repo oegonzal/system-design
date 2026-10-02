@@ -40,7 +40,7 @@ const reviseRoute: Route = {
   settle: (ctx) => {
     const settled = byRemediations.settle(ctx);
     return settled.decision === 'retry'
-      ? { decision: 'revise', reason: `${settled.reason} — applied as a revision` }
+      ? { ...settled, decision: 'revise', reason: `${settled.reason} — applied as a revision` }
       : settled;
   },
 };

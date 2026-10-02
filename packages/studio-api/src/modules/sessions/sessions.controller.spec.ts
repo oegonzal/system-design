@@ -1609,6 +1609,7 @@ describe('sessions', () => {
         reason: 'fake',
         decisionBasis: {
           factor: null,
+          facts: {},
           remediations: 0,
           criteria: { assessed: prompt.criteria.length, total: prompt.criteria.length },
         },
