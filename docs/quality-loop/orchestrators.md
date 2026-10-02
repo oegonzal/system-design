@@ -197,8 +197,8 @@ scale_mismatch (critical) at capacity.4, …: Query-side embedding is never coun
 ## Rules
 - Keep a chunk only for what its own text says; an insight the chunk does not state
   may not be attributed to it.
-- A chunk from a run that ended rejected or escalated may inform a risk, never a
-  recommendation.
+- A chunk whose own iteration was decided reject or escalate may inform a risk, never
+  a recommendation.
 
 ## Limits
 - Keep at most 6 of the 12 candidates.

@@ -85,7 +85,7 @@ export const memoryQuerySchema = queryShape.refine(
 export const RECALL_RULES: readonly string[] = [
   'Keep a chunk only for what its own text says; an insight the chunk does not state may not be attributed to it.',
   "Every kept chunk is cited by its alias, and its caveat names any way the chunk's context differs from the query.",
-  'A chunk from a run that ended rejected or escalated may inform a risk, never a recommendation.',
+  'A chunk whose own iteration was decided reject or escalate may inform a risk, never a recommendation.',
 ];
 
 const indexSchema = z.strictObject({

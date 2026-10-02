@@ -7,6 +7,7 @@
 import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
+import { outputsOf } from '../../../core/outputs';
 import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
@@ -16,14 +17,24 @@ import { chunksOf, type ChunkOrigin } from './chunks';
 /** The calendar day of an ISO timestamp. */
 const dayOf = (iso: string): string => iso.slice(0, 10);
 
-/** Where a memory came from, as every chunk of it says: the run, its pipeline, how it ended, and the day. */
-const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => ({
-  runId: source.runId,
-  pipeline: trace.pipeline.id,
-  decision: trace.finalDecision,
-  iteration: trace.bestIteration,
-  when: dayOf(source.startedAt),
-});
+/**
+ * Where a memory came from, as every chunk of it says: the run, its pipeline,
+ * the iteration it cites with that iteration's own decision, and the day. The
+ * iteration's decision, never the run's: a run that escalated because a later
+ * revision produced nothing ends `escalate`, and that says nothing about the
+ * judged iteration the digest learned from — stamped with it, the lesson would
+ * read to a curator as one from a run that failed.
+ */
+export const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => {
+  const { best, decision } = outputsOf(trace);
+  return {
+    runId: source.runId,
+    pipeline: trace.pipeline.id,
+    decision: decision?.finalDecision ?? trace.finalDecision,
+    iteration: best?.iteration ?? trace.bestIteration,
+    when: dayOf(source.startedAt),
+  };
+};
 
 /** The named vectors of chunk `index` out of one batch that asked every name of every chunk in order. */
 const vectorsFor = (
