@@ -7,7 +7,7 @@ import { Migration } from '@mikro-orm/migrations';
  * lessons the producer was handed. Null on every run that did not ask, which
  * is every row that exists.
  */
-export class Migration20261002100001_quality_run_recall extends Migration {
+export class Migration20261002100002_quality_run_recall extends Migration {
   override up(): void | Promise<void> {
     this.addSql(`alter table "quality_run" add column "recall" jsonb null;`);
   }
