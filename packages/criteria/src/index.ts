@@ -319,6 +319,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The client lists recent runs, reopens one on click or from ?run=<id>, and refreshes the list when a run ends.',
   },
+  {
+    id: 'QLU-5',
+    statement:
+      'Every route the client offers is named once as data: the nav bar, each page\'s title and what a navigation announces read the same table, the current route is marked, and what the inspector is pointed at lives in the URL — a target and its link are exact inverses, with every spelling of "nothing selected" producing one link.',
+  },
   // Govcon web client (packages/govcon-ui)
   {
     id: 'GOVU-1',

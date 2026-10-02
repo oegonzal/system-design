@@ -1,6 +1,9 @@
 import { Suspense } from 'react';
 
 import { RunWorkspace } from '../features/run/run-workspace';
+import { pageMetadata } from './nav';
+
+export const metadata = pageMetadata('/');
 
 /** Suspense: `useSearchParams` bails out of static prerender in Next 15 without a boundary. */
 export default function RunPage() {

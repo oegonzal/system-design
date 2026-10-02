@@ -20,6 +20,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '../../api/client';
+import { useLink } from '../../components/link-context';
+import { Measure } from '../../components/measure';
+import { inspectHref } from '../inspector/model/inspect-link';
 import { RunResults } from '../results/run-results';
 import { RecentRuns } from './recent-runs';
 import { RunControls } from './run-controls';
@@ -51,6 +54,7 @@ export function RunWorkspace() {
   const run = useRun();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const Link = useLink();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,56 +143,65 @@ export function RunWorkspace() {
   };
 
   return (
-    <Stack gap={6}>
-      <Surface as="section">
-        <Stack gap={4}>
-          <Heading level={2}>Choose a prompt and run</Heading>
-          {library ? (
-            <RunControls
-              prompts={library.prompts}
-              pipelines={library.pipelines}
-              value={form}
-              onChange={setForm}
-              onRun={onRun}
-              disabled={busy || document === null}
-            />
-          ) : libraryError ? (
-            <Text tone="secondary">{libraryError}</Text>
-          ) : (
-            <Spinner label="Loading the library" />
-          )}
-          {run.startError && <Text tone="secondary">{run.startError}</Text>}
-        </Stack>
-      </Surface>
-
-      {documentError && <Text tone="secondary">{documentError}</Text>}
-      {document && (
+    <Measure>
+      <Stack gap={6}>
         <Surface as="section">
-          <PreformattedText label={document.title} text={document.markdown} />
+          <Stack gap={4}>
+            <Heading level={2}>Choose a prompt and run</Heading>
+            {library ? (
+              <RunControls
+                prompts={library.prompts}
+                pipelines={library.pipelines}
+                value={form}
+                onChange={setForm}
+                onRun={onRun}
+                disabled={busy || document === null}
+              />
+            ) : libraryError ? (
+              <Text tone="secondary">{libraryError}</Text>
+            ) : (
+              <Spinner label="Loading the library" />
+            )}
+            {run.startError && <Text tone="secondary">{run.startError}</Text>}
+          </Stack>
         </Surface>
-      )}
 
-      <Surface as="section" aria-label="Recent runs">
-        {recent ? (
-          <RecentRuns runs={recent} activeRunId={run.runId} onSelect={run.select} />
-        ) : recentError ? (
-          <Text tone="secondary">{recentError}</Text>
-        ) : (
-          <Spinner label="Loading recent runs" />
+        {documentError && <Text tone="secondary">{documentError}</Text>}
+        {document && (
+          <Surface as="section">
+            <PreformattedText label={document.title} text={document.markdown} />
+          </Surface>
         )}
-      </Surface>
 
-      <LiveRegion message={run.message} />
-      {run.run && (
-        <Surface as="section" aria-label="Run progress">
-          <RunProgress run={run.run} />
+        <Surface as="section" aria-label="Recent runs">
+          {recent ? (
+            <RecentRuns runs={recent} activeRunId={run.runId} onSelect={run.select} />
+          ) : recentError ? (
+            <Text tone="secondary">{recentError}</Text>
+          ) : (
+            <Spinner label="Loading recent runs" />
+          )}
         </Surface>
-      )}
-      {run.run?.trace && (
-        <Surface as="section" aria-label="Results">
-          <RunResults key={run.run.runId} trace={run.run.trace} status={run.run.status} />
-        </Surface>
-      )}
-    </Stack>
+
+        <LiveRegion message={run.message} />
+        {run.run && (
+          <Surface as="section" aria-label="Run progress">
+            <Stack gap={4}>
+              <RunProgress run={run.run} />
+              <Text size="sm">
+                <Link href={inspectHref({ run: run.run.runId })}>
+                  Inspect this run&apos;s machinery →
+                </Link>
+              </Text>
+            </Stack>
+          </Surface>
+        )}
+        {run.run?.trace && (
+          <Surface as="section" aria-label="Results">
+            <RunResults key={run.run.runId} trace={run.run.trace} status={run.run.status} />
+          </Surface>
+        )}
+      </Stack>
+    </Measure>
   );
 }

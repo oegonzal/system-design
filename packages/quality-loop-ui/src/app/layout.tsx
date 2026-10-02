@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { APP_NAME, pageTitle } from './nav';
 import { Providers } from './providers';
 
+/** A route without its own row still carries the app's name, in the table's own form. */
 export const metadata: Metadata = {
-  title: 'Quality Loop',
+  title: { default: APP_NAME, template: pageTitle('%s') },
   description:
-    'Pick a prompt, run a critic/evaluator/controller pipeline over it, and read the verdict.',
+    'Run a critic/evaluator/controller pipeline over a prompt, then inspect what the machine did.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
