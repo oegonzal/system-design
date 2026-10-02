@@ -1,15 +1,16 @@
-import type {
-  DeriveCriteriaRequest,
-  DerivedCriteriaDto,
-  LlmModelDto,
-  PromptLibraryDocumentDto,
-  PromptLibraryEntryDto,
-  OrchestrationRunStartedDto,
-  QualityLoopHealthDto,
-  QualityRunDto,
-  QualityRunStartedDto,
-  RunRecallDto,
-  StartQualityRunRequest,
+import {
+  MEMORY_ORCHESTRATOR_ID,
+  type DeriveCriteriaRequest,
+  type DerivedCriteriaDto,
+  type LlmModelDto,
+  type PromptLibraryDocumentDto,
+  type PromptLibraryEntryDto,
+  type OrchestrationRunStartedDto,
+  type QualityLoopHealthDto,
+  type QualityRunDto,
+  type QualityRunStartedDto,
+  type RunRecallDto,
+  type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import {
   FakeLoop,
@@ -152,7 +153,7 @@ export class FakeQualityLoopClient extends QualityLoopClient {
   }
 
   digestRun(runId: string): Promise<OrchestrationRunStartedDto> {
-    return answer(() => this.inner.startOrchestrationFromRun('memory', { runId }));
+    return answer(() => this.inner.startOrchestrationFromRun(MEMORY_ORCHESTRATOR_ID, { runId }));
   }
 
   /** Run ids the studio asked to have digested, in order. */
