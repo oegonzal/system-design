@@ -7,9 +7,12 @@
  * Why a slot and not an injected provider: the memory module already depends
  * on this one (it composes pipelines through `RunsService`), so this module
  * importing it back would close a cycle. The dependency stays one way —
- * memory → runs — and a process that boots no memory module, like replay,
- * simply has nothing bound: a run there that asks to recall is recorded
- * `skipped` with `recall-unavailable` and goes on.
+ * memory → runs — which leaves the slot optional: a composition of the runs
+ * module without the memory module has nothing bound, and a run there that
+ * asks to recall is recorded `skipped` with `recall-unavailable` and goes on
+ * (QL-32 boots exactly that composition). Every shipped process that starts
+ * runs — the served app and the `run` CLI — boots `AppModule`, which binds
+ * one; replay boots neither module and starts no run.
  */
 import type {
   QualityRunDto,

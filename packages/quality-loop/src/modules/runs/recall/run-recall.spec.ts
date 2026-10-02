@@ -1,7 +1,8 @@
-import type { INestApplication } from '@nestjs/common';
+import { Module, type INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
 import { QualityRun, truncateTestTables } from '@sysdesign/db';
+import { DbModule } from '@sysdesign/nest-kit';
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -24,6 +25,7 @@ import {
   type Page,
   type ProviderOverride,
 } from '../../http/testing';
+import { RunsModule } from '../runs.module';
 import { PIPELINES_TOKEN, QUALITY_LOOP_LLM } from '../tokens';
 
 const DUMP_DIR = claimDumpDir('quality-loop-recall');
@@ -315,6 +317,53 @@ describe('a recall in flight, and one that finds nothing', () => {
       });
       expect((await runOf(url, run.recall?.recallRunId ?? '')).pipeline).toBe(MEMORY_RECALL_ID);
     } finally {
+      await app.close();
+    }
+  });
+});
+
+/**
+ * The runs module composed without the memory module: nothing binds the
+ * recall slot. No shipped process is this composition — the served app and
+ * the `run` CLI both boot `AppModule`, and replay starts no run — but the
+ * slot is optional by design, so what a run does there is specified here.
+ */
+@Module({ imports: [DbModule, RunsModule] })
+class RunsWithoutMemory {}
+
+describe('a process that composes runs without memory', () => {
+  it('[QL-32] records a recall it asked for as skipped, recall-unavailable, and the coach runs without lessons', async () => {
+    const { app, url } = await bootApp(
+      [
+        [QUALITY_LOOP_LLM, fakeLlm(...COACH_ANSWERS)],
+        [PIPELINES_TOKEN, PIPELINES],
+      ],
+      { root: RunsWithoutMemory },
+    );
+    const em = app.get(EntityManager);
+    try {
+      const runId = await start(url, { pipeline: 'coach', goal: GOAL, recall: true });
+      const run = await settled(url, runId);
+      expect(run.status).toBe('complete');
+      expect(run.trace?.finalDecision).toBe('accept');
+      expect(run.recall).toEqual({
+        status: 'skipped',
+        reason: 'recall-unavailable',
+        note: null,
+        recallRunId: null,
+        count: 0,
+        lessons: [],
+      });
+      // No recall run was opened, and the producer was briefed with nothing.
+      const page = await getJson<Page<QualityRunSummaryDto>>(
+        url,
+        `/runs?pipeline=${MEMORY_RECALL_ID}`,
+      );
+      expect(page.meta.total).toBe(0);
+      const producer = promptsOf(runId).find((prompt) => prompt.scope === 'producer');
+      expect(producer?.user).not.toContain(MEMORIES_HEADING);
+    } finally {
+      await truncateTestTables(em, TABLES);
       await app.close();
     }
   });

@@ -1465,8 +1465,10 @@ The path, end to end:
 3. **The runs layer recalls, before the loop.** `perform` calls whatever recall
    is bound in the runs module's `RunRecallSlot`. The memory module's
    `MemoryRunRecall` binds itself there at init; the runs module never imports
-   the memory module, which already imports it, so there is no cycle, and a
-   process without memory records `skipped` / `recall-unavailable`.
+   the memory module, which already imports it, so there is no cycle. The slot
+   is optional: a composition of the runs module without the memory module
+   records `skipped` / `recall-unavailable` (specced by booting one). Every
+   shipped process that starts runs boots `AppModule`, which binds it.
 4. **The same recall as the orchestrator's.** `MemoryRunRecall` asks the store
    how it stands now, then runs `recallMemory` — the function the orchestrator's
    recall step also calls: probes, one embedding batch, one search, the

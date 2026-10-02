@@ -24,7 +24,7 @@ describe('GET /prompts', () => {
         [QUALITY_LOOP_LLM, fakeLlm()],
         [PIPELINES_TOKEN, new Map([['tiny', tinyPipeline()]])],
       ],
-      {},
+      { env: {} },
     ));
   });
 

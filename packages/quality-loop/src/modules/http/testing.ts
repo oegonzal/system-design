@@ -9,7 +9,7 @@
  * directory is read when the application boots, so a suite claims its own
  * before calling `bootApp`.
  */
-import type { INestApplication } from '@nestjs/common';
+import type { INestApplication, Type } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,6 +50,17 @@ const DEFAULT_OVERRIDES = (): ProviderOverride[] => [
   [RUN_JANITOR_OPTIONS, { staleAfterMs: 600_000, intervalMs: null }],
 ];
 
+export interface BootOptions {
+  /** What `configureApp` reads instead of `process.env` (the CORS origin). */
+  env?: NodeJS.ProcessEnv;
+  /**
+   * The module to boot, when a suite means a composition other than the
+   * served application's — one without the memory module, say. The served
+   * `AppModule` otherwise.
+   */
+  root?: Type<unknown>;
+}
+
 /**
  * The real modules over real HTTP; a fresh instance shares nothing but the
  * database — a test one, created and migrated on first use, and refused
@@ -57,12 +68,12 @@ const DEFAULT_OVERRIDES = (): ProviderOverride[] => [
  */
 export async function bootApp(
   overrides: readonly ProviderOverride[],
-  env?: NodeJS.ProcessEnv,
+  { env, root }: BootOptions = {},
 ): Promise<{ app: INestApplication; url: string }> {
   await ensureDatabase();
-  const { AppModule } = await import('../app/app.module');
+  const imported = root ?? (await import('../app/app.module')).AppModule;
   const { configureApp } = await import('../app/configure-app');
-  let builder = Test.createTestingModule({ imports: [AppModule] });
+  let builder = Test.createTestingModule({ imports: [imported] });
   // A suite's override wins over the default for the same token.
   const merged = new Map<unknown, unknown>([...DEFAULT_OVERRIDES(), ...overrides]);
   for (const [token, value] of merged) builder = builder.overrideProvider(token).useValue(value);
