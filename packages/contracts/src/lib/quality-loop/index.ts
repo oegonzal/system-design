@@ -5,6 +5,7 @@ export * from './vocab';
 export * from './evidence';
 export * from './decision';
 export * from './pipeline';
+export * from './run-dump';
 export * from './runs';
 export * from './criteria';
 export * from './prompt-library';

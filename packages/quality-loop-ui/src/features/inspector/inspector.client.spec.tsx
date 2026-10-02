@@ -356,6 +356,92 @@ describe('InspectorClient', () => {
     expect(screen.getByText(/only edges drawn are blocks the record names/)).toBeTruthy();
   });
 
+  it('[QLU-13] opens the prompt that produced a named finding, read out of the dump', async () => {
+    const PROMPT = '# Goal\n\nThe worker polls every five minutes.';
+    stubApi([
+      RUNS,
+      PIPELINES,
+      ORCHESTRATIONS,
+      { path: `/runs/${complete.runId}`, body: { data: complete } },
+      {
+        path: `/runs/${complete.runId}/dump`,
+        body: {
+          data: [
+            { path: 'manifest.json', bytes: 100 },
+            { path: '05-llm/03.critic.requirements.s1.1.system.txt', bytes: 900 },
+            { path: '05-llm/03.critic.requirements.s1.1.user.txt', bytes: 4200 },
+            { path: '05-llm/03.critic.requirements.s1.1.response.json', bytes: 1800 },
+          ],
+        },
+      },
+      {
+        path: '/runs/' + complete.runId + '/dump/05-llm/03.critic.requirements.s1.1.user.txt',
+        body: {
+          data: {
+            path: '05-llm/03.critic.requirements.s1.1.user.txt',
+            bytes: 4200,
+            text: PROMPT,
+            problem: null,
+          },
+        },
+      },
+    ]);
+    setMockSearchParams({ run: complete.runId });
+    renderWithTheme(<InspectorClient />);
+    await advance(0);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Model calls' }));
+    await advance(0);
+    // The call that produced the finding — the critic's own sample.
+    fireEvent.click(screen.getByRole('button', { name: 'critic.requirements.s1' }));
+    await advance(0);
+
+    const files = screen.getByRole('table', { name: 'Files for critic.requirements.s1' });
+    expect([...files.querySelectorAll('tbody tr')].map((row) => row.textContent)).toEqual([
+      expect.stringContaining('system prompt'),
+      expect.stringContaining('user prompt'),
+      expect.stringContaining('raw reply'),
+    ]);
+    // The manifest is not this call's file, and neither is any other scope's.
+    expect(files.textContent).not.toContain('manifest.json');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '05-llm/03.critic.requirements.s1.1.user.txt' }),
+    );
+    await advance(0);
+    // The bytes exactly as the loop wrote them, which is the whole point.
+    expect(screen.getAllByText(/The worker polls every five minutes/).length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('05-llm/03.critic.requirements.s1.1.user.txt').textContent).toBe(
+      PROMPT,
+    );
+  });
+
+  it('[QLU-13] a run with no dump says so where the transcript would be, and nothing else breaks', async () => {
+    stubApi([
+      RUNS,
+      PIPELINES,
+      ORCHESTRATIONS,
+      { path: `/runs/${complete.runId}`, body: { data: complete } },
+      {
+        path: `/runs/${complete.runId}/dump`,
+        status: 404,
+        body: { message: 'no dump recorded for run x' },
+      },
+    ]);
+    setMockSearchParams({ run: complete.runId });
+    renderWithTheme(<InspectorClient />);
+    await advance(0);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Model calls' }));
+    await advance(0);
+    fireEvent.click(screen.getByRole('button', { name: 'criteria' }));
+    await advance(0);
+
+    // The listing is still there: a missing dump costs the transcript, not the run.
+    expect(screen.getByRole('table', { name: 'Model calls' })).toBeTruthy();
+    expect(screen.getByText(/no dump recorded/)).toBeTruthy();
+  });
+
   it('[QLU-5] with no run named, it asks for one rather than guessing', async () => {
     stubApi([RUNS, PIPELINES, ORCHESTRATIONS]);
     setMockSearchParams({});

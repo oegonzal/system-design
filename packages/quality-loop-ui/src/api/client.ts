@@ -1,5 +1,6 @@
 import type {
   GetOrchestrationRunResponse,
+  GetRunDumpFileResponse,
   GetPromptLibraryDocumentResponse,
   GetQualityRunResponse,
   ListOrchestrationRunsQuery,
@@ -8,12 +9,15 @@ import type {
   ListPromptLibraryResponse,
   ListQualityRunsQuery,
   ListQualityRunsResponse,
+  ListRunDumpResponse,
   OrchestrationRunDto,
   PipelineSummary,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityRunDto,
   QualityRunStartedDto,
+  RunDumpEntryDto,
+  RunDumpFileDto,
   StartQualityRunRequest,
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
@@ -56,6 +60,31 @@ export const api = {
 
   async getRun(runId: string, opts: GetOptions = {}): Promise<QualityRunDto> {
     return unwrap(await request<GetQualityRunResponse>(`/runs/${encodeURIComponent(runId)}`, opts));
+  },
+
+  /** The run's dump folder, sorted. A run with no dump answers 404 — the two stores diverge. */
+  async listRunDump(runId: string, opts: GetOptions = {}): Promise<RunDumpEntryDto[]> {
+    return unwrap(
+      await request<ListRunDumpResponse>(`/runs/${encodeURIComponent(runId)}/dump`, opts),
+    );
+  },
+
+  /**
+   * One dump file, by the exact path a listing gave. Each segment is escaped
+   * separately: the path's own slashes are the route's structure, not data.
+   */
+  async readRunDumpFile(
+    runId: string,
+    path: string,
+    opts: GetOptions = {},
+  ): Promise<RunDumpFileDto> {
+    const escaped = path.split('/').map(encodeURIComponent).join('/');
+    return unwrap(
+      await request<GetRunDumpFileResponse>(
+        `/runs/${encodeURIComponent(runId)}/dump/${escaped}`,
+        opts,
+      ),
+    );
   },
 
   async listOrchestrations(

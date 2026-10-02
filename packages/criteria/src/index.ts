@@ -298,6 +298,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A panel runs a declared few of its samples at once and reads them positionally: the runs it hands on, the child ids it records and the failure it reports are functions of the sample index rather than of which sample settled first, so the reconcile report's indices keep meaning what they meant.",
   },
+  {
+    id: 'QL-30',
+    statement:
+      "A run's dump folder can be read back as the inverse of the writer: the folder is walked once into a map of relative names, and a read resolves only through that map — so a traversal is not refused by a rule, it simply is not a key, and neither is a symbolic link or a run id the id grammar could not have minted, which is checked before any syscall. A JSON file comes back as text and never parsed, a folder that is not there is absence that claims nothing about the run, and a file that is a key but cannot be served answers in band with its problem named, carrying no stack and no server path.",
+  },
+  {
+    id: 'QL-31',
+    statement:
+      'The dump is served read-only under the run that owns it: a sorted listing with byte counts, one file by the exact name the listing gave, and a prompt the run record deliberately leaves out of its trace readable there. Being rooted under the run means it neither shadows the run record nor is shadowed by it, and a missing dump or an unknown name is a 404 that says only that.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
@@ -358,6 +368,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'QLU-12',
     statement:
       "An orchestration reads as its declared steps in order — every one of them, including a step that has not run — with what each published for the steps after it, the child runs it opened and each child's own verdict, and the child runs' own actions nested under the step that opened them. The only edges drawn are the blocks the record proves, naming the step that blocked; the orchestrator's declared dependencies are not published and nothing else is inferred, which the view says. The orchestration and the child being inspected are followed; every other child is read once, bounded, the selected one first, and a child left unread is listed as unread.",
+  },
+  {
+    id: 'QLU-13',
+    statement:
+      "A model call's own transcript is readable beside the record: the system prompt, the user prompt, the raw reply and the call's metadata, read out of the dump by the two fields the record carries — the call's scope and its ordinal. A file's name is decomposed exactly rather than matched by substring, so one scope can never claim another's files, and the position prefix is never read as a label because measured on disk it means something different in nearly every run. A run with no dump says so where the transcript would be and costs nothing else.",
   },
   // Govcon web client (packages/govcon-ui)
   {

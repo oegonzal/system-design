@@ -21,7 +21,8 @@ import { EvidencePanel } from '../results/evidence-panel';
 import { criteriaRows, findingGroups } from '../results/select';
 import { ACTION_GROUPS, type ActionGroup } from './model/action';
 import { dataFlow, flowTotals } from './model/data-flow';
-import { invocationsOf, invocationTotals } from './model/exchange-invocations';
+import { filesForCall } from './model/dump-files';
+import { invocationsOf, invocationTotals, type Invocation } from './model/exchange-invocations';
 import { inspectHref } from './model/inspect-link';
 import { lensContributions } from './model/lens-contributions';
 import { dimensionRows, gateRows, policyNumbers, validatorRows } from './model/policy-view';
@@ -33,6 +34,7 @@ import { useInspectTarget } from './use-inspect-target';
 import { useOrchestrationTimeline } from './use-orchestration-timeline';
 import { useRunTimeline } from './use-run-timeline';
 import { ExchangeList } from './view/exchange-list';
+import { ExchangeViewer } from './view/exchange-viewer';
 import { FlowPanel } from './view/flow-panel';
 import { Inspector } from './view/inspector';
 import { LensPanel } from './view/lens-panel';
@@ -84,6 +86,32 @@ export function InspectorClient() {
 
   const [shown, setShown] = useState<ReadonlySet<ActionGroup>>(ALL_GROUPS);
   const [ignoreTimings, setIgnoreTimings] = useState(false);
+
+  // The transcript: which model call is open, and which of its files is being
+  // read. Both are local rather than in the URL — a prompt is something a reader
+  // opens while reading, not a place they were.
+  const [openCall, setOpenCall] = useState<Invocation | null>(null);
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const callRunId = openCall?.runId ?? null;
+  const dump = useResource(
+    (signal) => (callRunId === null ? Promise.resolve([]) : api.listRunDump(callRunId, { signal })),
+    [callRunId],
+  );
+  const dumpFile = useResource(
+    (signal) =>
+      callRunId === null || openPath === null
+        ? Promise.resolve(null)
+        : api.readRunDumpFile(callRunId, openPath, { signal }),
+    [callRunId, openPath],
+  );
+  const onOpenCall = useCallback((call: Invocation) => {
+    setOpenCall(call);
+    setOpenPath(null);
+  }, []);
+  const onCloseCall = useCallback(() => {
+    setOpenCall(null);
+    setOpenPath(null);
+  }, []);
 
   const rows = useMemo(
     () => timelineRows(timeline, { groups: shown, ignoreTimings }),
@@ -174,10 +202,55 @@ export function InspectorClient() {
       {
         id: 'calls',
         label: 'Model calls',
-        content: <ExchangeList invocations={invocations} totals={invocationTotals(invocations)} />,
+        content: (
+          <Stack gap={5}>
+            <ExchangeList
+              invocations={invocations}
+              totals={invocationTotals(invocations)}
+              selected={
+                openCall === null
+                  ? null
+                  : { runId: openCall.runId, ordinal: openCall.attempts[0].ordinal }
+              }
+              onSelect={onOpenCall}
+            />
+            <ExchangeViewer
+              invocation={openCall}
+              files={
+                openCall === null
+                  ? []
+                  : filesForCall(dump.data ?? [], openCall.scope, openCall.attempts[0].ordinal)
+              }
+              open={dumpFile.data}
+              loadingList={openCall !== null && dump.loading}
+              loadingFile={openPath !== null && dumpFile.loading}
+              listError={openCall === null ? null : dump.error}
+              fileError={dumpFile.error}
+              onOpenFile={setOpenPath}
+              onClose={onCloseCall}
+            />
+          </Stack>
+        ),
       },
     ];
-  }, [selected, pipeline, orchSide.children, orchSide.unread, target, Link]);
+  }, [
+    selected,
+    pipeline,
+    orchSide.children,
+    orchSide.unread,
+    target,
+    Link,
+    openCall,
+    openPath,
+    dump.data,
+    dump.loading,
+    dump.error,
+    dumpFile.data,
+    dumpFile.loading,
+    dumpFile.error,
+    onOpenCall,
+    onCloseCall,
+  ]);
 
   const reconstructed = timeline.entries.filter(
     (entry) => entry.provenance === 'reconstructed',

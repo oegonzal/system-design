@@ -7,10 +7,11 @@ import { CriteriaController } from './criteria.controller';
 import { DumpTraceStore } from './dump-trace-store';
 import { PipelinesModule } from './pipelines.module';
 import { PipelinesController } from './pipelines.controller';
+import { RunDumpController } from './run-dump.controller';
 import { RunsController } from './runs.controller';
 import { RunsPersistenceModule } from './runs-persistence.module';
 import { RunsService } from './runs.service';
-import { QUALITY_LOOP_LLM, TRACE_STORE } from './tokens';
+import { QUALITY_LOOP_LLM, RUN_DUMP_DIR, TRACE_STORE } from './tokens';
 
 /**
  * Where run dumps go. The repo root is the cwd for both `nx serve` and
@@ -22,12 +23,14 @@ export const dumpDir = (): string =>
 
 @Module({
   imports: [PipelinesModule, RunsPersistenceModule, JanitorModule],
-  controllers: [RunsController, PipelinesController, CriteriaController],
+  controllers: [RunsController, RunDumpController, PipelinesController, CriteriaController],
   providers: [
     RunsService,
     // The subscription client, once, at boot — main.ts already refused to
     // start without a Claude Code login.
     { provide: QUALITY_LOOP_LLM, useFactory: createQualityLoopLlmFromEnv },
+    // One value for both halves: the store writes where the reader reads.
+    { provide: RUN_DUMP_DIR, useFactory: dumpDir },
     { provide: TRACE_STORE, useFactory: () => new DumpTraceStore(dumpDir()) },
   ],
   // The memory module composes pipelines through this one service, and derives

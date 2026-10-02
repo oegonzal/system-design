@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
  */
 const REPO = join(__dirname, '..');
 const CORE = join(REPO, 'packages/quality-loop/src/core');
+const RUN_DUMP = join(REPO, 'packages/run-dump/src');
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -61,6 +62,24 @@ describe('quality-loop guarantees', () => {
     const offenders = files.filter((path) =>
       /Date\.now|Math\.random|node:fs|process\.env/.test(read(path)),
     );
+    expect(offenders.map(relative)).toEqual([]);
+  });
+
+  it('run-dump depends on no package of this repo, which is what lets everything depend on it', () => {
+    // The dump path's leaf. The engine writes through it, the service reads
+    // through it and the code review mints ids with it, so an edge from here to
+    // any `@sysdesign/*` package would put a cycle through all three.
+    const dump = sourceFiles(RUN_DUMP);
+    expect(dump.length).toBeGreaterThan(3);
+    const offenders = dump.filter((path) => /from '@sysdesign\//.test(read(path)));
+    expect(offenders.map(relative)).toEqual([]);
+  });
+
+  it('the core never reads a dump back — writing the trail is its half, reading it is not', () => {
+    // The engine lays out a dump and hands it to a store; reading one back is a
+    // module-layer concern, and an engine that could read its own trail could
+    // feed yesterday's answer into today's grade.
+    const offenders = files.filter((path) => /\b(listDump|readDumpFile)\b/.test(read(path)));
     expect(offenders.map(relative)).toEqual([]);
   });
 

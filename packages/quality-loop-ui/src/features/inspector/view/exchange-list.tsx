@@ -21,15 +21,15 @@ const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 export interface ExchangeListProps {
   invocations: readonly Invocation[];
   totals: InvocationTotals;
-  /** Which invocation is open, by its first attempt's ordinal. */
-  selectedOrdinal?: number | null;
-  onSelect?: (ordinal: number) => void;
+  /** Which call is open, by the two fields that identify one. */
+  selected?: { runId: string; ordinal: number } | null;
+  onSelect?: (call: Invocation) => void;
 }
 
 export function ExchangeList({
   invocations,
   totals,
-  selectedOrdinal = null,
+  selected = null,
   onSelect,
 }: ExchangeListProps) {
   if (invocations.length === 0) {
@@ -69,11 +69,11 @@ export function ExchangeList({
         <tbody>
           {invocations.map((call) => {
             const ordinal = call.attempts[0].ordinal;
-            const selected = selectedOrdinal === ordinal;
+            const open = selected?.runId === call.runId && selected.ordinal === ordinal;
             return (
               <tr
                 key={`${call.runId}#${call.scope}#${ordinal}`}
-                aria-current={selected ? 'true' : undefined}
+                aria-current={open ? 'true' : undefined}
               >
                 {showRun && (
                   <td>
@@ -88,7 +88,7 @@ export function ExchangeList({
                       {call.scope}
                     </Text>
                   ) : (
-                    <button type="button" onClick={() => onSelect(ordinal)}>
+                    <button type="button" onClick={() => onSelect(call)}>
                       {call.scope}
                     </button>
                   )}
