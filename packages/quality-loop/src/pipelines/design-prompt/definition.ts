@@ -75,10 +75,12 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
     },
 
     // The writer sees the checklist: the draft is meant to meet it, and the
-    // experience it is written from is the goal itself.
+    // experience it is written from is the goal itself. Every cap is sized
+    // from the recorded runs with a fifth or more of headroom (the spec holds
+    // the measurements), and each is also the call's time limit.
     producer: {
       persona: producer,
-      maxTokens: 8000,
+      maxTokens: 10000,
       consumes: ['criteria'],
     },
 
@@ -92,7 +94,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         samples: 1,
         consumes: [],
         maxItems: 8,
-        maxTokens: 8000,
+        maxTokens: 10000,
       },
       {
         id: 'critic.gradeability',
@@ -111,7 +113,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         samples: 1,
         consumes: ['findings'],
         maxItems: MAX_CRITERIA,
-        maxTokens: 6000,
+        maxTokens: 8000,
         criterionKinds: ['fidelity', 'gradeability', 'scope'],
       },
     ],

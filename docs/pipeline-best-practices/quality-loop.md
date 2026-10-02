@@ -170,7 +170,7 @@ A pipeline whose input is more than a prompt owns an **input codec** (`input.ts`
 | Every pipeline declares its goal source; a composed one is never a route, a target or a choice                    | `[QL-24]`                                             |
 | A produced artifact is normalized before validation; a refused revision is explained to the producer              | `[QL-25]`                                             |
 | A coach recalls curated lessons for its producer alone, recorded with provenance; a recall problem never fails it | `[QL-32]` + `tooling/quality-loop-guarantees.spec.ts` |
-| A call's time limit is its declared answer at the slowest measured pace plus overhead; an abort is a timeout      | `[QL-33]`                                             |
+| A call's limit is its declared answer at the slowest pace plus overhead, with a minimum; an abort is a timeout    | `[QL-33]`                                             |
 | A coach that adopts an iteration recalls for that iteration's confirmed defects, and records the focus            | `[QL-34]`                                             |
 | A stored lesson carries its own iteration's decision, never the run's final one                                   | `[QL-35]`                                             |
 

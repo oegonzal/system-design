@@ -5,6 +5,7 @@ import {
   CALL_TIME_POLICY,
   callTimeLimitMs,
   CallTimePolicyError,
+  describeCallLimit,
   watchDeadline,
 } from './call-time-limit';
 import measured from './fixtures/measured-calls.json';
@@ -45,9 +46,30 @@ describe('a call’s time limit', () => {
 
   it('[QL-33] is the whole declared answer at the floor, plus the overhead — and grows with the declaration', () => {
     const { overheadMs, floorTokensPerSecond } = CALL_TIME_POLICY;
-    expect(callTimeLimitMs(0)).toBe(overheadMs);
-    expect(callTimeLimitMs(floorTokensPerSecond * 10)).toBe(overheadMs + 10_000);
-    expect(callTimeLimitMs(28_000)).toBeGreaterThan(callTimeLimitMs(1_000));
+    // Ten minutes of writing at the floor: a declaration well past the minimum.
+    expect(callTimeLimitMs(floorTokensPerSecond * 600)).toBe(overheadMs + 600_000);
+    expect(callTimeLimitMs(28_000)).toBeGreaterThan(callTimeLimitMs(10_000));
+    expect(describeCallLimit(10_000)).toBe('430 s (10000 declared tokens at 25/s + 30 s)');
+  });
+
+  it('[QL-33] runs no call under less than the minimum: a small declaration nothing measured backs gets three minutes', () => {
+    const { minimumMs } = CALL_TIME_POLICY;
+    expect(minimumMs).toBe(180_000);
+    // The probe deriver declares 1,000 tokens and the brief classifier 600:
+    // 70 s and 54 s by declaration alone, and neither records its exchanges.
+    for (const declared of [0, 600, 1_000, 3_750]) {
+      expect(callTimeLimitMs(declared), `${declared} declared`).toBe(minimumMs);
+    }
+    expect(callTimeLimitMs(3_751)).toBeGreaterThan(minimumMs);
+    expect(describeCallLimit(1_000)).toBe(
+      '180 s (the minimum; 1000 declared tokens at 25/s + 30 s is 70 s)',
+    );
+    // Every measured call kept its limit when the minimum came in: none is shorter for it.
+    for (const call of calls) {
+      expect(callTimeLimitMs(call.maxTokens)).toBeGreaterThanOrEqual(
+        callTimeLimitMs(call.maxTokens, { ...CALL_TIME_POLICY, minimumMs: 0 }),
+      );
+    }
   });
 
   it('[QL-33] refuses a policy that could never admit a call', () => {
@@ -55,6 +77,9 @@ describe('a call’s time limit', () => {
       CallTimePolicyError,
     );
     expect(() => assertCallTimePolicy({ ...CALL_TIME_POLICY, graceMs: -1 })).toThrow(
+      CallTimePolicyError,
+    );
+    expect(() => assertCallTimePolicy({ ...CALL_TIME_POLICY, minimumMs: -1 })).toThrow(
       CallTimePolicyError,
     );
     expect(assertCallTimePolicy(CALL_TIME_POLICY)).toBe(CALL_TIME_POLICY);

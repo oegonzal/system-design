@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { boundsBelowMeasured } from '../../core/testing';
+import { boundsBelowMeasured, capsBelowMeasured, declaredCaps } from '../../core/testing';
 import { SYSTEM_DESIGN } from './definition';
 import { designAnswerOutput, type DesignAnswer } from './output';
 
@@ -53,6 +53,29 @@ describe('the system-design pipeline', () => {
       'capacity[].estimate': 279,
     };
     expect(boundsBelowMeasured(designAnswerOutput.schema, measured)).toEqual([]);
+  });
+
+  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+    // The most output tokens, thinking included, each stage wrote across the
+    // recorded system-design runs (static/runs, 2026-09-06 – 2026-09-30). A
+    // cap is also the call's time limit, so one a stage outwrites is a call
+    // cut short.
+    const measured: Record<string, number> = {
+      criteria: 1_377,
+      producer: 15_746,
+      'critic.requirements': 7_773,
+      'critic.soundness': 11_244,
+      'critic.scale': 8_692,
+      'evaluator.requirements': 1_547,
+      'evaluator.quality': 2_730,
+    };
+    expect(capsBelowMeasured(SYSTEM_DESIGN, measured)).toEqual([]);
+    // With a fifth of headroom over each, so the next longer answer is not the one cut.
+    const withHeadroom = Object.fromEntries(
+      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
+    );
+    expect(capsBelowMeasured(SYSTEM_DESIGN, withHeadroom)).toEqual([]);
+    expect(Object.keys(declaredCaps(SYSTEM_DESIGN)).sort()).toEqual(Object.keys(measured).sort());
   });
 
   it('[QL-4] every location the answer exposes is printed verbatim where a judge reads it', () => {

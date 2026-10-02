@@ -22,7 +22,13 @@
  *   - a turn that wrote almost nothing still took up to 7 s, so 30 s of
  *     overhead covers the spawn and a long prompt's first token with room;
  *   - against those, the tightest measured call (that rubric, declared 4,000)
- *     ran at 34.6 tokens/s of its declaration — inside the floor.
+ *     ran at 34.6 tokens/s of its declaration — inside the floor;
+ *   - and no call runs under less than three minutes. A small declaration
+ *     derives a limit nothing measured backs — the probe deriver's 1,000
+ *     tokens come to 70 s, the brief classifier's 600 to 54 s — and neither
+ *     records its exchanges, so no run shows what they take; the 300 s cap
+ *     they ran under before never cut one. The minimum keeps them clear of a
+ *     slow start until a measurement can size them.
  *
  * A declaration below what a stage writes is a contract the limit now
  * enforces, which is why every pipeline's spec pins its declared caps above
@@ -34,6 +40,8 @@ export interface CallTimePolicy {
   overheadMs: number;
   /** The slowest pace the model has measurably written at, thinking included. */
   floorTokensPerSecond: number;
+  /** The least any call runs under, however little it declares. */
+  minimumMs: number;
   /**
    * How long past its limit an aborted turn may take to end before the call
    * stops waiting for it. The SDK's kill path is SIGTERM two seconds after the
@@ -46,6 +54,7 @@ export interface CallTimePolicy {
 export const CALL_TIME_POLICY: CallTimePolicy = {
   overheadMs: 30_000,
   floorTokensPerSecond: 25,
+  minimumMs: 180_000,
   graceMs: 15_000,
 };
 
@@ -55,27 +64,38 @@ export class CallTimePolicyError extends Error {
 
 /** Refuses a policy that could never admit a call, where it is declared. */
 export function assertCallTimePolicy(policy: CallTimePolicy): CallTimePolicy {
-  const { overheadMs, floorTokensPerSecond, graceMs } = policy;
-  if (!(overheadMs >= 0 && graceMs >= 0 && floorTokensPerSecond > 0)) {
+  const { overheadMs, floorTokensPerSecond, minimumMs, graceMs } = policy;
+  if (!(overheadMs >= 0 && minimumMs >= 0 && graceMs >= 0 && floorTokensPerSecond > 0)) {
     throw new CallTimePolicyError(
-      `overheadMs and graceMs must be ≥ 0 and floorTokensPerSecond > 0, got ${JSON.stringify(policy)}`,
+      `overheadMs, minimumMs and graceMs must be ≥ 0 and floorTokensPerSecond > 0, got ${JSON.stringify(policy)}`,
     );
   }
   return policy;
 }
 
-/** The limit a call declaring `maxTokens` runs under: its whole answer at the floor, plus the overhead. */
+/** What a declaration derives on its own: its whole answer at the floor, plus the overhead. */
+const derivedLimitMs = (maxTokens: number, policy: CallTimePolicy): number =>
+  policy.overheadMs + Math.ceil((maxTokens / policy.floorTokensPerSecond) * 1000);
+
+/** The limit a call declaring `maxTokens` runs under: what its declaration derives, and never under the minimum. */
 export const callTimeLimitMs = (
   maxTokens: number,
   policy: CallTimePolicy = CALL_TIME_POLICY,
-): number => policy.overheadMs + Math.ceil((maxTokens / policy.floorTokensPerSecond) * 1000);
+): number => Math.max(policy.minimumMs, derivedLimitMs(maxTokens, policy));
 
-/** The limit, said the way a record reads it. */
-export const describeCallLimit = (
+const seconds = (ms: number): number => Math.round(ms / 1000);
+
+/** The limit, said the way a record reads it — and that it is the minimum, when the declaration derived less. */
+export function describeCallLimit(
   maxTokens: number,
   policy: CallTimePolicy = CALL_TIME_POLICY,
-): string =>
-  `${Math.round(callTimeLimitMs(maxTokens, policy) / 1000)} s (${maxTokens} declared tokens at ${policy.floorTokensPerSecond}/s + ${Math.round(policy.overheadMs / 1000)} s)`;
+): string {
+  const derived = derivedLimitMs(maxTokens, policy);
+  const basis = `${maxTokens} declared tokens at ${policy.floorTokensPerSecond}/s + ${seconds(policy.overheadMs)} s`;
+  return derived >= policy.minimumMs
+    ? `${seconds(derived)} s (${basis})`
+    : `${seconds(policy.minimumMs)} s (the minimum; ${basis} is ${seconds(derived)} s)`;
+}
 
 /** A call's watch over its own limit. */
 export interface Deadline {

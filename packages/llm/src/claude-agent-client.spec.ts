@@ -504,8 +504,8 @@ describe('the subscription client reads the whole turn', () => {
 });
 
 describe('the subscription client under its time limit', () => {
-  /** Milliseconds, not minutes: a token a millisecond, no overhead, a short grace. */
-  const fast = { overheadMs: 0, floorTokensPerSecond: 1_000, graceMs: 40 };
+  /** Milliseconds, not minutes: a token a millisecond, no overhead or minimum, a short grace. */
+  const fast = { overheadMs: 0, floorTokensPerSecond: 1_000, minimumMs: 0, graceMs: 40 };
   const clock = { tickMs: 2 };
 
   /** A stream that says nothing, and ends only as `ending` does — or never. */

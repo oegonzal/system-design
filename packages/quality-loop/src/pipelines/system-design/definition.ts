@@ -69,9 +69,13 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
     maxTokens: 4000,
   },
 
+  // Every cap is sized from the recorded runs with a fifth or more of
+  // headroom (the spec holds the measurements), and each is also the call's
+  // time limit: an answer has taken up to 15.7k output tokens, thinking
+  // included, and a soundness critique 11.2k.
   producer: {
     persona: producer,
-    maxTokens: 16000,
+    maxTokens: 20000,
     consumes: ['criteria'],
   },
 
@@ -93,7 +97,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 14000,
     },
     {
       id: 'critic.scale',

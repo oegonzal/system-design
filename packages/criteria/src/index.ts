@@ -336,7 +336,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-33',
     statement:
-      'A provider call runs under a time limit derived from what it declares — its whole declared answer at the slowest pace the recorded runs measured, plus a fixed overhead — and no successful recorded call would have outlived it: the limit is watched on the wall clock, the turn is aborted when it passes and abandoned a grace later whether or not it has ended, and an abort is read as a timeout from its own signal — never from the name of the error the SDK throws — and asked again once.',
+      'A provider call runs under a time limit derived from what it declares — its whole declared answer at the slowest pace the recorded runs measured, plus a fixed overhead, and never less than a minimum declared once with that policy for the small declarations no recorded call measures — and no successful recorded call would have outlived it: the limit is watched on the wall clock, the turn is aborted when it passes and abandoned a grace later whether or not it has ended, and an abort is read as a timeout from its own signal — never from the name of the error the SDK throws — and asked again once.',
   },
   {
     id: 'QL-34',
