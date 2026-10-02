@@ -26,4 +26,4 @@ type Story = StoryObj<typeof FailureDetail>;
 export const Folded: Story = {};
 
 /** Opened: the operator's line, verbatim, wrapping inside the dock. */
-export const Opened: Story = { args: { open: true } };
+export const Opened: Story = { args: { defaultOpen: true } };

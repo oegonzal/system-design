@@ -2,6 +2,7 @@ export * from './alert/alert';
 export * from './badge/badge';
 export * from './badge/tones';
 export * from './button/button';
+export * from './disclosure/disclosure';
 export * from './field/checkbox-field';
 export type { LimitNotice, LimitNoticeProps } from './field/field-limit';
 export * from './field/select-field';

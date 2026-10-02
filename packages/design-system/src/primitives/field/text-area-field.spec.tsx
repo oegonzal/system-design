@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-area-field.stories';
 
-const { Default, Tall, Disabled, Invalid, NearLimit } = composeStories(stories);
+const { Default, Tall, Disabled, WithHint, Invalid, NearLimit } = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
 /** A limited field's own polite region, and what it last said. */
@@ -31,6 +31,15 @@ describe('TextAreaField', () => {
   it('passes disabled through', () => {
     renderWithTheme(<Disabled />);
     expect((screen.getByLabelText('Design narrative') as HTMLTextAreaElement).disabled).toBe(true);
+  });
+
+  it('shows a hint under the area and describes the area by it', () => {
+    renderWithTheme(<WithHint />);
+    const area = screen.getByLabelText('Design narrative');
+    expect(document.getElementById(area.getAttribute('aria-describedby') ?? '')?.textContent).toBe(
+      'The graders read this with the diagram: say why each component is there.',
+    );
+    expect(area.hasAttribute('aria-invalid')).toBe(false);
   });
 
   it('shows why a value is refused and marks the area invalid', () => {

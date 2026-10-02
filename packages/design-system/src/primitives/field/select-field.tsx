@@ -10,6 +10,7 @@ export interface SelectFieldProps extends FieldProps, SelectHTMLAttributes<HTMLS
 /** A labelled native select — the options are the caller's. */
 export function SelectField({
   label,
+  hint,
   error,
   id,
   children,
@@ -19,8 +20,12 @@ export function SelectField({
   const autoId = useId();
   const selectId = id ?? autoId;
   return (
-    <FieldFrame label={label} error={error} controlId={selectId}>
-      <SelectControl id={selectId} {...invalidAttributes(selectId, error, describedBy)} {...rest}>
+    <FieldFrame label={label} hint={hint} error={error} controlId={selectId}>
+      <SelectControl
+        id={selectId}
+        {...invalidAttributes(selectId, { hint, error, describedBy })}
+        {...rest}
+      >
         {children}
       </SelectControl>
     </FieldFrame>

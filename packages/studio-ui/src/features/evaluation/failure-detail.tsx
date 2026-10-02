@@ -1,29 +1,27 @@
 'use client';
 
 import styled from '@emotion/styled';
-import type { DetailsHTMLAttributes } from 'react';
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  type DisclosureProps,
+} from '@sysdesign/design-system';
 
-const Fold = styled.details`
+const Fold = styled(Disclosure)`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.space[1]}px;
   font-size: ${({ theme }) => theme.font.size.sm};
 `;
 
-const Toggle = styled.summary`
-  width: fit-content;
-  cursor: pointer;
-  border-radius: ${({ theme }) => theme.radius.sm};
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.color.border.focus};
-    outline-offset: 2px;
-  }
-`;
-
 const Line = styled.p`
-  margin: ${({ theme }) => theme.space[1]}px 0 0;
+  margin: 0;
   overflow-wrap: anywhere;
 `;
 
-export interface FailureDetailProps extends DetailsHTMLAttributes<HTMLDetailsElement> {
+export interface FailureDetailProps extends Omit<DisclosureProps, 'children'> {
   /** The run's own word on what went wrong, verbatim — written for whoever operates the grader. */
   detail: string;
 }
@@ -32,15 +30,19 @@ export interface FailureDetailProps extends DetailsHTMLAttributes<HTMLDetailsEle
  * What a run said about its own failure, kept but folded away. The sentence
  * beside it tells the author what happened and what to do; this line — a
  * stale heartbeat, a model that went away — is for whoever has to look into
- * it, so it is one click down, never the headline. A native disclosure: it
- * opens from the keyboard and reads as a collapsed group without any state
- * here. Inherits its colours from the alert it sits in.
+ * it, so it is one click down, never the headline. The design system's
+ * disclosure: a button that says whether the line shows and which line it
+ * is, opened from the keyboard as any button is.
  */
 export function FailureDetail({ detail, ...rest }: FailureDetailProps) {
   return (
     <Fold data-testid="failure-detail" {...rest}>
-      <Toggle>Technical details</Toggle>
-      <Line>{detail}</Line>
+      <DisclosureButton variant="ghost" size="sm" data-testid="failure-detail-toggle">
+        Technical details
+      </DisclosureButton>
+      <DisclosurePanel>
+        <Line>{detail}</Line>
+      </DisclosurePanel>
     </Fold>
   );
 }

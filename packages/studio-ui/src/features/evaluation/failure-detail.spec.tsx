@@ -9,13 +9,24 @@ describe('FailureDetail', () => {
   it('keeps a run’s own error folded under a control anyone can open, and wraps it inside the dock', async () => {
     renderWithTheme(<FailureDetail detail="connect ECONNREFUSED 127.0.0.1:3003" />);
 
-    const fold = screen.getByTestId('failure-detail') as HTMLDetailsElement;
-    expect(fold.open).toBe(false);
+    const toggle = screen.getByRole('button', { name: 'Technical details' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     const line = screen.getByText('connect ECONNREFUSED 127.0.0.1:3003');
+    const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+    expect(panel?.contains(line)).toBe(true);
+    expect(panel?.hidden).toBe(true);
     expect(getComputedStyle(line).overflowWrap).toBe('anywhere');
 
-    // A native disclosure: its summary is the control, by pointer or keyboard.
-    await userEvent.click(screen.getByText('Technical details'));
-    expect(fold.open).toBe(true);
+    // The design system's disclosure: its button is the control, by pointer or keyboard.
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(panel?.hidden).toBe(false);
+  });
+
+  it('can be shown from the start', () => {
+    renderWithTheme(<FailureDetail detail="the model went away" defaultOpen />);
+    expect(
+      screen.getByRole('button', { name: 'Technical details' }).getAttribute('aria-expanded'),
+    ).toBe('true');
   });
 });

@@ -21,6 +21,11 @@ export const Tall: Story = {
 
 export const Disabled: Story = { args: { disabled: true, defaultValue: 'read only' } };
 
+/** A hint under the area says what the prose is for, and stays while it is written. */
+export const WithHint: Story = {
+  args: { hint: 'The graders read this with the diagram: say why each component is there.' },
+};
+
 /** A refused value: the reason under the control, which is marked invalid and described by it. */
 export const Invalid: Story = { args: { error: 'Say how a request travels.', required: true } };
 

@@ -8,11 +8,13 @@ export interface TextFieldProps
 
 /**
  * A labelled single-line input; the label names the control, and clicking
- * it focuses the field. Given a `maxLength`, it says how much is left as
+ * it focuses the field. A `hint` under it says what the value is for and
+ * stays while it is typed. Given a `maxLength`, it says how much is left as
  * the limit nears (`limitNotice`), so the cap never cuts text off unsaid.
  */
 export function TextField({
   label,
+  hint,
   error,
   id,
   limitNotice,
@@ -24,10 +26,10 @@ export function TextField({
   const inputId = id ?? autoId;
   const limited = useFieldLimit<HTMLInputElement>({ ...rest, limitNotice, onChange });
   return (
-    <FieldFrame label={label} error={error} controlId={inputId} limit={limited.limit}>
+    <FieldFrame label={label} hint={hint} error={error} controlId={inputId} limit={limited.limit}>
       <Input
         id={inputId}
-        {...invalidAttributes(inputId, error, describedBy, limited.limit)}
+        {...invalidAttributes(inputId, { hint, error, describedBy, limit: limited.limit })}
         {...rest}
         onChange={limited.onChange}
       />

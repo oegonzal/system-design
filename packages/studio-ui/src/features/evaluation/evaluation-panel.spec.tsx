@@ -121,8 +121,8 @@ describe('EvaluationPanel', () => {
     // The author's sentence leads; the run's own error is kept, folded under it.
     expect(alert.textContent).toContain('Grading stopped unexpectedly');
     expect(alert.textContent).toContain('This revision was not graded.');
-    const detail = within(alert).getByTestId('failure-detail') as HTMLDetailsElement;
-    expect(detail.open).toBe(false);
+    const detail = within(alert).getByTestId('failure-detail');
+    expect(within(detail).getByRole('button').getAttribute('aria-expanded')).toBe('false');
     expect(detail.textContent).toContain('the run failed');
     expect(screen.getByTestId('retry-evaluation').textContent).toBe('Grade this revision again');
     expect(screen.queryByTestId('grading-duration')).toBeNull();

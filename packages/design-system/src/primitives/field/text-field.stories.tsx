@@ -27,6 +27,14 @@ export const Numeric: Story = {
   args: { label: 'Iterations', type: 'number', min: 1, max: 10, defaultValue: 1 },
 };
 
+/** A hint under the control says what the value is for — and stays while it is typed, unlike a placeholder. */
+export const WithHint: Story = {
+  args: {
+    label: 'Notes',
+    hint: 'Read by the graders — e.g. retries, ordering, what it guarantees',
+  },
+};
+
 /** A refused value: the reason under the control, which is marked invalid and described by it. */
 export const Invalid: Story = {
   args: { defaultValue: '', error: 'A service needs a name.', required: true },

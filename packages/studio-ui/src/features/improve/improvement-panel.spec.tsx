@@ -338,8 +338,8 @@ describe('ImprovementPanel', () => {
     expect(alert.getAttribute('data-testid')).toBe('improvement-error');
     expect(alert.textContent).toContain('The coach stopped unexpectedly');
     expect(alert.textContent).toContain('try again');
-    const detail = within(alert).getByTestId('failure-detail') as HTMLDetailsElement;
-    expect(detail.open).toBe(false);
+    const detail = within(alert).getByTestId('failure-detail');
+    expect(within(detail).getByRole('button').getAttribute('aria-expanded')).toBe('false');
     expect(detail.textContent).toContain(operatorLine);
     expect(screen.getByTestId('earlier-best').textContent).toContain('revision #4, scored 80');
     await userEvent.click(screen.getByTestId('load-earlier-best'));

@@ -6,10 +6,11 @@ import { VisuallyHidden } from '../visually-hidden/visually-hidden';
 import { limitAnnouncement, limitCopy, type FieldLimit } from './field-limit';
 
 /**
- * The one look every form field shares: a label over a control over, when
- * the value is refused, the reason — and, for a text field with a length
- * limit, how much of it is left — all reading only semantic theme roles.
- * Internal to the field primitives; each public field composes these.
+ * The one look every form field shares: a label over a control over what
+ * the control needs saying under it — what the value is for (`hint`), how
+ * much of a length limit is left, and, when the value is refused, the
+ * reason — all reading only semantic theme roles. Internal to the field
+ * primitives; each public field composes these.
  */
 
 export const FieldRoot = styled.div`
@@ -31,9 +32,21 @@ const FieldMessage = styled.span`
   color: ${({ theme }) => theme.color.danger.fg};
 `;
 
+/** What the value is for, or how it is read — under the control, and there whatever is typed. */
+const FieldHint = styled.span`
+  font-size: ${({ theme }) => theme.font.size.sm};
+  color: ${({ theme }) => theme.color.text.muted};
+`;
+
 /** What every field takes beyond its native control's attributes. */
 export interface FieldProps {
   label: string;
+  /**
+   * What the value is for, or who reads it — guidance that stays while the
+   * field is typed into, unlike a placeholder. Shown under the control,
+   * which is described by it.
+   */
+  hint?: string | null;
   /**
    * Why the current value is refused. Shown under the control, and the
    * control is marked invalid and described by it; nothing while null.
@@ -49,20 +62,29 @@ const FieldCount = styled('span', transient)<{ $reached: boolean }>`
 
 const messageIdOf = (controlId: string): string => `${controlId}-error`;
 const countIdOf = (controlId: string): string => `${controlId}-limit`;
+const hintIdOf = (controlId: string): string => `${controlId}-hint`;
+
+/** What a control is described by besides its own attributes: everything the frame shows under it. */
+export interface ControlDescription {
+  hint?: string | null;
+  error?: string | null;
+  /** Whatever described the control already — the caller's own `aria-describedby`. */
+  describedBy?: string;
+  limit?: FieldLimit | null;
+}
 
 /**
  * The control's half of the wiring: invalid while there is an error, and
- * described by everything shown under it — the count while it shows, then
- * the reason — alongside whatever described it already.
+ * described by everything shown under it — the hint, the count while it
+ * shows, then the reason — alongside whatever described it already.
  */
 export function invalidAttributes(
   controlId: string,
-  error: string | null | undefined,
-  describedBy: string | undefined,
-  limit: FieldLimit | null = null,
+  { hint, error, describedBy, limit = null }: ControlDescription,
 ): { 'aria-invalid'?: true; 'aria-describedby'?: string } {
   const described = [
     describedBy,
+    hint ? hintIdOf(controlId) : undefined,
     limit?.shown ? countIdOf(controlId) : undefined,
     error ? messageIdOf(controlId) : undefined,
   ].filter(Boolean);
@@ -81,17 +103,26 @@ export interface FieldFrameProps extends FieldProps {
 }
 
 /**
- * The label, the control, how much of its limit is left and the reason it
- * is refused, in that order. A limited field's announcer is mounted from
- * the start — a live region must exist before it has anything to say — and
- * is a plain polite region rather than a `status`: a form of capped fields
- * is not a form of statuses, and the page's own status stays the only one.
+ * The label, the control, what the value is for, how much of its limit is
+ * left and the reason it is refused, in that order. A limited field's
+ * announcer is mounted from the start — a live region must exist before it
+ * has anything to say — and is a plain polite region rather than a
+ * `status`: a form of capped fields is not a form of statuses, and the
+ * page's own status stays the only one.
  */
-export function FieldFrame({ label, error, controlId, limit = null, children }: FieldFrameProps) {
+export function FieldFrame({
+  label,
+  hint,
+  error,
+  controlId,
+  limit = null,
+  children,
+}: FieldFrameProps) {
   return (
     <FieldRoot>
       <FieldLabel htmlFor={controlId}>{label}</FieldLabel>
       {children}
+      {hint ? <FieldHint id={hintIdOf(controlId)}>{hint}</FieldHint> : null}
       {limit?.shown ? (
         <FieldCount id={countIdOf(controlId)} $reached={limit.remaining === 0}>
           {limitCopy(limit)}

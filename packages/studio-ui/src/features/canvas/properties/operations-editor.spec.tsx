@@ -194,7 +194,7 @@ describe('OperationsEditor', () => {
     );
   });
 
-  it('[UX-5] says a note is read by the graders, and how much of its limit is left as it nears', () => {
+  it('[UX-5] says a note is read by the graders — under the field, there while it is typed — and how much of its limit is left as it nears', () => {
     renderWithTheme(
       <Harness
         initial={[
@@ -204,13 +204,17 @@ describe('OperationsEditor', () => {
       />,
     );
     const empty = within(screen.getByTestId('operation-row-0'));
-    expect((empty.getByLabelText('Notes') as HTMLInputElement).placeholder).toContain(
-      'Read by the graders',
-    );
+    const notes = empty.getByLabelText('Notes') as HTMLInputElement;
+    expect(notes.hasAttribute('placeholder')).toBe(false);
+    const described = (notes.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(described).toEqual(['Read by the graders — e.g. retries, ordering, what it guarantees']);
     expect(empty.queryByText(/characters? left/)).toBeNull();
 
-    expect(
-      within(screen.getByTestId('operation-row-1')).getByText('3 characters left'),
-    ).toBeTruthy();
+    // A typed note keeps its guidance; the count joins it as the limit nears.
+    const typed = within(screen.getByTestId('operation-row-1'));
+    expect(typed.getByText(/Read by the graders/)).toBeTruthy();
+    expect(typed.getByText('3 characters left')).toBeTruthy();
   });
 });

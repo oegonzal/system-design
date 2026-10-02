@@ -6,8 +6,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-field.stories';
 
-const { Default, ExplicitId, Disabled, Numeric, Invalid, NearLimit, AtLimit, CountedThroughout } =
-  composeStories(stories);
+const {
+  Default,
+  ExplicitId,
+  Disabled,
+  Numeric,
+  WithHint,
+  Invalid,
+  NearLimit,
+  AtLimit,
+  CountedThroughout,
+} = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
 /** A limited field's own polite region, and what it last said. */
@@ -50,6 +59,35 @@ describe('TextField', () => {
     const describedBy = screen.getByLabelText('Service name').getAttribute('aria-describedby');
     expect(describedBy?.split(' ')[0]).toBe('hint');
     expect(describedBy?.split(' ')).toHaveLength(2);
+  });
+
+  it('shows a hint under the control, describes the control by it, and keeps it while the value is typed', () => {
+    renderWithTheme(<WithHint />);
+    const input = screen.getByLabelText('Notes');
+    const hint = document.getElementById(input.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe(
+      'Read by the graders — e.g. retries, ordering, what it guarantees',
+    );
+    expect(input.hasAttribute('placeholder')).toBe(false);
+
+    fireEvent.change(input, { target: { value: 'retries three times' } });
+    expect(
+      screen.getByText('Read by the graders — e.g. retries, ordering, what it guarantees'),
+    ).toBeTruthy();
+  });
+
+  it('describes the control by the hint before the count and the reason, after the caller’s own description', () => {
+    renderWithTheme(
+      <NearLimit
+        id="service-name"
+        hint="What the service is called"
+        error="That name is taken."
+        aria-describedby="outside"
+      />,
+    );
+    expect(screen.getByLabelText('Service name').getAttribute('aria-describedby')).toBe(
+      'outside service-name-hint service-name-limit service-name-error',
+    );
   });
 
   it('is any input type the caller asks for', () => {

@@ -2,8 +2,13 @@
 
 import styled from '@emotion/styled';
 import type { RunRecallDto, RunRecallReason } from '@sysdesign/contracts';
-import { Button, Stack, Text } from '@sysdesign/design-system';
-import { useId, useState } from 'react';
+import {
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  Stack,
+  Text,
+} from '@sysdesign/design-system';
 
 import { WrappingText } from '../evaluation/wrapping-text';
 
@@ -43,11 +48,14 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
  */
 const LESSON_LABEL = { serves: 'Where it helps', caveat: 'Keep in mind' } as const;
 
-/**
- * The list behind the toggle. Its own element rather than a `Stack`, because a
- * layout `display` outranks the browser's `[hidden]` rule: the collapsed list
- * must say `display: none` itself or it never collapses.
- */
+/** The summary row and, under it, the list the disclosure shows and hides. */
+const Recalled = styled(Disclosure)`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space[2]}px;
+`;
+
+/** The list behind the toggle — the disclosure's panel, so it collapses as one. */
 const LessonList = styled.ul`
   display: flex;
   flex-direction: column;
@@ -55,10 +63,6 @@ const LessonList = styled.ul`
   margin: 0;
   padding: 0;
   list-style: none;
-
-  &[hidden] {
-    display: none;
-  }
 `;
 
 const LessonItem = styled.li`
@@ -82,8 +86,6 @@ export interface RecalledLessonsProps {
  * panel's progress line says so. Only the coach saw these; the grade did not.
  */
 export function RecalledLessons({ recall }: RecalledLessonsProps) {
-  const [open, setOpen] = useState(false);
-  const listId = useId();
   if (recall === null || recall.status === 'recalling') return null;
 
   if (recall.status !== 'recalled') {
@@ -97,23 +99,16 @@ export function RecalledLessons({ recall }: RecalledLessonsProps) {
 
   const count = recall.lessons.length;
   return (
-    <Stack gap={2} data-testid="coach-recall" data-status="recalled">
+    <Recalled data-testid="coach-recall" data-status="recalled">
       <Stack direction="row" gap={3} align="center" wrap>
         <Text as="span" size="sm" tone="secondary" data-testid="coach-recall-summary">
           {`Recalled ${count} ${count === 1 ? 'lesson' : 'lessons'} from earlier runs for the coach`}
         </Text>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-expanded={open}
-          aria-controls={listId}
-          onClick={() => setOpen((shown) => !shown)}
-          data-testid="coach-recall-toggle"
-        >
-          {open ? 'Hide lessons' : 'Show lessons'}
-        </Button>
+        <DisclosureButton variant="ghost" size="sm" data-testid="coach-recall-toggle">
+          {(open) => (open ? 'Hide lessons' : 'Show lessons')}
+        </DisclosureButton>
       </Stack>
-      <LessonList id={listId} hidden={!open} data-testid="coach-recall-lessons">
+      <DisclosurePanel as={LessonList} data-testid="coach-recall-lessons">
         {recall.lessons.map((lesson) => (
           <LessonItem key={lesson.ref} data-testid="coach-recall-lesson">
             <WrappingText as="span" size="sm">
@@ -129,7 +124,7 @@ export function RecalledLessons({ recall }: RecalledLessonsProps) {
             ) : null}
           </LessonItem>
         ))}
-      </LessonList>
-    </Stack>
+      </DisclosurePanel>
+    </Recalled>
   );
 }
