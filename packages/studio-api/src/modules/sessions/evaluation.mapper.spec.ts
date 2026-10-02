@@ -321,6 +321,96 @@ describe('toEvaluationDto', () => {
     expect(toEvaluationDto(run, 1, submission, READ_AT).overall).toBe(32);
   });
 
+  it('[UX-18] a grade the evidence gate found too thin is unscored — no overall, no dimension, no lens’s words on what nobody settled — and a real 0 is still a 0', async () => {
+    const run = await finishedRun();
+    if (!run.trace) throw new Error('the fake completes synchronously');
+    const [it] = run.trace.iterations;
+    it.decision = {
+      ...it.decision,
+      finalDecision: 'escalate',
+      gates: { ...it.decision.gates, evidenceSufficient: false },
+      scores: { dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 }, overall: 0 },
+    };
+    it.ledger = {
+      ...it.ledger,
+      criteria: it.ledger.criteria.map((row) => ({ ...row, result: 'unassessed', hits: 0 })),
+    };
+    const thin = toEvaluationDto(run, 1, submission, READ_AT);
+    expect(thin).toMatchObject({
+      status: 'complete',
+      overall: null,
+      unscored: 'unassessed',
+      decision: 'escalate',
+      dimensions: { coverage: null, quality_attributes: null, compliance: null },
+    });
+    // One evaluator sample still wrote about c2; nobody settled it, so its words are not a verdict.
+    const c2 = thin.criterionResults.find((row) => row.criterionId === 'c2');
+    expect(c2).toMatchObject({
+      result: 'unassessed',
+      rationale: null,
+      locations: [],
+      mentions: [],
+    });
+
+    it.decision = {
+      ...it.decision,
+      gates: { ...it.decision.gates, evidenceSufficient: true },
+    };
+    expect(toEvaluationDto(run, 1, submission, READ_AT)).toMatchObject({
+      overall: 0,
+      unscored: null,
+      dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
+    });
+    // An iteration that produced nothing is unscored for its own reason.
+    it.artifact = null;
+    expect(toEvaluationDto(run, 1, submission, READ_AT)).toMatchObject({
+      overall: null,
+      unscored: 'no-artifact',
+    });
+  });
+
+  it('[DEL-8] says what settled the decision as data: the deciding step, the remediations selected, the criteria assessed', async () => {
+    const run = await finishedRun();
+    if (!run.trace) throw new Error('the fake completes synchronously');
+    const [it] = run.trace.iterations;
+    it.decision = {
+      ...it.decision,
+      selectedRemediations: [
+        {
+          subject: { finding: 'a|node.1' },
+          action: 'revise',
+          severity: 'high',
+          targetRefs: ['node.1'],
+        },
+        {
+          subject: { finding: 'b|node.2' },
+          action: 'revise',
+          severity: 'medium',
+          targetRefs: ['node.2'],
+        },
+      ],
+      reason: '2 remediation(s) to apply',
+      trace: {
+        ...it.decision.trace,
+        steps: [
+          { order: 1, factor: 'scores', outcome: 'computed', detail: 'overall 58' },
+          {
+            order: 2,
+            factor: 'evidence',
+            outcome: 'passed',
+            detail: '100% of 2 criteria assessed',
+          },
+          { order: 3, factor: 'route', outcome: 'decided', detail: '2 remediation(s) to apply' },
+        ],
+      },
+    };
+    expect(toEvaluationDto(run, 1, submission, READ_AT).decisionBasis).toEqual({
+      factor: 'route',
+      remediations: 2,
+      criteria: { assessed: it.ledger.criteria.length, total: it.ledger.criteria.length },
+    });
+  });
+
   it('[DEL-4] a run without a trace is its status with nothing invented; an iteration the run never reached is failed', async () => {
     const run = await finishedRun();
     const missing = toEvaluationDto(run, 2, submission, READ_AT);
@@ -341,8 +431,10 @@ describe('toEvaluationDto', () => {
       settled: false,
       llm: run.llm,
       overall: null,
+      unscored: null,
       decision: null,
       decisionReason: null,
+      decisionBasis: null,
       dimensions: {},
       findings: [],
       criterionResults: [],

@@ -8,6 +8,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
+  describeUnassessedBase,
   designSubmissionSchema,
   layoutGraph,
   MAX_IMPROVE_ITERATIONS,
@@ -28,7 +29,13 @@ import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sys
 import { notFound } from '../../common/not-found';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { recordCoachingStatus } from './coaching-status';
-import { findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
+import {
+  decisionBasisOf,
+  findingsOf,
+  iterationGrade,
+  locationIndex,
+  unscoredReason,
+} from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
 import { SessionsService, type RevisionCache } from './sessions.service';
@@ -143,6 +150,12 @@ export class ImproveService {
         `revision #${base.revisionNumber} has no grade to adopt: its run ${run} — submit it again`,
       );
     }
+    // A grade that assessed too little is no verdict to improve on: every
+    // revision the coach makes would be measured against a number that was
+    // never a score.
+    if (grade.unscored !== null) {
+      throw new ConflictException(describeUnassessedBase(base.revisionNumber));
+    }
     const adopt = { runId: base.qualityRunId, iteration: base.qualityIteration };
     return this.sessions.withSessionLock(sessionId, async (em, session, prompt) => {
       this.sessions.assertSessionOpen(session, prompt);
@@ -242,8 +255,8 @@ export class ImproveService {
     const layout = positionsOf(base.graph);
     let bestBefore = Number.NEGATIVE_INFINITY;
     for (const it of recorded) {
-      const cache: RevisionCache = { status: 'complete', ...iterationGrade(it) };
-      const { overall } = cache;
+      const { overall, decision } = iterationGrade(it);
+      const cache: RevisionCache = { status: 'complete', overall, decision };
       // What the iteration judged, when it is a submission: its findings are
       // grounded on it, and it is what an import would store.
       const judged = designSubmissionSchema.safeParse(it.artifact);
@@ -286,8 +299,10 @@ export class ImproveService {
         iteration: it.iteration,
         mode: it.mode,
         overall,
+        unscored: unscoredReason(it),
         decision: it.decision.finalDecision,
         reason: it.decision.reason,
+        decisionBasis: decisionBasisOf(it),
         findings: findingsOf(it, locationIndex(submission)),
         outcome,
         problems,

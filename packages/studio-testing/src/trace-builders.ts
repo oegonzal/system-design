@@ -38,6 +38,12 @@ export interface FakeIteration {
   locations?: ArtifactLocation[];
   /** A report with a block-gate problem makes the iteration blocked, as the real loop would. */
   validation?: ValidationReport[];
+  /**
+   * The engine's evidence gate: false when too few criteria were assessed for
+   * a verdict — the lenses did not answer — as on a grade during a provider
+   * outage. Defaults to true unless a validator blocked the iteration.
+   */
+  evidenceSufficient?: boolean;
 }
 
 const CRITERION_RESULTS = ['pass', 'partial', 'fail'] as const;
@@ -123,7 +129,7 @@ export function tracesFrom(
         gates: {
           artifactPresent: true,
           validatorsPassed: blockers.length === 0,
-          evidenceSufficient: blockers.length === 0,
+          evidenceSufficient: spec.evidenceSufficient ?? blockers.length === 0,
           policyAllowed: true,
         },
         scores: { dimensions: spec.dimensions ?? { coverage: overall }, overall },

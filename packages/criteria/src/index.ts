@@ -118,6 +118,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A failed grade is re-graded in place: the same revision is pointed at a fresh run of its stored design — never a second revision with the same content — only when it has no grade to keep (its run failed, the grader lost it, or it never had one), under the rules a submit obeys, and the draft is left alone.',
   },
+  {
+    id: 'UX-18',
+    statement:
+      'A grade the loop judged on too little evidence for a verdict is not a score: it is reported unassessed — no overall, no dimension values, no criterion rationale presented as a verdict — distinct from a real 0, is re-graded in place like a failed grade, and is refused as the coach’s starting point with words that say why.',
+  },
   // STAR repository
   {
     id: 'STAR-1',
@@ -161,6 +166,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'DEL-7',
     statement:
       'One zod schema defines a design submission for every side: the studio API validates with it, the canvas pipeline declares its artifact with it, and the canvas UI types its store from it.',
+  },
+  {
+    id: 'DEL-8',
+    statement:
+      "What settled a grade's decision reaches the studio as data — the controller step that decided, how many remediations it selected, how many of the criteria were assessed — so the decision is worded where it is read rather than shown as the controller's own sentence.",
   },
   // Quality-control loop (packages/quality-loop)
   {

@@ -6,7 +6,7 @@ import type {
   SessionDraft,
 } from './canvas.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
-import type { EvaluationFindingDto } from './evaluations';
+import type { DecisionBasisDto, EvaluationFindingDto, UnscoredReason } from './evaluations';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
 import type { RunRecallDto } from './quality-loop/recall';
@@ -34,6 +34,11 @@ export interface RevisionEvaluationRef {
   runId: string;
   iteration: number;
   status: QualityRunStatus;
+  /**
+   * Null on a complete grade that earned no score: a stored revision always
+   * has its design to judge, so its grade assessed too little to be a verdict
+   * (`EvaluationDto.unscored`) — never a 0.
+   */
   overall: number | null;
   decision: Decision | null;
   /**
@@ -48,6 +53,16 @@ export interface RevisionEvaluationRef {
 /** Why a grade the grader lost did not arrive: the API's record of it and its 404 alike. */
 export const describeLostGrade = (revisionNumber: number): string =>
   `The grader no longer has the run that graded revision #${revisionNumber} — grade it again to get a verdict.`;
+
+/**
+ * Why the coach will not start from a revision whose grade is no verdict
+ * (`unscored: 'unassessed'`): a coach measures every revision it makes
+ * against its starting grade, and a grade that assessed too little would
+ * have it beat a number that was never a score. The API's 409, in the
+ * author's words.
+ */
+export const describeUnassessedBase = (revisionNumber: number): string =>
+  `Revision #${revisionNumber} was not assessed — the grader could not judge enough of its criteria to score it, so there is no grade for the coach to start from. Grade it again, then coach it.`;
 
 export interface DesignSessionDto {
   id: Uuid;
@@ -229,11 +244,15 @@ export type ImproveIterationOutcome = (typeof IMPROVE_ITERATION_OUTCOMES)[number
 export interface ImproveIterationDto {
   iteration: number;
   mode: IterationMode;
-  /** The controller's score; null when the iteration had no artifact or assessed nothing. */
+  /** The controller's score; null when the iteration earned none — `unscored` says why. */
   overall: number | null;
+  /** Why the iteration has no score: it produced nothing, or assessed too little for a verdict. */
+  unscored: UnscoredReason | null;
   decision: Decision | null;
   /** The controller's own sentence for its decision. */
   reason: string | null;
+  /** What settled the decision, for wording it (`EvaluationDto.decisionBasis`). */
+  decisionBasis: DecisionBasisDto;
   /**
    * The iteration's confirmed findings, grounded on its own submission — the
    * artifact it judged — so a reader can name each finding `reason` cites by

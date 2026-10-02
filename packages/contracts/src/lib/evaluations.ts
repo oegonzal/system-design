@@ -83,6 +83,35 @@ export const proseLocations = ({
   'locations' | 'mentions'
 >): EvaluationLocationDto[] => [...locations, ...mentions];
 
+/**
+ * Why a complete grade carries no score. `no-artifact`: the iteration
+ * produced nothing to judge. `unassessed`: the loop's evidence gate found too
+ * few of the criteria assessed for a verdict — the lenses that should have
+ * judged them did not answer — so the controller's number is no score of the
+ * design, and the grade is no verdict on it. Kept apart from a real 0, which
+ * is a verdict.
+ */
+export const UNSCORED_REASONS = ['no-artifact', 'unassessed'] as const;
+export type UnscoredReason = (typeof UNSCORED_REASONS)[number];
+
+/**
+ * What settled a decision, as data a reader words — the controller's own
+ * sentence (`decisionReason`) is written for its trace, not for an author.
+ */
+export interface DecisionBasisDto {
+  /**
+   * The controller step that decided (`DecisionStep.factor`): a gate's name —
+   * `evidence`, `policy-allowed`, `accept-threshold` — or the route's,
+   * `route`. Open, as controllers are composed per pipeline; null for a trace
+   * that recorded no deciding step.
+   */
+  factor: string | null;
+  /** How many remediations the controller selected for the producer to apply. */
+  remediations: number;
+  /** How many of the iteration's criteria a lens assessed, of how many. */
+  criteria: { assessed: number; total: number };
+}
+
 /** A lens sample that should have answered and did not: the grade stands on the samples that did. */
 export interface DegradedSampleDto {
   /** The lens that ran it — `critic.scale`, `evaluator.quality`. */
@@ -119,12 +148,23 @@ export interface EvaluationDto {
    */
   settled: boolean;
   llm: LlmModelDto;
-  /** The controller's score; null when the run has no iteration yet, when the iteration had no artifact, and when it assessed nothing — never the controller's zero for an empty ledger. */
+  /**
+   * The controller's score; null when the run has no iteration yet, and when
+   * the iteration earned none (`unscored` says why) — never the controller's
+   * zero for a ledger it could not judge.
+   */
   overall: number | null;
+  /** Why a complete grade has no score; null when it has one, and while there is no grade yet. */
+  unscored: UnscoredReason | null;
   decision: Decision | null;
   /** The controller's own sentence for its decision. */
   decisionReason: string | null;
-  /** Keyed by the pipeline's own dimension names; null means the dimension was not assessed. */
+  /** What settled the decision, for wording it; null while there is no grade. */
+  decisionBasis: DecisionBasisDto | null;
+  /**
+   * Keyed by the pipeline's own dimension names; null means the dimension was
+   * not assessed — every one of them, on a grade that is `unscored`.
+   */
   dimensions: Record<string, number | null>;
   findings: EvaluationFindingDto[];
   criterionResults: CriterionResultDto[];
@@ -146,6 +186,15 @@ export interface EvaluationDto {
 }
 
 export type GetEvaluationResponse = ApiResponse<EvaluationDto>;
+
+/**
+ * Whether a revision's grade may be run again in place: it failed, or it
+ * stands on too little evidence to be a verdict. A grade that is one stands.
+ * The API's rule — anything else is refused with a 409 — and the offer a
+ * reader makes alike; a revision with no grade at all may always be graded.
+ */
+export const regradable = (grade: Pick<EvaluationDto, 'status' | 'unscored'>): boolean =>
+  grade.status === 'failed' || grade.unscored === 'unassessed';
 
 /**
  * `GET /grading/availability`: the grader — and so the coach — can run, on

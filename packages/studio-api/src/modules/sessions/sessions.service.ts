@@ -10,6 +10,7 @@ import {
   CANVAS_PIPELINE_ID,
   describeInFlight,
   PROMPT_COPY,
+  regradable,
   type AdoptedIterationRef,
   type Decision,
   type DesignSubmission,
@@ -178,8 +179,9 @@ export class SessionsService {
    * Grade a stored revision again, in place: the same design, a fresh run,
    * and the revision pointing at it — no second revision. Only for a revision
    * with no grade and none coming: its run failed, the grader no longer has
-   * it, or it was stored before grading moved to the loop. A grade that
-   * stands, or is still running, is refused (409). Everything else is a
+   * it, it was stored before grading moved to the loop, or its grade
+   * assessed too little to be a verdict. A grade that stands, or is still
+   * running, is refused (409). Everything else is a
    * submit's rule, under the same lock: an open session, nothing else in
    * flight, a design that still refers only to what exists. The draft is
    * not touched — nothing was submitted.
@@ -217,12 +219,14 @@ export class SessionsService {
   /**
    * A revision may be graded again only when there is no grade to lose: the
    * loop is asked, since the cache says `running` until someone reads it. A
-   * run it does not have, or a revision that never had one, has none.
+   * run it does not have, or a revision that never had one, has none; one
+   * that failed, or assessed too little to be a verdict, has none to keep
+   * (`regradable`).
    */
   private async assertNoGradeToKeep(em: EntityManager, revision: DesignRevision): Promise<void> {
     if (revision.qualityRunId === null || revision.qualityIteration === null) return;
     const grade = await this.evaluations.syncRevision(revision, em);
-    if (grade === null || grade.status === 'failed') return;
+    if (grade === null || regradable(grade)) return;
     throw new ConflictException(
       grade.status === 'running'
         ? describeInFlight({

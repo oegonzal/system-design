@@ -4,6 +4,7 @@ import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
   describeLostGrade,
+  describeUnassessedBase,
   LAYOUT_PITCH,
   PROMPT_COPY,
   recallWithout,
@@ -622,6 +623,58 @@ describe('sessions', () => {
         status: 'complete',
         overall: 64,
         decision: 'revise',
+      });
+    });
+
+    it('[UX-18] a grade that assessed too little is no verdict: it reads unscored, never 0, and is graded again in place', async () => {
+      const { prompt, sessionId } = await startSession();
+      const { body: created } = await submit(sessionId, submission());
+      // Every lens sample failed: the evidence gate escalated with nothing assessed.
+      h.loop.complete('fake-run-1', [
+        {
+          overall: 0,
+          decision: 'escalate',
+          evidenceSufficient: false,
+          dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
+          criteria: prompt.criteria.map((criterion) => ({
+            criterionId: criterion.id,
+            kind: criterion.kind,
+            result: 'unassessed' as const,
+            hits: 0,
+            confidence: 'none' as const,
+            locationRefs: [],
+          })),
+          reason: 'only 0% of criteria assessed',
+        },
+      ]);
+      const grade = (await evaluation(created.data.id)).body.data;
+      expect(grade).toMatchObject({
+        status: 'complete',
+        overall: null,
+        unscored: 'unassessed',
+        decision: 'escalate',
+        dimensions: { coverage: null, quality_attributes: null, compliance: null },
+        decisionBasis: { criteria: { assessed: 0, total: prompt.criteria.length } },
+      });
+      // The timeline's cache says the same: no number.
+      const listed = await call<ListRevisionsResponse>(`${h.url}/sessions/${sessionId}/revisions`);
+      expect(listed.body.data[0].evaluation).toMatchObject({
+        status: 'complete',
+        overall: null,
+        decision: 'escalate',
+      });
+
+      const again = await regrade(created.data.id);
+      expect(again.status).toBe(202);
+      expect(again.body.data).toMatchObject({
+        id: created.data.id,
+        evaluation: { runId: 'fake-run-2', iteration: 1, status: 'running', overall: null },
+      });
+      h.loop.complete('fake-run-2');
+      expect((await evaluation(created.data.id)).body.data).toMatchObject({
+        runId: 'fake-run-2',
+        overall: 64,
+        unscored: null,
       });
     });
 
@@ -1275,6 +1328,22 @@ describe('sessions', () => {
       expect(h.loop.startRequests).toHaveLength(requests);
     });
 
+    it('[UX-18] the coach refuses to start from a grade that assessed too little, and says why', async () => {
+      const { sessionId } = await startSession();
+      const { body: graded } = await submit(sessionId, submission());
+      h.loop.complete('fake-run-1', [
+        { overall: 0, decision: 'escalate', evidenceSufficient: false },
+      ]);
+      const requests = h.loop.startRequests.length;
+
+      const refused = await startImprove(sessionId, { baseRevisionId: graded.data.id });
+      expect(refused.status).toBe(409);
+      expect((refused.body as unknown as ApiErrorResponse).message).toBe(describeUnassessedBase(1));
+      expect(h.loop.startRequests).toHaveLength(requests);
+      const runs = await call<ListCoachingRunsResponse>(`${h.url}/sessions/${sessionId}/improve`);
+      expect(runs.body.data).toEqual([]);
+    });
+
     it('[DEL-3] every coaching run is listed on its session newest first, whatever became of it', async () => {
       const { sessionId } = await startSession();
       expect(
@@ -1524,7 +1593,7 @@ describe('sessions', () => {
     });
 
     it('[DEL-3] an iteration with no artifact is its own outcome: unscored, never “not better”, never the design’s fault', async () => {
-      const { sessionId } = await startSession();
+      const { prompt, sessionId } = await startSession();
       await startImprove(sessionId, { ...submission(), maxIterations: 2 });
       h.loop.complete('fake-run-1', [
         { overall: 12, decision: 'revise' },
@@ -1535,8 +1604,14 @@ describe('sessions', () => {
         iteration: 2,
         mode: 'revise',
         overall: null,
+        unscored: 'no-artifact',
         decision: 'escalate',
         reason: 'fake',
+        decisionBasis: {
+          factor: null,
+          remediations: 0,
+          criteria: { assessed: prompt.criteria.length, total: prompt.criteria.length },
+        },
         findings: [],
         outcome: 'no-artifact',
         problems: [],

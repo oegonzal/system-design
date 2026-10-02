@@ -8,6 +8,7 @@ import {
   type CriterionResultDto,
   type CriticReport,
   type Decision,
+  type DecisionBasisDto,
   type DegradedSampleDto,
   type DesignSubmission,
   type EvaluationDto,
@@ -20,6 +21,7 @@ import {
   type QualityRunDto,
   type QualityRunStatus,
   type SubmissionLocation,
+  type UnscoredReason,
 } from '@sysdesign/contracts';
 
 /**
@@ -63,8 +65,10 @@ export function toEvaluationDto(
       ...header,
       status,
       overall: null,
+      unscored: null,
       decision: null,
       decisionReason: null,
+      decisionBasis: null,
       dimensions: {},
       findings: [],
       criterionResults: [],
@@ -77,12 +81,21 @@ export function toEvaluationDto(
     };
   }
   const index = locationIndex(submission);
+  const grade = iterationGrade(it);
   return {
     ...header,
     status: 'complete',
-    ...iterationGrade(it),
+    ...grade,
     decisionReason: it.decision.reason,
-    dimensions: { ...it.decision.scores.dimensions },
+    decisionBasis: decisionBasisOf(it),
+    // A grade that earned no score assessed no dimension either: the
+    // controller's numbers there are what an empty ledger prices at.
+    dimensions: Object.fromEntries(
+      Object.entries(it.decision.scores.dimensions).map(([dimension, value]) => [
+        dimension,
+        grade.unscored === null ? value : null,
+      ]),
+    ),
     findings: findingsOf(it, index),
     criterionResults: it.ledger.criteria.map((row) => toCriterionResult(row, it, index)),
     stopReason: endedRun(run, iteration)
@@ -106,17 +119,52 @@ export function iterationStatus(run: QualityRunDto, iteration: number): QualityR
 
 /**
  * The controller's verdict on one recorded iteration, as the studio states
- * it: no artifact, or a ledger with nothing assessed, earns no score — the
- * controller's zero there is not one.
+ * it: no artifact, or a ledger the loop's evidence gate found too thin for a
+ * verdict, earns no score — the controller's number there is not one.
  */
 export function iterationGrade(it: IterationTrace): {
   overall: number | null;
+  unscored: UnscoredReason | null;
   decision: Decision;
 } {
-  const scored = it.artifact !== null && !nothingAssessed(it.decision.scores.dimensions);
+  const unscored = unscoredReason(it);
   return {
-    overall: scored ? it.decision.scores.overall : null,
+    overall: unscored === null ? it.decision.scores.overall : null,
+    unscored,
     decision: it.decision.finalDecision,
+  };
+}
+
+/**
+ * Why an iteration earned no score, read from the engine's own gates — the
+ * facts every controller is handed — never from a threshold of the studio's:
+ * nothing to judge, or too few criteria assessed for the evidence to be
+ * sufficient (a ledger with no dimension assessed at all is the extreme of
+ * that). Null when the grade is a verdict.
+ */
+export function unscoredReason(it: IterationTrace): UnscoredReason | null {
+  if (it.artifact === null || !it.decision.gates.artifactPresent) return 'no-artifact';
+  if (!it.decision.gates.evidenceSufficient || nothingAssessed(it.decision.scores.dimensions)) {
+    return 'unassessed';
+  }
+  return null;
+}
+
+/**
+ * What settled an iteration's decision, as data: the controller step that
+ * decided, how many remediations it selected, how many criteria were
+ * assessed. The reader words it; the controller's sentence stays its trace's.
+ */
+export function decisionBasisOf(it: IterationTrace): DecisionBasisDto {
+  const decided = it.decision.trace.steps.find((step) => step.outcome === 'decided');
+  const { criteria } = it.ledger;
+  return {
+    factor: decided?.factor ?? null,
+    remediations: it.decision.selectedRemediations.length,
+    criteria: {
+      assessed: criteria.filter((row) => row.result !== 'unassessed').length,
+      total: criteria.length,
+    },
   };
 }
 
@@ -228,7 +276,9 @@ function toCriterionResult(
   it: IterationTrace,
   index: ReadonlyMap<string, SubmissionLocation>,
 ): CriterionResultDto {
-  const said = firstSaid(it.evaluators, row.criterionId);
+  // A criterion no lens settled carries no lens's words: a lone sample's
+  // rationale beside "unassessed" reads as a verdict that was then thrown away.
+  const said = row.result === 'unassessed' ? null : firstSaid(it.evaluators, row.criterionId);
   const { locations, mentions } = said
     ? pointed(said.locationRefs, said.rationale, index)
     : { locations: [], mentions: [] };
