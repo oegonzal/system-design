@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { ExperienceProfile } from '@sysdesign/db';
 
+import { notFound } from '../../common/not-found';
 import type { ListExperiencesQueryInput } from './experience-requests';
 
 @Injectable()
@@ -24,7 +25,7 @@ export class ExperiencesService {
   async findOne(id: string): Promise<ExperienceProfile> {
     const experience = await this.em.findOne(ExperienceProfile, id);
     if (!experience) {
-      throw new NotFoundException(`Experience ${id} not found`);
+      throw notFound('experience', `Experience ${id} not found`);
     }
     return experience;
   }

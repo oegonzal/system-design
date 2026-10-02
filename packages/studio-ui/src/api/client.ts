@@ -190,6 +190,19 @@ export const api = {
     );
   },
 
+  /**
+   * Grades a stored revision again in place (202): the same revision, a fresh
+   * run — for one whose grade failed or cannot be read. 409 while a grade is
+   * running or once one stands; poll `getEvaluation` afterwards.
+   */
+  async regradeRevision(revisionId: string): Promise<DesignRevisionDto> {
+    return unwrap(
+      await request<ApiResponse<DesignRevisionDto>>(`/revisions/${revisionId}/evaluation`, {
+        method: 'POST',
+      }),
+    );
+  },
+
   // Grading and the coach ---------------------------------------------------
   /** The model behind the grader; 503 when it is unreachable — callers treat a throw as unavailable. */
   async gradingAvailability(opts: GetOptions = {}): Promise<LlmModelDto> {

@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
@@ -26,6 +25,7 @@ import {
 } from '@sysdesign/contracts';
 import { CoachingRun, createRevision, DesignRevision, DesignSession } from '@sysdesign/db';
 
+import { notFound } from '../../common/not-found';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { recordCoachingStatus } from './coaching-status';
 import { findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
@@ -120,7 +120,7 @@ export class ImproveService {
     maxIterations: number,
   ): Promise<StartImproveDto> {
     const base = await this.em.findOne(DesignRevision, { id: baseRevisionId, session: sessionId });
-    if (!base) throw new NotFoundException(`no revision ${baseRevisionId} in session ${sessionId}`);
+    if (!base) throw notFound('revision', `no revision ${baseRevisionId} in session ${sessionId}`);
     if (base.qualityRunId === null || base.qualityIteration === null) {
       throw new UnprocessableEntityException(
         `revision #${base.revisionNumber} was graded before delegation and has no grade to adopt — submit it again`,
@@ -167,7 +167,7 @@ export class ImproveService {
 
   async list(sessionId: string): Promise<CoachingRunSummaryDto[]> {
     const session = await this.em.findOne(DesignSession, sessionId);
-    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (!session) throw notFound('session', `Session ${sessionId} not found`);
     const runs = await this.em.find(
       CoachingRun,
       { session: sessionId },
@@ -182,9 +182,11 @@ export class ImproveService {
       { runId, session: sessionId },
       { populate: ['baseRevision', 'session.prompt'] },
     );
-    if (!coaching) throw new NotFoundException(`no coaching run ${runId} in session ${sessionId}`);
+    if (!coaching) {
+      throw notFound('coaching-run', `no coaching run ${runId} in session ${sessionId}`);
+    }
     const run = await this.loop.getRun(runId);
-    if (!run) throw new NotFoundException(`Run ${runId} not found`);
+    if (!run) throw notFound('coaching-run', `Run ${runId} not found`);
     // A finished run is recorded as such, so the session reads without asking again.
     recordCoachingStatus(coaching, run.status);
 

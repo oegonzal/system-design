@@ -1,7 +1,6 @@
 import {
   ConflictException,
   Injectable,
-  NotFoundException,
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -31,6 +30,7 @@ import {
   type RevisionRun,
 } from '@sysdesign/db';
 
+import { notFound } from '../../common/not-found';
 import { PromptsService } from '../prompts/prompts.service';
 import { isLoopUnavailable, QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { recordCoachingStatus } from './coaching-status';
@@ -82,7 +82,9 @@ export type LockedWork<T> = (
  * row stores the run's id. The studio checks structure and stores; the loop
  * judges. Every write that starts a run happens under a lock on the session
  * row, so two submits (or a submit and a coach start) on one session are
- * serialised: the second sees the first's run in flight and is refused.
+ * serialised: the second sees the first's run in flight and is refused. A
+ * revision's design never changes; the run its grade points at can, once —
+ * a grade that failed is run again in place rather than as a second copy.
  */
 @Injectable()
 export class SessionsService {
@@ -140,7 +142,7 @@ export class SessionsService {
     const session = await this.em.findOne(DesignSession, id, {
       populate: ['revisions', 'prompt'],
     });
-    if (!session) throw new NotFoundException(`Session ${id} not found`);
+    if (!session) throw notFound('session', `Session ${id} not found`);
     return withLatest(session);
   }
 
@@ -172,10 +174,70 @@ export class SessionsService {
     });
   }
 
+  /**
+   * Grade a stored revision again, in place: the same design, a fresh run,
+   * and the revision pointing at it — no second revision. Only for a revision
+   * with no grade and none coming: its run failed, the grader no longer has
+   * it, or it was stored before grading moved to the loop. A grade that
+   * stands, or is still running, is refused (409). Everything else is a
+   * submit's rule, under the same lock: an open session, nothing else in
+   * flight, a design that still refers only to what exists. The draft is
+   * not touched — nothing was submitted.
+   */
+  async regradeRevision(revisionId: string): Promise<DesignRevision> {
+    const found = await this.em.findOne(DesignRevision, revisionId);
+    if (!found) throw notFound('revision', `Revision ${revisionId} not found`);
+    const sessionId = found.session.id;
+    await this.ensureRubric(sessionId);
+    return this.withSessionLock(sessionId, async (em, session, prompt) => {
+      // Read again under the lock: a re-grade that won the lock first has
+      // already repointed it, and this one must see that run, not the old.
+      const revision = await em.findOne(DesignRevision, revisionId, { refresh: true });
+      if (!revision) throw notFound('revision', `Revision ${revisionId} not found`);
+      this.assertSessionOpen(session, prompt);
+      await this.assertNoGradeToKeep(em, revision);
+      await this.assertNoGradeInFlight(em, session);
+      const submission: DesignSubmission = {
+        graph: revision.graph,
+        brief: revision.brief,
+        narrative: revision.narrative,
+      };
+      this.assertSubmission(submission, prompt.criteria);
+      const started = await this.startGradingRun(prompt, { output: submission }, 1);
+      revision.qualityRunId = started.runId;
+      revision.qualityIteration = 1;
+      revision.evaluationStatus = 'running';
+      revision.overall = null;
+      revision.decision = null;
+      return revision;
+    });
+  }
+
+  /**
+   * A revision may be graded again only when there is no grade to lose: the
+   * loop is asked, since the cache says `running` until someone reads it. A
+   * run it does not have, or a revision that never had one, has none.
+   */
+  private async assertNoGradeToKeep(em: EntityManager, revision: DesignRevision): Promise<void> {
+    if (revision.qualityRunId === null || revision.qualityIteration === null) return;
+    const grade = await this.evaluations.syncRevision(revision, em);
+    if (grade === null || grade.status === 'failed') return;
+    throw new ConflictException(
+      grade.status === 'running'
+        ? describeInFlight({
+            kind: 'grade',
+            runId: revision.qualityRunId,
+            revisionNumber: revision.revisionNumber,
+            state: 'running',
+          })
+        : `Revision #${revision.revisionNumber} is already graded — its grade stands.`,
+    );
+  }
+
   /** The prompt's rubric, derived if it is still empty — outside any lock. */
   async ensureRubric(sessionId: string): Promise<Prompt> {
     const session = await this.em.findOne(DesignSession, sessionId, { populate: ['prompt'] });
-    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (!session) throw notFound('session', `Session ${sessionId} not found`);
     return this.prompts.ensureCriteria(session.prompt);
   }
 
@@ -189,7 +251,7 @@ export class SessionsService {
       const session = await em.findOne(DesignSession, sessionId, {
         lockMode: LockMode.PESSIMISTIC_WRITE,
       });
-      if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+      if (!session) throw notFound('session', `Session ${sessionId} not found`);
       const prompt = await em.findOneOrFail(Prompt, session.prompt.id);
       return work(em, session, prompt);
     });
@@ -233,11 +295,13 @@ export class SessionsService {
    * finished one is recorded, so a session whose runs have ended reads
    * without the grader. A coaching run comes first: it grades as it revises,
    * from a draft or from an adopted grade alike, and only the newest can be
-   * live, since each start was refused while another was. Then the latest
-   * revision's grade — its cache says `running` until someone reads the
-   * evaluation, so a grade that finished unread is not in flight. A run the
-   * loop does not have holds nothing, a coach's or a grade's alike: nothing
-   * can be running it, so it never makes a read fail or a write wait.
+   * live, since each start was refused while another was. Then any
+   * revision's grade the record says is running, newest first — a submit's
+   * is the latest revision's, a re-grade's may be an earlier one's — and its
+   * cache says `running` until someone reads the evaluation, so a grade that
+   * finished unread is not in flight. A run the loop does not have holds
+   * nothing, a coach's or a grade's alike: nothing can be running it, so it
+   * never makes a read fail or a write wait.
    */
   private async inFlight(
     em: EntityManager,
@@ -264,20 +328,24 @@ export class SessionsService {
         };
       }
     }
-    const latest = await em.findOne(
+    const grading = await em.find(
       DesignRevision,
-      { session: session.id },
-      { orderBy: { revisionNumber: 'desc' } },
+      { session: session.id, evaluationStatus: 'running' },
+      // As stored now: a row this context read before the lock may since point at another run.
+      { orderBy: { revisionNumber: 'desc' }, refresh: true },
     );
-    if (latest === null || latest.evaluationStatus !== 'running') return null;
-    if (latest.qualityRunId === null) return null;
-    const state = await this.ask(
-      asker,
-      async () => (await this.evaluations.syncRevision(latest, em))?.status ?? null,
-    );
-    return state === 'running' || state === 'unknown'
-      ? { kind: 'grade', runId: latest.qualityRunId, revisionNumber: latest.revisionNumber, state }
-      : null;
+    for (const revision of grading) {
+      const { qualityRunId: runId, revisionNumber } = revision;
+      if (runId === null) continue;
+      const state = await this.ask(
+        asker,
+        async () => (await this.evaluations.syncRevision(revision, em))?.status ?? null,
+      );
+      if (state === 'running' || state === 'unknown') {
+        return { kind: 'grade', runId, revisionNumber, state };
+      }
+    }
+    return null;
   }
 
   /** The loop's answer — or, for a read, `unknown` when the loop cannot give one. */
@@ -317,14 +385,14 @@ export class SessionsService {
 
   async getDraft(sessionId: string): Promise<SessionDraft | null> {
     const session = await this.em.findOne(DesignSession, sessionId);
-    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (!session) throw notFound('session', `Session ${sessionId} not found`);
     return session.draft;
   }
 
   /** The unsubmitted canvas, shape-checked by the pipe; only an open session keeps one. */
   async saveDraft(sessionId: string, draft: SessionDraft): Promise<void> {
     const session = await this.em.findOne(DesignSession, sessionId);
-    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (!session) throw notFound('session', `Session ${sessionId} not found`);
     if (session.status !== 'in-progress') {
       throw new UnprocessableEntityException(
         `session is ${session.status} — only an in-progress session keeps a draft`,
@@ -371,7 +439,7 @@ export class SessionsService {
     query: ListRevisionsQueryInput,
   ): Promise<[DesignRevision[], number]> {
     const session = await this.em.findOne(DesignSession, sessionId);
-    if (!session) throw new NotFoundException(`Session ${sessionId} not found`);
+    if (!session) throw notFound('session', `Session ${sessionId} not found`);
     return this.em.findAndCount(
       DesignRevision,
       { session: sessionId },

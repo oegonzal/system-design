@@ -145,9 +145,13 @@ the prompt authored.
 ## Re-grading a stored design
 
 A **failed** run (the loop lost the model mid-way, or its heartbeat went stale
-after a restart) shows as failed on the revision; the UI's retry resubmits the
-same design as a new revision with a new run. A **complete** grade is immutable — iterate by
-submitting the next revision.
+after a restart) shows as failed on the revision, and is graded again in
+place: `POST /api/revisions/:id/evaluation` starts a fresh run of the stored
+design and points the same revision at it — no second revision. The same
+call grades a revision whose run the loop no longer has, or one stored before
+grading was delegated. It is refused (409) while a grade is running and once
+one stands: a **complete** grade is immutable — iterate by submitting the
+next revision.
 
 ## The AI coach
 

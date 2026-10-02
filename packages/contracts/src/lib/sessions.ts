@@ -118,7 +118,11 @@ export interface DesignSessionDetailDto extends DesignSessionDto {
   inFlight: SessionInFlightDto | null;
 }
 
-/** Full revision — graph included. Immutable once submitted. */
+/**
+ * Full revision — graph included. The design is immutable once submitted;
+ * the run its grade points at changes only when a grade that failed, or
+ * cannot be read, is run again in place (`POST /revisions/:id/evaluation`).
+ */
 export interface DesignRevisionDto {
   id: Uuid;
   sessionId: Uuid;
@@ -151,6 +155,13 @@ export interface UpdateSessionRequest {
 
 /** `POST /sessions/:id/revisions` — the design as drawn; graded by one quality-loop run. */
 export type SubmitRevisionRequest = DesignSubmission;
+
+/**
+ * `POST /revisions/:id/evaluation` — grade a stored revision again, in place
+ * (202): no body, no new revision; the answer is the revision, pointing at
+ * the fresh run. Refused (409) unless the revision has no grade to keep.
+ */
+export type RegradeRevisionResponse = ApiResponse<DesignRevisionDto>;
 
 export interface ListSessionsQuery {
   promptId?: Uuid;

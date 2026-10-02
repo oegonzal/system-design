@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
@@ -25,6 +24,7 @@ import {
 } from '@sysdesign/contracts';
 import { DesignSession, ExperienceProfile, Prompt, PromptGeneration } from '@sysdesign/db';
 
+import { notFound } from '../../common/not-found';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { renderExperienceGoal } from './experience-goal';
 import type { ListPromptsQueryInput } from './prompt-requests';
@@ -63,7 +63,7 @@ export class PromptsService {
 
   async libraryDocument(id: string): Promise<PromptLibraryDocumentDto> {
     const document = await this.loop.getPrompt(id);
-    if (!document) throw new NotFoundException(`library prompt ${id} not found`);
+    if (!document) throw notFound('library-prompt', `library prompt ${id} not found`);
     return document;
   }
 
@@ -132,7 +132,7 @@ export class PromptsService {
       { runId },
       { populate: ['prompt', 'experience'] },
     );
-    if (!row) throw new NotFoundException(`prompt generation ${runId} not found`);
+    if (!row) throw notFound('prompt-generation', `prompt generation ${runId} not found`);
 
     const run = await this.loop.getRun(runId);
     const answer = (
@@ -263,7 +263,7 @@ export class PromptsService {
 
   private async require(id: string): Promise<Prompt> {
     const prompt = await this.em.findOne(Prompt, id);
-    if (!prompt) throw new NotFoundException(`Prompt ${id} not found`);
+    if (!prompt) throw notFound('prompt', `Prompt ${id} not found`);
     return prompt;
   }
 

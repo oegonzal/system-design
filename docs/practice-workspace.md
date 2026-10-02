@@ -51,10 +51,18 @@ and **see results / iterate**.
   it names, the lens's rationale, and the places it points at, **labelled** —
   `api · service · API`, `c1 ← api`, a narration's criterion — with the same
   labels substituted into the rationale; click one and its nodes and edges
-  highlight on the canvas. While the run is in flight the tab polls; while the
-  loop is unreachable it says so. A revision graded before grading moved to
-  the loop has no evaluation: the tab says so and offers a resubmit instead
-  of asking for one.
+  highlight on the canvas. A lens writes positions the way a person would —
+  `Rationale.3` at the start of a sentence, `edge.1-2` for a run — and every
+  one the revision has is read as its label. While the run is in flight the
+  tab polls; while the loop is unreachable it says so. A grade that **failed**
+  — the model went away, or the loop restarted under it — is graded again
+  **in place**: the same revision, a fresh run, no second copy of the design
+  in the timeline (`POST /revisions/:id/evaluation`, refused while a grade is
+  running or once one stands). A revision stored before grading moved to the
+  loop, or whose run the grader no longer has, has no evaluation; the tab says
+  so and offers the same re-grade. A plain grade shows no "stop reason": one
+  judgement always ends on its one iteration. Only a coach's last revision
+  says why the coach stopped, when it ran out of iterations or of progress.
 - **Coach** — hand your design to the loop with a number of iterations. From
   the draft: it is stored as your revision and graded as the starting point.
   From a graded revision — when the canvas is clean and the loaded revision's
@@ -69,8 +77,12 @@ and **see results / iterate**.
   when the page reloads. Each row is the **starting point**, **imported** (it beat every
   earlier one and landed in the timeline as an **AI** revision), **not
   better**, or **refused** with the problems the studio found — every row
-  with the controller's reason. **Load best** puts the best import on the
-  canvas read-only. Disabled, with the reason, while the loop is unreachable.
+  with the controller's reason. An imported revision keeps your layout: the
+  coach reads the canvas as text and returns no positions, so every block
+  that survived stays where you put it and each block the coach added is
+  placed beside the blocks it connects to, never on top of one. **Load best**
+  puts the best import on the canvas read-only. Disabled, with the reason,
+  while the loop is unreachable.
 - **Revisions** — the version history: one chip per revision, newest first,
   with its score, decision and status, and an **AI** badge on coach-authored
   ones. Click a chip to load that revision onto the canvas read-only: Submit,
@@ -97,9 +109,11 @@ it shows the edge's **kind** (sync or async), a label, and what it **carries**.
   text. There is no vocabulary to learn; the grader reads whatever you wrote,
   and a critic will say when a value contradicts a claim.
 - **Operations** are the component's declared interface — a name, a kind
-  (command, query, event, stream), whether it is idempotent, a note. An edge
-  may **carry** any operation declared on either of its endpoints; the panel
-  offers exactly those.
+  (command, query, event, stream), whether it is idempotent, a note. The
+  graders and the coach read a note whole, up to the 200 characters the panel
+  accepts, so it is the place to state an operation's contract — its retry,
+  its ordering, its acknowledgement. An edge may **carry** any operation
+  declared on either of its endpoints; the panel offers exactly those.
 
 ## Brief vs Narrative
 

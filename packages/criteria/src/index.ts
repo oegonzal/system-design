@@ -108,6 +108,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Canvas edits undo and redo step by step, from the toolbar and the keyboard — a typed field, a drag, a delete with its connections, a Clear each one step — and a revision on screen is read-only in every control: nothing on the canvas, the palette, the properties or the toolbar edits it.',
   },
+  {
+    id: 'UX-17',
+    statement:
+      'A failed grade is re-graded in place: the same revision is pointed at a fresh run of its stored design — never a second revision with the same content — only when it has no grade to keep (its run failed, the grader lost it, or it never had one), under the rules a submit obeys, and the draft is left alone.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

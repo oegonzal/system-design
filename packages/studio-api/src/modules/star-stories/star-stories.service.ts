@@ -1,15 +1,11 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { UniqueConstraintViolationException, type FilterQuery } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { SaveStarStoryRequest } from '@sysdesign/contracts';
 import { ExperienceProfile, Prompt, StarStory } from '@sysdesign/db';
 import { escapeLike } from '@sysdesign/nest-kit';
 
+import { notFound } from '../../common/not-found';
 import type { ListStarStoriesQueryInput } from './star-story-requests';
 
 interface StoryLinks {
@@ -71,7 +67,7 @@ export class StarStoriesService {
   async findOne(id: string): Promise<StarStory> {
     const story = await this.em.findOne(StarStory, id);
     if (!story) {
-      throw new NotFoundException(`Story ${id} not found`);
+      throw notFound('story', `Story ${id} not found`);
     }
     return story;
   }

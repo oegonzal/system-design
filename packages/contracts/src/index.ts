@@ -36,5 +36,6 @@ export * from './lib/submission-locations';
 export * from './lib/node-guide';
 export * from './lib/star-stories';
 export * from './lib/studio-pipelines';
+export * from './lib/studio-resources';
 export * from './lib/quality-loop';
 export * from './lib/govcon';

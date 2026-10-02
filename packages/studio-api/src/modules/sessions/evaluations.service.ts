@@ -1,15 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { EvaluationDto } from '@sysdesign/contracts';
 import { DesignRevision } from '@sysdesign/db';
 
+import { notFound } from '../../common/not-found';
 import { QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { toEvaluationDto } from './evaluation.mapper';
 
 /**
  * A revision's grade, read from the loop. The row caches the terminal
  * scalars on the way through, so lists and timelines answer without the
- * loop; the findings and criterion results are always the loop's, live.
+ * loop; the findings and criterion results are always the loop's, live. A
+ * read that finds nothing says which thing is missing: the `revision` — the
+ * same 404 a read of the revision itself gives — or its `evaluation`.
  */
 @Injectable()
 export class EvaluationsService {
@@ -20,14 +23,22 @@ export class EvaluationsService {
 
   async forRevision(revisionId: string): Promise<EvaluationDto> {
     const revision = await this.em.findOne(DesignRevision, revisionId);
-    if (!revision) throw new NotFoundException(`Revision ${revisionId} not found`);
+    if (!revision) throw notFound('revision', `Revision ${revisionId} not found`);
+    // The revision is there and its grade is not: both ways say `evaluation`,
+    // and both are cured the same way — the revision is graded again in place.
     if (revision.qualityRunId === null || revision.qualityIteration === null) {
-      throw new NotFoundException(
-        `Revision ${revisionId} was stored before grading moved to the quality loop and has no evaluation`,
+      throw notFound(
+        'evaluation',
+        `Revision #${revision.revisionNumber} was stored before grading moved to the quality loop and has no evaluation`,
       );
     }
     const evaluation = await this.syncRevision(revision);
-    if (evaluation === null) throw new NotFoundException(`Run ${revision.qualityRunId} not found`);
+    if (evaluation === null) {
+      throw notFound(
+        'evaluation',
+        `The grader no longer has the run that graded revision #${revision.revisionNumber}`,
+      );
+    }
     return evaluation;
   }
 
@@ -44,7 +55,7 @@ export class EvaluationsService {
     em: EntityManager = this.em,
   ): Promise<EvaluationDto | null> {
     if (revision.qualityRunId === null || revision.qualityIteration === null) {
-      throw new NotFoundException(`Revision ${revision.id} has no evaluation`);
+      throw notFound('evaluation', `Revision #${revision.revisionNumber} has no evaluation`);
     }
     const run = await this.loop.getRun(revision.qualityRunId);
     if (!run) return null;

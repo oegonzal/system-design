@@ -115,7 +115,7 @@ test.describe('the grading feedback', () => {
     ).toBeVisible();
   });
 
-  test('[EVAL-1] a run that fails is reported with its error, and resubmitting grades a fresh revision', async ({
+  test('[EVAL-1] [UX-17] a run that fails is reported with its error, and grading it again re-grades the same revision in place', async ({
     page,
     request,
   }) => {
@@ -133,15 +133,17 @@ test.describe('the grading feedback', () => {
     await canvas.submit();
     await canvas.expectEvaluationFailed(1, 'the model went away');
 
-    // There is no retry endpoint: the way back is the same design as a new revision.
+    // The way back is the same revision, graded again where it stands: a
+    // fresh run of the stored design, and no second copy of it in the timeline.
     await canvas.retryEvaluation();
-    await canvas.expectEvaluationComplete(2);
+    await canvas.expectEvaluationComplete(1);
     await canvas.expectOverall(NAIVE_DESIGN_SCORE);
 
     await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(1)).toContainText('failed');
-    await expect(canvas.revisionChip(2).getByTestId('revision-score')).toHaveText(
+    await expect(canvas.revisionChip(1).getByTestId('revision-score')).toHaveText(
       String(NAIVE_DESIGN_SCORE),
     );
+    await expect(canvas.revisionChip(1)).not.toContainText('failed');
+    await expect(canvas.revisionChip(2)).toHaveCount(0);
   });
 });
