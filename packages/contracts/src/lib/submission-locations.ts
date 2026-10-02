@@ -1,6 +1,6 @@
 import type { DesignSubmission } from './canvas.schema';
 import { nodeLabel } from './node-label';
-import { joinMention, proseSays, refIdsIn, replaceRefs } from './prose-refs';
+import { joinMention, nameClaims, refIdsIn, replaceRefs } from './prose-refs';
 
 /**
  * Every addressable part of a submission, numbered by position — the one
@@ -150,18 +150,23 @@ export const shortLocationLabel = (location: Pick<LocatedRef, 'part' | 'key' | '
  * time the prose reaches it and its short one after that — and its short one
  * from the start when the prose already says the part's name anywhere:
  * "Orders DB (node.5)" reads "Orders DB (n-5)", "the Orders DB at node.5"
- * reads "the Orders DB at n-5", never the name twice. A ref `locations` does
- * not hold is left as written.
+ * reads "the Orders DB at n-5", never the name twice. A saying of a name
+ * stands for one part (`nameClaims`): "the Orders DB" is the Orders DB's, so
+ * parts called "Orders" and "DB" beside it are still introduced in full. A
+ * ref `locations` does not hold is left as written.
  */
 export function substituteLocationRefs(prose: string, locations: readonly LocatedRef[]): string {
   const byRef = new Map(locations.map((location) => [location.ref, location]));
+  const claim = nameClaims(
+    prose,
+    locations.flatMap((location) => location.name ?? []),
+  );
   const introduced = new Set<string>();
   return replaceRefs(prose, [...byRef.keys()], (mention) =>
     joinMention(mention, (ref) => {
       const location = byRef.get(ref);
       if (location === undefined) return ref;
-      const said =
-        introduced.has(ref) || (location.name !== undefined && proseSays(prose, location.name));
+      const said = introduced.has(ref) || (location.name !== undefined && claim(location.name));
       introduced.add(ref);
       return said ? shortLocationLabel(location) : location.label;
     }),

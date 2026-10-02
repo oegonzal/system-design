@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   locationRefPattern,
+  nameClaims,
   refIdsIn,
   refMentions,
   substituteRefs,
@@ -112,5 +113,46 @@ describe('proseSays', () => {
     expect(proseSays('the DB of orders', 'Orders DB')).toBe(false);
     expect(proseSays('node.1 — the Client', 'Orders DB')).toBe(false);
     expect(proseSays('anything', '  ')).toBe(false);
+  });
+});
+
+describe('nameClaims', () => {
+  /** Each name claimed in turn, as a reader asks for each part it meets. */
+  const claimed = (prose: string, names: readonly string[], asked: readonly string[]) => {
+    const claim = nameClaims(prose, names);
+    return asked.map((name) => claim(name));
+  };
+
+  // "Orders DB (node.5) writes to node.7 and node.8" named the Orders DB, and
+  // read as though it had named parts called "DB" and "Orders" too.
+  it('[EVAL-2] gives a name inside a longer one to the longer one: its words are said once, for one name', () => {
+    const names = ['Orders DB', 'DB', 'Orders'];
+    expect(claimed('The Orders DB writes to node.7 and node.8.', names, names)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    // Said on their own as well, the shorter names are said.
+    expect(claimed('Orders reads the DB beside the Orders DB', names, names)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    // The longest saying first, the leftmost of equals: "DB Primary" lost its "DB".
+    expect(
+      claimed('the Orders DB Primary', ['Orders DB', 'DB Primary'], ['DB Primary', 'Orders DB']),
+    ).toEqual([false, true]);
+  });
+
+  it('[EVAL-2] spends one saying per claim, so two parts that share a name share its sayings', () => {
+    expect(claimed('the DB replicates to node.9', ['DB'], ['DB', 'db'])).toEqual([true, false]);
+    expect(claimed('the db replicates to the DB', ['DB'], ['DB', 'db', 'DB'])).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    // A name the reader did not hand in is never said, and neither is one of no words.
+    expect(claimed('the Client polls', ['DB'], ['Client'])).toEqual([false]);
+    expect(claimed('anything', ['  '], ['  '])).toEqual([false]);
   });
 });

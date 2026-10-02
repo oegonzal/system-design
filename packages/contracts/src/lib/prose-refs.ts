@@ -158,21 +158,64 @@ export function substituteRefs(prose: string, glossary: ReadonlyMap<string, stri
 /** The words of a text, folded: letters and digits, split on everything else. */
 const wordsOf = (text: string): string[] => text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 
+/** A name as the words it is made of, folded: what every spelling of one name shares. */
+const nameKey = (name: string): string => wordsOf(name).join(' ');
+
 /**
- * Whether `prose` says `name` anywhere — as whole words in order, in either
- * case, whatever punctuation stands between or around them: "the Orders DB
- * at node.5", "node.5 (the Orders DB)" and "The Orders DB primary (node.5)"
- * all say "Orders DB". How a reader tells that a sentence has already said
- * what a part is, wherever in the sentence it said it. A rule over the words,
- * never over where the ref sits: a name is said once, and the sentence has
- * said it.
+ * How many times `prose` says each of `names` — as whole words in order, in
+ * either case, whatever punctuation stands between or around them — where a
+ * word is said for one name only. The longest saying claims its words first,
+ * the leftmost of equals, and a saying any of whose words are claimed is no
+ * saying: beside a part called "Orders DB", "the Orders DB" says "Orders DB"
+ * once and neither "Orders" nor "DB" at all. Keyed by the folded name.
  */
-export function proseSays(prose: string, name: string): boolean {
-  const said = wordsOf(name);
-  if (said.length === 0) return false;
+function sayings(prose: string, names: readonly string[]): Map<string, number> {
   const words = wordsOf(prose);
-  return words.some((_, index) => said.every((word, offset) => words[index + offset] === word));
+  const spans = [...new Set(names.map(nameKey))]
+    .filter((key) => key !== '')
+    .flatMap((key) => {
+      const said = key.split(' ');
+      return words.flatMap((_, start) =>
+        said.every((word, offset) => words[start + offset] === word)
+          ? [{ key, start, length: said.length }]
+          : [],
+      );
+    })
+    .sort((a, b) => b.length - a.length || a.start - b.start);
+  const claimed = new Array<boolean>(words.length).fill(false);
+  const counts = new Map<string, number>();
+  for (const { key, start, length } of spans) {
+    const at = Array.from({ length }, (_, offset) => start + offset);
+    if (at.some((index) => claimed[index])) continue;
+    for (const index of at) claimed[index] = true;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
 }
+
+/**
+ * How a reader tells that a sentence has already said what a part is, one
+ * saying at a time: each call takes one of the sayings `prose` has of `name`
+ * among `names` — counted as `sayings` counts them, so a name inside a longer
+ * one is the longer one's — and is true while one was left. A saying names
+ * one part, the first to ask: two parts that share a name share its sayings,
+ * and a name `names` does not hold is never said. A rule over the words,
+ * never over where a ref sits: "the Orders DB at node.5", "node.5 (the
+ * Orders DB)" and "The Orders DB primary (node.5)" all say "Orders DB".
+ */
+export function nameClaims(prose: string, names: readonly string[]): (name: string) => boolean {
+  const left = sayings(prose, names);
+  return (name) => {
+    const key = nameKey(name);
+    const count = left.get(key) ?? 0;
+    if (count === 0) return false;
+    left.set(key, count - 1);
+    return true;
+  };
+}
+
+/** Whether `prose` says `name` anywhere, as `nameClaims` reads a sentence with that one name in view. */
+export const proseSays = (prose: string, name: string): boolean => nameClaims(prose, [name])(name);
 
 /** `data_integrity` → `data integrity`: a wire token as the words it is made of, for the middle of a sentence. */
 export const tokenWords = (token: string): string =>

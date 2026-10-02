@@ -94,8 +94,10 @@ describe('submissionLocations', () => {
   });
 
   it('has no overview entry for a blank overview, and only nodes and edges without a brief or narrative', () => {
-    const blank = submission();
-    blank.narrative = { ...blank.narrative!, overview: '   ' };
+    const blank: DesignSubmission = {
+      ...submission(),
+      narrative: { version: 1, overview: '   ', componentRationales: [], criterionNarrations: [] },
+    };
     expect(submissionLocations(blank).map((location) => location.id)).not.toContain('overview');
 
     expect(
@@ -188,6 +190,36 @@ describe('substituteLocationRefs', () => {
     // A part with no name of its own is introduced in full, whatever the sentence says.
     expect(substituteLocationRefs('the c1 binding (binding.1) is wrong', refs)).toBe(
       'the c1 binding (c1 binding (n-5)) is wrong',
+    );
+  });
+
+  // "The Orders DB (node.5) writes to node.7 and node.8." read "… writes to
+  // n-7 and n-8": the Orders DB's name was counted for a "DB" and an "Orders".
+  it('[EVAL-2] counts a name said once for one part, never again for a part whose name is inside it', () => {
+    const nested: LocatedRef[] = [
+      {
+        ref: 'node.5',
+        label: 'n-5 · database · Orders DB',
+        part: 'node',
+        key: 'n-5',
+        name: 'Orders DB',
+      },
+      { ref: 'node.7', label: 'n-7 · database · DB', part: 'node', key: 'n-7', name: 'DB' },
+      { ref: 'node.8', label: 'n-8 · service · Orders', part: 'node', key: 'n-8', name: 'Orders' },
+      { ref: 'node.9', label: 'n-9 · database · DB', part: 'node', key: 'n-9', name: 'DB' },
+    ];
+    expect(
+      substituteLocationRefs('The Orders DB (node.5) writes to node.7 and node.8.', nested),
+    ).toBe('The Orders DB (n-5) writes to n-7 · database · DB and n-8 · service · Orders.');
+    expect(
+      substituteLocationRefs(
+        'Orders (node.8) reads the DB (node.7) beside the Orders DB (node.5)',
+        nested,
+      ),
+    ).toBe('Orders (n-8) reads the DB (n-7) beside the Orders DB (n-5)');
+    // Two parts called "DB": one saying names the one the prose reaches first.
+    expect(substituteLocationRefs('the DB (node.7) replicates to node.9', nested)).toBe(
+      'the DB (n-7) replicates to n-9 · database · DB',
     );
   });
 
