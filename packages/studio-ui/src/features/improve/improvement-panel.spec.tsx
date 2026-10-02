@@ -411,9 +411,14 @@ describe('ImprovementPanel', () => {
     expect(list.hidden).toBe(false);
     const lessons = within(list).getAllByTestId('coach-recall-lesson');
     expect(lessons.map((lesson) => lesson.textContent)).toEqual([
-      'Put a cache in front of the primary database before adding read replicas.Helps with the read path',
-      'Say what the queue absorbs when the downstream service slows down.Helps with failure handling — note: learned on a different prompt',
+      'Put a cache in front of the primary database before adding read replicas.Where it helps: the read path',
+      'Say what the queue absorbs when the downstream service slows down.Where it helps: failure handlingKeep in mind: learned on a different prompt',
     ]);
+    // A lesson with nothing to keep in mind says nothing about it.
+    expect(within(lessons[0]).queryByTestId('coach-recall-caveat')).toBeNull();
+    expect(within(lessons[1]).getByTestId('coach-recall-caveat').textContent).toBe(
+      'Keep in mind: learned on a different prompt',
+    );
   });
 
   it('[QL-32] says plainly when the coach ran without lessons, and nothing when the run never recalled', () => {

@@ -32,6 +32,14 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
 };
 
 /**
+ * What stands before each part of a lesson the curator worded freely. Labels
+ * rather than a sentence built around its words: `serves` and `caveat` are
+ * whatever the curator wrote — a phrase, a clause, a sentence — and read
+ * right after a label however they are phrased.
+ */
+const LESSON_LABEL = { serves: 'Where it helps', caveat: 'Keep in mind' } as const;
+
+/**
  * The list behind the toggle. Its own element rather than a `Stack`, because a
  * layout `display` outranks the browser's `[hidden]` rule: the collapsed list
  * must say `display: none` itself or it never collapses.
@@ -65,7 +73,8 @@ export interface RecalledLessonsProps {
 /**
  * What the coach was handed from earlier runs: how many lessons, and — on
  * request — each one in the curator's words with the part of the prompt it
- * serves. Settled recalls only: while the loop is still recalling, the
+ * serves and, when the lesson was learned somewhere unlike this prompt, what
+ * to keep in mind about it. Settled recalls only: while the loop is still recalling, the
  * panel's progress line says so. Only the coach saw these; the grade did not.
  */
 export function RecalledLessons({ recall }: RecalledLessonsProps) {
@@ -106,9 +115,14 @@ export function RecalledLessons({ recall }: RecalledLessonsProps) {
             <WrappingText as="span" size="sm">
               {lesson.insight}
             </WrappingText>
-            <WrappingText as="span" size="sm" tone="muted">
-              {`Helps with ${lesson.serves}${lesson.caveat ? ` — note: ${lesson.caveat}` : ''}`}
+            <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-serves">
+              {`${LESSON_LABEL.serves}: ${lesson.serves}`}
             </WrappingText>
+            {lesson.caveat ? (
+              <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-caveat">
+                {`${LESSON_LABEL.caveat}: ${lesson.caveat}`}
+              </WrappingText>
+            ) : null}
           </LessonItem>
         ))}
       </LessonList>
