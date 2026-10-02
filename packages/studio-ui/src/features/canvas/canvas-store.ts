@@ -102,8 +102,10 @@ export interface CanvasState extends CanvasContent {
   /**
    * The element the properties panel edits. It follows the `selected` flags
    * React Flow draws by — whatever selects or deselects on the canvas (a
-   * click, a key, a drag, a click on the empty pane) moves it, and `select`
-   * moves the flags with it — so the panel and the canvas never disagree.
+   * click, a modifier-click that adds to the selection, a key, a drag, a
+   * click on the empty pane) moves it, and `select` moves the flags with it
+   * — so the panel and the canvas never disagree. Several elements may be
+   * selected at once; this is the one of them the panel is about.
    */
   selectedId: string | null;
   /** Unsaved-draft flag: set by edits, cleared by setGraph/markClean. */
@@ -163,7 +165,15 @@ export interface CanvasState extends CanvasContent {
   clear(): void;
   undo(): void;
   redo(): void;
+  /** Makes `id` the one element selected, on the canvas as in the panel; null clears the selection. */
   select(id: string | null): void;
+  /**
+   * Makes `id` the element the panel edits when the canvas already has it
+   * selected — a click on one of several — leaving the selection as it is.
+   * Nothing happens for an element the canvas has not selected: a click
+   * that selects reaches the store as React Flow's own `select` change.
+   */
+  inspect(id: string): void;
   setHighlight(highlight: HighlightState): void;
   clearHighlight(): void;
   setReadOnly(readOnly: boolean): void;
@@ -620,6 +630,15 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       select(id) {
         const { nodes, edges } = get();
         set({ selectedId: id, nodes: marked(nodes, id), edges: marked(edges, id) });
+      },
+
+      inspect(id) {
+        const { nodes, edges, selectedId } = get();
+        if (id === selectedId) return;
+        const element =
+          nodes.find((node) => node.id === id) ?? edges.find((edge) => edge.id === id);
+        if (!element?.selected) return;
+        set({ selectedId: id });
       },
 
       setHighlight(highlight) {

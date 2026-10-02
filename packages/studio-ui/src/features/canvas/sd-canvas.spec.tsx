@@ -16,6 +16,12 @@ import { SdCanvas } from './sd-canvas';
 /** The pane as the jsdom shims size it. */
 const PANE = { width: 800, height: 600 };
 
+/**
+ * The key React Flow adds to a selection with, chosen the way it chooses it
+ * — by the user agent — so the spec holds the one key it listens for.
+ */
+const MULTI_SELECTION_KEY = navigator.userAgent.includes('Mac') ? 'Meta' : 'Control';
+
 type FlowStore = ReturnType<typeof useStoreApi>;
 
 /** The canvas as the workspace mounts it — inside the page's React Flow provider — plus a handle on React Flow's own store. */
@@ -142,6 +148,47 @@ describe('SdCanvas', () => {
       (element) => element.selected,
     );
     expect(marked).toEqual([]);
+  });
+
+  it('[UX-2] a modifier-click adds to the selection: the canvas keeps every selected element, and the panel follows the one last clicked', () => {
+    const store = createCanvasStore(makeGraph());
+    const { flow } = mountCanvas(store);
+    const flagged = () =>
+      [...store.getState().nodes, ...store.getState().edges]
+        .filter((element) => element.selected)
+        .map((element) => element.id);
+
+    fireEvent.click(screen.getByTestId('node-n-1'));
+    expect(flagged()).toEqual(['n-1']);
+    expect(store.getState().selectedId).toBe('n-1');
+
+    // The multi-selection key as React Flow hears it — ⌘ on a Mac, Ctrl
+    // elsewhere — held on the window while the next blocks are clicked.
+    fireEvent.keyDown(window, { key: MULTI_SELECTION_KEY });
+    expect(flow().multiSelectionActive).toBe(true);
+    fireEvent.click(screen.getByTestId('node-n-3'));
+    expect(flagged()).toEqual(['n-1', 'n-3']);
+    expect(store.getState().selectedId).toBe('n-3');
+
+    // A modifier-click on a selected block takes it out; the panel moves to what is left.
+    fireEvent.click(screen.getByTestId('node-n-3'));
+    expect(flagged()).toEqual(['n-1']);
+    expect(store.getState().selectedId).toBe('n-1');
+    fireEvent.click(screen.getByTestId('node-n-2'));
+    expect(flagged()).toEqual(['n-1', 'n-2']);
+
+    // The key let go: a plain click on one of the selected blocks moves the
+    // panel to it and leaves the selection whole.
+    fireEvent.keyUp(window, { key: MULTI_SELECTION_KEY });
+    expect(flow().multiSelectionActive).toBe(false);
+    fireEvent.click(screen.getByTestId('node-n-1'));
+    expect(flagged()).toEqual(['n-1', 'n-2']);
+    expect(store.getState().selectedId).toBe('n-1');
+
+    // A plain click on a block outside it is a new, single selection.
+    fireEvent.click(screen.getByTestId('node-n-3'));
+    expect(flagged()).toEqual(['n-3']);
+    expect(store.getState().selectedId).toBe('n-3');
   });
 
   it.each(COLOR_MODES)(

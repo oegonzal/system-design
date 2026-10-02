@@ -95,6 +95,7 @@ export function SdCanvas() {
   const addNode = useCanvasStore((state) => state.addNode);
   const removeElements = useCanvasStore((state) => state.removeElements);
   const select = useCanvasStore((state) => state.select);
+  const inspect = useCanvasStore((state) => state.inspect);
   const clearHighlight = useCanvasStore((state) => state.clearHighlight);
   const attachViewport = useCanvasStore((state) => state.attachViewport);
   const requestFit = useCanvasStore((state) => state.requestFit);
@@ -145,6 +146,20 @@ export function SdCanvas() {
     clearHighlight();
   }, [select, clearHighlight]);
 
+  // Selection is React Flow's: a click, a modifier-click that adds to or
+  // takes from the selection, a key, a drag all reach the store as its own
+  // `select` changes, and `selectedId` follows them. A click handler that
+  // selected would undo a multi-selection the moment it was made; a click
+  // only tells the panel which of the selected elements to edit.
+  const handleNodeClick = useCallback(
+    (_event: unknown, node: SdNodeModel) => inspect(node.id),
+    [inspect],
+  );
+  const handleEdgeClick = useCallback(
+    (_event: unknown, edge: SdEdgeModel) => inspect(edge.id),
+    [inspect],
+  );
+
   // React Flow reports a delete as separate edge and node changes; taking it
   // here makes the whole gesture one store edit, so one undo puts it back.
   const handleBeforeDelete = useCallback<OnBeforeDelete<SdNodeModel, SdEdgeModel>>(
@@ -176,8 +191,8 @@ export function SdCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={(_event, node) => select(node.id)}
-        onEdgeClick={(_event, edge) => select(edge.id)}
+        onNodeClick={handleNodeClick}
+        onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onBeforeDelete={handleBeforeDelete}
         onDrop={handleDrop}

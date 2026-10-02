@@ -583,6 +583,44 @@ describe('canvas-store', () => {
       store.getState().onNodesChange([{ type: 'select', id: 'n-2', selected: false }]);
       expect(store.getState().selectedId).toBe('n-1');
     });
+
+    it('[UX-2] keeps a multi-selection React Flow made, and the panel is about the last element added to it', () => {
+      const store = createCanvasStore(makeGraph());
+
+      store.getState().onNodesChange([{ type: 'select', id: 'n-1', selected: true }]);
+      store.getState().onNodesChange([{ type: 'select', id: 'n-3', selected: true }]);
+      store.getState().onEdgesChange([{ type: 'select', id: 'e-2', selected: true }]);
+
+      expect(selectedFlags(store)).toEqual(['n-1', 'n-3', 'e-2']);
+      expect(store.getState().selectedId).toBe('e-2');
+    });
+
+    it('[UX-2] inspect moves the panel to a selected element without touching the selection, and does nothing for one that is not selected', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().onNodesChange([
+        { type: 'select', id: 'n-1', selected: true },
+        { type: 'select', id: 'n-2', selected: true },
+      ]);
+      expect(store.getState().selectedId).toBe('n-2');
+
+      // A plain click on one of the selected blocks: the panel follows, the selection stays.
+      store.getState().inspect('n-1');
+      expect(store.getState().selectedId).toBe('n-1');
+      expect(selectedFlags(store)).toEqual(['n-1', 'n-2']);
+
+      // A block the canvas has not selected is not the panel's to show.
+      store.getState().inspect('n-3');
+      expect(store.getState().selectedId).toBe('n-1');
+      expect(selectedFlags(store)).toEqual(['n-1', 'n-2']);
+
+      // Nor is a connection — the same rule for every element.
+      store.getState().inspect('e-1');
+      expect(store.getState().selectedId).toBe('n-1');
+      store.getState().onEdgesChange([{ type: 'select', id: 'e-1', selected: true }]);
+      store.getState().inspect('n-2');
+      expect(store.getState().selectedId).toBe('n-2');
+      expect(selectedFlags(store)).toEqual(['n-1', 'n-2', 'e-1']);
+    });
   });
 
   describe('content version', () => {
