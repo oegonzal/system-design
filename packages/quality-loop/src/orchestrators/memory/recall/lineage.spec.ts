@@ -1,7 +1,7 @@
-import type { AdoptedIterationRef } from '@sysdesign/contracts';
+import { linkLabel, type AdoptedIterationRef } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { linkLabel, MAX_LINEAGE_DEPTH, resolveLineage } from './lineage';
+import { MAX_LINEAGE_DEPTH, resolveLineage } from './lineage';
 
 /** A lookup over recorded adoptions, counting the runs it was asked about. */
 const recorded = (adoptions: Record<string, AdoptedIterationRef | null>) => {

@@ -71,6 +71,9 @@ export interface RecallScreenedDto {
   matched: string[];
 }
 
+/** A link of an adopted answer's chain as provenance names it: `run@iteration`. */
+export const linkLabel = (link: AdoptedIterationRef): string => `${link.runId}@${link.iteration}`;
+
 /** Where an offered lesson was learned, by the alias the curator was shown it under. */
 export interface RecallOriginDto {
   ref: string;

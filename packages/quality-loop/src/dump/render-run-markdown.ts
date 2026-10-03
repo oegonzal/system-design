@@ -1,8 +1,12 @@
 /** `run.md`: the human entry point of a dump — what happened, in order, in one screen. */
 import {
+  linkLabel,
   markdownCell,
+  RECALL_EXCLUSION_REASONS,
   type IterationTrace,
   type Overrun,
+  type RecallNoveltyDto,
+  type RecallScreenedDto,
   type RunTrace,
 } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
@@ -102,9 +106,39 @@ function lessonsSection(trace: RunTrace): string[] {
   ];
 }
 
+/** A lesson the screen matched, by where it is stored, and what it matched. */
+const screenedLine = (action: string, item: RecallScreenedDto): string =>
+  `- ${action} \`${item.sourceRunId}\` ${item.ref} (iteration ${item.iteration}) — ${item.reason}: ${item.matched.join(', ')}`;
+
+/**
+ * What a screen did with the search, in one line — the pool, what it set
+ * aside as already known by reason, the twins it collapsed, what it offered,
+ * and the chain it screened against — then each lesson it set aside or ranked
+ * last. Nothing for a recall that screened nothing.
+ */
+function noveltyLines(novelty: RecallNoveltyDto | null): string[] {
+  if (novelty === null) return [];
+  const byReason = RECALL_EXCLUSION_REASONS.flatMap((reason) => {
+    const count = novelty.excluded.filter((item) => item.reason === reason).length;
+    return count === 0 ? [] : [`${reason} ${count}`];
+  });
+  const reasons = byReason.length === 0 ? '' : ` (${byReason.join(' · ')})`;
+  const demoted = novelty.demoted.length === 0 ? '' : ` · demoted ${novelty.demoted.length}`;
+  const screened = [
+    ...novelty.excluded.map((item) => screenedLine('excluded', item)),
+    ...novelty.demoted.map((item) => screenedLine('demoted', item)),
+  ];
+  return [
+    `novelty: pool ${novelty.pool} → excluded ${novelty.excluded.length} as already known${reasons}${demoted} · collapsed ${novelty.collapsed} · offered ${novelty.offered} · chain ${novelty.chain.map(linkLabel).join(' → ')}`,
+    ``,
+    ...(screened.length === 0 ? [] : [...screened, ``]),
+  ];
+}
+
 /**
  * What the run recalled for its producer, and the lessons the producer saw —
- * the curator's words, each with the run it came from. Nothing when the run
+ * the curator's words, each with the run it came from and, when the recall
+ * screened what the producer held, where it was learned. Nothing when the run
  * did not ask to recall.
  */
 function recallSection(record: RunRecord): string[] {
@@ -113,15 +147,19 @@ function recallSection(record: RunRecord): string[] {
   const why =
     recall.reason === null ? '' : ` (${recall.reason}${recall.note ? `: ${recall.note}` : ''})`;
   const from = recall.recallRunId === null ? '' : ` · recall run ${recall.recallRunId}`;
+  const originOf = new Map(
+    (recall.novelty?.origins ?? []).map((origin) => [origin.ref, origin.origin]),
+  );
   return [
     `## Recall`,
     ``,
     `${recall.status}${why} · ${recall.count} lesson(s) handed to the producer${from}`,
     ``,
-    ...recall.lessons.map(
-      (lesson) =>
-        `- [${lesson.ref}] ${lesson.insight} — serves: ${lesson.serves}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (from run ${lesson.sourceRunId})`,
-    ),
+    ...noveltyLines(recall.novelty),
+    ...recall.lessons.map((lesson) => {
+      const origin = originOf.get(lesson.ref);
+      return `- [${lesson.ref}] ${lesson.insight} — serves: ${lesson.serves}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (from run ${lesson.sourceRunId}${origin === undefined ? '' : ` · origin ${origin}`})`;
+    }),
     ...(recall.lessons.length > 0 ? [``] : []),
   ];
 }

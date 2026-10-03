@@ -438,6 +438,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A recall for a producer that revises a judged answer screens out what that producer already holds: the chain the answer descends from is walked through the recorded runs, the search reaches three times wider than it offers, and after fusion a stored lesson is set aside — first match, with what it matched — when its run is in the chain at an iteration no later than the one held, when the evidence it cites was judged in exactly a link of the chain, or when it is of the same pipeline and prompt and every finding it cites is held; twins another run digested from the same evidence of one prompt take one slot; what each reason does is one declared table; every offered lesson carries its origin; a search that found only what is held opens no recall run and is empty as nothing new; the run records the chain, what was held and what became of the pool; and a recall with nothing held searches, composes and records exactly as before.',
   },
+  {
+    id: 'QL-52',
+    statement:
+      "A run's dump says what its recall screened out as already held: run.md's recall section prints the pool, how many were set aside as already known by reason, demoted, collapsed and offered, and the chain it screened against, then each lesson set aside with what it matched and each lesson handed on with its origin; recall.json carries the whole record; and a recall that screened nothing prints as it always did.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

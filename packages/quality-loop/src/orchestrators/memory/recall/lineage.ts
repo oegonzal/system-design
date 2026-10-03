@@ -34,6 +34,3 @@ export async function resolveLineage(
   }
   return chain;
 }
-
-/** A link as provenance names it: `run@iteration`. */
-export const linkLabel = (link: AdoptedIterationRef): string => `${link.runId}@${link.iteration}`;

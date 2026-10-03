@@ -61,7 +61,21 @@ longer read.
 
 ### SEAM-2 · No retry on a schema miss
 
-**Status** open · **Severity** high · **Where** `packages/llm/src/claude-agent-client.ts`, `extractStructured`
+**Status** closed · **Closed by** `8af8916 feat(llm): the seam salvages` · **Where** `packages/llm/src/claude-agent-client.ts`, `parseStructured`; `packages/contracts/src/lib/bounds.ts`, `parseLenient`
+
+**Closed.** A reply is read through the salvage ladder: a string past its
+target is kept whole and recorded as an overrun (prose past three times the
+target is cut at a word boundary with ` […]`), a list past its ceiling is
+trimmed by whole items, an unasked-for key is stripped — none of them a miss.
+Only a structural fault refuses the reply, and the next attempt inside the
+same call is asked again with every fault named in the one wording
+(`describeIssue`) and, when it is at most 60,000 characters, the reply as
+written (`LlmRetryPolicy.feedback`). A turn that ended without a result is
+still read from its transcript. Two lanes stay open for later: the SDK's
+structured-output mode, which would have the provider constrain the reply to
+the schema at the cost of the seam's own salvage record, and its `taskBudget`
+(alpha today) as a per-turn output bound in place of the declared
+`maxTokens`.
 
 **What.** The subscription client asks for one JSON object and validates it
 against the request's schema. Two kinds of excess are repaired — a

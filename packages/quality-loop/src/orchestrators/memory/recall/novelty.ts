@@ -9,19 +9,19 @@
  * and none reads a lesson's text. A recall over the goal alone never comes
  * here.
  */
-import type {
-  AdoptedIterationRef,
-  RecallExclusionReason,
-  RecallNoveltyDto,
-  RecallOrigin,
-  RecallScreenAction,
-  RecallScreenedDto,
+import {
+  linkLabel,
+  type AdoptedIterationRef,
+  type RecallExclusionReason,
+  type RecallNoveltyDto,
+  type RecallOrigin,
+  type RecallScreenAction,
+  type RecallScreenedDto,
 } from '@sysdesign/contracts';
 
 import { alias } from '../../../pipelines/memory-recall/input';
 import type { MemoryHit } from '../ports';
 import type { RecallKnown } from './known';
-import { linkLabel } from './lineage';
 import type { FusedHit } from './query';
 
 /**

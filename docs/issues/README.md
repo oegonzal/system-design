@@ -35,7 +35,7 @@ of re-deriving the problem.
 | Id       | Title                                                                    | Status   | Severity |
 | -------- | ------------------------------------------------------------------------ | -------- | -------- |
 | ENG-1    | Penalty-only dimensions carry weight without information                 | open     | high     |
-| ENG-2    | One lost sample voids a whole lens                                       | open     | high     |
+| ENG-2    | One lost sample voids a whole lens                                       | closed   | —        |
 | ENG-3    | Defect grouping chains through shared refs                               | open     | medium   |
 | ENG-4    | No `evidenceRefs` distinct from `locationRefs`                           | accepted | —        |
 | ENG-5    | Memory reaches the producer only through the goal                        | accepted | —        |
@@ -56,7 +56,7 @@ of re-deriving the problem.
 | MEM-10   | The digest routinely ends `revise` at its iteration cap                  | watch    | —        |
 | MEM-11   | `MemoryStepDto.counts` keys are a convention, not a vocabulary           | open     | low      |
 | SEAM-1   | The no-op client is still wired in                                       | closed   | —        |
-| SEAM-2   | No retry on a schema miss                                                | open     | high     |
+| SEAM-2   | No retry on a schema miss                                                | closed   | —        |
 | SEAM-3   | No temperature, seed or memoisation at the seam                          | open     | medium   |
 | SEAM-4   | The boot sweep interrupts in-flight runs from any process                | closed   | —        |
 | SEAM-5   | The pre-commit review runs no critics on the subscription route          | closed   | —        |

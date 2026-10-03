@@ -493,7 +493,7 @@ tab's failing criteria and findings.
      |                                        no  -> not-better; nothing stored; best unchanged
      |           (an iteration with no score is no-artifact or unassessed, never not-better)
      v
-  stops          accepted · rejected · escalated · plateau · max-iterations
+  stops          accepted · rejected · escalated · plateau · max-iterations · produce-lost
      v
   digest         on the first studio poll that sees it complete, the memory orchestrator
                  (section 4) opens an experience-digest quality run over it
@@ -507,9 +507,32 @@ unedited revision whose grade was unassessed is refused: there is no score to im
 **The recall can be skipped.** No recall run opens when embeddings are disabled, the embedding call
 fails, the store is unavailable, empty or returns no hits, `memory-recall` is not registered, or no
 recall is bound to the runs service, nor for a run that can never call its producer — a budget of
+one. When the base was adopted, the recall is focused on the defects the base iteration's grade
+found.
 
-1. When the base was adopted, the recall is focused on the defects the base
-   iteration's grade found.
+**A coach's recall screens out what its producer already holds.** Adopting copies the base's ledger
+and remediations, and a sibling coach run that adopted the same iteration copied them too, so
+lessons digested from that chain restate what the producer is about to be handed. The recall walks
+the chain — the base, then what the base's run had adopted, and so on, one recorded run read per
+link — searches three times wider than it offers (48 candidates for 16 slots), and sets aside after
+fusion, first match wins:
+
+| Reason            | A stored lesson is set aside when                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `chain-iteration` | its run is in the chain, at an iteration no later than the chain's; a later iteration of a chain run is offered, with origin `chain`     |
+| `sibling-copy`    | the evidence it cites was judged in exactly a link of the chain (`lineage.judged`): its run copied what the producer holds               |
+| `known-evidence`  | it is of the same pipeline — and the same prompt, when its lineage records one — and every finding it cites is a base-ledger finding key |
+
+Lessons another run digested from the same evidence of one prompt collapse into one slot. Each
+reason's action — exclude, or demote to last — is one declared table (`EXCLUSION_POLICY`). The
+curator is shown the producer's first eight remediation notes under "## Already in hand — do not
+restate", with a rule that a candidate only restating one is dropped, and each candidate's origin —
+`chain`, `same-prompt`, `same-pipeline` or `other-pipeline`. A chunk it keeps that only restates a
+held defect is a `restated_defect` finding, priced and never gating, and is withheld once confirmed.
+A search whose every lesson was set aside opens no recall run and is recorded `empty` with
+`nothing-new`. The run's recall records the chain, the counts and every lesson set aside with what
+it matched (`recall.novelty`), and run.md prints them under "## Recall". A run that adopted nothing,
+and the memory orchestrator's recall, screen nothing and compose the query they always did.
 
 **What iteration k's producer is given**, for k of 2 or more, in this order:
 
@@ -539,12 +562,31 @@ items crossed off.
 `improved`, `regressed` — into the live trace after every iteration, not only at the end. None of
 them is fed back to the producer.
 
-**When it stops.** Accept, reject and escalate end the quality run whatever budget is left, and
-escalate includes a producer that returned nothing to judge. Otherwise it stops on a plateau
-(`plateauAfter` 2: two iterations in a row that did not beat the best) or when the budget runs out.
+**When it stops.** Accept, reject and escalate end the quality run whatever budget is left — except
+an iteration whose producer returned nothing to judge. That iteration is still decided and recorded
+(no artifact, so it escalates), and it spends its place in the budget, but the loop then asks again
+in the same mode from the same best, with every fault the schema refused the reply for named under
+its own heading. It takes no crown and counts toward no plateau. The run stops `produce-lost` only
+once it has lost more produce calls than the policy's `loop.lostProduces` (1 on every pipeline) or
+has no iteration left to ask in, and its final decision is then the last one made on an artifact.
+Otherwise it stops on a plateau (`plateauAfter` 2: two iterations in a row that did not beat the
+best) or when the budget runs out.
 The budget counts the base, so the default of 3 allows at most two revisions, and a base that
 neither of them beats ends as `plateau` when the last one is decided revise (an escalate or reject
 on it ends the run as `escalated` or `rejected` instead).
+
+**A size limit never discards a revision.** Every string and list a model writes is one declared
+bound: a target it is asked for and a ceiling the schema accepts. A field written past its target is
+kept whole and recorded — a warning on the `bounds` validator, whose info problems are never
+remediations, and an `overrun` diagnostic, neither of which moves a decision; prose past three times
+its target is cut at a word boundary with ` […]`, and a list past its ceiling is trimmed from its
+end. Only a structural fault — a wrong type, a missing field, an unknown id or enum value, an empty
+required string — refuses the reply, and the next attempt within the same call is told each fault,
+with the reply as written when it is at most 60,000 characters. A turn that ended without a result
+is still read from what it streamed. A lens sample that is lost scores but cannot gate
+(`evidence.lostSample: 'score-only'`): what the lens's other sample saw is priced with the hits it
+really has, and nothing short of the policy's agreement blocks. Every stage is told this rule, and
+the HTTP edge measures a goal in bytes, as the engine does.
 
 **Which iterations become AI revisions.** On every poll the studio walks the iterations in order:
 
@@ -711,13 +753,16 @@ named where there is one.
   whether or not the defect went away. All 7 of 18-01-11's base findings read `resolved`, yet 6 of
   their 7 types recur among iteration 2's 9 findings: contradiction, scale_mismatch,
   topology_defect, unhandled_failure, data_integrity and operability_gap.
-- **One empty producer ends the coach.** No artifact makes the artifact gate escalate, which is
-  terminal, so any budget left is never used. Attempts within one producer call send byte-identical
-  prompts, and a schema miss's reason is not fed back: 18-58-32 and 21-53-19 each made three
-  identical attempts and stopped at iteration 2. Two of 21-53-19's three attempts reported 40,173
-  and 37,449 output tokens, and 22-30-00's successful iteration-3 producer call reported 37,276, all
-  against a declared `maxTokens` of 32,000. The definition's comment says a coached canvas has
-  taken up to 26.0k output tokens.
+- **Closed: one empty producer no longer ends the coach.** It did: no artifact made the artifact
+  gate escalate, which was terminal, and attempts within one producer call sent byte-identical
+  prompts — 18-58-32 and 21-53-19 each made three identical attempts and stopped at iteration 2,
+  their replies lost to a single field 3–19% over its bound. A size overrun is now kept and
+  recorded, a structurally refused reply is asked again with its faults named, and a lost produce
+  spends one iteration (_When it stops_, above). The producer declares 50,000 output tokens, above
+  the 40,173 its longest recorded turn wrote.
+- **A screened recall reads legacy lessons by pipeline alone.** A point stored before lineage was
+  recorded carries none: `known-evidence` compares it by pipeline rather than prompt, and it never
+  collapses as a twin, until `POST /memory/:id/reindex` back-fills its memory run's lineage.
 - **Best is the overall score alone.** A blocked iteration can stay best over a later, lower-scoring
   one that was accepted, and prompt generation claims the best draft without checking its decision.
   `2026-09-30T02-47-07-680-d435e0-quality` claims an unaccepted draft, while the design-prompt
@@ -793,6 +838,7 @@ directions are independent: a recall that gets refused still leaves a target qua
         |   strips the injected section back off first, so memory is never re-digested
         |   reduces the target quality run to lessons over engine facts only
         |   output: the memories that run endorsed
+        |   skips : nothing-to-digest | nothing-new (it judged nothing of its own)
         |   completes with no output: not-accepted | no-rubric | no-artifact | no-memories
         v
   [store]   no pipeline — writes to the vector store
@@ -801,11 +847,14 @@ directions are independent: a recall that gets refused still leaves a target qua
 ```
 
 Its own reasons are `embeddings-disabled`, `store-unavailable`, `store-empty`, `embedding-failed`,
-`not-accepted`, `no-rubric`, `no-artifact`, `no-usable-memory`, `goal-at-budget`,
-`nothing-to-digest`, `no-memories`. The middle three are the engine's `admission` in the
-orchestrator's words: `not-accepted` is a verdict (judged, and short of the bar or a gate);
-`no-rubric` and `no-artifact` mean the child was never judged, and are kept apart so a
-deriver's schema miss is never read as a digest that fell short.
+`query-refused`, `not-accepted`, `no-rubric`, `no-artifact`, `no-usable-memory`, `goal-at-budget`,
+`nothing-to-digest`, `nothing-new`, `no-memories`. `not-accepted`, `no-rubric` and `no-artifact`
+are the engine's `admission` in the orchestrator's words: `not-accepted` is a verdict (judged, and
+short of the bar or a gate); `no-rubric` and `no-artifact` mean the child was never judged, and are
+kept apart so a deriver's schema miss is never read as a digest that fell short. `query-refused` is
+a search whose hits could not be composed into the curator's query, the faults in the note.
+`nothing-new` is a target whose only judged evidence is an iteration it adopted: its ledger is a
+copy the adopted run's digest already read, and the note names that run.
 
 ### A real orchestration run that went all the way through
 
