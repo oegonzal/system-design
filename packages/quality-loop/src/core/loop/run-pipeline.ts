@@ -9,7 +9,8 @@
  * and the loop asks again in the same mode from the best, told what the
  * schema refused. A run that ends on a lost produce — it lost more than its
  * policy allows (`loop.lostProduces`), or had no iteration left to ask in —
- * stops `produce-lost`.
+ * stops `produce-lost`. A produce that was judged and did not beat the best
+ * leaves the best standing, and the next ask is told what its judges found.
  */
 import {
   describeIssue,
@@ -345,6 +346,7 @@ async function produceOrAdopt<T>(
     prior: mode === 'revise' ? (best?.artifact ?? null) : null,
     remediations: best?.remediations ?? [],
     refusals: refusalsOf(previous, best),
+    setbacks: setbacksOf(previous, best),
     memories: loop.input.memories ?? [],
   });
   const { output } = loop.definition.task;
@@ -400,6 +402,34 @@ const refusalsOf = <T>(
   return previous !== best && wasBlocked(previous)
     ? previous.remediations.filter((note) => 'validator' in note.subject)
     : [];
+};
+
+/** An iteration the lenses read: it had an artifact and no validator blocked it. */
+const wasJudged = <T>(entry: IterationTrace<T>): boolean =>
+  entry.artifact !== null && !wasBlocked(entry);
+
+const findingOf = (note: RemediationNote): string | null =>
+  'finding' in note.subject ? note.subject.finding : null;
+
+/**
+ * What the judges confirmed wrong with the attempt just before, when it was
+ * judged and did not become best. The producer revises the best with the
+ * best's remediations, so without these it never hears what its last attempt
+ * got wrong — and, handed the same brief, writes the same thing again. Its
+ * finding notes only, as the policy selected them; a finding the best's
+ * remediations already name (the same key, the identity `deriveLessons`
+ * compares iterations by) is said there once.
+ */
+const setbacksOf = <T>(
+  previous: IterationTrace<T> | null,
+  best: IterationTrace<T> | null,
+): RemediationNote[] => {
+  if (previous === null || previous === best || !wasJudged(previous)) return [];
+  const held = new Set((best?.remediations ?? []).flatMap((note) => findingOf(note) ?? []));
+  return previous.remediations.filter((note) => {
+    const finding = findingOf(note);
+    return finding !== null && !held.has(finding);
+  });
 };
 
 const notApplicableDetail = (artifact: unknown, blocked: boolean): string =>

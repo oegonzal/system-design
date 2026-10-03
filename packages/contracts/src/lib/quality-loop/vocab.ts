@@ -131,9 +131,13 @@ export type UpstreamEvidence = (typeof UPSTREAM_EVIDENCE)[number];
  * alone. `criteria`: the rubric the run is judged against. `memories`:
  * advisory lessons the run was handed before it started — shown to the
  * producer under their own heading, never to the deriver, a critic or an
- * evaluator, so they can inform an artifact and never a grade.
+ * evaluator, so they can inform an artifact and never a grade. `setbacks`:
+ * when the attempt just before was judged and did not beat the best, the
+ * defects its judges confirmed — the producer revises the best with the
+ * best's remediations, so nothing else would tell it what its last attempt
+ * got wrong, and it would write the same thing again.
  */
-export const PRODUCER_BRIEFING = ['criteria', 'memories'] as const;
+export const PRODUCER_BRIEFING = ['criteria', 'memories', 'setbacks'] as const;
 export type ProducerBriefing = (typeof PRODUCER_BRIEFING)[number];
 
 /** `block` stops the iteration before any model call; `warn` only informs. */

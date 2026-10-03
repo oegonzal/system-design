@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 import { criterionLengthBound, type RunProgress } from '../contracts';
 import { composeController } from '../controllers';
-import { describePipeline } from '../pipeline';
+import { describePipeline, type PipelineDefinition } from '../pipeline';
 import type { Critic, Evaluator, Producer, ProducerInput, UpstreamEvidenceBundle } from '../ports';
 import { createBoundsValidator, createSchemaValidator } from '../stages/schema-validator';
 import {
@@ -25,6 +25,7 @@ import {
   scriptedEvaluator,
   scriptedProducer,
   scriptedStages,
+  sequencedLlm,
   tinyPipeline,
   tinyPolicy,
   type TinyOutput,
@@ -749,6 +750,136 @@ describe('runPipeline', () => {
     expect(exchanges.every((exchange) => exchange.outcome === 'ok')).toBe(true);
     expect(trace.iterations[0].ledger.criteria.map((c) => c.result)).toEqual(['pass', 'pass']);
     expect(trace.finalDecision).toBe('accept');
+  });
+});
+
+describe('an attempt judged and not better than the best', () => {
+  const DRAFT_3: TinyOutput = { text: 'third', parts: ['a', 'b'] };
+  const SETBACKS =
+    '# Your last attempt was judged and did not beat the best — its defects; do not repeat them';
+
+  /** Three iterations the fake model answers in order: a best, an attempt that falls short of it, an accept. */
+  const run = async (consumes: PipelineDefinition<TinyOutput>['producer']['consumes']) => {
+    const exchanges: LlmExchange[] = [];
+    const llm = sequencedLlm(
+      DRAFT_1,
+      DRAFT_2,
+      DRAFT_3,
+      { findings: [finding({ rationale: 'the text is thin' })] },
+      {
+        findings: [
+          finding({ rationale: 'the text is still thin' }),
+          finding({
+            type: 'wrong',
+            severity: 'high',
+            locationRefs: ['part.2'],
+            rationale: 'the second part contradicts the text',
+          }),
+        ],
+      },
+      { findings: [] },
+      {
+        results: [result({ criterionId: 'c1' }), result({ criterionId: 'c2', result: 'partial' })],
+        advisoryVerdict: null,
+      },
+      {
+        results: [result({ criterionId: 'c1' }), result({ criterionId: 'c2', result: 'partial' })],
+        advisoryVerdict: null,
+      },
+      {
+        results: [result({ criterionId: 'c1' }), result({ criterionId: 'c2' })],
+        advisoryVerdict: null,
+      },
+    );
+    const definition = tinyPipeline({ producer: { ...tinyPipeline().producer, consumes } });
+    const trace = await runPipeline(
+      definition,
+      { goal: 'g', criteria: [criterion('c1'), criterion('c2', 'nice')], maxIterations: 3 },
+      { llm, sink: (exchange) => exchanges.push(exchange), now: clock },
+    );
+    const prompts = exchanges
+      .filter((exchange) => exchange.scope === 'producer')
+      .map((exchange) => exchange.user);
+    return { trace, prompts };
+  };
+
+  it("[QL-56] briefs the next produce with what its judges confirmed, and the best's own findings are named once", async () => {
+    const { trace, prompts } = await run(['criteria', 'setbacks']);
+
+    expect(
+      trace.iterations.map((iteration) => [iteration.mode, iteration.decision.finalDecision]),
+    ).toEqual([
+      ['initial', 'revise'],
+      ['revise', 'revise'],
+      ['revise', 'accept'],
+    ]);
+    // Iteration 2 was judged, fell short and left iteration 1 the best.
+    expect(trace.iterations[1].decision.scores.overall).toBeLessThan(
+      trace.iterations[0].decision.scores.overall,
+    );
+    expect(trace.iterations[1].ledger.findings.map((found) => found.key)).toEqual([
+      'wrong|part.2',
+      'gap|text',
+    ]);
+    expect(prompts).toHaveLength(3);
+    // The second ask revised the best it had just made: nothing fell short yet.
+    expect(prompts[1]).not.toContain(SETBACKS);
+
+    // The third ask revises iteration 1 with iteration 1's remediations — and
+    // hears what iteration 2's judges found, less what those already name.
+    const third = prompts[2];
+    expect(third).toContain('[text] first');
+    const setbacks = third.slice(third.indexOf(SETBACKS));
+    expect(third.indexOf(SETBACKS)).toBeGreaterThan(third.indexOf('# Remediations to apply'));
+    expect(setbacks).toContain('- [high] the second part contradicts the text\n');
+    // The finding iteration 1 already carries is said once, in its own words.
+    expect(third.match(/the text is thin/g)).toHaveLength(1);
+    expect(third).not.toContain('the text is still thin');
+  });
+
+  it('[QL-56] an ask after the best itself, or after an attempt refused before any judge read it, hears of no setback', async () => {
+    const inputs: ProducerInput<TinyOutput>[] = [];
+    const scripted = scriptedProducer(
+      [DRAFT_1, null, { text: 2 } as never, DRAFT_2],
+      [{ code: 'invalid_type', path: 'parts', at: ['parts'], message: 'not a list', soft: false }],
+    );
+    const trace = await runLoop(
+      scriptedStages({
+        producer: {
+          produce: (input) => {
+            inputs.push(input);
+            return scripted.produce(input);
+          },
+        },
+        critics: [scriptedCritic('critic.tiny', [[[finding()]]])],
+      }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 4 },
+      clock,
+    );
+    expect(trace.iterations.map((iteration) => iteration.decision.finalDecision)).toEqual([
+      'revise',
+      'escalate',
+      'retry',
+      expect.any(String),
+    ]);
+    expect(inputs.map((input) => input.setbacks)).toEqual([[], [], [], []]);
+    // The two refused attempts were named — as refusals, not as setbacks.
+    expect(inputs[2].refusals).toEqual([expect.objectContaining({ subject: { schema: 'parts' } })]);
+    expect(inputs[3].refusals).toEqual([
+      expect.objectContaining({ subject: { validator: 'schema' } }),
+    ]);
+  });
+
+  it('[QL-56] a producer that does not consume setbacks is briefed exactly as before', async () => {
+    const { trace, prompts } = await run(['criteria']);
+    expect(trace.iterations.map((iteration) => iteration.decision.finalDecision)).toEqual([
+      'revise',
+      'revise',
+      'accept',
+    ]);
+    expect(prompts[2]).not.toContain(SETBACKS);
+    expect(prompts[2]).not.toContain('contradicts');
   });
 });
 

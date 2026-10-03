@@ -2,9 +2,10 @@
  * The generator. It sees the goal, the criteria, any advisory memories the run
  * was handed, and — on a revise or retry — the remediations the policy
  * selected, in the lenses' own words, and why its last attempt was refused,
- * when it was: by a validator, or by the schema before anything was judged.
- * It never sees a score: the producer improves against reasons, not against
- * a number.
+ * when it was: by a validator, or by the schema before anything was judged;
+ * or, when its last attempt was judged and did not beat the best, what the
+ * judges found wrong with it. It never sees a score: the producer improves
+ * against reasons, not against a number.
  */
 import type { RemediationNote } from '@sysdesign/contracts';
 import { asDetailed, type LlmClient } from '@sysdesign/llm';
@@ -31,6 +32,12 @@ const REFUSALS_HEADINGS = {
 const refusedBy = (note: RemediationNote): keyof typeof REFUSALS_HEADINGS =>
   'schema' in note.subject ? 'reply' : 'revision';
 
+const SETBACKS_HEADING =
+  'Your last attempt was judged and did not beat the best — its defects; do not repeat them';
+
+/** A setback's refs point into an artifact this prompt does not show, so its notes go without them. */
+const unlocated = (note: RemediationNote): RemediationNote => ({ ...note, targetRefs: [] });
+
 const INSTRUCTIONS = {
   initial: 'Produce the artifact for this goal, addressing every success criterion.',
   revise:
@@ -42,12 +49,13 @@ const INSTRUCTIONS = {
  * What the producer is briefed with: the goal, the criteria if it consumes
  * them, the run's advisory memories if it consumes those and was handed any,
  * on a revise its previous artifact and what to fix, on a retry what to
- * avoid, and the instruction for the mode.
+ * avoid, the defects of a last attempt that did not beat the best if it
+ * consumes those, and the instruction for the mode.
  */
 function briefing<T>(
   task: TaskSpec<T>,
   spec: ProducerSpec,
-  { contract, mode, prior, remediations, refusals, memories }: ProducerInput<T>,
+  { contract, mode, prior, remediations, refusals, setbacks, memories }: ProducerInput<T>,
 ): { sections: string[]; clipped: boolean } {
   const goal = goalSection(contract.goal);
   const sections = [goal.text];
@@ -62,6 +70,9 @@ function briefing<T>(
     );
   } else if (mode === 'retry') {
     sections.push(remediationsSection('Pitfalls of the discarded attempt', remediations));
+  }
+  if (spec.consumes.includes('setbacks') && setbacks.length > 0) {
+    sections.push(remediationsSection(SETBACKS_HEADING, setbacks.map(unlocated)));
   }
   for (const [kind, heading] of Object.entries(REFUSALS_HEADINGS)) {
     const notes = refusals.filter((note) => refusedBy(note) === kind);

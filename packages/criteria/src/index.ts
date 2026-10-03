@@ -443,6 +443,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run's dump says what its recall screened out as already held: run.md's recall section prints the pool, how many were set aside as already known by reason, demoted, collapsed and offered, and the chain it screened against, then each lesson set aside with what it matched and each lesson handed on with its origin; recall.json carries the whole record; and a recall that screened nothing prints as it always did.",
   },
+  {
+    id: 'QL-56',
+    statement:
+      "A produce after an attempt that was judged and did not beat the best is told what that attempt's judges confirmed: its finding notes as its policy selected them, less any the best's remediations already name, under their own heading after what to fix in the best and without that attempt's locations, which no prompt shows — for a producer that declares it consumes `setbacks`; a producer that does not, an ask after the best itself and an ask after an attempt refused before any judge read it are briefed as before.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

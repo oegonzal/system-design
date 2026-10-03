@@ -60,6 +60,16 @@ export interface ProducerInput<T> {
    * best iteration's and cannot say either.
    */
   refusals: RemediationNote[];
+  /**
+   * What the judges confirmed wrong with the latest attempt, when it was
+   * judged and did not become best — its own finding notes, less any the
+   * best's remediations already name. Their refs point into that attempt's
+   * artifact, which no prompt shows. Empty when the latest attempt is the
+   * best, was refused before any judge read it, or there was none; a
+   * producer is briefed with them only when it declares it consumes
+   * `setbacks`.
+   */
+  setbacks: RemediationNote[];
   /** The run's advisory memories, the same on every call; empty when it was handed none. */
   memories: readonly AdvisoryMemory[];
 }

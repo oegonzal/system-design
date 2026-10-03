@@ -27,6 +27,7 @@ describe('createLlmProducer', () => {
         },
       ],
       refusals: [],
+      setbacks: [],
       memories: [],
     });
     expect(produced.output).toEqual({ text: 'new', parts: [] });
@@ -44,6 +45,7 @@ describe('createLlmProducer', () => {
       prior: null,
       remediations: [],
       refusals: [],
+      setbacks: [],
       memories: [],
     };
     await createLlmProducer(definition.task, { ...definition.producer, consumes: [] }, llm).produce(
@@ -65,6 +67,7 @@ describe('createLlmProducer', () => {
       prior,
       remediations: [],
       refusals: [],
+      setbacks: [],
       memories,
     };
     const consuming = { ...definition.producer, consumes: ['criteria', 'memories'] as const };
@@ -95,6 +98,7 @@ describe('createLlmProducer', () => {
       prior: null,
       remediations: [],
       refusals: [],
+      setbacks: [],
       memories: [],
     });
     expect(produced).toEqual({
@@ -117,6 +121,7 @@ describe('createLlmProducer', () => {
       prior: null,
       remediations: [],
       refusals: [],
+      setbacks: [],
       memories: [],
     });
     expect(produced.output).toBeNull();
@@ -156,6 +161,7 @@ describe('createLlmProducer', () => {
           note: 'cites c9, which the goal never listed',
         },
       ],
+      setbacks: [],
       memories: [],
     });
     const { user } = calls[0];
@@ -171,5 +177,63 @@ describe('createLlmProducer', () => {
       '- [critical] parts[0]: Invalid input: expected string, received number',
     );
     expect(user.slice(revision)).toContain('- [critical] cites c9, which the goal never listed');
+  });
+
+  it("[QL-56] is told what its last attempt was found wrong with under its own heading, without that attempt's refs, only when it consumes setbacks", async () => {
+    const calls: LlmCall[] = [];
+    const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
+    const input = {
+      contract,
+      mode: 'revise' as const,
+      prior,
+      remediations: [
+        {
+          subject: { finding: 'gap|text' },
+          action: 'revise' as const,
+          severity: 'medium' as const,
+          targetRefs: ['text'],
+          note: 'say more',
+        },
+      ],
+      refusals: [],
+      setbacks: [
+        {
+          subject: { finding: 'wrong|part.2' },
+          action: 'revise' as const,
+          severity: 'high' as const,
+          targetRefs: ['part.2'],
+          note: 'the second part contradicts the text',
+        },
+      ],
+      memories: [],
+    };
+    const heading =
+      '# Your last attempt was judged and did not beat the best — its defects; do not repeat them';
+
+    await createLlmProducer(definition.task, definition.producer, llm).produce(input);
+    expect(calls[0].user).not.toContain(heading);
+    expect(calls[0].user).not.toContain('contradicts');
+
+    await createLlmProducer(
+      definition.task,
+      { ...definition.producer, consumes: ['criteria', 'setbacks'] },
+      llm,
+    ).produce(input);
+    const { user } = calls[1];
+    const at = user.indexOf(heading);
+    // After what to fix in the best, before the instruction; the attempt's
+    // refs point into an artifact the prompt does not show, so none is given.
+    expect(at).toBeGreaterThan(user.indexOf('# Remediations to apply'));
+    expect(user.indexOf('# Instructions')).toBeGreaterThan(at);
+    expect(user.slice(at)).toContain('- [high] the second part contradicts the text\n');
+    expect(user).not.toContain('part.2');
+    expect(user).toContain('- [medium] say more (at: text)');
+
+    await createLlmProducer(
+      definition.task,
+      { ...definition.producer, consumes: ['criteria', 'setbacks'] },
+      llm,
+    ).produce({ ...input, setbacks: [] });
+    expect(calls[2].user).not.toContain(heading);
   });
 });
