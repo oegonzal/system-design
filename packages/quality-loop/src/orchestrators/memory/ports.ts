@@ -14,6 +14,8 @@ import type {
 } from '@sysdesign/contracts';
 
 import type { ChunkKind, ChunkSource } from '../../pipelines/memory-recall/input';
+
+export type { ChunkKind };
 import type { CachedEmbeddings } from './embeddings';
 
 /**

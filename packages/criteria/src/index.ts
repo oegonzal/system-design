@@ -659,6 +659,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A finished run is digested into typed knowledge written against what the store already holds: an item is a fact, an anti-pattern, a pattern or a procedure; its dimension is one its own cited evidence lands on under the source pipeline's policy; a procedure rests on a finding the engine recorded as resolved and a pattern on a criterion that held throughout; an item that borrows a listed alias, an iteration or a place of this run's artifact is faulted at that item before any lens reads it; and an item that teaches what a known item teaches confirms it by alias instead of being written again.",
   },
+  {
+    id: 'QL-43',
+    statement:
+      "The knowledge orchestrator learns from a finished run: it asks the store what it already knows using the run's own evidence as the query and no model call, digests the run against what came back, and stores the result — never reading the run's own points as known, never re-digesting memory a run was handed, and never letting a store it cannot search stop it learning.",
+  },
+  {
+    id: 'QL-44',
+    statement:
+      'An item whose evidence supports one already stored reinforces it instead of being stored again: the claim is a row keyed by (point, source run) pinned to the text it was made about, the count a search reads is derived from those rows, and digesting one run twice leaves the points, the rows and the counts as they were.',
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

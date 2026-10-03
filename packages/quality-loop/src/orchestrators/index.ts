@@ -6,6 +6,7 @@
 import { CALIBRATION } from './calibration/definition';
 import { DOCUMENT_MEMORY } from './document-memory/definition';
 import { FORM_MEMORY } from './form-memory/definition';
+import { KNOWLEDGE } from './knowledge/definition';
 import type { OrchestratorDefinition } from './runner/definition';
 import { MEMORY } from './memory/definition';
 import { ROUTER } from './router/definition';
@@ -20,6 +21,7 @@ const declared: Erased[] = [
   ROUTER as unknown as Erased,
   FORM_MEMORY as unknown as Erased,
   DOCUMENT_MEMORY as unknown as Erased,
+  KNOWLEDGE as unknown as Erased,
 ];
 
 export const ORCHESTRATORS: ReadonlyMap<string, Erased> = new Map(
