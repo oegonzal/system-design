@@ -34,6 +34,19 @@ const FORM = `<!doctype html><html><head><title>Apply — step 2</title>
 
 const NEXT_PAGE = `<!doctype html><html><head><title>Review</title></head><body><button type="button">Submit</button></body></html>`;
 
+/**
+ * The two shapes an ARIA combobox comes in, both met in live runs. The first
+ * is a search box: a textarea the author gave the combobox role, typed into
+ * like any search field. The second is a dropdown built on a div, which pops
+ * its list and is never typed into. The role is identical on both.
+ */
+const COMBOBOXES = `<!doctype html><html><head><title>Search</title></head><body>
+  <textarea role="combobox" aria-label="Search the web" aria-controls="suggestions" required></textarea>
+  <div id="suggestions"></div>
+  <div role="combobox" aria-label="Country" aria-controls="countries" tabindex="0">United States</div>
+  <ul id="countries"><li role="option">United States</li><li role="option">Canada</li></ul>
+</body></html>`;
+
 const byName = (observation: PageObservation, role: string, name: string): ObservedElement => {
   const element = observation.elements.find((e) => e.role === role && e.name === name);
   if (element === undefined) throw new Error(`no ${role} "${name}" observed`);
@@ -176,5 +189,32 @@ describe('the Playwright browser', () => {
     } finally {
       await quick.close();
     }
+  });
+
+  it('[BRW-2] reads what an element affords from the control beneath it, so a textarea given the combobox role is typed into and a div given it is chosen from', async () => {
+    await browser.page.setContent(COMBOBOXES);
+    const observation = await browser.observe();
+
+    // The live defect this pins: decided from the role name alone, the search
+    // box came out `selectable`, the `limits` validator refused `fill` on it
+    // as "cannot be typed into", and every plan the brain wrote was escalated
+    // until the session hit its failure rail with the search never run.
+    const search = byName(observation, 'combobox', 'Search the web');
+    expect(search).toMatchObject({ kind: 'fillable', inputType: 'textarea', options: null });
+
+    // Same role, no control to type into, and a list to choose from.
+    const country = byName(observation, 'combobox', 'Country');
+    expect(country).toMatchObject({ kind: 'selectable', inputType: null });
+    expect(country.options).toEqual(['United States', 'Canada']);
+
+    // Both are still offered: the pre-filter reads the role, which is non-static either way.
+    await browser.act({
+      kind: 'fill',
+      ref: search.ref,
+      value: 'playwright aria snapshot',
+      reason: 'spec',
+      expect: null,
+    });
+    expect(await browser.readValue(search.ref)).toBe('playwright aria snapshot');
   });
 });

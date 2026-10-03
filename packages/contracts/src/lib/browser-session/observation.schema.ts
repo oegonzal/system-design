@@ -53,7 +53,13 @@ export const pageObservationSchema = z.strictObject({
   url: bounded.id(URL_MAX_LENGTH),
   title: bounded.text(TITLE_BOUND),
   elements: bounded.list(ELEMENTS_BOUND, observedElementSchema),
-  /** Interactive elements the adapter saw but did not list, past the cap. */
+  /**
+   * Interactive elements the adapter saw but did not list: past the cap, or
+   * not readable inside the observation's budget. An element whose DOM facts
+   * did not arrive is counted here rather than listed, because the adapter
+   * cannot say it is enabled, visible or untrapped — and a plan may act only
+   * on what the observation listed.
+   */
   omittedElements: z.number().int().min(0),
   /** The accessibility snapshot as text, clipped to its budget. */
   ariaSnapshot: bounded.text(SNAPSHOT_BOUND),

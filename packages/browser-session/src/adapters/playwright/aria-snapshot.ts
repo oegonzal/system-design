@@ -63,6 +63,49 @@ export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
  * Playwright minted refs for; then none. A reduced snapshot opens with a line
  * naming its rung and what it dropped, so the dump and the model both know.
  */
+/**
+ * Whether a snapshot carries any ref at all. A settled page has at least one,
+ * because Playwright mints a ref for all but the plainest node; a read taken
+ * while the document is being replaced carries none — which is not the same
+ * thing as a page with nothing on it.
+ */
+export const hasRef = (snapshot: string): boolean => /\[ref=/.test(snapshot);
+
+/** How many times a ref-less read is taken again before the page is reported as it stands. */
+export const EMPTY_SNAPSHOT_READS = 4;
+
+/**
+ * The first read that carries a ref, or the last read that came back at all.
+ *
+ * Measured live on 2026-10-03: reading the page in the moment a `press Enter`
+ * was navigating returned a 450-line snapshot carrying no refs, and the
+ * session told the brain that a full search-results page had no interactive
+ * elements. The brain could only guess, was faulted for guessing, and the
+ * session died at its failure rail three steps on. A read is retried rather
+ * than believed, because the page not being readable yet is a fact about the
+ * moment, not about the page.
+ *
+ * `read` returns null when the document could not be read at all — mid-
+ * navigation there is no body to match — and `between` is awaited before each
+ * further read. The reader owns waiting for the load state; this owns only
+ * how many times a ref-less answer is taken for an answer.
+ */
+export async function settledSnapshot(
+  read: () => Promise<string | null>,
+  between: () => Promise<void>,
+  reads: number = EMPTY_SNAPSHOT_READS,
+): Promise<string> {
+  const limit = Math.max(1, reads);
+  let last = '';
+  for (let taken = 1; taken <= limit; taken += 1) {
+    const text = await read();
+    if (text !== null && hasRef(text)) return text;
+    if (text !== null) last = text;
+    if (taken < limit) await between();
+  }
+  return last;
+}
+
 export const SNAPSHOT_RUNGS = ['full', 'nodes-only', 'refs-only', 'none'] as const;
 export type SnapshotRung = (typeof SNAPSHOT_RUNGS)[number];
 

@@ -1,4 +1,10 @@
-import { decodeAriaSnapshot, fitSnapshot } from './aria-snapshot';
+import {
+  EMPTY_SNAPSHOT_READS,
+  decodeAriaSnapshot,
+  fitSnapshot,
+  hasRef,
+  settledSnapshot,
+} from './aria-snapshot';
 
 const SNAPSHOT = `- banner [ref=e1]:
   - link "Home" [ref=e2]:
@@ -79,5 +85,61 @@ describe('the aria snapshot decoder', () => {
     for (const fitted of [nodes, refs, none]) {
       expect(bytes(fitted.text)).toBeLessThanOrEqual(bytes(SNAPSHOT) - 1);
     }
+  });
+});
+
+describe('reading a page that has not settled', () => {
+  it('[BRW-2] takes a ref-less read again rather than reporting a page with nothing on it, and stops at the declared bound', async () => {
+    const nothing = '- generic:\n  - generic';
+    const settled = '- generic [ref=e1]:\n  - link "Next" [ref=e2]';
+    expect(hasRef(nothing)).toBe(false);
+    expect(hasRef(settled)).toBe(true);
+
+    // The live shape: the document is mid-navigation for the first two reads —
+    // once unreadable altogether, once readable but ref-less — and settles on
+    // the third. The page is reported as it is, not as it was for an instant.
+    const reads: (string | null)[] = [null, nothing, settled];
+    let taken = 0;
+    let paused = 0;
+    const text = await settledSnapshot(
+      () => {
+        const index = taken;
+        taken += 1;
+        // Indexed without `??` on the read itself: a deliberate null read is an
+        // unreadable document, not a missing fixture entry.
+        return Promise.resolve(index < reads.length ? (reads[index] ?? null) : settled);
+      },
+      () => {
+        paused += 1;
+        return Promise.resolve();
+      },
+    );
+    expect(text).toBe(settled);
+    expect(taken).toBe(3);
+    // One pause between reads, never after the read that settled.
+    expect(paused).toBe(2);
+
+    // A page that really has nothing interactive on it is reported, not retried
+    // forever: the last answer that came back is the answer.
+    let forever = 0;
+    expect(
+      await settledSnapshot(
+        () => {
+          forever += 1;
+          return Promise.resolve(nothing);
+        },
+        () => Promise.resolve(),
+      ),
+    ).toBe(nothing);
+    expect(forever).toBe(EMPTY_SNAPSHOT_READS);
+
+    // A document that never becomes readable yields the empty page, not a throw.
+    expect(
+      await settledSnapshot(
+        () => Promise.resolve(null),
+        () => Promise.resolve(),
+        2,
+      ),
+    ).toBe('');
   });
 });

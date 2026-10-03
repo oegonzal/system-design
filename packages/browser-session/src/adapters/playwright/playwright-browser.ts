@@ -4,6 +4,7 @@ import {
   actionRefs,
   ELEMENT_NAME_BOUND,
   ELEMENT_VALUE_BOUND,
+  elementKind,
   elementKindOf,
   ELEMENTS_BOUND,
   OPTIONS_BOUND,
@@ -19,8 +20,18 @@ import { chromium, type BrowserContext, type Locator, type Page } from 'playwrig
 
 import { ActionFailed, type BrowserAction, type BrowserPort } from '../../core/ports';
 import { clip } from '../../core/text';
-import { decodeAriaSnapshot, fitSnapshot, type SnapshotNode } from './aria-snapshot';
-import { hiddenTraitsOf, readElementFacts, type ElementFacts } from './element-facts';
+import {
+  decodeAriaSnapshot,
+  fitSnapshot,
+  settledSnapshot,
+  type SnapshotNode,
+} from './aria-snapshot';
+import {
+  hiddenTraitsOf,
+  readElementFacts,
+  readWithinBudget,
+  type ElementFacts,
+} from './element-facts';
 
 /**
  * The browser as Playwright drives it: a persistent Chrome profile, so the
@@ -39,6 +50,24 @@ export interface PlaywrightBrowserOptions {
 
 export const CHROME_CHANNEL = 'chrome';
 export const DEFAULT_ACTION_TIMEOUT_MS = 15_000;
+/**
+ * How long the observer waits for the document to settle before each read of
+ * the page, and how long it waits between reads that came back without a ref.
+ * `settledSnapshot` owns how many reads are taken; see its note for the live
+ * run these were measured on.
+ */
+export const SETTLE_TIMEOUT_MS = 10_000;
+export const SETTLE_RETRY_MS = 400;
+
+/**
+ * What one observation may spend: the timeout on a single element's facts read,
+ * and the budget for reading all of them. Both are declared here rather than
+ * inherited from the action timeout — see `readWithinBudget` for the live run
+ * that measured why a phase the engine's rails cannot interrupt must bound
+ * itself.
+ */
+export const FACTS_TIMEOUT_MS = 1_000;
+export const OBSERVE_BUDGET_MS = 20_000;
 const SCROLL_PX = 600;
 const ROLE_MAX = 40;
 const INPUT_TYPE_MAX = 30;
@@ -51,7 +80,7 @@ function toObservedElement(node: SnapshotNode, facts: ElementFacts): ObservedEle
     ref: node.ref ?? '',
     role: clip(node.role, ROLE_MAX),
     name: clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target),
-    kind: elementKindOf(node.role),
+    kind: elementKind(node.role, facts),
     inputType: facts.inputType === null ? null : clip(facts.inputType, INPUT_TYPE_MAX),
     value: facts.value === null ? null : clip(facts.value, ELEMENT_VALUE_BOUND.target),
     options:
@@ -100,17 +129,46 @@ export class PlaywrightBrowser implements BrowserPort {
     return page;
   }
 
+  /**
+   * The page as the accessibility tree reports it, read once the document has
+   * settled. A read taken mid-navigation comes back with no refs — or with no
+   * body to read at all — so it is taken again rather than reported as a page
+   * with nothing on it.
+   */
+  private snapshot(): Promise<string> {
+    const page = this.page;
+    const read = async (): Promise<string | null> => {
+      try {
+        await page.waitForLoadState('domcontentloaded', { timeout: SETTLE_TIMEOUT_MS });
+      } catch {
+        // A page that never reports a load state is still read: what it has is what the session gets.
+      }
+      try {
+        return await page.locator('body').ariaSnapshot({ mode: 'ai' });
+      } catch {
+        // Mid-navigation there is no body to match; another read is the answer.
+        return null;
+      }
+    };
+    return settledSnapshot(read, () => page.waitForTimeout(SETTLE_RETRY_MS));
+  }
+
   async observe(): Promise<PageObservation> {
     const page = this.page;
-    const snapshot = await page.locator('body').ariaSnapshot({ mode: 'ai' });
+    const snapshot = await this.snapshot();
     const nodes = decodeAriaSnapshot(snapshot).filter(
       (node) => node.ref !== null && elementKindOf(node.role) !== 'static',
     );
-    const elements: ObservedElement[] = [];
-    for (const node of nodes) {
-      const facts = await readElementFacts(page.locator(`aria-ref=${node.ref}`));
-      if (facts !== null) elements.push(toObservedElement(node, facts));
-    }
+    const { facts, unread } = await readWithinBudget(
+      nodes.map((node) => node.ref ?? ''),
+      (ref) => readElementFacts(page.locator(`aria-ref=${ref}`), FACTS_TIMEOUT_MS),
+      () => Date.now(),
+      OBSERVE_BUDGET_MS,
+    );
+    const elements: ObservedElement[] = nodes.flatMap((node) => {
+      const read = facts.get(node.ref ?? '');
+      return read === undefined ? [] : [toObservedElement(node, read)];
+    });
     const all = ordered(elements);
     const listed = all.slice(0, ELEMENTS_BOUND.target);
     this.known = new Map(listed.map((element) => [element.ref, element]));
@@ -118,7 +176,7 @@ export class PlaywrightBrowser implements BrowserPort {
       url: clip(page.url(), URL_MAX_LENGTH),
       title: clip(await page.title(), TITLE_BOUND.target),
       elements: listed,
-      omittedElements: all.length - listed.length,
+      omittedElements: all.length - listed.length + unread,
       ariaSnapshot: fitSnapshot(snapshot, SNAPSHOT_BOUND.target).text,
     });
   }

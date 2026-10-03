@@ -1,5 +1,5 @@
 import {
-  elementKindOf,
+  elementKind,
   fieldSpecOf,
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
@@ -60,7 +60,7 @@ type FieldsDecided = Decided<FieldAnswers> & { admission: Admission };
 
 /** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
 export const fillActionOf = (field: FieldSpec, value: string): BrowserAction =>
-  elementKindOf(field.role) === 'selectable'
+  elementKind(field.role, field) === 'selectable'
     ? { kind: 'select', ref: field.ref, option: value, reason: 'field answer', expect: null }
     : { kind: 'fill', ref: field.ref, value, reason: 'field answer', expect: null };
 

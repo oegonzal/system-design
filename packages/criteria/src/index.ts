@@ -722,7 +722,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-2',
     statement:
-      "An observation lists the page's interactive elements with the refs the browser minted for it, their roles, names and DOM facts including the traits that mark a field hidden; a ref resolves only within the observation that minted it, a stale ref is a failure, and a page that would not fit the goal budget is degraded by declared rungs — snapshot, context, elements — never clipped.",
+      "An observation lists the page's interactive elements with the refs the browser minted for it, their roles, names and DOM facts including the traits that mark a field hidden; what an element affords is read from the control beneath it wherever its role alone is ambiguous, never from the role name; a ref resolves only within the observation that minted it, a stale ref is a failure, and a page that would not fit the goal budget is degraded by declared rungs — snapshot, context, elements — never clipped.",
   },
   {
     id: 'BRW-3',
