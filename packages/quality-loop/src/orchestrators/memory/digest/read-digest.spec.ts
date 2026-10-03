@@ -49,6 +49,8 @@ describe('reading a digest', () => {
             { kind: 'finding', ref: 'unhandled_failure|flow.1' },
             { kind: 'criterion', ref: 'c1' },
           ],
+          // f1 was seen in i1 and resolved by i2; r1 was assessed in both.
+          iterations: [1, 2],
         },
       ],
       withheld: [{ ref: 'memory.2', source: 'finding', by: 'run_specific' }],

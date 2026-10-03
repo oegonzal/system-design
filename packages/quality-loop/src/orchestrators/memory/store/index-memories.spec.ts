@@ -150,6 +150,7 @@ describe('a stored lesson’s origin', () => {
             insight: 'Name the queue a write survives a crash in.',
             appliesWhen: 'a click counter must not lose counts on a crash',
             evidence: [],
+            iterations: [],
           },
         ],
       },
@@ -168,5 +169,67 @@ describe('a stored lesson’s origin', () => {
       adoptedFrom: null,
       goalHash: contentHash('design a link shortener'),
     });
+  });
+
+  it('[QL-54] stamps each memory with the iteration its evidence ends in and that iteration’s decision, not the run’s best', async () => {
+    // The measured case: a lesson resting on what iteration 1 found and
+    // iteration 2 resolved was stamped with the run's best, iteration 3.
+    const trace = escalatedAfterJudged();
+    const [first, second] = trace.iterations;
+    const graded: RunTrace = {
+      ...trace,
+      iterations: [
+        { ...first, mode: 'adopted' },
+        { ...second, decision: { ...second.decision, finalDecision: 'retry' } },
+        trace.iterations[2],
+      ],
+    };
+    const source: QualityRunDto = {
+      ...childRun('system-design-canvas', graded),
+      request: { ...childRun('system-design-canvas', graded).request, adoptedFrom: GRADE },
+      trace: graded,
+    };
+
+    // Resting on the adopted iteration alone: its decision, judged by the grade it copied.
+    expect(originOf(source, graded, [1])).toMatchObject({
+      source: { iteration: 1, decision: 'revise' },
+      lineage: { judged: GRADE, adoptedFrom: GRADE },
+    });
+    // Resting on a change that ends in iteration 2: iteration 2's own decision and judges.
+    expect(originOf(source, graded, [1, 2])).toMatchObject({
+      source: { iteration: 2, decision: 'retry' },
+      lineage: { judged: { runId: source.runId, iteration: 2 }, adoptedFrom: GRADE },
+    });
+    // Citing nothing the run can name: the best, as before.
+    expect(originOf(source, graded, [9]).source.iteration).toBe(graded.bestIteration);
+
+    const ports = memoryPorts();
+    const lesson = (position: number, iterations: number[]) => ({
+      position,
+      insight: `Lesson ${position}: name the queue a write survives a crash in.`,
+      appliesWhen: 'a click counter must not lose counts on a crash',
+      evidence: [],
+      iterations,
+    });
+    await indexMemories(
+      ports,
+      source,
+      { digestRunId: 'digest-run', memories: [lesson(1, [1]), lesson(2, [1, 2])] },
+      'fake-embedding',
+    );
+    const stored = [...(ports.store as InMemoryMemoryStore).points.values()]
+      .filter((chunk) => chunk.source.runId === source.runId)
+      .sort((a, b) => a.source.ref.localeCompare(b.source.ref));
+    expect(
+      stored.map((chunk) => [
+        chunk.source.ref,
+        chunk.source.iteration,
+        chunk.source.decision,
+        chunk.lineage?.judged,
+      ]),
+    ).toEqual([
+      ['memory.1', 1, 'revise', GRADE],
+      ['memory.2', 2, 'retry', { runId: source.runId, iteration: 2 }],
+    ]);
   });
 });

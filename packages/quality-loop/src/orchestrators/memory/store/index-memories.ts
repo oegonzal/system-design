@@ -5,7 +5,7 @@
  * the same engine facts rather than asking a model to derive them again, and
  * stamps every chunk with what the source run says of itself today.
  */
-import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
+import type { IterationTrace, QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import { outputsOf } from '../../../core/outputs';
@@ -20,34 +20,51 @@ import { chunksOf, type ChunkOrigin } from './chunks';
 const dayOf = (iso: string): string => iso.slice(0, 10);
 
 /**
+ * The iteration a memory is stamped with: the latest of those it cites that
+ * the run holds — where the evidence it rests on ends — or the run's best
+ * when it cites none the run can name (a digest whose index predates the
+ * iterations, or a re-index of one).
+ */
+const citedIteration = (trace: RunTrace, cited: readonly number[]): IterationTrace | null =>
+  trace.iterations.filter((iteration) => cited.includes(iteration.iteration)).at(-1) ??
+  outputsOf(trace).best;
+
+/**
  * Where a memory came from, as every chunk of it says: the run, its pipeline,
- * the iteration it cites with that iteration's own decision, and the day. The
+ * the iteration it cites (`cited`: the iterations its evidence belongs to)
+ * with that iteration's own decision, and the day. Per memory, never the
+ * run's best for all of them: a lesson resting on what iteration 1 found and
+ * iteration 2 resolved is iteration 2's, whatever a third went on to do. The
  * iteration's decision, never the run's: a run that escalated because a later
  * revision produced nothing ends `escalate`, and that says nothing about the
  * judged iteration the digest learned from — stamped with it, the lesson would
  * read to a curator as one from a run that failed.
  *
  * Beside it, the lineage: the iteration whose judges produced the evidence —
- * this run's best, unless its best is the iteration it adopted, in which case
+ * the stamped one, unless it is the iteration the run adopted, in which case
  * the adopted run's — what it adopted, and the hash of the bare goal. A goal a
  * recall composed carries the remembered section too, and that is not part of
  * what the run was asked.
  */
-export const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => {
-  const { best, decision } = outputsOf(trace);
-  const iteration = best?.iteration ?? trace.bestIteration;
+export const originOf = (
+  source: QualityRunDto,
+  trace: RunTrace,
+  cited: readonly number[] = [],
+): ChunkOrigin => {
+  const stamped = citedIteration(trace, cited);
+  const iteration = stamped?.iteration ?? trace.bestIteration;
   const { adoptedFrom } = source.request;
   return {
     source: {
       runId: source.runId,
       pipeline: trace.pipeline.id,
-      decision: decision?.finalDecision ?? trace.finalDecision,
+      decision: stamped?.decision.finalDecision ?? trace.finalDecision,
       iteration,
       when: dayOf(source.startedAt),
     },
     lineage: {
       judged:
-        best?.mode === 'adopted' && adoptedFrom !== null
+        stamped?.mode === 'adopted' && adoptedFrom !== null
           ? adoptedFrom
           : { runId: source.runId, iteration },
       adoptedFrom,
@@ -73,7 +90,10 @@ export async function indexMemories(
 ): Promise<StepResult<undefined>> {
   const trace = source.trace;
   if (trace === null) return skipped('nothing-to-digest');
-  const chunks = chunksOf(digested.memories, originOf(source, trace), digested.digestRunId, model);
+  // Each memory is stamped from the iterations it cites, so each is chunked under its own origin.
+  const chunks = digested.memories.flatMap((memory) =>
+    chunksOf([memory], originOf(source, trace, memory.iterations), digested.digestRunId, model),
+  );
   // Both indexed texts of every chunk, in one batch: the cache dedupes, and
   // the vectors come back in the order they were asked for.
   const embedded = await ports.embeddings.embed(

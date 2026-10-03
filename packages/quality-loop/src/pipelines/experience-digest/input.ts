@@ -165,7 +165,18 @@ const indexSchema = z.strictObject({
   pipeline: z.literal(EXPERIENCE_DIGEST_ID),
   maxMemories: z.number().int().min(1),
   evidence: z.array(
-    z.strictObject({ alias, kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) }),
+    z.strictObject({
+      alias,
+      kind: z.enum(EVIDENCE_KINDS),
+      ref: z.string().min(1),
+      /**
+       * The source run's iterations the item belongs to, ascending: where a
+       * finding was seen or a criterion assessed, and both ends of every
+       * change the record shows in it. A memory is stamped from what it
+       * cites; an index written before carried none.
+       */
+      iterations: z.array(iteration).default([]),
+    }),
   ),
 });
 export type ExperienceIndex = z.infer<typeof indexSchema>;
@@ -217,13 +228,37 @@ const adoptedLine = (count: number): string[] =>
       ]
     : [];
 
-/** The index the validators read back: every alias, its kind, and the engine id behind it. */
+/** Iterations ascending, each once: where an item stood, and both ends of each change in it. */
+const iterationsOf = (stood: readonly number[], transitions: readonly Transition[]): number[] =>
+  [...new Set([...stood, ...transitions.flatMap((transition) => transition.iterations)])].sort(
+    (a, b) => a - b,
+  );
+
+/**
+ * The index the validators read back: every alias, its kind, the engine id
+ * behind it, and the iterations it belongs to — a finding where it was seen,
+ * a criterion where it was assessed — so the store stamps each memory from
+ * the iterations it cites.
+ */
 const indexOf = (record: ExperienceRecord): ExperienceIndex => ({
   pipeline: EXPERIENCE_DIGEST_ID,
   maxMemories: record.maxMemories,
   evidence: [
-    ...record.findings.map((f) => ({ alias: f.alias, kind: 'finding' as const, ref: f.key })),
-    ...record.criteria.map((c) => ({ alias: c.alias, kind: 'criterion' as const, ref: c.id })),
+    ...record.findings.map((f) => ({
+      alias: f.alias,
+      kind: 'finding' as const,
+      ref: f.key,
+      iterations: iterationsOf(f.iterations, f.transitions),
+    })),
+    ...record.criteria.map((c) => ({
+      alias: c.alias,
+      kind: 'criterion' as const,
+      ref: c.id,
+      iterations: iterationsOf(
+        c.results.filter((row) => row.result !== 'unassessed').map((row) => row.iteration),
+        c.transitions,
+      ),
+    })),
   ],
 });
 

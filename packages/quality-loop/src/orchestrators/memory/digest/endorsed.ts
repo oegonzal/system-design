@@ -31,6 +31,12 @@ export interface MemoryToStore {
   insight: string;
   appliesWhen: string;
   evidence: EvidenceRef[];
+  /**
+   * The source run's iterations the evidence it cites belongs to, ascending
+   * — what the store stamps it from; empty when its index names none (a
+   * document's sections, or a digest written before its index carried them).
+   */
+  iterations: number[];
 }
 
 export interface DigestReadout {
@@ -54,9 +60,18 @@ export interface DigestLike {
   memories: readonly { evidence: readonly string[]; insight: string; appliesWhen: string }[];
 }
 
-/** The index every digest goal carries: each alias, what kind of evidence it is, and the id behind it. */
+/**
+ * The index every digest goal carries: each alias, what kind of evidence it
+ * is, the id behind it and — when its evidence was judged in a run's
+ * iterations — which.
+ */
 export interface DigestIndexLike {
-  evidence: readonly { alias: string; kind: EvidenceRef['kind']; ref: string }[];
+  evidence: readonly {
+    alias: string;
+    kind: EvidenceRef['kind'];
+    ref: string;
+    iterations?: readonly number[];
+  }[];
 }
 
 /**
@@ -99,16 +114,19 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
   const memories = digest.value.memories.flatMap((memory, position) => {
     if (faulted.has(memoryLocation(position))) return [];
-    const evidence = memory.evidence.flatMap((name) => {
+    const cited = memory.evidence.flatMap((name) => {
       const item = refOf.get(name);
-      return item ? [{ kind: item.kind, ref: item.ref }] : [];
+      return item ? [item] : [];
     });
     return [
       {
         position: position + 1,
         insight: memory.insight,
         appliesWhen: memory.appliesWhen,
-        evidence,
+        evidence: cited.map((item) => ({ kind: item.kind, ref: item.ref })),
+        iterations: [...new Set(cited.flatMap((item) => item.iterations ?? []))].sort(
+          (a, b) => a - b,
+        ),
       },
     ];
   });

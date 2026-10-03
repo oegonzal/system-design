@@ -26,12 +26,49 @@ describe('the experience-digest input codec', () => {
       pipeline: 'experience-digest',
       maxMemories: 8,
       evidence: [
-        { alias: 'f1', kind: 'finding', ref: 'unhandled_failure|flow.1' },
-        { alias: 'f2', kind: 'finding', ref: 'contradiction|component.1' },
-        { alias: 'r1', kind: 'criterion', ref: 'c1' },
-        { alias: 'r2', kind: 'criterion', ref: 'c2' },
+        { alias: 'f1', kind: 'finding', ref: 'unhandled_failure|flow.1', iterations: [1, 2] },
+        { alias: 'f2', kind: 'finding', ref: 'contradiction|component.1', iterations: [1, 2] },
+        { alias: 'r1', kind: 'criterion', ref: 'c1', iterations: [1, 2] },
+        { alias: 'r2', kind: 'criterion', ref: 'c2', iterations: [1, 2] },
       ],
     });
+  });
+
+  it('[QL-54] each evidence item names the iterations it belongs to: where it stood, and both ends of each change', () => {
+    const record = fromRun(sampleRun());
+    if (record === null) throw new Error('the sample run must compose');
+    const [resolved] = record.findings;
+    const [criterion] = record.criteria;
+    const goal = renderGoal({
+      ...record,
+      findings: [
+        {
+          ...resolved,
+          iterations: [1],
+          transitions: [{ kind: 'resolved', iterations: [1, 3], detail: 'gone' }],
+        },
+      ],
+      criteria: [
+        {
+          ...criterion,
+          results: [
+            { iteration: 1, result: 'unassessed' },
+            { iteration: 2, result: 'partial' },
+          ],
+          transitions: [],
+        },
+      ],
+    });
+    expect(readIndex(goal)?.evidence.map((item) => [item.alias, item.iterations])).toEqual([
+      // Seen in i1, gone by i3: the change ends at i3.
+      [resolved.alias, [1, 3]],
+      // An iteration that assessed nothing is not one the criterion stood in.
+      [criterion.alias, [2]],
+    ]);
+    // An index written before it carried iterations reads as citing none.
+    const legacy = goal.replace(/,"iterations":\[[\d,]*\]/g, '');
+    expect(legacy).not.toContain('"iterations"');
+    expect(readIndex(legacy)?.evidence.map((item) => item.iterations)).toEqual([[], []]);
   });
 
   it('[QL-14] a plain prompt, a foreign index or a broken fence reads as no index', () => {
