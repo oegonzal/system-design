@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
 
-import { renderGoal as renderQuery } from '../../../pipelines/memory-recall/input';
+import {
+  KNOWN_HEADING,
+  NOVELTY_RULE,
+  RECALL_RULES,
+  recallRules,
+  renderGoal as renderQuery,
+} from '../../../pipelines/memory-recall/input';
 import { MAX_PROBES } from '../ports';
 import { builtQuery, fused, GOAL as PROMPT, hitOf } from '../testing';
 import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
@@ -19,17 +25,54 @@ describe('the recall query', () => {
     expect(() => renderQuery(query)).not.toThrow();
   });
 
-  it('[QL-41] a query the curator’s schema refuses is a diagnostic in the one wording, never a throw', () => {
-    const stale = hitOf('y'.repeat(LESSON_CHUNK_BOUND.ceiling + 1), 'run-stale', 'memory.1');
-    const built = buildQuery(queryText(PROMPT), probeSet(PROMPT, []), fused([stale]));
+  it('[QL-41] a stored lesson kept past its ceiling is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {
+    const long = 'y'.repeat(LESSON_CHUNK_BOUND.ceiling + 1);
+    const kept = buildQuery(
+      queryText(PROMPT),
+      probeSet(PROMPT, []),
+      fused([hitOf(long, 'run-long', 'memory.1')]),
+    );
+    expect(kept.issues).toEqual([]);
+    expect(kept.query?.candidates[0].text).toBe(long);
+
+    const stale = hitOf('a lesson stored under a decision no pipeline makes', 'run-stale', 'm.1');
+    const broken = { ...stale, source: { ...stale.source, decision: 'maybe' as never } };
+    const built = buildQuery(queryText(PROMPT), probeSet(PROMPT, []), fused([broken]));
     expect(built.query).toBeNull();
-    expect(built.issues.map((issue) => issue.path)).toEqual(['candidates[0].text']);
-    expect(built.issues[0]).toMatchObject({
-      code: 'too_big',
-      target: LESSON_CHUNK_BOUND.target,
-      maximum: LESSON_CHUNK_BOUND.ceiling,
-      actual: LESSON_CHUNK_BOUND.ceiling + 1,
-    });
+    expect(built.issues.map((issue) => [issue.path, issue.soft])).toEqual([
+      ['candidates[0].source.decision', false],
+    ]);
+  });
+
+  it('[QL-50] states what the producer holds, and the novelty rule, only beside something known; a screened candidate carries its origin', () => {
+    const hits = fused([
+      hitOf('keep serving from the database', 'run-a', 'memory.1'),
+      hitOf('dedupe by event id', 'run-b', 'memory.1'),
+    ]);
+    const known = ['high · unhandled failure: no fallback on a cache outage'];
+    const screened = builtQuery(
+      queryText(PROMPT),
+      probeSet(PROMPT, []),
+      [
+        { ...hits[0], origin: 'chain' },
+        { ...hits[1], origin: 'same-pipeline' },
+      ],
+      known,
+    );
+    expect(screened.known).toEqual(known);
+    expect(screened.rules).toEqual(recallRules(known));
+    expect(screened.rules.at(-1)).toBe(NOVELTY_RULE);
+    expect(screened.candidates.map((candidate) => candidate.origin)).toEqual([
+      'chain',
+      'same-pipeline',
+    ]);
+
+    // Unscreened: the query a recall over the goal alone has always composed.
+    const bare = builtQuery(queryText(PROMPT), probeSet(PROMPT, []), hits);
+    expect(bare.known).toEqual([]);
+    expect(bare.rules).toEqual([...RECALL_RULES]);
+    expect(bare.candidates.map((candidate) => candidate.origin)).toEqual([undefined, undefined]);
+    expect(renderQuery(bare)).not.toContain(KNOWN_HEADING);
   });
 });
 

@@ -3,7 +3,16 @@ import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../../core/outputs';
 import type { MemoryHit } from '../ports';
-import { ACCEPT_AT, acceptedRecall, readoutTrace, recallHits, recallInput } from '../testing';
+import { samplePack } from '../../../pipelines/memory-recall/testing';
+import {
+  ACCEPT_AT,
+  acceptedRecall,
+  faulting,
+  passed,
+  readoutTrace,
+  recallHits,
+  recallInput,
+} from '../testing';
 import { readPack as packOf } from './read-pack';
 
 // The reader takes a run's outputs; these specs build traces, so read through the view.
@@ -74,5 +83,32 @@ describe('reading a recall', () => {
       kept: 2,
       usable: [],
     });
+  });
+
+  it('[QL-50] a kept chunk confirmed as only restating what the producer holds is withheld like any faulted one', () => {
+    const restated = readoutTrace({
+      ...recallInput(),
+      results: [passed('c1', 'need', ['m1', 'm2'])],
+      findings: [faulting('restated_defect', ['m1'])],
+    });
+
+    expect(readPack(restated, hits, ACCEPT_AT).usable.map((item) => item.alias)).toEqual(['m2']);
+  });
+
+  it('[QL-16] a pack the seam kept past a ceiling is drawn on whole, never withheld for its size', () => {
+    const [first, second] = samplePack().kept;
+    const wordy = {
+      ...first,
+      insight: 'a read path with one store behind it fell over. '.repeat(20),
+    };
+    const overlong = readoutTrace({
+      ...recallInput(),
+      artifact: samplePack({ kept: [wordy, second] }),
+      findings: [],
+    });
+
+    const readout = readPack(overlong, hits, ACCEPT_AT);
+    expect(readout.admission).toBe('admitted');
+    expect(readout.usable.map((item) => item.kept.insight)).toContain(wordy.insight);
   });
 });

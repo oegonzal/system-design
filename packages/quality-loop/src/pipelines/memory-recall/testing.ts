@@ -4,9 +4,11 @@
  */
 import {
   RECALL_RULES,
+  KNOWN_LINE_MAX,
   MAX_CANDIDATES,
   MAX_FOCUS,
   MAX_KEPT,
+  MAX_KNOWN,
   type ChunkSource,
   type MemoryQuery,
 } from './input';
@@ -44,6 +46,7 @@ export const sampleQuery = (overrides: Partial<MemoryQuery> = {}): MemoryQuery =
   ].join('\n'),
   rules: [...RECALL_RULES],
   focus: [],
+  known: [],
   probes: ['a read path depends on one upstream that can go down'],
   maxKept: 2,
   candidates: [
@@ -99,10 +102,12 @@ export const maximalQuery = (): MemoryQuery => ({
   query: fill(16_000),
   rules: Array.from({ length: 8 }, () => fill(300)),
   focus: Array.from({ length: MAX_FOCUS }, () => fill(240)),
+  known: Array.from({ length: MAX_KNOWN }, () => fill(KNOWN_LINE_MAX)),
   probes: Array.from({ length: 6 }, () => fill(240)),
   maxKept: MAX_KEPT,
   candidates: Array.from({ length: MAX_CANDIDATES }, () => ({
     text: fill(1_200),
+    origin: 'other-pipeline' as const,
     source: source({ runId: fill(80), pipeline: fill(80), ref: fill(200), when: fill(40) }),
     matched: [
       ...Array.from({ length: MAX_FOCUS }, (_, index) => `d${index + 1}`),

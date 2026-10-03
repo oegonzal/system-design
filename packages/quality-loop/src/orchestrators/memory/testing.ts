@@ -14,7 +14,13 @@ import type {
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { contentHash, type MemoryHit } from './ports';
-import { buildQuery, probeSet, type FusedHit, type ProbeSet } from './recall/query';
+import {
+  buildQuery,
+  probeSet,
+  type FusedHit,
+  type OfferedHit,
+  type ProbeSet,
+} from './recall/query';
 
 export const FAKE_MODEL = 'fake-embedding';
 
@@ -167,8 +173,13 @@ export function readoutTrace(input: ReadoutInput): RunTrace {
 }
 
 /** The query a sample recall composes; a sample that does not compose is a broken fixture. */
-export function builtQuery(query: string, probes: ProbeSet, hits: readonly FusedHit[]) {
-  const built = buildQuery(query, probes, hits);
+export function builtQuery(
+  query: string,
+  probes: ProbeSet,
+  hits: readonly OfferedHit[],
+  known: readonly string[] = [],
+) {
+  const built = buildQuery(query, probes, hits, known);
   if (built.query === null) {
     throw new Error(`the sample query does not compose: ${JSON.stringify(built.issues)}`);
   }

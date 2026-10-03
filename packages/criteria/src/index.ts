@@ -428,6 +428,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every declared bound and output cap is held to what the model measurably writes: `pnpm measure:bounds` reads the run dumps without writing them — each reply at the size the model wrote it, refused, kept past a ceiling and salvaged ones included — and regenerates one fixture beside each module that declares bounds, and the calls the time-limit spec replays; and a spec fails when a target sits below the 99th percentile written, a ceiling at or below the longest, or a cap less than a fifth above the most its stage wrote on a turn that answered, and when a measured field or stage is gone or a declared one was never measured — unless the spec exempts it with its reason.',
   },
+  {
+    id: 'QL-50',
+    statement:
+      'A recall asked for a producer that revises a judged answer tells its curator what that producer already holds: the remediation notes it is handed are listed, aliased, under their own section with the rule that a chunk only restating one is dropped, naming which, and kept only for a fix, mechanism or risk the list lacks; each screened candidate says where it was learned relative to that answer; a kept chunk that only restates a held defect is a precision finding a critic is asked for by name, priced and never gating, and withholds that chunk once confirmed; and a recall with nothing in hand composes the query it always did.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

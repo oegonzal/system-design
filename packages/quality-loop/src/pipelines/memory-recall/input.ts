@@ -4,7 +4,15 @@
  * engine hands every stage, and reads its own bookkeeping back. The index the
  * validators read is the last fenced JSON block, so no rule parses prose.
  */
-import { bound, bounded, DECISIONS, exact, LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
+import {
+  bound,
+  bounded,
+  DECISIONS,
+  exact,
+  LESSON_CHUNK_BOUND,
+  RECALL_ORIGINS,
+  type RecallOrigin,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -30,6 +38,17 @@ const MAX_QUERY_PROBES = 6;
  * searched as a probe is, so it is bounded as one.
  */
 export const MAX_FOCUS = MAX_KEPT;
+/**
+ * What the producer the pack is for already holds: the remediation notes it
+ * is handed for the answer it revises, one line each, in the order it reads
+ * them. A line is a note capped as a probe is, so the curator compares a
+ * candidate against the gist, not the whole note. The recorded coach bases
+ * handed on up to 17; a maximal query has room for as many as it lists
+ * defects, so the curator sees the first of them — the screen before it
+ * compared every candidate against all of them.
+ */
+export const MAX_KNOWN = MAX_FOCUS;
+export const KNOWN_LINE_MAX = PROBE_MAX;
 
 /*
  * The orchestrator composes the query from what it searched and sliced, so
@@ -42,6 +61,7 @@ const RULE_BOUND = bound(300);
 const RULES_BOUND = bound(8, 'list');
 const PROBE_BOUND = bound(PROBE_MAX);
 const FOCUS_BOUND = exact(MAX_FOCUS);
+const KNOWN_BOUND = exact(MAX_KNOWN);
 const QUERY_PROBES_BOUND = exact(MAX_QUERY_PROBES);
 const CANDIDATES_BOUND = exact(MAX_CANDIDATES);
 const MATCHED_BOUND = exact(MAX_FOCUS + MAX_QUERY_PROBES);
@@ -76,6 +96,13 @@ const queryShape = z.strictObject({
    * first. Searched under as the probes are, and cited by alias the same way.
    */
   focus: bounded.list(FOCUS_BOUND, probe()).default([]),
+  /**
+   * What the producer that reads the pack already holds, when the recall was
+   * asked for one that revises a judged answer: candidates that only restate
+   * one of these add nothing. Bounded as a probe is; empty for a recall over
+   * the goal alone.
+   */
+  known: bounded.list(KNOWN_BOUND, probe()).default([]),
   /** The conditions the retriever searched under, listed once and cited by alias. */
   probes: bounded.list(QUERY_PROBES_BOUND, probe()).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
@@ -91,6 +118,12 @@ const queryShape = z.strictObject({
        * judgement, and the retriever has no opinion worth deferring to.
        */
       matched: bounded.list(MATCHED_BOUND, bounded.id(ALIAS_MAX, { min: 1 })).default([]),
+      /**
+       * Where the chunk was learned relative to the answer the pack is for,
+       * when the recall screened what that answer's producer already holds;
+       * absent otherwise.
+       */
+      origin: z.enum(RECALL_ORIGINS).optional(),
     }),
     { min: 1 },
   ),
@@ -115,6 +148,16 @@ export const RECALL_RULES: readonly string[] = [
   'A chunk whose own iteration was decided reject or escalate may inform a risk, never a recommendation.',
 ];
 
+/** The rule a query states only when it lists what is already in hand — there is nothing to restate otherwise. */
+export const NOVELTY_RULE =
+  'A chunk that only restates a defect listed under Already in hand is dropped, naming which; it is kept only when it adds a tried fix, a mechanism or a risk that list lacks, and its insight names what it adds.';
+
+/** The rules a query states: the standing ones, and the novelty rule when something is already in hand. */
+export const recallRules = (known: readonly string[]): string[] => [
+  ...RECALL_RULES,
+  ...(known.length > 0 ? [NOVELTY_RULE] : []),
+];
+
 const indexSchema = z.strictObject({
   pipeline: z.literal(MEMORY_RECALL_ID),
   maxKept: z.number().int().min(1),
@@ -131,6 +174,9 @@ export const probeAlias = (position: number): string => `p${position + 1}`;
 /** The same, for the defects a search was focused on. */
 export const focusAlias = (position: number): string => `d${position + 1}`;
 
+/** The same, for what the producer already holds. */
+export const knownAlias = (position: number): string => `k${position + 1}`;
+
 /**
  * The marker of the focus section, wherever a model is shown one — the
  * curator's query here, and the probe deriver's task; the lead says what it
@@ -140,8 +186,20 @@ export const FOCUS_HEADING = '## What is wrong now';
 const FOCUS_LEAD =
   'The query is about an answer that was judged before. These are its confirmed defects and the criteria it fell short on, worst first: a candidate that bears on one of them serves the query.';
 
-const provenance = (id: string, source: ChunkSource): string =>
-  `### [${id}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}`;
+/**
+ * The marker of what the producer already holds, and what it is for: the
+ * curator keeps a chunk that only restates one of these for nothing.
+ */
+export const KNOWN_HEADING = '## Already in hand — do not restate';
+const KNOWN_LEAD =
+  'The producer that reads this pack already holds these remediation notes for the answer it is about to revise. A candidate that only restates one adds nothing: keep it only for a tried fix, a mechanism, or a risk this list lacks.';
+
+/** What a candidate's origin says, stated once above the candidates that carry one. */
+const ORIGIN_LEAD =
+  "A candidate's origin says how near to this answer it was learned: chain — a run this answer descends from, at an iteration past the one in hand; same-prompt — another attempt at this prompt; same-pipeline — another prompt of the same kind of work; other-pipeline — another kind of work.";
+
+const provenance = (id: string, source: ChunkSource, origin: RecallOrigin | undefined): string =>
+  `### [${id}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}${origin === undefined ? '' : ` · origin ${origin}`}`;
 
 /** The index the validators read back: each candidate's alias and where it came from. */
 const indexOf = (input: MemoryQuery): MemoryIndex => ({
@@ -169,10 +227,23 @@ export function renderGoal(input: MemoryQuery): string {
           '',
         ]
       : []),
+    ...(input.known.length > 0
+      ? [
+          KNOWN_HEADING,
+          '',
+          KNOWN_LEAD,
+          '',
+          ...input.known.map((line, position) => `- [${knownAlias(position)}] ${line.trim()}`),
+          '',
+        ]
+      : []),
     '## Candidates',
     '',
+    ...(input.candidates.some((candidate) => candidate.origin !== undefined)
+      ? [ORIGIN_LEAD, '']
+      : []),
     ...input.candidates.flatMap((candidate, position) => [
-      provenance(alias(position), candidate.source),
+      provenance(alias(position), candidate.source, candidate.origin),
       '',
       candidate.text.trim(),
       '',

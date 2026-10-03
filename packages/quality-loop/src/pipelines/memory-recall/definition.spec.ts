@@ -29,6 +29,22 @@ describe('the memory-recall pipeline', () => {
     expect(measured.fields['criteria[].statement'].n).toBeGreaterThan(0);
   });
 
+  it('[QL-50] a chunk that only restates what the producer holds is a precision finding a critic is told to raise, priced and never gating', () => {
+    expect(MEMORY_RECALL.task.findingTypes).toHaveProperty('restated_defect');
+    expect(MEMORY_RECALL.policy.findingTypes['restated_defect']).toEqual({
+      dimension: 'precision',
+      gate: false,
+    });
+    // Priced: its dimension carries weight in the overall score.
+    expect(MEMORY_RECALL.policy.dimensionWeights['precision']).toBeGreaterThan(0);
+    // Earnable: a lens is asked for it by name, beside the query's own section it reads.
+    const raising = MEMORY_RECALL.critics.filter((lens) =>
+      lens.persona.includes('(restated_defect)'),
+    );
+    expect(raising.map((lens) => lens.id)).toEqual(['critic.relevance']);
+    expect(raising[0].persona).toContain('already in hand');
+  });
+
   it('[QL-4] every location the pack exposes is printed verbatim where a judge reads it', () => {
     const pack = samplePack();
     const rendered = memoryPackOutput.render(pack);

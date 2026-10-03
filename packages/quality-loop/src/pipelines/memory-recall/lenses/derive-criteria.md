@@ -4,4 +4,4 @@ Turn the query into the checklist the panel will grade the memory pack against. 
 
 Keep the query's own numbers and wording in each statement. Read the candidates only to phrase a need precisely; never derive a criterion from what a candidate says. The Limits and Index sections are validator bookkeeping, not criteria.
 
-When the query says what is wrong now, the defects listed there are needs too, and the first ones to state: remembered evidence about them is what the answer's next revision needs most.
+When the query says what is wrong now, the defects listed there are needs too, and the first ones to state — each as what remembered evidence could add beyond what the query lists as already in hand: a tried fix, a mechanism, a risk. A chunk that restates the defect does not meet such a need.

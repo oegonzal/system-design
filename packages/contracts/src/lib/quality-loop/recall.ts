@@ -27,6 +27,18 @@ export interface MemoryLineageDto {
 }
 
 /**
+ * Where an offered lesson was learned, as near to the run that recalls it as
+ * the store can say: an iteration of the chain that run starts from, later
+ * than the one it holds (`chain`); another run of the same prompt, kin by goal
+ * hash (`same-prompt`); another prompt the same pipeline judged
+ * (`same-pipeline`); or another pipeline altogether. Read from the stored
+ * source and lineage, never from a lesson's text, and shown to the curator
+ * beside each candidate's provenance.
+ */
+export const RECALL_ORIGINS = ['chain', 'same-prompt', 'same-pipeline', 'other-pipeline'] as const;
+export type RecallOrigin = (typeof RECALL_ORIGINS)[number];
+
+/**
  * Where a run's recall stands. `recalling` while it runs — the run has not
  * produced yet. `recalled`: the producer was handed at least one lesson.
  * `empty`: recall ran and found nothing worth handing on. `skipped`: it could

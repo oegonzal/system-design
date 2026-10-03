@@ -39,6 +39,8 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       no_usable_memory: 'No candidate serves any need of the query; artifact-wide and unfixable.',
       irrelevant_chunk: 'A kept chunk that serves no need of the query.',
       redundant_chunk: 'A kept chunk whose insight another kept chunk already gives.',
+      restated_defect:
+        'A kept chunk that only restates a defect the query lists as already in hand, adding no fix, mechanism or risk.',
       unsupported_insight: "An insight attributed to a chunk that the chunk's text does not say.",
       misleading_chunk:
         'A kept chunk that contradicts a rule or target the query states, or another kept chunk, with no caveat.',
@@ -126,6 +128,13 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
         gate: false,
       },
       redundant_chunk: {
+        dimension: 'precision',
+        gate: false,
+      },
+      // What the producer already holds is not news, but a chunk that
+      // restates it misleads nobody: priced, never a reason to withhold the
+      // pack — and, confirmed, the chunk itself is withheld like any faulted one.
+      restated_defect: {
         dimension: 'precision',
         gate: false,
       },

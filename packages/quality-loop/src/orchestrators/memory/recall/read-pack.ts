@@ -1,10 +1,13 @@
 /**
  * What a recall endorses, read from the memory-recall run's own outputs:
- * kept chunks no confirmed finding names, strongest support first. A run the
- * policy would not admit endorses nothing. Over engine facts — the artifact,
- * the ledger — never over prose.
+ * kept chunks no confirmed finding names, strongest support first — a chunk a
+ * critic confirmed as irrelevant, redundant or only restating what the
+ * producer holds is withheld alike. A run the policy would not admit endorses
+ * nothing. Over engine facts — the artifact, the ledger — never over prose;
+ * the pack is read as the seam read the reply, so one kept past a ceiling is
+ * drawn on rather than refused for its size.
  */
-import type { EvidenceLedger } from '@sysdesign/contracts';
+import { parseLenient, type EvidenceLedger } from '@sysdesign/contracts';
 
 import { admission, type Admission, type RunOutputs } from '../../../core/outputs';
 import { alias } from '../../../pipelines/memory-recall/input';
@@ -45,16 +48,16 @@ export function readPack(
   acceptAt: number,
 ): RecallReadout {
   const { best } = outputs;
-  const pack = best === null ? null : memoryPackSchema.safeParse(best.artifact);
-  const kept = pack?.success ? pack.data.kept.length : 0;
+  const pack = best === null ? null : parseLenient(memoryPackSchema, best.artifact);
+  const kept = pack?.ok ? pack.value.kept.length : 0;
   const verdict = admission(outputs, acceptAt);
   if (verdict !== 'admitted') return { admission: verdict, kept, usable: [] };
   // Admitted, yet not a pack this reader can resolve: nothing of it is drawn on.
-  if (best === null || !pack?.success) return { admission: 'fell-short', kept, usable: [] };
+  if (best === null || !pack?.ok) return { admission: 'fell-short', kept, usable: [] };
   const faulted = faultedRefs(best.ledger);
   const supportOf = supportIn(best.ledger);
   const byAlias = new Map(hits.map((hit, position) => [alias(position), hit]));
-  const usable = pack.data.kept
+  const usable = pack.value.kept
     .filter((item) => !faulted.has(item.chunk))
     .flatMap((item) => {
       const hit = byAlias.get(item.chunk);

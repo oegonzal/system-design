@@ -3,7 +3,12 @@
  * it searches under, the probes those become against every named vector,
  * and the memory query the curator is handed once the hits are in.
  */
-import { modelSchema, schemaIssuesOf, type SchemaIssue } from '@sysdesign/contracts';
+import {
+  modelSchema,
+  parseLenient,
+  type RecallOrigin,
+  type SchemaIssue,
+} from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
 import {
@@ -13,7 +18,7 @@ import {
   MAX_KEPT,
   memoryQuerySchema,
   probeAlias,
-  RECALL_RULES,
+  recallRules,
   type MemoryQuery,
 } from '../../../pipelines/memory-recall/input';
 import { MAX_PROBES, VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../ports';
@@ -27,6 +32,15 @@ export const queryText = (goal: string): string => capText(goal, QUERY_MAX_BYTES
 export interface FusedHit extends MemoryHit {
   /** Indices into the searched texts (`ProbeSet.texts`); 0 is the prompt itself. */
   probes: number[];
+}
+
+/**
+ * A hit as the curator is offered it: fused and — when a screen placed it
+ * against what the asker already holds — where it was learned. Absent on a
+ * recall nothing screened, whose candidates say nothing of their origin.
+ */
+export interface OfferedHit extends FusedHit {
+  origin?: RecallOrigin;
 }
 
 /**
@@ -107,30 +121,40 @@ const QUERY_BOUNDS = modelSchema(memoryQuerySchema).bounds;
 
 /**
  * The query the curator judges: the whole prompt, what is wrong with the
- * answer it is about when the recall was focused, the candidates, and — for
- * each — the defects and derived conditions it was retrieved under. The
- * prompt itself is never cited, since "this came back on the prompt" is not
- * information. Composed from what was searched and sliced, so a miss is a
- * stored chunk the schema no longer admits or a query past the goal budget;
- * either is reported, in the one wording, rather than thrown.
+ * answer it is about when the recall was focused, what that answer's producer
+ * already holds when the recall was screened against it, the candidates, and
+ * — for each — the defects and derived conditions it was retrieved under and,
+ * once screened, its origin. The prompt itself is never cited, since "this
+ * came back on the prompt" is not information. The novelty rule is stated
+ * only beside something already in hand, so a recall with nothing known
+ * composes the query it always did. Read as the seam reads a reply — a stored
+ * lesson kept past its ceiling is offered whole — so a miss is a structural
+ * fault or a query past the goal budget; either is reported, in the one
+ * wording, rather than thrown.
  */
-export function buildQuery(query: string, probes: ProbeSet, hits: readonly FusedHit[]): BuiltQuery {
-  const parsed = memoryQuerySchema.safeParse(
+export function buildQuery(
+  query: string,
+  probes: ProbeSet,
+  hits: readonly OfferedHit[],
+  known: readonly string[] = [],
+): BuiltQuery {
+  const parsed = parseLenient(
+    memoryQuerySchema,
     {
       query,
-      rules: [...RECALL_RULES],
+      rules: recallRules(known),
       focus: probes.focus,
+      known,
       probes: probes.derived,
       maxKept: MAX_KEPT,
       candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
         text: hit.text,
         source: hit.source,
         matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
+        ...(hit.origin === undefined ? {} : { origin: hit.origin }),
       })),
     },
-    { reportInput: true },
+    QUERY_BOUNDS,
   );
-  return parsed.success
-    ? { query: parsed.data, issues: [] }
-    : { query: null, issues: schemaIssuesOf(parsed.error.issues, QUERY_BOUNDS) };
+  return parsed.ok ? { query: parsed.value, issues: [] } : { query: null, issues: parsed.issues };
 }
