@@ -426,7 +426,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-47',
     statement:
-      "A size overrun is a warning, never a block: every artifact is read against its schema the way the model seam reads a reply, so only a structural fault blocks, and a field past its target is one warning per field on a validator that blocks nothing and moves no decision; a field a reply wrote past its size — the producer's or the deriver's — is an overrun on the record, in the one wording, that degrades nothing; a supplied rubric is refused only past the ceiling its deriver is accepted with and recorded as an overrun past the target; every stage is told the rule as it is applied; and a pipeline's output schema is converted for the model when it boots.",
+      "A size overrun is a warning, never a block: every artifact is read against its schema the way the model seam reads a reply, so only a structural fault blocks, and a field past its target is one warning per field on a validator that blocks nothing, moves no decision and never reaches a judge, who is told as already counted only the validation problems the controller acts on, chosen by its own predicate; a field a reply wrote past its size — the producer's or the deriver's — is an overrun on the record, in the one wording, that degrades nothing; a supplied rubric is refused only past the ceiling its deriver is accepted with and recorded as an overrun past the target; every stage is told the rule as it is applied; and a pipeline's output schema is converted for the model when it boots.",
   },
   {
     id: 'QL-48',

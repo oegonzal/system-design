@@ -203,8 +203,13 @@ const criterionRemediations = (ledger: EvidenceLedger): Remediation[] =>
       targetRefs: evidence.locationRefs,
     }));
 
-/** A validation problem the producer is asked to act on: anything above `info`, which only informs. */
-const actionable = (problem: ValidationReport['problems'][number]): boolean =>
+/**
+ * A validation problem the producer is asked to act on: anything above
+ * `info`, which only informs. The one predicate for what the controller
+ * counts of a warning, so whatever tells a judge what was already counted
+ * selects with it rather than listing its own.
+ */
+export const actionable = (problem: ValidationReport['problems'][number]): boolean =>
   problem.severity !== 'info';
 
 const validatorRemediations = (ledger: EvidenceLedger): Remediation[] =>

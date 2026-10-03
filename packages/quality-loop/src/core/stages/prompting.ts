@@ -15,6 +15,7 @@ import type {
 import { capText } from '@sysdesign/run-dump';
 
 import { GOAL_MAX_BYTES } from '../contracts';
+import { actionable } from '../controllers/context';
 import type { AdvisoryMemory, UpstreamEvidenceBundle } from '../ports';
 
 const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly string[]> = {
@@ -99,10 +100,18 @@ export function locationsSection(locations: readonly ArtifactLocation[]): string
   ].join('\n');
 }
 
-/** What deterministic validators already found — a critic must add, not repeat. */
+/**
+ * What deterministic validators already found — a critic must add, not
+ * repeat. "Already counted" is true by construction: the problems listed are
+ * the ones the controller acts on, chosen by its own predicate, so one that
+ * only informs — a field past the size it was asked for — is on the record
+ * and never in a judge's prompt.
+ */
 export function validationSection(validation: readonly ValidationReport[]): string {
   const lines = validation.flatMap((report) =>
-    report.problems.map((problem) => `- [${report.validatorId}] ${problem.message}`),
+    report.problems
+      .filter(actionable)
+      .map((problem) => `- [${report.validatorId}] ${problem.message}`),
   );
   return [
     '# Known validation problems (already counted)',
