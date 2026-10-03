@@ -5,8 +5,11 @@
  * digest pipeline that proposes `{ evidence, insight, appliesWhen }` items
  * against an aliased index: the experience digest reads a run's findings and
  * criteria, the document digest reads a document's sections, and the store
- * consumes what either endorsed through the same reader.
+ * consumes what either endorsed through the same reader. The artifact is read
+ * as the seam read the reply — leniently — so a lesson kept whole past its
+ * ceiling is stored whole, never a digest refused for it.
  */
+import { parseLenient } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
 import { admission, type Admission, type RunOutputs } from '../../../core/outputs';
@@ -58,18 +61,18 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
   codec: DigestCodec<D, I>,
 ): DigestReadout {
   const { best } = outputs;
-  const digest = best === null ? null : codec.schema.safeParse(best.artifact);
-  const proposed = digest?.success ? digest.data.memories.length : 0;
+  const digest = best === null ? null : parseLenient(codec.schema, best.artifact);
+  const proposed = digest?.ok ? digest.value.memories.length : 0;
   const verdict = admission(outputs, acceptAt);
   if (verdict !== 'admitted') return { admission: verdict, proposed, memories: [] };
   const index = codec.readIndex(outputs.trace.contract.goal);
   // Admitted, yet not a digest this reader can resolve: nothing of it is drawn on.
-  if (best === null || !digest?.success || index === null) {
+  if (best === null || !digest?.ok || index === null) {
     return { admission: 'fell-short', proposed, memories: [] };
   }
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
-  const memories = digest.data.memories.flatMap((memory, position) => {
+  const memories = digest.value.memories.flatMap((memory, position) => {
     if (faulted.has(memoryLocation(position))) return [];
     const evidence = memory.evidence.flatMap((name) => {
       const item = refOf.get(name);

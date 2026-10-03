@@ -1,4 +1,4 @@
-import type { RunTrace } from '@sysdesign/contracts';
+import { LESSON_INSIGHT_BOUND, type RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../../core/outputs';
@@ -96,5 +96,17 @@ describe('reading a digest', () => {
 
     expect(readout.admission).toBe('admitted');
     expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
+  });
+
+  it('[QL-41] an insight the seam kept whole past its ceiling is endorsed whole, never the digest refused for it', () => {
+    const insight =
+      `${'Give every read path a story for its upstream being down. '.repeat(30)}`.trim();
+    expect(insight.length).toBeGreaterThan(LESSON_INSIGHT_BOUND.ceiling);
+    const digest = sampleDigest({
+      memories: [{ ...sampleDigest().memories[0], insight }],
+    });
+    const readout = memoriesToStore(readoutTrace(digestInput(digest, composedGoal())), ACCEPT_AT);
+    expect(readout).toMatchObject({ admission: 'admitted', proposed: 1 });
+    expect(readout.memories.map((memory) => memory.insight)).toEqual([insight]);
   });
 });
