@@ -19,3 +19,4 @@ export * from './goal-index';
 export * from './admission';
 export * from './document-digest';
 export * from './document-memory';
+export * from './knowledge';
