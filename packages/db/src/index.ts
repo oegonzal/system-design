@@ -13,6 +13,7 @@ export * from './entities/govcon-saved-search.entity';
 export * from './entities/govcon-search-profile.entity';
 export * from './entities/govcon-source-call.entity';
 export * from './entities/memory-embedding.entity';
+export * from './entities/memory-support.entity';
 export * from './entities/orchestration-run-child.entity';
 export * from './entities/orchestration-run.entity';
 export * from './entities/prompt-generation.entity';
