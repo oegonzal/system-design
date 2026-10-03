@@ -495,24 +495,44 @@ const count = (value: number): string => value.toLocaleString('en-US');
 /** `— noted, not refused`: the suffix of a soft fault, wherever one is listed. */
 export const SOFT_ISSUE_NOTE = '— noted, not refused';
 
+/** A fault's path and what is wrong there: the sizes of a size fault, or the schema's own message. */
+function faultWording(issue: SchemaIssue): string {
+  if (issue.maximum !== undefined && issue.actual !== undefined) {
+    const unit = issue.kind === 'list' ? 'items' : 'characters';
+    const asked = issue.target ?? issue.maximum;
+    return `${issue.path}: ${count(issue.actual)} ${unit}; ${count(asked)} asked, ${count(issue.maximum)} accepted`;
+  }
+  return `${issue.path}: ${issue.message}`;
+}
+
 /**
  * The one wording of a fault: `findings[2].rationale: 1,015 characters; 900
  * asked, 1,125 accepted`, or the schema's own message after the path, with
  * the soft note where the fault did not refuse.
  */
 export function describeIssue(issue: SchemaIssue): string {
-  const note = issue.soft ? ` ${SOFT_ISSUE_NOTE}` : '';
-  if (issue.maximum !== undefined && issue.actual !== undefined) {
-    const unit = issue.kind === 'list' ? 'items' : 'characters';
-    const asked = issue.target ?? issue.maximum;
-    return `${issue.path}: ${count(issue.actual)} ${unit}; ${count(asked)} asked, ${count(issue.maximum)} accepted${note}`;
-  }
-  return `${issue.path}: ${issue.message}${note}`;
+  return issue.soft ? `${faultWording(issue)} ${SOFT_ISSUE_NOTE}` : faultWording(issue);
 }
 
 /**
- * An overrun as the size fault it is — noted, never refused — so it is worded
- * by the one wording every size fault has.
+ * What a field past its target came to, said after its sizes. Kept whole —
+ * within the ceiling or past it — it was noted and not refused; a cut or a
+ * trim lost work, and says what: where the text now ends, or how many items
+ * went.
+ */
+const HANDLED: Record<OverrunHandling, (overrun: Overrun) => string> = {
+  accepted: () => SOFT_ISSUE_NOTE,
+  'kept-over-ceiling': () => SOFT_ISSUE_NOTE,
+  cut: () => `— cut at a word boundary, marked ${CUT_MARKER.trim()}`,
+  trimmed: (overrun) => {
+    const dropped = overrun.dropped ?? overrun.actual - overrun.ceiling;
+    return `— ${count(dropped)} ${dropped === 1 ? 'item' : 'items'} dropped`;
+  },
+};
+
+/**
+ * An overrun as the size fault it is — soft, never refused — so its sizes are
+ * worded the way every size fault's are.
  */
 export const overrunIssue = (overrun: Overrun): SchemaIssue => ({
   code: 'too_big',
@@ -526,8 +546,13 @@ export const overrunIssue = (overrun: Overrun): SchemaIssue => ({
   soft: true,
 });
 
-/** One field past its target, in the one wording: what a diagnostic, a warning and a log line say alike. */
-export const describeOverrun = (overrun: Overrun): string => describeIssue(overrunIssue(overrun));
+/**
+ * One field past its target, in the one wording: what a diagnostic, a warning
+ * and a log line say alike — its sizes as its size fault's, then whether work
+ * was lost.
+ */
+export const describeOverrun = (overrun: Overrun): string =>
+  `${faultWording(overrunIssue(overrun))} ${HANDLED[overrun.handling](overrun)}`;
 
 // ---- the lenient parse -----------------------------------------------------
 

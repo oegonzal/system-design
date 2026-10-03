@@ -349,21 +349,44 @@ describe('parseLenient', () => {
     );
   });
 
-  it('[QL-58] words an overrun as the size fault it is, noted and not refused, a list in items', () => {
+  it('[QL-58] words an overrun as the size fault it is, and says when work was lost: a cut where the text now ends, a trim how many items went', () => {
     const claim = z.strictObject({
       claims: bounded.list(bound(6, 'list'), bounded.text(CLAIM)),
     });
     const parsed = parseLenient(claim, {
-      claims: ['c'.repeat(480), ...Array.from({ length: 9 }, () => 'held')],
+      claims: [
+        'c'.repeat(340),
+        prose(700),
+        prose(1200),
+        ...Array.from({ length: 7 }, () => 'held'),
+      ],
     });
     if (!parsed.ok) throw new Error('only sizes are at fault');
-    expect(parsed.overruns.map(describeOverrun).sort()).toEqual([
-      `claims: 10 items; 6 asked, 8 accepted ${SOFT_ISSUE_NOTE}`,
-      `claims[0]: 480 characters; 300 asked, 375 accepted ${SOFT_ISSUE_NOTE}`,
+    expect(
+      parsed.overruns.map((overrun) => [overrun.handling, describeOverrun(overrun)]).sort(),
+    ).toEqual([
+      ['accepted', `claims[0]: 340 characters; 300 asked, 375 accepted ${SOFT_ISSUE_NOTE}`],
+      [
+        'cut',
+        'claims[2]: 1,200 characters; 300 asked, 375 accepted — cut at a word boundary, marked […]',
+      ],
+      [
+        'kept-over-ceiling',
+        `claims[1]: 700 characters; 300 asked, 375 accepted ${SOFT_ISSUE_NOTE}`,
+      ],
+      ['trimmed', 'claims: 10 items; 6 asked, 8 accepted — 2 items dropped'],
     ]);
-    // The overrun is the issue a strict reader of the same text would have been told about.
-    const [overrun] = parsed.overruns.filter((item) => item.kind === 'text');
-    expect(describeOverrun(overrun)).toBe(describeIssue(overrunIssue(overrun)));
-    expect(overrunIssue(overrun)).toMatchObject({ code: 'too_big', soft: true, kind: 'text' });
+    // A field kept whole is the issue a strict reader of the same text would have been told about.
+    for (const overrun of parsed.overruns) {
+      const issue = overrunIssue(overrun);
+      expect(issue).toMatchObject({ code: 'too_big', soft: true, kind: overrun.kind });
+      const lost = overrun.handling === 'cut' || overrun.handling === 'trimmed';
+      expect(describeOverrun(overrun) === describeIssue(issue)).toBe(!lost);
+    }
+
+    const one = parseLenient(claim, { claims: Array.from({ length: 9 }, () => 'held') });
+    expect(one.ok && one.overruns.map(describeOverrun)).toEqual([
+      'claims: 9 items; 6 asked, 8 accepted — 1 item dropped',
+    ]);
   });
 });
