@@ -61,6 +61,7 @@ export interface RecallAsk {
 /** How many texts were searched, how many came back, and what the curator made of them. */
 export interface RecallCounts {
   probes: number;
+  /** What the curator was offered: the hits, as many as the goal budget held. */
   candidates: number;
   kept: number;
   usable: number;
@@ -187,7 +188,7 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
   const readout = readPack(outputsOf(child.trace), hits, acceptAt);
   const counts: RecallCounts = {
     probes: texts.length,
-    candidates: hits.length,
+    candidates: built.query.candidates.length,
     kept: readout.kept,
     usable: readout.usable.length,
   };

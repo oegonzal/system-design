@@ -19,14 +19,14 @@ import {
   MAX_PROBES,
   memoryQuerySchema,
   probeAlias,
+  QUERY_MAX_BYTES,
   recallRules,
+  withinBudget,
   type MemoryQuery,
 } from '../../../pipelines/memory-recall/input';
 import { VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../ports';
 
 /** The recall query is the goal's head: enough to embed and to judge candidates against. */
-const QUERY_MAX_BYTES = 16_000;
-
 export const queryText = (goal: string): string => capText(goal, QUERY_MAX_BYTES).text;
 
 /** A hit after fusion, with the probes that surfaced it. */
@@ -128,10 +128,10 @@ const QUERY_BOUNDS = modelSchema(memoryQuerySchema).bounds;
  * once screened, its origin. The prompt itself is never cited, since "this
  * came back on the prompt" is not information. The novelty rule is stated
  * only beside something already in hand, so a recall with nothing known
- * composes the query it always did. Read as the seam reads a reply — a stored
- * lesson kept past its ceiling is offered whole — so a miss is a structural
- * fault or a query past the goal budget; either is reported, in the one
- * wording, rather than thrown.
+ * composes the query it always did. The candidates are offered in rank order
+ * as many as fit the goal budget, each whole however long the store kept it,
+ * so a miss is a structural fault — reported, in the one wording, rather
+ * than thrown.
  */
 export function buildQuery(
   query: string,
@@ -139,23 +139,20 @@ export function buildQuery(
   hits: readonly OfferedHit[],
   known: readonly string[] = [],
 ): BuiltQuery {
-  const parsed = parseLenient(
-    memoryQuerySchema,
-    {
-      query,
-      rules: recallRules(known),
-      focus: probes.focus,
-      known,
-      probes: probes.derived,
-      maxKept: MAX_KEPT,
-      candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
-        text: hit.text,
-        source: hit.source,
-        matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
-        ...(hit.origin === undefined ? {} : { origin: hit.origin }),
-      })),
-    },
-    QUERY_BOUNDS,
-  );
+  const composed: MemoryQuery = {
+    query,
+    rules: recallRules(known),
+    focus: probes.focus,
+    known: [...known],
+    probes: probes.derived,
+    maxKept: MAX_KEPT,
+    candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
+      text: hit.text,
+      source: hit.source,
+      matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
+      ...(hit.origin === undefined ? {} : { origin: hit.origin }),
+    })),
+  };
+  const parsed = parseLenient(memoryQuerySchema, withinBudget(composed), QUERY_BOUNDS);
   return parsed.ok ? { query: parsed.value, issues: [] } : { query: null, issues: parsed.issues };
 }

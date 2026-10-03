@@ -26,9 +26,20 @@ import {
 
 export const MEMORY_RECALL_ID = 'memory-recall';
 
-/** Caps chosen so a maximal query renders well under the engine's goal budget. */
+/**
+ * How many candidates the curator is offered at most, and may keep. The
+ * recorded recall queries were all offered sixteen; the goal budget decides
+ * how many of them fit (`withinBudget`).
+ */
 export const MAX_CANDIDATES = 16;
 export const MAX_KEPT = 8;
+/**
+ * The head of the goal a recall searches with and shows the curator, in
+ * bytes. The 99 recall queries recorded (2026-09-07 → 2026-10-02) searched
+ * with at most 5,954 bytes of goal, and no bare goal recorded was longer; the
+ * rest of the goal budget is the candidates'.
+ */
+export const QUERY_MAX_BYTES = 8_000;
 /** A candidate or probe alias: `m12`, `p3`. */
 export const ALIAS_MAX = 8;
 /**
@@ -49,6 +60,7 @@ export const PROBES_BOUND = exact(MAX_PROBES);
  * searched as a probe is, so it is capped at what a probe is asked for.
  */
 export const MAX_FOCUS = MAX_KEPT;
+export const FOCUS_LINE_MAX = PROBE_BOUND.target;
 /**
  * What the producer the pack is for already holds: the remediation notes it
  * is handed for the answer it revises, one line each, in the order it reads
@@ -59,20 +71,24 @@ export const MAX_FOCUS = MAX_KEPT;
  * compared every candidate against all of them.
  */
 export const MAX_KNOWN = MAX_FOCUS;
-export const KNOWN_LINE_MAX = PROBE_BOUND.target;
+export const KNOWN_LINE_MAX = FOCUS_LINE_MAX;
 
 /*
- * The orchestrator composes the query from what it searched and sliced, so
- * the counts are exact and the prose is bounded; a candidate's text is a
- * stored lesson, bounded by the lesson's own declaration so a lesson a
- * digest accepted always fits the query that recalls it. A probe is listed
- * as the deriver's reply was read — kept whole past its ceiling — so the
- * query admits the longest such a read returns, never re-cutting one.
+ * A program writes every field of the query, never a model, so every bound
+ * is exact: what the orchestrator caps, slices or states, at most. Where a
+ * field holds what a lenient read returned it admits the longest such a read
+ * returns (`keptAtMost`), so nothing is refused or cut a second time: a probe
+ * as the deriver's reply was read, and a candidate's text as the store holds
+ * it — a lesson whose halves a digest's reply kept past their ceilings,
+ * joined — so a lesson the store holds always fits the query that recalls it.
  */
-const QUERY_BOUND = bound(16_000);
-const RULE_BOUND = bound(300);
-const RULES_BOUND = bound(8, 'list');
+const QUERY_BOUND = exact(QUERY_MAX_BYTES);
+const RULE_BOUND = exact(300);
+const RULES_BOUND = exact(8);
+const FOCUS_LINE_BOUND = exact(FOCUS_LINE_MAX);
+const KNOWN_LINE_BOUND = exact(KNOWN_LINE_MAX);
 const QUERY_PROBE_BOUND = exact(keptAtMost(PROBE_BOUND));
+const CANDIDATE_TEXT_BOUND = exact(keptAtMost(LESSON_CHUNK_BOUND));
 const FOCUS_BOUND = exact(MAX_FOCUS);
 const KNOWN_BOUND = exact(MAX_KNOWN);
 const CANDIDATES_BOUND = exact(MAX_CANDIDATES);
@@ -95,9 +111,6 @@ export const chunkSourceSchema = z.strictObject({
 });
 export type ChunkSource = z.infer<typeof chunkSourceSchema>;
 
-/** A focus line or a line in hand, bounded as a probe is. */
-const line = () => bounded.text(PROBE_BOUND, { min: 1 });
-
 const queryShape = z.strictObject({
   /** The prompt as a producer would receive it — any markdown. */
   query: bounded.text(QUERY_BOUND, { min: 1 }),
@@ -108,21 +121,20 @@ const queryShape = z.strictObject({
    * before: its confirmed defects and the criteria it fell short on, worst
    * first. Searched under as the probes are, and cited by alias the same way.
    */
-  focus: bounded.list(FOCUS_BOUND, line()).default([]),
+  focus: bounded.list(FOCUS_BOUND, bounded.text(FOCUS_LINE_BOUND, { min: 1 })).default([]),
   /**
    * What the producer that reads the pack already holds, when the recall was
    * asked for one that revises a judged answer: candidates that only restate
-   * one of these add nothing. Bounded as a probe is; empty for a recall over
-   * the goal alone.
+   * one of these add nothing. Empty for a recall over the goal alone.
    */
-  known: bounded.list(KNOWN_BOUND, line()).default([]),
+  known: bounded.list(KNOWN_BOUND, bounded.text(KNOWN_LINE_BOUND, { min: 1 })).default([]),
   /** The conditions the retriever searched under, listed once and cited by alias. */
   probes: bounded.list(PROBES_BOUND, bounded.text(QUERY_PROBE_BOUND, { min: 1 })).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
   candidates: bounded.list(
     CANDIDATES_BOUND,
     z.strictObject({
-      text: bounded.text(LESSON_CHUNK_BOUND, { min: 1 }),
+      text: bounded.text(CANDIDATE_TEXT_BOUND, { min: 1 }),
       source: chunkSourceSchema,
       /**
        * Aliases of the defects and probes that surfaced this chunk. Empty
@@ -143,16 +155,38 @@ const queryShape = z.strictObject({
 });
 export type MemoryQuery = z.infer<typeof queryShape>;
 
+const withinGoalBudget = (query: MemoryQuery): boolean =>
+  goalBytes(renderGoal(query)) <= GOAL_MAX_BYTES;
+
 /**
  * The shape plus the one invariant the caps alone cannot state: a query must
  * render under the engine's goal budget, or every stage would read a clipped
  * goal while the validators read the whole one. The caps are sized so a
- * maximal query fits; an orchestrator handing over more gets a refusal.
+ * query with every other field at its longest still fits one candidate at
+ * the longest lesson the store holds, and sixteen at the length a digest is
+ * asked for; an orchestrator offers candidates through `withinBudget`, and
+ * one handing over more gets a refusal.
  */
-export const memoryQuerySchema = queryShape.refine(
-  (query) => goalBytes(renderGoal(query)) <= GOAL_MAX_BYTES,
-  { message: `the query renders beyond the goal budget of ${GOAL_MAX_BYTES} bytes` },
-);
+export const memoryQuerySchema = queryShape.refine(withinGoalBudget, {
+  message: `the query renders beyond the goal budget of ${GOAL_MAX_BYTES} bytes`,
+});
+
+/**
+ * The query with as many of its candidates as fit the goal budget, in the
+ * order they were ranked. Every query recorded was offered all it was
+ * handed; only stored lessons kept well past what a digest was asked for can
+ * leave the lowest-ranked of them out, and never the first (see
+ * `memoryQuerySchema`) — they stay in the store for the next recall.
+ */
+export function withinBudget(query: MemoryQuery): MemoryQuery {
+  const first = (count: number): MemoryQuery => ({
+    ...query,
+    candidates: query.candidates.slice(0, count),
+  });
+  let count = query.candidates.length;
+  while (count > 1 && !withinGoalBudget(first(count))) count -= 1;
+  return count === query.candidates.length ? query : first(count);
+}
 
 /** Rules an orchestrator can state as they are. */
 export const RECALL_RULES: readonly string[] = [

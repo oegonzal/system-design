@@ -2,14 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { confirmed, evidence, ledger, traceOf } from '../../../core/testing';
 import type { RecallBase } from '../../../modules/runs/recall/run-recall';
-import { MAX_FOCUS } from '../../../pipelines/memory-recall/input';
-import {
-  FOCUS_LINE_MAX,
-  focusLines,
-  focusOf,
-  MAX_FOCUS_CRITERIA,
-  MAX_FOCUS_FINDINGS,
-} from './focus';
+import { FOCUS_LINE_MAX, MAX_FOCUS } from '../../../pipelines/memory-recall/input';
+import { focusLines, focusOf, MAX_FOCUS_CRITERIA, MAX_FOCUS_FINDINGS } from './focus';
 
 const CRITERIA = [
   { id: 'c1', kind: 'functional', statement: 'Redirect a short link to its target.' },

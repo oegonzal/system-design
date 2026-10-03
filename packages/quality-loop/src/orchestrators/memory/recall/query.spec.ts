@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
+import { keptAtMost, LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
 
+import { GOAL_MAX_BYTES, goalBytes } from '../../../core/contracts';
 import {
   KNOWN_HEADING,
+  MAX_CANDIDATES,
   MAX_PROBES,
   NOVELTY_RULE,
+  QUERY_MAX_BYTES,
   RECALL_RULES,
   recallRules,
   renderGoal as renderQuery,
@@ -14,19 +17,39 @@ import { builtQuery, fused, GOAL as PROMPT, hitOf } from '../testing';
 import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
 
 describe('the recall query', () => {
-  it('[QL-16] is the goal head under the byte cap, and a maximal query of the longest lessons still renders under the goal budget', () => {
+  it('[QL-16] is the goal head under the byte cap, and offers as many of the best-ranked lessons as the goal budget holds — every one when they are the length a digest asks for', () => {
     const long = 'x'.repeat(70_000);
-    expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(16_000);
-    const wide = Array.from({ length: 17 }, (_, index) =>
-      hitOf('y'.repeat(LESSON_CHUNK_BOUND.ceiling), `run-${index}`, 'memory.1'),
+    expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(QUERY_MAX_BYTES);
+    const hitsOf = (length: number) =>
+      fused(
+        Array.from({ length: MAX_CANDIDATES + 1 }, (_, index) =>
+          hitOf('y'.repeat(length), `run-${index}`, 'memory.1'),
+        ),
+      );
+
+    const asked = builtQuery(
+      queryText(long),
+      probeSet(long, []),
+      hitsOf(LESSON_CHUNK_BOUND.target),
     );
-    const query = builtQuery(queryText(long), probeSet(long, []), fused(wide));
-    expect(query.candidates).toHaveLength(16);
-    expect(() => renderQuery(query)).not.toThrow();
+    expect(asked.candidates).toHaveLength(MAX_CANDIDATES);
+
+    // The longest lessons the store holds: fewer, best-ranked first, and the query within the budget.
+    const longest = builtQuery(
+      queryText(long),
+      probeSet(long, []),
+      hitsOf(keptAtMost(LESSON_CHUNK_BOUND)),
+    );
+    expect(longest.candidates.length).toBeGreaterThan(1);
+    expect(longest.candidates.length).toBeLessThan(MAX_CANDIDATES);
+    expect(longest.candidates.map((candidate) => candidate.source.runId)).toEqual(
+      Array.from({ length: longest.candidates.length }, (_, index) => `run-${index}`),
+    );
+    expect(goalBytes(renderQuery(longest))).toBeLessThanOrEqual(GOAL_MAX_BYTES);
   });
 
-  it('[QL-41] a stored lesson kept past its ceiling is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {
-    const long = 'y'.repeat(LESSON_CHUNK_BOUND.ceiling + 1);
+  it('[QL-41] the longest lesson the store holds is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {
+    const long = 'y'.repeat(keptAtMost(LESSON_CHUNK_BOUND));
     const kept = buildQuery(
       queryText(PROMPT),
       probeSet(PROMPT, []),

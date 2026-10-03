@@ -22,7 +22,7 @@ import { capText } from '@sysdesign/run-dump';
 
 import { annotate } from '../../../core/evidence/annotate';
 import type { RecallBase } from '../../../modules/runs/recall/run-recall';
-import { MAX_FOCUS, PROBE_BOUND } from '../../../pipelines/memory-recall/input';
+import { FOCUS_LINE_MAX, MAX_FOCUS } from '../../../pipelines/memory-recall/input';
 
 /**
  * How many of each a focus names. The recorded canvas iterations
@@ -34,9 +34,6 @@ import { MAX_FOCUS, PROBE_BOUND } from '../../../pipelines/memory-recall/input';
  */
 export const MAX_FOCUS_FINDINGS = 5;
 export const MAX_FOCUS_CRITERIA = MAX_FOCUS - MAX_FOCUS_FINDINGS;
-
-/** One focus line, as searched and as the curator reads it: what a probe is asked for. */
-export const FOCUS_LINE_MAX = PROBE_BOUND.target;
 
 const cap = (text: string): string => capText(text.trim(), FOCUS_LINE_MAX).text;
 

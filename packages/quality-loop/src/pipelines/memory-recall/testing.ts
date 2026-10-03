@@ -2,13 +2,16 @@
  * Builders the memory-recall specs share. Pure helpers only — no vitest
  * imports — so the file compiles under the app tsconfig.
  */
+import { MAX_QUALITY_RUN_ITERATIONS, modelSchema, type BoundPath } from '@sysdesign/contracts';
+
 import {
-  RECALL_RULES,
-  KNOWN_LINE_MAX,
-  MAX_CANDIDATES,
+  focusAlias,
   MAX_FOCUS,
   MAX_KEPT,
-  MAX_KNOWN,
+  MAX_PROBES,
+  memoryQuerySchema,
+  probeAlias,
+  RECALL_RULES,
   type ChunkSource,
   type MemoryQuery,
 } from './input';
@@ -97,26 +100,42 @@ export const samplePack = (overrides: Partial<MemoryPack> = {}): MemoryPack => (
   ...overrides,
 });
 
-/** Every field at its cap: the render of this must stay under the goal budget. */
-export const maximalQuery = (): MemoryQuery => ({
-  query: fill(16_000),
-  rules: Array.from({ length: 8 }, () => fill(300)),
-  focus: Array.from({ length: MAX_FOCUS }, () => fill(240)),
-  known: Array.from({ length: MAX_KNOWN }, () => fill(KNOWN_LINE_MAX)),
-  probes: Array.from({ length: 6 }, () => fill(240)),
+const ADMITTED = modelSchema(memoryQuerySchema).bounds;
+
+/** The most the curator's schema admits at a path: a count, or a length in characters. */
+export const admitted = (path: BoundPath): number => {
+  const declared = ADMITTED[path];
+  if (declared === undefined) throw new Error(`the memory query declares no bound at ${path}`);
+  return declared.ceiling;
+};
+
+/**
+ * Every field at the most the schema admits — every bound there being exact
+ * and sized to what its writer can hand over, that is the most a store, a
+ * probe deriver and an orchestrator can put in a query — and every
+ * candidate's text `lesson` characters: by default the longest lesson the
+ * store holds.
+ */
+export const maximalQuery = (lesson = admitted('candidates[].text')): MemoryQuery => ({
+  query: fill(admitted('query')),
+  rules: Array.from({ length: admitted('rules') }, () => fill(admitted('rules[]'))),
+  focus: Array.from({ length: admitted('focus') }, () => fill(admitted('focus[]'))),
+  known: Array.from({ length: admitted('known') }, () => fill(admitted('known[]'))),
+  probes: Array.from({ length: admitted('probes') }, () => fill(admitted('probes[]'))),
   maxKept: MAX_KEPT,
-  candidates: Array.from({ length: MAX_CANDIDATES }, () => ({
-    text: fill(1_200),
+  candidates: Array.from({ length: admitted('candidates') }, () => ({
+    text: fill(lesson),
     origin: 'other-pipeline' as const,
-    source: source({ runId: fill(80), pipeline: fill(80), ref: fill(200), when: fill(40) }),
+    source: source({
+      runId: fill(admitted('candidates[].source.runId')),
+      pipeline: fill(admitted('candidates[].source.pipeline')),
+      ref: fill(admitted('candidates[].source.ref')),
+      when: fill(admitted('candidates[].source.when')),
+      iteration: MAX_QUALITY_RUN_ITERATIONS,
+    }),
     matched: [
-      ...Array.from({ length: MAX_FOCUS }, (_, index) => `d${index + 1}`),
-      'p1',
-      'p2',
-      'p3',
-      'p4',
-      'p5',
-      'p6',
+      ...Array.from({ length: MAX_FOCUS }, (_, index) => focusAlias(index)),
+      ...Array.from({ length: MAX_PROBES }, (_, index) => probeAlias(index)),
     ],
   })),
 });
