@@ -1,4 +1,4 @@
-import type { DesignPromptDraft } from '@sysdesign/contracts';
+import { DESIGN_PROMPT_SCENARIO_BOUND, type DesignPromptDraft } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
@@ -59,5 +59,16 @@ describe('the design-prompt shape validator', () => {
 
   it('[QL-3] an ill-formed artifact is left to the schema validator', () => {
     expect(problems({ title: 3 } as unknown as DesignPromptDraft)).toEqual([]);
+  });
+
+  it('[QL-47] a scenario past its ceiling hides no gap: the draft is read whole, as the seam read it', () => {
+    const draft = sampleDraft({
+      scenario: 'x'.repeat(DESIGN_PROMPT_SCENARIO_BOUND.ceiling + 200),
+      scale: [],
+    });
+    expect(DESIGN_PROMPT.task.output.schema.safeParse(draft).success).toBe(false);
+    expect(problems(draft).map((problem) => problem.message)).toEqual([
+      'the prompt states no scale target',
+    ]);
   });
 });

@@ -3,6 +3,9 @@
  * artifact the engine hands over, well-formed or not, so each starts from the
  * output schema; neither reads prose.
  *
+ * Each reads the artifact the way the model seam reads a reply, so a field
+ * past its size never hides a fault from them.
+ *
  * `references` blocks. An edge to a node that is not there, a carry naming an
  * operation neither endpoint declares, a brief bound to a criterion the
  * contract never listed or to a node the canvas does not hold, a path that
@@ -23,7 +26,12 @@ import {
   type ValidatorGate,
 } from '@sysdesign/contracts';
 
-import { problem, REFERENCES_VALIDATOR_ID, type TaskContract } from '../../core/contracts';
+import {
+  problem,
+  readArtifact,
+  REFERENCES_VALIDATOR_ID,
+  type TaskContract,
+} from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 import type { CanvasSubmission } from './output';
 
@@ -42,10 +50,11 @@ function check(
   contract: TaskContract<CanvasSubmission>,
   rule: Rule,
 ): ValidationReport {
-  // An ill-formed artifact is the schema validator's to report, once.
-  const parsed = contract.output.schema.safeParse(artifact);
-  if (!parsed.success) return { validatorId, gate, problems: [] };
-  return { validatorId, gate, problems: rule(parsed.data, contract) };
+  // An ill-formed artifact is the schema validator's to report, once; one a
+  // field past its size left well-formed is read whole, as the seam read it.
+  const parsed = readArtifact(contract.output.schema, artifact);
+  if (!parsed.ok) return { validatorId, gate, problems: [] };
+  return { validatorId, gate, problems: rule(parsed.value, contract) };
 }
 
 const references: Rule = ({ graph, brief, narrative }, contract) =>

@@ -15,6 +15,7 @@ import type {
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
+import { readArtifact } from '../contracts';
 import { STANDARD } from '../controllers';
 import type { PipelineDefinition } from '../pipeline';
 import { STANDARD_SCORING } from '../policy';
@@ -242,14 +243,14 @@ export const scriptedDeriver =
       overruns: [],
     });
 
-/** The tiny task's schema, as a blocking validator the loop runs first. */
+/** The tiny task's schema, as a blocking validator the loop runs first, read as the engine reads an artifact. */
 const tinySchemaValidator = (): Stages<TinyOutput>['validators'][number] => ({
   id: 'schema',
   gate: 'block',
   validate: (artifact, contract) => ({
     validatorId: 'schema',
     gate: 'block',
-    problems: contract.output.schema.safeParse(artifact).success
+    problems: readArtifact(contract.output.schema, artifact).ok
       ? []
       : [{ severity: 'critical', locationRefs: [], message: 'not the shape' }],
   }),

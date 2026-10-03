@@ -1,7 +1,12 @@
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
-import { repairSubmission, type CanvasEdge, type DesignSubmission } from '@sysdesign/contracts';
+import {
+  BINDING_CLAIM_BOUND,
+  repairSubmission,
+  type CanvasEdge,
+  type DesignSubmission,
+} from '@sysdesign/contracts';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm, sequencedLlm } from '../../core/testing';
@@ -241,6 +246,49 @@ describe('the system-design-canvas loop', () => {
       judged.iterations[0].validation.find((report) => report.validatorId === 'references')
         ?.problems,
     ).toEqual([expect.objectContaining({ message: 'binding references unknown criterion: c99' })]);
+  });
+
+  it('[QL-47] a coach revision with a claim past its ceiling is still repaired before judging, and one with an edge to nowhere still blocks', async () => {
+    // Past the ceiling and short of the cut: the seam keeps it whole, so the repair and `references` must read it whole too.
+    const long = 'x'.repeat(BINDING_CLAIM_BOUND.ceiling + 105);
+    const wordy = (coached: DesignSubmission): DesignSubmission => {
+      if (!coached.brief) throw new Error('the fixture has a brief');
+      const [first, ...rest] = coached.brief.bindings;
+      return { ...coached, brief: { version: 1, bindings: [{ ...first, claim: long }, ...rest] } };
+    };
+    const revise = async (coached: DesignSubmission) =>
+      (
+        await runPipeline(
+          SYSTEM_DESIGN_CANVAS,
+          { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
+          {
+            llm: fakeLlm(findings, requirementResults, qualityResults, coached),
+            sink: () => undefined,
+            now: () => 0,
+          },
+        )
+      ).iterations[1];
+    const problemsOf = (
+      iteration: { validation: { validatorId: string; problems: { message: string }[] }[] },
+      id: string,
+    ) =>
+      iteration.validation
+        .find((report) => report.validatorId === id)
+        ?.problems.map((p) => p.message);
+
+    const repaired = await revise(wordy(sloppyCoached()));
+    expect(problemsOf(repaired, 'references')).toEqual([]);
+    const bindings = repaired.artifact?.brief?.bindings ?? [];
+    expect(bindings.map((binding) => binding.criterionId)).not.toContain('c99');
+    expect(bindings.filter((binding) => binding.criterionId === 'c1')).toEqual([
+      expect.objectContaining({ claim: long }),
+    ]);
+
+    const blocked = await revise(wordy(brokenCoached()));
+    expect(problemsOf(blocked, 'references')).toEqual([
+      'edge ai-edge-9 references unknown target node: nowhere',
+    ]);
+    expect(blocked.decision.reason).toContain('blocked by validator(s) references');
   });
 
   it('[QL-25] after a revision `references` refused, the coach is told why before it revises again', async () => {

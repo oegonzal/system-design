@@ -1,4 +1,8 @@
-import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_OPERATIONS_BOUND } from '@sysdesign/contracts';
+import {
+  BINDING_CLAIM_BOUND,
+  CANVAS_MAX_TOTAL_OPERATIONS,
+  NODE_OPERATIONS_BOUND,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
@@ -139,5 +143,25 @@ describe('the system-design-canvas validators', () => {
   it('[QL-3] an ill-formed artifact is left to the schema validator', () => {
     const broken = { graph: { nodes: 'no' } } as unknown as CanvasSubmission;
     expect(messages(broken)).toEqual({ references: [], structure: [] });
+  });
+
+  it('[QL-47] a claim past its ceiling hides nothing: a dangling edge still blocks and an island still warns', () => {
+    const submission = sampleSubmission();
+    const [first] = submission.brief?.bindings ?? [];
+    if (!first) throw new Error('the sample binds a criterion');
+    first.claim = 'x'.repeat(BINDING_CLAIM_BOUND.ceiling + 105);
+    submission.graph.nodes.push({ id: 'cache-1', kind: 'cache', label: 'Unused cache' });
+    submission.graph.edges.push({
+      id: 'edge-x',
+      source: 'service-1',
+      target: 'ghost',
+      kind: 'sync',
+    });
+    // The size alone is no fault a strict read would forgive — the seam kept it, so must these.
+    expect(SYSTEM_DESIGN_CANVAS.task.output.schema.safeParse(submission).success).toBe(false);
+    expect(messages(submission)).toEqual({
+      references: ['edge edge-x references unknown target node: ghost'],
+      structure: ['node cache-1 is connected to nothing'],
+    });
   });
 });

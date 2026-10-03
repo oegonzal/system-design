@@ -29,7 +29,7 @@ import {
   type DesignSubmission,
 } from '@sysdesign/contracts';
 
-import type { OutputShape } from '../../core/contracts';
+import { readArtifact, type OutputShape } from '../../core/contracts';
 
 export type CanvasSubmission = DesignSubmission;
 
@@ -88,12 +88,14 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
    * binding to a criterion the rubric never listed, a duplicate, a broken
    * path are dropped, not refused — before `references` reads it. The graph
    * is never touched: an edge to nowhere stays a refusal. The studio stores
-   * what was judged and repairs nothing; a value that would not parse is
-   * returned as it came, for the schema validator to report.
+   * what was judged and repairs nothing. The revision is read as the seam
+   * read it, so a claim past its size is no reason to skip the repair; a
+   * value with a structural fault is returned as it came, for the schema
+   * validator to report.
    */
   normalize: (submission, contract) => {
-    const parsed = designSubmissionSchema.safeParse(submission);
-    return parsed.success ? repairSubmission(parsed.data, contract.criteria) : submission;
+    const parsed = readArtifact(designSubmissionSchema, submission);
+    return parsed.ok ? repairSubmission(parsed.value, contract.criteria) : submission;
   },
 
   render: (submission) => {
