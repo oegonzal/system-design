@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BLOCK_GAP,
   blocksOf,
+  bodyHeight,
   FONT_STEP,
+  headingLevels,
   linesOf,
   pageText,
   type PositionedText,
@@ -35,7 +37,53 @@ function resumePage(): PositionedText[] {
   ];
 }
 
+/** The three sizes a résumé sets: the name, its section headings, its employers, and the body. */
+function sizedPage(): PositionedText[] {
+  let y = 740;
+  const next = (gap: number): number => (y -= gap);
+  return [
+    item('Ada Lovelace', 40, y, 40, 'title'),
+    item('ada@example.test', 40, next(16), 11, 'contact'),
+    item('EXPERIENCE', 40, next(30), 16, 'section'),
+    item('ACME | Lead Engineer', 40, next(20), 12, 'employer'),
+    item('Jun 2024 – Feb 2026', 40, next(12), 10),
+    item('• Built the thing.', 40, next(12), 9),
+    item('• Led the other thing.', 40, next(12), 9),
+    item('EDUCATION', 40, next(30), 16, 'section'),
+    item('UC EXAMPLE', 40, next(20), 12, 'employer'),
+  ];
+}
+
 describe('pdf blocks', () => {
+  it('[ING-2] takes the size most of the page is set at as the body, and ranks every larger size as a heading level', () => {
+    const lines = linesOf(sizedPage());
+    expect(bodyHeight(lines)).toBe(9);
+    // 40, 16, 12 and 11 clear the body by the declared step; the 10-point date
+    // line does not, which is the point — a size within the body's own
+    // variation is body text, not a heading.
+    expect([...headingLevels(lines).entries()].sort((a, b) => b[0] - a[0])).toEqual([
+      [40, 1],
+      [16, 2],
+      [12, 3],
+      [11, 4],
+    ]);
+    // A page set at one size throughout has no headings to find.
+    expect(headingLevels(linesOf([item('a', 0, 20), item('b', 0, 0)])).size).toBe(0);
+  });
+
+  it('[ING-2] writes a line the typography sets above the body as the markdown heading it is, so a chunk beginning mid-section still names its section', () => {
+    const text = pageText(sizedPage());
+    expect(text).toContain('# Ada Lovelace');
+    expect(text).toContain('## EXPERIENCE');
+    expect(text).toContain('### ACME | Lead Engineer');
+    expect(text).toContain('## EDUCATION');
+    // The name and the contact line are separate lines: the tolerance follows the smaller glyph.
+    expect(text).not.toMatch(/# Ada Lovelace ada@example\.test/);
+    // Body text is left as it is.
+    expect(text).toContain('• Built the thing.');
+    expect(text).not.toContain('# • Built');
+  });
+
   it('[ING-2] groups items into lines by baseline, left to right, and reads the page top down', () => {
     const lines = linesOf(resumePage());
     expect(lines.map((line) => line.text)).toEqual([
