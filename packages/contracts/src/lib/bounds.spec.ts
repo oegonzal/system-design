@@ -8,9 +8,11 @@ import {
   composedBound,
   CUT_FACTOR,
   CUT_MARKER,
+  cutPoint,
   describeIssue,
   exact,
   jsonSchemaBoundPath,
+  keptAtMost,
   locationPath,
   modelSchema,
   overrunsOf,
@@ -188,6 +190,27 @@ describe('parseLenient', () => {
     // Parsed again, what was cut is kept as written: never cut twice.
     const again = parseLenient(schema, parsed.value);
     expect(again.ok && again.value).toEqual(parsed.value);
+  });
+
+  it('[QL-41] keeps a text whole up to keptAtMost and cuts past it to within a word of the cut point — a short target too', () => {
+    for (const declared of [bound(10), bound(300)]) {
+      const schema = z.strictObject({ text: bounded.text(declared) });
+      expect(cutPoint(declared)).toBe(Math.max(CUT_FACTOR * declared.target, declared.ceiling));
+      for (let length = declared.ceiling + 1; length <= 2 * keptAtMost(declared); length++) {
+        const read = parseLenient(schema, { text: prose(length) });
+        if (!read.ok) throw new Error(`refused at ${length}`);
+        const kept = read.value.text;
+        expect(kept.length).toBeLessThanOrEqual(keptAtMost(declared));
+        if (length <= keptAtMost(declared)) expect(kept.length).toBe(length);
+        else {
+          expect(kept.endsWith(CUT_MARKER)).toBe(true);
+          // A cut lands on the last word boundary before the cut point: never more than one word short of it.
+          expect(kept.length - CUT_MARKER.length).toBeGreaterThan(
+            cutPoint(declared) - 'epsilon '.length,
+          );
+        }
+      }
+    }
   });
 
   it('[QL-41] trims a 13-item list to its ceiling by whole items, worst-last, and records what it dropped', () => {

@@ -56,6 +56,22 @@ export function bound(target: number, kind: Exclude<BoundKind, 'id'> = 'text'): 
   };
 }
 
+/**
+ * Where a lenient read cuts prose written into this bound: three targets, or
+ * the ceiling when that is more (a short target's floor can put the ceiling
+ * past three targets, and nothing within the ceiling is ever cut).
+ */
+export const cutPoint = (b: Bound): number => Math.max(CUT_FACTOR * b.target, b.ceiling);
+
+/**
+ * The longest text a lenient read of this bound returns: what it keeps whole
+ * runs to the cut point plus the marker's length, and what it cuts ends within
+ * the same. Whatever must accept a value a lenient read returned — a rubric
+ * handed back, a query that recalls a stored lesson — sizes against this,
+ * never against the ceiling.
+ */
+export const keptAtMost = (b: Bound): number => cutPoint(b) + CUT_MARKER.length;
+
 /** A bound with no tolerance: what is asked is exactly what is accepted — an engine cap, a count a caller slices to. */
 export const exact = (size: number): Bound => ({ target: size, ceiling: size });
 
@@ -648,7 +664,7 @@ export function parseLenient<T>(
           });
         } else if (typeof fault.input === 'string') {
           const written = fault.input;
-          const limit = CUT_FACTOR * target;
+          const limit = cutPoint({ target, ceiling });
           // A cut string ends within the limit plus its marker, so parsing it again never cuts twice.
           const cut = written.length > limit + CUT_MARKER.length;
           const text = cut ? cutAtWord(written, limit) : written;
