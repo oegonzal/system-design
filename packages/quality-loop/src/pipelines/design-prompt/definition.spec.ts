@@ -24,8 +24,11 @@ describe('the design-prompt pipeline', () => {
     expect(DESIGN_PROMPT.producer.persona).toContain('design-prompt');
   });
 
-  it('[QL-56] its writer sees the checklist, and no setbacks its two-iteration loop could never hand it', () => {
-    expect(DESIGN_PROMPT.producer.consumes).toEqual(['criteria']);
+  it('[QL-56] its writer sees the checklist, and the setbacks a run that raises its two-iteration loop can hand it', () => {
+    // Declared at two, but a run request replaces `maxIterations`, so a third ask
+    // — the earliest a setback reaches — is one override away.
+    expect(DESIGN_PROMPT.policy.loop.maxIterations).toBe(2);
+    expect(DESIGN_PROMPT.producer.consumes).toEqual(['criteria', 'setbacks']);
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

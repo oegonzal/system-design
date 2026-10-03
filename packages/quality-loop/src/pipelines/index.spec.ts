@@ -46,7 +46,12 @@ describe('the pipeline registry', () => {
     }
   });
 
-  it('[QL-56] every producer whose loop can reach a third iteration declares setbacks, and none whose loop cannot', () => {
+  it('[QL-56] a pipeline DECLARING a loop that reaches a third iteration declares setbacks', () => {
+    // A declaration check, not a runtime guarantee: a run request replaces the
+    // declared `maxIterations` (up to `MAX_QUALITY_RUN_ITERATIONS`), so a
+    // pipeline whose declared loop stops short of the third ask can still be
+    // run past it. That is why the reverse — a declaration on a short loop is
+    // dead — is not asserted: an override can make it live.
     const reaches = (definition: PipelineDefinition<unknown>): boolean =>
       definition.policy.loop.maxIterations >= FIRST_SETBACK_ITERATION;
     const declares = (definition: PipelineDefinition<unknown>): boolean =>
@@ -64,10 +69,6 @@ describe('the pipeline registry', () => {
     expect(
       ids(registry.filter((definition) => reaches(definition) && !declares(definition))),
       'a loop that reaches a third ask never tells its producer what the attempt before fell short on',
-    ).toEqual([]);
-    expect(
-      ids(registry.filter((definition) => declares(definition) && !reaches(definition))),
-      'a declaration on a loop that never reaches a third ask is dead',
     ).toEqual([]);
   });
 });

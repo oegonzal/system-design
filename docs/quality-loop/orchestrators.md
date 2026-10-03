@@ -742,8 +742,9 @@ named where there is one.
 - **Closed: a losing revision's critique reaches the next briefing.** It did not: the next
   iteration got the best's briefing again, byte-identical in 22-30-00, so with the default budget a
   lost iteration 2 made iteration 3 a second try at the same revision. A producer that consumes
-  `setbacks` — every producer whose loop can reach a third iteration does, since the third ask is
-  the earliest a setback can reach — is now told, on the ask after an attempt its judges read and
+  `setbacks` — every pipeline whose declared loop reaches a third iteration declares it, since the
+  third ask is the earliest a setback can reach, and so does the prompt writer, whose declared two
+  a run request can raise — is now told, on the ask after an attempt its judges read and
   found no better than the best, that attempt's confirmed finding notes under their own heading,
   less any the best's remediations already name. A blocked loser's validator notes
   still reach the producer as refusals, and a lost produce's schema faults as refusals of their own.
@@ -791,6 +792,12 @@ named where there is one.
   18-01-11's manifest said 0 while its best scored 57.8. The manifest, the index row and `run.md`'s
   verdict line now headline the best iteration, with the last one's score in a clause of its own
   when the last is not the best.
+- **A request can raise `maxIterations` past the declaration.** A run request's `maxIterations`
+  replaces the pipeline's declared one (`run-pipeline.ts`, `RunsService`), bounded only by
+  `MAX_QUALITY_RUN_ITERATIONS`, so anything checked against the declared loop — the registry spec's
+  setbacks rule, say — holds for the declaration, not for every run. Capping a request at the
+  declared value would close it, but it changes behaviour for every caller that overrides today, so
+  it is not done.
 - **A duplicate set cannot say which of its members are the twins.** Every duplicate type
   withholds `none`, because a confirmed duplicate finding is the union of the overlapping claims
   its samples made (`sameDefect` groups on a common location), not one claim, so `all-but-one`
