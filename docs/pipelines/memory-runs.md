@@ -435,7 +435,7 @@ reason means the step ran and had no effect.
 | `store-unavailable`    | memory | recall, store — `verify()` said not ready, or a call threw                                                    | `pnpm stack:db`; `context.store.note` carries the cause                                     |
 | `store-empty`          | memory | recall — the collection holds nothing, or the fused list came back empty                                      | seed past runs, or re-index them if the generation moved (§6)                               |
 | `embedding-failed`     | memory | recall, store — the provider returned nothing after one retry                                                 | check the `llm: embeddings request failed` line for status and body                         |
-| `query-refused`        | memory | recall — the hits could not be composed into the curator's query: a structural fault, or past the goal budget | `note` lists the faults in the one wording; re-index the run that stored the chunk          |
+| `query-refused`        | memory | recall — a hit could not be composed into the curator's query: a structural fault — not the goal budget (§16) | `note` lists the faults in the one wording; re-index the run that stored the chunk          |
 | `not-accepted`         | memory | recall, digest — `admission()` said `fell-short`: judged, and a gate failed or the score missed the bar       | read the child; the name predates the rule and now means unadmitted                         |
 | `no-rubric`            | memory | recall, digest — the child derived no criteria, so no lens judged it                                          | read the child's `criteria` exchanges: a deriver that missed its schema                     |
 | `no-artifact`          | memory | recall, digest — the child produced nothing to judge                                                          | read the child's `producer` exchanges                                                       |
@@ -1498,12 +1498,13 @@ The path, end to end:
    to fix — with a lead that they are advice, never requirements. The deriver,
    critics and evaluators are never shown them.
 6. **Provenance.** `QualityRunDto.recall` — `recalled` with the lessons
-   (`ref`, `serves`, `insight`, `caveat`, the stored `text`, the `sourceRunId`),
-   or `empty` / `skipped` with a closed reason and the recall run's id where one
-   ran — is on the row (`quality_run.recall`), the list row (without the
-   lessons), the dump (`recall.json`, `run.md`) and, verbatim, in the producer's
-   own prompt under `05-llm/`. The studio's coach panel shows the count and the
-   list.
+   (`ref`, `serves`, `insight`, `caveat`, the stored `text`, the `sourceRunId`
+   and the `pipeline`, `iteration`, `decision` and `when` it was learned in,
+   §16), or `empty` / `skipped` with a closed reason and the recall run's id
+   where one ran — is on the row (`quality_run.recall`), the list row (without
+   the lessons), the dump (`recall.json`, `run.md`) and, verbatim, in the
+   producer's own prompt under `05-llm/`. The studio's coach panel shows the
+   count and the list.
 7. **Nothing fails the coach.** No key, a store that is down or empty, a recall
    run that fails or endorses nothing, or an error nobody expected: each is
    recorded with its reason and the coach runs without lessons.
@@ -1513,3 +1514,73 @@ into the goal at n = 15 and found it inert against those judges; this path
 leaves the judges untouched by construction, so a paired comparison — coach
 runs with and without recall on the same prompts, read off `recall.lessons`
 and the iterations' scores — is the experiment that would answer it.
+
+## 16. What a reader keeps, where a lesson is stamped, and in whose words it arrives
+
+Four rules sit between a finished run and what anyone draws from it. Each is
+written once and read by every reader, so a digest and a recall can never
+disagree about them.
+
+**What a confirmed finding withholds is declared, per type.** A pipeline's
+policy gives each finding type a `withholds` from `WITHHOLDINGS`:
+
+| Value         | What it does to the items the finding names                                            |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `every-ref`   | withholds each of them — also what any type that declares nothing does                 |
+| `all-but-one` | keeps the one with the most support (passing criteria that cite it), ties to the first |
+| `none`        | withholds nothing: the finding names the item without faulting it                      |
+
+The value is chosen by what storing the item **as written** would put in the
+store, never by the type's name: false or misleading there — a wrong fact or
+attribution, a wrong kind or key, a restatement of what the producer already
+holds — is `every-ref`; merely weaker than it could be — vague, templated,
+wordy, beside a gap — is `none`, because its remedy is a rewrite; a duplicate
+is `all-but-one`. `validatePipeline` refuses an unknown value at boot. The one
+rule is `withheldItems` in `core/outputs/withheld.ts`: it reads engine facts
+only — the ledger's confirmed findings, its validation reports (a validator's
+problems withhold what the reader declares for that validator id, `every-ref`
+when nothing is) and the criteria's citations for support — withholds the
+`every-ref` items first, then keeps the best still standing of each
+`all-but-one` group. Its readers are a digest's memories (`endorsedMemories`)
+and a recall's kept chunks (`readPack`); each readout carries `withheld`, one
+entry per item with what withheld it (`finding` or `validator`, and the type
+or id), so a reader counts what it withheld by source and type.
+
+**A stored lesson is stamped from the evidence it cites.** The digest's index
+names, for every finding and criterion, the source run's iterations it was
+seen or assessed in, and both ends of each change the record shows in it. Each
+endorsed memory carries the iterations its evidence belongs to, and the store
+stamps it with the latest of them and that iteration's own decision — never the
+run's best for every lesson of the run. Its lineage names the adopted run's
+iteration only when the stamped iteration is the copy. An index written before
+it named iterations stamps from the run's best, as before. The curator's rule
+that a lesson from a rejected or escalated iteration informs a risk, never a
+recommendation, reads that per-lesson stamp.
+
+**A recalled lesson arrives in the asker's terms, with where it was learned.**
+The curator's query labels the asker's needs for it — `d1…` the focused
+defects, `p1…` the derived conditions, `k1…` the notes already in hand — and
+its own rubric's ids, `c1…`, name the needs it derived. None of those means
+anything to the producer, the author or the target's stages, and `c8` would
+read as the asker's own c8. So `lessonOf` (`recall/provenance.ts`) reads the
+curator's `serves`, `insight` and `caveat` back through one mapping: a defect
+label becomes the asker's criterion it fell short on, or the defect's own
+words; a curator criterion stands for what the focus labels its statement
+cites stand for; every other label is dropped, and a part named only by such
+labels is left unsaid. Each lesson carries the run, `pipeline`, `iteration`,
+`decision` and `when` the curator was shown beside it. The producer's
+briefing, the studio's coach panel, the run's `recall.json` and `run.md`, and
+the section the memory orchestrator appends to a target's goal all read the
+lesson this way.
+
+**A lesson the store holds always fits the query that recalls it.** A program
+writes every field of the curator's query, so every bound on it is exact, and
+a field holding what a lenient read returned admits the longest such a read
+returns: a candidate's text `keptAtMost(LESSON_CHUNK_BOUND)` (a lesson whose
+halves a digest kept past their ceilings), a probe `keptAtMost(PROBE_BOUND)`.
+The goal head is 8,000 bytes (the recorded queries used at most 5,954).
+Sixteen lessons that long cannot fit the 64,000-byte goal budget, so
+`buildQuery` offers the best-ranked candidates that fit (`withinBudget`): with
+every other field at its longest, one candidate at the longest stored lesson
+always fits and sixteen at the length a digest is asked for all do. A query is
+refused (`query-refused`) only for a structural fault.
