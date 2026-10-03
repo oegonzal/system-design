@@ -1,8 +1,10 @@
-import type {
-  PipelineSummary,
-  PromptLibraryDocumentDto,
-  PromptLibraryEntryDto,
-  QualityRunSummaryDto,
+import {
+  CRITERION_STATEMENT_BOUND,
+  keptAtMost,
+  type PipelineSummary,
+  type PromptLibraryDocumentDto,
+  type PromptLibraryEntryDto,
+  type QualityRunSummaryDto,
 } from '@sysdesign/contracts';
 
 /** What the service's library and pipeline registry answer, shaped exactly like the wire. */
@@ -42,7 +44,7 @@ export const makePipeline = (overrides: Partial<PipelineSummary> = {}): Pipeline
       unsupported_claim: 'A claim the design makes without showing how.',
     },
     maxCriteria: 20,
-    maxStatementLength: 400,
+    maxStatementLength: keptAtMost(CRITERION_STATEMENT_BOUND),
   },
   producer: { consumes: ['criteria'] },
   controller: {
