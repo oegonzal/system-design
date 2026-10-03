@@ -13,6 +13,7 @@
 import {
   SEVERITIES,
   tokenWords,
+  type ConfirmedFinding,
   type CriterionEvidence,
   type RecallFocusCriterionDto,
   type RecallFocusDto,
@@ -48,31 +49,46 @@ const isShortfall = (
 ): row is CriterionEvidence & { result: RecallFocusCriterionDto['result'] } =>
   (SHORTFALL_ORDER as readonly string[]).includes(row.result);
 
-/** The defects of the iteration a run starts from, worst first, within the caps. */
-export function focusOf(base: RecallBase): RecallFocusDto {
-  const { iteration } = base;
-  // A finding carries the words its lens gave it; one recorded before it
-  // did is read from the critics' own reports.
-  const annotated = annotate(iteration.ledger.findings, iteration.critics, iteration.locations);
-  const findings: RecallFocusFindingDto[] = iteration.ledger.findings
-    .map((finding, position) => ({
-      finding: {
-        ...finding,
-        rationale: finding.rationale ?? annotated[position]?.rationale ?? null,
-      },
-      position,
-    }))
+/**
+ * The findings a focus names, in the order it names them: worst first, then as
+ * the ledger recorded them, within the cap. Exported because a focus records a
+ * finding's type and words rather than its key, so anything reading a focus back
+ * — the effectiveness report does — has to rank the ledger the same way, and one
+ * comparator in two places would drift.
+ */
+export const rankedFocusFindings = (
+  ledger: RecallBase['iteration']['ledger'],
+): ConfirmedFinding[] =>
+  ledger.findings
+    .map((finding, position) => ({ finding, position }))
     .sort(
       (a, b) =>
         SEVERITIES.indexOf(a.finding.severity) - SEVERITIES.indexOf(b.finding.severity) ||
         a.position - b.position,
     )
     .slice(0, MAX_FOCUS_FINDINGS)
-    .map(({ finding }) => ({
+    .map(({ finding }) => finding);
+
+/** The defects of the iteration a run starts from, worst first, within the caps. */
+export function focusOf(base: RecallBase): RecallFocusDto {
+  const { iteration } = base;
+  // A finding carries the words its lens gave it; one recorded before it
+  // did is read from the critics' own reports.
+  const annotated = annotate(iteration.ledger.findings, iteration.critics, iteration.locations);
+  const words = new Map(
+    iteration.ledger.findings.map((finding, position) => [
+      finding.key,
+      finding.rationale ?? annotated[position]?.rationale ?? null,
+    ]),
+  );
+  const findings: RecallFocusFindingDto[] = rankedFocusFindings(iteration.ledger).map((finding) => {
+    const rationale = words.get(finding.key) ?? null;
+    return {
       type: finding.type,
       severity: finding.severity,
-      rationale: finding.rationale === null ? null : cap(finding.rationale),
-    }));
+      rationale: rationale === null ? null : cap(rationale),
+    };
+  });
   const statementOf = new Map(
     base.criteria.map((criterion) => [criterion.id, criterion.statement]),
   );

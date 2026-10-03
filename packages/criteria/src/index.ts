@@ -669,6 +669,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'An item whose evidence supports one already stored reinforces it instead of being stored again: the claim is a row keyed by (point, source run) pinned to the text it was made about, the count a search reads is derived from those rows, and digesting one run twice leaves the points, the rows and the counts as they were.',
   },
+  {
+    id: 'QL-45',
+    statement:
+      "Two read-only reports answer what the memory tier could not say about itself: for every run that recalled, what became of each defect the recall searched for, read from the engine's own transitions and attributed at run level because the curator's words are prose; and for every brief, the needs no recall could serve, kept against the brief taken bare so the same prompt groups once.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',
@@ -678,6 +683,6 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'ING-2',
     statement:
-      'Documents are read through a declared table of readers by extension — PDF text page by page, markdown and plain text verbatim — and an extension the table does not name is refused by name, never guessed.',
+      "Documents are read through a declared table of readers by extension — PDF text from the page's own geometry, markdown and plain text verbatim, JSON Lines one record per titled section through a declared field map — and an extension the table does not name, or a record the map cannot read, is refused by name, never guessed and never skipped.",
   },
 ] as const;

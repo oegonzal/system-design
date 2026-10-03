@@ -14,12 +14,17 @@ import {
 } from '@nestjs/common';
 import type {
   OrchestrationStepDto,
+  QualityRunDto,
+  QualityRunSummaryDto,
+  RecallEffectivenessDto,
   RetrievalHitDto,
   RetrievalProbeDto,
   RetrievalReportDto,
+  StandingGapsDto,
 } from '@sysdesign/contracts';
 import { MEMORY_ORCHESTRATOR_ID } from '@sysdesign/contracts';
 
+import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { outputsOf } from '../../core/outputs';
 import { digestedChildren } from '../../orchestrators/memory/definition';
 import { memoriesToStore } from '../../orchestrators/memory/digest/read-digest';
@@ -34,7 +39,13 @@ import { isOrchestrationRunId } from '../orchestration/orchestration-request';
 import type { OrchestrationRunRepository } from '../orchestration/ports';
 import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
 import { RunsService } from '../runs/runs.service';
+import { recallEffectiveness, type RecallingRun } from './reports/effectiveness';
+import { goalHashOf, standingGaps, type AttributedRecall } from './reports/gaps';
 import { MEMORY_PORTS } from './tokens';
+
+/** How far back a report will read, and in what pages: a bound by declaration, not by accident. */
+const MAX_REPORT_RUNS = 500;
+const REPORT_PAGE = 100;
 
 /** The first text searched is the prompt itself; the rest are the derived probes, aliased in order. */
 const probeLabel = (position: number): string =>
@@ -160,6 +171,106 @@ export class MemoryService implements OnModuleInit {
         matched: hit.probes.map(probeLabel),
       })),
     };
+  }
+
+  /**
+   * Whether recalled lessons went with runs whose defects then resolved. A read
+   * over records already written: the runs that recalled, each with the recall
+   * run it opened, joined to what the engine said changed in the next iteration.
+   * Reports nothing a record does not hold, and writes nothing at all.
+   */
+  async effectiveness(query: {
+    pipeline?: string;
+    limit: number;
+  }): Promise<RecallEffectivenessDto> {
+    const { rows, scanned } = await this.scan(
+      { pipeline: query.pipeline, status: 'complete' },
+      (summary) => summary.recall !== null && summary.recall.status === 'recalled',
+      query.limit,
+    );
+    const entries: RecallingRun[] = [];
+    for (const summary of rows) {
+      const run = await this.runs.get(summary.runId);
+      if (run === null || run.recall === null) continue;
+      // The recall run is what carries the candidates' own points, read out of
+      // the query it was asked. A run that recorded no recall run — it never
+      // opened one — contributes its outcomes and no lesson rows.
+      const recallRunId = run.recall.recallRunId;
+      const recall = recallRunId === null ? null : await this.runs.get(recallRunId);
+      entries.push({ run, recall });
+    }
+    return recallEffectiveness(entries, scanned);
+  }
+
+  /**
+   * What recalls could not serve, by brief. A recall is attributed to the brief
+   * it served through the run that opened it; one whose parent is no longer
+   * stored is counted rather than guessed at.
+   */
+  async gaps(query: {
+    runId?: string;
+    goalHash?: string;
+    limit: number;
+  }): Promise<StandingGapsDto> {
+    const { rows, scanned } = await this.scan(
+      { pipeline: MEMORY_RECALL_ID, status: 'complete' },
+      () => true,
+      query.limit,
+    );
+    const attributed: AttributedRecall[] = [];
+    for (const summary of rows) {
+      const recall = await this.runs.get(summary.runId);
+      if (recall === null) continue;
+      attributed.push({ recall, goal: await this.briefOf(recall) });
+    }
+    const report = standingGaps(attributed, scanned);
+    const wanted = await this.wantedHash(query);
+    return wanted === null
+      ? report
+      : { ...report, groups: report.groups.filter((group) => group.goalHash === wanted) };
+  }
+
+  /** The brief a recall served: the goal of the run that opened it, taken bare. */
+  private async briefOf(recall: QualityRunDto): Promise<string | null> {
+    if (recall.parentRunId === null) return null;
+    const parent = await this.runs.get(recall.parentRunId);
+    return parent?.request.goal ?? null;
+  }
+
+  /** The one group a query asked for, by brief hash or by the run whose brief it is. */
+  private async wantedHash(query: { runId?: string; goalHash?: string }): Promise<string | null> {
+    if (query.goalHash !== undefined) return query.goalHash;
+    if (query.runId === undefined) return null;
+    const run = await this.runs.get(query.runId);
+    if (run === null) throw new NotFoundException(`run ${query.runId} not found`);
+    // A recall run names the brief through its parent; any other run is its own.
+    const goal = run.pipeline === MEMORY_RECALL_ID ? await this.briefOf(run) : run.request.goal;
+    return goal === null ? null : goalHashOf(goal);
+  }
+
+  /**
+   * Rows a report reads, newest first, paged until it has `limit` of them or the
+   * scan bound is reached — so a report over a long history is bounded by
+   * declaration rather than by how much a page happened to hold.
+   */
+  private async scan(
+    query: { pipeline?: string; status: 'complete' },
+    keep: (summary: QualityRunSummaryDto) => boolean,
+    limit: number,
+  ): Promise<{ rows: QualityRunSummaryDto[]; scanned: number }> {
+    const rows: QualityRunSummaryDto[] = [];
+    let scanned = 0;
+    for (let offset = 0; offset < MAX_REPORT_RUNS; offset += REPORT_PAGE) {
+      const [page] = await this.runs.listRuns({ ...query, limit: REPORT_PAGE, offset });
+      if (page.length === 0) break;
+      scanned += page.length;
+      for (const summary of page) {
+        if (keep(summary)) rows.push(summary);
+        if (rows.length === limit) return { rows, scanned };
+      }
+      if (page.length < REPORT_PAGE) break;
+    }
+    return { rows, scanned };
   }
 
   /** A registered pipeline's own accept bar; unreachable when it is not registered. */
