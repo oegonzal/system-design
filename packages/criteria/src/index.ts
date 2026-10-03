@@ -373,6 +373,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
   },
+  {
+    id: 'QL-41',
+    statement:
+      'Every string and list a model writes into is one declared bound — a target the model is asked for and a ceiling the schema accepts — and a size limit never discards work: a reply a little over is kept whole and recorded, an extreme overrun is cut at a word boundary with a visible marker, a list over is trimmed by whole items, and only a structural fault refuses the reply, with every fault named in one wording.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

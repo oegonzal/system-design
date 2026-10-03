@@ -1,0 +1,326 @@
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+
+import {
+  bound,
+  boundPath,
+  bounded,
+  composedBound,
+  CUT_FACTOR,
+  CUT_MARKER,
+  describeIssue,
+  exact,
+  jsonSchemaBoundPath,
+  locationPath,
+  modelSchema,
+  overrunsOf,
+  parseLenient,
+  schemaIssuesOf,
+  SOFT_ISSUE_NOTE,
+} from './bounds';
+
+const CLAIM = bound(300);
+
+/** Prose of whole words, so a cut can be checked for landing between two of them. */
+const prose = (length: number): string => {
+  const words = ['alpha', 'beta', 'gamma', 'delta', 'epsilon'];
+  let text = '';
+  for (let index = 0; text.length < length; index++) text += `${words[index % words.length]} `;
+  return text.slice(0, length);
+};
+
+describe('a declared bound', () => {
+  it('[QL-41] is a target and a ceiling: a quarter over the target, or the floor when that is more', () => {
+    expect(CLAIM).toEqual({ target: 300, ceiling: 375 });
+    // Under ~160 characters the floor of forty is what clears a sentence.
+    expect(bound(80)).toEqual({ target: 80, ceiling: 120 });
+    expect(bound(6, 'list')).toEqual({ target: 6, ceiling: 8 });
+    expect(bound(24, 'list')).toEqual({ target: 24, ceiling: 30 });
+    expect(exact(16)).toEqual({ target: 16, ceiling: 16 });
+  });
+
+  it('[QL-41] composes from bounded parts and literal separators, each separator counted once', () => {
+    const row = composedBound([bound(24), ' — ', bound(160), ' — ', bound(60)]);
+    expect(row).toEqual({ target: 24 + 160 + 60 + 6, ceiling: 64 + 200 + 100 + 6 });
+  });
+});
+
+describe('modelSchema', () => {
+  const id = bounded.id(8, { min: 1 });
+  const schema = z.strictObject({
+    claim: bounded.text(CLAIM, { description: 'In your own words.' }),
+    label: bounded.text(bound(80)).optional(),
+    note: bounded.text(bound(80)).nullable(),
+    tags: bounded.list(bound(6, 'list'), bounded.text(bound(40)), { min: 1 }).default([]),
+    value: z.union([bounded.text(bound(120)), z.number(), z.boolean()]),
+    // One node, three places: an index read off the conversion alone would miss two.
+    edge: z.strictObject({ id, source: id, target: id.describe('Where it ends.') }),
+  });
+
+  it('[QL-41] asks the model for the target while the schema accepts the ceiling', () => {
+    const { json, bounds } = modelSchema(schema);
+    const properties = json['properties'] as Record<string, Record<string, unknown>>;
+    expect(properties['claim']['maxLength']).toBe(300);
+    expect(properties['claim']['description']).toBe('In your own words.');
+    expect(properties['tags']['maxItems']).toBe(6);
+    expect((properties['tags']['items'] as Record<string, unknown>)['maxLength']).toBe(40);
+    expect(JSON.stringify(json)).not.toContain('$bound');
+
+    const accepted = (claim: string) =>
+      schema.safeParse({
+        claim,
+        note: null,
+        value: 1,
+        edge: { id: 'e1', source: 'n1', target: 'n2' },
+      }).success;
+    expect(accepted('x'.repeat(375))).toBe(true);
+    expect(accepted('x'.repeat(376))).toBe(false);
+
+    expect(bounds).toEqual({
+      claim: { kind: 'text', target: 300, ceiling: 375 },
+      label: { kind: 'text', target: 80, ceiling: 120 },
+      note: { kind: 'text', target: 80, ceiling: 120 },
+      tags: { kind: 'list', target: 6, ceiling: 8 },
+      'tags[]': { kind: 'text', target: 40, ceiling: 80 },
+      value: { kind: 'text', target: 120, ceiling: 160 },
+      'edge.id': { kind: 'id', target: 8, ceiling: 8 },
+      'edge.source': { kind: 'id', target: 8, ceiling: 8 },
+      'edge.target': { kind: 'id', target: 8, ceiling: 8 },
+    });
+  });
+
+  it('[QL-41] names a bound by its index-free path, and a value by its indices', () => {
+    expect(boundPath(['findings', 2, 'rationale'])).toBe('findings[].rationale');
+    expect(locationPath(['findings', 2, 'rationale'])).toBe('findings[2].rationale');
+    expect(locationPath([])).toBe('(root)');
+    expect(
+      jsonSchemaBoundPath(['properties', 'findings', 'items', 'properties', 'rationale']),
+    ).toBe('findings[].rationale');
+    expect(jsonSchemaBoundPath(['properties', 'value', 'anyOf', 0])).toBe('value');
+    expect(jsonSchemaBoundPath(['properties', 'config', 'additionalProperties'])).toBe('config.*');
+  });
+
+  it('[QL-41] reports every field of a value past its target', () => {
+    const { bounds } = modelSchema(schema);
+    const value = {
+      claim: 'x'.repeat(358),
+      note: null,
+      tags: ['t'.repeat(50), 't'],
+      value: 7,
+      edge: { id: 'e1', source: 'n1', target: 'n2' },
+    };
+    expect(overrunsOf(value, bounds)).toEqual([
+      {
+        path: 'claim',
+        at: ['claim'],
+        kind: 'text',
+        target: 300,
+        ceiling: 375,
+        actual: 358,
+        handling: 'accepted',
+      },
+      {
+        path: 'tags[0]',
+        at: ['tags', 0],
+        kind: 'text',
+        target: 40,
+        ceiling: 80,
+        actual: 50,
+        handling: 'accepted',
+      },
+    ]);
+  });
+});
+
+describe('parseLenient', () => {
+  const schema = z.strictObject({
+    claim: bounded.text(CLAIM, { min: 1 }),
+    severity: z.enum(['low', 'high']),
+    nodeIds: bounded.list(bound(8, 'list'), bounded.id(8, { min: 1 })),
+  });
+  const valid = { claim: 'the API writes the order', severity: 'low', nodeIds: ['n1'] };
+
+  it('[QL-41] keeps a 358/300 claim whole and records it as accepted', () => {
+    const parsed = parseLenient(schema, { ...valid, claim: 'x'.repeat(358) });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.claim).toHaveLength(358);
+    expect(parsed.repairs).toEqual([]);
+    expect(parsed.overruns).toEqual([
+      expect.objectContaining({ path: 'claim', actual: 358, handling: 'accepted' }),
+    ]);
+  });
+
+  it('[QL-41] keeps a claim past the ceiling whole, up to three targets, and records it', () => {
+    const parsed = parseLenient(schema, { ...valid, claim: prose(700) });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.claim).toBe(prose(700));
+    expect(parsed.overruns).toEqual([
+      {
+        path: 'claim',
+        at: ['claim'],
+        kind: 'text',
+        target: 300,
+        ceiling: 375,
+        actual: 700,
+        handling: 'kept-over-ceiling',
+      },
+    ]);
+  });
+
+  it('[QL-41] cuts a 1,200/300 claim at a word boundary before three targets, with the marker', () => {
+    const written = prose(1200);
+    const parsed = parseLenient(schema, { ...valid, claim: written });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const { claim } = parsed.value;
+    expect(claim.endsWith(CUT_MARKER)).toBe(true);
+    const kept = claim.slice(0, -CUT_MARKER.length);
+    expect(kept.length).toBeLessThanOrEqual(CUT_FACTOR * CLAIM.target);
+    // Ends on a whole word: the written text continues with a space there.
+    expect(written.startsWith(kept)).toBe(true);
+    expect(written[kept.length]).toBe(' ');
+    expect(kept.endsWith(' ')).toBe(false);
+    expect(parsed.overruns).toEqual([
+      expect.objectContaining({ path: 'claim', actual: 1200, handling: 'cut' }),
+    ]);
+    // Parsed again, what was cut is kept as written: never cut twice.
+    const again = parseLenient(schema, parsed.value);
+    expect(again.ok && again.value).toEqual(parsed.value);
+  });
+
+  it('[QL-41] trims a 13-item list to its ceiling by whole items, worst-last, and records what it dropped', () => {
+    const nodeIds = Array.from({ length: 13 }, (_, index) => `n${index + 1}`);
+    const parsed = parseLenient(schema, { ...valid, nodeIds });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.value.nodeIds).toEqual(nodeIds.slice(0, 10));
+    expect(parsed.repairs).toEqual([
+      { path: 'nodeIds', at: ['nodeIds'], action: 'trimmed', detail: '3 dropped' },
+    ]);
+    expect(parsed.overruns).toEqual([
+      {
+        path: 'nodeIds',
+        at: ['nodeIds'],
+        kind: 'list',
+        target: 8,
+        ceiling: 10,
+        actual: 13,
+        handling: 'trimmed',
+        dropped: 3,
+      },
+    ]);
+  });
+
+  it('[QL-41] strips an aside key the schema never asked for, and says so', () => {
+    const parsed = parseLenient(schema, { ...valid, claim_note: 'an aside' });
+    expect(parsed.ok && parsed.value).toEqual(valid);
+    expect(parsed.repairs).toEqual([
+      { path: '(root)', at: [], action: 'stripped-keys', detail: 'claim_note' },
+    ]);
+  });
+
+  it('[QL-41] refuses a wrong enum value, with every fault named and the soft ones flagged', () => {
+    const parsed = parseLenient(schema, { ...valid, claim: 'x'.repeat(400), severity: 'fatal' });
+    expect(parsed.ok).toBe(false);
+    expect(parsed.value).toBeNull();
+    expect(parsed.issues.map((issue) => [issue.path, issue.code, issue.soft])).toEqual([
+      ['claim', 'too_big', true],
+      ['severity', 'invalid_value', false],
+    ]);
+    expect(parsed.issues.map(describeIssue)).toEqual([
+      `claim: 400 characters; 300 asked, 375 accepted ${SOFT_ISSUE_NOTE}`,
+      'severity: Invalid option: expected one of "low"|"high"',
+    ]);
+  });
+
+  it('[QL-41] an id over its max is structural, never kept — and so is an empty required string', () => {
+    const overlong = parseLenient(schema, { ...valid, nodeIds: ['n'.repeat(9)] });
+    expect(overlong.ok).toBe(false);
+    expect(overlong.issues).toEqual([
+      expect.objectContaining({ path: 'nodeIds[0]', code: 'too_big', kind: 'id', soft: false }),
+    ]);
+    const empty = parseLenient(schema, { ...valid, claim: '' });
+    expect(empty.ok).toBe(false);
+    expect(empty.issues).toEqual([
+      expect.objectContaining({ path: 'claim', code: 'too_small', soft: false }),
+    ]);
+  });
+
+  it('[QL-41] keeps the union branch the reply meant when its only fault is soft', () => {
+    const scalar = z.strictObject({ value: z.union([bounded.text(bound(120)), z.number()]) });
+    const kept = parseLenient(scalar, { value: 'v'.repeat(200) });
+    expect(kept.ok && kept.value).toEqual({ value: 'v'.repeat(200) });
+    expect(kept.overruns).toEqual([
+      expect.objectContaining({ path: 'value', actual: 200, handling: 'kept-over-ceiling' }),
+    ]);
+
+    const shapes = z.strictObject({
+      part: z.union([
+        z.strictObject({ claim: bounded.text(bound(100)) }),
+        z.strictObject({ count: z.number() }),
+      ]),
+    });
+    const branch = parseLenient(shapes, { part: { claim: 'c'.repeat(160) } });
+    expect(branch.ok && branch.value).toEqual({ part: { claim: 'c'.repeat(160) } });
+    expect(branch.overruns).toEqual([
+      expect.objectContaining({ path: 'part.claim', actual: 160, handling: 'kept-over-ceiling' }),
+    ]);
+    // No branch fits even softly: the union is one structural fault, at the union.
+    const none = parseLenient(shapes, { part: { other: true } });
+    expect(none.ok).toBe(false);
+    expect(none.issues).toEqual([
+      expect.objectContaining({ path: 'part', code: 'invalid_union', soft: false }),
+    ]);
+  });
+
+  it('[QL-41] applies defaults and transforms, then restores the text it kept', () => {
+    const withDefault = z.strictObject({
+      text: bounded.text(bound(100)),
+      tags: z.array(z.string()).default([]),
+    });
+    const parsed = parseLenient(withDefault, { text: 't'.repeat(200) });
+    expect(parsed.ok && parsed.value).toEqual({ text: 't'.repeat(200), tags: [] });
+  });
+
+  it('[QL-41] is idempotent on a valid value, and reports nothing on one within every target', () => {
+    const parsed = parseLenient(schema, valid);
+    expect(parsed).toEqual({ ok: true, value: valid, overruns: [], repairs: [], issues: [] });
+    const again = parseLenient(schema, parsed.value);
+    expect(again).toEqual(parsed);
+  });
+
+  it('[QL-41] words a fault the one way every reader uses, from a strict parse too', () => {
+    const lens = z.strictObject({
+      findings: z.array(z.strictObject({ rationale: bounded.text(bound(900)) })),
+    });
+    const { bounds } = modelSchema(lens);
+    const result = lens.safeParse(
+      { findings: [{ rationale: 'a' }, { rationale: 'b' }, { rationale: 'r'.repeat(1015) }] },
+      { reportInput: true },
+    );
+    expect(result.success).toBe(true);
+    const over = lens.safeParse(
+      { findings: [{ rationale: 'a' }, { rationale: 'b' }, { rationale: 'r'.repeat(1200) }] },
+      { reportInput: true },
+    );
+    expect(over.success).toBe(false);
+    if (over.success) return;
+    const [issue] = schemaIssuesOf(over.error.issues, bounds);
+    expect(issue).toEqual({
+      code: 'too_big',
+      path: 'findings[2].rationale',
+      at: ['findings', 2, 'rationale'],
+      message: 'Too big: expected string to have <=1125 characters',
+      maximum: 1125,
+      target: 900,
+      actual: 1200,
+      kind: 'text',
+      soft: true,
+    });
+    expect(describeIssue({ ...issue, soft: false })).toBe(
+      'findings[2].rationale: 1,200 characters; 900 asked, 1,125 accepted',
+    );
+  });
+});

@@ -10,6 +10,7 @@
 // compiler and Vite, and the extensionless relative form is the one spelling
 // all of them agree on.
 export * from './lib/primitives';
+export * from './lib/bounds';
 export * from './lib/constants';
 export * from './lib/envelope';
 export * from './lib/appearance';
