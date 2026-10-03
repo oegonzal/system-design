@@ -8,7 +8,7 @@ import { sampleDigest, sampleRun } from '../../../pipelines/experience-digest/te
 import { memoriesToStore } from '../digest/read-digest';
 import { ACCEPT_AT, digestInput, readoutTrace } from '../testing';
 import { CHUNK_KINDS } from '../../../pipelines/memory-recall/input';
-import { chunkKind, chunksOf, DEFAULT_CHUNK_KIND } from './chunks';
+import { chunkKind, chunksOf, DEFAULT_CHUNK_KIND, type OwnedKinds } from './chunks';
 
 describe('a stored chunk', () => {
   it('[QL-40] is stored under the kind its digest declared, and under the old one when it declares none', () => {
@@ -26,7 +26,7 @@ describe('a stored chunk', () => {
       evidence: [],
       ...(kind === undefined ? {} : { kind }),
     });
-    const owned = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
+    const owned: OwnedKinds = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
     const kinds = chunksOf(
       [
         memory(1, 'profile_fact'),
@@ -53,6 +53,21 @@ describe('a stored chunk', () => {
     expect(chunkKind('pattern', owned)).toBe(DEFAULT_CHUNK_KIND);
     expect(chunkKind('profile_story', [DEFAULT_CHUNK_KIND])).toBe(DEFAULT_CHUNK_KIND);
     expect(CHUNK_KINDS).toContain('pattern');
+
+    // Where a stray is filed is the writer's OWN first kind, never a fixed one:
+    // a writer owning no lessons would otherwise file it outside its own replace
+    // scope and orphan it on the next re-digest. Requiring every writer to own
+    // `lesson` would close that and open the worse half — owning a kind means
+    // replacing it, so the knowledge writer, which owns items and findings and
+    // deliberately no lesson, would delete the memory orchestrator's lessons.
+    const noLessons: OwnedKinds = ['fact', 'pattern'];
+    expect(chunkKind(undefined, noLessons)).toBe('fact');
+    expect(chunkKind('profile_story', noLessons)).toBe('fact');
+    expect(noLessons).not.toContain(DEFAULT_CHUNK_KIND);
+    for (const kinds of [owned, noLessons]) {
+      expect(kinds).toContain(chunkKind(undefined, kinds));
+      expect(kinds).toContain(chunkKind('a_kind_nobody_owns', kinds));
+    }
   });
 
   it('[QL-40] every kind a document memory may declare is one the store can hold', () => {

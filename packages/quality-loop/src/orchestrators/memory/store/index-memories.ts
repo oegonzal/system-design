@@ -12,8 +12,7 @@ import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
 import { VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
-import type { ChunkKind } from '../../../pipelines/memory-recall/input';
-import { chunkKind, chunksOf, type ChunkOrigin } from './chunks';
+import { chunkKind, chunksOf, type ChunkOrigin, type OwnedKinds } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
 const dayOf = (iso: string): string => iso.slice(0, 10);
@@ -60,7 +59,7 @@ export async function indexMemories(
    * under the same run. Declared by the caller because the vocabulary belongs
    * to the caller's digest, which this function cannot see.
    */
-  ownedKinds: readonly ChunkKind[],
+  ownedKinds: OwnedKinds,
 ): Promise<StepResult<undefined>> {
   const trace = source.trace;
   if (trace === null) return skipped('nothing-to-digest');

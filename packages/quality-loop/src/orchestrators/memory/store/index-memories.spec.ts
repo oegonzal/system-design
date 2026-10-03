@@ -6,7 +6,7 @@ import { pointId } from '../../../modules/memory/qdrant/collection';
 import type { StoredChunk } from '../ports';
 import { childRun, memoryPorts } from '../steps.testing';
 import { FAKE_MODEL, readoutTrace } from '../testing';
-import { DEFAULT_CHUNK_KIND } from './chunks';
+import { DEFAULT_CHUNK_KIND, type OwnedKinds } from './chunks';
 import { indexMemories, originOf } from './index-memories';
 
 /**
@@ -93,7 +93,7 @@ describe('a stored lesson’s origin', () => {
     const source: QualityRunDto = { ...childRun('system-design-canvas', trace), trace };
     const ports = memoryPorts();
     const store = ports.store as InMemoryMemoryStore;
-    const owned = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
+    const owned: OwnedKinds = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
     const memory = (position: number, kind: string) => ({
       position,
       insight: `insight ${position}`,
