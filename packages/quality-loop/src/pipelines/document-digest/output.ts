@@ -7,11 +7,14 @@
  * a form would ask, and the probes a form's labels become are searched in
  * that register.
  *
- * A location is a PLACE in the digest — the summary, each memory, each
- * unused slot — never a memory's citation, for the reason the experience
- * digest learned the hard way: a finding is located at the memory it faults
- * and names the sections in its rationale, so admission excludes that memory
- * and no other.
+ * A location is a PLACE in the digest — the summary and each memory — never
+ * a section, for the reason the experience digest learned the hard way: a
+ * finding is located at the memory it faults and names the sections in its
+ * rationale, so admission excludes that memory and no other. The first live
+ * runs taught the second half: when some section aliases were locations (the
+ * ones under `unused`) and others were not, the judges cited sections freely,
+ * the schema refused the reply, and a run lost samples to it. A fact no
+ * memory holds is located at the summary.
  */
 import { DOCUMENT_MAX_MEMORIES, DOCUMENT_MAX_PARTS, SECTION_ALIAS } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -74,7 +77,6 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
       id: `memory.${index + 1}`,
       label: memory.insight,
     })),
-    ...digest.unused.map((id) => ({ id, label: 'unused' })),
   ],
 
   render: (digest) =>

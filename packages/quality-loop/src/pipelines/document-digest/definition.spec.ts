@@ -71,20 +71,20 @@ describe('the document-digest pipeline', () => {
   });
 
   it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // SEEDED from the experience digest's measured table (static/runs,
-    // 2026-09-20 – 2026-10-02): the pipeline with the same lens shape and
-    // item shape over goals of the same size. No live document run has been
-    // recorded yet; the first ones (05-llm output tokens) replace this
-    // table. A cap is also the call's time limit, so one a stage outwrites
-    // is a call cut short.
+    // MEASURED on the first two live document runs (static/runs
+    // 2026-10-03T02-01-50-804-cccff4 and 2026-10-03T02-23-44-080-9c93d1,
+    // 05-llm/*.meta.json output tokens, 46 calls over an 18-part and a
+    // 10-part résumé chunk): the largest any stage wrote. A cap is also the
+    // call's time limit, so one a stage outwrites is a call cut short; the
+    // caps hold 1.2× these. Re-measure when a chunk shape changes.
     const measured: Record<string, number> = {
-      criteria: 7_684,
-      producer: 31_719,
-      'critic.grounding': 26_918,
-      'critic.coverage': 27_805,
-      'critic.usability': 19_963,
-      'evaluator.capture': 13_321,
-      'evaluator.rules': 13_321,
+      criteria: 3_901,
+      producer: 21_858,
+      'critic.grounding': 17_454,
+      'critic.coverage': 5_917,
+      'critic.usability': 15_454,
+      'evaluator.capture': 12_382,
+      'evaluator.rules': 9_940,
     };
     expect(capsBelowMeasured(DOCUMENT_DIGEST, measured)).toEqual([]);
     expect(Object.keys(declaredCaps(DOCUMENT_DIGEST)).sort()).toEqual(Object.keys(measured).sort());
@@ -97,10 +97,12 @@ describe('the document-digest pipeline', () => {
       expect(rendered).toContain(`[${location.id}]`);
     }
     const ids = documentDigestOutput.locate(digest).map((location) => location.id);
-    expect(ids).toEqual(['summary', 'memory.1', 'memory.2', 'section.3']);
+    expect(ids).toEqual(['summary', 'memory.1', 'memory.2']);
+    // Neither a cited section nor an unused one is a place: a judge cites a memory or the summary.
     for (const memory of digest.memories) {
       for (const alias of memory.evidence) expect(ids).not.toContain(alias);
     }
+    for (const alias of digest.unused) expect(ids).not.toContain(alias);
     expect(rendered).toContain('[memory.2] on [section.1]: Alex Example lives in Lisbon');
     expect(documentDigestOutput.schema.safeParse(digest).success).toBe(true);
   });
