@@ -114,4 +114,28 @@ describe('memory in the goal', () => {
       '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns',
     );
   });
+
+  it("[QL-55] a part left with no letter or digit once its labels are dropped is unsaid, a focus label is one on an unfocused recall too, and the curator's other words stay as written", () => {
+    const usable: UsableMemory = {
+      alias: 'm1',
+      hit: hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
+      support: 1,
+      rubric: [
+        { id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' },
+        { id: 'c2', kind: 'need', statement: 'keep the read path available' },
+      ],
+      kept: {
+        chunk: 'm1',
+        // Labels only, in a bracket: nothing is left to say, so no `serves: ()`.
+        serves: 'c1 (p2, k1)',
+        // Words between labels are the curator's own and are not guessed at.
+        insight: 'answers c2 and p1 directly',
+        // A focus label the target never listed, and the stop it leaves: no `: availability`.
+        caveat: 'd1: availability of the read path',
+      },
+    };
+    expect(withMemory(GOAL, [usable])?.goal.split('\n').at(-1)).toBe(
+      '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns — insight: answers and directly; caveat: availability of the read path',
+    );
+  });
 });

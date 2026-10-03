@@ -2,6 +2,7 @@ import type { RecallFocusDto, SuccessCriterion } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { briefingOf } from '../../../modules/runs/recall/run-recall';
+import { focusAlias, MAX_FOCUS } from '../../../pipelines/memory-recall/input';
 import { hitOf } from '../testing';
 import { askerTermsOf, inAskerTerms, lessonOf, provenanceOf } from './provenance';
 import type { UsableMemory } from './read-pack';
@@ -84,6 +85,12 @@ describe('a recalled lesson in the asker’s terms', () => {
     expect(
       inAskerTerms('c2 — embedding-provider budget at 50 peak qps', askerTermsOf(null, RUBRIC)),
     ).toBe('embedding-provider budget at 50 peak qps');
+    // A focus label is a label on it too, up to as many as a query can list.
+    const unfocused = askerTermsOf(null, RUBRIC);
+    expect(
+      Array.from({ length: MAX_FOCUS }, (_, position) => unfocused.get(focusAlias(position))),
+    ).toEqual(Array.from({ length: MAX_FOCUS }, () => []));
+    expect(inAskerTerms('see c1/c2; k3 already holds it', unfocused)).toBe('see; already holds it');
     // A sentence that names no label is returned as written — `p99` is a percentile, not a probe.
     expect(inAskerTerms('holds p99 under 50 ms at the edge', terms)).toBe(
       'holds p99 under 50 ms at the edge',

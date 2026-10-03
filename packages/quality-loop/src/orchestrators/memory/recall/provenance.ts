@@ -35,6 +35,7 @@ import {
 import {
   focusAlias,
   knownAlias,
+  MAX_FOCUS,
   MAX_KNOWN,
   MAX_PROBES,
   probeAlias,
@@ -73,7 +74,9 @@ function focusTerms(focus: RecallFocusDto | null): Map<string, string[]> {
  * Every label the curator's query could have given, with what it stands for
  * in the asker's terms. A rubric criterion stands for what the focus labels
  * its own statement cites stand for — the curator's need `c6` derived from
- * `d6` is `d6`'s — read with the one grammar ids are read from prose by.
+ * `d6` is `d6`'s — read with the one grammar ids are read from prose by. A
+ * focus label the query did not list — every one, when it had no focus — is
+ * a label all the same, and stands for nothing.
  */
 export function askerTermsOf(
   focus: RecallFocusDto | null,
@@ -89,6 +92,7 @@ export function askerTermsOf(
   const unmeaning = (alias: (position: number) => string, count: number): [string, string[]][] =>
     Array.from({ length: count }, (_, position) => [alias(position), []]);
   return new Map([
+    ...unmeaning(focusAlias, MAX_FOCUS),
     ...unmeaning(probeAlias, MAX_PROBES),
     ...unmeaning(knownAlias, MAX_KNOWN),
     ...rubric.map((criterion): [string, string[]] => [criterion.id, standsFor(criterion)]),
@@ -110,20 +114,29 @@ function groupsOf(prose: string, mentions: readonly RefMention[]): RefMention[][
   return groups;
 }
 
-/** Separators a dropped label leaves at either end, as the ref grammar reads them. */
+/** What a dropped label leaves at an end of a part: a separator, as the ref grammar reads one, or a clause's stop. */
+const isDebris = (char: string): boolean => listedTogether(char) || char === ':' || char === ';';
+
+/** The separators and stops a dropped label leaves at either end. */
 function trimSeparators(text: string): string {
   let start = 0;
   let end = text.length;
-  while (start < end && listedTogether(text.charAt(start))) start += 1;
-  while (end > start && listedTogether(text.charAt(end - 1))) end -= 1;
+  while (start < end && isDebris(text.charAt(start))) start += 1;
+  while (end > start && isDebris(text.charAt(end - 1))) end -= 1;
   return text.slice(start, end);
 }
+
+/** What a part must keep to say anything: a letter or a digit. */
+const SAYS_SOMETHING = /[\p{L}\p{N}]/u;
 
 /**
  * The curator's words in the asker's terms: each label, or each run of
  * labels listed together, becomes what it stands for — once each, joined as
- * the ref grammar joins a list — or nothing; a sentence that names no label
- * is returned as written.
+ * the ref grammar joins a list — or nothing, and what a dropped label leaves
+ * behind goes with it: a space before a stop, the separators and stops at
+ * either end. A part with no letter or digit left says nothing and is empty;
+ * the curator's other words are kept as written. A sentence that names no
+ * label is returned as written.
  */
 export function inAskerTerms(prose: string, terms: AskerTerms): string {
   const mentions = refMentions(prose, [...terms.keys()]);
@@ -139,7 +152,10 @@ export function inAskerTerms(prose: string, terms: AskerTerms): string {
     out += prose.slice(cursor, first.index) + standsFor.join(' / ');
     cursor = last.index + last.text.length;
   }
-  return trimSeparators((out + prose.slice(cursor)).replace(/ {2,}/g, ' '));
+  const said = trimSeparators(
+    (out + prose.slice(cursor)).replace(/ {2,}/g, ' ').replace(/ +([,;:])/g, '$1'),
+  );
+  return SAYS_SOMETHING.test(said) ? said : '';
 }
 
 export const lessonOf = (

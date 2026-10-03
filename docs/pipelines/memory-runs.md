@@ -1573,12 +1573,17 @@ read as the asker's own c8. So `lessonOf` (`recall/provenance.ts`) reads the
 curator's `serves`, `insight` and `caveat` back through one mapping: a defect
 label becomes the asker's criterion it fell short on, or the defect's own
 words; a curator criterion stands for what the focus labels its statement
-cites stand for; every other label is dropped, and a part named only by such
-labels is left unsaid. Each lesson carries the run, `pipeline`, `iteration`,
-`decision` and `when` the curator was shown beside it. The producer's
-briefing, the studio's coach panel, the run's `recall.json` and `run.md`, and
-the section the memory orchestrator appends to a target's goal all read the
-lesson this way.
+cites stand for; every other label is dropped — a focus label too, up to
+`MAX_FOCUS`, when the recall listed none by it — and with it what it leaves
+behind: the separators and stops at either end of a part and a space before
+a stop. A part with no letter or digit left is left unsaid, so `c1 (p2, k1)`
+is no `serves: ()` and `d1: availability` no `: availability`. The curator's
+other words are kept as written — `answers c2 and p1 directly` reads
+`answers and directly` — because mending its grammar would be a guess. Each
+lesson carries the run, `pipeline`, `iteration`, `decision` and `when` the
+curator was shown beside it. The producer's briefing, the studio's coach
+panel, the run's `recall.json` and `run.md`, and the section the memory
+orchestrator appends to a target's goal all read the lesson this way.
 
 **A lesson the store holds always fits the query that recalls it.** A program
 writes every field of the curator's query, so every bound on it is exact, and
