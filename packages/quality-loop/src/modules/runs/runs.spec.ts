@@ -149,6 +149,13 @@ describe('the HTTP surface', () => {
       startedAt: expect.any(String),
       attempt: 1,
       errorName: null,
+      overruns: 0,
+      overCeiling: 0,
+      cut: 0,
+      trimmed: 0,
+      salvagedFrom: 'result',
+      feedback: false,
+      apiCalls: 1,
     });
     expect(record).not.toHaveProperty('git');
     expect(record.trace?.iterations[0]?.rendered).toBe('[text] made\n[part.1] one');

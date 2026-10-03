@@ -13,6 +13,14 @@ export type QualityRunStatus = (typeof QUALITY_RUN_STATUSES)[number];
 export const LLM_EXCHANGE_OUTCOMES = ['ok', 'refusal', 'schema-miss', 'error'] as const;
 export type LlmExchangeOutcome = (typeof LLM_EXCHANGE_OUTCOMES)[number];
 
+/**
+ * Where the seam read a reply's value from: the turn's own result, or the
+ * transcript of a turn whose ending — our limit, the provider's error, a
+ * broken pipe — left no result to read.
+ */
+export const LLM_REPLY_SOURCES = ['result', 'transcript'] as const;
+export type LlmReplySource = (typeof LLM_REPLY_SOURCES)[number];
+
 /** One model call, attributed to its stage and sample. Prompts and responses stay in the dump. */
 export interface LlmExchangeSummaryDto {
   scope: string;
@@ -32,6 +40,23 @@ export interface LlmExchangeSummaryDto {
    * over dump folders.
    */
   errorName?: string | null;
+  /**
+   * The seam's salvage by count, the fields themselves left to the dump:
+   * every field past its target; of those, every one past its ceiling,
+   * however it was handled; of those, the prose cut at a word with the
+   * marker and the lists trimmed by whole items. Optional so a summary
+   * from before the seam salvaged still reads, as nothing kept.
+   */
+  overruns?: number;
+  overCeiling?: number;
+  cut?: number;
+  trimmed?: number;
+  /** Where the value was read from; null when there was no value. */
+  salvagedFrom?: LlmReplySource | null;
+  /** True when this attempt's ask named the previous attempt's faults. */
+  feedback?: boolean;
+  /** API calls the turn took — more than one when the per-call output ceiling made it resume. Null when the turn never ran. */
+  apiCalls?: number | null;
 }
 
 export interface RunErrorDto {

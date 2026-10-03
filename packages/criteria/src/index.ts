@@ -389,6 +389,11 @@ export const CRITERIA: readonly Criterion[] = [
       'Every string and list a model writes into is one declared bound — a target the model is asked for and a ceiling the schema accepts — and a size limit never discards work: a reply a little over is kept whole and recorded, an extreme overrun is cut at a word boundary with a visible marker, a list over is trimmed by whole items, and only a structural fault refuses the reply, with every fault named in one wording.',
   },
   {
+    id: 'QL-42',
+    statement:
+      "The model seam never loses a reply to its own reading: the model is shown every bound at its target and the reply is read to the ceilings through the salvage ladder, so a soft overrun is kept and recorded on the attempt it arrived in and never costs another; a reply refused for a structural fault is asked again with every fault named in the one wording and, when it is small enough, the reply as written; a turn that ended without a result — our limit, the provider's error, a broken pipe — is still read from what it streamed and answers when that holds the whole object, with what ended it on the record; the API calls a turn took are counted; a caller that asks in detail sees the faults of the last refused reply or the overruns of the value; and a run's wire summary counts what each call kept.",
+  },
+  {
     id: 'QL-43',
     statement:
       "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",

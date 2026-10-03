@@ -110,13 +110,27 @@ export interface LlmRetryPolicy {
   /** Pause before asking again, for the kinds that mean "the provider is strained". */
   backoffMs: number;
   maxBackoffMs: number;
+  /**
+   * What the next ask is told about a reply the schema refused. With `issues`
+   * on, the ask names every fault of the miss, in the one wording a dump
+   * uses; the refused reply rides along, as written, when it is no longer
+   * than `replyMaxChars` — past that the faults alone say what to change.
+   */
+  feedback: { issues: boolean; replyMaxChars: number };
 }
 
 /**
  * Three attempts, because a sample is expensive to lose and cheap to re-ask
  * for: four of six pipelines confirm a defect only when one lens sees it in
  * two of its own samples, so a lost sample does not merely thin the evidence,
- * it silences that lens entirely.
+ * it silences that lens entirely. A schema miss here is a structural one —
+ * a wrong type, a missing field, an unknown id or enum value — because a size
+ * overrun is kept by the parse and never reaches a retry; and the next ask
+ * names what broke (`feedback`), where before it re-sent the same prompt and
+ * hoped for a different draw. Every reply measured fits under the
+ * 60k-character cap on the one that rides along — a lens's to 6.1k
+ * characters, a producer's to 29k (static/runs, 2026-09-01 → 2026-10-03) —
+ * so the cap only keeps a runaway reply out of its own next prompt.
  *
  * A timeout gets one more ask, not two. A call's limit is its whole declared
  * answer at the slowest pace the model has measurably kept
@@ -147,6 +161,7 @@ export const DEFAULT_RETRY_POLICY: LlmRetryPolicy = {
   onceOnly: ['unknown'],
   backoffMs: 1_000,
   maxBackoffMs: 30_000,
+  feedback: { issues: true, replyMaxChars: 60_000 },
 };
 
 /** Kinds that mean the provider is strained, so asking again should wait first. */

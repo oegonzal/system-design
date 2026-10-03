@@ -1,3 +1,10 @@
+import {
+  bound,
+  bounded,
+  CUT_MARKER,
+  designSubmissionSchema,
+  SOFT_ISSUE_NOTE,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -5,12 +12,21 @@ import type { ClaudeQuery } from './claude-account';
 import {
   ClaudeAgentLlmClient,
   extractStructured,
+  FEEDBACK_HEADING,
+  jsonCandidates,
   OUTPUT_TOKEN_CEILING,
   parseStructured,
+  PREVIOUS_REPLY_HEADING,
+  SALVAGED,
   SCHEMA_MISS,
   TIMED_OUT,
 } from './claude-agent-client';
 import type { LlmCall } from './exchange';
+import coach185832p2 from './fixtures/canvas-coach-18-58-32-p2.json';
+import coach185832p3 from './fixtures/canvas-coach-18-58-32-p3.json';
+import coach215319p1 from './fixtures/canvas-coach-21-53-19-p1.json';
+import coach215319p2 from './fixtures/canvas-coach-21-53-19-p2.json';
+import coach215319p3 from './fixtures/canvas-coach-21-53-19-p3.json';
 import { InFlightGate } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY } from './llm-failure';
 
@@ -59,16 +75,33 @@ describe('extractStructured', () => {
     expect(extractStructured(text, capped)).toEqual({ items: [{ note: 'kept' }] });
   });
 
-  it('[QL-4] never cuts prose to fit a bound: an overlong string is a miss that names the bound', () => {
-    const capped = z.object({ summary: z.string().max(10) });
-    const text = JSON.stringify({ summary: 'twelve chars' });
-    expect(extractStructured(text, capped)).toBeNull();
-    const miss = parseStructured(text, capped);
-    expect(miss.ok).toBe(false);
-    if (!miss.ok) {
-      expect(miss.reason).toMatch(/^summary: /);
-      expect(miss.reason).toContain('10');
-    }
+  it('[QL-42] keeps a string past its bound whole and records it, and cuts only an extreme one — at a word, with the marker', () => {
+    // A bound is a target and a ceiling: 200 asked, 250 accepted, 600 the cut.
+    const capped = z.object({ summary: bounded.text(bound(200)) });
+    const words = (count: number) => 'word '.repeat(count).trim();
+
+    const within = words(44); // 219: past the target, within the ceiling
+    expect(parseStructured(JSON.stringify({ summary: within }), capped)).toMatchObject({
+      ok: true,
+      value: { summary: within },
+      overruns: [{ path: 'summary', target: 200, ceiling: 250, actual: 219, handling: 'accepted' }],
+      repairs: [],
+    });
+
+    const over = words(80); // 399: past the ceiling, under three targets
+    expect(parseStructured(JSON.stringify({ summary: over }), capped)).toMatchObject({
+      ok: true,
+      value: { summary: over },
+      overruns: [{ path: 'summary', actual: 399, handling: 'kept-over-ceiling' }],
+    });
+
+    const extreme = words(200); // 999: past three targets
+    const cut = parseStructured(JSON.stringify({ summary: extreme }), capped);
+    expect(cut).toMatchObject({
+      ok: true,
+      value: { summary: `${words(120)}${CUT_MARKER}` },
+      overruns: [{ path: 'summary', actual: 999, handling: 'cut' }],
+    });
   });
 
   it('[QL-4] says why there is no object: nothing parsed, or what each parsed candidate got wrong', () => {
@@ -77,6 +110,7 @@ describe('extractStructured', () => {
     expect(parseStructured(tail, schema)).toEqual({
       ok: false,
       reason: 'no complete JSON object in the reply (0 candidate span(s), none parsed)',
+      issues: [],
     });
 
     const two = parseStructured('{"answer":"a"} then {"score":1}', schema);
@@ -84,6 +118,35 @@ describe('extractStructured', () => {
     if (!two.ok) {
       expect(two.reason).toContain('candidate 1: score: ');
       expect(two.reason).toContain('candidate 2: answer: ');
+      // The faults the next ask is told: the closest candidate's, the first on a tie.
+      expect(two.issues).toMatchObject([{ path: 'score', soft: false }]);
+    }
+
+    // A fenced object is also a brace span: one candidate, one miss — not two.
+    const fenced = '```json\n{"answer":"a"}\n```';
+    expect(jsonCandidates(fenced)).toEqual(['{"answer":"a"}\n']);
+    const once = parseStructured(fenced, schema);
+    expect(once.ok).toBe(false);
+    if (!once.ok)
+      expect(once.reason).toBe('score: Invalid input: expected number, received undefined');
+  });
+
+  it('[QL-42] refuses a structural fault with every fault named, the soft ones noted, not refused', () => {
+    const capped = z.strictObject({
+      summary: bounded.text(bound(200)),
+      kind: z.enum(['service', 'queue']),
+    });
+    const over = 'word '.repeat(80).trim();
+    const miss = parseStructured(JSON.stringify({ summary: over, kind: 'bus' }), capped);
+    expect(miss.ok).toBe(false);
+    if (!miss.ok) {
+      expect(miss.reason).toBe(
+        `summary: 399 characters; 200 asked, 250 accepted ${SOFT_ISSUE_NOTE}; kind: Invalid option: expected one of "service"|"queue"`,
+      );
+      expect(miss.issues.map((issue) => [issue.path, issue.soft])).toEqual([
+        ['summary', true],
+        ['kind', false],
+      ]);
     }
   });
 
@@ -119,6 +182,75 @@ describe('extractStructured', () => {
       score: 1,
     });
   });
+});
+
+/**
+ * The canvas coach replies two recorded runs threw away whole (static/runs,
+ * 2026-10-02T21-53-19 producer 1–3 and 2026-10-02T18-58-32 producer 2–3):
+ * each a complete revision of 30–40k output tokens, each refused because a
+ * string or two ran 1–19% past the bound it was shown. The objects are the
+ * replies as written, unfenced; `overran` is every field the old parse named,
+ * with what it wrote over what it was asked.
+ */
+const RECORDED_COACH_LOSSES: readonly [string, unknown, Record<string, [number, number]>][] = [
+  [
+    '21-53-19 producer 1',
+    coach215319p1,
+    {
+      'graph.nodes[2].responsibilities[1]': [87, 80],
+      'graph.nodes[2].responsibilities[2]': [89, 80],
+    },
+  ],
+  ['21-53-19 producer 2', coach215319p2, { 'brief.bindings[1].claim': [358, 300] }],
+  ['21-53-19 producer 3', coach215319p3, { 'narrative.overview': [1438, 1400] }],
+  [
+    '18-58-32 producer 2',
+    coach185832p2,
+    {
+      'graph.nodes[2].config[3].value': [141, 120],
+      'graph.nodes[5].config[3].value': [126, 120],
+      'graph.nodes[2].responsibilities[0]': [81, 80],
+    },
+  ],
+  [
+    '18-58-32 producer 3',
+    coach185832p3,
+    {
+      'brief.bindings[1].claim': [320, 300],
+      'brief.bindings[2].claim': [304, 300],
+      'brief.bindings[4].claim': [326, 300],
+      'narrative.overview': [1472, 1400],
+    },
+  ],
+];
+
+/** The value at a located path, read off the reply as written. */
+const at = (value: unknown, path: readonly (string | number)[]): unknown =>
+  path.reduce<unknown>((node, key) => (node as Record<string | number, unknown>)[key], value);
+
+describe('the recorded coach losses, replayed', () => {
+  it.each(RECORDED_COACH_LOSSES)(
+    '[QL-42] %s, refused whole before, now parses with every overrun recorded and nothing cut',
+    (_, reply, overran) => {
+      // Fenced, as the model wrote it.
+      const text = ['```json', JSON.stringify(reply), '```'].join('\n');
+      const read = parseStructured(text, designSubmissionSchema);
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+
+      expect(
+        Object.fromEntries(
+          read.overruns.map((overrun) => [overrun.path, [overrun.actual, overrun.target]]),
+        ),
+      ).toEqual(overran);
+      // All within the ceiling: accepted as written, not one word cut.
+      expect(read.overruns.every((overrun) => overrun.handling === 'accepted')).toBe(true);
+      expect(read.repairs).toEqual([]);
+      for (const overrun of read.overruns) {
+        expect(at(read.value, overrun.at)).toBe(at(reply, overrun.at));
+      }
+    },
+  );
 });
 
 /** A stand-in for the SDK's `query` that replays messages (then optionally throws, as the real SDK does on a non-zero exit) and records the options it got. */
@@ -160,7 +292,7 @@ describe('a call that failed once', () => {
     { type: 'result', subtype: 'error_during_execution', is_error: true, errors: [error] },
   ];
 
-  it('[QL-28] a schema miss is asked again at once, and both attempts are on the record', async () => {
+  it("[QL-28] [QL-42] a schema miss is asked again at once, both attempts are on the record, and the second ask names the first's faults", async () => {
     const calls: LlmCall[] = [];
     const script = sequence([[succeeded(bad)], [succeeded(good)]]);
     const answered = await new ClaudeAgentLlmClient({ query: script.run })
@@ -172,9 +304,127 @@ describe('a call that failed once', () => {
       [1, 'schema-miss'],
       [2, 'ok'],
     ]);
-    // The ask is identical: nothing the model wrote comes back to it, so the
-    // second attempt is another independent draw rather than a correction.
-    expect(script.prompts[0]).toBe(script.prompts[1]);
+    // The second ask names the first's faults, after the output format, with
+    // the refused reply as written — a correction, not another independent draw.
+    expect(script.prompts[1]).toBe(
+      `${script.prompts[0]}\n\n${FEEDBACK_HEADING}\n- answer: Invalid input: expected string, received number\n\n${PREVIOUS_REPLY_HEADING}\n${bad}`,
+    );
+    expect(calls.map((call) => call.salvage?.feedback)).toEqual([false, true]);
+    expect(calls[0]?.salvage?.issues).toMatchObject([{ path: 'answer', soft: false }]);
+  });
+
+  it('[QL-42] the second ask carries a small reply as written, and not a 160k-character one', async () => {
+    // A key the schema ignores carries the bulk: the one fault is the same either way.
+    const huge = JSON.stringify({ answer: 42, pad: 'x'.repeat(160_000) });
+    const script = sequence([[succeeded(huge)], [succeeded(good)]]);
+    await new ClaudeAgentLlmClient({ query: script.run }).completeStructured({
+      system: 's',
+      user: 'u',
+      schema: answer,
+    });
+    expect(script.prompts[1]).toContain(FEEDBACK_HEADING);
+    expect(script.prompts[1]).toContain(
+      '- answer: Invalid input: expected string, received number',
+    );
+    expect(script.prompts[1]).not.toContain(PREVIOUS_REPLY_HEADING);
+    expect(script.prompts[1].length).toBeLessThan(DEFAULT_RETRY_POLICY.feedback.replyMaxChars);
+
+    // The policy can switch the feedback off: then the ask is the one it was.
+    const silent = sequence([[succeeded(bad)], [succeeded(good)]]);
+    await new ClaudeAgentLlmClient({
+      query: silent.run,
+      retry: { ...DEFAULT_RETRY_POLICY, feedback: { issues: false, replyMaxChars: 0 } },
+    }).completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(silent.prompts[1]).toBe(silent.prompts[0]);
+  });
+
+  it('[QL-42] a soft overrun is kept on the first attempt and recorded, and never costs another', async () => {
+    const bounded10 = z.object({ answer: bounded.text(bound(10)) });
+    const calls: LlmCall[] = [];
+    const script = sequence([[succeeded('{"answer":"fourteen chars"}')]]);
+    const answered = await new ClaudeAgentLlmClient({ query: script.run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: bounded10 });
+
+    expect(answered).toEqual({ answer: 'fourteen chars' });
+    expect(script.calls()).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      attempt: 1,
+      outcome: 'ok',
+      error: null,
+      salvage: {
+        from: 'result',
+        feedback: false,
+        issues: [],
+        repairs: [],
+        overruns: [{ path: 'answer', target: 10, ceiling: 50, actual: 14, handling: 'accepted' }],
+      },
+    });
+    // The model was asked for the target; the schema it is parsed with accepts the ceiling.
+    expect(calls[0]?.schema).toMatchObject({ properties: { answer: { maxLength: 10 } } });
+  });
+
+  it('[QL-42] a list past its ceiling is trimmed by whole items, and the record says what was dropped', async () => {
+    // Two asked, four accepted (the floor); six written.
+    const listed = z.object({ items: bounded.list(bound(2, 'list'), z.string()) });
+    const calls: LlmCall[] = [];
+    const six = JSON.stringify({ items: ['a', 'b', 'c', 'd', 'e', 'f'] });
+    const answered = await new ClaudeAgentLlmClient({ query: sequence([[succeeded(six)]]).run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: listed });
+
+    expect(answered).toEqual({ items: ['a', 'b', 'c', 'd'] });
+    expect(calls[0]?.salvage).toMatchObject({
+      overruns: [
+        {
+          path: 'items',
+          kind: 'list',
+          target: 2,
+          ceiling: 4,
+          actual: 6,
+          handling: 'trimmed',
+          dropped: 2,
+        },
+      ],
+      repairs: [{ path: 'items', action: 'trimmed', detail: '2 dropped' }],
+    });
+  });
+
+  it('[QL-42] the detailed call reports the faults of the last refused reply, and every ask after the first carries feedback', async () => {
+    const calls: LlmCall[] = [];
+    const script = sequence([[succeeded(bad)]]);
+    const reply = await new ClaudeAgentLlmClient({
+      query: script.run,
+      sleep: async () => undefined,
+    })
+      .withRecorder((call) => calls.push(call))
+      .completeStructuredDetailed({ system: 's', user: 'u', schema: answer });
+
+    expect(reply).toMatchObject({
+      value: null,
+      overruns: [],
+      issues: [{ path: 'answer', code: 'invalid_type', soft: false }],
+    });
+    expect(calls.map((call) => call.salvage?.feedback)).toEqual([false, true, true]);
+    expect(script.prompts.slice(1).every((prompt) => prompt.includes(FEEDBACK_HEADING))).toBe(true);
+
+    // An attempt that failed some other way leaves the refusal standing: the
+    // next ask still names it, and the caller is handed it when attempts run out.
+    const strained = sequence([[succeeded(bad)], errored('overloaded')]);
+    const afterStrain = await new ClaudeAgentLlmClient({
+      query: strained.run,
+      sleep: async () => undefined,
+    }).completeStructuredDetailed({ system: 's', user: 'u', schema: answer });
+    expect(strained.calls()).toBe(DEFAULT_RETRY_POLICY.attempts);
+    expect(strained.prompts[2]).toContain(FEEDBACK_HEADING);
+    expect(afterStrain).toMatchObject({ value: null, issues: [{ path: 'answer', soft: false }] });
+
+    // The one-method port is the same call's value, and a value carries its overruns.
+    const detailed = await new ClaudeAgentLlmClient({
+      query: sequence([[succeeded(good)]]).run,
+    }).completeStructuredDetailed({ system: 's', user: 'u', schema: answer });
+    expect(detailed).toEqual({ value: { answer: 'hi' }, issues: [], overruns: [] });
   });
 
   it('[QL-28] the first attempt stays visible, so the miss rate is still measurable', async () => {
@@ -378,12 +628,21 @@ describe('the subscription client at its call site', () => {
   });
 });
 
-/** One streamed assistant frame: a single text block, top-level, as the CLI emits it. */
-const said = (uuid: string, text: string, extra: Record<string, unknown> = {}) => ({
+/**
+ * One streamed assistant frame: a single text block, top-level, as the CLI
+ * emits it. `call` is the API message id the frame belongs to — one per API
+ * call, shared by every block that call streamed; the frame's own by default.
+ */
+const said = (
+  uuid: string,
+  text: string,
+  extra: Record<string, unknown> = {},
+  call: string = uuid,
+) => ({
   type: 'assistant',
   uuid,
   parent_tool_use_id: null,
-  message: { content: [{ type: 'text', text }], stop_reason: null },
+  message: { id: call, content: [{ type: 'text', text }], stop_reason: null },
   ...extra,
 });
 
@@ -433,10 +692,12 @@ describe('the subscription client reads the whole turn', () => {
       stopReason: 'end_turn',
       maxTokens: 28_000,
       usage: { inputTokens: 4, outputTokens: 21_122 },
+      // The resume was a second API call, and the record says so.
+      apiCalls: 2,
     });
   });
 
-  it('[QL-10] records why a reply missed the schema, so the dump says which bound or that nothing parsed', async () => {
+  it('[QL-10] records why a reply missed the schema, so the dump says which fault refused it or that nothing parsed', async () => {
     const calls: LlmCall[] = [];
     const record = (call: LlmCall) => calls.push(call);
     const cut = scripted([said('m-1', '"id":"n-2"}]}'), succeeded('"id":"n-2"}]}')]);
@@ -449,19 +710,101 @@ describe('the subscription client reads the whole turn', () => {
       error: { name: SCHEMA_MISS, message: expect.stringContaining('no complete JSON object') },
     });
 
-    const long = JSON.stringify({ answer: 'far past the bound' });
-    const over = scripted([said('m-1', long), succeeded(long)]);
+    const wrong = JSON.stringify({ answer: ['not', 'a', 'string'] });
+    const over = scripted([said('m-1', wrong), succeeded(wrong)]);
     await new ClaudeAgentLlmClient({ query: over.run, retry: ONCE })
       .withRecorder(record)
-      .completeStructured({
-        system: 's',
-        user: 'u',
-        schema: z.object({ answer: z.string().max(4) }),
-      });
+      .completeStructured({ system: 's', user: 'u', schema: answer });
     expect(calls[1]).toMatchObject({
       outcome: 'schema-miss',
-      text: long,
+      text: wrong,
       error: { name: SCHEMA_MISS, message: expect.stringMatching(/^answer: /) },
+      salvage: { from: null, issues: [{ path: 'answer', soft: false }] },
+      apiCalls: 1,
+    });
+  });
+
+  it('[QL-42] counts the API calls a turn took: one per message id, however many blocks each streamed', async () => {
+    const calls: LlmCall[] = [];
+    const record = (call: LlmCall) => calls.push(call);
+    // Two blocks of one call share a message id; a resume is a second call.
+    const resumed = scripted([
+      said('m-1a', '{"nodes":[', { error: 'max_output_tokens' }, 'msg-1'),
+      said('m-1b', '{"id":"n-1","kind":"client"}],', {}, 'msg-1'),
+      said('m-2', '"edges":[]}', {}, 'msg-2'),
+      succeeded('"edges":[]}'),
+    ]);
+    await new ClaudeAgentLlmClient({ query: resumed.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: graph });
+    expect(calls[0]).toMatchObject({
+      outcome: 'ok',
+      response: { nodes: [{ id: 'n-1', kind: 'client' }], edges: [] },
+      apiCalls: 2,
+    });
+
+    const single = scripted([said('m-1', '{"answer":"hi"}'), succeeded('{"answer":"hi"}')]);
+    await new ClaudeAgentLlmClient({ query: single.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(calls[1]?.apiCalls).toBe(1);
+  });
+
+  it('[QL-42] a turn that ended without a result is still read, and answers when its transcript holds the whole object', async () => {
+    const calls: LlmCall[] = [];
+    const record = (call: LlmCall) => calls.push(call);
+    // The CLI wrote the object, then the turn ended on an error result.
+    const errored = scripted([
+      said('m-1', '{"answer":"whole"}'),
+      { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['lost'] },
+    ]);
+    const answered = await new ClaudeAgentLlmClient({ query: errored.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(answered).toEqual({ answer: 'whole' });
+    expect(calls[0]).toMatchObject({
+      outcome: 'ok',
+      response: { answer: 'whole' },
+      error: { name: SALVAGED, message: 'error_during_execution: lost' },
+      salvage: { from: 'transcript', issues: [] },
+    });
+
+    // The same when the model ran out of output and the turn ended on it.
+    const exhausted = scripted([
+      said('m-1', '{"answer":"whole"}', { error: 'max_output_tokens' }),
+      { type: 'result', subtype: 'error_during_execution', is_error: true, errors: ['cut'] },
+    ]);
+    await new ClaudeAgentLlmClient({ query: exhausted.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(calls.at(-1)).toMatchObject({
+      outcome: 'ok',
+      error: { name: SALVAGED, message: 'max_output_tokens: cut' },
+      salvage: { from: 'transcript' },
+    });
+
+    // The same when the stream broke before any result.
+    const broke = scripted([said('m-1', '{"answer":"whole"}')], new Error('pipe closed'));
+    await new ClaudeAgentLlmClient({ query: broke.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(calls.at(-1)).toMatchObject({
+      outcome: 'ok',
+      error: { name: SALVAGED, message: 'Error: pipe closed' },
+      salvage: { from: 'transcript' },
+    });
+
+    // A transcript that holds no whole object is the error it was, with the partial text kept.
+    const partial = scripted([said('m-1', '{"answer":"cut')], new Error('pipe closed'));
+    const nothing = await new ClaudeAgentLlmClient({ query: partial.run, retry: ONCE })
+      .withRecorder(record)
+      .completeStructured({ system: 's', user: 'u', schema: answer });
+    expect(nothing).toBeNull();
+    expect(calls.at(-1)).toMatchObject({
+      outcome: 'error',
+      text: '{"answer":"cut',
+      error: { name: 'Error', message: 'pipe closed' },
+      salvage: { from: null, issues: [] },
     });
   });
 
@@ -546,6 +889,37 @@ describe('the subscription client under its time limit', () => {
     // The record says which limit, from what the call declared.
     expect(recorded[0]?.error?.message).toContain('20 declared tokens');
     expect(recorded[0]?.error?.message).toContain('process aborted by user');
+  });
+
+  it('[QL-42] a turn our limit ended answers ok, salvaged, when what it streamed holds the whole object', async () => {
+    // The object arrives, then the stream hangs until the abort kills it.
+    const spoke = ((params: { options?: { abortController?: AbortController } }) => {
+      const signal = params.options?.abortController?.signal;
+      return (async function* () {
+        yield said('m-1', '{"answer":"whole"}');
+        await new Promise<never>((_, reject) =>
+          signal?.addEventListener('abort', () =>
+            reject(new Error('Claude Code process aborted by user')),
+          ),
+        );
+      })();
+    }) as unknown as ClaudeQuery;
+    const recorded: LlmCall[] = [];
+    const answered = await new ClaudeAgentLlmClient({ query: spoke, limits: fast, clock })
+      .withRecorder((call) => recorded.push(call))
+      .completeStructured({ system: 's', user: 'u', schema: answer, maxTokens: 20 });
+
+    expect(answered).toEqual({ answer: 'whole' });
+    // One attempt: the value was read, so there was nothing to ask again.
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({
+      outcome: 'ok',
+      response: { answer: 'whole' },
+      text: '{"answer":"whole"}',
+      error: { name: SALVAGED, message: expect.stringContaining(`${TIMED_OUT}: no answer within`) },
+      salvage: { from: 'transcript', overruns: [], issues: [] },
+      apiCalls: 1,
+    });
   });
 
   it('[QL-33] a turn that ignores its abort is abandoned a grace after its limit, never awaited past it', async () => {

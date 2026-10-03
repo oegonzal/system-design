@@ -1,0 +1,446 @@
+{
+  "graph": {
+    "nodes": [
+      { "id": "n-1", "kind": "client", "label": "Marketer & visitor browser" },
+      {
+        "id": "n-2",
+        "kind": "gateway",
+        "label": "API Gateway",
+        "config": [
+          { "key": "hopBudgetMs", "value": 5 },
+          {
+            "key": "idempotencyPolicy",
+            "value": "Required 'Idempotency-Key' header on createLink; dedupes retries within a short window before forwarding"
+          }
+        ],
+        "operations": [
+          {
+            "name": "createLink",
+            "kind": "command",
+            "idempotent": true,
+            "notes": "Requires an Idempotency-Key header; gateway dedupes duplicate submissions within a short window before forwarding to the service"
+          },
+          { "name": "redirect", "kind": "query" },
+          { "name": "getClickCount", "kind": "query" }
+        ]
+      },
+      {
+        "id": "n-3",
+        "kind": "service",
+        "label": "Link Service",
+        "config": [
+          { "key": "hopBudgetMs", "value": 10 },
+          { "key": "createFlow", "value": "insert row then write-through populate cache" }
+        ],
+        "responsibilities": [
+          "Create immutable code->URL mappings",
+          "Resolve redirects from cache, fall back to replica then primary",
+          "Emit click events reliably (ack+retry), never write counters inline"
+        ],
+        "operations": [
+          { "name": "cacheRead", "kind": "query" },
+          { "name": "cachePopulate", "kind": "command", "idempotent": true },
+          {
+            "name": "dbWriteCreate",
+            "kind": "command",
+            "idempotent": true,
+            "notes": "Insert-only, keyed by client idempotency key or custom alias; duplicate submissions return the existing link; alias collisions rejected before insert; rows never updated after"
+          },
+          {
+            "name": "dbReadFallback",
+            "kind": "query",
+            "notes": "Reads the hot standby replica first; may itself miss during replication lag on a just-created link, in which case the service falls through to the primary via dbReadFallbackPrimary"
+          },
+          {
+            "name": "emitClickEvent",
+            "kind": "event",
+            "idempotent": true,
+            "notes": "At-least-once publish with broker ack; local durable buffer and bounded-backoff retry on failure so an event is never silently dropped; downstream dedup by event id handles redelivery"
+          },
+          { "name": "readClickCounts", "kind": "query" }
+        ]
+      },
+      {
+        "id": "n-4",
+        "kind": "cache",
+        "label": "Link Cache (Redis)",
+        "config": [
+          { "key": "hopBudgetMs", "value": 5 },
+          { "key": "ttlSeconds", "value": 0 },
+          {
+            "key": "evictionPolicy",
+            "value": "none needed: mappings are immutable, write-through on create"
+          }
+        ]
+      },
+      {
+        "id": "n-5",
+        "kind": "database",
+        "label": "Links DB (Postgres primary)",
+        "config": [
+          { "key": "hopBudgetMs", "value": 10 },
+          { "key": "capacity", "value": "20M+ rows, indexed on short code" },
+          {
+            "key": "primaryEndpointModel",
+            "value": "Stable DNS/proxy endpoint; writes/reads route here regardless of which instance holds primary role"
+          }
+        ],
+        "operations": [
+          {
+            "name": "replicateData",
+            "kind": "event",
+            "notes": "async streaming replication to standby"
+          },
+          {
+            "name": "dbReadFallbackPrimary",
+            "kind": "query",
+            "notes": "Last-resort read when the replica lacks the row (replication-lag window) or is unavailable; also the logical write target for dbWriteCreate via a stable endpoint that repoints across failover"
+          }
+        ]
+      },
+      {
+        "id": "ai-replica",
+        "kind": "replica",
+        "label": "Links DB Hot Standby Replica",
+        "config": [
+          { "key": "hopBudgetMs", "value": 15 },
+          { "key": "sizedForPeakRps", "value": 10000 },
+          { "key": "role", "value": "cache-miss fallback reads + promotable on primary failure" },
+          {
+            "key": "reprovisioning",
+            "value": "Auto-provisions a fresh standby from the new primary within minutes of promotion, restoring redundancy"
+          }
+        ],
+        "responsibilities": [
+          "Absorb 100% of cache-miss reads at full peak",
+          "Promote to primary on failover"
+        ]
+      },
+      {
+        "id": "ai-queue",
+        "kind": "queue",
+        "label": "Click Events Queue",
+        "config": [
+          { "key": "durability", "value": "persistent log, at-least-once delivery" },
+          { "key": "partitions", "value": 20 },
+          {
+            "key": "producerContract",
+            "value": "At-least-once; publisher retries with backoff, buffering locally until broker ack"
+          }
+        ]
+      },
+      {
+        "id": "ai-aggregator",
+        "kind": "stream-processor",
+        "label": "Click Count Aggregator",
+        "config": [
+          { "key": "batchIntervalSeconds", "value": 30 },
+          { "key": "dedupStrategy", "value": "idempotent upsert keyed by click event id" },
+          { "key": "consumerParallelism", "value": 20 }
+        ],
+        "operations": [
+          { "name": "consumeClickBatch", "kind": "event" },
+          { "name": "writeAggregatedCounts", "kind": "command", "idempotent": true }
+        ]
+      },
+      {
+        "id": "ai-counter-store",
+        "kind": "kv-store",
+        "label": "Click Counts Store",
+        "config": [{ "key": "decoupledFromLinkRow", "value": true }]
+      },
+      {
+        "id": "ai-monitoring",
+        "kind": "monitoring",
+        "label": "SLO Monitoring & Alerting",
+        "config": [
+          { "key": "slo_p99_ms", "value": 50 },
+          { "key": "slo_availability_pct", "value": 99.95 },
+          { "key": "alertOnBreach", "value": true },
+          { "key": "slo_freshness_minutes", "value": 5 },
+          { "key": "alertOnQueueBacklogSeconds", "value": 60 },
+          { "key": "alertOnAggregatorLagSeconds", "value": 60 }
+        ],
+        "operations": [{ "name": "emitMetrics", "kind": "event" }]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "source": "n-1",
+        "target": "n-2",
+        "kind": "sync",
+        "carries": ["createLink", "redirect", "getClickCount"]
+      },
+      {
+        "id": "e-2",
+        "source": "n-2",
+        "target": "n-3",
+        "kind": "sync",
+        "carries": ["createLink", "redirect", "getClickCount"]
+      },
+      {
+        "id": "e-3",
+        "source": "n-3",
+        "target": "n-4",
+        "kind": "sync",
+        "carries": ["cacheRead", "cachePopulate"]
+      },
+      {
+        "id": "e-4",
+        "source": "n-3",
+        "target": "n-5",
+        "kind": "sync",
+        "carries": ["dbWriteCreate"]
+      },
+      {
+        "id": "ai-e-replica-repl",
+        "source": "n-5",
+        "target": "ai-replica",
+        "kind": "async",
+        "label": "streaming replication",
+        "carries": ["replicateData"]
+      },
+      {
+        "id": "ai-e-fallback",
+        "source": "n-3",
+        "target": "ai-replica",
+        "kind": "sync",
+        "label": "cache-miss fallback (first tier)",
+        "carries": ["dbReadFallback"]
+      },
+      {
+        "id": "ai-e-fallback-primary",
+        "source": "n-3",
+        "target": "n-5",
+        "kind": "sync",
+        "label": "replica-miss or outage fallback (second tier)",
+        "carries": ["dbReadFallbackPrimary"]
+      },
+      {
+        "id": "ai-e-clickevent",
+        "source": "n-3",
+        "target": "ai-queue",
+        "kind": "async",
+        "label": "reliable async click event (ack+retry)",
+        "carries": ["emitClickEvent"]
+      },
+      {
+        "id": "ai-e-queueagg",
+        "source": "ai-queue",
+        "target": "ai-aggregator",
+        "kind": "async",
+        "carries": ["consumeClickBatch"]
+      },
+      {
+        "id": "ai-e-aggwrite",
+        "source": "ai-aggregator",
+        "target": "ai-counter-store",
+        "kind": "async",
+        "carries": ["writeAggregatedCounts"]
+      },
+      {
+        "id": "ai-e-dashboard",
+        "source": "n-3",
+        "target": "ai-counter-store",
+        "kind": "sync",
+        "label": "dashboard read",
+        "carries": ["readClickCounts"]
+      },
+      {
+        "id": "ai-e-mon-gw",
+        "source": "n-2",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-svc",
+        "source": "n-3",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-cache",
+        "source": "n-4",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-db",
+        "source": "n-5",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-replica",
+        "source": "ai-replica",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-queue",
+        "source": "ai-queue",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-agg",
+        "source": "ai-aggregator",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      }
+    ]
+  },
+  "brief": {
+    "version": 1,
+    "bindings": [
+      {
+        "criterionId": "c1",
+        "nodeIds": ["n-2", "n-3", "n-5", "n-4"],
+        "path": ["e-1", "e-2", "e-4"],
+        "claim": "Gateway routes POST /links, requiring an Idempotency-Key, to the link service, which dedupes retries, checks alias availability, then inserts the immutable mapping into Links DB and write-through populates Redis so the first redirect is already a cache hit."
+      },
+      {
+        "criterionId": "c2",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "n-5", "ai-queue"],
+        "path": ["e-1", "e-2", "e-3"],
+        "claim": "GET /{code} checks Redis, then the replica on a miss; if the replica also lacks the row (replication lag on a new link) or is down, it falls through to the primary before giving up, so a live link is never 404'd. The click event is emitted with ack+retry, never fire-and-forget."
+      },
+      {
+        "criterionId": "c3",
+        "nodeIds": ["n-2", "n-3", "ai-queue", "ai-aggregator", "ai-counter-store", "ai-monitoring"],
+        "path": ["e-1", "e-2", "ai-e-dashboard"],
+        "claim": "The dashboard query reaches the decoupled Click Counts Store, refreshed every 30s by a 20-way-partitioned aggregator sized for 10k events/sec peak. Events publish with ack+retry so none are silently dropped; idempotent upserts block double counts; monitoring alerts on backlog or lag."
+      },
+      {
+        "criterionId": "c4",
+        "nodeIds": ["n-1", "n-2", "n-3", "n-4", "ai-replica", "n-5"],
+        "path": ["e-1", "e-2", "e-3"],
+        "claim": "Hop budget: gateway5+service10+cache5=20ms p99 hit path. A cache miss costs the failed 5ms lookup plus the replica's 15ms = 35ms; if the replica also misses or is down, a further 10ms primary fallback brings the rare double-miss path to 45ms — both under the 50ms budget."
+      },
+      {
+        "criterionId": "c5",
+        "nodeIds": ["n-2", "n-3", "n-4", "n-5", "ai-replica"],
+        "path": ["e-1", "e-2", "e-3"],
+        "claim": "The hot standby, sized for 100% of peak, absorbs cache-miss reads and promotes on primary failure; if it lacks a row or is unavailable, the fallback continues to the primary rather than failing, and a fresh standby auto-reprovisions from the new primary within minutes of promotion."
+      },
+      {
+        "criterionId": "c6",
+        "nodeIds": ["n-3", "ai-queue", "ai-aggregator", "ai-counter-store", "ai-monitoring"],
+        "claim": "Click events publish with ack+retry (never fire-and-forget) and a 20-way-partitioned aggregator, sized for 10k events/sec peak, batches them into the Counts Store every 30s with idempotent dedup; monitoring alerts on queue backlog or aggregator lag before the 5-minute bound is at risk."
+      },
+      {
+        "criterionId": "c7",
+        "nodeIds": ["n-5"],
+        "claim": "Links DB is a single Postgres instance indexed on short code; 20 million rows is well within one instance's capacity with headroom before sharding would ever be needed."
+      },
+      {
+        "criterionId": "c8",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "n-5"],
+        "path": ["e-1", "e-2", "e-3"],
+        "claim": "At 2,000 rps average nearly all reads hit cache (20ms p99); the replica absorbs residual misses (35ms p99) and the primary is only a last-resort fallback on replica-miss or outage (45ms worst case), so steady load never serializes through the primary in the common case."
+      },
+      {
+        "criterionId": "c9",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "ai-queue", "n-5", "ai-aggregator"],
+        "path": ["e-1", "e-2", "e-3"],
+        "claim": "At 10,000 rps peak the cache serves most reads, the replica takes 100% of peak on a cache outage with the primary as further fallback, and a 20-way-partitioned queue/aggregator sized for this exact peak rate keeps click counting off the redirect path without backing up."
+      }
+    ]
+  },
+  "narrative": {
+    "version": 1,
+    "overview": "The panel's sharpest findings were two relocated SPOFs and a silent-loss gap. First, the redirect's cache-miss fallback went only to the hot standby replica: if that replica itself lacked a just-created row (replication lag) or was simply down, a real link 404'd and the whole availability claim rested on one unredundant replica with no further fallback. I added a second fallback hop from the service straight to the primary, and the primary's endpoint is now a stable, role-based address so writes keep working across a promotion; after any failover a fresh standby auto-reprovisions from the new primary within minutes, so the design tolerates more than one failure a month, not just one. Second, the click-event emit was labeled fire-and-forget: a broker hiccup silently dropped a click with no compensation. The emit now carries an at-least-once ack+retry contract, buffering locally rather than dropping. Third, the single aggregator had no stated parallelism against a 10k/sec peak producer; it's now 20-way partitioned, with monitoring watching queue backlog age and aggregator lag directly. I also corrected the miss-path latency arithmetic — the failed cache lookup's 5ms was missing from the 30ms total — and state the rare double-miss-to-primary cost too (45ms, still under budget). Finally, createLink now requires an idempotency key so a client retry can't duplicate a link, and alias collisions are rejected before insert.",
+    "componentRationales": [
+      {
+        "nodeId": "n-1",
+        "prose": "The marketer and the visitor are the same client surface: one issues creates and reads the dashboard, the other just follows redirects. No change requested here."
+      },
+      {
+        "nodeId": "n-2",
+        "prose": "Still a thin router with a declared 5ms hop budget and metrics emission, now also enforcing idempotency: createLink requires an Idempotency-Key header so a client retry after a timeout can't create a duplicate link before it ever reaches the service."
+      },
+      {
+        "nodeId": "n-3",
+        "prose": "Still the sole owner of create and redirect logic. dbWriteCreate is now idempotent — keyed by the idempotency key or custom alias, rejecting alias collisions before insert — and emitClickEvent now carries an explicit at-least-once, ack+retry contract instead of a bare fire-and-forget. dbReadFallback is documented as the first fallback only: on a replica miss or outage it falls through to the primary via the new edge to n-5."
+      },
+      {
+        "nodeId": "n-4",
+        "prose": "Now explicitly write-through on create (via cachePopulate on e-3), closing the gap where a cache that's only ever read can never reach a stated hit rate. No TTL is needed since mappings never change."
+      },
+      {
+        "nodeId": "n-5",
+        "prose": "Still the system of record for the immutable mapping, but it now also serves as the last-resort read fallback (dbReadFallbackPrimary) when the replica lacks a row or is down, closing the gap where a replication-lag window could 404 a brand-new link. Its address is a stable, role-based endpoint so writes don't need to change when a standby is promoted into this role."
+      },
+      {
+        "nodeId": "ai-replica",
+        "prose": "Still a hot standby sized for 100% of peak, absorbing cache-miss reads and promotable on failure — but it's no longer the sole fallback: a miss here now falls through to the primary instead of failing outright, and a fresh standby auto-reprovisions from the new primary within minutes of any promotion, so the design survives more than one failure per monthly window."
+      },
+      {
+        "nodeId": "ai-queue",
+        "prose": "Still a durable, at-least-once log, now explicitly partitioned (20-way) so a single consumer can't bottleneck the 10k/sec peak, and its producer contract is now ack+retry with local buffering — a failed publish is retried, never silently dropped."
+      },
+      {
+        "nodeId": "ai-aggregator",
+        "prose": "Still batches every 30 seconds with idempotent, keyed upserts, but now runs with stated consumer parallelism (20, one per queue partition) sized to the peak event rate, so a backlog at 10k events/sec doesn't silently push staleness toward the 5-minute bound."
+      },
+      {
+        "nodeId": "ai-counter-store",
+        "prose": "The counter lives here, fully decoupled from the immutable link row, matching the rule that a hot-row counter must not share a row with the entity it's counting."
+      },
+      {
+        "nodeId": "ai-monitoring",
+        "prose": "Still receives metrics from every redirect-path component, now also from the queue and aggregator, and its config adds explicit freshness alerting — queue backlog age and aggregator lag thresholds — so a stalled count pipeline is caught before a marketer notices stale numbers, not just a p99 or availability breach."
+      }
+    ],
+    "criterionNarrations": [
+      {
+        "criterionId": "c1",
+        "prose": "Create still flows gateway→service→single immutable insert, now gated by a required idempotency key so a client retry can't duplicate a link, with alias collisions rejected before the insert and the cache write-through populated as before."
+      },
+      {
+        "criterionId": "c2",
+        "prose": "Redirect still resolves from cache first, but the fallback is now two-tiered: replica, then primary, so a just-created link within the replication-lag window or a replica outage no longer produces a false 404 — the fallback actually reaches a node guaranteed to hold the row."
+      },
+      {
+        "criterionId": "c3",
+        "prose": "The marketer's count still comes from batch aggregation off an event queue, now explicitly partitioned for peak throughput and published with ack+retry so no click is silently lost in transit, with monitoring watching the pipeline's lag directly."
+      },
+      {
+        "criterionId": "c4",
+        "prose": "The hop budget is corrected: the failed cache lookup's cost is now included in the miss-path total (35ms, not 30), and the rare double-miss-to-primary path is stated too (45ms) — both still comfortably under the 50ms p99 budget."
+      },
+      {
+        "criterionId": "c5",
+        "prose": "The replica is no longer a bare swap for the primary: its own miss or outage now falls through to the primary, and a fresh standby is auto-reprovisioned after any promotion, so the 99.95% claim doesn't quietly rest on tolerating only one failure a month."
+      },
+      {
+        "criterionId": "c6",
+        "prose": "The 30-second aggregation interval stays well inside the 5-minute bound, and now that interval is actually protected: ack+retry on emit stops silent event loss, partitioning stops peak-load backlog, and monitoring alerts on lag before the bound is ever threatened."
+      },
+      {
+        "criterionId": "c7",
+        "prose": "Unchanged: 20 million indexed rows remains a non-issue for a single Postgres primary; nothing in this revision touches storage volume."
+      },
+      {
+        "criterionId": "c8",
+        "prose": "At 2,000 rps average, the corrected arithmetic (20/35/45ms across hit/replica-miss/double-miss) still clears the latency budget, and the two-tier fallback means average load never depends on a single replica holding up alone."
+      },
+      {
+        "criterionId": "c9",
+        "prose": "At 10,000 rps peak, the replica remains sized for full peak with the primary as a stated further fallback, and the click pipeline is now explicitly 20-way partitioned for this exact rate, so neither the redirect path nor the counting path backs up at peak."
+      },
+      {
+        "criterionId": "c10",
+        "prose": "Unchanged: links are inserted once via dbWriteCreate and never updated; the only addition is idempotent dedup on retried creates, which still produces at most one row per logical link and never alters an existing one."
+      }
+    ]
+  }
+}

@@ -1,6 +1,33 @@
-import type { LlmExchangeOutcome } from '@sysdesign/contracts';
+import type {
+  LlmExchangeOutcome,
+  LlmReplySource,
+  Overrun,
+  Repair,
+  SchemaIssue,
+} from '@sysdesign/contracts';
 
 import type { LlmClient } from './llm-client';
+
+/**
+ * What the seam's reading of one reply kept, changed or refused — the
+ * salvage ladder's report, beside the value it produced. Recorded whenever a
+ * reply was parsed at all; null on a call that never had text to read.
+ */
+export interface LlmSalvage {
+  /** Every field past its target, with how it was handled: accepted, kept over the ceiling, cut, trimmed. */
+  overruns: Overrun[];
+  /** What the parse changed on the way to the value — keys stripped, lists trimmed — never a word of prose. */
+  repairs: Repair[];
+  /** The faults of a miss, in the one wording every reader uses; empty on an `ok`. */
+  issues: SchemaIssue[];
+  /**
+   * Where the value was read from: the turn's result, or the transcript of a
+   * turn whose ending left no result to read. Null when there was no value.
+   */
+  from: LlmReplySource | null;
+  /** True when this attempt's ask named the previous attempt's faults. */
+  feedback: boolean;
+}
 
 /**
  * What actually happened on one call to the model.
@@ -41,8 +68,10 @@ export interface LlmCall {
   response: unknown;
   /**
    * Why there is no response: the provider's reason on an `error`, the
-   * schema's complaint on a `schema-miss` — which bound was crossed, or that
-   * no object parsed at all. Null on `ok`.
+   * schema's complaint on a `schema-miss` — which fault refused it, or that
+   * no object parsed at all. Null on `ok`, except an `ok` read from the
+   * transcript of a turn that ended without a result: then what ended the
+   * turn, under the name `Salvaged`.
    */
   error: { name: string; message: string } | null;
   /**
@@ -57,6 +86,17 @@ export interface LlmCall {
    * would make a busy process look like a slow model.
    */
   queuedMs?: number;
+  /**
+   * The salvage ladder's report on this reply. Optional so a hand-rolled
+   * literal keeps compiling and reads as a call that salvaged nothing.
+   */
+  salvage?: LlmSalvage | null;
+  /**
+   * API calls the turn took: one, or more when the per-call output ceiling
+   * made it resume — so a declaration a turn outgrows is visible in its
+   * record. Null when the turn never ran; optional as `salvage` is.
+   */
+  apiCalls?: number | null;
 }
 
 export type LlmCallSink = (call: LlmCall) => void;

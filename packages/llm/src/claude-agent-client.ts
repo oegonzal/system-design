@@ -1,5 +1,17 @@
 import type { SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { z, type ZodIssue, type ZodType } from 'zod';
+import {
+  describeIssue,
+  modelSchema,
+  parseLenient,
+  type BoundPath,
+  type DeclaredBound,
+  type LlmReplySource,
+  type ModelSchema,
+  type Overrun,
+  type Repair,
+  type SchemaIssue,
+} from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
 
 import {
   assertCallTimePolicy,
@@ -20,10 +32,20 @@ import {
   type LlmFailureKind,
   type LlmRetryPolicy,
 } from './llm-failure';
-import type { LlmClient, StructuredRequest } from './llm-client';
+import type { LlmClient, LlmDetailed, StructuredReply, StructuredRequest } from './llm-client';
 
 /** The `error.name` a schema miss is recorded under; its message is the schema's own complaint. */
 export const SCHEMA_MISS = 'SchemaMiss';
+
+/**
+ * The `error.name` an `ok` is recorded under when its value was read from the
+ * transcript of a turn that ended without a result; the message is what
+ * ended the turn.
+ */
+export const SALVAGED = 'Salvaged';
+
+/** The `error.name` a turn is recorded under when its stream ended with no result and no error of its own. */
+export const NO_RESULT = 'NoResult';
 
 /** The model report when no model is pinned: the subscription's own choice. */
 export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
@@ -33,11 +55,13 @@ export const TIMED_OUT = 'Timeout';
 
 /**
  * Output-token ceiling for one API call of the spawned turn, thinking
- * included. Sized from recorded runs: the largest turns so far wrote 26,054
- * (an agentic-design producer, 2026-09-23) and 21,122 (a canvas coach,
- * 2026-10-01) output tokens, and at the old 16,000 each was cut and resumed in
- * a second message. A cut is no longer lossy — the turn's text is read whole,
- * see `TurnTranscript` — but every resume is another model round trip.
+ * included. Sized from recorded runs: the largest turns so far wrote 40,173
+ * (a canvas coach, 2026-10-02), 26,054 (an agentic-design producer,
+ * 2026-09-23) and 21,122 (a canvas coach, 2026-10-01) output tokens, and at
+ * the old 16,000 each was cut and resumed in a second message. A cut is not
+ * lossy — the turn's text is read whole, see `TurnTranscript`, and the
+ * record counts the calls in `apiCalls` — but every resume is another model
+ * round trip, so a turn that routinely resumes is a declaration to revisit.
  */
 export const OUTPUT_TOKEN_CEILING = 32_000;
 
@@ -58,6 +82,13 @@ const DEFAULT_MAX_TOKENS = 4096;
  * permission, the model has nothing to call and no way to be granted one.
  */
 const NO_TOOLS: string[] = [];
+
+/** The heading under which the next ask names what refused the last reply. */
+export const FEEDBACK_HEADING =
+  '# Your previous reply was refused — correct these and return the whole object again';
+
+/** The heading under which the refused reply rides along, when it is small enough. */
+export const PREVIOUS_REPLY_HEADING = '## The reply, as written';
 
 /**
  * Scan `text` for balanced, string-aware top-level `{...}` objects and yield
@@ -93,92 +124,88 @@ function* braceObjects(text: string): Generator<string> {
 }
 
 /**
- * Two kinds of schema issue are excess rather than a wrong answer, and both
- * can be undone without changing a word the model wrote. An array past its
- * `.max()` drops its trailing items — whole items, worst-last as every list
- * here asks to be ordered. An `unrecognized_keys` on a strict object is an
- * aside (a `steps_note` beside the `steps` the schema asked for) and is
- * stripped. Schema-driven, so no caller knows a cap or a key list exists.
- *
- * A string past its `.max()` is never cut: a clamp lands mid-word, and the
- * cut prose is then judged and stored as if the model had written it. An
- * overshoot is a schema miss the loop can revise or retry, and its issues are
- * recorded so the dump says which bound was crossed — a bound the model
- * routinely crosses is sized from the runs, not enforced with scissors.
+ * Every span of `text` that could be the object: each fenced block, then each
+ * balanced brace span, in that order, each once — a fenced object is also a
+ * brace span, and reporting it twice told a reader one miss was two.
  */
-const isRepairable = (issue: ZodIssue): boolean =>
-  issue.code === 'unrecognized_keys' ||
-  (issue.code === 'too_big' && typeof issue.maximum === 'number' && issue.origin === 'array');
-
-function repairExcess(value: unknown, issues: readonly ZodIssue[]): unknown {
-  let next = value;
-  for (const issue of issues) {
-    const path = issue.path.filter(
-      (key): key is string | number => typeof key === 'string' || typeof key === 'number',
-    );
-    if (issue.code === 'too_big') {
-      const maximum = issue.maximum as number;
-      next = updateAt(next, path, (current) =>
-        Array.isArray(current) ? current.slice(0, maximum) : current,
-      );
-    } else if (issue.code === 'unrecognized_keys') {
-      const unwanted = new Set(issue.keys);
-      next = updateAt(next, path, (current) =>
-        current !== null && typeof current === 'object' && !Array.isArray(current)
-          ? Object.fromEntries(Object.entries(current).filter(([key]) => !unwanted.has(key)))
-          : current,
-      );
-    }
+export function jsonCandidates(text: string): string[] {
+  const spans: string[] = [];
+  const fence = /```(?:json)?\s*([\s\S]*?)```/g;
+  for (let m = fence.exec(text); m !== null; m = fence.exec(text)) spans.push(m[1]);
+  for (const span of braceObjects(text)) spans.push(span);
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  for (const span of spans) {
+    const key = span.trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(span);
   }
-  return next;
+  return candidates;
 }
 
-function updateAt(
-  value: unknown,
-  path: readonly (string | number)[],
-  fn: (v: unknown) => unknown,
-): unknown {
-  if (path.length === 0) return fn(value);
-  const [head, ...rest] = path;
-  if (Array.isArray(value) && typeof head === 'number') {
-    const copy = [...value];
-    copy[head] = updateAt(copy[head], rest, fn);
-    return copy;
-  }
-  if (value !== null && typeof value === 'object' && typeof head === 'string') {
-    const record = value as Record<string, unknown>;
-    return { ...record, [head]: updateAt(record[head], rest, fn) };
-  }
-  return value;
+/** A value the ladder accepted, with every field it kept past its target and every repair. */
+interface Read<T> {
+  ok: true;
+  value: T;
+  overruns: Overrun[];
+  repairs: Repair[];
 }
 
-/** Repairs can cascade (an array trimmed, then a member's key); a few rounds settle it. */
-const REPAIR_ROUNDS = 3;
+/** No value: why, in words a dump can carry, and the faults the next ask is told. */
+interface Miss {
+  ok: false;
+  reason: string;
+  issues: SchemaIssue[];
+}
 
-/** The one validated object, or why there was none — in words a dump can carry. */
-export type Extraction<T> = { ok: true; value: T } | { ok: false; reason: string };
+/** The one validated object with what the parse kept, or why there was none. */
+export type Extraction<T> = Read<T> | Miss;
 
-const issuePath = (issue: ZodIssue): string =>
-  issue.path.map((key) => String(key)).join('.') || '(root)';
-
-const describeIssues = (issues: readonly ZodIssue[]): string =>
-  issues.map((issue) => `${issuePath(issue)}: ${issue.message}`).join('; ');
+const structuralFaults = (issues: readonly SchemaIssue[]): number =>
+  issues.filter((issue) => !issue.soft).length;
 
 /**
- * Pull the one schema-valid JSON object out of an agent's text. Tries every
- * fenced block, then every balanced brace span, returning the first that both
- * parses AND satisfies the schema — trimming array overshoots and stripping
- * unasked-for keys on the way. A miss names what each parsed candidate got
- * wrong, or that nothing parsed at all: a reply cut before its object closed
- * reads exactly like that.
+ * Of several candidates that missed, the faults of the one that came
+ * closest — the fewest structural faults, the first on a tie — which is the
+ * one the next ask is told about. A soft fault is kept by the parse, so it
+ * never makes a candidate further away.
  */
-export function parseStructured<T>(text: string, schema: ZodType<T>): Extraction<T> {
-  const candidates: string[] = [];
-  const fence = /```(?:json)?\s*([\s\S]*?)```/g;
-  for (let m = fence.exec(text); m !== null; m = fence.exec(text)) candidates.push(m[1]);
-  for (const span of braceObjects(text)) candidates.push(span);
+export function closestMiss(misses: readonly (readonly SchemaIssue[])[]): SchemaIssue[] {
+  let closest: readonly SchemaIssue[] = [];
+  let distance = Number.POSITIVE_INFINITY;
+  for (const issues of misses) {
+    const faults = structuralFaults(issues);
+    if (faults < distance) {
+      closest = issues;
+      distance = faults;
+    }
+  }
+  return [...closest];
+}
 
-  const misses: string[] = [];
+const describeMiss = (issues: readonly SchemaIssue[]): string =>
+  issues.map(describeIssue).join('; ');
+
+/**
+ * Pull the one JSON object out of an agent's text. Tries every fenced block,
+ * then every balanced brace span, returning the first that both parses AND
+ * the salvage ladder accepts — a text past its bound kept whole or cut with
+ * a marker, a list past its ceiling trimmed, an unasked-for key stripped,
+ * every one of them recorded. A miss is structural: it names what each
+ * parsed candidate got wrong in the one wording the next ask repeats, or
+ * says that nothing parsed at all — a reply cut before its object closed
+ * reads exactly like that. `bounds` are the schema's own declarations; a
+ * caller that built the model schema already hands them over.
+ */
+export function parseStructured<T>(
+  text: string,
+  schema: ZodType<T>,
+  bounds?: Readonly<Record<BoundPath, DeclaredBound>>,
+): Extraction<T> {
+  const candidates = jsonCandidates(text);
+  const index = bounds ?? modelSchema(schema).bounds;
+  const misses: SchemaIssue[][] = [];
   for (const candidate of candidates) {
     let parsed: unknown;
     try {
@@ -186,28 +213,26 @@ export function parseStructured<T>(text: string, schema: ZodType<T>): Extraction
     } catch {
       continue;
     }
-    let issues: readonly ZodIssue[] = [];
-    for (let round = 0; round <= REPAIR_ROUNDS; round++) {
-      const result = schema.safeParse(parsed);
-      if (result.success) return { ok: true, value: result.data };
-      issues = result.error.issues;
-      if (issues.length === 0 || !issues.every(isRepairable)) break;
-      parsed = repairExcess(parsed, issues);
+    const result = parseLenient(schema, parsed, index);
+    if (result.ok) {
+      return { ok: true, value: result.value, overruns: result.overruns, repairs: result.repairs };
     }
-    misses.push(describeIssues(issues));
+    misses.push(result.issues);
   }
   if (misses.length === 0) {
     return {
       ok: false,
       reason: `no complete JSON object in the reply (${candidates.length} candidate span(s), none parsed)`,
+      issues: [],
     };
   }
   return {
     ok: false,
     reason:
       misses.length === 1
-        ? misses[0]
-        : misses.map((miss, index) => `candidate ${index + 1}: ${miss}`).join(' | '),
+        ? describeMiss(misses[0])
+        : misses.map((miss, index) => `candidate ${index + 1}: ${describeMiss(miss)}`).join(' | '),
+    issues: closestMiss(misses),
   };
 }
 
@@ -218,18 +243,22 @@ export function extractStructured<T>(text: string, schema: ZodType<T>): T | null
 }
 
 /**
- * What one turn wrote. The CLI streams a turn as several assistant messages —
- * one per content block, and when a reply runs past the output cap it resumes
- * it in a further API call mid-thought — while the closing `result` repeats
- * only the last message's text. A long answer read from `result` alone is its
- * tail: no opening brace, nothing to parse. So every top-level text block is
- * kept in arrival order and read as one; a message the CLI retracts (it names
- * it in a later message's `supersedes`) is dropped.
+ * What one turn wrote, and how many API calls it took. The CLI streams a
+ * turn as several assistant messages — one per content block, and when a
+ * reply runs past the output cap it resumes it in a further API call
+ * mid-thought — while the closing `result` repeats only the last message's
+ * text. A long answer read from `result` alone is its tail: no opening
+ * brace, nothing to parse. So every top-level text block is kept in arrival
+ * order and read as one; a message the CLI retracts (it names it in a later
+ * message's `supersedes`) is dropped. The blocks of one API call share their
+ * `message.id`, so the distinct ids are the calls.
  */
 class TurnTranscript {
   private readonly texts = new Map<string, string>();
+  private readonly calls = new Set<string>();
 
   add(message: SDKAssistantMessage): void {
+    this.calls.add(message.message.id);
     if (message.parent_tool_use_id) return;
     for (const retracted of message.supersedes ?? []) this.texts.delete(retracted);
     const text = message.message.content
@@ -241,6 +270,43 @@ class TurnTranscript {
   get text(): string {
     return [...this.texts.values()].join('');
   }
+
+  get apiCalls(): number {
+    return this.calls.size;
+  }
+}
+
+/** A reply the schema refused, carried to the next attempt so the ask can name what broke. */
+interface Refusal {
+  issues: SchemaIssue[];
+  text: string;
+}
+
+/** What one attempt came to: the reply, whether it is worth asking again, and what the next ask is told. */
+interface Attempt<T> {
+  reply: StructuredReply<T>;
+  kind: LlmFailureKind | null;
+  refusal: Refusal | null;
+}
+
+/** How a turn ended without a result to read, in the words the record keeps. */
+interface Ending {
+  error: NonNullable<LlmCall['error']>;
+  kind: LlmFailureKind;
+  usage: LlmCall['usage'];
+  stopReason: string | null;
+}
+
+/**
+ * The section the next ask gains after `# Output format` when the last reply
+ * was refused: one line per fault, and the reply as written when it fits.
+ */
+function feedbackSection(previous: Refusal, policy: LlmRetryPolicy['feedback']): string[] {
+  const lines = [FEEDBACK_HEADING, ...previous.issues.map((issue) => `- ${describeIssue(issue)}`)];
+  if (previous.text.length <= policy.replyMaxChars) {
+    lines.push('', PREVIOUS_REPLY_HEADING, previous.text);
+  }
+  return lines;
 }
 
 /**
@@ -252,13 +318,16 @@ class TurnTranscript {
  * subscription.
  *
  * There is no server-side output constraint, so the schema rides in the
- * prompt as JSON Schema and `parseStructured` enforces it on the way out over
- * the whole turn's text — a miss is `null`, exactly the contract every caller
- * already handles, and the recorded call says why.
+ * prompt as JSON Schema — every bound at its target, from `modelSchema` —
+ * and `parseStructured` reads the reply on the way out over the whole turn's
+ * text, keeping what the ladder keeps. A structural miss is `null`, exactly
+ * the contract every caller already handles, and the recorded call says why;
+ * the next attempt's ask names it.
  *
- * Implements `LlmRecordable` so a run dump captures the exchange.
+ * Implements `LlmRecordable` so a run dump captures the exchange, and
+ * `LlmDetailed` so a caller can read the faults and the overruns.
  */
-export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
+export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetailed {
   readonly model: string;
 
   /** Only set when the caller pinned one; otherwise the CLI's default rules. */
@@ -313,8 +382,14 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
     });
   }
 
+  /** One answer, or null once the attempts the policy allows are spent: the detailed call's value. */
+  async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+    return (await this.completeStructuredDetailed(request)).value;
+  }
+
   /**
-   * One answer, or null once the attempts the policy allows are spent.
+   * One answer with what the seam knows about it, or the faults of the final
+   * miss once the attempts the policy allows are spent.
    *
    * A retry happens here, immediately, inside the call its caller is already
    * awaiting — never gathered up and re-run later. That matters upstream: a
@@ -325,15 +400,23 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
    * Each attempt takes its own permit and gives it back, so a wait for a
    * strained provider is spent queueing rather than holding a slot shut. Each
    * is recorded in its own right, so the rate of first-attempt failures stays
-   * exactly as visible as it was before there was a second attempt.
+   * exactly as visible as it was before there was a second attempt. A reply
+   * the schema refused is carried to the next ask, which names what broke; an
+   * attempt that failed some other way leaves the last refusal standing, so
+   * the fault is still named when the model next reads the ask — and when
+   * the attempts run out, it is the faults the caller is handed.
    */
-  async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+  async completeStructuredDetailed<T>(request: StructuredRequest<T>): Promise<StructuredReply<T>> {
+    let previous: Refusal | null = null;
     for (let attempt = 1; ; attempt += 1) {
-      const { value, kind } = await this.gate.run(({ queuedMs }) =>
-        this.callOnce(request, queuedMs, attempt),
+      const { reply, kind, refusal } = await this.gate.run(({ queuedMs }) =>
+        this.callOnce(request, queuedMs, attempt, previous),
       );
-      if (kind === null) return value;
-      if (!retryable(kind, attempt, this.retry)) return null;
+      previous = refusal ?? previous;
+      if (kind === null) return reply;
+      if (!retryable(kind, attempt, this.retry)) {
+        return { ...reply, issues: previous?.issues ?? [] };
+      }
       const pause = backoffFor(kind, attempt, this.retry);
       if (pause > 0) await this.pause(pause);
     }
@@ -343,21 +426,29 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
     request: StructuredRequest<T>,
     queuedMs: number,
     attempt: number,
-  ): Promise<{ value: T | null; kind: LlmFailureKind | null }> {
+    previous: Refusal | null,
+  ): Promise<Attempt<T>> {
     const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
     const startedAt = new Date();
     const started = Date.now();
-    let jsonSchema = '';
+    const feedback = this.retry.feedback.issues && previous !== null && previous.issues.length > 0;
+    /** The schema as the model sees it, once converted; null until then. */
+    let shown: ModelSchema | null = null;
+    // Owned here, not by the read: whatever ends the turn, what it streamed
+    // before the end is still in hand to be read.
+    const transcript = new TurnTranscript();
 
-    let kind: LlmFailureKind | null = null;
     const record = (
-      call: Pick<LlmCall, 'outcome' | 'text' | 'response' | 'error' | 'usage' | 'stopReason'>,
+      call: Pick<
+        LlmCall,
+        'outcome' | 'text' | 'response' | 'error' | 'usage' | 'stopReason' | 'salvage' | 'apiCalls'
+      >,
     ): void => {
       this.sink?.({
         model: this.model,
         system: request.system,
         user: request.user,
-        schema: jsonSchema ? safeJson(jsonSchema) : null,
+        schema: shown?.json ?? null,
         maxTokens,
         startedAt: startedAt.toISOString(),
         durationMs: Date.now() - started,
@@ -367,29 +458,100 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
         ...call,
       });
     };
+    /** A value read: recorded `ok` with what the ladder kept, and nothing left to ask. */
+    const answered = (
+      read: Read<T>,
+      text: string,
+      from: LlmReplySource,
+      ended: Pick<LlmCall, 'error' | 'usage' | 'stopReason'>,
+    ): Attempt<T> => {
+      record({
+        outcome: 'ok',
+        text,
+        response: read.value,
+        ...ended,
+        salvage: { overruns: read.overruns, repairs: read.repairs, issues: [], from, feedback },
+        apiCalls: transcript.apiCalls,
+      });
+      return {
+        reply: { value: read.value, issues: [], overruns: read.overruns },
+        kind: null,
+        refusal: null,
+      };
+    };
+    /**
+     * No value: recorded with the faults of the miss when a reply was parsed
+     * at all, and carried to the next ask when it had faults to name.
+     */
+    const missed = (
+      miss: Miss | null,
+      text: string,
+      kind: LlmFailureKind,
+      ended: Pick<LlmCall, 'outcome' | 'error' | 'usage' | 'stopReason'>,
+    ): Attempt<T> => {
+      record({
+        text: text || null,
+        response: null,
+        ...ended,
+        salvage:
+          miss === null
+            ? null
+            : { overruns: [], repairs: [], issues: miss.issues, from: null, feedback },
+        apiCalls: transcript.apiCalls,
+      });
+      return {
+        reply: { value: null, issues: miss?.issues ?? [], overruns: [] },
+        kind,
+        refusal: miss !== null && miss.issues.length > 0 ? { issues: miss.issues, text } : null,
+      };
+    };
 
     // The limit this call runs under, from what it declares. Our abort is a
     // fact this adapter knows first-hand, so whether it fired is read from the
     // signal — never from the name of whatever the SDK threw afterwards, which
     // is a plain `Error` ("process aborted by user") and read as a broken pipe.
     const abort = new AbortController();
-    const timedOut = (cause?: string): LlmCall['error'] => ({
+    const timedOut = (cause?: string): NonNullable<LlmCall['error']> => ({
       name: TIMED_OUT,
       message: `no answer within ${describeCallLimit(maxTokens, this.limits)}${cause ? `: ${cause}` : ''}`,
     });
 
+    /**
+     * A turn that ended without a result to read — our limit, the provider's
+     * error, a broken pipe — is still read: what it streamed before the end
+     * may hold the whole object, and then the call answers `ok`, read from
+     * the transcript, with what ended the turn kept under `Salvaged`.
+     * Otherwise the ending is the record, with the partial text beside it.
+     */
+    const settle = ({ error, kind, usage, stopReason }: Ending): Attempt<T> => {
+      const text = transcript.text;
+      const extraction =
+        text.length > 0 && shown !== null
+          ? parseStructured(text, request.schema, shown.bounds)
+          : null;
+      if (extraction?.ok) {
+        const salvaged = { name: SALVAGED, message: `${error.name}: ${error.message}` };
+        return answered(extraction, text, 'transcript', { error: salvaged, usage, stopReason });
+      }
+      return missed(extraction, text, kind, { outcome: 'error', error, usage, stopReason });
+    };
+
     try {
       // Inside the try: an unconvertible schema must yield null, not reject —
       // the LlmClient contract is "null on any failure".
-      jsonSchema = JSON.stringify(z.toJSONSchema(request.schema));
-      const prompt = [
+      shown = modelSchema(request.schema);
+      const sections = [
         request.user,
         '',
         '# Output format',
         'Respond with ONLY one JSON object — no prose before or after, no markdown',
         'fence. It must validate against this JSON Schema:',
-        jsonSchema,
-      ].join('\n');
+        JSON.stringify(shown.json),
+      ];
+      if (feedback && previous !== null) {
+        sections.push('', ...feedbackSection(previous, this.retry.feedback));
+      }
+      const prompt = sections.join('\n');
 
       const query = this.run ?? (await import('@anthropic-ai/claude-agent-sdk')).query;
 
@@ -429,104 +591,81 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable {
             },
           },
         });
-        const reading = readTurn(turn);
+        const reading = readTurn(turn, transcript);
         const settled = await Promise.race([reading, deadline.abandoned.then(() => null)]);
         if (settled === null) {
           // Past the limit and its grace, and the stream still open: whatever
           // it would say now is no answer. Its late settling is swallowed.
           reading.catch(() => undefined);
           turn.close?.();
-          kind = 'timeout';
-          record({
-            outcome: 'error',
-            text: null,
-            response: null,
+          return settle({
             error: timedOut('the turn did not end after its abort'),
+            kind: 'timeout',
             usage: null,
             stopReason: null,
           });
-          return { value: null, kind };
         }
         read = settled;
       } finally {
         deadline.stop();
       }
-      const { transcript, resultText, stopReason, failure, assistantError, usage } = read;
+      const { resultText, stopReason, failure, assistantError, usage } = read;
 
       if (resultText === null) {
         // `failure.name` is whichever closed vocabulary spoke: the assistant's
         // error when there was one, else the result's subtype — unless our
         // own abort is what ended the turn.
         const aborted = abort.signal.aborted;
-        kind = classifyFailure({
-          aborted,
-          assistantError: failure?.name ?? null,
-          resultSubtype: failure?.name ?? null,
-        });
-        record({
-          outcome: 'error',
-          text: null,
-          response: null,
-          error: aborted ? timedOut(failure?.message) : failure,
+        const ended = failure ?? {
+          name: NO_RESULT,
+          message: 'the turn ended without a result',
+        };
+        return settle({
+          error: aborted ? timedOut(ended.message) : ended,
+          kind: classifyFailure({
+            aborted,
+            assistantError: failure?.name ?? null,
+            resultSubtype: failure?.name ?? null,
+          }),
           usage,
           stopReason,
         });
-        return { value: null, kind };
       }
       // The whole turn first; `result` alone only when the turn streamed no
       // text of its own, or what it streamed does not hold the answer.
       const written = transcript.text || resultText;
-      let extraction = parseStructured(written, request.schema);
+      let extraction = parseStructured(written, request.schema, shown.bounds);
       if (!extraction.ok && written !== resultText) {
-        const fromResult = parseStructured(resultText, request.schema);
+        const fromResult = parseStructured(resultText, request.schema, shown.bounds);
         if (fromResult.ok) extraction = fromResult;
       }
-      if (!extraction.ok) {
-        // A reply the model truncated is not the same failure as a reply that
-        // simply broke a bound, and only one of them is worth re-asking in the
-        // same breath; the assistant's own `max_output_tokens` says which.
-        kind = classifyFailure({ assistantError, schemaMiss: true });
+      if (extraction.ok) {
+        return answered(extraction, written, 'result', { error: null, usage, stopReason });
       }
-      record(
-        extraction.ok
-          ? {
-              outcome: 'ok',
-              text: written,
-              response: extraction.value,
-              error: null,
-              usage,
-              stopReason,
-            }
-          : {
-              outcome: 'schema-miss',
-              text: written,
-              response: null,
-              error: { name: SCHEMA_MISS, message: extraction.reason },
-              usage,
-              stopReason,
-            },
-      );
-      return { value: extraction.ok ? extraction.value : null, kind };
+      // A reply the model truncated is not the same failure as a reply that
+      // broke the schema, and only one of them is worth re-asking in the same
+      // breath; the assistant's own `max_output_tokens` says which.
+      return missed(extraction, written, classifyFailure({ assistantError, schemaMiss: true }), {
+        outcome: 'schema-miss',
+        error: { name: SCHEMA_MISS, message: extraction.reason },
+        usage,
+        stopReason,
+      });
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       const aborted = abort.signal.aborted;
-      kind = classifyFailure({ noResult: true, aborted });
-      record({
-        outcome: 'error',
-        text: null,
-        response: null,
+      return settle({
         error: aborted ? timedOut(err.message) : { name: err.name, message: err.message },
+        kind: classifyFailure({ noResult: true, aborted }),
         usage: null,
         stopReason: null,
       });
-      return { value: null, kind };
     }
   }
 }
 
-/** What one turn said, read to its end. */
+/** What one turn said, read to its end; its text is in the transcript the caller owns. */
 interface TurnRead {
-  transcript: TurnTranscript;
   resultText: string | null;
   stopReason: string | null;
   /**
@@ -539,14 +678,18 @@ interface TurnRead {
 }
 
 /**
- * Read a turn's messages to the end. It rejects only when the stream broke
- * before a result arrived: the CLI exits non-zero after an error result and
- * the SDK rethrows that exit, but the result already carries the reason worth
+ * Read a turn's messages to the end, feeding every assistant message to the
+ * caller's transcript as it arrives — so what was streamed is in hand even
+ * when the read never returns. It rejects only when the stream broke before
+ * a result arrived: the CLI exits non-zero after an error result and the SDK
+ * rethrows that exit, but the result already carries the reason worth
  * recording.
  */
-async function readTurn(turn: AsyncIterable<SDKMessage>): Promise<TurnRead> {
+async function readTurn(
+  turn: AsyncIterable<SDKMessage>,
+  transcript: TurnTranscript,
+): Promise<TurnRead> {
   const read: TurnRead = {
-    transcript: new TurnTranscript(),
     resultText: null,
     stopReason: null,
     failure: null,
@@ -557,7 +700,7 @@ async function readTurn(turn: AsyncIterable<SDKMessage>): Promise<TurnRead> {
   try {
     for await (const message of turn) {
       if (message.type === 'assistant') {
-        read.transcript.add(message);
+        transcript.add(message);
         if (message.error) read.assistantError = message.error;
       }
       if (message.type === 'result') {
@@ -582,12 +725,4 @@ async function readTurn(turn: AsyncIterable<SDKMessage>): Promise<TurnRead> {
     if (!sawResult) throw error;
   }
   return read;
-}
-
-function safeJson(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
 }

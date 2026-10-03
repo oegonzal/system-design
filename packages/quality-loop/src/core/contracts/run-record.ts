@@ -1,10 +1,11 @@
 import type {
   LlmExchangeSummaryDto,
+  OverrunHandling,
   QualityRunDto,
   RunTrace,
   StopReason,
 } from '@sysdesign/contracts';
-import type { LlmExchange } from '@sysdesign/llm';
+import type { LlmExchange, LlmSalvage } from '@sysdesign/llm';
 import type { GitContext } from '@sysdesign/run-dump';
 
 /**
@@ -35,6 +36,16 @@ export interface RunRecord extends Omit<QualityRunDto, 'exchanges'> {
   exchanges: LlmExchange[];
 }
 
+/** How many of a call's overruns were handled a given way. */
+const handled = (salvage: LlmSalvage | null | undefined, ...ways: OverrunHandling[]): number =>
+  salvage?.overruns.filter((overrun) => ways.includes(overrun.handling)).length ?? 0;
+
+/**
+ * One exchange as the wire carries it: the salvage by count — every field
+ * past its target, those past the ceiling however handled, those cut and
+ * those trimmed — with the fields themselves left to the dump. A record
+ * written before the seam salvaged reads as a call that kept nothing.
+ */
 export const summariseExchange = ({
   scope,
   ordinal,
@@ -43,6 +54,8 @@ export const summariseExchange = ({
   startedAt,
   attempt,
   error,
+  salvage,
+  apiCalls,
 }: LlmExchange): LlmExchangeSummaryDto => ({
   scope,
   ordinal,
@@ -51,6 +64,13 @@ export const summariseExchange = ({
   startedAt,
   attempt: attempt ?? 1,
   errorName: error?.name ?? null,
+  overruns: salvage?.overruns.length ?? 0,
+  overCeiling: handled(salvage, 'kept-over-ceiling', 'cut', 'trimmed'),
+  cut: handled(salvage, 'cut'),
+  trimmed: handled(salvage, 'trimmed'),
+  salvagedFrom: salvage?.from ?? null,
+  feedback: salvage?.feedback ?? false,
+  apiCalls: apiCalls ?? null,
 });
 
 /** The wire projection, picked field by field: prompts, responses and git stay in the dump. */

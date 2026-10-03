@@ -1,0 +1,463 @@
+{
+  "graph": {
+    "nodes": [
+      { "id": "n-1", "kind": "client", "label": "Marketer & visitor browser" },
+      {
+        "id": "n-2",
+        "kind": "gateway",
+        "label": "API Gateway",
+        "config": [{ "key": "hopBudgetMs", "value": 5 }],
+        "operations": [
+          {
+            "name": "createLink",
+            "kind": "command",
+            "idempotent": true,
+            "notes": "honors client Idempotency-Key header; service dedupes before insert"
+          },
+          { "name": "redirect", "kind": "query" },
+          { "name": "getClickCount", "kind": "query" }
+        ]
+      },
+      {
+        "id": "n-3",
+        "kind": "service",
+        "label": "Link Service",
+        "config": [
+          { "key": "hopBudgetMs", "value": 10 },
+          { "key": "createFlow", "value": "insert row then write-through populate cache" },
+          {
+            "key": "createIdempotency",
+            "value": "dedupe by client Idempotency-Key or alias/content hash before insert; retry-safe"
+          },
+          {
+            "key": "aliasCollision",
+            "value": "unique constraint on custom alias; collision returns 409 before insert"
+          },
+          { "key": "clickEventAckMs", "value": 2 }
+        ],
+        "responsibilities": [
+          "Create immutable code->URL mappings, deduped by idempotency key",
+          "Resolve redirects from cache, fall back to replica then primary",
+          "Emit synchronous, acknowledged, retried click events — never silent loss"
+        ],
+        "operations": [
+          { "name": "cacheRead", "kind": "query" },
+          { "name": "cachePopulate", "kind": "command", "idempotent": true },
+          {
+            "name": "dbWriteCreate",
+            "kind": "command",
+            "idempotent": true,
+            "notes": "insert-only; links never change target; deduped by idempotency key/alias uniqueness"
+          },
+          {
+            "name": "dbReadFallback",
+            "kind": "query",
+            "notes": "reads hot standby replica first on cache miss; falls to dbReadFallbackPrimary if row missing (lag) or replica unreachable"
+          },
+          {
+            "name": "dbReadFallbackPrimary",
+            "kind": "query",
+            "notes": "direct primary read when replica lacks the row (replication lag on a new link) or replica is unavailable"
+          },
+          {
+            "name": "emitClickEvent",
+            "kind": "event",
+            "idempotent": true,
+            "notes": "synchronous broker ack (~2ms), retried 3x with backoff before redirect returns; exhausted retries raise alertClickEventLoss"
+          },
+          { "name": "readClickCounts", "kind": "query" }
+        ]
+      },
+      {
+        "id": "n-4",
+        "kind": "cache",
+        "label": "Link Cache (Redis)",
+        "config": [
+          { "key": "hopBudgetMs", "value": 5 },
+          { "key": "ttlSeconds", "value": 0 },
+          {
+            "key": "evictionPolicy",
+            "value": "none needed: mappings are immutable, write-through on create"
+          }
+        ]
+      },
+      {
+        "id": "n-5",
+        "kind": "database",
+        "label": "Links DB (Postgres primary)",
+        "config": [
+          { "key": "hopBudgetMs", "value": 10 },
+          { "key": "capacity", "value": "20M+ rows, indexed on short code" },
+          {
+            "key": "logicalRole",
+            "value": "primary via failover-aware endpoint; physical instance may be original primary or a promoted standby"
+          }
+        ],
+        "operations": [
+          {
+            "name": "replicateData",
+            "kind": "event",
+            "notes": "async streaming replication to standby"
+          }
+        ]
+      },
+      {
+        "id": "ai-replica",
+        "kind": "replica",
+        "label": "Links DB Hot Standby Replica",
+        "config": [
+          { "key": "hopBudgetMs", "value": 15 },
+          { "key": "sizedForPeakRps", "value": 10000 },
+          {
+            "key": "role",
+            "value": "tier-1 cache-miss fallback reads + promotable on primary failure"
+          },
+          {
+            "key": "postPromotionReprovision",
+            "value": "auto-reprovisions a fresh standby from the new primary within ~5min via snapshot+WAL replay, restoring two-tier fallback"
+          }
+        ],
+        "responsibilities": [
+          "Absorb the bulk of cache-miss reads at full peak as tier-1 fallback",
+          "Promote to primary on failover; a fresh standby is auto-reprovisioned after"
+        ]
+      },
+      {
+        "id": "ai-queue",
+        "kind": "queue",
+        "label": "Click Events Queue",
+        "config": [
+          { "key": "durability", "value": "persistent log, at-least-once delivery" },
+          { "key": "partitionCount", "value": 12 },
+          { "key": "partitionKey", "value": "hash(shortCode)" }
+        ]
+      },
+      {
+        "id": "ai-aggregator",
+        "kind": "stream-processor",
+        "label": "Click Count Aggregator",
+        "config": [
+          { "key": "batchIntervalSeconds", "value": 30 },
+          { "key": "dedupStrategy", "value": "idempotent upsert keyed by click event id" },
+          { "key": "consumerGroupSize", "value": 12 },
+          { "key": "sizedForPeakEventsPerSec", "value": 10000 }
+        ],
+        "operations": [
+          {
+            "name": "consumeClickBatch",
+            "kind": "event",
+            "notes": "12 parallel consumers, one per partition, sized to the 10k events/sec peak"
+          },
+          { "name": "writeAggregatedCounts", "kind": "command", "idempotent": true }
+        ]
+      },
+      {
+        "id": "ai-counter-store",
+        "kind": "kv-store",
+        "label": "Click Counts Store",
+        "config": [{ "key": "decoupledFromLinkRow", "value": true }]
+      },
+      {
+        "id": "ai-monitoring",
+        "kind": "monitoring",
+        "label": "SLO Monitoring & Alerting",
+        "config": [
+          { "key": "slo_p99_ms", "value": 50 },
+          { "key": "slo_availability_pct", "value": 99.95 },
+          { "key": "alertOnBreach", "value": true },
+          { "key": "slo_aggregator_lag_seconds_max", "value": 60 },
+          { "key": "slo_queue_backlog_max_events", "value": 50000 }
+        ],
+        "operations": [
+          { "name": "emitMetrics", "kind": "event" },
+          {
+            "name": "alertClickEventLoss",
+            "kind": "event",
+            "notes": "fires when click-event enqueue retries are exhausted, surfacing potential undercount immediately"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "e-1",
+        "source": "n-1",
+        "target": "n-2",
+        "kind": "sync",
+        "carries": ["createLink", "redirect", "getClickCount"]
+      },
+      {
+        "id": "e-2",
+        "source": "n-2",
+        "target": "n-3",
+        "kind": "sync",
+        "carries": ["createLink", "redirect", "getClickCount"]
+      },
+      {
+        "id": "e-3",
+        "source": "n-3",
+        "target": "n-4",
+        "kind": "sync",
+        "carries": ["cacheRead", "cachePopulate"]
+      },
+      {
+        "id": "e-4",
+        "source": "n-3",
+        "target": "n-5",
+        "kind": "sync",
+        "carries": ["dbWriteCreate"]
+      },
+      {
+        "id": "ai-e-replica-repl",
+        "source": "n-5",
+        "target": "ai-replica",
+        "kind": "async",
+        "label": "streaming replication",
+        "carries": ["replicateData"]
+      },
+      {
+        "id": "ai-e-fallback",
+        "source": "n-3",
+        "target": "ai-replica",
+        "kind": "sync",
+        "label": "fallback tier 1: hot standby replica",
+        "carries": ["dbReadFallback"]
+      },
+      {
+        "id": "ai-e-fallback-primary",
+        "source": "n-3",
+        "target": "n-5",
+        "kind": "sync",
+        "label": "fallback tier 2: direct primary read when replica missing/behind/down",
+        "carries": ["dbReadFallbackPrimary"]
+      },
+      {
+        "id": "ai-e-clickevent",
+        "source": "n-3",
+        "target": "ai-queue",
+        "kind": "sync",
+        "label": "click event: synchronous broker ack + bounded retry before redirect returns",
+        "carries": ["emitClickEvent"]
+      },
+      {
+        "id": "ai-e-queueagg",
+        "source": "ai-queue",
+        "target": "ai-aggregator",
+        "kind": "async",
+        "label": "12-partition consumer group",
+        "carries": ["consumeClickBatch"]
+      },
+      {
+        "id": "ai-e-aggwrite",
+        "source": "ai-aggregator",
+        "target": "ai-counter-store",
+        "kind": "async",
+        "carries": ["writeAggregatedCounts"]
+      },
+      {
+        "id": "ai-e-dashboard",
+        "source": "n-3",
+        "target": "ai-counter-store",
+        "kind": "sync",
+        "label": "dashboard read",
+        "carries": ["readClickCounts"]
+      },
+      {
+        "id": "ai-e-mon-gw",
+        "source": "n-2",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-svc",
+        "source": "n-3",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics", "alertClickEventLoss"]
+      },
+      {
+        "id": "ai-e-mon-cache",
+        "source": "n-4",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-db",
+        "source": "n-5",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-replica",
+        "source": "ai-replica",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-queue",
+        "source": "ai-queue",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "label": "queue backlog depth metric",
+        "carries": ["emitMetrics"]
+      },
+      {
+        "id": "ai-e-mon-agg",
+        "source": "ai-aggregator",
+        "target": "ai-monitoring",
+        "kind": "async",
+        "label": "aggregator consumer-group lag metric",
+        "carries": ["emitMetrics"]
+      }
+    ]
+  },
+  "brief": {
+    "version": 1,
+    "bindings": [
+      {
+        "criterionId": "c1",
+        "nodeIds": ["n-2", "n-3", "n-5", "n-4"],
+        "claim": "Gateway routes POST /links to the link service, which dedupes by a client Idempotency-Key (or alias/content hash) before inserting the immutable mapping into Links DB, rejecting alias collisions with 409; it then write-through populates Redis so the first redirect is already a cache hit.",
+        "path": ["e-1", "e-2", "e-4"]
+      },
+      {
+        "criterionId": "c2",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "ai-queue", "n-5"],
+        "claim": "GET /{code} resolves via gateway and link service against Redis; on a cache miss it reads the hot standby replica, and if the replica lacks the row (lag) or is unreachable it falls through to the primary directly, so a just-created link or a replica outage never produces a false miss. The click event gets a synchronous ack and retry before the 302 returns.",
+        "path": ["e-1", "e-2", "e-3"]
+      },
+      {
+        "criterionId": "c3",
+        "nodeIds": ["n-2", "n-3", "ai-queue", "ai-aggregator", "ai-counter-store", "ai-monitoring"],
+        "claim": "The dashboard query goes through gateway and link service to the decoupled Click Counts Store, refreshed by a 12-way partitioned aggregator every 30s from the click-event queue — well inside the 5-minute bound — with idempotent upserts and monitoring watching backlog and lag.",
+        "path": ["e-1", "e-2", "ai-e-dashboard"]
+      },
+      {
+        "criterionId": "c4",
+        "nodeIds": ["n-1", "n-2", "n-3", "n-4", "ai-replica", "n-5"],
+        "claim": "Corrected hop budget: hit path gateway5+service10+cache5+clickAck2=22ms; cache-miss-to-replica adds 15ms (37ms, including the failed 5ms cache lookup); the rare replica-miss-to-primary adds 10ms more (47ms) — every path stays under the 50ms p99 budget.",
+        "path": ["e-1", "e-2", "e-3"]
+      },
+      {
+        "criterionId": "c5",
+        "nodeIds": ["n-2", "n-3", "n-4", "n-5", "ai-replica"],
+        "claim": "Redirects now have a two-tier DB fallback: replica first, then primary directly if the replica is behind or down, so no single Postgres instance is the sole in-line dependency; after a promotion, automated reprovisioning rebuilds a fresh standby within minutes, restoring the two-tier shape.",
+        "path": ["e-1", "e-2", "e-3"]
+      },
+      {
+        "criterionId": "c6",
+        "nodeIds": ["n-3", "ai-queue", "ai-aggregator", "ai-counter-store", "ai-monitoring"],
+        "claim": "Click events get a synchronous, acknowledged, retried enqueue (no silent loss) and a 12-way partitioned aggregator batches them every 30s with idempotent dedup; monitoring alerts on queue backlog or aggregator lag before the 5-minute bound is ever at risk."
+      },
+      {
+        "criterionId": "c7",
+        "nodeIds": ["n-5"],
+        "claim": "Links DB is a single Postgres instance indexed on short code; 20 million rows is well within one instance's capacity with headroom before sharding would ever be needed."
+      },
+      {
+        "criterionId": "c8",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "n-5"],
+        "claim": "At 2,000 rps average, nearly all reads hit the write-through cache; residual misses go to the replica, and only a replica outage or lag falls through to the primary — average load never depends on one unreplicated Postgres instance, and corrected hop math (22/37/47ms) still clears 50ms.",
+        "path": ["e-1", "e-2", "e-3"]
+      },
+      {
+        "criterionId": "c9",
+        "nodeIds": ["n-2", "n-3", "n-4", "ai-replica", "ai-queue", "n-5", "ai-aggregator"],
+        "claim": "At 10,000 rps peak the cache serves the bulk of reads, the replica (sized for 100% of peak) and primary form a two-tier read fallback with no sole SPOF, and the click pipeline is a 12-partition consumer group sized to the same 10k events/sec peak so the aggregator never backs up.",
+        "path": ["e-1", "e-2", "e-3"]
+      }
+    ]
+  },
+  "narrative": {
+    "version": 1,
+    "overview": "This revision closes the SPOF the panel found twice: a cache miss used to have exactly one fallback, the hot replica, with no further fallback and no story for after it's promoted. Now a cache miss tries the replica first and, only if the replica lacks the row — the lag window right after a create — or is unreachable, falls through to the primary, so a just-created link can't 404 and no single Postgres instance is ever the sole in-line dependency. After a promotion, automated reprovisioning rebuilds a fresh standby within minutes so the two-tier fallback survives more than one failure a month. The click event that used to be fire-and-forget now gets a synchronous broker ack and bounded retry (~2ms) before the redirect returns, with an explicit alert if retries are exhausted — loss is observed, never silent. The aggregator is now a stated 12-way consumer group, partitioned to match the 10,000 events/sec peak, so a single-consumer bottleneck can't back the freshness bound up at the worst moment. Monitoring now also watches queue backlog and aggregator lag. I corrected the hop-budget arithmetic to include the failed cache lookup on every miss path (22ms hit / 37ms replica-fallback / 47ms double-fallback, all under 50ms) and added idempotency-key dedup plus an alias-collision check to create.",
+    "componentRationales": [
+      {
+        "nodeId": "n-1",
+        "prose": "The marketer and the visitor are the same client surface: one issues creates and reads the dashboard, the other just follows redirects. No change requested here."
+      },
+      {
+        "nodeId": "n-2",
+        "prose": "Still a thin router with a declared 5ms hop budget and metrics emission. createLink is now explicitly idempotent — it honors a client Idempotency-Key so a retried POST can't silently create two links for one submission."
+      },
+      {
+        "nodeId": "n-3",
+        "prose": "Owns create and redirect logic with a fully explicit interface: cache read/populate, DB write-create (deduped by idempotency key, alias-collision checked), a two-tier read fallback (replica, then primary when the replica is behind or down), a synchronous acknowledged-and-retried click emit, and counts read. No operation does double duty, and no redirect can silently fail or silently lose its click."
+      },
+      {
+        "nodeId": "n-4",
+        "prose": "Still write-through on create, no TTL needed since mappings never change. Unchanged beyond that — the panel's findings were about the fallback chain behind it, not the cache itself."
+      },
+      {
+        "nodeId": "n-5",
+        "prose": "Primary system of record for the immutable mapping. It's also now the tier-2 fallback for any redirect the replica can't serve — a just-created link, or any read while the replica is down — and the endpoint is logical: after a promotion, whichever instance holds the primary role answers here without a new edge."
+      },
+      {
+        "nodeId": "ai-replica",
+        "prose": "A hot standby sized for 100% of peak, serving as tier-1 fallback and promotion target — but no longer the sole fallback, since the primary now backs it up on the same path. After a promotion, automated reprovisioning rebuilds a fresh standby within minutes, so the two-tier shape survives more than one failure a month."
+      },
+      {
+        "nodeId": "ai-queue",
+        "prose": "A durable, at-least-once log, now partitioned 12 ways so a single consumer can't become the bottleneck at peak. It's also now written to synchronously with a broker ack, not fired-and-forgotten, so a failed enqueue is retried rather than silently dropped."
+      },
+      {
+        "nodeId": "ai-aggregator",
+        "prose": "Now modeled as a 12-member consumer group, one per partition, explicitly sized to the 10,000 events/sec peak — the single-consumer bottleneck can't recur. Idempotent, keyed upserts still guard against double-counting on retry or hot-key contention."
+      },
+      {
+        "nodeId": "ai-counter-store",
+        "prose": "Unchanged: the counter lives here, fully decoupled from the immutable link row."
+      },
+      {
+        "nodeId": "ai-monitoring",
+        "prose": "Now also watches queue backlog and aggregator consumer lag, not just gateway/cache/DB/replica latency — a stalled aggregator or a backing-up queue is caught before the 5-minute freshness bound is at risk. It also raises an explicit alert if a click event's retries are exhausted, so a lost click is observed rather than silently absorbed."
+      }
+    ],
+    "criterionNarrations": [
+      {
+        "criterionId": "c1",
+        "prose": "Create still goes gateway→service→single immutable insert, but now dedupes a retried submission by idempotency key and rejects a colliding custom alias with 409 before the insert, so a flaky client can't silently fork a second link for one request."
+      },
+      {
+        "criterionId": "c2",
+        "prose": "Redirect is still cache-first with a replica fallback, but the replica fallback now itself falls through to the primary when the replica lacks the row — exactly the window right after a create — or is unreachable, so the promised redirect no longer has a window where it 404s, and the click event is acknowledged and retried rather than fired-and-forgotten."
+      },
+      {
+        "criterionId": "c3",
+        "prose": "The marketer's click count comes from a 12-way partitioned aggregator sized to peak, writing idempotent upserts into a store decoupled from the link row; monitoring now also watches queue backlog and aggregator lag so a stall is caught, not just assumed away."
+      },
+      {
+        "criterionId": "c4",
+        "prose": "Corrected hop math: hit path is 22ms (gateway5+service10+cache5+click-ack2); a replica fallback is 37ms once the failed 5ms cache lookup is counted; the rare replica-miss-to-primary path is 47ms. All three clear the 50ms p99 budget with headroom."
+      },
+      {
+        "criterionId": "c5",
+        "prose": "The in-line redirect path now has two independent DB tiers — replica, then primary — so neither alone is a sole SPOF, and automated reprovisioning rebuilds the standby within minutes of a promotion, restoring the two-tier shape before a second failure is likely in the same month."
+      },
+      {
+        "criterionId": "c6",
+        "prose": "Click events are acknowledged and retried on enqueue (no silent loss), aggregated by a 12-way consumer group sized to the 10,000/sec peak, and monitoring now alerts on queue backlog or aggregator lag directly — freshness is observed, not just asserted from the 30s interval."
+      },
+      {
+        "criterionId": "c7",
+        "prose": "Links DB is a single Postgres instance indexed on short code; 20 million rows is well within one instance's capacity with headroom before sharding would ever be needed — unaffected by this round's fallback-chain changes."
+      },
+      {
+        "criterionId": "c8",
+        "prose": "At 2,000 rps average the cache absorbs nearly all reads; a replica-then-primary fallback chain, both correctly sized, means no single unreplicated instance sits in-line, and the corrected hop math (22/37/47ms) still clears the latency budget comfortably."
+      },
+      {
+        "criterionId": "c9",
+        "prose": "At 10,000 rps peak the same cache-plus-two-tier-DB shape holds for reads, and the click pipeline is now an explicit 12-partition consumer group matched to that same peak rate, so the aggregator can't back up at exactly the load where it matters most."
+      },
+      {
+        "criterionId": "c10",
+        "prose": "Links are inserted once via dbWriteCreate (now idempotent) and never updated; no edge or operation in the graph performs an update to a link row, consistent with the immutability constraint."
+      }
+    ]
+  }
+}
