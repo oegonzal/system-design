@@ -1,10 +1,9 @@
 import {
+  bounded,
   DEFAULT_LIST_LIMIT,
   MAX_LIST_LIMIT,
-  PROMPT_MARKDOWN_BOUND,
   PROMPT_SOURCES,
   PROMPT_STATUSES,
-  PROMPT_TITLE_BOUND,
   promptDocumentSchema,
 } from '@sysdesign/contracts';
 import { pageFields } from '@sysdesign/nest-kit';
@@ -17,15 +16,24 @@ export const authorPromptSchema = z.strictObject({
   experienceId: z.uuid().optional(),
 });
 
-/** A library id is a path below the loop's prompt folder (`agentic/workflow-graph-engine`). */
-export const importPromptSchema = z.strictObject({ libraryId: z.string().min(1).max(200) });
+/** A library id is a path below the loop's prompt folder (`agentic/workflow-graph-engine`): exact, never cut. */
+const LIBRARY_ID_MAX_LENGTH = 200;
+
+export const importPromptSchema = z.strictObject({
+  libraryId: bounded.id(LIBRARY_ID_MAX_LENGTH, { min: 1 }),
+});
 
 export const generatePromptSchema = z.strictObject({ experienceId: z.uuid().optional() });
 
+/**
+ * A rewrite takes what a create takes — the document's own fields, to the
+ * ceilings they declare — so a title or text either route stored can be sent
+ * back unchanged.
+ */
 export const updatePromptSchema = z.strictObject({
   status: z.enum(PROMPT_STATUSES).optional(),
-  title: z.string().min(1).max(PROMPT_TITLE_BOUND.target).optional(),
-  markdown: z.string().min(1).max(PROMPT_MARKDOWN_BOUND.target).optional(),
+  title: promptDocumentSchema.shape.title.optional(),
+  markdown: promptDocumentSchema.shape.markdown.optional(),
 });
 
 export const listPromptsQuerySchema = z.strictObject({

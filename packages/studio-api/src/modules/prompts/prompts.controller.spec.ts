@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { criteriaFromDraft, PROMPT_COPY } from '@sysdesign/contracts';
+import {
+  criteriaFromDraft,
+  PROMPT_COPY,
+  PROMPT_MARKDOWN_BOUND,
+  PROMPT_TITLE_BOUND,
+} from '@sysdesign/contracts';
 import type {
   ApiErrorResponse,
   AuthorPromptRequest,
@@ -458,6 +463,34 @@ describe('prompts', () => {
         body: JSON.stringify({ status: 'active' }),
       });
       expect(reactivated.body.data.status).toBe('active');
+    });
+
+    it('[UX-19] a rewrite takes a title and text up to the ceilings a create takes, so a stored one is sent back unchanged', async () => {
+      // A title past what is asked and within what is accepted, as the composer lets one be written.
+      const title = 'Serve a unified order history '
+        .repeat(6)
+        .slice(0, PROMPT_TITLE_BOUND.target + 20);
+      const { body: created } = await author({ ...authoredPrompt(), title });
+      expect(created.data.title).toBe(title);
+      const patch = (body: unknown) =>
+        call<GetPromptResponse>(`${h.url}/prompts/${created.data.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+
+      const unchanged = await patch({ title });
+      expect(unchanged.status).toBe(200);
+      expect(unchanged.body.data.title).toBe(title);
+
+      const atCeiling = 'x'.repeat(PROMPT_TITLE_BOUND.ceiling);
+      expect((await patch({ title: atCeiling })).body.data.title).toBe(atCeiling);
+      expect((await patch({ title: `${atCeiling}x` })).status).toBe(400);
+
+      const markdown = AUTHORED_MARKDOWN.padEnd(PROMPT_MARKDOWN_BOUND.ceiling, '\n');
+      const rewritten = await patch({ markdown });
+      expect(rewritten.status).toBe(200);
+      expect(rewritten.body.data.markdown).toBe(markdown);
+      expect((await patch({ markdown: `${markdown}x` })).status).toBe(400);
     });
 
     it('rejects a status outside the vocabulary with 400 and an unknown prompt with 404', async () => {
