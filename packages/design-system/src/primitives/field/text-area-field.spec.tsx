@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-area-field.stories';
 
-const { Default, Tall, Disabled, WithHint, Invalid, NearLimit, OverTarget } =
+const { Default, Tall, Disabled, WithHint, Invalid, NearLimit, OverTarget, PastCeiling } =
   composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
@@ -81,5 +81,14 @@ describe('TextAreaField', () => {
     fireEvent.change(area, { target: { value: 'x'.repeat(75) } });
     expect(count()?.textContent).toBe('Limit reached — 75 characters at most.');
     expect(announced()).toBe('Limit of 75 characters reached.');
+  });
+
+  it('[UX-22] keeps prose set past its maxLength whole and says how far past the most accepted it runs and that it must be shortened to submit', () => {
+    renderWithTheme(<PastCeiling />);
+    const area = screen.getByLabelText('Design narrative') as HTMLTextAreaElement;
+    const count = () => document.getElementById(area.getAttribute('aria-describedby') ?? '');
+    expect(area.value).toHaveLength(88);
+    expect(count()?.textContent).toBe('13 characters past the 75 accepted — shorten it to submit.');
+    expect(announced()).toBe('Past the limit of 75 characters — shorten it to submit.');
   });
 });

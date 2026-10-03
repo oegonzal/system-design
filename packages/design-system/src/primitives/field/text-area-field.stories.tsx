@@ -47,3 +47,17 @@ export const OverTarget: Story = {
     defaultValue: 'Requests enter through the gateway and fan out to the shards.',
   },
 };
+
+/**
+ * Prose set past the `maxLength` from code — a coach revision imported
+ * whole — stays whole on screen: the count says how far past the most
+ * accepted it runs and that it must be shortened to submit.
+ */
+export const PastCeiling: Story = {
+  args: {
+    maxLength: 75,
+    target: 60,
+    defaultValue:
+      'Requests enter through the gateway, fan out to the shards and are retried at most twice.',
+  },
+};

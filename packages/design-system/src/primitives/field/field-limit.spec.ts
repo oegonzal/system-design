@@ -36,6 +36,7 @@ describe('fieldLimit', () => {
     expect(fieldLimit(140, 120, 'near')).toMatchObject({
       remaining: 0,
       over: 20,
+      past: 20,
       reached: true,
       near: true,
       shown: true,
@@ -70,7 +71,16 @@ describe('fieldLimit', () => {
         reached: false,
         shown: true,
       });
-      expect(fieldLimit(120, 120, 'near', 80)).toMatchObject({ over: 40, reached: true });
+      expect(fieldLimit(120, 120, 'near', 80)).toMatchObject({
+        over: 40,
+        past: 0,
+        reached: true,
+      });
+      expect(fieldLimit(150, 120, 'near', 80)).toMatchObject({
+        over: 70,
+        past: 30,
+        reached: true,
+      });
     });
 
     it('takes the limit as the ask when the target is missing, past the limit, or nothing', () => {
@@ -123,6 +133,23 @@ describe('the limit’s wording', () => {
       expect(limitAnnouncement(asked(1200))).toBe('At the 1,200 characters asked — 1,500 at most.');
       expect(limitAnnouncement(asked(1438))).toBe('At the 1,200 characters asked — 1,500 at most.');
       expect(limitAnnouncement(asked(1500))).toBe('Limit of 1,500 characters reached.');
+    });
+
+    it('[UX-22] says how far past the most accepted a value set from code runs, and that it must be shortened to submit — announced once', () => {
+      expect(limitCopy(asked(1501))).toBe(
+        '1 character past the 1,500 accepted — shorten it to submit.',
+      );
+      expect(limitCopy(asked(1545))).toBe(
+        '45 characters past the 1,500 accepted — shorten it to submit.',
+      );
+      expect(limitAnnouncement(asked(1501))).toBe(
+        'Past the limit of 1,500 characters — shorten it to submit.',
+      );
+      expect(limitAnnouncement(asked(1545))).toBe(limitAnnouncement(asked(1501)));
+      // A field with no target words it alike.
+      expect(limitCopy(at(4100))).toBe(
+        '100 characters past the 4,000 accepted — shorten it to submit.',
+      );
     });
   });
 });

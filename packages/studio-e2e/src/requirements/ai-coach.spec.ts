@@ -177,18 +177,20 @@ test.describe('the AI coach', () => {
     expect(asked(graded?.evaluation?.runId)).toBe(false);
   });
 
-  test('[UX-20] a coach revision that wrote past what was asked imports whole, says how far over on each field, and re-saves as the draft as written', async ({
+  test('[UX-20] [UX-22] a coach revision that wrote past what was asked imports whole, says how far over on each field, and re-saves as the draft as written', async ({
     page,
     request,
   }) => {
-    // The measured overrun — a claim 58 characters past the 300 asked — and
-    // one past what a submit accepts, short of the three asks past which the
-    // loop would cut it: the coach's words, scripted for this test's run.
+    // A claim 58 characters past `BINDING_CLAIM_BOUND.target` — the measured
+    // overrun's margin — and one past its ceiling, what a submit accepts,
+    // short of the three targets past which the loop would cut it: the
+    // coach's words, scripted for this test's run.
     const { target, ceiling } = BINDING_CLAIM_BOUND;
     const prose = (length: number) =>
       'the replica absorbs every repeat read of the order history '.repeat(20).slice(0, length);
     const overAsk = prose(target + 58);
-    const overCeiling = prose(ceiling + 45);
+    const pastCeiling = 45;
+    const overCeiling = prose(ceiling + pastCeiling);
     const prompt = await keyedPrompt(request, 'coach writes long');
     await scenarioFor(request, prompt.markdown, {
       outcome: 'complete',
@@ -211,7 +213,7 @@ test.describe('the AI coach', () => {
     );
     await expect(canvas.bindingClaim('c2')).toHaveValue(overCeiling);
     await expect(canvas.bindingRow('c2')).toContainText(
-      `Limit reached — ${ceiling} characters at most.`,
+      `${pastCeiling} characters past the ${ceiling} accepted — shorten it to submit.`,
     );
 
     // Restored as the draft, it saves as written and comes back whole after a reload.

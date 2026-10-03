@@ -1667,9 +1667,10 @@ describe('sessions', () => {
     it('[UX-20] an iteration that wrote past its bounds imports whole — past the ask and past the ceiling — with the overruns logged, re-saves as the draft, and a submit of it is still held to the ceilings', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
-      // The measured overruns: an overview a little past the 1,400 asked and
-      // within the ceiling, and a claim past the ceiling — short of the three
-      // asks past which the loop would have cut it.
+      // The measured overruns, against today's bounds: an overview a little
+      // past `NARRATION_OVERVIEW_BOUND.target` and within its ceiling, and a
+      // claim past `BINDING_CLAIM_BOUND.ceiling` — short of the three targets
+      // past which the loop would have cut it.
       const overview = prose(NARRATION_OVERVIEW_BOUND.target + 38);
       const claim = prose(BINDING_CLAIM_BOUND.ceiling + 45);
       const [first, second] = validBrief().bindings;

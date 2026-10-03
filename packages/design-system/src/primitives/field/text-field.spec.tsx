@@ -18,6 +18,7 @@ const {
   CountedThroughout,
   OverTarget,
   AtCeiling,
+  PastCeiling,
 } = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
@@ -197,6 +198,21 @@ describe('TextField', () => {
         expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual([
           'Limit reached — 30 characters at most.',
         ]);
+        expect(announced()).toBe('Limit of 30 characters reached.');
+      });
+
+      it('[UX-22] holds a value set past the maxLength whole, and says how far past the most accepted it runs and that it must be shortened to submit', () => {
+        renderWithTheme(<PastCeiling />);
+        const input = screen.getByLabelText('Service name') as HTMLInputElement;
+        expect(input.value).toBe('order-history-reader-by-region-v2');
+        expect(descriptionsOf(input)).toEqual([
+          '3 characters past the 30 accepted — shorten it to submit.',
+        ]);
+        expect(announced()).toBe('Past the limit of 30 characters — shorten it to submit.');
+
+        // Shortened to the limit, it is the limit reached again.
+        fireEvent.change(input, { target: { value: 'order-history-reader-by-region' } });
+        expect(descriptionsOf(input)).toEqual(['Limit reached — 30 characters at most.']);
         expect(announced()).toBe('Limit of 30 characters reached.');
       });
     });

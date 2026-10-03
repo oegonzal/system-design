@@ -22,6 +22,9 @@ export interface LimitNoticeProps {
    * its ceiling. The count runs down to it, then says how far over the ask
    * the value is and how much the field takes at most, and the limit is
    * reached only at `maxLength`. The `maxLength` itself unless given.
+   * A value set past `maxLength` from code — a revision imported whole —
+   * is never cut: the count says how far past it runs and that it must be
+   * shortened to submit.
    */
   target?: number;
 }
@@ -36,6 +39,8 @@ export interface FieldLimit {
   remaining: number;
   /** Characters past the ask, none until it is crossed. */
   over: number;
+  /** Characters past the max, none until it is crossed — only a value set from code gets there. */
+  past: number;
   /** Within the last stretch before the ask, or past it. */
   near: boolean;
   /** At the max: nothing more is taken. */
@@ -68,6 +73,7 @@ export function fieldLimit(
     target: asked,
     remaining,
     over: Math.max(0, length - asked),
+    past: Math.max(0, length - max),
     near,
     reached: length >= max,
     shown: near || notice === 'always',
@@ -79,30 +85,38 @@ const count = (value: number): string => value.toLocaleString('en-US');
 /** Whether the field takes more than it asks for — the one case the count has to word. */
 const roomPastAsk = ({ max, target }: FieldLimit): boolean => target < max;
 
+const characters = (value: number): string =>
+  `${count(value)} ${value === 1 ? 'character' : 'characters'}`;
+
 /**
  * The count as shown under the control: what is left to the ask, then —
  * where the field takes more — that the ask is met and how far over it the
  * value runs, with what is taken at most, and the limit once nothing more
- * is taken.
+ * is taken; a value held past the limit says by how much, and that it has
+ * to be shortened before it is accepted.
  */
 export function limitCopy(limit: FieldLimit): string {
-  const { max, target, remaining, over, reached } = limit;
+  const { max, target, remaining, over, past, reached } = limit;
+  if (past > 0) {
+    return `${characters(past)} past the ${count(max)} accepted — shorten it to submit.`;
+  }
   if (reached) return `Limit reached — ${count(max)} characters at most.`;
   if (over > 0) return `${count(over)} over the ${count(target)} asked — ${count(max)} at most`;
   if (remaining === 0 && roomPastAsk(limit)) {
     return `At the ${count(target)} asked — ${count(max)} at most`;
   }
-  return `${count(remaining)} ${remaining === 1 ? 'character' : 'characters'} left`;
+  return `${characters(remaining)} left`;
 }
 
 /**
  * What is announced — only at the moments that matter, never per keystroke:
  * entering the last stretch before the ask, meeting the ask where the field
- * takes more, and reaching the limit. Constant within each stretch, so a
- * live region reads each once. Empty before any.
+ * takes more, reaching the limit, and holding a value past it. Constant
+ * within each stretch, so a live region reads each once. Empty before any.
  */
 export function limitAnnouncement(limit: FieldLimit): string {
-  const { max, target, remaining, near, reached } = limit;
+  const { max, target, remaining, near, past, reached } = limit;
+  if (past > 0) return `Past the limit of ${count(max)} characters — shorten it to submit.`;
   if (reached) return `Limit of ${count(max)} characters reached.`;
   if (!near) return '';
   if (!roomPastAsk(limit)) return `Nearing the limit of ${count(max)} characters.`;

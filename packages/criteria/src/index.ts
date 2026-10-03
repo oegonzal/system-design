@@ -138,6 +138,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "The studio says where a grade or a lesson stands without the loop's private words: a session card whose latest grade's run failed reads grading failed, beside not assessed for one that judged too little, and neither shows a score or a decision; and each lesson the coach was handed says where it helps in the prompt's own criteria and defects — nothing when it names none — and where it was learned: the iteration of an earlier run of which kind of work, how that iteration was decided, and the day, when the record carries them.",
   },
+  {
+    id: 'UX-22',
+    statement:
+      'A text field holding a value past its ceiling — set from code, as a coach revision imported whole is, and refused by a submit — shows it whole and never cuts it: its count says how far past the most the field accepts the value runs and that it must be shortened to submit, and the field announces that once, until it is shortened.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

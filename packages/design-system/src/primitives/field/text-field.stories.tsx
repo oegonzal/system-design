@@ -70,3 +70,12 @@ export const OverTarget: Story = {
 export const AtCeiling: Story = {
   args: { maxLength: 30, target: 20, defaultValue: 'order-history-reader-by-region' },
 };
+
+/**
+ * A value set past the `maxLength` from code — a revision imported whole —
+ * is shown whole, never cut: the count says how far past the most accepted
+ * it runs and that it must be shortened to submit.
+ */
+export const PastCeiling: Story = {
+  args: { maxLength: 30, target: 20, defaultValue: 'order-history-reader-by-region-v2' },
+};
