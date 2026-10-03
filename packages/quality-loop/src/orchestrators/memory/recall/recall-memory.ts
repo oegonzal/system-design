@@ -21,7 +21,7 @@ import {
   MEMORY_RECALL_ID,
   renderGoal as renderQuery,
 } from '../../../pipelines/memory-recall/input';
-import { completed } from '../../common';
+import { completed, storeReadiness } from '../../common';
 import type { MemoryPorts } from '../ports';
 import { fuse } from './fusion';
 import { focusLines } from './focus';
@@ -83,16 +83,13 @@ export type Recalled =
       usable: UsableMemory[];
     };
 
-/** Why a recall cannot run at all — no embeddings, no store, nothing stored, no pipeline — or null when it can. */
+/** Why a recall cannot run at all — the store cannot be searched, or the curating pipeline is not registered — or null when it can. */
 function readiness(ports: MemoryPorts, ask: RecallAsk): Recalled | null {
-  const skipped = (
-    reason: Extract<Recalled, { status: 'skipped' }>['reason'],
-    note: string | null = null,
-  ): Recalled => ({ status: 'skipped', reason, note });
-  if (!ports.embeddings.enabled) return skipped('embeddings-disabled', ports.embedding.reason);
-  if (!ask.store.ready) return skipped('store-unavailable', ask.store.note ?? ask.store.reason);
-  if (ask.store.chunks === 0) return skipped('store-empty');
-  if (ask.acceptAt === null) return skipped('pipeline-unavailable', MEMORY_RECALL_ID);
+  const notReady = storeReadiness(ports, ask.store);
+  if (notReady !== null) return { status: 'skipped', ...notReady };
+  if (ask.acceptAt === null) {
+    return { status: 'skipped', reason: 'pipeline-unavailable', note: MEMORY_RECALL_ID };
+  }
   return null;
 }
 

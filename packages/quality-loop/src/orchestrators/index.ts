@@ -4,6 +4,8 @@
  * binding them, since ports are adapters and a definition is data.
  */
 import { CALIBRATION } from './calibration/definition';
+import { DOCUMENT_MEMORY } from './document-memory/definition';
+import { FORM_MEMORY } from './form-memory/definition';
 import type { OrchestratorDefinition } from './runner/definition';
 import { MEMORY } from './memory/definition';
 import { ROUTER } from './router/definition';
@@ -16,6 +18,8 @@ const declared: Erased[] = [
   CALIBRATION as unknown as Erased,
   SECOND_OPINION as unknown as Erased,
   ROUTER as unknown as Erased,
+  FORM_MEMORY as unknown as Erased,
+  DOCUMENT_MEMORY as unknown as Erased,
 ];
 
 export const ORCHESTRATORS: ReadonlyMap<string, Erased> = new Map(

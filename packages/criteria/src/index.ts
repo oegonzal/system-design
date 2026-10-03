@@ -359,6 +359,11 @@ export const CRITERIA: readonly Criterion[] = [
       'Field answers list every field the goal listed exactly once and cite evidence only by listed alias; a value the field cannot take is a located warning the lenses and the caller both read; a field a confirmed finding points at is never filled by the caller; and a field the page hides is left blank whatever the model decided.',
   },
   {
+    id: 'QL-38',
+    statement:
+      "A form's fields are answered over facts recalled without a model call: each field's own label is a probe, the hits are fused per field and listed as evidence every stage reads, aliased in field order; a recall that cannot run or finds nothing never blocks the answer, which still runs over the goal as composed; and the target step reports the run's admission so the caller never recomputes it.",
+  },
+  {
     id: 'QL-39',
     statement:
       "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads.",
@@ -603,7 +608,6 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run awaited through the client is judged alive by its heartbeat against the loop's own stale window, never by its exchange count or status; a run the loop no longer has is lost, one whose beat has stopped is stale, and an orchestration is awaited the same way through the child run its running step has open.",
   },
-  // Browser session (packages/browser-session)
   {
     id: 'BRW-6',
     statement:

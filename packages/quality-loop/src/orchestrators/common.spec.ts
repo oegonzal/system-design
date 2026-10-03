@@ -1,6 +1,7 @@
+import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { briefRoutes, refuseInternal } from './common';
+import { briefRoutes, refuseInternal, requestInput, storeReadiness } from './common';
 import { summaryOf } from './runner/testing';
 
 const registry = [
@@ -40,5 +41,61 @@ describe('the pipelines a brief may go to', () => {
     expect(
       refuseInternal({ pipeline: 'system-design-canvas', goal: 'g' }, registry, false),
     ).toMatch(/not a target/);
+  });
+});
+
+describe('the run inputs a request carries', () => {
+  it('[QL-38] forwards a supplied rubric with the goal and the budget, so an orchestration’s runs cite the caller’s ids', () => {
+    const criteria = [{ id: 'c1', kind: 'grounding', statement: 'Every value rests on evidence.' }];
+    expect(requestInput({ goal: 'g', maxIterations: 1, criteria })).toEqual({
+      goal: 'g',
+      output: undefined,
+      maxIterations: 1,
+      criteria,
+    });
+    expect(requestInput({ goal: 'g' }, 'g with evidence')).toEqual({
+      goal: 'g with evidence',
+      output: undefined,
+      maxIterations: undefined,
+      criteria: undefined,
+    });
+  });
+});
+
+describe('whether the memory store can be searched', () => {
+  const ready: MemoryStoreAvailabilityDto = {
+    ready: true,
+    reason: null,
+    note: null,
+    model: 'm',
+    collection: 'c',
+    chunks: 3,
+  };
+  const on = {
+    embedding: { enabled: true, model: 'm', reason: null },
+    embeddings: { enabled: true },
+  };
+
+  it('[QL-38] says why not in the closed words both recalls declare, embeddings first, then the store, then its emptiness', () => {
+    expect(
+      storeReadiness(
+        {
+          embedding: { enabled: false, model: null, reason: 'no-key' },
+          embeddings: { enabled: false },
+        },
+        ready,
+      ),
+    ).toEqual({ reason: 'embeddings-disabled', note: 'no-key' });
+    expect(
+      storeReadiness(on, { ...ready, ready: false, reason: 'unreachable', note: 'down' }),
+    ).toEqual({ reason: 'store-unavailable', note: 'down' });
+    expect(storeReadiness(on, { ...ready, ready: false, reason: 'no-model', model: null })).toEqual(
+      { reason: 'store-unavailable', note: 'no-model' },
+    );
+    expect(storeReadiness(on, { ...ready, chunks: 0 })).toEqual({
+      reason: 'store-empty',
+      note: null,
+    });
+    expect(storeReadiness(on, ready)).toBeNull();
   });
 });

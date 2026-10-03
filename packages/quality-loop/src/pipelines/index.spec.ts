@@ -12,6 +12,9 @@ describe('the pipeline registry', () => {
       'experience-digest',
       'system-design-canvas',
       'design-prompt',
+      'browser-step',
+      'field-answer',
+      'document-digest',
     ]);
     for (const definition of PIPELINES.values()) {
       expect(() => validatePipeline(definition)).not.toThrow();

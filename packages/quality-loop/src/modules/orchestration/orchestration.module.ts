@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 
-import { MEMORY_ORCHESTRATOR_ID, ROUTER_ORCHESTRATOR_ID } from '@sysdesign/contracts';
+import {
+  DOCUMENT_MEMORY_ORCHESTRATOR_ID,
+  FORM_MEMORY_ORCHESTRATOR_ID,
+  MEMORY_ORCHESTRATOR_ID,
+  ROUTER_ORCHESTRATOR_ID,
+} from '@sysdesign/contracts';
 
 import { ORCHESTRATORS } from '../../orchestrators';
 import type { MemoryPorts } from '../../orchestrators/memory/ports';
@@ -25,7 +30,9 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
  * ports. A definition is data in `orchestrators/`; the ports are adapters
  * owned by the module that built them, so the binding — and only the binding
  * — lives here. An orchestrator that declares ports gets them by id; one that
- * declares none, like the two panels, is bound to nothing.
+ * declares none, like the two panels, is bound to nothing. The form and
+ * document memory orchestrators declare a subset of the memory ports and are
+ * bound to the same object, so one store and one embedding client serve all three.
  */
 @Module({
   imports: [RunsModule, OrchestrationRecordModule, MemoryModule, RouterModule, JanitorModule],
@@ -40,6 +47,8 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
       ): ReadonlyMap<string, OrchestratorHost> => {
         const ports = new Map<string, unknown>([
           [MEMORY_ORCHESTRATOR_ID, memory],
+          [FORM_MEMORY_ORCHESTRATOR_ID, memory],
+          [DOCUMENT_MEMORY_ORCHESTRATOR_ID, memory],
           [ROUTER_ORCHESTRATOR_ID, router],
         ]);
         return new Map(

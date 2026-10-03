@@ -9,9 +9,13 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { EVIDENCE_KINDS } from '../../../pipelines/experience-digest/input';
+import {
+  EVIDENCE_KINDS,
+  type IndexedChunk,
+  type MemoryHit,
+  type VectorName,
+} from '../../../orchestrators/memory/ports';
 import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
-import type { IndexedChunk, MemoryHit, VectorName } from '../../../orchestrators/memory/ports';
 
 /**
  * What is embedded is part of the vector space, exactly as the model and the

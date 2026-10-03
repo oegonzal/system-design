@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vitest';
+
+import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { capsBelowMeasured, declaredCaps, jsonSchemaTypes } from '../../core/testing';
+import { BROWSER_STEP } from './definition';
+import { stepPlanOutput } from './output';
+import { askFields, click, samplePlan, taskStart } from './testing';
+
+describe('the browser-step pipeline', () => {
+  it('[QL-1] is valid data with md personas loaded beside it', () => {
+    expect(() => validatePipeline(BROWSER_STEP as never)).not.toThrow();
+    const summary = describePipeline(BROWSER_STEP as never);
+    expect(JSON.parse(JSON.stringify(summary))).toEqual(summary);
+    for (const lens of [...BROWSER_STEP.critics, ...BROWSER_STEP.evaluators]) {
+      expect(lens.persona.length).toBeGreaterThan(80);
+    }
+    expect(BROWSER_STEP.deriveCriteria.persona.length).toBeGreaterThan(80);
+    expect(BROWSER_STEP.id).toBe('browser-step');
+    expect(BROWSER_STEP.goalSource).toBe('composed');
+    expect(BROWSER_STEP.producer.persona).toContain('browser-step');
+    expect(summary.validators.map((validator) => validator.id)).toEqual(['references', 'limits']);
+    expect(summary.controller.id).toBe('hand-back');
+    expect(BROWSER_STEP.policy.loop.maxIterations).toBe(1);
+  });
+
+  it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {
+    const earning = new Set(
+      Object.values(BROWSER_STEP.policy.criterionKinds).map((kind) => kind.dimension),
+    );
+    for (const dimension of Object.keys(BROWSER_STEP.policy.dimensionWeights)) {
+      expect(earning).toContain(dimension);
+    }
+  });
+
+  it('[QL-36] every persona names the pipeline and the positions it cites, and the planner is told where refs come from', () => {
+    const personas = [
+      BROWSER_STEP.deriveCriteria.persona,
+      BROWSER_STEP.producer.persona,
+      ...BROWSER_STEP.critics.map((lens) => lens.persona),
+      ...BROWSER_STEP.evaluators.map((lens) => lens.persona),
+    ];
+    for (const persona of personas) expect(persona).toContain('browser-step');
+    for (const lens of [...BROWSER_STEP.critics, ...BROWSER_STEP.evaluators]) {
+      expect(lens.persona).toMatch(/action\.1/);
+    }
+    // Each critic names what is the other's concern, so the two never chase the same defect.
+    for (const critic of BROWSER_STEP.critics) expect(critic.persona).toMatch(/critic's concern/);
+    const { persona } = BROWSER_STEP.producer;
+    expect(persona).toContain('Cite refs only from the Elements list');
+    expect(persona).toContain('askFields');
+    expect(persona).toMatch(/terminate with that condition's cause word/);
+    // The three findings the session must never execute gate; everything else is priced.
+    const gated = Object.entries(BROWSER_STEP.policy.findingTypes)
+      .filter(([, mapped]) => mapped.gate)
+      .map(([type]) => type);
+    expect(gated).toEqual(['unsafe_action', 'trap_interaction', 'missed_stop']);
+    expect(BROWSER_STEP.policy.criterionKinds['safety'].gate).toBe(true);
+  });
+
+  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+    // SEEDED, not measured: no live step run has been recorded yet, so these
+    // are the most each stage is expected to write for a page of up to 150
+    // elements, taken from the shortest recorded pipeline (design-prompt) at
+    // comparable prompt sizes. The first live runs (static/runs, 05-llm
+    // output tokens) replace this table; a cap is also the call's time limit,
+    // so one a stage outwrites is a call cut short.
+    const measured: Record<string, number> = {
+      criteria: 2_500,
+      producer: 4_000,
+      'critic.mission': 4_000,
+      'critic.safety': 4_000,
+      'evaluator.plan': 4_000,
+    };
+    expect(capsBelowMeasured(BROWSER_STEP, measured)).toEqual([]);
+    // With a fifth of headroom over each, so the next longer answer is not the one cut.
+    const withHeadroom = Object.fromEntries(
+      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
+    );
+    expect(capsBelowMeasured(BROWSER_STEP, withHeadroom)).toEqual([]);
+    expect(Object.keys(declaredCaps(BROWSER_STEP)).sort()).toEqual(Object.keys(measured).sort());
+  });
+
+  it('[QL-4] every location the plan exposes is printed verbatim where a judge reads it, beside the ref it acts on', () => {
+    const plan = samplePlan([
+      taskStart(),
+      click('e3', 'open the first listing', 'the listing detail'),
+      askFields(['e1', 'e2']),
+    ]);
+    const rendered = stepPlanOutput.render(plan);
+    for (const location of stepPlanOutput.locate(plan)) {
+      expect(rendered).toContain(`[${location.id}]`);
+    }
+    expect(stepPlanOutput.locate(plan).map((location) => location.id)).toEqual([
+      'assessment',
+      'action.1',
+      'action.2',
+      'action.3',
+    ]);
+    expect(rendered).toContain(
+      '[action.2] click e3 — open the first listing — expect: the listing detail',
+    );
+    expect(rendered).toContain('[action.3] askFields e1, e2 — questions about the applicant');
+    expect(stepPlanOutput.schema.safeParse(plan).success).toBe(true);
+  });
+
+  it('[QL-6] the plan a model answers with contains no number', () => {
+    const types = jsonSchemaTypes(stepPlanOutput.schema);
+    expect(types).not.toContain('number');
+    expect(types).not.toContain('integer');
+  });
+});

@@ -6,6 +6,8 @@
  * the runner applies none of them.
  */
 import type {
+  LlmAvailabilityDto,
+  MemoryStoreAvailabilityDto,
   PipelineSummary,
   QualityRunDto,
   RouteDto,
@@ -52,7 +54,12 @@ export const bareRequest = (request: StartOrchestrationRequest): StartOrchestrat
   goal: bareGoal(request.goal),
 });
 
-/** The run inputs a request carries, for a step that runs a pipeline on the request's own terms. */
+/**
+ * The run inputs a request carries, for a step that runs a pipeline on the
+ * request's own terms. A supplied rubric travels with them: a caller that
+ * derived its criteria once and hands them on every run keeps `c3` meaning
+ * `c3` across the runs an orchestration opens for it.
+ */
 export const requestInput = (
   request: StartOrchestrationRequest,
   goal: string = request.goal,
@@ -60,7 +67,33 @@ export const requestInput = (
   goal,
   output: request.output,
   maxIterations: request.maxIterations,
+  criteria: request.criteria,
 });
+
+/** Why a step over the memory store cannot search it at all, in the closed words every such step declares. */
+export interface StoreNotReady {
+  reason: 'embeddings-disabled' | 'store-unavailable' | 'store-empty';
+  note: string | null;
+}
+
+/**
+ * Whether the store can be searched: embeddings on, the store reachable and
+ * bound to a model, and something in it. The memory recall and the form
+ * recall both ask this first, so the two can never skip for different
+ * reasons over the same world; what each does once the store is ready is
+ * its own.
+ */
+export function storeReadiness(
+  ports: { embedding: LlmAvailabilityDto; embeddings: { readonly enabled: boolean } },
+  store: MemoryStoreAvailabilityDto,
+): StoreNotReady | null {
+  if (!ports.embeddings.enabled) {
+    return { reason: 'embeddings-disabled', note: ports.embedding.reason };
+  }
+  if (!store.ready) return { reason: 'store-unavailable', note: store.note ?? store.reason };
+  if (store.chunks === 0) return { reason: 'store-empty', note: null };
+  return null;
+}
 
 /** A skip yields nothing, so it satisfies every step's result type. */
 export const skipped = (reason: string, note: string | null = null): StepResult<never> => ({

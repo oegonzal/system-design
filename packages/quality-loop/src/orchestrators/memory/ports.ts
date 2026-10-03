@@ -9,13 +9,21 @@ import { createHash } from 'node:crypto';
 
 import type { LlmAvailabilityDto, MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 
-import type { EVIDENCE_KINDS } from '../../pipelines/experience-digest/input';
 import type { ChunkSource } from '../../pipelines/memory-recall/input';
 import type { CachedEmbeddings } from './embeddings';
 
-/** The engine evidence a stored memory rests on — joinable to the source run's rows. */
+/**
+ * What a stored memory may rest on: a confirmed finding or a judged criterion
+ * of the source run, or a section of a document that was digested. Declared
+ * here, where the store's payload reads it, so a digest pipeline that cites a
+ * new kind of evidence widens one list and every stored point still parses.
+ */
+export const EVIDENCE_KINDS = ['finding', 'criterion', 'section'] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+
+/** The evidence a stored memory rests on — joinable to the source run's rows, or to a document's sections. */
 export interface EvidenceRef {
-  kind: (typeof EVIDENCE_KINDS)[number];
+  kind: EvidenceKind;
   ref: string;
 }
 
