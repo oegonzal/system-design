@@ -4,11 +4,11 @@ import type { IterationTrace } from '../quality-loop/decision';
 import type { ConfirmedFinding, ValidationReport } from '../quality-loop/evidence';
 import type { QualityRunDto } from '../quality-loop/runs';
 import type { Decision } from '../quality-loop/vocab';
-import type { FieldAnswers } from './field-answers.schema';
+import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
 import { fieldSpecOf } from './field-goal';
 import { formObservation } from './fixtures';
 import { routeFields, routePlan } from './read-back';
-import type { StepPlan } from './step-plan.schema';
+import { ASSESSMENT_BOUND, type StepPlan } from './step-plan.schema';
 
 interface RunShape {
   artifact: unknown;
@@ -157,6 +157,14 @@ describe('routePlan', () => {
     expect(routePlan(run({ artifact: null })).reason).toBe('no-artifact');
     expect(routePlan(run({ artifact: { not: 'a plan' } })).reason).toContain('schema');
   });
+
+  it('[QL-36] [QL-58] executes a plan whose assessment the seam kept past its ceiling, read as it was kept', () => {
+    const assessment = 'a'.repeat(ASSESSMENT_BOUND.ceiling + 1);
+    const readout = routePlan(run({ artifact: { ...plan, assessment } }));
+    expect(readout.executable).toBe(true);
+    expect(readout.executePrefix).toBe(4);
+    expect(readout.plan?.assessment).toBe(assessment);
+  });
 });
 
 const fields = () =>
@@ -277,5 +285,21 @@ describe('routeFields', () => {
       reason: 'unanswered',
       source: 'engine',
     });
+  });
+
+  it('[QL-37] [QL-58] routes every answer of a page whose reason the seam kept just past its ceiling', () => {
+    const reason = 'r'.repeat(ANSWER_REASON_BOUND.ceiling + 1);
+    const routes = routeFields(
+      run({ artifact: answers({ e1: { reason } }) }),
+      'admitted',
+      fields(),
+    );
+    expect(routes.map((r) => [r.field.ref, r.route, r.source])).toEqual([
+      ['e1', 'fill', 'memory'],
+      ['e2', 'ask-operator', 'loop'],
+      ['e3', 'leave-blank', 'blank'],
+      ['e4', 'leave-blank', 'blank'],
+    ]);
+    expect(routes[0]).toMatchObject({ value: '6', reason });
   });
 });

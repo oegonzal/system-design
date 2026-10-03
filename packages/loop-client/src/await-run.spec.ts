@@ -1,7 +1,10 @@
-import type {
-  OrchestrationRunDto,
-  QualityLoopHealthDto,
-  QualityRunDto,
+import {
+  bound,
+  bounded,
+  type IterationTrace,
+  type OrchestrationRunDto,
+  type QualityLoopHealthDto,
+  type QualityRunDto,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -217,5 +220,26 @@ describe('bestArtifact', () => {
     expect(bestArtifact(settled, z.object({ a: z.string() }))).toEqual({ a: 'second' });
     expect(bestArtifact(settled, z.object({ b: z.string() }))).toBeNull();
     expect(bestArtifact(run({}), z.object({}))).toBeNull();
+  });
+
+  it('[QL-58] reads a field the seam kept past its ceiling as kept, and refuses only a structural fault', () => {
+    const NOTE = bound(20);
+    const schema = z.strictObject({ note: bounded.text(NOTE) });
+    const note = 'n'.repeat(NOTE.ceiling + 1);
+    const settled = (artifact: unknown) =>
+      run({
+        status: 'complete',
+        trace: {
+          pipeline: { id: 'p', version: '1' },
+          contract: { goal: 'g', criteria: [] },
+          iterations: [{ iteration: 1, artifact } as IterationTrace],
+          bestIteration: 1,
+          finalDecision: 'accept',
+          stopReason: 'accepted',
+          lessons: [],
+        },
+      });
+    expect(bestArtifact(settled({ note }), schema)).toEqual({ note });
+    expect(bestArtifact(settled({ note: 7 }), schema)).toBeNull();
   });
 });

@@ -1,4 +1,9 @@
-import type { IterationTrace, OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
+import {
+  parseLenient,
+  type IterationTrace,
+  type OrchestrationRunDto,
+  type QualityRunDto,
+} from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
 import type { LoopClient } from './loop-client';
@@ -115,10 +120,14 @@ export function bestIterationOf(run: QualityRunDto): IterationTrace | null {
   return trace.iterations.find((it) => it.iteration === trace.bestIteration) ?? null;
 }
 
-/** The best iteration's artifact as the schema reads it, or null when there is none that fits. */
+/**
+ * The best iteration's artifact as the schema reads it leniently — the way the
+ * model seam kept it, so a field past its ceiling never discards the whole
+ * artifact — or null when there is none, or it has a structural fault.
+ */
 export function bestArtifact<T>(run: QualityRunDto, schema: ZodType<T>): T | null {
   const best = bestIterationOf(run);
   if (best === null || best.artifact === null) return null;
-  const parsed = schema.safeParse(best.artifact);
-  return parsed.success ? parsed.data : null;
+  const parsed = parseLenient(schema, best.artifact);
+  return parsed.ok ? parsed.value : null;
 }

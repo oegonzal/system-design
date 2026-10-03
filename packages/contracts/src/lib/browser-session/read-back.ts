@@ -5,6 +5,7 @@
  * plan runs only as far as nobody objected and a field is never filled when
  * a judge pointed at it.
  */
+import { parseLenient } from '../bounds';
 import type { Admission } from '../quality-loop/admission';
 import type { IterationTrace } from '../quality-loop/decision';
 import type { QualityRunDto } from '../quality-loop/runs';
@@ -74,9 +75,9 @@ const notExecutable = (
 export function routePlan(run: QualityRunDto): PlanReadout {
   const best = bestIterationOf(run);
   if (best === null || best.artifact === null) return notExecutable(null, 'no-artifact');
-  const parsed = stepPlanSchema.safeParse(best.artifact);
-  if (!parsed.success) return notExecutable(null, 'artifact does not match the step plan schema');
-  const plan = parsed.data;
+  const parsed = parseLenient(stepPlanSchema, best.artifact);
+  if (!parsed.ok) return notExecutable(null, 'artifact does not match the step plan schema');
+  const plan = parsed.value;
   const findings = best.ledger.findings.map(
     (finding) => `${finding.type}${finding.rationale ? `: ${finding.rationale}` : ''}`,
   );
@@ -151,9 +152,11 @@ export function routeFields(
 ): FieldReadout[] {
   const best = bestIterationOf(run);
   const parsed =
-    best === null || best.artifact === null ? null : fieldAnswersSchema.safeParse(best.artifact);
+    best === null || best.artifact === null
+      ? null
+      : parseLenient(fieldAnswersSchema, best.artifact);
   const answers = new Map<string, FieldAnswer>(
-    parsed?.success ? parsed.data.fields.map((answer) => [answer.ref, answer]) : [],
+    parsed?.ok ? parsed.value.fields.map((answer) => [answer.ref, answer]) : [],
   );
   const faulted =
     best === null ? new Map<number, string[]>() : faultedPositions(best, FIELD_LOCATION);
