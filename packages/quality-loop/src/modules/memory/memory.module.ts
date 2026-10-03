@@ -49,6 +49,8 @@ const qdrantStore = (client: EmbeddingClient): QdrantMemoryStore =>
     }),
     client.model,
     client.dimensions,
+    () => new Date(),
+    (message) => logger.warn(message),
   );
 
 /** The memory orchestrator's ports, bound once from the adapters this module built. */

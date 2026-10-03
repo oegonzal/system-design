@@ -64,6 +64,11 @@ export async function indexMemories(
     const stored = await ports.store.replaceRunChunks(
       source.runId,
       chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
+      // This writer owns the lessons of a source run and nothing else. Another
+      // writer keeps its own kinds under the same run id, and an unscoped
+      // replace would erase them; every point that existed before this scope
+      // was a lesson, so it deletes exactly what it deleted before.
+      { kinds: ['lesson'] },
     );
     return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
   } catch (error) {

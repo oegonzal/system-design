@@ -7,10 +7,17 @@
  */
 import { createHash } from 'node:crypto';
 
+import {
+  KNOWLEDGE_GROUNDINGS,
+  KNOWLEDGE_POLARITIES,
+  SEVERITIES,
+  TRANSITION_KINDS,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
   EVIDENCE_KINDS,
+  type ChunkFacets,
   type IndexedChunk,
   type MemoryHit,
   type VectorName,
@@ -32,8 +39,26 @@ const INDEX_GENERATION = 'v2';
 export const collectionName = (model: string, dimensions: number): string =>
   `quality-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
 
-/** Payload fields a filter may use; each gets a keyword index. */
-export const INDEXED_FIELDS = ['runId', 'pipeline', 'kind'] as const;
+/**
+ * Payload fields a filter may use; each gets a keyword index. The facets are
+ * here because a search that cannot narrow by them is a search that reads the
+ * whole store: measured on the live corpus, a candidate digested from the same
+ * pipeline as the query was twice as likely to be kept as one from another.
+ * Indexes are ensured on every boot, not only when the collection is created,
+ * so a field added here reaches a collection that already exists.
+ */
+export const INDEXED_FIELDS = [
+  'runId',
+  'pipeline',
+  'kind',
+  'dimension',
+  'polarity',
+  'transition',
+  'grounding',
+  'topics',
+  'criterionKinds',
+  'findingTypes',
+] as const;
 
 /** A UUID-shaped digest of (source run, ref): the same memory always lands on the same point. */
 export function pointId(sourceRunId: string, ref: string): string {
@@ -51,6 +76,26 @@ const keysSchema = z.strictObject({
 /** `contentHash` is sha-256 as hex. */
 const SHA256_HEX_LENGTH = 64;
 
+/**
+ * The facets, flat so Qdrant can index them and every one optional so the
+ * points written before they existed still parse — a strict schema would
+ * otherwise make every older point invisible to recall rather than merely
+ * unfacetted.
+ */
+const facetFields = {
+  polarity: z.enum(KNOWLEDGE_POLARITIES).optional(),
+  dimension: z.string().min(1).nullable().optional(),
+  topics: z.array(z.string().min(1)).optional(),
+  criterionKinds: z.array(z.string().min(1)).optional(),
+  findingTypes: z.array(z.string().min(1)).optional(),
+  transition: z.enum(TRANSITION_KINDS).nullable().optional(),
+  grounding: z.enum(KNOWLEDGE_GROUNDINGS).optional(),
+  severity: z.enum(SEVERITIES).optional(),
+  support: z.strictObject({ confirms: z.number().int(), contradicts: z.number().int() }).optional(),
+};
+
+const FACET_NAMES = Object.keys(facetFields) as (keyof ChunkFacets)[];
+
 const payloadSchema = chunkSourceSchema.extend({
   text: z.string().min(1),
   /** The texts this point's named vectors are of — the store describes itself. */
@@ -60,6 +105,7 @@ const payloadSchema = chunkSourceSchema.extend({
   evidence: z.array(z.strictObject({ kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) })),
   digestRunId: z.string().nullable(),
   storedAt: z.string(),
+  ...facetFields,
 });
 
 export type ChunkPayload = z.infer<typeof payloadSchema>;
@@ -74,18 +120,65 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
     evidence: chunk.evidence,
     digestRunId: chunk.digestRunId,
     storedAt,
+    ...(chunk.facets ?? {}),
   };
+}
+
+/** The facets a payload carries, or undefined when it carries none — so an older point reads exactly as it did. */
+function facetsOf(payload: ChunkPayload): ChunkFacets | undefined {
+  const entries = FACET_NAMES.flatMap((name) =>
+    payload[name] === undefined ? [] : [[name, payload[name]] as const],
+  );
+  return entries.length === 0 ? undefined : (Object.fromEntries(entries) as ChunkFacets);
 }
 
 /** A hit from a stored payload, or null for a point this module did not write. */
 export function fromPayload(payload: unknown, score: number): MemoryHit | null {
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return null;
-  const { text, contentHash, model, evidence, digestRunId, storedAt, keys, ...source } =
-    parsed.data;
+  const {
+    text,
+    contentHash,
+    model,
+    evidence,
+    digestRunId,
+    storedAt,
+    keys,
+    polarity,
+    dimension,
+    topics,
+    criterionKinds,
+    findingTypes,
+    transition,
+    grounding,
+    severity,
+    support,
+    ...source
+  } = parsed.data;
   // Neither is a fact about the hit: one is when it was written, the other is
-  // what it was indexed by, and a reader judges the lesson, not its key.
+  // what it was indexed by, and a reader judges the lesson, not its key. The
+  // facets are destructured out of `source` and handed back under one key, so
+  // a chunk source stays exactly the recall pipeline's own shape.
   void storedAt;
   void keys;
-  return { text, contentHash, model, evidence, digestRunId, source, score };
+  void polarity;
+  void dimension;
+  void topics;
+  void criterionKinds;
+  void findingTypes;
+  void transition;
+  void grounding;
+  void severity;
+  void support;
+  const facets = facetsOf(parsed.data);
+  return {
+    text,
+    contentHash,
+    model,
+    evidence,
+    digestRunId,
+    source,
+    score,
+    ...(facets === undefined ? {} : { facets }),
+  };
 }

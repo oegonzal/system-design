@@ -1,9 +1,11 @@
 import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { InMemoryMemoryStore } from '../../../modules/memory/testing';
+import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
+import { pointId } from '../../../modules/memory/qdrant/collection';
+import type { StoredChunk } from '../ports';
 import { childRun, memoryPorts } from '../steps.testing';
-import { readoutTrace } from '../testing';
+import { FAKE_MODEL, readoutTrace } from '../testing';
 import { indexMemories, originOf } from './index-memories';
 
 /**
@@ -81,6 +83,64 @@ describe('a stored lesson’s origin', () => {
     );
     expect(stored.map((chunk) => [chunk.source.decision, chunk.source.iteration])).toEqual([
       ['revise', 2],
+    ]);
+  });
+
+  it('[QL-41] replaces the run’s lessons and leaves another writer’s kinds under the same run standing', async () => {
+    const trace = escalatedAfterJudged();
+    const source: QualityRunDto = { ...childRun('system-design-canvas', trace), trace };
+    const ports = memoryPorts();
+    const store = ports.store as InMemoryMemoryStore;
+
+    // What another writer keeps under the same source run: an item of its own
+    // kind, and a lesson of an earlier digest of this run that this one drops.
+    const foreign = (ref: string, kind: StoredChunk['source']['kind']): StoredChunk => ({
+      text: `${kind} ${ref}`,
+      keys: { condition: `when ${ref}`, lesson: `${kind} ${ref}` },
+      contentHash: `${'0'.repeat(63)}${kind === 'fact' ? '1' : '2'}`,
+      source: {
+        runId: source.runId,
+        pipeline: 'knowledge-digest',
+        kind,
+        ref,
+        decision: 'revise',
+        iteration: 2,
+        when: '2026-10-02',
+      },
+      evidence: [],
+      digestRunId: 'knowledge-digest-run',
+      model: FAKE_MODEL,
+      vectors: { condition: vectorOf(`when ${ref}`), lesson: vectorOf(`${kind} ${ref}`) },
+    });
+    store.points.set(pointId(source.runId, 'knowledge.1'), foreign('knowledge.1', 'fact'));
+    store.points.set(pointId(source.runId, 'finding.1'), foreign('finding.1', 'finding'));
+    store.points.set(pointId(source.runId, 'memory.9'), {
+      ...foreign('memory.9', 'lesson'),
+      source: { ...foreign('memory.9', 'lesson').source, pipeline: 'system-design-canvas' },
+    });
+
+    await indexMemories(
+      ports,
+      source,
+      {
+        digestRunId: 'digest-run',
+        memories: [
+          {
+            position: 1,
+            insight: 'Name the queue a write survives a crash in.',
+            appliesWhen: 'a click counter must not lose counts on a crash',
+            evidence: [],
+          },
+        ],
+      },
+      FAKE_MODEL,
+    );
+
+    const mine = [...store.points.values()].filter((chunk) => chunk.source.runId === source.runId);
+    expect(mine.map((chunk) => [chunk.source.kind, chunk.source.ref]).sort()).toEqual([
+      ['fact', 'knowledge.1'],
+      ['finding', 'finding.1'],
+      ['lesson', 'memory.1'],
     ]);
   });
 });

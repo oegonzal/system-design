@@ -10,10 +10,13 @@ import type { EmbeddingClient } from '@sysdesign/llm';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
+  ChunkKindScope,
   EmbeddingCache,
   MemoryHit,
   MemoryProbe,
   MemoryStore,
+  PointRef,
+  ProbeFilter,
   StoredChunk,
 } from '../../orchestrators/memory/ports';
 import { FAKE_MODEL } from '../../orchestrators/memory/testing';
@@ -53,6 +56,23 @@ export const mutedEmbeddings = (): CachedEmbeddings =>
     { ...fakeEmbeddings(), embed: () => Promise.resolve(null) },
     new InMemoryEmbeddingCache(),
   );
+
+/**
+ * The adapter's declared filter, applied the way Qdrant applies it: each field
+ * narrows, an empty list narrows nothing. This fake is a hand-written mirror of
+ * the adapter, so a rule added to one and not the other passes every fast spec
+ * and diverges only in production — which is why it lives beside the cosine.
+ */
+const passes = (chunk: StoredChunk, filter: ProbeFilter | undefined): boolean => {
+  if (filter === undefined) return true;
+  const within = (values: readonly string[] | undefined, value: string): boolean =>
+    values === undefined || values.length === 0 || values.includes(value);
+  return (
+    within(filter.kinds, chunk.source.kind) &&
+    within(filter.pipelines, chunk.source.pipeline) &&
+    !(filter.notRunIds ?? []).includes(chunk.source.runId)
+  );
+};
 
 const cosine = (a: readonly number[], b: readonly number[]): number =>
   a.reduce((sum, value, index) => sum + value * (b[index] ?? 0), 0) /
@@ -108,6 +128,7 @@ export class InMemoryMemoryStore implements MemoryStore {
   /** The closest chunks first, one per content hash, up to the probe's limit. */
   private rank(probe: MemoryProbe, limit: number): MemoryHit[] {
     const scored = [...this.points.values()]
+      .filter((chunk) => passes(chunk, probe.filter))
       .map((chunk) => ({ chunk, score: cosine(probe.vector, chunk.vectors[probe.using]) }))
       .sort((a, b) => b.score - a.score);
     const seen = new Set<string>();
@@ -124,16 +145,36 @@ export class InMemoryMemoryStore implements MemoryStore {
       digestRunId: chunk.digestRunId,
       model: chunk.model,
       score,
+      ...(chunk.facets === undefined ? {} : { facets: chunk.facets }),
     }));
   }
 
-  replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number> {
+  replaceRunChunks(
+    sourceRunId: string,
+    chunks: readonly StoredChunk[],
+    scope?: ChunkKindScope,
+  ): Promise<number> {
     if (this.unreachable) return Promise.reject(new Error('store unreachable'));
     for (const [id, chunk] of this.points) {
-      if (chunk.source.runId === sourceRunId) this.points.delete(id);
+      const owned = scope === undefined || scope.kinds.includes(chunk.source.kind);
+      if (chunk.source.runId === sourceRunId && owned) this.points.delete(id);
     }
     for (const chunk of chunks) this.points.set(pointId(sourceRunId, chunk.source.ref), chunk);
     return Promise.resolve(chunks.length);
+  }
+
+  /** As the adapter does: the counts are set on points that stand, and an unknown point is left alone. */
+  setSupport(
+    updates: readonly { point: PointRef; support: { confirms: number; contradicts: number } }[],
+  ): Promise<void> {
+    if (this.unreachable) return Promise.reject(new Error('store unreachable'));
+    for (const update of updates) {
+      const id = pointId(update.point.runId, update.point.ref);
+      const chunk = this.points.get(id);
+      if (chunk === undefined) continue;
+      this.points.set(id, { ...chunk, facets: { ...chunk.facets, support: update.support } });
+    }
+    return Promise.resolve();
   }
 }
 

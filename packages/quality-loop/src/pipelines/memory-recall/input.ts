@@ -4,7 +4,7 @@
  * engine hands every stage, and reads its own bookkeeping back. The index the
  * validators read is the last fenced JSON block, so no rule parses prose.
  */
-import { DECISIONS } from '@sysdesign/contracts';
+import { DECISIONS, KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -35,7 +35,22 @@ const MAX_QUERY_PROBES = 6;
  */
 export const MAX_FOCUS = MAX_KEPT;
 
-export const CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
+/**
+ * What a stored chunk is. `lesson` is what to do next time and `section` a
+ * passage of a document; `finding` and `criterion` are a run's own evidence,
+ * kept in the register the engine recorded it in; the knowledge kinds are what
+ * a run was found to teach. A candidate of any kind is judged the same way —
+ * on its own text — so the list is open to the next kind of thing worth
+ * remembering, and widening it leaves every stored point parsing.
+ */
+export const CHUNK_KINDS = [
+  'section',
+  'finding',
+  'criterion',
+  'lesson',
+  ...KNOWLEDGE_ITEM_KINDS,
+] as const;
+export type ChunkKind = (typeof CHUNK_KINDS)[number];
 
 export const chunkSourceSchema = z.strictObject({
   runId: z.string().min(1).max(80),

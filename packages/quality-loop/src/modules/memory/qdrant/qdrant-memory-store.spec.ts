@@ -97,6 +97,74 @@ describe('the Qdrant memory store', () => {
     expect((await store.verify()).chunks).toBe(1);
   });
 
+  it('[QL-41] narrows a probe by kind and run, replaces only the kinds a writer owns, and sets support', async () => {
+    const lesson = chunk('shard the write path before the read path', 'run-d', 'memory.1');
+    const fact = {
+      ...chunk(
+        'a partitioned unique key must include the partition column',
+        'run-d',
+        'knowledge.1',
+      ),
+      source: {
+        ...lesson.source,
+        ref: 'knowledge.1',
+        kind: 'fact' as const,
+        pipeline: 'knowledge-digest',
+      },
+      facets: { dimension: 'soundness', polarity: 'avoid' as const, topics: ['partitioning'] },
+    };
+    expect(await store.replaceRunChunks('run-d', [lesson, fact])).toBe(2);
+
+    // The facets survive the round trip through the real payload.
+    const [anything] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5 },
+    ]);
+    expect(anything.find((hit) => hit.source.ref === 'knowledge.1')?.facets).toEqual(fact.facets);
+
+    // Each field of the filter narrows: by kind, by pipeline, and away from a run.
+    const [kinds, pipelines, notRun] = await store.searchMany([
+      {
+        vector: fact.vectors.lesson,
+        using: 'lesson',
+        limit: 5,
+        filter: { kinds: ['fact', 'pattern'] },
+      },
+      {
+        vector: fact.vectors.lesson,
+        using: 'lesson',
+        limit: 5,
+        filter: { pipelines: ['knowledge-digest'] },
+      },
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { notRunIds: ['run-d'] } },
+    ]);
+    expect(kinds.map((hit) => hit.source.kind)).toEqual(['fact']);
+    expect(pipelines.map((hit) => hit.source.ref)).toEqual(['knowledge.1']);
+    expect(notRun.every((hit) => hit.source.runId !== 'run-d')).toBe(true);
+
+    // A writer that owns one kind replaces its own points and leaves the rest.
+    expect(await store.replaceRunChunks('run-d', [], { kinds: ['lesson'] })).toBe(0);
+    const [survivors] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { notRunIds: [] } },
+    ]);
+    expect(
+      survivors.filter((hit) => hit.source.runId === 'run-d').map((hit) => hit.source.ref),
+    ).toEqual(['knowledge.1']);
+
+    // Support is set on a point that stands; one that has gone is left alone.
+    await store.setSupport([
+      { point: { runId: 'run-d', ref: 'knowledge.1' }, support: { confirms: 2, contradicts: 1 } },
+      { point: { runId: 'run-d', ref: 'memory.1' }, support: { confirms: 9, contradicts: 9 } },
+    ]);
+    const [supported] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { kinds: ['fact'] } },
+    ]);
+    expect(supported[0].facets).toEqual({
+      ...fact.facets,
+      support: { confirms: 2, contradicts: 1 },
+    });
+    expect(await store.replaceRunChunks('run-d', [], { kinds: ['fact'] })).toBe(0);
+  });
+
   it('[QL-17] reports an unreachable server and a missing model as data, never as a throw at boot', async () => {
     const dark = new QdrantMemoryStore(
       new QdrantClient({ url: 'http://127.0.0.1:1', checkCompatibility: false, timeout: 500 }),

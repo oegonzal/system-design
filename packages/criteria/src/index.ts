@@ -649,6 +649,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The package names no site: the mission, its units of work, its procedure, its stop conditions and its answering policy live in a markdown goal, and the same program runs any goal.',
   },
+  {
+    id: 'QL-41',
+    statement:
+      "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',
