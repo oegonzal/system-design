@@ -1,3 +1,4 @@
+import { WITHHOLDINGS } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { validatePolicy } from './policy';
@@ -53,6 +54,24 @@ describe('validatePolicy', () => {
   ])('[QL-1] rejects %s, naming the pipeline', (_label, override) => {
     expect(() => validatePolicy({ ...tinyPolicy(), ...override }, task, 'tiny@0')).toThrow(
       /pipeline tiny@0/,
+    );
+  });
+
+  it('[QL-53] takes what a finding type withholds as a declared withholding, or nothing at all', () => {
+    const withholding = (withholds: unknown) => ({
+      ...tinyPolicy(),
+      findingTypes: {
+        ...tinyPolicy().findingTypes,
+        gap: { dimension: 'substance', gate: false, withholds: withholds as never },
+      },
+    });
+    for (const withholds of WITHHOLDINGS) {
+      expect(() => validatePolicy(withholding(withholds), task, 'tiny')).not.toThrow();
+    }
+    // Undeclared is today's rule, every ref; a word the vocabulary lacks is a typo, refused at boot.
+    expect(() => validatePolicy(tinyPolicy(), task, 'tiny')).not.toThrow();
+    expect(() => validatePolicy(withholding('some-refs'), task, 'tiny@0')).toThrow(
+      /pipeline tiny@0: finding type gap withholds some-refs/,
     );
   });
 });

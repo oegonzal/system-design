@@ -2,6 +2,28 @@ import type { ApiResponse } from '../envelope';
 import type { AxisFactorLevel, GoalSource, LostSamplePolicy, Severity } from './vocab';
 
 /**
+ * What a confirmed finding does to the items it names when a reader draws on
+ * a run's best iteration — a digest's memories, a recall's kept chunks.
+ * `every-ref`: each item it names is withheld. `all-but-one`: all but the one
+ * with the most support — passing criteria that cite it — are, ties to the
+ * first in the artifact; a duplicate keeps its best copy. `none`: it names an
+ * item without faulting it, and withholds nothing.
+ *
+ * Declared by what storing the item as written would put in the store, never
+ * by the type's name: if the item would be false or misleading there — a
+ * wrong fact, a wrong attribution, a wrong kind or index key, a restatement
+ * of what is already held — the finding withholds it (`every-ref`); if the
+ * item is only weaker than it could be — vague, templated, wordy, or beside a
+ * gap the finding names — it survives (`none`), because its remedy is a
+ * rewrite, not removal; a duplicate withholds all but the best-supported of
+ * its group (`all-but-one`). A type that declares nothing withholds every ref
+ * on purpose: one whose author has not answered the question is safer
+ * withheld than stored.
+ */
+export const WITHHOLDINGS = ['every-ref', 'all-but-one', 'none'] as const;
+export type Withholding = (typeof WITHHOLDINGS)[number];
+
+/**
  * The decision policy: every number, threshold, gate and route the controller
  * uses. A pipeline declares one as data; the loop refuses a malformed one
  * before it can grade anything.
@@ -12,8 +34,14 @@ export interface DecisionPolicy {
   dimensionWeights: Readonly<Record<string, number>>;
   /** Every task criterion kind: where its credit lands, how much it weighs, whether a fail blocks. */
   criterionKinds: Readonly<Record<string, { dimension: string; weight: number; gate: boolean }>>;
-  /** Every task finding type: where its penalty lands, whether it is an unacceptable failure mode. */
-  findingTypes: Readonly<Record<string, { dimension: string; gate: boolean }>>;
+  /**
+   * Every task finding type: where its penalty lands, whether it is an
+   * unacceptable failure mode, and what it withholds of the items it names
+   * from a reader of the run (`WITHHOLDINGS`; `every-ref` when undeclared).
+   */
+  findingTypes: Readonly<
+    Record<string, { dimension: string; gate: boolean; withholds?: Withholding }>
+  >;
   resultValues: Readonly<Record<'pass' | 'partial' | 'fail', number>>;
   confidenceWeights: Readonly<Record<AxisFactorLevel, number>>;
   penalties: {

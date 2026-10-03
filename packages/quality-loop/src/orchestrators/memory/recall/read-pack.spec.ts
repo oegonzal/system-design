@@ -33,7 +33,7 @@ describe('reading a recall', () => {
       hits,
       ACCEPT_AT,
     );
-    expect(belowTheBar).toEqual({ admission: 'fell-short', kept: 2, usable: [] });
+    expect(belowTheBar).toEqual({ admission: 'fell-short', kept: 2, usable: [], withheld: [] });
   });
 
   it('[QL-16] a pack that cleared the bar is drawn on even though the loop ran out of iterations', () => {
@@ -51,6 +51,23 @@ describe('reading a recall', () => {
     expect(readout.admission).toBe('admitted');
     // m2 is the one a finding names, and it is the only one withheld.
     expect(readout.usable.map((item) => item.alias)).toEqual(['m1']);
+    expect(readout.withheld).toEqual([{ ref: 'm2', source: 'finding', by: 'irrelevant_chunk' }]);
+  });
+
+  it('[QL-53] a redundant pair keeps its better-supported half, and a gap that names a kept chunk withholds nothing', () => {
+    // The recorded drops this fixes: every confirmed redundant pair lost both
+    // halves, leaving the defects each served with no lesson at all.
+    const redundant = readoutTrace({
+      ...recallInput(),
+      results: [passed('c1', 'need', ['m2'])],
+      findings: [faulting('redundant_chunk', ['m1', 'm2']), faulting('missed_chunk', ['m1', 'm3'])],
+    });
+
+    const readout = readPack(redundant, hits, ACCEPT_AT);
+    expect(readout.usable.map((item) => item.alias)).toEqual(['m2']);
+    expect(readout.withheld).toEqual([{ ref: 'm1', source: 'finding', by: 'redundant_chunk' }]);
+    // Every usable memory carries the rubric its curator's words cite needs by.
+    expect(readout.usable[0].rubric).toEqual(redundant.contract.criteria);
   });
 
   it('[QL-16] a pack whose validators failed is withheld whole, however well it scored', () => {
@@ -65,6 +82,7 @@ describe('reading a recall', () => {
       admission: 'fell-short',
       kept: 2,
       usable: [],
+      withheld: [],
     });
   });
 
@@ -82,6 +100,7 @@ describe('reading a recall', () => {
       admission: 'no-rubric',
       kept: 2,
       usable: [],
+      withheld: [],
     });
   });
 

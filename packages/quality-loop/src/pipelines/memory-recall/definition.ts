@@ -114,22 +114,32 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
         gate: true,
       },
     },
+    // `withholds` is what a confirmed finding does to the kept chunks it
+    // names when the pack is read (`withheldItems`), declared by what handing
+    // the chunk to the producer as written would do: a chunk that is
+    // irrelevant, unsupported, misleading, stale or already in hand would
+    // mislead it, so it is withheld; of a redundant group the best-supported
+    // copy is kept; and a gap names a chunk without faulting it.
     findingTypes: {
       missed_chunk: {
         dimension: 'coverage',
         gate: false,
+        withholds: 'none',
       },
       no_usable_memory: {
         dimension: 'coverage',
         gate: true,
+        withholds: 'every-ref',
       },
       irrelevant_chunk: {
         dimension: 'precision',
         gate: false,
+        withholds: 'every-ref',
       },
       redundant_chunk: {
         dimension: 'precision',
         gate: false,
+        withholds: 'all-but-one',
       },
       // What the producer already holds is not news, but a chunk that
       // restates it misleads nobody: priced, never a reason to withhold the
@@ -137,6 +147,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       restated_defect: {
         dimension: 'precision',
         gate: false,
+        withholds: 'every-ref',
       },
       // Priced, not gated: the producer that reads the pack sees the chunk's own
       // text beside the insight, so an over-reaching insight is a penalty,
@@ -144,14 +155,17 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       unsupported_insight: {
         dimension: 'fidelity',
         gate: false,
+        withholds: 'every-ref',
       },
       misleading_chunk: {
         dimension: 'fidelity',
         gate: false,
+        withholds: 'every-ref',
       },
       stale_chunk: {
         dimension: 'fidelity',
         gate: false,
+        withholds: 'every-ref',
       },
     },
     ...STANDARD_SCORING,

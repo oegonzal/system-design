@@ -2,7 +2,12 @@
  * `validatePolicy` refuses a malformed decision policy (the shape lives in
  * `@sysdesign/contracts`) before it can grade anything.
  */
-import { AXIS_FACTOR_LEVELS, LOST_SAMPLE_POLICIES, SEVERITIES } from '@sysdesign/contracts';
+import {
+  AXIS_FACTOR_LEVELS,
+  LOST_SAMPLE_POLICIES,
+  SEVERITIES,
+  WITHHOLDINGS,
+} from '@sysdesign/contracts';
 import type { DecisionPolicy } from '@sysdesign/contracts';
 
 import { sum } from './arithmetic';
@@ -71,7 +76,10 @@ function checkCriterionKinds(
   }
 }
 
-/** The policy maps exactly the task's finding types, each onto a declared dimension. */
+/**
+ * The policy maps exactly the task's finding types, each onto a declared
+ * dimension, and what one withholds — when it says — is a declared withholding.
+ */
 function checkFindingTypes(
   policy: DecisionPolicy,
   task: TaskSpec<unknown>,
@@ -87,6 +95,14 @@ function checkFindingTypes(
     const mapped = policy.findingTypes[type];
     if (!dimensions.includes(mapped.dimension))
       fail(`finding type ${type} lands on unknown dimension ${mapped.dimension}`);
+    if (
+      mapped.withholds !== undefined &&
+      !(WITHHOLDINGS as readonly string[]).includes(mapped.withholds)
+    ) {
+      fail(
+        `finding type ${type} withholds ${mapped.withholds}, not one of ${WITHHOLDINGS.join(', ')}`,
+      );
+    }
   }
 }
 

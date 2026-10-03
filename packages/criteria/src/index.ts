@@ -444,6 +444,11 @@ export const CRITERIA: readonly Criterion[] = [
       "A run's dump says what its recall screened out as already held: run.md's recall section prints the pool, how many were set aside as already known by reason, demoted, collapsed and offered, and the chain it screened against, then each lesson set aside with what it matched and each lesson handed on with its origin; recall.json carries the whole record; and a recall that screened nothing prints as it always did.",
   },
   {
+    id: 'QL-53',
+    statement:
+      "What a confirmed finding withholds of the items it names is declared, per finding type, on the pipeline that confirms it — every item, all but the best-supported of a group with ties to the first, or none — checked when the pipeline boots, by what storing the item as written would do and never by the type's name; one rule reads it for every reader of a run, a digest's memories and a recall's kept chunks alike, over confirmed findings and the validator problems that name an item, withholding every named item where nothing is declared; and each reader counts what it withheld, by source and type.",
+  },
+  {
     id: 'QL-56',
     statement:
       "A produce after an attempt that was judged and did not beat the best is told what that attempt's judges confirmed: its finding notes as its policy selected them, less any the best's remediations already name, under their own heading after what to fix in the best and without that attempt's locations, which no prompt shows — for a producer that declares it consumes `setbacks`; a producer that does not, an ask after the best itself and an ask after an attempt refused before any judge read it are briefed as before.",

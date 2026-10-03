@@ -34,6 +34,7 @@ describe('the memory-recall pipeline', () => {
     expect(MEMORY_RECALL.policy.findingTypes['restated_defect']).toEqual({
       dimension: 'precision',
       gate: false,
+      withholds: 'every-ref',
     });
     // Priced: its dimension carries weight in the overall score.
     expect(MEMORY_RECALL.policy.dimensionWeights['precision']).toBeGreaterThan(0);
@@ -43,6 +44,25 @@ describe('the memory-recall pipeline', () => {
     );
     expect(raising.map((lens) => lens.id)).toEqual(['critic.relevance']);
     expect(raising[0].persona).toContain('already in hand');
+  });
+
+  it('[QL-53] every finding type declares what it withholds of the chunks it names', () => {
+    const withholds = Object.fromEntries(
+      Object.entries(MEMORY_RECALL.policy.findingTypes).map(([type, mapped]) => [
+        type,
+        mapped.withholds,
+      ]),
+    );
+    expect(withholds).toEqual({
+      missed_chunk: 'none',
+      no_usable_memory: 'every-ref',
+      irrelevant_chunk: 'every-ref',
+      redundant_chunk: 'all-but-one',
+      restated_defect: 'every-ref',
+      unsupported_insight: 'every-ref',
+      misleading_chunk: 'every-ref',
+      stale_chunk: 'every-ref',
+    });
   });
 
   it('[QL-4] every location the pack exposes is printed verbatim where a judge reads it', () => {

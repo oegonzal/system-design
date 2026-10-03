@@ -51,6 +51,7 @@ describe('reading a digest', () => {
           ],
         },
       ],
+      withheld: [{ ref: 'memory.2', source: 'finding', by: 'run_specific' }],
     });
     const belowTheBar = readoutTrace({
       ...digestInput(digest, goal),
@@ -61,6 +62,7 @@ describe('reading a digest', () => {
       admission: 'fell-short',
       proposed: 2,
       memories: [],
+      withheld: [],
     });
   });
 
@@ -76,6 +78,7 @@ describe('reading a digest', () => {
       admission: 'no-rubric',
       proposed: digest.memories.length,
       memories: [],
+      withheld: [],
     });
   });
 
@@ -96,6 +99,38 @@ describe('reading a digest', () => {
 
     expect(readout.admission).toBe('admitted');
     expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
+  });
+
+  it('[QL-53] a duplicate keeps its better copy, and a gap or a vague wording withholds nothing — as the digest declares', () => {
+    // The recorded drops this fixes: every digest that confirmed a duplicate
+    // lost both halves of it, and a gap finding that named a memory lost it.
+    const memory = (insight: string, evidence: string[]) => ({
+      evidence,
+      insight,
+      appliesWhen: 'a read path depends on an upstream that can go down',
+    });
+    const digest = sampleDigest({
+      memories: [
+        memory('Give the read path a story for its upstream being down.', ['f1']),
+        memory('Say what the read path does when its upstream is down.', ['r1']),
+        memory('Name the fix for a contradiction.', ['f2']),
+      ],
+      unused: ['r2'],
+    });
+    const trace = readoutTrace({
+      ...digestInput(digest, composedGoal()),
+      locations: ['summary', 'memory.1', 'memory.2', 'memory.3', 'r2'],
+      findings: [
+        faulting('duplicate_memory', ['memory.1', 'memory.2']),
+        faulting('missed_signal', ['memory.3']),
+        faulting('vague_insight', ['memory.3']),
+      ],
+    });
+    const readout = memoriesToStore(trace, ACCEPT_AT);
+    expect(readout.memories.map((kept) => kept.position)).toEqual([1, 3]);
+    expect(readout.withheld).toEqual([
+      { ref: 'memory.2', source: 'finding', by: 'duplicate_memory' },
+    ]);
   });
 
   it('[QL-41] an insight the seam kept whole past its ceiling is endorsed whole, never the digest refused for it', () => {

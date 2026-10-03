@@ -132,18 +132,30 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     // of either starts them at 100,
     // and a digest nobody faulted renormalises
     // them out.
+    //
+    // `withholds` is what a confirmed finding does to the memories it names
+    // when the store reads the digest (`withheldItems`), declared by what
+    // storing the memory as written would put in the store: an effect the
+    // record does not show, a misattribution or a lesson only this run's
+    // names make true would be false there, so it is withheld; of a duplicate
+    // group the best-supported copy is stored; a vague wording is weaker, not
+    // wrong — its remedy is a rewrite — and a missed signal is a gap that
+    // names a memory without faulting it.
     findingTypes: {
       missed_signal: {
         dimension: 'attribution',
         gate: false,
+        withholds: 'none',
       },
       unsupported_effect: {
         dimension: 'attribution',
         gate: false,
+        withholds: 'every-ref',
       },
       misattributed_evidence: {
         dimension: 'fidelity',
         gate: true,
+        withholds: 'every-ref',
       },
       // Gated, unlike its two neighbours in `reuse`: a memory that holds only
       // for this run's names and numbers is the one failure a later prompt
@@ -153,14 +165,17 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       run_specific: {
         dimension: 'reuse',
         gate: true,
+        withholds: 'every-ref',
       },
       vague_insight: {
         dimension: 'reuse',
         gate: false,
+        withholds: 'none',
       },
       duplicate_memory: {
         dimension: 'reuse',
         gate: false,
+        withholds: 'all-but-one',
       },
     },
     ...STANDARD_SCORING,

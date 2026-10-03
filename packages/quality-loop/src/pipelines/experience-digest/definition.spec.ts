@@ -21,6 +21,23 @@ describe('the experience-digest pipeline', () => {
     expect(summary.validators.map((validator) => validator.id)).toEqual(['references', 'limits']);
   });
 
+  it('[QL-53] every finding type declares what it withholds of the memories it names', () => {
+    const withholds = Object.fromEntries(
+      Object.entries(EXPERIENCE_DIGEST.policy.findingTypes).map(([type, mapped]) => [
+        type,
+        mapped.withholds,
+      ]),
+    );
+    expect(withholds).toEqual({
+      missed_signal: 'none',
+      unsupported_effect: 'every-ref',
+      misattributed_evidence: 'every-ref',
+      run_specific: 'every-ref',
+      vague_insight: 'none',
+      duplicate_memory: 'all-but-one',
+    });
+  });
+
   it('[QL-4] every location the digest exposes is printed verbatim where a judge reads it', () => {
     const digest = sampleDigest();
     const rendered = experienceDigestOutput.render(digest);
