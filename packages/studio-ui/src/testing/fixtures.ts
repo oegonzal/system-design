@@ -461,6 +461,10 @@ export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto 
       caveat: null,
       text: 'When reads dominate, cache before you replicate.',
       sourceRunId: 'run-earlier',
+      pipeline: 'system-design-canvas',
+      iteration: 2,
+      decision: 'revise',
+      when: '2026-10-01',
     },
     {
       ref: 'm2',
@@ -469,6 +473,10 @@ export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto 
       caveat: 'learned on a different prompt',
       text: 'Name the failure a queue absorbs, or it absorbs nothing.',
       sourceRunId: 'run-earlier',
+      pipeline: 'system-design',
+      iteration: 1,
+      decision: 'accept',
+      when: '2026-09-28',
     },
   ];
   return {

@@ -570,14 +570,50 @@ describe('ImprovementPanel', () => {
     expect(list.hidden).toBe(false);
     const lessons = within(list).getAllByTestId('coach-recall-lesson');
     expect(lessons.map((lesson) => lesson.textContent)).toEqual([
-      'Put a cache in front of the primary database before adding read replicas.Where it helps: the read path',
-      'Say what the queue absorbs when the downstream service slows down.Where it helps: failure handlingKeep in mind: learned on a different prompt',
+      'Put a cache in front of the primary database before adding read replicas.Where it helps: the read pathLearned from: iteration 2 of an earlier system design canvas run, decided revise, 2026-10-01',
+      'Say what the queue absorbs when the downstream service slows down.Where it helps: failure handlingKeep in mind: learned on a different promptLearned from: iteration 1 of an earlier system design run, decided accept, 2026-09-28',
     ]);
     // A lesson with nothing to keep in mind says nothing about it.
     expect(within(lessons[0]).queryByTestId('coach-recall-caveat')).toBeNull();
     expect(within(lessons[1]).getByTestId('coach-recall-caveat').textContent).toBe(
       'Keep in mind: learned on a different prompt',
     );
+  });
+
+  it('[UX-21] says where each lesson was learned, and only what the curator said in the prompt’s own terms', async () => {
+    const user = userEvent.setup();
+    const [learned] = makeRecall().lessons;
+    renderPanel({
+      run: makeImproveRun({
+        status: 'complete',
+        recall: makeRecall({
+          count: 2,
+          lessons: [
+            learned,
+            // Recorded before lessons carried where they were learned, and
+            // whose curator named only labels that stand for nothing here.
+            {
+              ref: 'm4',
+              serves: '',
+              insight: 'Count every serial hop in the availability product.',
+              caveat: null,
+              text: 'Recompute availability over every serial dependency.',
+              sourceRunId: 'run-older',
+            },
+          ],
+        }),
+      }),
+    });
+    await user.click(screen.getByTestId('coach-recall-toggle'));
+    const [first, older] = within(screen.getByTestId('coach-recall-lessons')).getAllByTestId(
+      'coach-recall-lesson',
+    );
+    expect(within(first).getByTestId('coach-recall-learned').textContent).toBe(
+      'Learned from: iteration 2 of an earlier system design canvas run, decided revise, 2026-10-01',
+    );
+    expect(older.textContent).toBe('Count every serial hop in the availability product.');
+    expect(within(older).queryByTestId('coach-recall-serves')).toBeNull();
+    expect(within(older).queryByTestId('coach-recall-learned')).toBeNull();
   });
 
   it('[QL-32] [QL-34] says what the recall searched for beside the prompt — the starting grade’s defects — next to the lessons', () => {

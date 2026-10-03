@@ -133,6 +133,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A coach revision imports whatever it wrote: a field past what was asked, or past what a submit accepts, is stored whole with its overruns logged on the import, and only a shape that is no submission is refused; restored as the draft it re-saves as written — a draft save refuses only a fault of shape, in the one issue shape — while a submit stays held to the ceilings.',
   },
+  {
+    id: 'UX-21',
+    statement:
+      "The studio says where a grade or a lesson stands without the loop's private words: a session card whose latest grade's run failed reads grading failed, beside not assessed for one that judged too little, and neither shows a score or a decision; and each lesson the coach was handed says where it helps in the prompt's own criteria and defects — nothing when it names none — and where it was learned: the iteration of an earlier run of which kind of work, how that iteration was decided, and the day, when the record carries them.",
+  },
   // STAR repository
   {
     id: 'STAR-1',

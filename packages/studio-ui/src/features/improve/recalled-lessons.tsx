@@ -3,6 +3,7 @@
 import styled from '@emotion/styled';
 import {
   tokenWords,
+  type RecalledLessonDto,
   type RecallFocusCriterionDto,
   type RecallFocusDto,
   type RunRecallDto,
@@ -52,12 +53,28 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
 };
 
 /**
- * What stands before each part of a lesson the curator worded freely. Labels
- * rather than a sentence built around its words: `serves` and `caveat` are
- * whatever the curator wrote — a phrase, a clause, a sentence — and read
- * right after a label however they are phrased.
+ * What stands before each part of a lesson the curator worded freely, and
+ * before where it was learned. Labels rather than a sentence built around its
+ * words: `serves` and `caveat` are whatever the curator wrote — a phrase, a
+ * clause, a sentence — and read right after a label however they are phrased.
  */
-const LESSON_LABEL = { serves: 'Where it helps', caveat: 'Keep in mind' } as const;
+const LESSON_LABEL = {
+  serves: 'Where it helps',
+  caveat: 'Keep in mind',
+  learned: 'Learned from',
+} as const;
+
+/**
+ * Where a lesson was learned, in words: the iteration its evidence ends in,
+ * the kind of work that run was, how that iteration was decided, and the day
+ * — what the curator weighed it by. Null on a lesson recorded before the run
+ * carried it.
+ */
+function learnedFrom({ pipeline, iteration, decision, when }: RecalledLessonDto): string | null {
+  if (pipeline === undefined || iteration === undefined || decision === undefined) return null;
+  const day = when === undefined ? '' : `, ${when}`;
+  return `iteration ${iteration} of an earlier ${tokenWords(pipeline)} run, decided ${decision}${day}`;
+}
 
 /** How a criterion the starting grade fell short on fell short, in words. Every shortfall the contract names. */
 const SHORTFALL_WORDS: Record<RecallFocusCriterionDto['result'], string> = {
@@ -119,10 +136,11 @@ export interface RecalledLessonsProps {
  * What the coach was handed from earlier runs: how many lessons, what they
  * were searched for — the starting grade's defects, when the coach started
  * from one — and, on request, each one in the curator's words with the part
- * of the prompt it serves and, when the lesson was learned somewhere unlike
- * this prompt, what to keep in mind about it. Settled recalls only: while the
- * loop is still recalling, the panel's progress line says so. Only the coach
- * saw these; the grade did not.
+ * of the prompt it serves — in the prompt's own criteria and defects, never
+ * the curator's private labels — what to keep in mind about it when it was
+ * learned somewhere unlike this prompt, and where it was learned. Settled
+ * recalls only: while the loop is still recalling, the panel's progress line
+ * says so. Only the coach saw these; the grade did not.
  */
 export function RecalledLessons({ recall }: RecalledLessonsProps) {
   if (recall === null || recall.status === 'recalling') return null;
@@ -153,21 +171,31 @@ export function RecalledLessons({ recall }: RecalledLessonsProps) {
         </WrappingText>
       ) : null}
       <DisclosurePanel as={LessonList} data-testid="coach-recall-lessons">
-        {recall.lessons.map((lesson) => (
-          <LessonItem key={lesson.ref} data-testid="coach-recall-lesson">
-            <WrappingText as="span" size="sm">
-              {lesson.insight}
-            </WrappingText>
-            <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-serves">
-              {`${LESSON_LABEL.serves}: ${lesson.serves}`}
-            </WrappingText>
-            {lesson.caveat ? (
-              <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-caveat">
-                {`${LESSON_LABEL.caveat}: ${lesson.caveat}`}
+        {recall.lessons.map((lesson) => {
+          const learned = learnedFrom(lesson);
+          return (
+            <LessonItem key={lesson.ref} data-testid="coach-recall-lesson">
+              <WrappingText as="span" size="sm">
+                {lesson.insight}
               </WrappingText>
-            ) : null}
-          </LessonItem>
-        ))}
+              {lesson.serves ? (
+                <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-serves">
+                  {`${LESSON_LABEL.serves}: ${lesson.serves}`}
+                </WrappingText>
+              ) : null}
+              {lesson.caveat ? (
+                <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-caveat">
+                  {`${LESSON_LABEL.caveat}: ${lesson.caveat}`}
+                </WrappingText>
+              ) : null}
+              {learned !== null ? (
+                <WrappingText as="span" size="sm" tone="muted" data-testid="coach-recall-learned">
+                  {`${LESSON_LABEL.learned}: ${learned}`}
+                </WrappingText>
+              ) : null}
+            </LessonItem>
+          );
+        })}
       </DisclosurePanel>
     </Recalled>
   );

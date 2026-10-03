@@ -47,6 +47,13 @@ const SessionLink = styled(Link)`
   }
 `;
 
+/**
+ * One session as the dashboard lists it: its prompt, status and latest
+ * grade — a score and a decision when the grade is a verdict, and, when it
+ * is not, which way it is not, in the words every surface prints a grade's
+ * standing in: still grading, not assessed (it judged too little to score),
+ * or grading failed (its run broke, and the revision waits to be re-graded).
+ */
 function SessionCard({ session }: { session: DesignSessionDto }) {
   // The latest grade's standing, read the way a revision's cached grade is.
   const standing =
@@ -73,6 +80,10 @@ function SessionCard({ session }: { session: DesignSessionDto }) {
             {standing === 'unscored' ? (
               <Badge tone="neutral" data-testid="session-unscored">
                 {GRADE_STANDING_LABEL.unscored}
+              </Badge>
+            ) : standing === 'failed' ? (
+              <Badge tone="critical" data-testid="session-grade-failed">
+                {GRADE_STANDING_LABEL.failed}
               </Badge>
             ) : session.latestDecision ? (
               <Badge tone={DECISION_TONE[session.latestDecision]} data-testid="session-decision">
