@@ -205,6 +205,46 @@ The practice workspace's **Export** button downloads a single `.zip` with
 `narrative.md`, `brief.md`, `feedback.md`, and `revisions.md` — a copy of a
 run that lives outside the database entirely.
 
+## Learning from a run that has already finished
+
+A settled run can be turned into knowledge without re-running anything:
+
+```bash
+curl -s -XPOST localhost:3003/orchestrations/knowledge/from-run \
+  -H 'content-type: application/json' \
+  -d '{"runId": "<a complete quality run>"}'
+# 202; poll GET /orchestrations/:id until it stops running
+```
+
+Four steps. The run stands in for `target` and is never re-run. `known` asks the
+store what it already holds about that run's own confirmed findings and judged
+criteria — no model call, and never the run's own points. `digest` runs the
+`knowledge-digest` pipeline over the run plus what came back, and types what it
+taught: a fact, an anti-pattern, a pattern, or a procedure. `store` writes one
+point per item, one per confirmed finding of the judged iteration, and records
+what the run claims about items other runs stored.
+
+Read `steps.digest.counts` for `items`, `kept` and `confirming`, and
+`steps.store.counts` for `items`, `findings`, `confirms` and `contradicts`. An
+item that confirms something already stored is deliberately **not** a second
+point: `confirming` counts those, and `confirms` is the rows they became. Running
+it twice over one run replaces that run's own points and rows and leaves the
+counts as they were.
+
+Two reads, neither of which runs a pipeline or writes anything:
+
+```bash
+curl -s 'localhost:3003/memory/effectiveness?pipeline=system-design-canvas&limit=10'
+curl -s 'localhost:3003/memory/gaps?runId=<a coach run>'
+```
+
+The first says, for every run that recalled, what became of each defect the
+recall searched for — resolved, persisted, improved, regressed, unchanged, or
+never judged again — and sums that per stored item. It attributes at run level
+and says so: which lesson served which defect is prose on the curator's pack.
+The second keeps the needs no recall could serve, grouped by brief, which is the
+list of what the store has yet to learn.
+
 ## A browser session the loop decides for
 
 `packages/browser-session` drives a headed Chrome through a **markdown goal**

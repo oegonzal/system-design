@@ -1,9 +1,9 @@
-# The four orchestrators, and how to read what they did
+# The orchestrators, and how to read what they did
 
 A single quality run answers one question: is this artifact any good? An orchestrator answers questions that need several quality runs — _does this answer get better if it remembers what earlier quality runs learned_, _which
 judge does this brief belong to_, _would I get this score again_, _do the judges even agree_.
 
-This page covers what each of the four is for, how its steps actually work, and what a real recorded orchestration run looks like. Every trace below is a real row from the local database, not an invention. Section 2 is the exception: it shows how the studio's grading, coach and prompt generation — plain quality runs, not orchestrations — turn into iterations and revisions, and its traces are real dumps under `static/runs/`, not database rows.
+This page covers what each one is for, how its steps actually work, and what a real recorded orchestration run looks like. Seven are registered; the two the browser session added — `form-memory` and `document-memory` — are documented with that work instead. Every trace below is a real row from the local database, not an invention. Section 2 is the exception: it shows how the studio's grading, coach and prompt generation — plain quality runs, not orchestrations — turn into iterations and revisions, and its traces are real dumps under `static/runs/`, not database rows.
 
 ## 1. What an orchestrator is
 
@@ -853,6 +853,83 @@ Across the sixteen memory orchestration runs recorded under the current code:
 
 Fourteen of sixteen went end to end. The recall funnel is stable: always 16 candidates, at most 8
 kept, and between 0 and 7 usable.
+
+## 4a. `knowledge` — learn from a finished run, against what is already known
+
+**Use it when** a run has settled and you want what it taught kept in a form another prompt can use.
+It is `memory`'s counterpart rather than its replacement, and the difference is the direction of the
+question. `memory` asks _does this run go better if it remembers_, so it recalls first and digests
+afterwards. `knowledge` asks _what does this run add to what the store holds_, so the recall happens
+**after** the target, the answer reaches the digest rather than the producer, and nothing it finds can
+change the run being learned from.
+
+```text
+  POST /orchestrations/knowledge/from-run  { runId }
+  (or POST /orchestrations/knowledge { pipeline, goal }, which runs the target first)
+        |
+        v
+  [target]  the run to learn from
+        |   a `/from-run` start stands it in: skipped `provided-run`, and the run is never re-run
+        |   output: the whole run
+        v
+  [known]   no pipeline, and no model call
+        |   its own confirmed findings and judged criteria become the probes — a defect in words and
+        |   a situation in words are already the two registers the store indexes
+        |   searched for knowledge and lessons only, never this run's own points
+        |   output: up to 12 already-known items, fused by reciprocal rank
+        |   skips : upstream-skipped | embeddings-disabled | store-unavailable | store-empty
+        |           nothing-to-digest | no-probes
+        v
+  [digest]  runs the knowledge-digest pipeline — and deliberately does NOT need `known`
+        |   the record is the engine's reduction of the run plus what is known, the source
+        |   pipeline's dimension map, and the artifact's own place ids
+        |   output: typed items, and what each claims about what is stored
+        |   completes with no output: not-accepted | no-rubric | no-artifact | no-items
+        |   skips : source-pipeline-unknown (the source pipeline is no longer registered)
+        v
+  [store]   no pipeline — writes vectors and rows
+            one point per item, one per confirmed finding of the judged iteration
+            an item that confirms a known one is a ROW, not a second point
+            fails: embedding-failed | store-unavailable | support-unavailable
+```
+
+Its reasons are `embeddings-disabled`, `store-unavailable`, `store-empty`, `embedding-failed`,
+`support-unavailable`, `not-accepted`, `no-rubric`, `no-artifact`, `nothing-to-digest`, `no-probes`,
+`no-items`, `source-pipeline-unknown`. The admission three mean what they mean everywhere: a verdict,
+or a child that was never judged.
+
+### The three things worth knowing about it
+
+**`known` costs no model call.** A recall for a goal needs one, because a problem statement has to be
+decomposed into the conditions it puts an answer in. This asks about evidence the engine has already
+decomposed, so the probes are the evidence itself. It never reads the run's own points, because on a
+second pass they would come back as "already known" and the digest would confirm itself.
+
+**A store it cannot search costs the delta, not the learning.** `digest` needs only `target`. With an
+empty or unreachable store the step skips, the digest runs with nothing known, and the run still
+learns — which is what every digest did before there was a store.
+
+**An item that confirms is reinforcement, not a point.** Its claim becomes a row keyed by (point,
+source run), pinned to the text it was made about, and the count a search reads is recomputed from
+those rows. Rows rather than a counter because a run digested twice has to count once. This is the
+answer to a measured problem: at 386 stored chunks there were 7 lesson pairs above 0.80 cosine and 2
+above 0.90, all of them the same brief coached again — where at 145 chunks nothing passed 0.80.
+
+### What a run of it looks like
+
+Learning from a `system-design` run, with nothing stored yet:
+
+```text
+target    skipped    provided-run
+known     skipped    store-empty
+digest    complete   items 1 · kept 1 · confirming 0
+store     complete   items 1 · findings 1 · chunks 2 · confirms 0
+```
+
+Nothing is wrong here. The store had nothing to compare against, so the digest wrote what the run
+taught and the run still learned: one typed item, and one chunk for the confirmed finding the digest's
+cap could not have held. Learning from the same run again replaces its own points and rows and leaves
+the counts as they were.
 
 ## 5. `router` — let the registry pick the judge
 
