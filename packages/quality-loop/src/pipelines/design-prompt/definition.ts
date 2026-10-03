@@ -75,13 +75,15 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
     },
 
     // The writer sees the checklist: the draft is meant to meet it, and the
-    // experience it is written from is the goal itself. Every cap is sized
+    // experience it is written from is the goal itself. A revision its judges
+    // found no better than the best is named to it on the next ask
+    // (setbacks), so it does not write the same thing again. Every cap is sized
     // from the recorded runs with a fifth or more of headroom (the spec holds
     // the measurements), and each is also the call's time limit.
     producer: {
       persona: producer,
       maxTokens: 10000,
-      consumes: ['criteria'],
+      consumes: ['criteria', 'setbacks'],
     },
 
     validators: [shapeValidator],

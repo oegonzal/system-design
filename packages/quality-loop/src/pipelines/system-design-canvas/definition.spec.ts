@@ -26,7 +26,7 @@ describe('the system-design-canvas pipeline', () => {
     expect(SYSTEM_DESIGN_CANVAS.producer.persona).toContain('`ai-`');
   });
 
-  it('[QL-21] [QL-32] its kinds, its cap and its numbering are the contract’s declarations, and its coach sees the criteria and any lessons its run recalled', () => {
+  it('[QL-21] [QL-32] [QL-56] its kinds, its cap and its numbering are the contract’s declarations, and its coach sees the criteria, any lessons its run recalled and what its last revision no better than the best was found wrong with', () => {
     expect(Object.keys(SYSTEM_DESIGN_CANVAS.task.criterionKinds)).toEqual([
       ...CANVAS_CRITERION_KINDS,
     ]);
@@ -43,7 +43,7 @@ describe('the system-design-canvas pipeline', () => {
       expect(evaluator.maxItems).toBe(CANVAS_MAX_CRITERIA);
     }
     expect(SYSTEM_DESIGN_CANVAS.goalSource).toBe('composed');
-    expect(SYSTEM_DESIGN_CANVAS.producer.consumes).toEqual(['criteria', 'memories']);
+    expect(SYSTEM_DESIGN_CANVAS.producer.consumes).toEqual(['criteria', 'memories', 'setbacks']);
     const submission = sampleSubmission();
     expect(canvasOutput.locate(submission)).toEqual(
       submissionLocations(submission).map(({ id, label }) => ({ id, label })),

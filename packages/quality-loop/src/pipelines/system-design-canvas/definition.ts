@@ -125,7 +125,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // run that recalled lessons for its prompt hands them to the coach too, as
   // advice under their own heading; the lenses never see them, so a lesson
   // can shape a revision and never a grade. It still revises against the
-  // remediations the panel selected, never against a score. Every cap is
+  // remediations the panel selected, never against a score. A revision its
+  // judges found no better than the best is named to it on the next ask
+  // (setbacks), so it does not write the same thing again. Every cap is
   // sized from the recorded runs (the spec holds the measurements) with a
   // fifth of headroom, and each is also the call's time limit
   // (`callTimeLimitMs`), so a cap a stage outwrites is a call cut short: a
@@ -135,7 +137,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   producer: {
     persona: producer,
     maxTokens: 50000,
-    consumes: ['criteria', 'memories'],
+    consumes: ['criteria', 'memories', 'setbacks'],
   },
 
   validators: [referencesValidator, structureValidator],

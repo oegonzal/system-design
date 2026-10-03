@@ -90,12 +90,14 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
   // derived criteria. A producer that does writes one mechanism per line, and
   // 279 of 279 criteria passed. Its evaluators consume the confirmed findings
   // instead: producer → critics → evaluators → controller, by declaration.
+  // A revision its judges found no better than the best is named to it on
+  // the next ask (setbacks), so it does not write the same thing again.
   // Its cap is sized from the recorded runs: a full design has taken up to
   // 26.1k output tokens, thinking included (the spec holds the measurements).
   producer: {
     persona: producer,
     maxTokens: 32000,
-    consumes: [],
+    consumes: ['setbacks'],
   },
 
   validators: [],

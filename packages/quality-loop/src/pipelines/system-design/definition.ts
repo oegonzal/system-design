@@ -69,6 +69,8 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
     maxTokens: 4000,
   },
 
+  // A revision its judges found no better than the best is named to it on
+  // the next ask (setbacks), so it does not write the same thing again.
   // Every cap is sized from the recorded runs with a fifth or more of
   // headroom (the spec holds the measurements), and each is also the call's
   // time limit: an answer has taken up to 15.7k output tokens, thinking
@@ -76,7 +78,7 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
   producer: {
     persona: producer,
     maxTokens: 20000,
-    consumes: ['criteria'],
+    consumes: ['criteria', 'setbacks'],
   },
 
   validators: [],

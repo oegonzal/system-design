@@ -337,9 +337,10 @@ nothing is digested.
 - **Does each coach iteration feed the next?** Only while it wins. Each coach iteration's producer
   revises the **best** design so far, with the **best** iteration's fixes, and the best is not
   always the iteration just before. The chain moves forward only while each iteration beats the
-  best. An iteration that does not is discarded, design and fixes alike, and the next one gets the
-  same briefing again — byte-identical in 22-30-00 below — plus, if the loser was blocked by a
-  validator, that validator's notes as refusals. The producer works from the original
+  best. An iteration that does not is discarded, design and fixes alike, and the next one revises
+  the best with the best's fixes again — byte-identical in 22-30-00 below, before setbacks — plus,
+  if the loser was blocked by a validator, that validator's notes as refusals, or, if its judges
+  read it, what they confirmed wrong with it as setbacks. The producer works from the original
   submission only while it is still the best. The judges grade every iteration from scratch: they
   never see an earlier grade or what the producer was asked to fix.
 - **Is the coach applying the fixes?** Yes. Its producer is handed every remediation the best
@@ -547,16 +548,16 @@ and the memory orchestrator's recall, screen nothing and compose the query they 
    that was not criticised preserved."
 
 It sees every criterion, passed or not, but never which ones passed. It never sees a score, a
-finding marked `requires_user` or `unfixable`, or what a losing iteration's judges said, refusals
-apart.
+finding marked `requires_user` or `unfixable`, or what a losing iteration's judges said beyond the
+finding notes its policy selected (its setbacks) and refusals.
 
 **Do fixes accumulate from one iteration to the next?** Only while each revision wins, as the
 answers at the top of this section say. If iteration 2 beats the base, iteration 3 revises
 iteration 2's canvas against iteration 2's remediations. If it does not, iteration 2's canvas and
-remediations are dropped from the briefing, and iteration 3 gets exactly what iteration 2 got: the
-base and the base's remediations, plus iteration 2's validator notes as refusals if a validator
-blocked it. Each grade's remediations are a new list, not the old one with
-items crossed off.
+remediations are dropped from the briefing, and iteration 3 gets what iteration 2 got: the base
+and the base's remediations, plus iteration 2's validator notes as refusals if a validator blocked
+it, or the findings its judges confirmed as setbacks if they read it. Each grade's remediations are
+a new list, not the old one with items crossed off.
 
 **Lessons are a record, not feedback.** The loop re-derives the lessons — `resolved`, `persisted`,
 `improved`, `regressed` — into the live trace after every iteration, not only at the end. None of
@@ -738,11 +739,13 @@ named where there is one.
   from the loop, notes included, but its own DTO reduces it to a count, so only the count reaches
   the UI: the author cannot see which fixes the number means, and nothing shows what the coach
   changed.
-- **A losing revision's critique is dropped from the next briefing.** The next iteration gets the
-  best's briefing again, byte-identical in 22-30-00. With the default budget, a lost iteration 2
-  makes iteration 3 a second try at the same revision. The critique itself stays in the trace and
-  the dump, and the memory digest reads it; a blocked loser's validator notes still reach the
-  producer, as refusals.
+- **Closed: a losing revision's critique reaches the next briefing.** It did not: the next
+  iteration got the best's briefing again, byte-identical in 22-30-00, so with the default budget a
+  lost iteration 2 made iteration 3 a second try at the same revision. A producer that consumes
+  `setbacks` — every producer whose loop revises does — is now told, on the ask after an attempt its
+  judges read and found no better than the best, that attempt's confirmed finding notes under their
+  own heading, less any the best's remediations already name. A blocked loser's validator notes
+  still reach the producer as refusals, and a lost produce's schema faults as refusals of their own.
 - **"Your previous artifact" is the best one.** The heading reads as the previous iteration's, but
   after a revision that did not win it is older, and may be the author's own canvas.
 - **Lessons compare neighbours, by exact key.** `resolved` and `persisted` compare each iteration
@@ -783,8 +786,10 @@ named where there is one.
   comment at `sessions.ts:202-203` says the loop "revises up to `maxIterations` times". The dropdown
   offers 1, which can never revise, and a coach can be started from a base already accepted,
   rejected or escalated, which stops at iteration 1.
-- **A manifest's `overall` is the last iteration's.** 18-01-11's manifest says 0 while its best
-  scored 57.8. Read `bestIteration` instead.
+- **Closed: a manifest's `overall` is the best iteration's.** It was the last iteration's:
+  18-01-11's manifest said 0 while its best scored 57.8. The manifest, the index row and `run.md`'s
+  verdict line now headline the best iteration, with the last one's score in a clause of its own
+  when the last is not the best.
 - **A criterion's fix note may quote the wrong sample.** The note takes the first evaluator
   sample's rationale for that criterion, whatever result that sample gave, so with two samples it
   can quote one that said pass. The recorded quality runs show it: in 6 of 259 fail or partial
