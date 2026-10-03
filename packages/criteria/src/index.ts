@@ -613,4 +613,15 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A session's trace is written incrementally through the shared run-dump plumbing — each step's files land through a temp name and a rename, bytes as well as text — and the index row that claims the folder complete is appended once, when the session is whole.",
   },
+  // Memory ingest (packages/memory-ingest)
+  {
+    id: 'ING-1',
+    statement:
+      'Documents are chunked deterministically — the same text yields the same aliased parts, packed under the declared budget with no overlap and continuity through the enclosing headings — and each chunk is posted to the loop once, one at a time, awaited to settle and recorded in a manifest by its content hash, so a re-run skips what was ingested unless forced.',
+  },
+  {
+    id: 'ING-2',
+    statement:
+      'Documents are read through a declared table of readers by extension — PDF text page by page, markdown and plain text verbatim — and an extension the table does not name is refused by name, never guessed.',
+  },
 ] as const;

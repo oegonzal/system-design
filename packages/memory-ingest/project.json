@@ -1,0 +1,18 @@
+{
+  "name": "memory-ingest",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/memory-ingest/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "// targets": "build and test are inferred from vite.config.ts by @nx/vite/plugin; there is no serve target — the program runs once and exits",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/memory-ingest",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}
