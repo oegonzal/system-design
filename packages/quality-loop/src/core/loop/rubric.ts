@@ -1,13 +1,14 @@
 /**
  * A supplied rubric stands in for the derived one only when the task could
  * have derived it: ids unique, every kind one the task prices, no more
- * criteria than it allows, none longer than its deriver is accepted with. Checked
+ * criteria than it allows, none longer than its deriver can return. Checked
  * before any row is written or any model is called; the problems name what
- * is wrong so the caller can fix its rubric.
+ * is wrong so the caller can fix its rubric. A criterion past the target and
+ * within that length is no problem — it is an overrun on the run's record.
  */
 import type { SuccessCriterion } from '@sysdesign/contracts';
 
-import { overlongCriteria, criterionLengthBound, type TaskSpec } from '../contracts';
+import { overlongCriteria, providedStatementLimit, type TaskSpec } from '../contracts';
 
 export function rubricProblems(
   criteria: readonly SuccessCriterion[],
@@ -33,7 +34,7 @@ export function rubricProblems(
   // Measured where the bound is declared, never read here: only which ids run past it.
   for (const id of overlongCriteria(criteria, task)) {
     problems.push(
-      `criterion ${id} is longer than the ${criterionLengthBound(task).ceiling} characters this pipeline allows`,
+      `criterion ${id} is longer than the ${providedStatementLimit(task)} characters this pipeline allows`,
     );
   }
   return problems;

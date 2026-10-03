@@ -13,7 +13,12 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { criterionLengthBound, toRunDto, type RunRecord } from '../../core/contracts';
+import {
+  criterionLengthBound,
+  providedStatementLimit,
+  toRunDto,
+  type RunRecord,
+} from '../../core/contracts';
 import { progressOf } from '../../core/loop/progress';
 import type { RunRepository } from '../../core/ports';
 import { fakeLlm, gatedLlm, result, sequencedLlm, tinyPipeline } from '../../core/testing';
@@ -255,6 +260,25 @@ describe('the HTTP surface', () => {
     expect(rows.map((row) => row.criterionId)).toEqual(['req-1', 'nfr-1']);
   });
 
+  it('[QL-47] a rubric statement past the ceiling, as long as the deriver can return, is taken back and recorded whole', async () => {
+    // The studio hands a derived rubric back on every grade and coach run: a
+    // statement the deriver kept past its ceiling must start a run, not a 400.
+    const statement = 'y'.repeat(criterionLengthBound(tinyPipeline().task).ceiling + 120);
+    expect(statement.length).toBeLessThanOrEqual(providedStatementLimit(tinyPipeline().task));
+    const rubric = [{ id: 'c1', kind: 'must', statement }];
+    const started = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal',
+      criteria: rubric,
+    });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ runId: string }>;
+    const run = await settledRun(data.runId);
+    expect(run.trace?.contract.criteria).toEqual(rubric);
+    const rows = await em.fork().find(QualityRunCriterion, { run: data.runId });
+    expect(rows.map((row) => row.statement)).toEqual([statement]);
+  });
+
   it('[QL-20] a rubric that does not fit the pipeline is 400 with the offending path, and no row is written', async () => {
     const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
     for (const criteria of [
@@ -268,12 +292,12 @@ describe('the HTTP surface', () => {
         kind: 'must',
         statement: 's',
       })),
-      // Within the edge's cap, past the pipeline's own ceiling: the service's 400, same path.
+      // Within the edge's cap, past the longest the pipeline's own deriver can return: the service's 400, same path.
       [
         {
           id: 'c1',
           kind: 'must',
-          statement: 'x'.repeat(criterionLengthBound(tinyPipeline().task).ceiling + 1),
+          statement: 'x'.repeat(providedStatementLimit(tinyPipeline().task) + 1),
         },
       ],
     ]) {

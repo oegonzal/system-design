@@ -64,8 +64,9 @@ export function createCriteriaDeriver<T>(
 /**
  * A supplied rubric measured the way a derived one is: against the deriver's
  * own schema, so every statement past the length the deriver is asked for is
- * an overrun alike. Past the ceiling it was refused before the run started
- * (`rubricProblems`); within it, it is kept and recorded.
+ * an overrun alike. Past the longest the deriver can return it was refused
+ * before the run started (`rubricProblems`); within it, it is kept and
+ * recorded.
  */
 export function rubricOverruns<T>(
   criteria: readonly SuccessCriterion[],

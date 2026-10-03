@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { bound } from '@sysdesign/contracts';
+import { bound, CUT_FACTOR, CUT_MARKER, cutPoint, keptAtMost } from '@sysdesign/contracts';
 
 import { criterionLengthBound } from '../contracts';
+import { createCriteriaDeriver } from '../stages/derive-criteria';
 import type { Stages } from '../ports';
 import {
   criterion,
@@ -41,13 +42,55 @@ describe('rubricProblems', () => {
     ]);
   });
 
-  it('[QL-20] holds a supplied statement to the ceiling the pipeline’s own deriver is accepted with', () => {
-    const { ceiling } = criterionLengthBound(task);
-    const long = criterion('c1', 'must', 'x'.repeat(ceiling + 1));
+  it('[QL-20] [QL-47] holds a supplied statement to the longest the pipeline’s own deriver can return', () => {
+    const limit = keptAtMost(criterionLengthBound(task));
+    const long = criterion('c1', 'must', 'x'.repeat(limit + 1));
     expect(rubricProblems([long, criterion('c2')], task)).toEqual([
-      `criterion c1 is longer than the ${ceiling} characters this pipeline allows`,
+      `criterion c1 is longer than the ${limit} characters this pipeline allows`,
     ]);
-    expect(rubricProblems([long], { ...task, statementBound: bound(ceiling + 1) })).toEqual([]);
+    expect(rubricProblems([long], { ...task, statementBound: bound(limit) })).toEqual([]);
+  });
+
+  it('[QL-47] accepts back any rubric its deriver can return — from the target to the longest it keeps, and one it cut', async () => {
+    const statementBound = criterionLengthBound(task);
+    const { target, ceiling } = statementBound;
+    const lengths = [
+      target,
+      ceiling,
+      ceiling + 1,
+      cutPoint(statementBound),
+      keptAtMost(statementBound),
+      CUT_FACTOR * keptAtMost(statementBound),
+    ];
+    expect(lengths.length).toBeLessThanOrEqual(task.maxCriteria);
+    const words = (length: number): string =>
+      'every request is answered from the replica nearest the caller '
+        .repeat(length)
+        .slice(0, length);
+    const derived = await createCriteriaDeriver(
+      task,
+      tinyPipeline().deriveCriteria,
+      fakeLlm({ criteria: lengths.map((length) => ({ kind: 'must', statement: words(length) })) }),
+    )('goal');
+    const rubric = derived.criteria ?? [];
+    expect(rubric).toHaveLength(lengths.length);
+    // The longest was cut, with the marker, and is still a statement the deriver returned.
+    expect(rubric[rubric.length - 1].statement.endsWith(CUT_MARKER)).toBe(true);
+    expect(Math.max(...rubric.map((item) => item.statement.length))).toBeGreaterThan(ceiling);
+    expect(rubricProblems(rubric, task)).toEqual([]);
+    // Supplied back, it runs, with every statement past the target an overrun on the record.
+    const trace = await runLoop(
+      scriptedStages(),
+      tinyPipeline(),
+      { goal: 'g', criteria: rubric, maxIterations: 1 },
+      clock,
+    );
+    expect(trace.contract.criteria).toEqual(rubric);
+    expect(
+      trace.iterations[0].ledger.diagnostics.filter(
+        (diagnostic) => diagnostic.reason === 'overrun',
+      ),
+    ).toHaveLength(lengths.filter((length) => length > target).length);
   });
 });
 

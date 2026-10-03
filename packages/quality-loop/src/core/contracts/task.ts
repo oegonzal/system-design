@@ -1,5 +1,6 @@
 import {
   CRITERION_STATEMENT_BOUND,
+  keptAtMost,
   type ArtifactLocation,
   type Bound,
   type SuccessCriterion,
@@ -45,9 +46,10 @@ export interface TaskSpec<T> {
 
   /**
    * The statement bound the deriver writes within — its target asked for,
-   * its ceiling accepted — and a supplied rubric may carry. The contract's
-   * bound unless declared: a pipeline whose record genuinely needs longer
-   * statements sizes its own from measured runs.
+   * its ceiling accepted without a word — and so what a supplied rubric may
+   * carry (`providedStatementLimit`). The contract's bound unless declared: a
+   * pipeline whose record genuinely needs longer statements sizes its own
+   * from measured runs.
    */
   readonly statementBound?: Bound;
 
@@ -58,13 +60,23 @@ export interface TaskSpec<T> {
 export const criterionLengthBound = (task: Pick<TaskSpec<unknown>, 'statementBound'>): Bound =>
   task.statementBound ?? CRITERION_STATEMENT_BOUND;
 
-/** The ids of the criteria whose statement runs past what the task accepts — its bound's ceiling. */
+/**
+ * The longest statement a supplied rubric may carry: the longest the task's
+ * own deriver can return, which reads its reply leniently and so keeps a
+ * statement past the ceiling. One rule for both, so a rubric the deriver
+ * returned is always one a caller can hand back; past the target it is an
+ * overrun on the record, as a derived one is.
+ */
+export const providedStatementLimit = (task: Pick<TaskSpec<unknown>, 'statementBound'>): number =>
+  keptAtMost(criterionLengthBound(task));
+
+/** The ids of the criteria whose statement runs past what the task accepts — `providedStatementLimit`. */
 export const overlongCriteria = (
   criteria: readonly SuccessCriterion[],
   task: Pick<TaskSpec<unknown>, 'statementBound'>,
 ): string[] =>
   criteria
-    .filter((criterion) => criterion.statement.length > criterionLengthBound(task).ceiling)
+    .filter((criterion) => criterion.statement.length > providedStatementLimit(task))
     .map((criterion) => criterion.id);
 
 /** The task contract for one run: the spec plus the goal and its derived criteria. */

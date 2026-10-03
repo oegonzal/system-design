@@ -1,6 +1,8 @@
 import {
   bound,
   CRITERION_STATEMENT_BOUND,
+  keptAtMost,
+  LARGEST_STATEMENT_BOUND,
   MAX_PROVIDED_STATEMENT_LENGTH,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
@@ -173,17 +175,23 @@ describe('validatePipeline', () => {
     expect(JSON.stringify(summary)).not.toContain('persona');
   });
 
-  it('[QL-2] projects the statement bound its deriver is held to — the contract’s unless declared — and refuses one a caller could never hand back', () => {
+  it('[QL-2] [QL-47] projects the longest statement its deriver can return — of the contract’s bound unless declared — and refuses a bound a caller could never hand back', () => {
     expect(describePipeline(asAny(tinyPipeline())).task.maxStatementLength).toBe(
-      CRITERION_STATEMENT_BOUND.ceiling,
+      keptAtMost(CRITERION_STATEMENT_BOUND),
     );
+    // The largest bound a pipeline may declare is exactly what the HTTP edge takes back.
     const declared = tinyPipeline();
-    declared.task = { ...declared.task, statementBound: bound(1200) };
-    expect(describePipeline(asAny(declared)).task.maxStatementLength).toBe(bound(1200).ceiling);
+    declared.task = { ...declared.task, statementBound: LARGEST_STATEMENT_BOUND };
+    expect(describePipeline(asAny(declared)).task.maxStatementLength).toBe(
+      MAX_PROVIDED_STATEMENT_LENGTH,
+    );
     expect(() => validatePipeline(asAny(declared))).not.toThrow();
-    for (const target of [0, 1.5, MAX_PROVIDED_STATEMENT_LENGTH + 1]) {
+    // A bound whose ceiling the edge takes, but whose kept statements it would not.
+    const kept = bound(LARGEST_STATEMENT_BOUND.target + 1);
+    expect(kept.ceiling).toBeLessThan(MAX_PROVIDED_STATEMENT_LENGTH);
+    for (const statementBound of [bound(0), bound(1.5), kept]) {
       const malformed = tinyPipeline();
-      malformed.task = { ...malformed.task, statementBound: bound(target) };
+      malformed.task = { ...malformed.task, statementBound };
       expect(() => validatePipeline(asAny(malformed))).toThrow(/statementBound/);
     }
   });

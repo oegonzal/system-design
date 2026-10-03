@@ -208,8 +208,8 @@ export async function runLoop<T>(
  * A supplied rubric is used verbatim — its ids are what the caller cites
  * across runs — so the deriver is never asked. Its statements are measured
  * against the bound the deriver writes within, as a derived one is: past the
- * target is an overrun on the record (past the ceiling it was refused before
- * the run started).
+ * target is an overrun on the record (past the longest its deriver can return
+ * it was refused before the run started).
  */
 function deriveOrAdopt<T>(
   stages: Stages<T>,

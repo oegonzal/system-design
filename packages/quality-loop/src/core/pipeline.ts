@@ -22,7 +22,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
-import { criterionLengthBound, type TaskSpec } from './contracts';
+import { criterionLengthBound, providedStatementLimit, type TaskSpec } from './contracts';
 import { validatePolicy } from './policy';
 import type { Controller, Validator } from './ports';
 import { BOUNDS_VALIDATOR_ID, SCHEMA_VALIDATOR_ID } from './stages/schema-validator';
@@ -172,16 +172,17 @@ function checkTask(definition: Definition, fail: Fail): void {
     if (ENGINE_VALIDATOR_IDS.includes(id)) fail(`validator id ${id} is the engine's own`);
   }
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
-  // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it judged.
+  // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it
+  // judged — every statement its deriver can return, kept past the ceiling, through the HTTP edge.
   const bound = criterionLengthBound(definition.task);
   if (!(
     Number.isInteger(bound.target) &&
     bound.target >= 1 &&
     bound.ceiling >= bound.target &&
-    bound.ceiling <= MAX_PROVIDED_STATEMENT_LENGTH
+    providedStatementLimit(definition.task) <= MAX_PROVIDED_STATEMENT_LENGTH
   )) {
     fail(
-      `task.statementBound must have an integer target from 1 and a ceiling at most ${MAX_PROVIDED_STATEMENT_LENGTH}`,
+      `task.statementBound must have an integer target from 1 and keep at most ${MAX_PROVIDED_STATEMENT_LENGTH} characters`,
     );
   }
 }
@@ -262,7 +263,7 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
       criterionKinds: { ...task.criterionKinds },
       findingTypes: { ...task.findingTypes },
       maxCriteria: task.maxCriteria,
-      maxStatementLength: criterionLengthBound(task).ceiling,
+      maxStatementLength: providedStatementLimit(task),
     },
     producer: { consumes: [...definition.producer.consumes] },
     validators: definition.validators.map(({ id, gate }) => ({ id, gate })),

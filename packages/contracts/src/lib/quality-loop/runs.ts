@@ -1,8 +1,9 @@
+import { keptAtMost } from '../bounds';
 import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { LlmModelDto } from '../llm-model';
 import type { IsoDateString } from '../primitives';
 import type { RunTrace } from './decision';
-import type { SuccessCriterion } from './evidence';
+import { LARGEST_STATEMENT_BOUND, type SuccessCriterion } from './evidence';
 import type { RunRecallDto, RunRecallSummaryDto } from './recall';
 import { STOP_REASON_CAUSES, type Decision, type StopReason } from './vocab';
 
@@ -197,12 +198,14 @@ export interface StartQualityRunRequest {
 /** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */
 export const MAX_PROVIDED_CRITERIA = 64;
 /**
- * HTTP-edge cap on a supplied statement, and the most a pipeline may declare
+ * HTTP-edge cap on a supplied statement, and the most a pipeline may accept
  * for its own (`maxStatementLength`): a rubric a pipeline derives must be one
- * a caller can hand back, to adopt an iteration it judged. The pipeline's own
- * bound is the real limit.
+ * a caller can hand back, to adopt an iteration it judged, and a derived
+ * statement is read leniently — kept past its ceiling, up to `keptAtMost` —
+ * so the cap is what a lenient read of the largest declared bound returns,
+ * never a number of its own. The pipeline's own bound is the real limit.
  */
-export const MAX_PROVIDED_STATEMENT_LENGTH = 2000;
+export const MAX_PROVIDED_STATEMENT_LENGTH = keptAtMost(LARGEST_STATEMENT_BOUND);
 
 export const DEFAULT_QUALITY_RUN_ITERATIONS = 1;
 /** A request may shorten a pipeline's loop, never lengthen it past this. */
