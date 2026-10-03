@@ -654,6 +654,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",
   },
+  {
+    id: 'QL-42',
+    statement:
+      "A finished run is digested into typed knowledge written against what the store already holds: an item is a fact, an anti-pattern, a pattern or a procedure; its dimension is one its own cited evidence lands on under the source pipeline's policy; a procedure rests on a finding the engine recorded as resolved and a pattern on a criterion that held throughout; an item that borrows a listed alias, an iteration or a place of this run's artifact is faulted at that item before any lens reads it; and an item that teaches what a known item teaches confirms it by alias instead of being written again.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',
