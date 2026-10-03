@@ -21,6 +21,7 @@ import { bareGoal, withMemory } from './recall/inject';
 import { recallMemory } from './recall/recall-memory';
 import { indexMemories } from './store/index-memories';
 import { UNADMITTED_REASON } from './unadmitted';
+import { DEFAULT_CHUNK_KIND } from './store/chunks';
 
 /** What each step hands on. `store` yields nothing: it is the end of the line. */
 export interface MemoryOutputs {
@@ -119,5 +120,8 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   if (!context.store.ready || source.trace === null || model === null) {
     return skip('store-unavailable', context.store.note ?? context.store.reason);
   }
-  return indexMemories(ctx.ports, source, digested, model);
+  // This writer owns a source run's lessons; the knowledge orchestrator keeps
+  // its own kinds under the same run, and a document digest writes under its
+  // own digest run, never this one.
+  return indexMemories(ctx.ports, source, digested, model, [DEFAULT_CHUNK_KIND]);
 }

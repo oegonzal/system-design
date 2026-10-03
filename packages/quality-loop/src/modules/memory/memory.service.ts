@@ -42,6 +42,7 @@ import { RunsService } from '../runs/runs.service';
 import { recallEffectiveness, type RecallingRun } from './reports/effectiveness';
 import { goalHashOf, standingGaps, type AttributedRecall } from './reports/gaps';
 import { MEMORY_PORTS } from './tokens';
+import { DEFAULT_CHUNK_KIND } from '../../orchestrators/memory/store/chunks';
 
 /** How far back a report will read, and in what pages: a bound by declaration, not by accident. */
 const MAX_REPORT_RUNS = 500;
@@ -134,6 +135,8 @@ export class MemoryService implements OnModuleInit {
       source,
       { digestRunId: digestRun.runId, memories },
       model,
+      // Guarded to the memory orchestrator above, so this re-indexes lessons.
+      [DEFAULT_CHUNK_KIND],
     );
     this.logger.log(`memory run ${id} re-indexed: ${outcome.status}`);
     return {

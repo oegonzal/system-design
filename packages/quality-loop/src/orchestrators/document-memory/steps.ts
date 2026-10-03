@@ -14,7 +14,7 @@ import type {
   MemoryContextDto,
   QualityRunDto,
 } from '@sysdesign/contracts';
-import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
+import { DEFAULT_QUALITY_RUN_ITERATIONS, DOCUMENT_MEMORY_KINDS } from '@sysdesign/contracts';
 
 import { outputsOf } from '../../core/outputs';
 import { DOCUMENT_DIGEST_ID, readIndex } from '../../pipelines/document-digest/input';
@@ -25,6 +25,7 @@ import { UNADMITTED_REASON } from '../memory/unadmitted';
 import type { StepContext, StepResult } from '../runner/definition';
 import type { DocumentMemoryPorts } from './ports';
 import { readDocumentDigest } from './read-document-digest';
+import { DEFAULT_CHUNK_KIND } from '../memory/store/chunks';
 
 /** What each step hands on. The digest run is its own source, so `store` needs nothing else. */
 export interface DocumentMemoryOutputs {
@@ -88,5 +89,11 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   if (!context.store.ready || model === null) {
     return skip('store-unavailable', context.store.note ?? context.store.reason);
   }
-  return indexMemories(ctx.ports, digested.source, digested.digested, model);
+  // A document digest may write any of its declared kinds, and wrote lessons
+  // before it declared any. All of them, so a re-digest that drops a kind the
+  // last one wrote replaces that point rather than orphaning it.
+  return indexMemories(ctx.ports, digested.source, digested.digested, model, [
+    DEFAULT_CHUNK_KIND,
+    ...DOCUMENT_MEMORY_KINDS,
+  ]);
 }

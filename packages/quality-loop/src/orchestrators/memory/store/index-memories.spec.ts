@@ -1,4 +1,4 @@
-import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
+import { DOCUMENT_MEMORY_KINDS, type QualityRunDto, type RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
@@ -6,6 +6,7 @@ import { pointId } from '../../../modules/memory/qdrant/collection';
 import type { StoredChunk } from '../ports';
 import { childRun, memoryPorts } from '../steps.testing';
 import { FAKE_MODEL, readoutTrace } from '../testing';
+import { DEFAULT_CHUNK_KIND } from './chunks';
 import { indexMemories, originOf } from './index-memories';
 
 /**
@@ -76,6 +77,7 @@ describe('a stored lesson’s origin', () => {
         ],
       },
       'fake-embedding',
+      [DEFAULT_CHUNK_KIND],
     );
     expect(written).toMatchObject({ status: 'complete', counts: { chunks: 1 } });
     const stored = [...(ports.store as InMemoryMemoryStore).points.values()].filter(
@@ -84,6 +86,52 @@ describe('a stored lesson’s origin', () => {
     expect(stored.map((chunk) => [chunk.source.decision, chunk.source.iteration])).toEqual([
       ['revise', 2],
     ]);
+  });
+
+  it('[QL-41] replaces every kind the writer owns, so a re-digest that drops one does not orphan its point', async () => {
+    const trace = escalatedAfterJudged();
+    const source: QualityRunDto = { ...childRun('system-design-canvas', trace), trace };
+    const ports = memoryPorts();
+    const store = ports.store as InMemoryMemoryStore;
+    const owned = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
+    const memory = (position: number, kind: string) => ({
+      position,
+      insight: `insight ${position}`,
+      appliesWhen: `when ${position}`,
+      evidence: [],
+      kind,
+    });
+    const kindsNow = () =>
+      [...store.points.values()]
+        .filter((chunk) => chunk.source.runId === source.runId)
+        .map((chunk) => [chunk.source.kind, chunk.source.ref])
+        .sort();
+
+    // A first digest writes two kinds under this source run.
+    await indexMemories(
+      ports,
+      source,
+      { digestRunId: 'd1', memories: [memory(1, 'profile_fact'), memory(2, 'profile_story')] },
+      FAKE_MODEL,
+      owned,
+    );
+    expect(kindsNow()).toEqual([
+      ['profile_fact', 'memory.1'],
+      ['profile_story', 'memory.2'],
+    ]);
+
+    // A second digest of the same document proposes only the first. Scoping the
+    // replace to the kinds this run WROTE would leave the story standing beside
+    // it for ever: a point id carries no kind, so nothing overwrites a position
+    // the new digest does not reach, and the delete must cover it instead.
+    await indexMemories(
+      ports,
+      source,
+      { digestRunId: 'd2', memories: [memory(1, 'profile_fact')] },
+      FAKE_MODEL,
+      owned,
+    );
+    expect(kindsNow()).toEqual([['profile_fact', 'memory.1']]);
   });
 
   it('[QL-41] replaces the run’s lessons and leaves another writer’s kinds under the same run standing', async () => {
@@ -134,6 +182,7 @@ describe('a stored lesson’s origin', () => {
         ],
       },
       FAKE_MODEL,
+      [DEFAULT_CHUNK_KIND],
     );
 
     const mine = [...store.points.values()].filter((chunk) => chunk.source.runId === source.runId);
