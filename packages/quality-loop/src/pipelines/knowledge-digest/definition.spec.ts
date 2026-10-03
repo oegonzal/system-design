@@ -136,7 +136,7 @@ describe('the knowledge-digest pipeline', () => {
       ]),
     );
     // What is false or misleading in the store is withheld; what is merely weak
-    // is not; a duplicate keeps one of its set.
+    // is not; nor is a member of a named duplicate set, which may be a bystander.
     expect(declared).toEqual({
       misattributed_evidence: 'every-ref',
       ungrounded_fact: 'every-ref',
@@ -144,7 +144,7 @@ describe('the knowledge-digest pipeline', () => {
       wrong_kind: 'every-ref',
       run_specific: 'every-ref',
       vague_item: 'none',
-      duplicate_item: 'all-but-one',
+      duplicate_item: 'none',
       restated_known: 'every-ref',
       false_confirmation: 'every-ref',
       false_contradiction: 'every-ref',

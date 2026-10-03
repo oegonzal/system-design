@@ -201,14 +201,26 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
     // dropping it loses a detail the corpus will not answer with again. In the
     // experience digest this type alone cost 51 of 245 narrow exclusions.
     //
-    // **One of a set** for `duplicate_item`: the member still standing with the
-    // most support, ties to the earlier — which is what the persona asks the
-    // critic for and what 42 of 43 recorded duplicate findings made possible by
-    // naming both. On the compliant one in forty-three, which names only the
-    // later item, this withholds nothing and the near-twin is stored; that is
-    // the lesser harm, and reinforcement rather than this rule is the real
-    // defence against a twin: an item whose evidence supports a stored one is
-    // never stored again.
+    // **Nothing** for `duplicate_item` either, measured rather than reasoned.
+    // `all-but-one` was the declared value on the strength of 42 of 43 recorded
+    // duplicate findings naming two or more items — which establishes that the
+    // rule has something to act on, and not that the named set contains only
+    // the duplication. It does not: of the eight `duplicate_memory` findings in
+    // ten recorded parent runs, three name three items, and in all three the
+    // rationale identifies a pair and the third item is unrelated — a shared
+    // store keyed by one identity beside two lessons about narration claims, a
+    // p99 latency check beside two about a synchronous write. `all-but-one`
+    // keeps one of the three, so it drops a bystander every time, and no rule
+    // of this shape can avoid it: it cannot know which members of a named set
+    // are the pair. A peer measured 18 of 75 (24%) on the same type over a
+    // larger corpus.
+    //
+    // The asymmetry decides it. A dropped bystander is a distinct lesson lost
+    // for good, since the run is not re-digested. A stored twin costs at most
+    // one of sixteen fused recall slots, and the real defence against it is
+    // reinforcement rather than this rule: an item whose evidence supports a
+    // stored one is never stored again (`storable: false`). Storing a near-twin
+    // is the recoverable failure; dropping a sound item is not.
     findingTypes: {
       misattributed_evidence: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
       ungrounded_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
@@ -219,7 +231,7 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
       // stored — a digest penalised to the clamp still scores over the bar.
       run_specific: { dimension: 'reuse', gate: true, withholds: 'every-ref' },
       vague_item: { dimension: 'reuse', gate: false, withholds: 'none' },
-      duplicate_item: { dimension: 'reuse', gate: false, withholds: 'all-but-one' },
+      duplicate_item: { dimension: 'reuse', gate: false, withholds: 'none' },
       restated_known: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
       false_confirmation: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
       false_contradiction: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
