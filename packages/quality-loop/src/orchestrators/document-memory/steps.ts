@@ -92,6 +92,8 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   // A document digest may write any of its declared kinds, and wrote lessons
   // before it declared any. All of them, so a re-digest that drops a kind the
   // last one wrote replaces that point rather than orphaning it.
+  // The order is not cosmetic: the first kind is where a memory declaring one
+  // this writer does not own is filed, and lessons are this writer's older points.
   return indexMemories(ctx.ports, digested.source, digested.digested, model, [
     DEFAULT_CHUNK_KIND,
     ...DOCUMENT_MEMORY_KINDS,

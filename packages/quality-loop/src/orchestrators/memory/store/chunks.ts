@@ -78,7 +78,7 @@ export function chunksOf(
       text,
       keys: { condition: memory.appliesWhen, lesson: memory.insight },
       contentHash: contentHash(text),
-      // What the digest declared, or the one kind every memory had before any did.
+      // What the digest declared, or the first kind this writer owns.
       source: {
         ...origin,
         kind: chunkKind(memory.kind, ownedKinds),
