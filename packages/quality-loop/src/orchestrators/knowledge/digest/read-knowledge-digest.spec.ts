@@ -163,6 +163,11 @@ describe('what a knowledge digest endorses', () => {
   });
 
   it('[QL-42] every declared finding type says what it withholds, and nothing else is named', () => {
+    // A quantification over an empty collection is trivially true, and an
+    // equality between two empty key lists holds — so the count comes first.
+    // The three named rules below happen to cover this today, but a migration
+    // that keeps the quantifier and drops a pin would reopen it silently.
+    expect(Object.keys(KNOWLEDGE_DIGEST.task.findingTypes)).toHaveLength(10);
     // Both ways: a type the pipeline declares and the table forgets would fall to
     // the strict default silently, and a type in the table the pipeline no longer
     // declares is a rule about nothing.
