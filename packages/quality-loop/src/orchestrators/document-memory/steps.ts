@@ -25,7 +25,7 @@ import { UNADMITTED_REASON } from '../memory/unadmitted';
 import type { StepContext, StepResult } from '../runner/definition';
 import type { DocumentMemoryPorts } from './ports';
 import { readDocumentDigest } from './read-document-digest';
-import { DEFAULT_CHUNK_KIND } from '../memory/store/chunks';
+import { DEFAULT_CHUNK_KIND, type OwnedKinds } from '../memory/store/chunks';
 
 /** What each step hands on. The digest run is its own source, so `store` needs nothing else. */
 export interface DocumentMemoryOutputs {
@@ -80,6 +80,21 @@ export async function digest(ctx: Ctx): Promise<StepResult<DocumentMemoryOutputs
   };
 }
 
+/**
+ * The kinds this writer owns under a source run: every kind a document digest
+ * may declare, and the lessons it wrote before it declared any. All of them, so
+ * a re-digest that drops a kind the last one wrote replaces that point instead
+ * of orphaning it.
+ *
+ * Named rather than built inline at the call because the ORDER is behaviour: the
+ * first kind is where a memory declaring one this writer does not own is filed,
+ * and the lesson belongs there because it is what this writer's older points
+ * already are. Sorting this list would move every future stray onto another
+ * shelf while keeping the type satisfied, so a spec asserts where a stray lands
+ * through this very constant — a comment could not have caught it.
+ */
+export const DOCUMENT_MEMORY_OWNED: OwnedKinds = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
+
 /** Store what the digest endorsed as the digest run's own memory. */
 export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   const digested = ctx.outputs.digest;
@@ -89,13 +104,5 @@ export async function store(ctx: Ctx): Promise<StepResult<undefined>> {
   if (!context.store.ready || model === null) {
     return skip('store-unavailable', context.store.note ?? context.store.reason);
   }
-  // A document digest may write any of its declared kinds, and wrote lessons
-  // before it declared any. All of them, so a re-digest that drops a kind the
-  // last one wrote replaces that point rather than orphaning it.
-  // The order is not cosmetic: the first kind is where a memory declaring one
-  // this writer does not own is filed, and lessons are this writer's older points.
-  return indexMemories(ctx.ports, digested.source, digested.digested, model, [
-    DEFAULT_CHUNK_KIND,
-    ...DOCUMENT_MEMORY_KINDS,
-  ]);
+  return indexMemories(ctx.ports, digested.source, digested.digested, model, DOCUMENT_MEMORY_OWNED);
 }
