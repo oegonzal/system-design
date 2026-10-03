@@ -454,6 +454,11 @@ export const CRITERIA: readonly Criterion[] = [
       "A stored lesson is stamped from the evidence it cites, never with its run's best iteration: the digest's index names, for each finding and criterion, the source run's iterations it was seen or assessed in and both ends of each change the record shows in it; each memory is stamped with the latest of the iterations its evidence belongs to and that iteration's own decision, its lineage naming the adopted run's iteration only when that one is the copy; an index written before it named iterations stamps as before; and the decision a recall's curator reads beside the lesson — risk only after a reject or an escalate — is that per-lesson stamp.",
   },
   {
+    id: 'QL-55',
+    statement:
+      "A recalled lesson reaches the producer and the author in the asker's own terms: the labels the curator's query gave the asker's needs — a focused defect, a derived condition, a note already in hand, the curator's own criterion ids — are read back, with the one grammar ids are read from prose by, as the asker's criterion a defect line names or the defect's own words, a curator criterion standing for what the focus labels its statement cites stand for, and every other label dropped; a part the curator named only by labels that stand for nothing is left unsaid; and each lesson carries the pipeline, iteration, decision and day it was learned in, as the curator was shown them.",
+  },
+  {
     id: 'QL-56',
     statement:
       "A produce after an attempt that was judged and did not beat the best is told what that attempt's judges confirmed: its finding notes as its policy selected them, less any the best's remediations already name, under their own heading after what to fix in the best and without that attempt's locations, which no prompt shows — for a producer that declares it consumes `setbacks`; a producer that does not, an ask after the best itself and an ask after an attempt refused before any judge read it are briefed as before.",

@@ -6,7 +6,7 @@
  */
 import type { EvidenceResult } from './evidence';
 import { mayProduce, type AdoptedIterationRef, type QualityRunRequestSummary } from './runs';
-import type { Severity } from './vocab';
+import type { Decision, Severity } from './vocab';
 
 /**
  * Where the evidence a stored lesson cites was judged, beyond the run that
@@ -143,11 +143,19 @@ export const RUN_RECALL_REASON_STATUS = {
 export type RunRecallReason = keyof typeof RUN_RECALL_REASON_STATUS;
 export const RUN_RECALL_REASONS = Object.keys(RUN_RECALL_REASON_STATUS) as RunRecallReason[];
 
-/** One lesson a producer was handed: the stored lesson, and what the curator said it lends this goal. */
+/**
+ * One lesson a producer was handed: the stored lesson, what the curator said
+ * it lends this goal, and where it was learned. The curator's words reach the
+ * producer and the author in the goal's own terms: the labels the curator's
+ * query gave the goal's needs — its defects, its derived criteria, its probes
+ * and what was already in hand — are read back as the goal's own criterion
+ * ids or the defect words they stand for, and dropped where they stand for
+ * neither, so no label either one never saw reaches them.
+ */
 export interface RecalledLessonDto {
   /** The alias the curator kept it under (`m3`) — what the producer's prompt cites it by. */
   ref: string;
-  /** The part of the goal the curator says it informs. */
+  /** The part of the goal the curator says it informs, in the goal's own terms; empty when it named only labels that stand for nothing here. */
   serves: string;
   /** What it teaches for this goal, in the stored lesson's own terms. */
   insight: string;
@@ -157,6 +165,15 @@ export interface RecalledLessonDto {
   text: string;
   /** The run the lesson was digested from. */
   sourceRunId: string;
+  /**
+   * The pipeline that run was, the iteration the lesson's evidence ends in
+   * with that iteration's own decision, and the day — what the curator was
+   * shown beside it. Absent on a lesson recorded before they were carried.
+   */
+  pipeline?: string;
+  iteration?: number;
+  decision?: Decision;
+  when?: string;
 }
 
 /** A defect a recall searched for: one confirmed finding of the iteration the run started from. */

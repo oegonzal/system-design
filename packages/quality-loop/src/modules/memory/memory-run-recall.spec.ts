@@ -84,6 +84,10 @@ describe("the memory module's recall for a run's producer", () => {
       caveat: first.caveat,
       text: 'serve the list from a store the page owns',
       sourceRunId: 'run-a',
+      pipeline: 'system-design',
+      iteration: 1,
+      decision: 'accept',
+      when: '2026-09-06',
     });
   });
 

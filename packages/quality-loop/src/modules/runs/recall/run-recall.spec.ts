@@ -166,6 +166,11 @@ describe('a run that recalls lessons for its producer', () => {
       caveat: 'another prompt',
       sourceRunId: 'run-a',
       text: 'record each status transition as a row',
+      // Where it was learned, as the curator was shown it beside the lesson.
+      pipeline: 'system-design',
+      iteration: 1,
+      decision: 'accept',
+      when: '2026-09-06',
     });
     const recallRunId = run.recall?.recallRunId ?? '';
     const recallRun = await runOf(url, recallRunId);

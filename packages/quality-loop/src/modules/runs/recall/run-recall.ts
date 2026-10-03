@@ -84,9 +84,15 @@ export class RunRecallSlot {
   }
 }
 
-/** One recalled lesson as the producer reads it: the curator's insight, what it serves, and how it differs. */
+/**
+ * One recalled lesson as the producer reads it: the curator's insight, what
+ * it serves and how it differs — already in the goal's own terms
+ * (`RecalledLessonDto`), so a part the curator named only by its own labels
+ * is left unsaid rather than said in them.
+ */
 const lessonText = ({ insight, serves, caveat }: RecalledLessonDto): string =>
-  `${insight} — serves: ${serves}${caveat ? `; caveat: ${caveat}` : ''}`;
+  [insight, ...(serves ? [`serves: ${serves}`] : [])].join(' — ') +
+  (caveat ? `; caveat: ${caveat}` : '');
 
 /** What the engine is handed: every recalled lesson, by the ref the record cites it under. */
 export const briefingOf = (lessons: readonly RecalledLessonDto[]): AdvisoryMemory[] =>

@@ -14,6 +14,10 @@ export const FAKE_RECALLED_LESSONS: readonly RecalledLessonDto[] = [
     caveat: null,
     text: 'When reads dominate, cache before you replicate.',
     sourceRunId: 'fake-earlier-run',
+    pipeline: 'system-design-canvas',
+    iteration: 2,
+    decision: 'revise',
+    when: '2026-10-01',
   },
   {
     ref: 'm2',
@@ -22,6 +26,10 @@ export const FAKE_RECALLED_LESSONS: readonly RecalledLessonDto[] = [
     caveat: 'learned on a different prompt',
     text: 'Name the failure a queue absorbs, or it absorbs nothing.',
     sourceRunId: 'fake-earlier-run',
+    pipeline: 'system-design-canvas',
+    iteration: 1,
+    decision: 'revise',
+    when: '2026-10-01',
   },
 ];
 
