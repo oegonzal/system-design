@@ -108,9 +108,6 @@ export interface EmbeddingCache {
   save(model: string, entries: readonly { hash: string; vector: number[] }[]): Promise<void>;
 }
 
-/** Probes past this add candidates without adding coverage; the goal is extra. */
-export const MAX_PROBES = 6;
-
 /** What a recall asks for the conditions of the goal it is about to answer. */
 export interface QueryProbes {
   /**

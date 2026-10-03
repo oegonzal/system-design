@@ -36,9 +36,9 @@ import {
   focusAlias,
   knownAlias,
   MAX_KNOWN,
+  MAX_PROBES,
   probeAlias,
 } from '../../../pipelines/memory-recall/input';
-import { MAX_PROBES } from '../ports';
 import { focusLines } from './focus';
 import { probeSet } from './query';
 import type { Recalled } from './recall-memory';

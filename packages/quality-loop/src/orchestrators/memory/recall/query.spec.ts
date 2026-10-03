@@ -4,12 +4,12 @@ import { LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
 
 import {
   KNOWN_HEADING,
+  MAX_PROBES,
   NOVELTY_RULE,
   RECALL_RULES,
   recallRules,
   renderGoal as renderQuery,
 } from '../../../pipelines/memory-recall/input';
-import { MAX_PROBES } from '../ports';
 import { builtQuery, fused, GOAL as PROMPT, hitOf } from '../testing';
 import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
 

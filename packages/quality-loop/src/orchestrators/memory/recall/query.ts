@@ -16,12 +16,13 @@ import {
   MAX_CANDIDATES,
   MAX_FOCUS,
   MAX_KEPT,
+  MAX_PROBES,
   memoryQuerySchema,
   probeAlias,
   recallRules,
   type MemoryQuery,
 } from '../../../pipelines/memory-recall/input';
-import { MAX_PROBES, VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../ports';
+import { VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../ports';
 
 /** The recall query is the goal's head: enough to embed and to judge candidates against. */
 const QUERY_MAX_BYTES = 16_000;

@@ -9,6 +9,7 @@ import {
   bounded,
   DECISIONS,
   exact,
+  keptAtMost,
   LESSON_CHUNK_BOUND,
   RECALL_ORIGINS,
   type RecallOrigin,
@@ -30,12 +31,22 @@ export const MAX_CANDIDATES = 16;
 export const MAX_KEPT = 8;
 /** A candidate or probe alias: `m12`, `p3`. */
 export const ALIAS_MAX = 8;
-export const PROBE_MAX = 240;
-const MAX_QUERY_PROBES = 6;
+/**
+ * A condition a recall searches under, as the probe deriver is asked to write
+ * it — declared here once, for the deriver's reply and for the query that
+ * lists what was searched. The recorded recall queries (2026-09-07 →
+ * 2026-10-02, 516 probes) held none past 240 characters and 230 at p99, under
+ * a strict 240 that refused a longer one with the whole reply. As many as the
+ * deriver is asked for and the search slices to: past six, a probe adds
+ * candidates without adding coverage, and the goal is searched besides.
+ */
+export const PROBE_BOUND = bound(240);
+export const MAX_PROBES = 6;
+export const PROBES_BOUND = exact(MAX_PROBES);
 /**
  * Defects of the answer the query is about, one per lesson the curator may
  * keep, so each kept lesson can answer a different one. A focus line is
- * searched as a probe is, so it is bounded as one.
+ * searched as a probe is, so it is capped at what a probe is asked for.
  */
 export const MAX_FOCUS = MAX_KEPT;
 /**
@@ -48,23 +59,24 @@ export const MAX_FOCUS = MAX_KEPT;
  * compared every candidate against all of them.
  */
 export const MAX_KNOWN = MAX_FOCUS;
-export const KNOWN_LINE_MAX = PROBE_MAX;
+export const KNOWN_LINE_MAX = PROBE_BOUND.target;
 
 /*
  * The orchestrator composes the query from what it searched and sliced, so
  * the counts are exact and the prose is bounded; a candidate's text is a
  * stored lesson, bounded by the lesson's own declaration so a lesson a
- * digest accepted always fits the query that recalls it.
+ * digest accepted always fits the query that recalls it. A probe is listed
+ * as the deriver's reply was read — kept whole past its ceiling — so the
+ * query admits the longest such a read returns, never re-cutting one.
  */
 const QUERY_BOUND = bound(16_000);
 const RULE_BOUND = bound(300);
 const RULES_BOUND = bound(8, 'list');
-const PROBE_BOUND = bound(PROBE_MAX);
+const QUERY_PROBE_BOUND = exact(keptAtMost(PROBE_BOUND));
 const FOCUS_BOUND = exact(MAX_FOCUS);
 const KNOWN_BOUND = exact(MAX_KNOWN);
-const QUERY_PROBES_BOUND = exact(MAX_QUERY_PROBES);
 const CANDIDATES_BOUND = exact(MAX_CANDIDATES);
-const MATCHED_BOUND = exact(MAX_FOCUS + MAX_QUERY_PROBES);
+const MATCHED_BOUND = exact(MAX_FOCUS + MAX_PROBES);
 const SOURCE_ID_MAX_LENGTH = 80;
 const SOURCE_REF_MAX_LENGTH = 200;
 const SOURCE_WHEN_MAX_LENGTH = 40;
@@ -83,7 +95,8 @@ export const chunkSourceSchema = z.strictObject({
 });
 export type ChunkSource = z.infer<typeof chunkSourceSchema>;
 
-const probe = () => bounded.text(PROBE_BOUND, { min: 1 });
+/** A focus line or a line in hand, bounded as a probe is. */
+const line = () => bounded.text(PROBE_BOUND, { min: 1 });
 
 const queryShape = z.strictObject({
   /** The prompt as a producer would receive it — any markdown. */
@@ -95,16 +108,16 @@ const queryShape = z.strictObject({
    * before: its confirmed defects and the criteria it fell short on, worst
    * first. Searched under as the probes are, and cited by alias the same way.
    */
-  focus: bounded.list(FOCUS_BOUND, probe()).default([]),
+  focus: bounded.list(FOCUS_BOUND, line()).default([]),
   /**
    * What the producer that reads the pack already holds, when the recall was
    * asked for one that revises a judged answer: candidates that only restate
    * one of these add nothing. Bounded as a probe is; empty for a recall over
    * the goal alone.
    */
-  known: bounded.list(KNOWN_BOUND, probe()).default([]),
+  known: bounded.list(KNOWN_BOUND, line()).default([]),
   /** The conditions the retriever searched under, listed once and cited by alias. */
-  probes: bounded.list(QUERY_PROBES_BOUND, probe()).default([]),
+  probes: bounded.list(PROBES_BOUND, bounded.text(QUERY_PROBE_BOUND, { min: 1 })).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
   candidates: bounded.list(
     CANDIDATES_BOUND,

@@ -48,6 +48,7 @@ const SCHEMA_FILES = [
   'packages/quality-loop/src/pipelines/agentic-design/output.ts',
   'packages/quality-loop/src/modules/router/classifier/llm-brief-classifier.ts',
   'packages/studio-api/src/modules/prompts/prompt-requests.ts',
+  'packages/quality-loop/src/modules/memory/query-probes/llm-query-probes.ts',
 ];
 
 /** The calls that may follow a `bounded.*` node: they wrap it, never clone it. */

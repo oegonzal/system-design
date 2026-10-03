@@ -17,22 +17,25 @@
  * always probe zero, so the fused result can only add to what a bare search
  * would have found.
  */
+import { bounded } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
-import { MAX_PROBES, type QueryProbes } from '../../../orchestrators/memory/ports';
-import { FOCUS_HEADING } from '../../../pipelines/memory-recall/input';
+import type { QueryProbes } from '../../../orchestrators/memory/ports';
+import { FOCUS_HEADING, PROBE_BOUND, PROBES_BOUND } from '../../../pipelines/memory-recall/input';
 import persona from './probes.md?raw';
 
-const PROBE_MAX = 240;
 /** Six short conditions, with room to spare. */
 const PROBES_MAX_TOKENS = 1000;
 
+/**
+ * Bounded as the curator's query lists what was searched: a probe a little
+ * long is kept whole and recorded, and a list past six loses its last.
+ */
 const probesSchema = z.strictObject({
-  probes: z
-    .array(z.string().min(1).max(PROBE_MAX))
-    .max(MAX_PROBES)
-    .describe('One condition per demand the goal makes, in the register of a stored condition.'),
+  probes: bounded.list(PROBES_BOUND, bounded.text(PROBE_BOUND, { min: 1 }), {
+    description: 'One condition per demand the goal makes, in the register of a stored condition.',
+  }),
 });
 
 /**

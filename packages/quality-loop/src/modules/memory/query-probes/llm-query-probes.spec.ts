@@ -1,8 +1,12 @@
+import { CUT_MARKER, keptAtMost } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
+import { fakeLlm } from '../../../core/testing';
+import { buildQuery, probeSet, queryText } from '../../../orchestrators/memory/recall/query';
 import { noQueryProbes } from '../../../orchestrators/memory/steps.testing';
-import { FOCUS_HEADING } from '../../../pipelines/memory-recall/input';
+import { fused, GOAL, hitOf } from '../../../orchestrators/memory/testing';
+import { FOCUS_HEADING, MAX_PROBES, PROBE_BOUND } from '../../../pipelines/memory-recall/input';
 import { LlmQueryProbes } from './llm-query-probes';
 
 const client = (completeStructured: LlmClient['completeStructured']): LlmClient => ({
@@ -65,5 +69,37 @@ describe('deriving what to search under', () => {
       ].join('\n'),
       '# Prompt',
     ]);
+  });
+
+  it("[QL-41] a probe written past its bound is kept, a list past six is cut by whole items, and the curator's query lists each probe as it was read", async () => {
+    const words = (length: number): string =>
+      'a condition '
+        .repeat(Math.ceil(length / 12))
+        .slice(0, length)
+        .trim();
+    const over = words(PROBE_BOUND.ceiling + 60);
+    const extreme = words(keptAtMost(PROBE_BOUND) * 2);
+    const written = [
+      over,
+      extreme,
+      ...Array.from({ length: MAX_PROBES }, (_, i) => `condition ${i}`),
+    ];
+    const derived = await new LlmQueryProbes(fakeLlm({ probes: written })).derive(GOAL);
+
+    // The list is cut to six from its end; the long probe is whole, the extreme one cut at a word, marked.
+    expect(derived).toHaveLength(MAX_PROBES);
+    expect(derived.slice(2)).toEqual(written.slice(2, MAX_PROBES));
+    expect(derived[0]).toBe(over);
+    expect(derived[1].endsWith(CUT_MARKER)).toBe(true);
+    expect(derived[1].length).toBeLessThanOrEqual(keptAtMost(PROBE_BOUND));
+
+    // What the read returned is what the curator is shown: never refused, never cut again.
+    const built = buildQuery(
+      queryText(GOAL),
+      probeSet(GOAL, derived),
+      fused([hitOf('serve the list from a store the page owns', 'run-a', 'memory.1')]),
+    );
+    expect(built.issues).toEqual([]);
+    expect(built.query?.probes).toEqual(derived);
   });
 });
