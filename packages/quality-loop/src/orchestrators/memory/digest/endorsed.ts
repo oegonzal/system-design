@@ -1,7 +1,16 @@
 /**
- * What a digest endorses, read from the digest run's own outputs: memories no
- * confirmed finding names, with their evidence resolved through the index the
- * digest's goal carries. Over engine facts, never over prose — and over any
+ * What a digest endorses, read from the digest run's own outputs: the memories
+ * its findings do not withhold, with their evidence resolved through the index
+ * the digest's goal carries.
+ *
+ * Which findings withhold is declared, not assumed. A finding saying a fact is
+ * wrong — invented, or a section misread — must withhold every item it names,
+ * because storing it is worse than losing it. A finding saying a true fact is
+ * merely written weakly — a pronoun where the name belongs, a condition that
+ * restates its insight — must withhold nothing: the fact is sound, and dropping
+ * it loses a detail the corpus will never answer with. Measured on the first
+ * live JSON Lines chunk, where three of eight true facts were withheld for a
+ * pronoun. A pipeline that declares no table keeps the strict default. Over engine facts, never over prose — and over any
  * digest pipeline that proposes `{ evidence, insight, appliesWhen }` items
  * against an aliased index: the experience digest reads a run's findings and
  * criteria, the document digest reads a document's sections, and the store
@@ -43,10 +52,40 @@ export interface DigestIndexLike {
   evidence: readonly { alias: string; kind: EvidenceRef['kind']; ref: string }[];
 }
 
+/** What a finding of some type withholds from the store. */
+export const WITHHOLDS = ['every-ref', 'all-but-one', 'none'] as const;
+export type Withhold = (typeof WITHHOLDS)[number];
+
+/**
+ * What a finding withholds when its pipeline declares nothing for its type:
+ * every item it names. A new finding type is strict until someone decides it is
+ * not, which is the safe direction for a store of facts about a person.
+ */
+export const DEFAULT_WITHHOLD: Withhold = 'every-ref';
+
 /** How one digest pipeline's artifact and goal are read: its output schema and its own index reader. */
 export interface DigestCodec<D extends DigestLike, I extends DigestIndexLike> {
   schema: ZodType<D>;
   readIndex(goal: string): I | null;
+  /** What each finding type withholds; a type not named here withholds by the default. */
+  withholds?: Readonly<Record<string, Withhold>>;
+}
+
+/** The items a run's findings withhold, by the declared rule for each finding's type. */
+export function withheldRefs(
+  findings: readonly { type: string; locationRefs: readonly string[] }[],
+  withholds: Readonly<Record<string, Withhold>> = {},
+): Set<string> {
+  const refs = new Set<string>();
+  for (const finding of findings) {
+    const rule = withholds[finding.type] ?? DEFAULT_WITHHOLD;
+    if (rule === 'none') continue;
+    // `all-but-one` is for a finding that faults a set for sharing something —
+    // two memories stating one fact — where keeping one of them is the repair.
+    const named = rule === 'all-but-one' ? finding.locationRefs.slice(1) : finding.locationRefs;
+    for (const ref of named) refs.add(ref);
+  }
+  return refs;
 }
 
 /** The location id of the memory at `position` (zero-based) — the place a finding is located at. */
@@ -67,7 +106,7 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
   if (best === null || !digest?.success || index === null) {
     return { admission: 'fell-short', proposed, memories: [] };
   }
-  const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
+  const faulted = withheldRefs(best.ledger.findings, codec.withholds);
   const refOf = new Map(index.evidence.map((item) => [item.alias, item]));
   const memories = digest.data.memories.flatMap((memory, position) => {
     if (faulted.has(memoryLocation(position))) return [];

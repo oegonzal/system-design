@@ -371,7 +371,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-40',
     statement:
-      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
+      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; a qualifier its sections put on a claim is carried into the insight and graded as a rule; a finding withholds the facts it names by a declared table, so one saying a fact is wrong withholds every fact it names while one faulting a true fact for its wording withholds none; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
   },
   // Quality-loop web client (packages/quality-loop-ui)
   {
