@@ -8,11 +8,16 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
   criteriaFromDraft,
+  describeIssue,
+  describeOverrun,
   designPromptDraftSchema,
+  modelSchema,
+  parseLenient,
   PROMPT_COPY,
   PROMPT_PIPELINE_ID,
   renderDesignPromptMarkdown,
   type AuthorPromptRequest,
+  type DesignPromptDraft,
   type ImportPromptRequest,
   type PromptGenerationDto,
   type PromptLibraryDocumentDto,
@@ -32,6 +37,9 @@ import { toPromptDto, type PromptView } from './prompts.mapper';
 
 /** The prompt pipeline writes, is criticised, and rewrites once. */
 const GENERATION_ITERATIONS = 2;
+
+/** The draft's declared bounds, indexed once: what a claim measures the run's fields against. */
+const DRAFT_BOUNDS = modelSchema(designPromptDraftSchema).bounds;
 
 /** Thrown inside the claim transaction when another poll claimed first; rolls the transaction back. */
 class AlreadyClaimed extends Error {}
@@ -164,11 +172,22 @@ export class PromptsService {
     }
 
     const best = bestIteration(run);
-    const draft = designPromptDraftSchema.safeParse(best.artifact);
-    if (!draft.success) {
+    // Read as the loop read it — leniently: a field the run wrote past its
+    // bound is kept whole and noted, and only a shape that is no draft is none.
+    const draft = parseLenient(designPromptDraftSchema, best.artifact, DRAFT_BOUNDS);
+    if (!draft.ok) {
+      this.logger.warn(
+        `prompt generation ${runId}: no prompt draft — ${draft.issues.map(describeIssue).join('; ')}`,
+      );
       return answer({ status: 'failed', error: 'the run produced no prompt draft' });
     }
-    const claimed = await this.claim(runId, row.experience, draft.data);
+    if (draft.overruns.length > 0) {
+      // Noted, not refused: the run judged the draft as written, and it is claimed so.
+      this.logger.log(
+        `prompt generation ${runId}: claimed with ${draft.overruns.length} field(s) past what was asked — ${draft.overruns.map(describeOverrun).join('; ')}`,
+      );
+    }
+    const claimed = await this.claim(runId, row.experience, draft.value);
     return answer({
       status: 'complete',
       error: null,
@@ -314,10 +333,16 @@ export class PromptsService {
     if ((await this.view(prompt)).rubricLocked) throw new ConflictException(refusal);
   }
 
+  /**
+   * The draft as one prompt, claimed once. Its rubric is its rows, and each
+   * row a lenient read keeps composes within what the grader takes back as a
+   * supplied statement — so no row is refused at the first grade; the spec
+   * holds it for the longest draft a lenient read returns.
+   */
   private async claim(
     runId: string,
     experience: ExperienceProfile | null,
-    draft: ReturnType<typeof designPromptDraftSchema.parse>,
+    draft: DesignPromptDraft,
   ): Promise<Prompt> {
     const markdown = renderDesignPromptMarkdown(draft);
     const criteria = criteriaFromDraft(draft);

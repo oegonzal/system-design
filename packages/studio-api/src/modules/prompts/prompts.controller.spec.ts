@@ -1,15 +1,24 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { Logger } from '@nestjs/common';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CRITERION_STATEMENT_BOUND,
   criteriaFromDraft,
+  DESIGN_PROMPT_SCENARIO_BOUND,
+  designPromptDraftSchema,
+  keptAtMost,
+  modelSchema,
   PROMPT_COPY,
   PROMPT_MARKDOWN_BOUND,
   PROMPT_TITLE_BOUND,
+  SOFT_ISSUE_NOTE,
 } from '@sysdesign/contracts';
 import type {
   ApiErrorResponse,
   AuthorPromptRequest,
   DesignPromptDraft,
   GetPromptGenerationResponse,
+  GetRevisionResponse,
+  GetSessionResponse,
   GetPromptLibraryDocumentResponse,
   GetPromptResponse,
   ListPromptLibraryResponse,
@@ -253,6 +262,77 @@ describe('prompts', () => {
       const list = await call<ListPromptsResponse>(`${h.url}/prompts?source=generated`);
       expect(list.body.meta.total).toBe(1);
       expect(h.loop.criteriaRequests).toEqual([]);
+    });
+
+    it('[GEN-1] [QL-41] a draft the run kept past its ceilings is claimed whole, its overruns logged, and every row a criterion the grader takes back on a grade', async () => {
+      // The longest a lenient read keeps of each field the draft declares —
+      // whole to the cut point, never more — so each row composes at its most.
+      const bounds = modelSchema(designPromptDraftSchema).bounds;
+      const longest = (path: string): string =>
+        'every on-sale seat is held for exactly one buyer until checkout lapses '
+          .repeat(120)
+          .slice(0, keptAtMost(bounds[path]))
+          .trimEnd();
+      const wordy: DesignPromptDraft = {
+        title: 'Keep a flash on-sale fair',
+        // Past what the scenario accepts, short of where a read would cut it.
+        scenario: longest('scenario')
+          .slice(0, DESIGN_PROMPT_SCENARIO_BOUND.ceiling + 600)
+          .trimEnd(),
+        functionalRequirements: [longest('functionalRequirements[]')],
+        nonFunctionalRequirements: [
+          {
+            kind: longest('nonFunctionalRequirements[].kind'),
+            requirement: longest('nonFunctionalRequirements[].requirement'),
+            target: longest('nonFunctionalRequirements[].target'),
+          },
+        ],
+        scale: [{ metric: longest('scale[].metric'), target: longest('scale[].target') }],
+        constraints: [longest('constraints[]')],
+      };
+      expect(wordy.scenario.length).toBeGreaterThan(DESIGN_PROMPT_SCENARIO_BOUND.ceiling);
+      expect(designPromptDraftSchema.safeParse(wordy).success).toBe(false);
+
+      const logged = vi.spyOn(Logger.prototype, 'log');
+      await startGeneration({ experienceId: TICKETING_ID });
+      h.loop.complete('fake-run-1', [{ overall: 84, decision: 'accept', artifact: wordy }]);
+      const done = await generation('fake-run-1');
+      expect(done.body.data).toMatchObject({ status: 'complete', error: null });
+      const prompt = done.body.data.prompt;
+      if (!prompt) throw new Error('claimed nothing');
+      expect(prompt.markdown).toContain(wordy.scenario);
+      expect(prompt.criteria).toEqual(criteriaFromDraft(wordy));
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `scenario: ${wordy.scenario.length.toLocaleString('en-US')} characters; ${DESIGN_PROMPT_SCENARIO_BOUND.target.toLocaleString('en-US')} asked, ${DESIGN_PROMPT_SCENARIO_BOUND.ceiling.toLocaleString('en-US')} accepted ${SOFT_ISSUE_NOTE}`,
+        ),
+      );
+      logged.mockRestore();
+
+      // Each row composes within what the grader takes back as a supplied
+      // statement, and a grade hands the rubric back as it was claimed.
+      for (const criterion of prompt.criteria) {
+        expect(criterion.statement.length).toBeLessThanOrEqual(
+          keptAtMost(CRITERION_STATEMENT_BOUND),
+        );
+      }
+      const session = await call<GetSessionResponse>(`${h.url}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ promptId: prompt.id }),
+      });
+      const graded = await call<GetRevisionResponse>(
+        `${h.url}/sessions/${session.body.data.id}/revisions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            graph: { nodes: [{ id: 'api', kind: 'service', label: 'API' }], edges: [] },
+            brief: null,
+            narrative: null,
+          }),
+        },
+      );
+      expect(graded.status).toBe(201);
+      expect(h.loop.startRequests.at(-1)?.criteria).toEqual(prompt.criteria);
     });
 
     it('[UX-14] a generated prompt is not re-derived; rewriting it derives once and makes it authored', async () => {
