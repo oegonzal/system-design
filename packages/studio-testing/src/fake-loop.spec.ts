@@ -177,6 +177,40 @@ describe('FakeLoop', () => {
     expect(second?.ledger.criteria.every((c) => c.result === 'unassessed')).toBe(true);
   });
 
+  it('a scenario’s coach writes its claims onto the revision in its own words: an author’s binding keeps its components, an unbound criterion is held by the replica', () => {
+    const loop = new FakeLoop();
+    const long = 'the replica absorbs every repeat read '.repeat(10);
+    loop.scenario(GOAL, {
+      outcome: 'complete',
+      coach: { claims: { c1: 'reads stay fresh', c2: long } },
+      once: true,
+    });
+    const authored = {
+      ...graph(3),
+      brief: { version: 1, bindings: [{ criterionId: 'c1', nodeIds: ['n-2'], claim: 'mine' }] },
+    };
+    loop.startRun(request({ maxIterations: 2, output: authored }));
+    loop.settle('fake-run-1');
+    const [first, second] = loop.getRun('fake-run-1')?.trace?.iterations ?? [];
+    expect(first?.artifact).toEqual(authored);
+    expect(second?.artifact).toMatchObject({
+      brief: {
+        version: 1,
+        bindings: [
+          { criterionId: 'c1', nodeIds: ['n-2'], claim: 'reads stay fresh' },
+          { criterionId: 'c2', nodeIds: ['ai-replica'], claim: long },
+        ],
+      },
+    });
+
+    // Unscripted, the coach leaves the author's words alone.
+    loop.startRun(request({ maxIterations: 2, output: authored }));
+    loop.settle('fake-run-2');
+    expect(loop.getRun('fake-run-2')?.trace?.iterations[1]?.artifact).toMatchObject({
+      brief: authored.brief,
+    });
+  });
+
   it('adopts a judged iteration verbatim as iteration 1 in mode adopted, and refuses a different rubric or an unknown run', () => {
     const loop = new FakeLoop();
     loop.startRun(request());

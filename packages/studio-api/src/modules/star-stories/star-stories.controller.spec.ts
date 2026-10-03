@@ -153,6 +153,17 @@ describe('star stories', () => {
       expect(byTag.body.data[0]?.title).toBe('Scaled the on-sale reservation path');
     });
 
+    it('[STAR-2] filters by a tag written past the ask and up to the ceiling, and refuses a term no stored tag can match', async () => {
+      const long = 't'.repeat(STORY_TAG_BOUND.ceiling);
+      await createStory(storyRequest({ title: 'Tagged at the ceiling', tags: [long] }));
+
+      const byLong = await call<ListStarStoriesResponse>(`${h.url}/star-stories?tag=${long}`);
+      expect(byLong.body.data.map((story) => story.title)).toEqual(['Tagged at the ceiling']);
+      const past = await call<ApiErrorResponse>(`${h.url}/star-stories?tag=${long}t`);
+      expect(past.status).toBe(400);
+      expect(past.body.issues?.map((issue) => issue.path)).toEqual(['tag']);
+    });
+
     it('reports the filtered total for the pager', async () => {
       await createStory(storyRequest());
       await createStory(storyRequest({ title: 'A second story' }));

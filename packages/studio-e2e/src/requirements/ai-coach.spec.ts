@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { BINDING_CLAIM_BOUND } from '@sysdesign/contracts';
 import { FAKE_RECALLED_LESSONS } from '@sysdesign/studio-testing';
 
-import { coachingRuns, listRevisions } from '../support/backend';
+import { coachingRuns, getSession, listRevisions } from '../support/backend';
 import {
   buildNaiveDesign,
   NAIVE_DESIGN_PLUS_ONE_SCORE,
@@ -106,6 +107,9 @@ test.describe('the AI coach', () => {
     // The coach's revision on screen, unedited and graded: the coach starts from it as it is.
     await canvas.loadBestRevision();
     await canvas.startCoach(2);
+    // The first run's stopped line stays on screen until the second run is
+    // recorded, so wait for the session to list it before reading either.
+    await expect.poll(async () => (await coachingRuns(request, sessionId)).length).toBe(2);
     await canvas.expectCoachStopped();
 
     // The stub records every run of every test; this session's newest is the one to read.
@@ -171,6 +175,56 @@ test.describe('the AI coach', () => {
       startRequests.find((started) => started.runId === runId)?.recall;
     expect(asked(coachRun.runId)).toBe(true);
     expect(asked(graded?.evaluation?.runId)).toBe(false);
+  });
+
+  test('[UX-20] a coach revision that wrote past what was asked imports whole, says how far over on each field, and re-saves as the draft as written', async ({
+    page,
+    request,
+  }) => {
+    // The measured overrun — a claim 58 characters past the 300 asked — and
+    // one past what a submit accepts, short of the three asks past which the
+    // loop would cut it: the coach's words, scripted for this test's run.
+    const { target, ceiling } = BINDING_CLAIM_BOUND;
+    const prose = (length: number) =>
+      'the replica absorbs every repeat read of the order history '.repeat(20).slice(0, length);
+    const overAsk = prose(target + 58);
+    const overCeiling = prose(ceiling + 45);
+    const prompt = await keyedPrompt(request, 'coach writes long');
+    await scenarioFor(request, prompt.markdown, {
+      outcome: 'complete',
+      coach: { claims: { c1: overAsk, c2: overCeiling } },
+      once: true,
+    });
+    const { canvas, sessionId } = await openPracticeSession(page, request, prompt);
+    await buildNaiveDesign(canvas);
+
+    await canvas.startCoach(2);
+    await canvas.expectCoachStopped();
+    await canvas.expectCoachOutcome(2, 'imported');
+
+    // On the coach's revision every word is there, and each field says where it stands.
+    await canvas.loadBestRevision();
+    await canvas.briefTab.click();
+    await expect(canvas.bindingClaim('c1')).toHaveValue(overAsk);
+    await expect(canvas.bindingRow('c1')).toContainText(
+      `58 over the ${target} asked — ${ceiling} at most`,
+    );
+    await expect(canvas.bindingClaim('c2')).toHaveValue(overCeiling);
+    await expect(canvas.bindingRow('c2')).toContainText(
+      `Limit reached — ${ceiling} characters at most.`,
+    );
+
+    // Restored as the draft, it saves as written and comes back whole after a reload.
+    await canvas.restoreAsDraft();
+    await canvas.expectDraftStatus('saved');
+    const claims = async () =>
+      (await getSession(request, sessionId)).draft?.brief?.bindings.map((binding) => binding.claim);
+    expect(await claims()).toEqual([overAsk, overCeiling]);
+    await page.reload();
+    await canvas.ready();
+    await canvas.briefTab.click();
+    await expect(canvas.bindingClaim('c1')).toHaveValue(overAsk);
+    await expect(canvas.bindingClaim('c2')).toHaveValue(overCeiling);
   });
 
   test('[UX-11] a coaching run that fails is reported failed, imports nothing, and its base revision shows failed', async ({

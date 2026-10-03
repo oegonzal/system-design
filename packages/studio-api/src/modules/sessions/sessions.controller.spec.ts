@@ -1,11 +1,13 @@
-import { BadGatewayException } from '@nestjs/common';
+import { BadGatewayException, Logger } from '@nestjs/common';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  BINDING_CLAIM_BOUND,
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
   describeLostGrade,
   describeUnassessedBase,
   LAYOUT_PITCH,
+  NARRATION_OVERVIEW_BOUND,
   PROMPT_COPY,
   recallWithout,
   type ApiErrorResponse,
@@ -100,6 +102,10 @@ const coached = (): DesignSubmission => {
     },
   };
 };
+
+/** Prose of exactly `length` characters, in words — what a coach writes when it runs long. */
+const prose = (length: number): string =>
+  'the replica absorbs every repeat read of the order history '.repeat(60).slice(0, length);
 
 /**
  * An iteration the loop's evidence gate found too thin for a verdict: no lens
@@ -1657,6 +1663,63 @@ describe('sessions', () => {
       expect(list.body.meta.total).toBe(1);
     });
 
+    it('[UX-20] an iteration that wrote past its bounds imports whole — past the ask and past the ceiling — with the overruns logged, re-saves as the draft, and a submit of it is still held to the ceilings', async () => {
+      const { sessionId } = await startSession();
+      await startImprove(sessionId, submission());
+      // The measured overruns: an overview a little past the 1,400 asked and
+      // within the ceiling, and a claim past the ceiling — short of the three
+      // asks past which the loop would have cut it.
+      const overview = prose(NARRATION_OVERVIEW_BOUND.target + 38);
+      const claim = prose(BINDING_CLAIM_BOUND.ceiling + 45);
+      const [first, second] = validBrief().bindings;
+      const wordy: DesignSubmission = {
+        ...coached(),
+        brief: { version: 1, bindings: [{ ...first, claim }, second] },
+        narrative: { ...validNarrative(), overview },
+      };
+      const logged = vi.spyOn(Logger.prototype, 'log');
+      h.loop.complete('fake-run-1', [{ overall: 40 }, { overall: 72, artifact: wordy }]);
+      const { body } = await readImprove(sessionId, 'fake-run-1');
+      expect(body.data.iterations.map((it) => it.outcome)).toEqual(['base', 'imported']);
+      const imported = await call<GetRevisionResponse>(
+        `${h.url}/revisions/${body.data.iterations[1].revisionId}`,
+      );
+      expect(imported.body.data.brief?.bindings[0]?.claim).toBe(claim);
+      expect(imported.body.data.narrative?.overview).toBe(overview);
+      const grouped = (n: number) => n.toLocaleString('en-US');
+      const { target, ceiling } = BINDING_CLAIM_BOUND;
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `brief.bindings[0].claim: ${claim.length} characters; ${target} asked, ${ceiling} accepted (kept-over-ceiling)`,
+        ),
+      );
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `narrative.overview: ${grouped(overview.length)} characters; ${grouped(NARRATION_OVERVIEW_BOUND.target)} asked, ${grouped(NARRATION_OVERVIEW_BOUND.ceiling)} accepted (accepted)`,
+        ),
+      );
+      logged.mockRestore();
+
+      // Restored as the draft, it saves as written and reads back whole.
+      const { graph, brief, narrative } = imported.body.data;
+      const restored: SessionDraft = { graph, brief, narrative };
+      const saved = await call(`${h.url}/sessions/${sessionId}/draft`, {
+        method: 'PUT',
+        body: JSON.stringify(restored),
+      });
+      expect(saved.status).toBe(204);
+      const draftRead = await call<GetSessionDraftResponse>(`${h.url}/sessions/${sessionId}/draft`);
+      expect(draftRead.body.data?.brief?.bindings[0]?.claim).toBe(claim);
+
+      // Submitted, it is held to the ceiling, naming the one field past it.
+      const submitted = await call<ApiErrorResponse>(`${h.url}/sessions/${sessionId}/revisions`, {
+        method: 'POST',
+        body: JSON.stringify(restored),
+      });
+      expect(submitted.status).toBe(400);
+      expect(submitted.body.issues?.map((issue) => issue.path)).toEqual(['brief.bindings.0.claim']);
+    });
+
     it('404s for a run that is not this session’s, 400 for more iterations than the loop allows', async () => {
       const { sessionId } = await startSession();
       await startImprove(sessionId, submission());
@@ -1688,7 +1751,7 @@ describe('sessions', () => {
       expect((await getDraft(sessionId)).body.data).toBeNull();
     });
 
-    it('[UX-15] a coach started from the draft clears it; a closed session keeps none; the shape is still the canvas’s', async () => {
+    it('[UX-15] a coach started from the draft clears it; a closed session keeps none; the shape is still the canvas’s, and only a fault of shape is refused', async () => {
       const { sessionId } = await startSession();
       await putDraft(sessionId, draft());
       const coach = await call<StartImproveResponse>(`${h.url}/sessions/${sessionId}/improve`, {
@@ -1702,8 +1765,14 @@ describe('sessions', () => {
         ...draft(),
         graph: { nodes: [{ id: 'x', kind: 'teapot', label: 'x' }], edges: [] },
       };
-      expect((await putDraft(sessionId, malformed)).status).toBe(400);
-      expect((await putDraft(sessionId, { ...draft(), extra: 1 })).status).toBe(400);
+      const refused = await putDraft(sessionId, malformed);
+      expect(refused.status).toBe(400);
+      expect((refused.body as ApiErrorResponse).issues).toEqual([
+        { path: 'graph.nodes.0.kind', message: expect.any(String) },
+      ]);
+      // An aside the canvas does not know is no fault of shape: dropped, the rest kept.
+      expect((await putDraft(sessionId, { ...draft(), extra: 1 })).status).toBe(204);
+      expect((await getDraft(sessionId)).body.data).toEqual(draft());
 
       await call(`${h.url}/sessions/${sessionId}`, {
         method: 'PATCH',

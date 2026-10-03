@@ -33,3 +33,17 @@ export const Invalid: Story = { args: { error: 'Say how a request travels.', req
 export const NearLimit: Story = {
   args: { maxLength: 60, defaultValue: 'Requests enter through the gateway and fan out to shards' },
 };
+
+/**
+ * An area that takes more than it asks for — a bound's ceiling as
+ * `maxLength`, its target as `target`: past the ask it says how far over the
+ * value runs and what is taken at most, and the limit is reached only at
+ * the ceiling.
+ */
+export const OverTarget: Story = {
+  args: {
+    maxLength: 75,
+    target: 60,
+    defaultValue: 'Requests enter through the gateway and fan out to the shards.',
+  },
+};

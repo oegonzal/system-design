@@ -23,6 +23,7 @@ import { resolveAdoption } from './fake-adoption';
 import {
   exchangesOf,
   FAKE_LOOP_HEARTBEAT,
+  type CoachScript,
   type FakeLoopOptions,
   type RunScenario,
 } from './fake-loop-options';
@@ -262,20 +263,22 @@ export class FakeLoop {
 
   /**
    * Finish a run. `'default'` is the fake's one revise-worthy iteration;
-   * `'auto'` is what the stub grades from the request alone; a list is what
-   * the spec says. An adopting run's iteration 1 is the adopted iteration,
-   * copied verbatim in mode `adopted`, and the list describes what follows.
+   * `'auto'` is what the stub grades from the request alone — its coach
+   * writing what `coach` says too; a list is what the spec says. An adopting
+   * run's iteration 1 is the adopted iteration, copied verbatim in mode
+   * `adopted`, and the list describes what follows.
    */
   complete(
     runId: string,
     iterations: readonly FakeIteration[] | 'default' | 'auto' = 'default',
+    coach: CoachScript = {},
   ): void {
     const run = this.require(runId);
     this.recalled(run);
     run.status = 'complete';
     run.finishedAt = this.now();
     run.heartbeatAt = run.finishedAt;
-    run.trace = this.traceOf(runId, iterations);
+    run.trace = this.traceOf(runId, iterations, coach);
   }
 
   /**
@@ -324,13 +327,16 @@ export class FakeLoop {
     if (scenario === undefined) return this.complete(runId, 'auto');
     this.consume(run.request.goal, scenario);
     if (scenario.outcome === 'fail') return this.fail(runId, scenario.message);
-    if (scenario.outcome === 'complete') return this.complete(runId, scenario.iterations ?? 'auto');
+    if (scenario.outcome === 'complete') {
+      return this.complete(runId, scenario.iterations ?? 'auto', scenario.coach);
+    }
   }
 
   /** The trace a run's request and the spec's iterations describe. */
   private traceOf(
     runId: string,
     iterations: readonly FakeIteration[] | 'default' | 'auto',
+    coach: CoachScript = {},
   ): QualityRunDto['trace'] {
     const run = this.require(runId);
     const request = this.requests.get(runId);
@@ -340,7 +346,7 @@ export class FakeLoop {
 
     let traced: IterationTrace[];
     if (iterations === 'auto') {
-      traced = autoIterations(request, criteria, adopted);
+      traced = autoIterations(request, criteria, adopted, coach);
     } else {
       const specs = iterations === 'default' ? DEFAULT_ITERATIONS(criteria) : iterations;
       traced =

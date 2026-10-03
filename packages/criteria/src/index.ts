@@ -123,6 +123,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A grade the loop judged on too little evidence for a verdict is not a score: it is reported unassessed — no overall, no dimension values, no criterion rationale presented as a verdict — distinct from a real 0, is re-graded in place like a failed grade, and is refused as the coach’s starting point with words that say why.',
   },
+  {
+    id: 'UX-19',
+    statement:
+      'A text field bounded by a declared bound asks for its target and takes up to its ceiling: the count runs down to the target, then says how far over the ask the value runs and how much the field takes at most, and the field stops — and says so — only at the ceiling; every studio editor of a bounded value passes both, while an exact id keeps its one max.',
+  },
+  {
+    id: 'UX-20',
+    statement:
+      'A coach revision imports whatever it wrote: a field past what was asked, or past what a submit accepts, is stored whole with its overruns logged on the import, and only a shape that is no submission is refused; restored as the draft it re-saves as written — a draft save refuses only a fault of shape, in the one issue shape — while a submit stays held to the ceilings.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

@@ -205,7 +205,8 @@ export function PromptComposer() {
               <TextField
                 label="Title"
                 value={title}
-                maxLength={PROMPT_TITLE_BOUND.target}
+                maxLength={PROMPT_TITLE_BOUND.ceiling}
+                target={PROMPT_TITLE_BOUND.target}
                 onChange={(event) => setTitle(event.target.value)}
                 data-testid="compose-title"
               />
@@ -213,7 +214,8 @@ export function PromptComposer() {
                 label="Prompt (markdown)"
                 rows={16}
                 value={markdown}
-                maxLength={PROMPT_MARKDOWN_BOUND.target}
+                maxLength={PROMPT_MARKDOWN_BOUND.ceiling}
+                target={PROMPT_MARKDOWN_BOUND.target}
                 placeholder={'# Design …\n\n## Functional requirements\n1. …'}
                 onChange={(event) => setMarkdown(event.target.value)}
                 data-testid="compose-markdown"

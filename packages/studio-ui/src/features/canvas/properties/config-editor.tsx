@@ -153,7 +153,8 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
             label="Value"
             data-testid="config-value"
             value={value}
-            maxLength={NODE_CONFIG_STRING_VALUE_BOUND.target}
+            maxLength={NODE_CONFIG_STRING_VALUE_BOUND.ceiling}
+            target={NODE_CONFIG_STRING_VALUE_BOUND.target}
             disabled={atCap}
             placeholder="3, true, or text"
             onChange={(event) => setValue(event.target.value)}

@@ -87,7 +87,8 @@ export function CriterionBindingRow({
           label="How the design meets it"
           data-testid={`binding-claim-${criterion.id}`}
           value={binding?.claim ?? ''}
-          maxLength={BINDING_CLAIM_BOUND.target}
+          maxLength={BINDING_CLAIM_BOUND.ceiling}
+          target={BINDING_CLAIM_BOUND.target}
           placeholder="e.g. the cache absorbs repeat reads"
           disabled={disabled}
           onChange={(event) => onClaim(event.target.value)}

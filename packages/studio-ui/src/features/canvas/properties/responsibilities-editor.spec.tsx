@@ -76,11 +76,11 @@ describe('ResponsibilitiesEditor', () => {
     expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).disabled).toBe(true);
   });
 
-  it('caps the input length to the contract and shows the helper', () => {
+  it('caps the input length at the contract’s ceiling and shows the helper', () => {
     renderWithTheme(<Harness />);
 
     expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).maxLength).toBe(
-      RESPONSIBILITY_BOUND.target,
+      RESPONSIBILITY_BOUND.ceiling,
     );
     expect(screen.getByText(/what is this component in charge of/i)).toBeTruthy();
   });

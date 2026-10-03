@@ -10,10 +10,10 @@ import { z } from 'zod';
 /** The list's query. POST and PUT validate with the contracts' `saveStarStorySchema`, verbatim — the rule the form applies too. */
 export const listStarStoriesQuerySchema = z.strictObject({
   ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
-  /** Case-insensitive contains over title, situation and result. */
-  search: z.string().max(STORY_SECTION_BOUND.target).optional(),
-  /** Exact tag membership — a term longer than a tag can never match one. */
-  tag: z.string().max(STORY_TAG_BOUND.target).optional(),
+  /** Case-insensitive contains over title, situation and result — a term longer than a stored section can never match one. */
+  search: z.string().max(STORY_SECTION_BOUND.ceiling).optional(),
+  /** Exact tag membership — a term longer than a stored tag, which may run to the ceiling, can never match one. */
+  tag: z.string().max(STORY_TAG_BOUND.ceiling).optional(),
   promptId: z.uuid().optional(),
   experienceId: z.uuid().optional(),
 });

@@ -6,9 +6,23 @@ import type {
 
 import type { FakeIteration } from './trace-builders';
 
-/** What a scripted run does when it settles, keyed by the run's goal. */
+/**
+ * What the coach writes beyond its one idea, as data a scenario carries over
+ * HTTP: a claim per criterion id, in the coach's words — the author's binding
+ * for that criterion rewritten, or a new one held by the coach's replica. How
+ * a spec has the coach write long without drawing its revision by hand.
+ */
+export interface CoachScript {
+  claims?: Readonly<Record<string, string>>;
+}
+
+/**
+ * What a scripted run does when it settles, keyed by the run's goal. A
+ * completed run follows its `iterations` when given; otherwise it is the
+ * stub's own grade, whose coach also writes what `coach` says.
+ */
 export type RunScenario =
-  | { outcome: 'complete'; iterations?: FakeIteration[]; once?: boolean }
+  | { outcome: 'complete'; iterations?: FakeIteration[]; coach?: CoachScript; once?: boolean }
   | { outcome: 'fail'; message: string; once?: boolean }
   | { outcome: 'refuse'; status?: number; message?: string; once?: boolean };
 

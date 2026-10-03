@@ -86,16 +86,16 @@ describe('NarrativeEditor', () => {
     }
   });
 
-  it('[UX-8] bounds every slot by the schema’s own limit, so nothing written is cut on the way out', () => {
+  it('[UX-8] [UX-19] bounds every slot by the schema’s own ceiling, so nothing written is cut on the way out', () => {
     renderEditor();
     const maxLength = (testId: string) =>
       (screen.getByTestId(testId) as HTMLTextAreaElement).maxLength;
-    expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_BOUND.target);
-    expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_BOUND.target);
-    expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_BOUND.target);
+    expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_BOUND.ceiling);
+    expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_BOUND.ceiling);
+    expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_BOUND.ceiling);
   });
 
-  it('[UX-8] says how much of a slot’s limit is left as it nears, and that it was reached — a walkthrough never just stops taking words', () => {
+  it('[UX-8] [UX-19] says how much of a slot’s ask is left as it nears, how far over it the prose runs, and that the limit was reached — a walkthrough never just stops taking words', () => {
     const store = renderEditor((seeded) => {
       seeded.getState().setNarrativeOverview('Reads and writes are split.');
       seeded.getState().setComponentRationale('n-3', 'x'.repeat(NARRATION_PROSE_BOUND.target - 7));
@@ -107,11 +107,20 @@ describe('NarrativeEditor', () => {
     const rationale = screen.getByTestId('narrative-rationale-n-3');
     expect(rationale.getAttribute('aria-describedby')).toContain(`${rationale.id}-limit`);
 
-    act(() => store.getState().setNarrativeOverview('x'.repeat(NARRATION_OVERVIEW_BOUND.target)));
+    // At the ask the slot still takes more, up to its ceiling — and says so.
+    const { target, ceiling } = NARRATION_OVERVIEW_BOUND;
+    const grouped = (n: number) => n.toLocaleString('en-US');
+    act(() => store.getState().setNarrativeOverview('x'.repeat(target)));
     expect(
-      screen.getByText(
-        `Limit reached — ${NARRATION_OVERVIEW_BOUND.target.toLocaleString('en-US')} characters at most.`,
-      ),
+      screen.getByText(`At the ${grouped(target)} asked — ${grouped(ceiling)} at most`),
+    ).toBeTruthy();
+    act(() => store.getState().setNarrativeOverview('x'.repeat(target + 38)));
+    expect(
+      screen.getByText(`38 over the ${grouped(target)} asked — ${grouped(ceiling)} at most`),
+    ).toBeTruthy();
+    act(() => store.getState().setNarrativeOverview('x'.repeat(ceiling)));
+    expect(
+      screen.getByText(`Limit reached — ${grouped(ceiling)} characters at most.`),
     ).toBeTruthy();
   });
 });

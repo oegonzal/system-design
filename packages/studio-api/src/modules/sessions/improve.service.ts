@@ -12,6 +12,8 @@ import {
   designSubmissionSchema,
   layoutGraph,
   MAX_IMPROVE_ITERATIONS,
+  modelSchema,
+  parseLenient,
   positionsOf,
   type CanvasPosition,
   type CoachingRunSummaryDto,
@@ -19,6 +21,8 @@ import {
   type ImproveIterationDto,
   type ImproveIterationOutcome,
   type ImproveRunDto,
+  type LenientParse,
+  type Overrun,
   type QualityRunStatus,
   type StartImproveDto,
   type StartImproveRequest,
@@ -46,6 +50,15 @@ const UNSCORED_OUTCOME: Readonly<Record<UnscoredReason, ImproveIterationOutcome>
   'no-artifact': 'no-artifact',
   unassessed: 'unassessed',
 };
+
+/** The submission's declared bounds, indexed once: what an import measures the coach's fields against. */
+const SUBMISSION_BOUNDS = modelSchema(designSubmissionSchema).bounds;
+
+const grouped = (value: number): string => value.toLocaleString('en-US');
+
+/** One field past its target, for the log, in the contracts' wording of a size fault and how it was kept. */
+const describeOverrun = ({ path, actual, kind, target, ceiling, handling }: Overrun): string =>
+  `${path}: ${grouped(actual)} ${kind === 'list' ? 'items' : 'characters'}; ${grouped(target)} asked, ${grouped(ceiling)} accepted (${handling})`;
 
 /**
  * The coach: the same run as a grade, allowed to iterate, whose producer is
@@ -264,9 +277,11 @@ export class ImproveService {
       const { overall, unscored, decision } = iterationGrade(it);
       const cache: RevisionCache = { status: 'complete', overall, decision };
       // What the iteration judged, when it is a submission: its findings are
-      // grounded on it, and it is what an import would store.
-      const judged = designSubmissionSchema.safeParse(it.artifact);
-      const submission = judged.success ? judged.data : null;
+      // grounded on it, and it is what an import would store. Read as the
+      // loop reads it — leniently: a field the coach wrote past its bound is
+      // kept whole and noted, and only a shape that is no submission is none.
+      const judged = parseLenient(designSubmissionSchema, it.artifact, SUBMISSION_BOUNDS);
+      const submission = judged.ok ? judged.value : null;
       let revision: DesignRevision | null = null;
       let outcome: ImproveIterationOutcome = 'not-better';
       let problems: string[] = [];
@@ -285,7 +300,7 @@ export class ImproveService {
           sessionId,
           runId,
           it.iteration,
-          submission,
+          judged,
           criteria,
           cache,
           layout,
@@ -357,30 +372,39 @@ export class ImproveService {
    * artifact is a submission the studio itself would accept. The loop
    * repairs what it can before judging, so what arrives here is what was
    * judged; a coach that still drew an edge to nowhere is refused with the
-   * reasons, logged, and never stored — the studio repairs nothing. What it
-   * does add is where each block sits: `layout` for the ones that have a
-   * place already, a free slot beside its neighbours for each new one, and
-   * never a position the model wrote.
+   * reasons, logged, and never stored — the studio repairs nothing. A field
+   * written past its bound is no reason to refuse: it was judged as written
+   * and is stored as written, and the import logs what ran over. What the
+   * studio does add is where each block sits: `layout` for the ones that
+   * have a place already, a free slot beside its neighbours for each new
+   * one, and never a position the model wrote.
    */
   private async import(
     sessionId: string,
     runId: string,
     iteration: number,
-    submission: DesignSubmission | null,
+    judged: LenientParse<DesignSubmission>,
     criteria: readonly SuccessCriterion[],
     cache: RevisionCache,
     layout: ReadonlyMap<string, CanvasPosition>,
   ): Promise<{ revision: DesignRevision } | { problems: string[] }> {
-    if (submission === null) {
+    if (!judged.ok) {
       this.logger.warn(`run ${runId} iteration ${iteration}: artifact is not a submission`);
       return { problems: ['the artifact is not a submission'] };
     }
+    const submission = judged.value;
     const problems = submissionProblems(submission, criteria);
     if (problems.length > 0) {
       this.logger.warn(
         `run ${runId} iteration ${iteration}: not imported — ${problems.join('; ')}`,
       );
       return { problems };
+    }
+    if (judged.overruns.length > 0) {
+      // Noted, not refused: the run judged these as written, and they are stored so.
+      this.logger.log(
+        `run ${runId} iteration ${iteration}: imported with ${judged.overruns.length} field(s) past what was asked — ${judged.overruns.map(describeOverrun).join('; ')}`,
+      );
     }
     try {
       return {

@@ -76,16 +76,16 @@ describe('StoriesList', () => {
     expect(await screen.findByTestId('story-list')).toBeTruthy();
   });
 
-  it('[STAR-2] bounds its filters as the API bounds them', async () => {
+  it('[STAR-2] bounds its filters as the API bounds them: by the ceiling a stored story may run to', async () => {
     stubApi([storiesServer(0).route]);
     renderWithTheme(<StoriesList />);
 
     expect(await screen.findByText(/No stories yet/)).toBeTruthy();
     expect((screen.getByTestId('story-search') as HTMLInputElement).maxLength).toBe(
-      STORY_SECTION_BOUND.target,
+      STORY_SECTION_BOUND.ceiling,
     );
     expect((screen.getByTestId('story-tag-filter') as HTMLInputElement).maxLength).toBe(
-      STORY_TAG_BOUND.target,
+      STORY_TAG_BOUND.ceiling,
     );
   });
 });

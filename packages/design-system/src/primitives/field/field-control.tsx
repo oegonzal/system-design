@@ -8,8 +8,9 @@ import { limitAnnouncement, limitCopy, type FieldLimit } from './field-limit';
 /**
  * The one look every form field shares: a label over a control over what
  * the control needs saying under it — what the value is for (`hint`), how
- * much of a length limit is left, and, when the value is refused, the
- * reason — all reading only semantic theme roles. Internal to the field
+ * much of a length limit is left or how far over the ask the value runs,
+ * and, when the value is refused, the reason — all reading only semantic
+ * theme roles. Internal to the field
  * primitives; each public field composes these.
  */
 
@@ -54,10 +55,10 @@ export interface FieldProps {
   error?: string | null;
 }
 
-/** How much of the length limit is left; it turns to a warning once none is. */
-const FieldCount = styled('span', transient)<{ $reached: boolean }>`
+/** How much of the length is left; it turns to a warning once the ask is crossed, and stays one at the limit. */
+const FieldCount = styled('span', transient)<{ $warn: boolean }>`
   font-size: ${({ theme }) => theme.font.size.sm};
-  color: ${({ theme, $reached }) => ($reached ? theme.color.warn.fg : theme.color.text.muted)};
+  color: ${({ theme, $warn }) => ($warn ? theme.color.warn.fg : theme.color.text.muted)};
 `;
 
 const messageIdOf = (controlId: string): string => `${controlId}-error`;
@@ -124,7 +125,7 @@ export function FieldFrame({
       {children}
       {hint ? <FieldHint id={hintIdOf(controlId)}>{hint}</FieldHint> : null}
       {limit?.shown ? (
-        <FieldCount id={countIdOf(controlId)} $reached={limit.remaining === 0}>
+        <FieldCount id={countIdOf(controlId)} $warn={limit.over > 0 || limit.reached}>
           {limitCopy(limit)}
         </FieldCount>
       ) : null}

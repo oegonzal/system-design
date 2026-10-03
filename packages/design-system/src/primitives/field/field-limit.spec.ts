@@ -33,7 +33,51 @@ describe('fieldLimit', () => {
   });
 
   it('never counts below nothing left, for a value set past the limit from code', () => {
-    expect(fieldLimit(140, 120, 'near')).toMatchObject({ remaining: 0, near: true, shown: true });
+    expect(fieldLimit(140, 120, 'near')).toMatchObject({
+      remaining: 0,
+      over: 20,
+      reached: true,
+      near: true,
+      shown: true,
+    });
+  });
+
+  describe('with a target under the limit', () => {
+    it('[UX-19] counts down to the ask, not the limit, and is near within the last tenth of the ask', () => {
+      expect(fieldLimit(71, 120, 'near', 80)).toMatchObject({
+        target: 80,
+        remaining: 9,
+        over: 0,
+        near: false,
+        shown: false,
+      });
+      expect(fieldLimit(72, 120, 'near', 80)).toMatchObject({
+        remaining: 8,
+        near: true,
+        shown: true,
+      });
+    });
+
+    it('is over the ask past the target and reached only at the limit', () => {
+      expect(fieldLimit(80, 120, 'near', 80)).toMatchObject({
+        remaining: 0,
+        over: 0,
+        reached: false,
+      });
+      expect(fieldLimit(95, 120, 'near', 80)).toMatchObject({
+        remaining: 0,
+        over: 15,
+        reached: false,
+        shown: true,
+      });
+      expect(fieldLimit(120, 120, 'near', 80)).toMatchObject({ over: 40, reached: true });
+    });
+
+    it('takes the limit as the ask when the target is missing, past the limit, or nothing', () => {
+      expect(fieldLimit(10, 120, 'near')).toMatchObject({ target: 120 });
+      expect(fieldLimit(10, 120, 'near', 200)).toMatchObject({ target: 120 });
+      expect(fieldLimit(10, 120, 'near', 0)).toMatchObject({ target: 120 });
+    });
   });
 });
 
@@ -55,5 +99,30 @@ describe('the limit’s wording', () => {
     expect(limitAnnouncement(at(3600))).toBe('Nearing the limit of 4,000 characters.');
     expect(limitAnnouncement(at(3999))).toBe('Nearing the limit of 4,000 characters.');
     expect(limitAnnouncement(at(4000))).toBe('Limit of 4,000 characters reached.');
+  });
+
+  describe('with a target under the limit', () => {
+    const asked = (length: number) => {
+      const limit = fieldLimit(length, 1500, 'always', 1200);
+      if (limit === null) throw new Error('a limited field has a standing');
+      return limit;
+    };
+
+    it('[UX-19] counts down to the ask, says the ask is met, then how far over it the value runs, and the limit last', () => {
+      expect(limitCopy(asked(1193))).toBe('7 characters left');
+      expect(limitCopy(asked(1200))).toBe('At the 1,200 asked — 1,500 at most');
+      expect(limitCopy(asked(1201))).toBe('1 over the 1,200 asked — 1,500 at most');
+      expect(limitCopy(asked(1438))).toBe('238 over the 1,200 asked — 1,500 at most');
+      expect(limitCopy(asked(1500))).toBe('Limit reached — 1,500 characters at most.');
+    });
+
+    it('announces nearing the ask, meeting it, and reaching the limit — once each', () => {
+      expect(limitAnnouncement(asked(1000))).toBe('');
+      expect(limitAnnouncement(asked(1080))).toBe('Nearing the 1,200 characters asked.');
+      expect(limitAnnouncement(asked(1199))).toBe('Nearing the 1,200 characters asked.');
+      expect(limitAnnouncement(asked(1200))).toBe('At the 1,200 characters asked — 1,500 at most.');
+      expect(limitAnnouncement(asked(1438))).toBe('At the 1,200 characters asked — 1,500 at most.');
+      expect(limitAnnouncement(asked(1500))).toBe('Limit of 1,500 characters reached.');
+    });
   });
 });

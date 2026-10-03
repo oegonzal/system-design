@@ -89,12 +89,18 @@ export class SessionsController {
     return ok(await this.sessions.getDraft(id));
   }
 
-  /** 204: the unsubmitted canvas, kept with the session until it is submitted. */
+  /**
+   * 204: the unsubmitted canvas, kept with the session until it is submitted.
+   * Kept as written: a field past its bound — a coach's revision restored
+   * as the draft — is stored whole, and only a shape that is no canvas is
+   * refused. A submit stays strict to the schema's ceilings.
+   */
   @Put(':id/draft')
   @HttpCode(204)
   async saveDraft(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(putSessionDraftSchema)) body: PutSessionDraftRequest,
+    @Body(new ZodValidationPipe(putSessionDraftSchema, { lenient: true }))
+    body: PutSessionDraftRequest,
   ): Promise<void> {
     await this.sessions.saveDraft(id, body);
   }

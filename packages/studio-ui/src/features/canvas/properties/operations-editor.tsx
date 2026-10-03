@@ -142,7 +142,8 @@ export function OperationsEditor({ operations, onChange }: OperationsEditorProps
             <TextField
               label="Notes"
               value={operation.notes ?? ''}
-              maxLength={OPERATION_NOTES_BOUND.target}
+              maxLength={OPERATION_NOTES_BOUND.ceiling}
+              target={OPERATION_NOTES_BOUND.target}
               hint={NOTES_HINT}
               onChange={(event) => patchRow(index, { notes: event.target.value })}
             />

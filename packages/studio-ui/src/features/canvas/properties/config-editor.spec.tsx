@@ -127,7 +127,7 @@ describe('ConfigEditor', () => {
     ).toBeTruthy();
   });
 
-  it('[UX-9] says how much of a value’s limit is left as it nears, and that it was reached — a long value is never cut off unsaid', () => {
+  it('[UX-9] [UX-19] says how much of a value’s ask is left as it nears, how far over the ask it runs, and that the limit was reached — a long value is never cut off unsaid', () => {
     renderWithTheme(<Harness />);
     const value = screen.getByTestId('config-value');
     const editor = within(screen.getByTestId('config-editor'));
@@ -142,13 +142,15 @@ describe('ConfigEditor', () => {
     });
     expect(editor.getByText('5 characters left')).toBeTruthy();
 
-    fireEvent.change(value, {
-      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.target) },
-    });
-    expect(
-      editor.getByText(
-        `Limit reached — ${NODE_CONFIG_STRING_VALUE_BOUND.target} characters at most.`,
-      ),
-    ).toBeTruthy();
+    // At the ask the field still takes more, up to the bound's ceiling.
+    const { target, ceiling } = NODE_CONFIG_STRING_VALUE_BOUND;
+    expect((value as HTMLInputElement).maxLength).toBe(ceiling);
+    fireEvent.change(value, { target: { value: 'x'.repeat(target) } });
+    expect(editor.getByText(`At the ${target} asked — ${ceiling} at most`)).toBeTruthy();
+    fireEvent.change(value, { target: { value: 'x'.repeat(target + 9) } });
+    expect(editor.getByText(`9 over the ${target} asked — ${ceiling} at most`)).toBeTruthy();
+
+    fireEvent.change(value, { target: { value: 'x'.repeat(ceiling) } });
+    expect(editor.getByText(`Limit reached — ${ceiling} characters at most.`)).toBeTruthy();
   });
 });

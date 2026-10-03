@@ -16,6 +16,8 @@ const {
   NearLimit,
   AtLimit,
   CountedThroughout,
+  OverTarget,
+  AtCeiling,
 } = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
@@ -173,6 +175,30 @@ describe('TextField', () => {
       renderWithTheme(<AtLimit limitNotice="never" />);
       expect(screen.getByLabelText('Service name').hasAttribute('aria-describedby')).toBe(false);
       expect(announcer()).toBeNull();
+    });
+
+    describe('and a target under it', () => {
+      it('[UX-19] says how far over the ask the value runs and what is taken at most, announces the ask once, and keeps the target off the control', () => {
+        renderWithTheme(<OverTarget />);
+        const input = screen.getByLabelText('Service name') as HTMLInputElement;
+        expect(descriptionsOf(input)).toEqual(['3 over the 20 asked — 30 at most']);
+        expect(announced()).toBe('At the 20 characters asked — 30 at most.');
+        expect(input.maxLength).toBe(30);
+        expect(input.hasAttribute('target')).toBe(false);
+
+        // Back under the ask, the count runs down to it, not to the limit.
+        fireEvent.change(input, { target: { value: 'order-history-read' } });
+        expect(descriptionsOf(input)).toEqual(['2 characters left']);
+        expect(announced()).toBe('Nearing the 20 characters asked.');
+      });
+
+      it('[UX-19] reaches the limit only at the maxLength, and names it as before', () => {
+        renderWithTheme(<AtCeiling />);
+        expect(descriptionsOf(screen.getByLabelText('Service name'))).toEqual([
+          'Limit reached — 30 characters at most.',
+        ]);
+        expect(announced()).toBe('Limit of 30 characters reached.');
+      });
     });
   });
 

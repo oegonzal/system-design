@@ -7,7 +7,7 @@
  */
 export { FakeLoop } from './fake-loop';
 export { FakeLoopClient } from './fake-loop-client';
-export type { FakeLoopOptions, RunScenario } from './fake-loop-options';
+export type { CoachScript, FakeLoopOptions, RunScenario } from './fake-loop-options';
 export { FakeOrchestrations, type FakeOrchestrationDeps } from './fake-orchestrations';
 export { FAKE_RECALLED_LESSONS, fakeRecalled, fakeRecallRunId } from './fake-recall';
 export { DerivationFailed, LoopRefused, LoopUnreachable } from './loop-errors';

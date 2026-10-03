@@ -184,7 +184,7 @@ describe('OperationsEditor', () => {
     ).toBeTruthy();
   });
 
-  it('caps name and notes input lengths to the contract', () => {
+  it('[UX-19] caps the name at its exact max and the notes at the contract’s ceiling', () => {
     renderWithTheme(<Harness initial={twoOps} />);
 
     const row = within(screen.getByTestId('operation-row-0'));
@@ -192,7 +192,7 @@ describe('OperationsEditor', () => {
       OPERATION_NAME_MAX_LENGTH,
     );
     expect((row.getByLabelText('Notes') as HTMLInputElement).maxLength).toBe(
-      OPERATION_NOTES_BOUND.target,
+      OPERATION_NOTES_BOUND.ceiling,
     );
   });
 

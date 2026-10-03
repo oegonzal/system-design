@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './text-area-field.stories';
 
-const { Default, Tall, Disabled, WithHint, Invalid, NearLimit } = composeStories(stories);
+const { Default, Tall, Disabled, WithHint, Invalid, NearLimit, OverTarget } =
+  composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
 /** A limited field's own polite region, and what it last said. */
@@ -66,5 +67,19 @@ describe('TextAreaField', () => {
   it('says nothing of a maxLength while there is room', () => {
     renderWithTheme(<Default maxLength={60} defaultValue="Requests enter through the gateway." />);
     expect(screen.getByLabelText('Design narrative').hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('[UX-19] given a target under its maxLength, says how far over the ask the prose runs and reaches the limit only at the maxLength', () => {
+    renderWithTheme(<OverTarget />);
+    const area = screen.getByLabelText('Design narrative') as HTMLTextAreaElement;
+    const count = () => document.getElementById(area.getAttribute('aria-describedby') ?? '');
+    expect(area.maxLength).toBe(75);
+    expect(area.hasAttribute('target')).toBe(false);
+    expect(count()?.textContent).toBe('1 over the 60 asked — 75 at most');
+    expect(announced()).toBe('At the 60 characters asked — 75 at most.');
+
+    fireEvent.change(area, { target: { value: 'x'.repeat(75) } });
+    expect(count()?.textContent).toBe('Limit reached — 75 characters at most.');
+    expect(announced()).toBe('Limit of 75 characters reached.');
   });
 });

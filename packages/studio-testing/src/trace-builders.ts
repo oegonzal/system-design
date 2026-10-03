@@ -1,9 +1,11 @@
 import {
+  DESIGN_BRIEF_VERSION,
   PROMPT_PIPELINE_ID,
   type CanvasGraph,
   type ConfirmedFinding,
   type CriterionEvidence,
   type Decision,
+  type DesignBrief,
   type DesignPromptDraft,
   type IterationMode,
   type IterationTrace,
@@ -14,6 +16,8 @@ import {
   type ValidationReport,
   type ArtifactLocation,
 } from '@sysdesign/contracts';
+
+import type { CoachScript } from './fake-loop-options';
 
 /**
  * Pure builders for the traces the fake loop hands out. Nothing here keeps
@@ -316,8 +320,31 @@ function freshId(base: string, taken: readonly { id: string }[]): string {
   return candidate;
 }
 
-/** The coach's one idea: a read replica hung off the last component, ids prefixed `ai-` as the schema asks. */
-function revised(output: unknown): unknown {
+/**
+ * The script's claims on a submission's brief: the author's binding for each
+ * criterion keeps its components and takes the coach's words; a criterion
+ * the author left unbound is held by `holder`.
+ */
+function withClaims(
+  brief: DesignBrief | null | undefined,
+  claims: Readonly<Record<string, string>>,
+  holder: string,
+): DesignBrief | null {
+  const bindings = [...(brief?.bindings ?? [])];
+  for (const [criterionId, claim] of Object.entries(claims)) {
+    const at = bindings.findIndex((binding) => binding.criterionId === criterionId);
+    if (at >= 0) bindings[at] = { ...bindings[at], claim };
+    else bindings.push({ criterionId, nodeIds: [holder], claim });
+  }
+  return { version: DESIGN_BRIEF_VERSION, bindings };
+}
+
+/**
+ * The coach's one idea: a read replica hung off the last component, ids
+ * prefixed `ai-` as the schema asks — and, when a scenario scripts it, the
+ * claims it writes in its own words.
+ */
+function revised(output: unknown, coach: CoachScript = {}): unknown {
   const graph = graphOf(output);
   if (!graph) return output;
   const last = graph.nodes[graph.nodes.length - 1];
@@ -334,7 +361,10 @@ function revised(output: unknown): unknown {
         },
       ]
     : graph.edges;
-  return { ...(output as object), graph: { nodes, edges } };
+  const revision = { ...(output as object), graph: { nodes, edges } };
+  if (coach.claims === undefined) return revision;
+  const { brief } = output as { brief?: DesignBrief | null };
+  return { ...revision, brief: withClaims(brief, coach.claims, replicaId) };
 }
 
 function canvasIteration(
@@ -370,6 +400,7 @@ function canvasIterations(
   request: StartQualityRunRequest,
   criteria: readonly SuccessCriterion[],
   adopted: IterationTrace | null = null,
+  coach: CoachScript = {},
 ): IterationTrace[] {
   const first =
     adopted === null
@@ -385,7 +416,7 @@ function canvasIterations(
   const budget = request.maxIterations ?? 1;
   if (first.decision.finalDecision === 'accept') return iterations;
 
-  const artifact = revised(first.artifact);
+  const artifact = revised(first.artifact, coach);
   const overall = Math.min(100, first.decision.scores.overall + 8);
   for (let iteration = 2; iteration <= budget; iteration += 1) {
     const next = canvasIteration(iteration, 'revise', artifact, criteria, overall);
@@ -441,12 +472,13 @@ function promptIterations(
   ];
 }
 
-/** The iterations the loop would have produced for this request, by pipeline, with nothing scripted. */
+/** The iterations the loop would have produced for this request, by pipeline, with nothing scripted but what its coach writes. */
 export const autoIterations = (
   request: StartQualityRunRequest,
   criteria: readonly SuccessCriterion[],
   adopted: IterationTrace | null,
+  coach: CoachScript = {},
 ): IterationTrace[] =>
   request.pipeline === PROMPT_PIPELINE_ID
     ? promptIterations(request, criteria)
-    : canvasIterations(request, criteria, adopted);
+    : canvasIterations(request, criteria, adopted, coach);

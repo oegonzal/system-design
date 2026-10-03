@@ -156,7 +156,7 @@ test.describe('interactive design canvas', () => {
     const width = async (field: typeof key) => (await field.boundingBox())?.width;
     const before = await width(value);
     expect(before).toBe(await width(key));
-    await value.fill('x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.target));
+    await value.fill('x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.ceiling));
     await expect(canvas.properties.getByText(/Limit reached/)).toBeVisible();
     expect(await width(value)).toBe(before);
     expect(await width(key)).toBe(before);

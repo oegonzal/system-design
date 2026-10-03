@@ -55,3 +55,18 @@ export const AtLimit: Story = { args: { maxLength: 20, defaultValue: 'order-hist
 export const CountedThroughout: Story = {
   args: { maxLength: 40, limitNotice: 'always', defaultValue: 'checkout' },
 };
+
+/**
+ * A field that takes more than it asks for — a bound's ceiling as
+ * `maxLength`, its target as `target`: the count runs down to the ask and
+ * then says how far over it the value runs and what is taken at most, so
+ * nothing is cut and nothing a little over is refused unsaid.
+ */
+export const OverTarget: Story = {
+  args: { maxLength: 30, target: 20, defaultValue: 'order-history-reader-v2' },
+};
+
+/** Past the ask, the limit is reached only at the `maxLength` — and named as before. */
+export const AtCeiling: Story = {
+  args: { maxLength: 30, target: 20, defaultValue: 'order-history-reader-by-region' },
+};

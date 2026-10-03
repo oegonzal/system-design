@@ -55,7 +55,8 @@ export function ResponsibilitiesEditor({
       <TextField
         label="Add responsibility"
         value={draft}
-        maxLength={RESPONSIBILITY_BOUND.target}
+        maxLength={RESPONSIBILITY_BOUND.ceiling}
+        target={RESPONSIBILITY_BOUND.target}
         disabled={atCap}
         placeholder="e.g. owns the order lifecycle"
         onChange={(event) => setDraft(event.target.value)}

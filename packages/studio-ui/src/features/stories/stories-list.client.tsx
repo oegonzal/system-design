@@ -119,11 +119,13 @@ export function StoriesList() {
       <Surface padding={5}>
         <FilterRow>
           <SearchSlot>
+            {/* A filter is bounded as the API bounds its query: by what a story
+                may store, the ceiling — a longer term can never match. */}
             <TextField
               label="Search"
               type="search"
               value={search}
-              maxLength={STORY_SECTION_BOUND.target}
+              maxLength={STORY_SECTION_BOUND.ceiling}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search titles, situations, results…"
               data-testid="story-search"
@@ -133,7 +135,7 @@ export function StoriesList() {
             <TextField
               label="Tag"
               value={tag}
-              maxLength={STORY_TAG_BOUND.target}
+              maxLength={STORY_TAG_BOUND.ceiling}
               onChange={(event) => setTag(event.target.value)}
               placeholder="e.g. caching"
               data-testid="story-tag-filter"
