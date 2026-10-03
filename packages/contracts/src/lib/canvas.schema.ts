@@ -1,32 +1,33 @@
 import { z } from 'zod';
 
+import { bounded } from './bounds';
 import {
-  BINDING_CLAIM_MAX_LENGTH,
-  BINDING_MAX_NODES,
-  BRIEF_MAX_BINDINGS,
+  BINDING_CLAIM_BOUND,
+  BINDING_NODES_BOUND,
+  BRIEF_BINDINGS_BOUND,
+  CANVAS_EDGES_BOUND,
   CANVAS_ID_MAX_LENGTH,
   CANVAS_MAX_TOTAL_OPERATIONS,
-  CANVAS_MAX_EDGES,
-  CANVAS_MAX_NODES,
+  CANVAS_NODES_BOUND,
+  EDGE_CARRIES_BOUND,
   EDGE_KINDS,
-  EDGE_LABEL_MAX_LENGTH,
-  EDGE_MAX_CARRIES,
-  FLOW_MAX_STEPS,
-  NARRATION_MAX_COMPONENT_RATIONALES,
-  NARRATION_MAX_CRITERION_NARRATIONS,
-  NARRATION_OVERVIEW_MAX_LENGTH,
-  NARRATION_PROSE_MAX_LENGTH,
+  EDGE_LABEL_BOUND,
+  FLOW_STEPS_BOUND,
+  NARRATION_COMPONENT_RATIONALES_BOUND,
+  NARRATION_CRITERION_NARRATIONS_BOUND,
+  NARRATION_OVERVIEW_BOUND,
+  NARRATION_PROSE_BOUND,
   NODE_CONFIG_KEY_MAX_LENGTH,
-  NODE_CONFIG_MAX_KEYS,
-  NODE_CONFIG_STRING_VALUE_MAX_LENGTH,
+  NODE_CONFIG_KEYS_BOUND,
+  NODE_CONFIG_STRING_VALUE_BOUND,
   NODE_KINDS,
-  NODE_LABEL_MAX_LENGTH,
-  NODE_MAX_OPERATIONS,
-  NODE_MAX_RESPONSIBILITIES,
+  NODE_LABEL_BOUND,
+  NODE_OPERATIONS_BOUND,
+  NODE_RESPONSIBILITIES_BOUND,
   OPERATION_KINDS,
   OPERATION_NAME_MAX_LENGTH,
-  OPERATION_NOTES_MAX_LENGTH,
-  RESPONSIBILITY_MAX_LENGTH,
+  OPERATION_NOTES_BOUND,
+  RESPONSIBILITY_BOUND,
 } from './canvas';
 import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
 
@@ -38,22 +39,23 @@ import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
  * and its coach revises, and the canvas UI types its store from it. One schema
  * means one shape; there is no DTO class or hand-written interface to drift.
  *
- * Bounds are `.max()` everywhere and `.min(1)` only on the things other parts
- * reference (ids, a binding's components, a claim). Nothing is cut to fit: a
- * string past its bound is a schema miss that discards the coach's whole
- * answer, so every string bound sits above the longest the coach has
- * measurably written (the canvas pipeline's spec holds them there), and an
- * empty string it should not have emitted cannot be repaired either — the
- * schema asks for as little as it can. `.describe()` lines are read by the
- * coach, which writes into this schema.
+ * Every bound is declared through `bounded` and `.min(1)` is only on the
+ * things other parts reference (ids, a binding's components, a claim). The
+ * model is asked for each bound's target and the schema accepts its ceiling;
+ * past that the parse keeps prose whole and trims a list by whole items, so
+ * a string a little over is never a lost revision — while an empty string
+ * the coach should not have emitted cannot be repaired, so the schema asks
+ * for as little as it can. `description`s are read by the coach, which
+ * writes into this schema.
  */
 
-const canvasId = z.string().min(1).max(CANVAS_ID_MAX_LENGTH);
-const criterionId = z.string().min(1).max(CRITERION_ID_MAX_LENGTH);
+const canvasId = (description?: string) =>
+  bounded.id(CANVAS_ID_MAX_LENGTH, { min: 1, description });
+const criterionId = () => bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 });
 
 /** A config value is a scalar the author typed: text, a number or a flag. */
 export const nodeConfigValueSchema = z.union([
-  z.string().max(NODE_CONFIG_STRING_VALUE_MAX_LENGTH),
+  bounded.text(NODE_CONFIG_STRING_VALUE_BOUND),
   z.number(),
   z.boolean(),
 ]);
@@ -65,7 +67,7 @@ export type NodeConfigValue = z.infer<typeof nodeConfigValueSchema>;
  * its keys under structured output, a list does not.
  */
 export const nodeConfigEntrySchema = z.strictObject({
-  key: z.string().min(1).max(NODE_CONFIG_KEY_MAX_LENGTH),
+  key: bounded.id(NODE_CONFIG_KEY_MAX_LENGTH, { min: 1 }),
   value: nodeConfigValueSchema,
 });
 export type NodeConfigEntry = z.infer<typeof nodeConfigEntrySchema>;
@@ -76,74 +78,67 @@ export type NodeConfigEntry = z.infer<typeof nodeConfigEntrySchema>;
  * is a continuous flow. Names are matched exactly by an edge's `carries`.
  */
 export const nodeOperationSchema = z.strictObject({
-  name: z.string().min(1).max(OPERATION_NAME_MAX_LENGTH),
+  name: bounded.id(OPERATION_NAME_MAX_LENGTH, { min: 1 }),
   kind: z.enum(OPERATION_KINDS).optional(),
   idempotent: z.boolean().optional(),
-  notes: z.string().max(OPERATION_NOTES_MAX_LENGTH).optional(),
+  notes: bounded.text(OPERATION_NOTES_BOUND).optional(),
 });
 export type NodeOperation = z.infer<typeof nodeOperationSchema>;
 
 export const canvasNodeSchema = z.strictObject({
-  id: canvasId.describe("The author's id; keep it. A new node takes an id starting with `ai-`."),
+  id: canvasId("The author's id; keep it. A new node takes an id starting with `ai-`."),
   kind: z.enum(NODE_KINDS),
-  label: z.string().max(NODE_LABEL_MAX_LENGTH),
+  label: bounded.text(NODE_LABEL_BOUND),
   /** Canvas layout, so a stored revision re-renders where the author left it. */
   position: z
     .strictObject({ x: z.number(), y: z.number() })
     .optional()
     .describe('Omit for a new node; the studio lays it out.'),
-  config: z
-    .array(nodeConfigEntrySchema)
-    .max(NODE_CONFIG_MAX_KEYS)
-    .optional()
-    .describe('One entry per key; a key set twice is refused.'),
-  /** Short role statements — "owns the order lifecycle", one clause each. */
-  responsibilities: z
-    .array(z.string().max(RESPONSIBILITY_MAX_LENGTH))
-    .max(NODE_MAX_RESPONSIBILITIES)
+  config: bounded
+    .list(NODE_CONFIG_KEYS_BOUND, nodeConfigEntrySchema, {
+      description: 'One entry per key; a key set twice is refused.',
+    })
     .optional(),
-  operations: z
-    .array(nodeOperationSchema)
-    .max(NODE_MAX_OPERATIONS)
-    .optional()
-    .describe(
-      "This node's declared interface. A name must be unique on the node, and an edge's `carries` matches it exactly.",
-    ),
+  /** Short role statements — "owns the order lifecycle", one clause each. */
+  responsibilities: bounded
+    .list(NODE_RESPONSIBILITIES_BOUND, bounded.text(RESPONSIBILITY_BOUND))
+    .optional(),
+  operations: bounded
+    .list(NODE_OPERATIONS_BOUND, nodeOperationSchema, {
+      description:
+        "This node's declared interface. A name must be unique on the node, and an edge's `carries` matches it exactly.",
+    })
+    .optional(),
 });
 export type CanvasNode = z.infer<typeof canvasNodeSchema>;
 
 export const canvasEdgeSchema = z.strictObject({
-  id: canvasId.describe("The author's id; keep it. A new edge takes an id starting with `ai-`."),
-  source: canvasId,
-  target: canvasId,
+  id: canvasId("The author's id; keep it. A new edge takes an id starting with `ai-`."),
+  source: canvasId(),
+  target: canvasId(),
   /** A solid request/response call, or fire-and-forget messaging. */
   kind: z.enum(EDGE_KINDS),
-  label: z.string().max(EDGE_LABEL_MAX_LENGTH).optional(),
+  label: bounded.text(EDGE_LABEL_BOUND).optional(),
   /** Operation names this connection exercises — declared on its source or its target. */
-  carries: z
-    .array(z.string().min(1).max(OPERATION_NAME_MAX_LENGTH))
-    .max(EDGE_MAX_CARRIES)
-    .optional()
-    .describe(
-      'Operation names this connection exercises, each declared on its source or its target, and none repeated.',
-    ),
+  carries: bounded
+    .list(EDGE_CARRIES_BOUND, bounded.id(OPERATION_NAME_MAX_LENGTH, { min: 1 }), {
+      description:
+        'Operation names this connection exercises, each declared on its source or its target, and none repeated.',
+    })
+    .optional(),
 });
 export type CanvasEdge = z.infer<typeof canvasEdgeSchema>;
 
 export const canvasGraphSchema = z.strictObject({
-  nodes: z
-    .array(canvasNodeSchema)
-    .max(CANVAS_MAX_NODES)
+  nodes: bounded.list(CANVAS_NODES_BOUND, canvasNodeSchema, {
     // The budget is the one rule no bound can carry — it is a sum across nodes —
     // so it is stated here, interpolated, rather than left for the writer to be
     // refused by a number it was never shown.
-    .describe(
-      `Every node id is distinct, and all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations.`,
-    ),
-  edges: z
-    .array(canvasEdgeSchema)
-    .max(CANVAS_MAX_EDGES)
-    .describe('Every edge id is distinct, and no edge joins a node to itself.'),
+    description: `Every node id is distinct, and all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations.`,
+  }),
+  edges: bounded.list(CANVAS_EDGES_BOUND, canvasEdgeSchema, {
+    description: 'Every edge id is distinct, and no edge joins a node to itself.',
+  }),
 });
 export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
 
@@ -153,20 +148,18 @@ export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
  * of edges it takes. One binding per criterion.
  */
 export const bindingSchema = z.strictObject({
-  criterionId,
-  nodeIds: z
-    .array(canvasId)
-    .min(1)
-    .max(BINDING_MAX_NODES)
-    .describe('Every node that holds this criterion, existing ids only.'),
-  path: z
-    .array(canvasId)
-    .max(FLOW_MAX_STEPS)
-    .optional()
-    .describe(
-      'One connected walk of existing edge ids, in order — each edge starts where the previous one ends. The single route a request takes, never every edge involved.',
-    ),
-  claim: z.string().min(1).max(BINDING_CLAIM_MAX_LENGTH),
+  criterionId: criterionId(),
+  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasId(), {
+    min: 1,
+    description: 'Every node that holds this criterion, existing ids only.',
+  }),
+  path: bounded
+    .list(FLOW_STEPS_BOUND, canvasId(), {
+      description:
+        'One connected walk of existing edge ids, in order — each edge starts where the previous one ends. The single route a request takes, never every edge involved.',
+    })
+    .optional(),
+  claim: bounded.text(BINDING_CLAIM_BOUND, { min: 1 }),
 });
 export type Binding = z.infer<typeof bindingSchema>;
 
@@ -174,24 +167,23 @@ export const DESIGN_BRIEF_VERSION = 1;
 
 export const designBriefSchema = z.strictObject({
   version: z.literal(DESIGN_BRIEF_VERSION),
-  bindings: z
-    .array(bindingSchema)
-    .max(BRIEF_MAX_BINDINGS)
-    .describe('At most one binding per criterion.'),
+  bindings: bounded.list(BRIEF_BINDINGS_BOUND, bindingSchema, {
+    description: 'At most one binding per criterion.',
+  }),
 });
 export type DesignBrief = z.infer<typeof designBriefSchema>;
 
 export const NARRATION_VERSION = 1;
 
 export const componentRationaleSchema = z.strictObject({
-  nodeId: canvasId,
-  prose: z.string().max(NARRATION_PROSE_MAX_LENGTH),
+  nodeId: canvasId(),
+  prose: bounded.text(NARRATION_PROSE_BOUND),
 });
 export type ComponentRationale = z.infer<typeof componentRationaleSchema>;
 
 export const criterionNarrationSchema = z.strictObject({
-  criterionId,
-  prose: z.string().max(NARRATION_PROSE_MAX_LENGTH),
+  criterionId: criterionId(),
+  prose: bounded.text(NARRATION_PROSE_BOUND),
 });
 export type CriterionNarration = z.infer<typeof criterionNarrationSchema>;
 
@@ -202,9 +194,9 @@ export type CriterionNarration = z.infer<typeof criterionNarrationSchema>;
  */
 export const designNarrativeSchema = z.strictObject({
   version: z.literal(NARRATION_VERSION),
-  overview: z.string().max(NARRATION_OVERVIEW_MAX_LENGTH).optional(),
-  componentRationales: z.array(componentRationaleSchema).max(NARRATION_MAX_COMPONENT_RATIONALES),
-  criterionNarrations: z.array(criterionNarrationSchema).max(NARRATION_MAX_CRITERION_NARRATIONS),
+  overview: bounded.text(NARRATION_OVERVIEW_BOUND).optional(),
+  componentRationales: bounded.list(NARRATION_COMPONENT_RATIONALES_BOUND, componentRationaleSchema),
+  criterionNarrations: bounded.list(NARRATION_CRITERION_NARRATIONS_BOUND, criterionNarrationSchema),
 });
 export type DesignNarrative = z.infer<typeof designNarrativeSchema>;
 
@@ -223,13 +215,13 @@ export type DesignSubmission = z.infer<typeof designSubmissionSchema>;
  * is about to draw.
  */
 export const bindingDraftSchema = bindingSchema.extend({
-  nodeIds: z.array(canvasId).max(BINDING_MAX_NODES),
-  claim: z.string().max(BINDING_CLAIM_MAX_LENGTH),
+  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasId()),
+  claim: bounded.text(BINDING_CLAIM_BOUND),
 });
 
 export const designBriefDraftSchema = z.strictObject({
   version: z.literal(DESIGN_BRIEF_VERSION),
-  bindings: z.array(bindingDraftSchema).max(BRIEF_MAX_BINDINGS),
+  bindings: bounded.list(BRIEF_BINDINGS_BOUND, bindingDraftSchema),
 });
 
 /** The unsubmitted canvas, as `PUT /sessions/:id/draft` stores it and the workspace restores it. */

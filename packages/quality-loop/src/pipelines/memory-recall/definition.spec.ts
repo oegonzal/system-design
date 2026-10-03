@@ -25,7 +25,7 @@ describe('the memory-recall pipeline', () => {
     // 286 characters across the recorded runs (static/runs, to 2026-10-02):
     // the persona asks for the query's own numbers and wording, never for
     // every alias, so no bound of its own is declared.
-    expect(MEMORY_RECALL.task.maxStatementLength).toBeUndefined();
+    expect(MEMORY_RECALL.task.statementBound).toBeUndefined();
     const kinds = Object.keys(MEMORY_RECALL.task.criterionKinds) as [string, ...string[]];
     const schema = criteriaSchema(
       kinds,

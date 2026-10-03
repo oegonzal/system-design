@@ -1,10 +1,10 @@
 import {
   DEFAULT_LIST_LIMIT,
   MAX_LIST_LIMIT,
-  PROMPT_MARKDOWN_MAX_LENGTH,
+  PROMPT_MARKDOWN_BOUND,
   PROMPT_SOURCES,
   PROMPT_STATUSES,
-  PROMPT_TITLE_MAX_LENGTH,
+  PROMPT_TITLE_BOUND,
   promptDocumentSchema,
 } from '@sysdesign/contracts';
 import { pageFields } from '@sysdesign/nest-kit';
@@ -24,8 +24,8 @@ export const generatePromptSchema = z.strictObject({ experienceId: z.uuid().opti
 
 export const updatePromptSchema = z.strictObject({
   status: z.enum(PROMPT_STATUSES).optional(),
-  title: z.string().min(1).max(PROMPT_TITLE_MAX_LENGTH).optional(),
-  markdown: z.string().min(1).max(PROMPT_MARKDOWN_MAX_LENGTH).optional(),
+  title: z.string().min(1).max(PROMPT_TITLE_BOUND.target).optional(),
+  markdown: z.string().min(1).max(PROMPT_MARKDOWN_BOUND.target).optional(),
 });
 
 export const listPromptsQuerySchema = z.strictObject({

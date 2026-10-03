@@ -1,7 +1,7 @@
 /**
  * A supplied rubric stands in for the derived one only when the task could
  * have derived it: ids unique, every kind one the task prices, no more
- * criteria than it allows, none longer than its deriver may write. Checked
+ * criteria than it allows, none longer than its deriver is accepted with. Checked
  * before any row is written or any model is called; the problems name what
  * is wrong so the caller can fix its rubric.
  */
@@ -33,7 +33,7 @@ export function rubricProblems(
   // Measured where the bound is declared, never read here: only which ids run past it.
   for (const id of overlongCriteria(criteria, task)) {
     problems.push(
-      `criterion ${id} is longer than the ${criterionLengthBound(task)} characters this pipeline allows`,
+      `criterion ${id} is longer than the ${criterionLengthBound(task).ceiling} characters this pipeline allows`,
     );
   }
   return problems;

@@ -1,20 +1,35 @@
 import { describe, expect, it } from 'vitest';
 
+import { LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
+
 import { renderGoal as renderQuery } from '../../../pipelines/memory-recall/input';
 import { MAX_PROBES } from '../ports';
-import { fused, GOAL as PROMPT, hitOf } from '../testing';
+import { builtQuery, fused, GOAL as PROMPT, hitOf } from '../testing';
 import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
 
 describe('the recall query', () => {
-  it('[QL-16] is the goal head under the byte cap, and a maximal query still renders under the goal budget', () => {
+  it('[QL-16] is the goal head under the byte cap, and a maximal query of the longest lessons still renders under the goal budget', () => {
     const long = 'x'.repeat(70_000);
     expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(16_000);
     const wide = Array.from({ length: 17 }, (_, index) =>
-      hitOf('y'.repeat(1_200), `run-${index}`, 'memory.1'),
+      hitOf('y'.repeat(LESSON_CHUNK_BOUND.ceiling), `run-${index}`, 'memory.1'),
     );
-    const query = buildQuery(queryText(long), probeSet(long, []), fused(wide));
+    const query = builtQuery(queryText(long), probeSet(long, []), fused(wide));
     expect(query.candidates).toHaveLength(16);
     expect(() => renderQuery(query)).not.toThrow();
+  });
+
+  it('[QL-41] a query the curator’s schema refuses is a diagnostic in the one wording, never a throw', () => {
+    const stale = hitOf('y'.repeat(LESSON_CHUNK_BOUND.ceiling + 1), 'run-stale', 'memory.1');
+    const built = buildQuery(queryText(PROMPT), probeSet(PROMPT, []), fused([stale]));
+    expect(built.query).toBeNull();
+    expect(built.issues.map((issue) => issue.path)).toEqual(['candidates[0].text']);
+    expect(built.issues[0]).toMatchObject({
+      code: 'too_big',
+      target: LESSON_CHUNK_BOUND.target,
+      maximum: LESSON_CHUNK_BOUND.ceiling,
+      actual: LESSON_CHUNK_BOUND.ceiling + 1,
+    });
   });
 });
 
@@ -82,7 +97,7 @@ describe('a probe set focused on the defects of an adopted iteration', () => {
       ],
       [0, 1, 3],
     );
-    const query = buildQuery(queryText(PROMPT), set, [first, { ...second, probes: [0] }]);
+    const query = builtQuery(queryText(PROMPT), set, [first, { ...second, probes: [0] }]);
     expect(query.focus).toEqual(defects);
     expect(query.probes).toEqual([derived[0]]);
     expect(query.candidates.map((candidate) => candidate.matched)).toEqual([['d1', 'p1'], []]);

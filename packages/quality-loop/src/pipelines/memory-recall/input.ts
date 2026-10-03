@@ -4,7 +4,7 @@
  * engine hands every stage, and reads its own bookkeeping back. The index the
  * validators read is the last fenced JSON block, so no rule parses prose.
  */
-import { DECISIONS } from '@sysdesign/contracts';
+import { bound, bounded, DECISIONS, exact, LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -22,10 +22,6 @@ export const MAX_CANDIDATES = 16;
 export const MAX_KEPT = 8;
 /** A candidate or probe alias: `m12`, `p3`. */
 export const ALIAS_MAX = 8;
-const QUERY_MAX = 16_000;
-const CHUNK_MAX = 1_200;
-const RULE_MAX = 300;
-const MAX_RULES = 8;
 export const PROBE_MAX = 240;
 const MAX_QUERY_PROBES = 6;
 /**
@@ -35,53 +31,69 @@ const MAX_QUERY_PROBES = 6;
  */
 export const MAX_FOCUS = MAX_KEPT;
 
+/*
+ * The orchestrator composes the query from what it searched and sliced, so
+ * the counts are exact and the prose is bounded; a candidate's text is a
+ * stored lesson, bounded by the lesson's own declaration so a lesson a
+ * digest accepted always fits the query that recalls it.
+ */
+const QUERY_BOUND = bound(16_000);
+const RULE_BOUND = bound(300);
+const RULES_BOUND = bound(8, 'list');
+const PROBE_BOUND = bound(PROBE_MAX);
+const FOCUS_BOUND = exact(MAX_FOCUS);
+const QUERY_PROBES_BOUND = exact(MAX_QUERY_PROBES);
+const CANDIDATES_BOUND = exact(MAX_CANDIDATES);
+const MATCHED_BOUND = exact(MAX_FOCUS + MAX_QUERY_PROBES);
+const SOURCE_ID_MAX_LENGTH = 80;
+const SOURCE_REF_MAX_LENGTH = 200;
+const SOURCE_WHEN_MAX_LENGTH = 40;
+
 export const CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
 
 export const chunkSourceSchema = z.strictObject({
-  runId: z.string().min(1).max(80),
-  pipeline: z.string().min(1).max(80),
+  runId: bounded.id(SOURCE_ID_MAX_LENGTH, { min: 1 }),
+  pipeline: bounded.id(SOURCE_ID_MAX_LENGTH, { min: 1 }),
   kind: z.enum(CHUNK_KINDS),
   /** The engine id the chunk carries: a location id, a finding key or a criterion id. */
-  ref: z.string().min(1).max(200),
+  ref: bounded.id(SOURCE_REF_MAX_LENGTH, { min: 1 }),
   decision: z.enum(DECISIONS),
   iteration: z.number().int().min(1),
-  when: z.string().min(1).max(40),
+  when: bounded.id(SOURCE_WHEN_MAX_LENGTH, { min: 1 }),
 });
 export type ChunkSource = z.infer<typeof chunkSourceSchema>;
 
+const probe = () => bounded.text(PROBE_BOUND, { min: 1 });
+
 const queryShape = z.strictObject({
   /** The prompt as a producer would receive it — any markdown. */
-  query: z.string().min(1).max(QUERY_MAX),
+  query: bounded.text(QUERY_BOUND, { min: 1 }),
   /** Prose rules about what may be kept; each derives an admissibility criterion. */
-  rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
+  rules: bounded.list(RULES_BOUND, bounded.text(RULE_BOUND, { min: 1 })),
   /**
    * What is wrong with the answer the query is about, when it was judged
    * before: its confirmed defects and the criteria it fell short on, worst
    * first. Searched under as the probes are, and cited by alias the same way.
    */
-  focus: z.array(z.string().min(1).max(PROBE_MAX)).max(MAX_FOCUS).default([]),
+  focus: bounded.list(FOCUS_BOUND, probe()).default([]),
   /** The conditions the retriever searched under, listed once and cited by alias. */
-  probes: z.array(z.string().min(1).max(PROBE_MAX)).max(MAX_QUERY_PROBES).default([]),
+  probes: bounded.list(QUERY_PROBES_BOUND, probe()).default([]),
   maxKept: z.number().int().min(1).max(MAX_KEPT),
-  candidates: z
-    .array(
-      z.strictObject({
-        text: z.string().min(1).max(CHUNK_MAX),
-        source: chunkSourceSchema,
-        /**
-         * Aliases of the defects and probes that surfaced this chunk. Empty
-         * means it came back on the query as a whole. It says why the chunk
-         * is here, never that it is useful — that is the pipeline's
-         * judgement, and the retriever has no opinion worth deferring to.
-         */
-        matched: z
-          .array(z.string().min(1).max(ALIAS_MAX))
-          .max(MAX_FOCUS + MAX_QUERY_PROBES)
-          .default([]),
-      }),
-    )
-    .min(1)
-    .max(MAX_CANDIDATES),
+  candidates: bounded.list(
+    CANDIDATES_BOUND,
+    z.strictObject({
+      text: bounded.text(LESSON_CHUNK_BOUND, { min: 1 }),
+      source: chunkSourceSchema,
+      /**
+       * Aliases of the defects and probes that surfaced this chunk. Empty
+       * means it came back on the query as a whole. It says why the chunk
+       * is here, never that it is useful — that is the pipeline's
+       * judgement, and the retriever has no opinion worth deferring to.
+       */
+      matched: bounded.list(MATCHED_BOUND, bounded.id(ALIAS_MAX, { min: 1 })).default([]),
+    }),
+    { min: 1 },
+  ),
 });
 export type MemoryQuery = z.infer<typeof queryShape>;
 

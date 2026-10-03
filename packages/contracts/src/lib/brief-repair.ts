@@ -1,4 +1,4 @@
-import { BINDING_MAX_NODES, BRIEF_MAX_BINDINGS, FLOW_MAX_STEPS } from './canvas';
+import { BINDING_NODES_BOUND, BRIEF_BINDINGS_BOUND, FLOW_STEPS_BOUND } from './canvas';
 import {
   DESIGN_BRIEF_VERSION,
   type Binding,
@@ -25,7 +25,7 @@ import type { CriterionRef } from './brief-validator';
 export function validPrefix(graph: CanvasGraph, path: readonly string[]): string[] {
   const kept: string[] = [];
   let previousTarget: string | null = null;
-  for (const edgeId of path.slice(0, FLOW_MAX_STEPS)) {
+  for (const edgeId of path.slice(0, FLOW_STEPS_BOUND.ceiling)) {
     const edge = graph.edges.find((candidate) => candidate.id === edgeId);
     if (!edge) break;
     if (previousTarget !== null && edge.source !== previousTarget) break;
@@ -46,6 +46,8 @@ export function validPrefix(graph: CanvasGraph, path: readonly string[]): string
  * rubric lists, a claim, at least one component still on the canvas, and a
  * path that is a connected walk (truncated at the first hop that no longer
  * connects). The first binding per criterion wins; the rest are duplicates.
+ * Lists are cut at what the schema accepts — a bound's ceiling — so the
+ * repair never drops what the schema would have kept.
  */
 export function reconcileBrief(
   bindings: readonly Binding[],
@@ -59,12 +61,12 @@ export function reconcileBrief(
   const kept: Binding[] = [];
   for (const binding of bindings) {
     if (!criterionIds.has(binding.criterionId) || seen.has(binding.criterionId)) continue;
-    // Trimmed, never cut: a claim past its bound stays whole for the schema to refuse.
+    // Trimmed, never cut: a claim past its bound stays whole for the schema to keep or refuse.
     const claim = binding.claim.trim();
     if (claim.length === 0) continue;
     const nodes = [...new Set(binding.nodeIds)]
       .filter((id) => nodeIds.has(id))
-      .slice(0, BINDING_MAX_NODES);
+      .slice(0, BINDING_NODES_BOUND.ceiling);
     if (nodes.length === 0) continue;
     const path = validPrefix(graph, binding.path ?? []);
     seen.add(binding.criterionId);
@@ -74,7 +76,7 @@ export function reconcileBrief(
       ...(path.length > 0 ? { path } : {}),
       claim,
     });
-    if (kept.length >= BRIEF_MAX_BINDINGS) break;
+    if (kept.length >= BRIEF_BINDINGS_BOUND.ceiling) break;
   }
 
   if (kept.length === 0) return null;

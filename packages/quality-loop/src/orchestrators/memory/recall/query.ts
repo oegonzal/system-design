@@ -3,6 +3,7 @@
  * it searches under, the probes those become against every named vector,
  * and the memory query the curator is handed once the hits are in.
  */
+import { modelSchema, schemaIssuesOf, type SchemaIssue } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 
 import {
@@ -98,28 +99,38 @@ export function probesOf(vectors: readonly (readonly number[])[], limit: number)
  */
 export const probeOf = (listIndex: number): number => Math.floor(listIndex / VECTOR_NAMES.length);
 
+/** The query, or every way the composed one missed the curator's schema — a diagnostic, never a throw. */
+export type BuiltQuery =
+  { query: MemoryQuery; issues: [] } | { query: null; issues: SchemaIssue[] };
+
+const QUERY_BOUNDS = modelSchema(memoryQuerySchema).bounds;
+
 /**
  * The query the curator judges: the whole prompt, what is wrong with the
  * answer it is about when the recall was focused, the candidates, and — for
  * each — the defects and derived conditions it was retrieved under. The
  * prompt itself is never cited, since "this came back on the prompt" is not
- * information.
+ * information. Composed from what was searched and sliced, so a miss is a
+ * stored chunk the schema no longer admits or a query past the goal budget;
+ * either is reported, in the one wording, rather than thrown.
  */
-export function buildQuery(
-  query: string,
-  probes: ProbeSet,
-  hits: readonly FusedHit[],
-): MemoryQuery {
-  return memoryQuerySchema.parse({
-    query,
-    rules: [...RECALL_RULES],
-    focus: probes.focus,
-    probes: probes.derived,
-    maxKept: MAX_KEPT,
-    candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
-      text: hit.text,
-      source: hit.source,
-      matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
-    })),
-  });
+export function buildQuery(query: string, probes: ProbeSet, hits: readonly FusedHit[]): BuiltQuery {
+  const parsed = memoryQuerySchema.safeParse(
+    {
+      query,
+      rules: [...RECALL_RULES],
+      focus: probes.focus,
+      probes: probes.derived,
+      maxKept: MAX_KEPT,
+      candidates: hits.slice(0, MAX_CANDIDATES).map((hit) => ({
+        text: hit.text,
+        source: hit.source,
+        matched: hit.probes.flatMap((index) => searchAlias(probes, index) ?? []),
+      })),
+    },
+    { reportInput: true },
+  );
+  return parsed.success
+    ? { query: parsed.data, issues: [] }
+    : { query: null, issues: schemaIssuesOf(parsed.error.issues, QUERY_BOUNDS) };
 }

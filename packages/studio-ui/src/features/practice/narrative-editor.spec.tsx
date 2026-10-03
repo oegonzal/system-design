@@ -1,4 +1,4 @@
-import { NARRATION_OVERVIEW_MAX_LENGTH, NARRATION_PROSE_MAX_LENGTH } from '@sysdesign/contracts';
+import { NARRATION_OVERVIEW_BOUND, NARRATION_PROSE_BOUND } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -90,15 +90,15 @@ describe('NarrativeEditor', () => {
     renderEditor();
     const maxLength = (testId: string) =>
       (screen.getByTestId(testId) as HTMLTextAreaElement).maxLength;
-    expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_MAX_LENGTH);
-    expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_MAX_LENGTH);
-    expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_MAX_LENGTH);
+    expect(maxLength('narrative-overview')).toBe(NARRATION_OVERVIEW_BOUND.target);
+    expect(maxLength('narrative-rationale-n-3')).toBe(NARRATION_PROSE_BOUND.target);
+    expect(maxLength('narrative-narration-c1')).toBe(NARRATION_PROSE_BOUND.target);
   });
 
   it('[UX-8] says how much of a slot’s limit is left as it nears, and that it was reached — a walkthrough never just stops taking words', () => {
     const store = renderEditor((seeded) => {
       seeded.getState().setNarrativeOverview('Reads and writes are split.');
-      seeded.getState().setComponentRationale('n-3', 'x'.repeat(NARRATION_PROSE_MAX_LENGTH - 7));
+      seeded.getState().setComponentRationale('n-3', 'x'.repeat(NARRATION_PROSE_BOUND.target - 7));
     });
     // Far from its limit, a slot says nothing; within the last stretch, it counts down.
     expect(screen.getAllByText(/characters? left/).map((count) => count.textContent)).toEqual([
@@ -107,10 +107,10 @@ describe('NarrativeEditor', () => {
     const rationale = screen.getByTestId('narrative-rationale-n-3');
     expect(rationale.getAttribute('aria-describedby')).toContain(`${rationale.id}-limit`);
 
-    act(() => store.getState().setNarrativeOverview('x'.repeat(NARRATION_OVERVIEW_MAX_LENGTH)));
+    act(() => store.getState().setNarrativeOverview('x'.repeat(NARRATION_OVERVIEW_BOUND.target)));
     expect(
       screen.getByText(
-        `Limit reached — ${NARRATION_OVERVIEW_MAX_LENGTH.toLocaleString('en-US')} characters at most.`,
+        `Limit reached — ${NARRATION_OVERVIEW_BOUND.target.toLocaleString('en-US')} characters at most.`,
       ),
     ).toBeTruthy();
   });

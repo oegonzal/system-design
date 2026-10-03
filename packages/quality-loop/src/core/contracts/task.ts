@@ -1,6 +1,7 @@
 import {
-  CRITERION_STATEMENT_MAX_LENGTH,
+  CRITERION_STATEMENT_BOUND,
   type ArtifactLocation,
+  type Bound,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
@@ -43,27 +44,27 @@ export interface TaskSpec<T> {
   readonly maxCriteria: number;
 
   /**
-   * The longest statement the deriver may write — and a supplied rubric may
-   * carry. The contract's bound unless declared: a pipeline whose record
-   * genuinely needs longer statements sizes its own from measured runs, with
-   * headroom, since a statement past the bound discards the whole rubric.
+   * The statement bound the deriver writes within — its target asked for,
+   * its ceiling accepted — and a supplied rubric may carry. The contract's
+   * bound unless declared: a pipeline whose record genuinely needs longer
+   * statements sizes its own from measured runs.
    */
-  readonly maxStatementLength?: number;
+  readonly statementBound?: Bound;
 
   readonly output: OutputShape<T>;
 }
 
-/** The length a task holds every criterion statement to: its own bound, or the contract's. */
-export const criterionLengthBound = (task: Pick<TaskSpec<unknown>, 'maxStatementLength'>): number =>
-  task.maxStatementLength ?? CRITERION_STATEMENT_MAX_LENGTH;
+/** The bound a task holds every criterion statement to: its own, or the contract's. */
+export const criterionLengthBound = (task: Pick<TaskSpec<unknown>, 'statementBound'>): Bound =>
+  task.statementBound ?? CRITERION_STATEMENT_BOUND;
 
-/** The ids of the criteria whose statement runs past the task's bound. */
+/** The ids of the criteria whose statement runs past what the task accepts — its bound's ceiling. */
 export const overlongCriteria = (
   criteria: readonly SuccessCriterion[],
-  task: Pick<TaskSpec<unknown>, 'maxStatementLength'>,
+  task: Pick<TaskSpec<unknown>, 'statementBound'>,
 ): string[] =>
   criteria
-    .filter((criterion) => criterion.statement.length > criterionLengthBound(task))
+    .filter((criterion) => criterion.statement.length > criterionLengthBound(task).ceiling)
     .map((criterion) => criterion.id);
 
 /** The task contract for one run: the spec plus the goal and its derived criteria. */

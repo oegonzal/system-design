@@ -1,7 +1,7 @@
 import {
-  HISTORY_ACTION_MAX,
+  HISTORY_ACTION_BOUND,
   HISTORY_MAX,
-  HISTORY_NOTE_MAX,
+  HISTORY_NOTE_BOUND,
   type OperatorGuidanceDto,
   type PageObservation,
   type SessionRailsDto,
@@ -113,9 +113,9 @@ export function pushHistory(
   note: string | null,
 ): void {
   state.history.push({
-    action: clip(action, HISTORY_ACTION_MAX),
+    action: clip(action, HISTORY_ACTION_BOUND.target),
     outcome,
-    note: note === null ? null : clip(note, HISTORY_NOTE_MAX),
+    note: note === null ? null : clip(note, HISTORY_NOTE_BOUND.target),
   });
   if (state.history.length > HISTORY_MAX)
     state.history.splice(0, state.history.length - HISTORY_MAX);

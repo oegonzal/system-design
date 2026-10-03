@@ -3,8 +3,8 @@
 import styled from '@emotion/styled';
 import {
   NODE_CONFIG_KEY_MAX_LENGTH,
-  NODE_CONFIG_MAX_KEYS,
-  NODE_CONFIG_STRING_VALUE_MAX_LENGTH,
+  NODE_CONFIG_KEYS_BOUND,
+  NODE_CONFIG_STRING_VALUE_BOUND,
   type NodeConfigEntry,
 } from '@sysdesign/contracts';
 import { Badge, Button, Stack, Text, TextField } from '@sysdesign/design-system';
@@ -84,7 +84,7 @@ const Problem = styled(Text)`
 export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
-  const atCap = config.length >= NODE_CONFIG_MAX_KEYS;
+  const atCap = config.length >= NODE_CONFIG_KEYS_BOUND.target;
 
   const normalizedKey = normalizeConfigKey(key);
   const duplicate = config.some((entry) => entry.key === normalizedKey);
@@ -153,7 +153,7 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
             label="Value"
             data-testid="config-value"
             value={value}
-            maxLength={NODE_CONFIG_STRING_VALUE_MAX_LENGTH}
+            maxLength={NODE_CONFIG_STRING_VALUE_BOUND.target}
             disabled={atCap}
             placeholder="3, true, or text"
             onChange={(event) => setValue(event.target.value)}
@@ -173,8 +173,8 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
         </Problem>
       ) : null}
       <Text as="span" size="sm" tone="muted">
-        {config.length} of {NODE_CONFIG_MAX_KEYS} · numbers and true/false are typed as such,
-        anything else is text.
+        {config.length} of {NODE_CONFIG_KEYS_BOUND.target} · numbers and true/false are typed as
+        such, anything else is text.
       </Text>
     </Stack>
   );

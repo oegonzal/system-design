@@ -6,6 +6,7 @@
  * judge whatever they drew. The shapes themselves are the zod schema in
  * `canvas.schema.ts`.
  */
+import { bound } from './bounds';
 
 /**
  * Every building block the palette offers. The single source of the
@@ -212,38 +213,40 @@ export type EdgeKind = (typeof EDGE_KINDS)[number];
 export const OPERATION_KINDS = ['command', 'query', 'event', 'stream'] as const;
 export type OperationKind = (typeof OPERATION_KINDS)[number];
 
-export const CANVAS_MAX_NODES = 100;
-export const CANVAS_MAX_EDGES = 300;
-export const CANVAS_ID_MAX_LENGTH = 64;
-export const NODE_LABEL_MAX_LENGTH = 80;
-export const EDGE_LABEL_MAX_LENGTH = 80;
-
 /*
- * Every string bound below is one the coach writes into: the client never
- * cuts a string to fit, so a bound the coach meets is a schema miss that
- * discards its whole answer. Each sits above the longest the coach has
- * measurably written — the canvas pipeline's spec holds them to those
- * figures — and the editors enforce the same constants as `maxLength`.
+ * Every bound below is one the coach writes into, declared once as a target
+ * and a ceiling (`bound`): the model is asked for the target, the schema
+ * accepts the ceiling without a word, and the parse keeps what runs past it —
+ * nothing is cut to fit, and nothing a little over is refused. Each target
+ * sits above the longest the coach has measurably written (the canvas
+ * pipeline's spec holds them to those figures), and the editors enforce the
+ * same declarations as `maxLength`. Ids are exact: a wrong one is a fault.
  */
-export const NODE_MAX_RESPONSIBILITIES = 6;
-export const RESPONSIBILITY_MAX_LENGTH = 80;
-export const NODE_MAX_OPERATIONS = 12;
+export const CANVAS_NODES_BOUND = bound(100, 'list');
+export const CANVAS_EDGES_BOUND = bound(300, 'list');
+export const CANVAS_ID_MAX_LENGTH = 64;
+export const NODE_LABEL_BOUND = bound(80);
+export const EDGE_LABEL_BOUND = bound(80);
+
+export const NODE_RESPONSIBILITIES_BOUND = bound(6, 'list');
+export const RESPONSIBILITY_BOUND = bound(80);
+export const NODE_OPERATIONS_BOUND = bound(12, 'list');
 export const OPERATION_NAME_MAX_LENGTH = 60;
-export const OPERATION_NOTES_MAX_LENGTH = 200;
-export const EDGE_MAX_CARRIES = 8;
+export const OPERATION_NOTES_BOUND = bound(200);
+export const EDGE_CARRIES_BOUND = bound(8, 'list');
 /** Whole-graph operation budget, enforced by the graph validator. */
 export const CANVAS_MAX_TOTAL_OPERATIONS = 400;
 
-export const NODE_CONFIG_MAX_KEYS = 20;
+export const NODE_CONFIG_KEYS_BOUND = bound(20, 'list');
 export const NODE_CONFIG_KEY_MAX_LENGTH = 40;
-export const NODE_CONFIG_STRING_VALUE_MAX_LENGTH = 120;
+export const NODE_CONFIG_STRING_VALUE_BOUND = bound(120);
 
-export const BRIEF_MAX_BINDINGS = 24;
-export const BINDING_MAX_NODES = 12;
-export const FLOW_MAX_STEPS = 24;
-export const BINDING_CLAIM_MAX_LENGTH = 300;
+export const BRIEF_BINDINGS_BOUND = bound(24, 'list');
+export const BINDING_NODES_BOUND = bound(12, 'list');
+export const FLOW_STEPS_BOUND = bound(24, 'list');
+export const BINDING_CLAIM_BOUND = bound(300);
 
-export const NARRATION_PROSE_MAX_LENGTH = 720;
-export const NARRATION_OVERVIEW_MAX_LENGTH = 1400;
-export const NARRATION_MAX_COMPONENT_RATIONALES = 40;
-export const NARRATION_MAX_CRITERION_NARRATIONS = 24;
+export const NARRATION_PROSE_BOUND = bound(720);
+export const NARRATION_OVERVIEW_BOUND = bound(1400);
+export const NARRATION_COMPONENT_RATIONALES_BOUND = bound(40, 'list');
+export const NARRATION_CRITERION_NARRATIONS_BOUND = bound(24, 'list');

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { GoalBudgetExceeded } from '../quality-loop/goal-index';
-import { evidenceAlias, fieldAnswersSchema, MAX_FIELDS } from './field-answers.schema';
+import { evidenceAlias, fieldAnswersSchema, FIELDS_BOUND } from './field-answers.schema';
 import {
   composeFieldGoal,
   FIELD_EVIDENCE_HEADING,
@@ -65,7 +65,7 @@ describe('composeFieldGoal', () => {
   });
 
   it('[QL-39] refuses a goal that would not fit the engine budget', () => {
-    const many = Array.from({ length: MAX_FIELDS }, (_, i) => ({
+    const many = Array.from({ length: FIELDS_BOUND.target }, (_, i) => ({
       ...fields()[0],
       ref: `e${i + 1}`,
       options: Array.from({ length: 60 }, () => 'o'.repeat(200)),

@@ -1,4 +1,4 @@
-import { NODE_CONFIG_MAX_KEYS, type NodeConfigEntry } from '@sysdesign/contracts';
+import { NODE_CONFIG_KEYS_BOUND, type NodeConfigEntry } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
@@ -39,7 +39,7 @@ export const Typed: Story = {
 export const AtCapacity: Story = {
   render: () => (
     <Controlled
-      initial={Array.from({ length: NODE_CONFIG_MAX_KEYS }, (_, index) => ({
+      initial={Array.from({ length: NODE_CONFIG_KEYS_BOUND.target }, (_, index) => ({
         key: `setting${index + 1}`,
         value: index + 1,
       }))}

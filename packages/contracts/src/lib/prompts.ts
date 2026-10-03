@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { bound, bounded } from './bounds';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { IsoDateString, Uuid } from './primitives';
 import type { SuccessCriterion } from './quality-loop/evidence';
@@ -22,8 +23,9 @@ export type PromptStatus = (typeof PROMPT_STATUSES)[number];
 export const PROMPT_SOURCES = ['authored', 'generated', 'library'] as const;
 export type PromptSource = (typeof PROMPT_SOURCES)[number];
 
-export const PROMPT_TITLE_MAX_LENGTH = 120;
-export const PROMPT_MARKDOWN_MAX_LENGTH = 20_000;
+/** The title is asked for in one line; the stored column is `text`, so only the declared bound limits it. */
+export const PROMPT_TITLE_BOUND = bound(120);
+export const PROMPT_MARKDOWN_BOUND = bound(20_000);
 
 /**
  * The sentences the API refuses a prompt change with and the studio shows
@@ -41,8 +43,8 @@ export const PROMPT_COPY = {
 
 /** A title and a markdown body — what every source produces and what is stored. */
 export const promptDocumentSchema = z.strictObject({
-  title: z.string().min(1).max(PROMPT_TITLE_MAX_LENGTH),
-  markdown: z.string().min(1).max(PROMPT_MARKDOWN_MAX_LENGTH),
+  title: bounded.text(PROMPT_TITLE_BOUND, { min: 1 }),
+  markdown: bounded.text(PROMPT_MARKDOWN_BOUND, { min: 1 }),
 });
 export type PromptDocument = z.infer<typeof promptDocumentSchema>;
 

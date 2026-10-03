@@ -14,7 +14,7 @@ import type {
   Severity,
 } from '@sysdesign/contracts';
 import {
-  BINDING_MAX_NODES,
+  BINDING_NODES_BOUND,
   DEFAULT_NODE_LABELS,
   DESIGN_BRIEF_VERSION,
   NARRATION_VERSION,
@@ -725,7 +725,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
         const has = existing?.nodeIds.includes(nodeId) ?? false;
         // Capped here as well as in the payload, so the checkbox that would
         // exceed the limit is simply inert rather than silently dropped later.
-        if (!has && (existing?.nodeIds.length ?? 0) >= BINDING_MAX_NODES) return;
+        if (!has && (existing?.nodeIds.length ?? 0) >= BINDING_NODES_BOUND.target) return;
         commit({
           bindings: upsert(bindings, criterionId, (current) => ({
             ...current,

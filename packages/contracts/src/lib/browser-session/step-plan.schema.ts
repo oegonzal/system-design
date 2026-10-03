@@ -8,7 +8,8 @@
  */
 import { z } from 'zod';
 
-import { ELEMENT_REF, URL_MAX } from './observation.schema';
+import { bound, bounded } from '../bounds';
+import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import {
   PAGE_KINDS,
   PRESS_KEYS,
@@ -18,55 +19,53 @@ import {
   WAIT_UNTIL,
 } from './vocab';
 
-export const MAX_ACTIONS = 8;
-export const MAX_ASK_FIELDS = 40;
-export const ASSESSMENT_MAX_LENGTH = 700;
-export const ACTION_REASON_MAX_LENGTH = 240;
-export const EXPECT_MAX_LENGTH = 200;
-export const FILL_VALUE_MAX_LENGTH = 4000;
+export const ACTIONS_BOUND = bound(8, 'list');
+export const ASK_FIELDS_BOUND = bound(40, 'list');
+export const ASSESSMENT_BOUND = bound(700);
+export const ACTION_REASON_BOUND = bound(240);
+export const EXPECT_BOUND = bound(200);
+export const FILL_VALUE_BOUND = bound(4000);
 export const OPTION_VALUE_MAX_LENGTH = 200;
-export const WAIT_VALUE_MAX_LENGTH = 500;
-export const TASK_LABEL_MAX_LENGTH = 200;
-export const DETAIL_MAX_LENGTH = 300;
-export const SCREENSHOT_LABEL_MAX_LENGTH = 120;
+export const WAIT_VALUE_BOUND = bound(500);
+export const DETAIL_BOUND = bound(300);
+export const SCREENSHOT_LABEL_BOUND = bound(120);
 
 const ref = z
   .string()
   .regex(ELEMENT_REF)
   .describe('An element ref exactly as the Elements list gives it, e.g. e12.');
 
+const url = () => bounded.id(URL_MAX_LENGTH, { min: 1 });
+
 const common = {
-  reason: z
-    .string()
-    .min(1)
-    .max(ACTION_REASON_MAX_LENGTH)
-    .describe("Why this action, now, in the mission's own terms."),
-  expect: z
-    .string()
-    .max(EXPECT_MAX_LENGTH)
-    .nullable()
-    .describe(
-      'What the page should show once the action lands, or null when nothing visible changes.',
-    ),
+  reason: bounded.text(ACTION_REASON_BOUND, {
+    min: 1,
+    description: "Why this action, now, in the mission's own terms.",
+  }),
+  expect: bounded
+    .text(EXPECT_BOUND, {
+      description:
+        'What the page should show once the action lands, or null when nothing visible changes.',
+    })
+    .nullable(),
 };
 
 export const stepActionSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('navigate'), url: z.string().min(1).max(URL_MAX), ...common }),
+  z.strictObject({ kind: z.literal('navigate'), url: url(), ...common }),
   z.strictObject({ kind: z.literal('click'), ref, ...common }),
   z.strictObject({
     kind: z.literal('fill'),
     ref,
-    value: z.string().max(FILL_VALUE_MAX_LENGTH).describe('The exact text to type.'),
+    value: bounded.text(FILL_VALUE_BOUND, { description: 'The exact text to type.' }),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('select'),
     ref,
-    option: z
-      .string()
-      .min(1)
-      .max(OPTION_VALUE_MAX_LENGTH)
-      .describe('One of the options the Elements list gives for this ref, verbatim.'),
+    option: bounded.id(OPTION_VALUE_MAX_LENGTH, {
+      min: 1,
+      description: 'One of the options the Elements list gives for this ref, verbatim.',
+    }),
     ...common,
   }),
   z.strictObject({ kind: z.literal('press'), key: z.enum(PRESS_KEYS), ...common }),
@@ -79,49 +78,45 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('waitFor'),
     until: z.enum(WAIT_UNTIL),
-    value: z
-      .string()
-      .min(1)
-      .max(WAIT_VALUE_MAX_LENGTH)
-      .describe('A listed ref for element, visible text for text, or a URL fragment for url.'),
+    value: bounded.text(WAIT_VALUE_BOUND, {
+      min: 1,
+      description: 'A listed ref for element, visible text for text, or a URL fragment for url.',
+    }),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('screenshot'),
-    label: z.string().min(1).max(SCREENSHOT_LABEL_MAX_LENGTH),
+    label: bounded.text(SCREENSHOT_LABEL_BOUND, { min: 1 }),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('askFields'),
-    refs: z
-      .array(ref)
-      .min(1)
-      .max(MAX_ASK_FIELDS)
-      .describe(
+    refs: bounded.list(ASK_FIELDS_BOUND, ref, {
+      min: 1,
+      description:
         'Form fields about the applicant; the field-answer pipeline answers them before the next action runs.',
-      ),
+    }),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('taskStart'),
-    label: z
-      .string()
-      .min(1)
-      .max(TASK_LABEL_MAX_LENGTH)
-      .describe('The unit of work in the mission\'s terms, e.g. "Senior Engineer at Acme".'),
-    url: z.string().min(1).max(URL_MAX),
+    label: bounded.text(TASK_LABEL_BOUND, {
+      min: 1,
+      description: 'The unit of work in the mission\'s terms, e.g. "Senior Engineer at Acme".',
+    }),
+    url: url(),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('taskDone'),
     outcome: z.enum(TASK_OUTCOMES),
-    detail: z.string().max(DETAIL_MAX_LENGTH),
+    detail: bounded.text(DETAIL_BOUND),
     ...common,
   }),
   z.strictObject({
     kind: z.literal('terminate'),
     cause: z.enum(TERMINATE_CAUSES).describe("The mission's stop condition this page shows."),
-    detail: z.string().min(1).max(DETAIL_MAX_LENGTH),
+    detail: bounded.text(DETAIL_BOUND, { min: 1 }),
     ...common,
   }),
   z
@@ -135,20 +130,16 @@ export type StepAction = z.infer<typeof stepActionSchema>;
 
 export const stepPlanSchema = z.strictObject({
   pageKind: z.enum(PAGE_KINDS),
-  assessment: z
-    .string()
-    .min(1)
-    .max(ASSESSMENT_MAX_LENGTH)
-    .describe(
+  assessment: bounded.text(ASSESSMENT_BOUND, {
+    min: 1,
+    description:
       'What the page is, where the mission stands and what this plan does — two to four sentences.',
-    ),
-  actions: z
-    .array(stepActionSchema)
-    .min(1)
-    .max(MAX_ACTIONS)
-    .describe(
+  }),
+  actions: bounded.list(ACTIONS_BOUND, stepActionSchema, {
+    min: 1,
+    description:
       'In the order they run, stopping at the next page transition. A taskDone, terminate or done action is last and appears nowhere else.',
-    ),
+  }),
 });
 export type StepPlan = z.infer<typeof stepPlanSchema>;
 

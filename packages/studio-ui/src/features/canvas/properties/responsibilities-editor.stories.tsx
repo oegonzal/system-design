@@ -1,4 +1,4 @@
-import { NODE_MAX_RESPONSIBILITIES } from '@sysdesign/contracts';
+import { NODE_RESPONSIBILITIES_BOUND } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
@@ -34,7 +34,7 @@ export const AtCapacity: Story = {
   render: () => (
     <Controlled
       initial={Array.from(
-        { length: NODE_MAX_RESPONSIBILITIES },
+        { length: NODE_RESPONSIBILITIES_BOUND.target },
         (_, index) => `Responsibility ${index + 1}`,
       )}
     />

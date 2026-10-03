@@ -1,8 +1,8 @@
 import {
-  NODE_MAX_OPERATIONS,
+  NODE_OPERATIONS_BOUND,
   OPERATION_KINDS,
   OPERATION_NAME_MAX_LENGTH,
-  OPERATION_NOTES_MAX_LENGTH,
+  OPERATION_NOTES_BOUND,
   type NodeOperation,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
@@ -169,8 +169,8 @@ describe('OperationsEditor', () => {
     ).toBe(false);
   });
 
-  it(`disables Add at the contract cap of ${NODE_MAX_OPERATIONS} and shows the counter`, () => {
-    const full = Array.from({ length: NODE_MAX_OPERATIONS }, (_, index) => ({
+  it(`disables Add at the contract cap of ${NODE_OPERATIONS_BOUND.target} and shows the counter`, () => {
+    const full = Array.from({ length: NODE_OPERATIONS_BOUND.target }, (_, index) => ({
       name: `op${index}`,
       kind: 'command' as const,
     }));
@@ -179,7 +179,9 @@ describe('OperationsEditor', () => {
     expect(
       (screen.getByRole('button', { name: 'Add operation' }) as HTMLButtonElement).disabled,
     ).toBe(true);
-    expect(screen.getByText(`${NODE_MAX_OPERATIONS} of ${NODE_MAX_OPERATIONS}`)).toBeTruthy();
+    expect(
+      screen.getByText(`${NODE_OPERATIONS_BOUND.target} of ${NODE_OPERATIONS_BOUND.target}`),
+    ).toBeTruthy();
   });
 
   it('caps name and notes input lengths to the contract', () => {
@@ -190,7 +192,7 @@ describe('OperationsEditor', () => {
       OPERATION_NAME_MAX_LENGTH,
     );
     expect((row.getByLabelText('Notes') as HTMLInputElement).maxLength).toBe(
-      OPERATION_NOTES_MAX_LENGTH,
+      OPERATION_NOTES_BOUND.target,
     );
   });
 
@@ -199,7 +201,7 @@ describe('OperationsEditor', () => {
       <Harness
         initial={[
           { name: 'placeOrder', kind: 'command' },
-          { name: 'publish', kind: 'event', notes: 'x'.repeat(OPERATION_NOTES_MAX_LENGTH - 3) },
+          { name: 'publish', kind: 'event', notes: 'x'.repeat(OPERATION_NOTES_BOUND.target - 3) },
         ]}
       />,
     );

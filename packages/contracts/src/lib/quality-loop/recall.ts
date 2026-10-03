@@ -33,6 +33,7 @@ export const RUN_RECALL_REASON_STATUS = {
   'store-unavailable': 'skipped',
   'pipeline-unavailable': 'skipped',
   'embedding-failed': 'skipped',
+  'query-refused': 'skipped',
   'run-failed': 'skipped',
   'no-rubric': 'skipped',
   'no-artifact': 'skipped',

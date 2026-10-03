@@ -1,5 +1,8 @@
 import type { CriterionRef } from './brief-validator';
-import { NARRATION_MAX_COMPONENT_RATIONALES, NARRATION_MAX_CRITERION_NARRATIONS } from './canvas';
+import {
+  NARRATION_COMPONENT_RATIONALES_BOUND,
+  NARRATION_CRITERION_NARRATIONS_BOUND,
+} from './canvas';
 import {
   NARRATION_VERSION,
   type CanvasGraph,
@@ -17,9 +20,10 @@ import {
  * explanation critic's call; this only knows written from unwritten.
  *
  * Prose is trimmed, never cut: nothing is cut to fit. The editors bound each
- * slot with the schema's own constants as `maxLength`, so prose past its
- * bound did not come from them, and it stays whole for the schema to refuse
- * — a silent cut would send words the author never saw go missing.
+ * slot with the schema's own declarations as `maxLength`, so prose past its
+ * bound did not come from them, and it stays whole for the schema to keep or
+ * refuse — a silent cut would send words the author never saw go missing.
+ * Lists are cut at what the schema accepts, a bound's ceiling.
  */
 
 /**
@@ -51,7 +55,7 @@ export function reconcileNarration(
       seenNodes.add(rationale.nodeId);
       return true;
     })
-    .slice(0, NARRATION_MAX_COMPONENT_RATIONALES);
+    .slice(0, NARRATION_COMPONENT_RATIONALES_BOUND.ceiling);
 
   const seenCriteria = new Set<string>();
   const criterionNarrations = narrations
@@ -65,7 +69,7 @@ export function reconcileNarration(
       seenCriteria.add(narration.criterionId);
       return true;
     })
-    .slice(0, NARRATION_MAX_CRITERION_NARRATIONS);
+    .slice(0, NARRATION_CRITERION_NARRATIONS_BOUND.ceiling);
 
   const trimmedOverview = overview.trim();
 

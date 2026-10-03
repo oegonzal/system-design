@@ -1,6 +1,6 @@
 import {
   DEFAULT_NODE_LABELS,
-  OPERATION_NOTES_MAX_LENGTH,
+  OPERATION_NOTES_BOUND,
   NODE_KINDS,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
@@ -303,7 +303,7 @@ describe('PropertiesPanel · interface contracts', () => {
       await user.clear(notes);
       const scrolled = watchScrolls();
 
-      await user.paste('x'.repeat(OPERATION_NOTES_MAX_LENGTH - 12));
+      await user.paste('x'.repeat(OPERATION_NOTES_BOUND.target - 12));
 
       const count = await screen.findByText('12 characters left');
       expect(describedBy(notes)).toContain(count);

@@ -16,43 +16,52 @@
  * aliases in its rationale; a memory is excluded only when a finding is
  * located at it.
  */
+import {
+  bound,
+  bounded,
+  LESSON_APPLIES_WHEN_BOUND,
+  LESSON_INSIGHT_BOUND,
+  lessonText,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { section, type OutputShape } from '../../core/contracts';
 import { ALIAS_MAX, MAX_EVIDENCE, MAX_MEMORIES } from './input';
 
-const evidence = z.string().min(1).max(ALIAS_MAX).describe('An evidence alias exactly as listed.');
+const SUMMARY_BOUND = bound(950);
+const MEMORIES_BOUND = bound(MAX_MEMORIES, 'list');
+const MEMORY_EVIDENCE_BOUND = bound(8, 'list');
+const UNUSED_BOUND = bound(MAX_EVIDENCE, 'list');
+
+const evidence = () =>
+  bounded.id(ALIAS_MAX, { min: 1, description: 'An evidence alias exactly as listed.' });
 
 export const experienceDigestSchema = z.strictObject({
-  summary: z
-    .string()
-    .min(1)
-    .max(950)
-    .describe("What the record shows moved the output's quality, in 2–4 sentences."),
-  memories: z
-    .array(
-      z.strictObject({
-        evidence: z
-          .array(evidence)
-          .min(1)
-          .max(8)
-          .describe('The findings and criteria this memory rests on.'),
-        insight: z
-          .string()
-          .min(1)
-          .max(1000)
-          .describe(
-            'What to do or avoid next time, as an instruction a different prompt could use.',
-          ),
-        appliesWhen: z
-          .string()
-          .min(1)
-          .max(500)
-          .describe('The conditions under which the insight applies.'),
+  summary: bounded.text(SUMMARY_BOUND, {
+    min: 1,
+    description: "What the record shows moved the output's quality, in 2–4 sentences.",
+  }),
+  memories: bounded.list(
+    MEMORIES_BOUND,
+    z.strictObject({
+      evidence: bounded.list(MEMORY_EVIDENCE_BOUND, evidence(), {
+        min: 1,
+        description: 'The findings and criteria this memory rests on.',
       }),
-    )
-    .max(MAX_MEMORIES),
-  unused: z.array(evidence).max(MAX_EVIDENCE).describe('Every listed alias no memory rests on.'),
+      insight: bounded.text(LESSON_INSIGHT_BOUND, {
+        min: 1,
+        description:
+          'What to do or avoid next time, as an instruction a different prompt could use.',
+      }),
+      appliesWhen: bounded.text(LESSON_APPLIES_WHEN_BOUND, {
+        min: 1,
+        description: 'The conditions under which the insight applies.',
+      }),
+    }),
+  ),
+  unused: bounded.list(UNUSED_BOUND, evidence(), {
+    description: 'Every listed alias no memory rests on.',
+  }),
 });
 export type ExperienceDigest = z.infer<typeof experienceDigestSchema>;
 
@@ -77,7 +86,7 @@ export const experienceDigestOutput: OutputShape<ExperienceDigest> = {
         'Memories',
         digest.memories.map(
           (memory, index) =>
-            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${memory.insight} — applies when ${memory.appliesWhen}`,
+            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${lessonText(memory)}`,
         ),
       ),
       ...section('Unused', digest.unused.length > 0 ? [cited(digest.unused)] : []),

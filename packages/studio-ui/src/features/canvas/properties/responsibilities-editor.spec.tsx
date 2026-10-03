@@ -1,4 +1,4 @@
-import { NODE_MAX_RESPONSIBILITIES, RESPONSIBILITY_MAX_LENGTH } from '@sysdesign/contracts';
+import { NODE_RESPONSIBILITIES_BOUND, RESPONSIBILITY_BOUND } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -66,8 +66,11 @@ describe('ResponsibilitiesEditor', () => {
     expect(screen.getAllByText('owns orders')).toHaveLength(1);
   });
 
-  it(`disables the input at the contract cap of ${NODE_MAX_RESPONSIBILITIES}`, () => {
-    const full = Array.from({ length: NODE_MAX_RESPONSIBILITIES }, (_, index) => `role ${index}`);
+  it(`disables the input at the contract cap of ${NODE_RESPONSIBILITIES_BOUND.target}`, () => {
+    const full = Array.from(
+      { length: NODE_RESPONSIBILITIES_BOUND.target },
+      (_, index) => `role ${index}`,
+    );
     renderWithTheme(<Harness initial={full} />);
 
     expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).disabled).toBe(true);
@@ -77,7 +80,7 @@ describe('ResponsibilitiesEditor', () => {
     renderWithTheme(<Harness />);
 
     expect((screen.getByLabelText('Add responsibility') as HTMLInputElement).maxLength).toBe(
-      RESPONSIBILITY_MAX_LENGTH,
+      RESPONSIBILITY_BOUND.target,
     );
     expect(screen.getByText(/what is this component in charge of/i)).toBeTruthy();
   });

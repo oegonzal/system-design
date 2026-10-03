@@ -8,15 +8,15 @@ import { sampleDigest } from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { bareGoal, MEMORY_HEADING } from './recall/inject';
-import { buildQuery, probeSet } from './recall/query';
+import { probeSet } from './recall/query';
 import { digest, recall, store, target } from './steps';
 import { childRun as child, sampleHits as hits, stepContext as ctx } from './steps.testing';
-import { faulting, fused, GOAL, passed, readoutTrace } from './testing';
+import { builtQuery, faulting, fused, GOAL, passed, readoutTrace } from './testing';
 
 const recallTrace = (decision: RunTrace['finalDecision'] = 'accept', faulted = false) =>
   readoutTrace({
     pipeline: 'memory-recall',
-    goal: renderQuery(buildQuery(GOAL, probeSet(GOAL, []), fused(hits))),
+    goal: renderQuery(builtQuery(GOAL, probeSet(GOAL, []), fused(hits))),
     artifact: samplePack({ kept: samplePack().kept, dropped: [] }),
     locations: ['summary', 'm1', 'm2', 'gap.1'],
     criteria: [{ id: 'c1', kind: 'need', statement: 'x' }],

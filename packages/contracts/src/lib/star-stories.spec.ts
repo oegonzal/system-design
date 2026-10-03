@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   saveStarStorySchema,
-  STORY_MAX_TAGS,
-  STORY_TAG_MAX_LENGTH,
-  STORY_TITLE_MAX_LENGTH,
+  STORY_TAGS_BOUND,
+  STORY_TAG_BOUND,
+  STORY_TITLE_BOUND,
   type SaveStarStoryRequest,
 } from './star-stories';
 
@@ -37,15 +37,17 @@ describe('saveStarStorySchema', () => {
     expect(paths(story())).toEqual([]);
   });
 
-  it('[STAR-1] bounds a tag’s length and the tag count, and refuses a blank tag, by path', () => {
-    expect(paths(story({ tags: ['ok', 'x'.repeat(STORY_TAG_MAX_LENGTH + 1)] }))).toEqual([
+  it('[STAR-1] bounds a tag’s length and the tag count at their ceilings, and refuses a blank tag, by path', () => {
+    expect(paths(story({ tags: ['ok', 'x'.repeat(STORY_TAG_BOUND.ceiling + 1)] }))).toEqual([
       'tags.1',
     ]);
     expect(paths(story({ tags: ['ok', '  '] }))).toEqual(['tags.1']);
     expect(
-      paths(story({ tags: Array.from({ length: STORY_MAX_TAGS + 1 }, (_, i) => `t${i}`) })),
+      paths(
+        story({ tags: Array.from({ length: STORY_TAGS_BOUND.ceiling + 1 }, (_, i) => `t${i}`) }),
+      ),
     ).toEqual(['tags']);
-    expect(paths(story({ title: 'x'.repeat(STORY_TITLE_MAX_LENGTH + 1) }))).toEqual(['title']);
+    expect(paths(story({ title: 'x'.repeat(STORY_TITLE_BOUND.ceiling + 1) }))).toEqual(['title']);
   });
 
   it('refuses an undeclared key', () => {

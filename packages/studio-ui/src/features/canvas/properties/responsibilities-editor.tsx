@@ -1,6 +1,6 @@
 'use client';
 
-import { NODE_MAX_RESPONSIBILITIES, RESPONSIBILITY_MAX_LENGTH } from '@sysdesign/contracts';
+import { NODE_RESPONSIBILITIES_BOUND, RESPONSIBILITY_BOUND } from '@sysdesign/contracts';
 import { Badge, Stack, Text, TextField } from '@sysdesign/design-system';
 import { useState } from 'react';
 
@@ -22,7 +22,7 @@ export function ResponsibilitiesEditor({
   onChange,
 }: ResponsibilitiesEditorProps) {
   const [draft, setDraft] = useState('');
-  const atCap = responsibilities.length >= NODE_MAX_RESPONSIBILITIES;
+  const atCap = responsibilities.length >= NODE_RESPONSIBILITIES_BOUND.target;
 
   const commit = () => {
     const value = draft.trim();
@@ -55,7 +55,7 @@ export function ResponsibilitiesEditor({
       <TextField
         label="Add responsibility"
         value={draft}
-        maxLength={RESPONSIBILITY_MAX_LENGTH}
+        maxLength={RESPONSIBILITY_BOUND.target}
         disabled={atCap}
         placeholder="e.g. owns the order lifecycle"
         onChange={(event) => setDraft(event.target.value)}

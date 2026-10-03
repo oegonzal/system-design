@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  STORY_TAG_MAX_LENGTH,
+  STORY_TAG_BOUND,
   type ApiErrorResponse,
   type GetPromptResponse,
   type GetStarStoryResponse,
@@ -92,7 +92,7 @@ describe('star stories', () => {
             task: '  ',
             action: '',
             result: '\n',
-            tags: ['ok', 'x'.repeat(STORY_TAG_MAX_LENGTH + 1)],
+            tags: ['ok', 'x'.repeat(STORY_TAG_BOUND.ceiling + 1)],
           }),
         ),
       });

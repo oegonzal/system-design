@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  BINDING_CLAIM_MAX_LENGTH,
-  BINDING_MAX_NODES,
+  BINDING_CLAIM_BOUND,
+  BINDING_NODES_BOUND,
   type Binding,
   type CanvasGraph,
   type SuccessCriterion,
@@ -62,7 +62,7 @@ export function CriterionBindingRow({
   const [tracing, setTracing] = useState(path.length > 0);
   const state = bindingState(binding);
   const chip = STATE_CHIP[state];
-  const atCap = (binding?.nodeIds.length ?? 0) >= BINDING_MAX_NODES;
+  const atCap = (binding?.nodeIds.length ?? 0) >= BINDING_NODES_BOUND.target;
   const showTracer = tracing || path.length > 0;
 
   return (
@@ -87,7 +87,7 @@ export function CriterionBindingRow({
           label="How the design meets it"
           data-testid={`binding-claim-${criterion.id}`}
           value={binding?.claim ?? ''}
-          maxLength={BINDING_CLAIM_MAX_LENGTH}
+          maxLength={BINDING_CLAIM_BOUND.target}
           placeholder="e.g. the cache absorbs repeat reads"
           disabled={disabled}
           onChange={(event) => onClaim(event.target.value)}

@@ -3,6 +3,8 @@
  * indexed by both halves the digest already separates: the condition it
  * applies under, and the instruction itself.
  */
+import { lessonText } from '@sysdesign/contracts';
+
 import type { ChunkSource } from '../../../pipelines/memory-recall/input';
 import type { MemoryToStore } from '../digest/read-digest';
 import { contentHash, type IndexedChunk } from '../ports';
@@ -14,9 +16,6 @@ export interface ChunkOrigin {
   iteration: number;
   when: string;
 }
-
-const lessonText = (memory: MemoryToStore): string =>
-  `${memory.insight} — applies when ${memory.appliesWhen}`;
 
 export function chunksOf(
   memories: readonly MemoryToStore[],

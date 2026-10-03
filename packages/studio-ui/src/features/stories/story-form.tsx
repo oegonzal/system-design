@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  STORY_SECTION_MAX_LENGTH,
-  STORY_TITLE_MAX_LENGTH,
+  STORY_SECTION_BOUND,
+  STORY_TITLE_BOUND,
   type ExperienceProfileDto,
   type PromptDto,
   type SaveStarStoryRequest,
@@ -213,7 +213,7 @@ export function StoryForm({
       <TextField
         label="Title"
         value={values.title}
-        maxLength={STORY_TITLE_MAX_LENGTH}
+        maxLength={STORY_TITLE_BOUND.target}
         onChange={(event) => set('title')(event.target.value)}
         onBlur={visit('title')}
         error={errorFor('title')}
@@ -225,7 +225,7 @@ export function StoryForm({
           key={section.field}
           label={section.label}
           value={values[section.field]}
-          maxLength={STORY_SECTION_MAX_LENGTH}
+          maxLength={STORY_SECTION_BOUND.target}
           onChange={(event) => set(section.field)(event.target.value)}
           onBlur={visit(section.field)}
           error={errorFor(section.field)}

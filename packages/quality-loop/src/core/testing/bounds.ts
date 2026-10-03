@@ -3,14 +3,15 @@
  * imports, so this file compiles under the app tsconfig even though only
  * specs use it.
  */
-import { z, type ZodType } from 'zod';
+import { modelSchema } from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
 
 /**
  * Every string bound in a schema, by path — `summary`, `roles[].responsibility`,
- * `assumptions[]` — read off its JSON Schema, the form the model is given. A
- * pipeline spec holds this against the longest each path has measurably been
- * written: the client never cuts prose to fit, so a bound the model meets is a
- * schema miss waiting to discard a whole answer.
+ * `assumptions[]` — read off its JSON Schema, the form the model is given:
+ * each declared bound at its TARGET. A pipeline spec holds this against the
+ * longest each path has measurably been written: a target the model meets is
+ * an overrun on every reply, kept and recorded but never what was asked for.
  */
 export function proseBounds(schema: ZodType): Record<string, number> {
   const bounds: Record<string, number> = {};
@@ -30,7 +31,7 @@ export function proseBounds(schema: ZodType): Record<string, number> {
       }
     }
   };
-  visit(z.toJSONSchema(schema), '');
+  visit(modelSchema(schema).json, '');
   return bounds;
 }
 

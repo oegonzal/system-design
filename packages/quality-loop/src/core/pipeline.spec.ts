@@ -1,5 +1,6 @@
 import {
-  CRITERION_STATEMENT_MAX_LENGTH,
+  bound,
+  CRITERION_STATEMENT_BOUND,
   MAX_PROVIDED_STATEMENT_LENGTH,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
@@ -146,16 +147,16 @@ describe('validatePipeline', () => {
 
   it('[QL-2] projects the statement bound its deriver is held to — the contract’s unless declared — and refuses one a caller could never hand back', () => {
     expect(describePipeline(asAny(tinyPipeline())).task.maxStatementLength).toBe(
-      CRITERION_STATEMENT_MAX_LENGTH,
+      CRITERION_STATEMENT_BOUND.ceiling,
     );
     const declared = tinyPipeline();
-    declared.task = { ...declared.task, maxStatementLength: 1200 };
-    expect(describePipeline(asAny(declared)).task.maxStatementLength).toBe(1200);
+    declared.task = { ...declared.task, statementBound: bound(1200) };
+    expect(describePipeline(asAny(declared)).task.maxStatementLength).toBe(bound(1200).ceiling);
     expect(() => validatePipeline(asAny(declared))).not.toThrow();
-    for (const bound of [0, 1.5, MAX_PROVIDED_STATEMENT_LENGTH + 1]) {
+    for (const target of [0, 1.5, MAX_PROVIDED_STATEMENT_LENGTH + 1]) {
       const malformed = tinyPipeline();
-      malformed.task = { ...malformed.task, maxStatementLength: bound };
-      expect(() => validatePipeline(asAny(malformed))).toThrow(/maxStatementLength/);
+      malformed.task = { ...malformed.task, statementBound: bound(target) };
+      expect(() => validatePipeline(asAny(malformed))).toThrow(/statementBound/);
     }
   });
 

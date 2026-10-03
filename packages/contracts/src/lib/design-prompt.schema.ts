@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { PROMPT_TITLE_MAX_LENGTH } from './prompts';
-import { CRITERION_STATEMENT_MAX_LENGTH, type SuccessCriterion } from './quality-loop/evidence';
+import { bound, bounded, composedBound, type Bound } from './bounds';
+import { PROMPT_TITLE_BOUND } from './prompts';
+import { CRITERION_STATEMENT_BOUND, type SuccessCriterion } from './quality-loop/evidence';
 import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines';
 
 /**
@@ -14,84 +15,84 @@ import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines'
  * Kinds and targets are open strings on purpose: the model chooses the words
  * and the numbers; nothing here is a closed vocabulary a grader keys on.
  *
- * The row bounds sum to the canvas pipeline's criteria cap, because a
+ * The row targets sum to the canvas pipeline's criteria cap, because a
  * generated prompt's rubric is its rows (`criteriaFromDraft`): one criterion
- * per row, never more than the grader can hold, never a blank one. And each
- * row fits a criterion statement whole — a row is one, or composes into one
- * with its separators — so no requirement is ever cut to become a criterion.
+ * per row, never a blank one, and never more than the grader can hold — a
+ * draft a little over a row bound is kept whole, and the cap takes the first
+ * rows. And each row fits a criterion statement whole — a row is one, or
+ * composes into one with its separators — so no requirement is ever cut to
+ * become a criterion.
  *
- * The prose bounds sit above what the drafting model has measurably written
- * (the spec holds the measurements). Nothing on the way in cuts prose to fit:
- * a draft past a bound is refused whole, and the loop drafts again.
+ * The prose targets sit above what the drafting model has measurably written
+ * (the spec holds the measurements); past a ceiling, the parse keeps the
+ * prose and records it.
  */
-const FUNCTIONAL_MAX_ROWS = 8;
-const NON_FUNCTIONAL_MAX_ROWS = 6;
-const SCALE_MAX_ROWS = 6;
-const CONSTRAINT_MAX_ROWS = 4;
+const FUNCTIONAL_ROWS_BOUND = bound(8, 'list');
+const NON_FUNCTIONAL_ROWS_BOUND = bound(6, 'list');
+const SCALE_ROWS_BOUND = bound(6, 'list');
+const CONSTRAINT_ROWS_BOUND = bound(4, 'list');
 
-export const DESIGN_PROMPT_SCENARIO_MAX_LENGTH = 2400;
-const NFR_KIND_MAX_LENGTH = 24;
-const NFR_REQUIREMENT_MAX_LENGTH = 160;
-const NFR_TARGET_MAX_LENGTH = 60;
-const SCALE_METRIC_MAX_LENGTH = 48;
-const SCALE_TARGET_MAX_LENGTH = 40;
+export const DESIGN_PROMPT_SCENARIO_BOUND = bound(2400);
+const NFR_KIND_BOUND = bound(24);
+const NFR_REQUIREMENT_BOUND = bound(160);
+const NFR_TARGET_BOUND = bound(60);
+const SCALE_METRIC_BOUND = bound(48);
+const SCALE_TARGET_BOUND = bound(40);
 
 /** How a table row composes into one criterion statement: its cells, in order, joined by this. */
 const STATEMENT_SEPARATOR = ' — ';
 
-/** The longest statement a row can compose into — the spec holds it to `CRITERION_STATEMENT_MAX_LENGTH`. */
-export const DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS = {
-  functional: CRITERION_STATEMENT_MAX_LENGTH,
-  nonFunctional:
-    NFR_KIND_MAX_LENGTH +
-    NFR_REQUIREMENT_MAX_LENGTH +
-    NFR_TARGET_MAX_LENGTH +
-    2 * STATEMENT_SEPARATOR.length,
-  scale: SCALE_METRIC_MAX_LENGTH + SCALE_TARGET_MAX_LENGTH + STATEMENT_SEPARATOR.length,
-  constraint: CRITERION_STATEMENT_MAX_LENGTH,
-} as const;
+/** The statement a row composes into — the spec holds each within `CRITERION_STATEMENT_BOUND`. */
+export const DESIGN_PROMPT_ROW_STATEMENT_BOUNDS = {
+  functional: CRITERION_STATEMENT_BOUND,
+  nonFunctional: composedBound([
+    NFR_KIND_BOUND,
+    STATEMENT_SEPARATOR,
+    NFR_REQUIREMENT_BOUND,
+    STATEMENT_SEPARATOR,
+    NFR_TARGET_BOUND,
+  ]),
+  scale: composedBound([SCALE_METRIC_BOUND, STATEMENT_SEPARATOR, SCALE_TARGET_BOUND]),
+  constraint: CRITERION_STATEMENT_BOUND,
+} as const satisfies Record<string, Bound>;
 
 export const designPromptDraftSchema = z.strictObject({
-  title: z.string().max(PROMPT_TITLE_MAX_LENGTH).describe('Imperative, brand-neutral, one line.'),
-  scenario: z
-    .string()
-    .max(DESIGN_PROMPT_SCENARIO_MAX_LENGTH)
-    .describe(
-      `The situation in the second person, brand-neutral, drawn from the experience's real domain — at most ${DESIGN_PROMPT_SCENARIO_MAX_LENGTH} characters.`,
-    ),
-  functionalRequirements: z
-    .array(z.string().min(1).max(CRITERION_STATEMENT_MAX_LENGTH))
-    .max(FUNCTIONAL_MAX_ROWS),
-  nonFunctionalRequirements: z
-    .array(
-      z.strictObject({
-        kind: z
-          .string()
-          .min(1)
-          .max(NFR_KIND_MAX_LENGTH)
-          .describe(
-            'latency, availability, consistency, durability, security, cost, throughput, observability, …',
-          ),
-        requirement: z.string().min(1).max(NFR_REQUIREMENT_MAX_LENGTH),
-        target: z
-          .string()
-          .min(1)
-          .max(NFR_TARGET_MAX_LENGTH)
-          .describe('A figure with its unit or percentile, in words: "p99 ≤ 300 ms".'),
+  title: bounded.text(PROMPT_TITLE_BOUND, {
+    description: 'Imperative, brand-neutral, one line.',
+  }),
+  scenario: bounded.text(DESIGN_PROMPT_SCENARIO_BOUND, {
+    description: `The situation in the second person, brand-neutral, drawn from the experience's real domain — at most ${DESIGN_PROMPT_SCENARIO_BOUND.target} characters.`,
+  }),
+  functionalRequirements: bounded.list(
+    FUNCTIONAL_ROWS_BOUND,
+    bounded.text(CRITERION_STATEMENT_BOUND, { min: 1 }),
+  ),
+  nonFunctionalRequirements: bounded.list(
+    NON_FUNCTIONAL_ROWS_BOUND,
+    z.strictObject({
+      kind: bounded.text(NFR_KIND_BOUND, {
+        min: 1,
+        description:
+          'latency, availability, consistency, durability, security, cost, throughput, observability, …',
       }),
-    )
-    .max(NON_FUNCTIONAL_MAX_ROWS),
-  scale: z
-    .array(
-      z.strictObject({
-        metric: z.string().min(1).max(SCALE_METRIC_MAX_LENGTH),
-        target: z.string().min(1).max(SCALE_TARGET_MAX_LENGTH),
+      requirement: bounded.text(NFR_REQUIREMENT_BOUND, { min: 1 }),
+      target: bounded.text(NFR_TARGET_BOUND, {
+        min: 1,
+        description: 'A figure with its unit or percentile, in words: "p99 ≤ 300 ms".',
       }),
-    )
-    .max(SCALE_MAX_ROWS),
-  constraints: z
-    .array(z.string().min(1).max(CRITERION_STATEMENT_MAX_LENGTH))
-    .max(CONSTRAINT_MAX_ROWS),
+    }),
+  ),
+  scale: bounded.list(
+    SCALE_ROWS_BOUND,
+    z.strictObject({
+      metric: bounded.text(SCALE_METRIC_BOUND, { min: 1 }),
+      target: bounded.text(SCALE_TARGET_BOUND, { min: 1 }),
+    }),
+  ),
+  constraints: bounded.list(
+    CONSTRAINT_ROWS_BOUND,
+    bounded.text(CRITERION_STATEMENT_BOUND, { min: 1 }),
+  ),
 });
 export type DesignPromptDraft = z.infer<typeof designPromptDraftSchema>;
 
@@ -157,7 +158,7 @@ export function renderDesignPromptMarkdown(draft: DesignPromptDraft): string {
   return `${sections.join('\n\n')}\n`;
 }
 
-/** A row's cells as one statement. The row bounds keep it within a criterion statement; nothing is cut. */
+/** A row's cells as one statement. The row bounds compose within a criterion statement; nothing is cut. */
 const statement = (...cells: readonly string[]): string =>
   cells.map((cell) => cell.trim()).join(STATEMENT_SEPARATOR);
 
@@ -167,7 +168,8 @@ const statement = (...cells: readonly string[]): string =>
  * — the same four kinds the canvas pipeline declares. No model is asked to
  * read back what the draft already states, so the ids `c1…cN` are fixed the
  * moment the prompt is claimed, and there are never more than the grader's
- * cap because the row bounds sum to it.
+ * cap: the row targets sum to it, and a draft kept past them yields its first
+ * rows.
  */
 export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] {
   const [functional, nonFunctional, scale, constraint] = CANVAS_CRITERION_KINDS;

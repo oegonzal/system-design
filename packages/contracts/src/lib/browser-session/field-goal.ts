@@ -7,18 +7,21 @@
  */
 import { z } from 'zod';
 
+import { bounded } from '../bounds';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
   renderFencedIndex,
   withinBudget,
 } from '../quality-loop/goal-index';
-import { EVIDENCE_ALIAS, MAX_FIELDS } from './field-answers.schema';
+import { EVIDENCE_ALIAS, FIELDS_BOUND } from './field-answers.schema';
 import {
-  ELEMENT_NAME_MAX,
+  ELEMENT_NAME_BOUND,
   ELEMENT_REF,
-  MAX_OPTIONS,
-  OPTION_MAX,
+  INPUT_TYPE_MAX_LENGTH,
+  OPTION_BOUND,
+  OPTIONS_BOUND,
+  ROLE_MAX_LENGTH,
   type ObservedElement,
 } from './observation.schema';
 import { FIELD_ANSWER_PIPELINE_ID } from './pipelines';
@@ -32,10 +35,10 @@ export const FIELD_PROSE_MAX_LENGTH = 16_000;
 /** One form field as the model and the validators see it: the element's facts, plus the text beside it. */
 export const fieldSpecSchema = z.strictObject({
   ref: z.string().regex(ELEMENT_REF),
-  role: z.string().min(1).max(40),
-  name: z.string().max(ELEMENT_NAME_MAX),
-  inputType: z.string().max(30).nullable(),
-  options: z.array(z.string().max(OPTION_MAX)).max(MAX_OPTIONS).nullable(),
+  role: bounded.id(ROLE_MAX_LENGTH, { min: 1 }),
+  name: bounded.text(ELEMENT_NAME_BOUND),
+  inputType: bounded.id(INPUT_TYPE_MAX_LENGTH).nullable(),
+  options: bounded.list(OPTIONS_BOUND, bounded.text(OPTION_BOUND)).nullable(),
   required: z.boolean(),
   maxLength: z.number().int().positive().nullable(),
   hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)).max(HIDDEN_TRAITS.length),
@@ -79,7 +82,7 @@ export interface FieldGoalInput {
 
 export const fieldIndexSchema = z.strictObject({
   pipeline: z.literal(FIELD_ANSWER_PIPELINE_ID),
-  fields: z.array(fieldSpecSchema).min(1).max(MAX_FIELDS),
+  fields: bounded.list(FIELDS_BOUND, fieldSpecSchema, { min: 1 }),
   evidence: z.array(z.strictObject({ alias: z.string().regex(EVIDENCE_ALIAS) })).max(MAX_EVIDENCE),
 });
 export type FieldIndex = z.infer<typeof fieldIndexSchema>;

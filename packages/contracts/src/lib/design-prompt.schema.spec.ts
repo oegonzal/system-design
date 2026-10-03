@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { modelSchema } from './bounds';
 import {
   criteriaFromDraft,
   DESIGN_PROMPT_HEADINGS,
-  DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS,
-  DESIGN_PROMPT_SCENARIO_MAX_LENGTH,
+  DESIGN_PROMPT_ROW_STATEMENT_BOUNDS,
+  DESIGN_PROMPT_SCENARIO_BOUND,
   designPromptDraftSchema,
   renderDesignPromptMarkdown,
   type DesignPromptDraft,
 } from './design-prompt.schema';
-import { CRITERION_STATEMENT_MAX_LENGTH } from './quality-loop/evidence';
+import { CRITERION_STATEMENT_BOUND } from './quality-loop/evidence';
 import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines';
 
 export function draftFixture(): DesignPromptDraft {
@@ -35,19 +36,20 @@ export function draftFixture(): DesignPromptDraft {
   };
 }
 
-/** Every section at its bound: 8 + 6 + 6 + 4 rows, the canvas cap exactly. */
-function maximalDraft(): DesignPromptDraft {
+/** Every section at its target: 8 + 6 + 6 + 4 rows, the canvas cap exactly — or at its ceiling, a little over each. */
+function maximalDraft(at: 'target' | 'ceiling' = 'target'): DesignPromptDraft {
   const row = (n: number) => `requirement ${n}`;
+  const rows = { target: [8, 6, 6, 4], ceiling: [10, 8, 8, 6] }[at];
   return {
     ...draftFixture(),
-    functionalRequirements: Array.from({ length: 8 }, (_, i) => row(i)),
-    nonFunctionalRequirements: Array.from({ length: 6 }, (_, i) => ({
+    functionalRequirements: Array.from({ length: rows[0] }, (_, i) => row(i)),
+    nonFunctionalRequirements: Array.from({ length: rows[1] }, (_, i) => ({
       kind: 'latency',
       requirement: row(i),
       target: `${i} ms`,
     })),
-    scale: Array.from({ length: 6 }, (_, i) => ({ metric: `metric ${i}`, target: `${i}` })),
-    constraints: Array.from({ length: 4 }, (_, i) => row(i)),
+    scale: Array.from({ length: rows[2] }, (_, i) => ({ metric: `metric ${i}`, target: `${i}` })),
+    constraints: Array.from({ length: rows[3] }, (_, i) => row(i)),
   };
 }
 
@@ -57,10 +59,18 @@ describe('designPromptDraftSchema', () => {
     expect(() => z.toJSONSchema(designPromptDraftSchema)).not.toThrow();
   });
 
-  it('[GEN-1] bounds the rows to the canvas cap and refuses a blank row', () => {
+  it('[GEN-1] asks for rows that sum to the canvas cap, accepts a few over, refuses past the ceiling and refuses a blank row', () => {
     expect(designPromptDraftSchema.safeParse(maximalDraft()).success).toBe(true);
+    expect(designPromptDraftSchema.safeParse(maximalDraft('ceiling')).success).toBe(true);
+    const { bounds } = modelSchema(designPromptDraftSchema);
+    expect(
+      ['functionalRequirements', 'nonFunctionalRequirements', 'scale', 'constraints'].reduce(
+        (sum, path) => sum + bounds[path].target,
+        0,
+      ),
+    ).toBe(CANVAS_MAX_CRITERIA);
     const over = (draft: DesignPromptDraft) => designPromptDraftSchema.safeParse(draft).success;
-    const max = maximalDraft();
+    const max = maximalDraft('ceiling');
     expect(
       over({ ...max, functionalRequirements: [...max.functionalRequirements, 'one more'] }),
     ).toBe(false);
@@ -81,28 +91,29 @@ describe('designPromptDraftSchema', () => {
 });
 
 describe('the draft’s prose bounds', () => {
-  it('[GEN-1] sit above the longest the drafting model has measurably written, and the scenario says its limit', () => {
+  it('[GEN-1] ask for more than the longest the drafting model has measurably written, and the scenario says its limit', () => {
     // The longest each field has been written across the recorded
-    // design-prompt runs (static/runs, to 2026-10-01). A draft past a bound
-    // is refused whole — never cut to fit — so no bound may be one it meets.
-    const { shape } = designPromptDraftSchema;
-    const nfr = shape.nonFunctionalRequirements.element.shape;
-    const scale = shape.scale.element.shape;
-    const bounds: [string, number | null, number][] = [
-      ['title', shape.title.maxLength, 105],
-      ['scenario', shape.scenario.maxLength, 1903],
-      ['functionalRequirements[]', shape.functionalRequirements.element.maxLength, 221],
-      ['nonFunctionalRequirements[].kind', nfr.kind.maxLength, 13],
-      ['nonFunctionalRequirements[].requirement', nfr.requirement.maxLength, 128],
-      ['nonFunctionalRequirements[].target', nfr.target.maxLength, 40],
-      ['scale[].metric', scale.metric.maxLength, 35],
-      ['scale[].target', scale.target.maxLength, 31],
-      ['constraints[]', shape.constraints.element.maxLength, 247],
-    ];
-    for (const [path, bound, longest] of bounds) {
-      expect(bound ?? 0, path).toBeGreaterThan(longest);
+    // design-prompt runs (static/runs, to 2026-10-01). The target is what the
+    // model is asked for; past the ceiling a draft is kept and recorded, not
+    // cut — so no target may be one the model meets.
+    const { bounds } = modelSchema(designPromptDraftSchema);
+    const measured: Record<string, number> = {
+      title: 105,
+      scenario: 1903,
+      'functionalRequirements[]': 221,
+      'nonFunctionalRequirements[].kind': 13,
+      'nonFunctionalRequirements[].requirement': 128,
+      'nonFunctionalRequirements[].target': 40,
+      'scale[].metric': 35,
+      'scale[].target': 31,
+      'constraints[]': 247,
+    };
+    for (const [path, longest] of Object.entries(measured)) {
+      expect(bounds[path]?.target ?? 0, path).toBeGreaterThan(longest);
     }
-    expect(shape.scenario.description).toContain(String(DESIGN_PROMPT_SCENARIO_MAX_LENGTH));
+    expect(designPromptDraftSchema.shape.scenario.description).toContain(
+      String(DESIGN_PROMPT_SCENARIO_BOUND.target),
+    );
   });
 });
 
@@ -125,6 +136,8 @@ describe('criteriaFromDraft', () => {
     expect(criteria).toHaveLength(CANVAS_MAX_CRITERIA);
     expect(new Set(criteria.map((c) => c.kind))).toEqual(new Set(CANVAS_CRITERION_KINDS));
     expect(new Set(criteria.map((c) => c.id)).size).toBe(CANVAS_MAX_CRITERIA);
+    // A draft kept past the row targets yields its first rows, never more than the cap.
+    expect(criteriaFromDraft(maximalDraft('ceiling'))).toHaveLength(CANVAS_MAX_CRITERIA);
 
     const long = criteriaFromDraft({
       ...draftFixture(),
@@ -134,9 +147,13 @@ describe('criteriaFromDraft', () => {
   });
 
   it('[GEN-1] every row a draft allows becomes a criterion whole — none is cut to fit a statement', () => {
-    for (const longest of Object.values(DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS)) {
-      expect(longest).toBeLessThanOrEqual(CRITERION_STATEMENT_MAX_LENGTH);
+    // Composed at their ceilings, the rows still fit the statement's ceiling;
+    // asked at their targets, they fit its target.
+    for (const row of Object.values(DESIGN_PROMPT_ROW_STATEMENT_BOUNDS)) {
+      expect(row.target).toBeLessThanOrEqual(CRITERION_STATEMENT_BOUND.target);
+      expect(row.ceiling).toBeLessThanOrEqual(CRITERION_STATEMENT_BOUND.ceiling);
     }
+    // The schema's own `maxLength` is each bound's ceiling: the most a row may hold.
     const { shape } = designPromptDraftSchema;
     const full = (max: number | null) => 'x'.repeat(max ?? 0);
     const nfr = shape.nonFunctionalRequirements.element.shape;
@@ -156,10 +173,10 @@ describe('criteriaFromDraft', () => {
     };
     expect(designPromptDraftSchema.safeParse(draft).success).toBe(true);
     expect(criteriaFromDraft(draft).map((c) => c.statement.length)).toEqual([
-      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.functional,
-      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.nonFunctional,
-      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.scale,
-      DESIGN_PROMPT_ROW_STATEMENT_MAX_LENGTHS.constraint,
+      DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.functional.ceiling,
+      DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.nonFunctional.ceiling,
+      DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.scale.ceiling,
+      DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.constraint.ceiling,
     ]);
   });
 });

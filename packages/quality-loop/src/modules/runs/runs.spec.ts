@@ -261,12 +261,12 @@ describe('the HTTP surface', () => {
         kind: 'must',
         statement: 's',
       })),
-      // Within the edge's cap, past the pipeline's own bound: the service's 400, same path.
+      // Within the edge's cap, past the pipeline's own ceiling: the service's 400, same path.
       [
         {
           id: 'c1',
           kind: 'must',
-          statement: 'x'.repeat(criterionLengthBound(tinyPipeline().task) + 1),
+          statement: 'x'.repeat(criterionLengthBound(tinyPipeline().task).ceiling + 1),
         },
       ],
     ]) {

@@ -2,10 +2,10 @@
 
 import styled from '@emotion/styled';
 import {
-  NODE_MAX_OPERATIONS,
+  NODE_OPERATIONS_BOUND,
   OPERATION_KINDS,
   OPERATION_NAME_MAX_LENGTH,
-  OPERATION_NOTES_MAX_LENGTH,
+  OPERATION_NOTES_BOUND,
   type NodeOperation,
   type OperationKind,
 } from '@sysdesign/contracts';
@@ -77,7 +77,7 @@ function withKind(operation: NodeOperation, value: string): NodeOperation {
  */
 export function OperationsEditor({ operations, onChange }: OperationsEditorProps) {
   const duplicates = duplicateIndexes(operations);
-  const atCap = operations.length >= NODE_MAX_OPERATIONS;
+  const atCap = operations.length >= NODE_OPERATIONS_BOUND.target;
   // A repeated name voids the whole submission at the API. Add is refused while
   // one stands, so a node cannot be filled up on top of an unresolved collision
   // the author would then have to scroll back to find. This does not make a
@@ -142,7 +142,7 @@ export function OperationsEditor({ operations, onChange }: OperationsEditorProps
             <TextField
               label="Notes"
               value={operation.notes ?? ''}
-              maxLength={OPERATION_NOTES_MAX_LENGTH}
+              maxLength={OPERATION_NOTES_BOUND.target}
               hint={NOTES_HINT}
               onChange={(event) => patchRow(index, { notes: event.target.value })}
             />
@@ -172,7 +172,7 @@ export function OperationsEditor({ operations, onChange }: OperationsEditorProps
           Add operation
         </Button>
         <Text as="span" size="sm" tone="muted">
-          {operations.length} of {NODE_MAX_OPERATIONS}
+          {operations.length} of {NODE_OPERATIONS_BOUND.target}
         </Text>
       </Stack>
     </Stack>

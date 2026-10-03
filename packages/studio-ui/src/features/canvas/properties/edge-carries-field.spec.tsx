@@ -1,4 +1,4 @@
-import { EDGE_MAX_CARRIES } from '@sysdesign/contracts';
+import { EDGE_CARRIES_BOUND } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -98,8 +98,11 @@ describe('EdgeCarriesField', () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
-  it(`caps carries at the DTO's ${EDGE_MAX_CARRIES}: unchecked boxes disable`, () => {
-    const full = Array.from({ length: EDGE_MAX_CARRIES - 1 }, (_, index) => `call-${index}`);
+  it(`caps carries at the DTO's ${EDGE_CARRIES_BOUND.target}: unchecked boxes disable`, () => {
+    const full = Array.from(
+      { length: EDGE_CARRIES_BOUND.target - 1 },
+      (_, index) => `call-${index}`,
+    );
     renderWithTheme(<Harness initial={[...full, 'getOrder']} />);
 
     expect(

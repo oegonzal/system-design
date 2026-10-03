@@ -4,11 +4,11 @@ import styled from '@emotion/styled';
 import {
   DEFAULT_NODE_LABELS,
   EDGE_KINDS,
-  EDGE_LABEL_MAX_LENGTH,
+  EDGE_LABEL_BOUND,
   kindsInCategory,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
-  NODE_LABEL_MAX_LENGTH,
+  NODE_LABEL_BOUND,
   type EdgeKind,
   type NodeKind,
 } from '@sysdesign/contracts';
@@ -116,7 +116,7 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
             <TextField
               label="Label"
               value={node.data.label}
-              maxLength={NODE_LABEL_MAX_LENGTH}
+              maxLength={NODE_LABEL_BOUND.target}
               onChange={(event) => updateNode(node.id, { label: event.target.value })}
               // Clearing the field is allowed while typing; leaving it blank is not.
               // A nameless node reads as a nameless node everywhere it is printed —
@@ -216,7 +216,7 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
             <TextField
               label="Label"
               value={typeof edge.label === 'string' ? edge.label : ''}
-              maxLength={EDGE_LABEL_MAX_LENGTH}
+              maxLength={EDGE_LABEL_BOUND.target}
               placeholder="e.g. writes, cache fill"
               onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
             />

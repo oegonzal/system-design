@@ -1,6 +1,6 @@
 'use client';
 
-import { EDGE_MAX_CARRIES, type NodeOperation } from '@sysdesign/contracts';
+import { EDGE_CARRIES_BOUND, type NodeOperation } from '@sysdesign/contracts';
 import { Badge, CheckboxField, Stack, Text } from '@sysdesign/design-system';
 
 import { ChipRemoveButton } from './chip-remove-button';
@@ -61,7 +61,7 @@ export function EdgeCarriesField({ carries, source, target, onChange }: EdgeCarr
   const candidates = candidatesOf(source, target);
   const declared = new Set(candidates.map((candidate) => candidate.name));
   const stale = carries.filter((name) => !declared.has(name));
-  const atCap = carries.length >= EDGE_MAX_CARRIES;
+  const atCap = carries.length >= EDGE_CARRIES_BOUND.target;
 
   const toggle = (name: string, checked: boolean) => {
     if (checked) {
@@ -115,7 +115,7 @@ export function EdgeCarriesField({ carries, source, target, onChange }: EdgeCarr
       ))}
 
       <Text as="span" size="sm" tone="muted">
-        {carries.length} of {EDGE_MAX_CARRIES}
+        {carries.length} of {EDGE_CARRIES_BOUND.target}
       </Text>
     </Stack>
   );

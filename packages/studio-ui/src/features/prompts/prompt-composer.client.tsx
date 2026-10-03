@@ -2,8 +2,8 @@
 
 import styled from '@emotion/styled';
 import {
-  PROMPT_MARKDOWN_MAX_LENGTH,
-  PROMPT_TITLE_MAX_LENGTH,
+  PROMPT_MARKDOWN_BOUND,
+  PROMPT_TITLE_BOUND,
   type ExperienceProfileDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
@@ -205,7 +205,7 @@ export function PromptComposer() {
               <TextField
                 label="Title"
                 value={title}
-                maxLength={PROMPT_TITLE_MAX_LENGTH}
+                maxLength={PROMPT_TITLE_BOUND.target}
                 onChange={(event) => setTitle(event.target.value)}
                 data-testid="compose-title"
               />
@@ -213,7 +213,7 @@ export function PromptComposer() {
                 label="Prompt (markdown)"
                 rows={16}
                 value={markdown}
-                maxLength={PROMPT_MARKDOWN_MAX_LENGTH}
+                maxLength={PROMPT_MARKDOWN_BOUND.target}
                 placeholder={'# Design …\n\n## Functional requirements\n1. …'}
                 onChange={(event) => setMarkdown(event.target.value)}
                 data-testid="compose-markdown"

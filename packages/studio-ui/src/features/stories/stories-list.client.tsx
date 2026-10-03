@@ -1,11 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
-import {
-  DEFAULT_LIST_LIMIT,
-  STORY_SECTION_MAX_LENGTH,
-  STORY_TAG_MAX_LENGTH,
-} from '@sysdesign/contracts';
+import { DEFAULT_LIST_LIMIT, STORY_SECTION_BOUND, STORY_TAG_BOUND } from '@sysdesign/contracts';
 import {
   Badge,
   Heading,
@@ -127,7 +123,7 @@ export function StoriesList() {
               label="Search"
               type="search"
               value={search}
-              maxLength={STORY_SECTION_MAX_LENGTH}
+              maxLength={STORY_SECTION_BOUND.target}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search titles, situations, results…"
               data-testid="story-search"
@@ -137,7 +133,7 @@ export function StoriesList() {
             <TextField
               label="Tag"
               value={tag}
-              maxLength={STORY_TAG_MAX_LENGTH}
+              maxLength={STORY_TAG_BOUND.target}
               onChange={(event) => setTag(event.target.value)}
               placeholder="e.g. caching"
               data-testid="story-tag-filter"

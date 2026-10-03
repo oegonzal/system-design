@@ -6,12 +6,12 @@ import {
   GOAL_INDEX_FENCE_CLOSE,
   GOAL_INDEX_FENCE_OPEN,
   GoalBudgetExceeded,
-  MAX_ELEMENTS,
+  ELEMENTS_BOUND,
   MISSION_FIXTURE,
   openTaskLedger,
   renderDocumentGoal,
   resumeChunk,
-  SNAPSHOT_MAX_BYTES,
+  SNAPSHOT_BOUND,
   textBytes,
   type ObservedElement,
   type PageObservation,
@@ -47,9 +47,9 @@ function maximalObservation(): PageObservation {
   return {
     url: `https://jobs.example.test/${fill(200, 'u')}`,
     title: fill(100, 't'),
-    elements: Array.from({ length: MAX_ELEMENTS }, (_, position) => element(position)),
+    elements: Array.from({ length: ELEMENTS_BOUND.target }, (_, position) => element(position)),
     omittedElements: 12,
-    ariaSnapshot: fill(SNAPSHOT_MAX_BYTES, 's'),
+    ariaSnapshot: fill(SNAPSHOT_BOUND.target, 's'),
   };
 }
 
@@ -100,7 +100,7 @@ describe('the browser-step input codec', () => {
       ledger: openTaskLedger(),
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
-    expect(readIndex(goal)?.elements).toHaveLength(MAX_ELEMENTS);
+    expect(readIndex(goal)?.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(goal).toContain('(12 more interactive elements not listed)');
     expect(() =>
       composeStepGoal(

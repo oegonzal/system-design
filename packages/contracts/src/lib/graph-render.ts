@@ -1,4 +1,4 @@
-import { NODE_MAX_OPERATIONS, OPERATION_NOTES_MAX_LENGTH } from './canvas';
+import { NODE_OPERATIONS_BOUND, OPERATION_NOTES_BOUND } from './canvas';
 import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
 import { nodeLabel } from './node-label';
 
@@ -14,24 +14,24 @@ import { nodeLabel } from './node-label';
  */
 
 /**
- * Every operation a node may declare is printed. Pinned to the schema's own cap
- * so the two cannot drift: a lens is asked which declarations no edge exercises,
+ * Every operation a node may declare is printed. Pinned to what the schema
+ * accepts — its bound's ceiling — so the two cannot drift: a lens is asked which declarations no edge exercises,
  * and it can only answer about the ones it was shown. An edge's `carries` is
  * never elided either, so eliding a node's operations would read as "carried but
  * never declared" — a defect the author did not commit. The whole-graph budget
  * `CANVAS_MAX_TOTAL_OPERATIONS` is what keeps a prompt in bounds, and a
  * blocking validator enforces it.
  */
-export const MAX_SERIALIZED_OPS = NODE_MAX_OPERATIONS;
+export const MAX_SERIALIZED_OPS = NODE_OPERATIONS_BOUND.ceiling;
 /**
  * A note is printed whole. It is where an author states the contract of an
  * operation — its retry, its ordering, its acknowledgement — and a lens that
  * reads half of one reports the other half missing; the coach, which revises
- * from this same text, would hand back the half it was shown. Pinned to the
- * schema's own bound for the reason the operation cap is: the render never
+ * from this same text, would hand back the half it was shown. Pinned to what
+ * the schema accepts for the reason the operation cap is: the render never
  * cuts what the schema admits.
  */
-export const MAX_SERIALIZED_NOTE_LENGTH = OPERATION_NOTES_MAX_LENGTH;
+export const MAX_SERIALIZED_NOTE_LENGTH = OPERATION_NOTES_BOUND.ceiling;
 
 /**
  * `command placeOrder idem note="Validates inventory first"` — kind when

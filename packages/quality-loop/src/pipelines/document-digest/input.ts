@@ -6,7 +6,12 @@
  * cites by alias, the rules, and the index the validators read back here
  * through the engine's own fence reader.
  */
-import { DOCUMENT_DIGEST_ID, documentIndexSchema, type DocumentIndex } from '@sysdesign/contracts';
+import {
+  bound,
+  DOCUMENT_DIGEST_ID,
+  documentIndexSchema,
+  type DocumentIndex,
+} from '@sysdesign/contracts';
 
 import { readFencedIndex } from '../../core/contracts';
 
@@ -17,13 +22,13 @@ export type { DocumentIndex };
 export const MAX_CRITERIA = 24;
 
 /**
- * The longest statement the deriver may write. A fact criterion carries the
- * section's own figures, names and dates so the panel can check the memory
- * against them without re-reading the chunk; sized above the contract's
- * default with headroom, since a statement past the bound discards the
- * whole rubric.
+ * The statement bound the deriver writes within. A fact criterion carries
+ * the section's own figures, names and dates so the panel can check the
+ * memory against them without re-reading the chunk; its target sits above
+ * the contract's default with headroom, and past the ceiling a statement is
+ * kept and recorded rather than discarding the rubric.
  */
-export const MAX_STATEMENT_LENGTH = 600;
+export const STATEMENT_BOUND = bound(600);
 
 /** The index the composer wrote, or null for a goal that is not a document chunk. */
 export const readIndex = (goal: string): DocumentIndex | null =>

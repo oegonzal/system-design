@@ -14,7 +14,7 @@
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
-import { DOCUMENT_DIGEST_ID, MAX_CRITERIA, MAX_STATEMENT_LENGTH } from './input';
+import { DOCUMENT_DIGEST_ID, MAX_CRITERIA, STATEMENT_BOUND } from './input';
 import criticCoverage from './lenses/critic.coverage.md?raw';
 import criticGrounding from './lenses/critic.grounding.md?raw';
 import criticUsability from './lenses/critic.usability.md?raw';
@@ -50,7 +50,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       duplicate_fact: 'Two memories stating the same fact about the subject.',
     },
     maxCriteria: MAX_CRITERIA,
-    maxStatementLength: MAX_STATEMENT_LENGTH,
+    statementBound: STATEMENT_BOUND,
     output: documentDigestOutput,
   },
 

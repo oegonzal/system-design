@@ -1,6 +1,8 @@
 import type { LlmCall } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
+import { bound } from '@sysdesign/contracts';
+
 import { criterionLengthBound } from '../contracts';
 import { fakeLlm, tinyPipeline } from '../testing';
 import { createCriteriaDeriver } from './derive-criteria';
@@ -39,14 +41,15 @@ describe('createCriteriaDeriver', () => {
     expect(calls[0].system).toContain('never cut to fit');
   });
 
-  it('[QL-2] a reply with one statement past the task’s bound is refused whole — never cut to fit — and is llm-failed', async () => {
+  it('[QL-2] a reply with one statement past the task’s ceiling is refused whole by a strict client — and is llm-failed', async () => {
     // The live failure this pins: a deriver that wrote 751 characters into
     // one of sixteen statements lost all sixteen, three attempts running.
-    const bound = criterionLengthBound(task);
+    // The ceiling is what the fake client, which parses strictly, refuses at.
+    const { ceiling } = criterionLengthBound(task);
     const reply = {
       criteria: [
         { kind: 'must', statement: 'short enough' },
-        { kind: 'must', statement: 'x'.repeat(bound + 1) },
+        { kind: 'must', statement: 'x'.repeat(ceiling + 1) },
       ],
     };
     const derived = await createCriteriaDeriver(task, deriveCriteria, fakeLlm(reply))('goal');
@@ -56,11 +59,11 @@ describe('createCriteriaDeriver', () => {
     });
 
     // The same reply, to a pipeline that declares room for it, is a rubric.
-    const roomy = { ...task, maxStatementLength: bound * 2 };
+    const roomy = { ...task, statementBound: bound(ceiling * 2) };
     const fitted = await createCriteriaDeriver(roomy, deriveCriteria, fakeLlm(reply))('goal');
     expect(fitted.criteria?.map((criterion) => criterion.statement.length)).toEqual([
       'short enough'.length,
-      bound + 1,
+      ceiling + 1,
     ]);
   });
 

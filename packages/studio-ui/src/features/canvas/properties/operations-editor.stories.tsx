@@ -1,4 +1,4 @@
-import { NODE_MAX_OPERATIONS, type NodeOperation } from '@sysdesign/contracts';
+import { NODE_OPERATIONS_BOUND, type NodeOperation } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
@@ -53,7 +53,7 @@ export const DuplicateNames: Story = {
 export const AtCapacity: Story = {
   render: () => (
     <Controlled
-      initial={Array.from({ length: NODE_MAX_OPERATIONS }, (_, index) => ({
+      initial={Array.from({ length: NODE_OPERATIONS_BOUND.target }, (_, index) => ({
         name: `operation${index + 1}`,
         kind: 'command' as const,
       }))}

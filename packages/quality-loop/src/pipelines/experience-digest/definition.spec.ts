@@ -1,4 +1,4 @@
-import { CRITERION_STATEMENT_MAX_LENGTH } from '@sysdesign/contracts';
+import { CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { criterionLengthBound } from '../../core/contracts';
@@ -73,13 +73,13 @@ describe('the experience-digest pipeline', () => {
     expect(boundsBelowMeasured(experienceDigestOutput.schema, measured)).toEqual([]);
   });
 
-  it('[QL-2] its deriver’s statement bound sits above the longest it has measurably written, and its persona asks for concision', () => {
+  it('[QL-2] its deriver’s statement target sits above the longest it has measurably written, and its persona asks for concision', () => {
     // The longest statement the digest's deriver has written across the
     // recorded runs (static/runs, to 2026-10-02): 751 characters, in a
     // record whose rubric was refused whole for it, three attempts running.
     // The persona that asked for every alias and iteration is gone; the
-    // bound is still sized above what it produced, since one statement past
-    // it discards the rubric and no lens runs.
+    // target is still sized above what it produced, so a statement that long
+    // is what was asked for, not an overrun kept past the ceiling.
     const kinds = Object.keys(EXPERIENCE_DIGEST.task.criterionKinds) as [string, ...string[]];
     const schema = criteriaSchema(
       kinds,
@@ -88,7 +88,7 @@ describe('the experience-digest pipeline', () => {
     );
     expect(boundsBelowMeasured(schema, { 'criteria[].statement': 751 })).toEqual([]);
     expect(describePipeline(EXPERIENCE_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
-      CRITERION_STATEMENT_MAX_LENGTH,
+      CRITERION_STATEMENT_BOUND.ceiling,
     );
     const persona = EXPERIENCE_DIGEST.deriveCriteria.persona;
     expect(persona).toMatch(/one concise sentence/);

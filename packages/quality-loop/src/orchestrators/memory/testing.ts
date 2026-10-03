@@ -14,7 +14,7 @@ import type {
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { contentHash, type MemoryHit } from './ports';
-import { buildQuery, probeSet, type FusedHit } from './recall/query';
+import { buildQuery, probeSet, type FusedHit, type ProbeSet } from './recall/query';
 
 export const FAKE_MODEL = 'fake-embedding';
 
@@ -163,11 +163,20 @@ export function readoutTrace(input: ReadoutInput): RunTrace {
   };
 }
 
+/** The query a sample recall composes; a sample that does not compose is a broken fixture. */
+export function builtQuery(query: string, probes: ProbeSet, hits: readonly FusedHit[]) {
+  const built = buildQuery(query, probes, hits);
+  if (built.query === null) {
+    throw new Error(`the sample query does not compose: ${JSON.stringify(built.issues)}`);
+  }
+  return built.query;
+}
+
 /** A memory-recall run over the sample pack that kept m1 and m2, with m2 faulted. */
 export function recallInput(hits: readonly MemoryHit[] = recallHits()): ReadoutInput {
   return {
     pipeline: 'memory-recall',
-    goal: renderQuery(buildQuery(GOAL, probeSet(GOAL, []), fused(hits))),
+    goal: renderQuery(builtQuery(GOAL, probeSet(GOAL, []), fused(hits))),
     artifact: samplePack(),
     locations: ['summary', 'm1', 'm2', 'm3', 'gap.1'],
     criteria: [{ id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' }],

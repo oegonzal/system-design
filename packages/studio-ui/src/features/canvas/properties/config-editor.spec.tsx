@@ -1,6 +1,6 @@
 import {
-  NODE_CONFIG_MAX_KEYS,
-  NODE_CONFIG_STRING_VALUE_MAX_LENGTH,
+  NODE_CONFIG_KEYS_BOUND,
+  NODE_CONFIG_STRING_VALUE_BOUND,
   type NodeConfigEntry,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
@@ -111,8 +111,8 @@ describe('ConfigEditor', () => {
     expect(screen.queryByTestId('config-row-replicas')).toBeNull();
   });
 
-  it(`caps entries at the contract's ${NODE_CONFIG_MAX_KEYS}: the draft disables`, () => {
-    const full = Array.from({ length: NODE_CONFIG_MAX_KEYS }, (_, index) => ({
+  it(`caps entries at the contract's ${NODE_CONFIG_KEYS_BOUND.target}: the draft disables`, () => {
+    const full = Array.from({ length: NODE_CONFIG_KEYS_BOUND.target }, (_, index) => ({
       key: `k${index}`,
       value: index,
     }));
@@ -121,7 +121,9 @@ describe('ConfigEditor', () => {
     expect((screen.getByTestId('config-key') as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByTestId('config-add') as HTMLButtonElement).disabled).toBe(true);
     expect(
-      screen.getByText(new RegExp(`${NODE_CONFIG_MAX_KEYS} of ${NODE_CONFIG_MAX_KEYS}`)),
+      screen.getByText(
+        new RegExp(`${NODE_CONFIG_KEYS_BOUND.target} of ${NODE_CONFIG_KEYS_BOUND.target}`),
+      ),
     ).toBeTruthy();
   });
 
@@ -136,14 +138,16 @@ describe('ConfigEditor', () => {
     expect(editor.queryByText(/characters? left/)).toBeNull();
 
     fireEvent.change(value, {
-      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_MAX_LENGTH - 5) },
+      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.target - 5) },
     });
     expect(editor.getByText('5 characters left')).toBeTruthy();
 
-    fireEvent.change(value, { target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_MAX_LENGTH) } });
+    fireEvent.change(value, {
+      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.target) },
+    });
     expect(
       editor.getByText(
-        `Limit reached — ${NODE_CONFIG_STRING_VALUE_MAX_LENGTH} characters at most.`,
+        `Limit reached — ${NODE_CONFIG_STRING_VALUE_BOUND.target} characters at most.`,
       ),
     ).toBeTruthy();
   });

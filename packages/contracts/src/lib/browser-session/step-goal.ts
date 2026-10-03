@@ -21,7 +21,7 @@ import {
   type TaskLedgerSummary,
 } from './observation.schema';
 import { BROWSER_STEP_PIPELINE_ID } from './pipelines';
-import { MAX_ACTIONS } from './step-plan.schema';
+import { ACTIONS_BOUND } from './step-plan.schema';
 import { ELEMENT_KINDS, HIDDEN_TRAITS } from './vocab';
 
 export interface StepGoalInput {
@@ -86,7 +86,7 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
 
 const indexOf = (input: StepGoalInput): StepIndex => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
-  maxActions: MAX_ACTIONS,
+  maxActions: ACTIONS_BOUND.target,
   elements: input.observation.elements.map((element) => ({
     ref: element.ref,
     kind: element.kind,
@@ -133,7 +133,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     '## Limits',
     '',
-    `- At most ${MAX_ACTIONS} actions, in the order they run; a taskDone, terminate or done action is last and appears nowhere else.`,
+    `- At most ${ACTIONS_BOUND.target} actions, in the order they run; a taskDone, terminate or done action is last and appears nowhere else.`,
     '- Cite refs only from the Elements list. Never act on a disabled element; fill only what can be typed into; select only a listed option.',
     '- A field the page hides is never filled or selected.',
     '- taskStart only while no unit of work is open; taskDone only while one is.',

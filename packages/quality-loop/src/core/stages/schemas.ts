@@ -2,16 +2,22 @@
  * The only zod that faces a model, built per request: every reference field is
  * a `z.enum` over the ids that exist for THIS artifact and THIS contract, so a
  * lens cannot cite what is not there. Nothing here is a number — the model
- * picks categories and ordinals; the policy owns every figure.
+ * picks categories and ordinals; the policy owns every figure. Every bound is
+ * declared through `bounded`: the model is asked for the target, a reply a
+ * little over is kept, and a list over is trimmed by whole items.
  */
 import { z } from 'zod';
 
 import {
   AXIS_FACTOR_LEVELS,
+  bound,
+  bounded,
   CRITERION_RESULTS,
   DECISIONS,
+  exact,
   FIXABILITIES,
   SEVERITIES,
+  type Bound,
 } from '@sysdesign/contracts';
 
 export type EnumTuple = [string, ...string[]];
@@ -21,49 +27,49 @@ export function enumTuple(ids: readonly string[]): EnumTuple | null {
   return ids.length === 0 ? null : (ids as EnumTuple);
 }
 
+/** The list a lens may cite nothing into, when nothing exists: exact, so an invented id is a fault. */
+const NO_REFS = exact(0);
+
 /** An id list locked to what exists, degrading to an empty list rather than an invented enum. */
-const refs = (ids: readonly string[], max: number, description: string) => {
+const refs = (ids: readonly string[], b: Bound, description: string) => {
   const tuple = enumTuple(ids);
-  return (tuple ? z.array(z.enum(tuple)).max(max) : z.array(z.string()).max(0)).describe(
-    description,
-  );
+  return tuple
+    ? bounded.list(b, z.enum(tuple), { description })
+    : bounded.list(NO_REFS, z.string(), { description });
 };
 
 /**
- * Above the longest rationale any lens has measurably written (695
- * characters, a critic, across every recorded run): a rationale past it is a
- * miss, never cut to fit, so the bound must not be one a lens routinely meets.
+ * The target sits above the longest rationale any lens has measurably
+ * written (695 characters, a critic, across every recorded run); past the
+ * ceiling a rationale is kept and recorded, never a lost sample.
  */
-const RATIONALE_MAX = 900;
+export const RATIONALE_BOUND = bound(900);
 /** How many artifact parts one finding may point at. */
-const MAX_LOCATION_REFS = 8;
+const LOCATION_REFS_BOUND = bound(8, 'list');
 /** How many criteria one finding may weaken. */
-const MAX_CRITERION_REFS = 4;
+const CRITERION_REFS_BOUND = bound(4, 'list');
 /** How many artifact parts one result may cite as evidence. */
-const MAX_EVIDENCE_REFS = 6;
+const EVIDENCE_REFS_BOUND = bound(6, 'list');
 
 /**
- * The deriver's answer: at most `maxCriteria`, each statement within the
- * task's bound (`criterionLengthBound`) — stated to the model in words as well as
- * in the schema, since a statement past it discards the whole rubric.
+ * The deriver's answer: at most `maxCriteria` — the engine's own cap, so a
+ * list over it is trimmed to it — each statement asked within the task's
+ * bound (`criterionLengthBound`), stated to the model in words as well as in
+ * the schema.
  */
-export function criteriaSchema(kinds: EnumTuple, maxCriteria: number, statementMax: number) {
+export function criteriaSchema(kinds: EnumTuple, maxCriteria: number, statementBound: Bound) {
   return z.strictObject({
-    criteria: z
-      .array(
-        z.strictObject({
-          kind: z.enum(kinds),
-          statement: z
-            .string()
-            .min(1)
-            .max(statementMax)
-            .describe(
-              `One checkable sentence, in the goal’s own terms, within ${statementMax} characters. Never invent a requirement.`,
-            ),
+    criteria: bounded.list(
+      exact(maxCriteria),
+      z.strictObject({
+        kind: z.enum(kinds),
+        statement: bounded.text(statementBound, {
+          min: 1,
+          description: `One checkable sentence, in the goal’s own terms, within ${statementBound.target} characters. Never invent a requirement.`,
         }),
-      )
-      .max(maxCriteria)
-      .describe('Every distinct requirement the goal states, most important first.'),
+      }),
+      { description: 'Every distinct requirement the goal states, most important first.' },
+    ),
   });
 }
 
@@ -74,40 +80,41 @@ export function findingsSchema(
   maxFindings: number,
 ) {
   return z.strictObject({
-    findings: z
-      .array(
-        z.strictObject({
-          type: z.enum(findingTypes),
-          severity: z
-            .enum(SEVERITIES)
-            .describe('How badly this hurts the artifact against the goal.'),
-          confidence: z
-            .enum(AXIS_FACTOR_LEVELS)
-            .describe('How sure you are this is a real defect, not a matter of taste.'),
-          fixability: z
-            .enum(FIXABILITIES)
-            .describe(
-              'fixable_local: edit the artifact. requires_retry: start over. requires_user: a person must decide. unfixable: no version of this artifact can satisfy the goal.',
-            ),
-          locationRefs: refs(
-            locationIds,
-            MAX_LOCATION_REFS,
-            'Ids of the artifact parts this concerns. Empty only if artifact-wide.',
+    findings: bounded.list(
+      exact(maxFindings),
+      z.strictObject({
+        type: z.enum(findingTypes),
+        severity: z
+          .enum(SEVERITIES)
+          .describe('How badly this hurts the artifact against the goal.'),
+        confidence: z
+          .enum(AXIS_FACTOR_LEVELS)
+          .describe('How sure you are this is a real defect, not a matter of taste.'),
+        fixability: z
+          .enum(FIXABILITIES)
+          .describe(
+            'fixable_local: edit the artifact. requires_retry: start over. requires_user: a person must decide. unfixable: no version of this artifact can satisfy the goal.',
           ),
-          criterionIds: refs(
-            criterionIds,
-            MAX_CRITERION_REFS,
-            'The success criteria this defect weakens. Empty only if cross-cutting.',
-          ),
-          rationale: z
-            .string()
-            .min(1)
-            .max(RATIONALE_MAX)
-            .describe('What is wrong, where, and what would fix it — one or two sentences.'),
+        locationRefs: refs(
+          locationIds,
+          LOCATION_REFS_BOUND,
+          'Ids of the artifact parts this concerns. Empty only if artifact-wide.',
+        ),
+        criterionIds: refs(
+          criterionIds,
+          CRITERION_REFS_BOUND,
+          'The success criteria this defect weakens. Empty only if cross-cutting.',
+        ),
+        rationale: bounded.text(RATIONALE_BOUND, {
+          min: 1,
+          description: 'What is wrong, where, and what would fix it — one or two sentences.',
         }),
-      )
-      .max(maxFindings)
-      .describe('Distinct defects only, worst first. Never restate a known validation problem.'),
+      }),
+      {
+        description:
+          'Distinct defects only, worst first. Never restate a known validation problem.',
+      },
+    ),
   });
 }
 
@@ -117,26 +124,25 @@ export function evaluationSchema(
   maxResults: number,
 ) {
   return z.strictObject({
-    results: z
-      .array(
-        z.strictObject({
-          criterionId: z.enum(criterionIds),
-          result: z
-            .enum(CRITERION_RESULTS)
-            .describe(
-              'pass: fully satisfied. partial: addressed but incomplete. fail: unmet. not_applicable: the criterion cannot apply to this artifact.',
-            ),
-          confidence: z.enum(AXIS_FACTOR_LEVELS),
-          locationRefs: refs(
-            locationIds,
-            MAX_EVIDENCE_REFS,
-            'Ids of the artifact parts that are your evidence.',
+    results: bounded.list(
+      exact(maxResults),
+      z.strictObject({
+        criterionId: z.enum(criterionIds),
+        result: z
+          .enum(CRITERION_RESULTS)
+          .describe(
+            'pass: fully satisfied. partial: addressed but incomplete. fail: unmet. not_applicable: the criterion cannot apply to this artifact.',
           ),
-          rationale: z.string().max(RATIONALE_MAX).describe('Why, in one sentence.'),
-        }),
-      )
-      .max(maxResults)
-      .describe('Exactly one result per listed criterion, in the listed order.'),
+        confidence: z.enum(AXIS_FACTOR_LEVELS),
+        locationRefs: refs(
+          locationIds,
+          EVIDENCE_REFS_BOUND,
+          'Ids of the artifact parts that are your evidence.',
+        ),
+        rationale: bounded.text(RATIONALE_BOUND, { description: 'Why, in one sentence.' }),
+      }),
+      { description: 'Exactly one result per listed criterion, in the listed order.' },
+    ),
     advisoryVerdict: z
       .enum(DECISIONS)
       .nullable()

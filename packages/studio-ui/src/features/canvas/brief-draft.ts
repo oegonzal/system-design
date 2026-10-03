@@ -1,5 +1,5 @@
 import {
-  FLOW_MAX_STEPS,
+  FLOW_STEPS_BOUND,
   type Binding,
   type CanvasEdge,
   type CanvasGraph,
@@ -45,7 +45,7 @@ export function bindingState(binding: Binding | null | undefined): BindingState 
  * the API enforces — offered as a choice rather than checked after the fact.
  */
 export function nextHops(graph: CanvasGraph, path: readonly string[]): CanvasEdge[] {
-  if (path.length >= FLOW_MAX_STEPS) return [];
+  if (path.length >= FLOW_STEPS_BOUND.target) return [];
   const lastId = path[path.length - 1];
   if (lastId === undefined) return [...graph.edges];
   const last = graph.edges.find((edge) => edge.id === lastId);

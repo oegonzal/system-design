@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  NARRATION_OVERVIEW_MAX_LENGTH,
-  NARRATION_PROSE_MAX_LENGTH,
+  NARRATION_OVERVIEW_BOUND,
+  NARRATION_PROSE_BOUND,
   type CanvasGraph,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
@@ -95,7 +95,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
           label="The big picture — why this shape"
           data-testid="narrative-overview"
           rows={4}
-          maxLength={NARRATION_OVERVIEW_MAX_LENGTH}
+          maxLength={NARRATION_OVERVIEW_BOUND.target}
           value={overview}
           disabled={readOnly}
           onChange={(event) => setOverview(event.target.value)}
@@ -123,7 +123,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                   label={`Why ${node.label} is here`}
                   data-testid={`narrative-rationale-${node.id}`}
                   rows={3}
-                  maxLength={NARRATION_PROSE_MAX_LENGTH}
+                  maxLength={NARRATION_PROSE_BOUND.target}
                   value={prose}
                   disabled={readOnly}
                   onChange={(event) => setRationale(node.id, event.target.value)}
@@ -160,7 +160,7 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                       label={`Walkthrough for ${criterion.id}`}
                       data-testid={`narrative-narration-${criterion.id}`}
                       rows={3}
-                      maxLength={NARRATION_PROSE_MAX_LENGTH}
+                      maxLength={NARRATION_PROSE_BOUND.target}
                       value={prose}
                       disabled={readOnly}
                       onChange={(event) => setNarration(criterion.id, event.target.value)}

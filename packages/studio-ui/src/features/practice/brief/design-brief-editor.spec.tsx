@@ -1,4 +1,4 @@
-import { BINDING_CLAIM_MAX_LENGTH, type CanvasGraph } from '@sysdesign/contracts';
+import { BINDING_CLAIM_BOUND, type CanvasGraph } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -171,7 +171,7 @@ describe('DesignBriefEditor', () => {
   });
   it('[UX-6] says how much of a claim’s limit is left as it nears — a claim is never cut off unsaid', () => {
     renderEditor((store) => {
-      store.getState().setBindingClaim('c1', 'x'.repeat(BINDING_CLAIM_MAX_LENGTH - 4));
+      store.getState().setBindingClaim('c1', 'x'.repeat(BINDING_CLAIM_BOUND.target - 4));
       store.getState().setBindingClaim('c2', 'The cache absorbs repeat reads.');
     });
 

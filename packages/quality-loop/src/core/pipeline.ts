@@ -167,8 +167,15 @@ function checkTask(definition: Definition, fail: Fail): void {
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
   // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it judged.
   const bound = criterionLengthBound(definition.task);
-  if (!(Number.isInteger(bound) && bound >= 1 && bound <= MAX_PROVIDED_STATEMENT_LENGTH)) {
-    fail(`task.maxStatementLength must be an integer from 1 to ${MAX_PROVIDED_STATEMENT_LENGTH}`);
+  if (!(
+    Number.isInteger(bound.target) &&
+    bound.target >= 1 &&
+    bound.ceiling >= bound.target &&
+    bound.ceiling <= MAX_PROVIDED_STATEMENT_LENGTH
+  )) {
+    fail(
+      `task.statementBound must have an integer target from 1 and a ceiling at most ${MAX_PROVIDED_STATEMENT_LENGTH}`,
+    );
   }
 }
 
@@ -246,7 +253,7 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
       criterionKinds: { ...task.criterionKinds },
       findingTypes: { ...task.findingTypes },
       maxCriteria: task.maxCriteria,
-      maxStatementLength: criterionLengthBound(task),
+      maxStatementLength: criterionLengthBound(task).ceiling,
     },
     producer: { consumes: [...definition.producer.consumes] },
     validators: definition.validators.map(({ id, gate }) => ({ id, gate })),

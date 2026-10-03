@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { bound, bounded, type Bound } from './bounds';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { IsoDateString, Uuid } from './primitives';
 
@@ -22,29 +23,29 @@ export interface StarStoryDto {
   updatedAt: IsoDateString;
 }
 
-export const STORY_TITLE_MAX_LENGTH = 120;
-export const STORY_SECTION_MAX_LENGTH = 4000;
-export const STORY_TAG_MAX_LENGTH = 40;
-export const STORY_MAX_TAGS = 12;
+export const STORY_TITLE_BOUND = bound(120);
+export const STORY_SECTION_BOUND = bound(4000);
+export const STORY_TAG_BOUND = bound(40);
+export const STORY_TAGS_BOUND = bound(12, 'list');
 
 /** Trimmed, then required and bounded: whitespace alone is not a title, a section or a tag. */
-const filled = (max: number) => z.string().trim().min(1).max(max);
+const filled = (b: Bound) => bounded.text(b, { trim: true, min: 1 });
 
 /**
  * What a story must be to be saved — one rule for the API, which refuses
  * anything else with every offending path, and for the form, which says so
  * before the request. A title and all four STAR sections are required, tags
  * are bounded in length and count, and every value is stored trimmed. The
- * bounds are the column widths, so Postgres never has to refuse. Used by
- * both POST (create) and PUT (full replace).
+ * columns are `text`, so only the declared bounds limit them and Postgres
+ * never has to refuse. Used by both POST (create) and PUT (full replace).
  */
 export const saveStarStorySchema = z.strictObject({
-  title: filled(STORY_TITLE_MAX_LENGTH),
-  situation: filled(STORY_SECTION_MAX_LENGTH),
-  task: filled(STORY_SECTION_MAX_LENGTH),
-  action: filled(STORY_SECTION_MAX_LENGTH),
-  result: filled(STORY_SECTION_MAX_LENGTH),
-  tags: z.array(filled(STORY_TAG_MAX_LENGTH)).max(STORY_MAX_TAGS),
+  title: filled(STORY_TITLE_BOUND),
+  situation: filled(STORY_SECTION_BOUND),
+  task: filled(STORY_SECTION_BOUND),
+  action: filled(STORY_SECTION_BOUND),
+  result: filled(STORY_SECTION_BOUND),
+  tags: bounded.list(STORY_TAGS_BOUND, filled(STORY_TAG_BOUND)),
   promptId: z.uuid().optional(),
   experienceId: z.uuid().optional(),
 });

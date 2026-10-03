@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_MAX_OPERATIONS } from './canvas';
+import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_OPERATIONS_BOUND } from './canvas';
 import { canvasGraphSchema, type CanvasGraph } from './canvas.schema';
 import { validateGraphReferences } from './graph-validator';
 
@@ -87,19 +87,21 @@ describe('validateGraphReferences', () => {
   // rule and the test proves nothing. The smallest such graph fills
   // ceil((400 + 1) / 12) = 34 nodes to their own cap.
   it('holds the whole-graph operation budget on a graph the schema accepts', () => {
-    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_MAX_OPERATIONS);
+    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_OPERATIONS_BOUND.target);
     const nodes = Array.from({ length: nodeCount }, (_, n) => ({
       id: `n-${n}`,
       kind: 'service' as const,
       label: `Service ${n}`,
-      operations: Array.from({ length: NODE_MAX_OPERATIONS }, (_, i) => ({ name: `op-${n}-${i}` })),
+      operations: Array.from({ length: NODE_OPERATIONS_BOUND.target }, (_, i) => ({
+        name: `op-${n}-${i}`,
+      })),
     }));
     const over = graph({ nodes, edges: [] });
     expect(canvasGraphSchema.safeParse(over).success).toBe(true);
-    expect(nodeCount * NODE_MAX_OPERATIONS).toBeGreaterThan(CANVAS_MAX_TOTAL_OPERATIONS);
+    expect(nodeCount * NODE_OPERATIONS_BOUND.target).toBeGreaterThan(CANVAS_MAX_TOTAL_OPERATIONS);
 
     expect(validateGraphReferences(over)).toEqual([
-      `graph declares ${nodeCount * NODE_MAX_OPERATIONS} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
+      `graph declares ${nodeCount * NODE_OPERATIONS_BOUND.target} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
     ]);
 
     // One node fewer cannot reach the budget, so the rule is not merely always on.

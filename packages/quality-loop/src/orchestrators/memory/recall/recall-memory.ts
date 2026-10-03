@@ -7,10 +7,11 @@
  * then used for — a goal section, a producer briefing — is the caller's.
  * Every way it can hand on nothing is a closed reason.
  */
-import type {
-  MemoryStoreAvailabilityDto,
-  QualityRunDto,
-  RecallFocusDto,
+import {
+  describeIssue,
+  type MemoryStoreAvailabilityDto,
+  type QualityRunDto,
+  type RecallFocusDto,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -69,7 +70,7 @@ export type Recalled =
     }
   | {
       status: 'failed';
-      reason: 'embedding-failed' | 'store-unavailable' | 'run-failed';
+      reason: 'embedding-failed' | 'store-unavailable' | 'query-refused' | 'run-failed';
       note: string | null;
       /** Only what was counted before it broke: the probes, when the embedding did. */
       counts?: Pick<RecallCounts, 'probes'>;
@@ -129,7 +130,17 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
   }
   if (hits.length === 0) return { status: 'skipped', reason: 'store-empty', note: null };
 
-  const child = await ask.execute({ goal: renderQuery(buildQuery(query, searched, hits)) });
+  const built = buildQuery(query, searched, hits);
+  if (built.query === null) {
+    return {
+      status: 'failed',
+      reason: 'query-refused',
+      note: built.issues.map(describeIssue).join('; '),
+      counts: { probes: texts.length },
+      runId: null,
+    };
+  }
+  const child = await ask.execute({ goal: renderQuery(built.query) });
   if (!completed(child)) {
     return {
       status: 'failed',

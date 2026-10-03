@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { CANVAS_MAX_NODES, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_MAX_KEYS } from './canvas';
+import { CANVAS_NODES_BOUND, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_KEYS_BOUND } from './canvas';
 import { designSubmissionSchema, type DesignSubmission } from './canvas.schema';
 
 /** A complete, valid submission: every optional field present once. */
@@ -78,10 +78,10 @@ describe('designSubmissionSchema', () => {
     expect(designSubmissionSchema.safeParse(nested).success).toBe(false);
   });
 
-  it('bounds every array so an oversize submission is refused before any lens sees it', () => {
+  it('bounds every array at its ceiling, so an oversize submission is refused before any lens sees it', () => {
     const fixture = submissionFixture();
     const tooManyNodes = structuredClone(fixture);
-    tooManyNodes.graph.nodes = Array.from({ length: CANVAS_MAX_NODES + 1 }, (_, i) => ({
+    tooManyNodes.graph.nodes = Array.from({ length: CANVAS_NODES_BOUND.ceiling + 1 }, (_, i) => ({
       id: `n-${i}`,
       kind: 'service' as const,
       label: '',
@@ -90,7 +90,7 @@ describe('designSubmissionSchema', () => {
 
     const tooManyKeys = structuredClone(fixture);
     tooManyKeys.graph.nodes[1].config = Array.from(
-      { length: NODE_CONFIG_MAX_KEYS + 1 },
+      { length: NODE_CONFIG_KEYS_BOUND.ceiling + 1 },
       (_, i) => ({
         key: `k${i}`,
         value: i,

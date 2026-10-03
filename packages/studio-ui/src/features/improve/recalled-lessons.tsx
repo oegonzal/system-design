@@ -39,6 +39,8 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
     'The coach ran without lessons from earlier runs: lessons cannot be reviewed right now.',
   'embedding-failed':
     'The coach ran without lessons from earlier runs: the search for them failed.',
+  'query-refused':
+    'The coach ran without lessons from earlier runs: what the search found could not be put to review.',
   'run-failed': 'The coach ran without lessons from earlier runs: reviewing them failed.',
   'no-rubric':
     'The coach ran without lessons from earlier runs: the review could not settle what to check them against.',

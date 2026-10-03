@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 
+import { bounded } from '../bounds';
 import type { IsoDateString, Uuid } from '../primitives';
 import {
   DOCUMENT_MAX_MEMORIES,
@@ -14,7 +15,12 @@ import {
   DOCUMENT_RULES,
   type DocumentChunk,
 } from '../quality-loop/document-digest';
-import { ELEMENT_NAME_MAX, MAX_OPTIONS, OPTION_MAX, TASK_LABEL_MAX } from './observation.schema';
+import {
+  ELEMENT_NAME_BOUND,
+  OPTION_BOUND,
+  OPTIONS_BOUND,
+  TASK_LABEL_BOUND,
+} from './observation.schema';
 import { FIELD_TYPES } from './vocab';
 
 export const GUIDANCE_QUESTION_MAX_LENGTH = 600;
@@ -25,15 +31,15 @@ export const operatorGuidanceSchema = z.strictObject({
   sessionId: z.string().min(1),
   capturedAt: z.string().min(1),
   field: z.strictObject({
-    label: z.string().min(1).max(ELEMENT_NAME_MAX),
+    label: bounded.text(ELEMENT_NAME_BOUND, { min: 1 }),
     /** The text beside the field, when the label alone is terse. */
     question: z.string().max(GUIDANCE_QUESTION_MAX_LENGTH).nullable(),
     type: z.enum(FIELD_TYPES),
-    options: z.array(z.string().max(OPTION_MAX)).max(MAX_OPTIONS).nullable(),
+    options: bounded.list(OPTIONS_BOUND, bounded.text(OPTION_BOUND)).nullable(),
   }),
   context: z.strictObject({
     /** The unit of work, in the mission's terms; never a URL, which would leak into the store. */
-    taskLabel: z.string().max(TASK_LABEL_MAX).nullable(),
+    taskLabel: bounded.text(TASK_LABEL_BOUND).nullable(),
     page: z.string().max(GUIDANCE_PAGE_MAX_LENGTH).nullable(),
   }),
   answer: z.string().min(1).max(GUIDANCE_ANSWER_MAX_LENGTH),

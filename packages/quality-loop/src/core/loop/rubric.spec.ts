@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { bound } from '@sysdesign/contracts';
+
 import { criterionLengthBound } from '../contracts';
 import type { Stages } from '../ports';
 import {
@@ -39,13 +41,13 @@ describe('rubricProblems', () => {
     ]);
   });
 
-  it('[QL-20] holds a supplied statement to the bound the pipeline’s own deriver is held to', () => {
-    const bound = criterionLengthBound(task);
-    const long = criterion('c1', 'must', 'x'.repeat(bound + 1));
+  it('[QL-20] holds a supplied statement to the ceiling the pipeline’s own deriver is accepted with', () => {
+    const { ceiling } = criterionLengthBound(task);
+    const long = criterion('c1', 'must', 'x'.repeat(ceiling + 1));
     expect(rubricProblems([long, criterion('c2')], task)).toEqual([
-      `criterion c1 is longer than the ${bound} characters this pipeline allows`,
+      `criterion c1 is longer than the ${ceiling} characters this pipeline allows`,
     ]);
-    expect(rubricProblems([long], { ...task, maxStatementLength: bound + 1 })).toEqual([]);
+    expect(rubricProblems([long], { ...task, statementBound: bound(ceiling + 1) })).toEqual([]);
   });
 });
 

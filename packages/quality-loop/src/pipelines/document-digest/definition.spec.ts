@@ -1,4 +1,4 @@
-import { CRITERION_STATEMENT_MAX_LENGTH } from '@sysdesign/contracts';
+import { CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
@@ -65,7 +65,7 @@ describe('the document-digest pipeline', () => {
     }
     // A fact criterion quotes the section's own figures, so the bound sits above the contract's default.
     expect(describePipeline(DOCUMENT_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
-      CRITERION_STATEMENT_MAX_LENGTH,
+      CRITERION_STATEMENT_BOUND.ceiling,
     );
     expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(/longer than the schema allows/);
   });

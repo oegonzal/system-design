@@ -1,4 +1,4 @@
-import { STORY_MAX_TAGS, STORY_TAG_MAX_LENGTH } from '@sysdesign/contracts';
+import { STORY_TAGS_BOUND, STORY_TAG_BOUND } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -107,18 +107,20 @@ describe('StoryForm', () => {
     const reason = () =>
       document.getElementById(tags.getAttribute('aria-describedby') ?? '')?.textContent;
 
-    const long = 'x'.repeat(STORY_TAG_MAX_LENGTH + 1);
+    const long = 'x'.repeat(STORY_TAG_BOUND.ceiling + 1);
     await user.type(tags, `postgres, ${long}`);
-    expect(reason()).toBe(`“${long}” is longer than ${STORY_TAG_MAX_LENGTH} characters.`);
+    expect(reason()).toBe(`“${long}” is longer than ${STORY_TAG_BOUND.ceiling} characters.`);
     expect(save.disabled).toBe(true);
     expect(screen.getByTestId('save-story-reason').textContent).toBe(
       'Fix the marked fields to save.',
     );
 
     await user.clear(tags);
-    const many = Array.from({ length: STORY_MAX_TAGS + 1 }, (_, i) => `t${i}`);
+    const many = Array.from({ length: STORY_TAGS_BOUND.ceiling + 1 }, (_, i) => `t${i}`);
     await user.type(tags, many.join(','));
-    expect(reason()).toBe(`At most ${STORY_MAX_TAGS} tags — this has ${STORY_MAX_TAGS + 1}.`);
+    expect(reason()).toBe(
+      `At most ${STORY_TAGS_BOUND.ceiling} tags — this has ${STORY_TAGS_BOUND.ceiling + 1}.`,
+    );
     expect(save.disabled).toBe(true);
     expect(onSave).not.toHaveBeenCalled();
   });

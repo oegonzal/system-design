@@ -13,10 +13,24 @@
  * and names the sections in its rationale, so admission excludes that memory
  * and no other.
  */
-import { DOCUMENT_MAX_MEMORIES, DOCUMENT_MAX_PARTS, SECTION_ALIAS } from '@sysdesign/contracts';
+import {
+  bound,
+  bounded,
+  DOCUMENT_MAX_MEMORIES,
+  DOCUMENT_MAX_PARTS,
+  LESSON_APPLIES_WHEN_BOUND,
+  LESSON_INSIGHT_BOUND,
+  lessonText,
+  SECTION_ALIAS,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { section, type OutputShape } from '../../core/contracts';
+
+const SUMMARY_BOUND = bound(950);
+const MEMORIES_BOUND = bound(DOCUMENT_MAX_MEMORIES, 'list');
+const MEMORY_EVIDENCE_BOUND = bound(4, 'list');
+const UNUSED_BOUND = bound(DOCUMENT_MAX_PARTS, 'list');
 
 const evidence = z
   .string()
@@ -24,42 +38,33 @@ const evidence = z
   .describe('A section alias exactly as listed, e.g. section.3.');
 
 export const documentDigestSchema = z.strictObject({
-  summary: z
-    .string()
-    .min(1)
-    .max(950)
-    .describe(
+  summary: bounded.text(SUMMARY_BOUND, {
+    min: 1,
+    description:
       'What the chunk states about the subject that a form could ask for, in 2–4 sentences.',
-    ),
-  memories: z
-    .array(
-      z.strictObject({
-        evidence: z
-          .array(evidence)
-          .min(1)
-          .max(4)
-          .describe('The sections this fact rests on; a section may back several facts.'),
-        insight: z
-          .string()
-          .min(1)
-          .max(1000)
-          .describe(
-            'One fact about the subject, named, complete as a form field could take or compute from it: absolute dates and figures, names as the document spells them.',
-          ),
-        appliesWhen: z
-          .string()
-          .min(1)
-          .max(500)
-          .describe(
-            'The form situation that calls for the fact — the field or question an applicant would be asked.',
-          ),
+  }),
+  memories: bounded.list(
+    MEMORIES_BOUND,
+    z.strictObject({
+      evidence: bounded.list(MEMORY_EVIDENCE_BOUND, evidence, {
+        min: 1,
+        description: 'The sections this fact rests on; a section may back several facts.',
       }),
-    )
-    .max(DOCUMENT_MAX_MEMORIES),
-  unused: z
-    .array(evidence)
-    .max(DOCUMENT_MAX_PARTS)
-    .describe('Every listed section no memory rests on.'),
+      insight: bounded.text(LESSON_INSIGHT_BOUND, {
+        min: 1,
+        description:
+          'One fact about the subject, named, complete as a form field could take or compute from it: absolute dates and figures, names as the document spells them.',
+      }),
+      appliesWhen: bounded.text(LESSON_APPLIES_WHEN_BOUND, {
+        min: 1,
+        description:
+          'The form situation that calls for the fact — the field or question an applicant would be asked.',
+      }),
+    }),
+  ),
+  unused: bounded.list(UNUSED_BOUND, evidence, {
+    description: 'Every listed section no memory rests on.',
+  }),
 });
 export type DocumentDigest = z.infer<typeof documentDigestSchema>;
 
@@ -84,7 +89,7 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
         'Memories',
         digest.memories.map(
           (memory, index) =>
-            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${memory.insight} — applies when ${memory.appliesWhen}`,
+            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${lessonText(memory)}`,
         ),
       ),
       ...section('Unused', digest.unused.length > 0 ? [cited(digest.unused)] : []),

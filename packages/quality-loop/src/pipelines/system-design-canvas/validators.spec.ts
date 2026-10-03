@@ -1,4 +1,4 @@
-import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_MAX_OPERATIONS } from '@sysdesign/contracts';
+import { CANVAS_MAX_TOTAL_OPERATIONS, NODE_OPERATIONS_BOUND } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { TaskContract } from '../../core/contracts';
@@ -118,19 +118,21 @@ describe('the system-design-canvas validators', () => {
 
   it('[QL-3] the whole-graph operation budget blocks a canvas the schema would accept', () => {
     const submission = sampleSubmission();
-    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_MAX_OPERATIONS);
+    const nodeCount = Math.ceil((CANVAS_MAX_TOTAL_OPERATIONS + 1) / NODE_OPERATIONS_BOUND.target);
     submission.graph.nodes = Array.from({ length: nodeCount }, (_, n) => ({
       id: `n-${n}`,
       kind: 'service' as const,
       label: `Service ${n}`,
-      operations: Array.from({ length: NODE_MAX_OPERATIONS }, (_, i) => ({ name: `op-${n}-${i}` })),
+      operations: Array.from({ length: NODE_OPERATIONS_BOUND.target }, (_, i) => ({
+        name: `op-${n}-${i}`,
+      })),
     }));
     submission.graph.edges = [];
     submission.brief = null;
     submission.narrative = null;
     expect(SYSTEM_DESIGN_CANVAS.task.output.schema.safeParse(submission).success).toBe(true);
     expect(messages(submission).references).toContain(
-      `graph declares ${nodeCount * NODE_MAX_OPERATIONS} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
+      `graph declares ${nodeCount * NODE_OPERATIONS_BOUND.target} operations — the maximum is ${CANVAS_MAX_TOTAL_OPERATIONS}`,
     );
   });
 

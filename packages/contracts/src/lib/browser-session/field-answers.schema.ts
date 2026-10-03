@@ -6,14 +6,15 @@
  */
 import { z } from 'zod';
 
+import { bound, bounded } from '../bounds';
 import { ELEMENT_REF } from './observation.schema';
 import { CONFIDENCE_LEVELS, FIELD_DECISIONS } from './vocab';
 
-export const MAX_FIELDS = 40;
-export const MAX_BASIS = 6;
-export const ANSWERS_SUMMARY_MAX_LENGTH = 600;
-export const ANSWER_VALUE_MAX_LENGTH = 4000;
-export const ANSWER_REASON_MAX_LENGTH = 300;
+export const FIELDS_BOUND = bound(40, 'list');
+export const BASIS_BOUND = bound(6, 'list');
+export const ANSWERS_SUMMARY_BOUND = bound(600);
+export const ANSWER_VALUE_BOUND = bound(4000);
+export const ANSWER_REASON_BOUND = bound(300);
 
 /** An evidence alias as the goal lists it: `m3`. */
 export const EVIDENCE_ALIAS = /^m\d+$/;
@@ -26,32 +27,29 @@ export const fieldAnswerSchema = z.strictObject({
     .describe(
       'answer: fill it from the evidence. ask-operator: the evidence does not settle it. leave-blank: the page hides it, or it must stay empty.',
     ),
-  value: z
-    .string()
-    .max(ANSWER_VALUE_MAX_LENGTH)
-    .nullable()
-    .describe('The exact text to type or the option to pick; null unless the decision is answer.'),
+  value: bounded
+    .text(ANSWER_VALUE_BOUND, {
+      description:
+        'The exact text to type or the option to pick; null unless the decision is answer.',
+    })
+    .nullable(),
   confidence: z.enum(CONFIDENCE_LEVELS),
-  basis: z
-    .array(z.string().regex(EVIDENCE_ALIAS))
-    .max(MAX_BASIS)
-    .describe(
+  basis: bounded.list(BASIS_BOUND, z.string().regex(EVIDENCE_ALIAS), {
+    description:
       'The evidence aliases the value rests on, exactly as listed; empty when none supports it.',
-    ),
-  reason: z.string().min(1).max(ANSWER_REASON_MAX_LENGTH),
+  }),
+  reason: bounded.text(ANSWER_REASON_BOUND, { min: 1 }),
 });
 export type FieldAnswer = z.infer<typeof fieldAnswerSchema>;
 
 export const fieldAnswersSchema = z.strictObject({
-  summary: z
-    .string()
-    .min(1)
-    .max(ANSWERS_SUMMARY_MAX_LENGTH)
-    .describe('What the form asks and how the evidence covers it — two or three sentences.'),
-  fields: z
-    .array(fieldAnswerSchema)
-    .min(1)
-    .max(MAX_FIELDS)
-    .describe('Every field the Fields list names, exactly once, in the order listed.'),
+  summary: bounded.text(ANSWERS_SUMMARY_BOUND, {
+    min: 1,
+    description: 'What the form asks and how the evidence covers it — two or three sentences.',
+  }),
+  fields: bounded.list(FIELDS_BOUND, fieldAnswerSchema, {
+    min: 1,
+    description: 'Every field the Fields list names, exactly once, in the order listed.',
+  }),
 });
 export type FieldAnswers = z.infer<typeof fieldAnswersSchema>;

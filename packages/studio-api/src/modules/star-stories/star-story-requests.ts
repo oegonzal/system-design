@@ -1,8 +1,8 @@
 import {
   DEFAULT_LIST_LIMIT,
   MAX_LIST_LIMIT,
-  STORY_SECTION_MAX_LENGTH,
-  STORY_TAG_MAX_LENGTH,
+  STORY_SECTION_BOUND,
+  STORY_TAG_BOUND,
 } from '@sysdesign/contracts';
 import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
@@ -11,9 +11,9 @@ import { z } from 'zod';
 export const listStarStoriesQuerySchema = z.strictObject({
   ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
   /** Case-insensitive contains over title, situation and result. */
-  search: z.string().max(STORY_SECTION_MAX_LENGTH).optional(),
+  search: z.string().max(STORY_SECTION_BOUND.target).optional(),
   /** Exact tag membership — a term longer than a tag can never match one. */
-  tag: z.string().max(STORY_TAG_MAX_LENGTH).optional(),
+  tag: z.string().max(STORY_TAG_BOUND.target).optional(),
   promptId: z.uuid().optional(),
   experienceId: z.uuid().optional(),
 });

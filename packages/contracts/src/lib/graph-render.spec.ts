@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { NODE_MAX_OPERATIONS, OPERATION_NOTES_MAX_LENGTH } from './canvas';
+import { NODE_OPERATIONS_BOUND, OPERATION_NOTES_BOUND } from './canvas';
 import { nodeOperationSchema } from './canvas.schema';
 import {
   MAX_SERIALIZED_NOTE_LENGTH,
@@ -39,13 +39,15 @@ describe('renderNodeLine', () => {
       id: 'n-1',
       kind: 'service',
       label: 'Orders',
-      operations: Array.from({ length: NODE_MAX_OPERATIONS }, (_, i) => ({ name: `op${i}` })),
+      operations: Array.from({ length: NODE_OPERATIONS_BOUND.ceiling }, (_, i) => ({
+        name: `op${i}`,
+      })),
     });
-    for (let i = 0; i < NODE_MAX_OPERATIONS; i++) expect(line).toContain(`op${i}`);
+    for (let i = 0; i < NODE_OPERATIONS_BOUND.ceiling; i++) expect(line).toContain(`op${i}`);
     expect(line).not.toContain('more]');
     // This assertion is the whole defence: inline either constant and the two
     // drift apart again, hiding declarations the lens is asked to judge.
-    expect(MAX_SERIALIZED_OPS).toBe(NODE_MAX_OPERATIONS);
+    expect(MAX_SERIALIZED_OPS).toBe(NODE_OPERATIONS_BOUND.ceiling);
   });
 
   // The valve the schema no longer opens: kept so a future cap rise cannot
@@ -67,9 +69,9 @@ describe('renderNodeLine', () => {
   it('prints a note whole at the longest the schema admits, quoted so its punctuation is its own', () => {
     const notes =
       `${'published async after the 302 is sent; idempotent producer with acks=all (retries on) '.repeat(3)}`
-        .slice(0, OPERATION_NOTES_MAX_LENGTH - 1)
+        .slice(0, OPERATION_NOTES_BOUND.ceiling - 1)
         .concat(')');
-    expect(notes).toHaveLength(OPERATION_NOTES_MAX_LENGTH);
+    expect(notes).toHaveLength(OPERATION_NOTES_BOUND.ceiling);
     expect(nodeOperationSchema.safeParse({ name: 'click_event', notes }).success).toBe(true);
     const line = renderNodeLine({
       id: 'n-1',
@@ -80,7 +82,7 @@ describe('renderNodeLine', () => {
     expect(line).toContain(`ops=[event click_event note=${JSON.stringify(notes)}; next]`);
     expect(line).not.toContain('…');
     // The whole defence, as for the operation cap: one number, declared by the schema.
-    expect(MAX_SERIALIZED_NOTE_LENGTH).toBe(OPERATION_NOTES_MAX_LENGTH);
+    expect(MAX_SERIALIZED_NOTE_LENGTH).toBe(OPERATION_NOTES_BOUND.ceiling);
   });
 
   it('cuts a note only past the bound the schema enforces, and marks the cut', () => {

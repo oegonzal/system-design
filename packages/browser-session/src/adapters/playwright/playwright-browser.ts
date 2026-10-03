@@ -2,16 +2,16 @@ import { join } from 'node:path';
 
 import {
   actionRefs,
-  ELEMENT_NAME_MAX,
-  ELEMENT_VALUE_MAX,
+  ELEMENT_NAME_BOUND,
+  ELEMENT_VALUE_BOUND,
   elementKindOf,
-  MAX_ELEMENTS,
-  MAX_OPTIONS,
-  OPTION_MAX,
+  ELEMENTS_BOUND,
+  OPTIONS_BOUND,
+  OPTION_BOUND,
   pageObservationSchema,
-  SNAPSHOT_MAX_BYTES,
-  TITLE_MAX,
-  URL_MAX,
+  SNAPSHOT_BOUND,
+  TITLE_BOUND,
+  URL_MAX_LENGTH,
   type ObservedElement,
   type PageObservation,
 } from '@sysdesign/contracts';
@@ -50,20 +50,22 @@ function toObservedElement(node: SnapshotNode, facts: ElementFacts): ObservedEle
   return {
     ref: node.ref ?? '',
     role: clip(node.role, ROLE_MAX),
-    name: clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_MAX),
+    name: clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target),
     kind: elementKindOf(node.role),
     inputType: facts.inputType === null ? null : clip(facts.inputType, INPUT_TYPE_MAX),
-    value: facts.value === null ? null : clip(facts.value, ELEMENT_VALUE_MAX),
+    value: facts.value === null ? null : clip(facts.value, ELEMENT_VALUE_BOUND.target),
     options:
       facts.options === null
         ? null
-        : facts.options.slice(0, MAX_OPTIONS).map((option) => clip(option, OPTION_MAX)),
+        : facts.options
+            .slice(0, OPTIONS_BOUND.target)
+            .map((option) => clip(option, OPTION_BOUND.target)),
     required: facts.required,
     disabled: facts.disabled || node.attributes['disabled'] === true,
     visible: facts.visible,
     maxLength: facts.maxLength,
     hiddenTraits: hiddenTraitsOf(facts),
-    context: facts.context === null ? null : clip(facts.context, ELEMENT_NAME_MAX),
+    context: facts.context === null ? null : clip(facts.context, ELEMENT_NAME_BOUND.target),
   };
 }
 
@@ -110,14 +112,14 @@ export class PlaywrightBrowser implements BrowserPort {
       if (facts !== null) elements.push(toObservedElement(node, facts));
     }
     const all = ordered(elements);
-    const listed = all.slice(0, MAX_ELEMENTS);
+    const listed = all.slice(0, ELEMENTS_BOUND.target);
     this.known = new Map(listed.map((element) => [element.ref, element]));
     return pageObservationSchema.parse({
-      url: clip(page.url(), URL_MAX),
-      title: clip(await page.title(), TITLE_MAX),
+      url: clip(page.url(), URL_MAX_LENGTH),
+      title: clip(await page.title(), TITLE_BOUND.target),
       elements: listed,
       omittedElements: all.length - listed.length,
-      ariaSnapshot: fitSnapshot(snapshot, SNAPSHOT_MAX_BYTES).text,
+      ariaSnapshot: fitSnapshot(snapshot, SNAPSHOT_BOUND.target).text,
     });
   }
 

@@ -3,6 +3,7 @@
 // orchestration runs and each orchestrator's own types, and what `/health` says.
 export * from './vocab';
 export * from './evidence';
+export * from './lessons';
 export * from './decision';
 export * from './pipeline';
 export * from './run-dump';

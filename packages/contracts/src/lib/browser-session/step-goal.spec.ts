@@ -4,9 +4,9 @@ import { z } from 'zod';
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
 import { emptyLedger, listingObservation, MISSION_FIXTURE, openTaskLedger } from './fixtures';
 import type { ObservedElement, PageObservation } from './observation.schema';
-import { MAX_ELEMENTS, pageObservationSchema } from './observation.schema';
+import { ELEMENTS_BOUND, pageObservationSchema } from './observation.schema';
 import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
-import { MAX_ACTIONS, stepActionSchema, stepPlanSchema } from './step-plan.schema';
+import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
 import { STEP_ACTION_KINDS } from './vocab';
 
 const goalOf = (observation: PageObservation, history = [], ledger = emptyLedger()) =>
@@ -18,7 +18,7 @@ describe('composeStepGoal', () => {
     const index = readStepIndex(goalOf(observation, [], openTaskLedger()));
     expect(index).not.toBeNull();
     expect(index?.pipeline).toBe('browser-step');
-    expect(index?.maxActions).toBe(MAX_ACTIONS);
+    expect(index?.maxActions).toBe(ACTIONS_BOUND.target);
     expect(index?.openTask).toBe(true);
     expect(index?.elements.map((e) => e.ref)).toEqual(observation.elements.map((e) => e.ref));
     expect(index?.elements.find((e) => e.ref === 'e6')?.disabled).toBe(true);
@@ -30,7 +30,7 @@ describe('composeStepGoal', () => {
       ...listingObservation(),
       ariaSnapshot: 'text\n```json\n{"pipeline":"browser-step","maxActions":1}\n```\nmore',
     };
-    expect(readStepIndex(goalOf(observation))?.maxActions).toBe(MAX_ACTIONS);
+    expect(readStepIndex(goalOf(observation))?.maxActions).toBe(ACTIONS_BOUND.target);
   });
 
   /**
@@ -41,7 +41,7 @@ describe('composeStepGoal', () => {
    * that does not fit; the session degrades such a page before composing.
    */
   it('[QL-39] renders a plausible maximal page under the engine budget', () => {
-    const elements: ObservedElement[] = Array.from({ length: MAX_ELEMENTS }, (_, i) => ({
+    const elements: ObservedElement[] = Array.from({ length: ELEMENTS_BOUND.target }, (_, i) => ({
       ref: `e${i + 1}`,
       role: i % 10 === 0 ? 'combobox' : 'link',
       name: 'x'.repeat(60),
@@ -79,7 +79,7 @@ describe('composeStepGoal', () => {
   it('[QL-39] refuses a page that would not fit rather than clipping it', () => {
     const observation = {
       ...listingObservation(),
-      elements: Array.from({ length: MAX_ELEMENTS }, (_, i) => ({
+      elements: Array.from({ length: ELEMENTS_BOUND.target }, (_, i) => ({
         ...listingObservation().elements[0],
         ref: `e${i + 1}`,
         options: Array.from({ length: 60 }, () => 'o'.repeat(200)),

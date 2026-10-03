@@ -1,8 +1,4 @@
-import {
-  DEFAULT_LIST_LIMIT,
-  STORY_SECTION_MAX_LENGTH,
-  STORY_TAG_MAX_LENGTH,
-} from '@sysdesign/contracts';
+import { DEFAULT_LIST_LIMIT, STORY_SECTION_BOUND, STORY_TAG_BOUND } from '@sysdesign/contracts';
 import type * as WebTesting from '@sysdesign/web-testing';
 import { renderWithTheme, resetNavigationMock, stubApi } from '@sysdesign/web-testing';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -86,10 +82,10 @@ describe('StoriesList', () => {
 
     expect(await screen.findByText(/No stories yet/)).toBeTruthy();
     expect((screen.getByTestId('story-search') as HTMLInputElement).maxLength).toBe(
-      STORY_SECTION_MAX_LENGTH,
+      STORY_SECTION_BOUND.target,
     );
     expect((screen.getByTestId('story-tag-filter') as HTMLInputElement).maxLength).toBe(
-      STORY_TAG_MAX_LENGTH,
+      STORY_TAG_BOUND.target,
     );
   });
 });

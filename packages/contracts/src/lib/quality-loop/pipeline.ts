@@ -57,7 +57,7 @@ export interface PipelineSummary {
     criterionKinds: Record<string, string>;
     findingTypes: Record<string, string>;
     maxCriteria: number;
-    /** The longest statement the deriver may write, and a supplied rubric may carry. */
+    /** The longest statement a derivation is accepted with, and a supplied rubric may carry — the statement bound's ceiling. */
     maxStatementLength: number;
   };
   producer: { consumes: string[] };

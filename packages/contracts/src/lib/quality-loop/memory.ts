@@ -14,13 +14,16 @@ export const MEMORY_ORCHESTRATOR_ID = 'memory';
  * the runner's own reasons. A child run that was judged and fell short is
  * `not-accepted`; one that was never judged says why instead — `no-rubric`
  * when it derived no criteria, `no-artifact` when it produced nothing — so a
- * miss is never read as a verdict on what it would have judged.
+ * miss is never read as a verdict on what it would have judged. A search
+ * whose hits could not be composed into the curator's query is
+ * `query-refused`, with the faults in the note.
  */
 export const MEMORY_STEP_REASONS = [
   'embeddings-disabled',
   'store-unavailable',
   'store-empty',
   'embedding-failed',
+  'query-refused',
   'not-accepted',
   'no-rubric',
   'no-artifact',

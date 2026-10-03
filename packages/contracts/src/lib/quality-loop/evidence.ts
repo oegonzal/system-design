@@ -1,3 +1,4 @@
+import { bound } from '../bounds';
 import type {
   AxisFactorLevel,
   CriterionResult,
@@ -29,14 +30,14 @@ export const CRITERION_ID_MAX_LENGTH = 20;
 export const CRITERION_KIND_MAX_LENGTH = 60;
 /**
  * The bound a derived statement keeps unless its pipeline declares a larger
- * one (`TaskSpec.maxStatementLength`): above the longest any deriver but the
- * experience digest's has measurably written (323 characters, a system-design
- * one). A derivation past its bound is refused whole, never cut, so a bound
- * must not be one a model meets — and a pipeline whose record genuinely
- * needs longer statements declares that where its deriver is declared, not
- * here. The stored column is `text`, so only a declared bound limits it.
+ * one (`TaskSpec.statementBound`): the target sits above the longest any
+ * deriver but the experience digest's has measurably written (323
+ * characters, a system-design one), and the ceiling is what a derivation is
+ * accepted to without a word — a pipeline whose record genuinely needs
+ * longer statements declares that where its deriver is declared, not here.
+ * The stored column is `text`, so only a declared bound limits it.
  */
-export const CRITERION_STATEMENT_MAX_LENGTH = 400;
+export const CRITERION_STATEMENT_BOUND = bound(400);
 
 /** Position by position: the same ids, kinds and statements — what "the rubric it was judged against" means. */
 export const sameRubric = (
