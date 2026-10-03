@@ -177,11 +177,15 @@ describe('what a knowledge digest endorses', () => {
     for (const rule of Object.values(KNOWLEDGE_WITHHOLDS)) expect(WITHHOLDS).toContain(rule);
     // What is false or misleading is withheld; what is merely weak is not.
     expect(KNOWLEDGE_WITHHOLDS['vague_item']).toBe('none');
-    expect(KNOWLEDGE_WITHHOLDS['duplicate_item']).toBe('all-but-one');
+    // `none`, because a finding of this type names a superset of the duplication
+    // often enough to matter: three of eight recorded parent findings name three
+    // items where the rationale identifies a pair, so keeping one drops a
+    // bystander. A stored twin is recoverable; a dropped lesson is not.
+    expect(KNOWLEDGE_WITHHOLDS['duplicate_item']).toBe('none');
     expect(KNOWLEDGE_WITHHOLDS['misattributed_evidence']).toBe(DEFAULT_WITHHOLD);
   });
 
-  it('[QL-42] a weakly written item survives its fault, a duplicate pair keeps one, and a misreading is withheld', () => {
+  it('[QL-42] a weakly written item and a named twin both survive their fault, and a misreading is withheld', () => {
     const three = sampleDigest({
       memories: [
         { ...sampleDigest().memories[0], confirms: [] },
@@ -231,8 +235,11 @@ describe('what a knowledge digest endorses', () => {
 
     // Weakly written is not wrong: the item stands and a rewrite improves it later.
     expect(readout([faulted('vague_item', ['memory.1', 'memory.2'])])).toEqual([1, 2, 3]);
-    // Two items teaching one thing keep the earlier; the knowledge is kept once.
-    expect(readout([faulted('duplicate_item', ['memory.2', 'memory.3'])])).toEqual([1, 2]);
+    // Both members of a named twin stand. The finding names a SET, not a pair:
+    // it cannot be read as "these two say one thing" because a third, unrelated
+    // item lands in the set often enough to matter, so dropping any member risks
+    // dropping a sound one. Reinforcement is what keeps a twin out of the store.
+    expect(readout([faulted('duplicate_item', ['memory.2', 'memory.3'])])).toEqual([1, 2, 3]);
     // An insight its evidence does not say would be false in the store.
     expect(readout([faulted('misattributed_evidence', ['memory.2'])])).toEqual([1, 3]);
   });
