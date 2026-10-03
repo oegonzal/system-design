@@ -18,6 +18,7 @@ import {
 } from '@sysdesign/contracts';
 
 import {
+  asWarning,
   indexedValidator,
   LIMITS_VALIDATOR_ID,
   problem,
@@ -112,13 +113,6 @@ const limits: Rule = (answers, index) => {
   });
 };
 
-/** The same parse-then-index reading as a blocking validator, reported as a warning. */
-const asWarning = <A>(blocking: Validator<A>): Validator<A> => ({
-  id: blocking.id,
-  gate: 'warn',
-  validate: (artifact, contract) => ({ ...blocking.validate(artifact, contract), gate: 'warn' }),
-});
-
 export const referencesValidator: Validator<FieldAnswers> = indexedValidator(
   REFERENCES_VALIDATOR_ID,
   readIndex,
@@ -126,6 +120,16 @@ export const referencesValidator: Validator<FieldAnswers> = indexedValidator(
   [problem('critical', `the goal carries no ${FIELD_ANSWER_PIPELINE_ID} index`)],
 );
 
+/**
+ * Warn rather than block, and withhold nothing: a value past a field's own
+ * maxLength, or a numeric field answered with prose, is one field's problem.
+ * Blocking would close admission on the whole page and the operator would be
+ * asked to fill every field of it; withholding would drop the answers this
+ * validator located, which is the same page lost by a quieter route. Located
+ * warnings route exactly the faulted fields to the operator and leave the rest
+ * to be filled.
+ */
 export const limitsValidator: Validator<FieldAnswers> = asWarning(
   indexedValidator(LIMITS_VALIDATOR_ID, readIndex, limits, []),
+  'none',
 );
