@@ -28,6 +28,8 @@ const WITHOUT_COPY: Record<RunRecallReason, string> = {
   'store-empty': 'No lessons from earlier runs are stored yet, so the coach worked without any.',
   'not-accepted': 'No lessons from earlier runs passed review for this prompt.',
   'no-usable-memory': 'No lessons from earlier runs fit this prompt.',
+  'nothing-new':
+    'Every lesson from earlier runs repeated what the starting grade already told the coach.',
   'no-produce-iteration':
     'The coach had one iteration, which grades the design without revising it, so it needed no lessons.',
   'recall-unavailable': 'The coach ran without lessons from earlier runs: recall is not set up.',

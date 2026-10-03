@@ -4,6 +4,7 @@ import {
   recallInProgress,
   recallWithout,
   sameRubric,
+  type AdoptedIterationRef,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
   type IterationTrace,
@@ -44,6 +45,16 @@ import {
   RUN_REPOSITORY,
   TRACE_STORE,
 } from './tokens';
+
+/**
+ * What an adopting request starts from: the recorded iteration, and what the
+ * run that recorded it had adopted in turn — the next link of the chain its
+ * recall screens against.
+ */
+interface Adoption {
+  iteration: IterationTrace;
+  adoptedFrom: AdoptedIterationRef | null;
+}
 
 /**
  * Runs. A run is minutes long on the subscription client, so HTTP starts one
@@ -165,7 +176,7 @@ export class RunsService {
   private async resolveAdoption(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
-  ): Promise<IterationTrace | undefined> {
+  ): Promise<Adoption | undefined> {
     const { adopt } = request;
     if (adopt === undefined) return undefined;
     // Declared with its type so the compiler narrows after each call.
@@ -199,7 +210,7 @@ export class RunsService {
     if (!sameRubric(request.criteria ?? [], source.trace.contract.criteria)) {
       refuse(`the rubric is not the one run ${adopt.runId} was judged against`, 'criteria');
     }
-    return iteration;
+    return { iteration, adoptedFrom: source.request.adoptedFrom };
   }
 
   private resolve(pipeline: string): PipelineDefinition<unknown> {
@@ -325,7 +336,7 @@ export class RunsService {
     record: RunRecord,
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
-    adopted: IterationTrace | undefined,
+    adoption: Adoption | undefined,
   ): Promise<void> {
     // The row is alive while this process says so: a model call can run for
     // minutes with no exchange to record, so the heartbeat ticks on its own.
@@ -373,10 +384,17 @@ export class RunsService {
       write('recall', () => this.recalls.recordRecall(record.runId, recall));
     };
     try {
-      // A run that adopted a judged iteration recalls for what is wrong with it.
-      const base =
-        adopted !== undefined && request.adopt !== undefined
-          ? { runId: request.adopt.runId, iteration: adopted, criteria: request.criteria ?? [] }
+      // A run that adopted a judged iteration recalls for what is wrong with
+      // it, and screens out what its producer already holds of it.
+      const base: RecallBase | undefined =
+        adoption !== undefined && request.adopt !== undefined
+          ? {
+              runId: request.adopt.runId,
+              pipeline: definition.id,
+              iteration: adoption.iteration,
+              criteria: request.criteria ?? [],
+              adoptedFrom: adoption.adoptedFrom,
+            }
           : undefined;
       const memories = await this.recallLessons(record, onRecall, base);
       record.trace = await runPipeline(
@@ -386,7 +404,7 @@ export class RunsService {
           output: request.output,
           maxIterations: request.maxIterations,
           criteria: request.criteria,
-          adopted,
+          adopted: adoption?.iteration,
           memories,
         },
         { llm: this.llm, sink, now: Date.now, onIteration },

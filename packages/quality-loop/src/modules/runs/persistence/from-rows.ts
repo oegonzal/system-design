@@ -151,8 +151,11 @@ export function fromRows(
     },
     parentRunId: run.parentRunId ?? null,
     // Null on every run that did not ask to recall, every row older than recall
-    // included; a row older than the focus recalled for the prompt alone.
-    recall: run.recall ? { ...run.recall, focus: run.recall.focus ?? null } : null,
+    // included; a row older than the focus recalled for the prompt alone, and
+    // one older than the screen screened nothing.
+    recall: run.recall
+      ? { ...run.recall, focus: run.recall.focus ?? null, novelty: run.recall.novelty ?? null }
+      : null,
     trace: traceFromRows(run, criteria, iterations, findings, results),
     exchanges: run.exchanges,
     error: run.error,

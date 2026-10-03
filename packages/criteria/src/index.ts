@@ -433,6 +433,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'A recall asked for a producer that revises a judged answer tells its curator what that producer already holds: the remediation notes it is handed are listed, aliased, under their own section with the rule that a chunk only restating one is dropped, naming which, and kept only for a fix, mechanism or risk the list lacks; each screened candidate says where it was learned relative to that answer; a kept chunk that only restates a held defect is a precision finding a critic is asked for by name, priced and never gating, and withholds that chunk once confirmed; and a recall with nothing in hand composes the query it always did.',
   },
+  {
+    id: 'QL-51',
+    statement:
+      'A recall for a producer that revises a judged answer screens out what that producer already holds: the chain the answer descends from is walked through the recorded runs, the search reaches three times wider than it offers, and after fusion a stored lesson is set aside — first match, with what it matched — when its run is in the chain at an iteration no later than the one held, when the evidence it cites was judged in exactly a link of the chain, or when it is of the same pipeline and prompt and every finding it cites is held; twins another run digested from the same evidence of one prompt take one slot; what each reason does is one declared table; every offered lesson carries its origin; a search that found only what is held opens no recall run and is empty as nothing new; the run records the chain, what was held and what became of the pool; and a recall with nothing held searches, composes and records exactly as before.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

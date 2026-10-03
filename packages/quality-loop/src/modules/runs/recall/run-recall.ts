@@ -15,6 +15,7 @@
  * one; replay boots neither module and starts no run.
  */
 import type {
+  AdoptedIterationRef,
   IterationTrace,
   QualityRunDto,
   RecalledLessonDto,
@@ -47,8 +48,12 @@ export type ChildRunner = (request: StartQualityRunRequest) => Promise<QualityRu
  */
 export interface RecallBase {
   runId: string;
+  /** The pipeline that judged it — the adopting run's own. */
+  pipeline: string;
   iteration: IterationTrace;
   criteria: readonly SuccessCriterion[];
+  /** What the run it comes from had adopted in turn; null when that run judged its own. */
+  adoptedFrom: AdoptedIterationRef | null;
 }
 
 export interface RunRecall {

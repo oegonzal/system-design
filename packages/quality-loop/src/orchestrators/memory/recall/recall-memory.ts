@@ -12,6 +12,7 @@ import {
   type MemoryStoreAvailabilityDto,
   type QualityRunDto,
   type RecallFocusDto,
+  type RecallNoveltyDto,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -26,7 +27,9 @@ import { completed, storeReadiness } from '../../common';
 import type { MemoryPorts } from '../ports';
 import { fuse } from './fusion';
 import { focusLines } from './focus';
-import { buildQuery, probeSet, probesOf, queryText, type FusedHit } from './query';
+import { knownLines, type RecallKnown } from './known';
+import { noveltyOf, POOL_FACTOR, screen } from './novelty';
+import { buildQuery, probeSet, probesOf, queryText, type FusedHit, type OfferedHit } from './query';
 import { readPack, type UsableMemory } from './read-pack';
 import { UNADMITTED_REASON, type UnadmittedReason } from '../unadmitted';
 
@@ -45,6 +48,14 @@ export interface RecallAsk {
    * Absent for a recall over the goal alone — the memory orchestrator's.
    */
   focus?: RecallFocusDto | null;
+  /**
+   * What the producer the recall is for already holds, when it revises a
+   * judged answer (`knownOf`): the search reaches wider, what came back is
+   * screened against it after fusion, and the curator is told it. Absent for
+   * a recall over the goal alone — the memory orchestrator's, which composes
+   * exactly the query it did before there was a screen.
+   */
+  known?: RecallKnown | null;
 }
 
 /** How many texts were searched, how many came back, and what the curator made of them. */
@@ -56,16 +67,23 @@ export interface RecallCounts {
 }
 
 /**
- * What came of it. `skipped`: it could not start. `failed`: it started and
- * broke, `runId` naming the recall run when the break was that run.
- * `complete`: the recall run finished, and `usable` is what it endorsed —
- * empty, with the reason, when it endorsed nothing: judged and short of the
- * bar, or never judged at all, which the reason keeps apart.
+ * What came of it. `skipped`: it could not start — or every lesson it found
+ * the producer already held (`nothing-new`), so no recall run opened.
+ * `failed`: it started and broke, `runId` naming the recall run when the
+ * break was that run. `complete`: the recall run finished, and `usable` is
+ * what it endorsed — empty, with the reason, when it endorsed nothing: judged
+ * and short of the bar, or never judged at all, which the reason keeps apart.
+ * A screened recall carries what its screen did, however it ended after it.
  */
-export type Recalled =
+export type Recalled = (
   | {
       status: 'skipped';
-      reason: 'embeddings-disabled' | 'store-unavailable' | 'store-empty' | 'pipeline-unavailable';
+      reason:
+        | 'embeddings-disabled'
+        | 'store-unavailable'
+        | 'store-empty'
+        | 'pipeline-unavailable'
+        | 'nothing-new';
       note: string | null;
     }
   | {
@@ -82,7 +100,8 @@ export type Recalled =
       counts: RecallCounts;
       runId: string;
       usable: UsableMemory[];
-    };
+    }
+) & { novelty?: RecallNoveltyDto };
 
 /** Why a recall cannot run at all — the store cannot be searched, or the curating pipeline is not registered — or null when it can. */
 function readiness(ports: MemoryPorts, ask: RecallAsk): Recalled | null {
@@ -117,9 +136,13 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
       runId: null,
     };
   }
-  let hits: FusedHit[];
+  // A screened recall reaches wider, so what it sets aside as already held
+  // leaves room for what is not; one over the goal alone searches as it did.
+  const known = ask.known ?? null;
+  const pool = known === null ? MAX_CANDIDATES : MAX_CANDIDATES * POOL_FACTOR;
+  let fused: FusedHit[];
   try {
-    hits = fuse(await store.searchMany(probesOf(embedded.vectors, MAX_CANDIDATES)), MAX_CANDIDATES);
+    fused = fuse(await store.searchMany(probesOf(embedded.vectors, pool)), pool);
   } catch (error) {
     return {
       status: 'failed',
@@ -128,9 +151,19 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
       runId: null,
     };
   }
-  if (hits.length === 0) return { status: 'skipped', reason: 'store-empty', note: null };
+  if (fused.length === 0) return { status: 'skipped', reason: 'store-empty', note: null };
 
-  const built = buildQuery(query, searched, hits);
+  const screened = known === null ? null : screen(fused, known, MAX_CANDIDATES);
+  const hits: OfferedHit[] = screened?.offered ?? fused;
+  // Spread onto every outcome below, so a screened recall says what its screen did however it ends.
+  const novelty =
+    known === null || screened === null
+      ? {}
+      : { novelty: noveltyOf(known, fused.length, screened) };
+  if (hits.length === 0)
+    return { status: 'skipped', reason: 'nothing-new', note: null, ...novelty };
+
+  const built = buildQuery(query, searched, hits, known === null ? [] : knownLines(known));
   if (built.query === null) {
     return {
       status: 'failed',
@@ -138,6 +171,7 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
       note: built.issues.map(describeIssue).join('; '),
       counts: { probes: texts.length },
       runId: null,
+      ...novelty,
     };
   }
   const child = await ask.execute({ goal: renderQuery(built.query) });
@@ -147,6 +181,7 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
       reason: 'run-failed',
       note: child.error?.message ?? null,
       runId: child.runId,
+      ...novelty,
     };
   }
   const readout = readPack(outputsOf(child.trace), hits, acceptAt);
@@ -162,5 +197,12 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
       : readout.usable.length === 0
         ? 'no-usable-memory'
         : null;
-  return { status: 'complete', reason, counts, runId: child.runId, usable: readout.usable };
+  return {
+    status: 'complete',
+    reason,
+    counts,
+    runId: child.runId,
+    usable: readout.usable,
+    ...novelty,
+  };
 }

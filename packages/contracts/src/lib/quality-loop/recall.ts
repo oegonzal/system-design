@@ -39,6 +39,69 @@ export const RECALL_ORIGINS = ['chain', 'same-prompt', 'same-pipeline', 'other-p
 export type RecallOrigin = (typeof RECALL_ORIGINS)[number];
 
 /**
+ * Why a recall for a producer that revises a judged answer set a stored
+ * lesson aside before the curator saw it — the first that matches.
+ * `chain-iteration`: it was digested from a run that answer descends from, at
+ * an iteration no later than the one the producer holds. `sibling-copy`: the
+ * evidence it cites was judged in exactly an iteration of that chain — its own
+ * run copied what the producer holds. `known-evidence`: of the same pipeline
+ * — and the same prompt, when its lineage records one — and every finding it
+ * cites is one the producer already holds.
+ */
+export const RECALL_EXCLUSION_REASONS = [
+  'chain-iteration',
+  'sibling-copy',
+  'known-evidence',
+] as const;
+export type RecallExclusionReason = (typeof RECALL_EXCLUSION_REASONS)[number];
+
+/** What a screen does with a lesson a reason matched: set it aside, or rank it after every other. */
+export const RECALL_SCREEN_ACTIONS = ['exclude', 'demote'] as const;
+export type RecallScreenAction = (typeof RECALL_SCREEN_ACTIONS)[number];
+
+/** A stored lesson a screen matched, by where it is stored — it was never offered, so it has no alias. */
+export interface RecallScreenedDto {
+  sourceRunId: string;
+  /** The chunk's ref in its source run (`memory.3`). */
+  ref: string;
+  /** The iteration of its source run it was learned from. */
+  iteration: number;
+  reason: RecallExclusionReason;
+  /** What it matched: the chain entry as `run@iteration`, or the held finding keys it cites. */
+  matched: string[];
+}
+
+/** Where an offered lesson was learned, by the alias the curator was shown it under. */
+export interface RecallOriginDto {
+  ref: string;
+  sourceRunId: string;
+  origin: RecallOrigin;
+}
+
+/**
+ * What a recall for a producer that revises a judged answer screened out as
+ * already in hand: the chain that answer descends from, how much the producer
+ * holds, how many lessons came back and how many were collapsed as twins,
+ * excluded or demoted by reason, or offered — and, for each offered one, its
+ * origin. Null on a recall over the goal alone, which screens nothing.
+ */
+export interface RecallNoveltyDto {
+  /** The iteration the producer starts from, then each iteration its run had adopted in turn. */
+  chain: AdoptedIterationRef[];
+  /** How many findings, criterion results and remediation notes the producer holds. */
+  known: { findings: number; criteria: number; remediations: number };
+  /** How many lessons the search came back with, deduped, before the screen. */
+  pool: number;
+  /** Lessons folded into a twin resting on the same evidence of the same prompt. */
+  collapsed: number;
+  /** How many the curator was offered. */
+  offered: number;
+  excluded: RecallScreenedDto[];
+  demoted: RecallScreenedDto[];
+  origins: RecallOriginDto[];
+}
+
+/**
  * Where a run's recall stands. `recalling` while it runs — the run has not
  * produced yet. `recalled`: the producer was handed at least one lesson.
  * `empty`: recall ran and found nothing worth handing on. `skipped`: it could
@@ -54,7 +117,8 @@ export type RunRecallStatus = (typeof RUN_RECALL_STATUSES)[number];
  * that is — one table, so the status is never decided apart from the reason.
  * The memory steps' own reasons where they apply, plus the three only a run's
  * recall can give: a run that can never call its producer, no recall bound in
- * this process, and an error it did not expect.
+ * this process, and an error it did not expect. `nothing-new` is a search
+ * whose every lesson the producer already held: a verdict on what it found.
  */
 export const RUN_RECALL_REASON_STATUS = {
   'no-produce-iteration': 'skipped',
@@ -71,6 +135,7 @@ export const RUN_RECALL_REASON_STATUS = {
   'store-empty': 'empty',
   'not-accepted': 'empty',
   'no-usable-memory': 'empty',
+  'nothing-new': 'empty',
 } as const satisfies Record<string, Extract<RunRecallStatus, 'empty' | 'skipped'>>;
 export type RunRecallReason = keyof typeof RUN_RECALL_REASON_STATUS;
 export const RUN_RECALL_REASONS = Object.keys(RUN_RECALL_REASON_STATUS) as RunRecallReason[];
@@ -144,6 +209,11 @@ export interface RunRecallDto extends RunRecallSummaryDto {
    * searched for the prompt alone, and on every record older than the focus.
    */
   focus: RecallFocusDto | null;
+  /**
+   * What the recall screened out as already in the producer's hands — null
+   * when it screened nothing, and on every record older than the screen.
+   */
+  novelty: RecallNoveltyDto | null;
 }
 
 /** The recall a run records as it opens, before anything is known. */
@@ -155,6 +225,7 @@ export const recallInProgress = (): RunRecallDto => ({
   count: 0,
   lessons: [],
   focus: null,
+  novelty: null,
 });
 
 /** A recall that handed the producer nothing, its status read from the reason. */
@@ -170,6 +241,7 @@ export const recallWithout = (
   count: 0,
   lessons: [],
   focus: null,
+  novelty: null,
 });
 
 /**
@@ -198,6 +270,7 @@ export const recallOf = (
   count: lessons.length,
   lessons: [...lessons],
   focus: null,
+  novelty: null,
 });
 
 /** A recall's record with the defects it searched for beside its prompt. */
@@ -205,6 +278,12 @@ export const withRecallFocus = (
   recall: RunRecallDto,
   focus: RecallFocusDto | null,
 ): RunRecallDto => ({ ...recall, focus });
+
+/** A recall's record with what it screened out as already in the producer's hands. */
+export const withRecallNovelty = (
+  recall: RunRecallDto,
+  novelty: RecallNoveltyDto | null,
+): RunRecallDto => ({ ...recall, novelty });
 
 /** The list row's view of a recall, picked field by field: everything but the lessons. */
 export const recallSummary = (recall: RunRecallDto): RunRecallSummaryDto => ({

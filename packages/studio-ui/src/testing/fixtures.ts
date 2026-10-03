@@ -479,6 +479,7 @@ export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto 
     count: lessons.length,
     lessons,
     focus: null,
+    novelty: null,
     ...overrides,
   };
 }

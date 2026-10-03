@@ -48,7 +48,13 @@ const base = (): RecallBase => {
       ],
     }),
   }).iterations;
-  return { runId: 'run-adopted', iteration, criteria: CRITERIA };
+  return {
+    runId: 'run-adopted',
+    pipeline: 'system-design-canvas',
+    iteration,
+    criteria: CRITERIA,
+    adoptedFrom: null,
+  };
 };
 
 describe('what a coach’s recall is focused on', () => {

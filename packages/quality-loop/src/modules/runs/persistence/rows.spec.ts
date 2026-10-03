@@ -1,4 +1,10 @@
-import { recallInProgress, recallOf } from '@sysdesign/contracts';
+import {
+  recallInProgress,
+  recallOf,
+  recallWithout,
+  withRecallNovelty,
+  type RecallNoveltyDto,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../../core/contracts';
@@ -234,6 +240,34 @@ describe('the run rows', () => {
     expect(
       roundtrip(toRows(fullRecord({ status: 'running', recall: recallInProgress() }))).recall,
     ).toEqual(recallInProgress());
+  });
+
+  it('[QL-51] what a recall screened out round-trips; a row recorded before the screen reads as one that screened nothing', () => {
+    const novelty: RecallNoveltyDto = {
+      chain: [{ runId: 'coach-quality', iteration: 2 }],
+      known: { findings: 3, criteria: 2, remediations: 4 },
+      pool: 5,
+      collapsed: 1,
+      offered: 2,
+      excluded: [
+        {
+          sourceRunId: 'coach-quality',
+          ref: 'memory.1',
+          iteration: 2,
+          reason: 'chain-iteration',
+          matched: ['coach-quality@2'],
+        },
+      ],
+      demoted: [],
+      origins: [{ ref: 'm1', sourceRunId: 'earlier-quality', origin: 'other-pipeline' }],
+    };
+    const recall = withRecallNovelty(recallWithout('no-usable-memory', null, 'r'), novelty);
+    expect(roundtrip(toRows(fullRecord({ recall }))).recall).toEqual(recall);
+
+    const rows = toRows(fullRecord({ recall: recallWithout('store-empty') }));
+    const { novelty: _dropped, ...older } = rows.run.recall ?? recallWithout('store-empty');
+    const legacy = { ...rows, run: { ...rows.run, recall: older as typeof rows.run.recall } };
+    expect(roundtrip(legacy).recall?.novelty).toBeNull();
   });
 
   it('[QL-32] the run a run was opened for round-trips and is on its list row; a row from before the column reads as none', () => {

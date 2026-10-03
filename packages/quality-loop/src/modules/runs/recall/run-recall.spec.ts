@@ -216,7 +216,7 @@ describe('a run that recalls lessons for its producer', () => {
     expect(recallRows.data.find((row) => row.runId === recallRunId)?.parentRunId).toBe(runId);
   });
 
-  it('[QL-34] a run that adopts a judged iteration hands its recall that iteration, and records it as the focus', async () => {
+  it('[QL-34] [QL-51] a run that adopts a judged iteration hands its recall that iteration, and records it as the focus and the chain it screened against', async () => {
     const sourceId = await start(url, { pipeline: 'coach', goal: GOAL });
     const source = await settled(url, sourceId);
     expect(source.status).toBe('complete');
@@ -238,9 +238,19 @@ describe('a run that recalls lessons for its producer', () => {
       findings: [],
       criteria: [],
     });
-    // A run that started fresh recalled for its prompt alone.
+    // The source judged its own iteration, so the chain is that iteration
+    // alone; neither stored lesson came from it, so both were offered.
+    expect(run.recall?.novelty).toMatchObject({
+      chain: [{ runId: sourceId, iteration: 1 }],
+      pool: 2,
+      offered: 2,
+      excluded: [],
+    });
+    // A run that started fresh recalled for its prompt alone, and screened nothing.
     const fresh = await start(url, { pipeline: 'coach', goal: GOAL, recall: true });
-    expect((await settled(url, fresh)).recall?.focus).toBeNull();
+    const unscreened = (await settled(url, fresh)).recall;
+    expect(unscreened?.focus).toBeNull();
+    expect(unscreened?.novelty).toBeNull();
   });
 
   it('[QL-32] a run that does not ask never recalls, and a grade-only pipeline is refused before any row', async () => {
@@ -274,6 +284,7 @@ describe('a run that recalls lessons for its producer', () => {
       count: 0,
       lessons: [],
       focus: null,
+      novelty: null,
     };
 
     // A supplied artifact judged once: iteration 1 takes it as provided, and
@@ -323,6 +334,7 @@ describe('a run that recalls lessons for its producer', () => {
         count: 0,
         lessons: [],
         focus: null,
+        novelty: null,
       });
       const producer = promptsOf(runId).find((prompt) => prompt.scope === 'producer');
       expect(producer?.user).not.toContain(MEMORIES_HEADING);
@@ -453,6 +465,7 @@ describe('a process that composes runs without memory', () => {
         count: 0,
         lessons: [],
         focus: null,
+        novelty: null,
       });
       // No recall run was opened, and the producer was briefed with nothing.
       const page = await getJson<Page<QualityRunSummaryDto>>(

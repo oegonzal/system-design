@@ -1,14 +1,30 @@
-import type { QualityRunDto } from '@sysdesign/contracts';
+import type { MemoryLineageDto, QualityRunDto } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../../core/contracts';
 import { confirmed, evidence, ledger, traceOf } from '../../../core/testing';
-import { readIndex, MAX_CANDIDATES } from '../../../pipelines/memory-recall/input';
+import {
+  KNOWN_HEADING,
+  MAX_CANDIDATES,
+  NOVELTY_RULE,
+  readIndex,
+  renderGoal as renderQuery,
+} from '../../../pipelines/memory-recall/input';
 import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
-import { contentHash, type MemoryPorts, type QueryProbes, type StoredChunk } from '../ports';
+import {
+  contentHash,
+  type EvidenceRef,
+  type MemoryPorts,
+  type MemoryProbe,
+  type QueryProbes,
+  type StoredChunk,
+} from '../ports';
 import { childRun, memoryContext, memoryPorts } from '../steps.testing';
-import { ACCEPT_AT, acceptedRecall, GOAL } from '../testing';
+import { ACCEPT_AT, acceptedRecall, builtQuery, GOAL } from '../testing';
 import { focusLines, focusOf } from './focus';
+import { fuse } from './fusion';
+import type { RecallKnown } from './known';
+import { probeSet, probesOf, queryText } from './query';
 import { recallMemory } from './recall-memory';
 
 /** The adopted iteration's defect the recall should find a lesson for. */
@@ -28,6 +44,8 @@ const focus = () => {
   }).iterations;
   return focusOf({
     runId: 'run-adopted',
+    pipeline: 'system-design-canvas',
+    adoptedFrom: null,
     iteration,
     criteria: [{ id: 'c1', kind: 'functional', statement: 'Redirect within 50 ms at p99.' }],
   });
@@ -152,5 +170,168 @@ describe('a recall focused on the iteration a coach starts from', () => {
     await recallWith(memoryPorts({ probes }), true);
     await recallWith(memoryPorts({ probes }), false);
     expect(asked).toEqual([focusLines(focus()), []]);
+  });
+});
+
+/** The coach adopted `coach@2`, whose own run had adopted the grade's iteration 1. */
+const KNOWN: RecallKnown = {
+  pipeline: 'system-design-canvas',
+  goalHash: contentHash(GOAL),
+  chain: [
+    { runId: 'coach', iteration: 2 },
+    { runId: 'grade', iteration: 1 },
+  ],
+  findings: new Set([DEFECT.key]),
+  criteria: new Map([['c1', 'fail']]),
+  remediations: [
+    {
+      subject: 'unhandled failure',
+      severity: 'high',
+      note: 'Say what serves redirects while the cache is down.',
+    },
+  ],
+};
+
+/** A lesson stored under the goal itself, so every one of them comes back on probe zero. */
+const stored = (
+  text: string,
+  runId: string,
+  of: {
+    pipeline?: string;
+    iteration?: number;
+    evidence?: EvidenceRef[];
+    lineage?: MemoryLineageDto | null;
+  } = {},
+): StoredChunk => ({
+  ...lesson(text, GOAL, GOAL, runId),
+  source: {
+    runId,
+    pipeline: of.pipeline ?? 'system-design-canvas',
+    kind: 'lesson',
+    ref: 'memory.1',
+    decision: 'revise',
+    iteration: of.iteration ?? 1,
+    when: '2026-10-02',
+  },
+  evidence: of.evidence ?? [],
+  lineage: of.lineage ?? null,
+});
+
+/** What a coach adopting `coach@2` should not be handed again, beside one lesson it should. */
+const COPIES = [
+  stored('The grade said to name a cache fallback.', 'grade', { iteration: 1 }),
+  stored('A sibling restated the adopted ledger.', 'sibling', {
+    lineage: {
+      judged: { runId: 'coach', iteration: 2 },
+      adoptedFrom: { runId: 'coach', iteration: 2 },
+      goalHash: contentHash(GOAL),
+    },
+  }),
+  stored('A point stored before lineage restates the held defect.', 'old', {
+    evidence: [{ kind: 'finding', ref: DEFECT.key }],
+  }),
+];
+const NEWS = stored('Serve redirects from the database when the cache is down.', 'elsewhere', {
+  pipeline: 'system-design',
+  evidence: [{ kind: 'finding', ref: DEFECT.key }],
+});
+
+/** A store of these chunks, and every probe it was searched with. */
+async function storeOf(chunks: readonly StoredChunk[]) {
+  const store = new InMemoryMemoryStore();
+  for (const chunk of chunks) await store.replaceRunChunks(chunk.source.runId, [chunk]);
+  const probes: MemoryProbe[] = [];
+  const searchMany = store.searchMany.bind(store);
+  store.searchMany = (asked) => {
+    probes.push(...asked);
+    return searchMany(asked);
+  };
+  return { store, probes };
+}
+
+const screened = async (chunks: readonly StoredChunk[], known: RecallKnown | null) => {
+  const { store, probes } = await storeOf(chunks);
+  const goals: string[] = [];
+  const recalled = await recallMemory(memoryPorts({ store }), {
+    goal: GOAL,
+    store: memoryContext().store,
+    acceptAt: ACCEPT_AT,
+    execute: (input) => {
+      goals.push(input.goal);
+      return Promise.resolve(
+        toRunDto(childRun('memory-recall', acceptedRecall())) as QualityRunDto,
+      );
+    },
+    known,
+  });
+  return { recalled, query: goals[0] ?? null, probes, store };
+};
+
+describe('a recall for a producer that revises a judged answer', () => {
+  it('[QL-51] sets aside the chain’s lesson, a sibling’s copy and a legacy restatement, and offers another pipeline’s lesson with its origin', async () => {
+    const { recalled, query } = await screened([...COPIES, NEWS], KNOWN);
+    const candidates = readIndex(query ?? '')?.candidates ?? [];
+    expect(candidates.map((candidate) => candidate.source.runId)).toEqual(['elsewhere']);
+    expect(query).toContain('· origin other-pipeline');
+    // The curator is told what the producer holds, and the rule that goes with it.
+    expect(query).toContain(KNOWN_HEADING);
+    expect(query).toContain(
+      '- [k1] high · unhandled failure: Say what serves redirects while the cache is down.',
+    );
+    expect(query).toContain(`- ${NOVELTY_RULE}`);
+    expect(recalled.novelty).toMatchObject({
+      chain: KNOWN.chain,
+      known: { findings: 1, criteria: 1, remediations: 1 },
+      pool: 4,
+      collapsed: 0,
+      offered: 1,
+      origins: [{ ref: 'm1', sourceRunId: 'elsewhere', origin: 'other-pipeline' }],
+    });
+    expect(recalled.novelty?.excluded.map((item) => [item.sourceRunId, item.reason])).toEqual([
+      ['grade', 'chain-iteration'],
+      ['sibling', 'sibling-copy'],
+      ['old', 'known-evidence'],
+    ]);
+  });
+
+  it('[QL-51] reaches three times wider than it offers, so what it sets aside leaves room for what it does not', async () => {
+    const crowd = Array.from({ length: MAX_CANDIDATES }, (_, index) =>
+      stored(`The grade’s lesson number ${index}.`, `grade-${index}`, {
+        lineage: {
+          judged: { runId: 'grade', iteration: 1 },
+          adoptedFrom: null,
+          goalHash: contentHash(GOAL),
+        },
+      }),
+    );
+    const { recalled, query, probes } = await screened([...crowd, NEWS], KNOWN);
+    expect(probes.map((probe) => probe.limit)).toEqual([48, 48]);
+    expect(recalled.novelty).toMatchObject({ pool: MAX_CANDIDATES + 1, offered: 1 });
+    expect(readIndex(query ?? '')?.candidates.map((candidate) => candidate.source.runId)).toEqual([
+      'elsewhere',
+    ]);
+  });
+
+  it('[QL-51] a search whose every lesson the producer already holds opens no recall run: nothing new', async () => {
+    const { recalled, query } = await screened(COPIES, KNOWN);
+    expect(query).toBeNull();
+    expect(recalled).toMatchObject({ status: 'skipped', reason: 'nothing-new', note: null });
+    expect(recalled.novelty).toMatchObject({ pool: 3, offered: 0, origins: [] });
+    expect(recalled.novelty?.excluded).toHaveLength(3);
+  });
+
+  it('[QL-51] with nothing known it is the recall it always was: the same probes, candidates and query, and no screen', async () => {
+    const chunks = [...COPIES, NEWS];
+    const { recalled, query, probes, store } = await screened(chunks, null);
+    expect(probes.map((probe) => probe.limit)).toEqual([MAX_CANDIDATES, MAX_CANDIDATES]);
+    expect(recalled.novelty).toBeUndefined();
+    // What a recall composed before there was a screen, step by step from the same store.
+    const vectors = [vectorOf(queryText(GOAL))];
+    const hits = fuse(await store.searchMany(probesOf(vectors, MAX_CANDIDATES)), MAX_CANDIDATES);
+    expect(query).toBe(renderQuery(builtQuery(queryText(GOAL), probeSet(GOAL, []), hits)));
+    expect(query).not.toContain(KNOWN_HEADING);
+    expect(query).not.toContain(NOVELTY_RULE);
+    expect(query).not.toContain('· origin');
+    expect(readIndex(query ?? '')?.candidates).toHaveLength(chunks.length);
   });
 });

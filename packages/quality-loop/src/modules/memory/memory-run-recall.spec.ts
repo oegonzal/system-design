@@ -3,16 +3,19 @@ import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../core/contracts';
-import { confirmed, evidence, ledger, traceOf } from '../../core/testing';
+import { confirmed, evidence, ledger, runDto, traceOf } from '../../core/testing';
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
+import { contentHash, type StoredChunk } from '../../orchestrators/memory/ports';
 import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
 import { childRun, memoryPorts } from '../../orchestrators/memory/steps.testing';
 import { ACCEPT_AT, GOAL, passed, readoutTrace } from '../../orchestrators/memory/testing';
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { RunRecallSlot } from '../runs/recall/run-recall';
+import { readIndex } from '../../pipelines/memory-recall/input';
+import type { RecallBase } from '../runs/recall/run-recall';
 import type { RunsService } from '../runs/runs.service';
 import { MemoryRunRecall } from './memory-run-recall';
-import { InMemoryEmbeddingCache, InMemoryMemoryStore } from './testing';
+import { InMemoryEmbeddingCache, InMemoryMemoryStore, vectorOf } from './testing';
 
 /** memory-recall as registered, or not: all the adapter asks the runs service is its accept bar. */
 const registry = (acceptAt: number | null = ACCEPT_AT): RunsService =>
@@ -100,6 +103,8 @@ describe("the memory module's recall for a run's producer", () => {
     }).iterations;
     const base = {
       runId: 'run-adopted',
+      pipeline: 'tiny',
+      adoptedFrom: null,
       iteration,
       criteria: [{ id: 'c1', kind: 'functional', statement: 'List orders newest first.' }],
     };
@@ -175,6 +180,7 @@ describe("the memory module's recall for a run's producer", () => {
       count: 0,
       lessons: [],
       focus: null,
+      novelty: null,
     });
     expect(
       await recallWith({
@@ -196,6 +202,144 @@ describe("the memory module's recall for a run's producer", () => {
       status: 'skipped',
       reason: 'pipeline-unavailable',
       note: 'memory-recall',
+    });
+  });
+
+  describe('for a run that adopted an iteration which was itself adopted', () => {
+    /** The coach adopts `coach@2`; the coach's own run had adopted `grade@1`, which adopted nothing. */
+    const adopting = (): RecallBase => {
+      const [iteration] = traceOf({
+        ledger: ledger({
+          findings: [confirmed({ key: 'unhandled_failure|node.3', type: 'unhandled_failure' })],
+        }),
+      }).iterations;
+      const note = 'Say what serves reads while the order store is down.';
+      return {
+        runId: 'coach',
+        pipeline: 'tiny',
+        iteration: {
+          ...iteration,
+          iteration: 2,
+          remediations: [
+            {
+              subject: { finding: 'unhandled_failure|node.3' },
+              action: 'revise',
+              severity: 'high',
+              targetRefs: ['node.3'],
+              note,
+            },
+          ],
+        },
+        criteria: [],
+        adoptedFrom: { runId: 'grade', iteration: 1 },
+      };
+    };
+
+    /** The runs this process records, as far as the recall reads them: who adopted what. */
+    const recordedRuns = () => {
+      const read: string[] = [];
+      const runs = {
+        ...registry(),
+        get: (runId: string) => {
+          read.push(runId);
+          return Promise.resolve(runDto(runId, null));
+        },
+      } as unknown as RunsService;
+      return { runs, read };
+    };
+
+    /** The grade's own lesson — what the coach's producer already holds. */
+    const gradeLesson = (): StoredChunk => {
+      const text = 'The grade said to name what serves reads while the cache is down.';
+      const keys = { condition: `when ${text}`, lesson: text };
+      return {
+        text,
+        keys,
+        contentHash: contentHash(text),
+        source: {
+          runId: 'grade',
+          pipeline: 'tiny',
+          kind: 'lesson',
+          ref: 'memory.1',
+          decision: 'revise',
+          iteration: 1,
+          when: '2026-10-02',
+        },
+        evidence: [{ kind: 'finding', ref: 'unhandled_failure|node.3' }],
+        digestRunId: null,
+        lineage: {
+          judged: { runId: 'grade', iteration: 1 },
+          adoptedFrom: null,
+          goalHash: contentHash(GOAL),
+        },
+        model: 'fake-embedding',
+        vectors: { condition: vectorOf(keys.condition), lesson: vectorOf(keys.lesson) },
+      };
+    };
+
+    it('[QL-51] walks the chain through the recorded runs and records what it screened out beside the lessons', async () => {
+      const store = memoryPorts().store as InMemoryMemoryStore;
+      await store.replaceRunChunks('grade', [gradeLesson()]);
+      const { runs, read } = recordedRuns();
+      const { asked, execute } = runner(childRun('memory-recall', curated()));
+      const recalled = await new MemoryRunRecall(
+        memoryPorts({ store }),
+        runs,
+        new RunRecallSlot(),
+      ).recall(GOAL, execute, adopting());
+
+      expect(read).toEqual(['grade']);
+      expect(asked[0].goal).toContain('## Already in hand — do not restate');
+      expect(asked[0].goal).toContain(
+        '- [k1] high · unhandled failure: Say what serves reads while the order store is down.',
+      );
+      expect(
+        readIndex(asked[0].goal)?.candidates.map((candidate) => candidate.source.runId),
+      ).toEqual(['run-a', 'run-a']);
+      expect(recalled).toMatchObject({ status: 'recalled', count: 2 });
+      expect(recalled.novelty).toMatchObject({
+        chain: [
+          { runId: 'coach', iteration: 2 },
+          { runId: 'grade', iteration: 1 },
+        ],
+        known: { findings: 1, criteria: 0, remediations: 1 },
+        pool: 3,
+        offered: 2,
+        excluded: [
+          {
+            sourceRunId: 'grade',
+            ref: 'memory.1',
+            iteration: 1,
+            reason: 'chain-iteration',
+            matched: ['grade@1'],
+          },
+        ],
+        origins: [
+          { ref: 'm1', sourceRunId: 'run-a', origin: 'other-pipeline' },
+          { ref: 'm2', sourceRunId: 'run-a', origin: 'other-pipeline' },
+        ],
+      });
+    });
+
+    it('[QL-51] a search that found only what the producer holds is empty, nothing new, and opens no recall run', async () => {
+      const store = new InMemoryMemoryStore();
+      await store.replaceRunChunks('grade', [gradeLesson()]);
+      const { runs } = recordedRuns();
+      const { asked, execute } = runner(null);
+      const recalled = await new MemoryRunRecall(
+        memoryPorts({ store }),
+        runs,
+        new RunRecallSlot(),
+      ).recall(GOAL, execute, adopting());
+
+      expect(asked).toEqual([]);
+      expect(recalled).toMatchObject({
+        status: 'empty',
+        reason: 'nothing-new',
+        recallRunId: null,
+        count: 0,
+      });
+      expect(recalled.novelty?.excluded.map((item) => item.reason)).toEqual(['chain-iteration']);
     });
   });
 });
