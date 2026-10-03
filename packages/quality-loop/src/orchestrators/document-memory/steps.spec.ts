@@ -31,7 +31,9 @@ const digestTrace = (
     goal: GOAL,
     artifact: sampleDocumentDigest(),
     locations: ['summary', 'memory.1', 'memory.2', 'section.3'],
-    criteria: [{ id: 'c1', kind: 'fact', statement: 'captures the Acme role in section.2' }],
+    criteria: [
+      { id: 'c1', kind: 'profile_fact', statement: 'captures the Acme role in section.2' },
+    ],
     results: [passed('c1', 'fact', ['memory.1'])],
     decision,
     ...overrides,
@@ -208,7 +210,9 @@ describe('the document-memory steps', () => {
     for (const point of points) {
       expect(point.source).toMatchObject({
         pipeline: 'document-digest',
-        kind: 'lesson',
+        // The kind the digest declared for the item, not a fixed one: a probe
+        // narrowing to facts must not also return a story or a boundary.
+        kind: 'profile_fact',
         decision: 'accept',
         iteration: 1,
       });

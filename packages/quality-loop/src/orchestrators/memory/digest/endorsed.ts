@@ -26,6 +26,12 @@ export interface MemoryToStore {
   insight: string;
   appliesWhen: string;
   evidence: EvidenceRef[];
+  /**
+   * What the stored chunk's kind becomes — the shape a probe may narrow to.
+   * Absent when the digest proposes no kind, and the store then falls back to
+   * the one kind every memory had before any digest declared one.
+   */
+  kind?: string;
 }
 
 export interface DigestReadout {
@@ -44,7 +50,13 @@ export interface Digested {
 
 /** The item shape every digest pipeline proposes and the store consumes. */
 export interface DigestLike {
-  memories: readonly { evidence: readonly string[]; insight: string; appliesWhen: string }[];
+  memories: readonly {
+    evidence: readonly string[];
+    insight: string;
+    appliesWhen: string;
+    /** Declared by digests whose items differ in shape; absent from those whose do not. */
+    kind?: string;
+  }[];
 }
 
 /** The index every digest goal carries: each alias, what kind of evidence it is, and the id behind it. */
@@ -120,6 +132,7 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
         insight: memory.insight,
         appliesWhen: memory.appliesWhen,
         evidence,
+        ...(memory.kind === undefined ? {} : { kind: memory.kind }),
       },
     ];
   });

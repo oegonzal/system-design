@@ -12,7 +12,7 @@ import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
 import { VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
-import { chunksOf, type ChunkOrigin } from './chunks';
+import { chunksOf, type ChunkOrigin, DEFAULT_CHUNK_KIND } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
 const dayOf = (iso: string): string => iso.slice(0, 10);
@@ -64,11 +64,15 @@ export async function indexMemories(
     const stored = await ports.store.replaceRunChunks(
       source.runId,
       chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
-      // This writer owns the lessons of a source run and nothing else. Another
-      // writer keeps its own kinds under the same run id, and an unscoped
-      // replace would erase them; every point that existed before this scope
-      // was a lesson, so it deletes exactly what it deleted before.
-      { kinds: ['lesson'] },
+      // This writer owns the kinds it writes under a source run, and nothing
+      // else: another writer keeps its own kinds under the same run id, and an
+      // unscoped replace would erase them. The scope is read from the chunks
+      // rather than fixed, because a digest that declares kinds of its own
+      // would otherwise re-post under a kind the scope does not name and leave
+      // its previous points standing beside the new ones. `lesson` is always
+      // included: it is what this writer wrote before any kind was declared,
+      // so a re-run still replaces what an earlier one left.
+      { kinds: [...new Set([DEFAULT_CHUNK_KIND, ...chunks.map((chunk) => chunk.source.kind)])] },
     );
     return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
   } catch (error) {

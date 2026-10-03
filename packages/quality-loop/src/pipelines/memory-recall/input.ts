@@ -4,7 +4,7 @@
  * engine hands every stage, and reads its own bookkeeping back. The index the
  * validators read is the last fenced JSON block, so no rule parses prose.
  */
-import { DECISIONS, KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
+import { DECISIONS, DOCUMENT_MEMORY_KINDS, KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -48,6 +48,14 @@ export const CHUNK_KINDS = [
   'finding',
   'criterion',
   'lesson',
+  // What a document digest writes about the person it is about: a fact a field
+  // can take, a course of events kept whole for a field asking them to recount
+  // one, and a bound on what they may claim. Named apart from the knowledge
+  // kinds below, which are an agent's own knowledge about its own work: a
+  // writer owns a run's points by kind, so a shared kind would have two writers
+  // erase each other, and a probe for this person's career must not return
+  // engineering knowledge.
+  ...DOCUMENT_MEMORY_KINDS,
   ...KNOWLEDGE_ITEM_KINDS,
 ] as const;
 export type ChunkKind = (typeof CHUNK_KINDS)[number];

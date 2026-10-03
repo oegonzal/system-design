@@ -122,7 +122,9 @@ describe('the document-digest pipeline', () => {
       for (const alias of memory.evidence) expect(ids).not.toContain(alias);
     }
     for (const alias of digest.unused) expect(ids).not.toContain(alias);
-    expect(rendered).toContain('[memory.2] on [section.1]: Alex Example lives in Lisbon');
+    expect(rendered).toContain(
+      '[memory.2] profile_fact on [section.1]: Alex Example lives in Lisbon',
+    );
     expect(documentDigestOutput.schema.safeParse(digest).success).toBe(true);
   });
 

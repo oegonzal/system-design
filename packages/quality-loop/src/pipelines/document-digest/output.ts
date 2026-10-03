@@ -5,7 +5,11 @@
  * one the memory store consumes, so a fact is stored as the digest wrote it:
  * the insight is what a form field could take, the condition is the question
  * a form would ask, and the probes a form's labels become are searched in
- * that register.
+ * that register. Each item also declares its kind, which becomes the stored
+ * chunk's kind, so a probe can ask for the shape a field needs — a fact for a
+ * short input, a story for one asking the subject to recount something, a
+ * boundary for one a careless answer would overstate — instead of reading one
+ * flat register and hoping rank sorts them.
  *
  * A location is a PLACE in the digest — the summary and each memory — never
  * a section, for the reason the experience digest learned the hard way: a
@@ -16,7 +20,13 @@
  * the schema refused the reply, and a run lost samples to it. A fact no
  * memory holds is located at the summary.
  */
-import { DOCUMENT_MAX_MEMORIES, DOCUMENT_MAX_PARTS, SECTION_ALIAS } from '@sysdesign/contracts';
+import {
+  DOCUMENT_MAX_MEMORIES,
+  DOCUMENT_MAX_PARTS,
+  DOCUMENT_MEMORY_KIND_USES,
+  DOCUMENT_MEMORY_KINDS,
+  SECTION_ALIAS,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { section, type OutputShape } from '../../core/contracts';
@@ -37,6 +47,11 @@ export const documentDigestSchema = z.strictObject({
   memories: z
     .array(
       z.strictObject({
+        kind: z
+          .enum(DOCUMENT_MEMORY_KINDS)
+          .describe(
+            DOCUMENT_MEMORY_KINDS.map((k) => `${k}: ${DOCUMENT_MEMORY_KIND_USES[k]}`).join(' | '),
+          ),
         evidence: z
           .array(evidence)
           .min(1)
@@ -86,7 +101,7 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
         'Memories',
         digest.memories.map(
           (memory, index) =>
-            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${memory.insight} — applies when ${memory.appliesWhen}`,
+            `[memory.${index + 1}] ${memory.kind} on ${cited(memory.evidence)}: ${memory.insight} — applies when ${memory.appliesWhen}`,
         ),
       ),
       ...section('Unused', digest.unused.length > 0 ? [cited(digest.unused)] : []),
