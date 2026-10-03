@@ -7,8 +7,13 @@
  */
 import {
   AXIS_FACTOR_LEVELS,
+  bound,
+  bounded,
+  CRITERION_ID_MAX_LENGTH,
+  CRITERION_KIND_MAX_LENGTH,
   CRITERION_RESULTS,
   DECISIONS,
+  exact,
   FIXABILITIES,
   MAX_QUALITY_RUN_ITERATIONS,
   ITERATION_MODES,
@@ -50,17 +55,45 @@ export const MAX_FINDING_REFS = 8;
 export const MAX_FINDING_CRITERIA = 4;
 export const MAX_FINDING_LENSES = 6;
 
+const FINDING_TYPE_MAX = 60;
+const DIMENSION_MAX = 40;
+const RUN_ID_MAX = 80;
+const PIPELINE_ID_MAX = 120;
+
+/*
+ * The record is composed (`from-run.ts`), never written by a model: each text
+ * is capped where it is composed at its bound's target, and each list sliced
+ * to its count, so the counts are exact and the prose is bounded — a record
+ * another composer hands over a little past a target is still a record.
+ */
+const PROMPT_BOUND = bound(PROMPT_MAX);
+const ARTIFACT_BOUND = bound(ARTIFACT_MAX);
+const RATIONALE_BOUND = bound(RATIONALE_MAX);
+const REASON_BOUND = bound(REASON_MAX);
+const STATEMENT_BOUND = bound(STATEMENT_MAX);
+const RULE_BOUND = bound(RULE_MAX);
+const RULES_BOUND = bound(MAX_RULES, 'list');
+const TRANSITION_DETAIL_BOUND = bound(TRANSITION_DETAIL_MAX);
+const PER_ITERATION_BOUND = exact(MAX_QUALITY_RUN_ITERATIONS);
+const TRANSITION_ENDS_BOUND = exact(2);
+const FINDINGS_BOUND = exact(MAX_FINDINGS);
+const CRITERIA_BOUND = exact(MAX_CRITERIA_ITEMS);
+const FINDING_REFS_BOUND = exact(MAX_FINDING_REFS);
+const FINDING_CRITERIA_BOUND = exact(MAX_FINDING_CRITERIA);
+const FINDING_LENSES_BOUND = exact(MAX_FINDING_LENSES);
+
 export const EVIDENCE_KINDS = ['finding', 'criterion'] as const;
 const TRANSITION_KINDS = ['persisted', 'resolved', 'improved', 'regressed'] as const;
 
-const alias = z.string().min(1).max(ALIAS_MAX);
+const alias = bounded.id(ALIAS_MAX, { min: 1 });
 const iteration = z.number().int().min(1);
 const score = z.number().nullable();
+const dimension = bounded.id(DIMENSION_MAX);
 
 const transitionSchema = z.strictObject({
   kind: z.enum(TRANSITION_KINDS),
-  iterations: z.array(iteration).min(2).max(2),
-  detail: z.string().max(TRANSITION_DETAIL_MAX),
+  iterations: bounded.list(TRANSITION_ENDS_BOUND, iteration, { min: 2 }),
+  detail: bounded.text(TRANSITION_DETAIL_BOUND),
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
@@ -68,45 +101,44 @@ const iterationSummarySchema = z.strictObject({
   iteration,
   mode: z.enum(ITERATION_MODES),
   decision: z.enum(DECISIONS),
-  reason: z.string().max(REASON_MAX),
+  reason: bounded.text(REASON_BOUND),
   overall: z.number(),
   overallDelta: score,
-  dimensions: z.record(z.string().max(40), score),
-  dimensionDeltas: z.record(z.string().max(40), score),
+  dimensions: z.record(dimension, score),
+  dimensionDeltas: z.record(dimension, score),
 });
 export type IterationSummary = z.infer<typeof iterationSummarySchema>;
 
 export const recordedCriterionSchema = z.strictObject({
   alias,
-  id: z.string().min(1).max(20),
-  kind: z.string().min(1).max(60),
-  statement: z.string().min(1).max(STATEMENT_MAX),
-  results: z
-    .array(
-      z.strictObject({ iteration, result: z.enum([...CRITERION_RESULTS, 'unassessed'] as const) }),
-    )
-    .max(MAX_QUALITY_RUN_ITERATIONS),
-  transitions: z.array(transitionSchema).max(MAX_QUALITY_RUN_ITERATIONS),
+  id: bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 }),
+  kind: bounded.id(CRITERION_KIND_MAX_LENGTH, { min: 1 }),
+  statement: bounded.text(STATEMENT_BOUND, { min: 1 }),
+  results: bounded.list(
+    PER_ITERATION_BOUND,
+    z.strictObject({ iteration, result: z.enum([...CRITERION_RESULTS, 'unassessed'] as const) }),
+  ),
+  transitions: bounded.list(PER_ITERATION_BOUND, transitionSchema),
 });
 export type RecordedCriterion = z.infer<typeof recordedCriterionSchema>;
 
 export const recordedFindingSchema = z.strictObject({
   alias,
-  key: z.string().min(1).max(KEY_MAX),
-  type: z.string().min(1).max(60),
+  key: bounded.id(KEY_MAX, { min: 1 }),
+  type: bounded.id(FINDING_TYPE_MAX, { min: 1 }),
   severity: z.enum(SEVERITIES),
   confidence: z.enum(AXIS_FACTOR_LEVELS),
   fixability: z.enum(FIXABILITIES),
-  locationRefs: z.array(z.string().max(REF_MAX)).max(MAX_FINDING_REFS),
+  locationRefs: bounded.list(FINDING_REFS_BOUND, bounded.id(REF_MAX)),
   /** Aliases of the record's criteria the finding weakened. */
-  criteria: z.array(alias).max(MAX_FINDING_CRITERIA),
-  lenses: z.array(z.string().max(LENS_MAX)).max(MAX_FINDING_LENSES),
-  iterations: z.array(iteration).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
-  rationale: z.string().max(RATIONALE_MAX).nullable(),
+  criteria: bounded.list(FINDING_CRITERIA_BOUND, alias),
+  lenses: bounded.list(FINDING_LENSES_BOUND, bounded.id(LENS_MAX)),
+  iterations: bounded.list(PER_ITERATION_BOUND, iteration, { min: 1 }),
+  rationale: bounded.text(RATIONALE_BOUND).nullable(),
   /** The policy selected it for remediation in at least one iteration. */
   remediated: z.boolean(),
   reconciledTo: alias.nullable(),
-  transitions: z.array(transitionSchema).max(MAX_QUALITY_RUN_ITERATIONS),
+  transitions: bounded.list(PER_ITERATION_BOUND, transitionSchema),
   /**
    * Seen only in an iteration adopted from an earlier run: that run's judges
    * confirmed it, and only its transitions are this run's own.
@@ -116,16 +148,16 @@ export const recordedFindingSchema = z.strictObject({
 export type RecordedFinding = z.infer<typeof recordedFindingSchema>;
 
 const recordShape = z.strictObject({
-  runId: z.string().min(1).max(80),
-  pipeline: z.string().min(1).max(120),
+  runId: bounded.id(RUN_ID_MAX, { min: 1 }),
+  pipeline: bounded.id(PIPELINE_ID_MAX, { min: 1 }),
   finalDecision: z.enum(DECISIONS),
   stopReason: z.enum(STOP_REASONS),
   bestIteration: iteration,
-  prompt: z.string().min(1).max(PROMPT_MAX),
-  artifact: z.string().max(ARTIFACT_MAX).nullable(),
-  iterations: z.array(iterationSummarySchema).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
-  criteria: z.array(recordedCriterionSchema).max(MAX_CRITERIA_ITEMS),
-  findings: z.array(recordedFindingSchema).max(MAX_FINDINGS),
+  prompt: bounded.text(PROMPT_BOUND, { min: 1 }),
+  artifact: bounded.text(ARTIFACT_BOUND).nullable(),
+  iterations: bounded.list(PER_ITERATION_BOUND, iterationSummarySchema, { min: 1 }),
+  criteria: bounded.list(CRITERIA_BOUND, recordedCriterionSchema),
+  findings: bounded.list(FINDINGS_BOUND, recordedFindingSchema),
   /**
    * What the record left out, counted: findings and criteria past their caps
    * or the goal budget, and findings seen only in an adopted iteration with no
@@ -137,7 +169,7 @@ const recordShape = z.strictObject({
     criteria: z.number().int().min(0),
     adopted: z.number().int().min(0),
   }),
-  rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
+  rules: bounded.list(RULES_BOUND, bounded.text(RULE_BOUND, { min: 1 })),
   maxMemories: z.number().int().min(1).max(MAX_MEMORIES),
 });
 export type ExperienceRecord = z.infer<typeof recordShape>;

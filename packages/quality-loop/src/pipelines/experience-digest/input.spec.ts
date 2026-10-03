@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
 import { fit, fromRun } from './from-run';
-import { experienceRecordSchema, readIndex, renderGoal } from './input';
+import { experienceRecordSchema, RATIONALE_MAX, readIndex, renderGoal } from './input';
 import { maximalRecord, sampleRun } from './testing';
 
 describe('the experience-digest input codec', () => {
@@ -69,6 +69,20 @@ describe('the experience-digest input codec', () => {
     const legacy = goal.replace(/,"iterations":\[[\d,]*\]/g, '');
     expect(legacy).not.toContain('"iterations"');
     expect(readIndex(legacy)?.evidence.map((item) => item.iterations)).toEqual([[], []]);
+  });
+
+  it('[QL-41] a record a composer handed over a little past a text’s target is still a record', () => {
+    const record = fromRun(sampleRun());
+    if (record === null) throw new Error('the sample run must compose');
+    const [finding] = record.findings;
+    const rationale = 'the read path has no story for an outage. '.repeat(5).trim();
+    expect(rationale.length).toBeGreaterThan(RATIONALE_MAX);
+    // Refused before: the composer's cap was the schema's too.
+    const parsed = experienceRecordSchema.safeParse({
+      ...record,
+      findings: [{ ...finding, rationale }, ...record.findings.slice(1)],
+    });
+    expect(parsed.success).toBe(true);
   });
 
   it('[QL-14] a plain prompt, a foreign index or a broken fence reads as no index', () => {

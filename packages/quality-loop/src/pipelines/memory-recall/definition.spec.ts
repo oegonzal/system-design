@@ -1,4 +1,4 @@
-import { boundsAgainstMeasured } from '@sysdesign/contracts';
+import { boundsAgainstMeasured, modelSchema, parseLenient } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
@@ -92,6 +92,26 @@ describe('the memory-recall pipeline', () => {
         measured.fields,
       ),
     ).toEqual([]);
+  });
+
+  it('[QL-41] the pack asks for each bound’s target and keeps a verdict a little past it whole', () => {
+    const { json, bounds } = modelSchema(memoryPackOutput.schema);
+    expect(bounds['kept[].serves']).toMatchObject({ kind: 'text', target: 200 });
+    expect(JSON.stringify(json)).toContain('"maxLength":200');
+    const [first, second] = samplePack().kept;
+    const serves = 'the list read while the POS feed is down, and what it serves; '
+      .repeat(4)
+      .trim();
+    expect(serves.length).toBeGreaterThan(bounds['kept[].serves'].target);
+    expect(serves.length).toBeLessThanOrEqual(bounds['kept[].serves'].ceiling);
+    const read = parseLenient(
+      memoryPackOutput.schema,
+      samplePack({ kept: [{ ...first, serves }, second] }),
+    );
+    expect(read.ok).toBe(true);
+    expect(read.overruns.map((overrun) => [overrun.path, overrun.handling])).toEqual([
+      ['kept[0].serves', 'accepted'],
+    ]);
   });
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
