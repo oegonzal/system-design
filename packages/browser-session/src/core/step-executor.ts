@@ -1,0 +1,258 @@
+import {
+  DOCUMENT_MAX_PARTS,
+  guidanceDocument,
+  TASK_OUTCOME_STATUS,
+  type BrowserTaskStatus,
+  type DocumentChunk,
+  type PageObservation,
+  type PlanReadout,
+  type StepAction,
+  type StepPlan,
+} from '@sysdesign/contracts';
+
+import type { EngineContext } from './engine-context';
+import { exactCheckOf } from './expectations';
+import { askFields } from './field-flow';
+import {
+  ActionFailed,
+  BrainFaulted,
+  isBrowserAction,
+  type BrowserAction,
+  type Decided,
+  type Termination,
+} from './ports';
+import { labelledScreenshot, stepJsonFile } from './session-dump';
+import { describeAction, pushHistory, type OpenTask } from './session-state';
+
+/**
+ * Running the unfaulted prefix of an accepted plan, action by action. A
+ * browser action goes to the browser and leaves its promise pending for the
+ * next observation; the engine's own events — units of work opening and
+ * closing, fields asked, a screenshot, the end — are handled here. The
+ * first `ActionFailed` — a browser action's or a field fill's — stops the
+ * plan and counts one failed step; what did not run is carried into the
+ * history as not-executed with its reason, the rest of the prefix as
+ * "after a failed action" and what a judge or validator cut as their words,
+ * so the next plan is told both.
+ */
+
+/** Which count a closed unit of work moves, by the status its outcome maps to. */
+const TASK_COUNT_BY_STATUS: Readonly<
+  Record<BrowserTaskStatus, 'done' | 'skipped' | 'failed' | null>
+> = { open: null, complete: 'done', abandoned: 'skipped', failed: 'failed' };
+
+const day = (at: Date): string => at.toISOString().slice(0, 10);
+
+function openTask(
+  ctx: EngineContext,
+  action: Extract<StepAction, { kind: 'taskStart' }>,
+  label: string,
+): void {
+  const { state, deps, queue } = ctx;
+  if (state.tasks.open !== null) {
+    pushHistory(state, label, 'not-executed', 'a unit of work is already open');
+    return;
+  }
+  const task: OpenTask = {
+    id: crypto.randomUUID(),
+    ordinal: state.tasks.started + 1,
+    label: action.label,
+    url: action.url,
+    startStep: state.step,
+  };
+  state.tasks.open = task;
+  state.tasks.started = task.ordinal;
+  const startedAt = deps.clock.now();
+  queue.write(`task ${task.ordinal} open`, () =>
+    deps.ledger.openTask({
+      id: task.id,
+      sessionId: state.sessionId,
+      ordinal: task.ordinal,
+      label: task.label,
+      externalRef: task.url,
+      startStep: task.startStep,
+      startedAt,
+    }),
+  );
+  pushHistory(state, label, 'ok', action.expect);
+}
+
+/**
+ * The operator's answers during the unit, as one guidance document per part
+ * cap, handed to the memory; each orchestration id is written onto exactly
+ * the decision rows whose answers its document carried.
+ */
+async function teach(ctx: EngineContext, task: OpenTask): Promise<void> {
+  const { state, deps, queue } = ctx;
+  const answers = state.guidance.splice(0);
+  if (answers.length === 0) return;
+  const batches = Array.from({ length: Math.ceil(answers.length / DOCUMENT_MAX_PARTS) }, (_, i) =>
+    answers.slice(i * DOCUMENT_MAX_PARTS, (i + 1) * DOCUMENT_MAX_PARTS),
+  );
+  const taught: {
+    document: DocumentChunk;
+    decisionIds: string[];
+    orchestrationRunId: string | null;
+    fault: string | null;
+  }[] = [];
+  for (const batch of batches) {
+    const document = guidanceDocument(
+      state.sessionId,
+      ctx.options.subject,
+      batch.map((answer) => answer.item),
+      day(deps.clock.now()),
+    );
+    const decisionIds = batch.map((answer) => answer.decisionId);
+    try {
+      const { orchestrationRunId } = await deps.brain.teach(document);
+      queue.write(`task ${task.ordinal} teaching`, () =>
+        deps.ledger.recordTeaching(decisionIds, orchestrationRunId),
+      );
+      taught.push({ document, decisionIds, orchestrationRunId, fault: null });
+      deps.log(
+        `task ${task.ordinal}: ${document.parts.length} answer(s) taught through ${orchestrationRunId}`,
+      );
+    } catch (error) {
+      if (!(error instanceof BrainFaulted)) throw error;
+      taught.push({ document, decisionIds, orchestrationRunId: null, fault: error.message });
+      deps.warn(`task ${task.ordinal}: answers not taught — ${error.message}`);
+    }
+  }
+  ctx.dumpFiles('teach', [stepJsonFile(state.step, 'teach', { taskId: task.id, taught })]);
+}
+
+async function closeTask(
+  ctx: EngineContext,
+  action: Extract<StepAction, { kind: 'taskDone' }>,
+  label: string,
+): Promise<void> {
+  const { state, deps, queue } = ctx;
+  const task = state.tasks.open;
+  if (task === null) {
+    pushHistory(state, label, 'not-executed', 'no unit of work is open');
+    return;
+  }
+  const status = TASK_OUTCOME_STATUS[action.outcome];
+  const count = TASK_COUNT_BY_STATUS[status];
+  if (count !== null) state.tasks[count] += 1;
+  state.tasks.open = null;
+  // Captured now: the write runs later, when the engine may be steps ahead.
+  const close = {
+    status,
+    outcome: action.outcome,
+    endStep: state.step,
+    finishedAt: deps.clock.now(),
+  };
+  queue.write(`task ${task.ordinal} close`, () => deps.ledger.closeTask(task.id, close));
+  pushHistory(state, label, 'ok', action.expect);
+  await teach(ctx, task);
+}
+
+/** One of the engine's own events; true when it failed and the plan must stop. */
+async function perform(
+  ctx: EngineContext,
+  action: Exclude<StepAction, BrowserAction | { kind: 'terminate' }>,
+  label: string,
+  observation: PageObservation,
+): Promise<{ failed: boolean; stopped: boolean }> {
+  const { deps, state } = ctx;
+  switch (action.kind) {
+    case 'screenshot': {
+      const bytes = await deps.browser.screenshot();
+      ctx.dumpFiles('screenshot', [labelledScreenshot(state.step, action.label, bytes)]);
+      pushHistory(state, label, 'ok', action.expect);
+      return { failed: false, stopped: false };
+    }
+    case 'askFields': {
+      const outcome = await askFields(ctx, action.refs, observation);
+      pushHistory(state, label, outcome.failed ? 'failed' : 'ok', outcome.note);
+      if (outcome.stopped) state.operatorStopped = true;
+      return { failed: outcome.failed, stopped: outcome.stopped };
+    }
+    case 'taskStart':
+      openTask(ctx, action, label);
+      return { failed: false, stopped: false };
+    case 'taskDone':
+      await closeTask(ctx, action, label);
+      return { failed: false, stopped: false };
+    case 'done':
+      pushHistory(state, label, 'ok', action.expect);
+      return { failed: false, stopped: false };
+  }
+}
+
+/** A browser action; true when the page refused it. */
+async function act(
+  ctx: EngineContext,
+  action: BrowserAction,
+  label: string,
+  observation: PageObservation,
+): Promise<boolean> {
+  const { deps, state } = ctx;
+  try {
+    await deps.browser.act(action);
+  } catch (error) {
+    if (!(error instanceof ActionFailed)) throw error;
+    pushHistory(state, label, 'failed', error.message);
+    return true;
+  }
+  pushHistory(state, label, 'ok', action.expect);
+  state.pending = {
+    action: label,
+    expect: action.expect,
+    check: exactCheckOf(action, observation),
+  };
+  return false;
+}
+
+/**
+ * The actions before the first faulted one, in order, stopping at the first
+ * the page refuses; a termination when the plan declared one. What did not
+ * run goes into the history with why — and the failure count moves once per
+ * step, whichever action failed.
+ */
+export async function executeActions(
+  ctx: EngineContext,
+  decided: Decided<StepPlan>,
+  readout: PlanReadout & { plan: StepPlan },
+  observation: PageObservation,
+): Promise<Termination | null> {
+  const { state } = ctx;
+  const actions = readout.plan.actions;
+  const prefix = actions.slice(0, readout.executePrefix);
+  /** Where the prefix stopped: the index after the last action attempted. */
+  let next = 0;
+  let failed = false;
+  for (const action of prefix) {
+    next += 1;
+    const label = describeAction(action, observation);
+    if (action.kind === 'terminate') {
+      pushHistory(state, label, 'ok', null);
+      return ctx.terminate({ reason: action.cause, detail: action.detail }, 'loop', decided.runId);
+    }
+    if (isBrowserAction(action)) {
+      failed = await act(ctx, action, label, observation);
+    } else {
+      const outcome = await perform(ctx, action, label, observation);
+      if (outcome.stopped) return null;
+      failed = outcome.failed;
+    }
+    if (failed) break;
+  }
+  if (failed) ctx.fail('action-failed');
+  else state.consecutiveFailures = 0;
+
+  for (const action of prefix.slice(next)) {
+    pushHistory(
+      state,
+      describeAction(action, observation),
+      'not-executed',
+      'after a failed action',
+    );
+  }
+  const cut = readout.faults.length > 0 ? readout.faults.join('; ') : 'past the executable prefix';
+  for (const action of actions.slice(prefix.length)) {
+    pushHistory(state, describeAction(action, observation), 'not-executed', cut);
+  }
+  return null;
+}

@@ -1,0 +1,363 @@
+import { createHash } from 'node:crypto';
+
+import {
+  actionRefs,
+  type BrowserDecisionDto,
+  type BrowserSessionDetailDto,
+  type BrowserSessionDto,
+  type BrowserTaskDto,
+  type PageObservation,
+  type SuccessCriterion,
+} from '@sysdesign/contracts';
+import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
+
+import {
+  ActionFailed,
+  type BrowserAction,
+  type BrowserPort,
+  type Clock,
+  type DumpSink,
+  type DumpStore,
+  type GoalSource,
+  type LedgerPort,
+  type NewDecision,
+  type NewSession,
+  type NewTask,
+  type OperatorPort,
+  type OperatorPrompt,
+  type OperatorReply,
+  type SessionClose,
+  type TaskClose,
+} from './ports';
+
+export * from './testing-runs';
+export * from './testing-journey';
+
+/**
+ * The ports as fakes, for the engine's specs and the scripted end-to-end
+ * run. Every fake records what it was asked and answers from a script; none
+ * imports vitest, so the Nest spec can use them too.
+ */
+
+/** One page the fake browser shows, and which page each action leads to. */
+export interface ScriptedPage {
+  id: string;
+  observation: PageObservation;
+  /** Action key (`click e3`, `navigate https://…`, `press Enter`) → the page shown after it. */
+  transitions?: Record<string, string>;
+}
+
+/** The key a transition is declared under: the action's kind and its target, never its value. */
+export function actionKey(action: BrowserAction): string {
+  switch (action.kind) {
+    case 'navigate':
+      return `navigate ${action.url}`;
+    case 'press':
+      return `press ${action.key}`;
+    case 'scroll':
+      return `scroll ${action.direction}`;
+    case 'waitFor':
+      return `waitFor ${action.until} ${action.value}`;
+    default:
+      return `${action.kind} ${action.ref}`;
+  }
+}
+
+export class FakeBrowser implements BrowserPort {
+  readonly calls: string[] = [];
+  readonly values = new Map<string, string>();
+  opened: { profile: string; headed: boolean } | null = null;
+  closed = false;
+  private current: ScriptedPage;
+  private observed = new Set<string>();
+
+  constructor(private readonly pages: readonly ScriptedPage[]) {
+    const [first] = pages;
+    if (first === undefined) throw new Error('a fake browser needs at least one page');
+    this.current = first;
+  }
+
+  get pageId(): string {
+    return this.current.id;
+  }
+
+  async open(profile: string, options: { headed: boolean }): Promise<void> {
+    this.opened = { profile, headed: options.headed };
+    this.calls.push(`open ${profile} ${options.headed ? 'headed' : 'headless'}`);
+  }
+
+  async observe(): Promise<PageObservation> {
+    this.calls.push(`observe ${this.current.id}`);
+    this.observed = new Set(this.current.observation.elements.map((element) => element.ref));
+    return structuredClone(this.current.observation);
+  }
+
+  async act(action: BrowserAction): Promise<void> {
+    const key = actionKey(action);
+    this.calls.push(key);
+    for (const ref of actionRefs(action)) {
+      if (!this.observed.has(ref)) {
+        throw new ActionFailed(key, `${ref} is not an element of the last observation`);
+      }
+    }
+    if (action.kind === 'fill') this.values.set(action.ref, action.value);
+    if (action.kind === 'select') this.values.set(action.ref, action.option);
+    const next = this.current.transitions?.[key];
+    if (next !== undefined) this.show(next);
+  }
+
+  /** Jump to a page, as a site would after something the script did not model. */
+  show(pageId: string): void {
+    const page = this.pages.find((candidate) => candidate.id === pageId);
+    if (page === undefined) throw new Error(`the fake browser has no page ${pageId}`);
+    this.current = page;
+    this.values.clear();
+  }
+
+  async highlight(ref: string): Promise<void> {
+    this.calls.push(`highlight ${ref}`);
+  }
+
+  async readValue(ref: string): Promise<string | null> {
+    const typed = this.values.get(ref);
+    if (typed !== undefined) return typed;
+    return this.current.observation.elements.find((e) => e.ref === ref)?.value ?? null;
+  }
+
+  async screenshot(): Promise<Uint8Array> {
+    return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+    this.calls.push('close');
+  }
+}
+
+type StoredSession = BrowserSessionDto & {
+  goalMarkdown: string;
+  criteria: Record<string, SuccessCriterion[]> | null;
+};
+
+/** The records in memory, as DTOs; `failing` makes every write reject, for the queue's reporting. */
+export class InMemoryLedger implements LedgerPort {
+  readonly sessions = new Map<string, StoredSession>();
+  readonly tasks = new Map<string, BrowserTaskDto>();
+  readonly decisions: BrowserDecisionDto[] = [];
+  readonly heartbeats: { at: string; steps: number }[] = [];
+  readonly teachings: { decisionIds: string[]; orchestrationRunId: string }[] = [];
+  failing: Error | null = null;
+
+  private async write<T>(work: () => T): Promise<T> {
+    if (this.failing) throw this.failing;
+    return work();
+  }
+
+  openSession(session: NewSession): Promise<void> {
+    return this.write(() => {
+      const { startedAt, ...rest } = session;
+      this.sessions.set(session.id, {
+        ...rest,
+        status: 'running',
+        terminationReason: null,
+        terminationDetail: null,
+        criteria: null,
+        steps: 0,
+        startedAt: startedAt.toISOString(),
+        heartbeatAt: startedAt.toISOString(),
+        finishedAt: null,
+        error: null,
+      });
+    });
+  }
+
+  recordCriteria(sessionId: string, criteria: Record<string, SuccessCriterion[]>): Promise<void> {
+    return this.write(() => {
+      this.require(sessionId).criteria = criteria;
+    });
+  }
+
+  heartbeat(sessionId: string, at: Date, steps: number): Promise<void> {
+    return this.write(() => {
+      const session = this.require(sessionId);
+      session.heartbeatAt = at.toISOString();
+      session.steps = steps;
+      this.heartbeats.push({ at: at.toISOString(), steps });
+    });
+  }
+
+  openTask(task: NewTask): Promise<void> {
+    return this.write(() => {
+      const { startedAt, ...rest } = task;
+      this.tasks.set(task.id, {
+        ...rest,
+        status: 'open',
+        outcome: null,
+        endStep: null,
+        startedAt: startedAt.toISOString(),
+        finishedAt: null,
+      });
+    });
+  }
+
+  closeTask(taskId: string, close: TaskClose): Promise<void> {
+    return this.write(() => {
+      const task = this.tasks.get(taskId);
+      if (task === undefined) throw new Error(`no task ${taskId}`);
+      Object.assign(task, {
+        status: close.status,
+        outcome: close.outcome,
+        endStep: close.endStep,
+        finishedAt: close.finishedAt.toISOString(),
+      });
+    });
+  }
+
+  recordDecision(decision: NewDecision): Promise<void> {
+    return this.write(() => {
+      const { createdAt, ...rest } = decision;
+      this.decisions.push({
+        ...rest,
+        teachOrchestrationId: null,
+        createdAt: createdAt.toISOString(),
+      });
+    });
+  }
+
+  recordTeaching(decisionIds: readonly string[], orchestrationRunId: string): Promise<void> {
+    return this.write(() => {
+      this.teachings.push({ decisionIds: [...decisionIds], orchestrationRunId });
+      for (const decision of this.decisions) {
+        if (decisionIds.includes(decision.id)) decision.teachOrchestrationId = orchestrationRunId;
+      }
+    });
+  }
+
+  closeSession(sessionId: string, close: SessionClose): Promise<void> {
+    return this.write(() => {
+      const session = this.require(sessionId);
+      Object.assign(session, {
+        status: close.status,
+        terminationReason: close.termination.reason,
+        terminationDetail: close.termination.detail,
+        steps: close.steps,
+        finishedAt: close.finishedAt.toISOString(),
+        heartbeatAt: close.finishedAt.toISOString(),
+        error: close.error,
+      });
+    });
+  }
+
+  async listSessions(limit: number): Promise<BrowserSessionDto[]> {
+    return [...this.sessions.values()]
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, limit)
+      .map(({ goalMarkdown: _goal, criteria: _criteria, ...dto }) => dto);
+  }
+
+  async getSession(id: string): Promise<BrowserSessionDetailDto | null> {
+    const session = this.sessions.get(id);
+    if (session === undefined) return null;
+    const { goalMarkdown: _goal, criteria: _criteria, ...dto } = session;
+    return {
+      ...dto,
+      tasks: [...this.tasks.values()]
+        .filter((task) => task.sessionId === id)
+        .sort((a, b) => a.ordinal - b.ordinal),
+      decisions: this.decisions
+        .filter((decision) => decision.sessionId === id)
+        .sort((a, b) => a.step - b.step || a.ordinal - b.ordinal),
+    };
+  }
+
+  private require(sessionId: string): StoredSession {
+    const session = this.sessions.get(sessionId);
+    if (session === undefined) throw new Error(`no session ${sessionId}`);
+    return session;
+  }
+}
+
+/** An operator who answers from a script; past the script, every field is left blank. */
+export class ScriptedOperator implements OperatorPort {
+  readonly prompts: OperatorPrompt[] = [];
+  readonly notices: string[] = [];
+  readonly pauses: string[] = [];
+  private readonly replies: OperatorReply[];
+
+  constructor(replies: readonly OperatorReply[] = []) {
+    this.replies = [...replies];
+  }
+
+  async ask(prompt: OperatorPrompt): Promise<OperatorReply> {
+    this.prompts.push(prompt);
+    return this.replies.shift() ?? { kind: 'blank' };
+  }
+
+  notify(text: string): void {
+    this.notices.push(text);
+  }
+
+  async pause(text: string): Promise<void> {
+    this.pauses.push(text);
+  }
+}
+
+/** A clock that moves a fixed step on every read, and jumps when a spec says so. */
+export class FixedClock implements Clock {
+  private at: number;
+
+  constructor(
+    start = new Date('2026-10-03T10:00:00.000Z'),
+    private readonly stepMs = 1_000,
+  ) {
+    this.at = start.getTime();
+  }
+
+  now(): Date {
+    const now = new Date(this.at);
+    this.at += this.stepMs;
+    return now;
+  }
+
+  advance(ms: number): void {
+    this.at += ms;
+  }
+}
+
+/** A dump that keeps its files in memory, by path. */
+export class InMemoryDumpStore implements DumpStore {
+  readonly files = new Map<string, string | Uint8Array>();
+  readonly index: string[] = [];
+  readonly runId = 'fake-session-dump';
+
+  open(): DumpSink {
+    return {
+      runId: this.runId,
+      write: (files: readonly (DumpFile | DumpBytes)[]) => {
+        for (const file of files) {
+          this.files.set(file.path, 'bytes' in file ? file.bytes : file.content);
+        }
+      },
+      index: (row: string) => {
+        this.index.push(row);
+      },
+    };
+  }
+
+  text(path: string): string {
+    const file = this.files.get(path);
+    if (typeof file !== 'string') throw new Error(`no text file ${path} in the fake dump`);
+    return file;
+  }
+}
+
+/** Goals by path, hashed the way the filesystem source hashes them. */
+export class InMemoryGoalSource implements GoalSource {
+  constructor(private readonly documents: Record<string, string>) {}
+
+  async read(path: string): Promise<{ path: string; markdown: string; hash: string }> {
+    const markdown = this.documents[path];
+    if (markdown === undefined) throw new Error(`no goal at ${path}`);
+    return { path, markdown, hash: createHash('sha256').update(markdown).digest('hex') };
+  }
+}

@@ -608,10 +608,46 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run awaited through the client is judged alive by its heartbeat against the loop's own stale window, never by its exchange count or status; a run the loop no longer has is lost, one whose beat has stopped is stale, and an orchestration is awaited the same way through the child run its running step has open.",
   },
+  // Browser session (packages/browser-session)
+  {
+    id: 'BRW-1',
+    statement:
+      'The session engine decides nothing of its own: every plan, every field answer and every termination it acts on is a recorded quality-loop run or orchestration named by id on the decision row, and the engine adds only declared rails and declared routing.',
+  },
+  {
+    id: 'BRW-2',
+    statement:
+      "An observation lists the page's interactive elements with the refs the browser minted for it, their roles, names and DOM facts including the traits that mark a field hidden; a ref resolves only within the observation that minted it, a stale ref is a failure, and a page that would not fit the goal budget is degraded by declared rungs — snapshot, context, elements — never clipped.",
+  },
+  {
+    id: 'BRW-3',
+    statement:
+      "Fields are routed by declared precedence — the page's admission, the page's own hidden traits, what a judge or validator pointed at, then the model's decision with its confidence and basis — and an operator's answer is filled, recorded with its source, cached for the session, and taught back as a guidance document whose orchestration id lands on the rows it came from.",
+  },
+  {
+    id: 'BRW-4',
+    statement:
+      "A session ends only by a plan's declared cause, a declared rail, the operator or a fault; its status follows the termination table, and the browser, the write queue and the session row are closed on every path.",
+  },
+  {
+    id: 'BRW-5',
+    statement:
+      "A session's rows — session, units of work and decisions — are written through a chained write queue that never stalls the browser, with a heartbeat ticker on its own timer, so a reader tells a live session from a dead one by its beat.",
+  },
   {
     id: 'BRW-6',
     statement:
       "A session's trace is written incrementally through the shared run-dump plumbing — each step's files land through a temp name and a rename, bytes as well as text — and the index row that claims the folder complete is appended once, when the session is whole.",
+  },
+  {
+    id: 'BRW-7',
+    statement:
+      'Every flag and environment variable the session reads is declared once as data with its default, validated by name before anything boots, and nothing else in the package reads the environment.',
+  },
+  {
+    id: 'BRW-8',
+    statement:
+      'The package names no site: the mission, its units of work, its procedure, its stop conditions and its answering policy live in a markdown goal, and the same program runs any goal.',
   },
   // Memory ingest (packages/memory-ingest)
   {

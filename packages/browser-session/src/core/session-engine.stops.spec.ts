@@ -1,0 +1,186 @@
+import type { StepPlan } from '@sysdesign/contracts';
+
+import { ActionFailed, BrainFaulted } from './ports';
+import {
+  actionKey,
+  decidedAnswers,
+  decidedPlan,
+  FakeBrowser,
+  finding,
+  FixedClock,
+} from './testing';
+import {
+  JOURNEY_ANSWERS as ANSWERS,
+  JOURNEY_PLANS as PLANS,
+  journeyPages as pages,
+} from './testing-journey';
+import { runScripted as run } from './testing-session';
+
+/**
+ * How a plan stops — at the first action the page refuses, or where a judge
+ * cut it — and how a session ends: by each declared rail, by the operator,
+ * by a fault, by an error, every path closing the browser and the row.
+ */
+describe('how a plan stops and how a session ends', () => {
+  /** A browser whose page refuses every fill: the element is gone by the time it is typed into. */
+  const refusingFills = (pageId: string): FakeBrowser => {
+    const browser = new FakeBrowser(pages());
+    const act = browser.act.bind(browser);
+    browser.act = async (action) => {
+      if (action.kind === 'fill' && browser.pageId === pageId) {
+        throw new ActionFailed(actionKey(action), 'the element is detached');
+      }
+      return act(action);
+    };
+    return browser;
+  };
+
+  it('[BRW-1] stops a plan at the first action the page refuses — a field fill included — tells the next plan what did not run and why, and counts one failed step', async () => {
+    // A judge cut the plan at its third action and the page refuses the first: the history says both.
+    const searchThenEnter: StepPlan = {
+      ...PLANS.search,
+      actions: [
+        ...PLANS.search.actions,
+        { kind: 'press', key: 'Enter', reason: 'submit', expect: null },
+      ],
+    };
+    const cut = await run({
+      script: {
+        plans: [
+          decidedPlan(searchThenEnter, {
+            findings: [finding('wrong_target', ['action.3'], 'Enter would submit twice')],
+          }),
+          decidedPlan(PLANS.end),
+        ],
+      },
+      browser: refusingFills('search'),
+    });
+    expect(cut.brain.planInputs[1]?.history.map((h) => [h.action, h.outcome, h.note])).toEqual([
+      [
+        'fill e1 searchbox "Search" with "software engineer"',
+        'failed',
+        'fill e1: the element is detached',
+      ],
+      ['click e2 button "Search"', 'not-executed', 'after a failed action'],
+      ['press Enter', 'not-executed', 'wrong_target: Enter would submit twice'],
+    ]);
+    expect(cut.browser.calls).not.toContain('click e2');
+    expect(cut.outcome.termination.reason).toBe('mission-complete');
+
+    // A field the page refuses stops the fields after it and the plan's click, and moves the count once.
+    const form = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.end].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      browser: refusingFills('form'),
+      rails: { maxConsecutiveFailures: 2 },
+    });
+    expect(form.outcome.termination.reason).toBe('mission-complete');
+    expect(form.browser.pageId).toBe('form');
+    expect(form.browser.calls).not.toContain('click e6');
+    expect(form.operator.prompts).toEqual([]);
+    expect(form.brain.planInputs[3]?.history.slice(-2).map((h) => [h.outcome, h.note])).toEqual([
+      ['failed', '3 field(s): 0 filled, 0 asked, 0 blank, 1 failed, 2 not attempted'],
+      ['not-executed', 'after a failed action'],
+    ]);
+    const rows = form.detail.decisions.filter((d) => d.kind === 'field-answer');
+    expect(rows.map((d) => [d.ref, d.payload['outcome']])).toEqual([['e1', 'failed']]);
+    const dumped = JSON.parse(form.dumps.text('01-steps/03/fields.json')) as {
+      fields: { result: unknown }[];
+    };
+    expect(dumped.fields.map((field) => field.result === null)).toEqual([false, true, true]);
+  });
+
+  it('[BRW-4] stops on each declared rail with the status the termination table gives, closing the browser every time', async () => {
+    const byTasks = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.done].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      rails: { maxTasks: 1 },
+    });
+    expect(byTasks.outcome.termination.reason).toBe('max-tasks');
+    expect(byTasks.outcome.status).toBe('stopped');
+    expect(byTasks.detail.decisions.find((d) => d.kind === 'termination')?.source).toBe('engine');
+    expect(byTasks.brain.planInputs).toHaveLength(4);
+    expect(byTasks.browser.closed).toBe(true);
+
+    // The page took a minute and a half to come up: the clock jumps once, and the rail reads it.
+    const clock = new FixedClock(new Date('2026-10-03T10:00:00.000Z'), 0);
+    const slow = new FakeBrowser(pages());
+    const observe = slow.observe.bind(slow);
+    slow.observe = async () => {
+      clock.advance(90_000);
+      return observe();
+    };
+    const byMinutes = await run({
+      script: { plans: [decidedPlan(PLANS.search)] },
+      rails: { maxMinutes: 1 },
+      clock,
+      browser: slow,
+    });
+    expect(byMinutes.outcome.termination).toEqual({
+      reason: 'max-minutes',
+      detail: '1.5 of 1 minutes elapsed',
+    });
+
+    const escalated = decidedPlan(PLANS.search, {
+      decision: 'escalate',
+      findings: [finding('missed_stop', [], 'the page shows the limit text')],
+    });
+    const byFailures = await run({
+      script: { plans: [escalated, escalated, escalated] },
+      rails: { maxConsecutiveFailures: 3 },
+    });
+    expect(byFailures.outcome.termination.reason).toBe('max-failures');
+    expect(byFailures.brain.planInputs[1]?.history.map((h) => h.outcome)).toEqual([
+      'not-executed',
+      'not-executed',
+    ]);
+    expect(byFailures.brain.planInputs[1]?.history[0]?.note).toContain('missed_stop');
+    expect(byFailures.browser.calls).not.toContain('fill e1');
+
+    const fault = new BrainFaulted('unreachable', 'nobody home');
+    const byFaults = await run({ script: { plans: [fault, fault, fault] } });
+    expect(byFaults.outcome.termination.reason).toBe('brain-unavailable');
+    expect(
+      byFaults.detail.decisions.filter((d) => d.kind === 'step-plan').map((d) => d.source),
+    ).toEqual(['engine', 'engine', 'engine']);
+    expect(byFaults.dumps.files.has('01-steps/01/fault.json')).toBe(true);
+
+    const byOperator = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      replies: [{ kind: 'stop' }],
+    });
+    expect(byOperator.outcome.termination.reason).toBe('operator-stop');
+    expect(byOperator.outcome.status).toBe('stopped');
+
+    const noRubric = await run({
+      script: { plans: [], deriveFault: new BrainFaulted('failed', 'no model') },
+    });
+    expect(noRubric.outcome.termination.reason).toBe('brain-unavailable');
+    expect(noRubric.browser.opened).toBeNull();
+    expect(noRubric.detail.status).toBe('stopped');
+  });
+
+  it('[BRW-4] a browser that throws ends the session failed with the error recorded, the row closed and the dump indexed', async () => {
+    const browser = new FakeBrowser(pages());
+    browser.observe = async () => {
+      throw new Error('the tab crashed');
+    };
+    const { outcome, detail, dumps, ledger } = await run({ script: { plans: [] }, browser });
+    expect(outcome.status).toBe('failed');
+    expect(outcome.termination.reason).toBe('error');
+    expect(detail.error).toEqual({ name: 'Error', message: 'the tab crashed' });
+    expect(detail.finishedAt).not.toBeNull();
+    expect(browser.closed).toBe(true);
+    expect(dumps.index).toHaveLength(1);
+    expect(JSON.parse(dumps.index[0] ?? '{}')).toMatchObject({ kind: 'session', status: 'failed' });
+    expect(dumps.files.has('manifest.json')).toBe(true);
+    expect(ledger.sessions.size).toBe(1);
+  });
+});

@@ -1,0 +1,81 @@
+# browser-session
+
+A Playwright program whose every decision is a quality-loop run. It opens Chrome on a persistent, signed-in profile, observes the page in front of it and asks the loop what to do next; the loop's `browser-step` pipeline plans, its `form-memory` orchestration answers form fields from recalled facts, and the engine here only executes what nobody objected to, applies the declared rails, and records every step. Nothing in the package names a site: the mission lives in a markdown goal, and the same program runs any goal.
+
+```bash
+pnpm browser-session login --profile smoke --url https://duckduckgo.com         # sign in once; the profile keeps the cookies
+pnpm browser-session run --goal packages/browser-session/goals/smoke-search.md --profile smoke --max-tasks 1 --max-minutes 5
+pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-apply.md --profile linkedin --max-tasks 2 --max-minutes 45
+pnpm browser-session sessions [--limit 20] [--json]
+pnpm browser-session show <id> [--json]
+pnpm exec nx test browser-session          # pure, browser (headless bundled Chromium) and db projects
+```
+
+Exit codes: a session that ended `complete` or `stopped` is 0, `failed` is 1, a usage or configuration problem is 2.
+
+## Configuration
+
+Every flag and variable is declared once in `src/config.ts`, with its default; nothing else in the package reads the environment.
+
+| Variable                   | Default                   | Meaning                                                                                                    |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `QUALITY_LOOP_URL`         | `http://localhost:3003`   | the loop the session asks                                                                                  |
+| `BROWSER_SESSION_DUMP_DIR` | `static/sessions`         | where session dumps are written                                                                            |
+| `BROWSER_PROFILES_DIR`     | `static/browser-profiles` | where persistent Chrome profiles live, one folder per `--profile` name — never commit them                 |
+| `BROWSER_SESSION_SUBJECT`  | `the applicant`           | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
+
+Rails (`--max-tasks 10`, `--max-minutes 60`, `--max-failures 3`; brain faults are capped at 3) are the engine's only decisions of its own. The browser is headed unless `--headless` is given.
+
+## How a step goes
+
+1. Observe: the accessibility snapshot (`ariaSnapshot({ mode: 'ai' })`) gives every element a ref; the DOM facts behind each interactive one — type, value, options, required, disabled, visible, maxLength and the hidden traits that mark a trap — are read in the page. A ref resolves only within the observation that minted it. A snapshot too large for the observation's bound is reduced by declared rungs — nodes only, refs only, none — never cut mid-page, and its first line says which rung it is.
+2. Plan: the goal (mission, page, elements, snapshot, recent actions, units of work, limits, index) is composed within the loop's budget by a declared ladder — full, without the snapshot, with element context trimmed, with fewer elements (counted) — and run through `browser-step` with the rubric derived once per session. The plan runs only if the loop accepted it with its policy gate open and no judge named the whole plan; then only up to the first action a finding or validator pointed at. An action the page refuses — a click or a field fill — stops the plan there and counts one failed step toward `--max-failures`; so does a plan the loop handed back. What did not run is told to the next plan as `not-executed`, with why.
+3. Fields: `askFields` sends the fields to `form-memory`; each answer is routed by declared precedence — the server-reported admission, the page's own hidden traits, what a judge or validator pointed at, then the model's decision with its confidence and basis — to fill, leave blank, or ask the operator. A fill the page refuses stops the fields after it, which are not attempted.
+4. Units of work: `taskStart`/`taskDone` open and close `browser_task` rows; closing one teaches the operator's answers from it back as one guidance document (`document-memory`), whose orchestration id lands on exactly the decision rows those answers came from — a later form the session cache answered is not re-taught.
+5. Rails are checked after every step; a plan's `terminate` ends the session by its cause word.
+
+## The operator prompt
+
+When a field needs a person the field is highlighted in Chrome and the terminal shows:
+
+```
+──── operator needed ────
+Field: "Years of experience with Python" (number, required) — Whole years, professional only.
+Page: Apply — additional questions · Unit of work: Senior Engineer at Acme
+Suggested: "6" — not trusted: low confidence: the evidence names TypeScript, not Python
+Type the answer, or fill the field in the browser and press Enter to read it back; /blank leaves it empty; /stop ends the session.
+>
+```
+
+The answer is filled, recorded with `source: operator`, cached for the session by field label, and taught back when the unit of work closes.
+
+## The dump
+
+`static/sessions/<dump run id>/` — `manifest.json`, `goal.md`, `01-steps/NN/{observation.json, snapshot.txt, screenshot.png, plan.json | fault.json, fields.json, teach.json}`, `02-tasks.json`; one row in `static/sessions/index.jsonl` once the session is whole. `plan.json` records which rung of the goal ladder the step used.
+
+## Records
+
+Three tables in `packages/db`: `browser_session`, `browser_task`, `browser_decision`. Loop ids on a decision are plain columns, not foreign keys — the loop is another service. A `running` session whose `heartbeat_at` is older than 60 s belongs to a dead process.
+
+Learning queries:
+
+```sql
+-- Ask rate per session over time: how often a field needed a person.
+select s.started_at::date as day, s.id,
+       count(*) filter (where d.kind = 'field-answer') as fields,
+       count(*) filter (where d.kind = 'field-answer' and d.source = 'operator') as asked
+  from browser_session s join browser_decision d on d.session_id = s.id
+ group by 1, 2 order by 1, 2;
+
+-- Fields first asked of the operator, then later answered from memory: the join is the exact question.
+select asked.question, min(asked.created_at) as first_asked, min(learned.created_at) as first_from_memory
+  from browser_decision asked
+  join browser_decision learned on learned.question = asked.question
+   and learned.source = 'memory' and learned.created_at > asked.created_at
+ where asked.kind = 'field-answer' and asked.source = 'operator'
+ group by asked.question order by first_asked;
+```
+
+## Layout
+
+`src/core` (pure: ports, the engine, step execution, the field flow, rails, the write queue and heartbeat, the dump layout, the fakes), `src/adapters/{playwright,loop-http,mikro-orm,terminal-operator,fs-goal}`, `src/modules/{app,session}` (the composition root), `src/cli.ts` + `src/render.ts`, `goals/`.
