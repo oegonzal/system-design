@@ -297,6 +297,8 @@ const maximalFinding = (position: number): RecordedFinding => ({
     iterations: [1, 2],
     detail: fill(TRANSITION_DETAIL_MAX),
   })),
+  // The longer line: an adopted finding renders its provenance too.
+  adopted: true,
 });
 
 const maximalCriterion = (position: number): RecordedCriterion => ({
@@ -340,7 +342,7 @@ export const maximalRecord = (): ExperienceRecord => ({
   })),
   criteria: Array.from({ length: MAX_CRITERIA_ITEMS }, (_, index) => maximalCriterion(index)),
   findings: Array.from({ length: MAX_FINDINGS }, (_, index) => maximalFinding(index)),
-  omitted: { findings: 99, criteria: 99 },
+  omitted: { findings: 99, criteria: 99, adopted: 99 },
   rules: Array.from({ length: 8 }, () => fill(300)),
   maxMemories: MAX_MEMORIES,
 });

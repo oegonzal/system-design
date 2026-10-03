@@ -4,4 +4,4 @@ Turn the record into the checklist the panel will grade the digest against. Each
 
 State each criterion as one concise sentence: the requirement, the one alias it rests on (`f3`, `r2`) and, for a transition, the iterations it spans — nothing more. The record already holds the evidence and the panel reads it there, so never recite a finding's rationale or list every alias that bears on a point. A statement longer than the schema allows discards the whole checklist. Strongest evidence first.
 
-Derive only what the record states; a single-iteration run has no transitions. The Rules, Limits and Index sections are guidance and validator bookkeeping, not criteria.
+Derive only what the record states; a single-iteration run has no transitions. A finding marked adopted from an earlier run was judged there: it is evidence here only through its transition, so derive a transition criterion for what this run changed about it and never a signal from the finding itself. The Rules, Limits and Index sections are guidance and validator bookkeeping, not criteria.

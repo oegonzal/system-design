@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryMemoryStore, mutedEmbeddings } from '../../modules/memory/testing';
 import { fromRun } from '../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
-import { sampleDigest } from '../../pipelines/experience-digest/testing';
+import {
+  sampleDigest,
+  sampleIterations,
+  sampleRun,
+} from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { samplePack } from '../../pipelines/memory-recall/testing';
 import { bareGoal, MEMORY_HEADING } from './recall/inject';
@@ -239,6 +243,55 @@ describe('the memory steps', () => {
       reason: 'upstream-skipped',
       note: 'target',
     });
+  });
+
+  it('[QL-44] digest skips a target whose only judged iteration it adopted, naming the run it adopted from, and digests one that judged its own revision', async () => {
+    const run = sampleRun();
+    const trace = run.trace;
+    if (trace === null) throw new Error('the sample run carries a trace');
+    const [first, second] = sampleIterations();
+    const adopted = { ...first, mode: 'adopted' as const };
+    const grade = { runId: 'grade-run', iteration: 2 };
+    const coach = (iterations: typeof trace.iterations, bestIteration: number): QualityRunDto => ({
+      ...run,
+      request: { ...run.request, adoptedFrom: grade },
+      trace: {
+        ...trace,
+        iterations,
+        bestIteration,
+        lessons: bestIteration === 1 ? [] : trace.lessons,
+      },
+    });
+
+    // As the measured siblings went: the copy, then a revision that produced nothing.
+    const sibling = coach(
+      [
+        adopted,
+        {
+          ...second,
+          artifact: null,
+          rendered: null,
+          ledger: { ...second.ledger, artifactPresent: false, criteria: [], findings: [] },
+        },
+      ],
+      1,
+    );
+    const copied = ctx(() => child('experience-digest', digestTraceFor(sibling)), {
+      outputs: { target: sibling },
+    });
+    expect(await digest(copied)).toEqual({
+      status: 'skipped',
+      reason: 'nothing-new',
+      note: grade.runId,
+    });
+    expect(copied.executed).toEqual([]);
+
+    const revised = coach([adopted, second], 2);
+    const judged = ctx(() => child('experience-digest', digestTraceFor(revised)), {
+      outputs: { target: revised },
+    });
+    expect(await digest(judged)).toMatchObject({ status: 'complete', counts: { kept: 1 } });
+    expect(judged.executed[0].goal).toContain('· seen i1 · adopted from an earlier run ·');
   });
 
   it('[QL-16] store explains why it did not write, and writes one lesson as two indexed texts', async () => {

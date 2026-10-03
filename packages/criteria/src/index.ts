@@ -383,6 +383,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",
   },
+  {
+    id: 'QL-44',
+    statement:
+      "A run whose only judged evidence is an iteration it adopted is not digested — its ledger is a copy an earlier run's digest already read — and the memory step skips it as nothing new, naming the run it adopted from; a run that judged an iteration of its own is digested, with a finding seen only in an adopted iteration left out and counted unless this run judged a change in it, which keeps it marked as adopted from an earlier run so a memory rests on the change and never on the copied finding.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

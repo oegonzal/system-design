@@ -107,6 +107,11 @@ export const recordedFindingSchema = z.strictObject({
   remediated: z.boolean(),
   reconciledTo: alias.nullable(),
   transitions: z.array(transitionSchema).max(MAX_QUALITY_RUN_ITERATIONS),
+  /**
+   * Seen only in an iteration adopted from an earlier run: that run's judges
+   * confirmed it, and only its transitions are this run's own.
+   */
+  adopted: z.boolean(),
 });
 export type RecordedFinding = z.infer<typeof recordedFindingSchema>;
 
@@ -121,7 +126,17 @@ const recordShape = z.strictObject({
   iterations: z.array(iterationSummarySchema).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
   criteria: z.array(recordedCriterionSchema).max(MAX_CRITERIA_ITEMS),
   findings: z.array(recordedFindingSchema).max(MAX_FINDINGS),
-  omitted: z.strictObject({ findings: z.number().int().min(0), criteria: z.number().int().min(0) }),
+  /**
+   * What the record left out, counted: findings and criteria past their caps
+   * or the goal budget, and findings seen only in an adopted iteration with no
+   * transition — copies of an earlier run's evidence this run changed nothing
+   * about, which that run's own digest already read.
+   */
+  omitted: z.strictObject({
+    findings: z.number().int().min(0),
+    criteria: z.number().int().min(0),
+    adopted: z.number().int().min(0),
+  }),
   rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
   maxMemories: z.number().int().min(1).max(MAX_MEMORIES),
 });
@@ -143,6 +158,7 @@ export const DIGEST_RULES: readonly string[] = [
   'A memory rests only on the findings and criteria it cites, and says only what they show.',
   'A memory claims a change in quality only where the record shows a transition or a score that moved.',
   'A memory states what to do or avoid in terms another prompt could use, and says when it applies.',
+  'A finding adopted from an earlier run was judged there: a memory rests on it only for what this run changed about it, as its transition shows.',
 ];
 
 const indexSchema = z.strictObject({
@@ -183,6 +199,7 @@ const findingLine = (item: RecordedFinding): string => {
     item.criteria.length > 0 ? `weakens ${item.criteria.join(', ')}` : null,
     `by ${item.lenses.join(', ')}`,
     `seen ${item.iterations.map((n) => `i${n}`).join(', ')}`,
+    item.adopted ? 'adopted from an earlier run' : null,
     item.remediated ? 'remediated' : 'not remediated',
     item.reconciledTo ? `reconciled to ${item.reconciledTo}` : null,
     item.transitions.length > 0 ? transitionText(item.transitions) : null,
@@ -192,6 +209,13 @@ const findingLine = (item: RecordedFinding): string => {
 
 const omittedLine = (count: number, noun: string): string[] =>
   count > 0 ? [`(${count} more ${noun} omitted)`] : [];
+
+const adoptedLine = (count: number): string[] =>
+  count > 0
+    ? [
+        `(${count} more findings omitted: seen only in an iteration adopted from an earlier run, with no change this run judged)`,
+      ]
+    : [];
 
 /** The index the validators read back: every alias, its kind, and the engine id behind it. */
 const indexOf = (record: ExperienceRecord): ExperienceIndex => ({
@@ -238,6 +262,7 @@ export function renderGoal(record: ExperienceRecord): string {
     '',
     ...(record.findings.length > 0 ? record.findings.map(findingLine) : ['(none confirmed)']),
     ...omittedLine(record.omitted.findings, 'findings'),
+    ...adoptedLine(record.omitted.adopted),
     '',
     '## Rules',
     '',

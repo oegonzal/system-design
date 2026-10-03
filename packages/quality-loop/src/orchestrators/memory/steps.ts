@@ -7,7 +7,7 @@
 import type { MemoryContextDto, MemoryStepReason, QualityRunDto } from '@sysdesign/contracts';
 
 import { outputsOf } from '../../core/outputs';
-import { fromRun } from '../../pipelines/experience-digest/from-run';
+import { fromRun, teachesNothingNew } from '../../pipelines/experience-digest/from-run';
 import {
   EXPERIENCE_DIGEST_ID,
   renderGoal as renderRecord,
@@ -76,7 +76,10 @@ export const target = (ctx: Ctx): Promise<StepResult<QualityRunDto>> =>
 /**
  * Digest the finished target; yields what the digest endorsed, or nothing
  * with the reason — and a digest that was never judged (no rubric derived,
- * nothing produced) says that, never `not-accepted`.
+ * nothing produced) says that, never `not-accepted`. A target whose only
+ * judged evidence it adopted is not digested at all: that ledger is a copy of
+ * an earlier run's, whose own digest already read it, so the step skips
+ * `nothing-new` naming the run it was copied from.
  */
 export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
   const source = ctx.outputs.target;
@@ -95,7 +98,10 @@ export async function digest(ctx: Ctx): Promise<StepResult<Digested>> {
           ...source,
           trace: { ...trace, contract: { ...trace.contract, goal: bareGoal(trace.contract.goal) } },
         });
-  if (record === null) return skip('nothing-to-digest');
+  if (trace === null || record === null) return skip('nothing-to-digest');
+  if (teachesNothingNew(trace)) {
+    return skip('nothing-new', source.request.adoptedFrom?.runId ?? null);
+  }
 
   const child = await ctx.execute({ goal: renderRecord(record) });
   if (!completed(child)) return runFailed(child);

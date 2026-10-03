@@ -16,7 +16,10 @@ export const MEMORY_ORCHESTRATOR_ID = 'memory';
  * when it derived no criteria, `no-artifact` when it produced nothing — so a
  * miss is never read as a verdict on what it would have judged. A search
  * whose hits could not be composed into the curator's query is
- * `query-refused`, with the faults in the note.
+ * `query-refused`, with the faults in the note. A source run whose only
+ * judged evidence is an iteration it adopted is `nothing-new`, with the run
+ * it adopted from in the note: its ledger is a copy that run's own digest
+ * already read.
  */
 export const MEMORY_STEP_REASONS = [
   'embeddings-disabled',
@@ -30,6 +33,7 @@ export const MEMORY_STEP_REASONS = [
   'no-usable-memory',
   'goal-at-budget',
   'nothing-to-digest',
+  'nothing-new',
   'no-memories',
 ] as const;
 export type MemoryStepReason = (typeof MEMORY_STEP_REASONS)[number];

@@ -97,7 +97,7 @@ const remediatedIn = (iteration: IterationTrace, key: string): boolean =>
     (remediation) => 'finding' in remediation.subject && remediation.subject.finding === key,
   );
 
-type Unaliased = Omit<RecordedFinding, 'alias'>;
+type Unaliased = Omit<RecordedFinding, 'alias' | 'adopted'>;
 
 /** A finding as first seen, before any iteration has been folded into it. */
 const fresh = (
@@ -132,11 +132,48 @@ const byPriority = (a: Unaliased, b: Unaliased): number =>
   SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) ||
   a.iterations[0] - b.iterations[0];
 
-/** Every confirmed finding across the iterations, folded by key, the latest iteration's reading kept. */
+/** The iterations whose ledger was copied verbatim from an earlier run rather than judged in this one. */
+const adoptedIterations = (trace: RunTrace): ReadonlySet<number> =>
+  new Set(
+    trace.iterations
+      .filter((iteration) => iteration.mode === 'adopted')
+      .map((iteration) => iteration.iteration),
+  );
+
+/**
+ * Whether a finished run holds no evidence of its own: it adopted an
+ * iteration, and no iteration it did not adopt holds an artifact — so every
+ * judged finding and criterion in it is a copy of an earlier run's ledger,
+ * which that run's own digest already read. A digest of it could only mint
+ * those lessons again. Read off the iterations' modes and ledgers alone.
+ */
+export function teachesNothingNew(trace: RunTrace): boolean {
+  const adopted = adoptedIterations(trace);
+  return (
+    adopted.size > 0 &&
+    trace.iterations.every(
+      (iteration) => adopted.has(iteration.iteration) || !iteration.ledger.artifactPresent,
+    )
+  );
+}
+
+interface CollectedFindings {
+  findings: RecordedFinding[];
+  /** Seen only in an adopted iteration and never changed in this run: left out, counted. */
+  adopted: number;
+}
+
+/**
+ * Every confirmed finding across the iterations, folded by key, the latest
+ * iteration's reading kept. A finding seen only in an adopted iteration was
+ * confirmed by an earlier run's judges: it stays only when this run changed
+ * it — a transition the engine recorded — and is marked adopted, so a memory
+ * can rest on the change and never on the copied finding itself.
+ */
 function collectFindings(
   trace: RunTrace,
   criterionAlias: ReadonlyMap<string, string>,
-): RecordedFinding[] {
+): CollectedFindings {
   const byKey = new Map<string, Unaliased>();
   const aliasOf = (id: string): string => criterionAlias.get(id) ?? id;
 
@@ -156,9 +193,22 @@ function collectFindings(
       });
     }
   }
-  return [...byKey.values()]
-    .sort(byPriority)
-    .map((finding, position) => ({ alias: `f${position + 1}`, ...finding }));
+  const adoptedIn = adoptedIterations(trace);
+  const ownIteration = (iteration: number): boolean => !adoptedIn.has(iteration);
+  const folded = [...byKey.values()].map((finding) => ({
+    ...finding,
+    adopted: !finding.iterations.some(ownIteration),
+  }));
+  // A change is this run's when it reaches an iteration this run judged, not one it copied.
+  const changedHere = (finding: Unaliased): boolean =>
+    finding.transitions.some((transition) => transition.iterations.some(ownIteration));
+  const kept = folded.filter((finding) => !finding.adopted || changedHere(finding));
+  return {
+    findings: kept
+      .sort(byPriority)
+      .map((finding, position) => ({ alias: `f${position + 1}`, ...finding })),
+    adopted: folded.length - kept.length,
+  };
 }
 
 function collectCriteria(trace: RunTrace): RecordedCriterion[] {
@@ -230,7 +280,7 @@ export function fromRun(run: QualityRunDto, options: ComposeOptions = {}): Exper
 
   const criteria = collectCriteria(trace);
   const criterionAlias = new Map(criteria.map((criterion) => [criterion.id, criterion.alias]));
-  const findings = collectFindings(trace, criterionAlias);
+  const { findings, adopted } = collectFindings(trace, criterionAlias);
   const best = outputsOf(trace).best ?? trace.iterations[trace.iterations.length - 1];
 
   return fit({
@@ -247,6 +297,7 @@ export function fromRun(run: QualityRunDto, options: ComposeOptions = {}): Exper
     omitted: {
       findings: Math.max(0, findings.length - MAX_FINDINGS),
       criteria: Math.max(0, criteria.length - MAX_CRITERIA_ITEMS),
+      adopted,
     },
     rules: [...(options.rules ?? DIGEST_RULES)],
     maxMemories: options.maxMemories ?? MAX_MEMORIES,
