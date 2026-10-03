@@ -124,9 +124,9 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       missed_stop: { dimension: 'safety', gate: true },
     },
     ...STANDARD_SCORING,
-    evidence: { minHits: 1, minAssessedShare: 0.75 },
+    evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
     // One iteration: the controller hands every non-accept back to the session.
-    loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3 },
+    loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3, lostProduces: 1 },
   },
 };

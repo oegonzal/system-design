@@ -37,8 +37,14 @@ const RULES: Record<'criteria' | 'producer' | 'critic' | 'evaluator', readonly s
   ],
 };
 
-const OUTPUT_RULE =
-  'Reply with ONE complete JSON object that satisfies the schema — nothing else. Keep every string within its maxLength: a string past it is never cut to fit, and the whole reply is discarded.';
+/**
+ * What a reply is held to, as the seam holds it: a size is an ask, a
+ * structural fault a refusal that is named before the next ask.
+ */
+const OUTPUT_RULE = [
+  'Reply with ONE complete JSON object that satisfies the schema — nothing else.',
+  'Each maxLength and maxItems is the size asked for: write to fit it. A string a little over is accepted and noted; a list over is cut to size from its end; a wrong type, a missing field, an unknown id or enum value, or an empty required string refuses the whole reply and you will be asked again with the fault named.',
+].join(' ');
 
 export function systemPrompt(role: keyof typeof RULES, persona: string): string {
   return [persona.trim(), '', ...RULES[role], OUTPUT_RULE].join('\n');

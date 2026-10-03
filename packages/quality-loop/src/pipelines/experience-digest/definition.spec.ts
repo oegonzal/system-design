@@ -92,7 +92,7 @@ describe('the experience-digest pipeline', () => {
     );
     const persona = EXPERIENCE_DIGEST.deriveCriteria.persona;
     expect(persona).toMatch(/one concise sentence/);
-    expect(persona).toMatch(/longer than the schema allows/);
+    expect(persona).toMatch(/within the length the schema asks for/);
     expect(persona).not.toMatch(/Name the aliases and iterations/);
     // The deriver has measurably written 6,783 output tokens for one record.
     expect(EXPERIENCE_DIGEST.deriveCriteria.maxTokens).toBeGreaterThan(6783);

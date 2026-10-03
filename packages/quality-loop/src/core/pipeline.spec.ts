@@ -4,6 +4,7 @@ import {
   MAX_PROVIDED_STATEMENT_LENGTH,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { describePipeline, validatePipeline } from './pipeline';
 import { tinyPipeline } from './testing';
@@ -36,7 +37,10 @@ describe('validatePipeline', () => {
       validatePipeline(
         asAny(
           tinyPipeline({
-            policy: { ...base.policy, evidence: { minHits: 2, minAssessedShare: 1 } },
+            policy: {
+              ...base.policy,
+              evidence: { ...base.policy.evidence, minHits: 2, minAssessedShare: 1 },
+            },
           }),
         ),
       ),
@@ -72,6 +76,30 @@ describe('validatePipeline', () => {
         ),
       ),
     ).toThrow(/consumes unknown evidence memories/);
+  });
+
+  it('[QL-1] [QL-47] refuses a validator that takes the id of one the engine runs on every artifact', () => {
+    for (const id of ['schema', 'bounds']) {
+      const own = {
+        id,
+        gate: 'warn' as const,
+        validate: () => ({ validatorId: id, gate: 'warn' as const, problems: [] }),
+      };
+      expect(() => validatePipeline(asAny(tinyPipeline({ validators: [own] })))).toThrow(
+        `validator id ${id} is the engine's own`,
+      );
+    }
+  });
+
+  it('[QL-47] converts the output schema for the model at boot: a schema with no JSON form never boots', () => {
+    const tiny = tinyPipeline();
+    const broken = tinyPipeline({
+      task: {
+        ...tiny.task,
+        output: { ...tiny.task.output, schema: z.strictObject({ at: z.date() }) as never },
+      },
+    });
+    expect(() => validatePipeline(asAny(broken))).toThrow();
   });
 
   it('[QL-1] refuses a lens consuming evidence nothing produces before it, and evidence it does not know', () => {

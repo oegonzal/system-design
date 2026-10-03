@@ -131,8 +131,8 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       duplicate_fact: { dimension: 'coverage', gate: false },
     },
     ...STANDARD_SCORING,
-    evidence: { minHits: 2, minAssessedShare: 0.75 },
+    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
     thresholds: { acceptAt: 75, rejectBelow: 30 },
-    loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2 },
+    loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
   },
 };

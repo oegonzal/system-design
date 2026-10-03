@@ -16,7 +16,7 @@ const ctx: LensContext<TinyOutput> = {
 };
 
 describe('createLlmCritic', () => {
-  it('[QL-4] a finding that cites an unlisted location cannot be parsed, so the sample is a diagnostic', async () => {
+  it('[QL-4] [QL-46] a finding that cites an unlisted location cannot be parsed, so the sample is a diagnostic that keeps the fault', async () => {
     const critic = createLlmCritic(definition.critics[0], definition.task, [
       fakeLlm({ findings: [finding({ locationRefs: ['ghost'] })] }),
     ]);
@@ -27,6 +27,9 @@ describe('createLlmCritic', () => {
           stage: 'critic.tiny',
           sample: 1,
           reason: 'llm-failed',
+          facts: {
+            issues: [expect.objectContaining({ path: 'findings[0].locationRefs[0]', soft: false })],
+          },
         }),
       },
     ]);

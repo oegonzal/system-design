@@ -67,7 +67,7 @@ describe('the standard controller', () => {
           confirmed({ reconciledTo: 'c2' }),
         ],
       }),
-      { ...tinyPolicy(), evidence: { minHits: 1, minAssessedShare: 0 } },
+      { ...tinyPolicy(), evidence: { ...tinyPolicy().evidence, minHits: 1, minAssessedShare: 0 } },
     );
     expect(decision.scores.dimensions['substance']).toBe(0);
     expect(decision.scores.dimensions['form']).toBe(88);

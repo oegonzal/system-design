@@ -16,15 +16,16 @@ import type {
 import {
   GOAL_SOURCES,
   MAX_PROVIDED_STATEMENT_LENGTH,
+  modelSchema,
   PRODUCER_BRIEFING,
   UPSTREAM_EVIDENCE,
 } from '@sysdesign/contracts';
-import { z } from 'zod';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
 import { criterionLengthBound, type TaskSpec } from './contracts';
 import { validatePolicy } from './policy';
 import type { Controller, Validator } from './ports';
+import { BOUNDS_VALIDATOR_ID, SCHEMA_VALIDATOR_ID } from './stages/schema-validator';
 
 export interface LensSpec {
   id: string;
@@ -88,6 +89,9 @@ export interface PipelineDefinition<T> {
 
 /** Stage ids the engine owns; a lens may not take one. */
 const RESERVED_STAGE_IDS = ['producer', 'criteria', 'lenses'] as const;
+
+/** The validators the engine runs on every artifact, first; a pipeline's own may not take their ids. */
+const ENGINE_VALIDATOR_IDS: readonly string[] = [SCHEMA_VALIDATOR_ID, BOUNDS_VALIDATOR_ID];
 
 const describePipelineId = (definition: PipelineDefinition<unknown>): string =>
   `${definition.id}@${definition.version}`;
@@ -164,6 +168,9 @@ function checkTask(definition: Definition, fail: Fail): void {
   }
   const validatorIds = definition.validators.map((validator) => validator.id);
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
+  for (const id of validatorIds) {
+    if (ENGINE_VALIDATOR_IDS.includes(id)) fail(`validator id ${id} is the engine's own`);
+  }
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
   // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it judged.
   const bound = criterionLengthBound(definition.task);
@@ -211,9 +218,11 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkTask(definition, fail);
   checkController(definition, fail);
 
-  // The client turns the output schema into JSON Schema; an unsupported zod
-  // type would otherwise surface as a null response mid-run.
-  z.toJSONSchema(definition.task.output.schema);
+  // The model is shown the output schema at its targets and the reply is read
+  // against its ceilings, both from this one conversion: an unsupported zod
+  // type, or a bound declared where none can sit, fails here rather than as a
+  // null response mid-run.
+  modelSchema(definition.task.output.schema);
 }
 
 const summariseLens = ({ id, samples, maxItems, maxTokens, consumes }: LensSpec) => ({

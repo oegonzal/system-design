@@ -1,11 +1,13 @@
 /**
  * The generator. It sees the goal, the criteria, any advisory memories the run
  * was handed, and — on a revise or retry — the remediations the policy
- * selected, in the lenses' own words, and why a validator refused its last
- * attempt, when one did. It never sees a score: the producer improves against
- * reasons, not against a number.
+ * selected, in the lenses' own words, and why its last attempt was refused,
+ * when it was: by a validator, or by the schema before anything was judged.
+ * It never sees a score: the producer improves against reasons, not against
+ * a number.
  */
-import type { LlmClient } from '@sysdesign/llm';
+import type { RemediationNote } from '@sysdesign/contracts';
+import { asDetailed, type LlmClient } from '@sysdesign/llm';
 
 import type { TaskSpec } from '../contracts';
 import type { ProducerSpec } from '../pipeline';
@@ -18,10 +20,16 @@ import {
   remediationsSection,
   systemPrompt,
 } from './prompting';
-import { PRODUCER_STAGE, stageDiagnostic } from './shared';
+import { failedDiagnostic, PRODUCER_STAGE, stageDiagnostic } from './shared';
 
-const REFUSALS_HEADING =
-  'Why your previous revision was refused before any judge read it — do not repeat these';
+/** What refused the last attempt, by what the refusal names: the schema read a reply, a validator a revision. */
+const REFUSALS_HEADINGS = {
+  reply: 'Why your previous reply was refused before any judge read it — do not repeat these',
+  revision: 'Why your previous revision was refused before any judge read it — do not repeat these',
+} as const;
+
+const refusedBy = (note: RemediationNote): keyof typeof REFUSALS_HEADINGS =>
+  'schema' in note.subject ? 'reply' : 'revision';
 
 const INSTRUCTIONS = {
   initial: 'Produce the artifact for this goal, addressing every success criterion.',
@@ -55,7 +63,10 @@ function briefing<T>(
   } else if (mode === 'retry') {
     sections.push(remediationsSection('Pitfalls of the discarded attempt', remediations));
   }
-  if (refusals.length > 0) sections.push(remediationsSection(REFUSALS_HEADING, refusals));
+  for (const [kind, heading] of Object.entries(REFUSALS_HEADINGS)) {
+    const notes = refusals.filter((note) => refusedBy(note) === kind);
+    if (notes.length > 0) sections.push(remediationsSection(heading, notes));
+  }
   sections.push(['# Instructions', '', INSTRUCTIONS[mode]].join('\n'));
   return { sections, clipped: goal.clipped };
 }
@@ -68,27 +79,31 @@ export function createLlmProducer<T>(
   return {
     async produce(input) {
       const briefed = briefing(task, spec, input);
-      const output = await llm.completeStructured({
+      const reply = await asDetailed(llm).completeStructuredDetailed({
         system: systemPrompt('producer', spec.persona),
         user: joinSections(...briefed.sections),
         schema: task.output.schema,
         maxTokens: spec.maxTokens,
       });
 
-      if (output === null) {
+      if (reply.value === null) {
         return {
           output: null,
-          diagnostic: stageDiagnostic(PRODUCER_STAGE, 'llm-failed'),
+          diagnostic: failedDiagnostic(PRODUCER_STAGE, null, reply.issues),
           model: llm.model,
+          issues: reply.issues,
+          overruns: [],
         };
       }
 
       return {
-        output,
+        output: reply.value,
         diagnostic: briefed.clipped
           ? stageDiagnostic(PRODUCER_STAGE, 'token-clipped', 'goal exceeded the prompt budget')
           : null,
         model: llm.model,
+        issues: [],
+        overruns: reply.overruns,
       };
     },
   };

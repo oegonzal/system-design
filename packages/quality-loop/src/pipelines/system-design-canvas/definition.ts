@@ -126,14 +126,15 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // advice under their own heading; the lenses never see them, so a lesson
   // can shape a revision and never a grade. It still revises against the
   // remediations the panel selected, never against a score. Every cap is
-  // sized from the recorded runs (the spec holds the measurements), and each
-  // is also the call's time limit (`callTimeLimitMs`), so a cap a stage
-  // outwrites is a call cut short: a coached canvas has taken up to 26.0k
-  // output tokens, thinking included, critics up to 25.4k on a dense
-  // diagram and evaluators up to 12.0k.
+  // sized from the recorded runs (the spec holds the measurements) with a
+  // fifth of headroom, and each is also the call's time limit
+  // (`callTimeLimitMs`), so a cap a stage outwrites is a call cut short: a
+  // coached canvas has taken up to 40.2k output tokens in one turn, thinking
+  // included (2026-10-02, a revision the seam now keeps whole), critics up
+  // to 25.4k on a dense diagram and evaluators up to 12.0k.
   producer: {
     persona: producer,
-    maxTokens: 32000,
+    maxTokens: 48000,
     consumes: ['criteria', 'memories'],
   },
 
@@ -245,10 +246,10 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
     // Two samples on every lens and two hits to confirm: a constraint
     // violation gates, and one sample must never be able to block a run.
-    evidence: { minHits: 2, minAssessedShare: 0.75 },
+    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
 
     thresholds: { acceptAt: 75, rejectBelow: 30 },
 
-    loop: { maxIterations: 3, plateauAfter: 2, concurrency: 3 },
+    loop: { maxIterations: 3, plateauAfter: 2, concurrency: 3, lostProduces: 1 },
   },
 };

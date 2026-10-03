@@ -67,7 +67,7 @@ describe('the document-digest pipeline', () => {
     expect(describePipeline(DOCUMENT_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
       CRITERION_STATEMENT_BOUND.ceiling,
     );
-    expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(/longer than the schema allows/);
+    expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(/within the length the schema asks for/);
   });
 
   it('[QL-33] every declared output cap is above what its stage has measurably written', () => {

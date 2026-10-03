@@ -11,9 +11,13 @@ import type {
 } from './evidence';
 import type { Decision, IterationMode, StopReason } from './vocab';
 
-/** What the producer is asked to act on. Chosen by the policy from the ledger. */
+/**
+ * What the producer is asked to act on. Chosen by the policy from the ledger
+ * — except `schema`, a path of a reply the schema refused before any judge
+ * read it, which the runner names from the refusal itself.
+ */
 export interface Remediation {
-  subject: { finding: string } | { criterion: string } | { validator: string };
+  subject: { finding: string } | { criterion: string } | { validator: string } | { schema: string };
   action: 'revise' | 'retry';
   severity: Severity;
   targetRefs: string[];

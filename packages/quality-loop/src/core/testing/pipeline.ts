@@ -9,6 +9,7 @@ import type {
   LensOutcome,
   RawCriterionResult,
   RawFinding,
+  SchemaIssue,
   SuccessCriterion,
   UpstreamEvidence,
 } from '@sysdesign/contracts';
@@ -36,9 +37,9 @@ export const tinyPolicy = (): DecisionPolicy => ({
     wrong: { dimension: 'form', gate: false },
   },
   ...STANDARD_SCORING,
-  evidence: { minHits: 1, minAssessedShare: 0.75 },
+  evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
   thresholds: { acceptAt: 80, rejectBelow: 35 },
-  loop: { maxIterations: 3, plateauAfter: 2, concurrency: 2 },
+  loop: { maxIterations: 3, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
 });
 
 export function tinyPipeline(
@@ -133,7 +134,15 @@ export const reported = <R>(report: R): LensOutcome<R> => ({ report, diagnostic:
 
 // ---- scripted stages ---------------------------------------------------------
 
-export const scriptedProducer = (outputs: readonly (TinyOutput | null)[]): Producer<TinyOutput> => {
+/**
+ * The drafts in order, the last standing for every later call. A null is a
+ * produce that answered nothing — refused for `refused`, the faults a seam
+ * would have named, when given.
+ */
+export const scriptedProducer = (
+  outputs: readonly (TinyOutput | null)[],
+  refused: readonly SchemaIssue[] = [],
+): Producer<TinyOutput> => {
   let call = 0;
   return {
     produce: () => {
@@ -142,9 +151,17 @@ export const scriptedProducer = (outputs: readonly (TinyOutput | null)[]): Produ
         output,
         diagnostic:
           output === null
-            ? { stage: 'producer', sample: null, reason: 'llm-failed', detail: null }
+            ? {
+                stage: 'producer',
+                sample: null,
+                reason: 'llm-failed',
+                detail: null,
+                ...(refused.length > 0 ? { facts: { issues: [...refused] } } : {}),
+              }
             : null,
         model: 'scripted',
+        issues: output === null ? [...refused] : [],
+        overruns: [],
       });
     },
   };
@@ -222,6 +239,7 @@ export const scriptedDeriver =
       diagnostic: criteria
         ? null
         : { stage: 'criteria', sample: null, reason: 'llm-failed' as const, detail: null },
+      overruns: [],
     });
 
 /** The tiny task's schema, as a blocking validator the loop runs first. */

@@ -1,7 +1,9 @@
 /**
  * What the run taught: which findings survived a revision and which it
  * resolved, which criteria improved and which regressed. Derived from the
- * iteration history alone, so a dump can be re-read into lessons later.
+ * iteration history alone, so a dump can be re-read into lessons later. An
+ * iteration whose produce answered nothing has nothing to compare: a lesson
+ * spans it, from the iteration before it to the one after.
  */
 import type { IterationTrace, Lesson } from '@sysdesign/contracts';
 import { RESULT_WORST_FIRST } from './ordering';
@@ -10,8 +12,9 @@ const judged = <T>(iteration: IterationTrace<T>): boolean =>
   iteration.critics.some((outcome) => outcome.report !== null) ||
   iteration.evaluators.some((outcome) => outcome.report !== null);
 
-export function deriveLessons<T>(iterations: readonly IterationTrace<T>[]): Lesson[] {
+export function deriveLessons<T>(recorded: readonly IterationTrace<T>[]): Lesson[] {
   const lessons: Lesson[] = [];
+  const iterations = recorded.filter((iteration) => iteration.artifact !== null);
   for (let index = 1; index < iterations.length; index++) {
     const previous = iterations[index - 1];
     const current = iterations[index];

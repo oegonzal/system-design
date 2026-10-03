@@ -104,4 +104,6 @@ export const subjectLabel = (subject: Remediation['subject']): string =>
     ? `finding ${subject.finding}`
     : 'criterion' in subject
       ? `criterion ${subject.criterion}`
-      : `validator ${subject.validator}`;
+      : 'validator' in subject
+        ? `validator ${subject.validator}`
+        : `schema ${subject.schema}`;

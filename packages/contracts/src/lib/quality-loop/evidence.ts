@@ -1,4 +1,4 @@
-import { bound } from '../bounds';
+import { bound, type Overrun, type SchemaIssue } from '../bounds';
 import type {
   AxisFactorLevel,
   CriterionResult,
@@ -52,12 +52,24 @@ export const sameRubric = (
       criterion.statement === recorded[index].statement,
   );
 
-/** A stage that produced nothing, and why. Never evidence; always traced. */
+/**
+ * What a diagnostic rests on, as data: the faults of the reply a stage was
+ * refused — named, so the next ask can say what broke — or the one field a
+ * reply wrote past the size it was asked for.
+ */
+export interface DiagnosticFacts {
+  issues?: SchemaIssue[];
+  overrun?: Overrun;
+}
+
+/** A stage that produced nothing, or noted what it did produce, and why. Never evidence; always traced. */
 export interface Diagnostic {
   stage: string;
   sample: number | null;
   reason: DiagnosticReason;
   detail: string | null;
+  /** Absent where it rests on nothing more than its reason, and on traces from before diagnostics carried any. */
+  facts?: DiagnosticFacts;
 }
 
 export interface ValidationProblem {

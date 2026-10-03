@@ -39,7 +39,10 @@ export const SamplesLost: LensStory = {
             consumes: ['findings'],
           },
         ],
-        policy: { ...makePipeline().policy, evidence: { minHits: 2, minAssessedShare: 0.75 } },
+        policy: {
+          ...makePipeline().policy,
+          evidence: { ...makePipeline().policy.evidence, minHits: 2 },
+        },
       }),
     ),
   },

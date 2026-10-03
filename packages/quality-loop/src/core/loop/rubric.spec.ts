@@ -58,7 +58,7 @@ describe('a supplied rubric', () => {
     let derivations = 0;
     const counting: Stages<TinyOutput>['deriveCriteria'] = () => {
       derivations += 1;
-      return Promise.resolve({ criteria: [criterion('c1')], diagnostic: null });
+      return Promise.resolve({ criteria: [criterion('c1')], diagnostic: null, overruns: [] });
     };
     const trace = await runLoop(
       scriptedStages({

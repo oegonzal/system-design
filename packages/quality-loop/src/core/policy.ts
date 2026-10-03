@@ -2,7 +2,7 @@
  * `validatePolicy` refuses a malformed decision policy (the shape lives in
  * `@sysdesign/contracts`) before it can grade anything.
  */
-import { AXIS_FACTOR_LEVELS, SEVERITIES } from '@sysdesign/contracts';
+import { AXIS_FACTOR_LEVELS, LOST_SAMPLE_POLICIES, SEVERITIES } from '@sysdesign/contracts';
 import type { DecisionPolicy } from '@sysdesign/contracts';
 
 import { sum } from './arithmetic';
@@ -118,13 +118,19 @@ function checkPricing(policy: DecisionPolicy, fail: Fail): void {
 function checkLoop(policy: DecisionPolicy, fail: Fail): void {
   if (!(policy.evidence.minHits >= 1)) fail('evidence.minHits must be ≥ 1');
   if (!inUnit(policy.evidence.minAssessedShare)) fail('evidence.minAssessedShare must be in [0,1]');
+  if (!(LOST_SAMPLE_POLICIES as readonly string[]).includes(policy.evidence.lostSample)) {
+    fail(`evidence.lostSample must be one of ${LOST_SAMPLE_POLICIES.join(', ')}`);
+  }
   const { acceptAt, rejectBelow } = policy.thresholds;
   if (!(rejectBelow >= 0 && rejectBelow < acceptAt && acceptAt <= 100)) {
     fail('thresholds must satisfy 0 ≤ rejectBelow < acceptAt ≤ 100');
   }
-  const { maxIterations, plateauAfter, concurrency } = policy.loop;
+  const { maxIterations, plateauAfter, concurrency, lostProduces } = policy.loop;
   if (!(maxIterations >= 1 && plateauAfter >= 1 && concurrency >= 1)) {
     fail('loop.maxIterations, plateauAfter and concurrency must be ≥ 1');
+  }
+  if (!(Number.isInteger(lostProduces) && lostProduces >= 0)) {
+    fail('loop.lostProduces must be a whole number ≥ 0');
   }
 }
 

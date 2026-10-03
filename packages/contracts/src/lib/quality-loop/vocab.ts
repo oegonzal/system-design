@@ -30,27 +30,44 @@ export const FIXABILITIES = [
 ] as const;
 export type Fixability = (typeof FIXABILITIES)[number];
 
-/** Why a stage produced nothing. A model that answers nothing is `llm-failed`; there is no "off". */
+/**
+ * Why a stage produced nothing, or what it noted about what it did produce.
+ * A model that answers nothing is `llm-failed`; there is no "off". `overrun`
+ * is a field a reply wrote past the size it was asked for — kept, and
+ * recorded once per field, never a loss.
+ */
 export const DIAGNOSTIC_REASONS = [
   'llm-failed',
   'token-clipped',
   'llm-artifact-rejected',
   'not-applicable',
+  'overrun',
 ] as const;
 export type DiagnosticReason = (typeof DIAGNOSTIC_REASONS)[number];
 
 /**
  * Whether a reason means a stage that should have answered did not — what it
  * fed was then computed without it. `not-applicable` is a stage with nothing
- * to do, a lens with no criteria of its kinds, and costs a grade nothing.
- * Exhaustive, so a new reason is classified where it is declared.
+ * to do, a lens with no criteria of its kinds, and costs a grade nothing; an
+ * `overrun` is a stage that answered whole. Exhaustive, so a new reason is
+ * classified where it is declared.
  */
 export const DIAGNOSTIC_DEGRADES = {
   'llm-failed': true,
   'token-clipped': true,
   'llm-artifact-rejected': true,
   'not-applicable': false,
+  overrun: false,
 } as const satisfies Record<DiagnosticReason, boolean>;
+
+/**
+ * What a lens's lost sample does to agreement. `score-only`: what the samples
+ * that answered agree on is confirmed with the hits it has — it scores, but
+ * fewer than `minHits` samples saw it, so it cannot block. `discard`: the
+ * policy's `minHits` stands, so one lost sample can silence its lens.
+ */
+export const LOST_SAMPLE_POLICIES = ['score-only', 'discard'] as const;
+export type LostSamplePolicy = (typeof LOST_SAMPLE_POLICIES)[number];
 
 /** Why the loop ended — the runner's reason, distinct from the last decision. */
 export const STOP_REASONS = [
@@ -59,6 +76,7 @@ export const STOP_REASONS = [
   'escalated',
   'plateau',
   'max-iterations',
+  'produce-lost',
 ] as const;
 export type StopReason = (typeof STOP_REASONS)[number];
 
@@ -66,8 +84,10 @@ export type StopReason = (typeof STOP_REASONS)[number];
  * What ended the loop, reason by reason. `decision`: the controller's last
  * decision did — accept, reject, escalate — and the decision beside the stop
  * already says so. `budget`: the loop ran out of iterations, or of progress,
- * with a design it could still have revised. Exhaustive, so a new reason is
- * classified where it is declared; `gradeStopReason` reads it.
+ * with a design it could still have revised — or ended on a produce that
+ * answered nothing (`produce-lost`), with no produce call left to lose or no
+ * iteration left to ask again in. Exhaustive, so a new reason is classified
+ * where it is declared; `gradeStopReason` reads it.
  */
 export const STOP_REASON_CAUSES = {
   accepted: 'decision',
@@ -75,6 +95,7 @@ export const STOP_REASON_CAUSES = {
   escalated: 'decision',
   plateau: 'budget',
   'max-iterations': 'budget',
+  'produce-lost': 'budget',
 } as const satisfies Record<StopReason, 'decision' | 'budget'>;
 
 export const PRODUCE_MODES = ['initial', 'revise', 'retry'] as const;

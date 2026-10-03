@@ -1,5 +1,5 @@
 /**
- * Definition + client + sink → stages. The schema validator is always first;
+ * Definition + client + sink → stages. The schema and bounds validators are always first;
  * every LLM stage gets its own scoped client (one per sample for lenses), so
  * the dump can say which lens, which sample, which call.
  */
@@ -12,7 +12,7 @@ import { createCriteriaDeriver } from '../stages/derive-criteria';
 import { createLlmCritic } from '../stages/llm-critic';
 import { createLlmEvaluator } from '../stages/llm-evaluator';
 import { createLlmProducer } from '../stages/llm-producer';
-import { createSchemaValidator } from '../stages/schema-validator';
+import { createBoundsValidator, createSchemaValidator } from '../stages/schema-validator';
 import { CRITERIA_STAGE, PRODUCER_STAGE } from '../stages/shared';
 
 const sampleScope = (lensId: string, sample: number): string => `${lensId}.s${sample}`;
@@ -45,7 +45,7 @@ export function materialize<T>(
 
     producer: createLlmProducer(definition.task, definition.producer, scoped(PRODUCER_STAGE)),
 
-    validators: [createSchemaValidator<T>(), ...definition.validators],
+    validators: [createSchemaValidator<T>(), createBoundsValidator<T>(), ...definition.validators],
 
     critics: definition.critics.map((spec) =>
       createLlmCritic(spec, definition.task, perSample(spec)),

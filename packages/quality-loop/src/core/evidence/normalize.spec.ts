@@ -67,7 +67,10 @@ describe('normalize', () => {
   });
 
   it('[QL-5] confirms only what recurs in enough samples, merging ordinals by a conservative median', () => {
-    const policy = { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } };
+    const policy = {
+      ...tinyPolicy(),
+      evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 1 },
+    };
     const ledger = normalize(
       input({
         critics: [
@@ -163,7 +166,10 @@ describe('normalize', () => {
   });
 
   it('[QL-5] two samples that cite overlapping evidence confirm one defect, not two singletons', () => {
-    const policy = { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } };
+    const policy = {
+      ...tinyPolicy(),
+      evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 1 },
+    };
     const ledger = normalize(
       input({
         locations: [
@@ -195,7 +201,7 @@ describe('normalize', () => {
           critic(2, finding({ type: 'gap' }), finding({ type: 'wrong' })),
         ],
       }),
-      { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } },
+      { ...tinyPolicy(), evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 1 } },
     );
     expect(ledger.findings.map((item) => item.type).sort()).toEqual(['gap', 'wrong']);
   });
@@ -208,7 +214,7 @@ describe('normalize', () => {
           reported({ criticId: 'critic.other', sample: 1, findings: [finding()] }),
         ],
       }),
-      { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 1 } },
+      { ...tinyPolicy(), evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 1 } },
     );
     expect(ledger.findings).toEqual([]);
     expect(ledger.discarded.map((item) => item.lens).sort()).toEqual([
@@ -254,5 +260,70 @@ describe('normalize', () => {
     expect(JSON.stringify(accept)).not.toContain('rationale');
     expect(accept).toEqual(reject);
     expect(STANDARD.decide(accept, tinyPolicy())).toEqual(STANDARD.decide(reject, tinyPolicy()));
+  });
+});
+
+describe('a lost sample', () => {
+  /** Two samples to agree, a critical finding that blocks, and a gating kind: everything a lone sample could gate. */
+  const base = tinyPolicy();
+  const policy = (lostSample: 'score-only' | 'discard') => ({
+    ...base,
+    evidence: { ...base.evidence, minHits: 2, lostSample },
+    criterionKinds: { ...base.criterionKinds, must: { ...base.criterionKinds.must, gate: true } },
+  });
+  const lost = (lens: string) => ({
+    report: null,
+    diagnostic: { stage: lens, sample: 2, reason: 'llm-failed' as const, detail: null },
+  });
+  const critical = finding({ severity: 'critical' });
+  const results = [result({ criterionId: 'c1', result: 'fail' }), result({ criterionId: 'c2' })];
+  const oneAnswered = input({
+    critics: [critic(1, critical), lost('critic.tiny')],
+    evaluators: [evaluation(1, results), lost('evaluator.tiny')],
+  });
+
+  it('[QL-46] scores but cannot gate: what the samples left agree on is confirmed with the hits it has, and blocks nothing', () => {
+    const scoreOnly = policy('score-only');
+    const ledger = normalize(oneAnswered, scoreOnly);
+    expect(ledger.findings).toEqual([
+      expect.objectContaining({ key: 'gap|text', severity: 'critical', hits: 1 }),
+    ]);
+    expect(ledger.criteria.map((entry) => [entry.criterionId, entry.result, entry.hits])).toEqual([
+      ['c1', 'fail', 1],
+      ['c2', 'pass', 1],
+    ]);
+    expect(ledger.discarded).toEqual([]);
+
+    const decision = STANDARD.decide(ledger, scoreOnly);
+    // It prices: the finding is charged and the failed criterion earns nothing …
+    const substance = decision.trace.dimensions.find((trace) => trace.dimension === 'substance');
+    expect(substance?.penalties.map((penalty) => penalty.key)).toEqual(['gap|text']);
+    expect(substance?.base).toBe(0);
+    // … and neither the critical finding nor the failed gating criterion blocks.
+    expect(decision.gates.policyAllowed).toBe(true);
+
+    // The same evidence from both samples is agreement, and blocks.
+    const agreed = normalize(
+      input({
+        critics: [critic(1, critical), critic(2, critical)],
+        evaluators: [evaluation(1, results), evaluation(2, results)],
+      }),
+      scoreOnly,
+    );
+    expect(agreed.findings[0].hits).toBe(2);
+    expect(STANDARD.decide(agreed, scoreOnly).gates.policyAllowed).toBe(false);
+  });
+
+  it('[QL-46] under discard, minHits stands: the lens that lost a sample confirms nothing', () => {
+    const ledger = normalize(oneAnswered, policy('discard'));
+    expect(ledger.findings).toEqual([]);
+    expect(ledger.criteria.map((entry) => entry.result)).toEqual(['unassessed', 'unassessed']);
+    expect(ledger.discarded).toEqual([
+      expect.objectContaining({
+        key: 'gap|text',
+        reason: 'below-min-hits',
+        detail: '1 of 2 samples',
+      }),
+    ]);
   });
 });

@@ -16,12 +16,14 @@ import type {
   LensOutcome,
   ListQualityRunsQuery,
   LlmExchangeSummaryDto,
+  Overrun,
   PipelineSummary,
   ProduceMode,
   QualityControlDecision,
   QualityRunDto,
   QualityRunSummaryDto,
   RemediationNote,
+  SchemaIssue,
   SuccessCriterion,
   UpstreamEvidence,
   ValidationReport,
@@ -51,9 +53,11 @@ export interface ProducerInput<T> {
   prior: T | null;
   remediations: RemediationNote[];
   /**
-   * Why the latest revision was thrown out before any judge read it — the
+   * Why the latest attempt was thrown out before any judge read it — the
    * validator notes of an iteration a validator blocked and that never
-   * became best. `remediations` are the best iteration's and cannot say it.
+   * became best, or, when the last produce answered nothing, the faults the
+   * schema refused its reply for (subject `schema`). `remediations` are the
+   * best iteration's and cannot say either.
    */
   refusals: RemediationNote[];
   /** The run's advisory memories, the same on every call; empty when it was handed none. */
@@ -64,6 +68,10 @@ export interface Produced<T> {
   output: T | null;
   diagnostic: Diagnostic | null;
   model: string | null;
+  /** On a null output: every fault of the last reply the schema refused; empty when nothing parsed, or beside an output. */
+  issues: SchemaIssue[];
+  /** Beside an output: every field the reply wrote past the size it was asked for, as the seam handled it. */
+  overruns: Overrun[];
 }
 
 export interface Producer<T> {
@@ -129,9 +137,15 @@ export interface Evaluator<T> {
   plan(ctx: LensContext<T>): readonly LensUnit<EvaluationReport>[];
 }
 
-export type CriteriaDeriver = (
-  goal: string,
-) => Promise<{ criteria: SuccessCriterion[] | null; diagnostic: Diagnostic | null }>;
+export interface DerivedCriteria {
+  criteria: SuccessCriterion[] | null;
+  /** Why it derived nothing, or derived from a clipped goal; null when it answered whole. */
+  diagnostic: Diagnostic | null;
+  /** Every statement the reply wrote past the length it was asked for — kept, and recorded by the loop. */
+  overruns: Overrun[];
+}
+
+export type CriteriaDeriver = (goal: string) => Promise<DerivedCriteria>;
 
 /**
  * The controller: the ledger and the policy in, a decision out. Synchronous

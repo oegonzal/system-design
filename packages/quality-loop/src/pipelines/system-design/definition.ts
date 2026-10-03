@@ -199,10 +199,10 @@ export const SYSTEM_DESIGN: PipelineDefinition<DesignAnswer> = {
 
     ...STANDARD_SCORING,
 
-    evidence: { minHits: 1, minAssessedShare: 0.75 },
+    evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
 
     thresholds: { acceptAt: 80, rejectBelow: 35 },
 
-    loop: { maxIterations: 3, plateauAfter: 2, concurrency: 2 },
+    loop: { maxIterations: 3, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
   },
 };

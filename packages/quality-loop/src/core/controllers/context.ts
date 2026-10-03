@@ -3,7 +3,9 @@
  * of the ledger and are traced whether or not a gate fires; the four facts
  * are the engine's, computed the same way under every controller; the
  * remediations are everything the producer could act on, worst first. A gate
- * observes this context and gives a verdict — it never edits it.
+ * observes this context and gives a verdict — it never edits it. Only what
+ * `minHits` samples agreed on can block: an item confirmed short of them
+ * (a lens that lost a sample) is priced and never a blocker.
  */
 import type {
   ConfirmedFinding,
@@ -232,6 +234,14 @@ const selectRemediations = (ledger: EvidenceLedger): Remediation[] =>
 const isBlocker = (finding: ConfirmedFinding, policy: DecisionPolicy): boolean =>
   policy.blockingSeverities.includes(finding.severity) || policy.findingTypes[finding.type].gate;
 
+/**
+ * Whether enough samples saw an item for it to block. An item a lens
+ * confirmed after losing a sample (`lostSample: 'score-only'`) carries fewer
+ * hits than `minHits`: it prices like any other, and blocks nothing.
+ */
+const agreed = (item: { hits: number }, policy: DecisionPolicy): boolean =>
+  item.hits >= policy.evidence.minHits;
+
 /** How much of the contract was judged at all; zero when there was nothing to judge. */
 const assessedShareOf = (criteria: readonly CriterionEvidence[]): number =>
   criteria.length === 0
@@ -244,9 +254,14 @@ export function buildContext(ledger: EvidenceLedger, policy: DecisionPolicy): Ga
     (report) => report.gate === 'block' && report.problems.length > 0,
   );
   const assessedShare = assessedShareOf(ledger.criteria);
-  const findings = ledger.findings.filter((finding) => isBlocker(finding, policy));
+  const findings = ledger.findings.filter(
+    (finding) => isBlocker(finding, policy) && agreed(finding, policy),
+  );
   const criteria = ledger.criteria.filter(
-    (evidence) => policy.criterionKinds[evidence.kind].gate && evidence.result === 'fail',
+    (evidence) =>
+      policy.criterionKinds[evidence.kind].gate &&
+      evidence.result === 'fail' &&
+      agreed(evidence, policy),
   );
   return {
     ledger,

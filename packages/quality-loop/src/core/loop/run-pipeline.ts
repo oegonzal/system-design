@@ -3,19 +3,29 @@
  * validate, judge, normalize, decide — and either act on the decision or stop
  * with a reason the runner owns. `finalDecision` says what the artifact
  * deserves next; `stopReason` says why the loop ended. Both are recorded.
+ *
+ * A produce that answers nothing costs its iteration, never the run: the
+ * controller still decides it — no artifact, so it escalates, on the record —
+ * and the loop asks again in the same mode from the best, told what the
+ * schema refused. A run that ends on a lost produce — it lost more than its
+ * policy allows (`loop.lostProduces`), or had no iteration left to ask in —
+ * stops `produce-lost`.
  */
-import type {
-  CriticReport,
-  Diagnostic,
-  EvaluationReport,
-  IterationMode,
-  IterationTrace,
-  LensOutcome,
-  ProduceMode,
-  RemediationNote,
-  RunTrace,
-  StopReason,
-  SuccessCriterion,
+import {
+  describeIssue,
+  PRODUCE_MODES,
+  type CriticReport,
+  type Diagnostic,
+  type EvaluationReport,
+  type IterationMode,
+  type IterationTrace,
+  type LensOutcome,
+  type ProduceMode,
+  type RemediationNote,
+  type RunTrace,
+  type SchemaIssue,
+  type StopReason,
+  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
@@ -27,12 +37,20 @@ import {
   emptyUpstream,
   type AdvisoryMemory,
   type Critic,
+  type DerivedCriteria,
   type Evaluator,
   type ExchangeSink,
   type LensContext,
   type Stages,
 } from '../ports';
-import { LENSES_STAGE, stageDiagnostic } from '../stages/shared';
+import { rubricOverruns } from '../stages/derive-criteria';
+import {
+  CRITERIA_STAGE,
+  LENSES_STAGE,
+  overrunDiagnostic,
+  PRODUCER_STAGE,
+  stageDiagnostic,
+} from '../stages/shared';
 import { materialize } from './materialize';
 import { beats, progressOf } from './progress';
 import { rubricProblems } from './rubric';
@@ -124,14 +142,17 @@ export async function runLoop<T>(
   const { policy, task } = definition;
   const maxIterations = Math.max(1, input.maxIterations ?? policy.loop.maxIterations);
 
-  const derived = await deriveOrAdopt(stages, input);
+  const derived = await deriveOrAdopt(stages, task, input);
   const contract: TaskContract<T> = { ...task, goal: input.goal, criteria: derived.criteria ?? [] };
   const loop: Loop<T> = {
     stages,
     definition,
     contract,
     input,
-    baseDiagnostics: derived.diagnostic ? [derived.diagnostic] : [],
+    baseDiagnostics: [
+      ...(derived.diagnostic ? [derived.diagnostic] : []),
+      ...derived.overruns.map((overrun) => overrunDiagnostic(CRITERIA_STAGE, overrun)),
+    ],
     now,
   };
 
@@ -146,6 +167,7 @@ export async function runLoop<T>(
   let mode: IterationMode =
     input.adopted !== undefined ? 'adopted' : input.output !== undefined ? 'provided' : 'initial';
   let stop: StopReason | null = null;
+  let lost = 0;
 
   for (let iteration = 1; iteration <= maxIterations && stop === null; iteration++) {
     const previous = iterations[iterations.length - 1] ?? null;
@@ -155,18 +177,22 @@ export async function runLoop<T>(
         : await runIteration(loop, iteration, mode, best, previous);
     iterations.push(entry);
 
+    const produceLost = lostProduce(entry);
+    if (produceLost) lost += 1;
+    // A lost produce never beats a best with an artifact, and was no revision that failed to improve.
     if (beats(entry, best)) {
       best = entry;
       stalled = 0;
-    } else {
+    } else if (!produceLost) {
       stalled += 1;
     }
     standing = progressOf(head, iterations);
     if (standing !== null) onIteration?.(standing);
 
-    const next = afterDecision(entry, stages, policy.loop.plateauAfter, stalled, {
-      last: iteration === maxIterations,
-    });
+    const budget = { last: iteration === maxIterations };
+    const next = produceLost
+      ? afterLostProduce(entry, lost, policy.loop.lostProduces, budget)
+      : afterDecision(entry, stages, policy.loop.plateauAfter, stalled, budget);
     if ('stop' in next) stop = next.stop;
     else mode = next.mode;
   }
@@ -179,16 +205,21 @@ export async function runLoop<T>(
 
 /**
  * A supplied rubric is used verbatim — its ids are what the caller cites
- * across runs — so the deriver is never asked.
+ * across runs — so the deriver is never asked. Its statements are measured
+ * against the bound the deriver writes within, as a derived one is: past the
+ * target is an overrun on the record (past the ceiling it was refused before
+ * the run started).
  */
 function deriveOrAdopt<T>(
   stages: Stages<T>,
+  task: PipelineDefinition<T>['task'],
   input: RunInput,
-): Promise<{ criteria: SuccessCriterion[] | null; diagnostic: Diagnostic | null }> {
+): Promise<DerivedCriteria> {
   return input.criteria !== undefined
     ? Promise.resolve({
         criteria: input.criteria.map((criterion) => ({ ...criterion })),
         diagnostic: null,
+        overruns: rubricOverruns(input.criteria, task),
       })
     : stages.deriveCriteria(input.goal);
 }
@@ -219,7 +250,7 @@ async function runIteration<T>(
 
   const produced = await produceOrAdopt(loop, mode, best, previous);
   const { artifact } = produced;
-  if (produced.diagnostic) diagnostics.push(produced.diagnostic);
+  diagnostics.push(...produced.diagnostics);
 
   const validation =
     artifact === null
@@ -297,15 +328,17 @@ async function runIteration<T>(
  * Iteration 1 adopts a provided artifact exactly as handed in; every other
  * iteration asks the producer, and what it produced passes through the
  * output shape's `normalize` (when declared) before any validator sees it —
- * the normalized value is what the lenses judge and the trace stores.
+ * the normalized value is what the lenses judge and the trace stores. What
+ * the producer reports comes back as diagnostics: why it answered nothing,
+ * and one `overrun` per field it wrote past the size it was asked for.
  */
 async function produceOrAdopt<T>(
   loop: Loop<T>,
   mode: ProduceMode | 'provided',
   best: IterationTrace<T> | null,
   previous: IterationTrace<T> | null,
-): Promise<{ artifact: T | null; diagnostic: Diagnostic | null }> {
-  if (mode === 'provided') return { artifact: loop.input.output as T, diagnostic: null };
+): Promise<{ artifact: T | null; diagnostics: Diagnostic[] }> {
+  if (mode === 'provided') return { artifact: loop.input.output as T, diagnostics: [] };
   const produced = await loop.stages.producer.produce({
     contract: loop.contract,
     mode,
@@ -319,25 +352,55 @@ async function produceOrAdopt<T>(
     produced.output !== null && output.normalize
       ? output.normalize(produced.output, loop.contract)
       : produced.output;
-  return { artifact, diagnostic: produced.diagnostic };
+  return {
+    artifact,
+    diagnostics: [
+      ...(produced.diagnostic ? [produced.diagnostic] : []),
+      ...produced.overruns.map((overrun) => overrunDiagnostic(PRODUCER_STAGE, overrun)),
+    ],
+  };
 }
 
 const wasBlocked = <T>(entry: IterationTrace<T>): boolean =>
   entry.validation.some((report) => report.gate === 'block' && report.problems.length > 0);
 
+/** An iteration the loop asked the producer for, which answered nothing. */
+const lostProduce = <T>(entry: IterationTrace<T>): boolean =>
+  entry.artifact === null && (PRODUCE_MODES as readonly string[]).includes(entry.mode);
+
+/** The faults the schema refused a lost produce's reply for — kept on its diagnostic, never re-parsed. */
+const refusedIssues = <T>(entry: IterationTrace<T>): SchemaIssue[] =>
+  entry.ledger.diagnostics
+    .filter((diagnostic) => diagnostic.stage === PRODUCER_STAGE)
+    .flatMap((diagnostic) => diagnostic.facts?.issues ?? []);
+
+/** One note per fault, in the one wording; a fault noted and not refused is no more than info. */
+const schemaRefusal = (issue: SchemaIssue): RemediationNote => ({
+  subject: { schema: issue.path },
+  action: 'retry',
+  severity: issue.soft ? 'info' : 'critical',
+  targetRefs: [],
+  note: describeIssue(issue),
+});
+
 /**
- * The validator notes of the iteration just before, when a validator blocked
- * it and it never became best: the producer revises the best artifact with
- * the best remediations, so nothing else would tell it why its last attempt
- * was refused.
+ * Why the attempt just before was refused before any judge read it, when it
+ * was. A produce that answered nothing: the faults the schema refused its
+ * reply for, so the ask that replaces it names them. An iteration a validator
+ * blocked that never became best: the validator notes — the producer revises
+ * the best artifact with the best remediations, so nothing else would tell it
+ * why its last attempt was refused.
  */
 const refusalsOf = <T>(
   previous: IterationTrace<T> | null,
   best: IterationTrace<T> | null,
-): RemediationNote[] =>
-  previous !== null && previous !== best && wasBlocked(previous)
+): RemediationNote[] => {
+  if (previous === null) return [];
+  if (lostProduce(previous)) return refusedIssues(previous).map(schemaRefusal);
+  return previous !== best && wasBlocked(previous)
     ? previous.remediations.filter((note) => 'validator' in note.subject)
     : [];
+};
 
 const notApplicableDetail = (artifact: unknown, blocked: boolean): string =>
   artifact === null ? 'no artifact' : blocked ? 'blocked by a validator' : 'no criteria derived';
@@ -435,6 +498,23 @@ async function runWave<T>(
     critics: results.flatMap((result) => (result.critic ? [result.critic] : [])),
     evaluators: results.flatMap((result) => (result.evaluator ? [result.evaluator] : [])),
   };
+}
+
+/**
+ * A lost produce goes round again in the same mode — from the best, which it
+ * left unchanged — while the run has produce calls to lose and an iteration
+ * to ask in. Otherwise the run ends on the lost produce, and says so:
+ * `produce-lost`, whichever of the two ran out.
+ */
+function afterLostProduce<T>(
+  entry: IterationTrace<T>,
+  lost: number,
+  lostProduces: number,
+  budget: { last: boolean },
+): { stop: StopReason } | { mode: ProduceMode } {
+  return lost > lostProduces || budget.last
+    ? { stop: 'produce-lost' }
+    : { mode: entry.mode as ProduceMode };
 }
 
 /**

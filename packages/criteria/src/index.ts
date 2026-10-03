@@ -403,6 +403,21 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run whose only judged evidence is an iteration it adopted is not digested — its ledger is a copy an earlier run's digest already read — and the memory step skips it as nothing new, naming the run it adopted from; a run that judged an iteration of its own is digested, with a finding seen only in an adopted iteration left out and counted unless this run judged a change in it, which keeps it marked as adopted from an earlier run so a memory rests on the change and never on the copied finding.",
   },
+  {
+    id: 'QL-45',
+    statement:
+      "A lost attempt costs one attempt, never a run: a produce that answers nothing is still decided on the record — no artifact, so it escalates — and spends its iteration, and the loop asks again in the same mode from the same best, its remediations unchanged and every fault the schema refused the reply for named under its own heading; the iteration takes no crown from an artifact and counts toward no plateau; the run stops as produce-lost only when it has lost more produce calls than its policy declares, or has no iteration left to ask in; and the run's final decision is the last one made on an artifact.",
+  },
+  {
+    id: 'QL-46',
+    statement:
+      "A lost sample scores but cannot gate: under the declared score-only policy a lens that lost a sample confirms what the samples it has left agree on, with the hits it really has, so the item is priced like any other — and since fewer samples saw it than the policy's agreement asks, no finding or criterion short of that agreement ever blocks; a lens that lost nothing is held to the full agreement; the lost sample keeps the faults its reply was refused for; and every pipeline declares what a lost sample and a lost produce do, checked when it boots.",
+  },
+  {
+    id: 'QL-47',
+    statement:
+      "A size overrun is a warning, never a block: every artifact is read against its schema the way the model seam reads a reply, so only a structural fault blocks, and a field past its target is one warning per field on a validator that blocks nothing; a field a reply wrote past its size — the producer's or the deriver's — is an overrun on the record, in the one wording, that degrades nothing; a supplied rubric is refused only past the ceiling its deriver is accepted with and recorded as an overrun past the target; every stage is told the rule as it is applied; and a pipeline's output schema is converted for the model when it boots.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

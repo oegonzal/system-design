@@ -62,9 +62,10 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
 
   // Sized from the recorded runs (the spec holds the measurements): a cap is
   // also the call's time limit (`callTimeLimitMs`), so a cap a stage
-  // outwrites is a call cut short. The deriver has written 7,684 output
-  // tokens for one record, the producer 31,719, the critics up to 27,805.
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 8000 },
+  // outwrites is a call cut short. The deriver has written 9,350 output
+  // tokens for one record (2026-10-02, past its old 8,000), the producer
+  // 31,719, the critics up to 27,805.
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 12000 },
   producer: { persona: producer, maxTokens: 32000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
@@ -165,8 +166,8 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     ...STANDARD_SCORING,
     // Two samples everywhere and two hits to confirm: the gated
     // `misattributed_evidence` needs both samples of a critic to agree.
-    evidence: { minHits: 2, minAssessedShare: 0.75 },
+    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
     thresholds: { acceptAt: 75, rejectBelow: 30 },
-    loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2 },
+    loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
   },
 };

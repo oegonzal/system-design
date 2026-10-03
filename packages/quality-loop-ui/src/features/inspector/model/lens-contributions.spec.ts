@@ -49,7 +49,10 @@ describe('what each lens contributed', () => {
 
   it('[QLU-9] carries the declared bounds and the agreement bar the items had to clear', () => {
     const pipeline = makePipeline({
-      policy: { ...makePipeline().policy, evidence: { minHits: 2, minAssessedShare: 0.75 } },
+      policy: {
+        ...makePipeline().policy,
+        evidence: { ...makePipeline().policy.evidence, minHits: 2 },
+      },
     });
     const { critics, evaluators, minHits } = lensContributions(stateOf(), pipeline);
     expect(minHits).toBe(2);

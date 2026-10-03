@@ -61,7 +61,10 @@ const pipeline = () =>
       consumes: [],
     })),
     evaluators: [],
-    policy: { ...tinyPolicy(), evidence: { minHits: 2, minAssessedShare: 0 } },
+    policy: {
+      ...tinyPolicy(),
+      evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 0 },
+    },
   });
 
 const runWith = (settleAfter: Record<string, number>) =>
@@ -148,7 +151,7 @@ describe('a wave of lenses', () => {
         evaluators: [],
         policy: {
           ...tinyPolicy(),
-          evidence: { minHits: 2, minAssessedShare: 0 },
+          evidence: { ...tinyPolicy().evidence, minHits: 2, minAssessedShare: 0 },
           loop: { ...tinyPolicy().loop, concurrency: 3 },
         },
       }),

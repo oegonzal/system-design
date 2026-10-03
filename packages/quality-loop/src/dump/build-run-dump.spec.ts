@@ -51,7 +51,8 @@ describe('buildRunDump', () => {
   it('[QL-10] writes the goal verbatim, the contract, every iteration and every attributed exchange', async () => {
     const trace = await runLoop(
       {
-        deriveCriteria: () => Promise.resolve({ criteria: [criterion('c1')], diagnostic: null }),
+        deriveCriteria: () =>
+          Promise.resolve({ criteria: [criterion('c1')], diagnostic: null, overruns: [] }),
         producer: scriptedProducer([{ text: 't', parts: [] }]),
         validators: [],
         controller: STANDARD,
@@ -132,7 +133,8 @@ describe('buildRunDump', () => {
   it('[QL-10] run.md keeps every table row to its columns and says why a model call missed', async () => {
     const trace = await runLoop(
       {
-        deriveCriteria: () => Promise.resolve({ criteria: [criterion('c1')], diagnostic: null }),
+        deriveCriteria: () =>
+          Promise.resolve({ criteria: [criterion('c1')], diagnostic: null, overruns: [] }),
         producer: scriptedProducer([{ text: 't', parts: [] }]),
         validators: [],
         controller: STANDARD,

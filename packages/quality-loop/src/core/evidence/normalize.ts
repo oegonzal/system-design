@@ -3,21 +3,28 @@
  * keyed structurally, confirmed by agreement across samples, merged by a
  * conservative median, and reconciled so one shortfall is charged once. The
  * result carries ids, enums and counts only: the policy reads nothing else.
+ *
+ * Agreement is counted against the samples a lens still has. Under the
+ * policy's `lostSample: 'score-only'`, a lens that lost a sample confirms what
+ * every sample it has left agrees on, with the hits it really has: the item
+ * scores, and since fewer than `minHits` samples saw it, the controller never
+ * lets it block. Under `discard`, `minHits` stands whatever was lost.
  */
-import type {
-  ArtifactLocation,
-  ConfirmedFinding,
-  CriterionEvidence,
-  CriticReport,
-  DecisionPolicy,
-  Diagnostic,
-  DiscardedItem,
-  EvaluationReport,
-  EvidenceLedger,
-  LensOutcome,
-  RawCriterionResult,
-  RawFinding,
-  ValidationReport,
+import {
+  DIAGNOSTIC_DEGRADES,
+  type ArtifactLocation,
+  type ConfirmedFinding,
+  type CriterionEvidence,
+  type CriticReport,
+  type DecisionPolicy,
+  type Diagnostic,
+  type DiscardedItem,
+  type EvaluationReport,
+  type EvidenceLedger,
+  type LensOutcome,
+  type RawCriterionResult,
+  type RawFinding,
+  type ValidationReport,
 } from '@sysdesign/contracts';
 
 import type { TaskContract } from '../contracts';
@@ -73,7 +80,43 @@ interface Confirmed {
 
 interface CriterionBucket {
   samples: Set<number>;
+  /** The lenses that judged it — one, unless another lens cited a criterion it does not own. */
+  lenses: Set<string>;
   raws: RawCriterionResult[];
+}
+
+/** The samples an item must recur in, per lens: what the policy asks, or what the lens could still give. */
+type Threshold = (lens: string) => number;
+
+/** One more for `lens` in a tally. */
+const tally = (counts: Map<string, number>, lens: string): void => {
+  counts.set(lens, (counts.get(lens) ?? 0) + 1);
+};
+
+/**
+ * The agreement each lens is held to. A lens that lost no sample is held to
+ * `minHits`, however many it answered with; under `score-only`, one that lost
+ * a sample — it should have answered and did not — is held to the samples it
+ * has left. Only a sample's own diagnostic says it was lost.
+ */
+function thresholdOf<T>(input: NormalizeInput<T>, policy: DecisionPolicy): Threshold {
+  const { minHits, lostSample } = policy.evidence;
+  const answered = new Map<string, number>();
+  const lost = new Map<string, number>();
+  const outcomes: { lens: string | null; outcome: LensOutcome<unknown> }[] = [
+    ...input.critics.map((outcome) => ({ lens: outcome.report?.criticId ?? null, outcome })),
+    ...input.evaluators.map((outcome) => ({ lens: outcome.report?.evaluatorId ?? null, outcome })),
+  ];
+  for (const { lens, outcome } of outcomes) {
+    if (lens !== null) tally(answered, lens);
+    else if (outcome.diagnostic && DIAGNOSTIC_DEGRADES[outcome.diagnostic.reason]) {
+      tally(lost, outcome.diagnostic.stage);
+    }
+  }
+  return (lens) =>
+    lostSample === 'score-only' && (lost.get(lens) ?? 0) > 0
+      ? Math.max(1, Math.min(minHits, answered.get(lens) ?? 0))
+      : minHits;
 }
 
 const knownIn = <T>(input: NormalizeInput<T>): Known => ({
@@ -162,14 +205,15 @@ function admitFindings(
 }
 
 /**
- * A defect is confirmed when one lens saw it in `minHits` of its own samples.
+ * A defect is confirmed when one lens saw it in as many of its own samples as
+ * it is held to — `minHits`, or under `score-only` every sample it has left.
  * Two lenses seeing it once each is still two opinions, not agreement; only
  * what counts as "it" is as loose as `sameDefect`.
  */
 function confirmFindings(
   admitted: readonly Admitted[],
   lensOrder: ReadonlyMap<string, number>,
-  minHits: number,
+  threshold: Threshold,
   discarded: DiscardedItem[],
 ): Map<string, Confirmed> {
   const confirmed = new Map<string, Confirmed>();
@@ -183,7 +227,7 @@ function confirmFindings(
       seen.add(member.sample);
     }
     const confirming = [...samplesPerLens]
-      .filter(([, seen]) => seen.size >= minHits)
+      .filter(([lens, seen]) => seen.size >= threshold(lens))
       .sort(([a], [b]) => (lensOrder.get(a) ?? 0) - (lensOrder.get(b) ?? 0));
     if (confirming.length === 0) {
       for (const [lens, seen] of samplesPerLens) {
@@ -191,7 +235,7 @@ function confirmFindings(
           lens,
           key,
           reason: 'below-min-hits',
-          detail: `${seen.size} of ${minHits} samples`,
+          detail: `${seen.size} of ${threshold(lens)} samples`,
         });
       }
       continue;
@@ -229,25 +273,34 @@ function admitResults(
         });
         continue;
       }
-      const bucket = buckets.get(raw.criterionId) ?? { samples: new Set<number>(), raws: [] };
+      const bucket = buckets.get(raw.criterionId) ?? {
+        samples: new Set<number>(),
+        lenses: new Set<string>(),
+        raws: [],
+      };
       buckets.set(raw.criterionId, bucket);
       bucket.samples.add(sample);
+      bucket.lenses.add(evaluatorId);
       bucket.raws.push({ ...raw, locationRefs: admitRefs(raw.locationRefs, known.locations) });
     }
   }
   return buckets;
 }
 
-/** One entry per contract criterion: unassessed under `minHits`, otherwise the lower-middle median. */
+/**
+ * One entry per contract criterion: unassessed under the agreement its judge
+ * is held to, otherwise the lower-middle median, with the hits it really has.
+ */
 function settleCriteria<T>(
   contract: TaskContract<T>,
   buckets: ReadonlyMap<string, CriterionBucket>,
-  minHits: number,
+  threshold: Threshold,
 ): CriterionEvidence[] {
   return contract.criteria.map((criterion) => {
     const bucket = buckets.get(criterion.id);
     const hits = bucket?.samples.size ?? 0;
-    if (!bucket || hits < minHits) {
+    const needed = bucket ? Math.max(...[...bucket.lenses].map(threshold)) : 0;
+    if (!bucket || hits < needed) {
       return {
         criterionId: criterion.id,
         kind: criterion.kind,
@@ -334,16 +387,16 @@ const gatheredDiagnostics = <T>(input: NormalizeInput<T>): Diagnostic[] => [
 
 export function normalize<T>(input: NormalizeInput<T>, policy: DecisionPolicy): EvidenceLedger {
   const { contract } = input;
-  const { minHits } = policy.evidence;
+  const threshold = thresholdOf(input, policy);
   const known = knownIn(input);
   const discarded: DiscardedItem[] = [];
 
   const { admitted, lensOrder } = admitFindings(input.critics, known, discarded);
-  const confirmed = confirmFindings(admitted, lensOrder, minHits, discarded);
+  const confirmed = confirmFindings(admitted, lensOrder, threshold, discarded);
   const criteria = settleCriteria(
     contract,
     admitResults(input.evaluators, known, discarded),
-    minHits,
+    threshold,
   );
   const findings = reconcileFindings(confirmed, criteria, contract);
 

@@ -28,6 +28,7 @@ const STOP_REASONS = [
   'escalated',
   'plateau',
   'max-iterations',
+  'produce-lost',
 ] as const satisfies ContractStopReasons;
 
 /** The dump writes it; the row keeps it so a run can be traced to its commit without the folder. */

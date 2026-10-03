@@ -14,4 +14,6 @@ export const STOPPED_COPY: Record<StopReason, string> = {
     'The coach stopped and escalated — the loop needs a person to judge what its last revision left open.',
   plateau: 'The coach plateaued — its last revisions stopped improving the score.',
   'max-iterations': 'The coach used its iteration budget.',
+  'produce-lost':
+    'The coach stopped — the model returned no usable revision, and it had no attempt left to ask again.',
 };

@@ -76,7 +76,9 @@ const noteFor = (subject: Remediation['subject'], notes: Notes): string => {
     const asked = notes.statements.get(subject.criterion) ?? subject.criterion;
     return `${asked}: ${notes.criteria.get(subject.criterion) ?? 'not met'}`;
   }
-  return notes.validators.get(subject.validator) ?? subject.validator;
+  if ('validator' in subject) return notes.validators.get(subject.validator) ?? subject.validator;
+  // A schema refusal is noted where it is named, from the refused reply; the policy never selects one.
+  return subject.schema;
 };
 
 /**

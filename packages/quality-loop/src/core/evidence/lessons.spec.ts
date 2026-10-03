@@ -84,4 +84,20 @@ describe('deriveLessons', () => {
       expect.objectContaining({ kind: 'regressed', subject: 'c2', detail: 'pass → partial' }),
     ]);
   });
+
+  it('[QL-45] a lost produce between two judged iterations costs no lesson: it spans the iteration with nothing to compare', () => {
+    const before = iteration(1, [finding()], [result({ criterionId: 'c1', result: 'fail' })]);
+    const after = iteration(3, [], [result({ criterionId: 'c1', result: 'pass' })]);
+    const lost: IterationTrace<TinyOutput> = {
+      ...iteration(2, [], []),
+      mode: 'revise',
+      artifact: null,
+      critics: [],
+      evaluators: [],
+    };
+    expect(deriveLessons([before, lost, after])).toEqual([
+      expect.objectContaining({ kind: 'resolved', subject: 'gap|text', iterations: [1, 3] }),
+      expect.objectContaining({ kind: 'improved', subject: 'c1', iterations: [1, 3] }),
+    ]);
+  });
 });

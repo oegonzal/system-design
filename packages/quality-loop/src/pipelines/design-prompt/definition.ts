@@ -148,10 +148,10 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
 
       ...STANDARD_SCORING,
 
-      evidence: { minHits: 1, minAssessedShare: 0.75 },
+      evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
 
       thresholds: { acceptAt: 75, rejectBelow: 30 },
 
-      loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2 },
+      loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
     },
   };

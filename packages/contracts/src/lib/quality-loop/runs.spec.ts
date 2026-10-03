@@ -32,6 +32,7 @@ describe('gradeStopReason', () => {
         null,
         'plateau',
         'max-iterations',
+        'produce-lost',
       ]);
     }
     expect(gradeStopReason(null, coach)).toBeNull();

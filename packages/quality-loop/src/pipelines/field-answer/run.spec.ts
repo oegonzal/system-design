@@ -70,6 +70,7 @@ describe('the field-answer loop', () => {
     // The over-long value is a warning located at its field, so the page is still judged.
     expect(only.validation.map((report) => [report.validatorId, report.gate])).toEqual([
       ['schema', 'block'],
+      ['bounds', 'warn'],
       ['references', 'block'],
       ['limits', 'warn'],
     ]);

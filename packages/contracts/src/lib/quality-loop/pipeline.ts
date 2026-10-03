@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type { AxisFactorLevel, GoalSource, Severity } from './vocab';
+import type { AxisFactorLevel, GoalSource, LostSamplePolicy, Severity } from './vocab';
 
 /**
  * The decision policy: every number, threshold, gate and route the controller
@@ -24,13 +24,26 @@ export interface DecisionPolicy {
   };
   blockingSeverities: readonly Severity[];
   evidence: {
-    /** Samples an item must recur in to count. */
+    /** Samples an item must recur in to count — and to block. */
     minHits: number;
     /** Share of criteria that must be assessed before a score means anything. */
     minAssessedShare: number;
+    /** What a lens sample that answered nothing does to agreement (`LOST_SAMPLE_POLICIES`). */
+    lostSample: LostSamplePolicy;
   };
   thresholds: { acceptAt: number; rejectBelow: number };
-  loop: { maxIterations: number; plateauAfter: number; concurrency: number };
+  loop: {
+    maxIterations: number;
+    plateauAfter: number;
+    concurrency: number;
+    /**
+     * Produce calls a run may lose — answered with nothing — and go on. Each
+     * spends its iteration and is asked again in the same mode from the
+     * best; one more, or one on the last iteration, ends the run
+     * `produce-lost`.
+     */
+    lostProduces: number;
+  };
 }
 
 /** A gate's declared parameters, as data — the numbers a trace's details are measured against. */

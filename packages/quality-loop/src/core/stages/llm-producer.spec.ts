@@ -101,6 +101,75 @@ describe('createLlmProducer', () => {
       output: null,
       diagnostic: expect.objectContaining({ stage: 'producer', reason: 'llm-failed' }),
       model: 'test-model',
+      issues: [],
+      overruns: [],
     });
+  });
+
+  it('[QL-45] a reply the schema refused answers nothing, with every fault it was refused for — on the diagnostic as well', async () => {
+    const produced = await createLlmProducer(
+      definition.task,
+      definition.producer,
+      fakeLlm({ text: 7, parts: [] }),
+    ).produce({
+      contract,
+      mode: 'initial',
+      prior: null,
+      remediations: [],
+      refusals: [],
+      memories: [],
+    });
+    expect(produced.output).toBeNull();
+    expect(produced.issues).toEqual([
+      expect.objectContaining({ path: 'text', code: 'invalid_type', soft: false }),
+    ]);
+    expect(produced.diagnostic).toEqual({
+      stage: 'producer',
+      sample: null,
+      reason: 'llm-failed',
+      detail: null,
+      facts: { issues: produced.issues },
+    });
+  });
+
+  it('[QL-45] is told why its last reply was refused under its own heading, apart from what a validator refused', async () => {
+    const calls: LlmCall[] = [];
+    const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
+    await createLlmProducer(definition.task, definition.producer, llm).produce({
+      contract,
+      mode: 'revise',
+      prior,
+      remediations: [],
+      refusals: [
+        {
+          subject: { schema: 'parts[0]' },
+          action: 'retry',
+          severity: 'critical',
+          targetRefs: [],
+          note: 'parts[0]: Invalid input: expected string, received number',
+        },
+        {
+          subject: { validator: 'references' },
+          action: 'retry',
+          severity: 'critical',
+          targetRefs: [],
+          note: 'cites c9, which the goal never listed',
+        },
+      ],
+      memories: [],
+    });
+    const { user } = calls[0];
+    const reply = user.indexOf(
+      '# Why your previous reply was refused before any judge read it — do not repeat these',
+    );
+    const revision = user.indexOf(
+      '# Why your previous revision was refused before any judge read it — do not repeat these',
+    );
+    expect(reply).toBeGreaterThan(-1);
+    expect(revision).toBeGreaterThan(reply);
+    expect(user.slice(reply, revision)).toContain(
+      '- [critical] parts[0]: Invalid input: expected string, received number',
+    );
+    expect(user.slice(revision)).toContain('- [critical] cites c9, which the goal never listed');
   });
 });

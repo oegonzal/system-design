@@ -123,9 +123,9 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       blank_required: { dimension: 'coverage', gate: false },
     },
     ...STANDARD_SCORING,
-    evidence: { minHits: 1, minAssessedShare: 0.75 },
+    evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
     // One iteration: the caller reads the judged page field by field.
-    loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3 },
+    loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3, lostProduces: 1 },
   },
 };
