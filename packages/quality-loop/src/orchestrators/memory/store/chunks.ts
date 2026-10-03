@@ -19,14 +19,25 @@ import { contentHash, type IndexedChunk } from '../ports';
 export const DEFAULT_CHUNK_KIND: ChunkKind = 'lesson';
 
 /**
- * The kind a memory is stored under: what its digest declared, when the store
- * knows that kind, and the default otherwise. A digest declaring a kind the
- * store's vocabulary does not hold would have every one of its points refused
- * on write; one fact filed under the wrong kind is the smaller loss. A spec
- * pins each digest's kinds inside this vocabulary so it cannot arise.
+ * The kind a memory is stored under: what its digest declared, when that is one
+ * of the kinds this writer owns, and the default otherwise.
+ *
+ * Narrowed against the writer's own kinds and not the store's whole vocabulary,
+ * which is what makes the replace scope sound rather than merely agreed. A
+ * source run's points are replaced by kind, so a point written under a kind its
+ * caller did not declare sits outside the scope and is orphaned by the next
+ * re-digest. Checking against `CHUNK_KINDS` admitted every kind any writer owns,
+ * so the invariant held only because no producer happened to emit another's —
+ * and the next digest to declare kinds would have inherited a correct-looking
+ * `[DEFAULT_CHUNK_KIND]` at its call site and brought the orphan back silently.
+ * Narrowing here makes `written ⊆ owned` true by construction.
+ *
+ * The undeclared kind is retyped rather than refused, and counted so the
+ * retyping is visible: the fact is sound and only its filing is wrong, and a
+ * limit that discards the work it was measuring is the worse failure.
  */
-export const chunkKind = (kind: string | undefined): ChunkKind =>
-  kind !== undefined && (CHUNK_KINDS as readonly string[]).includes(kind)
+export const chunkKind = (kind: string | undefined, owned: readonly ChunkKind[]): ChunkKind =>
+  kind !== undefined && (owned as readonly string[]).includes(kind)
     ? (kind as ChunkKind)
     : DEFAULT_CHUNK_KIND;
 
@@ -46,6 +57,8 @@ export function chunksOf(
   origin: ChunkOrigin,
   digestRunId: string | null,
   model: string,
+  /** The kinds the writer owns; a memory declaring any other is filed under the default. */
+  ownedKinds: readonly ChunkKind[],
 ): IndexedChunk[] {
   return memories.map((memory) => {
     const text = lessonText(memory);
@@ -54,7 +67,11 @@ export function chunksOf(
       keys: { condition: memory.appliesWhen, lesson: memory.insight },
       contentHash: contentHash(text),
       // What the digest declared, or the one kind every memory had before any did.
-      source: { ...origin, kind: chunkKind(memory.kind), ref: `memory.${memory.position}` },
+      source: {
+        ...origin,
+        kind: chunkKind(memory.kind, ownedKinds),
+        ref: `memory.${memory.position}`,
+      },
       evidence: memory.evidence,
       digestRunId,
       model,

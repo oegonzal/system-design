@@ -13,7 +13,7 @@ import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
 import { VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
 import type { ChunkKind } from '../../../pipelines/memory-recall/input';
-import { chunksOf, type ChunkOrigin } from './chunks';
+import { chunkKind, chunksOf, type ChunkOrigin } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
 const dayOf = (iso: string): string => iso.slice(0, 10);
@@ -64,7 +64,18 @@ export async function indexMemories(
 ): Promise<StepResult<undefined>> {
   const trace = source.trace;
   if (trace === null) return skipped('nothing-to-digest');
-  const chunks = chunksOf(digested.memories, originOf(source, trace), digested.digestRunId, model);
+  const chunks = chunksOf(
+    digested.memories,
+    originOf(source, trace),
+    digested.digestRunId,
+    model,
+    ownedKinds,
+  );
+  // A memory whose declared kind this writer does not own is filed under the
+  // default rather than dropped, and counted so the retyping is not silent.
+  const retyped = digested.memories.filter(
+    (memory) => memory.kind !== undefined && chunkKind(memory.kind, ownedKinds) !== memory.kind,
+  ).length;
   // Both indexed texts of every chunk, in one batch: the cache dedupes, and
   // the vectors come back in the order they were asked for.
   const embedded = await ports.embeddings.embed(
@@ -77,7 +88,14 @@ export async function indexMemories(
       chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
       { kinds: ownedKinds },
     );
-    return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
+    return {
+      status: 'complete',
+      counts: {
+        chunks: stored,
+        embedded: embedded.misses,
+        ...(retyped > 0 ? { retyped } : {}),
+      },
+    };
   } catch (error) {
     return { status: 'failed', reason: 'store-unavailable', note: describeError(error).message };
   }

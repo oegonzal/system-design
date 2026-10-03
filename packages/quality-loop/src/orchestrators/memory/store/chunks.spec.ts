@@ -26,6 +26,7 @@ describe('a stored chunk', () => {
       evidence: [],
       ...(kind === undefined ? {} : { kind }),
     });
+    const owned = [DEFAULT_CHUNK_KIND, ...DOCUMENT_MEMORY_KINDS];
     const kinds = chunksOf(
       [
         memory(1, 'profile_fact'),
@@ -36,15 +37,22 @@ describe('a stored chunk', () => {
       origin,
       'd1',
       'm',
+      owned,
     ).map((chunk) => chunk.source.kind);
     // A digest that declares nothing writes what every digest wrote before one could.
     expect(kinds).toEqual(['profile_fact', 'profile_story', 'claim_boundary', DEFAULT_CHUNK_KIND]);
     expect(DEFAULT_CHUNK_KIND).toBe('lesson');
-    // A kind the store's vocabulary does not hold would have its point refused on
-    // write, so it falls back rather than losing the fact.
-    expect(chunkKind('not_a_kind')).toBe(DEFAULT_CHUNK_KIND);
-    expect(chunkKind(undefined)).toBe(DEFAULT_CHUNK_KIND);
-    for (const kind of DOCUMENT_MEMORY_KINDS) expect(chunkKind(kind)).toBe(kind);
+    // A kind this writer does not own is retyped rather than refused: the fact is
+    // sound and only its filing is wrong, and a point outside its caller's replace
+    // scope would be orphaned by the next re-digest.
+    expect(chunkKind('not_a_kind', owned)).toBe(DEFAULT_CHUNK_KIND);
+    expect(chunkKind(undefined, owned)).toBe(DEFAULT_CHUNK_KIND);
+    for (const kind of DOCUMENT_MEMORY_KINDS) expect(chunkKind(kind, owned)).toBe(kind);
+    // And a kind the STORE knows but this writer does not own is still retyped:
+    // written outside its caller's replace scope, it would orphan on re-digest.
+    expect(chunkKind('pattern', owned)).toBe(DEFAULT_CHUNK_KIND);
+    expect(chunkKind('profile_story', [DEFAULT_CHUNK_KIND])).toBe(DEFAULT_CHUNK_KIND);
+    expect(CHUNK_KINDS).toContain('pattern');
   });
 
   it('[QL-40] every kind a document memory may declare is one the store can hold', () => {
@@ -71,6 +79,8 @@ describe('a stored chunk', () => {
       },
       'digest-1',
       'fake-embedding',
+      // The experience digest declares no kind, and its writer owns only lessons.
+      [DEFAULT_CHUNK_KIND],
     );
     expect(chunk.source).toEqual({
       runId: 'run-a',
