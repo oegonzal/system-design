@@ -103,9 +103,10 @@ describe('reading a digest', () => {
     expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
   });
 
-  it('[QL-53] a duplicate keeps its better copy, and a gap or a vague wording withholds nothing — as the digest declares', () => {
+  it('[QL-53] a duplicate set, a gap and a vague wording each withhold nothing — as the digest declares', () => {
     // The recorded drops this fixes: every digest that confirmed a duplicate
     // lost both halves of it, and a gap finding that named a memory lost it.
+    // A confirmed duplicate set may hold a bystander, so every member stands.
     const memory = (insight: string, evidence: string[]) => ({
       evidence,
       insight,
@@ -129,10 +130,8 @@ describe('reading a digest', () => {
       ],
     });
     const readout = memoriesToStore(trace, ACCEPT_AT);
-    expect(readout.memories.map((kept) => kept.position)).toEqual([1, 3]);
-    expect(readout.withheld).toEqual([
-      { ref: 'memory.2', source: 'finding', by: 'duplicate_memory' },
-    ]);
+    expect(readout.memories.map((kept) => kept.position)).toEqual([1, 2, 3]);
+    expect(readout.withheld).toEqual([]);
   });
 
   it('[QL-58] an insight the seam kept whole past its ceiling is endorsed whole, never the digest refused for it', () => {

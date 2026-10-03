@@ -25,7 +25,7 @@ describe('the experience-digest pipeline', () => {
     expect(summary.validators.map((validator) => validator.id)).toEqual(['references', 'limits']);
   });
 
-  it('[QL-53] every finding type declares what it withholds of the memories it names', () => {
+  it('[QL-53] every finding type declares what it withholds of the memories it names, and a duplicate set withholds none of them', () => {
     const withholds = Object.fromEntries(
       Object.entries(EXPERIENCE_DIGEST.policy.findingTypes).map(([type, mapped]) => [
         type,
@@ -38,7 +38,7 @@ describe('the experience-digest pipeline', () => {
       misattributed_evidence: 'every-ref',
       run_specific: 'every-ref',
       vague_insight: 'none',
-      duplicate_memory: 'all-but-one',
+      duplicate_memory: 'none',
     });
   });
 

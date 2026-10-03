@@ -54,9 +54,10 @@ describe('reading a recall', () => {
     expect(readout.withheld).toEqual([{ ref: 'm2', source: 'finding', by: 'irrelevant_chunk' }]);
   });
 
-  it('[QL-53] a redundant pair keeps its better-supported half, and a gap that names a kept chunk withholds nothing', () => {
+  it('[QL-53] a redundant set and a gap that names a kept chunk each withhold nothing', () => {
     // The recorded drops this fixes: every confirmed redundant pair lost both
-    // halves, leaving the defects each served with no lesson at all.
+    // halves, leaving the defects each served with no lesson at all. A
+    // confirmed redundant set may hold a bystander, so every member stands.
     const redundant = readoutTrace({
       ...recallInput(),
       results: [passed('c1', 'need', ['m2'])],
@@ -64,8 +65,8 @@ describe('reading a recall', () => {
     });
 
     const readout = readPack(redundant, hits, ACCEPT_AT);
-    expect(readout.usable.map((item) => item.alias)).toEqual(['m2']);
-    expect(readout.withheld).toEqual([{ ref: 'm1', source: 'finding', by: 'redundant_chunk' }]);
+    expect(readout.usable.map((item) => item.alias)).toEqual(['m2', 'm1']);
+    expect(readout.withheld).toEqual([]);
     // Every usable memory carries the rubric its curator's words cite needs by.
     expect(readout.usable[0].rubric).toEqual(redundant.contract.criteria);
   });

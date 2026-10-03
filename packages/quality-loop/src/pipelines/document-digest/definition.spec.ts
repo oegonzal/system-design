@@ -115,7 +115,7 @@ describe('the document-digest pipeline', () => {
     ]);
   });
 
-  it('[QL-40] withholds a fact its sections do not support, and keeps a true one faulted only for its wording', () => {
+  it('[QL-40] withholds a fact its sections do not support, and keeps a true one faulted only for its wording or named in a duplicate set', () => {
     const declared = Object.fromEntries(
       Object.entries(DOCUMENT_DIGEST.policy.findingTypes).map(([type, mapped]) => [
         type,
@@ -132,8 +132,9 @@ describe('the document-digest pipeline', () => {
       missed_fact: ['none', false],
       unusable_fact: ['none', false],
       vague_condition: ['none', false],
-      // A duplicate is repaired by keeping one of the pair, not by losing both.
-      duplicate_fact: ['all-but-one', false],
+      // A duplicate set may hold a bystander, and a stored twin is recoverable
+      // where a dropped fact is not, so every member stands.
+      duplicate_fact: ['none', false],
     });
   });
 

@@ -136,10 +136,12 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
     // when the store reads the digest (`withheldItems`), declared by what
     // storing the memory as written would put in the store: an effect the
     // record does not show, a misattribution or a lesson only this run's
-    // names make true would be false there, so it is withheld; of a duplicate
-    // group the best-supported copy is stored; a vague wording is weaker, not
-    // wrong — its remedy is a rewrite — and a missed signal is a gap that
-    // names a memory without faulting it.
+    // names make true would be false there, so it is withheld; a vague
+    // wording is weaker, not wrong — its remedy is a rewrite — and a missed
+    // signal is a gap that names a memory without faulting it. A duplicate
+    // group withholds nothing: its confirmed set is a component of
+    // overlapping claims, not one claim, so any member may be a bystander
+    // (`WITHHOLDINGS` says why).
     findingTypes: {
       missed_signal: {
         dimension: 'attribution',
@@ -174,7 +176,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       duplicate_memory: {
         dimension: 'reuse',
         gate: false,
-        withholds: 'all-but-one',
+        withholds: 'none',
       },
     },
     ...STANDARD_SCORING,

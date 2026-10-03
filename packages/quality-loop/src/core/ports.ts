@@ -102,7 +102,8 @@ export interface Validator<T> {
   /**
    * Declared by what storing the item as written would put in the store, never
    * by the type's name: false or misleading → every-ref; only weaker than it
-   * could be → none (its remedy is a rewrite); a duplicate → all-but-one.
+   * could be → none (its remedy is a rewrite); a confirmed duplicate set → none
+   * (`WITHHOLDINGS` says why).
    */
   readonly withholds?: Withholding;
   validate(artifact: T, contract: TaskContract<T>): ValidationReport;

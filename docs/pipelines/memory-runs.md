@@ -1536,7 +1536,7 @@ store, never by the type's name: false or misleading there — a wrong fact or
 attribution, a wrong kind or key, a restatement of what the producer already
 holds — is `every-ref`; merely weaker than it could be — vague, templated,
 wordy, beside a gap — is `none`, because its remedy is a rewrite; a duplicate
-is `all-but-one`. A warning validator whose problems name an item declares the
+is `none` too (below). A warning validator whose problems name an item declares the
 same on itself (`Validator.withholds`); a blocking one may not, because a
 failing blocking validator closes admission and no reader ever sees its
 problems. `validatePipeline` refuses an unknown value, and a declaration on a
@@ -1552,6 +1552,28 @@ the rules read off its own pipeline's definition, never a table of its own.
 Each readout carries `withheld`, one entry per item with what withheld it
 (`finding` or `validator`, and the type or id), so a reader counts what it
 withheld by source and type.
+
+**A duplicate set withholds nothing.** Every duplicate type — `duplicate_fact`,
+`duplicate_memory`, `duplicate_item`, `redundant_chunk` — declares `none`. A
+confirmed duplicate finding is not one claim: the normaliser merges samples
+that share a location (`sameDefect`, by design — exact-set identity was
+measured to discard about 60% of findings), so its refs are a connected
+component of overlapping claims, and "all but one" of it has no principled
+survivor. Classifying the confirmed findings of three or more items in
+`static/runs` against the raw per-sample critic replies (`critics.json`):
+
+| Type               | Confirmed, ≥3 items | Written by one critic | Union of claims | Mixed |
+| ------------------ | ------------------: | --------------------: | --------------: | ----: |
+| `duplicate_memory` |                  18 |                     5 |               8 |     5 |
+| `redundant_chunk`  |                  25 |                    10 |               2 |    13 |
+| `duplicate_item`   |                   3 |                     0 |               3 |     0 |
+
+For example `[8, 3]` and `[7, 8]` in one run's iteration 2 confirm as
+`{3, 7, 8}`; `{1, 6, 8}` confirmed with no claim made twice; `{4, 5, 6}` rests
+`memory.5` on one sample. A dropped bystander is lost for good, since a run is
+not re-digested; a stored twin costs one bounded, recoverable slot. `all-but-one`
+stays in the vocabulary for a type whose findings name exactly one duplicate
+set.
 
 **A stored lesson is stamped from the evidence it cites.** The digest's index
 names, for every finding and criterion, the source run's iterations it was

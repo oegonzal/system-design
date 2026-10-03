@@ -791,6 +791,14 @@ named where there is one.
   18-01-11's manifest said 0 while its best scored 57.8. The manifest, the index row and `run.md`'s
   verdict line now headline the best iteration, with the last one's score in a clause of its own
   when the last is not the best.
+- **A duplicate set cannot say which of its members are the twins.** Every duplicate type
+  withholds `none`, because a confirmed duplicate finding is the union of the overlapping claims
+  its samples made (`sameDefect` groups on a common location), not one claim, so `all-but-one`
+  would drop a bystander (`docs/pipelines/memory-runs.md` §16 has the counts). The structural
+  follow-up is a reconciliation declared per finding type — overlap, as now, or the exact ref set —
+  that would make `all-but-one` sound again for the share of findings that are unions; the share a
+  single critic wrote as one oversized set needs the persona's ask instead. Exact-set identity also
+  changes what `minHits` confirms, so it needs its own measurement before it is declared.
 - **A criterion's fix note may quote the wrong sample.** The note takes the first evaluator
   sample's rationale for that criterion, whatever result that sample gave, so with two samples it
   can quote one that said pass. The recorded quality runs show it: in 6 of 259 fail or partial

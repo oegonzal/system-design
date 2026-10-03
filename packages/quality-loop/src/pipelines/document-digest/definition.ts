@@ -129,8 +129,10 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     // sections never stated, or a section read as saying what it does not, is
     // wrong: storing it would have the corpus assert something about the
     // subject that their own documents do not, so every memory such a finding
-    // names is withheld. The remaining types fault a fact that is true. A
-    // duplicate is repaired by keeping one of the pair. A fact a form could not
+    // names is withheld. The remaining types fault a fact that is true, and
+    // withhold nothing. A duplicate's confirmed set is a component of
+    // overlapping claims, not one pair, so keeping one of it may drop a
+    // bystander (`WITHHOLDINGS` says why). A fact a form could not
     // use as written, a condition that restates its insight, and a fact no
     // memory captured all say the writing is weak, not that the fact is false —
     // and a true fact dropped for its phrasing is a detail the corpus can never
@@ -143,7 +145,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       missed_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       unusable_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       vague_condition: { dimension: 'coverage', gate: false, withholds: 'none' },
-      duplicate_fact: { dimension: 'coverage', gate: false, withholds: 'all-but-one' },
+      duplicate_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
     },
     ...STANDARD_SCORING,
     evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },

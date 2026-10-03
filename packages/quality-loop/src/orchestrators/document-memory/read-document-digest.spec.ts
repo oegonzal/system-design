@@ -32,7 +32,7 @@ const judged = (digest: DocumentDigest, findings: ConfirmedFinding[]) => {
 const [role, home] = sampleDocumentDigest().memories;
 
 describe('what a document digest endorses', () => {
-  it('[QL-40] withholds by what a finding says about the fact, not by how many facts it names', () => {
+  it('[QL-40] withholds by what a finding says about the fact, not by how many facts it names, and a duplicate set withholds none', () => {
     const digest = sampleDocumentDigest({
       memories: [role, home, { ...role }, { ...role }, { ...home }, { ...home }, { ...home }],
     });
@@ -44,13 +44,12 @@ describe('what a document digest endorses', () => {
       faulting('a_type_no_table_names', ['memory.7']),
     ]);
     const readout = readDocumentDigest(outputs, ACCEPT_AT);
-    // A wrong fact goes, however many it names; a duplicate keeps one of its set;
-    // a true fact faulted for its wording stays; an undeclared fault withholds what it names.
-    expect(readout.memories.map((memory) => memory.position)).toEqual([1, 6]);
+    // A wrong fact goes, however many it names; every member of a duplicate set
+    // stays, since any may be a bystander; a true fact faulted for its wording
+    // stays; an undeclared fault withholds what it names.
+    expect(readout.memories.map((memory) => memory.position)).toEqual([1, 3, 4, 6]);
     expect(readout.withheld.map((item) => [item.ref, item.by]).sort()).toEqual([
       ['memory.2', 'invented_fact'],
-      ['memory.3', 'duplicate_fact'],
-      ['memory.4', 'duplicate_fact'],
       ['memory.5', 'invented_fact'],
       ['memory.7', 'a_type_no_table_names'],
     ]);

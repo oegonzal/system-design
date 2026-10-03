@@ -6,8 +6,8 @@ import type { AxisFactorLevel, GoalSource, LostSamplePolicy, Severity } from './
  * a run's best iteration — a digest's memories, a recall's kept chunks.
  * `every-ref`: each item it names is withheld. `all-but-one`: all but the one
  * with the most support — passing criteria that cite it — are, ties to the
- * first in the artifact; a duplicate keeps its best copy. `none`: it names an
- * item without faulting it, and withholds nothing.
+ * first in the artifact. `none`: it names an item without faulting it, and
+ * withholds nothing.
  *
  * Declared by what storing the item as written would put in the store, never
  * by the type's name: if the item would be false or misleading there — a
@@ -15,10 +15,23 @@ import type { AxisFactorLevel, GoalSource, LostSamplePolicy, Severity } from './
  * of what is already held — the finding withholds it (`every-ref`); if the
  * item is only weaker than it could be — vague, templated, wordy, or beside a
  * gap the finding names — it survives (`none`), because its remedy is a
- * rewrite, not removal; a duplicate withholds all but the best-supported of
- * its group (`all-but-one`). A type that declares nothing withholds every ref
- * on purpose: one whose author has not answered the question is safer
- * withheld than stored.
+ * rewrite, not removal. A type that declares nothing withholds every ref on
+ * purpose: one whose author has not answered the question is safer withheld
+ * than stored.
+ *
+ * A duplicate type withholds nothing (`none`). A confirmed duplicate finding
+ * is not one claim: the normaliser merges samples that share a location
+ * (`sameDefect` in `core/evidence/identity.ts`, by design — identity by the
+ * exact ref set was measured to discard about 60% of findings), so its refs
+ * are a connected component of overlapping claims — [a, b] and [c, a] confirm
+ * as {a, b, c}. "All but one" of that set has no principled survivor, and any
+ * member may be a bystander to every pair that was actually claimed. The
+ * asymmetry decides it: a dropped bystander is lost for good, because a run is
+ * not re-digested, while a stored twin costs one bounded, recoverable slot —
+ * at recall the next-best still enters the fused top N; a curated pack is not
+ * refilled; twins from different runs never meet in one finding anyway.
+ * `all-but-one` stays in the vocabulary for a type whose confirmed findings
+ * name exactly one duplicate set, and for no other.
  */
 export const WITHHOLDINGS = ['every-ref', 'all-but-one', 'none'] as const;
 export type Withholding = (typeof WITHHOLDINGS)[number];
@@ -48,7 +61,8 @@ export interface DecisionPolicy {
         /**
          * Declared by what storing the item as written would put in the store, never
          * by the type's name: false or misleading → every-ref; only weaker than it
-         * could be → none (its remedy is a rewrite); a duplicate → all-but-one.
+         * could be → none (its remedy is a rewrite); a confirmed duplicate set → none
+         * (`WITHHOLDINGS` says why).
          */
         withholds?: Withholding;
       }

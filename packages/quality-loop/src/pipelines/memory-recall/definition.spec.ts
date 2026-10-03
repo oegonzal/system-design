@@ -46,7 +46,7 @@ describe('the memory-recall pipeline', () => {
     expect(raising[0].persona).toContain('already in hand');
   });
 
-  it('[QL-53] every finding type declares what it withholds of the chunks it names', () => {
+  it('[QL-53] every finding type declares what it withholds of the chunks it names, and a redundant set withholds none of them', () => {
     const withholds = Object.fromEntries(
       Object.entries(MEMORY_RECALL.policy.findingTypes).map(([type, mapped]) => [
         type,
@@ -57,7 +57,7 @@ describe('the memory-recall pipeline', () => {
       missed_chunk: 'none',
       no_usable_memory: 'every-ref',
       irrelevant_chunk: 'every-ref',
-      redundant_chunk: 'all-but-one',
+      redundant_chunk: 'none',
       restated_defect: 'every-ref',
       unsupported_insight: 'every-ref',
       misleading_chunk: 'every-ref',

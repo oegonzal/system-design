@@ -118,8 +118,10 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
     // names when the pack is read (`withheldItems`), declared by what handing
     // the chunk to the producer as written would do: a chunk that is
     // irrelevant, unsupported, misleading, stale or already in hand would
-    // mislead it, so it is withheld; of a redundant group the best-supported
-    // copy is kept; and a gap names a chunk without faulting it.
+    // mislead it, so it is withheld; a gap names a chunk without faulting it;
+    // and a redundant group withholds nothing, because its confirmed set is
+    // a component of overlapping claims, not one claim, so any member may be
+    // a bystander (`WITHHOLDINGS` says why).
     findingTypes: {
       missed_chunk: {
         dimension: 'coverage',
@@ -139,7 +141,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       redundant_chunk: {
         dimension: 'precision',
         gate: false,
-        withholds: 'all-but-one',
+        withholds: 'none',
       },
       // What the producer already holds is not news, but a chunk that
       // restates it misleads nobody: priced, never a reason to withhold the
