@@ -5,14 +5,19 @@
  * schema is locked to the ids the registry offers, so the model cannot name a
  * judge that does not exist. Null on a miss; the step says `unclassified`.
  */
-import type { RouteDto } from '@sysdesign/contracts';
+import { bound, bounded, type RouteDto } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 import { z } from 'zod';
 
 import type { BriefClassifier, Classification } from '../../../orchestrators/router/ports';
 import persona from './classifier.md?raw';
 
-const RATIONALE_MAX = 400;
+/**
+ * One short reason, asked for at the size it always was; a longer one is kept
+ * and noted, never a lost classification. Nothing measures it yet: the reason
+ * is recorded only as its orchestration step's note, which no run dump holds.
+ */
+const rationale = bounded.text(bound(400), { min: 1 });
 /** Room for the id and one short reason, no more. */
 const CLASSIFY_MAX_TOKENS = 600;
 
@@ -42,7 +47,7 @@ export class LlmBriefClassifier implements BriefClassifier {
         user: renderBrief(goal, routes),
         schema: z.strictObject({
           pipeline: z.enum(ids),
-          rationale: z.string().min(1).max(RATIONALE_MAX),
+          rationale,
         }),
         maxTokens: CLASSIFY_MAX_TOKENS,
       });

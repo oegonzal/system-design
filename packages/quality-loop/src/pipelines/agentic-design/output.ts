@@ -7,10 +7,11 @@
  * `from` and `to` — because those are the names other sections point at, and a
  * dangling reference is a broken artifact rather than a weak one. Everywhere
  * else emptiness is a defect for a critic to name, deliberately not a schema
- * violation: there is no retry, so a single empty string would discard the
- * whole answer. It already did once. For the same reason every length bound
- * sits above what the producer has measurably written (the spec holds the
- * measurements): a string past its bound is a miss, never cut to fit.
+ * violation: an empty required string is a structural fault that refuses the
+ * whole reply — one once discarded a whole answer. Every bound is what the
+ * producer is asked for, at or above what it has measurably written
+ * (`measured.json`, held by the spec): a string past its target is kept and
+ * noted, a list past its ceiling trimmed from its end — never a lost answer.
  *
  * `roles` declare what they consume and produce; `contracts` declare the
  * hand-offs between them. That is redundant on purpose — the redundancy is what
@@ -18,97 +19,94 @@
  * contract carries has a defect a critic can point at, which is impossible when
  * only components and free-text steps are modelled.
  */
+import { bound, bounded } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
 export const agenticDesignSchema = z.strictObject({
-  summary: z
-    .string()
-    .min(1)
-    .max(1600)
-    .describe(
+  summary: bounded.text(bound(1600), {
+    min: 1,
+    description:
       'The shape of the workflow in 3–5 sentences: the hardest thing about it and how the design meets it.',
-    ),
-  assumptions: z
-    .array(z.string().max(220))
-    .max(8)
-    .describe('What the brief left unsaid and you decided.'),
-  roles: z
-    .array(
-      z.strictObject({
-        name: z.string().min(1).max(60),
-        responsibility: z.string().max(340).describe('The one thing this role owns.'),
-        consumes: z.string().max(200).describe('What it requires to do its work.'),
-        produces: z.string().max(220).describe('What it hands on, and in what shape.'),
+  }),
+  assumptions: bounded.list(bound(8, 'list'), bounded.text(bound(220)), {
+    description: 'What the brief left unsaid and you decided.',
+  }),
+  roles: bounded.list(
+    bound(10, 'list'),
+    z.strictObject({
+      name: bounded.text(bound(60), { min: 1 }),
+      responsibility: bounded.text(bound(340), { description: 'The one thing this role owns.' }),
+      consumes: bounded.text(bound(200), { description: 'What it requires to do its work.' }),
+      produces: bounded.text(bound(220), { description: 'What it hands on, and in what shape.' }),
+    }),
+    { min: 1, description: 'The agents, tools and services the workflow is made of.' },
+  ),
+  contracts: bounded.list(
+    bound(13, 'list'),
+    z.strictObject({
+      from: bounded.text(bound(60), {
+        min: 1,
+        description: 'The role that produces. A named role.',
       }),
-    )
-    .min(1)
-    .max(10)
-    .describe('The agents, tools and services the workflow is made of.'),
-  contracts: z
-    .array(
-      z.strictObject({
-        from: z.string().min(1).max(60).describe('The role that produces. A named role.'),
-        to: z.string().min(1).max(60).describe('The role that consumes. A named role.'),
-        payload: z.string().max(200).describe('What crosses the boundary.'),
-        guarantee: z
-          .string()
-          .max(360)
-          .describe('What the receiver may assume, including on failure.'),
+      to: bounded.text(bound(60), { min: 1, description: 'The role that consumes. A named role.' }),
+      payload: bounded.text(bound(200), { description: 'What crosses the boundary.' }),
+      guarantee: bounded.text(bound(360), {
+        description: 'What the receiver may assume, including on failure.',
       }),
-    )
-    .max(12)
-    .describe('The hand-offs between roles, one per edge.'),
-  flows: z
-    .array(
-      z.strictObject({
-        name: z.string().max(120),
-        steps: z.array(z.string().max(340)).max(8),
+    }),
+    { description: 'The hand-offs between roles, one per edge.' },
+  ),
+  flows: bounded.list(
+    bound(9, 'list'),
+    z.strictObject({
+      name: bounded.text(bound(120)),
+      steps: bounded.list(bound(8, 'list'), bounded.text(bound(340))),
+    }),
+    { description: 'One per capability: the roles the work passes through, in order.' },
+  ),
+  policies: bounded.list(
+    bound(9, 'list'),
+    z.strictObject({
+      name: bounded.text(bound(80)),
+      decides: bounded.text(bound(260), { description: 'What this rule settles.' }),
+      declaredAs: bounded.text(bound(280), {
+        description: 'Where it lives as data rather than code.',
       }),
-    )
-    .max(8)
-    .describe('One per capability: the roles the work passes through, in order.'),
-  policies: z
-    .array(
-      z.strictObject({
-        name: z.string().max(80),
-        decides: z.string().max(260).describe('What this rule settles.'),
-        declaredAs: z.string().max(280).describe('Where it lives as data rather than code.'),
+    }),
+    { description: 'The thresholds, gates and routes a decision follows.' },
+  ),
+  memory: bounded.list(
+    bound(6, 'list'),
+    z.strictObject({
+      what: bounded.text(bound(200), { description: 'What is kept or retrieved.' }),
+      shape: bounded.text(bound(250), { description: 'The form it is stored in.' }),
+      usedBy: bounded.text(bound(170), { description: 'Which role reads it, and when.' }),
+    }),
+    { description: 'What the workflow learns or looks up, and in what form.' },
+  ),
+  extensibility: bounded.list(
+    bound(6, 'list'),
+    z.strictObject({
+      change: bounded.text(bound(160), { description: 'A change someone will want.' }),
+      requires: bounded.text(bound(360), {
+        description: 'What it costs — ideally data, not code.',
       }),
-    )
-    .max(8)
-    .describe('The thresholds, gates and routes a decision follows.'),
-  memory: z
-    .array(
-      z.strictObject({
-        what: z.string().max(200).describe('What is kept or retrieved.'),
-        shape: z.string().max(250).describe('The form it is stored in.'),
-        usedBy: z.string().max(170).describe('Which role reads it, and when.'),
-      }),
-    )
-    .max(6)
-    .describe('What the workflow learns or looks up, and in what form.'),
-  extensibility: z
-    .array(
-      z.strictObject({
-        change: z.string().max(160).describe('A change someone will want.'),
-        requires: z.string().max(360).describe('What it costs — ideally data, not code.'),
-      }),
-    )
-    .max(6),
-  tradeoffs: z
-    .array(
-      z.strictObject({
-        decision: z.string().max(180),
-        rationale: z.string().max(340),
-        alternative: z.string().max(210).nullable(),
-      }),
-    )
-    .max(8),
-  risks: z
-    .array(z.strictObject({ risk: z.string().max(200), mitigation: z.string().max(340) }))
-    .max(8),
+    }),
+  ),
+  tradeoffs: bounded.list(
+    bound(8, 'list'),
+    z.strictObject({
+      decision: bounded.text(bound(180)),
+      rationale: bounded.text(bound(340)),
+      alternative: bounded.text(bound(210)).nullable(),
+    }),
+  ),
+  risks: bounded.list(
+    bound(8, 'list'),
+    z.strictObject({ risk: bounded.text(bound(200)), mitigation: bounded.text(bound(340)) }),
+  ),
 });
 export type AgenticDesign = z.infer<typeof agenticDesignSchema>;
 

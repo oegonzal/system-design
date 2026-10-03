@@ -1,3 +1,4 @@
+import { bound } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../../core/testing';
@@ -31,6 +32,20 @@ describe('the brief classifier', () => {
   it('[QL-19] an id outside the routes is a miss, not a route: the schema is locked to the registry', async () => {
     const classifier = new LlmBriefClassifier(fakeLlm({ pipeline: 'nope', rationale: 'invented' }));
     expect(await classifier.classify('brief', routes)).toBeNull();
+  });
+
+  it('[QL-19] a reason past the size it is asked for is kept whole: the classification stands, and the model was asked for the target', async () => {
+    const schemas: unknown[] = [];
+    const reason = `${'roles and contracts, '.repeat(30)}end`;
+    const llm = fakeLlm({ pipeline: 'agentic-design', rationale: reason }).withRecorder((call) => {
+      schemas.push(call.schema);
+    });
+    expect(await new LlmBriefClassifier(llm).classify('brief', routes)).toEqual({
+      pipeline: 'agentic-design',
+      rationale: reason,
+    });
+    expect(reason.length).toBeGreaterThan(bound(400).ceiling);
+    expect(schemas[0]).toMatchObject({ properties: { rationale: { maxLength: 400 } } });
   });
 
   it('[QL-19] without routes there is nothing to ask and the answer is null', async () => {
