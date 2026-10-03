@@ -3,11 +3,7 @@
  * indexed by both halves the digest already separates: the condition it
  * applies under, and the instruction itself.
  */
-import {
-  CHUNK_KINDS,
-  type ChunkKind,
-  type ChunkSource,
-} from '../../../pipelines/memory-recall/input';
+import { type ChunkKind, type ChunkSource } from '../../../pipelines/memory-recall/input';
 import type { MemoryToStore } from '../digest/read-digest';
 import { contentHash, type IndexedChunk } from '../ports';
 
