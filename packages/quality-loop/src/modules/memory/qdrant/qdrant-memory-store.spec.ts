@@ -1,7 +1,7 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { collectionName, pointId } from './collection';
+import { collectionName, INDEXED_FIELDS, pointId } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
 import { hitOf } from '../../../orchestrators/memory/testing';
 import { vectorOf } from '../testing';
@@ -163,6 +163,22 @@ describe('the Qdrant memory store', () => {
       support: { confirms: 2, contradicts: 1 },
     });
     expect(await store.replaceRunChunks('run-d', [], { kinds: ['fact'] })).toBe(0);
+  });
+
+  it('[QL-41] has an index on the server for every field a filter may narrow by', async () => {
+    // Existence only, deliberately. Comparing the reported type against the
+    // declared one is circular — the server reports back whatever `ensure`
+    // asked for, so a wrong declaration agrees with itself. That the declared
+    // type suits the value the payload holds is checked against the payload, in
+    // `collection.spec.ts`.
+    await store.verify();
+    const described = await client.getCollection(collectionName(model, DIMENSIONS));
+    const reported = described.payload_schema ?? {};
+    const fields = Object.keys(INDEXED_FIELDS);
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) {
+      expect(reported[field], `no index on the server for ${field}`).toBeDefined();
+    }
   });
 
   it('[QL-17] reports an unreachable server and a missing model as data, never as a throw at boot', async () => {

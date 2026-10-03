@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { EVIDENCE_KINDS, contentHash } from '../../../orchestrators/memory/ports';
-import { INDEXED_FIELDS, fromPayload, toPayload } from './collection';
+import { INDEXED_FIELDS, fromPayload, rootOf, toPayload } from './collection';
 
 /** A fact digested from a document, as `chunksOf` shapes it: its evidence is a section, not a run's rows. */
 const factChunk = () => {
@@ -30,6 +30,25 @@ const factChunk = () => {
     digestRunId: 'digest-run',
     model: 'fake-embedding',
   };
+};
+
+/** The value at a (possibly dotted) payload path, as Qdrant addresses one. */
+const valueAt = (payload: Record<string, unknown>, field: string): unknown =>
+  field.split('.').reduce<unknown>((at, key) => {
+    if (at === null || typeof at !== 'object') return undefined;
+    return (at as Record<string, unknown>)[key];
+  }, payload);
+
+/**
+ * The index a value of this shape needs. An array indexes as its member type:
+ * Qdrant indexes each element, which is why `topics` is a keyword index and not
+ * a type of its own.
+ */
+const indexFor = (value: unknown): string => {
+  const one = Array.isArray(value) ? value[0] : value;
+  if (typeof one === 'number') return Number.isInteger(one) ? 'integer' : 'float';
+  if (typeof one === 'boolean') return 'bool';
+  return 'keyword';
 };
 
 describe('the memory point payload', () => {
@@ -88,7 +107,19 @@ describe('the memory point payload', () => {
       transition: 'resolved',
       topics: ['cache-aside', 'latency-budget'],
     });
-    for (const field of INDEXED_FIELDS) expect(Object.keys(payload)).toContain(field);
+    // Every indexed field is a field the payload carries — a dotted path at the
+    // key it begins at, so an index on a nested field is still checked here —
+    // and the index it declares is the one its own value needs. Qdrant accepts
+    // a keyword index on a number and then matches no integer filter against
+    // it, so the declaration is only worth what the value agrees with; asking
+    // the server instead would be circular, since it reports back whatever it
+    // was asked for.
+    for (const [field, schema] of Object.entries(INDEXED_FIELDS)) {
+      expect(Object.keys(payload)).toContain(rootOf(field));
+      const value = valueAt(payload, field);
+      expect(value, `no value at ${field}`).toBeDefined();
+      expect(indexFor(value), `the index ${field} declares`).toBe(schema);
+    }
     expect(fromPayload(payload, 0.8)?.facets).toEqual(facets);
 
     // A point stored before facets existed reads exactly as it did: no facets at all.

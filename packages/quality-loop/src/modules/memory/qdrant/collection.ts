@@ -39,26 +39,50 @@ const INDEX_GENERATION = 'v2';
 export const collectionName = (model: string, dimensions: number): string =>
   `quality-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
 
-/**
- * Payload fields a filter may use; each gets a keyword index. The facets are
- * here because a search that cannot narrow by them is a search that reads the
- * whole store: measured on the live corpus, a candidate digested from the same
- * pipeline as the query was twice as likely to be kept as one from another.
- * Indexes are ensured on every boot, not only when the collection is created,
- * so a field added here reaches a collection that already exists.
- */
-export const INDEXED_FIELDS = [
-  'runId',
-  'pipeline',
-  'kind',
-  'dimension',
-  'polarity',
-  'transition',
-  'grounding',
-  'topics',
-  'criterionKinds',
-  'findingTypes',
+/** The index types Qdrant builds, as it names them. */
+export const PAYLOAD_INDEX_SCHEMAS = [
+  'keyword',
+  'integer',
+  'float',
+  'bool',
+  'datetime',
+  'uuid',
+  'text',
 ] as const;
+export type PayloadIndexSchema = (typeof PAYLOAD_INDEX_SCHEMAS)[number];
+
+/**
+ * Payload fields a filter may use, each declaring the index it needs. The
+ * facets are here because a search that cannot narrow by them is a search that
+ * reads the whole store: measured on the live corpus, a candidate digested from
+ * the same pipeline as the query was twice as likely to be kept as one from
+ * another. Indexes are ensured on every boot, not only when the collection is
+ * created, so a field added here reaches a collection that already exists.
+ *
+ * The index type is DECLARED per field rather than assumed, because Qdrant
+ * accepts a keyword index on a numeric field and then never matches an integer
+ * filter against it — which reads as "nothing found" rather than as an error.
+ * Every field here is a string or an array of strings today; the declaration is
+ * what keeps that from being an assumption the next field inherits.
+ *
+ * A nested field is written as Qdrant addresses it, dotted (`a.b`); `rootOf`
+ * gives the key the payload itself carries.
+ */
+export const INDEXED_FIELDS: Readonly<Record<string, PayloadIndexSchema>> = {
+  runId: 'keyword',
+  pipeline: 'keyword',
+  kind: 'keyword',
+  dimension: 'keyword',
+  polarity: 'keyword',
+  transition: 'keyword',
+  grounding: 'keyword',
+  topics: 'keyword',
+  criterionKinds: 'keyword',
+  findingTypes: 'keyword',
+};
+
+/** The payload key a (possibly dotted) indexed field path begins at. */
+export const rootOf = (field: string): string => field.split('.')[0];
 
 /** A UUID-shaped digest of (source run, ref): the same memory always lands on the same point. */
 export function pointId(sourceRunId: string, ref: string): string {

@@ -185,12 +185,15 @@ export class QdrantMemoryStore implements MemoryStore {
     // reach the collection that already holds the corpus, and asking for an
     // index that exists is a no-op. A refusal here is not fatal — an
     // unindexed facet is a slower filter, not a wrong answer — so it is
-    // reported and the store stays usable.
-    for (const field of INDEXED_FIELDS) {
+    // reported and the store stays usable. The index type comes from the
+    // field's own declaration: a keyword index on a numeric field is accepted
+    // and then matches no integer filter, which would read as an empty result
+    // rather than as a failure.
+    for (const [field, schema] of Object.entries(INDEXED_FIELDS)) {
       try {
         await this.client.createPayloadIndex(collection, {
           field_name: field,
-          field_schema: 'keyword',
+          field_schema: schema,
           wait: true,
         });
       } catch (error) {
