@@ -5,7 +5,9 @@
  * remediations are everything the producer could act on, worst first. A gate
  * observes this context and gives a verdict — it never edits it. Only what
  * `minHits` samples agreed on can block: an item confirmed short of them
- * (a lens that lost a sample) is priced and never a blocker.
+ * (a lens that lost a sample) is priced and never a blocker. A validation
+ * problem of severity `info` — a field past the size it was asked for —
+ * informs and is never acted on, so it moves no route.
  */
 import type {
   ConfirmedFinding,
@@ -201,18 +203,20 @@ const criterionRemediations = (ledger: EvidenceLedger): Remediation[] =>
       targetRefs: evidence.locationRefs,
     }));
 
+/** A validation problem the producer is asked to act on: anything above `info`, which only informs. */
+const actionable = (problem: ValidationReport['problems'][number]): boolean =>
+  problem.severity !== 'info';
+
 const validatorRemediations = (ledger: EvidenceLedger): Remediation[] =>
   ledger.validation
-    .filter((report) => report.problems.length > 0)
-    .map((report) => ({
+    .map((report) => ({ report, problems: report.problems.filter(actionable) }))
+    .filter(({ problems }) => problems.length > 0)
+    .map(({ report, problems }) => ({
       subject: { validator: report.validatorId },
       action: report.gate === 'block' ? 'retry' : 'revise',
-      severity: [...report.problems].sort(
-        (a, b) => severityRank(a.severity) - severityRank(b.severity),
-      )[0].severity,
-      targetRefs: unique(report.problems.flatMap((problem) => problem.locationRefs)).sort(
-        compareStrings,
-      ),
+      severity: [...problems].sort((a, b) => severityRank(a.severity) - severityRank(b.severity))[0]
+        .severity,
+      targetRefs: unique(problems.flatMap((problem) => problem.locationRefs)).sort(compareStrings),
     }));
 
 const subjectKey = (remediation: Remediation): string => Object.values(remediation.subject)[0];

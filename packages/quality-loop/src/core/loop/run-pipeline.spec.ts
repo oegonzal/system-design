@@ -547,7 +547,7 @@ describe('a size overrun', () => {
   const long: TinyOutput = { text: 'x'.repeat(25), parts: ['a'] };
   const warning = 'text: 25 characters; 20 asked, 60 accepted — noted, not refused';
 
-  it('[QL-47] is a warning, never a block: a provided artifact over its target is judged whole', async () => {
+  it('[QL-47] is a warning, never a block: a provided artifact over its target is judged whole, and decided as if it were not over', async () => {
     const trace = await runLoop(
       scriptedStages({ validators: [createSchemaValidator(), createBoundsValidator()] }),
       sized,
@@ -566,7 +566,15 @@ describe('a size overrun', () => {
     ]);
     expect(iteration.decision.gates.validatorsPassed).toBe(true);
     expect(iteration.critics).not.toEqual([]);
-    expect(iteration.decision.finalDecision).not.toBe('retry');
+    // The warning informs and moves nothing: judged without a bound, the decision is the same.
+    const unbounded = await runLoop(
+      scriptedStages({ validators: [createSchemaValidator(), createBoundsValidator()] }),
+      tinyPipeline(),
+      { goal: 'g', output: long, maxIterations: 1 },
+      clock,
+    );
+    expect(unbounded.iterations[0].validation[1].problems).toEqual([]);
+    expect(iteration.decision).toEqual(unbounded.iterations[0].decision);
   });
 
   it('[QL-47] a produced field past its target is an overrun on the producer — recorded once, degrading nothing', async () => {
