@@ -418,6 +418,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A size overrun is a warning, never a block: every artifact is read against its schema the way the model seam reads a reply, so only a structural fault blocks, and a field past its target is one warning per field on a validator that blocks nothing and moves no decision; a field a reply wrote past its size — the producer's or the deriver's — is an overrun on the record, in the one wording, that degrades nothing; a supplied rubric is refused only past the ceiling its deriver is accepted with and recorded as an overrun past the target; every stage is told the rule as it is applied; and a pipeline's output schema is converted for the model when it boots.",
   },
+  {
+    id: 'QL-48',
+    statement:
+      "A run's dump reports what the model seam kept: its manifest and its index row count every field a call wrote past its target — of them those past the ceiling, cut and trimmed — and the calls read from a cut transcript or asked again with their faults; run.md lists each such field with the call that wrote it, what was asked, accepted and written and how it was handled, and names on a call's own line the API calls a resumed turn took, a salvaged transcript and a feedback ask; each exchange's record carries its salvage and its API calls; and a record from before the seam salvaged reads as a run that kept nothing.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

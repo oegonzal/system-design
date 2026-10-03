@@ -25,8 +25,13 @@ import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
-/** Bump when a field changes meaning, so a later reader can tell records apart. */
-export const DUMP_SCHEMA_VERSION = 1;
+/**
+ * Bump when a field changes meaning, so a later reader can tell records apart.
+ * 2: a quality run's manifest and index row count what the model seam kept
+ * past a target, and each exchange's meta carries its `salvage` and
+ * `apiCalls`; a version-1 record reads as a run that salvaged nothing.
+ */
+export const DUMP_SCHEMA_VERSION = 2;
 
 export const INDEX_FILE = 'index.jsonl';
 

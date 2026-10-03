@@ -16,6 +16,7 @@ import {
 } from '@sysdesign/run-dump';
 
 import type { RunRecord } from '../core/contracts';
+import { tallyOverruns } from './overruns';
 import { renderRunMarkdown } from './render-run-markdown';
 
 const json = (value: unknown): string => `${JSON.stringify(jsonSafe(value), null, 2)}\n`;
@@ -58,6 +59,8 @@ function manifestOf(record: RunRecord) {
     parentRunId: record.parentRunId,
     recall: record.recall === null ? null : recallSummary(record.recall),
     exchangeCount: record.exchanges.length,
+    // What the seam kept past a target, salvaged from a cut turn or asked again.
+    overruns: tallyOverruns(record.exchanges),
     error: record.error,
     note: 'Contains the goal and the model’s prose verbatim.',
   };
@@ -117,6 +120,8 @@ function exchangeFiles(exchange: LlmExchange, position: number): DumpFile[] {
         requestId: exchange.requestId,
         error: exchange.error,
         schema: exchange.schema,
+        salvage: exchange.salvage ?? null,
+        apiCalls: exchange.apiCalls ?? null,
         systemTruncated: system.truncated ? system.originalBytes : null,
         userTruncated: user.truncated ? user.originalBytes : null,
         text: capText(exchange.text ?? '').text,
@@ -138,6 +143,7 @@ const indexRowOf = (record: RunRecord, manifest: Manifest): string =>
     overall: manifest.overall,
     iterations: manifest.iterations,
     exchangeCount: manifest.exchangeCount,
+    overruns: manifest.overruns.overruns,
     model: record.llm.model,
   })}\n`;
 

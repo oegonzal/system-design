@@ -1,7 +1,14 @@
 /** `run.md`: the human entry point of a dump — what happened, in order, in one screen. */
-import { markdownCell, type IterationTrace, type RunTrace } from '@sysdesign/contracts';
+import {
+  markdownCell,
+  type IterationTrace,
+  type Overrun,
+  type RunTrace,
+} from '@sysdesign/contracts';
+import type { LlmExchange } from '@sysdesign/llm';
 
 import type { RunRecord } from '../core/contracts';
+import { anySalvage, callOverruns, type OverrunTally } from './overruns';
 
 /** The manifest fields the page repeats. */
 export interface RunHeadline {
@@ -9,6 +16,7 @@ export interface RunHeadline {
   durationMs: number;
   finalDecision: string | null;
   stopReason: string | null;
+  overruns: OverrunTally;
 }
 
 /** One table row, every cell escaped: a reason quoting a finding key (`type|refs`) must not open a column. */
@@ -118,13 +126,66 @@ function recallSection(record: RunRecord): string[] {
   ];
 }
 
+const count = (value: number): string => value.toLocaleString('en-US');
+
+/** `N characters` or `N items`: what a field's size is counted in. */
+const sized = (overrun: Overrun): string =>
+  `${count(overrun.actual)} ${overrun.kind === 'list' ? 'items' : 'characters'}`;
+
+/** How the seam handled a field, with the items a trimmed list lost. */
+const handling = (overrun: Overrun): string =>
+  overrun.dropped === undefined
+    ? overrun.handling
+    : `${overrun.handling}, ${overrun.dropped} dropped`;
+
+/**
+ * Every field a call wrote past its target, and how the seam kept it — the
+ * headline the manifest counts, then one row per field. Nothing when no call
+ * overran, was read from a cut transcript, or was asked again with its faults.
+ */
+function overrunsSection(record: RunRecord, tally: OverrunTally): string[] {
+  if (!anySalvage(tally)) return [];
+  const rows = callOverruns(record.exchanges);
+  return [
+    `## Overruns`,
+    ``,
+    `${tally.overruns} overrun(s) in ${tally.calls} call(s) — ${tally.overCeiling} over the ceiling, ${tally.cut} cut, ${tally.trimmed} list(s) trimmed, ${tally.salvaged} salvaged from a cut transcript, ${tally.feedback} feedback ask(s)`,
+    ``,
+    ...(rows.length === 0
+      ? []
+      : [
+          `| call | field | asked | accepted | written | handling |`,
+          `| --- | --- | --- | --- | --- | --- |`,
+          ...rows.map(({ scope, ordinal, overrun }) =>
+            row([
+              `${scope} #${ordinal}`,
+              overrun.path,
+              count(overrun.target),
+              count(overrun.ceiling),
+              sized(overrun),
+              handling(overrun),
+            ]),
+          ),
+          ``,
+        ]),
+  ];
+}
+
+/** What a call's record adds to its line: a turn that resumed, a value read from a cut turn, an ask that named the last one's faults. */
+const salvageNotes = ({ apiCalls, salvage }: LlmExchange): string =>
+  [
+    apiCalls !== null && apiCalls !== undefined && apiCalls > 1 ? `, ${apiCalls} API calls` : '',
+    salvage?.from === 'transcript' ? ' (salvaged from transcript)' : '',
+    salvage?.feedback ? ' (asked with the previous reply’s faults)' : '',
+  ].join('');
+
 /** One line per exchange — with the recorded reason when it failed — or the reason there were none. */
 function modelCallsSection(record: RunRecord): string[] {
   if (record.exchanges.length === 0) return [`None — no stage reached the model.`, ``];
   return [
     ...record.exchanges.map(
       (exchange) =>
-        `- \`${exchange.scope}\` #${exchange.ordinal} — ${exchange.outcome}, ${exchange.durationMs} ms${exchange.usage ? `, ${exchange.usage.inputTokens} in / ${exchange.usage.outputTokens} out` : ''}${exchange.error ? ` — ${exchange.error.name}: ${exchange.error.message.replace(/\s+/g, ' ').trim()}` : ''}`,
+        `- \`${exchange.scope}\` #${exchange.ordinal} — ${exchange.outcome}, ${exchange.durationMs} ms${exchange.usage ? `, ${exchange.usage.inputTokens} in / ${exchange.usage.outputTokens} out` : ''}${salvageNotes(exchange)}${exchange.error ? ` — ${exchange.error.name}: ${exchange.error.message.replace(/\s+/g, ' ').trim()}` : ''}`,
     ),
     ``,
   ];
@@ -150,6 +211,11 @@ export function renderRunMarkdown(record: RunRecord, headline: RunHeadline): str
   if (record.error) {
     lines.push(`## Failed`, ``, '```', record.error.message, '```', ``);
   }
-  lines.push(`## Model calls`, ``, ...modelCallsSection(record));
+  lines.push(
+    ...overrunsSection(record, headline.overruns),
+    `## Model calls`,
+    ``,
+    ...modelCallsSection(record),
+  );
   return lines.join('\n');
 }

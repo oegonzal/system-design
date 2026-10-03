@@ -1,4 +1,6 @@
-import { recallOf, recallWithout } from '@sysdesign/contracts';
+import { recallOf, recallWithout, type Overrun } from '@sysdesign/contracts';
+import type { LlmExchange } from '@sysdesign/llm';
+import { DUMP_SCHEMA_VERSION } from '@sysdesign/run-dump';
 import { describe, expect, it } from 'vitest';
 
 import type { RunRecord } from '../core/contracts';
@@ -229,6 +231,152 @@ describe('buildRunDump', () => {
     const own = buildRunDump(record({}), null);
     expect(JSON.parse(content(own, 'manifest.json'))).toMatchObject({ parentRunId: null });
     expect(content(own, 'run.md')).not.toContain('Opened for run');
+  });
+
+  describe('what the model seam kept', () => {
+    const overrun = (fields: Partial<Overrun> & Pick<Overrun, 'path' | 'handling'>): Overrun => ({
+      at: [],
+      kind: 'text',
+      target: 300,
+      ceiling: 375,
+      actual: 358,
+      ...fields,
+    });
+    const exchange = (fields: Partial<LlmExchange>): LlmExchange => ({
+      scope: 'producer',
+      ordinal: 1,
+      model: 'test-model',
+      system: 's',
+      user: 'u',
+      schema: {},
+      maxTokens: 48_000,
+      startedAt: '2026-10-03T00:00:00.000Z',
+      durationMs: 5,
+      outcome: 'ok',
+      stopReason: 'end_turn',
+      usage: { inputTokens: 4, outputTokens: 40_173 },
+      requestId: null,
+      text: null,
+      response: {},
+      error: null,
+      ...fields,
+    });
+    const salvage = {
+      repairs: [],
+      issues: [],
+      from: 'result' as const,
+      feedback: false,
+    };
+    const exchanges: LlmExchange[] = [
+      exchange({
+        apiCalls: 2,
+        salvage: {
+          ...salvage,
+          overruns: [
+            overrun({ path: 'brief.bindings[2].claim', handling: 'accepted' }),
+            overrun({
+              path: 'narrative.overview',
+              target: 1_400,
+              ceiling: 1_750,
+              actual: 4_400,
+              handling: 'cut',
+            }),
+            overrun({
+              path: 'graph.nodes[3].responsibilities',
+              kind: 'list',
+              target: 6,
+              ceiling: 8,
+              actual: 13,
+              handling: 'trimmed',
+              dropped: 5,
+            }),
+          ],
+        },
+      }),
+      exchange({
+        scope: 'critic.scale.s1',
+        ordinal: 2,
+        error: { name: 'Salvaged', message: 'Timeout: the call outlived its limit' },
+        salvage: {
+          ...salvage,
+          from: 'transcript',
+          feedback: true,
+          overruns: [
+            overrun({
+              path: 'findings[0].rationale',
+              target: 900,
+              ceiling: 1_125,
+              actual: 1_210,
+              handling: 'kept-over-ceiling',
+            }),
+          ],
+        },
+      }),
+      // A record from before the seam salvaged: nothing kept, nothing counted.
+      exchange({ scope: 'critic.scale.s2', ordinal: 1 }),
+    ];
+
+    it('[QL-48] the manifest and the index row count every field written past its target, and each exchange records its salvage and API calls', () => {
+      const dump = buildRunDump(record({ exchanges }), null);
+      const manifest = JSON.parse(content(dump, 'manifest.json')) as Record<string, unknown>;
+      expect(manifest['schemaVersion']).toBe(DUMP_SCHEMA_VERSION);
+      expect(DUMP_SCHEMA_VERSION).toBe(2);
+      expect(manifest['overruns']).toEqual({
+        overruns: 4,
+        calls: 2,
+        overCeiling: 3,
+        cut: 1,
+        trimmed: 1,
+        salvaged: 1,
+        feedback: 1,
+      });
+      expect(JSON.parse(dump.indexRow)).toMatchObject({ overruns: 4, exchangeCount: 3 });
+
+      const meta = JSON.parse(content(dump, '05-llm/01.producer.1.meta.json')) as Record<
+        string,
+        unknown
+      >;
+      expect(meta['apiCalls']).toBe(2);
+      expect(meta['salvage']).toEqual(exchanges[0].salvage);
+      const old = JSON.parse(content(dump, '05-llm/03.critic.scale.s2.1.meta.json')) as Record<
+        string,
+        unknown
+      >;
+      expect(old).toMatchObject({ salvage: null, apiCalls: null });
+    });
+
+    it('[QL-48] run.md lists every overrun — asked, accepted, written and how it was handled — and names a resumed, salvaged or re-asked call on its line', () => {
+      const page = content(buildRunDump(record({ exchanges }), null), 'run.md').split('\n');
+      const at = page.indexOf('## Overruns');
+      expect(at).toBeGreaterThan(0);
+      expect(page[at + 2]).toBe(
+        '4 overrun(s) in 2 call(s) — 3 over the ceiling, 1 cut, 1 list(s) trimmed, 1 salvaged from a cut transcript, 1 feedback ask(s)',
+      );
+      expect(page.slice(at + 4, at + 10)).toEqual([
+        '| call | field | asked | accepted | written | handling |',
+        '| --- | --- | --- | --- | --- | --- |',
+        '| producer #1 | brief.bindings[2].claim | 300 | 375 | 358 characters | accepted |',
+        '| producer #1 | narrative.overview | 1,400 | 1,750 | 4,400 characters | cut |',
+        '| producer #1 | graph.nodes[3].responsibilities | 6 | 8 | 13 items | trimmed, 5 dropped |',
+        '| critic.scale.s1 #2 | findings[0].rationale | 900 | 1,125 | 1,210 characters | kept-over-ceiling |',
+      ]);
+      // The section sits with the calls it reports on.
+      expect(page.indexOf('## Model calls')).toBeGreaterThan(at);
+      expect(page).toContain('- `producer` #1 — ok, 5 ms, 4 in / 40173 out, 2 API calls');
+      expect(page).toContain(
+        '- `critic.scale.s1` #2 — ok, 5 ms, 4 in / 40173 out (salvaged from transcript) (asked with the previous reply’s faults) — Salvaged: Timeout: the call outlived its limit',
+      );
+      expect(page).toContain('- `critic.scale.s2` #1 — ok, 5 ms, 4 in / 40173 out');
+    });
+
+    it('[QL-48] a run whose calls kept nothing past a target says nothing about overruns, and counts none', () => {
+      const dump = buildRunDump(record({ exchanges: [exchanges[2]] }), null);
+      expect(content(dump, 'run.md')).not.toContain('## Overruns');
+      expect(JSON.parse(dump.indexRow)).toMatchObject({ overruns: 0 });
+      // A turn that took one API call does not say so.
+      const single = buildRunDump(record({ exchanges: [exchange({ apiCalls: 1 })] }), null);
+      expect(content(single, 'run.md')).not.toContain('API calls');
+    });
   });
 
   it('[QL-10] a run that failed before any trace still gets a manifest, the goal and the error', () => {
