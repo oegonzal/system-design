@@ -908,6 +908,16 @@ every recall. Closing one is the first number that reads as _learning_ rather th
 digest producer that knows the standing gaps writes the lesson the next recall will ask for, while
 its critics still hold it to the record's evidence.
 
+**What the built report then measured, 2026-10-03.** `GET /memory/gaps` over the five recalls of this
+brief returns one group with **eleven** standing gaps, every one of them named exactly once — although
+at least four are the same need in different words: "alias uniqueness enforcement (c5)", "how
+custom-alias uniqueness is guaranteed alongside system-generated codes", "whether a marketer can
+create a short link with an optional custom alias", "creating a short link with an optional custom
+alias". So the grouping by brief is right and the list is useful, and the "named 4×" above is what a
+reader would want rather than what exact-text dedupe can give. Reading two wordings as one need takes
+embeddings, which means a decision about writing rather than only reading; until then the per-gap
+counts understate repetition and the group count does not.
+
 ### 8.3 Measure the budget and a floor before changing either
 
 **What it is.** Two numbers in `probesOf` were chosen, not measured: the goal probe keeps the whole
