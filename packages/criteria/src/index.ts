@@ -448,6 +448,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A produce after an attempt that was judged and did not beat the best is told what that attempt's judges confirmed: its finding notes as its policy selected them, less any the best's remediations already name, under their own heading after what to fix in the best and without that attempt's locations, which no prompt shows — for a producer that declares it consumes `setbacks`; a producer that does not, an ask after the best itself and an ask after an attempt refused before any judge read it are briefed as before.",
   },
+  {
+    id: 'QL-57',
+    statement:
+      "A run's dump headlines the iteration the run stands on: the manifest's and the index row's overall are the best iteration's score, and run.md's verdict line gives the best iteration's overall beside its number, with the last iteration's score in a clause of its own only when the last is not the best — so a run whose last attempt fell short or produced nothing never reads as scoring what that attempt scored.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

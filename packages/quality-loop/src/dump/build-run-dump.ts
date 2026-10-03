@@ -16,6 +16,7 @@ import {
 } from '@sysdesign/run-dump';
 
 import type { RunRecord } from '../core/contracts';
+import { outputsOf } from '../core/outputs';
 import { tallyOverruns } from './overruns';
 import { renderRunMarkdown } from './render-run-markdown';
 
@@ -31,10 +32,15 @@ const withTruncationNote = (capped: ReturnType<typeof capText>): string =>
 const withNewline = (text: string): string =>
   text.length === 0 || text.endsWith('\n') ? text : `${text}\n`;
 
-/** `manifest.json`: the run at a glance, every number the index row and `run.md` repeat. */
+/**
+ * `manifest.json`: the run at a glance, every number the index row and
+ * `run.md` repeat. Its `overall` is the best iteration's, as the run's own
+ * record says it: the last one may have fallen short of it or produced
+ * nothing at all.
+ */
 function manifestOf(record: RunRecord) {
   const { trace } = record;
-  const last = trace?.iterations[trace.iterations.length - 1] ?? null;
+  const best = trace === null ? null : outputsOf(trace).best;
   const startedAt = Date.parse(record.startedAt);
   const finishedAt = record.finishedAt ? Date.parse(record.finishedAt) : startedAt;
   return {
@@ -50,7 +56,7 @@ function manifestOf(record: RunRecord) {
     git: record.git,
     finalDecision: trace?.finalDecision ?? null,
     stopReason: trace?.stopReason ?? null,
-    overall: last?.decision.scores.overall ?? null,
+    overall: best?.decision.scores.overall ?? null,
     bestIteration: trace?.bestIteration ?? null,
     iterations: trace?.iterations.length ?? 0,
     criteria: trace?.contract.criteria.length ?? 0,

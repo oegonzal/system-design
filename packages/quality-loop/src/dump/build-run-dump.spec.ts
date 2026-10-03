@@ -15,6 +15,7 @@ import { describePipeline } from '../core/pipeline';
 import { runLoop } from '../core/loop/run-pipeline';
 import {
   criterion,
+  DRAFT_1,
   finding,
   result,
   scriptedCritic,
@@ -305,6 +306,51 @@ describe('buildRunDump', () => {
     );
     expect(unscreened).not.toContain('novelty:');
     expect(unscreened).not.toContain('· origin');
+  });
+
+  it("[QL-57] the manifest, the index row and the verdict give the best iteration's score, and a last one that fell short only beside it", async () => {
+    // Iteration 1 is judged and decided revise; iteration 2's produce answers
+    // nothing, so it scores 0 and the run stops on it, standing on iteration 1.
+    const stages = {
+      deriveCriteria: () =>
+        Promise.resolve({ criteria: [criterion('c1')], diagnostic: null, overruns: [] }),
+      producer: scriptedProducer([DRAFT_1, null]),
+      validators: [],
+      controller: STANDARD,
+      critics: [scriptedCritic('critic.tiny', [[[finding({ criterionIds: ['c1'] })]]])],
+      evaluators: [
+        scriptedEvaluator('evaluator.tiny', [[[result({ criterionId: 'c1', result: 'partial' })]]]),
+      ],
+    };
+    const trace = await runLoop(stages, tinyPipeline(), { goal: 'g', maxIterations: 2 }, () => 0);
+    const [best, last] = trace.iterations;
+    expect(trace.bestIteration).toBe(1);
+    expect(last.decision.scores.overall).toBe(0);
+    expect(best.decision.scores.overall).toBeGreaterThan(0);
+
+    const dump = buildRunDump(record({ trace }), null);
+    expect(JSON.parse(content(dump, 'manifest.json'))).toMatchObject({
+      overall: best.decision.scores.overall,
+      bestIteration: 1,
+    });
+    expect(JSON.parse(dump.indexRow)).toMatchObject({ overall: best.decision.scores.overall });
+    const verdict = content(dump, 'run.md')
+      .split('\n')
+      .find((line) => line.startsWith(`**${trace.finalDecision}**`));
+    expect(verdict).toBe(
+      `**${trace.finalDecision}** (stopped: produce-lost) · overall ${best.decision.scores.overall}/100 · best iteration 1 · last iteration 2 0/100`,
+    );
+
+    // A run whose last iteration is its best says its score once.
+    const single = await runLoop(
+      { ...stages, producer: scriptedProducer([DRAFT_1]) },
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      () => 0,
+    );
+    expect(content(buildRunDump(record({ trace: single }), null), 'run.md')).toContain(
+      `· overall ${single.iterations[0].decision.scores.overall}/100 · best iteration 1\n`,
+    );
   });
 
   it('[QL-32] a run opened for another names it, in its manifest and on its page; one started on its own does not', () => {

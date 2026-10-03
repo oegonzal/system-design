@@ -12,6 +12,7 @@ import {
 import type { LlmExchange } from '@sysdesign/llm';
 
 import type { RunRecord } from '../core/contracts';
+import { outputsOf } from '../core/outputs';
 import { anySalvage, callOverruns, type OverrunTally } from './overruns';
 
 /** The manifest fields the page repeats. */
@@ -48,12 +49,25 @@ const iterationRow = (iteration: IterationTrace<unknown>): string => {
 const stoppedLine = (trace: RunTrace, status: string): string =>
   trace.stopReason !== null ? `stopped: ${trace.stopReason}` : `${status}, no stop reason`;
 
+/**
+ * The verdict with the best iteration's score — the one the run stands on —
+ * and the last iteration's beside it when that is another: a last attempt
+ * that fell short, or produced nothing, never reads as the run's score.
+ */
+function verdictLine(trace: RunTrace, status: string): string {
+  const last = trace.iterations[trace.iterations.length - 1];
+  const best = outputsOf(trace).best ?? last;
+  const stopped = stoppedLine(trace, status);
+  const lastClause =
+    last === best ? '' : ` · last iteration ${last.iteration} ${last.decision.scores.overall}/100`;
+  return `**${trace.finalDecision}** (${stopped}) · overall ${best.decision.scores.overall}/100 · best iteration ${best.iteration}${lastClause}`;
+}
+
 /** The verdict, every iteration as a row, and the last iteration's dimensions. */
 function traceSection(trace: RunTrace, status: string): string[] {
   const last = trace.iterations[trace.iterations.length - 1];
-  const stopped = stoppedLine(trace, status);
   return [
-    `**${trace.finalDecision}** (${stopped}) · overall ${last.decision.scores.overall}/100 · best iteration ${trace.bestIteration}`,
+    verdictLine(trace, status),
     ``,
     `## Iterations`,
     ``,
