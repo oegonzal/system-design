@@ -5,7 +5,7 @@
  * `OutputShape`, the record codec and composer beside it, and two exact
  * validators.
  */
-import { bound } from '@sysdesign/contracts';
+import { LARGEST_STATEMENT_BOUND } from '@sysdesign/contracts';
 
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
@@ -21,14 +21,6 @@ import { experienceDigestOutput, type ExperienceDigest } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
 const MAX_CRITERIA = 16;
-/**
- * The statement bound the deriver writes within. Its target is above the
- * longest it has measurably written (751 characters, across the recorded
- * runs to 2026-10-02 — and that was a second mode of a persona that asked
- * for aliases and iterations), with headroom; past the ceiling a statement
- * is kept and recorded rather than discarding the rubric.
- */
-const STATEMENT_BOUND = bound(1200);
 
 export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   id: EXPERIENCE_DIGEST_ID,
@@ -56,7 +48,14 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       duplicate_memory: 'Two memories teaching the same thing.',
     },
     maxCriteria: MAX_CRITERIA,
-    statementBound: STATEMENT_BOUND,
+    // The statement bound the deriver writes within, and the one the edge's
+    // cap on a supplied statement is sized from, so it is declared once, in
+    // contracts. Its target is above the longest this deriver has measurably
+    // written (751 characters, across the recorded runs to 2026-10-02 — and
+    // that was a second mode of a persona that asked for aliases and
+    // iterations), with headroom; past the ceiling a statement is kept and
+    // recorded rather than discarding the rubric.
+    statementBound: LARGEST_STATEMENT_BOUND,
     output: experienceDigestOutput,
   },
 

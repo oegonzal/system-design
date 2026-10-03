@@ -1,4 +1,8 @@
-import { boundsAgainstMeasured, CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
+import {
+  boundsAgainstMeasured,
+  CRITERION_STATEMENT_BOUND,
+  LARGEST_STATEMENT_BOUND,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
@@ -89,11 +93,12 @@ describe('the experience-digest pipeline', () => {
     ).toEqual([]);
   });
 
-  it('[QL-2] its deriver’s statement bound is its own, above the contract’s, and its persona asks for concision', () => {
+  it('[QL-2] [QL-47] its deriver’s statement bound is the largest a pipeline may declare — the one the edge’s cap is sized from, declared once — above the contract’s, and its persona asks for concision', () => {
     // The longest statement the digest's deriver has written (751
     // characters, in a record whose rubric was refused whole for it, three
     // attempts running) is held by the fixture above; the persona that asked
     // for every alias and iteration is gone.
+    expect(EXPERIENCE_DIGEST.task.statementBound).toBe(LARGEST_STATEMENT_BOUND);
     expect(describePipeline(EXPERIENCE_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
       CRITERION_STATEMENT_BOUND.ceiling,
     );

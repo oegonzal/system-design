@@ -40,11 +40,11 @@ export const CRITERION_KIND_MAX_LENGTH = 60;
 export const CRITERION_STATEMENT_BOUND = bound(400);
 /**
  * The largest statement bound a pipeline may declare — the experience
- * digest's, sized from what its deriver measurably wrote. A rubric a pipeline
- * derives is handed back by whoever adopts an iteration it judged, so the
- * HTTP edge sizes its cap on a supplied statement from this bound
- * (`MAX_PROVIDED_STATEMENT_LENGTH`), and boot holds every pipeline's own bound
- * under that cap.
+ * digest's, which declares this one, sized from what its deriver measurably
+ * wrote. A rubric a pipeline derives is handed back by whoever adopts an
+ * iteration it judged, so the HTTP edge sizes its cap on a supplied statement
+ * from this bound (`MAX_PROVIDED_STATEMENT_LENGTH`), and boot holds every
+ * pipeline's own bound under that cap.
  */
 export const LARGEST_STATEMENT_BOUND = bound(1200);
 
