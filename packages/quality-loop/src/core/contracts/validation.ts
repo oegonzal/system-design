@@ -15,6 +15,7 @@ import {
   type LenientParse,
   type Severity,
   type ValidationProblem,
+  type Withholding,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
@@ -75,5 +76,22 @@ export function indexedValidator<A, I>(
       const problems = index === null ? whenNoIndex : rule(parsed.value, index);
       return { validatorId: id, gate: 'block', problems };
     },
+  };
+}
+
+/**
+ * A validator — every field of it passed through — whose problems warn
+ * rather than block, both on the validator and on every report it returns,
+ * and which declares what its problems withhold of the item they name when
+ * the pipeline says so (`Validator.withholds`; undeclared, a reader withholds
+ * every item they name). Only a warning may declare it: a failing blocking
+ * validator closes admission, so no reader ever sees its problems.
+ */
+export function asWarning<A>(validator: Validator<A>, withholds?: Withholding): Validator<A> {
+  return {
+    ...validator,
+    gate: 'warn',
+    ...(withholds === undefined ? {} : { withholds }),
+    validate: (artifact, contract) => ({ ...validator.validate(artifact, contract), gate: 'warn' }),
   };
 }
