@@ -1,3 +1,6 @@
+export * from './entities/browser-decision.entity';
+export * from './entities/browser-session.entity';
+export * from './entities/browser-task.entity';
 export * from './entities/coaching-run.entity';
 export * from './entities/design-revision.entity';
 export * from './entities/design-session.entity';

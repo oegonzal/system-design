@@ -2,6 +2,9 @@ import { UnderscoreNamingStrategy } from '@mikro-orm/core';
 import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 
 import { connectionSettings } from './connection';
+import { BrowserDecision } from './entities/browser-decision.entity';
+import { BrowserSession } from './entities/browser-session.entity';
+import { BrowserTask } from './entities/browser-task.entity';
 import { CoachingRun } from './entities/coaching-run.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
@@ -53,6 +56,9 @@ export const ormOptions = {
     QualityRunIteration,
     QualityRunFinding,
     QualityRunCriterionResult,
+    BrowserSession,
+    BrowserTask,
+    BrowserDecision,
     StarStory,
     GovconOpportunity,
     GovconSourceCall,
