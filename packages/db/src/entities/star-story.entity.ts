@@ -25,8 +25,9 @@ export class StarStory {
   @PrimaryKey({ type: 'uuid' })
   id: string = crypto.randomUUID();
 
+  /** Bounded by `STORY_TITLE_BOUND` at the edge, never by a column width. */
   @Unique()
-  @Property({ type: 'varchar', length: 120 })
+  @Property({ type: 'text' })
   title!: string;
 
   @Property({ type: 'text' })

@@ -48,7 +48,8 @@ export class Prompt {
   @ManyToOne(() => ExperienceProfile, { deleteRule: 'restrict', nullable: true })
   experience: Rel<ExperienceProfile> | null = null;
 
-  @Property({ type: 'varchar', length: 120 })
+  /** Bounded by `PROMPT_TITLE_BOUND` at the edge, never by a column width. */
+  @Property({ type: 'text' })
   title!: string;
 
   @Property({ type: 'text' })
