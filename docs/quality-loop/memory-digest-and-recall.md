@@ -158,6 +158,14 @@ between them), the criteria cap never. Records hold a median of 9 findings (p90 
 criteria. Eighty-three of 94 source runs had a single iteration, five had two, six had three: **88% of
 digests had no transition to reason about**, which matters for what the lessons can be (§4.1).
 
+> **This figure has an expiry, and it has expired.** Measured 2026-10-02 over the 94 digests then
+> recorded. Re-measured 2026-10-03 over the 18 canvas runs the service holds: **9 of 18 are
+> multi-iteration**, and a resolved transition is citable from 7 of them. The corpus matured; the
+> number did not. Every conclusion below that rests on "88% single-iteration" is weaker than it
+> reads, and in particular a scarcity of transition-bearing lessons can no longer be explained by
+> the sources. A measurement written into a document acquires an expiry at the moment it is written;
+> this one says when it was taken, which is the only reason the drift was visible.
+
 ### 2.4 The goal the digest reads (`pipelines/experience-digest/input.ts`)
 
 `renderGoal` lays the record out as sections, and the sizes below are a real canvas digest
@@ -368,7 +376,8 @@ latency budgets, capacity sections and dependency graphs.
 
 Three things cap the abstraction level:
 
-- **88% of digests saw a single iteration**, so the record holds what was _found_, not what _fixing
+- **88% of digests saw a single iteration** — as measured on 2026-10-02; 9 of 18 canvas runs were
+  multi-iteration by 2026-10-03, see the note in §2.3 — so the record holds what was _found_, not what _fixing
   it changed_. The rules forbid claiming an effect without a transition (§2.3), so lessons become
   "this defect is caught by the judges" rather than "this change resolved it". Only the eleven multi-
   iteration digests could learn a proven fix. This is a property of the lesson **text** — the `text`,
