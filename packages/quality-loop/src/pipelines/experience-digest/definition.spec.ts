@@ -1,11 +1,10 @@
-import { CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
+import { boundsAgainstMeasured, CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { criteriaSchema } from '../../core/stages/schemas';
-import { boundsBelowMeasured, capsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
 import { EXPERIENCE_DIGEST } from './definition';
+import measured from './measured.json';
 import { experienceDigestOutput } from './output';
 import { sampleDigest } from './testing';
 
@@ -60,59 +59,41 @@ describe('the experience-digest pipeline', () => {
     }
   });
 
-  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
-    // The longest each path has been written across the recorded runs
-    // (static/runs, to 2026-10-01). A string past its bound is a miss that
-    // discards the whole answer — never cut to fit — so no bound may be one
-    // the producer meets.
-    const measured: Record<string, number> = {
-      summary: 755,
-      'memories[].insight': 862,
-      'memories[].appliesWhen': 235,
-    };
-    expect(boundsBelowMeasured(experienceDigestOutput.schema, measured)).toEqual([]);
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    // `measured.json`: every field across the recorded runs, refreshed by
+    // `pnpm measure:bounds`. A target under the 99th percentile written would
+    // make most replies overruns, and a ceiling at or under the longest would
+    // keep it past the ceiling rather than accept it.
+    expect(
+      boundsAgainstMeasured(
+        [experienceDigestOutput.schema, deriverSchema(EXPERIENCE_DIGEST.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
-  it('[QL-2] its deriver’s statement target sits above the longest it has measurably written, and its persona asks for concision', () => {
-    // The longest statement the digest's deriver has written across the
-    // recorded runs (static/runs, to 2026-10-02): 751 characters, in a
-    // record whose rubric was refused whole for it, three attempts running.
-    // The persona that asked for every alias and iteration is gone; the
-    // target is still sized above what it produced, so a statement that long
-    // is what was asked for, not an overrun kept past the ceiling.
-    const kinds = Object.keys(EXPERIENCE_DIGEST.task.criterionKinds) as [string, ...string[]];
-    const schema = criteriaSchema(
-      kinds,
-      EXPERIENCE_DIGEST.task.maxCriteria,
-      criterionLengthBound(EXPERIENCE_DIGEST.task),
-    );
-    expect(boundsBelowMeasured(schema, { 'criteria[].statement': 751 })).toEqual([]);
+  it('[QL-2] its deriver’s statement bound is its own, above the contract’s, and its persona asks for concision', () => {
+    // The longest statement the digest's deriver has written (751
+    // characters, in a record whose rubric was refused whole for it, three
+    // attempts running) is held by the fixture above; the persona that asked
+    // for every alias and iteration is gone.
     expect(describePipeline(EXPERIENCE_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
+      CRITERION_STATEMENT_BOUND.ceiling,
+    );
+    expect(measured.fields['criteria[].statement'].max).toBeGreaterThan(
       CRITERION_STATEMENT_BOUND.ceiling,
     );
     const persona = EXPERIENCE_DIGEST.deriveCriteria.persona;
     expect(persona).toMatch(/one concise sentence/);
     expect(persona).toMatch(/within the length the schema asks for/);
     expect(persona).not.toMatch(/Name the aliases and iterations/);
-    // The deriver has measurably written 6,783 output tokens for one record.
-    expect(EXPERIENCE_DIGEST.deriveCriteria.maxTokens).toBeGreaterThan(6783);
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded digest runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
-    // also the call's time limit, so one a stage outwrites is a call cut
-    // short — as the producer was, at a fixed 300 s, on 2026-10-02. The
-    // producer's figure is an answer the schema missed.
-    const measured: Record<string, number> = {
-      criteria: 7_684,
-      producer: 31_719,
-      'critic.attribution': 26_918,
-      'critic.provenance': 27_805,
-      'critic.transfer': 19_963,
-      'evaluator.attribution': 13_321,
-    };
-    expect(capsBelowMeasured(EXPERIENCE_DIGEST, measured)).toEqual([]);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // A cap is also the call's time limit, so one a stage outwrites is a call
+    // cut short — as the producer was, at a fixed 300 s, on 2026-10-02.
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(EXPERIENCE_DIGEST, measured.caps)).toEqual([]);
   });
 
   it('[QL-6] the digest a model answers with contains no number', () => {

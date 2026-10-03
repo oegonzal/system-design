@@ -28,7 +28,8 @@ import { z } from 'zod';
 import { section, type OutputShape } from '../../core/contracts';
 import { ALIAS_MAX, MAX_EVIDENCE, MAX_MEMORIES } from './input';
 
-const SUMMARY_BOUND = bound(950);
+/** Above the 99th percentile the producer has measurably written (`measured.json`). */
+const SUMMARY_BOUND = bound(1050);
 const MEMORIES_BOUND = bound(MAX_MEMORIES, 'list');
 const MEMORY_EVIDENCE_BOUND = bound(8, 'list');
 const UNUSED_BOUND = bound(MAX_EVIDENCE, 'list');

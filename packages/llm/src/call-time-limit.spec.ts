@@ -12,10 +12,10 @@ import measured from './fixtures/measured-calls.json';
 
 /**
  * Successful calls extracted from the recorded runs (static/runs/<run>/05-llm/
- * <call>.meta.json, 2026-09-20 → 2026-10-02): the longest, the slowest per
- * token, the tightest against their own declaration, the ones that wrote past
- * it, and the longest of every pipeline stage. Each keeps what it declared,
- * what it wrote and how long it took.
+ * <call>.meta.json) by `pnpm measure:bounds`: the longest, the slowest per
+ * token, the tightest against their own declaration, the furthest past it,
+ * and the longest of every pipeline stage. Each keeps what it declared, what
+ * it wrote and how long it took.
  */
 interface MeasuredCall {
   run: string;

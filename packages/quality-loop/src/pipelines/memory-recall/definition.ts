@@ -64,7 +64,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 18000,
     },
     {
       id: 'critic.grounding',
@@ -72,7 +72,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 18000,
+      maxTokens: 20000,
     },
   ],
 

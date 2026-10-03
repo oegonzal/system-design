@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 import { CANVAS_NODES_BOUND, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_KEYS_BOUND } from './canvas';
 import { designSubmissionSchema, type DesignSubmission } from './canvas.schema';
+import { boundsAgainstMeasured } from './measured-bounds';
+import measured from './measured/canvas.json';
 
 /** A complete, valid submission: every optional field present once. */
 export function submissionFixture(): DesignSubmission {
@@ -107,6 +109,16 @@ describe('designSubmissionSchema', () => {
     const noClaim = structuredClone(fixture);
     noClaim.brief!.bindings[0].claim = '';
     expect(designSubmissionSchema.safeParse(noClaim).success).toBe(false);
+  });
+
+  it('[QL-49] every bound the coach writes into sits above what it has measurably written', () => {
+    // `measured/canvas.json`: every field the canvas coach wrote across the
+    // recorded runs, refreshed by `pnpm measure:bounds`. A target under the
+    // 99th percentile written would make most revisions overruns, and a
+    // ceiling at or under the longest would keep it past the ceiling rather
+    // than accept it — which a submit, held to the ceilings, then refuses.
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(boundsAgainstMeasured(designSubmissionSchema, measured.fields)).toEqual([]);
   });
 
   it('converts to JSON Schema, so a model can be asked to write into it', () => {

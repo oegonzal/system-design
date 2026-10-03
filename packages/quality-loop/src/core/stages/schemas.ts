@@ -38,18 +38,19 @@ const refs = (ids: readonly string[], b: Bound, description: string) => {
     : bounded.list(NO_REFS, z.string(), { description });
 };
 
-/**
- * The target sits above the longest rationale any lens has measurably
- * written (695 characters, a critic, across every recorded run); past the
- * ceiling a rationale is kept and recorded, never a lost sample.
+/*
+ * Every lens bound sits at or above the 99th percentile any lens has
+ * measurably written, and its ceiling above the longest (`measured.json`
+ * beside this file, refreshed by `pnpm measure:bounds`): past the ceiling a
+ * rationale is kept and recorded and a list trimmed, never a lost sample.
  */
 export const RATIONALE_BOUND = bound(900);
 /** How many artifact parts one finding may point at. */
-const LOCATION_REFS_BOUND = bound(8, 'list');
+const LOCATION_REFS_BOUND = bound(10, 'list');
 /** How many criteria one finding may weaken. */
-const CRITERION_REFS_BOUND = bound(4, 'list');
+const CRITERION_REFS_BOUND = bound(6, 'list');
 /** How many artifact parts one result may cite as evidence. */
-const EVIDENCE_REFS_BOUND = bound(6, 'list');
+const EVIDENCE_REFS_BOUND = bound(10, 'list');
 
 /**
  * The deriver's answer: at most `maxCriteria` — the engine's own cap, so a

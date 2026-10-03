@@ -1,10 +1,10 @@
+import { boundsAgainstMeasured } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { criterionLengthBound } from '../../core/contracts';
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { criteriaSchema } from '../../core/stages/schemas';
-import { boundsBelowMeasured, capsBelowMeasured, jsonSchemaTypes } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
+import measured from './measured.json';
 import { memoryPackOutput } from './output';
 import { samplePack } from './testing';
 
@@ -21,18 +21,12 @@ describe('the memory-recall pipeline', () => {
     expect(summary.validators.map((validator) => validator.id)).toEqual(['references', 'limits']);
   });
 
-  it('[QL-2] its deriver keeps the contract’s statement bound, above the longest it has measurably written', () => {
-    // 286 characters across the recorded runs (static/runs, to 2026-10-02):
-    // the persona asks for the query's own numbers and wording, never for
-    // every alias, so no bound of its own is declared.
+  it('[QL-2] [QL-49] its deriver keeps the contract’s statement bound, above what it has measurably written', () => {
+    // The persona asks for the query's own numbers and wording, never for
+    // every alias, so no bound of its own is declared; the contract's is held
+    // to what the deriver wrote with the producer's fields, below.
     expect(MEMORY_RECALL.task.statementBound).toBeUndefined();
-    const kinds = Object.keys(MEMORY_RECALL.task.criterionKinds) as [string, ...string[]];
-    const schema = criteriaSchema(
-      kinds,
-      MEMORY_RECALL.task.maxCriteria,
-      criterionLengthBound(MEMORY_RECALL.task),
-    );
-    expect(boundsBelowMeasured(schema, { 'criteria[].statement': 286 })).toEqual([]);
+    expect(measured.fields['criteria[].statement'].n).toBeGreaterThan(0);
   });
 
   it('[QL-4] every location the pack exposes is printed verbatim where a judge reads it', () => {
@@ -51,35 +45,23 @@ describe('the memory-recall pipeline', () => {
     expect(memoryPackOutput.schema.safeParse(pack).success).toBe(true);
   });
 
-  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
-    // The longest each path has been written across the recorded runs
-    // (static/runs, to 2026-10-01). A string past its bound is a miss that
-    // discards the whole answer — never cut to fit — so no bound may be one
-    // the producer meets.
-    const measured: Record<string, number> = {
-      summary: 842,
-      'kept[].serves': 163,
-      'kept[].insight': 575,
-      'kept[].caveat': 267,
-      'dropped[].reason': 250,
-      'gaps[]': 200,
-    };
-    expect(boundsBelowMeasured(memoryPackOutput.schema, measured)).toEqual([]);
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    // `measured.json`: every field across the recorded runs, refreshed by
+    // `pnpm measure:bounds`. A target under the 99th percentile written would
+    // make most replies overruns, and a ceiling at or under the longest would
+    // keep it past the ceiling rather than accept it.
+    expect(
+      boundsAgainstMeasured(
+        [memoryPackOutput.schema, deriverSchema(MEMORY_RECALL.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded recall runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
-    // also the call's time limit, so one a stage outwrites is a call cut short.
-    const measured: Record<string, number> = {
-      criteria: 963,
-      producer: 6_863,
-      'critic.relevance': 7_134,
-      'critic.grounding': 15_092,
-      'evaluator.coverage': 3_636,
-      'evaluator.admissibility': 2_325,
-    };
-    expect(capsBelowMeasured(MEMORY_RECALL, measured)).toEqual([]);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // A cap is also the call's time limit, so one a stage outwrites is a call cut short.
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(MEMORY_RECALL, measured.caps)).toEqual([]);
   });
 
   it('[QL-6] the pack a model answers with contains no number', () => {

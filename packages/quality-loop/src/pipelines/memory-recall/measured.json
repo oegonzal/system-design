@@ -1,0 +1,28 @@
+{
+  "since": "2026-09-07T07:37:24.391Z",
+  "until": "2026-10-02T23:35:22.120Z",
+  "runs": 91,
+  "fields": {
+    "criteria": { "n": 91, "max": 12, "p99": 12, "overTarget": 0 },
+    "criteria[].statement": { "n": 1082, "max": 332, "p99": 241, "overTarget": 0 },
+    "dropped": { "n": 113, "max": 9, "p99": 9, "overTarget": 0 },
+    "dropped[].chunk": { "n": 844, "max": 3, "p99": 3, "overTarget": 0 },
+    "dropped[].reason": { "n": 844, "max": 290, "p99": 230, "overTarget": 9 },
+    "gaps": { "n": 113, "max": 9, "p99": 9, "overTarget": 0 },
+    "gaps[]": { "n": 604, "max": 224, "p99": 187, "overTarget": 0 },
+    "kept": { "n": 113, "max": 9, "p99": 9, "overTarget": 3 },
+    "kept[].caveat": { "n": 864, "max": 277, "p99": 250, "overTarget": 127 },
+    "kept[].chunk": { "n": 884, "max": 3, "p99": 3, "overTarget": 0 },
+    "kept[].insight": { "n": 883, "max": 575, "p99": 489, "overTarget": 139 },
+    "kept[].serves": { "n": 883, "max": 163, "p99": 140, "overTarget": 0 },
+    "summary": { "n": 113, "max": 907, "p99": 842, "overTarget": 104 }
+  },
+  "caps": {
+    "criteria": { "n": 91, "max": 2843, "p99": 2843, "maxApiCalls": null },
+    "critic.grounding": { "n": 220, "max": 15092, "p99": 11470, "maxApiCalls": null },
+    "critic.relevance": { "n": 220, "max": 14404, "p99": 12180, "maxApiCalls": null },
+    "evaluator.admissibility": { "n": 217, "max": 5606, "p99": 3454, "maxApiCalls": null },
+    "evaluator.coverage": { "n": 220, "max": 5406, "p99": 4433, "maxApiCalls": null },
+    "producer": { "n": 113, "max": 11584, "p99": 7305, "maxApiCalls": null }
+  }
+}

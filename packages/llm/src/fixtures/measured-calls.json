@@ -1,24 +1,262 @@
 [
   {
+    "run": "2026-09-07T07-38-09-839-111925-quality",
+    "call": "13.critic.provenance.s1.2",
+    "maxTokens": 2000,
+    "outputTokens": 7966,
+    "durationMs": 102250
+  },
+  {
+    "run": "2026-09-07T07-38-09-839-111925-quality",
+    "call": "15.critic.provenance.s2.2",
+    "maxTokens": 2000,
+    "outputTokens": 8075,
+    "durationMs": 101412
+  },
+  {
+    "run": "2026-09-07T20-11-29-015-2a31d3-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 13261,
+    "durationMs": 190818
+  },
+  {
+    "run": "2026-09-08T01-33-48-403-5cf43a-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 13640,
+    "durationMs": 195802
+  },
+  {
+    "run": "2026-09-08T02-08-19-558-5e5a80-quality",
+    "call": "03.critic.provenance.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 10,
+    "durationMs": 2172
+  },
+  {
+    "run": "2026-09-08T02-08-19-558-5e5a80-quality",
+    "call": "04.critic.attribution.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 10,
+    "durationMs": 2325
+  },
+  {
+    "run": "2026-09-08T02-08-19-558-5e5a80-quality",
+    "call": "05.critic.provenance.s2.1",
+    "maxTokens": 2000,
+    "outputTokens": 10,
+    "durationMs": 2313
+  },
+  {
+    "run": "2026-09-08T02-14-03-427-02c5e0-quality",
+    "call": "07.critic.scale.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 8692,
+    "durationMs": 118542
+  },
+  {
+    "run": "2026-09-08T02-20-04-602-cbad8a-quality",
+    "call": "04.critic.attribution.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 7723,
+    "durationMs": 108141
+  },
+  {
+    "run": "2026-09-08T02-28-29-006-18c74f-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 14231,
+    "durationMs": 201130
+  },
+  {
+    "run": "2026-09-08T02-28-29-006-18c74f-quality",
+    "call": "04.critic.soundness.s1.1",
+    "maxTokens": 2500,
+    "outputTokens": 11244,
+    "durationMs": 151982
+  },
+  {
+    "run": "2026-09-08T02-28-29-006-18c74f-quality",
+    "call": "08.evaluator.quality.s2.1",
+    "maxTokens": 2500,
+    "outputTokens": 2730,
+    "durationMs": 33260
+  },
+  {
+    "run": "2026-09-08T02-49-59-378-71b6a0-quality",
+    "call": "15.evaluator.coverage.s1.2",
+    "maxTokens": 2000,
+    "outputTokens": 3083,
+    "durationMs": 116891
+  },
+  {
+    "run": "2026-09-08T02-49-59-378-71b6a0-quality",
+    "call": "16.critic.grounding.s2.2",
+    "maxTokens": 2000,
+    "outputTokens": 4174,
+    "durationMs": 169046
+  },
+  {
+    "run": "2026-09-08T02-55-21-614-28eb67-quality",
+    "call": "02.producer.1",
+    "maxTokens": 4000,
+    "outputTokens": 3483,
+    "durationMs": 139314
+  },
+  {
+    "run": "2026-09-08T02-55-21-614-28eb67-quality",
+    "call": "05.critic.provenance.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 7737,
+    "durationMs": 101894
+  },
+  {
+    "run": "2026-09-08T03-21-40-532-17d40f-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 13027,
+    "durationMs": 190273
+  },
+  {
+    "run": "2026-09-08T03-39-02-413-a822e1-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 13782,
+    "durationMs": 187702
+  },
+  {
+    "run": "2026-09-08T03-45-12-733-77ce47-quality",
+    "call": "05.critic.provenance.s1.1",
+    "maxTokens": 2000,
+    "outputTokens": 7632,
+    "durationMs": 96804
+  },
+  {
+    "run": "2026-09-08T03-45-12-733-77ce47-quality",
+    "call": "08.critic.provenance.s2.1",
+    "maxTokens": 2000,
+    "outputTokens": 7584,
+    "durationMs": 94376
+  },
+  {
+    "run": "2026-09-08T04-03-13-691-e9ea74-quality",
+    "call": "13.critic.provenance.s1.2",
+    "maxTokens": 2000,
+    "outputTokens": 11136,
+    "durationMs": 144428
+  },
+  {
+    "run": "2026-09-08T04-50-50-555-7acb0f-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 2500,
+    "outputTokens": 1377,
+    "durationMs": 14854
+  },
+  {
+    "run": "2026-09-08T05-11-26-785-2185ce-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 12396,
+    "durationMs": 192275
+  },
+  {
+    "run": "2026-09-08T05-11-26-785-2185ce-quality",
+    "call": "03.critic.requirements.s1.1",
+    "maxTokens": 2500,
+    "outputTokens": 7773,
+    "durationMs": 109781
+  },
+  {
+    "run": "2026-09-08T05-18-50-303-409b2c-quality",
+    "call": "16.critic.provenance.s2.2",
+    "maxTokens": 2000,
+    "outputTokens": 7371,
+    "durationMs": 94997
+  },
+  {
+    "run": "2026-09-08T05-31-34-935-4073d7-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 14266,
+    "durationMs": 207766
+  },
+  {
+    "run": "2026-09-08T06-40-01-013-b20f43-quality",
+    "call": "15.critic.provenance.s2.2",
+    "maxTokens": 2000,
+    "outputTokens": 7417,
+    "durationMs": 97394
+  },
+  {
+    "run": "2026-09-08T06-48-39-136-f48520-quality",
+    "call": "11.producer.2",
+    "maxTokens": 4000,
+    "outputTokens": 12880,
+    "durationMs": 161828
+  },
+  {
+    "run": "2026-09-08T06-53-51-766-e21aa5-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 13436,
+    "durationMs": 184849
+  },
+  {
+    "run": "2026-09-08T06-54-24-713-e9ea7f-quality",
+    "call": "06.evaluator.requirements.s1.1",
+    "maxTokens": 2500,
+    "outputTokens": 1543,
+    "durationMs": 18295
+  },
+  {
+    "run": "2026-09-08T06-59-10-710-3ec6d7-quality",
+    "call": "14.critic.provenance.s1.2",
+    "maxTokens": 2000,
+    "outputTokens": 8279,
+    "durationMs": 100833
+  },
+  {
+    "run": "2026-09-08T07-02-27-771-cb21ab-quality",
+    "call": "02.producer.1",
+    "maxTokens": 5000,
+    "outputTokens": 15746,
+    "durationMs": 207173
+  },
+  {
+    "run": "2026-09-08T08-32-39-606-629eaf-quality",
+    "call": "04.critic.contracts.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 6999,
+    "durationMs": 92636
+  },
+  {
+    "run": "2026-09-08T22-40-02-745-e260a5-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 23822,
+    "durationMs": 299005
+  },
+  {
+    "run": "2026-09-09T00-10-45-938-7b4660-quality",
+    "call": "08.critic.soundness.s1.1",
+    "maxTokens": 12000,
+    "outputTokens": 9165,
+    "durationMs": 123588
+  },
+  {
+    "run": "2026-09-10T03-44-24-017-ebb942-quality",
+    "call": "15.evaluator.requirements.s2.1",
+    "maxTokens": 8000,
+    "outputTokens": 4961,
+    "durationMs": 61639
+  },
+  {
     "run": "2026-09-22T19-34-58-775-f3ceba-quality",
     "call": "07.critic.requirements.s2.1",
     "maxTokens": 12000,
     "outputTokens": 7491,
     "durationMs": 101452
-  },
-  {
-    "run": "2026-09-22T20-12-44-904-b6128a-quality",
-    "call": "08.critic.soundness.s1.1",
-    "maxTokens": 12000,
-    "outputTokens": 7130,
-    "durationMs": 94002
-  },
-  {
-    "run": "2026-09-22T20-22-28-653-b53301-quality",
-    "call": "04.critic.contracts.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 7454,
-    "durationMs": 90948
   },
   {
     "run": "2026-09-22T20-35-46-889-f568d3-quality",
@@ -56,41 +294,6 @@
     "durationMs": 286075
   },
   {
-    "run": "2026-09-22T22-55-05-729-fd78dd-quality",
-    "call": "09.critic.generality.s1.1",
-    "maxTokens": 12000,
-    "outputTokens": 4882,
-    "durationMs": 84869
-  },
-  {
-    "run": "2026-09-23T00-33-56-602-ce13bd-quality",
-    "call": "02.producer.1",
-    "maxTokens": 16000,
-    "outputTokens": 5450,
-    "durationMs": 73040
-  },
-  {
-    "run": "2026-09-23T01-02-17-868-014669-quality",
-    "call": "13.evaluator.requirements.s1.1",
-    "maxTokens": 8000,
-    "outputTokens": 3753,
-    "durationMs": 58367
-  },
-  {
-    "run": "2026-09-23T01-43-21-360-adbe35-quality",
-    "call": "01.criteria.1",
-    "maxTokens": 4000,
-    "outputTokens": 676,
-    "durationMs": 12014
-  },
-  {
-    "run": "2026-09-23T01-43-21-360-adbe35-quality",
-    "call": "08.evaluator.coverage.s1.1",
-    "maxTokens": 8000,
-    "outputTokens": 3512,
-    "durationMs": 48132
-  },
-  {
     "run": "2026-09-23T01-57-24-125-3c22ca-quality",
     "call": "19.evaluator.attribution.s2.2",
     "maxTokens": 8000,
@@ -126,25 +329,11 @@
     "durationMs": 59021
   },
   {
-    "run": "2026-09-30T02-56-13-899-c621ea-quality",
-    "call": "05.critic.requirements.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 1529,
-    "durationMs": 27352
-  },
-  {
-    "run": "2026-09-30T03-02-25-790-4c71dc-quality",
-    "call": "41.evaluator.requirements.s1.3",
+    "run": "2026-09-30T07-20-26-805-f43081-quality",
+    "call": "11.evaluator.quality.s1.1",
     "maxTokens": 4000,
-    "outputTokens": 1074,
-    "durationMs": 19044
-  },
-  {
-    "run": "2026-09-30T07-22-40-427-66d321-quality",
-    "call": "15.evaluator.requirements.s2.1",
-    "maxTokens": 4000,
-    "outputTokens": 1528,
-    "durationMs": 33829
+    "outputTokens": 292,
+    "durationMs": 6949
   },
   {
     "run": "2026-09-30T08-09-44-190-5957f4-quality",
@@ -154,53 +343,18 @@
     "durationMs": 9278
   },
   {
-    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
+    "run": "2026-09-30T17-39-15-492-3d48ed-quality",
     "call": "01.criteria.1",
     "maxTokens": 4000,
-    "outputTokens": 848,
-    "durationMs": 11433
+    "outputTokens": 195,
+    "durationMs": 5501
   },
   {
-    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
-    "call": "02.producer.1",
-    "maxTokens": 16000,
-    "outputTokens": 10213,
-    "durationMs": 145228
-  },
-  {
-    "run": "2026-09-30T08-34-16-908-63fb4f-quality",
-    "call": "07.critic.scale.s1.1",
-    "maxTokens": 12000,
-    "outputTokens": 8301,
-    "durationMs": 114114
-  },
-  {
-    "run": "2026-09-30T17-09-35-359-09d4dd-quality",
-    "call": "04.critic.soundness.s1.1",
-    "maxTokens": 12000,
-    "outputTokens": 7551,
-    "durationMs": 101390
-  },
-  {
-    "run": "2026-09-30T17-29-46-084-618bde-quality",
-    "call": "03.critic.requirements.s1.1",
-    "maxTokens": 12000,
-    "outputTokens": 7423,
-    "durationMs": 104568
-  },
-  {
-    "run": "2026-09-30T17-33-22-837-3e965d-quality",
-    "call": "06.evaluator.requirements.s1.1",
-    "maxTokens": 8000,
-    "outputTokens": 1111,
-    "durationMs": 15745
-  },
-  {
-    "run": "2026-09-30T17-33-22-837-3e965d-quality",
-    "call": "07.evaluator.quality.s1.1",
-    "maxTokens": 8000,
-    "outputTokens": 2142,
-    "durationMs": 26137
+    "run": "2026-09-30T17-50-07-879-d3b319-quality",
+    "call": "12.evaluator.quality.s1.1",
+    "maxTokens": 4000,
+    "outputTokens": 247,
+    "durationMs": 7194
   },
   {
     "run": "2026-10-01T01-35-58-485-f41f79-quality",
@@ -222,20 +376,6 @@
     "maxTokens": 8000,
     "outputTokens": 7592,
     "durationMs": 78039
-  },
-  {
-    "run": "2026-10-02T01-03-40-842-fd6be0-quality",
-    "call": "01.producer.1",
-    "maxTokens": 28000,
-    "outputTokens": 22709,
-    "durationMs": 207074
-  },
-  {
-    "run": "2026-10-02T02-58-52-647-1258ee-quality",
-    "call": "05.critic.attribution.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 25603,
-    "durationMs": 247549
   },
   {
     "run": "2026-10-02T03-07-43-385-651606-quality",
@@ -287,11 +427,11 @@
     "durationMs": 145661
   },
   {
-    "run": "2026-10-02T04-40-37-205-75f4cc-quality",
-    "call": "02.critic.requirements.s1.1",
+    "run": "2026-10-02T04-22-11-795-956564-quality",
+    "call": "22.critic.transfer.s2.2",
     "maxTokens": 12000,
-    "outputTokens": 24678,
-    "durationMs": 261560
+    "outputTokens": 19963,
+    "durationMs": 200636
   },
   {
     "run": "2026-10-02T04-40-37-205-75f4cc-quality",
@@ -299,20 +439,6 @@
     "maxTokens": 12000,
     "outputTokens": 24646,
     "durationMs": 282553
-  },
-  {
-    "run": "2026-10-02T04-22-11-795-956564-quality",
-    "call": "17.critic.provenance.s1.2",
-    "maxTokens": 12000,
-    "outputTokens": 27805,
-    "durationMs": 257507
-  },
-  {
-    "run": "2026-10-02T04-22-11-795-956564-quality",
-    "call": "22.critic.transfer.s2.2",
-    "maxTokens": 12000,
-    "outputTokens": 19963,
-    "durationMs": 200636
   },
   {
     "run": "2026-10-02T05-03-56-730-a0120c-quality",
@@ -323,24 +449,10 @@
   },
   {
     "run": "2026-10-02T05-39-33-370-17c0d8-quality",
-    "call": "04.critic.attribution.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 26346,
-    "durationMs": 254318
-  },
-  {
-    "run": "2026-10-02T05-39-33-370-17c0d8-quality",
     "call": "11.producer.2",
     "maxTokens": 16000,
     "outputTokens": 26677,
     "durationMs": 266099
-  },
-  {
-    "run": "2026-10-02T05-39-33-370-17c0d8-quality",
-    "call": "13.critic.attribution.s2.2",
-    "maxTokens": 12000,
-    "outputTokens": 24065,
-    "durationMs": 240153
   },
   {
     "run": "2026-10-02T09-39-25-001-96701c-quality",
@@ -350,31 +462,108 @@
     "durationMs": 116457
   },
   {
-    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
+    "run": "2026-10-02T21-53-36-191-5ccc6f-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 4000,
+    "outputTokens": 2842,
+    "durationMs": 28172
+  },
+  {
+    "run": "2026-10-02T21-53-36-191-5ccc6f-quality",
     "call": "04.critic.relevance.s1.1",
     "maxTokens": 12000,
-    "outputTokens": 7134,
-    "durationMs": 80951
+    "outputTokens": 13559,
+    "durationMs": 146504
   },
   {
-    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
-    "call": "10.critic.grounding.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 15092,
-    "durationMs": 166948
+    "run": "2026-10-02T22-30-00-513-ec64a6-quality",
+    "call": "17.producer.2",
+    "maxTokens": 32000,
+    "outputTokens": 37276,
+    "durationMs": 330739
   },
   {
-    "run": "2026-10-02T18-01-20-531-02fc9c-quality",
-    "call": "08.evaluator.admissibility.s1.1",
+    "run": "2026-10-02T23-00-42-343-6531df-quality",
+    "call": "05.critic.attribution.s1.1",
+    "maxTokens": 32000,
+    "outputTokens": 25771,
+    "durationMs": 264724
+  },
+  {
+    "run": "2026-10-02T23-35-13-804-8be336-quality",
+    "call": "01.producer.1",
+    "maxTokens": 32000,
+    "outputTokens": 39519,
+    "durationMs": 341005
+  },
+  {
+    "run": "2026-10-02T23-35-22-120-18eb29-quality",
+    "call": "02.producer.1",
+    "maxTokens": 16000,
+    "outputTokens": 11584,
+    "durationMs": 115533
+  },
+  {
+    "run": "2026-10-02T23-35-22-120-18eb29-quality",
+    "call": "10.evaluator.admissibility.s2.1",
     "maxTokens": 8000,
-    "outputTokens": 2155,
-    "durationMs": 24983
+    "outputTokens": 5261,
+    "durationMs": 49607
   },
   {
-    "run": "2026-10-02T18-33-36-045-8e573f-quality",
-    "call": "05.critic.attribution.s2.1",
-    "maxTokens": 12000,
-    "outputTokens": 26918,
-    "durationMs": 259567
+    "run": "2026-10-03T01-03-00-492-80801a-quality",
+    "call": "17.critic.provenance.s2.2",
+    "maxTokens": 32000,
+    "outputTokens": 32261,
+    "durationMs": 304961
+  },
+  {
+    "run": "2026-10-03T02-01-50-804-cccff4-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 8000,
+    "outputTokens": 3901,
+    "durationMs": 32663
+  },
+  {
+    "run": "2026-10-03T02-01-50-804-cccff4-quality",
+    "call": "14.evaluator.rules.s1.1",
+    "maxTokens": 16000,
+    "outputTokens": 9940,
+    "durationMs": 95450
+  },
+  {
+    "run": "2026-10-03T02-01-50-804-cccff4-quality",
+    "call": "15.producer.2",
+    "maxTokens": 32000,
+    "outputTokens": 21858,
+    "durationMs": 191061
+  },
+  {
+    "run": "2026-10-03T02-01-50-804-cccff4-quality",
+    "call": "17.critic.grounding.s1.2",
+    "maxTokens": 32000,
+    "outputTokens": 17454,
+    "durationMs": 175808
+  },
+  {
+    "run": "2026-10-03T02-01-50-804-cccff4-quality",
+    "call": "25.evaluator.capture.s1.4",
+    "maxTokens": 16000,
+    "outputTokens": 12382,
+    "durationMs": 112268
+  },
+  {
+    "run": "2026-10-03T03-12-40-982-6b3475-quality",
+    "call": "06.critic.coverage.s2.1",
+    "maxTokens": 32000,
+    "outputTokens": 8065,
+    "durationMs": 80356
+  },
+  {
+    "run": "2026-10-03T03-58-37-022-ba8da7-quality",
+    "call": "25.critic.usability.s2.2",
+    "maxTokens": 24000,
+    "outputTokens": 19373,
+    "durationMs": 206526
   }
 ]

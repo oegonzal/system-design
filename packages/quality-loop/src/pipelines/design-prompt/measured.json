@@ -1,0 +1,16 @@
+{
+  "since": "2026-09-30T02:47:07.680Z",
+  "until": "2026-10-01T01:35:58.485Z",
+  "runs": 4,
+  "fields": {
+    "criteria": { "n": 4, "max": 12, "p99": 12, "overTarget": 0 },
+    "criteria[].statement": { "n": 45, "max": 166, "p99": 166, "overTarget": 0 }
+  },
+  "caps": {
+    "criteria": { "n": 4, "max": 637, "p99": 637, "maxApiCalls": null },
+    "critic.fidelity": { "n": 6, "max": 7592, "p99": 7592, "maxApiCalls": null },
+    "critic.gradeability": { "n": 6, "max": 4482, "p99": 4482, "maxApiCalls": null },
+    "evaluator.prompt": { "n": 6, "max": 5700, "p99": 5700, "maxApiCalls": null },
+    "producer": { "n": 6, "max": 6693, "p99": 6693, "maxApiCalls": null }
+  }
+}

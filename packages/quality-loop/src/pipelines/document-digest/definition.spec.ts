@@ -1,9 +1,10 @@
-import { CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
+import { boundsAgainstMeasured, CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { capsBelowMeasured, declaredCaps, jsonSchemaTypes } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
 import { DOCUMENT_DIGEST } from './definition';
+import measured from './measured.json';
 import { documentDigestOutput } from './output';
 import { sampleDocumentDigest } from './testing';
 
@@ -70,24 +71,22 @@ describe('the document-digest pipeline', () => {
     expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(/within the length the schema asks for/);
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // SEEDED from the experience digest's measured table (static/runs,
-    // 2026-09-20 – 2026-10-02): the pipeline with the same lens shape and
-    // item shape over goals of the same size. No live document run has been
-    // recorded yet; the first ones (05-llm output tokens) replace this
-    // table. A cap is also the call's time limit, so one a stage outwrites
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds` — the recorded
+    // document runs, which replaced the table seeded from the experience
+    // digest. A cap is also the call's time limit, so one a stage outwrites
     // is a call cut short.
-    const measured: Record<string, number> = {
-      criteria: 7_684,
-      producer: 31_719,
-      'critic.grounding': 26_918,
-      'critic.coverage': 27_805,
-      'critic.usability': 19_963,
-      'evaluator.capture': 13_321,
-      'evaluator.rules': 13_321,
-    };
-    expect(capsBelowMeasured(DOCUMENT_DIGEST, measured)).toEqual([]);
-    expect(Object.keys(declaredCaps(DOCUMENT_DIGEST)).sort()).toEqual(Object.keys(measured).sort());
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(DOCUMENT_DIGEST, measured.caps)).toEqual([]);
+  });
+
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    expect(
+      boundsAgainstMeasured(
+        [documentDigestOutput.schema, deriverSchema(DOCUMENT_DIGEST.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
   it('[QL-4] every location the digest exposes is printed verbatim where a judge reads it, and a citation is never a location', () => {

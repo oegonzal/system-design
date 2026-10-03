@@ -218,9 +218,11 @@ export type OperationKind = (typeof OPERATION_KINDS)[number];
  * and a ceiling (`bound`): the model is asked for the target, the schema
  * accepts the ceiling without a word, and the parse keeps what runs past it —
  * nothing is cut to fit, and nothing a little over is refused. Each target
- * sits above the longest the coach has measurably written (the canvas
- * pipeline's spec holds them to those figures), and the editors enforce the
- * same declarations as `maxLength`. Ids are exact: a wrong one is a fault.
+ * sits at or above the 99th percentile the coach has measurably written and
+ * each ceiling above the longest (`measured/canvas.json`, which
+ * `pnpm measure:bounds` refreshes and `canvas.schema.spec.ts` holds them to),
+ * and the editors enforce the same declarations as `maxLength`. Ids are
+ * exact: a wrong one is a fault.
  */
 export const CANVAS_NODES_BOUND = bound(100, 'list');
 export const CANVAS_EDGES_BOUND = bound(300, 'list');
@@ -229,7 +231,7 @@ export const NODE_LABEL_BOUND = bound(80);
 export const EDGE_LABEL_BOUND = bound(80);
 
 export const NODE_RESPONSIBILITIES_BOUND = bound(6, 'list');
-export const RESPONSIBILITY_BOUND = bound(80);
+export const RESPONSIBILITY_BOUND = bound(90);
 export const NODE_OPERATIONS_BOUND = bound(12, 'list');
 export const OPERATION_NAME_MAX_LENGTH = 60;
 export const OPERATION_NOTES_BOUND = bound(200);
@@ -244,9 +246,9 @@ export const NODE_CONFIG_STRING_VALUE_BOUND = bound(120);
 export const BRIEF_BINDINGS_BOUND = bound(24, 'list');
 export const BINDING_NODES_BOUND = bound(12, 'list');
 export const FLOW_STEPS_BOUND = bound(24, 'list');
-export const BINDING_CLAIM_BOUND = bound(300);
+export const BINDING_CLAIM_BOUND = bound(360);
 
 export const NARRATION_PROSE_BOUND = bound(720);
-export const NARRATION_OVERVIEW_BOUND = bound(1400);
+export const NARRATION_OVERVIEW_BOUND = bound(1500);
 export const NARRATION_COMPONENT_RATIONALES_BOUND = bound(40, 'list');
 export const NARRATION_CRITERION_NARRATIONS_BOUND = bound(24, 'list');

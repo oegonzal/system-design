@@ -1,9 +1,14 @@
 import {
+  BINDING_CLAIM_BOUND,
   bound,
   bounded,
   CUT_MARKER,
   designSubmissionSchema,
+  NARRATION_OVERVIEW_BOUND,
+  NODE_CONFIG_STRING_VALUE_BOUND,
+  RESPONSIBILITY_BOUND,
   SOFT_ISSUE_NOTE,
+  type Bound,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -190,36 +195,43 @@ describe('extractStructured', () => {
  * each a complete revision of 30–40k output tokens, each refused because a
  * string or two ran 1–19% past the bound it was shown. The objects are the
  * replies as written, unfenced; `overran` is every field the old parse named,
- * with what it wrote over what it was asked.
+ * with what it wrote and the bound that field declares now. Measured, three
+ * of those targets now sit above what the coach writes (`pnpm
+ * measure:bounds`), so a field is an overrun only while it is past the target
+ * it is asked for today — and every one is within its ceiling.
  */
-const RECORDED_COACH_LOSSES: readonly [string, unknown, Record<string, [number, number]>][] = [
+const RECORDED_COACH_LOSSES: readonly [string, unknown, Record<string, [number, Bound]>][] = [
   [
     '21-53-19 producer 1',
     coach215319p1,
     {
-      'graph.nodes[2].responsibilities[1]': [87, 80],
-      'graph.nodes[2].responsibilities[2]': [89, 80],
+      'graph.nodes[2].responsibilities[1]': [87, RESPONSIBILITY_BOUND],
+      'graph.nodes[2].responsibilities[2]': [89, RESPONSIBILITY_BOUND],
     },
   ],
-  ['21-53-19 producer 2', coach215319p2, { 'brief.bindings[1].claim': [358, 300] }],
-  ['21-53-19 producer 3', coach215319p3, { 'narrative.overview': [1438, 1400] }],
+  ['21-53-19 producer 2', coach215319p2, { 'brief.bindings[1].claim': [358, BINDING_CLAIM_BOUND] }],
+  [
+    '21-53-19 producer 3',
+    coach215319p3,
+    { 'narrative.overview': [1438, NARRATION_OVERVIEW_BOUND] },
+  ],
   [
     '18-58-32 producer 2',
     coach185832p2,
     {
-      'graph.nodes[2].config[3].value': [141, 120],
-      'graph.nodes[5].config[3].value': [126, 120],
-      'graph.nodes[2].responsibilities[0]': [81, 80],
+      'graph.nodes[2].config[3].value': [141, NODE_CONFIG_STRING_VALUE_BOUND],
+      'graph.nodes[5].config[3].value': [126, NODE_CONFIG_STRING_VALUE_BOUND],
+      'graph.nodes[2].responsibilities[0]': [81, RESPONSIBILITY_BOUND],
     },
   ],
   [
     '18-58-32 producer 3',
     coach185832p3,
     {
-      'brief.bindings[1].claim': [320, 300],
-      'brief.bindings[2].claim': [304, 300],
-      'brief.bindings[4].claim': [326, 300],
-      'narrative.overview': [1472, 1400],
+      'brief.bindings[1].claim': [320, BINDING_CLAIM_BOUND],
+      'brief.bindings[2].claim': [304, BINDING_CLAIM_BOUND],
+      'brief.bindings[4].claim': [326, BINDING_CLAIM_BOUND],
+      'narrative.overview': [1472, NARRATION_OVERVIEW_BOUND],
     },
   ],
 ];
@@ -238,12 +250,17 @@ describe('the recorded coach losses, replayed', () => {
       expect(read.ok).toBe(true);
       if (!read.ok) return;
 
+      const stillOver = Object.entries(overran).filter(([, [written, b]]) => written > b.target);
       expect(
         Object.fromEntries(
           read.overruns.map((overrun) => [overrun.path, [overrun.actual, overrun.target]]),
         ),
-      ).toEqual(overran);
+      ).toEqual(
+        Object.fromEntries(stillOver.map(([path, [written, b]]) => [path, [written, b.target]])),
+      );
       // All within the ceiling: accepted as written, not one word cut.
+      for (const [written, b] of Object.values(overran))
+        expect(written).toBeLessThanOrEqual(b.ceiling);
       expect(read.overruns.every((overrun) => overrun.handling === 'accepted')).toBe(true);
       expect(read.repairs).toEqual([]);
       for (const overrun of read.overruns) {

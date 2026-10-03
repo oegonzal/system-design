@@ -11,6 +11,7 @@
 // all of them agree on.
 export * from './lib/primitives';
 export * from './lib/bounds';
+export * from './lib/measured-bounds';
 export * from './lib/constants';
 export * from './lib/envelope';
 export * from './lib/appearance';

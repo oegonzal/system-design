@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { capsBelowMeasured, declaredCaps, jsonSchemaTypes } from '../../core/testing';
+import { allStages, capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
 import { BROWSER_STEP } from './definition';
+import measured from './measured.json';
 import { stepPlanOutput } from './output';
 import { askFields, click, samplePlan, taskStart } from './testing';
 
@@ -57,27 +58,23 @@ describe('the browser-step pipeline', () => {
     expect(BROWSER_STEP.policy.criterionKinds['safety'].gate).toBe(true);
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
     // SEEDED, not measured: no live step run has been recorded yet, so these
     // are the most each stage is expected to write for a page of up to 150
     // elements, taken from the shortest recorded pipeline (design-prompt) at
-    // comparable prompt sizes. The first live runs (static/runs, 05-llm
-    // output tokens) replace this table; a cap is also the call's time limit,
-    // so one a stage outwrites is a call cut short.
-    const measured: Record<string, number> = {
+    // comparable prompt sizes. The first live runs replace them, through
+    // `measured.json` (`pnpm measure:bounds`); a cap is also the call's time
+    // limit, so one a stage outwrites is a call cut short.
+    const seeds = {
       criteria: 2_500,
       producer: 4_000,
       'critic.mission': 4_000,
       'critic.safety': 4_000,
       'evaluator.plan': 4_000,
     };
-    expect(capsBelowMeasured(BROWSER_STEP, measured)).toEqual([]);
-    // With a fifth of headroom over each, so the next longer answer is not the one cut.
-    const withHeadroom = Object.fromEntries(
-      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
-    );
-    expect(capsBelowMeasured(BROWSER_STEP, withHeadroom)).toEqual([]);
-    expect(Object.keys(declaredCaps(BROWSER_STEP)).sort()).toEqual(Object.keys(measured).sort());
+    expect(capsAgainstMeasured(BROWSER_STEP, seededCaps(seeds))).toEqual([]);
+    const unrecorded = measured.runs === 0 ? allStages(BROWSER_STEP, 'no step run recorded') : {};
+    expect(capsAgainstMeasured(BROWSER_STEP, measured.caps, { exempt: unrecorded })).toEqual([]);
   });
 
   it('[QL-4] every location the plan exposes is printed verbatim where a judge reads it, beside the ref it acts on', () => {

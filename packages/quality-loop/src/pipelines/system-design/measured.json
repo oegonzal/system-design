@@ -1,0 +1,41 @@
+{
+  "since": "2026-09-06T04:32:56.052Z",
+  "until": "2026-09-30T17:44:43.590Z",
+  "runs": 48,
+  "fields": {
+    "assumptions": { "n": 46, "max": 8, "p99": 8, "overTarget": 0 },
+    "assumptions[]": { "n": 367, "max": 180, "p99": 160, "overTarget": 3 },
+    "capacity": { "n": 46, "max": 9, "p99": 9, "overTarget": 1 },
+    "capacity[].estimate": { "n": 369, "max": 279, "p99": 258, "overTarget": 98 },
+    "capacity[].metric": { "n": 369, "max": 50, "p99": 37, "overTarget": 0 },
+    "components": { "n": 46, "max": 11, "p99": 11, "overTarget": 1 },
+    "components[].name": { "n": 450, "max": 41, "p99": 35, "overTarget": 0 },
+    "components[].responsibility": { "n": 450, "max": 360, "p99": 317, "overTarget": 13 },
+    "components[].technology": { "n": 450, "max": 95, "p99": 88, "overTarget": 11 },
+    "criteria": { "n": 48, "max": 23, "p99": 23, "overTarget": 1 },
+    "criteria[].statement": { "n": 839, "max": 323, "p99": 198, "overTarget": 2 },
+    "dataModel": { "n": 46, "max": 9, "p99": 9, "overTarget": 3 },
+    "dataModel[]": { "n": 371, "max": 438, "p99": 282, "overTarget": 37 },
+    "flows": { "n": 46, "max": 7, "p99": 7, "overTarget": 3 },
+    "flows[].name": { "n": 267, "max": 97, "p99": 86, "overTarget": 0 },
+    "flows[].steps": { "n": 267, "max": 8, "p99": 8, "overTarget": 0 },
+    "flows[].steps[]": { "n": 1595, "max": 358, "p99": 259, "overTarget": 84 },
+    "risks": { "n": 46, "max": 8, "p99": 8, "overTarget": 0 },
+    "risks[].mitigation": { "n": 364, "max": 364, "p99": 319, "overTarget": 9 },
+    "risks[].risk": { "n": 364, "max": 159, "p99": 149, "overTarget": 0 },
+    "summary": { "n": 46, "max": 1032, "p99": 1032, "overTarget": 44 },
+    "tradeoffs": { "n": 46, "max": 8, "p99": 8, "overTarget": 0 },
+    "tradeoffs[].alternative": { "n": 354, "max": 226, "p99": 166, "overTarget": 5 },
+    "tradeoffs[].decision": { "n": 354, "max": 167, "p99": 135, "overTarget": 1 },
+    "tradeoffs[].rationale": { "n": 354, "max": 457, "p99": 348, "overTarget": 9 }
+  },
+  "caps": {
+    "criteria": { "n": 48, "max": 1377, "p99": 1377, "maxApiCalls": null },
+    "critic.requirements": { "n": 45, "max": 7773, "p99": 7773, "maxApiCalls": null },
+    "critic.scale": { "n": 45, "max": 8692, "p99": 8692, "maxApiCalls": null },
+    "critic.soundness": { "n": 90, "max": 11244, "p99": 11244, "maxApiCalls": null },
+    "evaluator.quality": { "n": 90, "max": 2730, "p99": 2730, "maxApiCalls": null },
+    "evaluator.requirements": { "n": 45, "max": 1547, "p99": 1547, "maxApiCalls": null },
+    "producer": { "n": 48, "max": 15746, "p99": 15746, "maxApiCalls": null }
+  }
+}

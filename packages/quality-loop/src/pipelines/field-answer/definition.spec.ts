@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { capsBelowMeasured, declaredCaps, jsonSchemaTypes } from '../../core/testing';
+import { allStages, capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
 import { FIELD_ANSWER } from './definition';
+import measured from './measured.json';
 import { fieldAnswersOutput } from './output';
 import { sampleAnswers } from './testing';
 
@@ -59,26 +60,23 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.critics[0].persona).toContain('requires_user');
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
     // SEEDED, not measured: no live answer run has been recorded yet, so these
     // are the most each stage is expected to write for a page of up to 40
     // fields, taken from the shortest recorded pipeline (design-prompt) at
-    // comparable prompt sizes. The first live runs (static/runs, 05-llm
-    // output tokens) replace this table; a cap is also the call's time limit,
-    // so one a stage outwrites is a call cut short.
-    const measured: Record<string, number> = {
+    // comparable prompt sizes. The first live runs replace them, through
+    // `measured.json` (`pnpm measure:bounds`); a cap is also the call's time
+    // limit, so one a stage outwrites is a call cut short.
+    const seeds = {
       criteria: 2_500,
       producer: 4_500,
       'critic.grounding': 4_000,
       'critic.form': 4_000,
       'evaluator.answers': 4_000,
     };
-    expect(capsBelowMeasured(FIELD_ANSWER, measured)).toEqual([]);
-    const withHeadroom = Object.fromEntries(
-      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
-    );
-    expect(capsBelowMeasured(FIELD_ANSWER, withHeadroom)).toEqual([]);
-    expect(Object.keys(declaredCaps(FIELD_ANSWER)).sort()).toEqual(Object.keys(measured).sort());
+    expect(capsAgainstMeasured(FIELD_ANSWER, seededCaps(seeds))).toEqual([]);
+    const unrecorded = measured.runs === 0 ? allStages(FIELD_ANSWER, 'no answer run recorded') : {};
+    expect(capsAgainstMeasured(FIELD_ANSWER, measured.caps, { exempt: unrecorded })).toEqual([]);
   });
 
   it('[QL-4] every location the answers expose is printed verbatim where a judge reads it, beside the field’s ref', () => {

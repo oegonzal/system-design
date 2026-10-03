@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { modelSchema } from './bounds';
+import { boundsAgainstMeasured } from './measured-bounds';
+import measured from './measured/design-prompt.json';
 import {
   criteriaFromDraft,
   DESIGN_PROMPT_HEADINGS,
@@ -90,27 +92,26 @@ describe('designPromptDraftSchema', () => {
   });
 });
 
-describe('the draft’s prose bounds', () => {
-  it('[GEN-1] ask for more than the longest the drafting model has measurably written, and the scenario says its limit', () => {
-    // The longest each field has been written across the recorded
-    // design-prompt runs (static/runs, to 2026-10-01). The target is what the
-    // model is asked for; past the ceiling a draft is kept and recorded, not
-    // cut — so no target may be one the model meets.
-    const { bounds } = modelSchema(designPromptDraftSchema);
-    const measured: Record<string, number> = {
-      title: 105,
-      scenario: 1903,
-      'functionalRequirements[]': 221,
-      'nonFunctionalRequirements[].kind': 13,
-      'nonFunctionalRequirements[].requirement': 128,
-      'nonFunctionalRequirements[].target': 40,
-      'scale[].metric': 35,
-      'scale[].target': 31,
-      'constraints[]': 247,
-    };
-    for (const [path, longest] of Object.entries(measured)) {
-      expect(bounds[path]?.target ?? 0, path).toBeGreaterThan(longest);
-    }
+describe('the draft’s bounds', () => {
+  it('[GEN-1] [QL-49] ask for at least what the drafting model has measurably written, and the scenario says its limit', () => {
+    // `measured/design-prompt.json`: every field the drafting model wrote
+    // across the recorded runs, refreshed by `pnpm measure:bounds`. A target
+    // under the 99th percentile written would make most drafts overruns, and
+    // a ceiling at or under the longest would keep it past the ceiling. The
+    // row counts are policy: their targets sum to the canvas criteria cap, so
+    // a draft is one rubric — and the drafts measured were asked for more.
+    const rows = `the row targets sum to the canvas criteria cap (${CANVAS_MAX_CRITERIA})`;
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(
+      boundsAgainstMeasured(designPromptDraftSchema, measured.fields, {
+        exempt: {
+          functionalRequirements: rows,
+          nonFunctionalRequirements: rows,
+          scale: rows,
+          constraints: rows,
+        },
+      }),
+    ).toEqual([]);
     expect(designPromptDraftSchema.shape.scenario.description).toContain(
       String(DESIGN_PROMPT_SCENARIO_BOUND.target),
     );

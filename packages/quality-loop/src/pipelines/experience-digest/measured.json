@@ -1,0 +1,25 @@
+{
+  "since": "2026-09-07T07:38:09.839Z",
+  "until": "2026-10-03T01:03:00.492Z",
+  "runs": 95,
+  "fields": {
+    "criteria": { "n": 96, "max": 16, "p99": 16, "overTarget": 0 },
+    "criteria[].statement": { "n": 1311, "max": 751, "p99": 293, "overTarget": 7 },
+    "memories": { "n": 185, "max": 9, "p99": 8, "overTarget": 1 },
+    "memories[].appliesWhen": { "n": 1405, "max": 300, "p99": 215, "overTarget": 0 },
+    "memories[].evidence": { "n": 1405, "max": 6, "p99": 4, "overTarget": 0 },
+    "memories[].evidence[]": { "n": 4547, "max": 3, "p99": 3, "overTarget": 0 },
+    "memories[].insight": { "n": 1405, "max": 1015, "p99": 744, "overTarget": 102 },
+    "summary": { "n": 185, "max": 1042, "p99": 1039, "overTarget": 87 },
+    "unused": { "n": 185, "max": 19, "p99": 19, "overTarget": 0 },
+    "unused[]": { "n": 971, "max": 3, "p99": 3, "overTarget": 0 }
+  },
+  "caps": {
+    "criteria": { "n": 97, "max": 9350, "p99": 9350, "maxApiCalls": null },
+    "critic.attribution": { "n": 324, "max": 26918, "p99": 25603, "maxApiCalls": null },
+    "critic.provenance": { "n": 323, "max": 32261, "p99": 22107, "maxApiCalls": null },
+    "critic.transfer": { "n": 319, "max": 19963, "p99": 15487, "maxApiCalls": null },
+    "evaluator.attribution": { "n": 315, "max": 13321, "p99": 7715, "maxApiCalls": null },
+    "producer": { "n": 185, "max": 31719, "p99": 27058, "maxApiCalls": null }
+  }
+}

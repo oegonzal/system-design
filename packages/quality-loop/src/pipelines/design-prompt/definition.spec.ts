@@ -1,9 +1,14 @@
-import { DESIGN_PROMPT_HEADINGS, renderDesignPromptMarkdown } from '@sysdesign/contracts';
+import {
+  boundsAgainstMeasured,
+  DESIGN_PROMPT_HEADINGS,
+  renderDesignPromptMarkdown,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { capsBelowMeasured, declaredCaps } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema } from '../../core/testing';
 import { DESIGN_PROMPT } from './definition';
+import measured from './measured.json';
 import { designPromptOutput } from './output';
 import { sampleDraft } from './testing';
 
@@ -28,25 +33,13 @@ describe('the design-prompt pipeline', () => {
     }
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded design-prompt runs (static/runs, 2026-09-30 – 2026-10-01). A
-    // cap is also the call's time limit, so one a stage outwrites is a call
-    // cut short.
-    const measured: Record<string, number> = {
-      criteria: 637,
-      producer: 6_693,
-      'critic.fidelity': 7_592,
-      'critic.gradeability': 4_482,
-      'evaluator.prompt': 5_700,
-    };
-    expect(capsBelowMeasured(DESIGN_PROMPT, measured)).toEqual([]);
-    // With a fifth of headroom over each, so the next longer answer is not the one cut.
-    const withHeadroom = Object.fromEntries(
-      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
-    );
-    expect(capsBelowMeasured(DESIGN_PROMPT, withHeadroom)).toEqual([]);
-    expect(Object.keys(declaredCaps(DESIGN_PROMPT)).sort()).toEqual(Object.keys(measured).sort());
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and its deriver’s statement bound above what it wrote', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds`. A cap is also the
+    // call's time limit, so one a stage outwrites is a call cut short. The
+    // draft's own fields are measured beside its schema, in contracts.
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(DESIGN_PROMPT, measured.caps)).toEqual([]);
+    expect(boundsAgainstMeasured(deriverSchema(DESIGN_PROMPT.task), measured.fields)).toEqual([]);
   });
 
   it('[QL-4] every location the draft exposes is printed verbatim where a judge reads it', () => {

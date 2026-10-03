@@ -232,7 +232,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** Every schema node of a JSON Schema with its bound path, structure keys followed and nothing else. */
-function walkJsonSchema(
+export function walkJsonSchema(
   node: unknown,
   path: BoundPath,
   visit: (node: Record<string, unknown>, path: BoundPath) => void,

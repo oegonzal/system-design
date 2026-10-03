@@ -64,9 +64,9 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
   // also the call's time limit (`callTimeLimitMs`), so a cap a stage
   // outwrites is a call cut short. The deriver has written 9,350 output
   // tokens for one record (2026-10-02, past its old 8,000), the producer
-  // 31,719, the critics up to 27,805.
+  // 31,719, the critics up to 32,261 — each cap a fifth above its stage's.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 12000 },
-  producer: { persona: producer, maxTokens: 32000, consumes: ['criteria'] },
+  producer: { persona: producer, maxTokens: 40000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
 
@@ -77,7 +77,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 32000,
+      maxTokens: 36000,
     },
     {
       id: 'critic.provenance',
@@ -85,7 +85,7 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 32000,
+      maxTokens: 40000,
     },
     {
       id: 'critic.transfer',

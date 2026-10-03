@@ -1,8 +1,10 @@
+import { boundsAgainstMeasured } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { boundsBelowMeasured, capsBelowMeasured, declaredCaps } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema } from '../../core/testing';
 import { AGENTIC_DESIGN } from './definition';
+import measured from './measured.json';
 import { agenticDesignOutput, type AgenticDesign } from './output';
 
 const answer: AgenticDesign = {
@@ -53,57 +55,22 @@ describe('the agentic-design pipeline', () => {
     expect(AGENTIC_DESIGN.producer.persona).toContain('agentic-design');
   });
 
-  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
-    // The longest each path has been written across the recorded runs
-    // (static/runs, to 2026-10-01). A string past its bound is a miss that
-    // discards the whole answer — never cut to fit — so no bound may be one
-    // the producer meets.
-    const measured: Record<string, number> = {
-      summary: 1261,
-      'assumptions[]': 166,
-      'roles[].name': 31,
-      'roles[].responsibility': 265,
-      'roles[].consumes': 163,
-      'roles[].produces': 169,
-      'contracts[].from': 27,
-      'contracts[].to': 30,
-      'contracts[].payload': 161,
-      'contracts[].guarantee': 279,
-      'flows[].name': 92,
-      'flows[].steps[]': 263,
-      'policies[].name': 42,
-      'policies[].decides': 204,
-      'policies[].declaredAs': 221,
-      'memory[].what': 157,
-      'memory[].shape': 197,
-      'memory[].usedBy': 131,
-      'extensibility[].change': 111,
-      'extensibility[].requires': 284,
-      'tradeoffs[].decision': 138,
-      'tradeoffs[].rationale': 264,
-      'tradeoffs[].alternative': 161,
-      'risks[].risk': 156,
-      'risks[].mitigation': 264,
-    };
-    expect(boundsBelowMeasured(agenticDesignOutput.schema, measured)).toEqual([]);
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    // `measured.json`: every field across the recorded runs, refreshed by
+    // `pnpm measure:bounds`. A target under the 99th percentile written would
+    // make most replies overruns, and a ceiling at or under the longest would
+    // keep it past the ceiling rather than accept it.
+    expect(
+      boundsAgainstMeasured(
+        [agenticDesignOutput.schema, deriverSchema(AGENTIC_DESIGN.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
-  it('[QL-1] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded agentic-design runs (to 2026-10-01).
-    const measured: Record<string, number> = {
-      criteria: 1_203,
-      producer: 26_054,
-      'critic.requirements': 7_491,
-      'critic.contracts': 7_454,
-      'critic.soundness': 9_165,
-      'critic.generality': 6_828,
-      'evaluator.requirements': 4_961,
-      'evaluator.interfaces': 4_008,
-      'evaluator.properties': 2_513,
-    };
-    expect(capsBelowMeasured(AGENTIC_DESIGN, measured)).toEqual([]);
-    expect(Object.keys(declaredCaps(AGENTIC_DESIGN)).sort()).toEqual(Object.keys(measured).sort());
+  it('[QL-1] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(AGENTIC_DESIGN, measured.caps)).toEqual([]);
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

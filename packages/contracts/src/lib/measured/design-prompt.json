@@ -1,0 +1,21 @@
+{
+  "since": "2026-09-30T02:47:07.680Z",
+  "until": "2026-10-01T01:35:58.485Z",
+  "runs": 4,
+  "fields": {
+    "constraints": { "n": 6, "max": 6, "p99": 6, "overTarget": 0 },
+    "constraints[]": { "n": 28, "max": 247, "p99": 247, "overTarget": 1 },
+    "functionalRequirements": { "n": 6, "max": 8, "p99": 8, "overTarget": 0 },
+    "functionalRequirements[]": { "n": 45, "max": 221, "p99": 221, "overTarget": 0 },
+    "nonFunctionalRequirements": { "n": 6, "max": 8, "p99": 8, "overTarget": 0 },
+    "nonFunctionalRequirements[].kind": { "n": 39, "max": 13, "p99": 13, "overTarget": 0 },
+    "nonFunctionalRequirements[].requirement": { "n": 39, "max": 128, "p99": 128, "overTarget": 0 },
+    "nonFunctionalRequirements[].target": { "n": 39, "max": 40, "p99": 40, "overTarget": 0 },
+    "scale": { "n": 6, "max": 10, "p99": 10, "overTarget": 0 },
+    "scale[].metric": { "n": 42, "max": 35, "p99": 35, "overTarget": 0 },
+    "scale[].target": { "n": 42, "max": 31, "p99": 31, "overTarget": 0 },
+    "scenario": { "n": 6, "max": 1903, "p99": 1903, "overTarget": 3 },
+    "title": { "n": 6, "max": 105, "p99": 105, "overTarget": 0 }
+  },
+  "caps": {}
+}

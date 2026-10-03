@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { bound, CRITERION_STATEMENT_BOUND, modelSchema } from '@sysdesign/contracts';
+import { bound, boundsAgainstMeasured, modelSchema } from '@sysdesign/contracts';
 
+import measured from './measured.json';
 import { criteriaSchema, evaluationSchema, findingsSchema } from './schemas';
-import { boundsBelowMeasured, finding, result } from '../testing';
+import { finding, result } from '../testing';
 
 const walk = (node: unknown, visit: (value: Record<string, unknown>) => void): void => {
   if (Array.isArray(node)) return node.forEach((item) => walk(item, visit));
@@ -52,32 +53,19 @@ describe('per-request schemas', () => {
     ).toBe(false);
   });
 
-  it('[QL-4] a lens rationale target sits above the longest any lens has measurably written', () => {
-    // Across every pipeline's recorded runs (static/runs, to 2026-10-01): a
-    // critic's longest rationale ran 695 characters, an evaluator's 619. The
-    // target is what a lens is asked for; past the ceiling a rationale is
-    // kept and recorded, never a lost sample.
+  it('[QL-4] [QL-49] every bound a lens is shown sits above what any lens has measurably written', () => {
+    // `measured.json` beside this file: what every critic and evaluator of
+    // every pipeline wrote, refreshed by `pnpm measure:bounds`. How many
+    // findings or results a lens returns is its own declared `maxItems`,
+    // which the engine slices to — an exact list no measurement holds. A
+    // deriver's statements are held per pipeline, since the bound is the
+    // task's.
+    expect(measured.runs).toBeGreaterThan(0);
     expect(
-      boundsBelowMeasured(findingsSchema(['gap'], ['c1'], ['text'], 4), {
-        'findings[].rationale': 695,
-      }),
-    ).toEqual([]);
-    expect(
-      boundsBelowMeasured(evaluationSchema(['c1'], ['text'], 1), { 'results[].rationale': 619 }),
-    ).toEqual([]);
-  });
-
-  it('[QL-2] the default statement target sits above the longest any deriver but the digest’s has measurably written', () => {
-    // Across every pipeline's recorded derive-criteria answers (static/runs,
-    // to 2026-10-02) the longest statement ran 323 characters, a
-    // system-design one — the experience digest's deriver, which declares a
-    // bound of its own, is held to its own measurement in its own spec. The
-    // target is what the deriver is asked for; past the ceiling a statement
-    // is kept and recorded, so the target must not be one a model meets.
-    expect(
-      boundsBelowMeasured(criteriaSchema(['must'], 3, CRITERION_STATEMENT_BOUND), {
-        'criteria[].statement': 323,
-      }),
+      boundsAgainstMeasured(
+        [findingsSchema(['gap'], ['c1'], ['text'], 4), evaluationSchema(['c1'], ['text'], 4)],
+        measured.fields,
+      ),
     ).toEqual([]);
   });
 

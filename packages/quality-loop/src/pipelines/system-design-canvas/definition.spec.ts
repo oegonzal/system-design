@@ -7,13 +7,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import {
-  boundsBelowMeasured,
-  capsBelowMeasured,
-  declaredCaps,
-  proseBounds,
-} from '../../core/testing';
+import { capsAgainstMeasured } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
+import measured from './measured.json';
 import { canvasOutput } from './output';
 import { sampleSubmission } from './testing';
 
@@ -54,61 +50,17 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded canvas runs (static/runs, 2026-09-20 – 2026-10-02). A cap is
-    // also the call's time limit, so one a stage outwrites is a call cut short.
-    // The coach's figure is a revision the schema missed; the critics' are a
-    // 16-block, 35-connection diagram.
-    const measured: Record<string, number> = {
-      producer: 26_049,
-      'critic.requirements': 24_678,
-      'critic.architecture': 25_362,
-      'critic.scale': 24_646,
-      'critic.explanation': 25_094,
-      'critic.scenarios': 17_494,
-      'evaluator.requirements': 6_541,
-      'evaluator.quality': 11_958,
-    };
-    expect(capsBelowMeasured(SYSTEM_DESIGN_CANVAS, measured)).toEqual([]);
-    // Every stage that writes is measured; its rubric is the author's prompt's.
-    const { criteria: _supplied, ...writing } = declaredCaps(SYSTEM_DESIGN_CANVAS);
-    expect(Object.keys(writing).sort()).toEqual(Object.keys(measured).sort());
-  });
-
-  it('[QL-4] every string bound the coach writes into sits above the longest it has measurably written', () => {
-    // The longest each path has been written by the coach across the recorded
-    // canvas runs (static/runs, to 2026-10-01). A string past its bound is a
-    // miss that discards the whole revision — never cut to fit — so no bound
-    // may be one the coach meets. Every string the schema bounds is listed,
-    // so a new field cannot join the schema unmeasured.
-    const measured: Record<string, number> = {
-      'graph.nodes[].id': 19,
-      'graph.nodes[].label': 46,
-      'graph.nodes[].config[].key': 23,
-      'graph.nodes[].config[].value': 66,
-      'graph.nodes[].responsibilities[]': 52,
-      'graph.nodes[].operations[].name': 29,
-      'graph.nodes[].operations[].notes': 142,
-      'graph.edges[].id': 21,
-      'graph.edges[].source': 19,
-      'graph.edges[].target': 19,
-      'graph.edges[].label': 55,
-      'graph.edges[].carries[]': 29,
-      'brief.bindings[].criterionId': 2,
-      'brief.bindings[].nodeIds[]': 19,
-      'brief.bindings[].path[]': 18,
-      'brief.bindings[].claim': 229,
-      'narrative.overview': 1098,
-      'narrative.componentRationales[].nodeId': 19,
-      'narrative.componentRationales[].prose': 558,
-      'narrative.criterionNarrations[].criterionId': 2,
-      'narrative.criterionNarrations[].prose': 526,
-    };
-    expect(Object.keys(proseBounds(canvasOutput.schema)).sort()).toEqual(
-      Object.keys(measured).sort(),
-    );
-    expect(boundsBelowMeasured(canvasOutput.schema, measured)).toEqual([]);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds`. A cap is also the
+    // call's time limit, so one a stage outwrites is a call cut short. The
+    // coach writes into the submission schema contracts declares, so its
+    // fields are measured and held there (`canvas.schema.spec.ts`).
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(
+      capsAgainstMeasured(SYSTEM_DESIGN_CANVAS, measured.caps, {
+        exempt: { criteria: 'the rubric is the author’s prompt’s, never derived' },
+      }),
+    ).toEqual([]);
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

@@ -263,6 +263,38 @@ about 45 s each on the subscription login, so one application with three
 form pages is roughly ten to twenty minutes of model time plus whatever you
 type. Operator answers are cached for the session by field label.
 
+## Before changing a bound or a cap, measure
+
+Every string and list a model writes into is one declared bound — a target the
+model is asked for and a ceiling the schema accepts — and every stage declares
+an output cap (`maxTokens`), which is also its call's time limit. Each is held
+to what the model measurably writes by a committed fixture beside its
+declaration: `packages/quality-loop/src/pipelines/<id>/measured.json` (the
+deriver's and the producer's fields, every stage's output tokens),
+`packages/quality-loop/src/core/stages/measured.json` (what every lens writes)
+and `packages/contracts/src/lib/measured/<schema>.json` (the canvas a coach
+writes and the prompt a drafter writes). **Before changing any bound or cap,
+run `pnpm measure:bounds`:**
+
+```bash
+pnpm measure:bounds                                    # reads static/runs
+pnpm measure:bounds --runs-dir=<dir> --since=2026-10-01
+```
+
+It only reads the dumps — each call's reply as written, from its text when that
+parses and from its validated response otherwise, so a reply the seam refused,
+kept past a ceiling or salvaged from a cut turn counts at the size the model
+wrote — and rewrites the fixtures and
+`packages/llm/src/fixtures/measured-calls.json` (the calls the time-limit spec
+replays). Then the specs hold every declaration to them: a target at or above
+the 99th percentile written, a ceiling above the longest, a cap a fifth above
+the most its stage wrote on a turn that answered (a turn stopped by a limit or
+an error measures the fault, not the stage). A renamed field, a new one nothing
+measured, or a stage the definition no longer declares fails by name. Commit
+the fixtures with the change they justify; a declaration held to no
+measurement — a size a policy sets, a pipeline no run has recorded — is
+exempted in its spec, with the reason.
+
 ## Tests never touch your runs
 
 Every suite that touches Postgres — `nx test studio-api`, `quality-loop` and

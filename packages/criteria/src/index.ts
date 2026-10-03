@@ -423,6 +423,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run's dump reports what the model seam kept: its manifest and its index row count every field a call wrote past its target — of them those past the ceiling, cut and trimmed — and the calls read from a cut transcript or asked again with their faults; run.md lists each such field with the call that wrote it, what was asked, accepted and written and how it was handled, and names on a call's own line the API calls a resumed turn took, a salvaged transcript and a feedback ask; each exchange's record carries its salvage and its API calls; and a record from before the seam salvaged reads as a run that kept nothing.",
   },
+  {
+    id: 'QL-49',
+    statement:
+      'Every declared bound and output cap is held to what the model measurably writes: `pnpm measure:bounds` reads the run dumps without writing them — each reply at the size the model wrote it, refused, kept past a ceiling and salvaged ones included — and regenerates one fixture beside each module that declares bounds, and the calls the time-limit spec replays; and a spec fails when a target sits below the 99th percentile written, a ceiling at or below the longest, or a cap less than a fifth above the most its stage wrote on a turn that answered, and when a measured field or stage is gone or a declared one was never measured — unless the spec exempts it with its reason.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

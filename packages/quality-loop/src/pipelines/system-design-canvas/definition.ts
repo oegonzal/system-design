@@ -134,7 +134,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // to 25.4k on a dense diagram and evaluators up to 12.0k.
   producer: {
     persona: producer,
-    maxTokens: 48000,
+    maxTokens: 50000,
     consumes: ['criteria', 'memories'],
   },
 
@@ -156,7 +156,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 12,
-      maxTokens: 30000,
+      maxTokens: 32000,
     },
     {
       id: 'critic.scale',
@@ -172,7 +172,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       consumes: [],
       maxItems: 10,
-      maxTokens: 30000,
+      maxTokens: 32000,
     },
     {
       id: 'critic.scenarios',

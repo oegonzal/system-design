@@ -1,8 +1,10 @@
+import { boundsAgainstMeasured } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { boundsBelowMeasured, capsBelowMeasured, declaredCaps } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema } from '../../core/testing';
 import { SYSTEM_DESIGN } from './definition';
+import measured from './measured.json';
 import { designAnswerOutput, type DesignAnswer } from './output';
 
 const answer: DesignAnswer = {
@@ -30,52 +32,24 @@ describe('the system-design pipeline', () => {
     expect(SYSTEM_DESIGN.producer.persona).toContain('system-design');
   });
 
-  it('[QL-4] every prose bound the producer is shown sits above the longest it has measurably written', () => {
-    // The longest each path has been written across the recorded runs
-    // (static/runs, to 2026-10-01). A string past its bound is a miss that
-    // discards the whole answer — never cut to fit — so no bound may be one
-    // the producer meets.
-    const measured: Record<string, number> = {
-      summary: 1032,
-      'assumptions[]': 180,
-      'components[].name': 41,
-      'components[].responsibility': 360,
-      'components[].technology': 95,
-      'flows[].name': 97,
-      'flows[].steps[]': 358,
-      'dataModel[]': 438,
-      'tradeoffs[].decision': 167,
-      'tradeoffs[].rationale': 457,
-      'tradeoffs[].alternative': 226,
-      'risks[].risk': 159,
-      'risks[].mitigation': 364,
-      'capacity[].metric': 50,
-      'capacity[].estimate': 279,
-    };
-    expect(boundsBelowMeasured(designAnswerOutput.schema, measured)).toEqual([]);
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    // `measured.json`: every field across the recorded runs, refreshed by
+    // `pnpm measure:bounds`. A target under the 99th percentile written would
+    // make most replies overruns, and a ceiling at or under the longest would
+    // keep it past the ceiling rather than accept it.
+    expect(
+      boundsAgainstMeasured(
+        [designAnswerOutput.schema, deriverSchema(SYSTEM_DESIGN.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
-  it('[QL-33] every declared output cap is above what its stage has measurably written', () => {
-    // The most output tokens, thinking included, each stage wrote across the
-    // recorded system-design runs (static/runs, 2026-09-06 – 2026-09-30). A
-    // cap is also the call's time limit, so one a stage outwrites is a call
-    // cut short.
-    const measured: Record<string, number> = {
-      criteria: 1_377,
-      producer: 15_746,
-      'critic.requirements': 7_773,
-      'critic.soundness': 11_244,
-      'critic.scale': 8_692,
-      'evaluator.requirements': 1_547,
-      'evaluator.quality': 2_730,
-    };
-    expect(capsBelowMeasured(SYSTEM_DESIGN, measured)).toEqual([]);
-    // With a fifth of headroom over each, so the next longer answer is not the one cut.
-    const withHeadroom = Object.fromEntries(
-      Object.entries(measured).map(([stage, most]) => [stage, Math.ceil(most * 1.2)]),
-    );
-    expect(capsBelowMeasured(SYSTEM_DESIGN, withHeadroom)).toEqual([]);
-    expect(Object.keys(declaredCaps(SYSTEM_DESIGN)).sort()).toEqual(Object.keys(measured).sort());
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // A cap is also the call's time limit, so one a stage outwrites is a call
+    // cut short; the fifth is the room for the next longer answer.
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(capsAgainstMeasured(SYSTEM_DESIGN, measured.caps)).toEqual([]);
   });
 
   it('[QL-4] every location the answer exposes is printed verbatim where a judge reads it', () => {
