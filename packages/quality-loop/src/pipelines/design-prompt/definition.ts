@@ -79,9 +79,9 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
     // stops at two iterations, before any setback could reach it, but a run
     // request may raise `maxIterations` past that, so it declares setbacks: a
     // revision its judges found no better than the best is named to it on the
-    // next ask, so it does not write the same thing again. Every cap is sized from the recorded runs with a fifth or more of
-    // headroom (the spec holds the measurements), and each is also the call's
-    // time limit.
+    // next ask, so it does not write the same thing again. Every cap is sized
+    // from the recorded runs with a fifth or more of headroom (the spec holds
+    // the measurements), and each is also the call's time limit.
     producer: {
       persona: producer,
       maxTokens: 10000,
