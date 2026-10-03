@@ -14,6 +14,7 @@ import {
   CONTEXT_SEPARATOR,
   contextOf,
   type ChunkingInput,
+  PARTS_PER_CHUNK,
 } from './chunk';
 
 const NOTES = [
@@ -76,8 +77,9 @@ describe('chunkDocument', () => {
   it('[ING-1] reads structure first: headings, list items with their continuation lines, and blank-line paragraphs are the parts', () => {
     const { parts, chunks } = chunkDocument(input());
     expect(parts).toBe(9);
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]?.chunk.parts).toEqual([
+    // Nine parts, eight to a chunk: the structure is read whole, then packed.
+    expect(chunks.map((planned) => planned.chunk.parts.length)).toEqual([8, 1]);
+    expect(chunks.flatMap((planned) => planned.chunk.parts)).toEqual([
       '# Ada Lovelace — notes',
       '## Work',
       '### Analytical Engine, 1842–1843',
@@ -114,13 +116,13 @@ describe('chunkDocument', () => {
     ]);
   });
 
-  it('[ING-1] packs greedily under --chunk-bytes and the part cap, and every chunk passes the contract', () => {
+  it('[ING-1] packs greedily under --chunk-bytes and the declared parts-per-chunk, and every chunk passes the contract', () => {
     const bullets = Array.from({ length: 40 }, (_, i) => `- item ${i}`).join('\n');
     const plan = chunkDocument(input({ text: bullets, chunkBytes: 64_000 }));
-    expect(plan.chunks.map((planned) => planned.chunk.parts.length)).toEqual([
-      DOCUMENT_MAX_PARTS,
-      40 - DOCUMENT_MAX_PARTS,
-    ]);
+    expect(PARTS_PER_CHUNK).toBeLessThan(DOCUMENT_MAX_PARTS);
+    expect(plan.chunks.map((planned) => planned.chunk.parts.length)).toEqual(
+      Array.from({ length: 5 }, () => PARTS_PER_CHUNK),
+    );
 
     const heavy = Array.from({ length: 9 }, (_, i) => `- ${prose(160, `p${i}_`)}`).join('\n');
     const budget = 3000;
@@ -147,15 +149,14 @@ describe('chunkDocument', () => {
     }
   });
 
-  it('[ING-1] sets maxMemories to the lesser of the contract cap and the parts in the chunk', () => {
+  it("[ING-1] gives every chunk the contract's memory cap whatever its part count — a dense part states several facts", () => {
     const few = chunkDocument(input());
-    expect(few.chunks[0]?.chunk.maxMemories).toBe(9);
+    expect(few.chunks[0]?.chunk.maxMemories).toBe(DOCUMENT_MAX_MEMORIES);
     const many = Array.from({ length: 40 }, (_, i) => `- item ${i}`).join('\n');
     const plan = chunkDocument(input({ text: many, chunkBytes: 64_000 }));
-    expect(plan.chunks.map((planned) => planned.chunk.maxMemories)).toEqual([
-      DOCUMENT_MAX_MEMORIES,
-      8,
-    ]);
+    expect(new Set(plan.chunks.map((planned) => planned.chunk.maxMemories))).toEqual(
+      new Set([DOCUMENT_MAX_MEMORIES]),
+    );
   });
 
   it('reads a form feed as a page break, and a heading path deeper than its parent as a child of what is there', () => {

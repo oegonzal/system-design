@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import {
   DOCUMENT_CONTEXT_MAX_LENGTH,
   DOCUMENT_MAX_MEMORIES,
-  DOCUMENT_MAX_PARTS,
   DOCUMENT_PART_MAX_LENGTH,
   DOCUMENT_RULES,
   documentChunkSchema,
@@ -42,6 +41,16 @@ export interface ChunkPlan {
   parts: number;
   chunks: PlannedChunk[];
 }
+
+/**
+ * How many parts one chunk may carry. Measured on the first live digests
+ * (2026-10-03): a résumé's 18 bullet parts yielded 21 fact criteria against
+ * the contract's 16 memories, so coverage could never pass; and 10 dense
+ * skills parts wanted 14 memories against a cap tied to the part count, so
+ * the producer was blocked. The memory cap therefore stays the contract's,
+ * and a chunk carries at most this many parts, so two facts per part fit.
+ */
+export const PARTS_PER_CHUNK = 8;
 
 /** A part that cannot be made to fit: a lone section already renders past the budget. */
 export class ChunkBudgetExceeded extends Error {
@@ -170,7 +179,8 @@ const chunkOf = (
   context: contextOf(group[0]?.path ?? []),
   parts: group.map((part) => part.text),
   rules: [...DOCUMENT_RULES],
-  maxMemories: Math.min(DOCUMENT_MAX_MEMORIES, group.length),
+  // The contract's cap, not the part count: a dense part states several facts.
+  maxMemories: DOCUMENT_MAX_MEMORIES,
 });
 
 /**
@@ -193,7 +203,7 @@ function pack(parts: readonly Part[], input: ChunkingInput): Part[][] {
   parts.forEach((part, position) => {
     const candidate = [...current, part];
     const fits =
-      candidate.length <= DOCUMENT_MAX_PARTS &&
+      candidate.length <= PARTS_PER_CHUNK &&
       measure(candidate, input, parts.length) <= input.chunkBytes;
     if (fits) {
       current = candidate;
