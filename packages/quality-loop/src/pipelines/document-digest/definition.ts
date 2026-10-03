@@ -120,15 +120,30 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       // A broken rule is never offset by coverage: the store would hold the breach.
       rule: { dimension: 'fidelity', weight: 1, gate: true },
     },
+    // The two defects that would store a falsehood about a person gate;
+    // what a memory fails to hold, or holds awkwardly, is priced.
+    //
+    // `withholds` is what a confirmed finding does to the memories it names
+    // when the store reads the digest (`withheldItems`), by what the finding
+    // says about the fact rather than by how loudly it says it. A fact the
+    // sections never stated, or a section read as saying what it does not, is
+    // wrong: storing it would have the corpus assert something about the
+    // subject that their own documents do not, so every memory such a finding
+    // names is withheld. The remaining types fault a fact that is true. A
+    // duplicate is repaired by keeping one of the pair. A fact a form could not
+    // use as written, a condition that restates its insight, and a fact no
+    // memory captured all say the writing is weak, not that the fact is false —
+    // and a true fact dropped for its phrasing is a detail the corpus can never
+    // answer with again, which for a record of someone's career is the worse
+    // loss. Measured on the first live chunk: three of eight true facts were
+    // withheld, two of them for using "him" where the subject's name belonged.
     findingTypes: {
-      // The two defects that would store a falsehood about a person gate;
-      // what a memory fails to hold, or holds awkwardly, is priced.
-      invented_fact: { dimension: 'fidelity', gate: true },
-      misread_section: { dimension: 'fidelity', gate: true },
-      missed_fact: { dimension: 'coverage', gate: false },
-      unusable_fact: { dimension: 'coverage', gate: false },
-      vague_condition: { dimension: 'coverage', gate: false },
-      duplicate_fact: { dimension: 'coverage', gate: false },
+      invented_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      misread_section: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      missed_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
+      unusable_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
+      vague_condition: { dimension: 'coverage', gate: false, withholds: 'none' },
+      duplicate_fact: { dimension: 'coverage', gate: false, withholds: 'all-but-one' },
     },
     ...STANDARD_SCORING,
     evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },

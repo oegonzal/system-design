@@ -19,6 +19,7 @@ import {
   modelSchema,
   PRODUCER_BRIEFING,
   UPSTREAM_EVIDENCE,
+  WITHHOLDINGS,
 } from '@sysdesign/contracts';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
@@ -162,14 +163,34 @@ function checkWaves(definition: Definition, fail: Fail): void {
   }
 }
 
-function checkTask(definition: Definition, fail: Fail): void {
-  if (!(GOAL_SOURCES as readonly string[]).includes(definition.goalSource)) {
-    fail(`goalSource ${String(definition.goalSource)} is not one of ${GOAL_SOURCES.join(', ')}`);
-  }
+/**
+ * Every validator: a unique id the engine does not run itself, and what its
+ * problems withhold — when it says — a declared withholding on a `warn`
+ * validator. A failing `block` validator closes admission, so no reader ever
+ * sees its problems: what one would withhold is a declaration about nothing.
+ */
+function checkValidators(definition: Definition, fail: Fail): void {
   const validatorIds = definition.validators.map((validator) => validator.id);
   if (new Set(validatorIds).size !== validatorIds.length) fail('validator ids must be unique');
   for (const id of validatorIds) {
     if (ENGINE_VALIDATOR_IDS.includes(id)) fail(`validator id ${id} is the engine's own`);
+  }
+  for (const { id, gate, withholds } of definition.validators) {
+    if (withholds === undefined) continue;
+    if (!(WITHHOLDINGS as readonly string[]).includes(withholds)) {
+      fail(`validator ${id} withholds ${withholds}, not one of ${WITHHOLDINGS.join(', ')}`);
+    }
+    if (gate === 'block') {
+      fail(
+        `validator ${id} blocks, so no reader sees its problems and it may not declare withholds`,
+      );
+    }
+  }
+}
+
+function checkTask(definition: Definition, fail: Fail): void {
+  if (!(GOAL_SOURCES as readonly string[]).includes(definition.goalSource)) {
+    fail(`goalSource ${String(definition.goalSource)} is not one of ${GOAL_SOURCES.join(', ')}`);
   }
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
   // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it
@@ -217,6 +238,7 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkJudges(definition, fail);
   checkWaves(definition, fail);
   checkTask(definition, fail);
+  checkValidators(definition, fail);
   checkController(definition, fail);
 
   // The model is shown the output schema at its targets and the reply is read

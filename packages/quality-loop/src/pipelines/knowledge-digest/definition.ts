@@ -182,20 +182,47 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
     // digest nobody faulted renormalises them out. The pipeline's spec states
     // this as the declared exception and asserts that `coverage` and `novelty`
     // are earned by criteria.
+    //
+    // `withholds` is what a confirmed finding does to the items it names when
+    // the store reads the digest (`withheldItems`), by what the fault says
+    // rather than by how severe it is.
+    //
+    // **Every item it names** when storing the item would put something false
+    // or misleading in the corpus: an insight its evidence does not say, a fact
+    // that is not true with the design removed, an effect the record does not
+    // show, a kind the evidence cannot support — the kind is what the store
+    // indexes and what a later rule reads, so a mis-kinded item answers queries
+    // it should never answer — an insight that holds only for this run, a
+    // restatement of something already stored, and a claim about a known item
+    // that its evidence does not bear on.
+    //
+    // **Nothing** when the item is merely written weakly. `vague_item` is the
+    // whole of that case: the remedy is a rewrite, the knowledge is sound, and
+    // dropping it loses a detail the corpus will not answer with again. In the
+    // experience digest this type alone cost 51 of 245 narrow exclusions.
+    //
+    // **One of a set** for `duplicate_item`: the member still standing with the
+    // most support, ties to the earlier — which is what the persona asks the
+    // critic for and what 42 of 43 recorded duplicate findings made possible by
+    // naming both. On the compliant one in forty-three, which names only the
+    // later item, this withholds nothing and the near-twin is stored; that is
+    // the lesser harm, and reinforcement rather than this rule is the real
+    // defence against a twin: an item whose evidence supports a stored one is
+    // never stored again.
     findingTypes: {
-      misattributed_evidence: { dimension: 'fidelity', gate: true },
-      ungrounded_fact: { dimension: 'fidelity', gate: true },
-      unsupported_effect: { dimension: 'fidelity', gate: false },
-      wrong_kind: { dimension: 'fidelity', gate: false },
+      misattributed_evidence: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      ungrounded_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      unsupported_effect: { dimension: 'fidelity', gate: false, withholds: 'every-ref' },
+      wrong_kind: { dimension: 'fidelity', gate: false, withholds: 'every-ref' },
       // Gated: an item that holds only for this run's names is the one failure a
       // later prompt cannot recover from, and pricing it cannot stop it being
       // stored — a digest penalised to the clamp still scores over the bar.
-      run_specific: { dimension: 'reuse', gate: true },
-      vague_item: { dimension: 'reuse', gate: false },
-      duplicate_item: { dimension: 'reuse', gate: false },
-      restated_known: { dimension: 'novelty', gate: false },
-      false_confirmation: { dimension: 'novelty', gate: false },
-      false_contradiction: { dimension: 'novelty', gate: false },
+      run_specific: { dimension: 'reuse', gate: true, withholds: 'every-ref' },
+      vague_item: { dimension: 'reuse', gate: false, withholds: 'none' },
+      duplicate_item: { dimension: 'reuse', gate: false, withholds: 'all-but-one' },
+      restated_known: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
+      false_confirmation: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
+      false_contradiction: { dimension: 'novelty', gate: false, withholds: 'every-ref' },
     },
     ...STANDARD_SCORING,
     // Two samples everywhere and two hits to confirm: the gated types need both

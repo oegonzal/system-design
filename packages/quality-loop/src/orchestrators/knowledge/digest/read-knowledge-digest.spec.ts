@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { outputsOf, UNDECLARED_WITHHOLDING, WITHHOLDINGS } from '../../../core/outputs';
+import { outputsOf } from '../../../core/outputs';
 import { fromRun } from '../../../pipelines/knowledge-digest/from-run';
 import { renderGoal } from '../../../pipelines/knowledge-digest/input';
 import {
@@ -8,11 +8,11 @@ import {
   sampleKnown,
   sampleSource,
 } from '../../../pipelines/knowledge-digest/testing';
-import { sampleRun } from '../../../core/testing';
+import { contractOf, sampleRun } from '../../../core/testing';
 import { contentHash } from '../../memory/ports';
 import { ACCEPT_AT, readoutTrace } from '../../memory/testing';
 import { KNOWLEDGE_DIGEST } from '../../../pipelines/knowledge-digest/definition';
-import { KNOWLEDGE_WITHHOLDS, readKnowledgeDigest, type KnownRef } from './read-knowledge-digest';
+import { readKnowledgeDigest, type KnownRef } from './read-knowledge-digest';
 
 const KNOWN_TEXT = sampleKnown().text;
 
@@ -161,25 +161,6 @@ describe('what a knowledge digest endorses', () => {
     expect(unjudged.unresolved).toBe(0);
   });
 
-  it('[QL-42] every declared finding type says what it withholds, and nothing else is named', () => {
-    // A quantification over an empty collection is trivially true, and an
-    // equality between two empty key lists holds — so the count comes first.
-    // The three named rules below happen to cover this today, but a migration
-    // that keeps the quantifier and drops a pin would reopen it silently.
-    expect(Object.keys(KNOWLEDGE_DIGEST.task.findingTypes)).toHaveLength(10);
-    // Both ways: a type the pipeline declares and the table forgets would fall to
-    // the strict default silently, and a type in the table the pipeline no longer
-    // declares is a rule about nothing.
-    expect(Object.keys(KNOWLEDGE_WITHHOLDS).sort()).toEqual(
-      Object.keys(KNOWLEDGE_DIGEST.task.findingTypes).sort(),
-    );
-    for (const rule of Object.values(KNOWLEDGE_WITHHOLDS)) expect(WITHHOLDINGS).toContain(rule);
-    // What is false or misleading is withheld; what is merely weak is not.
-    expect(KNOWLEDGE_WITHHOLDS['vague_item']).toBe('none');
-    expect(KNOWLEDGE_WITHHOLDS['duplicate_item']).toBe('all-but-one');
-    expect(KNOWLEDGE_WITHHOLDS['misattributed_evidence']).toBe(UNDECLARED_WITHHOLDING);
-  });
-
   it('[QL-42] a weakly written item survives its fault, a duplicate pair keeps one, and a misreading is withheld', () => {
     const three = sampleDigest({
       memories: [
@@ -234,5 +215,70 @@ describe('what a knowledge digest endorses', () => {
     expect(readout([faulted('duplicate_item', ['memory.2', 'memory.3'])])).toEqual([1, 2]);
     // An insight its evidence does not say would be false in the store.
     expect(readout([faulted('misattributed_evidence', ['memory.2'])])).toEqual([1, 3]);
+  });
+  it('[QL-53] a warning validator withholds the item it names as that validator declares: a misfiled dimension keeps it, a borrowed run token does not', () => {
+    const base = { ...sampleDigest().memories[0], confirms: [] };
+    const digest = sampleDigest({
+      memories: [
+        { ...base, evidence: ['f1'] },
+        { ...base, kind: 'fact', evidence: ['r1'], dimension: 'compliance' },
+        {
+          ...base,
+          kind: 'fact',
+          evidence: ['r2'],
+          dimension: 'compliance',
+          insight: 'Do what f1 says about the upstream.',
+        },
+      ],
+      unused: ['f2'],
+    });
+    // The pipeline's own warnings, run as the engine runs them over this goal.
+    const contract = contractOf(KNOWLEDGE_DIGEST.task, goal());
+    const validation = KNOWLEDGE_DIGEST.validators
+      .filter((validator) => validator.gate === 'warn')
+      .map((validator) => validator.validate(digest, contract));
+    expect(
+      validation.map((report) => [
+        report.validatorId,
+        report.problems.flatMap((problem) => problem.locationRefs),
+      ]),
+    ).toEqual([
+      ['run-specificity', ['memory.3']],
+      ['dimension', ['memory.2']],
+      ['kinds', []],
+    ]);
+
+    const readout = readKnowledgeDigest(
+      outputsOf(
+        readoutTrace({
+          pipeline: 'knowledge-digest',
+          goal: goal(),
+          artifact: digest,
+          locations: ['summary', 'memory.1', 'memory.2', 'memory.3'],
+          criteria: [{ id: 'c1', kind: 'signal', statement: 'accounts for f1 resolving at i2' }],
+          results: [
+            {
+              criterionId: 'c1',
+              kind: 'signal',
+              result: 'pass',
+              hits: 2,
+              confidence: 'high',
+              locationRefs: ['memory.1'],
+            },
+          ],
+          validation,
+        }),
+      ),
+      ACCEPT_AT,
+      shown(),
+    );
+    // Each survivor keeps its own position and kind; only the run-local item goes.
+    expect(readout.memories.map((item) => [item.position, item.kind])).toEqual([
+      [1, 'procedure'],
+      [2, 'fact'],
+    ]);
+    expect(readout.withheld).toEqual([
+      { ref: 'memory.3', source: 'validator', by: 'run-specificity' },
+    ]);
   });
 });

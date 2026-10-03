@@ -1536,16 +1536,22 @@ store, never by the type's name: false or misleading there — a wrong fact or
 attribution, a wrong kind or key, a restatement of what the producer already
 holds — is `every-ref`; merely weaker than it could be — vague, templated,
 wordy, beside a gap — is `none`, because its remedy is a rewrite; a duplicate
-is `all-but-one`. `validatePipeline` refuses an unknown value at boot. The one
-rule is `withheldItems` in `core/outputs/withheld.ts`: it reads engine facts
-only — the ledger's confirmed findings, its validation reports (a validator's
-problems withhold what the reader declares for that validator id, `every-ref`
-when nothing is) and the criteria's citations for support — withholds the
-`every-ref` items first, then keeps the best still standing of each
-`all-but-one` group. Its readers are a digest's memories (`endorsedMemories`)
-and a recall's kept chunks (`readPack`); each readout carries `withheld`, one
-entry per item with what withheld it (`finding` or `validator`, and the type
-or id), so a reader counts what it withheld by source and type.
+is `all-but-one`. A warning validator whose problems name an item declares the
+same on itself (`Validator.withholds`); a blocking one may not, because a
+failing blocking validator closes admission and no reader ever sees its
+problems. `validatePipeline` refuses an unknown value, and a declaration on a
+blocking validator, at boot. The one rule is `withheldItems` in
+`core/outputs/withheld.ts`: it reads engine facts only — the ledger's confirmed
+findings, its validation reports and the criteria's citations for support —
+withholds the `every-ref` items first, then keeps the best still standing of
+each `all-but-one` group; a finding type or validator that declares nothing
+withholds every item it names. Its readers are a digest's memories
+(`endorsedMemories`, for the experience, document and knowledge digests) and a
+recall's kept chunks (`readPack`), and each binds `withholdingOf(definition)` —
+the rules read off its own pipeline's definition, never a table of its own.
+Each readout carries `withheld`, one entry per item with what withheld it
+(`finding` or `validator`, and the type or id), so a reader counts what it
+withheld by source and type.
 
 **A stored lesson is stamped from the evidence it cites.** The digest's index
 names, for every finding and criterion, the source run's iterations it was

@@ -28,6 +28,7 @@ import type {
   UpstreamEvidence,
   ValidationReport,
   ValidatorGate,
+  Withholding,
 } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 
@@ -88,9 +89,22 @@ export interface Producer<T> {
   produce(input: ProducerInput<T>): Promise<Produced<T>>;
 }
 
+/**
+ * An exact check over an artifact. `withholds` is what its problems withhold
+ * of the items they name from a reader of the run (`withheldItems`;
+ * `every-ref` when undeclared). Only a `warn` validator may declare it: a
+ * failing `block` validator closes admission, so no reader ever sees its
+ * problems, and `validatePipeline` refuses the dead declaration.
+ */
 export interface Validator<T> {
   readonly id: string;
   readonly gate: ValidatorGate;
+  /**
+   * Declared by what storing the item as written would put in the store, never
+   * by the type's name: false or misleading → every-ref; only weaker than it
+   * could be → none (its remedy is a rewrite); a duplicate → all-but-one.
+   */
+  readonly withholds?: Withholding;
   validate(artifact: T, contract: TaskContract<T>): ValidationReport;
 }
 

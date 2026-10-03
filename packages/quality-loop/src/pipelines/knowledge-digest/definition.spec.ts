@@ -2,6 +2,7 @@ import {
   boundsAgainstMeasured,
   CRITERION_STATEMENT_BOUND,
   KNOWLEDGE_ITEM_KINDS,
+  WITHHOLDINGS,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -114,6 +115,56 @@ describe('the knowledge-digest pipeline', () => {
       'warn',
       'warn',
       'warn',
+    ]);
+  });
+
+  it('[QL-42] every finding type this pipeline declares carries an explicit withholds', () => {
+    // A quantification over an empty collection is trivially true, so the count
+    // comes first: a migration that keeps the quantifier and drops a pin would
+    // otherwise reopen it silently.
+    expect(Object.keys(KNOWLEDGE_DIGEST.task.findingTypes)).toHaveLength(10);
+    // A type the pipeline declares with no withholds would fall to the strict
+    // default silently. The other direction — a rule for a type the pipeline no
+    // longer declares — has no place to be written: the rule is on the type's record.
+    for (const type of Object.keys(KNOWLEDGE_DIGEST.task.findingTypes)) {
+      expect(WITHHOLDINGS).toContain(KNOWLEDGE_DIGEST.policy.findingTypes[type].withholds);
+    }
+    const declared = Object.fromEntries(
+      Object.entries(KNOWLEDGE_DIGEST.policy.findingTypes).map(([type, mapped]) => [
+        type,
+        mapped.withholds,
+      ]),
+    );
+    // What is false or misleading in the store is withheld; what is merely weak
+    // is not; a duplicate keeps one of its set.
+    expect(declared).toEqual({
+      misattributed_evidence: 'every-ref',
+      ungrounded_fact: 'every-ref',
+      unsupported_effect: 'every-ref',
+      wrong_kind: 'every-ref',
+      run_specific: 'every-ref',
+      vague_item: 'none',
+      duplicate_item: 'all-but-one',
+      restated_known: 'every-ref',
+      false_confirmation: 'every-ref',
+      false_contradiction: 'every-ref',
+    });
+  });
+
+  it('[QL-53] its content warnings declare what their problems withhold, and its blocking checks declare nothing', () => {
+    // A blocking validator that fails closes admission, so no reader sees its
+    // problems; a warning leaves the digest standing and names one item.
+    expect(
+      KNOWLEDGE_DIGEST.validators.map(({ id, gate, withholds }) => [id, gate, withholds]),
+    ).toEqual([
+      ['references', 'block', undefined],
+      ['limits', 'block', undefined],
+      // Borrowing this run's tokens is `run_specific` caught exactly; a kind the
+      // evidence cannot support is `wrong_kind` caught exactly. A dimension its
+      // evidence does not land on leaves the insight and its evidence standing.
+      ['run-specificity', 'warn', 'every-ref'],
+      ['dimension', 'warn', 'none'],
+      ['kinds', 'warn', 'every-ref'],
     ]);
   });
 

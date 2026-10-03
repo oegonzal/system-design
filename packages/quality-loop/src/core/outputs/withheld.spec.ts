@@ -20,12 +20,15 @@ const naming = (type: string, refs: string[]) =>
 /** Rules declaring each type's withholding, as a policy's `findingTypes` would. */
 const declaring = (table: Record<string, Withholding>): WithholdingRules =>
   withholdingOf({
-    findingTypes: Object.fromEntries(
-      Object.entries(table).map(([type, withholds]) => [
-        type,
-        { dimension: 'any', gate: false, withholds },
-      ]),
-    ),
+    policy: {
+      findingTypes: Object.fromEntries(
+        Object.entries(table).map(([type, withholds]) => [
+          type,
+          { dimension: 'any', gate: false, withholds },
+        ]),
+      ),
+    },
+    validators: [],
   });
 
 /** Passing criteria citing each ref as many times as given: what supports it. */
@@ -98,7 +101,7 @@ describe('withheldItems', () => {
     ).toEqual([]);
   });
 
-  it('[QL-53] a validator problem naming an item withholds it as its validator is declared, every ref when not', () => {
+  it('[QL-53] a validator problem naming an item withholds it as its validator declares, every ref when it declares nothing', () => {
     const warned = ledger({
       validation: [
         {
@@ -117,8 +120,13 @@ describe('withheldItems', () => {
     expect(withheldItems(warned, ITEMS)).toEqual([
       { ref: 'memory.4', source: 'validator', by: 'run-specificity' },
     ]);
-    expect(
-      withheldItems(warned, ITEMS, { findingTypes: {}, validators: { 'run-specificity': 'none' } }),
-    ).toEqual([]);
+    // Read off the definition's validators, each declaring on itself — one that
+    // says nothing is left to the strict default.
+    const rules = withholdingOf({
+      policy: { findingTypes: {} },
+      validators: [{ id: 'run-specificity', withholds: 'none' }, { id: 'references' }],
+    });
+    expect(rules.validators).toEqual({ 'run-specificity': 'none' });
+    expect(withheldItems(warned, ITEMS, rules)).toEqual([]);
   });
 });

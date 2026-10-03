@@ -3,13 +3,17 @@
  * a digest's memories, a recall's kept chunks: each item something confirmed
  * against the iteration names, as far as what named it withholds. A confirmed
  * finding withholds what its type declares on the policy (`WITHHOLDINGS`); a
- * validator's problem what the reader is told that validator withholds; and
- * anything undeclared withholds every item it names, the rule before any was
- * declared. Written once, so no two readers can withhold differently, and over
- * engine facts only — the ledger's findings, its validation reports and its
- * criteria's citations — never over what any of them says in prose.
+ * validator's problem what that validator declares on itself; and anything
+ * undeclared withholds every item it names, the rule before any was declared.
+ * Both are read off the pipeline's definition (`withholdingOf`), so a reader
+ * cannot hold a second copy of either. Written once, so no two readers can
+ * withhold differently, and over engine facts only — the ledger's findings,
+ * its validation reports and its criteria's citations — never over what any
+ * of them says in prose.
  */
 import type { DecisionPolicy, EvidenceLedger, Withholding } from '@sysdesign/contracts';
+
+import type { Validator } from '../ports';
 
 export { WITHHOLDINGS, type Withholding } from '@sysdesign/contracts';
 
@@ -17,21 +21,36 @@ export { WITHHOLDINGS, type Withholding } from '@sysdesign/contracts';
 export const UNDECLARED_WITHHOLDING: Withholding = 'every-ref';
 
 /**
- * What withholds what. `findingTypes` is a policy's own table, read as
- * declared; `validators` is keyed by validator id, for a reader whose
- * pipeline runs a validator whose problems name items.
+ * What withholds what, as `withholdingOf` reads it off a definition:
+ * `findingTypes` is the policy's own table, read as declared; `validators` is
+ * keyed by validator id, one entry per validator that declares `withholds`.
  */
 export interface WithholdingRules {
   findingTypes: Readonly<Record<string, { withholds?: Withholding }>>;
-  validators?: Readonly<Record<string, Withholding>>;
+  validators: Readonly<Record<string, Withholding>>;
 }
 
 /** Nothing declared: every item anything names is withheld. */
-export const WITHHOLD_EVERY_REF: WithholdingRules = { findingTypes: {} };
+export const WITHHOLD_EVERY_REF: WithholdingRules = { findingTypes: {}, validators: {} };
 
-/** The rules a pipeline's policy declares for its finding types. */
-export const withholdingOf = (policy: Pick<DecisionPolicy, 'findingTypes'>): WithholdingRules => ({
-  findingTypes: policy.findingTypes,
+/**
+ * Where a pipeline declares what withholds what: its policy, per finding
+ * type, and its validators, each on itself — the part of a
+ * `PipelineDefinition` of any artifact type that says so.
+ */
+export interface WithholdingDeclarations {
+  policy: Pick<DecisionPolicy, 'findingTypes'>;
+  validators: readonly Pick<Validator<unknown>, 'id' | 'withholds'>[];
+}
+
+/** The rules a pipeline's definition declares, for its finding types and its validators. */
+export const withholdingOf = (definition: WithholdingDeclarations): WithholdingRules => ({
+  findingTypes: definition.policy.findingTypes,
+  validators: Object.fromEntries(
+    definition.validators.flatMap(({ id, withholds }) =>
+      withholds === undefined ? [] : [[id, withholds] as const],
+    ),
+  ),
 });
 
 /** What named an item: a confirmed finding, or a validator's problem. */
@@ -81,7 +100,7 @@ function namingsOf(
       report.problems.map((problem) => ({
         source: 'validator' as const,
         by: report.validatorId,
-        withholds: rules.validators?.[report.validatorId] ?? UNDECLARED_WITHHOLDING,
+        withholds: rules.validators[report.validatorId] ?? UNDECLARED_WITHHOLDING,
         refs: among(problem.locationRefs),
       })),
     ),

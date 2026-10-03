@@ -2,6 +2,7 @@ import {
   boundsAgainstMeasured,
   CRITERION_STATEMENT_BOUND,
   DOCUMENT_RULES,
+  WITHHOLDINGS,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -92,6 +93,48 @@ describe('the document-digest pipeline', () => {
       CRITERION_STATEMENT_BOUND.ceiling,
     );
     expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(/within the length the schema asks for/);
+  });
+
+  it('[QL-40] every finding type this pipeline declares carries an explicit withholds', () => {
+    // The count first, and the count expected rather than a floor at zero: a
+    // quantifier over an empty table holds just as happily, and what saves it
+    // today is the pins below — which a migration could move or rewrite while
+    // leaving this one green.
+    expect(Object.keys(DOCUMENT_DIGEST.task.findingTypes)).toHaveLength(6);
+    // A type with no declared withholds falls to the strict default and silently
+    // costs facts. The other direction — a rule for a type the pipeline cannot
+    // report — has no place to be written: the rule lives on the type's own record.
+    for (const type of Object.keys(DOCUMENT_DIGEST.task.findingTypes)) {
+      expect(WITHHOLDINGS).toContain(DOCUMENT_DIGEST.policy.findingTypes[type].withholds);
+    }
+    // No validator of this pipeline declares one: both block, and a failing
+    // blocking validator closes admission before any reader sees its problems.
+    expect(DOCUMENT_DIGEST.validators.map(({ gate, withholds }) => [gate, withholds])).toEqual([
+      ['block', undefined],
+      ['block', undefined],
+    ]);
+  });
+
+  it('[QL-40] withholds a fact its sections do not support, and keeps a true one faulted only for its wording', () => {
+    const declared = Object.fromEntries(
+      Object.entries(DOCUMENT_DIGEST.policy.findingTypes).map(([type, mapped]) => [
+        type,
+        [mapped.withholds, mapped.gate],
+      ]),
+    );
+    expect(declared).toEqual({
+      // These two say the fact is wrong — storing it would have the corpus assert
+      // what the subject's own documents do not — and they are the gated pair.
+      invented_fact: ['every-ref', true],
+      misread_section: ['every-ref', true],
+      // These say a true fact is written weakly. Dropping it loses a detail the
+      // corpus can never answer with again, so it is kept and the wording stands.
+      missed_fact: ['none', false],
+      unusable_fact: ['none', false],
+      vague_condition: ['none', false],
+      // A duplicate is repaired by keeping one of the pair, not by losing both.
+      duplicate_fact: ['all-but-one', false],
+    });
   });
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {

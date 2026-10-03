@@ -1,9 +1,9 @@
 /**
  * What an experience digest endorses: the generic reader in `endorsed.ts`
  * bound to the experience-digest pipeline's own schema, index and what its
- * definition declares each finding type withholds. The memory orchestrator's
- * digest step and the re-index tool both read through here, so the two can
- * never endorse differently.
+ * definition declares each finding type and validator withholds. The memory
+ * orchestrator's digest step and the re-index tool both read through here, so
+ * the two can never endorse differently.
  */
 import { withholdingOf, type RunOutputs } from '../../../core/outputs';
 import { EXPERIENCE_DIGEST } from '../../../pipelines/experience-digest/definition';
@@ -17,5 +17,5 @@ export const memoriesToStore = (outputs: RunOutputs, acceptAt: number): DigestRe
   endorsedMemories(outputs, acceptAt, {
     schema: experienceDigestSchema,
     readIndex: readDigestIndex,
-    withholding: withholdingOf(EXPERIENCE_DIGEST.policy),
+    withholding: withholdingOf(EXPERIENCE_DIGEST),
   });

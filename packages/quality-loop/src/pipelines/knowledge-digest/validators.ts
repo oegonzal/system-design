@@ -15,12 +15,13 @@
  * would refuse most first drafts, and two refusals lose the whole digest.
  * A warn problem lands on the iteration's validation, reaches the producer as a
  * revision to make, and leaves `validatorsPassed` standing — and the shared
- * reader is what decides whether a faulted item is stored.
+ * reader is what decides whether a faulted item is stored, by what each rule
+ * declares its problems withhold.
  *
  * Nothing here reads prose. Every rule is a lookup against ids the codec itself
  * wrote into the index.
  */
-import type { ValidationProblem } from '@sysdesign/contracts';
+import type { ValidationProblem, Withholding } from '@sysdesign/contracts';
 
 import {
   LIMITS_VALIDATOR_ID,
@@ -212,21 +213,45 @@ export const limitsValidator: Validator<KnowledgeDigest> = indexedValidator(
   [],
 );
 
-/** The three content rules warn: each faults one item, and the reader decides what a fault costs. */
-const warning = (validator: Validator<KnowledgeDigest>): Validator<KnowledgeDigest> => ({
+/**
+ * The three content rules warn: each faults one item, and the reader decides
+ * what a fault costs — by what the rule declares its problems withhold of the
+ * item they name. Every other field of the rule passes through.
+ */
+const warning = (
+  validator: Validator<KnowledgeDigest>,
+  withholds: Withholding,
+): Validator<KnowledgeDigest> => ({
   ...validator,
   gate: 'warn',
+  withholds,
   validate: (artifact, contract) => ({ ...validator.validate(artifact, contract), gate: 'warn' }),
 });
 
+/**
+ * Withholds the item it names: one that borrows this run's tokens holds only
+ * for this run, and is false anywhere else — as `run_specific` is.
+ */
 export const generalityValidator: Validator<KnowledgeDigest> = warning(
   indexedValidator(GENERALITY_VALIDATOR_ID, readIndex, generality, []),
+  'every-ref',
 );
 
+/**
+ * Withholds nothing: the insight and its evidence stand, and only the
+ * dimension the item is filed under is off, which a rewrite corrects.
+ */
 export const dimensionValidator: Validator<KnowledgeDigest> = warning(
   indexedValidator(DIMENSION_VALIDATOR_ID, readIndex, dimension, []),
+  'none',
 );
 
+/**
+ * Withholds the item it names: the kind is what the store indexes and a later
+ * rule reads, so a kind its evidence cannot support misleads — as `wrong_kind`
+ * does.
+ */
 export const kindsValidator: Validator<KnowledgeDigest> = warning(
   indexedValidator(KINDS_VALIDATOR_ID, readIndex, kinds, []),
+  'every-ref',
 );

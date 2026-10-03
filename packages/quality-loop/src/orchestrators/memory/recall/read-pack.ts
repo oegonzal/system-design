@@ -50,8 +50,8 @@ export interface RecallReadout {
   withheld: WithheldItem[];
 }
 
-/** What each of the curator's finding types withholds, as its pipeline declares it. */
-const WITHHOLDING = withholdingOf(MEMORY_RECALL.policy);
+/** What each of the curator's finding types and validators withholds, as its pipeline declares it. */
+const WITHHOLDING = withholdingOf(MEMORY_RECALL);
 
 export function readPack(
   outputs: RunOutputs,

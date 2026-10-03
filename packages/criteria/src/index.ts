@@ -391,7 +391,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-40',
     statement:
-      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; a qualifier its sections put on a claim is carried into the insight and graded as a rule; a finding withholds the facts it names by a declared table, so one saying a fact is wrong withholds every fact it names while one faulting a true fact for its wording withholds none; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
+      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; a qualifier its sections put on a claim is carried into the insight and graded as a rule; a finding withholds the facts it names as its type declares on the pipeline's policy, so one saying a fact is wrong withholds every fact it names while one faulting a true fact for its wording withholds none; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
   },
   {
     id: 'QL-46',
@@ -431,7 +431,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-53',
     statement:
-      "What a confirmed finding withholds of the items it names is declared, per finding type, on the pipeline that confirms it — every item, all but the best-supported of a group with ties to the first, or none — checked when the pipeline boots, by what storing the item as written would do and never by the type's name; one rule reads it for every reader of a run, a digest's memories and a recall's kept chunks alike, over confirmed findings and the validator problems that name an item, withholding every named item where nothing is declared; and each reader counts what it withheld, by source and type.",
+      "What a confirmed finding withholds of the items it names is declared, per finding type, on the pipeline that confirms it, and what a warning validator's problems withhold on that validator — every item, all but the best-supported of a group with ties to the first, or none — checked when the pipeline boots, which refuses the declaration on a blocking validator because its failing problems close admission, by what storing the item as written would do and never by the type's name; one rule reads both off the pipeline's definition for every reader of a run, a digest's memories and a recall's kept chunks alike, withholding every named item where nothing is declared; and each reader counts what it withheld, by source and type.",
   },
   {
     id: 'QL-54',

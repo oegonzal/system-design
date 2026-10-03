@@ -9,6 +9,7 @@ import type {
   Decision,
   RunTrace,
   SuccessCriterion,
+  ValidationReport,
 } from '@sysdesign/contracts';
 
 import { samplePack } from '../../pipelines/memory-recall/testing';
@@ -113,6 +114,8 @@ export interface ReadoutInput {
   criteria?: SuccessCriterion[];
   results?: CriterionEvidence[];
   findings?: ConfirmedFinding[];
+  /** What the iteration's validators reported — a warning's problems can name an item. */
+  validation?: ValidationReport[];
   decision?: Decision;
   /** Defaults to 90 for an accept, 50 otherwise — override to sit either side of an accept bar. */
   overall?: number;
@@ -134,12 +137,12 @@ export function readoutTrace(input: ReadoutInput): RunTrace {
         artifact: input.artifact,
         locations: input.locations.map((id) => ({ id, label: id })),
         rendered: '',
-        validation: [],
+        validation: input.validation ?? [],
         critics: [],
         evaluators: [],
         ledger: {
           artifactPresent: true,
-          validation: [],
+          validation: input.validation ?? [],
           criteria: input.results ?? [],
           findings: input.findings ?? [],
           discarded: [],

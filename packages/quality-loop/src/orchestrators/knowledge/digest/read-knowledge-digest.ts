@@ -19,7 +19,8 @@
  */
 import { parseLenient } from '@sysdesign/contracts';
 
-import type { RunOutputs, Withholding, WithholdingRules } from '../../../core/outputs';
+import { withholdingOf, type RunOutputs } from '../../../core/outputs';
+import { KNOWLEDGE_DIGEST } from '../../../pipelines/knowledge-digest/definition';
 import { readIndex } from '../../../pipelines/knowledge-digest/input';
 import {
   knowledgeDigestSchema,
@@ -68,52 +69,14 @@ export interface KnowledgeReadout extends Omit<DigestReadout, 'memories'> {
 }
 
 /**
- * What each of this pipeline's finding types withholds from the store, by what
- * the fault says rather than by how severe it is.
- *
- * **Withholds every item it names** when storing the item would put something
- * false or misleading in the corpus: an insight its evidence does not say, a
- * fact that is not true with the design removed, an effect the record does not
- * show, a kind the evidence cannot support — the kind is what the store indexes
- * and what a later rule reads, so a mis-kinded item answers queries it should
- * never answer — an insight that holds only for this run, a restatement of
- * something already stored, and a claim about a known item that its evidence
- * does not bear on.
- *
- * **Withholds nothing** when the item is merely written weakly. `vague_item` is
- * the whole of that case: the remedy is a rewrite, the knowledge is sound, and
- * dropping it loses a detail the corpus will not answer with again. In the
- * experience digest this type alone cost 51 of 245 narrow exclusions.
- *
- * **Keeps one of a set** for `duplicate_item`: the member still standing with
- * the most support, ties to the earlier (`withheldItems`) — which is what the
- * persona asks the critic for and what 42 of 43 recorded duplicate findings made
- * possible by naming both. On the compliant one in forty-three, which names only
- * the later item, this withholds nothing and the near-twin is stored; that is the lesser
- * harm, and reinforcement rather than this rule is the real defence against a
- * twin: an item whose evidence supports a stored one is never stored again.
+ * This pipeline's schema and index, and what its definition declares each
+ * finding type and validator withholds.
  */
-export const KNOWLEDGE_WITHHOLDS: Readonly<Record<string, Withholding>> = {
-  misattributed_evidence: 'every-ref',
-  ungrounded_fact: 'every-ref',
-  unsupported_effect: 'every-ref',
-  wrong_kind: 'every-ref',
-  run_specific: 'every-ref',
-  restated_known: 'every-ref',
-  false_confirmation: 'every-ref',
-  false_contradiction: 'every-ref',
-  duplicate_item: 'all-but-one',
-  vague_item: 'none',
+const codec = {
+  schema: knowledgeDigestSchema,
+  readIndex,
+  withholding: withholdingOf(KNOWLEDGE_DIGEST),
 };
-
-/** The table as the rules every reader of a run reads (`withheldItems`). */
-const KNOWLEDGE_WITHHOLDING: WithholdingRules = {
-  findingTypes: Object.fromEntries(
-    Object.entries(KNOWLEDGE_WITHHOLDS).map(([type, withholds]) => [type, { withholds }]),
-  ),
-};
-
-const codec = { schema: knowledgeDigestSchema, readIndex, withholding: KNOWLEDGE_WITHHOLDING };
 
 export function readKnowledgeDigest(
   outputs: RunOutputs,

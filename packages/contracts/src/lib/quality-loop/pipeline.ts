@@ -40,7 +40,19 @@ export interface DecisionPolicy {
    * from a reader of the run (`WITHHOLDINGS`; `every-ref` when undeclared).
    */
   findingTypes: Readonly<
-    Record<string, { dimension: string; gate: boolean; withholds?: Withholding }>
+    Record<
+      string,
+      {
+        dimension: string;
+        gate: boolean;
+        /**
+         * Declared by what storing the item as written would put in the store, never
+         * by the type's name: false or misleading → every-ref; only weaker than it
+         * could be → none (its remedy is a rewrite); a duplicate → all-but-one.
+         */
+        withholds?: Withholding;
+      }
+    >
   >;
   resultValues: Readonly<Record<'pass' | 'partial' | 'fail', number>>;
   confidenceWeights: Readonly<Record<AxisFactorLevel, number>>;

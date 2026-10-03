@@ -100,7 +100,7 @@ export interface DigestIndexLike {
  * How one digest pipeline's artifact and goal are read: its output schema,
  * its own index reader, and what its finding types — and any validator whose
  * problems name a memory — withhold, as its definition declares them
- * (`withholdingOf(policy)`). Without them, everything confirmed against a
+ * (`withholdingOf(definition)`). Without them, everything confirmed against a
  * memory withholds it.
  */
 export interface DigestCodec<D extends DigestLike, I extends DigestIndexLike> {

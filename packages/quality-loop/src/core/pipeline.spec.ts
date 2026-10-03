@@ -4,6 +4,7 @@ import {
   keptAtMost,
   LARGEST_STATEMENT_BOUND,
   MAX_PROVIDED_STATEMENT_LENGTH,
+  WITHHOLDINGS,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -91,6 +92,33 @@ describe('validatePipeline', () => {
         `validator id ${id} is the engine's own`,
       );
     }
+  });
+
+  it('[QL-53] takes what a warning validator withholds as a declared withholding, and refuses one on a blocking validator', () => {
+    const declaring = (gate: 'block' | 'warn', withholds: unknown) => ({
+      id: 'own',
+      gate,
+      withholds: withholds as never,
+      validate: () => ({ validatorId: 'own', gate, problems: [] }),
+    });
+    for (const withholds of WITHHOLDINGS) {
+      expect(() =>
+        validatePipeline(asAny(tinyPipeline({ validators: [declaring('warn', withholds)] }))),
+      ).not.toThrow();
+    }
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ validators: [declaring('warn', 'some-refs')] }))),
+    ).toThrow(/validator own withholds some-refs, not one of every-ref, all-but-one, none/);
+    // A failing blocking validator closes admission, so no reader ever sees its
+    // problems: what it would withhold is a declaration about nothing.
+    for (const withholds of WITHHOLDINGS) {
+      expect(() =>
+        validatePipeline(asAny(tinyPipeline({ validators: [declaring('block', withholds)] }))),
+      ).toThrow(/validator own blocks, so no reader sees its problems/);
+    }
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ validators: [declaring('block', undefined)] }))),
+    ).not.toThrow();
   });
 
   it('[QL-47] converts the output schema for the model at boot: a schema with no JSON form never boots', () => {
