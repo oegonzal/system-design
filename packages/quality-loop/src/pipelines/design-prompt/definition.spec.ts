@@ -24,9 +24,8 @@ describe('the design-prompt pipeline', () => {
     expect(DESIGN_PROMPT.producer.persona).toContain('design-prompt');
   });
 
-  it('[QL-56] its writer sees the checklist, and on a revise what its last draft no better than the best was found wrong with', () => {
-    expect(DESIGN_PROMPT.producer.consumes).toEqual(['criteria', 'setbacks']);
-    expect(DESIGN_PROMPT.policy.loop.maxIterations).toBeGreaterThan(1);
+  it('[QL-56] its writer sees the checklist, and no setbacks its two-iteration loop could never hand it', () => {
+    expect(DESIGN_PROMPT.producer.consumes).toEqual(['criteria']);
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

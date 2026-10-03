@@ -57,7 +57,6 @@ describe('the agentic-design pipeline', () => {
 
   it('[QL-56] its producer never sees the criteria, and on a revise is told what its last design no better than the best was found wrong with', () => {
     expect(AGENTIC_DESIGN.producer.consumes).toEqual(['setbacks']);
-    expect(AGENTIC_DESIGN.policy.loop.maxIterations).toBeGreaterThan(1);
   });
 
   it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {

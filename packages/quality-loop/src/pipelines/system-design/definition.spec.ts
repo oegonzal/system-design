@@ -34,7 +34,6 @@ describe('the system-design pipeline', () => {
 
   it('[QL-56] its producer sees the criteria, and on a revise what its last answer no better than the best was found wrong with', () => {
     expect(SYSTEM_DESIGN.producer.consumes).toEqual(['criteria', 'setbacks']);
-    expect(SYSTEM_DESIGN.policy.loop.maxIterations).toBeGreaterThan(1);
   });
 
   it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {

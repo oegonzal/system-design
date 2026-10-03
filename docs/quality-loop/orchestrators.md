@@ -742,9 +742,10 @@ named where there is one.
 - **Closed: a losing revision's critique reaches the next briefing.** It did not: the next
   iteration got the best's briefing again, byte-identical in 22-30-00, so with the default budget a
   lost iteration 2 made iteration 3 a second try at the same revision. A producer that consumes
-  `setbacks` — every producer whose loop revises does — is now told, on the ask after an attempt its
-  judges read and found no better than the best, that attempt's confirmed finding notes under their
-  own heading, less any the best's remediations already name. A blocked loser's validator notes
+  `setbacks` — every producer whose loop can reach a third iteration does, since the third ask is
+  the earliest a setback can reach — is now told, on the ask after an attempt its judges read and
+  found no better than the best, that attempt's confirmed finding notes under their own heading,
+  less any the best's remediations already name. A blocked loser's validator notes
   still reach the producer as refusals, and a lost produce's schema faults as refusals of their own.
 - **"Your previous artifact" is the best one.** The heading reads as the previous iteration's, but
   after a revision that did not win it is older, and may be the author's own canvas.

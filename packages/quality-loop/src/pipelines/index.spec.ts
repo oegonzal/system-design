@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { describePipeline, validatePipeline } from '../core/pipeline';
+import { describePipeline, validatePipeline, type PipelineDefinition } from '../core/pipeline';
 import { PIPELINES } from './index';
+
+/**
+ * The earliest iteration a producer can be handed setbacks on. A setback is
+ * what the judges confirmed of an attempt that did not become best, and the
+ * first judged attempt is the best until one beats it — so the ask after it,
+ * the second, has none to hear, and the third is the first that can.
+ */
+const FIRST_SETBACK_ITERATION = 3;
 
 describe('the pipeline registry', () => {
   it('[QL-1] holds instances of the one definition, each valid, none sharing an id', () => {
@@ -36,5 +44,30 @@ describe('the pipeline registry', () => {
         loop: { lostProduces: 1 },
       });
     }
+  });
+
+  it('[QL-56] every producer whose loop can reach a third iteration declares setbacks, and none whose loop cannot', () => {
+    const reaches = (definition: PipelineDefinition<unknown>): boolean =>
+      definition.policy.loop.maxIterations >= FIRST_SETBACK_ITERATION;
+    const declares = (definition: PipelineDefinition<unknown>): boolean =>
+      definition.producer.consumes.includes('setbacks');
+    const registry = [...PIPELINES.values()];
+    const ids = (definitions: PipelineDefinition<unknown>[]): string[] =>
+      definitions.map((definition) => definition.id);
+
+    // The rule is not vacuous: these loops reach the third ask.
+    expect(ids(registry.filter(reaches))).toEqual([
+      'system-design',
+      'agentic-design',
+      'system-design-canvas',
+    ]);
+    expect(
+      ids(registry.filter((definition) => reaches(definition) && !declares(definition))),
+      'a loop that reaches a third ask never tells its producer what the attempt before fell short on',
+    ).toEqual([]);
+    expect(
+      ids(registry.filter((definition) => declares(definition) && !reaches(definition))),
+      'a declaration on a loop that never reaches a third ask is dead',
+    ).toEqual([]);
   });
 });
