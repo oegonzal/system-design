@@ -5,16 +5,6 @@
  * verbatim. This file renders that record as the goal every stage reads and
  * reads its own bookkeeping back from the last fenced JSON block.
  */
-import {
-  AXIS_FACTOR_LEVELS,
-  CRITERION_RESULTS,
-  DECISIONS,
-  FIXABILITIES,
-  MAX_QUALITY_RUN_ITERATIONS,
-  ITERATION_MODES,
-  SEVERITIES,
-  STOP_REASONS,
-} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -24,104 +14,74 @@ import {
   goalBytes,
   readFencedIndex,
 } from '../../core/contracts';
+import {
+  ALIAS_MAX,
+  ARTIFACT_MAX,
+  KEY_MAX,
+  LENS_MAX,
+  MAX_CRITERIA_ITEMS,
+  MAX_EVIDENCE,
+  MAX_FINDING_CRITERIA,
+  MAX_FINDING_LENSES,
+  MAX_FINDING_REFS,
+  MAX_FINDINGS,
+  PROMPT_MAX,
+  RATIONALE_MAX,
+  REASON_MAX,
+  RECORD_EVIDENCE_KINDS,
+  REF_MAX,
+  STATEMENT_MAX,
+  TRANSITION_DETAIL_MAX,
+  experienceShape,
+  recordedCriterionSchema,
+  recordedFindingSchema,
+  type IterationSummary,
+  type RecordedCriterion,
+  type RecordedFinding,
+  type Transition,
+} from '../../core/outputs';
 
 export const EXPERIENCE_DIGEST_ID = 'experience-digest';
 
-/** Caps chosen so a maximal record renders well under the engine's goal budget. */
+/** How many memories this digest may propose; the record's own caps are the engine's. */
 export const MAX_MEMORIES = 8;
-export const MAX_FINDINGS = 32;
-export const MAX_CRITERIA_ITEMS = 24;
-export const MAX_EVIDENCE = MAX_FINDINGS + MAX_CRITERIA_ITEMS;
-export const PROMPT_MAX = 12_000;
-export const ARTIFACT_MAX = 16_000;
-export const RATIONALE_MAX = 200;
-export const REASON_MAX = 200;
-export const STATEMENT_MAX = 300;
 const RULE_MAX = 300;
 const MAX_RULES = 8;
-/** An evidence alias — `f12`, `r3` — and the engine ids a finding carries. */
-export const ALIAS_MAX = 8;
-export const KEY_MAX = 200;
-export const REF_MAX = 40;
-export const LENS_MAX = 40;
-export const TRANSITION_DETAIL_MAX = 120;
-/** How many locations, criteria and lenses one recorded finding lists. */
-export const MAX_FINDING_REFS = 8;
-export const MAX_FINDING_CRITERIA = 4;
-export const MAX_FINDING_LENSES = 6;
 
-export const EVIDENCE_KINDS = ['finding', 'criterion'] as const;
-const TRANSITION_KINDS = ['persisted', 'resolved', 'improved', 'regressed'] as const;
+/**
+ * The record's shape, caps and item schemas are `core/outputs`': two pipelines
+ * digest a run and must read the same account of it. They are re-exported here
+ * so this codec stays the one place a reader of the experience digest looks,
+ * and `EVIDENCE_KINDS` keeps the name every stage of this pipeline already uses
+ * for what a record's items may rest on.
+ */
+export {
+  ALIAS_MAX,
+  ARTIFACT_MAX,
+  KEY_MAX,
+  LENS_MAX,
+  MAX_CRITERIA_ITEMS,
+  MAX_EVIDENCE,
+  MAX_FINDING_CRITERIA,
+  MAX_FINDING_LENSES,
+  MAX_FINDING_REFS,
+  MAX_FINDINGS,
+  PROMPT_MAX,
+  RATIONALE_MAX,
+  REASON_MAX,
+  REF_MAX,
+  STATEMENT_MAX,
+  TRANSITION_DETAIL_MAX,
+  recordedCriterionSchema,
+  recordedFindingSchema,
+  RECORD_EVIDENCE_KINDS as EVIDENCE_KINDS,
+};
+export type { IterationSummary, RecordedCriterion, RecordedFinding, Transition };
 
+/** The alias every index entry is addressed by, bounded as the record's are. */
 const alias = z.string().min(1).max(ALIAS_MAX);
-const iteration = z.number().int().min(1);
-const score = z.number().nullable();
 
-const transitionSchema = z.strictObject({
-  kind: z.enum(TRANSITION_KINDS),
-  iterations: z.array(iteration).min(2).max(2),
-  detail: z.string().max(TRANSITION_DETAIL_MAX),
-});
-export type Transition = z.infer<typeof transitionSchema>;
-
-const iterationSummarySchema = z.strictObject({
-  iteration,
-  mode: z.enum(ITERATION_MODES),
-  decision: z.enum(DECISIONS),
-  reason: z.string().max(REASON_MAX),
-  overall: z.number(),
-  overallDelta: score,
-  dimensions: z.record(z.string().max(40), score),
-  dimensionDeltas: z.record(z.string().max(40), score),
-});
-export type IterationSummary = z.infer<typeof iterationSummarySchema>;
-
-export const recordedCriterionSchema = z.strictObject({
-  alias,
-  id: z.string().min(1).max(20),
-  kind: z.string().min(1).max(60),
-  statement: z.string().min(1).max(STATEMENT_MAX),
-  results: z
-    .array(
-      z.strictObject({ iteration, result: z.enum([...CRITERION_RESULTS, 'unassessed'] as const) }),
-    )
-    .max(MAX_QUALITY_RUN_ITERATIONS),
-  transitions: z.array(transitionSchema).max(MAX_QUALITY_RUN_ITERATIONS),
-});
-export type RecordedCriterion = z.infer<typeof recordedCriterionSchema>;
-
-export const recordedFindingSchema = z.strictObject({
-  alias,
-  key: z.string().min(1).max(KEY_MAX),
-  type: z.string().min(1).max(60),
-  severity: z.enum(SEVERITIES),
-  confidence: z.enum(AXIS_FACTOR_LEVELS),
-  fixability: z.enum(FIXABILITIES),
-  locationRefs: z.array(z.string().max(REF_MAX)).max(MAX_FINDING_REFS),
-  /** Aliases of the record's criteria the finding weakened. */
-  criteria: z.array(alias).max(MAX_FINDING_CRITERIA),
-  lenses: z.array(z.string().max(LENS_MAX)).max(MAX_FINDING_LENSES),
-  iterations: z.array(iteration).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
-  rationale: z.string().max(RATIONALE_MAX).nullable(),
-  /** The policy selected it for remediation in at least one iteration. */
-  remediated: z.boolean(),
-  reconciledTo: alias.nullable(),
-  transitions: z.array(transitionSchema).max(MAX_QUALITY_RUN_ITERATIONS),
-});
-export type RecordedFinding = z.infer<typeof recordedFindingSchema>;
-
-const recordShape = z.strictObject({
-  runId: z.string().min(1).max(80),
-  pipeline: z.string().min(1).max(120),
-  finalDecision: z.enum(DECISIONS),
-  stopReason: z.enum(STOP_REASONS),
-  bestIteration: iteration,
-  prompt: z.string().min(1).max(PROMPT_MAX),
-  artifact: z.string().max(ARTIFACT_MAX).nullable(),
-  iterations: z.array(iterationSummarySchema).min(1).max(MAX_QUALITY_RUN_ITERATIONS),
-  criteria: z.array(recordedCriterionSchema).max(MAX_CRITERIA_ITEMS),
-  findings: z.array(recordedFindingSchema).max(MAX_FINDINGS),
-  omitted: z.strictObject({ findings: z.number().int().min(0), criteria: z.number().int().min(0) }),
+const recordShape = experienceShape.extend({
   rules: z.array(z.string().min(1).max(RULE_MAX)).max(MAX_RULES),
   maxMemories: z.number().int().min(1).max(MAX_MEMORIES),
 });
@@ -149,7 +109,7 @@ const indexSchema = z.strictObject({
   pipeline: z.literal(EXPERIENCE_DIGEST_ID),
   maxMemories: z.number().int().min(1),
   evidence: z.array(
-    z.strictObject({ alias, kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) }),
+    z.strictObject({ alias, kind: z.enum(RECORD_EVIDENCE_KINDS), ref: z.string().min(1) }),
   ),
 });
 export type ExperienceIndex = z.infer<typeof indexSchema>;
