@@ -717,7 +717,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-1',
     statement:
-      'The session engine decides nothing of its own: every plan, every field answer and every termination it acts on is a recorded quality-loop run or orchestration named by id on the decision row, and the engine adds only declared rails and declared routing.',
+      'The session engine decides nothing of its own: every plan, every field answer and every termination it acts on is a recorded quality-loop run or orchestration named by id on the decision row, and the engine adds only declared rails and declared routing; what refused a plan — a critic finding or a validator problem alike — is carried into the next goal once for the plan it was about and whole, never folded into the record of an action.',
   },
   {
     id: 'BRW-2',

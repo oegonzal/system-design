@@ -4,13 +4,32 @@ import { z } from 'zod';
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
 import { emptyLedger, listingObservation, MISSION_FIXTURE, openTaskLedger } from './fixtures';
 import type { ObservedElement, PageObservation } from './observation.schema';
-import { ELEMENTS_BOUND, pageObservationSchema } from './observation.schema';
+import {
+  ELEMENTS_BOUND,
+  OBJECTION_AT_BOUND,
+  OBJECTION_DETAIL_BOUND,
+  OBJECTIONS_BOUND,
+  pageObservationSchema,
+  type StepObjection,
+} from './observation.schema';
 import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
 import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
 import { STEP_ACTION_KINDS } from './vocab';
 
-const goalOf = (observation: PageObservation, history = [], ledger = emptyLedger()) =>
-  composeStepGoal({ mission: MISSION_FIXTURE, observation, history, ledger });
+const goalOf = (
+  observation: PageObservation,
+  history = [],
+  ledger = emptyLedger(),
+  objections: readonly StepObjection[] = [],
+) => composeStepGoal({ mission: MISSION_FIXTURE, observation, history, ledger, objections });
+
+/** One objection at its declared ceiling, as a maximal goal would carry it. */
+const maximalObjection = (step: number): StepObjection => ({
+  step,
+  from: 'misread_page',
+  at: Array.from({ length: OBJECTION_AT_BOUND.target }, (_, i) => `action.${i + 1}`),
+  detail: 'd'.repeat(OBJECTION_DETAIL_BOUND.target),
+});
 
 describe('composeStepGoal', () => {
   it('[QL-39] writes an index the validators read back: every ref, its kind and facts, and whether a unit is open', () => {
@@ -71,9 +90,17 @@ describe('composeStepGoal', () => {
         note: 'o'.repeat(200),
       })),
       ledger: openTaskLedger(),
+      // Every objection the goal will carry, each at its ceiling, plus more
+      // than it carries — the budget has to hold the worst case, not the mean.
+      objections: Array.from({ length: OBJECTIONS_BOUND.target + 3 }, (_, i) =>
+        maximalObjection(i + 1),
+      ),
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(goal).toContain('(12 more interactive elements not listed)');
+    // Past the declared count they are counted, never cut.
+    expect(goal).toContain('(3 older objection(s) not listed)');
+    expect(goal.match(/^- step \d+ · /gm)).toHaveLength(OBJECTIONS_BOUND.target);
   });
 
   it('[QL-39] refuses a page that would not fit rather than clipping it', () => {

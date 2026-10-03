@@ -17,7 +17,9 @@ import {
   ELEMENT_REF,
   type ObservedElement,
   type PageObservation,
+  OBJECTIONS_BOUND,
   type StepHistoryEntry,
+  type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
 import { BROWSER_STEP_PIPELINE_ID } from './pipelines';
@@ -31,6 +33,12 @@ export interface StepGoalInput {
   /** Most recent last. */
   history: readonly StepHistoryEntry[];
   ledger: TaskLedgerSummary;
+  /**
+   * Why the plans before this one did not run, newest first — what the next
+   * plan has to answer. Carried here rather than on the actions they were
+   * about, so each one arrives whole and once.
+   */
+  objections: readonly StepObjection[];
 }
 
 /** The facts the validators check a plan against; everything else in the goal is for the model. */
@@ -74,6 +82,22 @@ const historyLines = (history: readonly StepHistoryEntry[]): string[] =>
         (entry) =>
           `- ${entry.action} — ${entry.outcome}${entry.note === null ? '' : ` — ${entry.note}`}`,
       );
+
+/**
+ * The objections the next plan must answer, newest first and each whole. Past
+ * the declared count the rest are counted rather than cut, the way an
+ * observation counts the elements it does not list.
+ */
+const objectionLines = (objections: readonly StepObjection[]): string[] => {
+  if (objections.length === 0) return ['(none — no plan has been refused yet)'];
+  const carried = objections.slice(0, OBJECTIONS_BOUND.target);
+  const lines = carried.map((objection) => {
+    const at = objection.at.length === 0 ? 'the plan as a whole' : objection.at.join(', ');
+    return `- step ${objection.step} · ${objection.from} at ${at} — ${objection.detail}`;
+  });
+  const rest = objections.length - carried.length;
+  return rest === 0 ? lines : [...lines, `(${rest} older objection(s) not listed)`];
+};
 
 const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   ledger.openTask === null
@@ -126,6 +150,10 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '## Recent actions',
     '',
     ...historyLines(input.history),
+    '',
+    '## Objections to answer',
+    '',
+    ...objectionLines(input.objections),
     '',
     '## Units of work',
     '',

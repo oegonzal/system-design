@@ -61,6 +61,7 @@ describe('the browser-step input codec', () => {
       observation,
       history: [{ action: 'click e6', outcome: 'ok', note: null }],
       ledger: openTaskLedger(),
+      objections: [],
     });
     expect(goal).toContain(MISSION_FIXTURE.trim());
     expect(goal).toContain(
@@ -98,13 +99,20 @@ describe('the browser-step input codec', () => {
         note: fill(300, 'x'),
       })),
       ledger: openTaskLedger(),
+      objections: [],
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(readIndex(goal)?.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(goal).toContain('(12 more interactive elements not listed)');
     expect(() =>
       composeStepGoal(
-        { mission: MISSION_FIXTURE, observation, history: [], ledger: openTaskLedger() },
+        {
+          mission: MISSION_FIXTURE,
+          observation,
+          history: [],
+          ledger: openTaskLedger(),
+          objections: [],
+        },
         1000,
       ),
     ).toThrow(GoalBudgetExceeded);

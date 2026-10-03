@@ -30,6 +30,7 @@ import {
   describeAction,
   ledgerSummaryOf,
   pushHistory,
+  pushObjections,
   railStateOf,
   tasksClosed,
 } from './session-state';
@@ -74,6 +75,9 @@ function settleExpectation(ctx: EngineContext, observation: PageObservation): vo
   ctx.fail('expectation-unmet');
 }
 
+/** Who objected when nothing named a finding or a problem: the controller's own reason. */
+const CONTROLLER = 'controller';
+
 const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
   pageKind: readout.plan?.pageKind ?? null,
   assessment: readout.plan?.assessment ?? null,
@@ -81,7 +85,7 @@ const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
   executable: readout.executable,
   executePrefix: readout.executePrefix,
   reason: readout.reason,
-  faults: readout.faults,
+  objections: readout.objections,
   finalDecision: decided.run.trace?.finalDecision ?? null,
   composition: decided.composition,
 });
@@ -104,6 +108,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
       observation,
       history: [...state.history],
       ledger: ledgerSummaryOf(state, options.rails),
+      objections: [...state.objections],
       criteria: ctx.criteria.plan,
     });
   } catch (error) {
@@ -130,7 +135,17 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
   const durationMs = deps.clock.now().getTime() - startedAt.getTime();
-  const readout = routePlan(decided.run);
+  const readout = routePlan(decided.run, state.step);
+  // Whatever objected is recorded once, whether or not the plan runs: a plan
+  // cut short owes the next producer the reasons as much as a refused one.
+  pushObjections(
+    state,
+    readout.objections.length > 0
+      ? readout.objections
+      : readout.reason === null
+        ? []
+        : [{ step: state.step, from: CONTROLLER, at: [], detail: readout.reason }],
+  );
   ctx.record({
     kind: 'step-plan',
     source: 'loop',
@@ -160,11 +175,12 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   );
 
   if (!readout.executable || readout.plan === null) {
-    const note = readout.faults.length > 0 ? readout.faults.join('; ') : (readout.reason ?? '');
     for (const action of readout.plan?.actions ?? []) {
-      pushHistory(state, describeAction(action, observation), 'not-executed', note);
+      // No note: why the plan did not run is an objection, carried once for the
+      // whole plan, not the same text copied onto every action it proposed.
+      pushHistory(state, describeAction(action, observation), 'not-executed', null);
     }
-    if (readout.plan === null) pushHistory(state, 'plan', 'not-executed', note);
+    if (readout.plan === null) pushHistory(state, 'plan', 'not-executed', readout.reason);
     ctx.fail('plan-not-executed');
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }

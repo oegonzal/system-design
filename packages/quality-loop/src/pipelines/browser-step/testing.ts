@@ -20,7 +20,8 @@ import {
 export const stepGoal = (
   observation: PageObservation = listingObservation(),
   ledger: TaskLedgerSummary = emptyLedger(),
-): string => composeStepGoal({ mission: MISSION_FIXTURE, observation, history: [], ledger });
+): string =>
+  composeStepGoal({ mission: MISSION_FIXTURE, observation, history: [], ledger, objections: [] });
 
 export const click = (
   ref: string,

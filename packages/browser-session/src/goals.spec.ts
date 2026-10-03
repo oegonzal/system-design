@@ -82,6 +82,7 @@ describe('the goals', () => {
           observation: formObservation(),
           history: [],
           ledger: emptyLedger(),
+          objections: [],
         }),
       ).not.toThrow();
     },

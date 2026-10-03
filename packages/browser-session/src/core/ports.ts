@@ -1,4 +1,5 @@
 import type {
+  StepObjection,
   Admission,
   BrowserDecisionKind,
   BrowserDecisionSource,
@@ -128,6 +129,8 @@ export interface StepInput {
   observation: PageObservation;
   history: readonly StepHistoryEntry[];
   ledger: TaskLedgerSummary;
+  /** Why the plans before this one did not run, newest first. */
+  objections: readonly StepObjection[];
   criteria: readonly SuccessCriterion[];
 }
 

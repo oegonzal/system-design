@@ -11,6 +11,7 @@ import type { IterationTrace } from '../quality-loop/decision';
 import type { QualityRunDto } from '../quality-loop/runs';
 import { fieldAnswersSchema, type FieldAnswer } from './field-answers.schema';
 import type { FieldSpec } from './field-goal';
+import type { StepObjection } from './observation.schema';
 import { ACTION_LOCATION, FIELD_LOCATION, positionOf } from './pipelines';
 import { stepPlanSchema, type StepPlan } from './step-plan.schema';
 import type { BrowserDecisionSource, FieldRoute } from './vocab';
@@ -45,26 +46,63 @@ function faultedPositions(iteration: IterationTrace, grammar: RegExp): Map<numbe
   return faults;
 }
 
+/**
+ * Everything that objected to a plan in one iteration: the critics' confirmed
+ * findings, then the validators' problems. Both are carried, because a plan a
+ * validator refused is refused for a reason the next plan must answer as
+ * surely as a critic's — and a validator problem the session dropped is
+ * exactly how a producer came to be told only "blocked by validator(s)
+ * limits", never which limit nor why.
+ */
+export function objectionsOf(iteration: IterationTrace, step: number): StepObjection[] {
+  const objections: StepObjection[] = [];
+  for (const finding of iteration.ledger.findings) {
+    objections.push({
+      step,
+      from: finding.type,
+      at: [...finding.locationRefs],
+      detail: finding.rationale || finding.type,
+    });
+  }
+  for (const report of iteration.validation) {
+    // Only a validator that gates refused anything. A `warn` validator's
+    // problems are recorded on the run and say so in their own text — "noted,
+    // not refused" — and listing them as objections to answer would send the
+    // next plan to fix what nothing objected to. Read from the report's
+    // declared gate, never guessed from a severity.
+    if (report.gate !== 'block') continue;
+    for (const problem of report.problems) {
+      objections.push({
+        step,
+        from: report.validatorId,
+        at: [...problem.locationRefs],
+        detail: problem.message,
+      });
+    }
+  }
+  return objections;
+}
+
 export interface PlanReadout {
   plan: StepPlan | null;
   executable: boolean;
   /** How many leading actions may run: those before the first one a judge or a validator pointed at. */
   executePrefix: number;
   reason: string | null;
-  /** What stopped or shortened it, for the next goal's recent-actions section. */
-  faults: string[];
+  /** Why it did not run, or why its tail was cut: each objection whole, never folded into an action. */
+  objections: StepObjection[];
 }
 
 const notExecutable = (
   plan: StepPlan | null,
   reason: string,
-  faults: string[] = [],
+  objections: StepObjection[] = [],
 ): PlanReadout => ({
   plan,
   executable: false,
   executePrefix: 0,
   reason,
-  faults,
+  objections,
 });
 
 /**
@@ -72,40 +110,31 @@ const notExecutable = (
  * judge objected to the plan as a whole; then only up to the first action a
  * confirmed finding or a validation problem names.
  */
-export function routePlan(run: QualityRunDto): PlanReadout {
+export function routePlan(run: QualityRunDto, step: number): PlanReadout {
   const best = bestIterationOf(run);
   if (best === null || best.artifact === null) return notExecutable(null, 'no-artifact');
   const parsed = parseLenient(stepPlanSchema, best.artifact);
   if (!parsed.ok) return notExecutable(null, 'artifact does not match the step plan schema');
   const plan = parsed.value;
-  const findings = best.ledger.findings.map(
-    (finding) => `${finding.type}${finding.rationale ? `: ${finding.rationale}` : ''}`,
-  );
+  const objections = objectionsOf(best, step);
   if (run.trace?.finalDecision !== 'accept') {
     return notExecutable(
       plan,
       `decided ${run.trace?.finalDecision ?? 'nothing'}: ${best.decision.reason}`,
-      findings,
+      objections,
     );
   }
   if (!best.decision.gates.policyAllowed) {
-    return notExecutable(plan, `policy gate closed: ${best.decision.reason}`, findings);
+    return notExecutable(plan, `policy gate closed: ${best.decision.reason}`, objections);
   }
   if (best.ledger.findings.some((finding) => finding.locationRefs.length === 0)) {
-    return notExecutable(plan, 'a confirmed finding names the whole plan', findings);
+    return notExecutable(plan, 'a confirmed finding names the whole plan', objections);
   }
   const faulted = faultedPositions(best, ACTION_LOCATION);
   const first = [...faulted.keys()].sort((a, b) => a - b)[0];
   const executePrefix = first === undefined ? plan.actions.length : first;
-  if (executePrefix === 0)
-    return notExecutable(plan, 'the first action was faulted', [...faulted.values()].flat());
-  return {
-    plan,
-    executable: true,
-    executePrefix,
-    reason: null,
-    faults: [...faulted.values()].flat(),
-  };
+  if (executePrefix === 0) return notExecutable(plan, 'the first action was faulted', objections);
+  return { plan, executable: true, executePrefix, reason: null, objections };
 }
 
 export interface FieldReadout {

@@ -84,12 +84,12 @@ describe('the browser-step loop', () => {
     expect(trace.finalDecision).toBe('escalate');
     expect(trace.stopReason).toBe('escalated');
 
-    const readout = routePlan(runDto('step-run', trace));
+    const readout = routePlan(runDto('step-run', trace), 1);
     expect(readout.plan).toEqual(samplePlan());
     expect(readout.executable).toBe(false);
     expect(readout.executePrefix).toBe(0);
     expect(readout.reason).toMatch(/^decided escalate/);
-    expect(readout.faults).toEqual([expect.stringContaining('missed_stop')]);
+    expect(readout.objections.map((objection) => objection.from)).toEqual(['missed_stop']);
   });
 
   it('[QL-36] an accepted plan runs up to the first action a confirmed finding names, and a clean one runs whole', async () => {
@@ -107,11 +107,11 @@ describe('the browser-step loop', () => {
     expect(faulted.iterations[0].ledger.findings.map((finding) => finding.key)).toEqual([
       'skipped_step|action.2',
     ]);
-    expect(routePlan(runDto('faulted', faulted))).toMatchObject({
+    expect(routePlan(runDto('faulted', faulted), 1)).toMatchObject({
       executable: true,
       executePrefix: 1,
       reason: null,
-      faults: [expect.stringContaining('skipped_step')],
+      objections: [expect.objectContaining({ from: 'skipped_step' })],
     });
 
     const whole = await runPipeline(
@@ -120,11 +120,11 @@ describe('the browser-step loop', () => {
       deps(fakeLlm(two, clean, results)),
     );
     expect(whole.finalDecision).toBe('accept');
-    expect(routePlan(runDto('whole', whole))).toMatchObject({
+    expect(routePlan(runDto('whole', whole), 1)).toMatchObject({
       executable: true,
       executePrefix: 2,
       reason: null,
-      faults: [],
+      objections: [],
     });
   });
 });

@@ -111,10 +111,10 @@ const plan: StepPlan = {
 
 describe('routePlan', () => {
   it('[QL-36] executes an accepted plan whose policy gate is open, in full when nobody objected', () => {
-    const readout = routePlan(run({ artifact: plan }));
+    const readout = routePlan(run({ artifact: plan }), 1);
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(4);
-    expect(readout.faults).toEqual([]);
+    expect(readout.objections).toEqual([]);
   });
 
   it('[QL-36] hands back any plan the loop did not accept, naming the findings for the next goal', () => {
@@ -126,10 +126,15 @@ describe('routePlan', () => {
           { type: 'missed_stop', locationRefs: [], rationale: 'the limit text is visible' },
         ],
       }),
+      7,
     );
     expect(readout.executable).toBe(false);
     expect(readout.reason).toContain('decided escalate');
-    expect(readout.faults).toEqual(['missed_stop: the limit text is visible']);
+    // Whole, and stamped with the step it came from: the next goal carries it
+    // as one objection, not as a note copied onto each action it was about.
+    expect(readout.objections).toEqual([
+      { step: 7, from: 'missed_stop', at: [], detail: 'the limit text is visible' },
+    ]);
   });
 
   it('[QL-36] runs only the unfaulted prefix of an accepted plan', () => {
@@ -138,29 +143,80 @@ describe('routePlan', () => {
         artifact: plan,
         findings: [{ type: 'wrong_target', locationRefs: ['action.3'], rationale: 'e9 is Back' }],
       }),
+      3,
     );
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(2);
-    expect(readout.faults).toEqual(['wrong_target: e9 is Back']);
+    expect(readout.objections).toEqual([
+      { step: 3, from: 'wrong_target', at: ['action.3'], detail: 'e9 is Back' },
+    ]);
+  });
+
+  it("[QL-36] carries a validator's own problem as an objection, so a plan refused by a validator is told which limit and why", () => {
+    // The live defect: a plan blocked by the `limits` validator reached the next
+    // producer as "blocked by validator(s) limits" and nothing more — never the
+    // message that said which element could not be typed into.
+    const readout = routePlan(
+      run({
+        artifact: plan,
+        finalDecision: 'escalate',
+        validation: [
+          {
+            validatorId: 'limits',
+            gate: 'block',
+            problems: [
+              {
+                severity: 'high',
+                message: 'e32 cannot be typed into (selectable)',
+                locationRefs: ['action.2'],
+              },
+            ],
+          },
+          {
+            // A validator that only warns refused nothing: its problems say so
+            // in their own text, and are not the next plan's to answer.
+            validatorId: 'bounds',
+            gate: 'warn',
+            problems: [
+              {
+                severity: 'low',
+                message: 'assessment: 719 characters; 700 asked, 875 accepted — noted, not refused',
+                locationRefs: [],
+              },
+            ],
+          },
+        ],
+      }),
+      4,
+    );
+    expect(readout.executable).toBe(false);
+    expect(readout.objections).toEqual([
+      {
+        step: 4,
+        from: 'limits',
+        at: ['action.2'],
+        detail: 'e32 cannot be typed into (selectable)',
+      },
+    ]);
   });
 
   it('[QL-36] refuses a plan whose first action was faulted, a closed policy gate, or an artifact-wide finding', () => {
     expect(
-      routePlan(run({ artifact: plan, findings: [{ type: 'x', locationRefs: ['action.1'] }] }))
+      routePlan(run({ artifact: plan, findings: [{ type: 'x', locationRefs: ['action.1'] }] }), 1)
         .executable,
     ).toBe(false);
-    expect(routePlan(run({ artifact: plan, policyAllowed: false })).executable).toBe(false);
+    expect(routePlan(run({ artifact: plan, policyAllowed: false }), 1).executable).toBe(false);
     expect(
-      routePlan(run({ artifact: plan, findings: [{ type: 'unsafe_action', locationRefs: [] }] }))
+      routePlan(run({ artifact: plan, findings: [{ type: 'unsafe_action', locationRefs: [] }] }), 1)
         .executable,
     ).toBe(false);
-    expect(routePlan(run({ artifact: null })).reason).toBe('no-artifact');
-    expect(routePlan(run({ artifact: { not: 'a plan' } })).reason).toContain('schema');
+    expect(routePlan(run({ artifact: null }), 1).reason).toBe('no-artifact');
+    expect(routePlan(run({ artifact: { not: 'a plan' } }), 1).reason).toContain('schema');
   });
 
   it('[QL-36] [QL-58] executes a plan whose assessment the seam kept past its ceiling, read as it was kept', () => {
     const assessment = 'a'.repeat(ASSESSMENT_BOUND.ceiling + 1);
-    const readout = routePlan(run({ artifact: { ...plan, assessment } }));
+    const readout = routePlan(run({ artifact: { ...plan, assessment } }), 1);
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(4);
     expect(readout.plan?.assessment).toBe(assessment);

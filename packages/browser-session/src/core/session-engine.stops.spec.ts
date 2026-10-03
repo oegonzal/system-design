@@ -55,6 +55,7 @@ describe('how a plan stops and how a session ends', () => {
       },
       browser: refusingFills('search'),
     });
+    // The history says what each action did; a note belongs to its own action.
     expect(cut.brain.planInputs[1]?.history.map((h) => [h.action, h.outcome, h.note])).toEqual([
       [
         'fill e1 searchbox "Search" with "software engineer"',
@@ -62,7 +63,12 @@ describe('how a plan stops and how a session ends', () => {
         'fill e1: the element is detached',
       ],
       ['click e2 button "Search"', 'not-executed', 'after a failed action'],
-      ['press Enter', 'not-executed', 'wrong_target: Enter would submit twice'],
+      ['press Enter', 'not-executed', 'past the executable prefix'],
+    ]);
+    // Why the judge cut it travels once, whole, as the plan-level objection it
+    // is — not copied onto every action and cut to a note's length.
+    expect(cut.brain.planInputs[1]?.objections).toEqual([
+      { step: 1, from: 'wrong_target', at: ['action.3'], detail: 'Enter would submit twice' },
     ]);
     expect(cut.browser.calls).not.toContain('click e2');
     expect(cut.outcome.termination.reason).toBe('mission-complete');
@@ -138,7 +144,19 @@ describe('how a plan stops and how a session ends', () => {
       'not-executed',
       'not-executed',
     ]);
-    expect(byFailures.brain.planInputs[1]?.history[0]?.note).toContain('missed_stop');
+    // The objection travels on its own, once for the plan it was about, and no
+    // action carries a note of it: the whole of the defect this pins is that a
+    // plan-level objection used to be copied onto every action it proposed.
+    expect(byFailures.brain.planInputs[1]?.history.every((entry) => entry.note === null)).toBe(
+      true,
+    );
+    expect(byFailures.brain.planInputs[1]?.objections).toEqual([
+      { step: 1, from: 'missed_stop', at: [], detail: 'the page shows the limit text' },
+    ]);
+    // After a second refusal: two plans of two actions each — four history
+    // entries, and two objections, newest first.
+    expect(byFailures.brain.planInputs[2]?.history).toHaveLength(4);
+    expect(byFailures.brain.planInputs[2]?.objections.map((o) => o.step)).toEqual([2, 1]);
     expect(byFailures.browser.calls).not.toContain('fill e1');
 
     const fault = new BrainFaulted('unreachable', 'nobody home');

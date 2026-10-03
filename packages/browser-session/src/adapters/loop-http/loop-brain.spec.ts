@@ -47,6 +47,7 @@ const stepInput = (observation: PageObservation = listingObservation()): StepInp
   observation,
   history: [],
   ledger: emptyLedger(),
+  objections: [],
   criteria: CRITERIA,
 });
 
@@ -106,7 +107,7 @@ describe('the loop brain', () => {
     expect(core.startRequests[0]?.goal).toContain(MISSION_FIXTURE.trim());
     expect(decided.runId).toBe('fake-run-1');
     expect(decided.orchestrationRunId).toBeNull();
-    expect(routePlan(decided.run).plan).toEqual(PLAN);
+    expect(routePlan(decided.run, 1).plan).toEqual(PLAN);
     expect(decided.run.status).toBe('complete');
     expect(decided.composition).toEqual({
       rung: 'full',

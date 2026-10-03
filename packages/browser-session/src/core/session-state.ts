@@ -2,11 +2,17 @@ import {
   HISTORY_ACTION_BOUND,
   HISTORY_MAX,
   HISTORY_NOTE_BOUND,
+  OBJECTION_AT_BOUND,
+  OBJECTION_AT_MAX_LENGTH,
+  OBJECTION_DETAIL_BOUND,
+  OBJECTION_FROM_MAX_LENGTH,
+  OBJECTIONS_MAX,
   type OperatorGuidanceDto,
   type PageObservation,
   type SessionRailsDto,
   type StepAction,
   type StepHistoryEntry,
+  type StepObjection,
   type TaskLedgerSummary,
 } from '@sysdesign/contracts';
 
@@ -42,6 +48,12 @@ export interface SessionState {
   step: number;
   /** Most recent last, at most `HISTORY_MAX`. */
   history: StepHistoryEntry[];
+  /**
+   * Why the plans before this one did not run, newest first. Kept until a plan
+   * runs every action it proposed: until then the next producer is owed the
+   * reasons, and a plan that was cut short has reasons of its own.
+   */
+  objections: StepObjection[];
   tasks: { open: OpenTask | null; started: number; done: number; skipped: number; failed: number };
   consecutiveFailures: number;
   brainFaults: number;
@@ -67,6 +79,7 @@ export function createState(ids: {
     ...ids,
     step: 0,
     history: [],
+    objections: [],
     tasks: { open: null, started: 0, done: 0, skipped: 0, failed: 0 },
     consecutiveFailures: 0,
     brainFaults: 0,
@@ -105,6 +118,32 @@ export const ledgerSummaryOf = (
   failed: state.tasks.failed,
   remainingTasks: remainingTasks(railStateOf(state), rails),
 });
+
+/**
+ * The objections recorded once each, newest first, clipped to their declared
+ * bounds. They are not written onto the actions they were about: one note per
+ * action meant the same plan-level text copied once per action, cut at the
+ * note's 300 characters, and `HISTORY_MAX` entries of duplication evicting
+ * the record of what the session had actually done.
+ */
+export function pushObjections(state: SessionState, objections: readonly StepObjection[]): void {
+  state.objections.unshift(
+    ...objections.map((objection) => ({
+      step: objection.step,
+      from: clip(objection.from, OBJECTION_FROM_MAX_LENGTH),
+      at: objection.at
+        .slice(0, OBJECTION_AT_BOUND.target)
+        .map((ref) => clip(ref, OBJECTION_AT_MAX_LENGTH)),
+      detail: clip(objection.detail, OBJECTION_DETAIL_BOUND.target),
+    })),
+  );
+  if (state.objections.length > OBJECTIONS_MAX) state.objections.length = OBJECTIONS_MAX;
+}
+
+/** A plan ran every action it proposed: nothing is owed to the next producer. */
+export const clearObjections = (state: SessionState): void => {
+  state.objections.length = 0;
+};
 
 export function pushHistory(
   state: SessionState,

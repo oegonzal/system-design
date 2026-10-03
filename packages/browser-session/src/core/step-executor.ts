@@ -22,8 +22,10 @@ import {
   type Termination,
 } from './ports';
 import { labelledScreenshot, stepJsonFile } from './session-dump';
-import { describeAction, pushHistory, type OpenTask } from './session-state';
+import { clearObjections, describeAction, pushHistory, type OpenTask } from './session-state';
 
+/** What a history entry says about an action the plan proposed past its executable prefix. */
+const CUT_NOTE = 'past the executable prefix';
 /**
  * Running the unfaulted prefix of an accepted plan, action by action. A
  * browser action goes to the browser and leaves its promise pending for the
@@ -250,9 +252,11 @@ export async function executeActions(
       'after a failed action',
     );
   }
-  const cut = readout.faults.length > 0 ? readout.faults.join('; ') : 'past the executable prefix';
   for (const action of actions.slice(prefix.length)) {
-    pushHistory(state, describeAction(action, observation), 'not-executed', cut);
+    // Why it was cut is an objection the next goal carries whole; the note says only that it was.
+    pushHistory(state, describeAction(action, observation), 'not-executed', CUT_NOTE);
   }
+  // Every action the plan proposed ran, and none failed: the objections are spent.
+  if (!failed && actions.length === prefix.length) clearObjections(state);
   return null;
 }
