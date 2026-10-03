@@ -6,6 +6,13 @@ import { DOCUMENT_WITHHOLDS } from './read-document-digest';
 
 describe('what a document digest withholds', () => {
   it('[QL-40] declares a rule for every finding type the pipeline can report, and for none it cannot', () => {
+    // The count first, and the count expected rather than a floor at zero: the
+    // equality below holds just as happily over two empty objects, and what
+    // saves it today is six pins in the case beneath — a different block, which
+    // a migration could move or rewrite while leaving this one green. Vacuity is
+    // not a property of one-sided assertions; any assertion that quantifies owes
+    // a count, however many sides it has.
+    expect(Object.keys(DOCUMENT_DIGEST.task.findingTypes)).toHaveLength(6);
     // A finding type with no declared rule falls to the strict default and silently
     // costs facts; one declared for a type the pipeline cannot report is dead data.
     expect(Object.keys(DOCUMENT_WITHHOLDS).sort()).toEqual(
