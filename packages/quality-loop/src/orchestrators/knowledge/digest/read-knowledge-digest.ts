@@ -28,6 +28,7 @@ import {
   endorsedMemories,
   type DigestReadout,
   type MemoryToStore,
+  type Withhold,
 } from '../../memory/digest/endorsed';
 import type { PointRef } from '../../memory/ports';
 
@@ -65,7 +66,46 @@ export interface KnowledgeReadout extends Omit<DigestReadout, 'memories'> {
   unresolved: number;
 }
 
-const codec = { schema: knowledgeDigestSchema, readIndex };
+/**
+ * What each of this pipeline's finding types withholds from the store, by what
+ * the fault says rather than by how severe it is.
+ *
+ * **Withholds every item it names** when storing the item would put something
+ * false or misleading in the corpus: an insight its evidence does not say, a
+ * fact that is not true with the design removed, an effect the record does not
+ * show, a kind the evidence cannot support — the kind is what the store indexes
+ * and what a later rule reads, so a mis-kinded item answers queries it should
+ * never answer — an insight that holds only for this run, a restatement of
+ * something already stored, and a claim about a known item that its evidence
+ * does not bear on.
+ *
+ * **Withholds nothing** when the item is merely written weakly. `vague_item` is
+ * the whole of that case: the remedy is a rewrite, the knowledge is sound, and
+ * dropping it loses a detail the corpus will not answer with again. In the
+ * experience digest this type alone cost 51 of 245 narrow exclusions.
+ *
+ * **Keeps one of a set** for `duplicate_item`, whose refs the normaliser sorts,
+ * so the earlier item stands and the later goes — which is what the persona asks
+ * the critic for and what 42 of 43 recorded duplicate findings made possible by
+ * naming both. On the compliant one in forty-three, which names only the later
+ * item, this withholds nothing and the near-twin is stored; that is the lesser
+ * harm, and reinforcement rather than this rule is the real defence against a
+ * twin: an item whose evidence supports a stored one is never stored again.
+ */
+export const KNOWLEDGE_WITHHOLDS: Readonly<Record<string, Withhold>> = {
+  misattributed_evidence: 'every-ref',
+  ungrounded_fact: 'every-ref',
+  unsupported_effect: 'every-ref',
+  wrong_kind: 'every-ref',
+  run_specific: 'every-ref',
+  restated_known: 'every-ref',
+  false_confirmation: 'every-ref',
+  false_contradiction: 'every-ref',
+  duplicate_item: 'all-but-one',
+  vague_item: 'none',
+};
+
+const codec = { schema: knowledgeDigestSchema, readIndex, withholds: KNOWLEDGE_WITHHOLDS };
 
 export function readKnowledgeDigest(
   outputs: RunOutputs,

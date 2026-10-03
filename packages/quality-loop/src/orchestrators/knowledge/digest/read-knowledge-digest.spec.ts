@@ -11,7 +11,9 @@ import {
 import { sampleRun } from '../../../core/testing';
 import { contentHash } from '../../memory/ports';
 import { ACCEPT_AT, readoutTrace } from '../../memory/testing';
-import { readKnowledgeDigest, type KnownRef } from './read-knowledge-digest';
+import { KNOWLEDGE_DIGEST } from '../../../pipelines/knowledge-digest/definition';
+import { DEFAULT_WITHHOLD, WITHHOLDS } from '../../memory/digest/endorsed';
+import { KNOWLEDGE_WITHHOLDS, readKnowledgeDigest, type KnownRef } from './read-knowledge-digest';
 
 const KNOWN_TEXT = sampleKnown().text;
 
@@ -158,5 +160,75 @@ describe('what a knowledge digest endorses', () => {
     expect(unjudged.admission).toBe('no-rubric');
     expect(unjudged.memories).toEqual([]);
     expect(unjudged.unresolved).toBe(0);
+  });
+
+  it('[QL-42] every declared finding type says what it withholds, and nothing else is named', () => {
+    // Both ways: a type the pipeline declares and the table forgets would fall to
+    // the strict default silently, and a type in the table the pipeline no longer
+    // declares is a rule about nothing.
+    expect(Object.keys(KNOWLEDGE_WITHHOLDS).sort()).toEqual(
+      Object.keys(KNOWLEDGE_DIGEST.task.findingTypes).sort(),
+    );
+    for (const rule of Object.values(KNOWLEDGE_WITHHOLDS)) expect(WITHHOLDS).toContain(rule);
+    // What is false or misleading is withheld; what is merely weak is not.
+    expect(KNOWLEDGE_WITHHOLDS['vague_item']).toBe('none');
+    expect(KNOWLEDGE_WITHHOLDS['duplicate_item']).toBe('all-but-one');
+    expect(KNOWLEDGE_WITHHOLDS['misattributed_evidence']).toBe(DEFAULT_WITHHOLD);
+  });
+
+  it('[QL-42] a weakly written item survives its fault, a duplicate pair keeps one, and a misreading is withheld', () => {
+    const three = sampleDigest({
+      memories: [
+        { ...sampleDigest().memories[0], confirms: [] },
+        { ...sampleDigest().memories[0], kind: 'fact', evidence: ['r1'], confirms: [] },
+        { ...sampleDigest().memories[0], kind: 'fact', evidence: ['r2'], confirms: [] },
+      ],
+      unused: ['f2'],
+    });
+    const faulted = (type: string, refs: string[]) => ({
+      key: `${type}|${[...refs].sort().join(',')}`,
+      type,
+      severity: 'medium' as const,
+      confidence: 'high' as const,
+      fixability: 'fixable_local' as const,
+      locationRefs: refs,
+      criterionIds: [],
+      hits: 2,
+      lenses: ['critic.generality'],
+      rationale: null,
+      reconciledTo: null,
+    });
+    const readout = (findings: ReturnType<typeof faulted>[]) =>
+      readKnowledgeDigest(
+        outputsOf(
+          readoutTrace({
+            pipeline: 'knowledge-digest',
+            goal: goal(),
+            artifact: three,
+            locations: ['summary', 'memory.1', 'memory.2', 'memory.3'],
+            criteria: [{ id: 'c1', kind: 'signal', statement: 'accounts for f1 resolving at i2' }],
+            results: [
+              {
+                criterionId: 'c1',
+                kind: 'signal',
+                result: 'pass',
+                hits: 2,
+                confidence: 'high',
+                locationRefs: ['memory.1'],
+              },
+            ],
+            findings,
+          }),
+        ),
+        ACCEPT_AT,
+        shown(),
+      ).memories.map((item) => item.position);
+
+    // Weakly written is not wrong: the item stands and a rewrite improves it later.
+    expect(readout([faulted('vague_item', ['memory.1', 'memory.2'])])).toEqual([1, 2, 3]);
+    // Two items teaching one thing keep the earlier; the knowledge is kept once.
+    expect(readout([faulted('duplicate_item', ['memory.2', 'memory.3'])])).toEqual([1, 2]);
+    // An insight its evidence does not say would be false in the store.
+    expect(readout([faulted('misattributed_evidence', ['memory.2'])])).toEqual([1, 3]);
   });
 });
