@@ -1,8 +1,9 @@
 /**
  * Write a source run's memories to the store as exactly these chunks. Pure of
  * the ledger, so re-indexing an already digested run — after the index
- * generation moves, say — re-embeds the same engine facts rather than asking
- * a model to derive them again.
+ * generation moves, or once the payload learned to carry lineage — re-embeds
+ * the same engine facts rather than asking a model to derive them again, and
+ * stamps every chunk with what the source run says of itself today.
  */
 import type { QualityRunDto, RunTrace } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
@@ -11,7 +12,8 @@ import { outputsOf } from '../../../core/outputs';
 import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
-import { VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
+import { contentHash, VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
+import { bareGoal } from '../recall/inject';
 import { chunksOf, type ChunkOrigin } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
@@ -24,15 +26,33 @@ const dayOf = (iso: string): string => iso.slice(0, 10);
  * revision produced nothing ends `escalate`, and that says nothing about the
  * judged iteration the digest learned from — stamped with it, the lesson would
  * read to a curator as one from a run that failed.
+ *
+ * Beside it, the lineage: the iteration whose judges produced the evidence —
+ * this run's best, unless its best is the iteration it adopted, in which case
+ * the adopted run's — what it adopted, and the hash of the bare goal. A goal a
+ * recall composed carries the remembered section too, and that is not part of
+ * what the run was asked.
  */
 export const originOf = (source: QualityRunDto, trace: RunTrace): ChunkOrigin => {
   const { best, decision } = outputsOf(trace);
+  const iteration = best?.iteration ?? trace.bestIteration;
+  const { adoptedFrom } = source.request;
   return {
-    runId: source.runId,
-    pipeline: trace.pipeline.id,
-    decision: decision?.finalDecision ?? trace.finalDecision,
-    iteration: best?.iteration ?? trace.bestIteration,
-    when: dayOf(source.startedAt),
+    source: {
+      runId: source.runId,
+      pipeline: trace.pipeline.id,
+      decision: decision?.finalDecision ?? trace.finalDecision,
+      iteration,
+      when: dayOf(source.startedAt),
+    },
+    lineage: {
+      judged:
+        best?.mode === 'adopted' && adoptedFrom !== null
+          ? adoptedFrom
+          : { runId: source.runId, iteration },
+      adoptedFrom,
+      goalHash: contentHash(bareGoal(trace.contract.goal)),
+    },
   };
 };
 

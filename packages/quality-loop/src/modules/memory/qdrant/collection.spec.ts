@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { EVIDENCE_KINDS, contentHash } from '../../../orchestrators/memory/ports';
-import { fromPayload, toPayload } from './collection';
+import { fromPayload, INDEXED_FIELDS, missingIndexes, toPayload } from './collection';
 
 /** A fact digested from a document, as `chunksOf` shapes it: its evidence is a section, not a run's rows. */
 const factChunk = () => {
@@ -28,6 +28,11 @@ const factChunk = () => {
       { kind: 'section' as const, ref: 'section.3' },
     ],
     digestRunId: 'digest-run',
+    lineage: {
+      judged: { runId: 'digest-run', iteration: 1 },
+      adoptedFrom: null,
+      goalHash: contentHash('the composed document goal'),
+    },
     model: 'fake-embedding',
   };
 };
@@ -50,6 +55,7 @@ describe('the memory point payload', () => {
       model: chunk.model,
       evidence: chunk.evidence,
       digestRunId: 'digest-run',
+      lineage: chunk.lineage,
       source: chunk.source,
       score: 0.91,
     });
@@ -63,5 +69,50 @@ describe('the memory point payload', () => {
     expect(
       fromPayload({ ...payload, evidence: [{ kind: 'paragraph', ref: 'p1' }] }, 0.5),
     ).toBeNull();
+  });
+
+  it('[QL-43] carries the lineage of the cited iteration, reads a point written before it as null, and refuses a malformed one', () => {
+    const chunk = factChunk();
+    const adopted = {
+      ...chunk,
+      lineage: {
+        judged: { runId: 'grade-run', iteration: 2 },
+        adoptedFrom: { runId: 'grade-run', iteration: 2 },
+        goalHash: contentHash('design a link shortener'),
+      },
+    };
+    const payload = toPayload(adopted, '2026-10-02T00:00:00.000Z');
+    expect(payload.lineage).toEqual(adopted.lineage);
+    expect(fromPayload(payload, 0.5)?.lineage).toEqual(adopted.lineage);
+
+    // A point written before the payload carried lineage has none, and still parses.
+    const { lineage, ...earlier } = payload;
+    void lineage;
+    expect(fromPayload(earlier, 0.5)?.lineage).toBeNull();
+    expect(fromPayload({ ...earlier, lineage: null }, 0.5)?.lineage).toBeNull();
+    // A lineage this module would not write is a point it did not write.
+    expect(
+      fromPayload({ ...payload, lineage: { ...adopted.lineage, goalHash: 'short' } }, 0.5),
+    ).toBeNull();
+  });
+
+  it('[QL-43] names the indexes a collection built before the lineage fields still lacks', () => {
+    const schemaOf = (fields: readonly string[]) =>
+      Object.fromEntries(fields.map((field) => [field, { data_type: 'keyword' }]));
+    expect(INDEXED_FIELDS).toEqual([
+      'runId',
+      'pipeline',
+      'kind',
+      'lineage.judged.runId',
+      'lineage.adoptedFrom.runId',
+      'lineage.goalHash',
+    ]);
+    expect(missingIndexes({})).toEqual([...INDEXED_FIELDS]);
+    expect(missingIndexes(schemaOf(['runId', 'pipeline', 'kind']))).toEqual([
+      'lineage.judged.runId',
+      'lineage.adoptedFrom.runId',
+      'lineage.goalHash',
+    ]);
+    expect(missingIndexes(schemaOf(INDEXED_FIELDS))).toEqual([]);
   });
 });

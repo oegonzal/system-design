@@ -89,10 +89,12 @@ export class MemoryService implements OnModuleInit {
 
   /**
    * Re-index a memory run's lessons against the current index generation:
-   * the digest it already produced, embedded again. Deliberately not a
-   * re-digest — that asks a model to derive the lessons afresh, and
-   * `replaceRunChunks` deletes a run's chunks before it writes, so a replay
-   * that answers differently destroys what it was meant to migrate.
+   * the digest it already produced, embedded again, with every chunk stamped
+   * as the source run reads today — which is how a point stored before the
+   * payload carried lineage is back-filled. Deliberately not a re-digest —
+   * that asks a model to derive the lessons afresh, and `replaceRunChunks`
+   * deletes a run's chunks before it writes, so a replay that answers
+   * differently destroys what it was meant to migrate.
    */
   async reindex(id: string): Promise<OrchestrationStepDto> {
     const record = isOrchestrationRunId(id) ? await this.records.find(id) : null;

@@ -378,6 +378,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'Every string and list a model writes into is one declared bound — a target the model is asked for and a ceiling the schema accepts — and a size limit never discards work: a reply a little over is kept whole and recorded, an extreme overrun is cut at a word boundary with a visible marker, a list over is trimmed by whole items, and only a structural fault refuses the reply, with every fault named in one wording.',
   },
+  {
+    id: 'QL-43',
+    statement:
+      "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',

@@ -21,6 +21,7 @@ const chunk = (text: string, runId: string, ref: string) => {
     source: hit.source,
     evidence: hit.evidence,
     digestRunId: hit.digestRunId,
+    lineage: hit.lineage,
     model,
     vectors: {
       condition: vectorOf(keys.condition, DIMENSIONS),

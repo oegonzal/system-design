@@ -53,6 +53,9 @@ export const hitOf = (
   },
   evidence: [{ kind: 'criterion', ref: 'c1' }],
   digestRunId: null,
+  // As a point stored before lineage was recorded reads: a spec about the
+  // screen a lineage drives says what it needs on the hit itself.
+  lineage: null,
   model: FAKE_MODEL,
   score: 0.9,
 });

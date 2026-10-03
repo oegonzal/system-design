@@ -7,7 +7,11 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { LlmAvailabilityDto, MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import type {
+  LlmAvailabilityDto,
+  MemoryLineageDto,
+  MemoryStoreAvailabilityDto,
+} from '@sysdesign/contracts';
 
 import type { ChunkSource } from '../../pipelines/memory-recall/input';
 import type { CachedEmbeddings } from './embeddings';
@@ -53,6 +57,14 @@ export interface MemoryChunk {
   evidence: EvidenceRef[];
   /** The experience-digest run that produced it. */
   digestRunId: string | null;
+  /**
+   * Where the cited evidence was judged — the iteration the lesson rests on,
+   * what the source run adopted, and the hash of its bare goal — so a recall
+   * can screen out a copy of what its asker already holds. Written on every
+   * chunk; null only on a point stored before lineage was recorded, which a
+   * re-index of its memory run back-fills.
+   */
+  lineage: MemoryLineageDto | null;
   model: string;
 }
 

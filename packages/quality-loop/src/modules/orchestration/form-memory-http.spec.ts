@@ -51,6 +51,7 @@ const storedFact = () => {
     },
     evidence: [{ kind: 'section' as const, ref: 'section.2' }],
     digestRunId: 'digest-run-1',
+    lineage: null,
     model: 'fake-embedding',
     vectors: { condition: vectorOf(condition), lesson: vectorOf(insight) },
   };

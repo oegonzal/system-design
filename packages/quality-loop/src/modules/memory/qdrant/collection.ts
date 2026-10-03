@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 
+import type { MemoryLineageDto } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
@@ -32,8 +33,26 @@ const INDEX_GENERATION = 'v2';
 export const collectionName = (model: string, dimensions: number): string =>
   `quality-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
 
-/** Payload fields a filter may use; each gets a keyword index. */
-export const INDEXED_FIELDS = ['runId', 'pipeline', 'kind'] as const;
+/**
+ * Payload fields a filter may use; each gets a keyword index. The lineage
+ * fields are what a recall screens by — the run that judged a lesson's
+ * evidence, the run it adopted, the prompt it was asked — and are indexed on
+ * an existing collection as well as a new one, since the payload grew them
+ * without a generation bump: the vectors did not change, only what rides
+ * beside them.
+ */
+export const INDEXED_FIELDS = [
+  'runId',
+  'pipeline',
+  'kind',
+  'lineage.judged.runId',
+  'lineage.adoptedFrom.runId',
+  'lineage.goalHash',
+] as const;
+
+/** The indexed fields a collection does not yet have, read from its own payload schema. */
+export const missingIndexes = (payloadSchema: Readonly<Record<string, unknown>>): string[] =>
+  INDEXED_FIELDS.filter((field) => !(field in payloadSchema));
 
 /** A UUID-shaped digest of (source run, ref): the same memory always lands on the same point. */
 export function pointId(sourceRunId: string, ref: string): string {
@@ -48,8 +67,19 @@ const keysSchema = z.strictObject({
   lesson: z.string().min(1),
 }) satisfies z.ZodType<Record<VectorName, string>>;
 
-/** `contentHash` is sha-256 as hex. */
+/** `contentHash` and a lineage's `goalHash` are sha-256 as hex. */
 const SHA256_HEX_LENGTH = 64;
+
+const iterationRefSchema = z.strictObject({
+  runId: z.string().min(1),
+  iteration: z.number().int().min(1),
+});
+
+const lineageSchema = z.strictObject({
+  judged: iterationRefSchema,
+  adoptedFrom: iterationRefSchema.nullable(),
+  goalHash: z.string().length(SHA256_HEX_LENGTH),
+}) satisfies z.ZodType<MemoryLineageDto>;
 
 const payloadSchema = chunkSourceSchema.extend({
   text: z.string().min(1),
@@ -59,6 +89,8 @@ const payloadSchema = chunkSourceSchema.extend({
   model: z.string().min(1),
   evidence: z.array(z.strictObject({ kind: z.enum(EVIDENCE_KINDS), ref: z.string().min(1) })),
   digestRunId: z.string().nullable(),
+  /** Absent on a point written before lineage was recorded: it reads as null until its run is re-indexed. */
+  lineage: lineageSchema.nullable().default(null),
   storedAt: z.string(),
 });
 
@@ -73,6 +105,7 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
     model: chunk.model,
     evidence: chunk.evidence,
     digestRunId: chunk.digestRunId,
+    lineage: chunk.lineage,
     storedAt,
   };
 }
@@ -81,11 +114,11 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
 export function fromPayload(payload: unknown, score: number): MemoryHit | null {
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return null;
-  const { text, contentHash, model, evidence, digestRunId, storedAt, keys, ...source } =
+  const { text, contentHash, model, evidence, digestRunId, lineage, storedAt, keys, ...source } =
     parsed.data;
   // Neither is a fact about the hit: one is when it was written, the other is
   // what it was indexed by, and a reader judges the lesson, not its key.
   void storedAt;
   void keys;
-  return { text, contentHash, model, evidence, digestRunId, source, score };
+  return { text, contentHash, model, evidence, digestRunId, lineage, source, score };
 }

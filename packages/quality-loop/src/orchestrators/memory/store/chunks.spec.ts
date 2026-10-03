@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../../core/outputs';
+import { contentHash } from '../ports';
 import { fromRun } from '../../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../../pipelines/experience-digest/input';
 import { sampleDigest, sampleRun } from '../../../pipelines/experience-digest/testing';
@@ -16,14 +17,22 @@ describe('a stored chunk', () => {
       outputsOf(readoutTrace(digestInput(sampleDigest(), renderRecord(record)))),
       ACCEPT_AT,
     );
+    const lineage = {
+      judged: { runId: 'run-a', iteration: 2 },
+      adoptedFrom: null,
+      goalHash: contentHash(record.prompt),
+    };
     const [chunk] = chunksOf(
       memories,
       {
-        runId: 'run-a',
-        pipeline: 'system-design',
-        decision: 'accept',
-        iteration: 2,
-        when: '2026-09-06',
+        source: {
+          runId: 'run-a',
+          pipeline: 'system-design',
+          decision: 'accept',
+          iteration: 2,
+          when: '2026-09-06',
+        },
+        lineage,
       },
       'digest-1',
       'fake-embedding',
@@ -42,5 +51,8 @@ describe('a stored chunk', () => {
     );
     expect(chunk.contentHash).toHaveLength(64);
     expect(chunk.digestRunId).toBe('digest-1');
+    // The lineage rides beside the source, never inside it: the curator's shape stays `ChunkSource`.
+    expect(chunk.lineage).toEqual(lineage);
+    expect(chunk.source).not.toHaveProperty('lineage');
   });
 });

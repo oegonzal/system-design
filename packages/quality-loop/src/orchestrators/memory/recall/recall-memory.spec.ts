@@ -54,6 +54,7 @@ const lesson = (
   },
   evidence: [],
   digestRunId: null,
+  lineage: null,
   model: 'fake-embedding',
   vectors: { condition: vectorOf(condition), lesson: vectorOf(lessonKey) },
 });

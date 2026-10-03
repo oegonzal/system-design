@@ -122,6 +122,7 @@ export class InMemoryMemoryStore implements MemoryStore {
       source: chunk.source,
       evidence: chunk.evidence,
       digestRunId: chunk.digestRunId,
+      lineage: chunk.lineage,
       model: chunk.model,
       score,
     }));

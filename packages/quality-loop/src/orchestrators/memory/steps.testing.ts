@@ -80,6 +80,7 @@ export function memoryPorts(overrides: Partial<MemoryPorts> = {}): MemoryPorts {
         source: hit.source,
         evidence: hit.evidence,
         digestRunId: hit.digestRunId,
+        lineage: hit.lineage,
         model: hit.model,
         vectors: { condition: vectorOf(keys.condition), lesson: vectorOf(keys.lesson) },
       };

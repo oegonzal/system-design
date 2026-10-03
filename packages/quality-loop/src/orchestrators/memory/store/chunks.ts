@@ -3,18 +3,22 @@
  * indexed by both halves the digest already separates: the condition it
  * applies under, and the instruction itself.
  */
-import { lessonText } from '@sysdesign/contracts';
+import { lessonText, type MemoryLineageDto } from '@sysdesign/contracts';
 
 import type { ChunkSource } from '../../../pipelines/memory-recall/input';
 import type { MemoryToStore } from '../digest/read-digest';
 import { contentHash, type IndexedChunk } from '../ports';
 
+/**
+ * What every chunk of one run says about where it came from: the source the
+ * curator is shown — the run, its pipeline, the cited iteration with its own
+ * decision, and the day — and the lineage only a recall's screen reads. Kept
+ * apart so the curator-facing shape is exactly `ChunkSource` and the lineage
+ * never reaches a prompt.
+ */
 export interface ChunkOrigin {
-  runId: string;
-  pipeline: string;
-  decision: ChunkSource['decision'];
-  iteration: number;
-  when: string;
+  source: Omit<ChunkSource, 'kind' | 'ref'>;
+  lineage: MemoryLineageDto;
 }
 
 export function chunksOf(
@@ -29,9 +33,10 @@ export function chunksOf(
       text,
       keys: { condition: memory.appliesWhen, lesson: memory.insight },
       contentHash: contentHash(text),
-      source: { ...origin, kind: 'lesson', ref: `memory.${memory.position}` },
+      source: { ...origin.source, kind: 'lesson', ref: `memory.${memory.position}` },
       evidence: memory.evidence,
       digestRunId,
+      lineage: origin.lineage,
       model,
     };
   });

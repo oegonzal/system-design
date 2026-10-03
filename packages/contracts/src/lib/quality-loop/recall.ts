@@ -5,8 +5,26 @@
  * `StartQualityRunRequest.recall`; the record is null on a run that did not.
  */
 import type { EvidenceResult } from './evidence';
-import { mayProduce, type QualityRunRequestSummary } from './runs';
+import { mayProduce, type AdoptedIterationRef, type QualityRunRequestSummary } from './runs';
 import type { Severity } from './vocab';
+
+/**
+ * Where the evidence a stored lesson cites was judged, beyond the run that
+ * stored it. A run that adopts a recorded iteration copies its ledger
+ * verbatim, so a lesson digested from the copy restates what the original
+ * run's digest already taught; the lineage is what lets a recall tell the
+ * copy from the original without reading either run back. `judged` is the
+ * run and iteration whose judges produced the cited evidence: the source
+ * run's own best iteration, or — when its best is the one it adopted — the
+ * iteration it adopted. `goalHash` is sha-256 hex of the bare goal the source
+ * run was asked, so runs of one prompt are kin by hash, never by text.
+ */
+export interface MemoryLineageDto {
+  judged: AdoptedIterationRef;
+  /** What the source run adopted as its iteration 1; null when it produced or judged its own. */
+  adoptedFrom: AdoptedIterationRef | null;
+  goalHash: string;
+}
 
 /**
  * Where a run's recall stands. `recalling` while it runs — the run has not

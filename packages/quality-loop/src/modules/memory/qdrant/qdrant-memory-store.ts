@@ -14,7 +14,7 @@ import {
   type MemoryStore,
   type StoredChunk,
 } from '../../../orchestrators/memory/ports';
-import { collectionName, fromPayload, INDEXED_FIELDS, pointId, toPayload } from './collection';
+import { collectionName, fromPayload, missingIndexes, pointId, toPayload } from './collection';
 
 export const DEFAULT_QDRANT_URL = 'http://localhost:6333';
 
@@ -106,6 +106,13 @@ export class QdrantMemoryStore implements MemoryStore {
     return this.collection;
   }
 
+  /**
+   * The collection exists and carries every declared payload index. The
+   * indexes are reconciled against the collection's own schema rather than
+   * created only with the collection, so a field declared after a collection
+   * was built — the lineage fields — is indexed on the next boot without a
+   * generation bump, and an index already there is never asked for twice.
+   */
   private async ensure(collection: string): Promise<void> {
     if (this.ensured) return;
     const { exists } = await this.client.collectionExists(collection);
@@ -117,13 +124,14 @@ export class QdrantMemoryStore implements MemoryStore {
       await this.client.createCollection(collection, { vectors }).catch(async (error: unknown) => {
         if (!(await this.client.collectionExists(collection)).exists) throw error;
       });
-      for (const field of INDEXED_FIELDS) {
-        await this.client.createPayloadIndex(collection, {
-          field_name: field,
-          field_schema: 'keyword',
-          wait: true,
-        });
-      }
+    }
+    const { payload_schema: indexed } = await this.client.getCollection(collection);
+    for (const field of missingIndexes(indexed ?? {})) {
+      await this.client.createPayloadIndex(collection, {
+        field_name: field,
+        field_schema: 'keyword',
+        wait: true,
+      });
     }
     this.ensured = true;
   }
