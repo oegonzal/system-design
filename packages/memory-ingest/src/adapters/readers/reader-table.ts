@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 
 import type { DocumentReader } from '../../core/ports';
+import { jsonlReader } from './jsonl-reader';
 import { markdownReader } from './markdown-reader';
 import { pdfReader } from './pdf-reader';
 
@@ -14,6 +15,7 @@ export const READERS: Readonly<Record<string, DocumentReader>> = {
   '.md': markdownReader,
   '.markdown': markdownReader,
   '.txt': markdownReader,
+  '.jsonl': jsonlReader(),
 };
 
 export class UnsupportedDocument extends Error {

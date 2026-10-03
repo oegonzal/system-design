@@ -30,6 +30,17 @@ export interface IngestOptions {
   kind: IngestKind;
   subject: string;
   chunkBytes: number;
+  /** The most sections one chunk may carry. */
+  partsPerChunk: number;
+  /** The day the documents speak for; null when nothing says. */
+  date: string | null;
+  /**
+   * Post at most this many chunks this run, then halt with the rest pending;
+   * null for every chunk. A run of one proves a document end to end — and
+   * records that chunk by its hash, so the full run skips it rather than
+   * digesting the same sections a second time into near-identical points.
+   */
+  limit: number | null;
   dryRun: boolean;
   force: boolean;
   /** Paths are recorded relative to this. */
@@ -38,12 +49,18 @@ export interface IngestOptions {
 
 export interface IngestDeps {
   reader: DocumentReader;
+  /** Asked between chunks; true halts the run with what it has recorded. Absent never halts. */
+  interrupted?: () => boolean;
   sink: IngestSink;
   ledger: IngestLedger;
   clock: Clock;
   /** Stamped on every record, so a manifest says which loop it speaks of. */
   loopUrl: string;
 }
+
+/** Why a run stopped early though nothing was wrong. */
+export const HALT_REASONS = ['limit', 'interrupted'] as const;
+export type HaltReason = (typeof HALT_REASONS)[number];
 
 export const CHUNK_OUTCOMES = [
   'posted',
@@ -98,6 +115,12 @@ export interface IngestReport {
   failed: number;
   /** Set when a refusal stopped the run before every chunk was posted. */
   stopped: { document: string; chunk: number; message: string } | null;
+  /**
+   * Set when the run halted as asked rather than by a refusal — the limit was
+   * reached, or the operator interrupted. The chunks not reached stay
+   * `pending`, and re-running the same command posts them.
+   */
+  halted: { reason: HaltReason; after: number } | null;
 }
 
 export interface PlannedDocument {
@@ -127,7 +150,10 @@ export class DocumentNameTooLong extends Error {
 /** Phase one: every document read and chunked, nothing posted. Throws on anything it cannot use. */
 export async function planIngest(
   paths: readonly string[],
-  options: Pick<IngestOptions, 'kind' | 'subject' | 'chunkBytes' | 'cwd'>,
+  options: Pick<
+    IngestOptions,
+    'kind' | 'subject' | 'chunkBytes' | 'partsPerChunk' | 'date' | 'cwd'
+  >,
   deps: Pick<IngestDeps, 'reader'>,
 ): Promise<PlannedDocument[]> {
   const planned: PlannedDocument[] = [];
@@ -143,8 +169,9 @@ export async function planIngest(
         kind: options.kind,
         title,
         subject: options.subject,
-        date: null,
+        date: options.date,
         chunkBytes: options.chunkBytes,
+        partsPerChunk: options.partsPerChunk,
       }),
     });
   }
@@ -240,7 +267,7 @@ const settle = (row: ChunkReport, entry: ManifestEntry, outcome: ChunkOutcome): 
 /** Phase two: one chunk at a time, each awaited to settle and recorded, in document order. */
 export async function runIngest(
   documents: readonly PlannedDocument[],
-  options: Pick<IngestOptions, 'dryRun' | 'force'>,
+  options: Pick<IngestOptions, 'dryRun' | 'force' | 'limit'>,
   deps: IngestDeps,
 ): Promise<IngestReport> {
   const entries = [...(await deps.ledger.load())];
@@ -260,11 +287,14 @@ export async function runIngest(
     skipped: 0,
     failed: 0,
     stopped: null,
+    halted: null,
   };
+  // Skipped chunks cost nothing, so they do not count against a limit.
+  let posted = 0;
 
   for (const [fileIndex, { document, plan }] of documents.entries()) {
     for (const [chunkIndex, planned] of plan.chunks.entries()) {
-      if (report.stopped !== null) return report;
+      if (report.stopped !== null || report.halted !== null) return report;
       const row = (files[fileIndex] as FileReport).chunks[chunkIndex] as ChunkReport;
       const prior = known.get(planned.chunkHash);
       if (prior !== undefined && INGESTED.has(prior.status) && !options.force) {
@@ -285,6 +315,12 @@ export async function runIngest(
       else report.failed += 1;
       if (outcome === 'refused') {
         report.stopped = { document, chunk: planned.chunk.chunk.index, message: entry.error ?? '' };
+      }
+      posted += 1;
+      if (options.limit !== null && posted >= options.limit) {
+        report.halted = { reason: 'limit', after: posted };
+      } else if (deps.interrupted?.() === true) {
+        report.halted = { reason: 'interrupted', after: posted };
       }
     }
   }

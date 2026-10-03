@@ -1,7 +1,7 @@
 import { DOCUMENT_MEMORY_ORCHESTRATOR_ID } from '@sysdesign/contracts';
 import { LoopRefused, LoopRunLost } from '@sysdesign/loop-client';
 
-import { chunkDocument } from '../../core/chunk';
+import { chunkDocument, PARTS_PER_CHUNK } from '../../core/chunk';
 import { IngestWaitFailed, type PlannedChunk } from '../../core/ports';
 import { fakeIngestLoop } from '../../test/fake-ingest-loop';
 import { INGEST_MAX_ITERATIONS } from './loop-ingest-sink';
@@ -13,6 +13,7 @@ const planned = (): PlannedChunk =>
     title: 'notes.md',
     subject: 'Ada',
     date: null,
+    partsPerChunk: PARTS_PER_CHUNK,
     chunkBytes: 6000,
   }).chunks[0] as PlannedChunk;
 

@@ -62,6 +62,9 @@ export function renderIngest(report: IngestReport): string {
     report.stopped
       ? `stopped at ${report.stopped.document} chunk ${report.stopped.chunk}: ${report.stopped.message}`
       : null,
+    report.halted
+      ? `halted after ${report.halted.after} chunk(s): ${report.halted.reason} — the pending chunks post on re-running the same command`
+      : null,
   ].filter((line): line is string => line !== null);
   return [...report.files.map(renderFile), [summary, ...tail].join('\n')].join('\n\n');
 }

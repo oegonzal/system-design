@@ -27,6 +27,9 @@ const options = (overrides: Partial<IngestOptions> = {}): IngestOptions => ({
   kind: 'notes',
   subject: 'Ada Lovelace',
   chunkBytes: 2600,
+  partsPerChunk: 8,
+  date: null,
+  limit: null,
   dryRun: false,
   force: false,
   cwd: '/work',
@@ -134,6 +137,44 @@ describe('ingest', () => {
     });
     expect(outcomes(report)).toEqual(['posted', 'posted', 'posted']);
     expect(chunks[0]?.steps).toEqual(ledger.entries[0]?.steps);
+  });
+
+  it('[ING-1] a limit posts that many chunks and no more, and the chunks it did not reach are posted by re-running the same command', async () => {
+    const first = harness();
+    const limited = await ingest(['notes.md'], options({ limit: 1 }), first.deps);
+    expect(limited).toMatchObject({ chunks: 3, posted: 1, skipped: 0, failed: 0, stopped: null });
+    expect(limited.halted).toEqual({ reason: 'limit', after: 1 });
+    expect(outcomes(limited)).toEqual(['posted', 'pending', 'pending']);
+    expect(first.posted).toHaveLength(1);
+
+    // The proven chunk is recorded by its hash, so the full run digests it no second time.
+    const rest = harness([], first.ledger);
+    const report = await ingest(['notes.md'], options(), rest.deps);
+    expect(report).toMatchObject({ chunks: 3, posted: 2, skipped: 1, halted: null });
+    expect(outcomes(report)).toEqual(['skipped', 'posted', 'posted']);
+  });
+
+  it('[ING-1] an interrupt halts once the chunk in flight is recorded, so no orchestration is left unrecorded', async () => {
+    let interrupted = false;
+    const { deps, posted, ledger } = harness();
+    // The interrupt arrives while the first chunk is in flight.
+    const report = await ingest(['notes.md'], options(), {
+      ...deps,
+      sink: {
+        ...deps.sink,
+        post: async (planned) => {
+          interrupted = true;
+          return deps.sink.post(planned);
+        },
+      },
+      interrupted: () => interrupted,
+    });
+    expect(report.halted).toEqual({ reason: 'interrupted', after: 1 });
+    expect(report).toMatchObject({ posted: 1, stopped: null });
+    expect(posted).toHaveLength(1);
+    // Recorded, not abandoned: the next run skips it rather than storing its facts twice.
+    expect(ledger.entries).toHaveLength(1);
+    expect(ledger.entries[0]?.status).toBe('complete');
   });
 
   it('[ING-1] a re-run skips what the manifest holds as stored, and --force posts it again while the ledger keeps every outcome', async () => {

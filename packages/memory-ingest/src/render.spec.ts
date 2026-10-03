@@ -72,6 +72,7 @@ const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
   skipped: 0,
   failed: 1,
   stopped: null,
+  halted: null,
   ...overrides,
 });
 

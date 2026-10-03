@@ -4,6 +4,8 @@ import {
   type DocumentKind,
 } from '@sysdesign/contracts';
 
+import { MAX_PARTS_PER_CHUNK, PARTS_PER_CHUNK } from './core/chunk';
+
 /**
  * The ingester's configuration, declared once.
  *
@@ -32,6 +34,9 @@ export const INGEST_FLAGS = {
   kind: { type: 'string', describe: `what the documents are: ${INGEST_KINDS.join('|')}` },
   subject: { type: 'string', describe: 'whom the facts are about, by name' },
   'chunk-bytes': { type: 'string', describe: 'the most a rendered chunk goal may weigh' },
+  date: { type: 'string', describe: 'the day the documents speak for, as YYYY-MM-DD' },
+  limit: { type: 'string', describe: 'post at most this many chunks, then halt' },
+  'parts-per-chunk': { type: 'string', describe: 'the most sections one chunk may carry' },
   'dry-run': { type: 'boolean', describe: 'print the chunks; post nothing, record nothing' },
   force: { type: 'boolean', describe: 'post chunks the manifest already holds as complete' },
   json: { type: 'boolean', describe: 'print the report as JSON' },
@@ -114,6 +119,45 @@ export function chunkBytes(raw: string | undefined): number {
     throw new IngestConfigError(
       `--chunk-bytes must be a positive integer no larger than ${GOAL_BUDGET_BYTES}, got ${JSON.stringify(raw)}`,
     );
+  }
+  return Number(raw);
+}
+
+/**
+ * The day a document speaks for, as the contract spells a day — or a refusal
+ * naming the flag. Undated is legitimate and is what a document that says
+ * nothing gets; a figure like a span of experience is only absolute against
+ * the day it was written, so a corpus that knows its date says so.
+ */
+export function documentDate(raw: string | undefined): string | null {
+  if (raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new IngestConfigError(`--date must be a day as YYYY-MM-DD, got ${JSON.stringify(raw)}`);
+  }
+  return trimmed;
+}
+
+/**
+ * How many sections one chunk may carry, or a refusal naming the flag. Lower
+ * it when a chunk's sections state more facts than the contract's memory cap
+ * allows the digest to propose — the remainder is dropped silently otherwise.
+ */
+export function partsPerChunk(raw: string | undefined): number {
+  if (raw === undefined) return PARTS_PER_CHUNK;
+  if (!/^\d+$/.test(raw.trim()) || Number(raw) <= 0 || Number(raw) > MAX_PARTS_PER_CHUNK) {
+    throw new IngestConfigError(
+      `--parts-per-chunk must be a positive integer no larger than ${MAX_PARTS_PER_CHUNK}, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return Number(raw);
+}
+
+/** How many chunks one run may post, or a refusal naming the flag. */
+export function postLimit(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  if (!/^\d+$/.test(raw.trim()) || Number(raw) <= 0) {
+    throw new IngestConfigError(`--limit must be a positive integer, got ${JSON.stringify(raw)}`);
   }
   return Number(raw);
 }

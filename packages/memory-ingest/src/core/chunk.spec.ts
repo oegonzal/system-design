@@ -42,6 +42,7 @@ const input = (overrides: Partial<ChunkingInput> = {}): ChunkingInput => ({
   subject: 'Ada Lovelace',
   date: null,
   chunkBytes: 6000,
+  partsPerChunk: PARTS_PER_CHUNK,
   ...overrides,
 });
 

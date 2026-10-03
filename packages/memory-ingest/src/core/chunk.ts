@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   DOCUMENT_CONTEXT_MAX_LENGTH,
   DOCUMENT_MAX_MEMORIES,
+  DOCUMENT_MAX_PARTS,
   DOCUMENT_PART_MAX_LENGTH,
   DOCUMENT_RULES,
   documentChunkSchema,
@@ -34,6 +35,13 @@ export interface ChunkingInput {
   date: string | null;
   /** The most a rendered goal may weigh, in UTF-8 bytes. */
   chunkBytes: number;
+  /**
+   * The most parts one chunk may carry. Fewer parts leave more of the
+   * contract's memory cap for each one, which is what decides whether a dense
+   * chunk's facts all fit: a chunk whose sections state more facts than
+   * `DOCUMENT_MAX_MEMORIES` loses the remainder with nothing to say it did.
+   */
+  partsPerChunk: number;
 }
 
 export interface ChunkPlan {
@@ -51,6 +59,9 @@ export interface ChunkPlan {
  * and a chunk carries at most this many parts, so two facts per part fit.
  */
 export const PARTS_PER_CHUNK = 8;
+
+/** Beyond this a chunk could not state two facts per part within the contract's memory cap. */
+export const MAX_PARTS_PER_CHUNK = DOCUMENT_MAX_PARTS;
 
 /** A part that cannot be made to fit: a lone section already renders past the budget. */
 export class ChunkBudgetExceeded extends Error {
@@ -203,7 +214,7 @@ function pack(parts: readonly Part[], input: ChunkingInput): Part[][] {
   parts.forEach((part, position) => {
     const candidate = [...current, part];
     const fits =
-      candidate.length <= PARTS_PER_CHUNK &&
+      candidate.length <= input.partsPerChunk &&
       measure(candidate, input, parts.length) <= input.chunkBytes;
     if (fits) {
       current = candidate;
