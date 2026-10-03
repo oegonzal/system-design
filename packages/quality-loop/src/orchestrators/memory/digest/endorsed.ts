@@ -94,6 +94,11 @@ export function withheldRefs(
     if (rule === 'none') continue;
     // `all-but-one` is for a finding that faults a set for sharing something —
     // two memories stating one fact — where keeping one of them is the repair.
+    // It keeps the FIRST ref, and the normaliser sorts a finding's refs, so the
+    // earlier item stands and the later goes. A finding that names only the
+    // later of a pair therefore withholds nothing and the near-twin is stored:
+    // measured by the knowledge lane at 42 of 43 duplicate findings naming both,
+    // and storing a near-twin is the smaller harm than losing a true fact.
     const named = rule === 'all-but-one' ? finding.locationRefs.slice(1) : finding.locationRefs;
     for (const ref of named) refs.add(ref);
   }
