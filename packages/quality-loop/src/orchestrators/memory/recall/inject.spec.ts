@@ -10,13 +10,14 @@ import {
   builtQuery,
   fused,
   GOAL,
+  hitOf,
   passed,
   readoutTrace,
   recallHits,
 } from '../testing';
 import { bareGoal, MEMORY_HEADING, withMemory } from './inject';
 import { probeSet } from './query';
-import { readPack } from './read-pack';
+import { readPack, type UsableMemory } from './read-pack';
 
 const hits = recallHits();
 
@@ -86,5 +87,31 @@ describe('memory in the goal', () => {
     expect(withMemory(GOAL, usable, Buffer.byteLength(GOAL) + tight)).not.toBeNull();
     expect(withMemory(GOAL, usable, Buffer.byteLength(GOAL))).toBeNull();
     expect(withMemory(GOAL, [])).toBeNull();
+  });
+
+  it("[QL-55] the curator's words reach the target's goal in the target's terms: its labels are dropped, and a part it named only by them is left unsaid", () => {
+    const usable: UsableMemory = {
+      alias: 'm1',
+      hit: hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
+      support: 1,
+      // The recall run's own rubric: `c1` is the curator's need, not the target's c1.
+      rubric: [{ id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' }],
+      kept: {
+        chunk: 'm1',
+        serves: 'c1/p2',
+        insight: 'c1 — a read path with a single store behind it went down with the POS',
+        caveat: 'p1',
+      },
+    };
+    const line = withMemory(GOAL, [usable])?.goal.split('\n').at(-1);
+    expect(line).toBe(
+      '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns — insight: a read path with a single store behind it went down with the POS',
+    );
+
+    // Nothing left of the curator's words: the stored lesson and where it was learned, alone.
+    const silent = { ...usable, kept: { ...usable.kept, insight: 'c1', caveat: null } };
+    expect(withMemory(GOAL, [silent])?.goal.split('\n').at(-1)).toBe(
+      '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns',
+    );
   });
 });

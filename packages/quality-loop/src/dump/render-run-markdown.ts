@@ -151,9 +151,11 @@ function noveltyLines(novelty: RecallNoveltyDto | null): string[] {
 
 /**
  * What the run recalled for its producer, and the lessons the producer saw —
- * the curator's words, each with the run it came from and, when the recall
- * screened what the producer held, where it was learned. Nothing when the run
- * did not ask to recall.
+ * the curator's words as the producer read them (a part named only by labels
+ * that stand for nothing here is left unsaid), each with the run, iteration
+ * and decision it was learned in and, when the recall screened what the
+ * producer held, where it was learned. Nothing when the run did not ask to
+ * recall.
  */
 function recallSection(record: RunRecord): string[] {
   const { recall } = record;
@@ -172,7 +174,13 @@ function recallSection(record: RunRecord): string[] {
     ...noveltyLines(recall.novelty),
     ...recall.lessons.map((lesson) => {
       const origin = originOf.get(lesson.ref);
-      return `- [${lesson.ref}] ${lesson.insight} — serves: ${lesson.serves}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (from run ${lesson.sourceRunId}${origin === undefined ? '' : ` · origin ${origin}`})`;
+      const learned = [
+        `from run ${lesson.sourceRunId}`,
+        ...(lesson.iteration === undefined ? [] : [`iteration ${lesson.iteration}`]),
+        ...(lesson.decision === undefined ? [] : [`decided ${lesson.decision}`]),
+        ...(origin === undefined ? [] : [`origin ${origin}`]),
+      ];
+      return `- [${lesson.ref}] ${lesson.insight}${lesson.serves ? ` — serves: ${lesson.serves}` : ''}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (${learned.join(' · ')})`;
     }),
     ...(recall.lessons.length > 0 ? [``] : []),
   ];

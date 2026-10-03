@@ -228,6 +228,26 @@ describe('buildRunDump', () => {
     expect(JSON.parse(content(plain, 'manifest.json'))).toMatchObject({ recall: null });
   });
 
+  it('[QL-55] each lesson prints as its producer read it: the iteration and decision it was learned in, and no serves clause where the curator named only labels', () => {
+    const lesson = {
+      ref: 'm3',
+      serves: '',
+      insight: 'Make the enqueue async.',
+      caveat: null,
+      text: 'An async enqueue keeps a redirect off the queue.',
+      sourceRunId: 'earlier-quality',
+      pipeline: 'system-design',
+      iteration: 2,
+      decision: 'revise' as const,
+      when: '2026-10-01',
+    };
+    const page = content(buildRunDump(record({ recall: recallOf([lesson], 'r') }), null), 'run.md');
+    expect(page).toContain(
+      '- [m3] Make the enqueue async. (from run earlier-quality · iteration 2 · decided revise)\n',
+    );
+    expect(page).not.toContain('serves:');
+  });
+
   it('[QL-52] a recall that screened what its producer held says what it set aside and why, the chain, and each lesson’s origin', () => {
     const lesson = {
       ref: 'm1',

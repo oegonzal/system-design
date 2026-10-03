@@ -4,6 +4,7 @@
  * budget. `bareGoal` strips at the marker, so nothing parses prose.
  */
 import { GOAL_MAX_BYTES } from '../../../core/contracts';
+import { lessonOf } from './provenance';
 import type { UsableMemory } from './read-pack';
 
 /** The marker the loop writes; `bareGoal` strips from it. */
@@ -17,10 +18,22 @@ export function bareGoal(goal: string): string {
   return marker < 0 ? goal : goal.slice(0, marker);
 }
 
-const rememberedLine = ({ alias: id, kept, hit }: UsableMemory): string => {
-  const { source } = hit;
-  const caveat = kept.caveat ? `; caveat: ${kept.caveat}` : '';
-  return `- [${id}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}: ${hit.text} — serves: ${kept.serves}; insight: ${kept.insight}${caveat}`;
+/**
+ * One remembered item: where it was learned, the stored lesson verbatim, and
+ * the curator's words read back in the target's own terms (`lessonOf`) — the
+ * labels its query gave the target's needs mean nothing in the target's goal,
+ * and its own criterion ids would read as the target's — each part it named
+ * only by such labels left unsaid.
+ */
+const rememberedLine = (usable: UsableMemory): string => {
+  const { source } = usable.hit;
+  const { ref, text, serves, insight, caveat } = lessonOf(usable);
+  const said = [
+    ...(serves ? [`serves: ${serves}`] : []),
+    ...(insight ? [`insight: ${insight}`] : []),
+    ...(caveat ? [`caveat: ${caveat}`] : []),
+  ];
+  return `- [${ref}] ${source.kind} · run ${source.runId} · ${source.pipeline} · iteration ${source.iteration} · decided ${source.decision} · ${source.when} · ref ${source.ref}: ${text}${said.length > 0 ? ` — ${said.join('; ')}` : ''}`;
 };
 
 /**
