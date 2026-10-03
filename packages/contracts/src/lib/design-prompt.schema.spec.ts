@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { modelSchema } from './bounds';
+import { keptAtMost, modelSchema } from './bounds';
 import { boundsAgainstMeasured } from './measured-bounds';
 import measured from './measured/design-prompt.json';
 import {
@@ -179,6 +179,39 @@ describe('criteriaFromDraft', () => {
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.scale.ceiling,
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.constraint.ceiling,
     ]);
+  });
+
+  it('[GEN-1] each row composed from its parts at the longest a lenient read returns stays within the longest statement a rubric may carry', () => {
+    // The studio reads a draft leniently, so each part may run to its
+    // keptAtMost; the rubric it claims is supplied to the grader, which takes
+    // a statement up to keptAtMost of the contract's statement bound.
+    const { bounds } = modelSchema(designPromptDraftSchema);
+    const longest = (path: string): string => {
+      const declared = bounds[path];
+      if (declared === undefined) throw new Error(`the draft declares no bound at ${path}`);
+      return 'x'.repeat(keptAtMost(declared));
+    };
+    const draft: DesignPromptDraft = {
+      ...draftFixture(),
+      functionalRequirements: [longest('functionalRequirements[]')],
+      nonFunctionalRequirements: [
+        {
+          kind: longest('nonFunctionalRequirements[].kind'),
+          requirement: longest('nonFunctionalRequirements[].requirement'),
+          target: longest('nonFunctionalRequirements[].target'),
+        },
+      ],
+      scale: [{ metric: longest('scale[].metric'), target: longest('scale[].target') }],
+      constraints: [longest('constraints[]')],
+    };
+    const criteria = criteriaFromDraft(draft);
+    expect(criteria.map((criterion) => criterion.kind)).toEqual([...CANVAS_CRITERION_KINDS]);
+    for (const { kind, statement } of criteria) {
+      expect([kind, statement.length <= keptAtMost(CRITERION_STATEMENT_BOUND)]).toEqual([
+        kind,
+        true,
+      ]);
+    }
   });
 });
 
