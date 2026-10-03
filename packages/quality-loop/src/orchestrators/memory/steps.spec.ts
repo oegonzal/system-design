@@ -91,7 +91,7 @@ describe('the memory steps', () => {
     const result = await recall(accepted);
     expect(result).toMatchObject({
       status: 'complete',
-      counts: { candidates: 2, kept: 2, usable: 2, injected: 2 },
+      counts: { candidates: 2, deferred: 0, kept: 2, usable: 2, injected: 2 },
     });
     expect(result.output?.goal).toContain(MEMORY_HEADING);
     expect(accepted.executed[0].goal).toContain('### [m1] lesson');

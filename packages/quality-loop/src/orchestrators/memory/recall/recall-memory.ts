@@ -63,6 +63,8 @@ export interface RecallCounts {
   probes: number;
   /** What the curator was offered: the hits, as many as the goal budget held. */
   candidates: number;
+  /** The hits the goal budget left out of what the curator was offered; 0 when every one fit. */
+  deferred: number;
   kept: number;
   usable: number;
 }
@@ -189,6 +191,7 @@ export async function recallMemory(ports: MemoryPorts, ask: RecallAsk): Promise<
   const counts: RecallCounts = {
     probes: texts.length,
     candidates: built.query.candidates.length,
+    deferred: built.deferred,
     kept: readout.kept,
     usable: readout.usable.length,
   };

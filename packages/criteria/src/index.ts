@@ -426,7 +426,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-52',
     statement:
-      "A run's dump says what its recall screened out as already held: run.md's recall section prints the pool, how many were set aside as already known by reason, demoted, collapsed and offered, and the chain it screened against, then each lesson set aside with what it matched and each lesson handed on with its origin; recall.json carries the whole record; and a recall that screened nothing prints as it always did.",
+      "A run's dump says what its recall screened out as already held, and what its goal budget left out: run.md's recall section prints the pool, how many were set aside as already known by reason, demoted, collapsed and offered, and the chain it screened against, then each lesson set aside with what it matched and each lesson handed on with its origin; how many candidates the goal budget left out of the curator's query is counted where the query is built and recorded on the run's recall and the memory orchestrator's recall step alike — zero when every one fit, when none was curated and on a record older than the count — and the recall line says it when any were; recall.json carries the whole record; and a recall that screened nothing and left nothing out prints as it always did.",
   },
   {
     id: 'QL-53',

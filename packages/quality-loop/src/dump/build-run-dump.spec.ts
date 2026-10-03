@@ -1,6 +1,7 @@
 import {
   recallOf,
   recallWithout,
+  withRecallDeferred,
   withRecallNovelty,
   type Overrun,
   type RecallNoveltyDto,
@@ -326,6 +327,31 @@ describe('buildRunDump', () => {
     );
     expect(unscreened).not.toContain('novelty:');
     expect(unscreened).not.toContain('· origin');
+  });
+
+  it("[QL-52] a recall whose goal budget left candidates out of the curator's query says how many on its line, and one that left none out says nothing of it", () => {
+    const lesson = {
+      ref: 'm1',
+      serves: 'the read path',
+      insight: 'Cache the read path before sharding it.',
+      caveat: null,
+      text: 'When reads dominate, cache before you shard.',
+      sourceRunId: 'earlier-quality',
+    };
+    const recall = withRecallDeferred(recallOf([lesson], 'recall-quality'), 3);
+    const dump = buildRunDump(record({ recall }), null);
+    expect(JSON.parse(content(dump, 'recall.json'))).toMatchObject({ deferred: 3 });
+    expect(content(dump, 'run.md')).toContain(
+      "recalled · 1 lesson(s) handed to the producer · recall run recall-quality · 3 candidate(s) left out of the curator's query for the goal budget\n",
+    );
+    const fitted = content(
+      buildRunDump(record({ recall: recallOf([lesson], 'recall-quality') }), null),
+      'run.md',
+    );
+    expect(fitted).toContain(
+      'recalled · 1 lesson(s) handed to the producer · recall run recall-quality\n',
+    );
+    expect(fitted).not.toContain('left out');
   });
 
   it("[QL-57] the manifest, the index row and the verdict give the best iteration's score, and a last one that fell short only beside it", async () => {

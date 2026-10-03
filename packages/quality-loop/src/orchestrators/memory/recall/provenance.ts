@@ -23,6 +23,7 @@ import {
   refIdsIn,
   refMentions,
   tokenWords,
+  withRecallDeferred,
   withRecallFocus,
   withRecallNovelty,
   type RecalledLessonDto,
@@ -181,16 +182,17 @@ export const lessonOf = (
 /**
  * The run's record of a recall: recalled with its lessons, or empty or
  * skipped with the reason — with the defects it searched for beside the
- * prompt, when it was focused on any, and what it screened out, when it
- * screened.
+ * prompt, when it was focused on any, what it screened out, when it
+ * screened, and how many hits the goal budget left out of the curator's
+ * query, when one was curated.
  */
 export function provenanceOf(
   recalled: Recalled,
   focus: RecallFocusDto | null = null,
 ): RunRecallDto {
-  return withRecallNovelty(
-    withRecallFocus(outcomeOf(recalled, focus), focus),
-    recalled.novelty ?? null,
+  return withRecallDeferred(
+    withRecallNovelty(withRecallFocus(outcomeOf(recalled, focus), focus), recalled.novelty ?? null),
+    recalled.status === 'complete' ? recalled.counts.deferred : 0,
   );
 }
 

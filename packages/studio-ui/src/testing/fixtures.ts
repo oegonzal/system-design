@@ -488,6 +488,7 @@ export function makeRecall(overrides: Partial<RunRecallDto> = {}): RunRecallDto 
     lessons,
     focus: null,
     novelty: null,
+    deferred: 0,
     ...overrides,
   };
 }

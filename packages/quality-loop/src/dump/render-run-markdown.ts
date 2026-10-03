@@ -150,12 +150,13 @@ function noveltyLines(novelty: RecallNoveltyDto | null): string[] {
 }
 
 /**
- * What the run recalled for its producer, and the lessons the producer saw —
- * the curator's words as the producer read them (a part named only by labels
- * that stand for nothing here is left unsaid), each with the run, iteration
- * and decision it was learned in and, when the recall screened what the
- * producer held, where it was learned. Nothing when the run did not ask to
- * recall.
+ * What the run recalled for its producer — and how many candidates the goal
+ * budget left out of the curator's query, when any were — and the lessons the
+ * producer saw: the curator's words as the producer read them (a part named
+ * only by labels that stand for nothing here is left unsaid), each with the
+ * run, iteration and decision it was learned in and, when the recall screened
+ * what the producer held, where it was learned. Nothing when the run did not
+ * ask to recall.
  */
 function recallSection(record: RunRecord): string[] {
   const { recall } = record;
@@ -163,13 +164,17 @@ function recallSection(record: RunRecord): string[] {
   const why =
     recall.reason === null ? '' : ` (${recall.reason}${recall.note ? `: ${recall.note}` : ''})`;
   const from = recall.recallRunId === null ? '' : ` · recall run ${recall.recallRunId}`;
+  const deferred =
+    recall.deferred > 0
+      ? ` · ${recall.deferred} candidate(s) left out of the curator's query for the goal budget`
+      : '';
   const originOf = new Map(
     (recall.novelty?.origins ?? []).map((origin) => [origin.ref, origin.origin]),
   );
   return [
     `## Recall`,
     ``,
-    `${recall.status}${why} · ${recall.count} lesson(s) handed to the producer${from}`,
+    `${recall.status}${why} · ${recall.count} lesson(s) handed to the producer${from}${deferred}`,
     ``,
     ...noveltyLines(recall.novelty),
     ...recall.lessons.map((lesson) => {

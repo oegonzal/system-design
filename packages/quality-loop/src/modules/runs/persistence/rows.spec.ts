@@ -2,6 +2,7 @@ import {
   recallInProgress,
   recallOf,
   recallWithout,
+  withRecallDeferred,
   withRecallNovelty,
   type RecallNoveltyDto,
 } from '@sysdesign/contracts';
@@ -268,6 +269,16 @@ describe('the run rows', () => {
     const { novelty: _dropped, ...older } = rows.run.recall ?? recallWithout('store-empty');
     const legacy = { ...rows, run: { ...rows.run, recall: older as typeof rows.run.recall } };
     expect(roundtrip(legacy).recall?.novelty).toBeNull();
+  });
+
+  it("[QL-52] how many a recall's goal budget left out round-trips; a row recorded before the count reads as one that left none out", () => {
+    const recall = withRecallDeferred(recallWithout('no-usable-memory', null, 'r'), 4);
+    expect(roundtrip(toRows(fullRecord({ recall }))).recall).toEqual(recall);
+
+    const rows = toRows(fullRecord({ recall: recallWithout('store-empty') }));
+    const { deferred: _dropped, ...older } = rows.run.recall ?? recallWithout('store-empty');
+    const legacy = { ...rows, run: { ...rows.run, recall: older as typeof rows.run.recall } };
+    expect(roundtrip(legacy).recall?.deferred).toBe(0);
   });
 
   it('[QL-32] the run a run was opened for round-trips and is on its list row; a row from before the column reads as none', () => {

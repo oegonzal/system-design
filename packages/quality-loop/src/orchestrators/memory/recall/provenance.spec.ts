@@ -143,13 +143,52 @@ describe('a recalled lesson in the asker’s terms', () => {
         status: 'complete',
         reason: null,
         runId: 'recall-run',
-        counts: { probes: 1, candidates: 1, kept: 1, usable: 1 },
+        counts: { probes: 1, candidates: 1, deferred: 0, kept: 1, usable: 1 },
         usable: [usable],
       },
       FOCUS,
     );
     expect(recorded.lessons).toEqual([lesson]);
     expect(recorded.focus).toEqual(FOCUS);
+  });
+
+  it("[QL-52] records how many hits the goal budget left out of the curator's query, and none where no query was curated", () => {
+    const usable: UsableMemory = {
+      alias: 'm1',
+      hit: hitOf('Own the store.', 'run-a', 'memory.1'),
+      kept: { chunk: 'm1', serves: 'the read path', insight: 'Own the store.', caveat: null },
+      support: 1,
+      rubric: RUBRIC,
+    };
+    const counts = { probes: 1, candidates: 13, deferred: 3, kept: 1, usable: 1 };
+    const recalled = provenanceOf({
+      status: 'complete',
+      reason: null,
+      runId: 'recall-run',
+      counts,
+      usable: [usable],
+    });
+    expect(recalled).toMatchObject({ status: 'recalled', count: 1, deferred: 3 });
+    // Curated and endorsed nothing: what was left out still counts.
+    expect(
+      provenanceOf({
+        status: 'complete',
+        reason: 'no-usable-memory',
+        runId: 'recall-run',
+        counts: { ...counts, usable: 0 },
+        usable: [],
+      }),
+    ).toMatchObject({ status: 'empty', deferred: 3 });
+    // Never curated: nothing was offered, so nothing was left out.
+    expect(provenanceOf({ status: 'skipped', reason: 'store-empty', note: null }).deferred).toBe(0);
+    expect(
+      provenanceOf({
+        status: 'failed',
+        reason: 'query-refused',
+        note: 'candidates[0].source.decision: Invalid option',
+        runId: null,
+      }).deferred,
+    ).toBe(0);
   });
 
   it('[QL-55] a lesson whose words named only labels that stand for nothing serves nothing the producer is told', () => {

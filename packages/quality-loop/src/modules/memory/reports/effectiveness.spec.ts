@@ -50,6 +50,7 @@ const coachRun = (overrides: Partial<RecallFocusDto> = {}): QualityRunDto => {
       recallRunId: 'recall-run',
       count: 1,
       novelty: null,
+      deferred: 0,
       lessons: [
         {
           ref: 'm1',

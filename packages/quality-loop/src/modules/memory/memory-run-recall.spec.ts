@@ -185,6 +185,7 @@ describe("the memory module's recall for a run's producer", () => {
       lessons: [],
       focus: null,
       novelty: null,
+      deferred: 0,
     });
     expect(
       await recallWith({

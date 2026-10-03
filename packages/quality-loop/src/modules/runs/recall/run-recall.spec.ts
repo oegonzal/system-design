@@ -290,6 +290,7 @@ describe('a run that recalls lessons for its producer', () => {
       lessons: [],
       focus: null,
       novelty: null,
+      deferred: 0,
     };
 
     // A supplied artifact judged once: iteration 1 takes it as provided, and
@@ -340,6 +341,7 @@ describe('a run that recalls lessons for its producer', () => {
         lessons: [],
         focus: null,
         novelty: null,
+        deferred: 0,
       });
       const producer = promptsOf(runId).find((prompt) => prompt.scope === 'producer');
       expect(producer?.user).not.toContain(MEMORIES_HEADING);
@@ -471,6 +473,7 @@ describe('a process that composes runs without memory', () => {
         lessons: [],
         focus: null,
         novelty: null,
+        deferred: 0,
       });
       // No recall run was opened, and the producer was briefed with nothing.
       const page = await getJson<Page<QualityRunSummaryDto>>(

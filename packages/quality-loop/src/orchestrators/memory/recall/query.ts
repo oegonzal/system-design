@@ -114,9 +114,12 @@ export function probesOf(vectors: readonly (readonly number[])[], limit: number)
  */
 export const probeOf = (listIndex: number): number => Math.floor(listIndex / VECTOR_NAMES.length);
 
-/** The query, or every way the composed one missed the curator's schema — a diagnostic, never a throw. */
+/**
+ * The query, with how many hits the goal budget left out of it — or every way
+ * the composed one missed the curator's schema: a diagnostic, never a throw.
+ */
 export type BuiltQuery =
-  { query: MemoryQuery; issues: [] } | { query: null; issues: SchemaIssue[] };
+  { query: MemoryQuery; issues: []; deferred: number } | { query: null; issues: SchemaIssue[] };
 
 const QUERY_BOUNDS = modelSchema(memoryQuerySchema).bounds;
 
@@ -130,8 +133,9 @@ const QUERY_BOUNDS = modelSchema(memoryQuerySchema).bounds;
  * only beside something already in hand, so a recall with nothing known
  * composes the query it always did. The candidates are offered in rank order
  * as many as fit the goal budget, each whole however long the store kept it,
- * so a miss is a structural fault — reported, in the one wording, rather
- * than thrown.
+ * and how many it left out is counted (`deferred`, 0 when every one fit), so
+ * a miss is a structural fault — reported, in the one wording, rather than
+ * thrown.
  */
 export function buildQuery(
   query: string,
@@ -154,5 +158,10 @@ export function buildQuery(
     })),
   };
   const parsed = parseLenient(memoryQuerySchema, withinBudget(composed), QUERY_BOUNDS);
-  return parsed.ok ? { query: parsed.value, issues: [] } : { query: null, issues: parsed.issues };
+  if (!parsed.ok) return { query: null, issues: parsed.issues };
+  return {
+    query: parsed.value,
+    issues: [],
+    deferred: composed.candidates.length - parsed.value.candidates.length,
+  };
 }

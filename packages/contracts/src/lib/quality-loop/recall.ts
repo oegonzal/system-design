@@ -234,6 +234,13 @@ export interface RunRecallDto extends RunRecallSummaryDto {
    * when it screened nothing, and on every record older than the screen.
    */
   novelty: RecallNoveltyDto | null;
+  /**
+   * How many hits the goal budget left out of the curator's query — the
+   * best-ranked are offered whole, as many as fit — so a lesson set aside for
+   * room is counted, never silent. 0 when every hit fit, when no query was
+   * composed, and on every record older than the count.
+   */
+  deferred: number;
 }
 
 /** The recall a run records as it opens, before anything is known. */
@@ -246,6 +253,7 @@ export const recallInProgress = (): RunRecallDto => ({
   lessons: [],
   focus: null,
   novelty: null,
+  deferred: 0,
 });
 
 /** A recall that handed the producer nothing, its status read from the reason. */
@@ -262,6 +270,7 @@ export const recallWithout = (
   lessons: [],
   focus: null,
   novelty: null,
+  deferred: 0,
 });
 
 /**
@@ -291,6 +300,7 @@ export const recallOf = (
   lessons: [...lessons],
   focus: null,
   novelty: null,
+  deferred: 0,
 });
 
 /** A recall's record with the defects it searched for beside its prompt. */
@@ -304,6 +314,12 @@ export const withRecallNovelty = (
   recall: RunRecallDto,
   novelty: RecallNoveltyDto | null,
 ): RunRecallDto => ({ ...recall, novelty });
+
+/** A recall's record with how many hits the goal budget left out of the curator's query. */
+export const withRecallDeferred = (recall: RunRecallDto, deferred: number): RunRecallDto => ({
+  ...recall,
+  deferred,
+});
 
 /** The list row's view of a recall, picked field by field: everything but the lessons. */
 export const recallSummary = (recall: RunRecallDto): RunRecallSummaryDto => ({

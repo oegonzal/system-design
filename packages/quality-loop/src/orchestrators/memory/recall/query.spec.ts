@@ -16,16 +16,18 @@ import {
 import { builtQuery, fused, GOAL as PROMPT, hitOf } from '../testing';
 import { buildQuery, probeSet, probesOf, probeTexts, queryText, searchAlias } from './query';
 
+/** One more ranked lesson of this length than the curator is offered, best first. */
+const hitsOf = (length: number) =>
+  fused(
+    Array.from({ length: MAX_CANDIDATES + 1 }, (_, index) =>
+      hitOf('y'.repeat(length), `run-${index}`, 'memory.1'),
+    ),
+  );
+
 describe('the recall query', () => {
   it('[QL-16] is the goal head under the byte cap, and offers as many of the best-ranked lessons as the goal budget holds — every one when they are the length a digest asks for', () => {
     const long = 'x'.repeat(70_000);
     expect(Buffer.byteLength(queryText(long))).toBeLessThanOrEqual(QUERY_MAX_BYTES);
-    const hitsOf = (length: number) =>
-      fused(
-        Array.from({ length: MAX_CANDIDATES + 1 }, (_, index) =>
-          hitOf('y'.repeat(length), `run-${index}`, 'memory.1'),
-        ),
-      );
 
     const asked = builtQuery(
       queryText(long),
@@ -46,6 +48,21 @@ describe('the recall query', () => {
       Array.from({ length: longest.candidates.length }, (_, index) => `run-${index}`),
     );
     expect(goalBytes(renderQuery(longest))).toBeLessThanOrEqual(GOAL_MAX_BYTES);
+  });
+
+  it('[QL-16] [QL-52] counts the lessons the goal budget left out of the query, and none when every one fit', () => {
+    const built = (length: number) => {
+      const query = buildQuery(queryText(PROMPT), probeSet(PROMPT, []), hitsOf(length));
+      if (query.query === null) throw new Error('the sample query does not compose');
+      return query;
+    };
+    const asked = built(LESSON_CHUNK_BOUND.target);
+    expect(asked.query.candidates).toHaveLength(MAX_CANDIDATES);
+    expect(asked.deferred).toBe(0);
+
+    const longest = built(keptAtMost(LESSON_CHUNK_BOUND));
+    expect(longest.deferred).toBeGreaterThan(0);
+    expect(longest.query.candidates.length + longest.deferred).toBe(MAX_CANDIDATES);
   });
 
   it('[QL-58] the longest lesson the store holds is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {

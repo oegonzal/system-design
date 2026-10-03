@@ -1594,5 +1594,9 @@ The goal head is 8,000 bytes (the recorded queries used at most 5,954).
 Sixteen lessons that long cannot fit the 64,000-byte goal budget, so
 `buildQuery` offers the best-ranked candidates that fit (`withinBudget`): with
 every other field at its longest, one candidate at the longest stored lesson
-always fits and sixteen at the length a digest is asked for all do. A query is
-refused (`query-refused`) only for a structural fault.
+always fits and sixteen at the length a digest is asked for all do. What it
+left out is never silent: `buildQuery` counts it (`deferred`), the run's
+recall record (`RunRecallDto.deferred`) and the memory orchestrator's recall
+step (`counts.deferred`) carry the count, zero when every candidate fit, and
+run.md's recall line says how many when any were. A query is refused
+(`query-refused`) only for a structural fault.
