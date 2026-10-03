@@ -205,6 +205,64 @@ The practice workspace's **Export** button downloads a single `.zip` with
 `narrative.md`, `brief.md`, `feedback.md`, and `revisions.md` — a copy of a
 run that lives outside the database entirely.
 
+## A browser session the loop decides for
+
+`packages/browser-session` drives a headed Chrome through a **markdown goal**
+— a mission, its unit of work, the procedure per unit, an answering policy,
+stop conditions and never-do rules — and decides nothing itself. Each page is
+a `browser-step` run that returns a bounded plan; each form page is a
+`form-memory` orchestration that recalls facts about you from the memory
+store without a model call and runs `field-answer` over them; a field the
+loop could not settle is put to you at the terminal, and what you answer is
+taught back as a `guidance` document when the unit of work ends. The
+LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`;
+the same program runs any goal.
+
+Prerequisites: Postgres and the loop (`pnpm stack:db && pnpm db:migrate`,
+then `pnpm quality-loop:serve` or the stack), Google Chrome installed, and a
+signed-in profile:
+
+```bash
+pnpm browser-session login --profile linkedin --url https://www.linkedin.com/login
+# Chrome opens on a persistent profile under static/browser-profiles/linkedin;
+# sign in yourself, then press Enter in the terminal. Cookies persist there.
+pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-apply.md \
+  --profile linkedin --headed --max-tasks 5 --max-minutes 90
+pnpm browser-session sessions            # what ran, how it ended
+pnpm browser-session show <sessionId>    # units of work and every decision, by loop run id
+```
+
+When a field needs you, the field is outlined in Chrome and the terminal
+shows the question, the loop's suggested value and why it was not trusted.
+Type the answer, or fill the field in the browser and press Enter and the
+value is read back; `/blank` leaves it empty, `/stop` ends the session. A
+session's trace — each step's observation, snapshot, screenshot and plan —
+lands under `static/sessions/<id>/`, indexed like a run dump. The rows are
+`browser_session`, `browser_task` and `browser_decision`.
+
+Never commit `static/browser-profiles/`: it holds the signed-in cookies. It
+is gitignored, as are the traces and the ingest manifest.
+
+Before any of this is useful, give the store facts about you:
+
+```bash
+pnpm memory-ingest ingest Resume_a2.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
+pnpm memory-ingest ingest Resume_a2.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
+pnpm memory-ingest status                                                                # how each chunk's digest went
+```
+
+Each chunk is one `document-memory` orchestration: a `document-digest` run
+turns the chunk into facts a form field could take, with grounding critics
+in front of the store, and the manifest at `static/memory-ingest/manifest.json`
+skips what was already ingested unless `--force`. Reading it back:
+`POST :3003/memory/retrieval-report {"goal": "How many years of TypeScript?"}`
+should rank the fact first.
+
+A measured note: a plan costs four model calls and an answer page four more,
+about 45 s each on the subscription login, so one application with three
+form pages is roughly ten to twenty minutes of model time plus whatever you
+type. Operator answers are cached for the session by field label.
+
 ## Tests never touch your runs
 
 Every suite that touches Postgres — `nx test studio-api`, `quality-loop` and

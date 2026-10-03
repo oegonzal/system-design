@@ -100,6 +100,9 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer    |
 | `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                   |
 | `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub           |
+| `packages/loop-client`     | The quality loop as one shared port: HTTP adapter, transport-agnostic errors, honest run awaiting |
+| `packages/browser-session` | Playwright session driven by a markdown goal; every click, answer and stop is a quality-loop run  |
+| `packages/memory-ingest`   | Your documents chunked and handed to the loop, which digests them into facts in the memory store  |
 | `packages/studio-ui`       | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository              |
 | `packages/storybook`       | Catalog host globbing sibling stories                                                             |
 | `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey, against a stub quality loop       |
