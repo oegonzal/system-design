@@ -1,5 +1,5 @@
 import type { MemoryContextDto, QualityRunDto, RunTrace } from '@sysdesign/contracts';
-import { renderDocumentGoal, resumeChunk } from '@sysdesign/contracts';
+import { DOCUMENT_MEMORY_KINDS, renderDocumentGoal, resumeChunk } from '@sysdesign/contracts';
 import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
@@ -11,12 +11,13 @@ import {
 } from '../../modules/memory/testing';
 import { sampleDocumentDigest } from '../../pipelines/document-digest/testing';
 import { CachedEmbeddings } from '../memory/embeddings';
+import { chunkKind, DEFAULT_CHUNK_KIND } from '../memory/store/chunks';
 import type { MemoryPorts } from '../memory/ports';
 import { childRun, memoryContext, memoryPorts } from '../memory/steps.testing';
 import { faulting, passed, readoutTrace } from '../memory/testing';
 import { fakeStepContext } from '../runner/testing';
 import type { DocumentMemoryPorts } from './ports';
-import { digest, store, type DocumentMemoryOutputs } from './steps';
+import { digest, store, type DocumentMemoryOutputs, DOCUMENT_MEMORY_OWNED } from './steps';
 
 const GOAL = renderDocumentGoal(resumeChunk());
 const ACCEPT_AT = 75;
@@ -31,7 +32,9 @@ const digestTrace = (
     goal: GOAL,
     artifact: sampleDocumentDigest(),
     locations: ['summary', 'memory.1', 'memory.2', 'section.3'],
-    criteria: [{ id: 'c1', kind: 'fact', statement: 'captures the Acme role in section.2' }],
+    criteria: [
+      { id: 'c1', kind: 'profile_fact', statement: 'captures the Acme role in section.2' },
+    ],
     results: [passed('c1', 'fact', ['memory.1'])],
     decision,
     ...overrides,
@@ -77,6 +80,22 @@ const child = (trace: RunTrace | null, failed = false): RunRecord =>
   childRun('document-digest', trace, failed);
 
 describe('the document-memory steps', () => {
+  it('[QL-40] files a stray under the lesson this writer already wrote, through the list the step actually passes', () => {
+    // The ORDER of DOCUMENT_MEMORY_OWNED is behaviour, not presentation: the
+    // first kind is where a memory declaring one this writer does not own gets
+    // filed. Sorting the list keeps it non-empty and keeps `written ⊆ owned`
+    // true, so neither the type nor a case that builds its own literal can
+    // object — this asserts through the constant the step passes, so a tidy-up
+    // that reorders it fails here instead of silently moving every future stray.
+    expect(chunkKind('pattern', DOCUMENT_MEMORY_OWNED)).toBe(DEFAULT_CHUNK_KIND);
+    expect(chunkKind(undefined, DOCUMENT_MEMORY_OWNED)).toBe(DEFAULT_CHUNK_KIND);
+    // And it owns every kind the digest may declare, so none of them orphans.
+    for (const kind of DOCUMENT_MEMORY_KINDS) {
+      expect(DOCUMENT_MEMORY_OWNED).toContain(kind);
+      expect(chunkKind(kind, DOCUMENT_MEMORY_OWNED)).toBe(kind);
+    }
+  });
+
   it('[QL-40] digest runs the pipeline over the chunk with the request’s budget, reports the document, and hands the run on as its own source', async () => {
     const accepted = ctx(child(digestTrace()));
     const digested = await digest(accepted);
@@ -208,7 +227,9 @@ describe('the document-memory steps', () => {
     for (const point of points) {
       expect(point.source).toMatchObject({
         pipeline: 'document-digest',
-        kind: 'lesson',
+        // The kind the digest declared for the item, not a fixed one: a probe
+        // narrowing to facts must not also return a story or a boundary.
+        kind: 'profile_fact',
         decision: 'accept',
         iteration: 1,
       });

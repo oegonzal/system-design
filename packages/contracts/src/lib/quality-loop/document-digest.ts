@@ -25,6 +25,32 @@ export const DOCUMENT_CONTEXT_MAX_LENGTH = 300;
 const RULE_MAX_LENGTH = 300;
 const MAX_RULES = 8;
 
+/**
+ * What a document memory is, so recall can ask for the shape a field needs
+ * rather than reading one flat register. A short input field wants a fact; an
+ * essay field wants the narrative a fact cannot carry; and a boundary on what
+ * the subject may claim is not an answer at all — retrieved as one it would
+ * fill a field with its own disclaimer, and left out it cannot stop an
+ * overstatement. These are a subset of the store's own chunk kinds, pinned by a
+ * spec, so a probe narrowing by kind reaches them. They are named apart from
+ * the knowledge kinds rather than merged with them: a writer owns a source
+ * run's points by kind, so two writers sharing one kind under one run would
+ * each erase the other's — and a probe for what is true of this person must
+ * not return an agent's engineering knowledge, which a shared `fact` would
+ * have conflated.
+ */
+export const DOCUMENT_MEMORY_KINDS = ['profile_fact', 'profile_story', 'claim_boundary'] as const;
+export type DocumentMemoryKind = (typeof DOCUMENT_MEMORY_KINDS)[number];
+
+/** What each kind is for, rendered into the goal so the producer chooses by it. */
+export const DOCUMENT_MEMORY_KIND_USES: Readonly<Record<DocumentMemoryKind, string>> = {
+  profile_fact: 'one thing true of the subject that a field could take or compute from',
+  profile_story:
+    'a course of events the subject was part of, kept whole, for a field asking them to describe or recount one',
+  claim_boundary:
+    'a bound on what the subject may claim, for a field a careless answer would overstate',
+};
+
 /** Engine-assigned: the part's position, never anything the model wrote. */
 export const sectionAlias = (position: number): string => `section.${position + 1}`;
 export const SECTION_ALIAS = /^section\.\d+$/;
@@ -56,6 +82,7 @@ export const DOCUMENT_RULES: readonly string[] = [
   'A memory states one fact the cited sections state about the subject, and nothing they do not.',
   'An insight is a complete statement a form field could take or compute from: absolute dates and figures, names as the document spells them, the subject named.',
   'An appliesWhen names the situation a form puts the applicant in — the field or question that calls for the fact.',
+  "Where a cited section qualifies a claim — reported rather than audited, a design, a learning exercise or a planned project, an interpretation — the insight carries that qualifier in the section's own words; a section that states a fact plainly needs none.",
 ];
 
 export const documentIndexSchema = z.strictObject({
@@ -120,6 +147,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     '## Limits',
     '',
     `- Propose at most ${chunk.maxMemories} memories, each resting on one to four of the listed sections.`,
+    `- Give each memory a kind: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`,
     '- A section may support several memories; list every section no memory rests on under unused.',
     '- Validators check these limits; they are not criteria.',
     '',

@@ -83,7 +83,7 @@ describe('the memory-recall input codec', () => {
     expect(plain).not.toContain('origin');
   });
 
-  it('[QL-41] a program writes every field, so every bound is exact — and a candidate admits the longest lesson the store holds, a probe the longest a read of the deriver keeps', () => {
+  it('[QL-58] a program writes every field, so every bound is exact — and a candidate admits the longest lesson the store holds, a probe the longest a read of the deriver keeps', () => {
     for (const [path, declared] of Object.entries(modelSchema(memoryQuerySchema).bounds)) {
       expect(declared.ceiling, path).toBe(declared.target);
     }

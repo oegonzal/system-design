@@ -391,32 +391,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-40',
     statement:
-      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
-  },
-  {
-    id: 'QL-41',
-    statement:
-      'Every string and list a model writes into is one declared bound — a target the model is asked for and a ceiling the schema accepts — and a size limit never discards work: a reply a little over is kept whole and recorded, an extreme overrun is cut at a word boundary with a visible marker, a list over is trimmed by whole items, and only a structural fault refuses the reply, with every fault named in one wording.',
-  },
-  {
-    id: 'QL-42',
-    statement:
-      "The model seam never loses a reply to its own reading: the model is shown every bound at its target and the reply is read to the ceilings through the salvage ladder, so a soft overrun is kept and recorded on the attempt it arrived in and never costs another; a reply refused for a structural fault is asked again with every fault named in the one wording and, when it is small enough, the reply as written; a turn that ended without a result — our limit, the provider's error, a broken pipe — is still read from what it streamed and answers when that holds the whole object, with what ended it on the record; the API calls a turn took are counted; a caller that asks in detail sees the faults of the last refused reply or the overruns of the value; and a run's wire summary counts what each call kept.",
-  },
-  {
-    id: 'QL-43',
-    statement:
-      "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",
-  },
-  {
-    id: 'QL-44',
-    statement:
-      "A run whose only judged evidence is an iteration it adopted is not digested — its ledger is a copy an earlier run's digest already read — and the memory step skips it as nothing new, naming the run it adopted from; a run that judged an iteration of its own is digested, with a finding seen only in an adopted iteration left out and counted unless this run judged a change in it, which keeps it marked as adopted from an earlier run so a memory rests on the change and never on the copied finding.",
-  },
-  {
-    id: 'QL-45',
-    statement:
-      "A lost attempt costs one attempt, never a run: a produce that answers nothing is still decided on the record — no artifact, so it escalates — and spends its iteration, and the loop asks again in the same mode from the same best, its remediations unchanged and every fault the schema refused the reply for named under its own heading; the iteration takes no crown from an artifact and counts toward no plateau; the run stops as produce-lost only when it has lost more produce calls than its policy declares, or has no iteration left to ask in; and the run's final decision is the last one made on an artifact.",
+      "A document chunk — a résumé page, a notes file, or the operator's answers from one session — renders as aliased sections and digests into facts in the store's own item shape, each resting on the sections that state it; a section may back several memories; a qualifier its sections put on a claim is carried into the insight and graded as a rule; a finding withholds the facts it names by a declared table, so one saying a fact is wrong withholds every fact it names while one faulting a true fact for its wording withholds none; the digest run is its own source, stamped with its pipeline; and evidence of kind section stays visible to search.",
   },
   {
     id: 'QL-46',
@@ -477,6 +452,31 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'QL-57',
     statement:
       "A run's dump headlines the iteration the run stands on: the manifest's and the index row's overall are the best iteration's score, and run.md's verdict line gives the best iteration's overall beside its number, with the last iteration's score in a clause of its own only when the last is not the best — so a run whose last attempt fell short or produced nothing never reads as scoring what that attempt scored.",
+  },
+  {
+    id: 'QL-58',
+    statement:
+      'Every string and list a model writes into is one declared bound — a target the model is asked for and a ceiling the schema accepts — and a size limit never discards work: a reply a little over is kept whole and recorded, an extreme overrun is cut at a word boundary with a visible marker, a list over is trimmed by whole items, and only a structural fault refuses the reply, with every fault named in one wording.',
+  },
+  {
+    id: 'QL-59',
+    statement:
+      "The model seam never loses a reply to its own reading: the model is shown every bound at its target and the reply is read to the ceilings through the salvage ladder, so a soft overrun is kept and recorded on the attempt it arrived in and never costs another; a reply refused for a structural fault is asked again with every fault named in the one wording and, when it is small enough, the reply as written; a turn that ended without a result — our limit, the provider's error, a broken pipe — is still read from what it streamed and answers when that holds the whole object, with what ended it on the record; the API calls a turn took are counted; a caller that asks in detail sees the faults of the last refused reply or the overruns of the value; and a run's wire summary counts what each call kept.",
+  },
+  {
+    id: 'QL-60',
+    statement:
+      "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",
+  },
+  {
+    id: 'QL-61',
+    statement:
+      "A run whose only judged evidence is an iteration it adopted is not digested — its ledger is a copy an earlier run's digest already read — and the memory step skips it as nothing new, naming the run it adopted from; a run that judged an iteration of its own is digested, with a finding seen only in an adopted iteration left out and counted unless this run judged a change in it, which keeps it marked as adopted from an earlier run so a memory rests on the change and never on the copied finding.",
+  },
+  {
+    id: 'QL-62',
+    statement:
+      "A lost attempt costs one attempt, never a run: a produce that answers nothing is still decided on the record — no artifact, so it escalates — and spends its iteration, and the loop asks again in the same mode from the same best, its remediations unchanged and every fault the schema refused the reply for named under its own heading; the iteration takes no crown from an artifact and counts toward no plateau; the run stops as produce-lost only when it has lost more produce calls than its policy declares, or has no iteration left to ask in; and the run's final decision is the last one made on an artifact.",
   },
   // Quality-loop web client (packages/quality-loop-ui)
   {
@@ -754,6 +754,31 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       'The package names no site: the mission, its units of work, its procedure, its stop conditions and its answering policy live in a markdown goal, and the same program runs any goal.',
   },
+  {
+    id: 'QL-41',
+    statement:
+      "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",
+  },
+  {
+    id: 'QL-42',
+    statement:
+      "A finished run is digested into typed knowledge written against what the store already holds: an item is a fact, an anti-pattern, a pattern or a procedure; its dimension is one its own cited evidence lands on under the source pipeline's policy; a procedure rests on a finding the engine recorded as resolved and a pattern on a criterion that held throughout; an item that borrows a listed alias, an iteration or a place of this run's artifact is faulted at that item before any lens reads it; and an item that teaches what a known item teaches confirms it by alias instead of being written again.",
+  },
+  {
+    id: 'QL-43',
+    statement:
+      "The knowledge orchestrator learns from a finished run: it asks the store what it already knows using the run's own evidence as the query and no model call, digests the run against what came back, and stores the result — never reading the run's own points as known, never re-digesting memory a run was handed, and never letting a store it cannot search stop it learning.",
+  },
+  {
+    id: 'QL-44',
+    statement:
+      'An item whose evidence supports one already stored reinforces it instead of being stored again: the claim is a row keyed by (point, source run) pinned to the text it was made about, the count a search reads is derived from those rows, and digesting one run twice leaves the points, the rows and the counts as they were.',
+  },
+  {
+    id: 'QL-45',
+    statement:
+      "Two read-only reports answer what the memory tier could not say about itself: for every run that recalled, what became of each defect the recall searched for, read from the engine's own transitions and attributed at run level because the curator's words are prose; and for every brief, the needs no recall could serve, kept against the brief taken bare so the same prompt groups once.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',
@@ -763,6 +788,6 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'ING-2',
     statement:
-      'Documents are read through a declared table of readers by extension — PDF text page by page, markdown and plain text verbatim — and an extension the table does not name is refused by name, never guessed.',
+      "Documents are read through a declared table of readers by extension — PDF text from the page's own geometry, markdown and plain text verbatim, JSON Lines one record per titled section through a declared field map — and an extension the table does not name, or a record the map cannot read, is refused by name, never guessed and never skipped.",
   },
 ] as const;

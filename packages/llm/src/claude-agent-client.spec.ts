@@ -80,7 +80,7 @@ describe('extractStructured', () => {
     expect(extractStructured(text, capped)).toEqual({ items: [{ note: 'kept' }] });
   });
 
-  it('[QL-42] keeps a string past its bound whole and records it, and cuts only an extreme one — at a word, with the marker', () => {
+  it('[QL-59] keeps a string past its bound whole and records it, and cuts only an extreme one — at a word, with the marker', () => {
     // A bound is a target and a ceiling: 200 asked, 250 accepted, 600 the cut.
     const capped = z.object({ summary: bounded.text(bound(200)) });
     const words = (count: number) => 'word '.repeat(count).trim();
@@ -136,7 +136,7 @@ describe('extractStructured', () => {
       expect(once.reason).toBe('score: Invalid input: expected number, received undefined');
   });
 
-  it('[QL-42] refuses a structural fault with every fault named, the soft ones noted, not refused', () => {
+  it('[QL-59] refuses a structural fault with every fault named, the soft ones noted, not refused', () => {
     const capped = z.strictObject({
       summary: bounded.text(bound(200)),
       kind: z.enum(['service', 'queue']),
@@ -242,7 +242,7 @@ const at = (value: unknown, path: readonly (string | number)[]): unknown =>
 
 describe('the recorded coach losses, replayed', () => {
   it.each(RECORDED_COACH_LOSSES)(
-    '[QL-42] %s, refused whole before, now parses with every overrun recorded and nothing cut',
+    '[QL-59] %s, refused whole before, now parses with every overrun recorded and nothing cut',
     (_, reply, overran) => {
       // Fenced, as the model wrote it.
       const text = ['```json', JSON.stringify(reply), '```'].join('\n');
@@ -309,7 +309,7 @@ describe('a call that failed once', () => {
     { type: 'result', subtype: 'error_during_execution', is_error: true, errors: [error] },
   ];
 
-  it("[QL-28] [QL-42] a schema miss is asked again at once, both attempts are on the record, and the second ask names the first's faults", async () => {
+  it("[QL-28] [QL-59] a schema miss is asked again at once, both attempts are on the record, and the second ask names the first's faults", async () => {
     const calls: LlmCall[] = [];
     const script = sequence([[succeeded(bad)], [succeeded(good)]]);
     const answered = await new ClaudeAgentLlmClient({ query: script.run })
@@ -330,7 +330,7 @@ describe('a call that failed once', () => {
     expect(calls[0]?.salvage?.issues).toMatchObject([{ path: 'answer', soft: false }]);
   });
 
-  it('[QL-42] the second ask carries a small reply as written, and not a 160k-character one', async () => {
+  it('[QL-59] the second ask carries a small reply as written, and not a 160k-character one', async () => {
     // A key the schema ignores carries the bulk: the one fault is the same either way.
     const huge = JSON.stringify({ answer: 42, pad: 'x'.repeat(160_000) });
     const script = sequence([[succeeded(huge)], [succeeded(good)]]);
@@ -355,7 +355,7 @@ describe('a call that failed once', () => {
     expect(silent.prompts[1]).toBe(silent.prompts[0]);
   });
 
-  it('[QL-42] a soft overrun is kept on the first attempt and recorded, and never costs another', async () => {
+  it('[QL-59] a soft overrun is kept on the first attempt and recorded, and never costs another', async () => {
     const bounded10 = z.object({ answer: bounded.text(bound(10)) });
     const calls: LlmCall[] = [];
     const script = sequence([[succeeded('{"answer":"fourteen chars"}')]]);
@@ -382,7 +382,7 @@ describe('a call that failed once', () => {
     expect(calls[0]?.schema).toMatchObject({ properties: { answer: { maxLength: 10 } } });
   });
 
-  it('[QL-42] a list past its ceiling is trimmed by whole items, and the record says what was dropped', async () => {
+  it('[QL-59] a list past its ceiling is trimmed by whole items, and the record says what was dropped', async () => {
     // Two asked, four accepted (the floor); six written.
     const listed = z.object({ items: bounded.list(bound(2, 'list'), z.string()) });
     const calls: LlmCall[] = [];
@@ -408,7 +408,7 @@ describe('a call that failed once', () => {
     });
   });
 
-  it('[QL-42] the detailed call reports the faults of the last refused reply, and every ask after the first carries feedback', async () => {
+  it('[QL-59] the detailed call reports the faults of the last refused reply, and every ask after the first carries feedback', async () => {
     const calls: LlmCall[] = [];
     const script = sequence([[succeeded(bad)]]);
     const reply = await new ClaudeAgentLlmClient({
@@ -741,7 +741,7 @@ describe('the subscription client reads the whole turn', () => {
     });
   });
 
-  it('[QL-42] counts the API calls a turn took: one per message id, however many blocks each streamed', async () => {
+  it('[QL-59] counts the API calls a turn took: one per message id, however many blocks each streamed', async () => {
     const calls: LlmCall[] = [];
     const record = (call: LlmCall) => calls.push(call);
     // Two blocks of one call share a message id; a resume is a second call.
@@ -767,7 +767,7 @@ describe('the subscription client reads the whole turn', () => {
     expect(calls[1]?.apiCalls).toBe(1);
   });
 
-  it('[QL-42] a turn that ended without a result is still read, and answers when its transcript holds the whole object', async () => {
+  it('[QL-59] a turn that ended without a result is still read, and answers when its transcript holds the whole object', async () => {
     const calls: LlmCall[] = [];
     const record = (call: LlmCall) => calls.push(call);
     // The CLI wrote the object, then the turn ended on an error result.
@@ -908,7 +908,7 @@ describe('the subscription client under its time limit', () => {
     expect(recorded[0]?.error?.message).toContain('process aborted by user');
   });
 
-  it('[QL-42] a turn our limit ended answers ok, salvaged, when what it streamed holds the whole object', async () => {
+  it('[QL-59] a turn our limit ended answers ok, salvaged, when what it streamed holds the whole object', async () => {
     // The object arrives, then the stream hangs until the abort kills it.
     const spoke = ((params: { options?: { abortController?: AbortController } }) => {
       const signal = params.options?.abortController?.signal;

@@ -61,9 +61,10 @@ const isCallerCap = (declared: DeclaredBound): boolean =>
  * Every size a schema shows the model, by path: each bound declared through
  * `bounded`, and a raw `.max` a schema not yet declared through it still
  * carries — read as a bound with no tolerance, which is how the salvage
- * reads it too (a text past it is kept, a list past it trimmed).
+ * reads it too (a text past it is kept, a list past it trimmed). What
+ * `boundsAgainstMeasured` holds, and what a spec exempts by path.
  */
-function declaredSizes(schema: ZodType): Record<BoundPath, DeclaredBound> {
+export function declaredSizes(schema: ZodType): Record<BoundPath, DeclaredBound> {
   const { json, bounds } = modelSchema(schema);
   const sizes: Record<BoundPath, DeclaredBound> = {};
   walkJsonSchema(json, '', (node, path) => {

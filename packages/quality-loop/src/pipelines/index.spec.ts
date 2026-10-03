@@ -15,6 +15,7 @@ describe('the pipeline registry', () => {
       'browser-step',
       'field-answer',
       'document-digest',
+      'knowledge-digest',
     ]);
     for (const definition of PIPELINES.values()) {
       expect(() => validatePipeline(definition)).not.toThrow();
@@ -22,7 +23,7 @@ describe('the pipeline registry', () => {
     }
   });
 
-  it('[QL-45] [QL-46] every pipeline declares what a lost sample and a lost produce cost: a sample scores without gating, one produce is asked again', () => {
+  it('[QL-62] [QL-46] every pipeline declares what a lost sample and a lost produce cost: a sample scores without gating, one produce is asked again', () => {
     for (const definition of PIPELINES.values()) {
       expect([definition.id, definition.policy.evidence.lostSample]).toEqual([
         definition.id,

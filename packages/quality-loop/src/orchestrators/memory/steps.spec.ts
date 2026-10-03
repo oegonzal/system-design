@@ -245,7 +245,7 @@ describe('the memory steps', () => {
     });
   });
 
-  it('[QL-44] digest skips a target whose only judged iteration it adopted, naming the run it adopted from, and digests one that judged its own revision', async () => {
+  it('[QL-61] digest skips a target whose only judged iteration it adopted, naming the run it adopted from, and digests one that judged its own revision', async () => {
     const run = sampleRun();
     const trace = run.trace;
     if (trace === null) throw new Error('the sample run carries a trace');

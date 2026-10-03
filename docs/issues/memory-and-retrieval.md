@@ -163,15 +163,14 @@ points.
 
 **Status** accepted · **Where** `qdrant/collection.ts`, `fromPayload`, `RetrievalProbeDto`
 
-**What.** `INDEXED_FIELDS` creates a keyword index per field but
-`searchMany` passes no filter; every payload carries `storedAt` and `keys`
-and nothing reads them back; `RetrievalProbeDto.found[].using` is `string`
-because `contracts` cannot import the module's `VECTOR_NAMES`. The lineage
-indexes — `lineage.judged.runId`, `lineage.adoptedFrom.runId`,
-`lineage.goalHash`, compared against the collection's `payload_schema` on
-every boot — were added for the coach recall's novelty screen, which reads
-`lineage` off the hits after fusion instead; they are unused until a
-filtered search needs them.
+**What.** Every payload carries `storedAt` and `keys` and nothing reads
+them back; `RetrievalProbeDto.found[].using` is `string` because `contracts`
+cannot import the module's `VECTOR_NAMES`. The lineage indexes —
+`lineage.judged.runId`, `lineage.adoptedFrom.runId`, `lineage.goalHash`,
+declared in `INDEXED_FIELDS` and asked for on every boot beside the facets'
+— were added for the coach recall's novelty screen, which reads `lineage`
+off the hits after fusion instead; no probe filters by them, so they are
+unused until a filtered search needs them.
 
 **Evidence.** memory-runs §11.
 

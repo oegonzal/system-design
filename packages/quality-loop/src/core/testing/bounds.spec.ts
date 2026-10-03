@@ -1,6 +1,15 @@
+import { bounded, boundsAgainstMeasured, exact } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
-import { allStages, CAP_HEADROOM, capsAgainstMeasured, seededCaps } from './bounds';
+import {
+  allStages,
+  CAP_HEADROOM,
+  capsAgainstMeasured,
+  seededCaps,
+  seededFields,
+  unseededFields,
+} from './bounds';
 
 const definition = {
   deriveCriteria: { maxTokens: 4_000 },
@@ -55,5 +64,23 @@ describe('capsAgainstMeasured', () => {
     expect(
       capsAgainstMeasured(definition, {}, { exempt: allStages(definition, 'no run recorded') }),
     ).toEqual([]);
+  });
+});
+
+describe('seeded field bounds', () => {
+  it('[QL-49] holds the paths a pipeline no run recorded can seed, every other declared bound exempt with its reason', () => {
+    const schema = z.strictObject({
+      summary: z.string().max(950),
+      notes: bounded.list(exact(4), z.string().max(300)),
+      items: z.array(z.strictObject({ insight: z.string().max(1000) })).max(12),
+    });
+    const seeds = { summary: 755, 'items[].insight': 862 };
+    const exempt = unseededFields(schema, seeds, 'no run recorded');
+    expect(Object.keys(exempt).sort()).toEqual(['items', 'notes', 'notes[]']);
+    expect(boundsAgainstMeasured(schema, seededFields(seeds), { exempt })).toEqual([]);
+    // A seed the schema has fallen to is a bound the model would meet.
+    expect(
+      boundsAgainstMeasured(schema, seededFields({ ...seeds, summary: 950 }), { exempt }),
+    ).toEqual(['summary: ceiling 950 ≤ measured max 950']);
   });
 });

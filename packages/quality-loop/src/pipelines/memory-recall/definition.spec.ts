@@ -94,7 +94,7 @@ describe('the memory-recall pipeline', () => {
     ).toEqual([]);
   });
 
-  it('[QL-41] the pack asks for each bound’s target and keeps a verdict a little past it whole', () => {
+  it('[QL-58] the pack asks for each bound’s target and keeps a verdict a little past it whole', () => {
     const { json, bounds } = modelSchema(memoryPackOutput.schema);
     expect(bounds['kept[].serves']).toMatchObject({ kind: 'text', target: 200 });
     expect(JSON.stringify(json)).toContain('"maxLength":200');

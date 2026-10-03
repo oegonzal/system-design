@@ -52,7 +52,7 @@ const memoryRun = (digestRunId: string, targetRunId: string): OrchestrationRunDt
 };
 
 describe('the memory service’s re-index', () => {
-  it('[QL-43] re-embeds the digest a memory run already produced, and the chunks it writes carry the source run’s lineage', async () => {
+  it('[QL-60] re-embeds the digest a memory run already produced, and the chunks it writes carry the source run’s lineage', async () => {
     const source = sampleRun();
     const digest = digestRun(source);
     const record = memoryRun(digest.runId, source.runId);

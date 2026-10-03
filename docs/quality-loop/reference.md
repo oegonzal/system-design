@@ -272,20 +272,30 @@ so a reader can tell a live run from a killed one still saying `running` before 
 ### `modules/memory/`
 
 Owns the memory tier's adapters. Tokens: `EMBEDDING_CLIENT`, `EMBEDDING_CACHE`, `MEMORY_STORE`,
-`QUERY_PROBES`, `MEMORY_PORTS`.
+`QUERY_PROBES`, `MEMORY_SUPPORT`, `MEMORY_PORTS`, `KNOWLEDGE_PORTS`.
 
 | File                                       | What it does                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------ |
 | `qdrant/qdrant-memory-store.ts`            | The vector store adapter.                                          |
 | `qdrant/collection.ts`                     | Collection naming by model, width and index generation; payloads.  |
 | `persistence/mikro-orm-embedding-cache.ts` | Caches embeddings by model and content hash.                       |
+| `persistence/mikro-orm-memory-support.ts`  | Which run confirmed or contradicted which stored item.             |
 | `query-probes/llm-query-probes.ts`         | Turns a goal into retrieval probes with one structured model call. |
-| `memory.service.ts`                        | Re-index and the retrieval report.                                 |
+| `reports/effectiveness.ts`                 | Did a recalled lesson's run see its defects resolve.               |
+| `reports/gaps.ts`                          | What no recall could serve, by brief.                              |
+| `memory.service.ts`                        | Re-index, the retrieval report, and the two reports' paging.       |
 
-Two routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons.
+`KNOWLEDGE_PORTS` is the same embeddings and store object the memory ports hold, plus the support
+store: one adapter set, two port shapes, because `support` belongs to one orchestrator and widening
+`MemoryPorts` would reach every fake of it.
+
+Four routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons.
 `POST /memory/retrieval-report` shows store availability, each probe's own ranking and the fused
-candidate list, without running a pipeline. Without an OpenAI key the tier degrades to disabled
-rather than failing.
+candidate list, without running a pipeline. `GET /memory/effectiveness` joins each recalling run's
+lessons to what the engine said changed in its next iteration — attributed at run level, which the
+DTO states, because the curator names what a lesson serves in prose. `GET /memory/gaps` keeps the
+needs no recall could serve, grouped by the brief taken bare. Both reports read records and write
+nothing. Without an OpenAI key the tier degrades to disabled rather than failing.
 
 ### `modules/orchestration/`
 
@@ -349,18 +359,25 @@ can only run a pipeline it declared, and an undeclared reason is rejected.
 **`panel/`** is the two step factories the two panel orchestrators share: `panelStep` runs a pipeline
 several times over, `reconcileStep` reads those runs and reports where they disagree.
 
-### The four
+### Each one
 
-| Orchestrator     | Steps                         | Run it when                                                                   |
-| ---------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `memory`         | recall, target, digest, store | You want a run to benefit from, and contribute to, what earlier runs learned. |
-| `router`         | classify, judge               | You have a brief and do not want to choose the pipeline yourself.             |
-| `calibration`    | panel, reconcile              | You want to measure end-to-end variance before trusting a score.              |
-| `second-opinion` | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree. |
+| Orchestrator      | Steps                         | Run it when                                                                   |
+| ----------------- | ----------------------------- | ----------------------------------------------------------------------------- |
+| `memory`          | recall, target, digest, store | You want a run to benefit from, and contribute to, what earlier runs learned. |
+| `knowledge`       | target, known, digest, store  | You want a finished run turned into typed knowledge, against what is known.   |
+| `router`          | classify, judge               | You have a brief and do not want to choose the pipeline yourself.             |
+| `calibration`     | panel, reconcile              | You want to measure end-to-end variance before trusting a score.              |
+| `second-opinion`  | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree. |
+| `form-memory`     | recall, target                | A form page needs the applicant's facts before it is answered.                |
+| `document-memory` | digest, store                 | A document chunk should become facts about its subject.                       |
 
-`memory/` is the largest: `recall/` builds the query, fuses the hits and injects what the recall run
-endorsed into the goal; `digest/` reads what the digest run endorsed; `store/` chunks it and indexes
-it. All four orchestrators are reachable over HTTP only — there is no CLI subcommand for them.
+`memory/` and `knowledge/` are the largest. In `memory/`, `recall/` builds the query, fuses the hits
+and injects what the recall run endorsed into the goal; `digest/` reads what the digest run endorsed;
+`store/` chunks it and indexes it. `knowledge/` asks the opposite question of a run that has already
+finished — `known/` turns its own evidence into probes with no model call, `digest/` reads back typed
+items and what they claim about what is stored, and `store/` writes the items, a chunk per confirmed
+finding, and the claims as rows. Every orchestrator is reachable over HTTP only — there is no CLI
+subcommand for them.
 
 ## `cli/`, `dump/`, `types/`
 

@@ -135,7 +135,7 @@ describe('reading a digest', () => {
     ]);
   });
 
-  it('[QL-41] an insight the seam kept whole past its ceiling is endorsed whole, never the digest refused for it', () => {
+  it('[QL-58] an insight the seam kept whole past its ceiling is endorsed whole, never the digest refused for it', () => {
     const insight =
       `${'Give every read path a story for its upstream being down. '.repeat(30)}`.trim();
     expect(insight.length).toBeGreaterThan(LESSON_INSIGHT_BOUND.ceiling);

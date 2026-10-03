@@ -1,5 +1,5 @@
 /**
- * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--dry-run] [--force] [--json]`
+ * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
  * `main.js status [--refresh] [--json]`
  *
  * `parseOptions` reads argv; `execute` runs the options over the ports and
@@ -18,6 +18,9 @@ import { LoopIngestSink } from './adapters/loop-http/loop-ingest-sink';
 import { READERS, tableReader } from './adapters/readers/reader-table';
 import {
   chunkBytes,
+  documentDate,
+  partsPerChunk,
+  postLimit,
   DEFAULT_CHUNK_BYTES,
   DEFAULT_HOME,
   DEFAULT_LOOP_URL,
@@ -36,9 +39,10 @@ import { refreshStatus } from './core/status';
 import { renderIngest, renderStatus } from './render';
 
 export const USAGE = `usage: memory-ingest <command> [options]
-  ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--dry-run] [--force] [--json]
+  ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]
           reads each document (${Object.keys(READERS).join(', ')}), chunks it and posts one chunk at a time to the loop;
-          --chunk-bytes defaults to ${DEFAULT_CHUNK_BYTES}; --dry-run prints the chunks and posts nothing;
+          --chunk-bytes defaults to ${DEFAULT_CHUNK_BYTES}; --date is the day the documents speak for;
+          --limit posts at most n chunks then halts, the rest pending; --dry-run prints the chunks and posts nothing;
           a chunk whose facts the manifest holds as stored is skipped unless --force
   status  [--refresh] [--json]
           the manifest; --refresh re-reads every recorded orchestration from the loop
@@ -48,7 +52,17 @@ environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.h
 /** Commands, the flags each takes and whether it takes paths — as data. */
 export const COMMANDS = {
   ingest: {
-    flags: ['kind', 'subject', 'chunk-bytes', 'dry-run', 'force', 'json'],
+    flags: [
+      'kind',
+      'subject',
+      'chunk-bytes',
+      'parts-per-chunk',
+      'date',
+      'limit',
+      'dry-run',
+      'force',
+      'json',
+    ],
     paths: true,
   },
   status: { flags: ['refresh', 'json'], paths: false },
@@ -63,6 +77,9 @@ export type Options =
       /** Unset falls back to the environment; neither is a usage error at execute time. */
       subject: string | undefined;
       chunkBytes: number;
+      partsPerChunk: number;
+      date: string | null;
+      limit: number | null;
       dryRun: boolean;
       force: boolean;
       json: boolean;
@@ -107,6 +124,9 @@ export function parseOptions(argv: readonly string[]): Options | Error {
         kind: ingestKind(values['kind'] as string | undefined),
         subject: subjectName(values['subject'] as string | undefined, '--subject'),
         chunkBytes: chunkBytes(values['chunk-bytes'] as string | undefined),
+        partsPerChunk: partsPerChunk(values['parts-per-chunk'] as string | undefined),
+        date: documentDate(values['date'] as string | undefined),
+        limit: postLimit(values['limit'] as string | undefined),
         dryRun: (values['dry-run'] as boolean | undefined) ?? false,
         force: (values['force'] as boolean | undefined) ?? false,
         json: (values['json'] as boolean | undefined) ?? false,
@@ -161,6 +181,8 @@ export async function cli(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   cwd: string,
+  /** Asked between chunks; true halts the run with everything it has recorded. */
+  interrupted?: () => boolean,
 ): Promise<number> {
   const options = parseOptions(argv);
   if (options instanceof Error) {
@@ -182,6 +204,7 @@ export async function cli(
     sink: new LoopIngestSink(client),
     ledger: new JsonFileLedger(resolve(cwd, config.home)),
     clock: { now: () => new Date().toISOString() },
+    interrupted,
     loopUrl: config.loopUrl,
   };
   return execute(options, deps, {

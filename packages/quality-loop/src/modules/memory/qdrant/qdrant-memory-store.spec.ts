@@ -1,7 +1,7 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { collectionName, pointId } from './collection';
+import { collectionName, INDEXED_FIELDS, pointId } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
 import { hitOf } from '../../../orchestrators/memory/testing';
 import { vectorOf } from '../testing';
@@ -96,6 +96,90 @@ describe('the Qdrant memory store', () => {
 
     expect(await store.replaceRunChunks('run-a', [])).toBe(0);
     expect((await store.verify()).chunks).toBe(1);
+  });
+
+  it('[QL-41] narrows a probe by kind and run, replaces only the kinds a writer owns, and sets support', async () => {
+    const lesson = chunk('shard the write path before the read path', 'run-d', 'memory.1');
+    const fact = {
+      ...chunk(
+        'a partitioned unique key must include the partition column',
+        'run-d',
+        'knowledge.1',
+      ),
+      source: {
+        ...lesson.source,
+        ref: 'knowledge.1',
+        kind: 'fact' as const,
+        pipeline: 'knowledge-digest',
+      },
+      facets: { dimension: 'soundness', polarity: 'avoid' as const, topics: ['partitioning'] },
+    };
+    expect(await store.replaceRunChunks('run-d', [lesson, fact])).toBe(2);
+
+    // The facets survive the round trip through the real payload.
+    const [anything] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5 },
+    ]);
+    expect(anything.find((hit) => hit.source.ref === 'knowledge.1')?.facets).toEqual(fact.facets);
+
+    // Each field of the filter narrows: by kind, by pipeline, and away from a run.
+    const [kinds, pipelines, notRun] = await store.searchMany([
+      {
+        vector: fact.vectors.lesson,
+        using: 'lesson',
+        limit: 5,
+        filter: { kinds: ['fact', 'pattern'] },
+      },
+      {
+        vector: fact.vectors.lesson,
+        using: 'lesson',
+        limit: 5,
+        filter: { pipelines: ['knowledge-digest'] },
+      },
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { notRunIds: ['run-d'] } },
+    ]);
+    expect(kinds.map((hit) => hit.source.kind)).toEqual(['fact']);
+    expect(pipelines.map((hit) => hit.source.ref)).toEqual(['knowledge.1']);
+    expect(notRun.every((hit) => hit.source.runId !== 'run-d')).toBe(true);
+
+    // A writer that owns one kind replaces its own points and leaves the rest.
+    expect(await store.replaceRunChunks('run-d', [], { kinds: ['lesson'] })).toBe(0);
+    const [survivors] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { notRunIds: [] } },
+    ]);
+    expect(
+      survivors.filter((hit) => hit.source.runId === 'run-d').map((hit) => hit.source.ref),
+    ).toEqual(['knowledge.1']);
+
+    // Support is set on a point that stands; one that has gone is left alone.
+    await store.setSupport([
+      { point: { runId: 'run-d', ref: 'knowledge.1' }, support: { confirms: 2, contradicts: 1 } },
+      { point: { runId: 'run-d', ref: 'memory.1' }, support: { confirms: 9, contradicts: 9 } },
+    ]);
+    const [supported] = await store.searchMany([
+      { vector: fact.vectors.lesson, using: 'lesson', limit: 5, filter: { kinds: ['fact'] } },
+    ]);
+    expect(supported[0].facets).toEqual({
+      ...fact.facets,
+      support: { confirms: 2, contradicts: 1 },
+    });
+    expect(await store.replaceRunChunks('run-d', [], { kinds: ['fact'] })).toBe(0);
+  });
+
+  it('[QL-41] has an index on the server for every field a filter may narrow by', async () => {
+    // Existence only, deliberately. Comparing the reported type against the
+    // declared one is circular — the server reports back whatever `ensure`
+    // asked for, so a wrong declaration agrees with itself. That the declared
+    // type suits the value the payload holds is checked against the payload, in
+    // `collection.spec.ts`.
+    await store.verify();
+    const described = await client.getCollection(collectionName(model, DIMENSIONS));
+    const reported = described.payload_schema ?? {};
+    const fields = Object.keys(INDEXED_FIELDS);
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) {
+      expect(reported[field], `no index on the server for ${field}`).toBeDefined();
+    }
   });
 
   it('[QL-17] reports an unreachable server and a missing model as data, never as a throw at boot', async () => {

@@ -48,7 +48,7 @@ describe('the recall query', () => {
     expect(goalBytes(renderQuery(longest))).toBeLessThanOrEqual(GOAL_MAX_BYTES);
   });
 
-  it('[QL-41] the longest lesson the store holds is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {
+  it('[QL-58] the longest lesson the store holds is offered whole; only a structural fault refuses the query, in the one wording, never a throw', () => {
     const long = 'y'.repeat(keptAtMost(LESSON_CHUNK_BOUND));
     const kept = buildQuery(
       queryText(PROMPT),

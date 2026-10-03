@@ -38,6 +38,7 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/browser-session/observation.schema.ts',
   'packages/contracts/src/lib/browser-session/step-plan.schema.ts',
   'packages/quality-loop/src/core/stages/schemas.ts',
+  'packages/quality-loop/src/core/outputs/experience-record.ts',
   'packages/quality-loop/src/pipelines/experience-digest/output.ts',
   'packages/quality-loop/src/pipelines/document-digest/output.ts',
   'packages/quality-loop/src/pipelines/memory-recall/input.ts',

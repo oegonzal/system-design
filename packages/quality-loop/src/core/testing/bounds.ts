@@ -5,7 +5,13 @@
  * tsconfig even though only specs use it. Field bounds are held by contracts'
  * `boundsAgainstMeasured`, the one check every declaring module shares.
  */
-import type { MeasuredCap } from '@sysdesign/contracts';
+import {
+  declaredSizes,
+  type BoundPath,
+  type MeasuredCap,
+  type MeasuredField,
+} from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
 
 import { criterionLengthBound, type TaskSpec } from '../contracts';
 import { criteriaSchema, enumTuple } from '../stages/schemas';
@@ -88,6 +94,33 @@ export const seededCaps = (seeds: Readonly<Record<string, number>>): Record<stri
       stage,
       { n: 0, max: most, p99: most, maxApiCalls: null },
     ]),
+  );
+
+/**
+ * A pipeline no run has recorded yet holds the field bounds it can seed — what
+ * a comparable pipeline's same fields measurably held — in the shape a
+ * measurement takes, until `pnpm measure:bounds` has a run to replace them.
+ */
+export const seededFields = (
+  seeds: Readonly<Record<BoundPath, number>>,
+): Record<BoundPath, MeasuredField> =>
+  Object.fromEntries(
+    Object.entries(seeds).map(([path, most]) => [
+      path,
+      { n: 0, max: most, p99: most, overTarget: 0 },
+    ]),
+  );
+
+/** Every bound a schema declares that `seeds` does not name, exempt for one reason. */
+export const unseededFields = (
+  schema: ZodType,
+  seeds: Readonly<Record<BoundPath, number>>,
+  reason: string,
+): Record<BoundPath, string> =>
+  Object.fromEntries(
+    Object.keys(declaredSizes(schema))
+      .filter((path) => !Object.hasOwn(seeds, path))
+      .map((path) => [path, reason]),
   );
 
 /** Every declared stage, exempt for one reason — a pipeline no run has recorded. */

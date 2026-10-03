@@ -17,6 +17,7 @@ import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
 import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
+import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
 import { OrchestrationRunChild } from './entities/orchestration-run-child.entity';
 import { QualityRun } from './entities/quality-run.entity';
@@ -49,6 +50,7 @@ export const ormOptions = {
     DesignRevision,
     CoachingRun,
     MemoryEmbedding,
+    MemorySupport,
     OrchestrationRun,
     OrchestrationRunChild,
     QualityRun,

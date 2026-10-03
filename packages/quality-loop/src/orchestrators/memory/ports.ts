@@ -8,12 +8,15 @@
 import { createHash } from 'node:crypto';
 
 import type {
+  ChunkFacetsDto,
   LlmAvailabilityDto,
   MemoryLineageDto,
   MemoryStoreAvailabilityDto,
 } from '@sysdesign/contracts';
 
-import type { ChunkSource } from '../../pipelines/memory-recall/input';
+import type { ChunkKind, ChunkSource } from '../../pipelines/memory-recall/input';
+
+export type { ChunkKind };
 import type { CachedEmbeddings } from './embeddings';
 
 /**
@@ -48,6 +51,24 @@ export type VectorName = (typeof VECTOR_NAMES)[number];
 export const contentHash = (text: string): string =>
   createHash('sha256').update(text, 'utf8').digest('hex');
 
+/**
+ * A stored point, named the way the store addresses it: the run it was
+ * digested from and the item within that run. The adapter turns the pair into
+ * one id, so nothing outside it needs to know how.
+ */
+export interface PointRef {
+  runId: string;
+  ref: string;
+}
+
+/**
+ * What a chunk carries beyond its text and provenance: what a search may
+ * filter on and what a curator's rule may read. Every field is optional and
+ * the wire shape is the contract's, so a chunk stored before any of them
+ * existed still parses and still ranks.
+ */
+export type ChunkFacets = ChunkFacetsDto;
+
 export interface MemoryChunk {
   /** The whole lesson, as the curator reads it and as it reaches a goal. */
   text: string;
@@ -66,6 +87,8 @@ export interface MemoryChunk {
    */
   lineage: MemoryLineageDto | null;
   model: string;
+  /** Absent on a chunk written before facets, and on one whose writer derives none. */
+  facets?: ChunkFacets;
 }
 
 /** A chunk with the texts it is indexed by — one per name in the collection. */
@@ -82,12 +105,33 @@ export interface MemoryHit extends MemoryChunk {
   score: number;
 }
 
-/** One dense query: a vector, the named vector it is compared against, and its budget. */
+/**
+ * What a probe will consider, declared rather than passed through: an
+ * adapter's own filter language would leak into every caller and every fake.
+ * Each field narrows, and an absent one does not: `{}` and `undefined` search
+ * the whole store, which is what every probe did before this existed.
+ */
+export interface ProbeFilter {
+  /** Only these chunk kinds — a search for knowledge need not read episodic precedent. */
+  kinds?: readonly ChunkKind[];
+  /** Only chunks digested by these pipelines — the facet that most predicts a usable hit. */
+  pipelines?: readonly string[];
+  /** Never these source runs — a run asking what is known must not be told its own items. */
+  notRunIds?: readonly string[];
+}
+
+/** The chunk kinds one writer owns under a source run: what a replace of its own points may delete. */
+export interface ChunkKindScope {
+  kinds: readonly ChunkKind[];
+}
+
+/** One dense query: a vector, the named vector it is compared against, its budget, and what it will consider. */
 export interface MemoryProbe {
   vector: readonly number[];
   using: VectorName;
   /** How many hits this probe may contribute before fusion. */
   limit: number;
+  filter?: ProbeFilter;
 }
 
 export interface MemoryStore {
@@ -99,8 +143,31 @@ export interface MemoryStore {
    * nothing downstream could tell it had happened.
    */
   searchMany(probes: readonly MemoryProbe[]): Promise<MemoryHit[][]>;
-  /** A source run's chunks become exactly these: stale ones go, the rest upsert. Returns how many stand. */
-  replaceRunChunks(sourceRunId: string, chunks: readonly StoredChunk[]): Promise<number>;
+  /**
+   * A source run's chunks become exactly these: stale ones go, the rest
+   * upsert. Returns how many stand.
+   *
+   * `scope` is what the caller owns. Two writers now keep points under one
+   * source run — the memory orchestrator its lessons, the knowledge
+   * orchestrator its items and findings — and an unscoped replace would have
+   * each erase the other. Every writer names its kinds; an absent scope still
+   * replaces the run's every point, which is what a reader of the older
+   * behaviour expects.
+   */
+  replaceRunChunks(
+    sourceRunId: string,
+    chunks: readonly StoredChunk[],
+    scope?: ChunkKindScope,
+  ): Promise<number>;
+  /**
+   * Set the support counts of points that already stand, leaving everything
+   * else about them alone. The counts are derived from rows elsewhere and
+   * written here only so a search can read them; a point that has since gone
+   * is skipped, never recreated.
+   */
+  setSupport(
+    updates: readonly { point: PointRef; support: { confirms: number; contradicts: number } }[],
+  ): Promise<void>;
 }
 
 export interface EmbeddingCache {

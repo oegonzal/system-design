@@ -2,6 +2,7 @@ import { LoopRefused } from '@sysdesign/loop-client';
 
 import { tableReader } from './adapters/readers/reader-table';
 import { execute, parseOptions, USAGE, type CliDeps, type Io, type Options } from './cli';
+import { PARTS_PER_CHUNK } from './core/chunk';
 import { DEFAULT_CHUNK_BYTES, INGEST_ENV } from './config';
 import type { ManifestEntry } from './core/ports';
 import {
@@ -33,6 +34,12 @@ describe('parseOptions', () => {
         'Ada',
         '--chunk-bytes',
         '4000',
+        '--parts-per-chunk',
+        '5',
+        '--date',
+        '2026-10-02',
+        '--limit',
+        '2',
         '--dry-run',
         '--force',
         '--json',
@@ -43,6 +50,9 @@ describe('parseOptions', () => {
       kind: 'resume',
       subject: 'Ada',
       chunkBytes: 4000,
+      partsPerChunk: 5,
+      date: '2026-10-02',
+      limit: 2,
       dryRun: true,
       force: true,
       json: true,
@@ -53,6 +63,9 @@ describe('parseOptions', () => {
       kind: 'notes',
       subject: undefined,
       chunkBytes: DEFAULT_CHUNK_BYTES,
+      partsPerChunk: PARTS_PER_CHUNK,
+      date: null,
+      limit: null,
       dryRun: false,
       force: false,
       json: false,
@@ -71,6 +84,9 @@ describe('parseOptions', () => {
     [['fly'], USAGE],
     [['ingest'], 'ingest takes at least one document path'],
     [['ingest', 'a.md', '--kind', 'poems'], '--kind must be one of resume, notes'],
+    [['ingest', 'a.md', '--date', 'last tuesday'], '--date must be a day as YYYY-MM-DD'],
+    [['ingest', 'a.md', '--limit', '0'], '--limit must be a positive integer'],
+    [['ingest', 'a.md', '--parts-per-chunk', '99'], '--parts-per-chunk must be a positive integer'],
     [['ingest', 'a.md', '--chunk-bytes', 'lots'], '--chunk-bytes must be a positive integer'],
     [
       ['ingest', 'a.md', '--subject', 'x'.repeat(121)],

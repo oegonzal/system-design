@@ -1,4 +1,8 @@
-import { boundsAgainstMeasured, CRITERION_STATEMENT_BOUND } from '@sysdesign/contracts';
+import {
+  boundsAgainstMeasured,
+  CRITERION_STATEMENT_BOUND,
+  DOCUMENT_RULES,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
@@ -31,6 +35,25 @@ describe('the document-digest pipeline', () => {
     for (const dimension of Object.keys(DOCUMENT_DIGEST.policy.dimensionWeights)) {
       expect(earning).toContain(dimension);
     }
+  });
+
+  it('[QL-40] the qualifier a section puts on a claim is graded, not merely stated: the rule, the kind it is graded under, the deriver that writes its criterion and the lenses that judge it all name it', () => {
+    // A rule the deriver does not recognise yields no criterion, and a rule with
+    // no criterion is decoration — nothing grades it, and a learning project
+    // reaches the store as completed professional work. These five move together.
+    const qualifier = /qualifier/i;
+    expect(DOCUMENT_RULES.some((rule) => qualifier.test(rule))).toBe(true);
+    expect(DOCUMENT_DIGEST.task.criterionKinds['rule']).toMatch(qualifier);
+    expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(qualifier);
+    // The producer writes it, the grounding critic faults a dropped one, the rules evaluator scores it.
+    expect(DOCUMENT_DIGEST.producer.persona).toMatch(/qualifi|marks it as planned/i);
+    expect(DOCUMENT_DIGEST.critics[0].persona).toMatch(qualifier);
+    expect(DOCUMENT_DIGEST.evaluators[1].persona).toMatch(qualifier);
+    // It is the insight that a form pastes, so that is where the qualifier has to land.
+    const rule = DOCUMENT_RULES.find((entry) => qualifier.test(entry)) ?? '';
+    expect(rule).toContain('insight');
+    // And a document whose sections qualify nothing — a résumé — must not be faulted for it.
+    expect(DOCUMENT_DIGEST.evaluators[1].persona).toContain('not_applicable');
   });
 
   it('[QL-40] facts and rules, two samples agreeing before a falsehood is withheld, and every persona names the pipeline and the places it cites', () => {
@@ -96,11 +119,15 @@ describe('the document-digest pipeline', () => {
       expect(rendered).toContain(`[${location.id}]`);
     }
     const ids = documentDigestOutput.locate(digest).map((location) => location.id);
-    expect(ids).toEqual(['summary', 'memory.1', 'memory.2', 'section.3']);
+    expect(ids).toEqual(['summary', 'memory.1', 'memory.2']);
+    // Neither a cited section nor an unused one is a place: a judge cites a memory or the summary.
     for (const memory of digest.memories) {
       for (const alias of memory.evidence) expect(ids).not.toContain(alias);
     }
-    expect(rendered).toContain('[memory.2] on [section.1]: Alex Example lives in Lisbon');
+    for (const alias of digest.unused) expect(ids).not.toContain(alias);
+    expect(rendered).toContain(
+      '[memory.2] profile_fact on [section.1]: Alex Example lives in Lisbon',
+    );
     expect(documentDigestOutput.schema.safeParse(digest).success).toBe(true);
   });
 

@@ -71,7 +71,7 @@ describe('deriving what to search under', () => {
     ]);
   });
 
-  it("[QL-41] a probe written past its bound is kept, a list past six is cut by whole items, and the curator's query lists each probe as it was read", async () => {
+  it("[QL-58] a probe written past its bound is kept, a list past six is cut by whole items, and the curator's query lists each probe as it was read", async () => {
     const words = (length: number): string =>
       'a condition '
         .repeat(Math.ceil(length / 12))

@@ -264,7 +264,7 @@ describe('prompts', () => {
       expect(h.loop.criteriaRequests).toEqual([]);
     });
 
-    it('[GEN-1] [QL-41] a draft the run kept past its ceilings is claimed whole, its overruns logged, and every row a criterion the grader takes back on a grade', async () => {
+    it('[GEN-1] [QL-58] a draft the run kept past its ceilings is claimed whole, its overruns logged, and every row a criterion the grader takes back on a grade', async () => {
       // The longest a lenient read keeps of each field the draft declares —
       // whole to the cut point, never more — so each row composes at its most.
       const bounds = modelSchema(designPromptDraftSchema).bounds;

@@ -43,7 +43,7 @@ describe('createCriteriaDeriver', () => {
     expect(calls[0].system).not.toMatch(/discarded|never cut to fit/);
   });
 
-  it('[QL-2] [QL-42] [QL-47] a reply with one statement past the task’s ceiling keeps its whole rubric — the seam keeps the statement and the stage reports it as an overrun', async () => {
+  it('[QL-2] [QL-59] [QL-47] a reply with one statement past the task’s ceiling keeps its whole rubric — the seam keeps the statement and the stage reports it as an overrun', async () => {
     // The live failure this pins: a deriver that wrote 751 characters into
     // one of sixteen statements lost all sixteen, three attempts running.
     // The fake reads a reply as the seam does, so the statement is kept whole.

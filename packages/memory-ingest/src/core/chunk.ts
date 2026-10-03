@@ -35,6 +35,13 @@ export interface ChunkingInput {
   date: string | null;
   /** The most a rendered goal may weigh, in UTF-8 bytes. */
   chunkBytes: number;
+  /**
+   * The most parts one chunk may carry. Fewer parts leave more of the
+   * contract's memory cap for each one, which is what decides whether a dense
+   * chunk's facts all fit: a chunk whose sections state more facts than
+   * `DOCUMENT_MAX_MEMORIES` loses the remainder with nothing to say it did.
+   */
+  partsPerChunk: number;
 }
 
 export interface ChunkPlan {
@@ -42,6 +49,19 @@ export interface ChunkPlan {
   parts: number;
   chunks: PlannedChunk[];
 }
+
+/**
+ * How many parts one chunk may carry. Measured on the first live digests
+ * (2026-10-03): a résumé's 18 bullet parts yielded 21 fact criteria against
+ * the contract's 16 memories, so coverage could never pass; and 10 dense
+ * skills parts wanted 14 memories against a cap tied to the part count, so
+ * the producer was blocked. The memory cap therefore stays the contract's,
+ * and a chunk carries at most this many parts, so two facts per part fit.
+ */
+export const PARTS_PER_CHUNK = 8;
+
+/** Beyond this a chunk could not state two facts per part within the contract's memory cap. */
+export const MAX_PARTS_PER_CHUNK = DOCUMENT_MAX_PARTS;
 
 /** A part that cannot be made to fit: a lone section already renders past the budget. */
 export class ChunkBudgetExceeded extends Error {
@@ -170,7 +190,8 @@ const chunkOf = (
   context: contextOf(group[0]?.path ?? []),
   parts: group.map((part) => part.text),
   rules: [...DOCUMENT_RULES],
-  maxMemories: Math.min(DOCUMENT_MAX_MEMORIES, group.length),
+  // The contract's cap, not the part count: a dense part states several facts.
+  maxMemories: DOCUMENT_MAX_MEMORIES,
 });
 
 /**
@@ -193,7 +214,7 @@ function pack(parts: readonly Part[], input: ChunkingInput): Part[][] {
   parts.forEach((part, position) => {
     const candidate = [...current, part];
     const fits =
-      candidate.length <= DOCUMENT_MAX_PARTS &&
+      candidate.length <= input.partsPerChunk &&
       measure(candidate, input, parts.length) <= input.chunkBytes;
     if (fits) {
       current = candidate;

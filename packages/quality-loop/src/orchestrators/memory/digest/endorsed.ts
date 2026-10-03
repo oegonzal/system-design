@@ -2,14 +2,24 @@
  * What a digest endorses, read from the digest run's own outputs: memories
  * nothing confirmed against it withholds (`withheldItems` — as the digest
  * pipeline declares each finding type withholds), with their evidence
- * resolved through the index the digest's goal carries. Over engine facts,
- * never over prose — and over any digest pipeline that proposes
- * `{ evidence, insight, appliesWhen }` items against an aliased index: the
- * experience digest reads a run's findings and criteria, the document digest
- * reads a document's sections, and the store consumes what either endorsed
- * through the same reader. The artifact is read as the seam read the reply —
- * leniently — so a lesson kept whole past its ceiling is stored whole, never
- * a digest refused for it.
+ * resolved through the index the digest's goal carries.
+ *
+ * Which findings withhold is declared, not assumed. A finding saying a fact is
+ * wrong — invented, or a section misread — must withhold every item it names,
+ * because storing it is worse than losing it. A finding saying a true fact is
+ * merely written weakly — a pronoun where the name belongs, a condition that
+ * restates its insight — must withhold nothing: the fact is sound, and dropping
+ * it loses a detail the corpus will never answer with. Measured on the first
+ * live JSON Lines chunk, where three of eight true facts were withheld for a
+ * pronoun. A pipeline that declares nothing keeps the strict default.
+ *
+ * Over engine facts, never over prose — and over any digest pipeline that
+ * proposes `{ evidence, insight, appliesWhen }` items against an aliased
+ * index: the experience digest reads a run's findings and criteria, the
+ * document digest reads a document's sections, and the store consumes what
+ * either endorsed through the same reader. The artifact is read as the seam
+ * read the reply — leniently — so a lesson kept whole past its ceiling is
+ * stored whole, never a digest refused for it.
  */
 import { parseLenient } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
@@ -37,6 +47,12 @@ export interface MemoryToStore {
    * document's sections, or a digest written before its index carried them).
    */
   iterations: number[];
+  /**
+   * What the stored chunk's kind becomes — the shape a probe may narrow to.
+   * Absent when the digest proposes no kind, and the store then falls back to
+   * the one kind every memory had before any digest declared one.
+   */
+  kind?: string;
 }
 
 export interface DigestReadout {
@@ -57,7 +73,13 @@ export interface Digested {
 
 /** The item shape every digest pipeline proposes and the store consumes. */
 export interface DigestLike {
-  memories: readonly { evidence: readonly string[]; insight: string; appliesWhen: string }[];
+  memories: readonly {
+    evidence: readonly string[];
+    insight: string;
+    appliesWhen: string;
+    /** Declared by digests whose items differ in shape; absent from those whose do not. */
+    kind?: string;
+  }[];
 }
 
 /**
@@ -127,6 +149,7 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
         iterations: [...new Set(cited.flatMap((item) => item.iterations ?? []))].sort(
           (a, b) => a - b,
         ),
+        ...(memory.kind === undefined ? {} : { kind: memory.kind }),
       },
     ];
   });

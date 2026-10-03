@@ -179,11 +179,11 @@ A pipeline whose input is more than a prompt owns an **input codec** (`input.ts`
 | A call's limit is its declared answer at the slowest pace plus overhead, with a minimum; an abort is a timeout    | `[QL-33]`                                             |
 | A coach that adopts an iteration recalls for that iteration's confirmed defects, and records the focus            | `[QL-34]`                                             |
 | A stored lesson carries its own iteration's decision, never the run's final one                                   | `[QL-35]`                                             |
-| Every model-written string and list is one declared bound; a size limit never discards work                       | `[QL-41]`                                             |
-| The seam salvages: soft overruns kept, a structural miss asked again with its faults, a cut transcript still read | `[QL-42]`                                             |
-| A stored lesson carries the lineage of the iteration it cites                                                     | `[QL-43]`                                             |
-| A run whose only judged evidence it adopted is not digested                                                       | `[QL-44]`                                             |
-| A lost attempt costs one attempt, never a run                                                                     | `[QL-45]`                                             |
+| Every model-written string and list is one declared bound; a size limit never discards work                       | `[QL-58]`                                             |
+| The seam salvages: soft overruns kept, a structural miss asked again with its faults, a cut transcript still read | `[QL-59]`                                             |
+| A stored lesson carries the lineage of the iteration it cites                                                     | `[QL-60]`                                             |
+| A run whose only judged evidence it adopted is not digested                                                       | `[QL-61]`                                             |
+| A lost attempt costs one attempt, never a run                                                                     | `[QL-62]`                                             |
 | A lost sample scores but cannot gate                                                                              | `[QL-46]`                                             |
 | A size overrun is a warning, never a block, and moves no decision                                                 | `[QL-47]`                                             |
 | A run's dump reports what the model seam kept                                                                     | `[QL-48]`                                             |

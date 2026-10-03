@@ -85,7 +85,7 @@ describe('deriveLessons', () => {
     ]);
   });
 
-  it('[QL-45] a lost produce between two judged iterations costs no lesson: it spans the iteration with nothing to compare', () => {
+  it('[QL-62] a lost produce between two judged iterations costs no lesson: it spans the iteration with nothing to compare', () => {
     const before = iteration(1, [finding()], [result({ criterionId: 'c1', result: 'fail' })]);
     const after = iteration(3, [], [result({ criterionId: 'c1', result: 'pass' })]);
     const lost: IterationTrace<TinyOutput> = {

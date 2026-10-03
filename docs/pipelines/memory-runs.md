@@ -848,14 +848,15 @@ run-specific memory reaching the store (§1).
 
 Notes, not fixes. None affects behaviour.
 
-- `qdrant/collection.ts` declares `INDEXED_FIELDS` — `runId`, `pipeline`,
-  `kind`, and the lineage fields `lineage.judged.runId`,
-  `lineage.adoptedFrom.runId` and `lineage.goalHash` — and `ensure()` creates
-  whichever the collection's `payload_schema` lacks, on every boot, so a
-  collection built before them gains them too. `searchMany` passes no filter —
-  only `query`, `using`, `limit` and `with_payload` — and the coach recall's
-  novelty screen reads `lineage` off the hits after fusion, so the indexes are
-  prepared for a filtered search that does not exist yet.
+- `qdrant/collection.ts` declares `INDEXED_FIELDS`, each field with the index
+  type its value needs — `runId`, `pipeline`, `kind`, the flat facets, and the
+  lineage fields `lineage.judged.runId`, `lineage.adoptedFrom.runId` and
+  `lineage.goalHash` (keyword, at their dotted paths) — and `ensure()` asks for
+  every one on every boot, warning on a refusal, so a collection built before
+  them gains them too. `searchMany` filters only by a probe's declared
+  `ProbeFilter` (kinds, pipelines, runs to leave out), and the coach recall's
+  novelty screen reads `lineage` off the hits after fusion, so the lineage
+  indexes are prepared for a filtered search that does not exist yet.
 - Every payload carries `storedAt` and `keys`; `fromPayload` destructures both
   and discards them. Nothing reads either back.
 - `MemoryStepDto.counts` is an open `Record<string, number>`. The keys

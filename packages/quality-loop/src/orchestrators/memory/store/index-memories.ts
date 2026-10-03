@@ -14,7 +14,7 @@ import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
 import { contentHash, VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
 import { bareGoal } from '../recall/inject';
-import { chunksOf, type ChunkOrigin } from './chunks';
+import { chunkKind, chunksOf, type ChunkOrigin, type OwnedKinds } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
 const dayOf = (iso: string): string => iso.slice(0, 10);
@@ -87,13 +87,34 @@ export async function indexMemories(
   source: QualityRunDto,
   digested: Digested,
   model: string,
+  /**
+   * Every kind this writer may ever write under a source run — what it owns,
+   * not what this run happened to write. A source run's points are replaced by
+   * kind, so the two bounds pull opposite ways: a scope narrower than the
+   * writer's vocabulary orphans a point whose kind an earlier digest wrote and
+   * this one did not, and a scope wider than it erases another writer's points
+   * under the same run. Declared by the caller because the vocabulary belongs
+   * to the caller's digest, which this function cannot see.
+   */
+  ownedKinds: OwnedKinds,
 ): Promise<StepResult<undefined>> {
   const trace = source.trace;
   if (trace === null) return skipped('nothing-to-digest');
   // Each memory is stamped from the iterations it cites, so each is chunked under its own origin.
   const chunks = digested.memories.flatMap((memory) =>
-    chunksOf([memory], originOf(source, trace, memory.iterations), digested.digestRunId, model),
+    chunksOf(
+      [memory],
+      originOf(source, trace, memory.iterations),
+      digested.digestRunId,
+      model,
+      ownedKinds,
+    ),
   );
+  // A memory whose declared kind this writer does not own is filed under the
+  // default rather than dropped, and counted so the retyping is not silent.
+  const retyped = digested.memories.filter(
+    (memory) => memory.kind !== undefined && chunkKind(memory.kind, ownedKinds) !== memory.kind,
+  ).length;
   // Both indexed texts of every chunk, in one batch: the cache dedupes, and
   // the vectors come back in the order they were asked for.
   const embedded = await ports.embeddings.embed(
@@ -104,8 +125,16 @@ export async function indexMemories(
     const stored = await ports.store.replaceRunChunks(
       source.runId,
       chunks.map((chunk, index) => ({ ...chunk, vectors: vectorsFor(index, embedded.vectors) })),
+      { kinds: ownedKinds },
     );
-    return { status: 'complete', counts: { chunks: stored, embedded: embedded.misses } };
+    return {
+      status: 'complete',
+      counts: {
+        chunks: stored,
+        embedded: embedded.misses,
+        ...(retyped > 0 ? { retyped } : {}),
+      },
+    };
   } catch (error) {
     return { status: 'failed', reason: 'store-unavailable', note: describeError(error).message };
   }

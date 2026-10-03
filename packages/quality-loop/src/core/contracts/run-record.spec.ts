@@ -95,7 +95,7 @@ describe('toRunDto', () => {
 });
 
 describe('summariseExchange', () => {
-  it('[QL-42] counts what the seam kept — past the target, past the ceiling, cut, trimmed — and leaves the fields to the dump', () => {
+  it('[QL-59] counts what the seam kept — past the target, past the ceiling, cut, trimmed — and leaves the fields to the dump', () => {
     const overrun = (handling: OverrunHandling, actual: number): Overrun => ({
       path: 'findings[0].rationale',
       at: ['findings', 0, 'rationale'],

@@ -8,8 +8,10 @@ import {
   bound,
   bounded,
   DECISIONS,
+  DOCUMENT_MEMORY_KINDS,
   exact,
   keptAtMost,
+  KNOWLEDGE_ITEM_KINDS,
   LESSON_CHUNK_BOUND,
   RECALL_ORIGINS,
   type RecallOrigin,
@@ -97,7 +99,30 @@ const SOURCE_ID_MAX_LENGTH = 80;
 const SOURCE_REF_MAX_LENGTH = 200;
 const SOURCE_WHEN_MAX_LENGTH = 40;
 
-export const CHUNK_KINDS = ['section', 'finding', 'criterion', 'lesson'] as const;
+/**
+ * What a stored chunk is. `lesson` is what to do next time and `section` a
+ * passage of a document; `finding` and `criterion` are a run's own evidence,
+ * kept in the register the engine recorded it in; the knowledge kinds are what
+ * a run was found to teach. A candidate of any kind is judged the same way —
+ * on its own text — so the list is open to the next kind of thing worth
+ * remembering, and widening it leaves every stored point parsing.
+ */
+export const CHUNK_KINDS = [
+  'section',
+  'finding',
+  'criterion',
+  'lesson',
+  // What a document digest writes about the person it is about: a fact a field
+  // can take, a course of events kept whole for a field asking them to recount
+  // one, and a bound on what they may claim. Named apart from the knowledge
+  // kinds below, which are an agent's own knowledge about its own work: a
+  // writer owns a run's points by kind, so a shared kind would have two writers
+  // erase each other, and a probe for this person's career must not return
+  // engineering knowledge.
+  ...DOCUMENT_MEMORY_KINDS,
+  ...KNOWLEDGE_ITEM_KINDS,
+] as const;
+export type ChunkKind = (typeof CHUNK_KINDS)[number];
 
 export const chunkSourceSchema = z.strictObject({
   runId: bounded.id(SOURCE_ID_MAX_LENGTH, { min: 1 }),

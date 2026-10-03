@@ -7,11 +7,18 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { MemoryLineageDto } from '@sysdesign/contracts';
+import {
+  KNOWLEDGE_GROUNDINGS,
+  KNOWLEDGE_POLARITIES,
+  SEVERITIES,
+  TRANSITION_KINDS,
+  type MemoryLineageDto,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
   EVIDENCE_KINDS,
+  type ChunkFacets,
   type IndexedChunk,
   type MemoryHit,
   type VectorName,
@@ -33,26 +40,59 @@ const INDEX_GENERATION = 'v2';
 export const collectionName = (model: string, dimensions: number): string =>
   `quality-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
 
-/**
- * Payload fields a filter may use; each gets a keyword index. The lineage
- * fields are what a recall screens by — the run that judged a lesson's
- * evidence, the run it adopted, the prompt it was asked — and are indexed on
- * an existing collection as well as a new one, since the payload grew them
- * without a generation bump: the vectors did not change, only what rides
- * beside them.
- */
-export const INDEXED_FIELDS = [
-  'runId',
-  'pipeline',
-  'kind',
-  'lineage.judged.runId',
-  'lineage.adoptedFrom.runId',
-  'lineage.goalHash',
+/** The index types Qdrant builds, as it names them. */
+export const PAYLOAD_INDEX_SCHEMAS = [
+  'keyword',
+  'integer',
+  'float',
+  'bool',
+  'datetime',
+  'uuid',
+  'text',
 ] as const;
+export type PayloadIndexSchema = (typeof PAYLOAD_INDEX_SCHEMAS)[number];
 
-/** The indexed fields a collection does not yet have, read from its own payload schema. */
-export const missingIndexes = (payloadSchema: Readonly<Record<string, unknown>>): string[] =>
-  INDEXED_FIELDS.filter((field) => !(field in payloadSchema));
+/**
+ * Payload fields a filter may use, each declaring the index it needs. The
+ * facets are here because a search that cannot narrow by them is a search that
+ * reads the whole store: measured on the live corpus, a candidate digested from
+ * the same pipeline as the query was twice as likely to be kept as one from
+ * another. The lineage paths are what a recall screens by — the run that judged
+ * a lesson's evidence, the run it adopted, the prompt it was asked. Indexes are
+ * ensured on every boot, not only when the collection is created, so a field
+ * added here reaches a collection that already exists: the payload grew both
+ * without a generation bump, since the vectors did not change, only what rides
+ * beside them.
+ *
+ * The index type is DECLARED per field rather than assumed, because Qdrant
+ * accepts a keyword index on a numeric field and then never matches an integer
+ * filter against it — which reads as "nothing found" rather than as an error.
+ * Every field here is a string or an array of strings today; the declaration is
+ * what keeps that from being an assumption the next field inherits. A lineage's
+ * `iteration` is not indexed: the novelty screen compares iterations in code
+ * after fusion, never in a store filter.
+ *
+ * A nested field is written as Qdrant addresses it, dotted (`a.b`); `rootOf`
+ * gives the key the payload itself carries.
+ */
+export const INDEXED_FIELDS: Readonly<Record<string, PayloadIndexSchema>> = {
+  runId: 'keyword',
+  pipeline: 'keyword',
+  kind: 'keyword',
+  dimension: 'keyword',
+  polarity: 'keyword',
+  transition: 'keyword',
+  grounding: 'keyword',
+  topics: 'keyword',
+  criterionKinds: 'keyword',
+  findingTypes: 'keyword',
+  'lineage.judged.runId': 'keyword',
+  'lineage.adoptedFrom.runId': 'keyword',
+  'lineage.goalHash': 'keyword',
+};
+
+/** The payload key a (possibly dotted) indexed field path begins at. */
+export const rootOf = (field: string): string => field.split('.')[0];
 
 /** A UUID-shaped digest of (source run, ref): the same memory always lands on the same point. */
 export function pointId(sourceRunId: string, ref: string): string {
@@ -81,6 +121,26 @@ const lineageSchema = z.strictObject({
   goalHash: z.string().length(SHA256_HEX_LENGTH),
 }) satisfies z.ZodType<MemoryLineageDto>;
 
+/**
+ * The facets, flat so Qdrant can index them and every one optional so the
+ * points written before they existed still parse — a strict schema would
+ * otherwise make every older point invisible to recall rather than merely
+ * unfacetted.
+ */
+const facetFields = {
+  polarity: z.enum(KNOWLEDGE_POLARITIES).optional(),
+  dimension: z.string().min(1).nullable().optional(),
+  topics: z.array(z.string().min(1)).optional(),
+  criterionKinds: z.array(z.string().min(1)).optional(),
+  findingTypes: z.array(z.string().min(1)).optional(),
+  transition: z.enum(TRANSITION_KINDS).nullable().optional(),
+  grounding: z.enum(KNOWLEDGE_GROUNDINGS).optional(),
+  severity: z.enum(SEVERITIES).optional(),
+  support: z.strictObject({ confirms: z.number().int(), contradicts: z.number().int() }).optional(),
+};
+
+const FACET_NAMES = Object.keys(facetFields) as (keyof ChunkFacets)[];
+
 const payloadSchema = chunkSourceSchema.extend({
   text: z.string().min(1),
   /** The texts this point's named vectors are of — the store describes itself. */
@@ -92,6 +152,7 @@ const payloadSchema = chunkSourceSchema.extend({
   /** Absent on a point written before lineage was recorded: it reads as null until its run is re-indexed. */
   lineage: lineageSchema.nullable().default(null),
   storedAt: z.string(),
+  ...facetFields,
 });
 
 export type ChunkPayload = z.infer<typeof payloadSchema>;
@@ -107,18 +168,67 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
     digestRunId: chunk.digestRunId,
     lineage: chunk.lineage,
     storedAt,
+    ...(chunk.facets ?? {}),
   };
+}
+
+/** The facets a payload carries, or undefined when it carries none — so an older point reads exactly as it did. */
+function facetsOf(payload: ChunkPayload): ChunkFacets | undefined {
+  const entries = FACET_NAMES.flatMap((name) =>
+    payload[name] === undefined ? [] : [[name, payload[name]] as const],
+  );
+  return entries.length === 0 ? undefined : (Object.fromEntries(entries) as ChunkFacets);
 }
 
 /** A hit from a stored payload, or null for a point this module did not write. */
 export function fromPayload(payload: unknown, score: number): MemoryHit | null {
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return null;
-  const { text, contentHash, model, evidence, digestRunId, lineage, storedAt, keys, ...source } =
-    parsed.data;
+  const {
+    text,
+    contentHash,
+    model,
+    evidence,
+    digestRunId,
+    lineage,
+    storedAt,
+    keys,
+    polarity,
+    dimension,
+    topics,
+    criterionKinds,
+    findingTypes,
+    transition,
+    grounding,
+    severity,
+    support,
+    ...source
+  } = parsed.data;
   // Neither is a fact about the hit: one is when it was written, the other is
-  // what it was indexed by, and a reader judges the lesson, not its key.
+  // what it was indexed by, and a reader judges the lesson, not its key. The
+  // facets are destructured out of `source` and handed back under one key, so
+  // a chunk source stays exactly the recall pipeline's own shape.
   void storedAt;
   void keys;
-  return { text, contentHash, model, evidence, digestRunId, lineage, source, score };
+  void polarity;
+  void dimension;
+  void topics;
+  void criterionKinds;
+  void findingTypes;
+  void transition;
+  void grounding;
+  void severity;
+  void support;
+  const facets = facetsOf(parsed.data);
+  return {
+    text,
+    contentHash,
+    model,
+    evidence,
+    digestRunId,
+    lineage,
+    source,
+    score,
+    ...(facets === undefined ? {} : { facets }),
+  };
 }

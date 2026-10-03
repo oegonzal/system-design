@@ -21,7 +21,7 @@ const chunk = z.strictObject({ text: bounded.text(LESSON_CHUNK_BOUND, { min: 1 }
 const prose = (length: number): string => 'word '.repeat(Math.ceil(length / 5)).slice(0, length);
 
 describe('a stored lesson’s text', () => {
-  it('[QL-41] is the two halves joined once, so halves at their targets or ceilings are a chunk at its own', () => {
+  it('[QL-58] is the two halves joined once, so halves at their targets or ceilings are a chunk at its own', () => {
     const at = (size: 'target' | 'ceiling') =>
       lessonText({
         insight: prose(LESSON_INSIGHT_BOUND[size]),
@@ -32,7 +32,7 @@ describe('a stored lesson’s text', () => {
     expect(at('target').split(LESSON_SEPARATOR)).toHaveLength(2);
   });
 
-  it('[QL-41] a lesson a digest kept — each half up to its cut — is a chunk a lenient read keeps whole', () => {
+  it('[QL-58] a lesson a digest kept — each half up to its cut — is a chunk a lenient read keeps whole', () => {
     // Far past every cut: the digest's own read cuts each half at a word with the marker.
     const reply = parseLenient(halves, {
       insight: prose(CUT_FACTOR * LESSON_INSIGHT_BOUND.target * 2),

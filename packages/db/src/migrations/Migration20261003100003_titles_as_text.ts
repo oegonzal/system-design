@@ -8,7 +8,7 @@ import { Migration } from '@mikro-orm/migrations';
  * every other prose column already is, so only the declared bound limits it.
  * Nothing stored is longer than 120, so the way back loses nothing.
  */
-export class Migration20261003100002_titles_as_text extends Migration {
+export class Migration20261003100003_titles_as_text extends Migration {
   override up(): void | Promise<void> {
     this.addSql(`alter table "prompt" alter column "title" type text using ("title"::text);`);
     this.addSql(`alter table "star_story" alter column "title" type text using ("title"::text);`);

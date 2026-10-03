@@ -420,7 +420,7 @@ describe('a lost produce', () => {
     },
   });
 
-  it('[QL-45] costs its iteration, never the run: decided on the record, then asked again in the same mode from the same best, told every fault it was refused for', async () => {
+  it('[QL-62] costs its iteration, never the run: decided on the record, then asked again in the same mode from the same best, told every fault it was refused for', async () => {
     const inputs: ProducerInput<TinyOutput>[] = [];
     const trace = await runLoop(
       scriptedStages({
@@ -469,7 +469,7 @@ describe('a lost produce', () => {
     expect(trace.bestIteration).toBe(3);
   });
 
-  it('[QL-45] a lost first produce is asked again from the goal, and any artifact after it takes the crown', async () => {
+  it('[QL-62] a lost first produce is asked again from the goal, and any artifact after it takes the crown', async () => {
     const inputs: ProducerInput<TinyOutput>[] = [];
     const trace = await runLoop(
       scriptedStages({ producer: recording(scriptedProducer([null, DRAFT_1], [refused]), inputs) }),
@@ -484,7 +484,7 @@ describe('a lost produce', () => {
     expect(trace.stopReason).toBe('max-iterations');
   });
 
-  it('[QL-45] stops produce-lost once the run lost more than its policy allows, standing on the last decision made on an artifact', async () => {
+  it('[QL-62] stops produce-lost once the run lost more than its policy allows, standing on the last decision made on an artifact', async () => {
     const published: RunProgress<TinyOutput>[] = [];
     const trace = await runLoop(
       scriptedStages({ producer: scriptedProducer([DRAFT_1, null]) }),
@@ -645,7 +645,7 @@ describe('a size overrun', () => {
 });
 
 describe('runPipeline', () => {
-  it('[QL-9] [QL-45] when every model call fails it escalates honestly: llm-failed diagnostics, no criteria, no invented number, every miss recorded, the produce asked once more', async () => {
+  it('[QL-9] [QL-62] when every model call fails it escalates honestly: llm-failed diagnostics, no criteria, no invented number, every miss recorded, the produce asked once more', async () => {
     const exchanges: LlmExchange[] = [];
     const trace = await runPipeline(
       tinyPipeline(),

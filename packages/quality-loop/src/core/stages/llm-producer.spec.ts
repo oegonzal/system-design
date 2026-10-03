@@ -110,7 +110,7 @@ describe('createLlmProducer', () => {
     });
   });
 
-  it('[QL-45] a reply the schema refused answers nothing, with every fault it was refused for — on the diagnostic as well', async () => {
+  it('[QL-62] a reply the schema refused answers nothing, with every fault it was refused for — on the diagnostic as well', async () => {
     const produced = await createLlmProducer(
       definition.task,
       definition.producer,
@@ -137,7 +137,7 @@ describe('createLlmProducer', () => {
     });
   });
 
-  it('[QL-45] is told why its last reply was refused under its own heading, apart from what a validator refused', async () => {
+  it('[QL-62] is told why its last reply was refused under its own heading, apart from what a validator refused', async () => {
     const calls: LlmCall[] = [];
     const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
     await createLlmProducer(definition.task, definition.producer, llm).produce({

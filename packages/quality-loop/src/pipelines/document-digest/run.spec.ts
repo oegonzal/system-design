@@ -49,11 +49,11 @@ describe('the document-digest loop', () => {
     expect(trace.iterations).toHaveLength(2);
     for (const iteration of trace.iterations) {
       expect(iteration.validation.every((report) => report.problems.length === 0)).toBe(true);
+      // Places only: the unused section is read, never pointed at.
       expect(iteration.locations.map((location) => location.id)).toEqual([
         'summary',
         'memory.1',
         'memory.2',
-        'section.3',
       ]);
       expect(iteration.ledger.findings.map((finding) => finding.key)).toEqual([
         'invented_fact|memory.1',

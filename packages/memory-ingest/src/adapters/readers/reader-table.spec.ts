@@ -48,7 +48,7 @@ describe('tableReader', () => {
   });
 
   it('[ING-2] declares its readers by extension', () => {
-    expect(Object.keys(READERS)).toEqual(['.pdf', '.md', '.markdown', '.txt']);
+    expect(Object.keys(READERS)).toEqual(['.pdf', '.md', '.markdown', '.txt', '.jsonl']);
   });
 
   it('[ING-2] reads markdown and plain text verbatim, whatever the case of the extension', async () => {
@@ -72,13 +72,25 @@ describe('tableReader', () => {
     expect(pages[1]).toContain('Page two text');
   });
 
+  it('[ING-2] reads JSON Lines as one titled section per record', async () => {
+    const path = join(dir, 'records.jsonl');
+    await writeFile(
+      path,
+      `${JSON.stringify({ text: 'Oscar built it.', metadata: { title: 'Backend', evidence_status: 'resume_reported' } })}\n`,
+      'utf8',
+    );
+    expect(await tableReader().read(path)).toBe(
+      '# Backend — evidence status: resume_reported\n\nOscar built it.',
+    );
+  });
+
   it('[ING-2] refuses an extension the table does not name, by name, and never guesses', async () => {
     const reader = tableReader();
     const docx = join(dir, 'resume.docx');
     await writeFile(docx, 'not read', 'utf8');
     await expect(reader.read(docx)).rejects.toBeInstanceOf(UnsupportedDocument);
     await expect(reader.read(docx)).rejects.toThrow(
-      `${docx}: no reader for ".docx" — readers exist for .pdf, .md, .markdown, .txt`,
+      `${docx}: no reader for ".docx" — readers exist for .pdf, .md, .markdown, .txt, .jsonl`,
     );
     await expect(reader.read(join(dir, 'README'))).rejects.toThrow(
       'no reader for a file without an extension',

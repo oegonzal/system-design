@@ -12,7 +12,7 @@ const schema = z.strictObject({
 const ask = { system: 's', user: 'u', schema };
 
 describe('the fake model clients', () => {
-  it('[QL-42] read a canned answer as the seam does: an overrun kept and reported, a structural fault named', async () => {
+  it('[QL-59] read a canned answer as the seam does: an overrun kept and reported, a structural fault named', async () => {
     const calls: LlmCall[] = [];
     const over = 'word '.repeat(80).trim();
     const kept = await asDetailed(
@@ -34,7 +34,7 @@ describe('the fake model clients', () => {
     expect(refused).toMatchObject({ value: null, issues: [{ path: 'kind', soft: false }] });
   });
 
-  it('[QL-42] a sequenced miss names the closest canned answer’s faults', async () => {
+  it('[QL-59] a sequenced miss names the closest canned answer’s faults', async () => {
     const llm = sequencedLlm({ summary: 'short', kind: 'bus' }, { other: true });
     await expect(llm.completeStructuredDetailed(ask)).resolves.toMatchObject({
       value: null,

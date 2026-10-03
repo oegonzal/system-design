@@ -71,7 +71,7 @@ describe('the experience-digest input codec', () => {
     expect(readIndex(legacy)?.evidence.map((item) => item.iterations)).toEqual([[], []]);
   });
 
-  it('[QL-41] a record a composer handed over a little past a text’s target is still a record', () => {
+  it('[QL-58] a record a composer handed over a little past a text’s target is still a record', () => {
     const record = fromRun(sampleRun());
     if (record === null) throw new Error('the sample run must compose');
     const [finding] = record.findings;

@@ -5,19 +5,28 @@
  * one the memory store consumes, so a fact is stored as the digest wrote it:
  * the insight is what a form field could take, the condition is the question
  * a form would ask, and the probes a form's labels become are searched in
- * that register.
+ * that register. Each item also declares its kind, which becomes the stored
+ * chunk's kind, so a probe can ask for the shape a field needs — a fact for a
+ * short input, a story for one asking the subject to recount something, a
+ * boundary for one a careless answer would overstate — instead of reading one
+ * flat register and hoping rank sorts them.
  *
- * A location is a PLACE in the digest — the summary, each memory, each
- * unused slot — never a memory's citation, for the reason the experience
- * digest learned the hard way: a finding is located at the memory it faults
- * and names the sections in its rationale, so admission excludes that memory
- * and no other.
+ * A location is a PLACE in the digest — the summary and each memory — never
+ * a section, for the reason the experience digest learned the hard way: a
+ * finding is located at the memory it faults and names the sections in its
+ * rationale, so admission excludes that memory and no other. The first live
+ * runs taught the second half: when some section aliases were locations (the
+ * ones under `unused`) and others were not, the judges cited sections freely,
+ * the schema refused the reply, and a run lost samples to it. A fact no
+ * memory holds is located at the summary.
  */
 import {
   bound,
   bounded,
   DOCUMENT_MAX_MEMORIES,
   DOCUMENT_MAX_PARTS,
+  DOCUMENT_MEMORY_KIND_USES,
+  DOCUMENT_MEMORY_KINDS,
   LESSON_APPLIES_WHEN_BOUND,
   LESSON_INSIGHT_BOUND,
   lessonText,
@@ -46,6 +55,11 @@ export const documentDigestSchema = z.strictObject({
   memories: bounded.list(
     MEMORIES_BOUND,
     z.strictObject({
+      kind: z
+        .enum(DOCUMENT_MEMORY_KINDS)
+        .describe(
+          DOCUMENT_MEMORY_KINDS.map((k) => `${k}: ${DOCUMENT_MEMORY_KIND_USES[k]}`).join(' | '),
+        ),
       evidence: bounded.list(MEMORY_EVIDENCE_BOUND, evidence, {
         min: 1,
         description: 'The sections this fact rests on; a section may back several facts.',
@@ -79,7 +93,6 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
       id: `memory.${index + 1}`,
       label: memory.insight,
     })),
-    ...digest.unused.map((id) => ({ id, label: 'unused' })),
   ],
 
   render: (digest) =>
@@ -89,7 +102,7 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
         'Memories',
         digest.memories.map(
           (memory, index) =>
-            `[memory.${index + 1}] on ${cited(memory.evidence)}: ${lessonText(memory)}`,
+            `[memory.${index + 1}] ${memory.kind} on ${cited(memory.evidence)}: ${lessonText(memory)}`,
         ),
       ),
       ...section('Unused', digest.unused.length > 0 ? [cited(digest.unused)] : []),

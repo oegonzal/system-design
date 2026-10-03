@@ -1,7 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { QdrantClient } from '@qdrant/js-client-rest';
-import { MemoryEmbedding } from '@sysdesign/db';
+import { MemoryEmbedding, MemorySupport } from '@sysdesign/db';
 import {
   createEmbeddingClientFromEnv,
   embeddingAvailability,
@@ -10,6 +10,7 @@ import {
 } from '@sysdesign/llm';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
+import type { KnowledgePorts, SupportStore } from '../../orchestrators/knowledge/ports';
 import type {
   EmbeddingCache,
   MemoryPorts,
@@ -23,13 +24,16 @@ import { MemoryController } from './memory.controller';
 import { MemoryRunRecall } from './memory-run-recall';
 import { MemoryService } from './memory.service';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
+import { MikroOrmMemorySupport } from './persistence/mikro-orm-memory-support';
 import { LlmQueryProbes } from './query-probes/llm-query-probes';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant/qdrant-memory-store';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
+  KNOWLEDGE_PORTS,
   MEMORY_PORTS,
   MEMORY_STORE,
+  MEMORY_SUPPORT,
   QUERY_PROBES,
 } from './tokens';
 
@@ -49,6 +53,8 @@ const qdrantStore = (client: EmbeddingClient): QdrantMemoryStore =>
     }),
     client.model,
     client.dimensions,
+    () => new Date(),
+    (message) => logger.warn(message),
   );
 
 /** The memory orchestrator's ports, bound once from the adapters this module built. */
@@ -76,7 +82,11 @@ const memoryPorts = (
  * an orchestration.
  */
 @Module({
-  imports: [RunsModule, OrchestrationRecordModule, MikroOrmModule.forFeature([MemoryEmbedding])],
+  imports: [
+    RunsModule,
+    OrchestrationRecordModule,
+    MikroOrmModule.forFeature([MemoryEmbedding, MemorySupport]),
+  ],
   controllers: [MemoryController],
   providers: [
     MemoryService,
@@ -85,6 +95,7 @@ const memoryPorts = (
     // client that carries its reason — the memory tier is optional.
     { provide: EMBEDDING_CLIENT, useFactory: createEmbeddingClientFromEnv },
     { provide: EMBEDDING_CACHE, useClass: MikroOrmEmbeddingCache },
+    { provide: MEMORY_SUPPORT, useClass: MikroOrmMemorySupport },
     { provide: MEMORY_STORE, useFactory: qdrantStore, inject: [EMBEDDING_CLIENT] },
     // The same client the runs module uses.
     {
@@ -98,7 +109,19 @@ const memoryPorts = (
       useFactory: memoryPorts,
       inject: [EMBEDDING_CLIENT, EMBEDDING_CACHE, MEMORY_STORE, QUERY_PROBES],
     },
+    // The same objects the memory ports hold, plus the support store: one
+    // adapter set, two port shapes, so nothing is built twice.
+    {
+      provide: KNOWLEDGE_PORTS,
+      useFactory: (memory: MemoryPorts, support: SupportStore): KnowledgePorts => ({
+        embedding: memory.embedding,
+        embeddings: memory.embeddings,
+        store: memory.store,
+        support,
+      }),
+      inject: [MEMORY_PORTS, MEMORY_SUPPORT],
+    },
   ],
-  exports: [MEMORY_PORTS, MEMORY_STORE, EMBEDDING_CLIENT],
+  exports: [MEMORY_PORTS, KNOWLEDGE_PORTS, MEMORY_STORE, EMBEDDING_CLIENT],
 })
 export class MemoryModule {}
