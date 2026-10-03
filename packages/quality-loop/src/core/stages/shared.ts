@@ -4,7 +4,7 @@
  * it was asked for — and the one way a lens asks the model once per sample.
  */
 import {
-  describeIssue,
+  describeOverrun,
   type Diagnostic,
   type DiagnosticFacts,
   type DiagnosticReason,
@@ -54,25 +54,9 @@ export const failedDiagnostic = (
     issues.length > 0 ? { issues: [...issues] } : undefined,
   );
 
-/**
- * An overrun as the size fault it is — noted, never refused — so it is worded
- * by the one wording every size fault has.
- */
-export const overrunIssue = (overrun: Overrun): SchemaIssue => ({
-  code: 'too_big',
-  path: overrun.path,
-  at: overrun.at,
-  message: overrun.handling,
-  maximum: overrun.ceiling,
-  target: overrun.target,
-  actual: overrun.actual,
-  kind: overrun.kind,
-  soft: true,
-});
-
 /** One field a reply wrote past the size it was asked for, as the seam handled it. */
 export const overrunDiagnostic = (stage: string, overrun: Overrun): Diagnostic =>
-  stageDiagnostic(stage, 'overrun', describeIssue(overrunIssue(overrun)), { overrun });
+  stageDiagnostic(stage, 'overrun', describeOverrun(overrun), { overrun });
 
 /** A lens sample that produced nothing: never evidence, always traced. */
 export const skipped = <R>(

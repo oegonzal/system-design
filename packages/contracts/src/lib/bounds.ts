@@ -510,6 +510,25 @@ export function describeIssue(issue: SchemaIssue): string {
   return `${issue.path}: ${issue.message}${note}`;
 }
 
+/**
+ * An overrun as the size fault it is — noted, never refused — so it is worded
+ * by the one wording every size fault has.
+ */
+export const overrunIssue = (overrun: Overrun): SchemaIssue => ({
+  code: 'too_big',
+  path: overrun.path,
+  at: overrun.at,
+  message: overrun.handling,
+  maximum: overrun.ceiling,
+  target: overrun.target,
+  actual: overrun.actual,
+  kind: overrun.kind,
+  soft: true,
+});
+
+/** One field past its target, in the one wording: what a diagnostic, a warning and a log line say alike. */
+export const describeOverrun = (overrun: Overrun): string => describeIssue(overrunIssue(overrun));
+
 // ---- the lenient parse -----------------------------------------------------
 
 /** What the parse changed on the way to a value: never a word of prose. */

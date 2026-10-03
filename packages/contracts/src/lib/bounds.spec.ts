@@ -10,11 +10,13 @@ import {
   CUT_MARKER,
   cutPoint,
   describeIssue,
+  describeOverrun,
   exact,
   jsonSchemaBoundPath,
   keptAtMost,
   locationPath,
   modelSchema,
+  overrunIssue,
   overrunsOf,
   parseLenient,
   schemaIssuesOf,
@@ -345,5 +347,23 @@ describe('parseLenient', () => {
     expect(describeIssue({ ...issue, soft: false })).toBe(
       'findings[2].rationale: 1,200 characters; 900 asked, 1,125 accepted',
     );
+  });
+
+  it('[QL-41] words an overrun as the size fault it is, noted and not refused, a list in items', () => {
+    const claim = z.strictObject({
+      claims: bounded.list(bound(6, 'list'), bounded.text(CLAIM)),
+    });
+    const parsed = parseLenient(claim, {
+      claims: ['c'.repeat(480), ...Array.from({ length: 9 }, () => 'held')],
+    });
+    if (!parsed.ok) throw new Error('only sizes are at fault');
+    expect(parsed.overruns.map(describeOverrun).sort()).toEqual([
+      `claims: 10 items; 6 asked, 8 accepted ${SOFT_ISSUE_NOTE}`,
+      `claims[0]: 480 characters; 300 asked, 375 accepted ${SOFT_ISSUE_NOTE}`,
+    ]);
+    // The overrun is the issue a strict reader of the same text would have been told about.
+    const [overrun] = parsed.overruns.filter((item) => item.kind === 'text');
+    expect(describeOverrun(overrun)).toBe(describeIssue(overrunIssue(overrun)));
+    expect(overrunIssue(overrun)).toMatchObject({ code: 'too_big', soft: true, kind: 'text' });
   });
 });

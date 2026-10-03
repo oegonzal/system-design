@@ -6,11 +6,10 @@
  * artifact the way the seam reads a reply, so they split exactly where it
  * does: a structural fault blocks, a size is a warning that blocks nothing.
  */
-import { describeIssue } from '@sysdesign/contracts';
+import { describeIssue, describeOverrun } from '@sysdesign/contracts';
 
 import { problem, readArtifact } from '../contracts';
 import type { Validator } from '../ports';
-import { overrunIssue } from './shared';
 
 export const SCHEMA_VALIDATOR_ID = 'schema';
 export const BOUNDS_VALIDATOR_ID = 'bounds';
@@ -51,9 +50,7 @@ export function createBoundsValidator<T>(): Validator<T> {
       return {
         validatorId: BOUNDS_VALIDATOR_ID,
         gate: 'warn',
-        problems: parsed.overruns.map((overrun) =>
-          problem('info', describeIssue(overrunIssue(overrun))),
-        ),
+        problems: parsed.overruns.map((overrun) => problem('info', describeOverrun(overrun))),
       };
     },
   };

@@ -8,6 +8,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   DEFAULT_IMPROVE_ITERATIONS,
   describeInFlight,
+  describeOverrun,
   describeUnassessedBase,
   designSubmissionSchema,
   layoutGraph,
@@ -22,7 +23,6 @@ import {
   type ImproveIterationOutcome,
   type ImproveRunDto,
   type LenientParse,
-  type Overrun,
   type QualityRunStatus,
   type StartImproveDto,
   type StartImproveRequest,
@@ -53,12 +53,6 @@ const UNSCORED_OUTCOME: Readonly<Record<UnscoredReason, ImproveIterationOutcome>
 
 /** The submission's declared bounds, indexed once: what an import measures the coach's fields against. */
 const SUBMISSION_BOUNDS = modelSchema(designSubmissionSchema).bounds;
-
-const grouped = (value: number): string => value.toLocaleString('en-US');
-
-/** One field past its target, for the log, in the contracts' wording of a size fault and how it was kept. */
-const describeOverrun = ({ path, actual, kind, target, ceiling, handling }: Overrun): string =>
-  `${path}: ${grouped(actual)} ${kind === 'list' ? 'items' : 'characters'}; ${grouped(target)} asked, ${grouped(ceiling)} accepted (${handling})`;
 
 /**
  * The coach: the same run as a grade, allowed to iterate, whose producer is

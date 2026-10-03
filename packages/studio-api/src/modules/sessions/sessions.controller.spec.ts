@@ -10,6 +10,7 @@ import {
   NARRATION_OVERVIEW_BOUND,
   PROMPT_COPY,
   recallWithout,
+  SOFT_ISSUE_NOTE,
   type ApiErrorResponse,
   type CanvasGraph,
   type ConfirmedFinding,
@@ -1686,16 +1687,17 @@ describe('sessions', () => {
       );
       expect(imported.body.data.brief?.bindings[0]?.claim).toBe(claim);
       expect(imported.body.data.narrative?.overview).toBe(overview);
+      // In the one wording every size fault has — the loop's diagnostics and warnings say the same.
       const grouped = (n: number) => n.toLocaleString('en-US');
       const { target, ceiling } = BINDING_CLAIM_BOUND;
       expect(logged).toHaveBeenCalledWith(
         expect.stringContaining(
-          `brief.bindings[0].claim: ${claim.length} characters; ${target} asked, ${ceiling} accepted (kept-over-ceiling)`,
+          `brief.bindings[0].claim: ${claim.length} characters; ${target} asked, ${ceiling} accepted ${SOFT_ISSUE_NOTE}`,
         ),
       );
       expect(logged).toHaveBeenCalledWith(
         expect.stringContaining(
-          `narrative.overview: ${grouped(overview.length)} characters; ${grouped(NARRATION_OVERVIEW_BOUND.target)} asked, ${grouped(NARRATION_OVERVIEW_BOUND.ceiling)} accepted (accepted)`,
+          `narrative.overview: ${grouped(overview.length)} characters; ${grouped(NARRATION_OVERVIEW_BOUND.target)} asked, ${grouped(NARRATION_OVERVIEW_BOUND.ceiling)} accepted ${SOFT_ISSUE_NOTE}`,
         ),
       );
       logged.mockRestore();
