@@ -131,31 +131,177 @@ function trimSeparators(text: string): string {
 const SAYS_SOMETHING = /[\p{L}\p{N}]/u;
 
 /**
+ * The words that only introduce or join a citation — "(see p1)", "(p2 and
+ * k1)", "(cf. d3)" — and say nothing once what they cite is gone. Read only
+ * inside a bracket every label of which was dropped; anywhere else the
+ * curator's words are its own and are kept as written.
+ */
+const CITATION_CONNECTIVES: ReadonlySet<string> = new Set([
+  'see',
+  'cf',
+  'cf.',
+  'e.g.',
+  'i.e.',
+  'per',
+  'via',
+  'and',
+  'or',
+  'also',
+  'in',
+  'at',
+]);
+
+/** The bracket pairs a sentence opens and closes, matched as written; an unclosed one is no pair. */
+const BRACKETS: Readonly<Record<string, string>> = { '(': ')', '[': ']' };
+
+/** Where each matched bracket pair opens and closes, innermost first. */
+function bracketPairs(prose: string): { open: number; close: number }[] {
+  const pairs: { open: number; close: number }[] = [];
+  const opened: { at: number; closer: string }[] = [];
+  for (let index = 0; index < prose.length; index += 1) {
+    const char = prose.charAt(index);
+    const closer = BRACKETS[char];
+    if (closer !== undefined) opened.push({ at: index, closer });
+    else if (opened.at(-1)?.closer === char) {
+      const open = opened.pop()?.at ?? index;
+      pairs.push({ open, close: index });
+    }
+  }
+  return pairs;
+}
+
+/** A range of the prose, start inclusive, end exclusive. */
+interface Span {
+  start: number;
+  end: number;
+}
+
+/**
+ * Whether what a bracket holds, once the dropped labels inside it are taken
+ * out, is only what they left: separators, stops and citation connectives.
+ */
+function onlyDebris(prose: string, inside: Span, dropped: readonly Span[]): boolean {
+  let rest = '';
+  let cursor = inside.start;
+  for (const span of dropped) {
+    rest += ` ${prose.slice(cursor, span.start)} `;
+    cursor = span.end;
+  }
+  rest += prose.slice(cursor, inside.end);
+  return rest
+    .split(/\s+/u)
+    .map((word) => trimSeparators(word).toLowerCase())
+    .every((word) => word === '' || CITATION_CONNECTIVES.has(word));
+}
+
+/**
+ * Where each dropped group goes: its own span, widened to the bracket around
+ * it — with the space before that bracket — when every label the bracket
+ * holds was dropped and nothing else but what they left is in it. One span
+ * may cover several groups; spans are returned in order and never overlap.
+ */
+function removedSpans(prose: string, groups: readonly { span: Span; dropped: boolean }[]): Span[] {
+  const spans = groups.filter((group) => group.dropped).map((group) => group.span);
+  const within = (span: Span, outer: Span): boolean =>
+    span.start >= outer.start && span.end <= outer.end;
+  const widened = bracketPairs(prose).flatMap(({ open, close }): Span[] => {
+    const inside = { start: open + 1, end: close };
+    const held = groups.filter((group) => within(group.span, inside));
+    if (held.length === 0 || held.some((group) => !group.dropped)) return [];
+    const labels = held.map((group) => group.span);
+    if (!onlyDebris(prose, inside, labels)) return [];
+    let start = open;
+    while (start > 0 && /\s/u.test(prose.charAt(start - 1))) start -= 1;
+    return [{ start, end: close + 1 }];
+  });
+  // An outer bracket swallows an inner one and every group either holds.
+  const all = [...widened, ...spans].sort((a, b) => a.start - b.start || b.end - a.end);
+  const kept: Span[] = [];
+  for (const span of all) {
+    const last = kept.at(-1);
+    if (last !== undefined && span.start < last.end) {
+      last.end = Math.max(last.end, span.end);
+    } else kept.push({ ...span });
+  }
+  return kept;
+}
+
+/** A clause's stop, or a bracket's close: what a removal must not leave a space before. */
+const STOPS_AFTER = /^[,;:.)\]]/u;
+
+/** A bracket's open: what a removal must not leave a space after. */
+const OPENS_BEFORE = /[([]$/u;
+
+/**
+ * `before` and `after` joined where a span was removed: one space where the
+ * removed span had a space beside it, and none before a stop, after a
+ * bracket's open or at either end — the spacing a removal broke, mended there
+ * and nowhere else.
+ */
+function joinAcross(before: string, after: string, spaced: boolean): string {
+  const head = before.replace(/\s+$/u, '');
+  const tail = after.replace(/^\s+/u, '');
+  if (head === '' || tail === '' || STOPS_AFTER.test(tail) || OPENS_BEFORE.test(head)) {
+    return head + tail;
+  }
+  const apart = spaced || head.length < before.length || tail.length < after.length;
+  return apart ? `${head} ${tail}` : head + tail;
+}
+
+/** Whether the prose has a space just inside or just outside either end of a span. */
+const spacedAround = (prose: string, span: Span): boolean =>
+  [span.start - 1, span.start, span.end - 1, span.end].some((index) =>
+    /\s/u.test(prose.charAt(index)),
+  );
+
+/**
  * The curator's words in the asker's terms: each label, or each run of
  * labels listed together, becomes what it stands for — once each, joined as
  * the ref grammar joins a list — or nothing, and what a dropped label leaves
- * behind goes with it: a space before a stop, the separators and stops at
- * either end. A part with no letter or digit left says nothing and is empty;
- * the curator's other words are kept as written. A sentence that names no
- * label is returned as written.
+ * behind goes with it: a bracket that held only dropped labels and the
+ * connectives citing them, a space before a stop where one was removed, the
+ * separators and stops at either end. A part with no letter or digit left
+ * says nothing and is empty; the curator's other words are kept as written.
+ * A sentence that names no label is returned as written.
  */
 export function inAskerTerms(prose: string, terms: AskerTerms): string {
   const mentions = refMentions(prose, [...terms.keys()]);
   if (mentions.length === 0) return prose;
-  let out = '';
-  let cursor = 0;
-  for (const group of groupsOf(prose, mentions)) {
+  const groups = groupsOf(prose, mentions).map((group) => {
     const first = group[0];
     const last = group[group.length - 1];
     const standsFor = [
       ...new Set(group.flatMap((mention) => mention.ids.flatMap((id) => terms.get(id) ?? []))),
     ];
-    out += prose.slice(cursor, first.index) + standsFor.join(' / ');
-    cursor = last.index + last.text.length;
+    return {
+      span: { start: first.index, end: last.index + last.text.length },
+      said: standsFor.join(' / '),
+      dropped: standsFor.length === 0,
+    };
+  });
+  const removed = removedSpans(prose, groups);
+  const edits = [
+    ...removed.map((span) => ({ span, said: null })),
+    ...groups
+      .filter((group) => !group.dropped)
+      .map((group) => ({ span: group.span, said: group.said })),
+  ].sort((a, b) => a.span.start - b.span.start);
+  let out = '';
+  let cursor = 0;
+  // Where the last edit removed a span, whether a space stood beside it.
+  let mend: { spaced: boolean } | null = null;
+  for (const { span, said } of edits) {
+    const between = prose.slice(cursor, span.start);
+    out = mend === null ? out + between : joinAcross(out, between, mend.spaced);
+    if (said === null) mend = { spaced: spacedAround(prose, span) };
+    else {
+      out += said;
+      mend = null;
+    }
+    cursor = span.end;
   }
-  const said = trimSeparators(
-    (out + prose.slice(cursor)).replace(/ {2,}/g, ' ').replace(/ +([,;:])/g, '$1'),
-  );
+  const rest = prose.slice(cursor);
+  const said = trimSeparators(mend === null ? out + rest : joinAcross(out, rest, mend.spaced));
   return SAYS_SOMETHING.test(said) ? said : '';
 }
 

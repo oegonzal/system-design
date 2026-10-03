@@ -138,4 +138,22 @@ describe('memory in the goal', () => {
       '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns — insight: answers and directly; caveat: availability of the read path',
     );
   });
+
+  it('[QL-55] a bracket that held only dropped labels and the words citing them leaves no empty bracket and no space before the stop after it', () => {
+    const usable: UsableMemory = {
+      alias: 'm1',
+      hit: hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
+      support: 1,
+      rubric: [{ id: 'c1', kind: 'need', statement: 'serve a list from an unreliable upstream' }],
+      kept: {
+        chunk: 'm1',
+        serves: 'the read path (c1)',
+        insight: 'guards writes (see p1); keeps reads',
+        caveat: null,
+      },
+    };
+    expect(withMemory(GOAL, [usable])?.goal.split('\n').at(-1)).toBe(
+      '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns — serves: the read path; insight: guards writes; keeps reads',
+    );
+  });
 });

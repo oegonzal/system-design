@@ -97,6 +97,34 @@ describe('a recalled lesson in the asker’s terms', () => {
     );
   });
 
+  it('[QL-55] a bracket left holding only dropped labels and the words that cited them goes with them, and spacing is mended only where a label was removed', () => {
+    const focus: RecallFocusDto = {
+      runId: 'grade-run',
+      iteration: 1,
+      findings: [{ type: 'single_point_of_failure', severity: 'high', rationale: 'one store' }],
+      criteria: [],
+    };
+    const spof = askerTermsOf(focus, []);
+    expect(spof.get('d1')).toEqual(['single point of failure']);
+    // A label that survives beside a bracket of dropped ones: no `()` left behind.
+    expect(inAskerTerms('d1 (p2, k1)', spof)).toBe('single point of failure');
+    // A citation's connective goes with the bracket it was in, and the stop closes up.
+    expect(inAskerTerms('guards writes (see p1); keeps reads', spof)).toBe(
+      'guards writes; keeps reads',
+    );
+    expect(inAskerTerms('guards writes (p1 and k2) and keeps reads', spof)).toBe(
+      'guards writes and keeps reads',
+    );
+    // A bracket with words of the curator's own keeps them, and only the label goes.
+    expect(inAskerTerms('guards writes (p1 shows the queue fills)', spof)).toBe(
+      'guards writes (shows the queue fills)',
+    );
+    // A bracket holding a label that stands for something is kept whole.
+    expect(inAskerTerms('one store (d1, p2)', spof)).toBe('one store (single point of failure)');
+    // Spacing the curator wrote is theirs: only where a label was removed is it mended.
+    expect(inAskerTerms('one  store , then p1', spof)).toBe('one  store , then');
+  });
+
   it('[QL-55] carries where the lesson was learned, and no label the producer or the author never saw', () => {
     const hit = hitOf('Make the enqueue async.', 'run-a', 'memory.2');
     const usable: UsableMemory = {
