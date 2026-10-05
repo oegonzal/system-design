@@ -1,8 +1,10 @@
+import { ELEMENT_REF, refOf } from '@sysdesign/contracts';
+
 /**
  * The grammar of Playwright's `ariaSnapshot({ mode: 'ai' })`, read back. One
  * node per line, indented two spaces per level: a role, an optional quoted
- * name, bracketed attributes — among them the `[ref=eN]` Playwright minted,
- * which `aria-ref=eN` resolves — and a trailing colon when children or
+ * name, bracketed attributes — among them the ref Playwright minted, which
+ * `aria-ref=` resolves — and a trailing colon when children or
  * inline text follow. Property lines (`- /url: …`) and text lines
  * (`- text: …`) are not nodes.
  * Nothing here touches a page; the spec runs over fixture text.
@@ -22,7 +24,6 @@ const NODE_LINE =
 /** The one pseudo-role: a `- text: …` line is a text node, not an element. */
 const TEXT_ROLE = 'text';
 const ATTRIBUTE = /\[([^\]=]+)(?:=([^\]]*))?\]/g;
-const REF = /^e\d+$/;
 
 /** A quoted name with its escapes undone. */
 const unescape = (name: string): string => name.replace(/\\(.)/g, '$1');
@@ -49,7 +50,7 @@ export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
       depth: (groups['indent'] ?? '').length / 2,
       role: groups['role'],
       name: groups['name'] === undefined ? null : unescape(groups['name']),
-      ref: typeof ref === 'string' && REF.test(ref) ? ref : null,
+      ref: typeof ref === 'string' && ELEMENT_REF.test(ref) ? ref : null,
       attributes,
     });
   }
@@ -152,7 +153,7 @@ const nodeLines = (lines: readonly string[]): string[] =>
 /** Each rung below `full`, as what it keeps of the snapshot's lines. */
 const REDUCTIONS: Readonly<Record<Exclude<SnapshotRung, 'full'>, (lines: string[]) => string[]>> = {
   'nodes-only': nodeLines,
-  'refs-only': (lines) => nodeLines(lines).filter((line) => /\[ref=e\d+\]/.test(line)),
+  'refs-only': (lines) => nodeLines(lines).filter((line) => refOf(line) !== null),
   none: () => [],
 };
 

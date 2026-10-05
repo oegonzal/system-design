@@ -53,8 +53,29 @@ export const OBJECTION_AT_BOUND = bound(8, 'list');
 export const OBJECTION_AT_MAX_LENGTH = 40;
 export const OBJECTION_DETAIL_BOUND = bound(900);
 
-/** A ref exactly as Playwright's snapshot minted it: `e12`. Valid only for the observation that minted it. */
-export const ELEMENT_REF = /^e\d+$/;
+/**
+ * A ref exactly as Playwright's snapshot minted it, with nothing read into its
+ * shape. `e12` for a node in the page's own document, `f1e7` for one inside a
+ * frame, and whatever a later version mints: the session carries the token and
+ * `aria-ref=` resolves it, so what has to hold is that it is safe to put in a
+ * selector and short — not that it looks like any particular one of those
+ * forms. Valid only for the observation that minted it.
+ *
+ * Measured live on 2026-10-03: a grammar of `e\d+` rejected every ref on a
+ * search-results page, whose content sits in a frame. Every node came back
+ * ref-less, so a page of 35 links read as having no interactive elements at
+ * all; the snapshot's own refs-only rung, filtering by the same shape in a
+ * second place, kept 0 of its 450 lines; and the producer was handed a
+ * populated page described as empty and faulted for every plan it guessed
+ * from it. One assumption about a token's spelling, three blindnesses.
+ */
+export const ELEMENT_REF = /^[a-z][a-z0-9]{0,19}$/;
+
+/** The ref a snapshot line carries, read with the one declared grammar, or null when it carries none the session may use. */
+export const refOf = (line: string): string | null => {
+  const token = /\[ref=([^\]]*)\]/.exec(line)?.[1];
+  return token !== undefined && ELEMENT_REF.test(token) ? token : null;
+};
 
 export const observedElementSchema = z.strictObject({
   ref: z.string().regex(ELEMENT_REF),

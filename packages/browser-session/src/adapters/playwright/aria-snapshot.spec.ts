@@ -143,3 +143,47 @@ describe('reading a page that has not settled', () => {
     ).toBe('');
   });
 });
+describe('the refs Playwright mints', () => {
+  it('[BRW-2] carries a frame-scoped ref as readily as a same-document one, in the decoder and in the rung that keeps ref lines', () => {
+    // Measured live: a search-results page renders in a frame, so every ref
+    // came back `f1e7` rather than `e7`. Against a grammar of `e\d+` the page
+    // read as having no interactive element at all, and the refs-only rung —
+    // filtering by the same shape in a second place — kept none of its lines.
+    const framed = [
+      '- generic [ref=f1e1]:',
+      '  - link "site home" [ref=f1e7] [cursor=pointer]:',
+      '    - /url: /?t=h_',
+      '  - combobox "Search" [ref=f1e17]: playwright aria snapshot',
+    ].join('\n');
+    expect(decodeAriaSnapshot(framed).map((node) => node.ref)).toEqual(['f1e1', 'f1e7', 'f1e17']);
+    expect(carriesRefNode(framed)).toBe(true);
+
+    // The rung keeps those lines, as it does a same-document page's. The page
+    // is built so reducing it reduces: property lines outnumber node lines,
+    // which is the shape of a real results page.
+    const big = [
+      '- generic [ref=f1e1]:',
+      ...Array.from({ length: 40 }, (_, i) => `  - link "r${i}" [ref=f1e${i + 2}]`),
+      // Ref-less nodes the rung above keeps whole: what makes refs-only the
+      // first rung that fits, so the test reaches the rung it is about.
+      ...Array.from({ length: 200 }, () => `  - generic "${'x'.repeat(80)}"`),
+    ].join('\n');
+    const fitted = fitSnapshot(big, 4_000);
+    expect(fitted.rung).toBe('refs-only');
+    expect(fitted.text).toContain('[ref=f1e2]');
+    expect(fitted.text).not.toContain('/url:');
+
+    // A token that is not safe to put in a selector never becomes a ref —
+    // whether the line is read and its ref refused, or the line is no node at
+    // all. Either way nothing reaches `aria-ref=` that could change what it
+    // selects.
+    for (const bad of ['e1 e2', 'e1]', '../e1', 'E1', '', 'e'.repeat(40)]) {
+      const node = decodeAriaSnapshot(`- link "x" [ref=${bad}]`)[0];
+      expect(node?.ref ?? null).toBeNull();
+    }
+    // And a safe one does, however it is spelled.
+    for (const good of ['e1', 'f1e7', 'f12f3e45']) {
+      expect(decodeAriaSnapshot(`- link "x" [ref=${good}]`)[0]?.ref).toBe(good);
+    }
+  });
+});
