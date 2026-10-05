@@ -57,6 +57,8 @@ export interface SessionState {
   tasks: { open: OpenTask | null; started: number; done: number; skipped: number; failed: number };
   consecutiveFailures: number;
   brainFaults: number;
+  /** Observations in a row the adapter could not read the page from; reset by one it could. */
+  unreadablePages: number;
   operatorStopped: boolean;
   /** What the last executed action promised, checked against the next observation. */
   pending: PendingExpectation | null;
@@ -83,6 +85,7 @@ export function createState(ids: {
     tasks: { open: null, started: 0, done: 0, skipped: 0, failed: 0 },
     consecutiveFailures: 0,
     brainFaults: 0,
+    unreadablePages: 0,
     operatorStopped: false,
     pending: null,
     operatorAnswers: new Map(),
@@ -103,6 +106,7 @@ export const railStateOf = (state: SessionState): RailState => ({
   openTask: state.tasks.open !== null,
   consecutiveFailures: state.consecutiveFailures,
   brainFaults: state.brainFaults,
+  unreadablePages: state.unreadablePages,
   operatorStopped: state.operatorStopped,
 });
 

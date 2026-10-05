@@ -24,6 +24,7 @@ import {
   decodeAriaSnapshot,
   fitSnapshot,
   settledSnapshot,
+  unreadSnapshotLines,
   type SnapshotNode,
 } from './aria-snapshot';
 import {
@@ -68,6 +69,34 @@ export const SETTLE_RETRY_MS = 400;
  */
 export const FACTS_TIMEOUT_MS = 1_000;
 export const OBSERVE_BUDGET_MS = 20_000;
+
+/**
+ * How many times the page is read when a read fails wholesale. A read fails
+ * wholesale when every ref the snapshot handed out came back dead — the page
+ * moved between the snapshot and the facts, so the map is stale — or when the
+ * grammar read no node at all from a snapshot with lines in it. Neither is a
+ * page with nothing on it, and reporting one as the other is what left a
+ * producer planning against a search-results page described as empty.
+ * Measured live on 2026-10-03: 135 elements seen, 135 reads dead.
+ */
+export const PAGE_READS = 3;
+
+/** One read of the page, and what it could not reach. */
+interface PageReading {
+  snapshot: string;
+  elements: ObservedElement[];
+  unreadElements: number;
+  unreadSnapshotLines: number;
+}
+
+/**
+ * Whether a read failed wholesale rather than finding little. Both halves are
+ * facts about the read, never a guess about the page: every ref dead means the
+ * snapshot's map is stale, and no node from a snapshot with lines in it means
+ * the text was not read.
+ */
+const failedWholesale = (reading: PageReading): boolean =>
+  reading.unreadSnapshotLines > 0 || (reading.unreadElements > 0 && reading.elements.length === 0);
 const SCROLL_PX = 600;
 const ROLE_MAX = 40;
 const INPUT_TYPE_MAX = 30;
@@ -153,31 +182,58 @@ export class PlaywrightBrowser implements BrowserPort {
     return settledSnapshot(read, () => page.waitForTimeout(SETTLE_RETRY_MS));
   }
 
-  async observe(): Promise<PageObservation> {
+  /** One read: the snapshot, the elements whose facts came back, and what did not. */
+  private async readOnce(): Promise<PageReading> {
     const page = this.page;
     const snapshot = await this.snapshot();
-    const nodes = decodeAriaSnapshot(snapshot).filter(
+    const nodes = decodeAriaSnapshot(snapshot);
+    const interactive = nodes.filter(
       (node) => node.ref !== null && elementKindOf(node.role) !== 'static',
     );
     const { facts, unread } = await readWithinBudget(
-      nodes.map((node) => node.ref ?? ''),
+      interactive.map((node) => node.ref ?? ''),
       (ref) => readElementFacts(page.locator(`aria-ref=${ref}`), FACTS_TIMEOUT_MS),
       () => Date.now(),
       OBSERVE_BUDGET_MS,
     );
-    const elements: ObservedElement[] = nodes.flatMap((node) => {
+    const elements: ObservedElement[] = interactive.flatMap((node) => {
       const read = facts.get(node.ref ?? '');
       return read === undefined ? [] : [toObservedElement(node, read)];
     });
-    const all = ordered(elements);
+    return {
+      snapshot,
+      elements,
+      unreadElements: unread,
+      unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
+    };
+  }
+
+  /** The page, read again while a read fails wholesale; what the last read reached, either way. */
+  private async readPage(): Promise<PageReading> {
+    let reading = await this.readOnce();
+    for (let read = 2; read <= PAGE_READS && failedWholesale(reading); read += 1) {
+      await this.page.waitForTimeout(SETTLE_RETRY_MS);
+      reading = await this.readOnce();
+    }
+    return reading;
+  }
+
+  async observe(): Promise<PageObservation> {
+    const page = this.page;
+    const reading = await this.readPage();
+    const all = ordered(reading.elements);
     const listed = all.slice(0, ELEMENTS_BOUND.target);
     this.known = new Map(listed.map((element) => [element.ref, element]));
+    const nothingUnread = reading.unreadElements === 0 && reading.unreadSnapshotLines === 0;
     return pageObservationSchema.parse({
       url: clip(page.url(), URL_MAX_LENGTH),
       title: clip(await page.title(), TITLE_BOUND.target),
       elements: listed,
-      omittedElements: all.length - listed.length + unread,
-      ariaSnapshot: fitSnapshot(snapshot, SNAPSHOT_BOUND.target).text,
+      omittedElements: all.length - listed.length,
+      unread: nothingUnread
+        ? null
+        : { elements: reading.unreadElements, snapshotLines: reading.unreadSnapshotLines },
+      ariaSnapshot: fitSnapshot(reading.snapshot, SNAPSHOT_BOUND.target).text,
     });
   }
 

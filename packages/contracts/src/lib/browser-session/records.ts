@@ -21,6 +21,8 @@ export interface SessionRailsDto {
   maxMinutes: number;
   maxConsecutiveFailures: number;
   maxBrainFaults: number;
+  /** Observations in a row the page could not be read before the session stops. */
+  maxUnreadablePages: number;
 }
 
 export interface BrowserSessionDto {

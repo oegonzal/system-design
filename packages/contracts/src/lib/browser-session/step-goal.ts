@@ -142,10 +142,23 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...(observation.omittedElements > 0
       ? [`(${observation.omittedElements} more interactive elements not listed)`]
       : []),
+    // Each fact beside the thing it is about, so "nothing listed" and "more
+    // than are listed" can never read as one page: an element that would not
+    // read is not an element you have.
+    ...(observation.unread !== null && observation.unread.elements > 0
+      ? [
+          `(${observation.unread.elements} interactive elements were seen and could not be read: this observation is incomplete, and nothing follows from what it does not list)`,
+        ]
+      : []),
     '',
     '## Snapshot',
     '',
     observation.ariaSnapshot.trim() || '(empty)',
+    ...(observation.unread !== null && observation.unread.snapshotLines > 0
+      ? [
+          `(the page's own snapshot could not be read: ${observation.unread.snapshotLines} lines came back with nothing the session could use, so this is not a picture of an empty page)`,
+        ]
+      : []),
     '',
     '## Recent actions',
     '',

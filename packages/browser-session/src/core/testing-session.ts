@@ -25,6 +25,7 @@ export const SPEC_RAILS: SessionRailsDto = {
   maxMinutes: 60,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
+  maxUnreadablePages: 3,
 };
 
 export const SPEC_SUBJECT = 'Alex Example';

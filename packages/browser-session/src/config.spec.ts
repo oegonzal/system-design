@@ -77,7 +77,10 @@ describe('the session configuration', () => {
       maxTasks: 2,
       maxMinutes: 5,
       maxConsecutiveFailures: 1,
+      // Rails with no flag of their own come from the declaration, so adding one
+      // cannot silently leave a session running without it.
       maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
+      maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
     });
     expect(() => railsOf({ maxTasks: '0' })).toThrow(
       '--max-tasks must be a positive integer, got "0"',

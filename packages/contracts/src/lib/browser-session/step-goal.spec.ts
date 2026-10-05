@@ -148,4 +148,27 @@ describe('stepPlanSchema', () => {
       expect(json, `the model is never told: ${rule}`).toContain(rule);
     }
   });
+  it('[QL-39] tells a reader what it could not read, apart from what it left past its cap, so "nothing listed" and "more than are listed" can never describe one page', () => {
+    const observation = {
+      ...listingObservation(),
+      elements: [],
+      omittedElements: 0,
+      unread: { elements: 135, snapshotLines: 450 },
+      ariaSnapshot: '',
+    };
+    const goal = goalOf(observation);
+    // The live contradiction this pins: read as one count, an unreadable page
+    // rendered as "(no interactive elements)" directly above "(135 more
+    // interactive elements not listed)", and the producer reasoned from it
+    // that the page was populated — then was faulted for the misreading.
+    expect(goal).toContain('(no interactive elements)');
+    expect(goal).not.toContain('more interactive elements not listed');
+    expect(goal).toContain('135 interactive elements were seen and could not be read');
+    expect(goal).toContain("the page's own snapshot could not be read: 450 lines");
+
+    // Past the cap is the other fact, and says the opposite: you have what matters.
+    const capped = goalOf({ ...listingObservation(), omittedElements: 12, unread: null });
+    expect(capped).toContain('(12 more interactive elements not listed)');
+    expect(capped).not.toContain('could not be read');
+  });
 });

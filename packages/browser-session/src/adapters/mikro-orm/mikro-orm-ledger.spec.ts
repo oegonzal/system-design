@@ -10,7 +10,13 @@ import {
 
 import { MikroOrmLedger } from './mikro-orm-ledger';
 
-const RAILS = { maxTasks: 2, maxMinutes: 30, maxConsecutiveFailures: 3, maxBrainFaults: 3 };
+const RAILS = {
+  maxTasks: 2,
+  maxMinutes: 30,
+  maxConsecutiveFailures: 3,
+  maxBrainFaults: 3,
+  maxUnreadablePages: 3,
+};
 const T0 = new Date('2026-10-03T10:00:00.000Z');
 const at = (seconds: number): Date => new Date(T0.getTime() + seconds * 1000);
 

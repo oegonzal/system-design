@@ -2,7 +2,13 @@ import { BROWSER_SESSION_TERMINATIONS, TERMINATION_STATUS } from '@sysdesign/con
 
 import { checkRails, RAILS, remainingTasks, type RailState } from './rails';
 
-const RAIL_LIMITS = { maxTasks: 2, maxMinutes: 30, maxConsecutiveFailures: 3, maxBrainFaults: 2 };
+const RAIL_LIMITS = {
+  maxTasks: 2,
+  maxMinutes: 30,
+  maxConsecutiveFailures: 3,
+  maxBrainFaults: 2,
+  maxUnreadablePages: 2,
+};
 const START = new Date('2026-10-03T10:00:00.000Z');
 const at = (minutes: number): Date => new Date(START.getTime() + minutes * 60_000);
 
@@ -13,6 +19,7 @@ const state = (overrides: Partial<RailState> = {}): RailState => ({
   openTask: false,
   consecutiveFailures: 0,
   brainFaults: 0,
+  unreadablePages: 0,
   operatorStopped: false,
   ...overrides,
 });
@@ -57,5 +64,20 @@ describe('the rails', () => {
     expect(remainingTasks(state(), RAIL_LIMITS)).toBe(2);
     expect(remainingTasks(state({ tasksStarted: 1 }), RAIL_LIMITS)).toBe(1);
     expect(remainingTasks(state({ tasksStarted: 5 }), RAIL_LIMITS)).toBe(0);
+  });
+
+  it('[BRW-4] stops on a page that will not read, rather than spending the failure budget on plans written against nothing', () => {
+    // The live shape: a results page the adapter could not read, observation
+    // after observation. Before this rail the session asked the brain for a
+    // plan each time, the critics faulted it for guessing, and it stopped
+    // reporting `max-failures` — a true count of a misleading thing.
+    expect(checkRails(state({ unreadablePages: 1 }), RAIL_LIMITS, at(1))).toBeNull();
+    const stopped = checkRails(state({ unreadablePages: 2 }), RAIL_LIMITS, at(1));
+    expect(stopped?.reason).toBe('page-unreadable');
+    expect(stopped?.detail).toContain('2 observations in a row');
+    // It yields to the rails declared before it.
+    expect(
+      checkRails(state({ unreadablePages: 2, operatorStopped: true }), RAIL_LIMITS, at(1))?.reason,
+    ).toBe('operator-stop');
   });
 });

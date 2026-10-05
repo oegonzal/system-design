@@ -48,6 +48,7 @@ export const DEFAULT_RAILS: SessionRailsDto = {
   maxMinutes: 60,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
+  maxUnreadablePages: 3,
 };
 
 /** A session shows its browser unless told otherwise: the operator is expected to watch. */
@@ -119,6 +120,7 @@ export function railsOf(values: {
     maxConsecutiveFailures:
       positiveInteger(values.maxFailures, 'maxFailures') ?? DEFAULT_RAILS.maxConsecutiveFailures,
     maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
+    maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
   };
 }
 

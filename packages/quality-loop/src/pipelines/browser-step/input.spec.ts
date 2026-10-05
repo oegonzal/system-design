@@ -49,6 +49,7 @@ function maximalObservation(): PageObservation {
     title: fill(100, 't'),
     elements: Array.from({ length: ELEMENTS_BOUND.target }, (_, position) => element(position)),
     omittedElements: 12,
+    unread: null,
     ariaSnapshot: fill(SNAPSHOT_BOUND.target, 's'),
   };
 }

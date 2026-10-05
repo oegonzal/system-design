@@ -100,6 +100,14 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   settleExpectation(ctx, observation);
   ctx.dumpFiles('step files', observationFiles(state.step, observation, screenshot));
 
+  // A read that did not reach the page is counted, and one that did clears the
+  // count. The rails are then checked before the brain is asked for anything:
+  // a page that will not read is not a plan anybody can write, and a session
+  // out of time or units of work should not spend another run finding out.
+  state.unreadablePages = observation.unread === null ? 0 : state.unreadablePages + 1;
+  const railed = checkRails(railStateOf(state), options.rails, deps.clock.now());
+  if (railed !== null) return railed;
+
   const startedAt = deps.clock.now();
   let decided: Decided<StepPlan>;
   try {

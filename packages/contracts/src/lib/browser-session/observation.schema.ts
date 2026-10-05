@@ -75,18 +75,41 @@ export const observedElementSchema = z.strictObject({
 });
 export type ObservedElement = z.infer<typeof observedElementSchema>;
 
+/**
+ * What one read of the page did not reach. Never both zero: an observation
+ * with nothing unread carries null instead.
+ */
+export const observationUnreadSchema = z.strictObject({
+  /** Interactive elements the snapshot listed whose DOM facts never came back. */
+  elements: z.number().int().min(0),
+  /**
+   * Non-blank snapshot lines the node grammar read nothing from — all of them,
+   * when a snapshot with lines in it yields no node at all. A text that cannot
+   * be read is not a page with nothing on it.
+   */
+  snapshotLines: z.number().int().min(0),
+});
+export type ObservationUnread = z.infer<typeof observationUnreadSchema>;
+
 export const pageObservationSchema = z.strictObject({
   url: bounded.id(URL_MAX_LENGTH),
   title: bounded.text(TITLE_BOUND),
   elements: bounded.list(ELEMENTS_BOUND, observedElementSchema),
-  /**
-   * Interactive elements the adapter saw but did not list: past the cap, or
-   * not readable inside the observation's budget. An element whose DOM facts
-   * did not arrive is counted here rather than listed, because the adapter
-   * cannot say it is enabled, visible or untrapped — and a plan may act only
-   * on what the observation listed.
-   */
+  /** Interactive elements the adapter saw and ranked but did not list, past the cap. */
   omittedElements: z.number().int().min(0),
+  /**
+   * What the adapter could not read of the page, or null when this observation
+   * is the page. Counted and named rather than folded into `omittedElements`,
+   * because the two mean opposite things to whoever plans next: elements past
+   * the cap say the page has more of what you already have, while elements
+   * that would not read say this observation is incomplete and its emptiness
+   * proves nothing. Measured live on 2026-10-03, with both counted as one, a
+   * results page that read as empty was rendered as "(no interactive
+   * elements)" above "(135 more interactive elements not listed)" — and the
+   * producer, reasoning from that, asserted a populated page and was faulted
+   * for a misreading the goal had handed it.
+   */
+  unread: observationUnreadSchema.nullable(),
   /** The accessibility snapshot as text, clipped to its budget. */
   ariaSnapshot: bounded.text(SNAPSHOT_BOUND),
 });

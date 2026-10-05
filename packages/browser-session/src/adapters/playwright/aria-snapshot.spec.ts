@@ -2,7 +2,7 @@ import {
   EMPTY_SNAPSHOT_READS,
   decodeAriaSnapshot,
   fitSnapshot,
-  hasRef,
+  carriesRefNode,
   settledSnapshot,
 } from './aria-snapshot';
 
@@ -92,8 +92,8 @@ describe('reading a page that has not settled', () => {
   it('[BRW-2] takes a ref-less read again rather than reporting a page with nothing on it, and stops at the declared bound', async () => {
     const nothing = '- generic:\n  - generic';
     const settled = '- generic [ref=e1]:\n  - link "Next" [ref=e2]';
-    expect(hasRef(nothing)).toBe(false);
-    expect(hasRef(settled)).toBe(true);
+    expect(carriesRefNode(nothing)).toBe(false);
+    expect(carriesRefNode(settled)).toBe(true);
 
     // The live shape: the document is mid-navigation for the first two reads —
     // once unreadable altogether, once readable but ref-less — and settles on

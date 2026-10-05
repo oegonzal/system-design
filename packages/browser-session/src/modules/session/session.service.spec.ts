@@ -127,7 +127,13 @@ describe('the session service, end to end', () => {
       goalPath: join(home, 'goal.md'),
       profile: 'spec',
       headed: false,
-      rails: { maxTasks: 3, maxMinutes: 30, maxConsecutiveFailures: 3, maxBrainFaults: 3 },
+      rails: {
+        maxTasks: 3,
+        maxMinutes: 30,
+        maxConsecutiveFailures: 3,
+        maxBrainFaults: 3,
+        maxUnreadablePages: 3,
+      },
     });
     expect(outcome.status).toBe('complete');
     expect(outcome.termination.reason).toBe('mission-complete');

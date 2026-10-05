@@ -27,6 +27,8 @@ export const ENGINE_TERMINATIONS = [
   'max-minutes',
   'max-failures',
   'brain-unavailable',
+  /** The page could not be read, observation after observation: there is nothing to plan against. */
+  'page-unreadable',
   'operator-stop',
   'error',
 ] as const;
@@ -45,6 +47,7 @@ export const TERMINATION_STATUS = {
   'max-minutes': 'stopped',
   'max-failures': 'stopped',
   'brain-unavailable': 'stopped',
+  'page-unreadable': 'stopped',
   'operator-stop': 'stopped',
   error: 'failed',
 } as const satisfies Record<BrowserSessionTermination, BrowserSessionStatus>;

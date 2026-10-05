@@ -64,12 +64,30 @@ export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
  * naming its rung and what it dropped, so the dump and the model both know.
  */
 /**
- * Whether a snapshot carries any ref at all. A settled page has at least one,
- * because Playwright mints a ref for all but the plainest node; a read taken
- * while the document is being replaced carries none — which is not the same
- * thing as a page with nothing on it.
+ * Whether a snapshot carries a node the session can act on: one the grammar
+ * reads and Playwright minted a ref for. A substring test for `[ref=` is not
+ * enough, because a text whose lines the grammar cannot read yields no node
+ * however many refs it mentions — and the session would then see a page with
+ * nothing on it. A settled page has at least one such node; a read taken
+ * while the document is being replaced has none.
  */
-export const hasRef = (snapshot: string): boolean => /\[ref=/.test(snapshot);
+export const carriesRefNode = (snapshot: string): boolean =>
+  decodeAriaSnapshot(snapshot).some((node) => node.ref !== null);
+
+/**
+ * Non-blank lines the node grammar read nothing from: all of them when a
+ * snapshot with lines in it yields no node, and none otherwise.
+ *
+ * `decodeAriaSnapshot` returning nothing says two different things — the page
+ * has nothing on it, or its text could not be read — and until this counted
+ * the difference, nothing downstream could tell them apart. A snapshot the
+ * grammar cannot read also empties the `refs-only` rung, so one failure to
+ * read blinded the producer twice over, with no sign that anything had failed.
+ */
+export function unreadSnapshotLines(snapshot: string, nodes: readonly SnapshotNode[]): number {
+  if (nodes.length > 0) return 0;
+  return snapshot.split('\n').filter((line) => line.trim() !== '').length;
+}
 
 /** How many times a ref-less read is taken again before the page is reported as it stands. */
 export const EMPTY_SNAPSHOT_READS = 4;
@@ -99,7 +117,10 @@ export async function settledSnapshot(
   let last = '';
   for (let taken = 1; taken <= limit; taken += 1) {
     const text = await read();
-    if (text !== null && hasRef(text)) return text;
+    // A page with nothing on it answers with nothing, and is settled at once:
+    // only a text that came back saying something the grammar cannot use is
+    // worth reading again.
+    if (text !== null && (text.trim() === '' || carriesRefNode(text))) return text;
     if (text !== null) last = text;
     if (taken < limit) await between();
   }

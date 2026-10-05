@@ -16,6 +16,8 @@ export interface RailState {
   openTask: boolean;
   consecutiveFailures: number;
   brainFaults: number;
+  /** Observations in a row the adapter could not read the page from. */
+  unreadablePages: number;
   operatorStopped: boolean;
 }
 
@@ -67,6 +69,15 @@ export const RAILS: readonly Rail[] = [
     reason: 'brain-unavailable',
     holds: (state, rails) => state.brainFaults >= rails.maxBrainFaults,
     detail: (state, rails) => `${state.brainFaults} brain faults, limit ${rails.maxBrainFaults}`,
+  },
+  {
+    // A page that will not read is not a plan the brain can be asked for. The
+    // session re-observes rather than guessing, and stops saying so rather
+    // than spending its failure budget on plans against nothing.
+    reason: 'page-unreadable',
+    holds: (state, rails) => state.unreadablePages >= rails.maxUnreadablePages,
+    detail: (state, rails) =>
+      `${state.unreadablePages} observations in a row the page could not be read, limit ${rails.maxUnreadablePages}`,
   },
 ];
 

@@ -54,6 +54,7 @@ export const observation = (
   title,
   elements,
   omittedElements: 0,
+  unread: null,
   ariaSnapshot: elements.map((e) => `- ${e.role} "${e.name}" [ref=${e.ref}]`).join('\n'),
 });
 
