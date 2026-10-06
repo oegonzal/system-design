@@ -9,6 +9,9 @@ import {
 
 import type { FieldsInput, GoalComposition } from '../../core/ports';
 import { quote } from '../../core/text';
+// The snapshot's own codec, not a browser: it reduces snapshot text by the
+// declared rungs and never touches a page.
+import { fitSnapshot } from '../playwright/aria-snapshot';
 
 /**
  * The goals the session composes for the loop, fitted to the loop's budget
@@ -52,6 +55,43 @@ const trimmedContext = (observation: PageObservation): PageObservation => ({
   })),
 });
 
+/**
+ * The observation with its snapshot fitted to the room the rest of the goal
+ * leaves, rather than to a constant of its own.
+ *
+ * Measured live on 2026-10-05: a form page of 1,415 snapshot lines reached the
+ * producer as `[snapshot reduced to none: 1415 of 1415 lines not shown]`,
+ * while the goal it arrived in came to 35KB of a 64KB budget. Twenty-nine
+ * kilobytes of room went unused because the snapshot had been cut to a fixed
+ * size before anything knew how large the goal would be. What was in those
+ * lines was the page's own validation message — static text, which no element
+ * list carries — so the session could not read why the form would not advance.
+ * It guessed, and the critics faulted it for guessing, three steps running.
+ *
+ * The goal is composed once without a snapshot to measure what else it says;
+ * what remains of the budget is the snapshot's. The ladder below still has
+ * work to do when the elements alone fill the goal.
+ */
+function snapshotFitted(
+  input: StepGoalInput,
+  observation: PageObservation,
+  budget: number,
+): { observation: PageObservation; rung: GoalRung } {
+  const bare = composeStepGoal(
+    { ...input, observation: { ...observation, ariaSnapshot: '' } },
+    Number.MAX_SAFE_INTEGER,
+  );
+  const room = Math.max(0, budget - textBytes(bare));
+  const fitted = fitSnapshot(observation.ariaSnapshot, room);
+  return {
+    observation: { ...observation, ariaSnapshot: fitted.text },
+    // A snapshot reduced within itself leaves the goal whole and says so in
+    // its own first line; one there was no room for at all is a goal without a
+    // snapshot, and the rung the dump records has to say which happened.
+    rung: fitted.rung === 'none' && observation.ariaSnapshot !== '' ? 'without-snapshot' : 'full',
+  };
+}
+
 /** The goal composed at one rung, or null when it does not fit. */
 function attempt(
   input: StepGoalInput,
@@ -72,10 +112,10 @@ export function composeStepGoalWithinBudget(
   input: StepGoalInput,
   budget = GOAL_BUDGET_BYTES,
 ): ComposedGoal {
-  const full = input.observation;
+  const { observation: full, rung } = snapshotFitted(input, input.observation, budget);
   const trimmed = trimmedContext(full);
   const fitted =
-    attempt(input, full, 'full', budget) ??
+    attempt(input, full, rung, budget) ??
     attempt(input, withoutSnapshot(full), 'without-snapshot', budget) ??
     attempt(input, trimmed, 'trimmed-context', budget);
   if (fitted !== null) return fitted;

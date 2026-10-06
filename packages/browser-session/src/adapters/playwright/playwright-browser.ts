@@ -233,6 +233,8 @@ export class PlaywrightBrowser implements BrowserPort {
       unread: nothingUnread
         ? null
         : { elements: reading.unreadElements, snapshotLines: reading.unreadSnapshotLines },
+      // Reduced only where it would not fit what an observation may carry; the
+      // goal composer fits it to the room the goal actually has.
       ariaSnapshot: fitSnapshot(reading.snapshot, SNAPSHOT_BOUND.target).text,
     });
   }

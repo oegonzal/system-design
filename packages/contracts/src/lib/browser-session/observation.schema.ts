@@ -13,6 +13,13 @@ import { ELEMENT_KINDS, HIDDEN_TRAITS, STEP_OUTCOMES } from './vocab';
 
 /** The most elements one observation lists; the adapter keeps visible, enabled ones first. */
 export const ELEMENTS_BOUND = bound(150, 'list');
+/**
+ * The most snapshot one observation carries. Sized so a page at every cap here
+ * still renders under the engine's goal budget — the caps have to compose, and
+ * this is the one that gives. The goal codec reduces what it is given into the
+ * room the rest of the goal leaves, so a snapshot inside this bound is never
+ * dropped for want of room that was there.
+ */
 export const SNAPSHOT_BOUND = bound(16_000);
 export const ELEMENT_NAME_BOUND = bound(300);
 export const ELEMENT_VALUE_BOUND = bound(500);

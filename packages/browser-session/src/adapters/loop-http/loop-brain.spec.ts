@@ -223,6 +223,27 @@ describe('the loop brain', () => {
       omittedElements: 0,
     });
 
+    // A snapshot too large to carry whole is reduced into the room the rest of
+    // the goal leaves, not discarded to save room nothing needed. Measured
+    // live: a 1,415-line form page arrived as `reduced to none` inside a 35KB
+    // goal of a 64KB budget, and the validation message that would have said
+    // why the form was stuck went with it.
+    // A page's real shape: node lines carrying refs, each with a property line
+    // under it — so the rungs have something to drop and the snapshot reduces
+    // rather than vanishing.
+    const lines = Array.from({ length: 380 }, (_, i) => [
+      `  - link "result ${i}" [ref=e${i + 1}] [cursor=pointer]:`,
+      `    - /url: https://example.test/${'p'.repeat(60)}/${i}`,
+    ]).flat();
+    const huge = stepInput({ ...big, ariaSnapshot: ['- generic [ref=e1]:', ...lines].join('\n') });
+    const bare = textBytes(composeStepGoal({ ...huge, observation: { ...big, ariaSnapshot: '' } }));
+    const roomy = composeStepGoalWithinBudget(huge, bare + 20_000);
+    expect(roomy.rung).toBe('full');
+    expect(roomy.goal).toContain('[ref=e1]');
+    expect(textBytes(roomy.goal)).toBeLessThanOrEqual(bare + 20_000);
+    // And it used the room: far more snapshot than the old fixed cut left.
+    expect(textBytes(roomy.goal) - bare).toBeGreaterThan(10_000);
+
     const noSnapshot = composeStepGoal({ ...input, observation: { ...big, ariaSnapshot: '' } });
     const withoutSnapshot = composeStepGoalWithinBudget(input, textBytes(noSnapshot));
     expect(withoutSnapshot.rung).toBe('without-snapshot');
