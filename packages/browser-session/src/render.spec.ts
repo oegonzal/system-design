@@ -91,7 +91,11 @@ describe('the CLI renderer', () => {
     expect(text).toContain(
       'session session-1 · complete · ended by mission-complete: results shown',
     );
-    expect(text).toContain('rails: 10 tasks · 60 min · 3 failures · 3 brain faults');
+    // Read from the declaration: the rails line reports what was declared, and
+    // a spec that retypes the numbers only ever tests the retyping.
+    expect(text).toContain(
+      `rails: ${DEFAULT_RAILS.maxTasks} tasks · ${DEFAULT_RAILS.maxMinutes} min · ${DEFAULT_RAILS.maxConsecutiveFailures} failures · ${DEFAULT_RAILS.maxBrainFaults} brain faults`,
+    );
     expect(text).toContain('error: Error: boom');
     expect(text).toMatch(/1\s+Senior Engineer at Acme\s+complete\s+done\s+2–4/);
     expect(text).toMatch(

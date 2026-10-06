@@ -42,10 +42,20 @@ export const SESSION_ENV = {
   subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the applicant' },
 } as const;
 
-/** The engine's stop rules when the flags leave them alone; `maxBrainFaults` has no flag. */
+/**
+ * The engine's stop rules when the flags leave them alone; `maxBrainFaults`
+ * and `maxUnreadablePages` have no flag.
+ *
+ * Twelve hours of wall clock, because a session is a long errand and not a
+ * demonstration: one page is one brain call, which runs one to three minutes,
+ * so an hour buys twenty or thirty pages — less than one job application of
+ * any depth. The clock is a backstop against a session nobody is watching,
+ * not a budget anybody should plan against; what ends a working session is
+ * closing the units of work it was given.
+ */
 export const DEFAULT_RAILS: SessionRailsDto = {
   maxTasks: 10,
-  maxMinutes: 60,
+  maxMinutes: 720,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,
