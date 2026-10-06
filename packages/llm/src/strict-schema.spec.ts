@@ -2,7 +2,7 @@ import { modelSchema, walkJsonSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { strictJsonSchema, UNSUPPORTED_KEYWORDS } from './strict-schema';
+import { strictJsonSchema } from './strict-schema';
 
 const bounded = z.strictObject({
   answer: z.string().max(400),
@@ -27,24 +27,18 @@ describe('a schema a strict endpoint will accept', () => {
     expect(faults).toEqual([]);
   });
 
-  it('[QL-62] says the sizes in words rather than dropping what they said, and leaves the caller’s schema alone', () => {
+  it('[QL-62] sends the declared bounds as they are, because the endpoint enforces them and a dropped one is a reply it cannot refuse', () => {
     const original = modelSchema(bounded).json;
     const before = JSON.stringify(original);
     const strict = strictJsonSchema(original);
 
-    // Not one keyword outside the subset survives.
-    const left: string[] = [];
-    walkJsonSchema(strict, '', (node) => {
-      for (const keyword of Object.keys(UNSUPPORTED_KEYWORDS)) {
-        if (keyword in node) left.push(keyword);
-      }
-    });
-    expect(left).toEqual([]);
-
-    // What they said is still there for the model to read.
-    const properties = (strict['properties'] as Record<string, Record<string, unknown>>)!;
-    expect(String(properties['answer']['description'])).toContain('at most 400 characters');
-    expect(String(properties['tags']['description'])).toContain('at most 6 items');
+    // Measured against both live endpoints: every one of these is accepted, so
+    // stripping them only ever weakened what the endpoint would enforce. A
+    // producer twice returned prose in a `ref` that `pattern` forbids.
+    const json = JSON.stringify(strict);
+    for (const keyword of ['maxLength', 'maxItems']) {
+      expect(json, `the endpoint is never told: ${keyword}`).toContain(keyword);
+    }
 
     // A deep copy: the schema the zod parse still enforces is untouched.
     expect(JSON.stringify(original)).toBe(before);

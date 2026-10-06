@@ -4,76 +4,43 @@ import { walkJsonSchema } from '@sysdesign/contracts';
  * A JSON Schema as a strict structured-output endpoint will accept it.
  *
  * OpenAI's `json_schema` mode with `strict: true` guarantees the reply matches
- * the schema — but only over a subset of JSON Schema, and it refuses the
- * request outright for a keyword outside it rather than ignoring the keyword.
- * The two structural demands it makes, every object closed and every property
- * required, this codebase already meets everywhere: its output schemas are
- * `z.strictObject` and say `.nullable()` where another codebase would say
- * `.optional()`. Audited on 2026-10-06 over the step-plan and field-answer
- * schemas: zero structural faults between them.
+ * the schema, and refuses the request outright for a keyword it does not take
+ * rather than ignoring it. Its two structural demands this codebase already
+ * meets everywhere: its output schemas are `z.strictObject` and say
+ * `.nullable()` where another codebase would say `.optional()`, so every
+ * object is closed and every property required. Audited over the step-plan and
+ * field-answer schemas on 2026-10-06: zero structural faults between them.
  *
- * What does not survive is the sizing. A declared bound reaches the model as
- * `maxLength` or `maxItems`, and those are not in the subset — so rather than
- * drop what they say, each one is written into the node's `description`, where
- * the model still reads it. Nothing is lost on correctness either way: the
- * zod parse enforces the ceiling on the reply whatever the request carried,
- * and the salvage ladder decides what an overrun costs.
+ * Which keywords the subset takes is measured, not assumed, and it is wider
+ * than the caution this file was first written with. Tested against the live
+ * endpoints on 2026-10-06, every one of `maxLength`, `minLength`, `pattern`,
+ * `format`, `maxItems`, `minItems`, `minimum`, `maximum`, `multipleOf`,
+ * `$schema` and `const` was accepted — by OpenAI and by a local Ollama alike.
+ * Only `oneOf` was refused, and only by OpenAI: *"'oneOf' is not permitted"*.
+ *
+ * Dropping them cost more than it saved. A producer twice wrote prose into a
+ * `ref` — `"search box"` — which `pattern` would have made impossible to
+ * return; stripped, the endpoint had nothing to enforce, the reply came back
+ * well-formed and wrong, and the zod parse refused it a step later. So this
+ * sends the schema as it is, and converts the one construct that is genuinely
+ * refused.
  */
 
-/**
- * Keywords a strict endpoint does not take, and how each one reads once it has
- * to be said in words instead. Declared as a table because the subset is the
- * endpoint's and will move: a keyword added to the subset is a line removed
- * from here, and one withdrawn is a line added.
- */
-export const UNSUPPORTED_KEYWORDS: Readonly<Record<string, (value: unknown) => string | null>> = {
-  maxLength: (v) => `at most ${String(v)} characters`,
-  minLength: (v) => (Number(v) > 0 ? `at least ${String(v)} characters` : null),
-  maxItems: (v) => `at most ${String(v)} items`,
-  minItems: (v) => (Number(v) > 0 ? `at least ${String(v)} items` : null),
-  pattern: (v) => `matching ${String(v)}`,
-  format: (v) => `in ${String(v)} format`,
-  minimum: (v) => `at least ${String(v)}`,
-  maximum: (v) => `at most ${String(v)}`,
-  multipleOf: (v) => `a multiple of ${String(v)}`,
-  $schema: () => null,
-};
-
-/** One schema node's description, with what its dropped keywords said appended. */
-const describedBy = (
-  node: Record<string, unknown>,
-  said: readonly string[],
-): string | undefined => {
-  const existing = typeof node['description'] === 'string' ? node['description'] : '';
-  if (said.length === 0) return existing === '' ? undefined : existing;
-  const sizes = said.join(', ');
-  return existing === '' ? sizes : `${existing} (${sizes})`;
-};
+/** What the subset takes instead of `oneOf`; for a closed set of variants the two say the same thing. */
+export const UNION_KEYWORD = 'anyOf';
 
 /**
- * The schema with every keyword the subset refuses turned into words, and
- * `oneOf` read as `anyOf` — the subset takes one and not the other, and for a
- * closed set of variants they say the same thing.
+ * The schema with `oneOf` read as `anyOf`, and nothing else changed.
  *
- * A deep copy: the caller's schema is the one the zod parse still enforces,
- * and nothing here may reach it.
+ * A deep copy: the schema the caller handed over is the one the zod parse
+ * still enforces, and nothing here may reach it.
  */
 export function strictJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
   const copy = structuredClone(schema) as Record<string, unknown>;
   walkJsonSchema(copy, '', (node) => {
-    const said: string[] = [];
-    for (const [keyword, say] of Object.entries(UNSUPPORTED_KEYWORDS)) {
-      if (!(keyword in node)) continue;
-      const words = say(node[keyword]);
-      if (words !== null) said.push(words);
-      delete node[keyword];
-    }
-    const description = describedBy(node, said);
-    if (description !== undefined) node['description'] = description;
-    if (Array.isArray(node['oneOf'])) {
-      node['anyOf'] = node['oneOf'];
-      delete node['oneOf'];
-    }
+    if (!Array.isArray(node['oneOf'])) return;
+    node[UNION_KEYWORD] = node['oneOf'];
+    delete node['oneOf'];
   });
   return copy;
 }

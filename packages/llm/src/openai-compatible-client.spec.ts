@@ -55,8 +55,9 @@ describe('an OpenAI-compatible provider', () => {
     expect(body.response_format.type).toBe('json_schema');
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.response_format.json_schema.name).toBe(SCHEMA_NAME);
-    // The schema it carries is the strict one: no keyword outside the subset.
-    expect(JSON.stringify(body.response_format.json_schema.schema)).not.toContain('maxLength');
+    // The schema it carries is the declared one: the endpoint enforces the
+    // bounds, so sending them is what makes strict mode worth asking for.
+    expect(JSON.stringify(body.response_format.json_schema.schema)).toContain('maxLength');
     expect(body.response_format.json_schema.schema['additionalProperties']).toBe(false);
     expect(body.messages.map((m) => m.role)).toEqual(['system', 'user']);
   });
