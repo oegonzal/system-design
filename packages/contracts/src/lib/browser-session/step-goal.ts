@@ -179,7 +179,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     // every time — planning the whole mission in one step, citing refs for
     // pages it had not opened yet, and being refused by the two validators
     // this section is describing. Saying it is a ceiling costs five words.
-    `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A taskDone, terminate or done action is last and appears nowhere else.`,
+    `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A taskDone, terminate or done action is last and appears nowhere else, except that a taskDone may stand immediately before a terminate or a done: closing a unit of work touches no page, so ending the session may follow it in the same plan.`,
     // The `references` validator enforces exactly this, and the section that
     // exists to say what the validators enforce did not say it: an Elements
     // list belongs to one observation, so a plan that navigates and then cites

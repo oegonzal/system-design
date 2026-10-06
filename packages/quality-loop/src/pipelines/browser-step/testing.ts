@@ -77,6 +77,14 @@ export const done = (): StepAction => ({
   expect: null,
 });
 
+export const terminate = (): StepAction => ({
+  kind: 'terminate',
+  cause: 'mission-complete',
+  detail: 'every listing in view has been applied to',
+  reason: "the mission's stop condition is on the page",
+  expect: null,
+});
+
 /** The plan a listing page calls for: open the first listing. */
 export const samplePlan = (
   actions: StepAction[] = [

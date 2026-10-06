@@ -11,6 +11,7 @@ import {
   actionLocation,
   actionRefs,
   TERMINAL_ACTION_KINDS,
+  TERMINAL_FOLLOWERS,
   type Severity,
   type StepAction,
   type StepIndex,
@@ -50,6 +51,17 @@ const references: Rule = (plan, index) => {
 
 const isTerminal = (action: StepAction): boolean =>
   (TERMINAL_ACTION_KINDS as readonly string[]).includes(action.kind);
+
+/**
+ * Whether what follows a terminal action is allowed to: the declared pairing,
+ * and exactly one action, since that one is itself terminal and so must be
+ * last. Everything else after a terminal action is a touch on a page this plan
+ * cannot have observed.
+ */
+function endingIsAllowed(action: StepAction, rest: readonly StepAction[]): boolean {
+  const followers = TERMINAL_FOLLOWERS[action.kind] ?? [];
+  return rest.length === 1 && followers.includes(rest[0]!.kind);
+}
 
 /**
  * Which actions touch the element they cite, as data. A touch on a disabled
@@ -149,7 +161,19 @@ const limits: Rule = (plan, index) => {
   plan.actions.forEach((action, position) => {
     const at = [actionLocation(position)];
     if (isTerminal(action) && position !== plan.actions.length - 1) {
-      problems.push(problem('high', `${action.kind} must be the last action`, at));
+      const rest = plan.actions.slice(position + 1);
+      if (!endingIsAllowed(action, rest)) {
+        const followers = TERMINAL_FOLLOWERS[action.kind] ?? [];
+        problems.push(
+          problem(
+            'high',
+            followers.length === 0
+              ? `${action.kind} must be the last action`
+              : `${action.kind} must be the last action, or the one before ${followers.join(' or ')}`,
+            at,
+          ),
+        );
+      }
     }
     const task = taskFault(action, open);
     if (task !== null) problems.push(problem(task.severity, task.message, at));

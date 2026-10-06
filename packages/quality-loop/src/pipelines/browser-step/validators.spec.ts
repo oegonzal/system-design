@@ -18,6 +18,7 @@ import {
   stepGoal,
   taskDone,
   taskStart,
+  terminate,
 } from './testing';
 import { limitsValidator, referencesValidator } from './validators';
 
@@ -175,5 +176,29 @@ describe('the browser-step validators', () => {
     });
     const broken = { pageKind: 'listing' } as unknown as StepPlan;
     expect(problems(broken)).toEqual({ references: [], limits: [] });
+  });
+
+  it('[QL-36] lets a taskDone stand before a terminate, because closing a unit of work touches no page', () => {
+    // Measured live on two providers: both reached for `taskDone, terminate`
+    // as a mission's last plan, both were refused, and both tried again until
+    // the failure rail ended the session. The pair is the natural final
+    // thought and costs an extra observation and an extra model call to say
+    // in two plans.
+    const open = stepGoal(listingObservation(), openTaskLedger());
+    expect(problems(samplePlan([taskDone(), terminate()]), open).limits).toEqual([]);
+    expect(problems(samplePlan([taskDone(), done()]), open).limits).toEqual([]);
+
+    // What may follow is still only ever the one closing action, and only after
+    // a taskDone: anything else after a terminal action touches a page this
+    // plan never observed.
+    expect(problems(samplePlan([taskDone(), terminate(), done()]), open).limits).not.toEqual([]);
+    expect(problems(samplePlan([taskDone(), click('e3')]), open).limits).not.toEqual([]);
+    expect(problems(samplePlan([terminate(), done()]), open).limits).toEqual([
+      expect.objectContaining({ message: 'terminate must be the last action' }),
+    ]);
+    // And the refusal says the way through, rather than only what is refused.
+    expect(problems(samplePlan([taskDone(), click('e3')]), open).limits[0]?.message).toBe(
+      'taskDone must be the last action, or the one before terminate or done',
+    );
   });
 });

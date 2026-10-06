@@ -227,6 +227,27 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
 /** The actions that end a plan; the validators require one of them last and nowhere else. */
 export const TERMINAL_ACTION_KINDS = ['taskDone', 'terminate', 'done'] as const;
 
+/**
+ * Which terminal action may stand immediately before which.
+ *
+ * A terminal action ends a plan because what follows it would act on a page
+ * this plan has not observed. Closing a unit of work is not that: `taskDone`
+ * is bookkeeping on the session's own ledger and touches nothing, so ending
+ * the session may follow it.
+ *
+ * Measured on 2026-10-05 and 2026-10-06, two providers independently: both
+ * reached for `taskDone, terminate` as the last plan of a mission, both were
+ * refused, and both tried again — three times each, until the failure rail
+ * ended the session. The natural final thought is one thought, and the
+ * vocabulary made it inexpressible: every mission paid an extra page
+ * observation and an extra model call to say the second half of it.
+ *
+ * A kind absent here takes nothing after it.
+ */
+export const TERMINAL_FOLLOWERS: Readonly<Record<string, readonly StepActionKind[]>> = {
+  taskDone: ['terminate', 'done'],
+};
+
 export const PRESS_KEYS = [
   'Enter',
   'Tab',
