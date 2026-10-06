@@ -1,3 +1,4 @@
+import { modelSchema } from '@sysdesign/contracts';
 import type {
   LlmExchangeOutcome,
   LlmReplySource,
@@ -6,7 +7,13 @@ import type {
   SchemaIssue,
 } from '@sysdesign/contracts';
 
-import type { LlmClient } from './llm-client';
+import {
+  asDetailed,
+  type LlmClient,
+  type LlmDetailed,
+  type StructuredReply,
+  type StructuredRequest,
+} from './llm-client';
 
 /**
  * What the seam's reading of one reply kept, changed or refused — the
@@ -123,10 +130,101 @@ export interface LlmExchange extends LlmCall {
 }
 
 /**
- * `null` for a client that cannot record — a spec's plain fake, say — so a
- * caller records nothing rather than guessing at a call.
+ * `null` for a client with no record of its own to offer. Prefer
+ * `recorderFor`, which is total: this is the capability check behind it.
  */
 export function asRecordable(client: LlmClient): LlmRecordable | null {
   const candidate = client as Partial<LlmRecordable>;
   return typeof candidate.withRecorder === 'function' ? (candidate as LlmRecordable) : null;
+}
+
+/**
+ * Every client records. Whichever adapter is serving, a run dump holds the
+ * prompt that was sent, the answer that came back and what became of it —
+ * because changing the provider is meant to change the model call and nothing
+ * else about the process around it.
+ *
+ * An adapter that knows more about its own turn says so by implementing
+ * `LlmRecordable`: the usage its provider reported, the raw text of a turn
+ * that took several API calls, why the turn ended. One that does not is
+ * wrapped here and records what the port itself can see, which is the prompt,
+ * the schema, how long it took and whether an object came back. Less detail,
+ * never no record — a dump with nothing in it is indistinguishable from a
+ * stage that never ran, and that cost an investigation.
+ */
+export function recorderFor(client: LlmClient): LlmRecordable {
+  return (
+    asRecordable(client) ?? {
+      withRecorder: (sink) => new PortRecordingLlmClient(client, sink),
+    }
+  );
+}
+
+/**
+ * What the seam itself can witness of a call, for an adapter that reports
+ * nothing of its own. It delegates through `asDetailed`, so a client that can
+ * say why a reply was refused still has its faults recorded.
+ */
+class PortRecordingLlmClient implements LlmClient, LlmDetailed {
+  readonly model: string;
+
+  constructor(
+    private readonly inner: LlmClient,
+    private readonly sink: LlmCallSink,
+  ) {
+    this.model = inner.model;
+  }
+
+  async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
+    return (await this.completeStructuredDetailed(request)).value;
+  }
+
+  async completeStructuredDetailed<T>(request: StructuredRequest<T>): Promise<StructuredReply<T>> {
+    const startedAt = new Date().toISOString();
+    const began = Date.now();
+    const record = (
+      outcome: LlmExchangeOutcome,
+      response: unknown,
+      error: LlmCall['error'],
+    ): void => {
+      this.sink({
+        model: this.model,
+        system: request.system,
+        user: request.user,
+        schema: modelSchema(request.schema).json,
+        maxTokens: request.maxTokens ?? 0,
+        startedAt,
+        durationMs: Date.now() - began,
+        outcome,
+        stopReason: null,
+        usage: null,
+        requestId: null,
+        // The port never shows the text, only what was made of it.
+        text: null,
+        response,
+        error,
+      });
+    };
+    try {
+      const reply = await asDetailed(this.inner).completeStructuredDetailed(request);
+      if (reply.value === null) {
+        record('schema-miss', null, {
+          name: 'NoValue',
+          message:
+            reply.issues.length > 0
+              ? reply.issues.map((issue) => `${issue.at}: ${issue.message}`).join('; ')
+              : 'the client returned no value and no faults',
+        });
+      } else {
+        record('ok', reply.value, null);
+      }
+      return reply;
+    } catch (cause) {
+      record('error', null, {
+        name: cause instanceof Error ? cause.name : 'Error',
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
+      throw cause;
+    }
+  }
 }

@@ -1,17 +1,16 @@
 /**
  * Attribution is explicit, not temporal: lenses run concurrently, so every
  * stage instance gets its own recording twin whose closure stamps the scope
- * and a per-scope ordinal. A client that cannot record (a spec's plain fake) passes through.
+ * and a per-scope ordinal. Every client records — `recorderFor` is total — so
+ * a run's exchanges do not depend on which adapter served it.
  */
-import { asRecordable, type LlmClient } from '@sysdesign/llm';
+import { recorderFor, type LlmClient } from '@sysdesign/llm';
 
 import type { ExchangeSink } from '../ports';
 
 export function scopeLlm(llm: LlmClient, scope: string, sink: ExchangeSink): LlmClient {
   let ordinal = 0;
-  return (
-    asRecordable(llm)?.withRecorder((call) => sink({ ...call, scope, ordinal: ++ordinal })) ?? llm
-  );
+  return recorderFor(llm).withRecorder((call) => sink({ ...call, scope, ordinal: ++ordinal }));
 }
 
 /** `Promise.all` with at most `limit` in flight; results keep input order. */

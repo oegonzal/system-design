@@ -1,6 +1,7 @@
 import { modelSchema, type SchemaIssue } from '@sysdesign/contracts';
 
 import { CALL_TIME_POLICY, callTimeLimitMs, type CallTimePolicy } from './call-time-limit';
+import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import { InFlightGate } from './in-flight-gate';
 import type { LlmClient, LlmDetailed, StructuredReply, StructuredRequest } from './llm-client';
 import {
@@ -12,7 +13,16 @@ import {
   type LlmRetryPolicy,
 } from './llm-failure';
 import { strictJsonSchema } from './strict-schema';
-import { FEEDBACK_HEADING, parseStructured, PREVIOUS_REPLY_HEADING } from './structured-reply';
+import {
+  FEEDBACK_HEADING,
+  parseStructured,
+  PREVIOUS_REPLY_HEADING,
+  SCHEMA_MISS,
+  TIMED_OUT,
+} from './structured-reply';
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error);
 
 /**
  * Any endpoint that speaks OpenAI's chat completions, over plain `fetch`.
@@ -50,6 +60,7 @@ export interface OpenAiCompatibleOptions {
   sleep?: (ms: number) => Promise<void>;
   limits?: CallTimePolicy;
   fetch?: ChatTransport;
+  sink?: LlmCallSink;
 }
 
 /** What one attempt came back with: a value, or the fault that stopped it. */
@@ -82,7 +93,7 @@ export const failureForStatus = (status: number): LlmFailureKind =>
 
 const DEFAULT_MAX_TOKENS = 4096;
 
-export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
+export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRecordable {
   readonly model: string;
   private readonly baseUrl: string;
   private readonly apiKey: string | null;
@@ -92,6 +103,8 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
   private readonly pause: (ms: number) => Promise<void>;
   private readonly limits: CallTimePolicy;
   private readonly send: ChatTransport;
+  private readonly sink: LlmCallSink | null;
+  private readonly options: OpenAiCompatibleOptions;
 
   constructor(options: OpenAiCompatibleOptions = {}) {
     this.model = options.model ?? OPENAI_COMPATIBLE_DEFAULT_MODEL;
@@ -104,6 +117,17 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
       options.sleep ?? ((ms) => new Promise<void>((wake) => setTimeout(wake, ms).unref?.()));
     this.limits = options.limits ?? CALL_TIME_POLICY;
     this.send = options.fetch ?? ((url, init) => fetch(url, init));
+    this.sink = options.sink ?? null;
+    this.options = options;
+  }
+
+  /**
+   * A twin reporting every call it makes. It shares this one's transport and
+   * its gate, so deriving one per run is cheap — and so the process ceiling
+   * stays one ceiling however many twins are holding it.
+   */
+  withRecorder(sink: LlmCallSink): LlmClient {
+    return new OpenAiCompatibleLlmClient({ ...this.options, gate: this.gate, sink });
   }
 
   async completeStructured<T>(request: StructuredRequest<T>): Promise<T | null> {
@@ -120,7 +144,9 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
   async completeStructuredDetailed<T>(request: StructuredRequest<T>): Promise<StructuredReply<T>> {
     let previous: SchemaIssue[] = [];
     for (let attempt = 1; ; attempt += 1) {
-      const outcome = await this.gate.run(() => this.callOnce(request, previous));
+      const outcome = await this.gate.run(({ queuedMs }) =>
+        this.callOnce(request, previous, attempt, queuedMs),
+      );
       if (outcome.failure === null) return outcome.reply;
       previous = outcome.issues.length > 0 ? outcome.issues : previous;
       if (!retryable(outcome.failure, attempt, this.retry)) {
@@ -134,24 +160,51 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
   private async callOnce<T>(
     request: StructuredRequest<T>,
     previous: readonly SchemaIssue[],
+    attempt: number,
+    queuedMs: number,
   ): Promise<Attempt<T>> {
     const { json, bounds } = modelSchema(request.schema);
     const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
+    const startedAt = new Date().toISOString();
+    const began = Date.now();
+    const strictSchema = strictJsonSchema(json);
+    const ask = askWith(request.user, previous);
+    /** Every attempt is recorded in its own right, whichever way it ended. */
+    const record = (
+      end: Pick<LlmCall, 'outcome' | 'stopReason' | 'usage' | 'text' | 'response' | 'error'>,
+    ): void => {
+      this.sink?.({
+        model: this.model,
+        system: request.system,
+        user: ask,
+        schema: strictSchema,
+        maxTokens,
+        startedAt,
+        durationMs: Date.now() - began,
+        requestId: null,
+        attempt,
+        queuedMs,
+        apiCalls: 1,
+        ...end,
+      });
+    };
     const body = {
       model: this.model,
       max_completion_tokens: maxTokens,
       messages: [
         { role: 'system', content: request.system },
-        { role: 'user', content: askWith(request.user, previous) },
+        { role: 'user', content: ask },
       ],
       response_format: {
         type: 'json_schema',
-        json_schema: { name: SCHEMA_NAME, schema: strictJsonSchema(json), strict: this.strict },
+        json_schema: { name: SCHEMA_NAME, schema: strictSchema, strict: this.strict },
       },
     };
 
     const abort = AbortSignal.timeout(callTimeLimitMs(maxTokens, this.limits));
     let text: string;
+    let stopReason: string | null = null;
+    let usage: LlmCall['usage'] = null;
     try {
       const response = await this.send(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -164,26 +217,64 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
       });
       if (!response.ok) {
         const detail = (await response.text().catch(() => '')).slice(0, 400);
-        return this.failed(failureForStatus(response.status), detail);
+        record({
+          outcome: 'error',
+          stopReason: String(response.status),
+          usage: null,
+          text: null,
+          response: null,
+          error: { name: `Http${response.status}`, message: detail },
+        });
+        return this.failed(failureForStatus(response.status));
       }
       const payload = (await response.json()) as {
         choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       text = payload.choices?.[0]?.message?.content ?? '';
+      stopReason = payload.choices?.[0]?.finish_reason ?? null;
+      usage = {
+        inputTokens: payload.usage?.prompt_tokens ?? 0,
+        outputTokens: payload.usage?.completion_tokens ?? 0,
+      };
     } catch (cause) {
       // Our own abort is the only timeout here; anything else never reached a reply.
       const aborted = cause instanceof Error && cause.name === 'TimeoutError';
+      record({
+        outcome: 'error',
+        stopReason: null,
+        usage: null,
+        text: null,
+        response: null,
+        error: { name: aborted ? TIMED_OUT : 'Transport', message: messageOf(cause) },
+      });
       return this.failed(aborted ? 'timeout' : 'transport');
     }
 
     const extraction = parseStructured(text, request.schema, bounds);
     if (extraction.ok) {
+      record({
+        outcome: 'ok',
+        stopReason,
+        usage,
+        text,
+        response: extraction.value,
+        error: null,
+      });
       return {
         reply: { value: extraction.value, issues: [], overruns: extraction.overruns },
         failure: null,
         issues: [],
       };
     }
+    record({
+      outcome: 'schema-miss',
+      stopReason,
+      usage,
+      text,
+      response: null,
+      error: { name: SCHEMA_MISS, message: extraction.reason },
+    });
     return {
       reply: { value: null, issues: extraction.issues, overruns: [] },
       // The shared classifier owns what a miss is worth, for either provider.
@@ -192,8 +283,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed {
     };
   }
 
-  private failed<T>(failure: LlmFailureKind, detail = ''): Attempt<T> {
-    void detail;
+  private failed<T>(failure: LlmFailureKind): Attempt<T> {
     return { reply: { value: null, issues: [], overruns: [] }, failure, issues: [] };
   }
 }
