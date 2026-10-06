@@ -177,8 +177,15 @@ export const HASH_PROBES: readonly HashProbe[] = [
     hash: (row) => `lesson:${String(row['kind'])}|${String(row['subject'])}`,
   },
   {
+    // Nothing stops one run recording the same diagnostic twice: a producer
+    // that overruns its budget on two iterations writes `producer/-/overrun`
+    // both times. The inspector met exactly that — React refused the repeated
+    // key, which is this differ's own collision showing through to the DOM,
+    // and the cost is the one named above: a change to one element
+    // attributed to the other. Position is part of the identity.
     shape: 'Diagnostic',
     discriminators: ['stage', 'reason'],
+    positional: true,
     hash: (row) =>
       `diagnostic:${String(row['stage'])}#${row['sample'] == null ? '-' : String(row['sample'])}#${String(row['reason'])}`,
   },

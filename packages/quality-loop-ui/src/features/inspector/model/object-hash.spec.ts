@@ -162,5 +162,14 @@ describe('identifying an array element across two states', () => {
     expect(identityOf({ severity: 'high', message: 'same text' }, 0)).toBe(
       'problem:high|same text#0',
     );
+
+    // Nor does a run's diagnostics list: a producer that overruns its budget on
+    // two iterations records `producer/-/overrun` both times. The inspector met
+    // this live — React refused the repeated key, which is this collision
+    // reaching the DOM.
+    const overrun = { stage: 'producer', sample: null, reason: 'overrun' };
+    expect(identityOf(overrun, 0)).toBe('diagnostic:producer#-#overrun#0');
+    expect(identityOf(overrun, 1)).toBe('diagnostic:producer#-#overrun#1');
+    expect(identityOf(overrun, 0)).not.toBe(identityOf(overrun, 1));
   });
 });
