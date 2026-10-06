@@ -1,5 +1,5 @@
+import { llmConfigSchema, MissingModelProviderError } from '@sysdesign/llm';
 import { describe, expect, it, vi } from 'vitest';
-import { MissingModelProviderError } from '@sysdesign/llm';
 
 import { preflight } from './boot';
 
@@ -19,7 +19,13 @@ describe('the preflight', () => {
       command: 'serve',
       model: { model: 'claude-code/subscription' },
     });
-    await expect(preflight(['run'], { LLM_MODEL: 'claude-opus-5' }, loggedIn)).resolves.toEqual({
+    // The model a process announces is the configured one — the file's, not
+    // the environment's, so every process of a deployment announces the same.
+    const pinned = llmConfigSchema.parse({
+      provider: 'claude-subscription',
+      model: 'claude-opus-5',
+    });
+    await expect(preflight(['run'], {}, loggedIn, pinned)).resolves.toEqual({
       command: 'run',
       model: { model: 'claude-opus-5' },
     });

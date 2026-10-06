@@ -225,7 +225,10 @@ describe('the subscription gate', () => {
       query: account({ apiProvider: 'firstParty', tokenSource: 'none' }),
       env: {},
     });
-    expect(problem).toMatch(/found no subscription login/);
+    // The wording is the seam's: a provider that will not answer, named, with
+    // that provider's own way out. It stopped saying "subscription" alone when
+    // the subscription stopped being the only provider there could be.
+    expect(problem).toMatch(/no model provider/);
     expect(problem).toMatch(/claude setup-token/);
   });
 

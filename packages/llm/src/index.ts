@@ -8,3 +8,7 @@ export * from './in-flight-gate';
 export * from './llm-client';
 export * from './llm-failure';
 export * from './openai-embedding-client';
+export * from './llm-config';
+export * from './openai-compatible-client';
+export * from './strict-schema';
+export * from './structured-reply';

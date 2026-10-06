@@ -3,24 +3,36 @@ import type { LlmModelDto } from '@sysdesign/contracts';
 import { describeAccount, readClaudeAccount, signedIn, type ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient, SUBSCRIPTION_MODEL_LABEL } from './claude-agent-client';
 import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-client';
-import { DEFAULT_GATE_POLICY, providerGate } from './in-flight-gate';
+import { providerGate } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY, type LlmRetryPolicy } from './llm-failure';
 import type { LlmClient } from './llm-client';
+import {
+  apiKeyFor,
+  LLM_CONFIG_FILE,
+  readLlmConfig,
+  type LlmConfig,
+  type LlmProvider,
+} from './llm-config';
+import { OpenAiCompatibleLlmClient } from './openai-compatible-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
 /**
- * Environment-driven factories — the only place LLM env vars are read.
+ * Which model this repository calls, and the factories that build it.
  *
- * The quality loop runs on a Claude Code subscription login and nothing else:
- * this machine's `claude login`, or — where there is no login, a container —
- * the long-lived `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token` prints.
- * No API key is read, and none reaches the CLI. A process without the
- * subscription is a boot failure saying how to get one, never a client that
- * quietly fails every call.
+ * The choice is `llm.config.json`, read once — a provider is a deployment
+ * fact and belongs where every process can read the same answer, not in
+ * whatever environment happens to launch one. A checkout with no file calls
+ * the Claude Code subscription, which is what every run before the file
+ * existed used: this machine's `claude login`, or a container's long-lived
+ * `CLAUDE_CODE_OAUTH_TOKEN`.
  *
- * The boot check proves a subscription credential is present, not that it
- * is still valid: that takes a model call. A revoked or mistyped token fails
- * the first call instead, and the exchange records the CLI's own reason.
+ * Secrets stay out of it. The file names the VARIABLE holding a key, never a
+ * key, so the choice can be committed and the credential cannot.
+ *
+ * Whatever the provider, a process that cannot reach its model does not boot:
+ * it refuses saying how to fix it, rather than becoming a client that fails
+ * every call. The check proves a credential is present, not that it is still
+ * valid — that takes a model call, and a revoked one fails the first.
  */
 export const MODEL_PROVIDER_HELP =
   'Claude Code is used here only through a subscription login: run `claude login` on this machine, or give a container or CI runner the CLAUDE_CODE_OAUTH_TOKEN that `claude setup-token` prints';
@@ -28,20 +40,34 @@ export const MODEL_PROVIDER_HELP =
 export class MissingModelProviderError extends Error {
   override readonly name = 'MissingModelProvider';
 
-  /** `found` is what the check saw instead of a subscription; `cause` a check that could not finish. */
-  constructor(detail: { found?: string; cause?: unknown } = {}) {
+  /**
+   * `found` is what the check saw instead of a usable provider; `cause` a
+   * check that could not finish; `help` the way out, which is the provider's
+   * own to say — telling someone whose OpenAI key is unset to run `claude
+   * login` is worse than saying nothing.
+   */
+  constructor(detail: { found?: string; cause?: unknown; help?: string } = {}) {
+    const help = detail.help ?? MODEL_PROVIDER_HELP;
     super(
       detail.cause !== undefined
-        ? `could not check the Claude Code login (${detail.cause instanceof Error ? detail.cause.message : String(detail.cause)}) — ${MODEL_PROVIDER_HELP}`
-        : `found no subscription login${detail.found ? ` (Claude Code reports ${detail.found})` : ''} — ${MODEL_PROVIDER_HELP}`,
+        ? `could not check the model provider (${detail.cause instanceof Error ? detail.cause.message : String(detail.cause)}) — ${help}`
+        : `no model provider${detail.found ? ` (${detail.found})` : ''} — ${help}`,
     );
   }
 }
 
 /** The model report a boot announces: the pinned `LLM_MODEL`, else the subscription's label. */
-export const describeModelProvider = (env: NodeJS.ProcessEnv = process.env): LlmModelDto => ({
-  model: env['LLM_MODEL'] || SUBSCRIPTION_MODEL_LABEL,
+export const describeModelProvider = (config: LlmConfig = readLlmConfig()): LlmModelDto => ({
+  model: PROVIDERS[config.provider].label(config),
 });
+
+/** Refuse unless the configured provider will answer — each provider's own check, from the table. */
+export function assertModelProvider(
+  config: LlmConfig = readLlmConfig(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
+  return PROVIDERS[config.provider].ready(config, env);
+}
 
 /**
  * Refuse unless Claude Code reports the subscription. The account is asked
@@ -61,67 +87,75 @@ export async function assertSubscriptionLogin(
 }
 
 /**
- * How many provider calls this process may have in flight. Declared here with
- * the other model settings rather than beside whatever happens to spend them:
- * one process leans on the provider once, however many runs it is serving.
+ * What each provider needs to be used, as data.
+ *
+ * A provider is two things and no more: how to build its client, and how to
+ * know before booting that it will answer. Declared together so adding a third
+ * is a row here rather than an edit to whatever boots — and so the readiness
+ * check can never drift from the client it is supposed to be vouching for,
+ * which is what a `boot.ts` asking about one provider while the factory built
+ * another would mean.
  */
-export const IN_FLIGHT_VAR = 'LLM_MAX_IN_FLIGHT';
-
-/** Attempts per call, the first included. One means the seam does not retry. */
-export const MAX_ATTEMPTS_VAR = 'LLM_MAX_ATTEMPTS';
-
-/** Attempts allowed when our own bound is what stopped the turn; each costs that bound. */
-export const MAX_TIMEOUT_ATTEMPTS_VAR = 'LLM_MAX_TIMEOUT_ATTEMPTS';
-
-export class LlmSettingError extends Error {
-  override readonly name = 'LlmSetting';
+export interface ProviderEntry {
+  create(config: LlmConfig, env: NodeJS.ProcessEnv): LlmClient;
+  /** Refuse now, saying how to fix it, rather than failing every call minutes into a run. */
+  ready(config: LlmConfig, env: NodeJS.ProcessEnv): Promise<void>;
+  /** The model a boot announces when the config pins none. */
+  label(config: LlmConfig): string;
 }
 
-/** A positive integer, or the declared default; anything else is refused by name. */
-function positiveInteger(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
-  const raw = env[name];
-  if (raw === undefined || raw === '') return fallback;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new LlmSettingError(`${name} must be an integer of at least 1, got ${raw}`);
-  }
-  return parsed;
+export const PROVIDERS: Readonly<Record<LlmProvider, ProviderEntry>> = {
+  'claude-subscription': {
+    create: (config) =>
+      new ClaudeAgentLlmClient({
+        model: config.model,
+        gate: providerGate({ ceiling: config.maxInFlight }),
+        retry: { ...DEFAULT_RETRY_POLICY, ...retryOf(config) },
+      }),
+    ready: () => assertSubscriptionLogin(),
+    label: (config) => config.model ?? SUBSCRIPTION_MODEL_LABEL,
+  },
+  'openai-compatible': {
+    create: (config, env) =>
+      new OpenAiCompatibleLlmClient({
+        model: config.model,
+        baseUrl: config.baseUrl,
+        apiKey: apiKeyFor(config, env),
+        strict: config.strict,
+        gate: providerGate({ ceiling: config.maxInFlight }),
+        retry: { ...DEFAULT_RETRY_POLICY, ...retryOf(config) },
+      }),
+    // Async so a refusal rejects rather than throwing out of a call the caller
+    // is awaiting: a `Promise<void>` that sometimes throws synchronously is
+    // one a `.catch` does not catch.
+    ready: async (config, env) => {
+      if (config.apiKeyVar !== undefined && apiKeyFor(config, env) === null) {
+        throw new MissingModelProviderError({
+          found: `${config.apiKeyVar} is unset or empty`,
+          help: `${LLM_CONFIG_FILE} names ${config.apiKeyVar} as the key for ${config.baseUrl ?? 'the endpoint'}: set it in the environment, or point the file at an endpoint that wants no key`,
+        });
+      }
+    },
+    label: (config) => config.model ?? 'openai-compatible',
+  },
+};
+
+const retryOf = (config: LlmConfig): Pick<LlmRetryPolicy, 'attempts' | 'timeoutAttempts'> => ({
+  attempts: config.attempts,
+  timeoutAttempts: Math.min(config.timeoutAttempts, config.attempts),
+});
+
+/** The client the declared configuration asks for. */
+export function createQualityLoopLlm(
+  config: LlmConfig = readLlmConfig(),
+  env: NodeJS.ProcessEnv = process.env,
+): LlmClient {
+  return PROVIDERS[config.provider].create(config, env);
 }
 
-export const maxInFlight = (env: NodeJS.ProcessEnv = process.env): number =>
-  positiveInteger(env, IN_FLIGHT_VAR, DEFAULT_GATE_POLICY.ceiling);
-
-/**
- * The retry budget, overlaid on the declared policy. Lowering the whole budget
- * lowers the timeout allowance with it — one knob should not have to be set
- * twice — but setting the two against each other is a mistake worth naming.
- */
-export function retryPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): LlmRetryPolicy {
-  const attempts = positiveInteger(env, MAX_ATTEMPTS_VAR, DEFAULT_RETRY_POLICY.attempts);
-  const asked = env[MAX_TIMEOUT_ATTEMPTS_VAR];
-  const timeoutAttempts = positiveInteger(
-    env,
-    MAX_TIMEOUT_ATTEMPTS_VAR,
-    DEFAULT_RETRY_POLICY.timeoutAttempts,
-  );
-  if (asked !== undefined && asked !== '' && timeoutAttempts > attempts) {
-    throw new LlmSettingError(
-      `${MAX_TIMEOUT_ATTEMPTS_VAR} (${timeoutAttempts}) cannot exceed ${MAX_ATTEMPTS_VAR} (${attempts})`,
-    );
-  }
-  return {
-    ...DEFAULT_RETRY_POLICY,
-    attempts,
-    timeoutAttempts: Math.min(timeoutAttempts, attempts),
-  };
-}
-
+/** Kept for the Nest factory and every caller that has no configuration of its own to pass. */
 export function createQualityLoopLlmFromEnv(env: NodeJS.ProcessEnv = process.env): LlmClient {
-  return new ClaudeAgentLlmClient({
-    model: env['LLM_MODEL'] || undefined,
-    gate: providerGate({ ceiling: maxInFlight(env) }),
-    retry: retryPolicyFromEnv(env),
-  });
+  return createQualityLoopLlm(readLlmConfig(), env);
 }
 
 /**
