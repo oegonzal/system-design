@@ -174,8 +174,18 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     '## Limits',
     '',
-    `- At most ${ACTIONS_BOUND.target} actions, in the order they run; a taskDone, terminate or done action is last and appears nowhere else.`,
-    '- Cite refs only from the Elements list. Never act on a disabled element; fill only what can be typed into; select only a listed option.',
+    // A cap reads as a quota unless it says otherwise. Measured on 2026-10-06:
+    // asked for "at most 8 actions", a producer returned seven or eight nearly
+    // every time — planning the whole mission in one step, citing refs for
+    // pages it had not opened yet, and being refused by the two validators
+    // this section is describing. Saying it is a ceiling costs five words.
+    `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A taskDone, terminate or done action is last and appears nowhere else.`,
+    // The `references` validator enforces exactly this, and the section that
+    // exists to say what the validators enforce did not say it: an Elements
+    // list belongs to one observation, so a plan that navigates and then cites
+    // a ref is citing one that will not exist by the time it runs.
+    '- Cite refs only from the Elements list above, which belongs to this observation alone: an action that navigates, or that otherwise replaces the page, ends what this plan can cite — plan up to it and leave the page it opens to the next plan.',
+    '- Never act on a disabled element; fill only what can be typed into; select only a listed option.',
     '- A field the page hides is never filled or selected.',
     '- taskStart only while no unit of work is open; taskDone only while one is.',
     '- Validators check these limits; they are not criteria.',

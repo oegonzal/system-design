@@ -148,6 +148,26 @@ describe('stepPlanSchema', () => {
       expect(json, `the model is never told: ${rule}`).toContain(rule);
     }
   });
+  it('[QL-36] says in the Limits what the validators refuse, including that the action cap is a ceiling and not a quota', () => {
+    const goal = goalOf(listingObservation());
+
+    // `references` refuses a ref the current observation did not list, so the
+    // section that exists to say what the validators enforce has to say that an
+    // Elements list belongs to one observation. Measured on 2026-10-06: without
+    // it, five of eight plans navigated and then cited refs for the page they
+    // had not opened yet, and every one of them was refused.
+    expect(goal).toContain('belongs to this observation alone');
+    expect(goal).toMatch(/navigates.*ends what this plan can cite/);
+
+    // And a cap reads as a quota unless it says otherwise: asked for "at most
+    // 8", the same producer returned seven or eight nearly every time.
+    expect(goal).toContain('never a number to reach');
+    expect(goal).toContain(`At most ${ACTIONS_BOUND.target} actions`);
+
+    // Still said once, where the validators' own rules are said.
+    expect(goal.split('belongs to this observation alone')).toHaveLength(2);
+  });
+
   it('[QL-39] tells a reader what it could not read, apart from what it left past its cap, so "nothing listed" and "more than are listed" can never describe one page', () => {
     const observation = {
       ...listingObservation(),
