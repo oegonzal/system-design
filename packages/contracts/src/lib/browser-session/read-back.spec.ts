@@ -137,19 +137,42 @@ describe('routePlan', () => {
     ]);
   });
 
-  it('[QL-36] runs only the unfaulted prefix of an accepted plan', () => {
+  it('[QL-36] runs only the unfaulted prefix of a plan a validator pointed into', () => {
     const readout = routePlan(
       run({
         artifact: plan,
-        findings: [{ type: 'wrong_target', locationRefs: ['action.3'], rationale: 'e9 is Back' }],
+        validation: [
+          {
+            validatorId: 'bounds',
+            gate: 'warn',
+            problems: [{ severity: 'high', message: 'e9 is Back', locationRefs: ['action.3'] }],
+          },
+        ],
       }),
       3,
     );
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(2);
-    expect(readout.objections).toEqual([
-      { step: 3, from: 'wrong_target', at: ['action.3'], detail: 'e9 is Back' },
-    ]);
+  });
+
+  it('[QL-36] runs a plan the decision accepted in full, however much advice the judges left on it', () => {
+    // Measured on 2026-10-06: a plan every gate passed — `policyAllowed` true,
+    // overall 73.3 against a threshold of 70 — never ran, because one `low`
+    // finding of a type the pipeline declares `gate: false` pointed at
+    // `action.1`. Ten steps of a session went that way and the page never
+    // moved. What a judge said is carried as an objection; it is not a veto
+    // the controller did not reach.
+    const advised = run({
+      artifact: plan,
+      findings: [
+        { type: 'skipped_step', severity: 'low', locationRefs: ['action.1'], rationale: 'thin' },
+      ],
+    });
+    const readout = routePlan(advised, 4);
+    expect(readout.executable).toBe(true);
+    expect(readout.executePrefix).toBe(plan.actions.length);
+    // Said, and carried to the next plan, rather than silently dropped.
+    expect(readout.objections.map((o) => o.from)).toEqual(['skipped_step']);
   });
 
   it("[QL-36] carries a validator's own problem as an objection, so a plan refused by a validator is told which limit and why", () => {
@@ -202,8 +225,14 @@ describe('routePlan', () => {
 
   it('[QL-36] refuses a plan whose first action was faulted, a closed policy gate, or an artifact-wide finding', () => {
     expect(
-      routePlan(run({ artifact: plan, findings: [{ type: 'x', locationRefs: ['action.1'] }] }), 1)
-        .executable,
+      routePlan(
+        run({
+          artifact: plan,
+          policyAllowed: false,
+          findings: [{ type: 'x', locationRefs: ['action.1'] }],
+        }),
+        1,
+      ).executable,
     ).toBe(false);
     expect(routePlan(run({ artifact: plan, policyAllowed: false }), 1).executable).toBe(false);
     expect(

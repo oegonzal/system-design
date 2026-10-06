@@ -63,9 +63,12 @@ describe('how a plan stops and how a session ends', () => {
         'fill e1: the element is detached',
       ],
       ['click e2 button "Search"', 'not-executed', 'after a failed action'],
-      ['press Enter', 'not-executed', 'past the executable prefix'],
+      // The judge's objection no longer cuts the plan — the controller accepted
+      // it and found nothing blocking — so what stopped this one is the page
+      // refusing an action, and every action after it says so.
+      ['press Enter', 'not-executed', 'after a failed action'],
     ]);
-    // Why the judge cut it travels once, whole, as the plan-level objection it
+    // What the judge said travels once, whole, as the plan-level objection it
     // is — not copied onto every action and cut to a note's length.
     expect(cut.brain.planInputs[1]?.objections).toEqual([
       { step: 1, from: 'wrong_target', at: ['action.3'], detail: 'Enter would submit twice' },

@@ -23,8 +23,36 @@ export function bestIterationOf(run: QualityRunDto): IterationTrace | null {
   return trace.iterations.find((it) => it.iteration === trace.bestIteration) ?? null;
 }
 
-/** The positions (zero-based) under a location grammar that a finding or a validation problem points at. */
-function faultedPositions(iteration: IterationTrace, grammar: RegExp): Map<number, string[]> {
+/**
+ * The positions a plan is cut at: where something the decision counted as
+ * blocking points.
+ *
+ * Not every objection is a veto, and reading them as one discarded accepted
+ * work. Measured on 2026-10-06: a plan the controller accepted outright —
+ * every gate passed, `policyAllowed` true, overall 73.3 against a threshold of
+ * 70 — never ran, because one `low`-severity finding of a type its pipeline
+ * declares `gate: false` pointed at `action.1` and took the executable prefix
+ * to zero. Ten steps of a session went that way, and the page never moved.
+ *
+ * So the two kinds are read as the engine already read them. A validator cuts
+ * where it gates and not where it warns, which is the same `gate` the
+ * controller consults. A finding cuts only where the decision found blocking
+ * findings at all: `policyAllowed` is precisely "no blocking finding or failed
+ * gating criterion", so when it holds, nothing a judge said was a veto and the
+ * plan runs as the controller accepted it. What those judges said is not lost
+ * — it is the objections the next goal carries.
+ */
+function faultedPositions(
+  iteration: IterationTrace,
+  grammar: RegExp,
+  /**
+   * Whether a judge's finding counts as a fault here. An action only moves a
+   * page, so it is cut where the decision blocked it; a field writes the
+   * applicant's own words into someone's form, so it is left alone wherever
+   * any judge pointed. The costs are not symmetric and neither is the rule.
+   */
+  findingsFault: boolean,
+): Map<number, string[]> {
   const faults = new Map<number, string[]>();
   const add = (refs: readonly string[], what: string): void => {
     for (const ref of refs) {
@@ -33,11 +61,13 @@ function faultedPositions(iteration: IterationTrace, grammar: RegExp): Map<numbe
       faults.set(position, [...(faults.get(position) ?? []), what]);
     }
   };
-  for (const finding of iteration.ledger.findings) {
-    add(
-      finding.locationRefs,
-      `${finding.type}${finding.rationale ? `: ${finding.rationale}` : ''}`,
-    );
+  if (findingsFault) {
+    for (const finding of iteration.ledger.findings) {
+      add(
+        finding.locationRefs,
+        `${finding.type}${finding.rationale ? `: ${finding.rationale}` : ''}`,
+      );
+    }
   }
   for (const report of iteration.validation) {
     for (const problem of report.problems)
@@ -45,6 +75,10 @@ function faultedPositions(iteration: IterationTrace, grammar: RegExp): Map<numbe
   }
   return faults;
 }
+
+/** Whether any judge's finding was a blocker, as the decision itself settled it. */
+const hadBlockingFindings = (iteration: IterationTrace): boolean =>
+  !iteration.decision.gates.policyAllowed;
 
 /**
  * Everything that objected to a plan in one iteration: the critics' confirmed
@@ -130,7 +164,7 @@ export function routePlan(run: QualityRunDto, step: number): PlanReadout {
   if (best.ledger.findings.some((finding) => finding.locationRefs.length === 0)) {
     return notExecutable(plan, 'a confirmed finding names the whole plan', objections);
   }
-  const faulted = faultedPositions(best, ACTION_LOCATION);
+  const faulted = faultedPositions(best, ACTION_LOCATION, hadBlockingFindings(best));
   const first = [...faulted.keys()].sort((a, b) => a - b)[0];
   const executePrefix = first === undefined ? plan.actions.length : first;
   if (executePrefix === 0) return notExecutable(plan, 'the first action was faulted', objections);
@@ -188,7 +222,7 @@ export function routeFields(
     parsed?.ok ? parsed.value.fields.map((answer) => [answer.ref, answer]) : [],
   );
   const faulted =
-    best === null ? new Map<number, string[]>() : faultedPositions(best, FIELD_LOCATION);
+    best === null ? new Map<number, string[]>() : faultedPositions(best, FIELD_LOCATION, true);
 
   return fields.map((field, position) => {
     const answer = answers.get(field.ref) ?? null;

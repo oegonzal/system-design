@@ -92,7 +92,7 @@ describe('the browser-step loop', () => {
     expect(readout.objections.map((objection) => objection.from)).toEqual(['missed_stop']);
   });
 
-  it('[QL-36] an accepted plan runs up to the first action a confirmed finding names, and a clean one runs whole', async () => {
+  it('[QL-36] an accepted plan runs whole, carrying what the judges said as objections rather than as a veto', async () => {
     const two = samplePlan([
       click('e3', 'open the first listing', 'the listing detail'),
       click('e5', 'go to the next page', 'the second page of results'),
@@ -107,9 +107,15 @@ describe('the browser-step loop', () => {
     expect(faulted.iterations[0].ledger.findings.map((finding) => finding.key)).toEqual([
       'skipped_step|action.2',
     ]);
+    // The controller accepted it and found nothing blocking, so the session
+    // does not add a stricter veto of its own: the plan runs, and what the
+    // critic said travels to the next goal as an objection. Measured on
+    // 2026-10-06, the other way round: a plan accepted at 73.3 against a
+    // threshold of 70 never ran because one `low` advisory finding pointed at
+    // its first action, and ten steps of a session went the same way.
     expect(routePlan(runDto('faulted', faulted), 1)).toMatchObject({
       executable: true,
-      executePrefix: 1,
+      executePrefix: 2,
       reason: null,
       objections: [expect.objectContaining({ from: 'skipped_step' })],
     });
