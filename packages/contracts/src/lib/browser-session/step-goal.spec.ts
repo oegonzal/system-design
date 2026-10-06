@@ -157,7 +157,10 @@ describe('stepPlanSchema', () => {
     // it, five of eight plans navigated and then cited refs for the page they
     // had not opened yet, and every one of them was refused.
     expect(goal).toContain('belongs to this observation alone');
-    expect(goal).toMatch(/navigates.*ends what this plan can cite/);
+    // And not only what it may cite — what it may claim: a `taskDone` after a
+    // submit names no ref and still asserts a page nobody has observed.
+    expect(goal).toMatch(/navigates.*is the LAST action of the plan/);
+    expect(goal).toContain('closing a unit of work and terminating included');
 
     // And a cap reads as a quota unless it says otherwise: asked for "at most
     // 8", the same producer returned seven or eight nearly every time.

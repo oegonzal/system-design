@@ -184,7 +184,12 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     // exists to say what the validators enforce did not say it: an Elements
     // list belongs to one observation, so a plan that navigates and then cites
     // a ref is citing one that will not exist by the time it runs.
-    '- Cite refs only from the Elements list above, which belongs to this observation alone: an action that navigates, or that otherwise replaces the page, ends what this plan can cite — plan up to it and leave the page it opens to the next plan.',
+    // Not only what a plan may cite: what it may claim. A `taskDone` after a
+    // submit names no ref and still asserts that a page nobody has observed
+    // says what the plan hoped. Measured on 2026-10-06, five plans in eight
+    // closed their unit of work and declared the mission complete on the far
+    // side of a search they had not yet watched land.
+    '- Cite refs only from the Elements list above, which belongs to this observation alone. An action that navigates, submits, or otherwise replaces the page is the LAST action of the plan: anything after it would act on, or claim something about, a page nobody has observed yet — closing a unit of work and terminating included. Plan up to it and leave the page it opens to the next plan.',
     '- Never act on a disabled element; fill only what can be typed into; select only a listed option.',
     '- A field the page hides is never filled or selected.',
     '- taskStart only while no unit of work is open; taskDone only while one is.',
