@@ -13,6 +13,7 @@ import {
   type StepAction,
   type StepHistoryEntry,
   type StepObjection,
+  type StepPlan,
   type TaskLedgerSummary,
 } from '@sysdesign/contracts';
 
@@ -59,6 +60,12 @@ export interface SessionState {
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from; reset by one it could. */
   unreadablePages: number;
+  /** The identity of the page the current step observed, compared with the step before. */
+  fingerprint: string | null;
+  /** Whether this step's page is the same page the last step observed. */
+  pageUnchanged: boolean;
+  /** Failed steps in a row on an unchanged page; reset by a step that ran clean or a page that moved. */
+  stalledSteps: number;
   operatorStopped: boolean;
   /** What the last executed action promised, checked against the next observation. */
   pending: PendingExpectation | null;
@@ -86,6 +93,9 @@ export function createState(ids: {
     consecutiveFailures: 0,
     brainFaults: 0,
     unreadablePages: 0,
+    fingerprint: null,
+    pageUnchanged: false,
+    stalledSteps: 0,
     operatorStopped: false,
     pending: null,
     operatorAnswers: new Map(),
@@ -107,8 +117,20 @@ export const railStateOf = (state: SessionState): RailState => ({
   consecutiveFailures: state.consecutiveFailures,
   brainFaults: state.brainFaults,
   unreadablePages: state.unreadablePages,
+  stalledSteps: state.stalledSteps,
   operatorStopped: state.operatorStopped,
 });
+
+/**
+ * The page this step observed, held against the last: the identity is kept
+ * for the next comparison, and whether it changed is what a failed step is
+ * read with. A page that moved ends any stall whatever the step then does.
+ */
+export function noteObservation(state: SessionState, fingerprint: string): void {
+  state.pageUnchanged = state.fingerprint === fingerprint;
+  state.fingerprint = fingerprint;
+  if (!state.pageUnchanged) state.stalledSteps = 0;
+}
 
 /** The units of work as the next goal is told them. */
 export const ledgerSummaryOf = (
@@ -169,6 +191,16 @@ const named = (ref: string, observation: PageObservation): string => {
   return element === undefined ? ref : `${ref} ${element.role} ${quote(element.name)}`;
 };
 
+/**
+ * A plan that did not run, as one line: how many actions and of what kinds.
+ * Never the actions' own words — a refused `terminate limit-reached` rendered
+ * whole reads, a step later, as a limit that was reached.
+ */
+export const describeRefusedPlan = (plan: StepPlan | null): string =>
+  plan === null
+    ? 'plan'
+    : `plan of ${plan.actions.length} action(s): ${plan.actions.map((action) => action.kind).join(', ')}`;
+
 /** One action as the next goal reads it back: refs with the role and name they had, so a new page's refs are never mistaken for them. */
 export function describeAction(action: StepAction, observation: PageObservation): string {
   switch (action.kind) {
@@ -192,10 +224,15 @@ export function describeAction(action: StepAction, observation: PageObservation)
       return `askFields ${action.refs.map((ref) => named(ref, observation)).join(', ')}`;
     case 'taskStart':
       return `taskStart ${quote(action.label)}`;
+    // A terminal action's detail is a claim about the page. An executed
+    // terminate ends the session, so one in the history by construction never
+    // ran; rendered with its words it read, a step later, as a limit that was
+    // reached. The kind and its cause or outcome are the fact; the words stay
+    // in the step's plan.json.
     case 'taskDone':
-      return `taskDone ${action.outcome}${action.detail ? ` — ${action.detail}` : ''}`;
+      return `taskDone ${action.outcome}`;
     case 'terminate':
-      return `terminate ${action.cause} — ${action.detail}`;
+      return `terminate ${action.cause}`;
     case 'done':
       return 'done';
   }

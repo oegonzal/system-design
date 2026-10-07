@@ -1,12 +1,13 @@
 import {
-  BROWSER_STEP_PIPELINE_ID,
-  FIELD_ANSWER_PIPELINE_ID,
   type Admission,
+  BROWSER_STEP_PIPELINE_ID,
   type ConfirmedFinding,
   type Decision,
   type DocumentChunk,
+  FIELD_ANSWER_PIPELINE_ID,
   type FieldAnswers,
   type QualityRunDto,
+  REFUSING_GATES,
   type StepPlan,
   type SuccessCriterion,
   type ValidationReport,
@@ -68,9 +69,19 @@ export function fakeRun(
   const runId = options.runId ?? `fake-${pipeline}-${++sequence}`;
   const decision = options.decision ?? 'accept';
   const validation = options.validation ?? [];
-  const blocked = validation.some(
-    (report) => report.gate === 'block' && report.problems.length > 0,
+  const refusing = validation.filter(
+    (report) =>
+      (REFUSING_GATES as readonly string[]).includes(report.gate) && report.problems.length > 0,
   );
+  const blocked = refusing.length > 0;
+  // What the engine would have recorded: every refusing report, and — when the
+  // policy gate is closed — every finding the fixture carries.
+  const policyAllowed = options.policyAllowed ?? true;
+  const blocking = {
+    validators: refusing.map((report) => report.validatorId),
+    findings: policyAllowed ? [] : (options.findings ?? []).map((finding) => finding.key),
+    criteria: [],
+  };
   const at = '2026-10-03T10:00:00.000Z';
   return {
     runId,
@@ -116,8 +127,9 @@ export function fakeRun(
               artifactPresent: artifact !== null,
               validatorsPassed: !blocked,
               evidenceSufficient: true,
-              policyAllowed: options.policyAllowed ?? true,
+              policyAllowed,
             },
+            blocking,
             scores: { dimensions: {}, overall: decision === 'accept' ? 85 : 40 },
             selectedRemediations: [],
             reason: 'fake',

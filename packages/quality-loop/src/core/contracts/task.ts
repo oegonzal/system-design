@@ -35,6 +35,12 @@ export interface OutputShape<T> {
   normalize?(output: T, contract: TaskContract<T>): T;
 }
 
+/** One declared criterion: its kind, and the sentence the panel grades against. */
+export interface FixedCriterion {
+  readonly kind: string;
+  readonly statement: string;
+}
+
 export interface TaskSpec<T> {
   /** Kind id → one-line meaning shown to the model. The policy prices kinds; the model only picks one. */
   readonly criterionKinds: Readonly<Record<string, string>>;
@@ -43,6 +49,16 @@ export interface TaskSpec<T> {
   readonly findingTypes: Readonly<Record<string, string>>;
 
   readonly maxCriteria: number;
+
+  /**
+   * Criteria every rubric of this pipeline carries, declared here and never
+   * derived: what holds for any goal of this kind, as against what one goal
+   * adds. They head the checklist with the first ids, so a cap the goal's own
+   * requirements fill cannot crowd them out — a dimension only they earn
+   * stays earnable — and the deriver is told they are already on the list and
+   * derives the rest within what remains of `maxCriteria`.
+   */
+  readonly fixedCriteria?: readonly FixedCriterion[];
 
   /**
    * The statement bound the deriver writes within — its target asked for,

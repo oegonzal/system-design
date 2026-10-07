@@ -33,6 +33,7 @@ const decision = (
     evidenceSufficient: true,
     policyAllowed: true,
   },
+  blocking: { validators: [], findings: [], criteria: [] },
   scores: { dimensions, overall },
   selectedRemediations,
   reason,

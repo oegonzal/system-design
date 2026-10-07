@@ -24,8 +24,27 @@ import producer from './lenses/producer.md?raw';
 import { stepPlanOutput } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
-/** A procedure of up to a dozen steps plus its stop conditions and never-do lines. */
-const MAX_CRITERIA = 16;
+/**
+ * The three grounding criteria head every rubric and the goal's own lines
+ * fill the rest. Sized from the longest mission run so far — eight procedure
+ * steps, four stop conditions, five never-do lines and two task events, 19
+ * lines, of which a cap of 16 silently dropped three and left grounding no
+ * room at all (measured 2026-10-07: zero grounding criteria in 165 runs).
+ */
+const MAX_CRITERIA = 24;
+
+/**
+ * What every step plan must get right about the page, whatever the mission:
+ * declared here rather than derived, because a mission's own lines are what a
+ * deriver fills a cap with, and these were crowded out of every rubric ever
+ * derived. They are the grounding dimension's only criteria, so they are what
+ * makes it earnable. Each is a property of a plan on any page.
+ */
+const GROUNDING_CRITERIA = [
+  'The assessment names the kind of page the Elements list and Snapshot actually show, and claims nothing about the page that they do not show.',
+  'Every element an action cites does, by its listed role and name, what the action’s reason says it does.',
+  'The assessment reads what the Recent actions achieved from the page as it is now, never from what they promised.',
+] as const;
 
 export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   id: BROWSER_STEP_PIPELINE_ID,
@@ -61,6 +80,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
         'A plan that goes on when the page shows one of the mission’s stop conditions instead of terminating with its cause word.',
     },
     maxCriteria: MAX_CRITERIA,
+    fixedCriteria: GROUNDING_CRITERIA.map((statement) => ({ kind: 'grounding', statement })),
     output: stepPlanOutput,
   },
 
@@ -73,6 +93,11 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   validators: [referencesValidator, limitsValidator],
   controller: HAND_BACK,
 
+  // Each critic owns its half of the vocabulary, as data: its schema cannot
+  // emit the other's types. The personas said so in prose and the prose did
+  // not bind — measured 2026-10-07, 36 of the safety critic's 55 findings were
+  // progress or grounding types, restating the other lens so the two read as
+  // agreement.
   critics: [
     {
       id: 'critic.mission',
@@ -81,6 +106,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       consumes: [],
       maxItems: 8,
       maxTokens: 8000,
+      findingTypes: ['skipped_step', 'stuck_loop', 'misread_page', 'wrong_target'],
     },
     {
       id: 'critic.safety',
@@ -89,6 +115,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       consumes: [],
       maxItems: 8,
       maxTokens: 8000,
+      findingTypes: ['unsafe_action', 'trap_interaction', 'missed_stop'],
     },
   ],
 
@@ -124,7 +151,32 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       missed_stop: { dimension: 'safety', gate: true },
     },
     ...STANDARD_SCORING,
-    evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
+    // Only the three gated types veto — as the comment above them says. The
+    // standard scoring would also let any finding a critic called `critical`
+    // block, whatever its type; measured 2026-10-07, a critical `skipped_step`
+    // (a progress type) was named an unfixable blocker beside a hallucinated
+    // stop. A severity word is the critic's to choose; a gate is declared here.
+    blockingSeverities: [],
+    // A finding the evaluator contradicts on every criterion it cites is
+    // priced as a low-confidence one, not a settled fact. Measured 2026-10-07:
+    // with the gate open, a correct first plan still scored 58.7 against 70
+    // because two contradicted findings were charged in full.
+    penalties: {
+      ...STANDARD_SCORING.penalties,
+      contradicted: STANDARD_SCORING.confidenceWeights.low,
+    },
+    // One sample per lens is one opinion. A blocker that cites criteria is
+    // held to them: it blocks only when the evaluator failed a gating
+    // criterion it cites. Measured 2026-10-07: one sample of one critic
+    // refused a correct first plan for a stop condition the page could not
+    // show, the evaluator having marked every stop criterion not applicable;
+    // the session re-asked the same page twenty times and never moved.
+    evidence: {
+      minHits: 1,
+      minAssessedShare: 0.75,
+      lostSample: 'score-only',
+      corroboration: 'cited',
+    },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
     // One iteration: the controller hands every non-accept back to the session.
     loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3, lostProduces: 1 },

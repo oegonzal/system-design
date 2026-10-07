@@ -23,6 +23,8 @@ export interface SessionRailsDto {
   maxBrainFaults: number;
   /** Observations in a row the page could not be read before the session stops. */
   maxUnreadablePages: number;
+  /** Failed steps in a row on an unchanged page before the session stops. */
+  maxStalledSteps: number;
 }
 
 export interface BrowserSessionDto {

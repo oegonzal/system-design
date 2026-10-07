@@ -2,6 +2,7 @@ import {
   formObservation,
   listingObservation,
   openTaskLedger,
+  type StepAction,
   type StepPlan,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
@@ -34,15 +35,17 @@ const problems = (plan: StepPlan, goal = listing) => {
 };
 
 describe('the browser-step validators', () => {
-  it('[QL-36] a plan over listed, enabled elements with its terminal action last passes both, and both block', () => {
+  it('[QL-36] a plan over listed, enabled elements with its terminal action last passes both, and both cut rather than block', () => {
     expect(problems(samplePlan())).toEqual({ references: [], limits: [] });
     expect(problems(samplePlan([click('e3'), done()]))).toEqual({ references: [], limits: [] });
     expect(problems(samplePlan([askFields(['e1', 'e2']), select('e2', 'Yes')]), form)).toEqual({
       references: [],
       limits: [],
     });
-    expect(referencesValidator.gate).toBe('block');
-    expect(limitsValidator.gate).toBe('block');
+    // Both CUT: a fault at action.3 refuses action.3 and after, never action.1,
+    // and the lenses still judge the whole plan with the fault already counted.
+    expect(referencesValidator.gate).toBe('cut');
+    expect(limitsValidator.gate).toBe('cut');
   });
 
   it('[QL-36] a ref the page did not offer blocks at its action, before any lens', () => {
@@ -200,5 +203,98 @@ describe('the browser-step validators', () => {
     expect(problems(samplePlan([taskDone(), click('e3')]), open).limits[0]?.message).toBe(
       'taskDone must be the last action, or the one before terminate or done',
     );
+  });
+
+  it('[QL-36] a terminate or taskDone on a page that shows nothing is refused there: no stop condition or outcome is shown to rest it on', () => {
+    // Measured 2026-10-07: twelve plans in a row terminated an empty document
+    // for a limit the page could not show. Read from the index's own account of
+    // the observation, never from a URL, a word or a page kind.
+    const blank = stepGoal({ ...listingObservation(), elements: [], ariaSnapshot: '' });
+    expect(problems(samplePlan([terminate()]), blank).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'terminate on a page that shows nothing: no stop condition or outcome is shown to rest it on — wait for, or navigate to, the page the mission names',
+      },
+    ]);
+    const open = stepGoal(
+      { ...listingObservation(), elements: [], ariaSnapshot: '' },
+      openTaskLedger(),
+    );
+    expect(problems(samplePlan([taskDone()]), open).limits.map((p) => p.message)).toEqual([
+      expect.stringContaining('taskDone on a page that shows nothing'),
+    ]);
+    // A page that shows something — one element, or one line of snapshot — may be terminated on.
+    expect(problems(samplePlan([terminate()]), stepGoal()).limits).toEqual([]);
+    const snapshotOnly = stepGoal({
+      ...listingObservation(),
+      elements: [],
+      ariaSnapshot: '- text "No more results"',
+    });
+    expect(problems(samplePlan([terminate()]), snapshotOnly).limits).toEqual([]);
+  });
+
+  it('[QL-36] an action after one that replaces the page is refused at that action — the Limits say it, and this is where it is enforced', () => {
+    // Measured on 2026-10-07: six plans in a row put a navigate at action.1 and
+    // two to five actions after it, citing refs on a page nobody had observed.
+    // The references rule caught the refs at action.3; the first fault was at
+    // action.2, and nothing said so. Now the cut lands where the page changes.
+    const navigate: StepAction = {
+      kind: 'navigate',
+      url: 'https://jobs.example.test/search',
+      reason: 'open the search',
+      expect: 'the results',
+    };
+    expect(problems(samplePlan([navigate])).limits).toEqual([]);
+    const beyond = problems(samplePlan([click('e3'), navigate, click('e4'), done()])).limits;
+    expect(beyond).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.3'],
+        message:
+          'click follows the navigate at action.2: the page it would act on has not been observed',
+      },
+      {
+        severity: 'high',
+        locationRefs: ['action.4'],
+        message:
+          'done follows the navigate at action.2: the page it would act on has not been observed',
+      },
+    ]);
+    // Read from the declared table, never from a kind's name: a click may or
+    // may not replace the page, so a click is never the action this cuts after.
+    expect(problems(samplePlan([click('e3'), click('e4')])).limits).toEqual([]);
+
+    // A wait for text or a URL is the plan's own word that the page will
+    // change: what follows it is planned on the page waited for. A wait for a
+    // listed element is a wait on this page, and cuts nothing.
+    const waitText: StepAction = {
+      kind: 'waitFor',
+      until: 'text',
+      value: 'Results',
+      reason: 'r',
+      expect: null,
+    };
+    const waitElement: StepAction = {
+      kind: 'waitFor',
+      until: 'element',
+      value: 'e5',
+      reason: 'r',
+      expect: null,
+    };
+    expect(
+      problems(
+        samplePlan([click('e3'), waitText, taskDone()]),
+        stepGoal(listingObservation(), openTaskLedger()),
+      ).limits,
+    ).toEqual([
+      expect.objectContaining({
+        locationRefs: ['action.3'],
+        message:
+          'taskDone follows the waitFor at action.2: the page it would act on has not been observed',
+      }),
+    ]);
+    expect(problems(samplePlan([waitElement, click('e3')])).limits).toEqual([]);
   });
 });

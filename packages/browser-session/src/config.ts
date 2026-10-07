@@ -43,8 +43,8 @@ export const SESSION_ENV = {
 } as const;
 
 /**
- * The engine's stop rules when the flags leave them alone; `maxBrainFaults`
- * and `maxUnreadablePages` have no flag.
+ * The engine's stop rules when the flags leave them alone; `maxBrainFaults`,
+ * `maxUnreadablePages` and `maxStalledSteps` have no flag.
  *
  * Twelve hours of wall clock, because a session is a long errand and not a
  * demonstration: one page is one brain call, which runs one to three minutes,
@@ -59,6 +59,12 @@ export const DEFAULT_RAILS: SessionRailsDto = {
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,
+  // The same budget its sibling rails get. A hand-back's premise is a fresh
+  // observation; three failed steps on a page that has not changed is three
+  // times that premise failing, however high an operator set the failure
+  // budget for a flaky page. Measured 2026-10-07: twenty steps on one unchanged
+  // empty document, under a failure budget of twenty.
+  maxStalledSteps: 3,
 };
 
 /** A session shows its browser unless told otherwise: the operator is expected to watch. */
@@ -131,6 +137,7 @@ export function railsOf(values: {
       positiveInteger(values.maxFailures, 'maxFailures') ?? DEFAULT_RAILS.maxConsecutiveFailures,
     maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
     maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
+    maxStalledSteps: DEFAULT_RAILS.maxStalledSteps,
   };
 }
 

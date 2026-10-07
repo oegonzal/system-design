@@ -70,6 +70,43 @@ describe('createCriteriaDeriver', () => {
     expect(calls[0]?.salvage?.overruns).toMatchObject([overrun]);
   });
 
+  it('[QL-2] fixed criteria head the rubric with the first ids, the deriver is told they are already there, and derives into what remains', async () => {
+    // A cap a goal's own lines fill crowds out whatever the deriver was also
+    // asked for. Measured 2026-10-07: a kind one pipeline declared never once
+    // appeared in 165 derived rubrics. Declared, it cannot be crowded out.
+    const fixed = [
+      { kind: 'nice', statement: 'The text reads as one voice.' },
+      { kind: 'nice', statement: 'Every part names its subject.' },
+    ];
+    const withFixed = { ...task, maxCriteria: 4, fixedCriteria: fixed };
+    const calls: LlmCall[] = [];
+    const llm = fakeLlm({
+      criteria: [
+        { kind: 'must', statement: 'a' },
+        { kind: 'must', statement: 'b' },
+        { kind: 'must', statement: 'past the room' },
+      ],
+    }).withRecorder((call) => calls.push(call));
+    const derived = await createCriteriaDeriver(withFixed, deriveCriteria, llm)('goal');
+    expect(derived.criteria).toEqual([
+      { id: 'c1', kind: 'nice', statement: 'The text reads as one voice.' },
+      { id: 'c2', kind: 'nice', statement: 'Every part names its subject.' },
+      { id: 'c3', kind: 'must', statement: 'a' },
+      { id: 'c4', kind: 'must', statement: 'b' },
+    ]);
+    // Told what is already on the checklist, and asked for only the room left.
+    expect(calls[0].user).toContain('# Criteria already on the checklist');
+    expect(calls[0].user).toContain('- [nice] The text reads as one voice.');
+    expect(JSON.stringify(calls[0].schema)).toContain('"maxItems":2');
+
+    // A pipeline with none declared says nothing about them.
+    const plain = fakeLlm({ criteria: [{ kind: 'must', statement: 'a' }] }).withRecorder((call) =>
+      calls.push(call),
+    );
+    await createCriteriaDeriver(task, deriveCriteria, plain)('goal');
+    expect(calls[1].user).not.toContain('already on the checklist');
+  });
+
   it('[QL-2] a refusal is a diagnostic, not evidence — and it keeps the faults the schema refused', async () => {
     const derived = await createCriteriaDeriver(task, deriveCriteria, fakeLlm())('goal');
     expect(derived).toEqual({

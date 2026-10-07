@@ -18,6 +18,19 @@ const results = {
   results: [result('c1', ['action.1']), result('c2'), result('c3')],
   advisoryVerdict: null,
 };
+/** The evaluator bears the safety critic out: the stop criterion the critic cites, failed. */
+const resultsFailingStop = {
+  results: [
+    result('c1', ['action.1']),
+    {
+      ...result('c2', ['action.1']),
+      result: 'fail',
+      rationale: 'the limit text is shown and the plan goes on',
+    },
+    result('c3'),
+  ],
+  advisoryVerdict: null,
+};
 const clean = { findings: [] };
 const missedStop = {
   findings: [
@@ -56,13 +69,16 @@ const deps = (llm: ReturnType<typeof fakeLlm>, exchanges: LlmExchange[] = []) =>
 });
 
 describe('the browser-step loop', () => {
-  it('[QL-36] a missed stop gates the plan: the loop hands it back as escalate after one iteration, and the session does not execute it', async () => {
+  it('[QL-36] [QL-5] a missed stop the evaluator bears out gates the plan: the loop hands it back as escalate after one iteration, and the session does not execute it', async () => {
     const exchanges: LlmExchange[] = [];
-    // The critics share one schema: the mission critic takes the first canned answer, the safety critic the next.
+    // Each critic's schema offers only the types it owns, and the sequenced
+    // fake hands every request the first canned reply that parses against it:
+    // the mission critic cannot carry a missed_stop, so it takes `clean`, and
+    // the safety critic takes the finding.
     const trace = await runPipeline(
       BROWSER_STEP,
       { goal: stepGoal(), criteria: sessionCriteria() },
-      deps(sequencedLlm(samplePlan(), clean, missedStop, results), exchanges),
+      deps(sequencedLlm(samplePlan(), missedStop, clean, resultsFailingStop), exchanges),
     );
 
     // The rubric was supplied, so the deriver never ran: producer, two critics, one evaluator.
@@ -88,11 +104,35 @@ describe('the browser-step loop', () => {
     expect(readout.plan).toEqual(samplePlan());
     expect(readout.executable).toBe(false);
     expect(readout.executePrefix).toBe(0);
-    expect(readout.reason).toMatch(/^decided escalate/);
-    expect(readout.objections.map((objection) => objection.from)).toEqual(['missed_stop']);
+    expect(readout.reason).toContain('the first action was faulted');
+    // What blocked travels as the objections: the finding, and the criterion it was borne out by.
+    expect(readout.objections.map((objection) => objection.from)).toEqual(['missed_stop', 'c2']);
   });
 
-  it('[QL-36] an accepted plan runs whole, carrying what the judges said as objections rather than as a veto', async () => {
+  it('[QL-36] [QL-5] a missed stop the evaluator does not bear out is priced and never a veto, so the plan is not refused on it', async () => {
+    // Measured 2026-10-07: one sample of one critic refused a correct first
+    // plan for a stop condition the page could not show, having cited the stop
+    // criteria the evaluator had marked not applicable. Twenty plans later the
+    // session had not moved. The critic's word is evidence; two judges reading
+    // one fact apart is what it takes to close a gate.
+    const trace = await runPipeline(
+      BROWSER_STEP,
+      { goal: stepGoal(), criteria: sessionCriteria() },
+      deps(sequencedLlm(samplePlan(), missedStop, clean, results)),
+    );
+    const [only] = trace.iterations;
+    expect(only.ledger.findings.map((finding) => finding.key)).toEqual(['missed_stop|action.1']);
+    expect(only.decision.gates.policyAllowed).toBe(true);
+    expect(only.decision.blocking.findings).toEqual([]);
+    // Still priced on the safety dimension, so a reader sees it.
+    expect(only.decision.scores.dimensions['safety']).toBeLessThan(100);
+    // Nothing blocked: the plan stands or falls on its quality alone, and the
+    // finding is not an objection the next producer is told to answer.
+    const readout = routePlan(runDto('contested', trace), 1);
+    expect(readout.objections).toEqual([]);
+  });
+
+  it('[QL-36] an accepted plan runs whole: what the judges said is advice on the record, neither a veto nor an objection', async () => {
     const two = samplePlan([
       click('e3', 'open the first listing', 'the listing detail'),
       click('e5', 'go to the next page', 'the second page of results'),
@@ -109,15 +149,17 @@ describe('the browser-step loop', () => {
     ]);
     // The controller accepted it and found nothing blocking, so the session
     // does not add a stricter veto of its own: the plan runs, and what the
-    // critic said travels to the next goal as an objection. Measured on
-    // 2026-10-06, the other way round: a plan accepted at 73.3 against a
-    // threshold of 70 never ran because one `low` advisory finding pointed at
-    // its first action, and ten steps of a session went the same way.
+    // critic said stays on the run's record as advice — not an objection the
+    // next plan has to answer. Measured on 2026-10-06, the other way round: a
+    // plan accepted at 73.3 against a threshold of 70 never ran because one
+    // `low` advisory finding pointed at its first action; and on 2026-10-07,
+    // advice carried as objections taught a producer a stop condition the
+    // page never showed.
     expect(routePlan(runDto('faulted', faulted), 1)).toMatchObject({
       executable: true,
       executePrefix: 2,
       reason: null,
-      objections: [expect.objectContaining({ from: 'skipped_step' })],
+      objections: [],
     });
 
     const whole = await runPipeline(

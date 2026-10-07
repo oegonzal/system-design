@@ -242,7 +242,10 @@ export async function executeActions(
     if (failed) break;
   }
   if (failed) ctx.fail('action-failed');
-  else state.consecutiveFailures = 0;
+  else {
+    state.consecutiveFailures = 0;
+    state.stalledSteps = 0;
+  }
 
   for (const action of prefix.slice(next)) {
     pushHistory(

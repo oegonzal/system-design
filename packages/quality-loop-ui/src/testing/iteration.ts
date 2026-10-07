@@ -155,6 +155,7 @@ export const makeIteration = (overrides: Partial<IterationTrace> = {}): Iteratio
       evidenceSufficient: true,
       policyAllowed: true,
     },
+    blocking: { validators: [], findings: [], criteria: [] },
     scores: { dimensions: { completeness: 50, soundness: 88 }, overall: 65.2 },
     selectedRemediations: [
       {

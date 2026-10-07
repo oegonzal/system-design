@@ -96,9 +96,24 @@ export interface DecisionTrace {
   weightedTotal: number;
 }
 
+/**
+ * What closed the engine's gates, by the id its record keys it with: the
+ * validators whose problems refuse, the confirmed findings that block, the
+ * gating criteria that failed. The engine's facts, like `gates` — recorded
+ * under every controller, so a reader that routes on them (the browser
+ * session cutting a plan at the first blocked action) reads the decision's
+ * own account and never re-derives one from the policy.
+ */
+export interface Blocking {
+  validators: string[];
+  findings: string[];
+  criteria: string[];
+}
+
 export interface QualityControlDecision {
   finalDecision: Decision;
   gates: Gates;
+  blocking: Blocking;
   scores: { dimensions: Record<string, number | null>; overall: number };
   selectedRemediations: Remediation[];
   reason: string;

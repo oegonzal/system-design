@@ -63,6 +63,7 @@ export const decision = (
     evidenceSufficient: true,
     policyAllowed: true,
   },
+  blocking: { validators: [], findings: [], criteria: [] },
   scores: { dimensions: {}, overall: 80 },
   selectedRemediations: [],
   reason: 'spec',

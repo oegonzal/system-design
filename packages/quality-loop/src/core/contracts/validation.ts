@@ -3,9 +3,12 @@
  * artifact and the index its goal carries. The validator runs on every
  * artifact the engine hands over, well-formed or not, so it starts from the
  * output schema — read as the model seam reads a reply, so a field past its
- * size is still well-formed — it reads the index, never prose; and it blocks,
- * because an artifact that cites what was never listed cannot be trusted by
- * any lens.
+ * size is still well-formed — and it reads the index, never prose. What its
+ * problems do is declared: `block`, because an artifact that cites what was
+ * never listed cannot be trusted by any lens; or `cut`, for a positional
+ * artifact whose units run in order, where a fault at one unit refuses it and
+ * what follows, says nothing against the units before it, and leaves the whole
+ * for the lenses to judge.
  */
 import {
   modelSchema,
@@ -15,6 +18,7 @@ import {
   type LenientParse,
   type Severity,
   type ValidationProblem,
+  type ValidatorGate,
   type Withholding,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
@@ -55,26 +59,31 @@ export const problem = (
 /** A rule reads a parsed artifact against the index; what it finds are the problems. */
 export type IndexedRule<A, I> = (artifact: A, index: I) => ValidationProblem[];
 
+/** A gate an indexed validator may declare: its problems refuse, one way or the other. */
+export type RefusingGate = Exclude<ValidatorGate, 'warn'>;
+
 /**
- * A blocking validator over an artifact and its goal's index. A malformed
- * artifact is the schema validator's to report, so it passes here with no
- * problems; a goal without an index yields `whenNoIndex`.
+ * A refusing validator over an artifact and its goal's index, with the gate
+ * it declares. A malformed artifact is the schema validator's to report, so
+ * it passes here with no problems; a goal without an index yields
+ * `whenNoIndex`.
  */
 export function indexedValidator<A, I>(
   id: string,
   readIndex: (goal: string) => I | null,
   rule: IndexedRule<A, I>,
   whenNoIndex: ValidationProblem[],
+  gate: RefusingGate = 'block',
 ): Validator<A> {
   return {
     id,
-    gate: 'block',
+    gate,
     validate: (artifact, contract) => {
       const parsed = readArtifact(contract.output.schema, artifact);
-      if (!parsed.ok) return { validatorId: id, gate: 'block', problems: [] };
+      if (!parsed.ok) return { validatorId: id, gate, problems: [] };
       const index = readIndex(contract.goal);
       const problems = index === null ? whenNoIndex : rule(parsed.value, index);
-      return { validatorId: id, gate: 'block', problems };
+      return { validatorId: id, gate, problems };
     },
   };
 }

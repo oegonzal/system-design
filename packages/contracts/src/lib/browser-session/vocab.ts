@@ -28,6 +28,11 @@ export const ENGINE_TERMINATIONS = [
   'brain-unavailable',
   /** The page could not be read, observation after observation: there is nothing to plan against. */
   'page-unreadable',
+  /**
+   * The page has not changed across the declared number of failed steps: a
+   * fresh observation was the hand-back's premise, and there is none to have.
+   */
+  'page-stalled',
   'operator-stop',
   'error',
 ] as const;
@@ -46,6 +51,7 @@ export const TERMINATION_STATUS = {
   'max-failures': 'stopped',
   'brain-unavailable': 'stopped',
   'page-unreadable': 'stopped',
+  'page-stalled': 'stopped',
   'operator-stop': 'stopped',
   error: 'failed',
 } as const satisfies Record<BrowserSessionTermination, BrowserSessionStatus>;
@@ -221,6 +227,24 @@ export const STEP_ACTION_KINDS = [
 export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
 
 /** The actions that end a plan; the validators require one of them last and nowhere else. */
+/**
+ * Actions that replace the page in front of the session. Anything planned after
+ * one would act on, or claim something about, a page nobody has observed yet,
+ * so the limits validator cuts a plan there and the page it opens is the next
+ * plan's to read. Only what the action kind alone makes certain is listed: a
+ * click or a key press may or may not replace the page, and the critics
+ * judge those.
+ */
+export const PAGE_REPLACING_ACTION_KINDS = ['navigate'] as const;
+
+/**
+ * The waits that are themselves a declaration that the page will change: a
+ * plan that waits for a URL or for text it cannot see yet is waiting for a
+ * page nobody has observed, and whatever it plans after the wait is planned
+ * on that page. A wait for a listed element is a wait on this page.
+ */
+export const PAGE_REPLACING_WAITS = ['url', 'text'] as const;
+
 export const TERMINAL_ACTION_KINDS = ['taskDone', 'terminate', 'done'] as const;
 
 /**

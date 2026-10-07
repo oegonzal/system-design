@@ -4,6 +4,7 @@
  */
 import {
   AXIS_FACTOR_LEVELS,
+  CORROBORATIONS,
   LOST_SAMPLE_POLICIES,
   SEVERITIES,
   WITHHOLDINGS,
@@ -125,6 +126,10 @@ function checkPricing(policy: DecisionPolicy, fail: Fail): void {
   if (!(policy.penalties.decay > 0 && policy.penalties.decay <= 1))
     fail('penalties.decay must be in (0,1]');
   if (!(policy.penalties.maxPerDimension >= 0)) fail('penalties.maxPerDimension must be ≥ 0');
+  const { contradicted } = policy.penalties;
+  if (contradicted !== undefined && !inUnit(contradicted)) {
+    fail('penalties.contradicted must be in [0,1]');
+  }
   if (policy.blockingSeverities.some((severity) => !SEVERITIES.includes(severity))) {
     fail('blockingSeverities names an unknown severity');
   }
@@ -136,6 +141,13 @@ function checkLoop(policy: DecisionPolicy, fail: Fail): void {
   if (!inUnit(policy.evidence.minAssessedShare)) fail('evidence.minAssessedShare must be in [0,1]');
   if (!(LOST_SAMPLE_POLICIES as readonly string[]).includes(policy.evidence.lostSample)) {
     fail(`evidence.lostSample must be one of ${LOST_SAMPLE_POLICIES.join(', ')}`);
+  }
+  const { corroboration } = policy.evidence;
+  if (
+    corroboration !== undefined &&
+    !(CORROBORATIONS as readonly string[]).includes(corroboration)
+  ) {
+    fail(`evidence.corroboration must be one of ${CORROBORATIONS.join(', ')}`);
   }
   const { acceptAt, rejectBelow } = policy.thresholds;
   if (!(rejectBelow >= 0 && rejectBelow < acceptAt && acceptAt <= 100)) {

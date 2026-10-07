@@ -18,6 +18,8 @@ export interface RailState {
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from. */
   unreadablePages: number;
+  /** Failed steps in a row whose observation was the same page as the step before. */
+  stalledSteps: number;
   operatorStopped: boolean;
 }
 
@@ -78,6 +80,18 @@ export const RAILS: readonly Rail[] = [
     holds: (state, rails) => state.unreadablePages >= rails.maxUnreadablePages,
     detail: (state, rails) =>
       `${state.unreadablePages} observations in a row the page could not be read, limit ${rails.maxUnreadablePages}`,
+  },
+  {
+    // A hand-back re-observes because a fresh observation beats a blind
+    // revise. When the page has not changed, there is no fresh observation to
+    // have: the same plan is being asked of the same page, and the failure
+    // budget — which an operator may set high for a flaky page — is the wrong
+    // rail to spend on it. Read from the observation's own identity, never
+    // from a URL or a page kind.
+    reason: 'page-stalled',
+    holds: (state, rails) => state.stalledSteps >= rails.maxStalledSteps,
+    detail: (state, rails) =>
+      `${state.stalledSteps} failed steps in a row on a page that did not change, limit ${rails.maxStalledSteps}`,
   },
 ];
 

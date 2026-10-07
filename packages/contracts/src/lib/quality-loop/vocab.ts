@@ -140,6 +140,28 @@ export type UpstreamEvidence = (typeof UPSTREAM_EVIDENCE)[number];
 export const PRODUCER_BRIEFING = ['criteria', 'memories', 'setbacks'] as const;
 export type ProducerBriefing = (typeof PRODUCER_BRIEFING)[number];
 
-/** `block` stops the iteration before any model call; `warn` only informs. */
-export const VALIDATOR_GATES = ['block', 'warn'] as const;
+/**
+ * What a validator's problems do. `block` stops the iteration before any
+ * model call: the artifact cannot be trusted by any lens. `cut` refuses the
+ * positions its problems point at and nothing before them, and the lenses
+ * still judge the whole artifact — for a positional artifact, an exact fault
+ * at one unit says nothing against the units ahead of it, and a caller that
+ * executes units in order runs up to the fault. `warn` only informs.
+ */
+export const VALIDATOR_GATES = ['block', 'cut', 'warn'] as const;
 export type ValidatorGate = (typeof VALIDATOR_GATES)[number];
+
+/** The gates whose problems refuse something — what the controller's validators gate counts. */
+export const REFUSING_GATES = ['block', 'cut'] as const satisfies readonly ValidatorGate[];
+
+/**
+ * What a confirmed finding needs, beyond agreement, before it may block.
+ * `none`: agreement alone — a confirmed finding of a gating type or a blocking
+ * severity closes the gate. `cited`: a blocker that cites criteria is held to
+ * them — it blocks only when the evaluator failed a gating criterion it cites,
+ * and is priced like any other finding otherwise; one that cites none made no
+ * checkable claim and blocks as under `none`. Two judges reading the same
+ * fact apart is the agreement a one-sample lens cannot supply for itself.
+ */
+export const CORROBORATIONS = ['none', 'cited'] as const;
+export type Corroboration = (typeof CORROBORATIONS)[number];

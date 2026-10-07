@@ -1,11 +1,13 @@
 /**
- * The task contract's criteria come from the goal itself: one structured
- * extraction, classified into the pipeline's kinds. Ids are assigned here,
- * positionally, so the model never authors an identifier and the policy can
- * price a kind without trusting a name. A statement past the task's bound is
- * kept as written and reported as an overrun, never a reason to lose the
- * rubric; only a reply the schema refuses outright — a wrong kind, an empty
- * statement — leaves the stage `llm-failed`, never judging against part of one.
+ * The task contract's criteria: what the pipeline declares for every goal of
+ * its kind (`task.fixedCriteria`), then what this goal adds — one structured
+ * extraction, classified into the pipeline's kinds, into the room the fixed
+ * ones leave. Ids are assigned here, positionally over the whole, so the
+ * model never authors an identifier and the policy can price a kind without
+ * trusting a name. A statement past the task's bound is kept as written and
+ * reported as an overrun, never a reason to lose the rubric; only a reply the
+ * schema refuses outright — a wrong kind, an empty statement — leaves the
+ * stage `llm-failed`, never judging against part of one.
  */
 import { modelSchema, overrunsOf, type Overrun, type SuccessCriterion } from '@sysdesign/contracts';
 import { asDetailed, type LlmClient } from '@sysdesign/llm';
@@ -13,7 +15,13 @@ import { asDetailed, type LlmClient } from '@sysdesign/llm';
 import { criterionLengthBound, type TaskSpec } from '../contracts';
 import type { StageSpec } from '../pipeline';
 import type { CriteriaDeriver } from '../ports';
-import { goalSection, joinSections, kindsSection, systemPrompt } from './prompting';
+import {
+  fixedCriteriaSection,
+  goalSection,
+  joinSections,
+  kindsSection,
+  systemPrompt,
+} from './prompting';
 import { criteriaSchema, enumTuple } from './schemas';
 import { CRITERIA_STAGE, failedDiagnostic, stageDiagnostic } from './shared';
 
@@ -32,11 +40,18 @@ export function createCriteriaDeriver<T>(
       };
     }
 
+    const fixed = task.fixedCriteria ?? [];
+    // Boot refuses a pipeline whose fixed criteria leave no room, so this is ≥ 1.
+    const room = task.maxCriteria - fixed.length;
     const goalText = goalSection(goal);
     const reply = await asDetailed(llm).completeStructuredDetailed({
       system: systemPrompt('criteria', spec.persona),
-      user: joinSections(kindsSection(task.criterionKinds), goalText.text),
-      schema: criteriaSchema(kinds, task.maxCriteria, criterionLengthBound(task)),
+      user: joinSections(
+        kindsSection(task.criterionKinds),
+        ...(fixedCriteriaSection(fixed) === null ? [] : [fixedCriteriaSection(fixed)!]),
+        goalText.text,
+      ),
+      schema: criteriaSchema(kinds, room, criterionLengthBound(task)),
       maxTokens: spec.maxTokens,
     });
     if (reply.value === null) {
@@ -48,7 +63,10 @@ export function createCriteriaDeriver<T>(
     }
 
     return {
-      criteria: reply.value.criteria.slice(0, task.maxCriteria).map((item, index) => ({
+      criteria: [
+        ...fixed.map((item) => ({ kind: item.kind, statement: item.statement })),
+        ...reply.value.criteria.slice(0, room),
+      ].map((item, index) => ({
         id: `c${index + 1}`,
         kind: item.kind,
         statement: item.statement.trim(),

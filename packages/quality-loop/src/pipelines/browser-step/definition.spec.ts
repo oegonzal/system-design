@@ -24,6 +24,27 @@ describe('the browser-step pipeline', () => {
     expect(BROWSER_STEP.policy.loop.maxIterations).toBe(1);
   });
 
+  it('[QL-36] [QL-5] declares what a weak model cannot be trusted to supply: grounding criteria on every rubric, cited corroboration for a blocker, and validators that cut', () => {
+    // Grounding is the one dimension only declared criteria earn: a mission's
+    // own lines fill the deriver's cap, and in 165 derived rubrics the kind
+    // never once appeared.
+    const fixed = BROWSER_STEP.task.fixedCriteria ?? [];
+    expect(fixed.length).toBeGreaterThan(0);
+    expect(fixed.every((criterion) => criterion.kind === 'grounding')).toBe(true);
+    expect(fixed.length).toBeLessThan(BROWSER_STEP.task.maxCriteria);
+    // One sample of one critic is one opinion: a blocker that cites criteria is
+    // held to them, and blocks only when the evaluator failed one it cites.
+    expect(BROWSER_STEP.policy.evidence.corroboration).toBe('cited');
+    // A fault at action.N refuses action.N and after; the lenses still judge.
+    expect(BROWSER_STEP.validators.map((validator) => validator.gate)).toEqual(['cut', 'cut']);
+    // Only the declared type gates veto; a severity word is the critic's to choose.
+    expect(BROWSER_STEP.policy.blockingSeverities).toEqual([]);
+    // Each critic owns its half of the vocabulary, and between them every type.
+    const owned = BROWSER_STEP.critics.flatMap((critic) => critic.findingTypes ?? []);
+    expect([...owned].sort()).toEqual(Object.keys(BROWSER_STEP.task.findingTypes).sort());
+    expect(new Set(owned).size).toBe(owned.length);
+  });
+
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {
     const earning = new Set(
       Object.values(BROWSER_STEP.policy.criterionKinds).map((kind) => kind.dimension),

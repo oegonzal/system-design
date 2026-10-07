@@ -33,7 +33,13 @@ export function createLlmCritic<T>(
     id: spec.id,
     consumes: spec.consumes,
     plan(ctx: LensContext<T>) {
-      const types = enumTuple(Object.keys(task.findingTypes));
+      // Only the types this lens owns: declared on the lens, else every one the task knows.
+      const owned = Object.fromEntries(
+        Object.entries(task.findingTypes).filter(
+          ([type]) => spec.findingTypes === undefined || spec.findingTypes.includes(type),
+        ),
+      );
+      const types = enumTuple(Object.keys(owned));
       if (!types) {
         return planned(skipped(spec.id, null, 'not-applicable', 'no finding types'));
       }
@@ -43,7 +49,7 @@ export function createLlmCritic<T>(
         user: joinSections(
           goalSection(ctx.contract.goal).text,
           criteriaSection(ctx.contract.criteria),
-          typesSection(task.findingTypes),
+          typesSection(owned),
           artifactSection(ctx.rendered),
           locationsSection(ctx.locations),
           validationSection(ctx.validation),

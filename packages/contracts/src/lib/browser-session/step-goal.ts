@@ -55,6 +55,14 @@ export const stepIndexSchema = z.strictObject({
     }),
   ),
   openTask: z.boolean(),
+  /**
+   * Whether the observation shows anything at all — a listed element or a
+   * line of snapshot. A terminate names a stop condition the page shows and a
+   * taskDone an outcome the page shows; on a page that shows nothing there is
+   * nothing for either to rest on, and the validators refuse them there so the
+   * most consequential actions in the vocabulary never rest on a claim alone.
+   */
+  pageShowsContent: z.boolean(),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
 
@@ -75,13 +83,21 @@ export function renderElementLine(element: ObservedElement): string {
   return `- ${parts.join(' · ')}`;
 }
 
+/**
+ * The recent actions, one line each. An entry that ran reads action first;
+ * one that did not leads with that fact, so a proposal the session never
+ * carried out cannot be read as something that happened — a `terminate` that
+ * was refused is not a reason the session has been given to stop.
+ */
 const historyLines = (history: readonly StepHistoryEntry[]): string[] =>
   history.length === 0
     ? ['(none yet)']
-    : history.map(
-        (entry) =>
-          `- ${entry.action} — ${entry.outcome}${entry.note === null ? '' : ` — ${entry.note}`}`,
-      );
+    : history.map((entry) => {
+        const note = entry.note === null ? '' : ` — ${entry.note}`;
+        return entry.outcome === 'not-executed'
+          ? `- not-executed (proposed, did not run): ${entry.action}${note}`
+          : `- ${entry.action} — ${entry.outcome}${note}`;
+      });
 
 /**
  * The objections the next plan must answer, newest first and each whole. Past
@@ -119,6 +135,8 @@ const indexOf = (input: StepGoalInput): StepIndex => ({
     hiddenTraits: element.hiddenTraits,
   })),
   openTask: input.ledger.openTask !== null,
+  pageShowsContent:
+    input.observation.elements.length > 0 || input.observation.ariaSnapshot.trim().length > 0,
 });
 
 /** The goal, or a refusal when it would not fit the engine's budget. */

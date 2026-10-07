@@ -42,6 +42,10 @@ describe('composeStepGoal', () => {
     expect(index?.elements.map((e) => e.ref)).toEqual(observation.elements.map((e) => e.ref));
     expect(index?.elements.find((e) => e.ref === 'e6')?.disabled).toBe(true);
     expect(index?.elements.find((e) => e.ref === 'e1')?.kind).toBe('fillable');
+    expect(index?.pageShowsContent).toBe(true);
+    // Nothing listed and nothing in the snapshot: the page shows nothing, and the index says so.
+    const empty = { ...observation, elements: [], ariaSnapshot: '  \n' };
+    expect(readStepIndex(goalOf(empty))?.pageShowsContent).toBe(false);
   });
 
   it('[QL-39] keeps the index last, so a snapshot carrying its own fenced block does not disturb it', () => {
@@ -136,6 +140,35 @@ describe('stepPlanSchema', () => {
     expect([...kinds].sort()).toEqual([...STEP_ACTION_KINDS].sort());
     const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
     expect(json).not.toMatch(/"type":"(number|integer)"/);
+  });
+
+  it('[QL-36] a recent action that did not run leads with that fact, so a refused terminate never reads as a stop the session was given', () => {
+    // Measured 2026-10-07: refused plans wrote their actions into the history
+    // as "terminate limit-reached — the daily limit is reached — not-executed",
+    // and the next producer read the limit as reached.
+    const goal = goalOf(listingObservation(), [
+      { action: 'click e3 link "Senior Engineer — Acme"', outcome: 'ok', note: 'the detail page' },
+      {
+        action: 'plan of 2 action(s): terminate, done',
+        outcome: 'not-executed',
+        note: null,
+      },
+      {
+        action: 'terminate limit-reached — tried again later',
+        outcome: 'not-executed',
+        note: 'cut',
+      },
+    ]);
+    const recent = goal.split('## Recent actions')[1]!.split('## Objections')[0]!;
+    expect(recent).toContain('- click e3 link "Senior Engineer — Acme" — ok — the detail page');
+    expect(recent).toContain(
+      '- not-executed (proposed, did not run): plan of 2 action(s): terminate, done',
+    );
+    expect(recent).toContain(
+      '- not-executed (proposed, did not run): terminate limit-reached — tried again later — cut',
+    );
+    // Never the action first when it did not happen.
+    expect(recent).not.toMatch(/^- terminate limit-reached/m);
   });
 
   it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {

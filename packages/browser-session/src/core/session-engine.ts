@@ -1,11 +1,12 @@
 import {
   BROWSER_SESSION_PIPELINES,
-  routePlan,
-  TERMINATION_STATUS,
   type BrowserSessionStatus,
+  observationFingerprint,
   type PageObservation,
   type PlanReadout,
+  routePlan,
   type StepPlan,
+  TERMINATION_STATUS,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -28,7 +29,9 @@ import {
 import {
   createState,
   describeAction,
+  describeRefusedPlan,
   ledgerSummaryOf,
+  noteObservation,
   pushHistory,
   pushObjections,
   railStateOf,
@@ -97,6 +100,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   state.ordinal = 0;
   const observation = await deps.browser.observe();
   const screenshot = await deps.browser.screenshot().catch(() => null);
+  noteObservation(state, observationFingerprint(observation));
   settleExpectation(ctx, observation);
   ctx.dumpFiles('step files', observationFiles(state.step, observation, screenshot));
 
@@ -183,12 +187,13 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   );
 
   if (!readout.executable || readout.plan === null) {
-    for (const action of readout.plan?.actions ?? []) {
-      // No note: why the plan did not run is an objection, carried once for the
-      // whole plan, not the same text copied onto every action it proposed.
-      pushHistory(state, describeAction(action, observation), 'not-executed', null);
-    }
-    if (readout.plan === null) pushHistory(state, 'plan', 'not-executed', readout.reason);
+    // One entry for the plan, not one per action it proposed. Measured on
+    // 2026-10-07: a refused six-action plan wrote six not-executed entries, two
+    // refusals filled HISTORY_MAX, and the producer read its own refused
+    // proposals — "terminate limit-reached" among them — as the session's
+    // recent past. The actions themselves stay whole in the step's plan.json,
+    // and why it did not run is an objection, carried once.
+    pushHistory(state, describeRefusedPlan(readout.plan), 'not-executed', null);
     ctx.fail('plan-not-executed');
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
@@ -257,6 +262,9 @@ export async function runSession(
     },
     fail(event) {
       state.consecutiveFailures += 1;
+      // A failure on a page that has not moved since the last step is a stall:
+      // the hand-back's premise, a fresh observation, is not being met.
+      if (state.pageUnchanged) state.stalledSteps += 1;
       deps.log(`step ${state.step}: ${event} (${state.consecutiveFailures} in a row)`);
     },
     terminate(termination, source, runId) {

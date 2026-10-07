@@ -3,6 +3,7 @@
 // codecs both sides parse, what the operator taught, and its records.
 export * from './vocab';
 export * from './pipelines';
+export * from './observation-fingerprint';
 export * from './observation.schema';
 export * from './step-plan.schema';
 export * from './step-goal';

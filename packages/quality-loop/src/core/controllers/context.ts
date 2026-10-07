@@ -5,10 +5,16 @@
  * remediations are everything the producer could act on, worst first. A gate
  * observes this context and gives a verdict — it never edits it. Only what
  * `minHits` samples agreed on can block: an item confirmed short of them
- * (a lens that lost a sample) is priced and never a blocker. A validation
- * problem of severity `info` — a field past the size it was asked for —
- * informs and is never acted on, so it moves no route.
+ * (a lens that lost a sample) is priced and never a blocker. Under a policy
+ * that asks for corroboration, a blocker that cites criteria must also be
+ * borne out by the evaluator — a gating criterion it cites, failed — or it is
+ * priced and never a blocker either: one sample of one lens is one opinion,
+ * and two judges reading one fact apart is the agreement that sample cannot
+ * supply for itself. A validation problem of severity `info` — a field past
+ * the size it was asked for — informs and is never acted on, so it moves no
+ * route.
  */
+import { REFUSING_GATES } from '@sysdesign/contracts';
 import type {
   ConfirmedFinding,
   CriterionEvidence,
@@ -99,10 +105,15 @@ function priceCriteria(
 function chargeFindings(
   findings: readonly ConfirmedFinding[],
   policy: DecisionPolicy,
+  contradicted: ReadonlySet<string>,
 ): { penalties: Penalty[]; penaltyTotal: number; clampScale: number } {
   const { bySeverity, decay, maxPerDimension } = policy.penalties;
+  const discount = policy.penalties.contradicted ?? 1;
   const penalties = findings.map((finding, position): Penalty => {
-    const listPoints = bySeverity[finding.severity] * policy.confidenceWeights[finding.confidence];
+    const listPoints =
+      bySeverity[finding.severity] *
+      policy.confidenceWeights[finding.confidence] *
+      (contradicted.has(finding.key) ? discount : 1);
     const decayed = listPoints * decay ** position;
     return {
       key: finding.key,
@@ -126,6 +137,7 @@ function scoreDimension(
   chargeable: readonly ConfirmedFinding[],
   policy: DecisionPolicy,
   dimension: string,
+  contradicted: ReadonlySet<string>,
 ): DimensionTrace {
   const criteria = priceCriteria(ledger, policy, dimension);
   const totalWeight = sum(criteria.map((criterion) => criterion.weight));
@@ -137,7 +149,7 @@ function scoreDimension(
   const base =
     criteria.length > 0 ? (100 * earned) / totalWeight : findings.length > 0 ? 100 : null;
 
-  const { penalties, penaltyTotal, clampScale } = chargeFindings(findings, policy);
+  const { penalties, penaltyTotal, clampScale } = chargeFindings(findings, policy, contradicted);
   const score = base === null ? null : round1(clamp(base - penaltyTotal, SCORE_MIN, SCORE_MAX));
 
   return {
@@ -169,12 +181,42 @@ function weighOverall(dimensions: DimensionTrace[]): Scored {
   };
 }
 
-function scoreDimensions(ledger: EvidenceLedger, policy: DecisionPolicy): Scored {
+function scoreDimensions(
+  ledger: EvidenceLedger,
+  policy: DecisionPolicy,
+  contradicted: ReadonlySet<string>,
+): Scored {
   const chargeable = ledger.findings.filter((finding) => finding.reconciledTo === null);
   return weighOverall(
     Object.keys(policy.dimensionWeights).map((dimension) =>
-      scoreDimension(ledger, chargeable, policy, dimension),
+      scoreDimension(ledger, chargeable, policy, dimension, contradicted),
     ),
+  );
+}
+
+/**
+ * The findings the evaluator contradicted, under a policy that asks for
+ * corroboration: each cites at least one criterion, and every criterion it
+ * cites was judged pass or not applicable — the judge of that very fact read
+ * it the other way. Nothing is contradicted under `none`, and a finding that
+ * cites nothing, or cites a criterion nobody judged, is not.
+ */
+function contradictedFindings(ledger: EvidenceLedger, policy: DecisionPolicy): Set<string> {
+  if ((policy.evidence.corroboration ?? 'none') === 'none') return new Set();
+  const settled = new Map(
+    ledger.criteria.map((evidence) => [evidence.criterionId, evidence.result]),
+  );
+  return new Set(
+    ledger.findings
+      .filter(
+        (finding) =>
+          finding.criterionIds.length > 0 &&
+          finding.criterionIds.every((id) => {
+            const result = settled.get(id);
+            return result === 'pass' || result === 'not_applicable';
+          }),
+      )
+      .map((finding) => finding.key),
   );
 }
 
@@ -251,6 +293,23 @@ const isBlocker = (finding: ConfirmedFinding, policy: DecisionPolicy): boolean =
 const agreed = (item: { hits: number }, policy: DecisionPolicy): boolean =>
   item.hits >= policy.evidence.minHits;
 
+/**
+ * Whether the evaluator bore a finding out, where the policy asks. Under
+ * `cited`, a finding that names criteria is held to them: one of them must be
+ * a gating criterion the evaluator failed. A finding that names none made no
+ * claim the evaluator could check, and stands on its agreement alone — the
+ * safety net for a fault the rubric never spelled out. Under `none`, every
+ * finding stands on agreement alone, as every pipeline before the field did.
+ */
+const corroborated = (
+  finding: ConfirmedFinding,
+  failedGating: ReadonlySet<string>,
+  policy: DecisionPolicy,
+): boolean =>
+  (policy.evidence.corroboration ?? 'none') === 'none' ||
+  finding.criterionIds.length === 0 ||
+  finding.criterionIds.some((id) => failedGating.has(id));
+
 /** How much of the contract was judged at all; zero when there was nothing to judge. */
 const assessedShareOf = (criteria: readonly CriterionEvidence[]): number =>
   criteria.length === 0
@@ -258,19 +317,29 @@ const assessedShareOf = (criteria: readonly CriterionEvidence[]): number =>
     : criteria.filter((evidence) => evidence.result !== 'unassessed').length / criteria.length;
 
 export function buildContext(ledger: EvidenceLedger, policy: DecisionPolicy): GateContext {
-  const scored = scoreDimensions(ledger, policy);
+  const contradicted = contradictedFindings(ledger, policy);
+  const scored = scoreDimensions(ledger, policy, contradicted);
+  // A report refuses whether it blocks the lenses or only cuts the artifact —
+  // and only on a problem the controller acts on: one that merely informs
+  // (a field past the size it was asked for) moves no route, as the header says.
   const validators = ledger.validation.filter(
-    (report) => report.gate === 'block' && report.problems.length > 0,
+    (report) =>
+      (REFUSING_GATES as readonly string[]).includes(report.gate) &&
+      report.problems.some(actionable),
   );
   const assessedShare = assessedShareOf(ledger.criteria);
-  const findings = ledger.findings.filter(
-    (finding) => isBlocker(finding, policy) && agreed(finding, policy),
-  );
   const criteria = ledger.criteria.filter(
     (evidence) =>
       policy.criterionKinds[evidence.kind].gate &&
       evidence.result === 'fail' &&
       agreed(evidence, policy),
+  );
+  const failedGating = new Set(criteria.map((evidence) => evidence.criterionId));
+  const findings = ledger.findings.filter(
+    (finding) =>
+      isBlocker(finding, policy) &&
+      agreed(finding, policy) &&
+      corroborated(finding, failedGating, policy),
   );
   return {
     ledger,

@@ -1,6 +1,13 @@
 import { BROWSER_SESSION_PIPELINES } from '@sysdesign/contracts';
 
-import { decidedAnswers, decidedPlan, FAKE_RUBRIC, FakeBrowser, InMemoryLedger } from './testing';
+import {
+  decidedAnswers,
+  decidedPlan,
+  FAKE_RUBRIC,
+  FakeBrowser,
+  finding,
+  InMemoryLedger,
+} from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
@@ -68,6 +75,66 @@ describe('the session engine', () => {
       ]),
     );
     expect(browser.closed).toBe(true);
+  });
+
+  it('[BRW-1] [QL-36] runs a handed-back plan up to the action a cutting validator pointed at, and tells the next plan what was cut and why', async () => {
+    // Measured 2026-10-07: six plans in a row were voided whole for a ref at
+    // action.2 or action.3 while action.1 was never faulted, and the session
+    // never left an empty document. The loop still hands such a plan back;
+    // the session runs what nobody objected to and re-observes.
+    const cutAtTwo = decidedPlan(PLANS.search, {
+      decision: 'escalate',
+      validation: [
+        {
+          validatorId: 'references',
+          gate: 'cut',
+          problems: [
+            {
+              severity: 'critical',
+              locationRefs: ['action.2'],
+              message: 'e2 is not a listed element',
+            },
+          ],
+        },
+      ],
+    });
+    const { brain, browser, outcome } = await run({
+      script: { plans: [cutAtTwo, decidedPlan(PLANS.end)], answers: [] },
+    });
+    expect(outcome.steps).toBe(2);
+    expect(browser.calls).toContain('fill e1');
+    expect(browser.calls).not.toContain('click e2');
+    // The next plan sees the action that ran, the one that was cut, and the cut itself as the objection.
+    expect(brain.planInputs[1]?.history.map((h) => [h.action, h.outcome, h.note])).toEqual([
+      ['fill e1 searchbox "Search" with "software engineer"', 'ok', null],
+      ['click e2 button "Search"', 'not-executed', 'past the executable prefix'],
+    ]);
+    expect(brain.planInputs[1]?.objections).toEqual([
+      { step: 1, from: 'references', at: ['action.2'], detail: 'e2 is not a listed element' },
+    ]);
+  });
+
+  it('[BRW-1] a plan refused whole is one line of history, never one per proposed action', async () => {
+    // Measured 2026-10-07: a refused six-action plan wrote six not-executed
+    // entries, two refusals filled HISTORY_MAX, and the producer read its own
+    // refused "terminate limit-reached" as the session's recent past.
+    const refused = decidedPlan(PLANS.search, {
+      decision: 'escalate',
+      policyAllowed: false,
+      findings: [finding('missed_stop', ['assessment'], 'the page shows a stop')],
+    });
+    const { brain, browser } = await run({
+      script: { plans: [refused, decidedPlan(PLANS.end)], answers: [] },
+      rails: { maxConsecutiveFailures: 3 },
+    });
+    expect(browser.calls).not.toContain('fill e1');
+    expect(brain.planInputs[1]?.history).toEqual([
+      { action: 'plan of 2 action(s): fill, click', outcome: 'not-executed', note: null },
+    ]);
+    // Why it did not run travels once, as the objection.
+    expect(brain.planInputs[1]?.objections.map((o) => [o.from, o.at])).toEqual([
+      ['missed_stop', ['assessment']],
+    ]);
   });
 
   it('[BRW-3] routes fields by the declared table, fills the operator answer, caches it, teaches it back and stamps the orchestration on its rows', async () => {

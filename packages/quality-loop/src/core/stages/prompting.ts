@@ -73,6 +73,24 @@ export function kindsSection(kinds: Readonly<Record<string, string>>): string {
   ].join('\n');
 }
 
+/**
+ * The criteria the pipeline declares for every goal of its kind, shown to the
+ * deriver so it derives what the goal adds and never restates these. Empty
+ * when the pipeline declares none, so the prompt says nothing about them.
+ */
+export function fixedCriteriaSection(
+  fixed: readonly { kind: string; statement: string }[],
+): string | null {
+  if (fixed.length === 0) return null;
+  return [
+    '# Criteria already on the checklist',
+    '',
+    'These head every checklist of this pipeline and are graded with the rest. Do not restate them; derive only what the goal adds.',
+    '',
+    ...fixed.map((criterion) => `- [${criterion.kind}] ${criterion.statement}`),
+  ].join('\n');
+}
+
 export function typesSection(types: Readonly<Record<string, string>>): string {
   return [
     '# Finding types',

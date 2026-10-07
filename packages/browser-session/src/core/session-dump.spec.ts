@@ -31,6 +31,7 @@ const manifest = () =>
       maxConsecutiveFailures: 1,
       maxBrainFaults: 1,
       maxUnreadablePages: 1,
+      maxStalledSteps: 1,
     },
     steps: 2,
     tasks: { started: 1, closed: 1 },

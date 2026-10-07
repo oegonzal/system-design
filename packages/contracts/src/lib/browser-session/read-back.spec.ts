@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { IterationTrace } from '../quality-loop/decision';
-import type { ConfirmedFinding, ValidationReport } from '../quality-loop/evidence';
+import type {
+  ConfirmedFinding,
+  CriterionEvidence,
+  SuccessCriterion,
+  ValidationReport,
+} from '../quality-loop/evidence';
 import type { QualityRunDto } from '../quality-loop/runs';
-import type { Decision } from '../quality-loop/vocab';
+import { REFUSING_GATES, type Decision } from '../quality-loop/vocab';
 import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
 import { fieldSpecOf } from './field-goal';
 import { formObservation } from './fixtures';
@@ -16,6 +21,8 @@ interface RunShape {
   policyAllowed?: boolean;
   findings?: Partial<ConfirmedFinding>[];
   validation?: ValidationReport[];
+  criteria?: Partial<CriterionEvidence>[];
+  contract?: SuccessCriterion[];
 }
 
 /** A finished run with one iteration, judged as described; every other field is the quiet default. */
@@ -34,6 +41,11 @@ function run(shape: RunShape): QualityRunDto {
     rationale: f.rationale ?? null,
     reconciledTo: null,
   }));
+  const policyAllowed = shape.policyAllowed ?? true;
+  const refusing = (shape.validation ?? []).filter(
+    (report) =>
+      (REFUSING_GATES as readonly string[]).includes(report.gate) && report.problems.length > 0,
+  );
   const iteration: IterationTrace = {
     iteration: 1,
     mode: 'initial',
@@ -46,7 +58,14 @@ function run(shape: RunShape): QualityRunDto {
     ledger: {
       artifactPresent: true,
       validation: shape.validation ?? [],
-      criteria: [],
+      criteria: (shape.criteria ?? []).map((c) => ({
+        criterionId: c.criterionId ?? 'c1',
+        kind: c.kind ?? 'progress',
+        result: c.result ?? 'pass',
+        hits: 1,
+        confidence: 'high',
+        locationRefs: c.locationRefs ?? [],
+      })),
       findings,
       discarded: [],
       diagnostics: [],
@@ -55,9 +74,16 @@ function run(shape: RunShape): QualityRunDto {
       finalDecision,
       gates: {
         artifactPresent: true,
-        validatorsPassed: true,
+        validatorsPassed: refusing.length === 0,
         evidenceSufficient: true,
-        policyAllowed: shape.policyAllowed ?? true,
+        policyAllowed,
+      },
+      // As the engine records it: every refusing report, and every finding
+      // when the policy gate is closed — never a finding when it is open.
+      blocking: {
+        validators: refusing.map((report) => report.validatorId),
+        findings: policyAllowed ? [] : findings.map((finding) => finding.key),
+        criteria: [],
       },
       scores: { dimensions: {}, overall: 80 },
       selectedRemediations: [],
@@ -86,7 +112,7 @@ function run(shape: RunShape): QualityRunDto {
     recall: null,
     trace: {
       pipeline: { id: 'browser-step', version: '1.0.0' },
-      contract: { goal: 'g', criteria: [] },
+      contract: { goal: 'g', criteria: shape.contract ?? [] },
       iterations: [iteration],
       bestIteration: 1,
       finalDecision,
@@ -122,6 +148,7 @@ describe('routePlan', () => {
       run({
         artifact: plan,
         finalDecision: 'escalate',
+        policyAllowed: false,
         findings: [
           { type: 'missed_stop', locationRefs: [], rationale: 'the limit text is visible' },
         ],
@@ -137,15 +164,26 @@ describe('routePlan', () => {
     ]);
   });
 
-  it('[QL-36] runs only the unfaulted prefix of a plan a validator pointed into', () => {
+  it('[QL-36] runs a handed-back plan up to the first action a cutting validator pointed at, carrying the cut as the objection', () => {
+    // Measured on 2026-10-07: six plans in a row were refused whole for a ref
+    // at action.2 or action.3 while action.1 — a navigate that would have
+    // taken the session off an empty document — was never faulted. The loop
+    // still hands such a plan back; the session runs what nobody objected to.
     const readout = routePlan(
       run({
         artifact: plan,
+        finalDecision: 'escalate',
         validation: [
           {
-            validatorId: 'bounds',
-            gate: 'warn',
-            problems: [{ severity: 'high', message: 'e9 is Back', locationRefs: ['action.3'] }],
+            validatorId: 'references',
+            gate: 'cut',
+            problems: [
+              {
+                severity: 'critical',
+                message: 'e9 is not a listed element',
+                locationRefs: ['action.3'],
+              },
+            ],
           },
         ],
       }),
@@ -153,6 +191,90 @@ describe('routePlan', () => {
     );
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(2);
+    expect(readout.objections).toEqual([
+      { step: 3, from: 'references', at: ['action.3'], detail: 'e9 is not a listed element' },
+    ]);
+  });
+
+  it('[QL-36] a handed-back plan with a blocking finding at an action runs up to it; one at the assessment runs not at all', () => {
+    const atAction = routePlan(
+      run({
+        artifact: plan,
+        finalDecision: 'escalate',
+        policyAllowed: false,
+        findings: [{ type: 'unsafe_action', severity: 'critical', locationRefs: ['action.3'] }],
+      }),
+      5,
+    );
+    expect(atAction.executable).toBe(true);
+    expect(atAction.executePrefix).toBe(2);
+    expect(atAction.objections.map((o) => o.from)).toEqual(['unsafe_action']);
+
+    // An objection to the plan's reading of the page: nothing planned on a
+    // misread page is trusted, however far from action.1 the words sit.
+    const atAssessment = routePlan(
+      run({
+        artifact: plan,
+        finalDecision: 'escalate',
+        policyAllowed: false,
+        findings: [{ type: 'missed_stop', severity: 'critical', locationRefs: ['assessment'] }],
+      }),
+      5,
+    );
+    expect(atAssessment.executable).toBe(false);
+    expect(atAssessment.reason).toContain('as a whole');
+  });
+
+  it('[QL-36] what did not block is advice, carried on the run and never as an objection to answer', () => {
+    // Measured on 2026-10-07: one critic's uncorroborated finding about a stop
+    // the page could not show, carried as an objection, was read by the next
+    // producer as a fact about the page; twelve plans later the session was
+    // terminating for it.
+    const readout = routePlan(
+      run({
+        artifact: plan,
+        finalDecision: 'escalate',
+        policyAllowed: true,
+        findings: [
+          {
+            type: 'missed_stop',
+            severity: 'critical',
+            locationRefs: ['assessment'],
+            rationale: 'might',
+          },
+        ],
+      }),
+      1,
+    );
+    // Nothing blocked and the loop did not accept: the plan does not run on
+    // quality alone — and the next plan is not told to answer the advice.
+    expect(readout.executable).toBe(false);
+    expect(readout.reason).toContain('decided escalate');
+    expect(readout.objections).toEqual([]);
+  });
+
+  it('[QL-36] carries every criterion the evaluator settled short, with its statement, so a plan handed back on its score is told why', () => {
+    const readout = routePlan(
+      run({
+        artifact: plan,
+        finalDecision: 'escalate',
+        criteria: [
+          { criterionId: 'c1', result: 'fail', locationRefs: ['action.1'] },
+          { criterionId: 'c2', result: 'pass', locationRefs: ['assessment'] },
+          { criterionId: 'c3', result: 'partial', locationRefs: [] },
+        ],
+        contract: [
+          { id: 'c1', kind: 'progress', statement: 'Open the next listing.' },
+          { id: 'c2', kind: 'safety', statement: 'Never sign in.' },
+          { id: 'c3', kind: 'grounding', statement: 'Name the kind of page shown.' },
+        ],
+      }),
+      2,
+    );
+    expect(readout.objections).toEqual([
+      { step: 2, from: 'c1', at: ['action.1'], detail: 'fail: Open the next listing.' },
+      { step: 2, from: 'c3', at: [], detail: 'partial: Name the kind of page shown.' },
+    ]);
   });
 
   it('[QL-36] runs a plan the decision accepted in full, however much advice the judges left on it', () => {
@@ -171,8 +293,9 @@ describe('routePlan', () => {
     const readout = routePlan(advised, 4);
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(plan.actions.length);
-    // Said, and carried to the next plan, rather than silently dropped.
-    expect(readout.objections.map((o) => o.from)).toEqual(['skipped_step']);
+    // Advice stays on the run's record for a reader; it is not an objection
+    // the next plan has to answer, since nothing refused anything.
+    expect(readout.objections).toEqual([]);
   });
 
   it("[QL-36] carries a validator's own problem as an objection, so a plan refused by a validator is told which limit and why", () => {
@@ -223,21 +346,32 @@ describe('routePlan', () => {
     ]);
   });
 
-  it('[QL-36] refuses a plan whose first action was faulted, a closed policy gate, or an artifact-wide finding', () => {
+  it('[QL-36] refuses a plan whose first action was faulted, one handed back with nothing to cut at, or an artifact-wide blocker', () => {
     expect(
       routePlan(
         run({
           artifact: plan,
+          finalDecision: 'escalate',
           policyAllowed: false,
           findings: [{ type: 'x', locationRefs: ['action.1'] }],
         }),
         1,
       ).executable,
     ).toBe(false);
-    expect(routePlan(run({ artifact: plan, policyAllowed: false }), 1).executable).toBe(false);
     expect(
-      routePlan(run({ artifact: plan, findings: [{ type: 'unsafe_action', locationRefs: [] }] }), 1)
+      routePlan(run({ artifact: plan, finalDecision: 'escalate', policyAllowed: false }), 1)
         .executable,
+    ).toBe(false);
+    expect(
+      routePlan(
+        run({
+          artifact: plan,
+          finalDecision: 'escalate',
+          policyAllowed: false,
+          findings: [{ type: 'unsafe_action', locationRefs: [] }],
+        }),
+        1,
+      ).executable,
     ).toBe(false);
     expect(routePlan(run({ artifact: null }), 1).reason).toBe('no-artifact');
     expect(routePlan(run({ artifact: { not: 'a plan' } }), 1).reason).toContain('schema');

@@ -44,6 +44,15 @@ export interface LensSpec {
    * declaration drives both when the lens runs and what it is shown.
    */
   consumes: readonly UpstreamEvidence[];
+  /**
+   * The finding types this lens may emit — its response schema offers only
+   * these, and the types section names only these. Undeclared, every type the
+   * task knows. A persona that says "whether the plan is safe is the other
+   * critic's concern" is prose; measured 2026-10-07, 36 of one critic's 55
+   * findings were of the other critic's types, each restating the other's
+   * hallucination so the two read as agreement. The declaration is what binds.
+   */
+  findingTypes?: readonly string[];
 }
 
 export interface EvaluatorSpec extends LensSpec {
@@ -118,6 +127,30 @@ function checkLenses(definition: Definition, fail: Fail): void {
       fail(`lens ${lens.id} needs maxItems and maxTokens ≥ 1`);
     if (lens.persona.trim().length === 0) fail(`lens ${lens.id} has an empty persona`);
   }
+  checkFindingTypeOwners(definition, fail);
+}
+
+/**
+ * A critic that declares its types declares ones the task knows, at least one;
+ * and once any critic declares, every task type must be some critic's, or a
+ * declared type would have no lens able to emit it.
+ */
+function checkFindingTypeOwners(definition: Definition, fail: Fail): void {
+  const known = Object.keys(definition.task.findingTypes);
+  const declaring = definition.critics.filter((lens) => lens.findingTypes !== undefined);
+  if (declaring.length === 0) return;
+  for (const lens of declaring) {
+    const types = lens.findingTypes ?? [];
+    if (types.length === 0) fail(`critic ${lens.id} declares no finding types`);
+    for (const type of types) {
+      if (!known.includes(type)) fail(`critic ${lens.id} declares unknown finding type ${type}`);
+    }
+  }
+  const owned = new Set(definition.critics.flatMap((lens) => lens.findingTypes ?? known));
+  for (const type of known) {
+    if (!owned.has(type))
+      fail(`finding type ${type} is declared by the task and owned by no critic`);
+  }
 }
 
 /** Every criterion kind has exactly one judge, and every judge judges kinds that exist. */
@@ -188,11 +221,38 @@ function checkValidators(definition: Definition, fail: Fail): void {
   }
 }
 
+/**
+ * Fixed criteria are graded with the rest, so each must be one the policy can
+ * price — a declared kind, a non-empty statement within the deriver's own
+ * target — and together they must leave the deriver room for what the goal
+ * adds: a pipeline whose fixed criteria fill the cap would never derive.
+ */
+function checkFixedCriteria(definition: Definition, fail: Fail): void {
+  const fixed = definition.task.fixedCriteria ?? [];
+  if (fixed.length === 0) return;
+  if (!(fixed.length < definition.task.maxCriteria)) {
+    fail(
+      `task.fixedCriteria declares ${fixed.length} of ${definition.task.maxCriteria} criteria, leaving none to derive`,
+    );
+  }
+  const { target } = criterionLengthBound(definition.task);
+  fixed.forEach((criterion, index) => {
+    if (!(criterion.kind in definition.task.criterionKinds)) {
+      fail(`task.fixedCriteria[${index}] has unknown kind ${criterion.kind}`);
+    }
+    const length = criterion.statement.trim().length;
+    if (!(length >= 1 && length <= target)) {
+      fail(`task.fixedCriteria[${index}] must be 1 to ${target} characters, not ${length}`);
+    }
+  });
+}
+
 function checkTask(definition: Definition, fail: Fail): void {
   if (!(GOAL_SOURCES as readonly string[]).includes(definition.goalSource)) {
     fail(`goalSource ${String(definition.goalSource)} is not one of ${GOAL_SOURCES.join(', ')}`);
   }
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
+  checkFixedCriteria(definition, fail);
   // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it
   // judged — every statement its deriver can return, kept past the ceiling, through the HTTP edge.
   const bound = criterionLengthBound(definition.task);
@@ -248,12 +308,13 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   modelSchema(definition.task.output.schema);
 }
 
-const summariseLens = ({ id, samples, maxItems, maxTokens, consumes }: LensSpec) => ({
+const summariseLens = ({ id, samples, maxItems, maxTokens, consumes, findingTypes }: LensSpec) => ({
   id,
   samples,
   maxItems,
   maxTokens,
   consumes: [...consumes],
+  ...(findingTypes === undefined ? {} : { findingTypes: [...findingTypes] }),
 });
 
 /** Key order is the summary's wire order: what it judges comes before what it consumes. */

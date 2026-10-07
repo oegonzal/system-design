@@ -133,6 +133,13 @@ export function composeController(id: string, parts: ControllerParts): Controlle
     return {
       finalDecision: settled.decision,
       gates: ctx.gates,
+      // By key, so a reader routing on them needs no policy: which reports
+      // refused, which findings blocked, which gating criteria failed.
+      blocking: {
+        validators: ctx.blocking.validators.map((report) => report.validatorId),
+        findings: ctx.blocking.findings.map((finding) => finding.key),
+        criteria: ctx.blocking.criteria.map((entry) => entry.criterionId),
+      },
       scores: projectScores(ctx.scored),
       selectedRemediations: ctx.remediations,
       reason: settled.reason,

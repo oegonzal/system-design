@@ -16,6 +16,7 @@ const RAILS = {
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,
+  maxStalledSteps: 3,
 };
 const T0 = new Date('2026-10-03T10:00:00.000Z');
 const at = (seconds: number): Date => new Date(T0.getTime() + seconds * 1000);

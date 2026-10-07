@@ -1,5 +1,11 @@
 import type { ApiResponse } from '../envelope';
-import type { AxisFactorLevel, GoalSource, LostSamplePolicy, Severity } from './vocab';
+import type {
+  AxisFactorLevel,
+  Corroboration,
+  GoalSource,
+  LostSamplePolicy,
+  Severity,
+} from './vocab';
 
 /**
  * What a confirmed finding does to the items it names when a reader draws on
@@ -75,6 +81,15 @@ export interface DecisionPolicy {
     /** Multiplier on each successive finding within a dimension, in (0, 1]. */
     decay: number;
     maxPerDimension: number;
+    /**
+     * Multiplier on the charge of a CONTRADICTED finding — one that cites
+     * criteria and whose every cited criterion the evaluator judged pass or
+     * not applicable — under `evidence.corroboration: 'cited'`. In [0, 1];
+     * 1 (the default) prices it like any other, as every pipeline before the
+     * field did. Two judges disagreeing on one fact is not a fact a plan
+     * should be charged the full price for.
+     */
+    contradicted?: number;
   };
   blockingSeverities: readonly Severity[];
   evidence: {
@@ -84,6 +99,8 @@ export interface DecisionPolicy {
     minAssessedShare: number;
     /** What a lens sample that answered nothing does to agreement (`LOST_SAMPLE_POLICIES`). */
     lostSample: LostSamplePolicy;
+    /** What a blocker needs beyond agreement (`CORROBORATIONS`); `none` when undeclared. */
+    corroboration?: Corroboration;
   };
   thresholds: { acceptAt: number; rejectBelow: number };
   loop: {
@@ -135,6 +152,8 @@ export interface PipelineSummary {
     maxItems: number;
     maxTokens: number;
     consumes: string[];
+    /** The finding types this lens may emit; absent, every one the task declares. */
+    findingTypes?: string[];
   }[];
   evaluators: {
     id: string;

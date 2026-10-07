@@ -161,6 +161,42 @@ describe('runLoop', () => {
     expect(trace.stopReason).toBe('max-iterations');
   });
 
+  it('[QL-3] a cutting validator refuses the position it points at and the lenses still judge the whole artifact', async () => {
+    // A block means the artifact cannot be trusted by any lens; a cut means
+    // one unit is wrong and the rest were planned against what the goal
+    // showed — so the lenses run, with the cut already counted, and the
+    // decision reads the report as refusing.
+    let lensCalls = 0;
+    const critic = scriptedCritic('critic.tiny', [[[]]]);
+    const counted = {
+      ...critic,
+      plan: (ctx: Parameters<typeof critic.plan>[0]) => (lensCalls++, critic.plan(ctx)),
+    };
+    const cutting = {
+      id: 'parts',
+      gate: 'cut' as const,
+      validate: () => ({
+        validatorId: 'parts',
+        gate: 'cut' as const,
+        problems: [{ severity: 'high' as const, locationRefs: ['part.2'], message: 'unlisted' }],
+      }),
+    };
+    const trace = await runLoop(
+      scriptedStages({ critics: [counted], validators: [cutting] }),
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      clock,
+    );
+    expect(lensCalls).toBe(1);
+    const [iteration] = trace.iterations;
+    expect(iteration.decision.gates.validatorsPassed).toBe(false);
+    expect(iteration.decision.blocking.validators).toEqual(['parts']);
+    expect(iteration.decision.finalDecision).toBe('retry');
+    expect(iteration.ledger.diagnostics.some((d) => d.detail === 'blocked by a validator')).toBe(
+      false,
+    );
+  });
+
   it('[QL-9] a provided artifact is judged as iteration 1, and the producer is asked only from iteration 2', async () => {
     let asked = 0;
     const producer: Producer<TinyOutput> = {

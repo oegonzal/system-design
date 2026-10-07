@@ -9,6 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { criterionLengthBound } from './contracts';
 import { describePipeline, validatePipeline } from './pipeline';
 import { tinyPipeline } from './testing';
 
@@ -54,6 +55,78 @@ describe('validatePipeline', () => {
     expect(() =>
       validatePipeline(asAny(tinyPipeline({ critics: [base.critics[0], { ...base.critics[0] }] }))),
     ).toThrow(/unique/);
+  });
+
+  it('[QL-1] [QL-2] fixed criteria must be gradable — a declared kind, a statement within the deriver’s target — and must leave the deriver room', () => {
+    const base = tinyPipeline();
+    const fixed = (criteria: { kind: string; statement: string }[], maxCriteria = 6) =>
+      asAny(tinyPipeline({ task: { ...base.task, maxCriteria, fixedCriteria: criteria } }));
+    expect(() =>
+      validatePipeline(fixed([{ kind: 'must', statement: 'The text names its subject.' }])),
+    ).not.toThrow();
+    expect(() => validatePipeline(fixed([{ kind: 'bogus', statement: 'x' }]))).toThrow(
+      /fixedCriteria\[0\] has unknown kind bogus/,
+    );
+    expect(() => validatePipeline(fixed([{ kind: 'must', statement: '   ' }]))).toThrow(
+      /fixedCriteria\[0\] must be 1 to/,
+    );
+    const { target } = criterionLengthBound(base.task);
+    expect(() =>
+      validatePipeline(fixed([{ kind: 'must', statement: 'x'.repeat(target + 1) }])),
+    ).toThrow(/must be 1 to/);
+    // Six of six: the deriver would have nothing to derive into.
+    expect(() =>
+      validatePipeline(
+        fixed(Array.from({ length: 6 }, (_, i) => ({ kind: 'must', statement: `fixed ${i}` }))),
+      ),
+    ).toThrow(/leaving none to derive/);
+  });
+
+  it('[QL-1] a critic that declares its finding types declares known ones, and every task type has an owner', () => {
+    const base = tinyPipeline();
+    const critic = (findingTypes?: string[]) => ({
+      ...base.critics[0],
+      ...(findingTypes ? { findingTypes } : {}),
+    });
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ critics: [critic(['gap', 'wrong'])] }))),
+    ).not.toThrow();
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ critics: [critic(['gap', 'bogus'])] }))),
+    ).toThrow(/unknown finding type bogus/);
+    expect(() => validatePipeline(asAny(tinyPipeline({ critics: [critic([])] })))).toThrow(
+      /declares no finding types/,
+    );
+    // One critic owns `gap` and nothing owns `wrong`: a type no lens can emit.
+    expect(() => validatePipeline(asAny(tinyPipeline({ critics: [critic(['gap'])] })))).toThrow(
+      /finding type wrong .* owned by no critic/,
+    );
+    // Two critics splitting the vocabulary is the intended shape.
+    expect(() =>
+      validatePipeline(
+        asAny(
+          tinyPipeline({
+            critics: [critic(['gap']), { ...critic(['wrong']), id: 'critic.other' }],
+          }),
+        ),
+      ),
+    ).not.toThrow();
+  });
+
+  it('[QL-5] refuses a corroboration the policy does not know, and accepts each declared one', () => {
+    const base = tinyPipeline();
+    const withCorroboration = (corroboration: string) =>
+      asAny(
+        tinyPipeline({
+          policy: {
+            ...base.policy,
+            evidence: { ...base.policy.evidence, corroboration: corroboration as never },
+          },
+        }),
+      );
+    expect(() => validatePipeline(withCorroboration('none'))).not.toThrow();
+    expect(() => validatePipeline(withCorroboration('cited'))).not.toThrow();
+    expect(() => validatePipeline(withCorroboration('vibes'))).toThrow(/evidence.corroboration/);
   });
 
   it('[QL-32] a producer may be briefed with memories; a lens has no way to ask for them', () => {

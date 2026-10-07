@@ -136,6 +136,7 @@ export function tracesFrom(
           evidenceSufficient: spec.evidenceSufficient ?? blockers.length === 0,
           policyAllowed: true,
         },
+        blocking: { validators: [], findings: [], criteria: [] },
         scores: { dimensions: spec.dimensions ?? { coverage: overall }, overall },
         selectedRemediations: [],
         reason:
@@ -303,6 +304,7 @@ function iterationTrace(
         evidenceSufficient: true,
         policyAllowed: true,
       },
+      blocking: { validators: [], findings: [], criteria: [] },
       scores: { dimensions, overall },
       selectedRemediations: [],
       reason,

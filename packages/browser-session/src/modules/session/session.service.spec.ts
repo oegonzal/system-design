@@ -133,6 +133,7 @@ describe('the session service, end to end', () => {
         maxConsecutiveFailures: 3,
         maxBrainFaults: 3,
         maxUnreadablePages: 3,
+        maxStalledSteps: 3,
       },
     });
     expect(outcome.status).toBe('complete');

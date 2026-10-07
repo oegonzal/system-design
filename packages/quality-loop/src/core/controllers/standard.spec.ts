@@ -210,6 +210,130 @@ describe('the standard controller', () => {
     ).toBe(false);
   });
 
+  it('[QL-5] under cited corroboration a blocker that cites criteria blocks only when the evaluator failed a gating one it cites; uncited, it blocks on agreement alone', () => {
+    // Measured 2026-10-07: one sample of one critic refused a correct plan for
+    // a stop condition the page could not show, having cited the four stop
+    // criteria — every one of which the evaluator had marked not applicable.
+    const cited = {
+      ...tinyPolicy(),
+      criterionKinds: {
+        ...tinyPolicy().criterionKinds,
+        must: { dimension: 'substance', weight: 1, gate: true },
+      },
+      findingTypes: { ...tinyPolicy().findingTypes, wrong: { dimension: 'form', gate: true } },
+      evidence: { ...tinyPolicy().evidence, corroboration: 'cited' as const },
+    };
+    const blocker = (criterionIds: string[]) =>
+      confirmed({ type: 'wrong', key: 'wrong|text', criterionIds, severity: 'critical' });
+
+    // Cites c1; the evaluator passed c1: priced, not a veto — the gate stays open.
+    const contested = decide(
+      ledger({ criteria: [evidence({ criterionId: 'c1' })], findings: [blocker(['c1'])] }),
+      cited,
+    );
+    expect(contested.gates.policyAllowed).toBe(true);
+    expect(contested.blocking.findings).toEqual([]);
+    // Charged in full unless the policy declares what a contradicted finding costs.
+    expect(dimensionOf(contested, 'form').penalties.map((p) => p.points)).toEqual([40]);
+    const discounted = decide(
+      ledger({ criteria: [evidence({ criterionId: 'c1' })], findings: [blocker(['c1'])] }),
+      { ...cited, penalties: { ...cited.penalties, contradicted: 0.25 } },
+    );
+    expect(dimensionOf(discounted, 'form').penalties.map((p) => p.points)).toEqual([10]);
+    // A finding the evaluator did NOT contradict — it cites a failed criterion — keeps its full price.
+    const upheld = decide(
+      ledger({
+        criteria: [evidence({ criterionId: 'c1', result: 'fail' })],
+        findings: [blocker(['c1'])],
+      }),
+      { ...cited, penalties: { ...cited.penalties, contradicted: 0.25 } },
+    );
+    expect(dimensionOf(upheld, 'form').penalties.map((p) => p.points)).toEqual([40]);
+
+    // Cites c1; the evaluator failed c1: two judges on one fact — it blocks.
+    const borneOut = decide(
+      ledger({
+        criteria: [evidence({ criterionId: 'c1', result: 'fail' })],
+        findings: [blocker(['c1'])],
+      }),
+      cited,
+    );
+    expect(borneOut.gates.policyAllowed).toBe(false);
+    expect(borneOut.blocking).toEqual({
+      validators: [],
+      findings: ['wrong|text'],
+      criteria: ['c1'],
+    });
+
+    // Cites nothing: no claim the evaluator could check, so agreement stands.
+    const uncited = decide(
+      ledger({ criteria: [evidence({ criterionId: 'c1' })], findings: [blocker([])] }),
+      cited,
+    );
+    expect(uncited.gates.policyAllowed).toBe(false);
+
+    // Cites only a non-gating criterion the evaluator failed: not the same fact.
+    const niceOnly = {
+      ...cited,
+      criterionKinds: {
+        ...cited.criterionKinds,
+        must: { ...cited.criterionKinds.must, gate: false },
+      },
+    };
+    expect(
+      decide(
+        ledger({
+          criteria: [evidence({ criterionId: 'c1', result: 'fail' })],
+          findings: [blocker(['c1'])],
+        }),
+        niceOnly,
+      ).gates.policyAllowed,
+    ).toBe(true);
+
+    // Under `none` — every pipeline before the field — the same finding blocks as it always did.
+    expect(
+      decide(ledger({ criteria: [evidence({ criterionId: 'c1' })], findings: [blocker(['c1'])] }), {
+        ...cited,
+        evidence: { ...cited.evidence, corroboration: 'none' as const },
+      }).gates.policyAllowed,
+    ).toBe(false);
+  });
+
+  it('[QL-5] every decision records by key which validators refused, which findings blocked and which gating criteria failed', () => {
+    const decision = decide(
+      ledger({
+        validation: [
+          { validatorId: 'schema', gate: 'block', problems: [] },
+          {
+            validatorId: 'refs',
+            gate: 'cut',
+            problems: [{ severity: 'high', locationRefs: ['part.2'], message: 'unlisted' }],
+          },
+          {
+            validatorId: 'bounds',
+            gate: 'warn',
+            problems: [{ severity: 'info', locationRefs: [], message: 'noted' }],
+          },
+        ],
+        criteria: [evidence({ criterionId: 'c1' })],
+        findings: [confirmed({ severity: 'critical' })],
+      }),
+      tinyPolicy(),
+    );
+    // A cutting validator refuses; a warning does not. A critical finding blocks on severity.
+    expect(decision.gates.validatorsPassed).toBe(false);
+    expect(decision.blocking).toEqual({
+      validators: ['refs'],
+      findings: ['gap|text'],
+      criteria: [],
+    });
+    expect(decide(ledger({ criteria: [evidence()] }), tinyPolicy()).blocking).toEqual({
+      validators: [],
+      findings: [],
+      criteria: [],
+    });
+  });
+
   it('[QL-8] thresholds: accept at or above acceptAt, retry below the floor, else route by remediations', () => {
     expect(decide(ledger({ criteria: [evidence({})] }), tinyPolicy()).finalDecision).toBe('accept');
     expect(

@@ -206,7 +206,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-3',
     statement:
-      'Deterministic validators run before any model; a blocking failure skips every lens and yields retry.',
+      'Deterministic validators run before any model, each with a declared gate: a block failure skips every lens and yields retry; a cut failure refuses the positions it points at and nothing before them, the lenses still judge the whole artifact with those problems already counted, and the controller reads the report as refusing; a warn only informs.',
   },
   {
     id: 'QL-4',
@@ -216,7 +216,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-5',
     statement:
-      'Multi-sample agreement confirms an item at or above minHits with lower-middle-median ordinals, discards and traces the rest, and a finding reconciled to a failed or partial criterion is never priced twice.',
+      'Multi-sample agreement confirms an item at or above minHits with lower-middle-median ordinals, discards and traces the rest, and a finding reconciled to a failed or partial criterion is never priced twice; under a pipeline that declares cited corroboration, a confirmed finding that would block — by its type’s gate or its severity — and cites criteria blocks only when the evaluator failed a gating criterion it cites, is priced at the policy’s declared contradicted multiplier when the evaluator judged every criterion it cites pass or not applicable, and one that cites none blocks on its agreement alone; every decision records by key which validators refused, which findings blocked and which gating criteria failed.',
   },
   {
     id: 'QL-6',
@@ -371,7 +371,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-36',
     statement:
-      'A step plan is a closed-vocabulary artifact judged once against a session rubric: a plan that cites a ref the page did not offer, acts on a disabled or hidden element, or places a terminal action anywhere but last is blocked before any lens; every non-accept is handed back as escalate; and the caller executes only the unfaulted prefix of an admitted plan whose policy gate is open.',
+      'A step plan is a closed-vocabulary artifact judged once against a session rubric headed by its declared grounding criteria: a plan that cites a ref the page did not offer, acts on a disabled or hidden element, places a terminal action anywhere but last, goes on past an action that replaces the page, or terminates or closes a unit of work on a page that shows nothing, is cut at that action by a validator the lenses still judge after; every non-accept is handed back as escalate; and the session, handed the plan back, runs an accepted plan whole, a refused plan up to the first action a blocker pointed at, and nothing of a plan whose first action was faulted or whose reading of the page a blocker refused — carrying as objections what blocked and every criterion the evaluator settled short with its statement, never advice; and a session whose page has not changed across the declared number of failed steps stops as page-stalled, whatever its failure budget.',
   },
   {
     id: 'QL-37',

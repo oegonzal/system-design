@@ -68,11 +68,11 @@ describe('how a plan stops and how a session ends', () => {
       // refusing an action, and every action after it says so.
       ['press Enter', 'not-executed', 'after a failed action'],
     ]);
-    // What the judge said travels once, whole, as the plan-level objection it
-    // is — not copied onto every action and cut to a note's length.
-    expect(cut.brain.planInputs[1]?.objections).toEqual([
-      { step: 1, from: 'wrong_target', at: ['action.3'], detail: 'Enter would submit twice' },
-    ]);
+    // The controller accepted the plan and found nothing blocking, so what the
+    // judge said is advice on the run's record — not an objection the next
+    // plan has to answer. Measured 2026-10-07: advice carried as objections
+    // taught a producer a stop condition the page never showed.
+    expect(cut.brain.planInputs[1]?.objections).toEqual([]);
     expect(cut.browser.calls).not.toContain('click e2');
     expect(cut.outcome.termination.reason).toBe('mission-complete');
 
@@ -136,6 +136,7 @@ describe('how a plan stops and how a session ends', () => {
 
     const escalated = decidedPlan(PLANS.search, {
       decision: 'escalate',
+      policyAllowed: false,
       findings: [finding('missed_stop', [], 'the page shows the limit text')],
     });
     const byFailures = await run({
@@ -143,22 +144,18 @@ describe('how a plan stops and how a session ends', () => {
       rails: { maxConsecutiveFailures: 3 },
     });
     expect(byFailures.outcome.termination.reason).toBe('max-failures');
-    expect(byFailures.brain.planInputs[1]?.history.map((h) => h.outcome)).toEqual([
-      'not-executed',
-      'not-executed',
+    // A refused plan is one line of history, not one per action it proposed:
+    // measured 2026-10-07, six-action refusals filled HISTORY_MAX in two steps
+    // and the producer read its own refused proposals as the recent past.
+    expect(byFailures.brain.planInputs[1]?.history).toEqual([
+      { action: 'plan of 2 action(s): fill, click', outcome: 'not-executed', note: null },
     ]);
-    // The objection travels on its own, once for the plan it was about, and no
-    // action carries a note of it: the whole of the defect this pins is that a
-    // plan-level objection used to be copied onto every action it proposed.
-    expect(byFailures.brain.planInputs[1]?.history.every((entry) => entry.note === null)).toBe(
-      true,
-    );
+    // The objection travels on its own, once for the plan it was about.
     expect(byFailures.brain.planInputs[1]?.objections).toEqual([
       { step: 1, from: 'missed_stop', at: [], detail: 'the page shows the limit text' },
     ]);
-    // After a second refusal: two plans of two actions each — four history
-    // entries, and two objections, newest first.
-    expect(byFailures.brain.planInputs[2]?.history).toHaveLength(4);
+    // After a second refusal: two lines, and two objections, newest first.
+    expect(byFailures.brain.planInputs[2]?.history).toHaveLength(2);
     expect(byFailures.brain.planInputs[2]?.objections.map((o) => o.step)).toEqual([2, 1]);
     expect(byFailures.browser.calls).not.toContain('fill e1');
 

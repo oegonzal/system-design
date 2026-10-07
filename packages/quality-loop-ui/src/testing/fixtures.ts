@@ -110,6 +110,7 @@ export const makeEscalatedRun = (): QualityRunDto =>
               evidenceSufficient: false,
               policyAllowed: true,
             },
+            blocking: { validators: [], findings: [], criteria: [] },
             scores: { dimensions: { completeness: null, soundness: null }, overall: 0 },
             selectedRemediations: [],
             reason: 'no artifact to judge',

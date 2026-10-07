@@ -8,6 +8,7 @@ const RAIL_LIMITS = {
   maxConsecutiveFailures: 3,
   maxBrainFaults: 2,
   maxUnreadablePages: 2,
+  maxStalledSteps: 2,
 };
 const START = new Date('2026-10-03T10:00:00.000Z');
 const at = (minutes: number): Date => new Date(START.getTime() + minutes * 60_000);
@@ -20,6 +21,7 @@ const state = (overrides: Partial<RailState> = {}): RailState => ({
   consecutiveFailures: 0,
   brainFaults: 0,
   unreadablePages: 0,
+  stalledSteps: 0,
   operatorStopped: false,
   ...overrides,
 });
@@ -79,5 +81,23 @@ describe('the rails', () => {
     expect(
       checkRails(state({ unreadablePages: 2, operatorStopped: true }), RAIL_LIMITS, at(1))?.reason,
     ).toBe('operator-stop');
+  });
+
+  it('[BRW-4] stops on a page that has not changed across the declared failed steps, whatever the failure budget', () => {
+    // Measured 2026-10-07: twenty consecutive failed steps on one unchanged
+    // empty document, under an operator's failure budget of twenty. The
+    // hand-back's premise — a fresh observation — had failed from step two.
+    expect(checkRails(state({ stalledSteps: 1 }), RAIL_LIMITS, at(1))).toBeNull();
+    const stalled = checkRails(state({ stalledSteps: 2 }), RAIL_LIMITS, at(1));
+    expect(stalled?.reason).toBe('page-stalled');
+    expect(stalled?.detail).toBe('2 failed steps in a row on a page that did not change, limit 2');
+    // A high failure budget does not save it: the stall rail reads its own count.
+    expect(
+      checkRails(
+        state({ stalledSteps: 2, consecutiveFailures: 2 }),
+        { ...RAIL_LIMITS, maxConsecutiveFailures: 99 },
+        at(1),
+      )?.reason,
+    ).toBe('page-stalled');
   });
 });

@@ -79,6 +79,7 @@ describe('the browser-step input codec', () => {
         hiddenTraits: element.hiddenTraits,
       })),
       openTask: true,
+      pageShowsContent: true,
     });
     expect(readIndex(stepGoal())?.openTask).toBe(false);
   });

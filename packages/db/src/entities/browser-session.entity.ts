@@ -16,6 +16,7 @@ const TERMINATIONS = [
   'max-failures',
   'brain-unavailable',
   'page-unreadable',
+  'page-stalled',
   'operator-stop',
   'error',
 ] as const satisfies ContractTerminations;

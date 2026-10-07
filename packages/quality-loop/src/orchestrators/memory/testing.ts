@@ -156,6 +156,7 @@ export function readoutTrace(input: ReadoutInput): RunTrace {
             evidenceSufficient: true,
             policyAllowed: input.policyAllowed ?? true,
           },
+          blocking: { validators: [], findings: [], criteria: [] },
           scores: {
             dimensions: {},
             overall: input.overall ?? (decision === 'accept' ? 90 : 50),

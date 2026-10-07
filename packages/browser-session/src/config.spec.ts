@@ -81,6 +81,7 @@ describe('the session configuration', () => {
       // cannot silently leave a session running without it.
       maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
       maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
+      maxStalledSteps: DEFAULT_RAILS.maxStalledSteps,
     });
     expect(() => railsOf({ maxTasks: '0' })).toThrow(
       '--max-tasks must be a positive integer, got "0"',
