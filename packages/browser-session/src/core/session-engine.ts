@@ -205,6 +205,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
   const openBefore = state.tasks.open !== null;
+  const closedBefore = tasksClosed(state);
   const executed = await executeActions(
     ctx,
     decided,
@@ -216,11 +217,12 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   // What the evaluator passed waits for the next observation: settled, if the
   // page moved, for the unit when one was open before or after the plan, else
   // for the session — every pass when the plan ran whole, else the passes an
-  // action that ran said it served. A plan that closed its unit settles
-  // nothing: what it passed was that unit's, and the unit is gone.
+  // action that ran said it served. A plan that closed a unit settles nothing:
+  // what it passed was that unit's, and the unit is gone — whether the plan
+  // ended there, went on to open the next unit, or opened and closed one.
   const openAfter = state.tasks.open !== null;
   const scope = openBefore || openAfter ? 'unit' : 'session';
-  if (!(openBefore && !openAfter)) {
+  if (tasksClosed(state) === closedBefore) {
     const settling = new Set(
       ctx.criteria.plan
         .filter((criterion) =>

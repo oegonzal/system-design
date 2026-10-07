@@ -153,7 +153,7 @@ export const stepPlanSchema = z.strictObject({
   actions: bounded.list(ACTIONS_BOUND, stepActionSchema, {
     min: 1,
     description:
-      'In the order they run, stopping at the next page transition. A taskDone, terminate or done action is last and appears nowhere else.',
+      'In the order they run, stopping at the next page transition. A terminate or done action is last and appears nowhere else; a taskDone comes before any action that could change the page.',
   }),
 });
 export type StepPlan = z.infer<typeof stepPlanSchema>;

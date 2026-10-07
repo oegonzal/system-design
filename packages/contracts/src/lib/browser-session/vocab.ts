@@ -262,7 +262,13 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
  * once and no rule has to be told about it. A wait is `none` by kind: a wait
  * for a URL or for text is its own declaration that the page will change
  * (`PAGE_REPLACING_WAITS`), and a wait for a listed element is a wait on
- * this page.
+ * this page. A `taskDone` claims the page and ends nothing: closing a unit of
+ * work is bookkeeping on the session's own ledger, so the next unit's click and
+ * taskStart may follow it in the same plan. Measured 2026-10-05 and 2026-10-06 on
+ * two providers: both reached for `taskDone, terminate` as one thought and were
+ * refused, three times each, until the failure rail ended the session; and
+ * 2026-10-07: a plan that closed an already-applied listing and moved on was
+ * refused whole for what followed the close, twice.
  */
 export interface ActionEffects {
   readonly touches: boolean;
@@ -289,7 +295,7 @@ export const ACTION_EFFECTS = {
   screenshot: effects(false, 'none'),
   askFields: effects(true, 'may-change'),
   taskStart: effects(false, 'none'),
-  taskDone: effects(false, 'none', true, true),
+  taskDone: effects(false, 'none', true),
   terminate: effects(false, 'none', true, true),
   done: effects(false, 'none', false, true),
 } as const satisfies Record<StepActionKind, ActionEffects>;
@@ -331,27 +337,6 @@ export const MUTATING_ACTION_KINDS = kindsWhere((effect) => effect.page !== 'non
 
 /** The terminal actions that claim something the page shows; `done` claims nothing. */
 export const CLAIMING_ACTION_KINDS = kindsWhere((effect) => effect.claims);
-
-/**
- * Which terminal action may stand immediately before which.
- *
- * A terminal action ends a plan because what follows it would act on a page
- * this plan has not observed. Closing a unit of work is not that: `taskDone`
- * is bookkeeping on the session's own ledger and touches nothing, so ending
- * the session may follow it.
- *
- * Measured on 2026-10-05 and 2026-10-06, two providers independently: both
- * reached for `taskDone, terminate` as the last plan of a mission, both were
- * refused, and both tried again — three times each, until the failure rail
- * ended the session. The natural final thought is one thought, and the
- * vocabulary made it inexpressible: every mission paid an extra page
- * observation and an extra model call to say the second half of it.
- *
- * A kind absent here takes nothing after it.
- */
-export const TERMINAL_FOLLOWERS: Readonly<Record<string, readonly StepActionKind[]>> = {
-  taskDone: ['terminate', 'done'],
-};
 
 export const PRESS_KEYS = [
   'Enter',

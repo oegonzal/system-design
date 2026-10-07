@@ -366,7 +366,7 @@ describe('stepPlanSchema', () => {
     const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
     for (const rule of [
       'exactly as the Elements list gives it',
-      'A taskDone, terminate or done action is last and appears nowhere else.',
+      'A terminate or done action is last and appears nowhere else; a taskDone comes before any action that could change the page.',
       'One of the options the Elements list gives for this ref, verbatim.',
     ]) {
       expect(json, `the model is never told: ${rule}`).toContain(rule);

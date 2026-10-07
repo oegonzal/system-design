@@ -13,6 +13,7 @@ import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
   journeyPages as pages,
+  JOURNEY_URLS,
 } from './testing-journey';
 import { runScripted as run, SPEC_SUBJECT } from './testing-session';
 
@@ -144,6 +145,56 @@ describe('the session engine', () => {
       },
     });
     expect(brain.planInputs[1]?.progress).toEqual({ settled: [], done: [] });
+  });
+
+  it('[BRW-1] a plan that closes a unit settles nothing, even when it opens the next unit and moves the page', async () => {
+    // Measured 2026-10-07: a listing found already applied to is closed and
+    // the next one opened in one plan. What that plan passed was the closed
+    // unit's; settling it onto the new unit — or, with no unit open before or
+    // after, onto the session — would credit work that unit never did.
+    const closeAndGoOn: StepPlan = {
+      ...PLANS.results,
+      actions: [
+        {
+          kind: 'taskStart',
+          label: 'Senior Engineer at Acme',
+          url: JOURNEY_URLS.listing,
+          reason: 'the unit begins',
+          expect: null,
+          serves: [],
+        },
+        {
+          kind: 'taskDone',
+          outcome: 'already-done',
+          detail: 'applied before',
+          reason: 'the pane reports the application was sent',
+          expect: null,
+          serves: ['c3'],
+        },
+        { kind: 'click', ref: 'e1', reason: 'open the next listing', expect: null, serves: [] },
+        {
+          kind: 'taskStart',
+          label: 'Staff Engineer at Globex',
+          url: JOURNEY_URLS.listing,
+          reason: 'the next unit begins',
+          expect: null,
+          serves: [],
+        },
+      ],
+    };
+    const { brain } = await run({
+      script: {
+        plans: [
+          decidedPlan(PLANS.search, { passed: ['c1'] }),
+          decidedPlan(closeAndGoOn, { passed: ['c3'] }),
+          decidedPlan(PLANS.end),
+        ],
+      },
+    });
+    // The page moved (the click opened the form) and the plan ran whole, yet c3 is settled nowhere.
+    expect(brain.planInputs[2]?.progress).toEqual({ settled: ['c1'], done: [] });
+    expect(brain.planInputs[2]?.ledger.openTask?.label).toBe('Staff Engineer at Globex');
+    expect(brain.planInputs[2]?.ledger.done).toBe(1);
   });
 
   it('[BRW-1] [QL-36] runs a handed-back plan up to the action a cutting validator pointed at, and tells the next plan what was cut and why', async () => {

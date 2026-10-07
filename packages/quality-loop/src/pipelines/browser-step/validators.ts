@@ -27,7 +27,6 @@ import {
   PAGE_REPLACING_ACTION_KINDS,
   PAGE_REPLACING_WAITS,
   TERMINAL_ACTION_KINDS,
-  TERMINAL_FOLLOWERS,
   type Severity,
   type StepAction,
   type StepIndex,
@@ -82,18 +81,6 @@ const claims = (action: StepAction): boolean =>
 const replacesPage = (action: StepAction): boolean =>
   (PAGE_REPLACING_ACTION_KINDS as readonly string[]).includes(action.kind) ||
   (action.kind === 'waitFor' && (PAGE_REPLACING_WAITS as readonly string[]).includes(action.until));
-
-/**
- * Whether what follows a terminal action is allowed to: the declared pairing,
- * and exactly one action, since that one is itself terminal and so must be
- * last. Everything else after a terminal action is a touch on a page this plan
- * cannot have observed.
- */
-function endingIsAllowed(action: StepAction, rest: readonly StepAction[]): boolean {
-  const followers = TERMINAL_FOLLOWERS[action.kind] ?? [];
-  const only = rest.length === 1 ? rest[0] : undefined;
-  return only !== undefined && followers.includes(only.kind);
-}
 
 /**
  * Whether an action touches the element it cites, from the declared effects:
@@ -236,20 +223,12 @@ const limits: Rule = (plan, index) => {
     } else if (replacesPage(action)) {
       replaced = { position, kind: action.kind };
     }
+    // A terminal action ends the plan: what follows it would act on a page this
+    // plan has not observed. Closing a unit of work is not terminal — it is
+    // bookkeeping that touches no page — and the stale-claim rule below holds
+    // it to the page as observed.
     if (isTerminal(action) && position !== plan.actions.length - 1) {
-      const rest = plan.actions.slice(position + 1);
-      if (!endingIsAllowed(action, rest)) {
-        const followers = TERMINAL_FOLLOWERS[action.kind] ?? [];
-        problems.push(
-          problem(
-            'high',
-            followers.length === 0
-              ? `${action.kind} must be the last action`
-              : `${action.kind} must be the last action, or the one before ${followers.join(' or ')}`,
-            at,
-          ),
-        );
-      }
+      problems.push(problem('high', `${action.kind} must be the last action`, at));
     }
     const claim = claimFault(action, index.pageShowsContent);
     if (claim !== null) problems.push(problem(claim.severity, claim.message, at));
