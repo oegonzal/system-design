@@ -30,7 +30,9 @@ import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
 const PLAN: StepPlan = {
   pageKind: 'listing',
   assessment: 'a listing; open the first result',
-  actions: [{ kind: 'click', ref: 'e3', reason: 'first result', expect: 'the listing' }],
+  actions: [
+    { kind: 'click', ref: 'e3', reason: 'first result', expect: 'the listing', serves: [] },
+  ],
 };
 
 const ANSWERS: FieldAnswers = {

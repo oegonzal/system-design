@@ -1,8 +1,8 @@
-import { modelSchema, walkJsonSchema } from '@sysdesign/contracts';
+import { modelSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { strictJsonSchema } from './strict-schema';
+import { strictJsonSchema, strictSchemaFaults } from './strict-schema';
 
 const bounded = z.strictObject({
   answer: z.string().max(400),
@@ -12,19 +12,58 @@ const bounded = z.strictObject({
 });
 
 describe('a schema a strict endpoint will accept', () => {
-  it('[QL-62] keeps every structural demand strict mode makes, which this codebase already meets', () => {
-    const strict = strictJsonSchema(modelSchema(bounded).json);
-    const faults: string[] = [];
-    walkJsonSchema(strict, '', (node, path) => {
-      if (node['type'] !== 'object' && node['properties'] === undefined) return;
-      if (node['additionalProperties'] !== false) faults.push(`${path}: open object`);
-      const properties = Object.keys((node['properties'] as object) ?? {});
-      const required = new Set((node['required'] as string[]) ?? []);
-      for (const key of properties) if (!required.has(key)) faults.push(`${path}.${key}: optional`);
-    });
+  it('[QL-62] keeps every structural demand strict mode makes, which this codebase meets by convention', () => {
     // Zero, because the output schemas are `strictObject` and say `.nullable()`
     // where another codebase would say `.optional()`.
-    expect(faults).toEqual([]);
+    expect(strictSchemaFaults(strictJsonSchema(modelSchema(bounded).json))).toEqual([]);
+  });
+
+  it('[QL-62] names an optional property and an open object by the path the endpoint would refuse them at', () => {
+    // The fault of 2026-10-07, as the schema then reached the endpoint: one
+    // property left out of `required` inside a union branch under a list, and
+    // every request was refused in under 200 ms.
+    const action = (properties: Record<string, unknown>, required: string[]) => ({
+      type: 'object',
+      properties,
+      required,
+      additionalProperties: false,
+    });
+    const asSent = {
+      type: 'object',
+      properties: {
+        actions: {
+          type: 'array',
+          items: {
+            anyOf: [
+              action(
+                { kind: { type: 'string' }, serves: { type: 'array', items: { type: 'string' } } },
+                ['kind'],
+              ),
+              action({ kind: { type: 'string' } }, ['kind']),
+            ],
+          },
+        },
+        notes: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+      required: ['actions', 'notes'],
+      additionalProperties: false,
+    };
+    expect(strictSchemaFaults(asSent)).toEqual([
+      'actions[]: serves is optional',
+      'notes: open object',
+    ]);
+  });
+
+  it('[QL-62] the same contract, converted for the model, has no fault left: what it leaves optional is shown required and nullable', () => {
+    const plan = z.strictObject({
+      actions: z.array(
+        z.union([
+          z.strictObject({ kind: z.literal('click'), serves: z.array(z.string()).optional() }),
+          z.strictObject({ kind: z.literal('done') }),
+        ]),
+      ),
+    });
+    expect(strictSchemaFaults(strictJsonSchema(modelSchema(plan).json))).toEqual([]);
   });
 
   it('[QL-62] sends the declared bounds as they are, because the endpoint enforces them and a dropped one is a reply it cannot refuse', () => {

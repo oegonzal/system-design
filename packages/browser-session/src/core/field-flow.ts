@@ -64,8 +64,15 @@ type FieldsDecided = Decided<FieldAnswers> & { admission: Admission };
 /** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
 export const fillActionOf = (field: FieldSpec, value: string): BrowserAction =>
   elementKind(field.role, field) === 'selectable'
-    ? { kind: 'select', ref: field.ref, option: value, reason: 'field answer', expect: null }
-    : { kind: 'fill', ref: field.ref, value, reason: 'field answer', expect: null };
+    ? {
+        kind: 'select',
+        ref: field.ref,
+        option: value,
+        reason: 'field answer',
+        expect: null,
+        serves: [],
+      }
+    : { kind: 'fill', ref: field.ref, value, reason: 'field answer', expect: null, serves: [] };
 
 const result = (
   field: RoutedField,

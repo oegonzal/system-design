@@ -93,45 +93,52 @@
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4473257910&keywords=software%20engineer%20remote%20easy%20apply",
           "reason": "Starting the application process for the job at Gopuff.",
-          "expect": "Transitioning to the application form for the position."
+          "expect": "Transitioning to the application form for the position.",
+          "serves": []
         },
         {
           "kind": "click",
           "ref": "f169e1307",
           "reason": "Pressing the Easy Apply button to begin the application process for the Senior Software Engineer role.",
-          "expect": "Loading the application form where the user can provide necessary information."
+          "expect": "Loading the application form where the user can provide necessary information.",
+          "serves": []
         },
         {
           "kind": "askFields",
           "refs": ["f169e6", "f169e15", "f169e29"],
           "reason": "Asking for necessary applicant fields to continue the application process, since they are required for submission.",
-          "expect": "Navigating to the next step of the application after collecting required fields."
+          "expect": "Navigating to the next step of the application after collecting required fields.",
+          "serves": []
         },
         {
           "kind": "waitFor",
           "until": "element",
           "value": "f169e6",
           "reason": "Waiting for the form to process the previous request and present the next step in the application.",
-          "expect": "The next page of the application form to be displayed."
+          "expect": "The next page of the application form to be displayed.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Enter",
           "reason": "Submitting the form to proceed with the application after filling the required fields.",
-          "expect": "Review page of the application form to be displayed."
+          "expect": "Review page of the application form to be displayed.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Enter",
           "reason": "Submitting the application on the review page to complete the application process.",
-          "expect": "Confirmation message showing that the application was submitted successfully."
+          "expect": "Confirmation message showing that the application was submitted successfully.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "done",
           "detail": "Successfully submitted the application for Senior Software Engineer - Delivery Tech at Gopuff.",
           "reason": "Completing the application process for this position.",
-          "expect": "No further actions required; the application has been confirmed."
+          "expect": "No further actions required; the application has been confirmed.",
+          "serves": []
         }
       ]
     }
@@ -229,26 +236,30 @@
           "kind": "click",
           "ref": "f169e1638",
           "reason": "To initiate the application process for the Senior Software Engineer position at Gopuff, which is relevant to the mission of applying to remote software engineering roles.",
-          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+          "expect": "The application form page will load, allowing the applicant to start inputting their information.",
+          "serves": []
         },
         {
           "kind": "askFields",
           "refs": ["f169e6", "f169e1250"],
           "reason": "To collect necessary applicant information for the application form since the specifics of the applicant's details are not provided in the evidence available.",
-          "expect": "The application form will now prompt for any required fields related to the applicant's qualifications."
+          "expect": "The application form will now prompt for any required fields related to the applicant's qualifications.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Tab",
           "reason": "To navigate through the form after asking for fields, ensuring all necessary information is accounted for and allowing progress on the application.",
-          "expect": "The next section of the application form will open, allowing for further input or review."
+          "expect": "The next section of the application form will open, allowing for further input or review.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "skipped",
           "detail": "The application was set aside because required fields were not provided in evidence and could not be filled.",
           "reason": "The application process could not proceed due to missing required fields for the applicant, requiring operator input.",
-          "expect": "The unit of work will be marked as skipped, and the session will proceed to the next job listing."
+          "expect": "The unit of work will be marked as skipped, and the session will proceed to the next job listing.",
+          "serves": []
         }
       ]
     }
@@ -499,13 +510,15 @@
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
           "reason": "Starting the application process for the Senior Software Engineer position at Gopuff as part of the mission.",
-          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+          "expect": "The application form page will load, allowing the applicant to start inputting their information.",
+          "serves": []
         },
         {
           "kind": "click",
           "ref": "f169e1638",
           "reason": "To initiate the job application process for the Senior Software Engineer position as part of the mission.",
-          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+          "expect": "The application form page will load, allowing the applicant to start inputting their information.",
+          "serves": []
         },
         {
           "kind": "askFields",
@@ -522,20 +535,23 @@
             "f169e85"
           ],
           "reason": "Collecting applicant-specific information that the application form requires for submission.",
-          "expect": "The form fields about the applicant would display, collecting the necessary details required for the application."
+          "expect": "The form fields about the applicant would display, collecting the necessary details required for the application.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Tab",
           "reason": "Navigating to the next actionable element on the application form to continue the application process.",
-          "expect": "The next section of the application form will be visible, allowing further progress."
+          "expect": "The next section of the application form will be visible, allowing further progress.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "done",
           "detail": "The application has successfully been submitted and confirmed.",
           "reason": "Completing the application process for this job listing, marking it as done.",
-          "expect": "A confirmation message appears indicating that the application was submitted successfully."
+          "expect": "A confirmation message appears indicating that the application was submitted successfully.",
+          "serves": []
         }
       ]
     }
@@ -700,26 +716,30 @@
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
           "reason": "Starting the application process for the Senior Software Engineer position at Gopuff is essential to complete this unit of work.",
-          "expect": "The next action should open the application form for the position."
+          "expect": "The next action should open the application form for the position.",
+          "serves": []
         },
         {
           "kind": "askFields",
           "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
           "reason": "These fields are required for the application and need to be filled out with known information about the applicant.",
-          "expect": "The fields for First name, Last name, Phone country code, Mobile phone number, and Email address should be populated appropriately."
+          "expect": "The fields for First name, Last name, Phone country code, Mobile phone number, and Email address should be populated appropriately.",
+          "serves": []
         },
         {
           "kind": "click",
           "ref": "f169e2182",
           "reason": "Pressing 'Next' is required to proceed to the next page of the application form after filling in the necessary fields.",
-          "expect": "The next page of the application form should load, allowing further progress."
+          "expect": "The next page of the application form should load, allowing further progress.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "done",
           "detail": "The application has been submitted successfully after confirming all required fields were filled correctly.",
           "reason": "Completing and submitting the application marks the end of this unit of work for this listing.",
-          "expect": null
+          "expect": null,
+          "serves": []
         }
       ]
     }
@@ -884,26 +904,30 @@
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
           "reason": "To start the application process for the Senior Software Engineer role.",
-          "expect": "The application form should load, showing required fields."
+          "expect": "The application form should load, showing required fields.",
+          "serves": []
         },
         {
           "kind": "askFields",
           "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
           "reason": "These fields require input from the applicant for the Easy Apply process.",
-          "expect": "The fields should display prompts for input regarding applicant information."
+          "expect": "The fields should display prompts for input regarding applicant information.",
+          "serves": []
         },
         {
           "kind": "click",
           "ref": "f169e2182",
           "reason": "To move forward in the application process after filling required fields.",
-          "expect": "The next page of the application or review should load."
+          "expect": "The next page of the application or review should load.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "done",
           "detail": "Successfully submitted the application for the Senior Software Engineer position.",
           "reason": "The application has been completed and submitted as per the required steps.",
-          "expect": "A confirmation message should appear, indicating the application was submitted successfully."
+          "expect": "A confirmation message should appear, indicating the application was submitted successfully.",
+          "serves": []
         }
       ]
     }
@@ -1049,26 +1073,30 @@
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
           "reason": "Starting the application process for the Senior Software Engineer position.",
-          "expect": "Load the application form with fields to fill out."
+          "expect": "Load the application form with fields to fill out.",
+          "serves": []
         },
         {
           "kind": "askFields",
           "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
           "reason": "Requesting the required fields about the applicant to ensure all necessary information is included in the application.",
-          "expect": "Fields for first name, last name, phone country code, mobile phone number, and email address will be prepared for input."
+          "expect": "Fields for first name, last name, phone country code, mobile phone number, and email address will be prepared for input.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Enter",
           "reason": "Proceeding to the next step in the application form after filling out required information.",
-          "expect": "Advance to the next page of the application form."
+          "expect": "Advance to the next page of the application form.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "failed",
           "detail": "Could not submit the application due to a missing required field.",
           "reason": "Finishing up the application process for the position.",
-          "expect": "The application remains unsubmitted, and the user is informed of the required fields still needing input."
+          "expect": "The application remains unsubmitted, and the user is informed of the required fields still needing input.",
+          "serves": []
         }
       ]
     }
@@ -1232,40 +1260,46 @@
           "kind": "askFields",
           "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
           "reason": "To gather required personal information about the applicant for the application form as specified in the mission.",
-          "expect": null
+          "expect": null,
+          "serves": []
         },
         {
           "kind": "press",
           "key": "ArrowDown",
           "reason": "Advancing the form to the next step after providing the necessary information in the fields to continue with the application process.",
-          "expect": null
+          "expect": null,
+          "serves": []
         },
         {
           "kind": "waitFor",
           "until": "element",
           "value": "f169e2182",
           "reason": "Waiting for the Next button to become available after pressing ArrowDown, indicating readiness to proceed with the application submission.",
-          "expect": "The Next button should be visible and clickable, allowing progression in the application."
+          "expect": "The Next button should be visible and clickable, allowing progression in the application.",
+          "serves": []
         },
         {
           "kind": "press",
           "key": "Enter",
           "reason": "Submitting the completed fields to advance to the next page of the application form.",
-          "expect": null
+          "expect": null,
+          "serves": []
         },
         {
           "kind": "waitFor",
           "until": "element",
           "value": "f169e2182",
           "reason": "Waiting for the next page to load after submission to confirm that the information has been processed.",
-          "expect": "The next page of the application form should load, indicating successful progression."
+          "expect": "The next page of the application form should load, indicating successful progression.",
+          "serves": []
         },
         {
           "kind": "taskDone",
           "outcome": "done",
           "detail": "The application has been successfully submitted, signaling the completion of this unit of work.",
           "reason": "The current unit of work is completed successfully with the submission of the application as outlined in the mission.",
-          "expect": null
+          "expect": null,
+          "serves": []
         }
       ]
     }

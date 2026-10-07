@@ -147,6 +147,7 @@ describe('the browser-step validators', () => {
       value: 'e6',
       reason: 'wait for the control to enable',
       expect: null,
+      serves: [],
     };
     const scrollToIt: StepPlan['actions'][number] = {
       kind: 'scroll',
@@ -154,6 +155,7 @@ describe('the browser-step validators', () => {
       ref: 'e6',
       reason: 'bring it into view',
       expect: null,
+      serves: [],
     };
     // Waiting for or scrolling to a disabled control is how a wizard page is worked, not a touch.
     expect(problems(samplePlan([waitForIt, scrollToIt, done()])).limits).toEqual([]);
@@ -188,7 +190,7 @@ describe('the browser-step validators', () => {
       click('e6'),
       fill('e1', '6'),
       select('e2', 'Yes'),
-      { kind: 'press', key: 'Enter', reason: 'submit', expect: null } as StepAction,
+      { kind: 'press', key: 'Enter', reason: 'submit', expect: null, serves: [] } as StepAction,
     ]) {
       expect(
         problems(samplePlan([first, taskDone()]), open).limits.map((p) => p.locationRefs),
@@ -202,6 +204,7 @@ describe('the browser-step validators', () => {
       ref: null,
       reason: 'look',
       expect: null,
+      serves: [],
     };
     const waitHere: StepAction = {
       kind: 'waitFor',
@@ -209,6 +212,7 @@ describe('the browser-step validators', () => {
       value: 'e6',
       reason: 'w',
       expect: null,
+      serves: [],
     };
     expect(problems(samplePlan([taskDone()]), open).limits).toEqual([]);
     expect(problems(samplePlan([taskDone(), terminate()]), open).limits).toEqual([]);
@@ -248,6 +252,7 @@ describe('the browser-step validators', () => {
       value: 'e3',
       reason: 'w',
       expect: null,
+      serves: [],
     };
     expect(problems(samplePlan([waitBehind]), dialog).limits).toEqual([]);
     // Not visible and not a trap: refused as not visible, never guessed at.
@@ -341,6 +346,7 @@ describe('the browser-step validators', () => {
       url: 'https://jobs.example.test/search',
       reason: 'open the search',
       expect: 'the results',
+      serves: [],
     };
     expect(problems(samplePlan([navigate])).limits).toEqual([]);
     const beyond = problems(samplePlan([click('e3'), navigate, click('e4'), done()])).limits;
@@ -371,6 +377,7 @@ describe('the browser-step validators', () => {
       value: 'Results',
       reason: 'r',
       expect: null,
+      serves: [],
     };
     const waitElement: StepAction = {
       kind: 'waitFor',
@@ -378,6 +385,7 @@ describe('the browser-step validators', () => {
       value: 'e5',
       reason: 'r',
       expect: null,
+      serves: [],
     };
     expect(
       problems(

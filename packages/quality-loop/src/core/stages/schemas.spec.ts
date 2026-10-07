@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { bound, boundsAgainstMeasured, modelSchema } from '@sysdesign/contracts';
+import { strictSchemaFaults } from '@sysdesign/llm';
 
 import measured from './measured.json';
 import { criteriaSchema, evaluationSchema, findingsSchema } from './schemas';
@@ -81,6 +82,20 @@ describe('per-request schemas', () => {
     const shown = JSON.stringify(modelSchema(schema).json);
     expect(shown).toContain('within 600 characters');
     expect(shown).toContain('"maxLength":600');
+  });
+
+  it('[QL-62] every schema a lens answers is one a strict endpoint takes: closed objects, every property required', () => {
+    // The producer's schema is checked at boot; the lenses' are built per
+    // request from the definition, so they are held here, at their shapes.
+    const schemas = [
+      criteriaSchema(['must'], 3, bound(400)),
+      findingsSchema(['gap'], ['c1'], ['text'], 4),
+      findingsSchema(['gap'], [], [], 4),
+      evaluationSchema(['c1'], ['text'], 1),
+    ];
+    for (const schema of schemas) {
+      expect(strictSchemaFaults(modelSchema(schema).json)).toEqual([]);
+    }
   });
 
   it('[QL-6] no schema a model answers contains a number', () => {

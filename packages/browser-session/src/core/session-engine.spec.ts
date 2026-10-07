@@ -119,7 +119,7 @@ describe('the session engine', () => {
       ...PLANS.search,
       actions: [
         { kind: 'click', ref: 'e2', reason: 'open the results', expect: null, serves: ['c1'] },
-        { kind: 'fill', ref: 'e1', value: 'x', reason: 'refine', expect: null },
+        { kind: 'fill', ref: 'e1', value: 'x', reason: 'refine', expect: null, serves: [] },
       ],
     };
     const { brain } = await run({
@@ -136,7 +136,7 @@ describe('the session engine', () => {
   it('[BRW-1] a pass on a plan that did not move the page settles nothing', async () => {
     const press: StepPlan = {
       ...PLANS.search,
-      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null }],
+      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null, serves: [] }],
     };
     const { brain } = await run({
       script: {

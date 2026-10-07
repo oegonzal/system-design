@@ -71,7 +71,13 @@ export class SessionService {
   async login(profile: string, url: string): Promise<void> {
     await this.browser.open(profile, { headed: true });
     try {
-      await this.browser.act({ kind: 'navigate', url, reason: 'sign in', expect: null });
+      await this.browser.act({
+        kind: 'navigate',
+        url,
+        reason: 'sign in',
+        expect: null,
+        serves: [],
+      });
       await this.operator.pause(
         `Sign in at ${url} in the browser window. The profile "${profile}" keeps the cookies for later sessions.`,
       );

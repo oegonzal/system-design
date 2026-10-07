@@ -390,3 +390,76 @@ describe('parseLenient', () => {
     ]);
   });
 });
+
+describe('what the contract leaves optional', () => {
+  const schema = z.strictObject({
+    name: z.string(),
+    notes: z.string().optional(),
+    tags: z.array(z.strictObject({ label: z.string(), weight: z.number().optional() })).optional(),
+    mood: z.string().nullable().optional(),
+  });
+
+  it('[QL-62] is shown to the model as required and nullable — a key that takes null already is shown as it is', () => {
+    const { json } = modelSchema(schema);
+    expect(json['required']).toEqual(['name', 'notes', 'tags', 'mood']);
+    const properties = json['properties'] as Record<string, Record<string, unknown>>;
+    expect(properties['notes']).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    expect(properties['mood']).toEqual({ anyOf: [{ type: 'string' }, { type: 'null' }] });
+    const [tags] = properties['tags']['anyOf'] as Record<string, unknown>[];
+    expect((tags['items'] as Record<string, unknown>)['required']).toEqual(['label', 'weight']);
+  });
+
+  it('[QL-62] reads a null written there as absent and records each; a null at a key that takes null stays; one at a required key refuses', () => {
+    const parsed = parseLenient(schema, {
+      name: 'n',
+      notes: null,
+      tags: [
+        { label: 'a', weight: null },
+        { label: 'b', weight: 2 },
+      ],
+      mood: null,
+    });
+    expect(parsed.ok && parsed.value).toEqual({
+      name: 'n',
+      tags: [{ label: 'a' }, { label: 'b', weight: 2 }],
+      mood: null,
+    });
+    expect(parsed.repairs).toEqual([
+      { path: 'notes', at: ['notes'], action: 'dropped-null', detail: 'notes' },
+      {
+        path: 'tags[0].weight',
+        at: ['tags', 0, 'weight'],
+        action: 'dropped-null',
+        detail: 'weight',
+      },
+    ]);
+
+    const refused = parseLenient(schema, { name: null, notes: 'kept' });
+    expect(refused.ok).toBe(false);
+    expect(refused.issues.map((issue) => [issue.path, issue.code, issue.soft])).toEqual([
+      ['name', 'invalid_type', false],
+    ]);
+  });
+
+  it('[QL-62] reads a union branch by branch, so a plan whose actions leave a key optional reads null there as absent', () => {
+    const plan = z.strictObject({
+      actions: z.array(
+        z.discriminatedUnion('kind', [
+          z.strictObject({ kind: z.literal('click'), serves: z.array(z.string()).optional() }),
+          z.strictObject({ kind: z.literal('done') }),
+        ]),
+      ),
+    });
+    const parsed = parseLenient(plan, {
+      actions: [
+        { kind: 'click', serves: null },
+        { kind: 'click', serves: ['c1'] },
+        { kind: 'done' },
+      ],
+    });
+    expect(parsed.ok && parsed.value).toEqual({
+      actions: [{ kind: 'click' }, { kind: 'click', serves: ['c1'] }, { kind: 'done' }],
+    });
+    expect(parsed.repairs.map((repair) => repair.path)).toEqual(['actions[0].serves']);
+  });
+});

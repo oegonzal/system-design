@@ -229,7 +229,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
         .map((criterion) => criterion.id),
     );
     const served = new Set(
-      readout.plan.actions.slice(0, executed.ranOk).flatMap((action) => action.serves ?? []),
+      readout.plan.actions.slice(0, executed.ranOk).flatMap((action) => action.serves),
     );
     const ids = readout.passed.filter(
       (id) => settling.has(id) && (executed.ranWhole || served.has(id)),

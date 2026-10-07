@@ -93,7 +93,7 @@ export const journeyPages = (): ScriptedPage[] => [
 ];
 
 const act = <A extends StepAction>(action: A): A => action;
-const common = { reason: 'the procedure says so', expect: null };
+const common = { reason: 'the procedure says so', expect: null, serves: [] };
 const plan = (pageKind: StepPlan['pageKind'], actions: StepAction[]): StepPlan => ({
   pageKind,
   assessment: `a ${pageKind} page; carrying the mission forward`,
@@ -104,7 +104,13 @@ const plan = (pageKind: StepPlan['pageKind'], actions: StepAction[]): StepPlan =
 export const JOURNEY_PLANS = {
   search: plan('listing', [
     act({ kind: 'fill', ref: 'e1', value: 'software engineer', ...common }),
-    act({ kind: 'click', ref: 'e2', reason: 'submit the search', expect: 'a list of results' }),
+    act({
+      kind: 'click',
+      ref: 'e2',
+      reason: 'submit the search',
+      expect: 'a list of results',
+      serves: [],
+    }),
   ]),
   results: plan('listing', [
     act({

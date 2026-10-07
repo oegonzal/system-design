@@ -21,6 +21,7 @@ import {
   UPSTREAM_EVIDENCE,
   WITHHOLDINGS,
 } from '@sysdesign/contracts';
+import { strictSchemaFaults } from '@sysdesign/llm';
 
 import { projectStep, SCORES_FACTOR } from './controllers/compose';
 import { criterionLengthBound, providedStatementLimit, type TaskSpec } from './contracts';
@@ -305,7 +306,14 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   // against its ceilings, both from this one conversion: an unsupported zod
   // type, or a bound declared where none can sit, fails here rather than as a
   // null response mid-run.
-  modelSchema(definition.task.output.schema);
+  const shown = modelSchema(definition.task.output.schema);
+  // A strict endpoint refuses the request for an open object or an optional
+  // property, every time, before any model reads the goal — so the schema that
+  // breaks the convention never boots instead of never producing.
+  const faults = strictSchemaFaults(shown.json);
+  if (faults.length > 0) {
+    fail(`output schema is not strict — a strict endpoint refuses it: ${faults.join('; ')}`);
+  }
 }
 
 const summariseLens = ({ id, samples, maxItems, maxTokens, consumes, findingTypes }: LensSpec) => ({

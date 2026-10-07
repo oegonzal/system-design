@@ -128,10 +128,23 @@ const plan: StepPlan = {
   pageKind: 'listing',
   assessment: 'A listing page; open the first result.',
   actions: [
-    { kind: 'click', ref: 'e3', reason: 'open the first listing', expect: 'the detail page' },
-    { kind: 'waitFor', until: 'text', value: 'Apply', reason: 'the detail loads', expect: null },
-    { kind: 'click', ref: 'e9', reason: 'press apply', expect: 'the form' },
-    { kind: 'done', reason: 'the page will change', expect: null },
+    {
+      kind: 'click',
+      ref: 'e3',
+      reason: 'open the first listing',
+      expect: 'the detail page',
+      serves: [],
+    },
+    {
+      kind: 'waitFor',
+      until: 'text',
+      value: 'Apply',
+      reason: 'the detail loads',
+      expect: null,
+      serves: [],
+    },
+    { kind: 'click', ref: 'e9', reason: 'press apply', expect: 'the form', serves: [] },
+    { kind: 'done', reason: 'the page will change', expect: null, serves: [] },
   ],
 };
 

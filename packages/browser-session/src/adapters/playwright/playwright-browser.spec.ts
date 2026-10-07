@@ -221,24 +221,45 @@ describe('the Playwright browser', () => {
     const auth = byName(observation, 'combobox', 'Work authorisation');
     const remote = byName(observation, 'checkbox', 'Remote only');
 
-    await browser.act({ kind: 'fill', ref: years.ref, value: '6', reason: 'cv', expect: null });
+    await browser.act({
+      kind: 'fill',
+      ref: years.ref,
+      value: '6',
+      reason: 'cv',
+      expect: null,
+      serves: [],
+    });
     expect(await browser.readValue(years.ref)).toBe('6');
-    await browser.act({ kind: 'select', ref: auth.ref, option: 'No', reason: 'cv', expect: null });
+    await browser.act({
+      kind: 'select',
+      ref: auth.ref,
+      option: 'No',
+      reason: 'cv',
+      expect: null,
+      serves: [],
+    });
     expect(await browser.readValue(auth.ref)).toBe('No');
-    await browser.act({ kind: 'click', ref: remote.ref, reason: 'remote', expect: null });
+    await browser.act({
+      kind: 'click',
+      ref: remote.ref,
+      reason: 'remote',
+      expect: null,
+      serves: [],
+    });
     await browser.highlight(years.ref);
     const again = await browser.observe();
     expect(byName(again, 'spinbutton', 'Years of experience with Python').value).toBe('6');
     expect(byName(again, 'combobox', 'Work authorisation').value).toBe('No');
     expect(byName(again, 'checkbox', 'Remote only').value).toBe('checked');
     expect((await browser.screenshot()).byteLength).toBeGreaterThan(100);
-    await browser.act({ kind: 'press', key: 'Tab', reason: 'move on', expect: null });
+    await browser.act({ kind: 'press', key: 'Tab', reason: 'move on', expect: null, serves: [] });
     await browser.act({
       kind: 'scroll',
       direction: 'down',
       ref: null,
       reason: 'look',
       expect: null,
+      serves: [],
     });
   });
 
@@ -253,7 +274,7 @@ describe('the Playwright browser', () => {
     if (stale === undefined)
       throw new Error('every old ref was re-minted; the fixture needs more elements');
     await expect(
-      browser.act({ kind: 'click', ref: stale.ref, reason: 'old', expect: null }),
+      browser.act({ kind: 'click', ref: stale.ref, reason: 'old', expect: null, serves: [] }),
     ).rejects.toBeInstanceOf(ActionFailed);
     await expect(browser.highlight(stale.ref)).rejects.toThrow(
       'is not an element of the last observation',
@@ -265,6 +286,7 @@ describe('the Playwright browser', () => {
       ref: after.elements[0]?.ref ?? '',
       reason: 'go',
       expect: null,
+      serves: [],
     });
     const quick = new PlaywrightBrowser({
       profilesDir: profiles,
@@ -282,6 +304,7 @@ describe('the Playwright browser', () => {
           value: 'never appears',
           reason: 'w',
           expect: null,
+          serves: [],
         }),
       ).rejects.toBeInstanceOf(ActionFailed);
     } finally {
@@ -426,6 +449,7 @@ describe('the Playwright browser', () => {
       value: 'playwright aria snapshot',
       reason: 'spec',
       expect: null,
+      serves: [],
     });
     expect(await browser.readValue(search.ref)).toBe('playwright aria snapshot');
   });

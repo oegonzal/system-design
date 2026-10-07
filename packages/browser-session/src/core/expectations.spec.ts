@@ -38,7 +38,7 @@ describe('what the engine checks of an action’s promise', () => {
     const observation = listingObservation();
     expect(
       exactCheckOf(
-        { kind: 'navigate', url: 'https://x.test/a?b=1', reason: 'r', expect: null },
+        { kind: 'navigate', url: 'https://x.test/a?b=1', reason: 'r', expect: null, serves: [] },
         observation,
       ),
     ).toEqual({
@@ -47,7 +47,7 @@ describe('what the engine checks of an action’s promise', () => {
     });
     expect(
       exactCheckOf(
-        { kind: 'waitFor', until: 'url', value: '/done', reason: 'r', expect: null },
+        { kind: 'waitFor', until: 'url', value: '/done', reason: 'r', expect: null, serves: [] },
         observation,
       ),
     ).toEqual({
@@ -56,7 +56,7 @@ describe('what the engine checks of an action’s promise', () => {
     });
     expect(
       exactCheckOf(
-        { kind: 'waitFor', until: 'element', value: 'e2', reason: 'r', expect: null },
+        { kind: 'waitFor', until: 'element', value: 'e2', reason: 'r', expect: null, serves: [] },
         observation,
       ),
     ).toEqual({
@@ -65,7 +65,10 @@ describe('what the engine checks of an action’s promise', () => {
       name: 'Search',
     });
     expect(
-      exactCheckOf({ kind: 'click', ref: 'e2', reason: 'r', expect: null }, observation),
+      exactCheckOf(
+        { kind: 'click', ref: 'e2', reason: 'r', expect: null, serves: [] },
+        observation,
+      ),
     ).toBeNull();
     expect(checkExact({ kind: 'element', role: 'button', name: 'Search' }, observation)).toBe(true);
     expect(checkExact({ kind: 'element', role: 'button', name: 'Submit' }, observation)).toBe(

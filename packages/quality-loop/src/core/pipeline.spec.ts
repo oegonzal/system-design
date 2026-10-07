@@ -205,6 +205,26 @@ describe('validatePipeline', () => {
     expect(() => validatePipeline(asAny(broken))).toThrow();
   });
 
+  it('[QL-62] refuses an output schema a strict endpoint would refuse, naming the fault, and takes one the conversion closes', () => {
+    // 2026-10-07: one `.optional()` on the step plan, and the endpoint refused
+    // every producer call of a twelve-step session in under 200 ms each. The
+    // conversion now shows an optional key as required and nullable; an open
+    // object — a record — is what the endpoint still refuses.
+    const tiny = tinyPipeline();
+    const withSchema = (schema: z.ZodType) =>
+      tinyPipeline({
+        task: { ...tiny.task, output: { ...tiny.task.output, schema: schema as never } },
+      });
+    const optional = withSchema(
+      z.strictObject({ text: z.string(), serves: z.array(z.string()).optional() }),
+    );
+    expect(() => validatePipeline(asAny(optional))).not.toThrow();
+    const open = withSchema(
+      z.strictObject({ text: z.string(), byKey: z.record(z.string(), z.string()) }),
+    );
+    expect(() => validatePipeline(asAny(open))).toThrow(/not strict.*byKey: open object/);
+  });
+
   it('[QL-1] refuses a lens consuming evidence nothing produces before it, and evidence it does not know', () => {
     const base = tinyPipeline();
     expect(() =>

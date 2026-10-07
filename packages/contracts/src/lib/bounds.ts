@@ -1,5 +1,5 @@
 import { z, type ZodType } from 'zod';
-import type { $ZodIssue, $ZodType } from 'zod/v4/core';
+import { safeParse, type $ZodIssue, type $ZodType } from 'zod/v4/core';
 
 /**
  * One declared bound for every string and list a model writes into, and the
@@ -273,19 +273,59 @@ export function walkJsonSchema(
   }
 }
 
+/** A zod node's declaration, read for what it wraps and which of its keys may be absent. */
+interface ZodDef {
+  type: string;
+  shape?: Record<string, $ZodType>;
+  element?: $ZodType;
+  valueType?: $ZodType;
+  options?: readonly $ZodType[];
+  innerType?: $ZodType;
+  in?: $ZodType;
+}
+
+const defOf = (node: $ZodType): ZodDef => node._zod.def as ZodDef;
+
+/**
+ * True for a key whose null means "none": the contract lets the output leave
+ * it out — `.optional()`, however wrapped — and does not itself take null,
+ * so a null there can only be the model's way of leaving it out.
+ */
+const nullMeansAbsent = (node: $ZodType): boolean =>
+  node._zod.optout === 'optional' && !safeParse(node, null).success;
+
+/**
+ * What the contract leaves optional, the model is shown as required and
+ * nullable. A strict endpoint takes no optional property — it refused one on
+ * every call of a twelve-step session, 2026-10-07, in under 200 ms each —
+ * and null is how the model says "none"; `parseLenient` reads it back as
+ * absent. A key that already takes null is shown as it is.
+ */
+function showOptionalAsNullable(zodSchema: $ZodType, json: Record<string, unknown>): void {
+  const def = defOf(zodSchema);
+  const properties = json['properties'];
+  if (def.type !== 'object' || def.shape === undefined || !isRecord(properties)) return;
+  for (const [key, child] of Object.entries(def.shape)) {
+    if (!nullMeansAbsent(child) || !(key in properties)) continue;
+    properties[key] = { anyOf: [properties[key], { type: 'null' }] };
+  }
+  json['required'] = Object.keys(properties);
+}
+
 /**
  * One conversion: the JSON Schema the model is shown, with every declared
- * bound at its TARGET while the zod schema keeps enforcing the ceiling, and
- * the index of those bounds by path. A node reused in two places is
- * converted once and inlined twice, so the index is read off the JSON
- * rather than the conversion.
+ * bound at its TARGET while the zod schema keeps enforcing the ceiling, every
+ * optional key required and nullable, and the index of those bounds by path.
+ * A node reused in two places is converted once and inlined twice, so the
+ * index is read off the JSON rather than the conversion.
  */
 export function modelSchema(schema: ZodType): ModelSchema {
   const json = z.toJSONSchema(schema, {
     override: ({ zodSchema, jsonSchema }) => {
+      const target = jsonSchema as Record<string, unknown>;
+      showOptionalAsNullable(zodSchema, target);
       const found = declaredOf(zodSchema);
       if (found === undefined) return;
-      const target = jsonSchema as Record<string, unknown>;
       if (found.kind === 'list') target['maxItems'] = found.target;
       else target['maxLength'] = found.target;
       target[STAMP] = found;
@@ -560,7 +600,7 @@ export const describeOverrun = (overrun: Overrun): string =>
 export interface Repair {
   path: LocationPath;
   at: PathKey[];
-  action: 'stripped-keys' | 'trimmed';
+  action: 'stripped-keys' | 'trimmed' | 'dropped-null';
   detail: string;
 }
 
@@ -611,8 +651,66 @@ function cutAtWord(text: string, limit: number): string {
 }
 
 /**
+ * Every null in `value` at a key whose null means "none", removed and
+ * recorded: the model was shown that key as required and nullable, because
+ * a strict endpoint takes no optional property, so null is how it leaves the
+ * key out. A null at a required key stays, and refuses as the wrong type it
+ * is; so does one at a key that takes null. A union is read branch by
+ * branch, so a key left optional in any branch is read as absent there.
+ */
+function absentNulls(node: $ZodType, value: unknown, at: PathKey[], repairs: Repair[]): unknown {
+  const def = defOf(node);
+  switch (def.type) {
+    case 'object': {
+      if (!isRecord(value) || def.shape === undefined) return value;
+      let out = value;
+      for (const [key, child] of Object.entries(def.shape)) {
+        if (!(key in out)) continue;
+        const here = [...at, key];
+        if (out[key] === null && nullMeansAbsent(child)) {
+          out = Object.fromEntries(Object.entries(out).filter(([name]) => name !== key));
+          repairs.push({ path: locationPath(here), at: here, action: 'dropped-null', detail: key });
+        } else {
+          const next = absentNulls(child, out[key], here, repairs);
+          if (next !== out[key]) out = { ...out, [key]: next };
+        }
+      }
+      return out;
+    }
+    case 'array': {
+      const element = def.element;
+      if (!Array.isArray(value) || element === undefined) return value;
+      const out = value.map((item, index) => absentNulls(element, item, [...at, index], repairs));
+      return out.some((item, index) => item !== value[index]) ? out : value;
+    }
+    case 'record': {
+      const valueType = def.valueType;
+      if (!isRecord(value) || valueType === undefined) return value;
+      const out = Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [
+          key,
+          absentNulls(valueType, item, [...at, key], repairs),
+        ]),
+      );
+      return Object.keys(out).some((key) => out[key] !== value[key]) ? out : value;
+    }
+    case 'union':
+      return (def.options ?? []).reduce<unknown>(
+        (current, option) => absentNulls(option, current, at, repairs),
+        value,
+      );
+    case 'pipe':
+      return def.in === undefined ? value : absentNulls(def.in, value, at, repairs);
+    default:
+      return def.innerType === undefined ? value : absentNulls(def.innerType, value, at, repairs);
+  }
+}
+
+/**
  * The salvage ladder, total over any JSON:
  *
+ * 0. A null at a key the contract leaves optional is read as absent and
+ *    recorded — the model was shown that key as required and nullable.
  * 1. The schema accepts the value → done, every field past its target recorded.
  * 2. Otherwise the faults are sorted: an aside key is stripped and a list past
  *    its ceiling is trimmed to it by whole items, worst-last, as every list
@@ -638,7 +736,7 @@ export function parseLenient<T>(
   const repairs: Repair[] = [];
   const recorded: Overrun[] = [];
   const kept: { at: PathKey[]; text: string }[] = [];
-  let current = value;
+  let current = absentNulls(schema, value, [], repairs);
   let issues: SchemaIssue[] = [];
 
   for (let round = 0; round <= REPAIR_ROUNDS; round++) {

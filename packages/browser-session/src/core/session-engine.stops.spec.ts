@@ -24,7 +24,7 @@ describe('how a plan stops and how a session ends', () => {
       ...PLANS.search,
       actions: [
         ...PLANS.search.actions,
-        { kind: 'press', key: 'Enter', reason: 'submit', expect: null },
+        { kind: 'press', key: 'Enter', reason: 'submit', expect: null, serves: [] },
       ],
     };
     const cut = await run({
@@ -175,7 +175,7 @@ describe('how a plan stops and how a session ends', () => {
     // taskStart while the unit was already open.
     const press: StepPlan = {
       ...PLANS.search,
-      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null }],
+      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null, serves: [] }],
     };
     const stalled = await run({
       script: { plans: [decidedPlan(press), decidedPlan(press), decidedPlan(press)] },
@@ -193,7 +193,7 @@ describe('how a plan stops and how a session ends', () => {
       ...PLANS.results,
       actions: [
         PLANS.results.actions[0] as StepPlan['actions'][number],
-        { kind: 'done', reason: 'nothing else is due', expect: null },
+        { kind: 'done', reason: 'nothing else is due', expect: null, serves: [] },
       ],
     };
     const skipped = await run({

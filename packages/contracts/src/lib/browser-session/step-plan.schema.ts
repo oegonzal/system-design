@@ -55,14 +55,14 @@ const common = {
    * What the session settles a passed criterion on: the action that said it
    * served it ran, and the page moved. Measured 2026-10-07: a plan's last
    * click timed out after its first click had opened the listing, and the
-   * criteria that click had earned were failed on nine pages after.
+   * criteria that click had earned were failed on nine pages after. Required
+   * and empty when the action serves none: a strict endpoint refuses a schema
+   * with an optional property, and did, on every call of a twelve-step session.
    */
-  serves: bounded
-    .list(SERVES_BOUND, bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 }), {
-      description:
-        'The procedure criteria this action is taken for, by id as the checklist lists them (c5); left out when it serves none.',
-    })
-    .optional(),
+  serves: bounded.list(SERVES_BOUND, bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 }), {
+    description:
+      'The procedure criteria this action is taken for, by id as the checklist lists them (c5); an empty list when it serves none.',
+  }),
 };
 
 export const stepActionSchema = z.discriminatedUnion('kind', [

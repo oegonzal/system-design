@@ -35,7 +35,7 @@ export const click = (
   ref: string,
   reason = `open ${ref}`,
   expect: string | null = null,
-): StepAction => ({ kind: 'click', ref, reason, expect });
+): StepAction => ({ kind: 'click', ref, reason, expect, serves: [] });
 
 export const fill = (ref: string, value: string, reason = `type into ${ref}`): StepAction => ({
   kind: 'fill',
@@ -43,6 +43,7 @@ export const fill = (ref: string, value: string, reason = `type into ${ref}`): S
   value,
   reason,
   expect: null,
+  serves: [],
 });
 
 export const select = (ref: string, option: string, reason = `choose on ${ref}`): StepAction => ({
@@ -51,6 +52,7 @@ export const select = (ref: string, option: string, reason = `choose on ${ref}`)
   option,
   reason,
   expect: null,
+  serves: [],
 });
 
 export const askFields = (
@@ -61,6 +63,7 @@ export const askFields = (
   refs,
   reason,
   expect: null,
+  serves: [],
 });
 
 export const taskStart = (label = 'Senior Engineer at Acme'): StepAction => ({
@@ -69,6 +72,7 @@ export const taskStart = (label = 'Senior Engineer at Acme'): StepAction => ({
   url: 'https://jobs.example.test/apply/42',
   reason: 'one application begins',
   expect: null,
+  serves: [],
 });
 
 export const taskDone = (): StepAction => ({
@@ -77,12 +81,14 @@ export const taskDone = (): StepAction => ({
   detail: 'submitted',
   reason: 'the confirmation page is shown',
   expect: null,
+  serves: [],
 });
 
 export const done = (): StepAction => ({
   kind: 'done',
   reason: 'nothing is due on this page',
   expect: null,
+  serves: [],
 });
 
 export const terminate = (): StepAction => ({
@@ -91,6 +97,7 @@ export const terminate = (): StepAction => ({
   detail: 'every listing in view has been applied to',
   reason: "the mission's stop condition is on the page",
   expect: null,
+  serves: [],
 });
 
 /** The plan a listing page calls for: open the first listing. */

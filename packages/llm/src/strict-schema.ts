@@ -5,11 +5,15 @@ import { walkJsonSchema } from '@sysdesign/contracts';
  *
  * OpenAI's `json_schema` mode with `strict: true` guarantees the reply matches
  * the schema, and refuses the request outright for a keyword it does not take
- * rather than ignoring it. Its two structural demands this codebase already
- * meets everywhere: its output schemas are `z.strictObject` and say
- * `.nullable()` where another codebase would say `.optional()`, so every
- * object is closed and every property required. Audited over the step-plan and
- * field-answer schemas on 2026-10-06: zero structural faults between them.
+ * rather than ignoring it. Its two structural demands are met by construction:
+ * output schemas are `z.strictObject`, so every object is closed, and the
+ * contracts' `modelSchema` shows whatever a contract leaves optional as
+ * required and nullable, reading a null there back as absent, so every
+ * property is required. The demand is checked, not trusted — `strictSchemaFaults`
+ * names every place a schema breaks it, and the engine refuses to boot a
+ * pipeline whose output schema does. Measured 2026-10-07: one `.optional()`
+ * property on the step plan was refused by the endpoint on every call, in
+ * under 200 ms, and a whole session ran twelve steps without a single plan.
  *
  * Which keywords the subset takes is measured, not assumed, and it is wider
  * than the caution this file was first written with. Tested against the live
@@ -43,4 +47,27 @@ export function strictJsonSchema(schema: Record<string, unknown>): Record<string
     delete node['oneOf'];
   });
   return copy;
+}
+
+/**
+ * Every place `schema` falls short of what the endpoint demands of its
+ * structure — an object left open, or a property the object does not
+ * require — by the bound path of the object it sits on. Empty when the
+ * endpoint will take the schema. The rule is the endpoint's own refusal,
+ * recorded 2026-10-07: *"'required' is required to be supplied and to be an
+ * array including every key in properties"*.
+ */
+export function strictSchemaFaults(schema: Record<string, unknown>): string[] {
+  const faults: string[] = [];
+  walkJsonSchema(schema, '', (node, path) => {
+    if (node['type'] !== 'object' && node['properties'] === undefined) return;
+    const where = path === '' ? 'the root object' : path;
+    if (node['additionalProperties'] !== false) faults.push(`${where}: open object`);
+    const properties = Object.keys((node['properties'] as object | undefined) ?? {});
+    const required = new Set((node['required'] as string[] | undefined) ?? []);
+    for (const key of properties) {
+      if (!required.has(key)) faults.push(`${where}: ${key} is optional`);
+    }
+  });
+  return faults;
 }
