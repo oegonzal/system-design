@@ -11,14 +11,14 @@ import {
   readLlmConfig,
 } from './llm-config';
 
-/** A disk holding only the files named: engine.env chooses, the named file answers. */
+/** A disk holding only the files named: engine.json chooses, the named file answers. */
 const disk = (files: Record<string, string>) => (at: string) => {
   const found = Object.entries(files).find(([name]) => at.endsWith(name));
   if (found === undefined) throw new Error(`ENOENT ${at}`);
   return found[1];
 };
 const chose = (json: string) =>
-  disk({ 'config/engine.env': 'llm=chosen\n', 'config/llm/chosen.json': json });
+  disk({ 'config/engine.json': '{"llm":"chosen"}', 'config/llm/chosen.json': json });
 
 describe('the model configuration', () => {
   it('[QL-62] runs on the subscription when no file names anything else, so a checkout without one is unchanged', () => {

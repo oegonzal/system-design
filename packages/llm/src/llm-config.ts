@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { chosenConfig, CONFIG_DIR, ENGINE_ENV_FILE, type ReadFile } from './engine-config';
+import { chosenConfig, CONFIG_DIR, ENGINE_FILE, type ReadFile } from './engine-config';
 import { DEFAULT_GATE_POLICY } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY } from './llm-failure';
 
@@ -12,7 +12,7 @@ import { DEFAULT_RETRY_POLICY } from './llm-failure';
  * and the ingester must all call the same model or their records cannot be
  * compared, and a file they all read is how that is said once. The
  * configurations live together under `config/llm/`, one per provider and each
- * complete, and `config/engine.env` chooses between them by name.
+ * complete, and `config/engine.json` chooses between them by name.
  *
  * They are safe to commit, because no secret is in them — `apiKeyVar` names
  * the variable that holds the key, never the key, so a repository carries the
@@ -104,7 +104,7 @@ export const readLlmConfig = (root?: string, read?: ReadFile): LlmConfig =>
 
 /** What a boot announces: the model, and the file that chose it. */
 export const describeLlmSource = (chosen: ChosenLlmConfig): string =>
-  chosen.source ?? `no ${CONFIG_DIR}/${ENGINE_ENV_FILE} choice — the default`;
+  chosen.source ?? `no ${CONFIG_DIR}/${ENGINE_FILE} choice — the default`;
 
 /** The key the config points at, or null where it names none; the value is never logged or returned elsewhere. */
 export function apiKeyFor(config: LlmConfig, env: NodeJS.ProcessEnv = process.env): string | null {

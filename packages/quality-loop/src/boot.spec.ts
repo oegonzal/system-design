@@ -8,7 +8,7 @@ const noLogin = () => Promise.reject(new MissingModelProviderError());
 
 /**
  * The choice a spec makes for itself. Never the repository's own: a spec that
- * reads `config/engine.env` asserts whatever this checkout happens to be set
+ * reads `config/engine.json` asserts whatever this checkout happens to be set
  * to, and passes or fails on an edit that has nothing to do with it.
  */
 const chose = (overrides: Record<string, unknown> = {}, source = 'config/llm/spec.json') => ({
