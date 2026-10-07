@@ -7,17 +7,22 @@ import {
   llmConfigSchema,
   LLM_PROVIDERS,
   LlmConfigError,
+  readChosenLlmConfig,
   readLlmConfig,
 } from './llm-config';
 
-const file = (text: string) => () => text;
-const missing = () => {
-  throw new Error('ENOENT');
+/** A disk holding only the files named: engine.env chooses, the named file answers. */
+const disk = (files: Record<string, string>) => (at: string) => {
+  const found = Object.entries(files).find(([name]) => at.endsWith(name));
+  if (found === undefined) throw new Error(`ENOENT ${at}`);
+  return found[1];
 };
+const chose = (json: string) =>
+  disk({ 'config/engine.env': 'llm=chosen\n', 'config/llm/chosen.json': json });
 
 describe('the model configuration', () => {
   it('[QL-62] runs on the subscription when no file names anything else, so a checkout without one is unchanged', () => {
-    expect(readLlmConfig('llm.config.json', missing)).toEqual(DEFAULT_LLM_CONFIG);
+    expect(readLlmConfig('/repo', disk({}))).toEqual(DEFAULT_LLM_CONFIG);
     expect(DEFAULT_LLM_CONFIG.provider).toBe('claude-subscription');
     // Every provider the vocabulary declares is one the table can build.
     expect(Object.keys(PROVIDERS).sort()).toEqual([...LLM_PROVIDERS].sort());
@@ -25,8 +30,8 @@ describe('the model configuration', () => {
 
   it('[QL-62] takes the file as the whole answer, and refuses one it cannot read rather than falling back to a provider nobody chose', () => {
     const openai = readLlmConfig(
-      'at',
-      file('{"provider":"openai-compatible","model":"gpt-4o-mini","apiKeyVar":"OPENAI_API_KEY"}'),
+      '/repo',
+      chose('{"provider":"openai-compatible","model":"gpt-4o-mini","apiKeyVar":"OPENAI_API_KEY"}'),
     );
     expect(openai).toMatchObject({ provider: 'openai-compatible', model: 'gpt-4o-mini' });
     // The settings a file leaves out come from the declared defaults.
@@ -35,11 +40,17 @@ describe('the model configuration', () => {
 
     // A file that is present and wrong is a refusal naming the field: the point
     // of writing the provider down is that what ran is what the file says.
-    expect(() => readLlmConfig('at', file('{"provider":"gpt"}'))).toThrow(LlmConfigError);
-    expect(() => readLlmConfig('at', file('not json'))).toThrow(LlmConfigError);
-    expect(() => readLlmConfig('at', file('{"provider":"openai-compatible","nope":1}'))).toThrow(
-      LlmConfigError,
+    expect(() => readLlmConfig('/repo', chose('{"provider":"gpt"}'))).toThrow(LlmConfigError);
+    expect(() => readLlmConfig('/repo', chose('not json'))).toThrow(LlmConfigError);
+    expect(() =>
+      readLlmConfig('/repo', chose('{"provider":"openai-compatible","nope":1}')),
+    ).toThrow(LlmConfigError);
+
+    // And the file it came from travels with it, so a boot can say which.
+    expect(readChosenLlmConfig('/repo', chose('{"provider":"claude-subscription"}')).source).toBe(
+      'config/llm/chosen.json',
     );
+    expect(readChosenLlmConfig('/repo', disk({})).source).toBeNull();
   });
 
   it('[QL-62] names the variable holding a key and never a key, so the file is safe to commit', () => {

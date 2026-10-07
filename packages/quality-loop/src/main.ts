@@ -50,7 +50,9 @@ async function bootstrap(): Promise<void> {
     : DEFAULT_PORT;
   await app.listen(port);
   Logger.log(`quality-loop listening on http://localhost:${port}/health`);
-  Logger.log(`quality-loop model: ${checked.model?.model ?? 'none'}`);
+  Logger.log(
+    `quality-loop model: ${checked.model?.model ?? 'none'}${checked.source === null ? '' : ` — from ${checked.source}`}`,
+  );
 }
 
 bootstrap().catch((error: unknown) => {

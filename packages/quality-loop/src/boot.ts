@@ -1,8 +1,9 @@
 import {
   assertModelProvider,
+  describeLlmSource,
   describeModelProvider,
-  readLlmConfig,
-  type LlmConfig,
+  readChosenLlmConfig,
+  type ChosenLlmConfig,
 } from '@sysdesign/llm';
 import type { LlmModelDto } from '@sysdesign/contracts';
 
@@ -14,6 +15,13 @@ export interface Preflight {
   command: Command;
   /** The model the process will announce; null for a command that calls none. */
   model: LlmModelDto | null;
+  /**
+   * Which configuration chose that model, for the boot to say out loud. A
+   * choice read once at boot is invisible afterwards, and a file edited under
+   * a running process looks exactly like a file that was ignored — which cost
+   * a session that ran an hour against a provider nobody had selected.
+   */
+  source: string | null;
 }
 
 /** Which of the three entry points the argv names. */
@@ -31,12 +39,17 @@ export const commandOf = (argv: readonly string[]): Command =>
 export async function preflight(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
-  checkLogin: (config: LlmConfig) => Promise<void> = (config) => assertModelProvider(config),
-  config: LlmConfig = readLlmConfig(),
+  checkLogin: (chosen: ChosenLlmConfig) => Promise<void> = (chosen) =>
+    assertModelProvider(chosen.config),
+  chosen: ChosenLlmConfig = readChosenLlmConfig(),
 ): Promise<Preflight> {
   const command = commandOf(argv);
-  if (command === 'replay') return { command, model: null };
+  if (command === 'replay') return { command, model: null, source: null };
   runStaleAfterMs(env);
-  await checkLogin(config);
-  return { command, model: describeModelProvider(config) };
+  await checkLogin(chosen);
+  return {
+    command,
+    model: describeModelProvider(chosen.config),
+    source: describeLlmSource(chosen),
+  };
 }

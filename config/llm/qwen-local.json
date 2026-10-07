@@ -1,0 +1,6 @@
+{
+  "provider": "openai-compatible",
+  "model": "qwen3.6:latest",
+  "baseUrl": "http://localhost:11434/v1",
+  "strict": true
+}

@@ -6,13 +6,8 @@ import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-clien
 import { providerGate } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY, type LlmRetryPolicy } from './llm-failure';
 import type { LlmClient } from './llm-client';
-import {
-  apiKeyFor,
-  LLM_CONFIG_FILE,
-  readLlmConfig,
-  type LlmConfig,
-  type LlmProvider,
-} from './llm-config';
+import { CONFIG_DIR } from './engine-config';
+import { apiKeyFor, LLM_KIND, readLlmConfig, type LlmConfig, type LlmProvider } from './llm-config';
 import { OpenAiCompatibleLlmClient } from './openai-compatible-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';
 
@@ -132,7 +127,7 @@ export const PROVIDERS: Readonly<Record<LlmProvider, ProviderEntry>> = {
       if (config.apiKeyVar !== undefined && apiKeyFor(config, env) === null) {
         throw new MissingModelProviderError({
           found: `${config.apiKeyVar} is unset or empty`,
-          help: `${LLM_CONFIG_FILE} names ${config.apiKeyVar} as the key for ${config.baseUrl ?? 'the endpoint'}: set it in the environment, or point the file at an endpoint that wants no key`,
+          help: `the chosen ${CONFIG_DIR}/${LLM_KIND} configuration names ${config.apiKeyVar} as the key for ${config.baseUrl ?? 'the endpoint'}: set it in the environment, or choose a configuration whose endpoint wants no key`,
         });
       }
     },

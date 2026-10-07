@@ -1,26 +1,27 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { z } from 'zod';
 
+import { chosenConfig, CONFIG_DIR, ENGINE_ENV_FILE, type ReadFile } from './engine-config';
 import { DEFAULT_GATE_POLICY } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY } from './llm-failure';
 
 /**
- * Which model serves this repository, declared in one file.
+ * Which model serves this repository.
  *
  * A provider is a deployment fact, not an environment variable scattered
  * across whatever happens to launch a process: the loop, the browser session
  * and the ingester must all call the same model or their records cannot be
- * compared, and a file both can read is how that is said once. The file is
- * safe to commit, because no secret is in it — `apiKeyVar` names the variable
- * that holds the key, never the key, so a repository carries the choice and a
- * machine carries the credential.
+ * compared, and a file they all read is how that is said once. The
+ * configurations live together under `config/llm/`, one per provider and each
+ * complete, and `config/engine.env` chooses between them by name.
  *
- * Absent, the answer is the Claude Code subscription: what every run before
- * this file existed used, and what a checkout with no file still gets.
+ * They are safe to commit, because no secret is in them — `apiKeyVar` names
+ * the variable that holds the key, never the key, so a repository carries the
+ * choice and a machine carries the credential.
+ *
+ * A checkout that chooses nothing runs on the Claude Code subscription: what
+ * every run before any of this existed used.
  */
-export const LLM_CONFIG_FILE = 'llm.config.json';
+export const LLM_KIND = 'llm';
 
 export const LLM_PROVIDERS = ['claude-subscription', 'openai-compatible'] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
@@ -59,31 +60,51 @@ export class LlmConfigError extends Error {
  * fallback onto a provider the operator did not choose — the whole point of
  * writing it down is that what ran is what the file says.
  */
-export function readLlmConfig(
-  path: string = resolve(process.cwd(), LLM_CONFIG_FILE),
-  read: (at: string) => string = (at) => readFileSync(at, 'utf8'),
-): LlmConfig {
-  let text: string;
-  try {
-    text = read(path);
-  } catch {
-    return DEFAULT_LLM_CONFIG;
-  }
+/** The configuration in force, and the file it came from — null where nothing was chosen. */
+export interface ChosenLlmConfig {
+  config: LlmConfig;
+  source: string | null;
+}
+
+/**
+ * The chosen configuration, read once.
+ *
+ * A file that is present and wrong is a refusal naming the field, never a
+ * quiet fallback onto a provider nobody chose — the whole point of writing the
+ * choice down is that what ran is what the file says. The source comes back
+ * with it so a process can announce which file it is running on: a
+ * configuration read once at boot is invisible afterwards, and a file edited
+ * under a running process looks exactly like a file that was ignored.
+ */
+export function readChosenLlmConfig(
+  root: string = process.cwd(),
+  read?: ReadFile,
+): ChosenLlmConfig {
+  const chosen = chosenConfig(LLM_KIND, root, read);
+  if (chosen.text === null) return { config: DEFAULT_LLM_CONFIG, source: null };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(chosen.text);
   } catch (cause) {
-    throw new LlmConfigError(`${path} is not JSON: ${(cause as Error).message}`);
+    throw new LlmConfigError(`${chosen.path} is not JSON: ${(cause as Error).message}`);
   }
   const result = llmConfigSchema.safeParse(parsed);
   if (!result.success) {
     const faults = result.error.issues
       .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
       .join('; ');
-    throw new LlmConfigError(`${path} is not a model configuration — ${faults}`);
+    throw new LlmConfigError(`${chosen.path} is not a model configuration — ${faults}`);
   }
-  return result.data;
+  return { config: result.data, source: `${CONFIG_DIR}/${LLM_KIND}/${chosen.name}.json` };
 }
+
+/** The chosen configuration alone, for a caller with no use for where it came from. */
+export const readLlmConfig = (root?: string, read?: ReadFile): LlmConfig =>
+  readChosenLlmConfig(root, read).config;
+
+/** What a boot announces: the model, and the file that chose it. */
+export const describeLlmSource = (chosen: ChosenLlmConfig): string =>
+  chosen.source ?? `no ${CONFIG_DIR}/${ENGINE_ENV_FILE} choice — the default`;
 
 /** The key the config points at, or null where it names none; the value is never logged or returned elsewhere. */
 export function apiKeyFor(config: LlmConfig, env: NodeJS.ProcessEnv = process.env): string | null {
