@@ -44,9 +44,13 @@ export function describeAction(action: StepAction): string {
   }
 }
 
-/** `click e12 — reason — expect: …`: the action, why, and what the page should show after. */
+/** `click e12 — reason — expect: … — serves: c5`: the action, why, what the page should show after, and the criteria it claims. */
 const actionLine = (action: StepAction): string =>
-  `${describeAction(action)} — ${action.reason}${action.expect === null ? '' : ` — expect: ${action.expect}`}`;
+  `${describeAction(action)} — ${action.reason}${action.expect === null ? '' : ` — expect: ${action.expect}`}${
+    action.serves === undefined || action.serves.length === 0
+      ? ''
+      : ` — serves: ${action.serves.join(', ')}`
+  }`;
 
 export const stepPlanOutput: OutputShape<StepPlan> = {
   schema: stepPlanSchema,

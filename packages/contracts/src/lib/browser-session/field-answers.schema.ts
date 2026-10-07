@@ -25,7 +25,7 @@ export const fieldAnswerSchema = z.strictObject({
   decision: z
     .enum(FIELD_DECISIONS)
     .describe(
-      'answer: fill it from the evidence. ask-operator: the evidence does not settle it. leave-blank: the page hides it, or it must stay empty.',
+      'answer: fill it from the evidence. keep: what the Fields list says it holds now is right, and it stays as it is. ask-operator: the evidence does not settle it. leave-blank: the page hides it, or it must stay empty.',
     ),
   value: bounded
     .text(ANSWER_VALUE_BOUND, {

@@ -28,6 +28,7 @@ export const stepGoal = (
     ledger,
     objections: [],
     progress: { criteria: [], settled: [], done: [] },
+    pageUnchanged: false,
   });
 
 export const click = (

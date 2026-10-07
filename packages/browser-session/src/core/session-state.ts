@@ -7,7 +7,7 @@ import {
   OBJECTION_DETAIL_BOUND,
   OBJECTION_FROM_MAX_LENGTH,
   OBJECTIONS_MAX,
-  type OperatorGuidanceDto,
+  type DocumentChunk,
   type PageObservation,
   type SessionRailsDto,
   type StepAction,
@@ -35,10 +35,12 @@ export interface OpenTask {
   startStep: number;
 }
 
-/** An answer the operator gave, with the decision row it was recorded on, so the teaching lands on that row. */
-export interface TaughtAnswer {
+/** One operator answer handed to the memory, as the step's dump records it. */
+export interface Teaching {
   decisionId: string;
-  item: OperatorGuidanceDto;
+  document: DocumentChunk;
+  orchestrationRunId: string | null;
+  fault: string | null;
 }
 
 export interface SessionState {
@@ -70,18 +72,29 @@ export interface SessionState {
   /** What the last executed action promised, checked against the next observation. */
   pending: PendingExpectation | null;
   /**
-   * The criteria settled by plans that ran whole and moved the page: for the
-   * session, when no unit of work was open; for the open unit otherwise,
+   * The criteria settled by plans that moved the page — every pass of a plan
+   * that ran whole, else the passes an action that ran said it served: for
+   * the session, when no unit of work was open; for the open unit otherwise,
    * cleared when it closes. A step of a unit may repeat on its next page, so
    * only the session's are taken out of the rubric.
    */
   reached: { session: Set<string>; unit: Set<string> };
   /** What the last plan passed, by id, awaiting the next observation: settled only if the page moved. */
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
+  /** How many actions the last plan ran without failing; 0 for a plan refused whole, and before any plan. */
+  lastRan: number;
   /** The operator's answers this session, by field label. */
   operatorAnswers: Map<string, string>;
-  /** The operator's answers during the open unit of work, taught back when it closes. */
-  guidance: TaughtAnswer[];
+  /**
+   * What this session settled into fields, by label — filled, kept, or
+   * answered by the operator — so a field that still holds one of these
+   * values is kept without a run. Measured 2026-10-07: three fields the site
+   * had filled were sent to the answerer thirty-two times, every fill
+   * writing the value the page already showed.
+   */
+  filled: Map<string, string>;
+  /** What this step taught the memory, one record per operator answer, for the step's dump. */
+  teachings: Teaching[];
   /** Decisions recorded so far, and the next ordinal within the current step. */
   decisions: number;
   ordinal: number;
@@ -109,8 +122,10 @@ export function createState(ids: {
     pending: null,
     reached: { session: new Set(), unit: new Set() },
     pendingPass: null,
+    lastRan: 0,
     operatorAnswers: new Map(),
-    guidance: [],
+    filled: new Map(),
+    teachings: [],
     decisions: 0,
     ordinal: 0,
     terminationRecorded: false,

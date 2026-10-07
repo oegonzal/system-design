@@ -296,7 +296,7 @@ export interface FieldReadout {
   field: FieldSpec;
   answer: FieldAnswer | null;
   route: FieldRoute;
-  /** What to type or pick when the route is fill; the model's suggestion when the operator is asked. */
+  /** What to type or pick when the route is fill; what the field holds when it is keep; the model's suggestion when the operator is asked. */
   value: string | null;
   source: BrowserDecisionSource;
   reason: string;
@@ -316,17 +316,30 @@ const readout = (
   field,
   answer,
   route,
-  value: answer?.value ?? null,
+  value: route === 'keep' ? field.value : (answer?.value ?? null),
   source,
   reason,
   faults,
 });
 
+/** What the field holds already, as a value worth a keep: non-empty. */
+const holds = (field: FieldSpec): boolean => field.value !== null && field.value !== '';
+
 /**
  * One route per listed field, by declared order of precedence: the page's
- * admission, then the page's own facts (a hidden field stays blank whatever
- * the model said), then what a judge or a validator pointed at, then the
- * model's decision read with its confidence and basis.
+ * own facts first (a hidden field stays blank whatever the model said), then
+ * an admission that says nothing was judged at all, then what a judge or a
+ * validator pointed at, then the model's decision read with its confidence
+ * and basis. The operator is asked only for a required field: an optional
+ * one the answers could not settle is left blank, and the row says why.
+ *
+ * A run that fell short is recorded on the row and demotes nothing by
+ * itself: the judges' objections arrive as faults at the fields they are
+ * about, and the fields they are not about are read on their own merits.
+ * Measured 2026-10-07: a page whose run fell short on one unanswerable
+ * field sent all three of its fields to the operator — two answered right
+ * from memory, all three already filled by the site — and two optional
+ * search controls asked as fields cost twelve minutes at the terminal.
  */
 export function routeFields(
   run: QualityRunDto,
@@ -358,24 +371,37 @@ export function routeFields(
         'trap-skipped: the page hides this field',
       );
     }
-    if (admission !== 'admitted') {
-      return readout(
-        position,
-        field,
-        answer,
-        'ask-operator',
-        'engine',
-        `page-escalated: ${admission}`,
-      );
+    /** A field the answers could not settle: the operator's when required, else left blank and said so. */
+    const unsettled = (
+      source: BrowserDecisionSource,
+      reason: string,
+      faults: string[] = [],
+    ): FieldReadout =>
+      field.required
+        ? readout(position, field, answer, 'ask-operator', source, reason, faults)
+        : readout(
+            position,
+            field,
+            answer,
+            'leave-blank',
+            source,
+            `optional, left blank: ${reason}`,
+            faults,
+          );
+    if (admission === 'no-rubric' || admission === 'no-artifact') {
+      return unsettled('engine', `page-escalated: ${admission}`);
     }
     const faults = faulted.get(position) ?? [];
-    if (faults.length > 0)
-      return readout(position, field, answer, 'ask-operator', 'loop', 'faulted', faults);
-    if (answer === null)
-      return readout(position, field, null, 'ask-operator', 'engine', 'unanswered');
+    if (faults.length > 0) return unsettled('loop', 'faulted', faults);
+    if (answer === null) return unsettled('engine', 'unanswered');
+    const grounded = answer.basis.length > 0;
     switch (answer.decision) {
+      case 'keep':
+        return holds(field)
+          ? readout(position, field, answer, 'keep', grounded ? 'memory' : 'loop', answer.reason)
+          : unsettled('loop', `nothing to keep: ${answer.reason}`);
       case 'ask-operator':
-        return readout(position, field, answer, 'ask-operator', 'loop', answer.reason);
+        return unsettled('loop', answer.reason);
       case 'leave-blank':
         return field.required
           ? readout(
@@ -388,7 +414,17 @@ export function routeFields(
             )
           : readout(position, field, answer, 'leave-blank', 'blank', answer.reason);
       case 'answer': {
-        const grounded = answer.basis.length > 0;
+        // An answer that says what the field holds is a keep: nothing is typed over itself.
+        if (holds(field) && answer.value === field.value) {
+          return readout(
+            position,
+            field,
+            answer,
+            'keep',
+            grounded ? 'memory' : 'loop',
+            `holds it already: ${answer.reason}`,
+          );
+        }
         if (answer.confidence === 'high' || (answer.confidence === 'medium' && grounded)) {
           return readout(
             position,
@@ -399,14 +435,7 @@ export function routeFields(
             answer.reason,
           );
         }
-        return readout(
-          position,
-          field,
-          answer,
-          'ask-operator',
-          'loop',
-          `${answer.confidence} confidence: ${answer.reason}`,
-        );
+        return unsettled('loop', `${answer.confidence} confidence: ${answer.reason}`);
       }
     }
   });

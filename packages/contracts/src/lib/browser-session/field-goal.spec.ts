@@ -75,6 +75,32 @@ describe('composeFieldGoal', () => {
     );
   });
 
+  it('[QL-39] prints what a field holds, the page’s invalid mark, and how many options the page offers past the listed ones', () => {
+    const [years, auth] = fields();
+    const goal = composeFieldGoal({
+      prose: PROSE,
+      fields: [
+        { ...years, value: '6', invalid: true },
+        { ...auth, optionsOmitted: 4 },
+      ],
+      evidence: [],
+    });
+    expect(goal).toContain(
+      '- e1 · textbox "Years of experience with Python" · type number · holds "6" now · required · marked invalid by the page',
+    );
+    expect(goal).toContain('options: Yes | No (4 more the page offers)');
+    expect(
+      readFieldIndex(goal)?.fields.map((field) => [
+        field.value,
+        field.invalid,
+        field.optionsOmitted,
+      ]),
+    ).toEqual([
+      ['6', true, 0],
+      [null, false, 4],
+    ]);
+  });
+
   it('returns null for a goal this codec did not write', () => {
     expect(splitFieldGoal('# Something else')).toBeNull();
   });

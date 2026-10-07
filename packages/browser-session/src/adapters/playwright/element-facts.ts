@@ -14,6 +14,8 @@ export interface ElementFacts {
   value: string | null;
   options: string[] | null;
   required: boolean;
+  /** Marked invalid by the page: `aria-invalid`, or the browser's own validity once a person has touched it. */
+  invalid: boolean;
   disabled: boolean;
   visible: boolean;
   maxLength: number | null;
@@ -29,12 +31,12 @@ export interface ElementFacts {
 
 /**
  * Runs inside the page. The hidden traits are the deterministic half of trap
- * detection: `aria-hidden` by an ancestor, `offscreen` by geometry against
- * the whole document (not the viewport — scrolling hides nothing), `zero-size`
- * by a collapsed or clipped box, `tabindex-negative` by attribute, and
- * `autocomplete-off-bait` for an autocomplete-off input that no label,
- * aria-label, placeholder or title explains — the shape of a honeypot, read
- * from what the page offers a person rather than from a list of names.
+ * detection: `aria-hidden` by an ancestor, `offscreen` for a box no scrolling
+ * could bring into view, `zero-size` by a collapsed or clipped box,
+ * `tabindex-negative` by attribute, and `autocomplete-off-bait` for an
+ * autocomplete-off input that no label, aria-label, placeholder or title
+ * explains — the shape of a honeypot, read from what the page offers a person
+ * rather than from a list of names.
  */
 export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
   const tag = el.tagName.toLowerCase();
@@ -110,15 +112,85 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
 
   const rect = el.getBoundingClientRect();
   const style = getComputedStyle(el);
-  const root = el.ownerDocument.documentElement;
-  const pageWidth = Math.max(root.scrollWidth, root.clientWidth);
-  const pageHeight = Math.max(root.scrollHeight, root.clientHeight);
-  const left = rect.left + window.scrollX;
-  const top = rect.top + window.scrollY;
   const traits: string[] = [];
   if (el.closest('[aria-hidden="true"]') !== null) traits.push('aria-hidden');
-  const offscreen =
-    left + rect.width <= 0 || top + rect.height <= 0 || left >= pageWidth || top >= pageHeight;
+  // Offscreen means out of anyone's reach: no scrolling of any box that clips
+  // the element, nor of the document, could bring it into view. Walked up the
+  // chain of boxes that clip it — which CSS draws through containing blocks,
+  // not through every ancestor: an absolutely positioned box is clipped only
+  // from its containing block upward, a fixed one only by an ancestor that
+  // transforms or filters, else by the viewport alone, and an inline box clips
+  // nothing. Each clipping box shows at most its own padding box, widened by
+  // however far it can still scroll; what passes it is the part of that box
+  // the element could reach, for the next. A field parked at left:-9999px is
+  // outside every box; a footer below the fold of a dialog that scrolls is
+  // inside its dialog's. Measured 2026-10-07 with the document's own extent
+  // as the only box: a modal over a scroll-locked page had every control
+  // below the fold "offscreen", its one Submit button refused 27 times, and
+  // the fields scrolled above the fold counted as traps.
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const intersects = (a: Box, b: Box): boolean =>
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  const within = (a: Box, b: Box): Box => ({
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  });
+  /** Whether a box establishes the containing block of fixed and absolute descendants: it transforms, filters, or contains. */
+  const anchors = (css: CSSStyleDeclaration): boolean =>
+    css.transform !== 'none' ||
+    css.perspective !== 'none' ||
+    css.filter !== 'none' ||
+    /paint|layout|strict|content/.test(css.contain);
+  const unreachable = (): boolean => {
+    const viewport: Box = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    let box: Box = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+    let position = style.position;
+    for (let node = el.parentElement; node !== null; node = node.parentElement) {
+      const css = getComputedStyle(node);
+      // What the box is positioned against: ancestors below it clip nothing of it.
+      if (position === 'fixed' && !anchors(css)) continue;
+      if (position === 'absolute' && css.position === 'static' && !anchors(css)) continue;
+      if (css.display === 'inline' || css.display === 'contents') continue;
+      const overflow = css.overflowX + css.overflowY;
+      const scrolls = /auto|scroll/.test(overflow);
+      if (scrolls || /hidden|clip/.test(overflow)) {
+        const outer = node.getBoundingClientRect();
+        const shown: Box = {
+          left: outer.left + node.clientLeft,
+          top: outer.top + node.clientTop,
+          right: outer.left + node.clientLeft + node.clientWidth,
+          bottom: outer.top + node.clientTop + node.clientHeight,
+        };
+        const reach: Box = scrolls
+          ? {
+              left: box.left - (node.scrollWidth - node.clientWidth - node.scrollLeft),
+              right: box.right + node.scrollLeft,
+              top: box.top - (node.scrollHeight - node.clientHeight - node.scrollTop),
+              bottom: box.bottom + node.scrollTop,
+            }
+          : box;
+        if (!intersects(reach, shown)) return true;
+        box = within(reach, shown);
+      }
+      position = css.position;
+    }
+    if (position === 'fixed') return !intersects(box, viewport);
+    const root = el.ownerDocument.documentElement;
+    const reach: Box = {
+      left:
+        box.left -
+        (Math.max(root.scrollWidth, root.clientWidth) - root.clientWidth - window.scrollX),
+      right: box.right + window.scrollX,
+      top:
+        box.top -
+        (Math.max(root.scrollHeight, root.clientHeight) - root.clientHeight - window.scrollY),
+      bottom: box.bottom + window.scrollY,
+    };
+    return !intersects(reach, viewport);
+  };
+  const offscreen = unreachable();
   if (offscreen) traits.push('offscreen');
   const clipped =
     style.clip === 'rect(0px, 0px, 0px, 0px)' ||
@@ -170,11 +242,21 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
       null;
   }
 
+  // Any invalid state the page declares — true, grammar, spelling — or the browser's own.
+  const ariaInvalid = attr('aria-invalid');
+  let invalid = ariaInvalid !== null && ariaInvalid !== 'false';
+  try {
+    invalid = invalid || el.matches(':user-invalid');
+  } catch {
+    // An engine without `:user-invalid` answers the ARIA half alone.
+  }
+
   return {
     inputType,
     value,
     options,
     required,
+    invalid,
     disabled,
     visible,
     maxLength,

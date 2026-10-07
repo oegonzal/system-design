@@ -35,7 +35,9 @@ function maximalObservation(): PageObservation {
       inputType: selectable ? null : 'text',
       value: null,
       options: selectable ? ['option one', 'option two', 'option three', 'option four'] : null,
+      optionsOmitted: 0,
       required: true,
+      invalid: false,
       disabled: false,
       visible: true,
       maxLength: null,
@@ -70,6 +72,7 @@ describe('the browser-step input codec', () => {
       ledger: openTaskLedger(),
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
+      pageUnchanged: false,
     });
     expect(goal).toContain(MISSION_FIXTURE.trim());
     // A field the page hides is counted, not listed — and still in the index, so a plan that touches it is refused.
@@ -87,6 +90,7 @@ describe('the browser-step input codec', () => {
         visible: element.visible,
         behind: false,
         options: element.options,
+        optionsOmitted: 0,
         hiddenTraits: element.hiddenTraits,
       })),
       pageShowsContent: true,
@@ -112,6 +116,7 @@ describe('the browser-step input codec', () => {
       ledger: openTaskLedger(),
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
+      pageUnchanged: false,
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);
@@ -126,6 +131,7 @@ describe('the browser-step input codec', () => {
           ledger: openTaskLedger(),
           objections: [],
           progress: { criteria: [], settled: [], done: [] },
+          pageUnchanged: false,
         },
         1000,
       ),

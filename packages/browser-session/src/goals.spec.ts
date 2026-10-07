@@ -84,6 +84,7 @@ describe('the goals', () => {
           ledger: emptyLedger(),
           objections: [],
           progress: { criteria: [], settled: [], done: [] },
+          pageUnchanged: false,
         }),
       ).not.toThrow();
     },

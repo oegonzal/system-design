@@ -70,22 +70,35 @@ describe('field routing in a session', () => {
       route: 'ask-operator',
       faults: ['ungrounded: ungrounded seen'],
     });
+    // A run that fell short demotes nothing by itself: the judges' objections arrive as faults.
     const fellShort = decidedAnswers(answers, { admission: 'fell-short' });
-    expect(routeFieldsInSession(fellShort, null, fields, new Map())[0]?.reason).toContain(
-      'page-escalated',
-    );
+    expect(routeFieldsInSession(fellShort, null, fields, new Map())[0]).toMatchObject({
+      route: 'fill',
+      source: 'memory',
+    });
+    // Nothing judged at all: a required field is the operator's, an optional one is left blank.
+    const unjudged = decidedAnswers(answers, { admission: 'no-rubric' });
+    expect(routeFieldsInSession(unjudged, null, fields, new Map()).map((r) => r.route)).toEqual([
+      'ask-operator',
+      'ask-operator',
+      'leave-blank',
+      'leave-blank',
+    ]);
   });
 
-  it('[BRW-3] with no run to read, every field goes to the operator except the ones the page hides', () => {
+  it('[BRW-3] with no run to read, a required field goes to the operator, an optional one is left blank, and a hidden one stays blank', () => {
     const fault = new BrainFaulted('unreachable', 'nobody home');
     const routed = faultedReadouts(fields, fault);
     expect(routed.map((r) => [r.route, r.source])).toEqual([
       ['ask-operator', 'engine'],
       ['ask-operator', 'engine'],
       ['leave-blank', 'blank'],
-      ['ask-operator', 'engine'],
+      ['leave-blank', 'engine'],
     ]);
     expect(routed[0]?.reason).toBe('brain unreachable: brain unreachable: nobody home');
+    expect(routed[3]?.reason).toBe(
+      'optional, left blank: brain unreachable: brain unreachable: nobody home',
+    );
     expect(routeFieldsInSession(null, fault, fields, new Map([['Website', 'x']]))[2]?.route).toBe(
       'leave-blank',
     );

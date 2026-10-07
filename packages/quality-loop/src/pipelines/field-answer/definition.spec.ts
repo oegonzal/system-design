@@ -43,6 +43,8 @@ describe('the field-answer pipeline', () => {
       .filter(([, mapped]) => mapped.gate)
       .map(([type]) => type);
     expect(gated).toEqual(['trap_answered']);
+    // A critic's severity word never vetoes a page: the gate above is the only one.
+    expect(FIELD_ANSWER.policy.blockingSeverities).toEqual([]);
     const personas = [
       FIELD_ANSWER.deriveCriteria.persona,
       FIELD_ANSWER.producer.persona,

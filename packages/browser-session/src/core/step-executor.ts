@@ -1,9 +1,6 @@
 import {
-  DOCUMENT_MAX_PARTS,
-  guidanceDocument,
   TASK_OUTCOME_STATUS,
   type BrowserTaskStatus,
-  type DocumentChunk,
   type PageObservation,
   type PlanReadout,
   type StepAction,
@@ -15,13 +12,12 @@ import { exactCheckOf } from './expectations';
 import { askFields } from './field-flow';
 import {
   ActionFailed,
-  BrainFaulted,
   isBrowserAction,
   type BrowserAction,
   type Decided,
   type Termination,
 } from './ports';
-import { labelledScreenshot, stepJsonFile } from './session-dump';
+import { labelledScreenshot } from './session-dump';
 import { clearObjections, describeAction, pushHistory, type OpenTask } from './session-state';
 
 /** What a history entry says about an action the plan proposed past its executable prefix. */
@@ -42,8 +38,6 @@ const CUT_NOTE = 'past the executable prefix';
 const TASK_COUNT_BY_STATUS: Readonly<
   Record<BrowserTaskStatus, 'done' | 'skipped' | 'failed' | null>
 > = { open: null, complete: 'done', abandoned: 'skipped', failed: 'failed' };
-
-const day = (at: Date): string => at.toISOString().slice(0, 10);
 
 function openTask(
   ctx: EngineContext,
@@ -79,50 +73,6 @@ function openTask(
   pushHistory(state, label, 'ok', action.expect);
 }
 
-/**
- * The operator's answers during the unit, as one guidance document per part
- * cap, handed to the memory; each orchestration id is written onto exactly
- * the decision rows whose answers its document carried.
- */
-async function teach(ctx: EngineContext, task: OpenTask): Promise<void> {
-  const { state, deps, queue } = ctx;
-  const answers = state.guidance.splice(0);
-  if (answers.length === 0) return;
-  const batches = Array.from({ length: Math.ceil(answers.length / DOCUMENT_MAX_PARTS) }, (_, i) =>
-    answers.slice(i * DOCUMENT_MAX_PARTS, (i + 1) * DOCUMENT_MAX_PARTS),
-  );
-  const taught: {
-    document: DocumentChunk;
-    decisionIds: string[];
-    orchestrationRunId: string | null;
-    fault: string | null;
-  }[] = [];
-  for (const batch of batches) {
-    const document = guidanceDocument(
-      state.sessionId,
-      ctx.options.subject,
-      batch.map((answer) => answer.item),
-      day(deps.clock.now()),
-    );
-    const decisionIds = batch.map((answer) => answer.decisionId);
-    try {
-      const { orchestrationRunId } = await deps.brain.teach(document);
-      queue.write(`task ${task.ordinal} teaching`, () =>
-        deps.ledger.recordTeaching(decisionIds, orchestrationRunId),
-      );
-      taught.push({ document, decisionIds, orchestrationRunId, fault: null });
-      deps.log(
-        `task ${task.ordinal}: ${document.parts.length} answer(s) taught through ${orchestrationRunId}`,
-      );
-    } catch (error) {
-      if (!(error instanceof BrainFaulted)) throw error;
-      taught.push({ document, decisionIds, orchestrationRunId: null, fault: error.message });
-      deps.warn(`task ${task.ordinal}: answers not taught — ${error.message}`);
-    }
-  }
-  ctx.dumpFiles('teach', [stepJsonFile(state.step, 'teach', { taskId: task.id, taught })]);
-}
-
 async function closeTask(
   ctx: EngineContext,
   action: Extract<StepAction, { kind: 'taskDone' }>,
@@ -149,7 +99,6 @@ async function closeTask(
   };
   queue.write(`task ${task.ordinal} close`, () => deps.ledger.closeTask(task.id, close));
   pushHistory(state, label, 'ok', action.expect);
-  await teach(ctx, task);
 }
 
 /** One of the engine's own events; true when it failed and the plan must stop. */
@@ -209,11 +158,13 @@ async function act(
   return false;
 }
 
-/** How a plan's execution ended: by the mission's own stop, or with whether every proposed action ran clean. */
+/** How a plan's execution ended: by the mission's own stop, or with what ran. */
 export interface Executed {
   termination: Termination | null;
   /** Every action the plan proposed ran and none failed. */
   ranWhole: boolean;
+  /** How many leading actions ran without failing. */
+  ranOk: number;
 }
 
 /**
@@ -246,13 +197,14 @@ export async function executeActions(
           decided.runId,
         ),
         ranWhole: false,
+        ranOk: next - 1,
       };
     }
     if (isBrowserAction(action)) {
       failed = await act(ctx, action, label, observation);
     } else {
       const outcome = await perform(ctx, action, label, observation);
-      if (outcome.stopped) return { termination: null, ranWhole: false };
+      if (outcome.stopped) return { termination: null, ranWhole: false, ranOk: next - 1 };
       failed = outcome.failed;
     }
     if (failed) break;
@@ -275,5 +227,5 @@ export async function executeActions(
   // Every action the plan proposed ran, and none failed: the objections are spent.
   const ranWhole = !failed && actions.length === prefix.length;
   if (ranWhole) clearObjections(state);
-  return { termination: null, ranWhole };
+  return { termination: null, ranWhole, ranOk: failed ? next - 1 : next };
 }

@@ -84,15 +84,15 @@ export type BrowserDecisionKind = (typeof BROWSER_DECISION_KINDS)[number];
 export const BROWSER_DECISION_SOURCES = ['loop', 'memory', 'operator', 'blank', 'engine'] as const;
 export type BrowserDecisionSource = (typeof BROWSER_DECISION_SOURCES)[number];
 
-/** What the field-answer pipeline may decide for one field. */
-export const FIELD_DECISIONS = ['answer', 'ask-operator', 'leave-blank'] as const;
+/** What the field-answer pipeline may decide for one field: a value, the value it already holds, an ask, a blank. */
+export const FIELD_DECISIONS = ['answer', 'keep', 'ask-operator', 'leave-blank'] as const;
 
 /** Ordinal confidence a producer states — never a number it invents. */
 export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
 
-/** What the session did with a field, after the decision and the routing rules. */
-export const FIELD_ROUTES = ['fill', 'ask-operator', 'leave-blank'] as const;
+/** What the session did with a field, after the decision and the routing rules; `keep` touches nothing. */
+export const FIELD_ROUTES = ['fill', 'keep', 'ask-operator', 'leave-blank'] as const;
 export type FieldRoute = (typeof FIELD_ROUTES)[number];
 
 /** What kind of control a field is, for an operator prompt and a guidance record. */

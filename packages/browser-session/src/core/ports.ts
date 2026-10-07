@@ -144,6 +144,15 @@ export interface StepInput {
    * brain asks the loop for a second iteration from its own briefing.
    */
   pageUnchanged: boolean;
+  /**
+   * Whether the last plan ran nothing — refused whole, or cut before its first
+   * action. Only then is a revise worth a second iteration: the engine's own
+   * briefing is all there is to answer. Measured 2026-10-07: 23 second
+   * iterations on unchanged pages after plans that had run, 8.3 minutes, and
+   * the four that changed what ran chose an improvised key press, a Dismiss
+   * and a navigate away.
+   */
+  nothingRan: boolean;
   /** The criteria settled for the session, which the run's rubric omits, and those done in the open unit, which it keeps. */
   progress: { settled: readonly string[]; done: readonly string[] };
 }

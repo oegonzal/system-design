@@ -56,7 +56,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       needless_ask:
         'A field routed to the operator although the listed evidence settles it plainly.',
       blank_required:
-        'A required, visible field left blank with no reason the answering policy allows.',
+        'A required, visible field left blank with no reason the answering policy allows; a field routed to the operator, or kept as the page holds it, is not left blank.',
     },
     maxCriteria: MAX_CRITERIA,
     output: fieldAnswersOutput,
@@ -123,6 +123,13 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       blank_required: { dimension: 'coverage', gate: false },
     },
     ...STANDARD_SCORING,
+    // Only the gated type vetoes. The standard scoring would also let a
+    // finding a critic called `critical` block the page, whatever its type;
+    // measured 2026-10-07, a critical `blank_required` on one field the model
+    // had rightly routed to the operator escalated a page whose other two
+    // fields were answered right from memory. A severity word is the critic's
+    // to choose; a gate is declared here.
+    blockingSeverities: [],
     evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
     // One iteration: the caller reads the judged page field by field.

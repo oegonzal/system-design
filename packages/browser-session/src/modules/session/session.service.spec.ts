@@ -121,7 +121,7 @@ describe('the session service, end to end', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('[BRW-1] drives the journey through the loop: the same rubric on every run, form-memory for the fields, one teach at taskDone, rows and dump to match', async () => {
+  it('[BRW-1] drives the journey through the loop: the same rubric on every run, form-memory for the fields, one teach the moment the operator answers, rows and dump to match', async () => {
     const service = moduleRef.get(SessionService);
     const outcome = await service.run({
       goalPath: join(home, 'goal.md'),
@@ -157,9 +157,9 @@ describe('the session service, end to end', () => {
     expect(stepStarts.every((r) => JSON.stringify(r.criteria) === JSON.stringify(rubric))).toBe(
       true,
     );
-    // One iteration on each new page; the last plan is asked of the page the
-    // plan before it already saw, so the loop may revise once in-run.
-    expect(stepStarts.map((r) => r.maxIterations)).toEqual([1, 1, 1, 1, 2]);
+    // One iteration on each page: the last plan is asked of the page the plan
+    // before it already saw, but that plan ran its taskDone, so no revise.
+    expect(stepStarts.map((r) => r.maxIterations)).toEqual([1, 1, 1, 1, 1]);
     const orchestrations = core.orchestrations.startRequests;
     expect(orchestrations.map((o) => o.orchestrator)).toEqual([
       FORM_MEMORY_ORCHESTRATOR_ID,
@@ -205,14 +205,16 @@ describe('the session service, end to end', () => {
     // The dump on disk: step files as the steps happened, the closing files, one index row.
     const dumpDir = join(home, 'sessions', outcome.dumpRunId);
     expect(readdirSync(join(dumpDir, '01-steps')).sort()).toEqual(['01', '02', '03', '04', '05']);
+    // The answer was taught at the step it was given, not when the unit closed.
     expect(readdirSync(join(dumpDir, '01-steps', '03')).sort()).toEqual([
       'fields.json',
       'observation.json',
       'plan.json',
       'screenshot.png',
       'snapshot.txt',
+      'teach.json',
     ]);
-    expect(existsSync(join(dumpDir, '01-steps', '04', 'teach.json'))).toBe(true);
+    expect(existsSync(join(dumpDir, '01-steps', '04', 'teach.json'))).toBe(false);
     expect(JSON.parse(readFileSync(join(dumpDir, 'manifest.json'), 'utf8'))).toMatchObject({
       kind: 'session',
       sessionId: outcome.sessionId,

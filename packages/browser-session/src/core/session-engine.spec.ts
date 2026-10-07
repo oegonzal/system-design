@@ -7,6 +7,7 @@ import {
   FakeBrowser,
   finding,
   InMemoryLedger,
+  refusing,
 } from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
@@ -108,6 +109,28 @@ describe('the session engine', () => {
     expect(inputs[4]?.progress).toEqual({ settled: ['c1'], done: [] });
     // The session hands the brain the whole rubric; the brain is what omits the settled.
     expect(inputs[4]?.criteria).toEqual(inputs[0]?.criteria);
+  });
+
+  it('[BRW-1] settles the passes the actions that ran said they served, even when a later action of the plan failed', async () => {
+    // Measured 2026-10-07: a plan's last click timed out after its first click
+    // had opened the listing, and the criteria that click earned were failed
+    // on nine pages after.
+    const clickThenFill: StepPlan = {
+      ...PLANS.search,
+      actions: [
+        { kind: 'click', ref: 'e2', reason: 'open the results', expect: null, serves: ['c1'] },
+        { kind: 'fill', ref: 'e1', value: 'x', reason: 'refine', expect: null },
+      ],
+    };
+    const { brain } = await run({
+      script: {
+        plans: [decidedPlan(clickThenFill, { passed: ['c1', 'c3'] }), decidedPlan(PLANS.end)],
+      },
+      browser: refusing(new FakeBrowser(pages()), 'fill', 'results'),
+    });
+    // c1 was served by the click that ran, and the page moved; c3 was served by nothing that ran.
+    expect(brain.planInputs[1]?.progress).toEqual({ settled: ['c1'], done: [] });
+    expect(brain.planInputs[1]?.nothingRan).toBe(false);
   });
 
   it('[BRW-1] a pass on a plan that did not move the page settles nothing', async () => {
@@ -215,7 +238,7 @@ describe('the session engine', () => {
     const again = detail.decisions.find((d) => d.kind === 'field-answer' && d.step === 4);
     expect(again?.source).toBe('operator');
     expect(again?.payload['cached']).toBe(true);
-    // One guidance document at taskDone, naming the field and the answer.
+    // One guidance document the moment the operator answered, naming the field and the answer.
     expect(brain.taught).toHaveLength(1);
     expect(brain.taught[0]?.subject).toBe(SPEC_SUBJECT);
     expect(brain.taught[0]?.parts[0]).toContain('"Work authorisation"');
@@ -226,7 +249,7 @@ describe('the session engine', () => {
     expect(ledger.teachings).toEqual([
       { decisionIds: [fields[1]?.id], orchestrationRunId: 'fake-teach-1' },
     ]);
-    expect(dumps.text('01-steps/05/teach.json')).toContain('fake-teach-1');
+    expect(dumps.text('01-steps/03/teach.json')).toContain('fake-teach-1');
     expect(dumps.files.has('01-steps/03/fields.json')).toBe(true);
   });
 

@@ -80,7 +80,10 @@ export function toObservedElement(
         : facts.options
             .slice(0, OPTIONS_BOUND.target)
             .map((option) => clip(option, OPTION_BOUND.target)),
+    optionsOmitted:
+      facts.options === null ? 0 : Math.max(0, facts.options.length - OPTIONS_BOUND.target),
     required: facts.required,
+    invalid: facts.invalid,
     disabled: facts.disabled || node.attributes['disabled'] === true,
     visible: facts.visible,
     maxLength: facts.maxLength,

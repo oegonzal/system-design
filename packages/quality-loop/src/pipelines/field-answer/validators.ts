@@ -89,7 +89,12 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
       `${ref} takes at most ${field.maxLength} characters; the value runs to ${value.length}`,
     );
   }
-  if (value !== null && field.options !== null && !field.options.includes(value)) {
+  if (
+    value !== null &&
+    field.options !== null &&
+    field.optionsOmitted === 0 &&
+    !field.options.includes(value)
+  ) {
     fault('medium', `${quote(value)} is not an option of ${ref}`);
   }
   if (value !== null && field.inputType === 'number' && !isNumeric(value)) {

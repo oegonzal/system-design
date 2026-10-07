@@ -16,6 +16,7 @@ import {
 } from '../quality-loop/goal-index';
 import {
   ELEMENT_REF,
+  OPTIONS_SHOWN,
   inScope,
   type ObservedElement,
   type PageObservation,
@@ -30,11 +31,12 @@ import { ELEMENT_KINDS, HIDDEN_TRAITS } from './vocab';
 
 /**
  * Where the mission stands, as engine facts: the criteria settled for the
- * session — passed by the evaluator on a plan that ran whole before any unit
- * of work opened, with the page then moved — which the rubric this run is
- * judged against no longer carries; and those passed the same way inside
- * the open unit of work, still carried and graded, because a step of a unit
- * may repeat on its next page.
+ * session — passed by the evaluator, earned by a plan that ran whole or by an
+ * action that ran and said it served them, before any unit of work opened,
+ * with the page then moved — which the rubric this run is judged against no
+ * longer carries; and those passed the same way inside the open unit of
+ * work, still carried and graded, because a step of a unit may repeat on its
+ * next page.
  */
 export interface StepProgress {
   /** The session's whole rubric, settled criteria included. */
@@ -57,6 +59,14 @@ export interface StepGoalInput {
    */
   objections: readonly StepObjection[];
   progress: StepProgress;
+  /**
+   * Whether this is the page the last plan was made against, unchanged: the
+   * recent actions moved nothing on it. Said in the goal, because a recent
+   * action marked ok reads as a step that worked. Measured 2026-10-07: a
+   * producer pressed Enter and Tab on one unchanged dialog for twenty steps,
+   * each press "ok".
+   */
+  pageUnchanged: boolean;
 }
 
 /** The facts the validators check a plan against; everything else in the goal is for the model. */
@@ -74,6 +84,8 @@ export const stepIndexSchema = z.strictObject({
       /** Outside the open modal dialog: a person could not reach it. */
       behind: z.boolean().default(false),
       options: z.array(z.string()).nullable(),
+      /** Options the page offers past the listed ones; a select is held to the list only when this is zero. */
+      optionsOmitted: z.number().int().min(0).default(0),
       hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)),
     }),
   ),
@@ -93,6 +105,20 @@ export type StepIndex = z.infer<typeof stepIndexSchema>;
 
 const quote = (text: string): string => `"${text.replace(/\s+/g, ' ').trim()}"`;
 
+/** The first `OPTIONS_SHOWN` options, then a count of those the page offers past them, so a cut list never reads as the whole. */
+const shownOptions = (
+  element: Pick<ObservedElement, 'options' | 'optionsOmitted'>,
+): { shown: string[]; more: number } => {
+  const options = element.options ?? [];
+  const shown = options.slice(0, OPTIONS_SHOWN);
+  return { shown, more: options.length - shown.length + element.optionsOmitted };
+};
+
+const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'>): string => {
+  const { shown, more } = shownOptions(element);
+  return `options: ${shown.join(' | ')}${more > 0 ? ` (${more} more the page offers)` : ''}`;
+};
+
 /** One element as the model reads it: ref, role, name, then only the facts that are true of it. */
 export function renderElementLine(element: ObservedElement): string {
   const parts = [element.ref, element.role, quote(element.name)];
@@ -100,8 +126,9 @@ export function renderElementLine(element: ObservedElement): string {
   if (element.text !== null && element.text !== '') parts.push(`text ${quote(element.text)}`);
   if (element.inputType !== null) parts.push(`type ${element.inputType}`);
   if (element.value !== null && element.value !== '') parts.push(`value ${quote(element.value)}`);
-  if (element.options !== null) parts.push(`options: ${element.options.join(' | ')}`);
+  if (element.options !== null) parts.push(optionsPart(element));
   if (element.required) parts.push('required');
+  if (element.invalid) parts.push('marked invalid by the page');
   if (element.disabled) parts.push('disabled');
   if (!element.visible) parts.push('not visible');
   if (element.hiddenTraits.length > 0) parts.push(`hidden: ${element.hiddenTraits.join(', ')}`);
@@ -222,7 +249,8 @@ const indexOf = (input: StepGoalInput): z.input<typeof stepIndexSchema> => ({
     disabled: element.disabled,
     ...(element.visible ? {} : { visible: false }),
     ...(inScope(element, input.observation.activeScope) ? {} : { behind: true }),
-    options: element.options,
+    options: element.options === null ? null : shownOptions(element).shown,
+    ...(shownOptions(element).more > 0 ? { optionsOmitted: shownOptions(element).more } : {}),
     hiddenTraits: element.hiddenTraits,
   })),
   pageShowsContent:
@@ -242,6 +270,9 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     `URL: ${observation.url}`,
     `Title: ${observation.title}`,
+    ...(input.pageUnchanged
+      ? ['Unchanged since the last plan: the recent actions moved nothing on this page.']
+      : []),
     '',
     '## Elements',
     '',
@@ -301,7 +332,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     // closed their unit of work and declared the mission complete on the far
     // side of a search they had not yet watched land.
     '- Cite refs only from the Elements list above, which belongs to this observation alone. An action that navigates, submits, or otherwise replaces the page is the LAST action of the plan: anything after it would act on, or claim something about, a page nobody has observed yet — closing a unit of work and terminating included. Plan up to it and leave the page it opens to the next plan.',
-    '- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option.',
+    '- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option, or where the list counts more the page offers, one of those, verbatim.',
     '- A field the page hides is never filled or selected.',
     // A claim rests on the page as observed. Measured 2026-10-07: twelve plans
     // closed their unit or ended the session past a click or a key press in

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { contractOf, fill } from '../../core/testing';
 import { FIELD_ANSWER } from './definition';
-import { answer, fieldGoal, sampleAnswers } from './testing';
+import { answer, fieldGoal, sampleAnswers, sampleFields } from './testing';
 import { limitsValidator, referencesValidator } from './validators';
 
 const goal = fieldGoal();
@@ -96,6 +96,18 @@ describe('the field-answer validators', () => {
     ]);
     expect(
       problems(withAnswer('e1', answer('e1', { value: ' 6 ', basis: ['m1'] }))).limits,
+    ).toEqual([]);
+  });
+
+  it('[QL-37] a value past a counted cut of the options is not a warning: the page offers more than the list shows', () => {
+    const counted = fieldGoal(
+      undefined,
+      sampleFields().map((field) =>
+        field.ref === 'e2' ? { ...field, optionsOmitted: 190 } : field,
+      ),
+    );
+    expect(
+      problems(withAnswer('e2', answer('e2', { value: 'Maybe', basis: ['m2'] })), counted).limits,
     ).toEqual([]);
   });
 

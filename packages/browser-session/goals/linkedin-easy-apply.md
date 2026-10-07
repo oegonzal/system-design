@@ -12,10 +12,11 @@ One application: from opening a job listing to the confirmation that the applica
 2. Open the next result in the list that has not been opened this session.
 3. If the listing says the application was already sent, mark the unit `already-done` and go on to the next result.
 4. Press the Easy Apply button and wait for the application form.
-5. On each page of the form, ask for every field about the applicant with askFields, then press Next (or Review) and wait for the next page.
-6. On the review page, press Submit application and wait for the confirmation; dismiss the confirmation dialog.
-7. Mark the unit `done`.
-8. When every result in view has been opened, scroll to the bottom of the list and open the next page of results.
+5. On each page of the form, advance: press Next, Review or Submit application, whichever the page offers. Before pressing, ask with askFields for any required field that is still empty and for any field the page has marked invalid; a field that already holds a value is left as it is.
+6. If the page refuses to advance, ask for the fields it marks and press again.
+7. After Submit application, wait for the confirmation and dismiss it.
+8. Mark the unit `done`.
+9. When every result in view has been opened, scroll to the bottom of the list and open the next page of results.
 
 ## Answering policy
 

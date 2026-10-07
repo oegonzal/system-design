@@ -43,6 +43,19 @@ describe('observationFingerprint', () => {
       ),
     };
     const dialogInFront = { ...first, activeScope: { role: 'dialog' as const, name: 'Apply' } };
+    // A field the page marks invalid, and a select the page offers more of, are facts the goal shows.
+    const invalidNow = {
+      ...first,
+      elements: first.elements.map((element, index) =>
+        index === 0 ? { ...element, invalid: true } : element,
+      ),
+    };
+    const moreOptions = {
+      ...first,
+      elements: first.elements.map((element, index) =>
+        index === 0 ? { ...element, optionsOmitted: 5 } : element,
+      ),
+    };
     for (const changed of [
       retitled,
       oneFewer,
@@ -51,6 +64,8 @@ describe('observationFingerprint', () => {
       worded,
       scoped,
       dialogInFront,
+      invalidNow,
+      moreOptions,
     ]) {
       expect(observationFingerprint(changed)).not.toBe(observationFingerprint(first));
     }

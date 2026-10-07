@@ -3,6 +3,8 @@ import {
   fieldSpecOf,
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
+  guidanceDocument,
+  OPTIONS_SHOWN,
   type Admission,
   type BrowserDecisionSource,
   type FieldAnswers,
@@ -26,14 +28,15 @@ import { clip } from './text';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
- * one goal, the answers come back as one run, and each field is routed by
- * the declared table — filled, left blank, or put to the operator with the
- * model's value as a suggestion and the reason it was not trusted. The
- * operator's answers are cached for the session and kept for the unit of
- * work, which teaches them back when it closes. One decision row per field
- * settled. A fill the page refuses stops the flow where it is — the page may
- * have moved on — so the fields after it are not attempted, and the plan
- * stops with it; the failure is counted once, by the step.
+ * one goal — except those that still hold what this session settled for
+ * them, which are kept without a run — the answers come back as one run, and
+ * each field is routed by the declared table: filled, kept, left blank, or
+ * put to the operator with the model's value as a suggestion and the reason
+ * it was not trusted. The operator's answers are cached for the session and
+ * taught back the moment they are given. One decision row per field settled.
+ * A fill the page refuses stops the flow where it is — the page may have
+ * moved on — so the fields after it are not attempted, and the plan stops
+ * with it; the failure is counted once, by the step.
  */
 export interface FieldResult {
   ref: string;
@@ -46,7 +49,7 @@ export interface FieldResult {
   reply: OperatorReply['kind'] | null;
   cached: boolean;
   detail: string | null;
-  /** The answer the operator gave here, to be taught back when the unit of work closes. */
+  /** The answer the operator gave here, taught back as soon as it was given. */
   guidance: OperatorGuidanceDto | null;
 }
 
@@ -95,6 +98,7 @@ async function fill(
 ): Promise<FieldResult> {
   try {
     await ctx.deps.browser.act(fillActionOf(field.field, value));
+    ctx.state.filled.set(field.field.name, value);
     return result(field, 'fill', source, value, reply);
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
@@ -102,7 +106,7 @@ async function fill(
   }
 }
 
-/** Keep what the operator said for the next form that asks the same; answer the item the unit of work teaches back. */
+/** Keep what the operator said for the next form that asks the same, and shape it as the item taught back at once. */
 function remember(
   ctx: EngineContext,
   field: FieldSpec,
@@ -111,6 +115,7 @@ function remember(
 ): OperatorGuidanceDto {
   const { state } = ctx;
   state.operatorAnswers.set(field.name, answer);
+  state.filled.set(field.name, answer);
   const page = clip(observation.title, GUIDANCE_PAGE_MAX_LENGTH);
   return {
     sessionId: state.sessionId,
@@ -119,7 +124,8 @@ function remember(
       label: field.name,
       question: field.context,
       type: fieldTypeOf(field),
-      options: field.options,
+      // What the step goal would show of them: a list of hundreds is no fact worth storing.
+      options: field.options === null ? null : field.options.slice(0, OPTIONS_SHOWN),
     },
     context: { taskLabel: state.tasks.open?.label ?? null, page: page === '' ? null : page },
     answer: clip(answer, GUIDANCE_ANSWER_MAX_LENGTH),
@@ -163,6 +169,55 @@ async function ask(
   }
 }
 
+const day = (at: Date): string => at.toISOString().slice(0, 10);
+
+/**
+ * One operator answer handed to the memory as soon as it is given, as its
+ * own guidance document, the orchestration id written onto the decision row
+ * it came from. At once rather than when the unit of work closes: measured
+ * 2026-10-07, a unit that never closed taught nothing, and the one answer
+ * the memory lacked would have been asked again the next session.
+ */
+async function teach(
+  ctx: EngineContext,
+  decisionId: string,
+  item: OperatorGuidanceDto,
+): Promise<void> {
+  const { state, deps, queue } = ctx;
+  const document = guidanceDocument(
+    state.sessionId,
+    ctx.options.subject,
+    [item],
+    day(deps.clock.now()),
+  );
+  try {
+    const { orchestrationRunId } = await deps.brain.teach(document);
+    queue.write(`decision ${decisionId} teaching`, () =>
+      deps.ledger.recordTeaching([decisionId], orchestrationRunId),
+    );
+    state.teachings.push({ decisionId, document, orchestrationRunId, fault: null });
+    deps.log(`step ${state.step}: "${item.field.label}" taught through ${orchestrationRunId}`);
+  } catch (error) {
+    if (!(error instanceof BrainFaulted)) throw error;
+    state.teachings.push({ decisionId, document, orchestrationRunId: null, fault: error.message });
+    deps.warn(`step ${state.step}: "${item.field.label}" not taught — ${error.message}`);
+  }
+  ctx.dumpFiles('teach', [stepJsonFile(state.step, 'teach', state.teachings)]);
+}
+
+/** A field that still holds what this session settled for it: kept, with no run and no touch. */
+const keptReadout = (field: FieldSpec, position: number): RoutedField => ({
+  position,
+  field,
+  answer: null,
+  route: 'keep',
+  value: field.value,
+  source: 'engine',
+  reason: 'holds what this session settled for it',
+  faults: [],
+  cached: true,
+});
+
 const settle = (
   ctx: EngineContext,
   field: RoutedField,
@@ -171,6 +226,9 @@ const settle = (
   switch (field.route) {
     case 'leave-blank':
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
+    case 'keep':
+      if (field.value !== null) ctx.state.filled.set(field.field.name, field.value);
+      return Promise.resolve(result(field, 'keep', field.source, field.value, null));
     case 'fill':
       return fill(ctx, field, field.value ?? '', field.source, null);
     case 'ask-operator':
@@ -217,7 +275,7 @@ const summarize = (results: readonly FieldResult[], listed: number): string => {
     results.filter((r) => r.route === route && r.outcome === 'ok').length;
   const failed = results.filter((r) => r.outcome === 'failed').length;
   const unattempted = listed - results.length;
-  return `${listed} field(s): ${count('fill')} filled, ${count('ask-operator')} asked, ${count('leave-blank')} blank${
+  return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${count('ask-operator')} asked, ${count('leave-blank')} blank${
     failed > 0 ? `, ${failed} failed` : ''
   }${unattempted > 0 ? `, ${unattempted} not attempted` : ''}`;
 };
@@ -235,34 +293,45 @@ export async function askFields(
   if (fields.length === 0)
     return { stopped: false, failed: false, note: 'no listed field matched' };
 
+  // A field that still holds what this session settled for it is not a question.
+  const open = fields.filter(
+    (field) =>
+      !(field.value !== null && field.value !== '' && state.filled.get(field.name) === field.value),
+  );
   const startedAt = deps.clock.now();
   let decided: FieldsDecided | null = null;
   let fault: BrainFaulted | null = null;
-  try {
-    decided = await deps.brain.answerFields({
-      mission: ctx.mission,
-      task:
-        state.tasks.open === null
-          ? null
-          : { label: state.tasks.open.label, url: state.tasks.open.url },
-      fields,
-      criteria: ctx.criteria.answer,
-    });
-  } catch (error) {
-    if (!(error instanceof BrainFaulted)) throw error;
-    fault = error;
-    state.brainFaults += 1;
+  if (open.length > 0) {
+    try {
+      decided = await deps.brain.answerFields({
+        mission: ctx.mission,
+        task:
+          state.tasks.open === null
+            ? null
+            : { label: state.tasks.open.label, url: state.tasks.open.url },
+        fields: open,
+        criteria: ctx.criteria.answer,
+      });
+    } catch (error) {
+      if (!(error instanceof BrainFaulted)) throw error;
+      fault = error;
+      state.brainFaults += 1;
+    }
   }
   const durationMs = deps.clock.now().getTime() - startedAt.getTime();
 
-  const routed = routeFieldsInSession(decided, fault, fields, state.operatorAnswers);
+  const answered = routeFieldsInSession(decided, fault, open, state.operatorAnswers);
+  const routed = fields.map((field, position) => {
+    const found = answered.find((candidate) => candidate.field.ref === field.ref);
+    return found === undefined ? keptReadout(field, position) : { ...found, position };
+  });
   const results: FieldResult[] = [];
   let stopped = false;
   for (const field of routed) {
     const outcome = await settle(ctx, field, observation);
     results.push(outcome);
     const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs));
-    if (outcome.guidance !== null) state.guidance.push({ decisionId, item: outcome.guidance });
+    if (outcome.guidance !== null) await teach(ctx, decisionId, outcome.guidance);
     if (outcome.reply === 'stop') {
       stopped = true;
       break;

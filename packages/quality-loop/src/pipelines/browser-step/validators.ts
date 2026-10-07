@@ -150,7 +150,11 @@ function elementFaults(
     if (action.kind === 'select') {
       if (element.kind !== 'selectable') {
         fault('high', `${ref} offers nothing to select (${element.kind})`);
-      } else if (element.options !== null && !element.options.includes(action.option)) {
+      } else if (
+        element.options !== null &&
+        element.optionsOmitted === 0 &&
+        !element.options.includes(action.option)
+      ) {
         fault('high', `${quote(action.option)} is not an option of ${ref}`);
       }
     }

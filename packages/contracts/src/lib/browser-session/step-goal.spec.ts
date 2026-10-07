@@ -16,6 +16,7 @@ import {
   OBJECTION_AT_BOUND,
   OBJECTION_DETAIL_BOUND,
   OBJECTIONS_BOUND,
+  OPTIONS_SHOWN,
   pageObservationSchema,
   type StepObjection,
 } from './observation.schema';
@@ -46,6 +47,7 @@ const goalOf = (
     ledger,
     objections,
     progress: NO_PROGRESS,
+    pageUnchanged: false,
   });
 
 /** One objection at its declared ceiling, as a maximal goal would carry it. */
@@ -106,7 +108,9 @@ describe('composeStepGoal', () => {
       inputType: null,
       value: null,
       options: i % 10 === 0 ? Array.from({ length: 6 }, (__, j) => `option number ${j}`) : null,
+      optionsOmitted: 0,
       required: i % 10 === 0,
+      invalid: false,
       disabled: false,
       visible: true,
       maxLength: null,
@@ -145,6 +149,7 @@ describe('composeStepGoal', () => {
         settled: Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
         done: ['c13'],
       },
+      pageUnchanged: false,
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     // The room such a page leaves a snapshot: measured 2026-10-07, a dialog of
@@ -231,6 +236,7 @@ describe('composeStepGoal', () => {
       ledger: openTaskLedger(),
       objections: [],
       progress: { criteria, settled: ['c2'], done: ['c3'] },
+      pageUnchanged: false,
     });
     const section = between(goal, '## Progress', '## Limits');
     expect(section).toContain('- Satisfied earlier this session, not graded on this page:');
@@ -242,6 +248,36 @@ describe('composeStepGoal', () => {
     expect(section).not.toContain('Press the apply button');
     // Nothing settled yet reads as such, not as an empty list.
     expect(goalOf(listingObservation())).toContain('- Satisfied earlier this session: none yet.');
+  });
+
+  it('[QL-39] lists a long select to the shown count in the goal and the index, counting the rest, and says when the page is unchanged', () => {
+    const options = Array.from({ length: OPTIONS_SHOWN + 7 }, (_, i) => `Country ${i + 1}`);
+    const observation = {
+      ...formObservation(),
+      elements: formObservation().elements.map((element) =>
+        element.ref === 'e2' ? { ...element, options, optionsOmitted: 200 } : element,
+      ),
+    };
+    const goal = goalOf(observation);
+    expect(goal).toContain(`Country ${OPTIONS_SHOWN} (207 more the page offers)`);
+    expect(goal).not.toContain(`Country ${OPTIONS_SHOWN + 1}`);
+    const indexed = readStepIndex(goal)?.elements.find((element) => element.ref === 'e2');
+    expect(indexed?.options).toHaveLength(OPTIONS_SHOWN);
+    expect(indexed?.optionsOmitted).toBe(207);
+    expect(readStepIndex(goalOf(formObservation()))?.elements[1].optionsOmitted).toBe(0);
+    // The page section says when nothing moved, and only then.
+    expect(goalOf(formObservation())).not.toContain('Unchanged since the last plan');
+    expect(
+      composeStepGoal({
+        mission: MISSION_FIXTURE,
+        observation: formObservation(),
+        history: [],
+        ledger: emptyLedger(),
+        objections: [],
+        progress: NO_PROGRESS,
+        pageUnchanged: true,
+      }),
+    ).toContain('Unchanged since the last plan: the recent actions moved nothing on this page.');
   });
 
   it('prints only the facts that are true of an element', () => {
@@ -256,6 +292,21 @@ describe('composeStepGoal', () => {
       '- e1 · searchbox · "Search by title" · options: a | b · required · hidden: offscreen',
     );
     expect(renderElementLine(listingObservation().elements[1])).toBe('- e2 · button · "Search"');
+    // A select past the shown count says how many more the page offers, and the page's invalid mark is printed.
+    const shown = Array.from({ length: OPTIONS_SHOWN }, (_, i) => `o${i + 1}`);
+    expect(
+      renderElementLine({
+        ...listingObservation().elements[0],
+        value: null,
+        options: [...shown, 'o61', 'o62'],
+        optionsOmitted: 3,
+        required: false,
+        invalid: true,
+        hiddenTraits: [],
+      }),
+    ).toBe(
+      `- e1 · searchbox · "Search by title" · options: ${shown.join(' | ')} (5 more the page offers) · marked invalid by the page`,
+    );
     // What a person reads on an element the tree gave no name, beside whatever stood in for one.
     expect(
       renderElementLine({

@@ -45,6 +45,7 @@ const CRITERIA = [{ id: 'c1', kind: 'progress', statement: 'Open the next listin
 const stepInput = (
   observation: PageObservation = listingObservation(),
   pageUnchanged = false,
+  nothingRan = false,
 ): StepInput => ({
   mission: MISSION_FIXTURE,
   observation,
@@ -53,6 +54,7 @@ const stepInput = (
   objections: [],
   criteria: CRITERIA,
   pageUnchanged,
+  nothingRan,
   progress: { settled: [], done: [] },
 });
 
@@ -118,13 +120,17 @@ describe('the loop brain', () => {
     expect(core.startRequests[0]?.goal).toContain(MISSION_FIXTURE.trim());
     expect(decided.runId).toBe('fake-run-1');
     expect(decided.orchestrationRunId).toBeNull();
-    // On a page that has not changed since the last plan, the loop is asked to revise once in-run.
-    await brain.planStep(stepInput(listingObservation(), true));
+    // On a page unchanged since a plan that ran nothing, the loop is asked to revise once in-run;
+    // after a plan that ran something, a fresh plan is briefed by what ran.
+    await brain.planStep(stepInput(listingObservation(), true, true));
     expect(core.startRequests[1]?.maxIterations).toBe(2);
+    await brain.planStep(stepInput(listingObservation(), true, false));
+    expect(core.startRequests[2]?.maxIterations).toBe(1);
+    expect(core.startRequests[2]?.goal).toContain('Unchanged since the last plan');
     // A criterion the session settled leaves the rubric this run is judged against and enters the goal.
     await brain.planStep({ ...stepInput(), progress: { settled: ['c1'], done: [] } });
-    expect(core.startRequests[2]?.criteria).toEqual([]);
-    expect(core.startRequests[2]?.goal).toContain('- c1 — Open the next listing.');
+    expect(core.startRequests[3]?.criteria).toEqual([]);
+    expect(core.startRequests[3]?.goal).toContain('- c1 — Open the next listing.');
     expect(routePlan(decided.run, 1).plan).toEqual(PLAN);
     expect(decided.run.status).toBe('complete');
     expect(decided.composition).toEqual({

@@ -112,6 +112,19 @@ describe('the browser-step validators', () => {
     ]);
   });
 
+  it('[QL-36] a select is held to the listed options only when the list is whole: past a counted cut, the page decides', () => {
+    const counted = stepGoal({
+      ...formObservation(),
+      elements: formObservation().elements.map((element) =>
+        element.ref === 'e2' ? { ...element, optionsOmitted: 190 } : element,
+      ),
+    });
+    expect(problems(samplePlan([select('e2', 'Maybe')]), counted).limits).toEqual([]);
+    expect(problems(samplePlan([select('e2', 'Maybe')]), form).limits).toEqual([
+      { severity: 'high', locationRefs: ['action.1'], message: '"Maybe" is not an option of e2' },
+    ]);
+  });
+
   it('[QL-36] touching an element the page hides — typing, selecting or clicking — is critical: the DOM half of a trap left blank', () => {
     const [hidden] = problems(
       samplePlan([click('e4'), fill('e3', 'https://alex.example')]),

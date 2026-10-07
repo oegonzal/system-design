@@ -9,6 +9,7 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
+import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import {
   PAGE_KINDS,
@@ -29,6 +30,8 @@ export const OPTION_VALUE_MAX_LENGTH = 200;
 export const WAIT_VALUE_BOUND = bound(500);
 export const DETAIL_BOUND = bound(300);
 export const SCREENSHOT_LABEL_BOUND = bound(120);
+/** The most criteria one action may say it serves: a step of a procedure, rarely two. */
+export const SERVES_BOUND = bound(4, 'list');
 
 const ref = z
   .string()
@@ -48,6 +51,18 @@ const common = {
         'What the page should show once the action lands, or null when nothing visible changes.',
     })
     .nullable(),
+  /**
+   * What the session settles a passed criterion on: the action that said it
+   * served it ran, and the page moved. Measured 2026-10-07: a plan's last
+   * click timed out after its first click had opened the listing, and the
+   * criteria that click had earned were failed on nine pages after.
+   */
+  serves: bounded
+    .list(SERVES_BOUND, bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 }), {
+      description:
+        'The procedure criteria this action is taken for, by id as the checklist lists them (c5); left out when it serves none.',
+    })
+    .optional(),
 };
 
 export const stepActionSchema = z.discriminatedUnion('kind', [

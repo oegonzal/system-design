@@ -27,7 +27,17 @@ export const SNAPSHOT_BOUND = bound(GOAL_BUDGET_BYTES);
 export const ELEMENT_NAME_BOUND = bound(300);
 export const ELEMENT_VALUE_BOUND = bound(500);
 export const OPTION_BOUND = bound(200);
-export const OPTIONS_BOUND = bound(60, 'list');
+/**
+ * The most options an observation keeps for one select: a country list runs
+ * to about 250. The step goal shows `OPTIONS_SHOWN` of them and counts the
+ * rest; the field goal shows them all, since the answerer must name one
+ * verbatim. Measured 2026-10-07 with this at 60 and no count: "United States
+ * (+1)" sat past the cut, no model ever saw it, and the limits validator
+ * refused the select of it five times as "not an option".
+ */
+export const OPTIONS_BOUND = bound(300, 'list');
+/** How many of a select's options the step goal lists before counting the rest. */
+export const OPTIONS_SHOWN = 60;
 export const ROLE_MAX_LENGTH = 40;
 export const INPUT_TYPE_MAX_LENGTH = 30;
 export const URL_MAX_LENGTH = 2000;
@@ -162,7 +172,11 @@ export const observedElementSchema = z.strictObject({
   inputType: bounded.id(INPUT_TYPE_MAX_LENGTH).nullable(),
   value: bounded.text(ELEMENT_VALUE_BOUND).nullable(),
   options: bounded.list(OPTIONS_BOUND, bounded.text(OPTION_BOUND)).nullable(),
+  /** Options the page offers past the listed ones, counted: a list is never cut silently. */
+  optionsOmitted: z.number().int().min(0),
   required: z.boolean(),
+  /** Whether the page marks the control invalid: `aria-invalid`, or the browser's own validity once a person has touched it. */
+  invalid: z.boolean(),
   disabled: z.boolean(),
   visible: z.boolean(),
   maxLength: z.number().int().positive().nullable(),

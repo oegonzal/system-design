@@ -506,15 +506,23 @@ describe('routeFields', () => {
     expect(routes[1].faults).toEqual(['limits: not an option']);
   });
 
-  it('[QL-37] asks for every visible field when the page was not admitted, and for a required field left blank', () => {
-    const escalated = routeFields(run({ artifact: answers() }), 'fell-short', fields());
-    expect(escalated.map((r) => r.route)).toEqual([
-      'ask-operator',
+  it('[QL-37] a run that fell short demotes nothing by itself; a page nothing judged asks for its required fields and blanks the optional ones; a required field left blank is asked', () => {
+    const fellShort = routeFields(run({ artifact: answers() }), 'fell-short', fields());
+    expect(fellShort.map((r) => r.route)).toEqual([
+      'fill',
       'ask-operator',
       'leave-blank',
-      'ask-operator',
+      'leave-blank',
     ]);
-    expect(escalated[0].reason).toBe('page-escalated: fell-short');
+    const unjudged = routeFields(run({ artifact: answers() }), 'no-rubric', fields());
+    expect(unjudged.map((r) => [r.route, r.source])).toEqual([
+      ['ask-operator', 'engine'],
+      ['ask-operator', 'engine'],
+      ['leave-blank', 'blank'],
+      ['leave-blank', 'engine'],
+    ]);
+    expect(unjudged[0].reason).toBe('page-escalated: no-rubric');
+    expect(unjudged[3].reason).toBe('optional, left blank: page-escalated: no-rubric');
 
     const blankRequired = routeFields(
       run({ artifact: answers({ e1: { decision: 'leave-blank', value: null } }) }),
@@ -523,6 +531,45 @@ describe('routeFields', () => {
     );
     expect(blankRequired[0].route).toBe('ask-operator');
     expect(blankRequired[0].reason).toContain('required field left blank');
+  });
+
+  it('[QL-37] keeps what a field holds when the model says so or answers with the same value, asks when a keep has nothing to keep, and blanks an optional field a judge faulted', () => {
+    const holding = fields().map((field) =>
+      field.ref === 'e1' ? { ...field, value: '6' } : field,
+    );
+    const kept = routeFields(
+      run({ artifact: answers({ e1: { decision: 'keep', value: null } }) }),
+      'admitted',
+      holding,
+    );
+    expect(kept[0]).toMatchObject({ route: 'keep', value: '6', source: 'memory' });
+    const same = routeFields(run({ artifact: answers() }), 'admitted', holding);
+    expect(same[0]).toMatchObject({
+      route: 'keep',
+      value: '6',
+      reason: 'holds it already: from m1',
+    });
+    const empty = routeFields(
+      run({ artifact: answers({ e1: { decision: 'keep', value: null } }) }),
+      'admitted',
+      fields(),
+    );
+    expect(empty[0]).toMatchObject({ route: 'ask-operator', reason: 'nothing to keep: from m1' });
+    // A judge pointed at an optional field: left blank with the fault on the row, never the operator's.
+    const faulted = routeFields(
+      run({
+        artifact: answers({ e4: { decision: 'answer', value: 'none' } }),
+        findings: [{ type: 'ungrounded', locationRefs: ['field.4'], rationale: 'invented' }],
+      }),
+      'admitted',
+      fields(),
+    );
+    expect(faulted[3]).toMatchObject({
+      route: 'leave-blank',
+      source: 'loop',
+      reason: 'optional, left blank: faulted',
+      faults: ['ungrounded: invented'],
+    });
   });
 
   it('[QL-37] asks when the model answered with low confidence or did not answer at all', () => {

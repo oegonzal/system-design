@@ -99,6 +99,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
   const { deps, state, options } = ctx;
   state.step += 1;
   state.ordinal = 0;
+  state.teachings = [];
   const observation = await deps.browser.observe();
   const screenshot = await deps.browser.screenshot().catch(() => null);
   noteObservation(state, observationFingerprint(observation));
@@ -124,6 +125,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
       objections: [...state.objections],
       criteria: ctx.criteria.plan,
       pageUnchanged: state.pageUnchanged,
+      nothingRan: state.step > 1 && state.lastRan === 0,
       progress: progressOf(state),
     });
   } catch (error) {
@@ -146,6 +148,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
       stepJsonFile(state.step, 'fault', { reason: error.reason, message: error.message }),
     ]);
     pushHistory(state, 'plan', 'failed', `brain ${error.reason}: ${error.message}`);
+    state.lastRan = 0;
     deps.warn(`step ${state.step}: no plan — ${error.message}`);
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
@@ -197,6 +200,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     // recent past. The actions themselves stay whole in the step's plan.json,
     // and why it did not run is an objection, carried once.
     pushHistory(state, describeRefusedPlan(readout.plan), 'not-executed', null);
+    state.lastRan = 0;
     ctx.fail('plan-not-executed');
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
@@ -208,13 +212,15 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     observation,
   );
   if (executed.termination !== null) return executed.termination;
-  // What the evaluator passed on a plan that ran whole waits for the next
-  // observation: settled, if the page moved, for the unit when one was open
-  // before or after the plan, else for the session. A plan that closed its
-  // unit settles nothing: what it passed was that unit's, and the unit is gone.
+  state.lastRan = executed.ranOk;
+  // What the evaluator passed waits for the next observation: settled, if the
+  // page moved, for the unit when one was open before or after the plan, else
+  // for the session — every pass when the plan ran whole, else the passes an
+  // action that ran said it served. A plan that closed its unit settles
+  // nothing: what it passed was that unit's, and the unit is gone.
   const openAfter = state.tasks.open !== null;
   const scope = openBefore || openAfter ? 'unit' : 'session';
-  if (executed.ranWhole && !(openBefore && !openAfter)) {
+  if (!(openBefore && !openAfter)) {
     const settling = new Set(
       ctx.criteria.plan
         .filter((criterion) =>
@@ -222,7 +228,12 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
         )
         .map((criterion) => criterion.id),
     );
-    const ids = readout.passed.filter((id) => settling.has(id));
+    const served = new Set(
+      readout.plan.actions.slice(0, executed.ranOk).flatMap((action) => action.serves ?? []),
+    );
+    const ids = readout.passed.filter(
+      (id) => settling.has(id) && (executed.ranWhole || served.has(id)),
+    );
     state.pendingPass = ids.length === 0 ? null : { ids, scope };
   }
   return checkRails(railStateOf(state), options.rails, deps.clock.now());

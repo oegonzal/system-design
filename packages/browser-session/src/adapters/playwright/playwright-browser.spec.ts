@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ObservedElement, PageObservation } from '@sysdesign/contracts';
+import {
+  observationFingerprint,
+  OPTIONS_BOUND,
+  type ObservedElement,
+  type PageObservation,
+} from '@sysdesign/contracts';
 
 import { ActionFailed } from '../../core/ports';
 import { PlaywrightBrowser } from './playwright-browser';
@@ -33,6 +38,63 @@ const FORM = `<!doctype html><html><head><title>Apply — step 2</title>
 </body></html>`;
 
 const NEXT_PAGE = `<!doctype html><html><head><title>Review</title></head><body><button type="button">Submit</button></body></html>`;
+
+/**
+ * A dialog that scrolls inside a page that does not — the shape of an
+ * application form over a locked document, measured live 2026-10-07. Its
+ * footer sits past the fold of its own scroll box, one select offers more
+ * options than an observation keeps, one field is marked invalid, and one
+ * input is parked off the page where no scrolling could show it.
+ */
+const SCROLLING_DIALOG = `<!doctype html><html style="height:100%;overflow:hidden"><head><title>Apply — contact</title>
+<style>.hp{position:absolute;left:-9999px;top:0}</style></head>
+<body style="height:100%;overflow:hidden;margin:0">
+  <main style="height:100%">results behind the dialog</main>
+  <div role="dialog" aria-modal="true" aria-label="Apply to Acme" style="position:fixed;top:20px;left:100px;width:600px;height:400px;background:#fff">
+    <div id="content" style="height:360px;overflow:auto">
+      <label>Email*<select id="email" required><option>a@example.test</option><option>b@example.test</option></select></label>
+      <label>Country code*<select id="code" required></select></label>
+      <label>Phone*<input id="phone" type="tel" required aria-invalid="true" value="not a number"></label>
+      <div style="height:1200px">the rest of the form</div>
+      <input class="hp" name="website" type="text" autocomplete="off">
+      <footer><button type="button">Submit application</button></footer>
+    </div>
+  </div>
+  <script>
+    const code = document.getElementById('code');
+    for (let i = 1; i <= 310; i += 1) {
+      const option = document.createElement('option');
+      option.textContent = 'Country ' + i + ' (+' + i + ')';
+      code.appendChild(option);
+    }
+  </script>
+</body></html>`;
+
+/**
+ * The shapes CSS clips differently from the DOM tree: a fixed bar inside a
+ * clipped card is not clipped by it, an absolutely positioned popover escapes
+ * a clipped card its containing block sits above, an inline box clips
+ * nothing, and a scroller inside a clipped box reaches only what the clip
+ * shows of it. One field declares a grammar error.
+ */
+const CLIPPING_PAGE = `<!doctype html><html><head><title>Clips</title></head><body style="margin:0">
+  <div style="height:100px;overflow:hidden;position:relative">
+    <div style="position:fixed;bottom:0;left:0;right:0;height:40px"><button type="button">Fixed bar</button></div>
+  </div>
+  <section style="position:relative">
+    <div style="height:60px;overflow:hidden">
+      <div style="position:absolute;top:200px;left:0"><button type="button">Escaping popover</button></div>
+    </div>
+  </section>
+  <p><span style="overflow:hidden;display:inline"><a href="#x">Inline link</a></span></p>
+  <div style="height:200px;overflow:hidden">
+    <div id="inner" style="height:1000px;overflow:auto">
+      <div style="height:1050px"></div>
+      <button type="button">Beyond the clip</button>
+    </div>
+  </div>
+  <label>Summary<textarea aria-invalid="grammar">ok</textarea></label>
+</body></html>`;
 
 /**
  * The two live shapes of 2026-10-07: a results page whose links carry their
@@ -257,6 +319,62 @@ describe('the Playwright browser', () => {
     expect(byName(observation, 'button', 'search').text).toBe('Describe the job you want');
     // A named element carries no text of its own.
     expect(byName(observation, 'button', 'Next').text).toBeNull();
+  });
+
+  it('[BRW-2] holds offscreen to what no scrolling could show: a footer past the fold of a dialog that scrolls is reachable, a field scrolled above it stays so, an input parked off the page is not, and a long select is counted past the bound', async () => {
+    await browser.page.setContent(SCROLLING_DIALOG);
+    const before = await browser.observe();
+    expect(before.activeScope).toEqual({ role: 'dialog', name: 'Apply to Acme' });
+    expect(byName(before, 'button', 'Submit application')).toMatchObject({
+      visible: true,
+      hiddenTraits: [],
+    });
+    expect(byName(before, 'textbox', 'website')).toMatchObject({
+      visible: false,
+      hiddenTraits: ['offscreen', 'autocomplete-off-bait'],
+    });
+    const code = byName(before, 'combobox', 'Country code*');
+    expect(code.options).toHaveLength(OPTIONS_BOUND.target);
+    expect(code.optionsOmitted).toBe(10);
+    expect(byName(before, 'textbox', 'Phone*')).toMatchObject({
+      invalid: true,
+      value: 'not a number',
+    });
+    expect(byName(before, 'combobox', 'Email*').invalid).toBe(false);
+
+    await browser.page.evaluate(() => {
+      const content = document.getElementById('content');
+      if (content !== null) content.scrollTop = 1400;
+    });
+    const after = await browser.observe();
+    expect(byName(after, 'combobox', 'Email*')).toMatchObject({ visible: true, hiddenTraits: [] });
+    expect(byName(after, 'button', 'Submit application')).toMatchObject({
+      visible: true,
+      hiddenTraits: [],
+    });
+    // A scroll of the dialog is not a page that changed.
+    expect(observationFingerprint(after)).toBe(observationFingerprint(before));
+  });
+
+  it('[BRW-2] clips along containing blocks, as CSS does: a fixed bar or an escaping popover inside a clipped card is reachable, an inline box clips nothing, and what a scroller shows past an outer clip is not', async () => {
+    await browser.page.setContent(CLIPPING_PAGE);
+    const observation = await browser.observe();
+    for (const name of ['Fixed bar', 'Escaping popover']) {
+      expect(byName(observation, 'button', name)).toMatchObject({
+        visible: true,
+        hiddenTraits: [],
+      });
+    }
+    expect(byName(observation, 'link', 'Inline link')).toMatchObject({
+      visible: true,
+      hiddenTraits: [],
+    });
+    expect(byName(observation, 'button', 'Beyond the clip')).toMatchObject({
+      visible: false,
+      hiddenTraits: ['offscreen'],
+    });
+    // Any invalid state the page declares counts, not only `true`.
+    expect(byName(observation, 'textbox', 'Summary').invalid).toBe(true);
   });
 
   it('[BRW-2] reports a page only once two reads agree, so a control that renders a moment after the document is observed', async () => {

@@ -52,7 +52,7 @@ const faultyAnswers = () => {
 };
 
 describe('the field-answer loop', () => {
-  it('[QL-37] an ungrounded value and a located warning route their fields to the operator, the hidden field stays blank, the rest are filled', async () => {
+  it('[QL-37] an ungrounded value and a located warning leave their optional fields blank with the fault on the row, the hidden field stays blank, the rest are filled', async () => {
     const goal = fieldGoal();
     // The critics share one schema: the grounding critic takes the first canned answer, the form critic the next.
     const trace = await runPipeline(
@@ -101,17 +101,17 @@ describe('the field-answer loop', () => {
     expect(routed.map((field) => [field.field.ref, field.route, field.source])).toEqual([
       ['e1', 'fill', 'memory'],
       ['e2', 'fill', 'memory'],
-      ['e3', 'ask-operator', 'loop'],
+      ['e3', 'leave-blank', 'loop'],
       ['e4', 'leave-blank', 'blank'],
-      ['e5', 'ask-operator', 'loop'],
+      ['e5', 'leave-blank', 'loop'],
     ]);
     expect(routed[2]).toMatchObject({
-      reason: 'faulted',
+      reason: 'optional, left blank: faulted',
       value: 'Acme',
       faults: [expect.stringContaining('ungrounded')],
     });
     expect(routed[4]).toMatchObject({
-      reason: 'faulted',
+      reason: 'optional, left blank: faulted',
       faults: ['limits: e5 takes at most 200 characters; the value runs to 220'],
     });
     expect(routed[3].reason).toContain('trap-skipped');
@@ -119,7 +119,7 @@ describe('the field-answer loop', () => {
     expect(routed[1].value).toBe('Yes');
   });
 
-  it('[QL-37] a page the loop did not admit asks the operator about every visible field, the hidden one still blank', async () => {
+  it('[QL-37] a page whose run fell short is still routed field by field: the score alone demotes nothing', async () => {
     const trace = await runPipeline(
       FIELD_ANSWER,
       { goal: fieldGoal(), criteria: policyCriteria() },
@@ -133,14 +133,15 @@ describe('the field-answer loop', () => {
     expect(trace.finalDecision).toBe('escalate');
     const verdict = admission(outputsOf(trace), FIELD_ANSWER.policy.thresholds.acceptAt);
     expect(verdict).toBe('fell-short');
+    // The judges' objections arrive as faults at the fields they are about; with none, each field is read on its own merits.
     const routed = routeFields(runDto('answers', trace), verdict, sampleFields());
     expect(routed.map((field) => field.route)).toEqual([
-      'ask-operator',
-      'ask-operator',
-      'ask-operator',
+      'fill',
+      'fill',
       'leave-blank',
-      'ask-operator',
+      'leave-blank',
+      'fill',
     ]);
-    expect(routed[0].reason).toBe('page-escalated: fell-short');
+    expect(routed.every((field) => !field.reason.includes('page-escalated'))).toBe(true);
   });
 });

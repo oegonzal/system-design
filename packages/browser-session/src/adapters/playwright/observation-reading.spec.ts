@@ -1,4 +1,9 @@
-import { ELEMENTS_BOUND, SNAPSHOT_BOUND, type PageObservation } from '@sysdesign/contracts';
+import {
+  ELEMENTS_BOUND,
+  OPTIONS_BOUND,
+  SNAPSHOT_BOUND,
+  type PageObservation,
+} from '@sysdesign/contracts';
 
 import type { SnapshotNode } from './aria-snapshot';
 import type { ElementFacts } from './element-facts';
@@ -10,6 +15,7 @@ const facts = (overrides: Partial<ElementFacts> = {}): ElementFacts => ({
   value: null,
   options: null,
   required: false,
+  invalid: false,
   disabled: false,
   visible: true,
   maxLength: null,
@@ -87,6 +93,21 @@ describe('one reading as an observation', () => {
         '',
       ),
     ).toMatchObject({ scope: { role: 'dialog', name: 'Apply to Acme', modal: true } });
+  });
+
+  it('[BRW-2] keeps a select to the options bound and counts the rest, and carries the page’s invalid mark', () => {
+    const many = Array.from({ length: OPTIONS_BOUND.target + 5 }, (_, i) => `option ${i + 1}`);
+    const long = toObservedElement(
+      node('e7', 'combobox', 'Country'),
+      facts({ options: many, invalid: true }),
+      null,
+      '',
+    );
+    expect(long.options).toHaveLength(OPTIONS_BOUND.target);
+    expect(long).toMatchObject({ optionsOmitted: 5, invalid: true });
+    expect(
+      toObservedElement(node('e8', 'combobox', 'Few'), facts({ options: ['a'] }), null, ''),
+    ).toMatchObject({ optionsOmitted: 0, invalid: false });
   });
 
   it('[BRW-2] puts the modal scope in front, orders what is inside it first, and reports the snapshot rung as data', () => {

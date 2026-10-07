@@ -48,6 +48,22 @@ export interface ScriptedPage {
 }
 
 /** The key a transition is declared under: the action's kind and its target, never its value. */
+/** A browser whose page refuses every action of one kind on one page: the element is gone by the time it is acted on. */
+export function refusing(
+  browser: FakeBrowser,
+  kind: BrowserAction['kind'],
+  pageId: string,
+): FakeBrowser {
+  const act = browser.act.bind(browser);
+  browser.act = async (action) => {
+    if (action.kind === kind && browser.pageId === pageId) {
+      throw new ActionFailed(actionKey(action), 'the element is detached');
+    }
+    return act(action);
+  };
+  return browser;
+}
+
 export function actionKey(action: BrowserAction): string {
   switch (action.kind) {
     case 'navigate':

@@ -1,14 +1,7 @@
 import type { StepPlan } from '@sysdesign/contracts';
 
-import { ActionFailed, BrainFaulted } from './ports';
-import {
-  actionKey,
-  decidedAnswers,
-  decidedPlan,
-  FakeBrowser,
-  finding,
-  FixedClock,
-} from './testing';
+import { BrainFaulted } from './ports';
+import { decidedAnswers, decidedPlan, FakeBrowser, finding, FixedClock, refusing } from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
@@ -22,18 +15,8 @@ import { runScripted as run } from './testing-session';
  * by a fault, by an error, every path closing the browser and the row.
  */
 describe('how a plan stops and how a session ends', () => {
-  /** A browser whose page refuses every fill: the element is gone by the time it is typed into. */
-  const refusingFills = (pageId: string): FakeBrowser => {
-    const browser = new FakeBrowser(pages());
-    const act = browser.act.bind(browser);
-    browser.act = async (action) => {
-      if (action.kind === 'fill' && browser.pageId === pageId) {
-        throw new ActionFailed(actionKey(action), 'the element is detached');
-      }
-      return act(action);
-    };
-    return browser;
-  };
+  const refusingFills = (pageId: string): FakeBrowser =>
+    refusing(new FakeBrowser(pages()), 'fill', pageId);
 
   it('[BRW-1] stops a plan at the first action the page refuses — a field fill included — tells the next plan what did not run and why, and counts one failed step', async () => {
     // A judge cut the plan at its third action and the page refuses the first: the history says both.
@@ -90,7 +73,7 @@ describe('how a plan stops and how a session ends', () => {
     expect(form.browser.calls).not.toContain('click e6');
     expect(form.operator.prompts).toEqual([]);
     expect(form.brain.planInputs[3]?.history.slice(-2).map((h) => [h.outcome, h.note])).toEqual([
-      ['failed', '3 field(s): 0 filled, 0 asked, 0 blank, 1 failed, 2 not attempted'],
+      ['failed', '3 field(s): 0 filled, 0 kept, 0 asked, 0 blank, 1 failed, 2 not attempted'],
       ['not-executed', 'after a failed action'],
     ]);
     const rows = form.detail.decisions.filter((d) => d.kind === 'field-answer');

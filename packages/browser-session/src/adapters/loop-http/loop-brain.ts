@@ -53,13 +53,15 @@ export const FORM_MEMORY_TARGET_STEP = 'target';
 /** One judged plan or answer set: a fresh observation beats a blind revise. */
 export const DECISION_ITERATIONS = 1;
 /**
- * On a page that has not changed since the last plan there is no fresh
- * observation to have, so the loop revises once from its own briefing — the
- * prior plan with the remediations at their positions — before the session
- * is handed the verdict. Measured 2026-10-07: four plans refused in a row on
- * one unchanged page, each told why only through the next goal's objections.
+ * On a page that has not changed since the last plan, after a plan that ran
+ * nothing, there is no fresh observation to have and nothing the page can add:
+ * the loop revises once from its own briefing — the prior plan with the
+ * remediations at their positions — before the session is handed the verdict.
+ * After a plan that ran something, a fresh plan is briefed by what ran:
+ * measured 2026-10-07, 23 such revises cost 8.3 minutes and the four that
+ * changed what ran chose worse.
  */
-export const DECISION_ITERATIONS_ON_AN_UNCHANGED_PAGE = 2;
+export const DECISION_ITERATIONS_WHEN_NOTHING_RAN = 2;
 /** A digest may revise once. */
 export const TEACH_ITERATIONS = 2;
 
@@ -126,9 +128,10 @@ export class LoopBrain implements BrainPort {
         pipeline: BROWSER_STEP_PIPELINE_ID,
         goal: composed.goal,
         criteria,
-        maxIterations: input.pageUnchanged
-          ? DECISION_ITERATIONS_ON_AN_UNCHANGED_PAGE
-          : DECISION_ITERATIONS,
+        maxIterations:
+          input.pageUnchanged && input.nothingRan
+            ? DECISION_ITERATIONS_WHEN_NOTHING_RAN
+            : DECISION_ITERATIONS,
       });
       const run = settled(await awaitRun(this.client, runId, this.options));
       return {

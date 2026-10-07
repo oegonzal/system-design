@@ -41,21 +41,26 @@ export function withOperatorCache(
   });
 }
 
-/** With no run to read — the brain faulted — every field goes to the operator, and the row says why. */
+/** With no run to read — the brain faulted — a required field goes to the operator and an optional one is left blank; the row says why. */
 export function faultedReadouts(fields: readonly FieldSpec[], fault: BrainFaulted): FieldReadout[] {
-  return fields.map((field, position) => ({
-    position,
-    field,
-    answer: null,
-    route: field.hiddenTraits.length > 0 ? 'leave-blank' : 'ask-operator',
-    value: null,
-    source: field.hiddenTraits.length > 0 ? 'blank' : 'engine',
-    reason:
-      field.hiddenTraits.length > 0
+  return fields.map((field, position) => {
+    const hidden = field.hiddenTraits.length > 0;
+    const reason = `brain ${fault.reason}: ${fault.message}`;
+    return {
+      position,
+      field,
+      answer: null,
+      route: hidden || !field.required ? 'leave-blank' : 'ask-operator',
+      value: null,
+      source: hidden ? 'blank' : 'engine',
+      reason: hidden
         ? 'trap-skipped: the page hides this field'
-        : `brain ${fault.reason}: ${fault.message}`,
-    faults: [],
-  }));
+        : field.required
+          ? reason
+          : `optional, left blank: ${reason}`,
+      faults: [],
+    };
+  });
 }
 
 /** One route per field for the session: the contracts' table, then the operator's cache. */
