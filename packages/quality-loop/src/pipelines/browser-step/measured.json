@@ -1,1 +1,18 @@
-{ "since": null, "until": null, "runs": 0, "fields": {}, "caps": {} }
+{
+  "since": "2026-10-03T18:16:26.268Z",
+  "until": "2026-10-07T02:46:14.733Z",
+  "runs": 170,
+  "fields": {
+    "actions": { "n": 156, "max": 8, "p99": 8, "overTarget": 0 },
+    "actions[].expect": { "n": 409, "max": 218, "p99": 165, "overTarget": 1 },
+    "actions[].reason": { "n": 470, "max": 288, "p99": 255, "overTarget": 8 },
+    "actions[].url": { "n": 113, "max": 265, "p99": 174, "overTarget": 0 },
+    "assessment": { "n": 156, "max": 847, "p99": 845, "overTarget": 12 }
+  },
+  "caps": {
+    "critic.mission": { "n": 138, "max": 11255, "p99": 11122, "maxApiCalls": 1 },
+    "critic.safety": { "n": 138, "max": 7179, "p99": 5066, "maxApiCalls": 1 },
+    "evaluator.plan": { "n": 140, "max": 16191, "p99": 11309, "maxApiCalls": 1 },
+    "producer": { "n": 172, "max": 5458, "p99": 4280, "maxApiCalls": 1 }
+  }
+}

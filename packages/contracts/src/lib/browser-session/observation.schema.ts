@@ -9,18 +9,21 @@
 import { z } from 'zod';
 
 import { bound, bounded, exact } from '../bounds';
-import { ELEMENT_KINDS, HIDDEN_TRAITS, STEP_OUTCOMES } from './vocab';
+import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
+import { ELEMENT_KINDS, HIDDEN_TRAITS, SCOPE_ROLES, SNAPSHOT_RUNGS, STEP_OUTCOMES } from './vocab';
 
-/** The most elements one observation lists; the adapter keeps visible, enabled ones first. */
+/** The most elements one observation lists; the adapter keeps those inside the open scope first, then visible, enabled ones. */
 export const ELEMENTS_BOUND = bound(150, 'list');
 /**
- * The most snapshot one observation carries. Sized so a page at every cap here
- * still renders under the engine's goal budget — the caps have to compose, and
- * this is the one that gives. The goal codec reduces what it is given into the
- * room the rest of the goal leaves, so a snapshot inside this bound is never
- * dropped for want of room that was there.
+ * The most snapshot one observation carries: the engine's whole goal budget.
+ * The goal codec fits the snapshot into the room the rest of the goal leaves,
+ * so the observation's own bound only has to be no tighter than that room can
+ * ever be. Measured 2026-10-07 with this at 16 000: eight observations in a
+ * row reached the model as `[snapshot reduced to none]` while their goals sat
+ * at 25–37 KB of the 64 KB budget — the bound bit first, and the room went
+ * unused.
  */
-export const SNAPSHOT_BOUND = bound(16_000);
+export const SNAPSHOT_BOUND = bound(GOAL_BUDGET_BYTES);
 export const ELEMENT_NAME_BOUND = bound(300);
 export const ELEMENT_VALUE_BOUND = bound(500);
 export const OPTION_BOUND = bound(200);
@@ -84,10 +87,76 @@ export const refOf = (line: string): string | null => {
   return token !== undefined && ELEMENT_REF.test(token) ? token : null;
 };
 
+/**
+ * The grammar of one line of Playwright's `ariaSnapshot({ mode: 'ai' })`: a
+ * node per line, indented two spaces per level — a role, an optional quoted
+ * name, bracketed attributes, and a trailing colon when children or inline
+ * text follow. A text line (`- text: …`) matches with the one pseudo-role; a
+ * property line (`- /url: …`) matches nothing. Declared once, here, so the
+ * adapter that decodes a tree and the fingerprint that compares two pages
+ * read the same lines the same way.
+ */
+export const SNAPSHOT_NODE_LINE =
+  /^(?<indent> *)- (?<role>[a-z][\w-]*)(?: "(?<name>(?:[^"\\]|\\.)*)")?(?<attrs>(?: \[[^\]]*\])*)\s*(?::\s*(?<inline>.*))?$/;
+export const SNAPSHOT_TEXT_ROLE = 'text';
+
+/** A node line without the text after its colon, or null for a line that is no node: a property line, a text line. */
+export function nodeLineOf(line: string): string | null {
+  const groups = SNAPSHOT_NODE_LINE.exec(line)?.groups;
+  if (!groups?.['role'] || groups['role'] === SNAPSHOT_TEXT_ROLE) return null;
+  const inline = groups['inline'] ?? '';
+  return inline === '' ? line : line.slice(0, line.length - inline.length).replace(/:\s*$/, '');
+}
+
+/** The snapshot's structure alone: its node lines, each without its inline text. */
+export const nodesOnly = (snapshot: string): string[] =>
+  snapshot.split('\n').flatMap((line) => {
+    const node = nodeLineOf(line);
+    return node === null ? [] : [node];
+  });
+
+/**
+ * The dialog an element sits in, by role and name: the identity a scope keeps
+ * from one observation to the next, when every ref is minted afresh. `modal`
+ * is the DOM's word (`aria-modal`, or a native dialog opened modally) that the
+ * rest of the page waits behind it.
+ */
+export const elementScopeSchema = z.strictObject({
+  role: z.enum(SCOPE_ROLES),
+  name: bounded.text(ELEMENT_NAME_BOUND),
+  modal: z.boolean(),
+});
+export type ElementScope = z.infer<typeof elementScopeSchema>;
+
+/** The open modal scope, as the page names it; what a plan is held to. */
+export const activeScopeSchema = z.strictObject({
+  role: z.enum(SCOPE_ROLES),
+  name: bounded.text(ELEMENT_NAME_BOUND),
+});
+export type ActiveScope = z.infer<typeof activeScopeSchema>;
+
+/** Whether an element sits inside the open scope; every element does when none is open. */
+export const inScope = (
+  element: { readonly scope: ElementScope | null },
+  active: ActiveScope | null,
+): boolean =>
+  active === null ||
+  (element.scope !== null &&
+    element.scope.role === active.role &&
+    element.scope.name === active.name);
+
 export const observedElementSchema = z.strictObject({
   ref: z.string().regex(ELEMENT_REF),
   role: bounded.id(ROLE_MAX_LENGTH, { min: 1 }),
   name: bounded.text(ELEMENT_NAME_BOUND),
+  /**
+   * What a person reads on an element the accessibility tree gives no name:
+   * the words beneath it in the tree, else the text the DOM renders. Null
+   * whenever the tree named it. Measured live 2026-10-07: 26 of 37 elements
+   * on a search landing page were `link ""` and `button ""`, 25 of them with
+   * their words one level down in a paragraph.
+   */
+  text: bounded.text(ELEMENT_NAME_BOUND).nullable(),
   kind: z.enum(ELEMENT_KINDS),
   /** The input's declared type when it has one: text, number, email, tel, file, date… */
   inputType: bounded.id(INPUT_TYPE_MAX_LENGTH).nullable(),
@@ -100,6 +169,8 @@ export const observedElementSchema = z.strictObject({
   hiddenTraits: bounded.list(exact(HIDDEN_TRAITS.length), z.enum(HIDDEN_TRAITS)),
   /** Nearby label or help text a form shows beside the control, when the accessible name alone is terse. */
   context: bounded.text(ELEMENT_NAME_BOUND).nullable(),
+  /** The dialog it sits in, or null for an element of the page itself. */
+  scope: elementScopeSchema.nullable(),
 });
 export type ObservedElement = z.infer<typeof observedElementSchema>;
 
@@ -117,6 +188,20 @@ export const observationUnreadSchema = z.strictObject({
    */
   snapshotLines: z.number().int().min(0),
 });
+
+/**
+ * What the read itself cost, apart from what it found: how many whole reads
+ * it took for two in a row to agree, whether they did, and how long the
+ * observation took. Facts about the reader, never about the page — the
+ * fingerprint leaves them out — kept so a live session can size the reader
+ * from data.
+ */
+export const observationReadingSchema = z.strictObject({
+  reads: z.number().int().min(1),
+  settled: z.boolean(),
+  durationMs: z.number().int().min(0),
+});
+export type ObservationReading = z.infer<typeof observationReadingSchema>;
 
 export const pageObservationSchema = z.strictObject({
   url: bounded.id(URL_MAX_LENGTH),
@@ -137,8 +222,20 @@ export const pageObservationSchema = z.strictObject({
    * for a misreading the goal had handed it.
    */
   unread: observationUnreadSchema.nullable(),
-  /** The accessibility snapshot as text, clipped to its budget. */
+  /**
+   * The modal dialog that is open, when one is: the elements inside it are
+   * what a person can reach, and the goal lists those first and the rest as
+   * behind it. Null when the page itself is what is in front.
+   */
+  activeScope: activeScopeSchema.nullable(),
+  /** The accessibility snapshot as text, reduced to its budget by rung. */
   ariaSnapshot: bounded.text(SNAPSHOT_BOUND),
+  /**
+   * Which rung `ariaSnapshot` is at — data, so that a page whose snapshot was
+   * reduced to its note line is never read as a page that shows something.
+   */
+  snapshotRung: z.enum(SNAPSHOT_RUNGS),
+  reading: observationReadingSchema,
 });
 export type PageObservation = z.infer<typeof pageObservationSchema>;
 

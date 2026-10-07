@@ -138,6 +138,8 @@ async function closeTask(
   const count = TASK_COUNT_BY_STATUS[status];
   if (count !== null) state.tasks[count] += 1;
   state.tasks.open = null;
+  // What this unit's plans settled was settled for this unit.
+  state.reached.unit.clear();
   // Captured now: the write runs later, when the engine may be steps ahead.
   const close = {
     status,
@@ -207,6 +209,13 @@ async function act(
   return false;
 }
 
+/** How a plan's execution ended: by the mission's own stop, or with whether every proposed action ran clean. */
+export interface Executed {
+  termination: Termination | null;
+  /** Every action the plan proposed ran and none failed. */
+  ranWhole: boolean;
+}
+
 /**
  * The actions before the first faulted one, in order, stopping at the first
  * the page refuses; a termination when the plan declared one. What did not
@@ -218,7 +227,7 @@ export async function executeActions(
   decided: Decided<StepPlan>,
   readout: PlanReadout & { plan: StepPlan },
   observation: PageObservation,
-): Promise<Termination | null> {
+): Promise<Executed> {
   const { state } = ctx;
   const actions = readout.plan.actions;
   const prefix = actions.slice(0, readout.executePrefix);
@@ -230,22 +239,26 @@ export async function executeActions(
     const label = describeAction(action, observation);
     if (action.kind === 'terminate') {
       pushHistory(state, label, 'ok', null);
-      return ctx.terminate({ reason: action.cause, detail: action.detail }, 'loop', decided.runId);
+      return {
+        termination: ctx.terminate(
+          { reason: action.cause, detail: action.detail },
+          'loop',
+          decided.runId,
+        ),
+        ranWhole: false,
+      };
     }
     if (isBrowserAction(action)) {
       failed = await act(ctx, action, label, observation);
     } else {
       const outcome = await perform(ctx, action, label, observation);
-      if (outcome.stopped) return null;
+      if (outcome.stopped) return { termination: null, ranWhole: false };
       failed = outcome.failed;
     }
     if (failed) break;
   }
   if (failed) ctx.fail('action-failed');
-  else {
-    state.consecutiveFailures = 0;
-    state.stalledSteps = 0;
-  }
+  else state.consecutiveFailures = 0;
 
   for (const action of prefix.slice(next)) {
     pushHistory(
@@ -260,6 +273,7 @@ export async function executeActions(
     pushHistory(state, describeAction(action, observation), 'not-executed', CUT_NOTE);
   }
   // Every action the plan proposed ran, and none failed: the objections are spent.
-  if (!failed && actions.length === prefix.length) clearObjections(state);
-  return null;
+  const ranWhole = !failed && actions.length === prefix.length;
+  if (ranWhole) clearObjections(state);
+  return { termination: null, ranWhole };
 }

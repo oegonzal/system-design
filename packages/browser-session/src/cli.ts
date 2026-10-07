@@ -1,5 +1,5 @@
 /**
- * `main.js run --goal <md> --profile <name> [--headed|--headless] [--max-tasks n] [--max-minutes n] [--max-failures n]`
+ * `main.js run --goal <md> --profile <name> [--headed|--headless] [--max-tasks n] [--max-minutes n] [--max-failures n] [--max-stalled-steps n]`
  * `main.js login --profile <name> --url <url>`
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
@@ -33,7 +33,7 @@ import { renderOutcome, renderSession, renderSessions } from './render';
 const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
-  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('headed')}|${flag('headless')}] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('subject')} <name>]
+  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('headed')}|${flag('headless')}] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
             every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
@@ -120,6 +120,7 @@ export function parseOptions(argv: readonly string[]): Options | Error {
             maxTasks: text('maxTasks'),
             maxMinutes: text('maxMinutes'),
             maxFailures: text('maxFailures'),
+            maxStalledSteps: text('maxStalledSteps'),
           }),
           subject: text('subject'),
         };

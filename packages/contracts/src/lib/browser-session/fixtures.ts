@@ -17,6 +17,7 @@ const element = (
   ref,
   role,
   name,
+  text: null,
   kind: 'clickable',
   inputType: null,
   value: null,
@@ -27,6 +28,7 @@ const element = (
   maxLength: null,
   hiddenTraits: [],
   context: null,
+  scope: null,
   ...overrides,
 });
 
@@ -47,6 +49,9 @@ export function listingObservation(): PageObservation {
     ],
     omittedElements: 0,
     unread: null,
+    activeScope: null,
+    snapshotRung: 'full',
+    reading: { reads: 1, settled: true, durationMs: 0 },
     ariaSnapshot:
       '- searchbox "Search by title" [ref=e1]\n- button "Search" [ref=e2]\n- list:\n  - link "Senior Engineer — Acme" [ref=e3]\n  - link "Staff Engineer — Globex" [ref=e4]\n- button "Next page" [ref=e5]\n- button "Save search" [disabled] [ref=e6]',
   };
@@ -85,8 +90,54 @@ export function formObservation(): PageObservation {
     ],
     omittedElements: 0,
     unread: null,
+    activeScope: null,
+    snapshotRung: 'full',
+    reading: { reads: 1, settled: true, durationMs: 0 },
     ariaSnapshot:
       '- textbox "Years of experience with Python" [required] [ref=e1]\n- combobox "Work authorisation" [required] [ref=e2]\n- textbox "If you are a bot, what is your favorite activation function?" [ref=e4]\n- button "Back" [ref=e5]\n- button "Next" [ref=e6]',
+  };
+}
+
+/**
+ * The listing page with a modal application dialog open over it: two fields
+ * and a Next button inside the dialog, the listing's own links behind it.
+ */
+export function dialogObservation(): PageObservation {
+  const dialog = { role: 'dialog' as const, name: 'Apply to Acme', modal: true };
+  const listing = listingObservation();
+  return {
+    ...listing,
+    url: 'https://jobs.example.test/search?q=software+engineer&apply=42',
+    title: 'Apply to Acme — Software engineer jobs',
+    elements: [
+      element('e11', 'textbox', 'First name', {
+        kind: 'fillable',
+        inputType: 'text',
+        required: true,
+        value: 'Alex',
+        scope: dialog,
+      }),
+      element('e12', 'textbox', 'Mobile phone number', {
+        kind: 'fillable',
+        inputType: 'tel',
+        required: true,
+        scope: dialog,
+      }),
+      element('e13', 'button', 'Next', { scope: dialog }),
+      element('e14', 'button', 'Dismiss', { scope: dialog }),
+      ...listing.elements,
+    ],
+    activeScope: { role: 'dialog', name: 'Apply to Acme' },
+    snapshotRung: 'full',
+    reading: { reads: 1, settled: true, durationMs: 0 },
+    ariaSnapshot: [
+      '- dialog "Apply to Acme" [ref=e10]:',
+      '  - textbox "First name" [required] [ref=e11]: Alex',
+      '  - textbox "Mobile phone number" [required] [ref=e12]',
+      '  - button "Next" [ref=e13]',
+      '  - button "Dismiss" [ref=e14]',
+      listing.ariaSnapshot,
+    ].join('\n'),
   };
 }
 

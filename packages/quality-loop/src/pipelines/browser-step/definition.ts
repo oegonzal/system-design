@@ -1,21 +1,26 @@
 /**
  * The browser session's planner: one bounded plan for the page in front of
- * it, judged once. The goal is composed by the session — mission, page,
- * elements, recent actions, task ledger — and the artifact is the step plan
- * the session executes once the loop accepts it. Everything here is data
- * except the plan's `OutputShape`, the two exact validators and the
- * hand-back controller beside it.
+ * it. The goal is composed by the session — mission, page, elements, recent
+ * actions, task ledger — and the artifact is the step plan the session
+ * executes as far as the loop's read-back allows. Everything here is data
+ * except the plan's `OutputShape` and the two exact validators.
  *
- * One sample per lens and one hit to confirm, one iteration: a plan is
- * cheap to make again against a fresh observation and expensive to wait
- * for, so the loop runs producer, two critics and one evaluator — four
- * calls — and hands anything but an accept back to the session.
+ * One sample per lens and one hit to confirm: a plan is cheap to make again
+ * against a fresh observation and expensive to wait for, so the loop runs
+ * producer, two critics and one evaluator — four calls — and the standard
+ * controller decides. One iteration by default, because a fresh observation
+ * beats a blind revise; the session asks for a second when the page has not
+ * changed since the last plan, which is when there is no fresh observation
+ * to have and the engine's own briefing — the prior plan, the remediations
+ * at their positions — is what the next attempt should read. Measured
+ * 2026-10-07: four plans in a row refused on one unchanged page, each told
+ * why only as the next goal's objections, and the stall rail ended the run.
  */
 import { BROWSER_STEP_PIPELINE_ID, type StepPlan } from '@sysdesign/contracts';
 
+import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
-import { HAND_BACK } from './controller';
 import criticMission from './lenses/critic.mission.md?raw';
 import criticSafety from './lenses/critic.safety.md?raw';
 import deriveCriteria from './lenses/derive-criteria.md?raw';
@@ -84,14 +89,16 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
     output: stepPlanOutput,
   },
 
-  // Caps are seeded, not measured: no live step run has been recorded yet.
-  // The spec holds the seed table; the first live runs replace it, and a cap
-  // is also the call's time limit, so one a stage outwrites is a call cut short.
+  // Caps measured over 170 recorded step runs (`measured.json`, `pnpm
+  // measure:bounds`), a fifth above the most each lens wrote; a cap is also
+  // the call's time limit, so one a stage outwrites is a call cut short. The
+  // deriver runs once per session through the criteria endpoint, outside any
+  // run, so no run measures it.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 6000 },
   // The planner sees the checklist: a session derives it once and supplies it on every run.
   producer: { persona: producer, maxTokens: 8000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
-  controller: HAND_BACK,
+  controller: STANDARD,
 
   // Each critic owns its half of the vocabulary, as data: its schema cannot
   // emit the other's types. The personas said so in prose and the prose did
@@ -105,7 +112,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       samples: 1,
       consumes: [],
       maxItems: 8,
-      maxTokens: 8000,
+      maxTokens: 14000,
       findingTypes: ['skipped_step', 'stuck_loop', 'misread_page', 'wrong_target'],
     },
     {
@@ -114,7 +121,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       samples: 1,
       consumes: [],
       maxItems: 8,
-      maxTokens: 8000,
+      maxTokens: 9000,
       findingTypes: ['unsafe_action', 'trap_interaction', 'missed_stop'],
     },
   ],
@@ -126,7 +133,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       samples: 1,
       consumes: [],
       maxItems: MAX_CRITERIA,
-      maxTokens: 8000,
+      maxTokens: 20000,
       criterionKinds: ['progress', 'safety', 'grounding'],
     },
   ],
@@ -178,7 +185,8 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       corroboration: 'cited',
     },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
-    // One iteration: the controller hands every non-accept back to the session.
+    // One iteration unless the session asks for more: a fresh observation
+    // beats a blind revise, except when there is no fresh observation to have.
     loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3, lostProduces: 1 },
   },
 };

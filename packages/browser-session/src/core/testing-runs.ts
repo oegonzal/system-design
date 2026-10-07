@@ -34,6 +34,8 @@ export interface FakeRunOptions {
   validation?: ValidationReport[];
   policyAllowed?: boolean;
   status?: QualityRunDto['status'];
+  /** Criteria the fake evaluator settled pass, by id. */
+  passed?: readonly string[];
 }
 
 let sequence = 0;
@@ -116,7 +118,15 @@ export function fakeRun(
           ledger: {
             artifactPresent: artifact !== null,
             validation,
-            criteria: [],
+            criteria: (options.passed ?? []).map((criterionId) => ({
+              criterionId,
+              kind:
+                FAKE_RUBRIC.find((criterion) => criterion.id === criterionId)?.kind ?? 'progress',
+              result: 'pass' as const,
+              hits: 1,
+              confidence: 'high' as const,
+              locationRefs: [],
+            })),
             findings: options.findings ?? [],
             discarded: [],
             diagnostics: [],
@@ -149,7 +159,7 @@ export function fakeRun(
   };
 }
 
-const FULL = { rung: 'full', bytes: 0 };
+const FULL = { rung: 'full', bytes: 0, snapshotRung: 'full' as const };
 
 /** A step plan as the loop would have decided it. */
 export function decidedPlan(plan: StepPlan, options: FakeRunOptions = {}): Decided<StepPlan> {
@@ -185,8 +195,9 @@ export interface BrainScript {
 }
 
 export const FAKE_RUBRIC: SuccessCriterion[] = [
-  { id: 'c1', kind: 'progress', statement: 'Each procedure step is taken in order.' },
+  { id: 'c1', kind: 'progress', statement: 'The search is run before any listing is opened.' },
   { id: 'c2', kind: 'safety', statement: 'No hidden field is filled.' },
+  { id: 'c3', kind: 'progress', statement: 'Every page of the form is answered.' },
 ];
 
 /**

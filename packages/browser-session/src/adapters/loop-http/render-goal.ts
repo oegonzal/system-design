@@ -41,6 +41,7 @@ const TRIMMED_VALUE_MAX = 60;
 const withoutSnapshot = (observation: PageObservation): PageObservation => ({
   ...observation,
   ariaSnapshot: '',
+  snapshotRung: 'none',
 });
 
 const trimmedContext = (observation: PageObservation): PageObservation => ({
@@ -78,13 +79,20 @@ function snapshotFitted(
   budget: number,
 ): { observation: PageObservation; rung: GoalRung } {
   const bare = composeStepGoal(
-    { ...input, observation: { ...observation, ariaSnapshot: '' } },
+    { ...input, observation: withoutSnapshot(observation) },
     Number.MAX_SAFE_INTEGER,
   );
   const room = Math.max(0, budget - textBytes(bare));
-  const fitted = fitSnapshot(observation.ariaSnapshot, room);
+  // The open scope is kept whole and the page behind it reduced first: the
+  // dialog's lines are what the plan acts on.
+  const fitted = fitSnapshot(observation.ariaSnapshot, room, observation.activeScope);
   return {
-    observation: { ...observation, ariaSnapshot: fitted.text },
+    observation: {
+      ...observation,
+      ariaSnapshot: fitted.text,
+      // What fits whole here is still at whatever rung the observation already reduced it to.
+      snapshotRung: fitted.rung === 'full' ? observation.snapshotRung : fitted.rung,
+    },
     // A snapshot reduced within itself leaves the goal whole and says so in
     // its own first line; one there was no room for at all is a goal without a
     // snapshot, and the rung the dump records has to say which happened.
@@ -101,7 +109,13 @@ function attempt(
 ): ComposedGoal | null {
   try {
     const goal = composeStepGoal({ ...input, observation }, budget);
-    return { goal, rung, bytes: textBytes(goal), omittedElements: observation.omittedElements };
+    return {
+      goal,
+      rung,
+      bytes: textBytes(goal),
+      snapshotRung: observation.snapshotRung,
+      omittedElements: observation.omittedElements,
+    };
   } catch (error) {
     if (error instanceof GoalBudgetExceeded) return null;
     throw error;

@@ -1,10 +1,12 @@
 /**
  * The exact checks on a step plan: what the page's index says against what
  * the plan does. A plan that acts on an element the page never offered,
- * touches a disabled one before anything could have enabled it, touches an
- * element the page hides, or goes on past an action that replaces the page is
- * refused from that action on — and the hidden-element case is critical on
- * its own, since it is the DOM half of "a trap is left blank".
+ * touches a disabled one before anything could have enabled it, one the page
+ * hides, one that is not visible or one behind the open dialog, goes on past
+ * an action that replaces the page, or claims what the page shows after an
+ * action that could have changed it, is refused from that action on — and
+ * the hidden-element case is critical on its own, since it is the DOM half
+ * of "a trap is left blank".
  *
  * Both validators CUT rather than block: a plan's actions run in order, so a
  * fault at action.3 says nothing against action.1 and action.2, which were
@@ -17,8 +19,11 @@
  * Nothing here reads prose: every fact is in the index the session wrote.
  */
 import {
+  ACTION_EFFECTS,
   actionLocation,
   actionRefs,
+  CLAIMING_ACTION_KINDS,
+  MUTATING_ACTION_KINDS,
   PAGE_REPLACING_ACTION_KINDS,
   PAGE_REPLACING_WAITS,
   TERMINAL_ACTION_KINDS,
@@ -62,6 +67,10 @@ const references: Rule = (plan, index) => {
 
 const isTerminal = (action: StepAction): boolean =>
   (TERMINAL_ACTION_KINDS as readonly string[]).includes(action.kind);
+const mutates = (action: StepAction): boolean =>
+  (MUTATING_ACTION_KINDS as readonly string[]).includes(action.kind);
+const claims = (action: StepAction): boolean =>
+  (CLAIMING_ACTION_KINDS as readonly string[]).includes(action.kind);
 
 /**
  * Whether an action replaces the page: by its kind, or — for a wait — by what
@@ -87,26 +96,12 @@ function endingIsAllowed(action: StepAction, rest: readonly StepAction[]): boole
 }
 
 /**
- * Which actions touch the element they cite, as data. A touch on a disabled
- * element fails in the browser; waiting for one or scrolling it into view
- * does not, and a plan that waits for a Submit control to become enabled is
- * the ordinary shape of a wizard page.
+ * Whether an action touches the element it cites, from the declared effects:
+ * a touch on a disabled element fails in the browser; waiting for one or
+ * scrolling it into view does not, and a plan that waits for a Submit
+ * control to become enabled is the ordinary shape of a wizard page.
  */
-const TOUCHES: Readonly<Record<StepAction['kind'], boolean>> = {
-  navigate: false,
-  click: true,
-  fill: true,
-  select: true,
-  press: false,
-  scroll: false,
-  waitFor: false,
-  screenshot: false,
-  askFields: true,
-  taskStart: false,
-  taskDone: false,
-  terminate: false,
-  done: false,
-};
+const touches = (action: StepAction): boolean => ACTION_EFFECTS[action.kind].touches;
 
 /** Whether the element's disabled state at observation still binds this action. */
 interface Standing {
@@ -127,8 +122,18 @@ function elementFaults(
   for (const ref of actionRefs(action)) {
     const element = elements.get(ref);
     if (element === undefined) continue;
-    if (element.disabled && TOUCHES[action.kind] && !standing.afterFields) {
+    if (element.disabled && touches(action) && !standing.afterFields) {
       fault('high', `${ref} is disabled`);
+    }
+    // What a person could not reach: behind the open dialog, or not shown at
+    // all. Measured 2026-10-07: a form page listed 150 elements with the
+    // open dialog's five fields among them unmarked, and the plans touched
+    // the page behind it.
+    if (touches(action) && element.behind) {
+      fault('high', `${ref} is behind the open dialog: a person could not reach it`);
+    }
+    if (touches(action) && !element.visible && element.hiddenTraits.length === 0) {
+      fault('high', `${ref} is not visible`);
     }
     if (
       (action.kind === 'fill' || action.kind === 'select' || action.kind === 'click') &&
@@ -168,53 +173,64 @@ function elementFaults(
  * resting on the previous plan's words, and only a credulous evaluator sample
  * stood between the session and ending as a success with no work done.
  */
-const CLAIMS_ABOUT_THE_PAGE: ReadonlySet<StepAction['kind']> = new Set(['terminate', 'taskDone']);
-
 const claimFault = (action: StepAction, pageShowsContent: boolean): Fault | null =>
-  !pageShowsContent && CLAIMS_ABOUT_THE_PAGE.has(action.kind)
+  !pageShowsContent && claims(action)
     ? {
         severity: 'high',
         message: `${action.kind} on a page that shows nothing: no stop condition or outcome is shown to rest it on — wait for, or navigate to, the page the mission names`,
       }
     : null;
 
-/** A unit of work opens once and closes once; the plan may do either only where the ledger allows it. */
-const taskFault = (action: StepAction, open: boolean): Fault | null => {
-  if (action.kind === 'taskStart' && open) {
-    return { severity: 'high', message: 'taskStart while a unit of work is already open' };
-  }
-  if (action.kind === 'taskDone' && !open) {
-    return { severity: 'high', message: 'taskDone while no unit of work is open' };
-  }
-  return null;
-};
+/**
+ * A claim rests on the page as observed, so one that follows an action that
+ * could have changed the page rests on nothing this plan has seen. The page
+ * such an action leads to is the next observation's to show. Measured
+ * 2026-10-07: `askFields, click Next, taskDone done` on page 1 of 9 of an
+ * application form — with the task rule that voided it gone, that plan would
+ * have run whole and closed the session's one unit of work as done.
+ */
+const staleClaimFault = (action: StepAction, mutated: Earlier | null): Fault | null =>
+  mutated !== null && claims(action)
+    ? {
+        severity: 'high',
+        message: `${action.kind} follows the ${mutated.kind} at ${actionLocation(mutated.position)}: it claims what the page shows, and that page has not been observed`,
+      }
+    : null;
+
+/** An action earlier in the plan that the one being checked is held against. */
+type Earlier = { position: number; kind: StepAction['kind'] };
 
 const limits: Rule = (plan, index) => {
   const elements = new Map(index.elements.map((element) => [element.ref, element]));
   const problems: ValidationProblem[] = [];
+  // Located at the first action past the limit, so the plan is cut there and
+  // the actions within the limit still run: a limit never discards work.
   if (plan.actions.length > index.maxActions) {
     problems.push(
-      problem('high', `${plan.actions.length} actions planned; the limit is ${index.maxActions}`),
+      problem('high', `${plan.actions.length} actions planned; the limit is ${index.maxActions}`, [
+        actionLocation(index.maxActions),
+      ]),
     );
   }
-  let open = index.openTask;
   let afterFields = false;
-  /** The position of the first action that replaced the page, once one has. */
-  let replacedAt: number | null = null;
+  /** The first action that replaced the page, once one has. */
+  let replaced: Earlier | null = null;
+  /** The first action that could have changed the page, once one has. */
+  let mutated: Earlier | null = null;
   plan.actions.forEach((action, position) => {
     const at = [actionLocation(position)];
     // The Limits section says it and this is where it is enforced: an action
     // after one that replaces the page acts on a page nobody has observed.
-    if (replacedAt !== null) {
+    if (replaced !== null) {
       problems.push(
         problem(
           'high',
-          `${action.kind} follows the ${plan.actions[replacedAt]!.kind} at ${actionLocation(replacedAt)}: the page it would act on has not been observed`,
+          `${action.kind} follows the ${replaced.kind} at ${actionLocation(replaced.position)}: the page it would act on has not been observed`,
           at,
         ),
       );
     } else if (replacesPage(action)) {
-      replacedAt = position;
+      replaced = { position, kind: action.kind };
     }
     if (isTerminal(action) && position !== plan.actions.length - 1) {
       const rest = plan.actions.slice(position + 1);
@@ -231,16 +247,17 @@ const limits: Rule = (plan, index) => {
         );
       }
     }
-    const task = taskFault(action, open);
-    if (task !== null) problems.push(problem(task.severity, task.message, at));
     const claim = claimFault(action, index.pageShowsContent);
     if (claim !== null) problems.push(problem(claim.severity, claim.message, at));
-    if (action.kind === 'taskStart') open = true;
-    if (action.kind === 'taskDone') open = false;
+    // Past a page replacement every action is already refused above; the
+    // stale-claim rule says what a replacement rule did not.
+    const stale = replaced === null ? staleClaimFault(action, mutated) : null;
+    if (stale !== null) problems.push(problem(stale.severity, stale.message, at));
     for (const fault of elementFaults(action, elements, { afterFields })) {
       problems.push(problem(fault.severity, fault.message, at));
     }
     if (action.kind === 'askFields') afterFields = true;
+    if (mutated === null && mutates(action)) mutated = { position, kind: action.kind };
   });
   return problems;
 };

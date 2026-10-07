@@ -25,9 +25,59 @@ describe('observationFingerprint', () => {
       ),
     };
     const unread = { ...first, unread: { elements: 3, snapshotLines: 0 } };
-    for (const changed of [retitled, oneFewer, disabledNow, unread]) {
+    // The words on an unnamed element, the dialog an element sits in, and the
+    // dialog in front are each a fact the goal shows — so each is identity: a
+    // dialog opening over an unchanged page is a page that changed.
+    const worded = {
+      ...first,
+      elements: first.elements.map((element, index) =>
+        index === 2 ? { ...element, name: '', text: 'Senior Engineer — Acme' } : element,
+      ),
+    };
+    const scoped = {
+      ...first,
+      elements: first.elements.map((element, index) =>
+        index === 2
+          ? { ...element, scope: { role: 'dialog' as const, name: 'Apply', modal: true } }
+          : element,
+      ),
+    };
+    const dialogInFront = { ...first, activeScope: { role: 'dialog' as const, name: 'Apply' } };
+    for (const changed of [
+      retitled,
+      oneFewer,
+      disabledNow,
+      unread,
+      worded,
+      scoped,
+      dialogInFront,
+    ]) {
       expect(observationFingerprint(changed)).not.toBe(observationFingerprint(first));
     }
+
+    // The words inside a node are not identity: a paragraph that counts seconds
+    // or notifications is not a page that moved, and a snapshot reduced to its
+    // note line says nothing about the page. A node appearing or going is.
+    const counting = {
+      ...first,
+      ariaSnapshot: `${first.ariaSnapshot}\n- paragraph [ref=e9]: 3 minutes ago`,
+    };
+    const countingOn = {
+      ...first,
+      ariaSnapshot: `${first.ariaSnapshot}\n- paragraph [ref=e9]: 4 minutes ago\n- text: live`,
+    };
+    expect(observationFingerprint(counting)).toBe(observationFingerprint(countingOn));
+    expect(observationFingerprint(counting)).not.toBe(observationFingerprint(first));
+    const noted = {
+      ...first,
+      ariaSnapshot: '[snapshot reduced to none: 1418 of 1418 lines not shown]',
+      snapshotRung: 'none' as const,
+    };
+    const notedAgain = {
+      ...noted,
+      ariaSnapshot: '[snapshot reduced to none: 1419 of 1419 lines not shown]',
+    };
+    expect(observationFingerprint(noted)).toBe(observationFingerprint(notedAgain));
   });
 
   it('[BRW-4] reads an empty document as one identity, so a session that never leaves it is seen to be standing still', () => {

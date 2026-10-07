@@ -50,8 +50,16 @@ import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
 
 /** The form-memory orchestrator's step that runs the field-answer pipeline. */
 export const FORM_MEMORY_TARGET_STEP = 'target';
-/** One plan, one judged answer set: the session re-observes rather than revising. */
+/** One judged plan or answer set: a fresh observation beats a blind revise. */
 export const DECISION_ITERATIONS = 1;
+/**
+ * On a page that has not changed since the last plan there is no fresh
+ * observation to have, so the loop revises once from its own briefing — the
+ * prior plan with the remediations at their positions — before the session
+ * is handed the verdict. Measured 2026-10-07: four plans refused in a row on
+ * one unchanged page, each told why only through the next goal's objections.
+ */
+export const DECISION_ITERATIONS_ON_AN_UNCHANGED_PAGE = 2;
 /** A digest may revise once. */
 export const TEACH_ITERATIONS = 2;
 
@@ -105,19 +113,33 @@ export class LoopBrain implements BrainPort {
 
   planStep(input: StepInput): Promise<Decided<StepPlan>> {
     return guarded(async () => {
-      const composed = composeStepGoalWithinBudget(input);
+      const composed = composeStepGoalWithinBudget({
+        ...input,
+        progress: { criteria: input.criteria, ...input.progress },
+      });
+      // A criterion the session settled is not graded again: the rubric this
+      // run reads omits it, and the goal's Progress section carries it instead.
+      const criteria = input.criteria.filter(
+        (criterion) => !input.progress.settled.includes(criterion.id),
+      );
       const { runId } = await this.client.startRun({
         pipeline: BROWSER_STEP_PIPELINE_ID,
         goal: composed.goal,
-        criteria: [...input.criteria],
-        maxIterations: DECISION_ITERATIONS,
+        criteria,
+        maxIterations: input.pageUnchanged
+          ? DECISION_ITERATIONS_ON_AN_UNCHANGED_PAGE
+          : DECISION_ITERATIONS,
       });
       const run = settled(await awaitRun(this.client, runId, this.options));
       return {
         runId,
         orchestrationRunId: null,
         run,
-        composition: { rung: composed.rung, bytes: composed.bytes },
+        composition: {
+          rung: composed.rung,
+          bytes: composed.bytes,
+          snapshotRung: composed.snapshotRung,
+        },
       };
     });
   }
@@ -158,7 +180,7 @@ export class LoopBrain implements BrainPort {
         runId,
         orchestrationRunId,
         run,
-        composition: { rung: 'full', bytes: textBytes(goal) },
+        composition: { rung: 'full', bytes: textBytes(goal), snapshotRung: null },
         admission: isAdmission(reported) ? reported : 'fell-short',
       };
     });

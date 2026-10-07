@@ -5,6 +5,7 @@ import {
   type PageObservation,
   type PlanReadout,
   routePlan,
+  SETTLING_CRITERION_KINDS,
   type StepPlan,
   TERMINATION_STATUS,
 } from '@sysdesign/contracts';
@@ -28,10 +29,10 @@ import {
 } from './session-dump';
 import {
   createState,
-  describeAction,
   describeRefusedPlan,
   ledgerSummaryOf,
   noteObservation,
+  progressOf,
   pushHistory,
   pushObjections,
   railStateOf,
@@ -122,6 +123,8 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
       ledger: ledgerSummaryOf(state, options.rails),
       objections: [...state.objections],
       criteria: ctx.criteria.plan,
+      pageUnchanged: state.pageUnchanged,
+      progress: progressOf(state),
     });
   } catch (error) {
     if (!(error instanceof BrainFaulted)) throw error;
@@ -197,13 +200,32 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     ctx.fail('plan-not-executed');
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
-  const termination = await executeActions(
+  const openBefore = state.tasks.open !== null;
+  const executed = await executeActions(
     ctx,
     decided,
     { ...readout, plan: readout.plan },
     observation,
   );
-  return termination ?? checkRails(railStateOf(state), options.rails, deps.clock.now());
+  if (executed.termination !== null) return executed.termination;
+  // What the evaluator passed on a plan that ran whole waits for the next
+  // observation: settled, if the page moved, for the unit when one was open
+  // before or after the plan, else for the session. A plan that closed its
+  // unit settles nothing: what it passed was that unit's, and the unit is gone.
+  const openAfter = state.tasks.open !== null;
+  const scope = openBefore || openAfter ? 'unit' : 'session';
+  if (executed.ranWhole && !(openBefore && !openAfter)) {
+    const settling = new Set(
+      ctx.criteria.plan
+        .filter((criterion) =>
+          (SETTLING_CRITERION_KINDS as readonly string[]).includes(criterion.kind),
+        )
+        .map((criterion) => criterion.id),
+    );
+    const ids = readout.passed.filter((id) => settling.has(id));
+    state.pendingPass = ids.length === 0 ? null : { ids, scope };
+  }
+  return checkRails(railStateOf(state), options.rails, deps.clock.now());
 }
 
 export async function runSession(
@@ -262,9 +284,6 @@ export async function runSession(
     },
     fail(event) {
       state.consecutiveFailures += 1;
-      // A failure on a page that has not moved since the last step is a stall:
-      // the hand-back's premise, a fresh observation, is not being met.
-      if (state.pageUnchanged) state.stalledSteps += 1;
       deps.log(`step ${state.step}: ${event} (${state.consecutiveFailures} in a row)`);
     },
     terminate(termination, source, runId) {

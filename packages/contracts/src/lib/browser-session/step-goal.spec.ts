@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
-import { emptyLedger, listingObservation, MISSION_FIXTURE, openTaskLedger } from './fixtures';
+import {
+  dialogObservation,
+  emptyLedger,
+  formObservation,
+  listingObservation,
+  MISSION_FIXTURE,
+  openTaskLedger,
+} from './fixtures';
 import type { ObservedElement, PageObservation } from './observation.schema';
 import {
   ELEMENTS_BOUND,
@@ -16,12 +23,30 @@ import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
 import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
 import { STEP_ACTION_KINDS } from './vocab';
 
+const NO_PROGRESS = { criteria: [], settled: [], done: [] };
+
+/** The goal's text between two of its headings, which must both be there. */
+const between = (goal: string, heading: string, next: string): string => {
+  const start = goal.indexOf(heading);
+  const end = start < 0 ? -1 : goal.indexOf(next, start);
+  if (end < 0) throw new Error(`the goal has no ${heading} followed by ${next}`);
+  return goal.slice(start + heading.length, end);
+};
+
 const goalOf = (
   observation: PageObservation,
   history = [],
   ledger = emptyLedger(),
   objections: readonly StepObjection[] = [],
-) => composeStepGoal({ mission: MISSION_FIXTURE, observation, history, ledger, objections });
+) =>
+  composeStepGoal({
+    mission: MISSION_FIXTURE,
+    observation,
+    history,
+    ledger,
+    objections,
+    progress: NO_PROGRESS,
+  });
 
 /** One objection at its declared ceiling, as a maximal goal would carry it. */
 const maximalObjection = (step: number): StepObjection => ({
@@ -38,13 +63,19 @@ describe('composeStepGoal', () => {
     expect(index).not.toBeNull();
     expect(index?.pipeline).toBe('browser-step');
     expect(index?.maxActions).toBe(ACTIONS_BOUND.target);
-    expect(index?.openTask).toBe(true);
     expect(index?.elements.map((e) => e.ref)).toEqual(observation.elements.map((e) => e.ref));
+    expect(index?.elements.every((e) => e.visible && !e.behind)).toBe(true);
     expect(index?.elements.find((e) => e.ref === 'e6')?.disabled).toBe(true);
     expect(index?.elements.find((e) => e.ref === 'e1')?.kind).toBe('fillable');
     expect(index?.pageShowsContent).toBe(true);
-    // Nothing listed and nothing in the snapshot: the page shows nothing, and the index says so.
-    const empty = { ...observation, elements: [], ariaSnapshot: '  \n' };
+    // Nothing listed and a snapshot reduced to nothing: the page shows nothing, and the index says so —
+    // read from the rung, so a note line saying what was not shown is never taken for content.
+    const empty = {
+      ...observation,
+      elements: [],
+      ariaSnapshot: '[snapshot reduced to none: 1418 of 1418 lines not shown]',
+      snapshotRung: 'none' as const,
+    };
     expect(readStepIndex(goalOf(empty))?.pageShowsContent).toBe(false);
   });
 
@@ -59,15 +90,18 @@ describe('composeStepGoal', () => {
   /**
    * A busy listing page: the element cap reached, every tenth element a
    * select with a handful of options, context on a fifth of them, the
-   * snapshot and the mission at their caps. Options are listed twice — for
-   * the model and in the index — so a page of long selects is the one shape
-   * that does not fit; the session degrades such a page before composing.
+   * mission at its cap, and no snapshot — the snapshot's room is whatever
+   * the rest leaves, and the session's composer fits it there. Options are
+   * listed twice — for the model and in the index — so a page of long
+   * selects is the one shape that does not fit; the session degrades such a
+   * page before composing.
    */
-  it('[QL-39] renders a plausible maximal page under the engine budget', () => {
+  it('[QL-39] renders a plausible maximal page under the engine budget, with room left for a snapshot', () => {
     const elements: ObservedElement[] = Array.from({ length: ELEMENTS_BOUND.target }, (_, i) => ({
       ref: `e${i + 1}`,
       role: i % 10 === 0 ? 'combobox' : 'link',
       name: 'x'.repeat(60),
+      text: null,
       kind: i % 10 === 0 ? 'selectable' : 'clickable',
       inputType: null,
       value: null,
@@ -78,12 +112,14 @@ describe('composeStepGoal', () => {
       maxLength: null,
       hiddenTraits: [],
       context: i % 5 === 0 ? 'c'.repeat(80) : null,
+      scope: null,
     }));
     const observation = pageObservationSchema.parse({
       ...listingObservation(),
       elements,
       omittedElements: 12,
-      ariaSnapshot: 's'.repeat(16_000),
+      snapshotRung: 'full',
+      ariaSnapshot: '',
     });
     const goal = composeStepGoal({
       mission: 'm'.repeat(6_000),
@@ -99,8 +135,21 @@ describe('composeStepGoal', () => {
       objections: Array.from({ length: OBJECTIONS_BOUND.target + 3 }, (_, i) =>
         maximalObjection(i + 1),
       ),
+      // A long rubric with half of it settled: each settled statement is printed whole.
+      progress: {
+        criteria: Array.from({ length: 24 }, (_, i) => ({
+          id: `c${i + 1}`,
+          kind: 'progress',
+          statement: 's'.repeat(400),
+        })),
+        settled: Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+        done: ['c13'],
+      },
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
+    // The room such a page leaves a snapshot: measured 2026-10-07, a dialog of
+    // twenty-odd lines is about 2 KB, and the scope rung keeps it whole.
+    expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);
     expect(goal).toContain('(12 more interactive elements not listed)');
     // Past the declared count they are counted, never cut.
     expect(goal).toContain('(3 older objection(s) not listed)');
@@ -119,6 +168,82 @@ describe('composeStepGoal', () => {
     expect(() => goalOf(observation)).toThrow(GoalBudgetExceeded);
   });
 
+  it('[QL-39] lists what a person can reach — inside the open dialog, visible — and counts the rest, every ref staying in the index', () => {
+    // Measured 2026-10-07: an application dialog's five fields reached the
+    // model among 150 lines, 67 of them hidden, with nothing saying a dialog
+    // was open and the page behind it listed as if a person could reach it.
+    const goal = goalOf(dialogObservation());
+    const elements = between(goal, '## Elements', '## Snapshot');
+    expect(elements).toContain(
+      'Inside the open dialog "Apply to Acme" — the rest of the page waits behind it:',
+    );
+    expect(elements).toMatch(/^- e11 · textbox · "First name"/m);
+    expect(elements).toMatch(/^- e13 · button · "Next"/m);
+    // The listing's own links are behind the dialog: counted, not listed.
+    expect(elements).not.toMatch(/^- e3 · /m);
+    expect(elements).toContain(
+      '(6 interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)',
+    );
+    // Every ref is still in the index, whether listed or not — marked behind the dialog where it is.
+    const index = readStepIndex(goal);
+    expect(index?.elements.map((e) => e.ref)).toEqual(
+      dialogObservation().elements.map((e) => e.ref),
+    );
+    expect(index?.elements.filter((e) => e.behind).map((e) => e.ref)).toEqual(
+      listingObservation().elements.map((e) => e.ref),
+    );
+    expect(index?.elements.find((e) => e.ref === 'e13')?.behind).toBe(false);
+
+    // No dialog open: everything visible is listed, and only the hidden is counted.
+    const form = goalOf(formObservation());
+    expect(form).not.toContain('Inside the open');
+    expect(form).toMatch(/^- e1 · textbox/m);
+    expect(form).not.toMatch(/^- e3 · /m);
+    expect(form).toContain('(1 interactive elements not visible');
+    expect(readStepIndex(form)?.elements.find((e) => e.ref === 'e3')).toMatchObject({
+      visible: false,
+      behind: false,
+    });
+
+    // A page with nothing on it still says so.
+    expect(goalOf({ ...listingObservation(), elements: [] })).toContain(
+      '(no interactive elements)',
+    );
+    // A page with no element but a snapshot at a rung above none still shows something.
+    expect(readStepIndex(goalOf({ ...listingObservation(), elements: [] }))?.pageShowsContent).toBe(
+      true,
+    );
+  });
+
+  it('[QL-39] says where the mission stands from engine facts: settled criteria with their statements, those done in the unit by id, the rest by id in rubric order', () => {
+    const criteria = [
+      { id: 'c1', kind: 'grounding', statement: 'The assessment names the kind of page.' },
+      { id: 'c2', kind: 'progress', statement: 'Open the jobs search and run the search.' },
+      { id: 'c3', kind: 'progress', statement: 'Open the next result.' },
+      { id: 'c4', kind: 'progress', statement: 'Press the apply button.' },
+      { id: 'c5', kind: 'safety', statement: 'Never sign in.' },
+      { id: 'c6', kind: 'progress', statement: 'Submit on the review page.' },
+    ];
+    const goal = composeStepGoal({
+      mission: MISSION_FIXTURE,
+      observation: listingObservation(),
+      history: [],
+      ledger: openTaskLedger(),
+      objections: [],
+      progress: { criteria, settled: ['c2'], done: ['c3'] },
+    });
+    const section = between(goal, '## Progress', '## Limits');
+    expect(section).toContain('- Satisfied earlier this session, not graded on this page:');
+    expect(section).toContain('  - c2 — Open the jobs search and run the search.');
+    expect(section).toContain('- Done in the open unit of work so far: c3.');
+    // Open ones by id only — the rubric carries their statements — and never a never-do line.
+    expect(section).toContain('- Still open: c4, c6.');
+    expect(section).not.toContain('c5');
+    expect(section).not.toContain('Press the apply button');
+    // Nothing settled yet reads as such, not as an empty list.
+    expect(goalOf(listingObservation())).toContain('- Satisfied earlier this session: none yet.');
+  });
+
   it('prints only the facts that are true of an element', () => {
     const line = renderElementLine({
       ...listingObservation().elements[0],
@@ -131,6 +256,21 @@ describe('composeStepGoal', () => {
       '- e1 · searchbox · "Search by title" · options: a | b · required · hidden: offscreen',
     );
     expect(renderElementLine(listingObservation().elements[1])).toBe('- e2 · button · "Search"');
+    // What a person reads on an element the tree gave no name, beside whatever stood in for one.
+    expect(
+      renderElementLine({
+        ...listingObservation().elements[2],
+        name: '',
+        text: 'Senior Engineer Acme',
+      }),
+    ).toBe('- e3 · link · "" · text "Senior Engineer Acme"');
+    expect(
+      renderElementLine({ ...listingObservation().elements[2], name: 'search', text: 'Describe' }),
+    ).toBe('- e3 · link · "search" · text "Describe"');
+    // An element the tree named carries no text, so none is printed.
+    expect(renderElementLine({ ...listingObservation().elements[2], text: null })).toBe(
+      '- e3 · link · "Senior Engineer — Acme"',
+    );
   });
 });
 
@@ -159,7 +299,7 @@ describe('stepPlanSchema', () => {
         note: 'cut',
       },
     ]);
-    const recent = goal.split('## Recent actions')[1]!.split('## Objections')[0]!;
+    const recent = between(goal, '## Recent actions', '## Objections');
     expect(recent).toContain('- click e3 link "Senior Engineer — Acme" — ok — the detail page');
     expect(recent).toContain(
       '- not-executed (proposed, did not run): plan of 2 action(s): terminate, done',
@@ -194,6 +334,8 @@ describe('stepPlanSchema', () => {
     // submit names no ref and still asserts a page nobody has observed.
     expect(goal).toMatch(/navigates.*is the LAST action of the plan/);
     expect(goal).toContain('closing a unit of work and terminating included');
+    // And a claim rests on the page as observed: never after an action that could change it.
+    expect(goal).toContain('press or askFields, never after');
 
     // And a cap reads as a quota unless it says otherwise: asked for "at most
     // 8", the same producer returned seven or eight nearly every time.

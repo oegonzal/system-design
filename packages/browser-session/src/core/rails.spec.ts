@@ -83,14 +83,15 @@ describe('the rails', () => {
     ).toBe('operator-stop');
   });
 
-  it('[BRW-4] stops on a page that has not changed across the declared failed steps, whatever the failure budget', () => {
+  it('[BRW-4] stops on a page that has not changed across the declared observations, whatever the steps did and whatever the failure budget', () => {
     // Measured 2026-10-07: twenty consecutive failed steps on one unchanged
-    // empty document, under an operator's failure budget of twenty. The
-    // hand-back's premise — a fresh observation — had failed from step two.
+    // empty document, under an operator's failure budget of twenty; then
+    // twelve observations of one landing page, each step a navigate that
+    // ran clean and moved nothing, which a count of failed steps never saw.
     expect(checkRails(state({ stalledSteps: 1 }), RAIL_LIMITS, at(1))).toBeNull();
     const stalled = checkRails(state({ stalledSteps: 2 }), RAIL_LIMITS, at(1));
     expect(stalled?.reason).toBe('page-stalled');
-    expect(stalled?.detail).toBe('2 failed steps in a row on a page that did not change, limit 2');
+    expect(stalled?.detail).toBe('2 observations in a row of a page that did not change, limit 2');
     // A high failure budget does not save it: the stall rail reads its own count.
     expect(
       checkRails(

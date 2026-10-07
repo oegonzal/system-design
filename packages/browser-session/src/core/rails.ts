@@ -18,7 +18,7 @@ export interface RailState {
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from. */
   unreadablePages: number;
-  /** Failed steps in a row whose observation was the same page as the step before. */
+  /** Observations in a row of a page that did not change, whatever the steps between them did. */
   stalledSteps: number;
   operatorStopped: boolean;
 }
@@ -86,12 +86,14 @@ export const RAILS: readonly Rail[] = [
     // revise. When the page has not changed, there is no fresh observation to
     // have: the same plan is being asked of the same page, and the failure
     // budget — which an operator may set high for a flaky page — is the wrong
-    // rail to spend on it. Read from the observation's own identity, never
-    // from a URL or a page kind.
+    // rail to spend on it. A step that ran and moved nothing is the same
+    // stall as one that was refused (measured 2026-10-07: twelve reloads of
+    // one page, each counted a success). Read from the observation's own
+    // identity, never from a URL or a page kind.
     reason: 'page-stalled',
     holds: (state, rails) => state.stalledSteps >= rails.maxStalledSteps,
     detail: (state, rails) =>
-      `${state.stalledSteps} failed steps in a row on a page that did not change, limit ${rails.maxStalledSteps}`,
+      `${state.stalledSteps} observations in a row of a page that did not change, limit ${rails.maxStalledSteps}`,
   },
 ];
 

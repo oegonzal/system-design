@@ -83,6 +83,7 @@ describe('the goals', () => {
           history: [],
           ledger: emptyLedger(),
           objections: [],
+          progress: { criteria: [], settled: [], done: [] },
         }),
       ).not.toThrow();
     },

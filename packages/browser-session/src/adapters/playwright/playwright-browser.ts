@@ -2,37 +2,32 @@ import { join } from 'node:path';
 
 import {
   actionRefs,
-  ELEMENT_NAME_BOUND,
-  ELEMENT_VALUE_BOUND,
-  elementKind,
   elementKindOf,
-  ELEMENTS_BOUND,
-  OPTIONS_BOUND,
-  OPTION_BOUND,
+  observationFingerprint,
   pageObservationSchema,
-  SNAPSHOT_BOUND,
-  TITLE_BOUND,
-  URL_MAX_LENGTH,
   type ObservedElement,
   type PageObservation,
 } from '@sysdesign/contracts';
 import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
 
 import { ActionFailed, type BrowserAction, type BrowserPort } from '../../core/ports';
-import { clip } from '../../core/text';
 import {
   decodeAriaSnapshot,
-  fitSnapshot,
+  scopesOf,
   settledSnapshot,
+  subtreeText,
   unreadSnapshotLines,
-  type SnapshotNode,
 } from './aria-snapshot';
+import { readElementFacts, readWithinBudget } from './element-facts';
 import {
-  hiddenTraitsOf,
-  readElementFacts,
-  readWithinBudget,
-  type ElementFacts,
-} from './element-facts';
+  failedWholesale,
+  toObservation,
+  toObservedElement,
+  type PageReading,
+} from './observation-reading';
+
+/** The reading facts of a read taken only to compare: never reported. */
+const UNSETTLED = { reads: 1, settled: false, durationMs: 0 } as const;
 
 /**
  * The browser as Playwright drives it: a persistent Chrome profile, so the
@@ -47,25 +42,30 @@ export interface PlaywrightBrowserOptions {
   /** `chrome` for the installed Chrome; undefined for the Chromium Playwright bundles (the specs). */
   channel: string | undefined;
   actionTimeoutMs?: number;
+  /** How long a read that differs from the one before waits before the next; the specs shorten it. */
+  settleRetryMs?: number;
 }
 
 export const CHROME_CHANNEL = 'chrome';
 export const DEFAULT_ACTION_TIMEOUT_MS = 15_000;
 /**
  * How long the observer waits for the document to settle before each read of
- * the page, and how long it waits between reads that came back without a ref.
- * `settledSnapshot` owns how many reads are taken; see its note for the live
- * run these were measured on.
+ * the page, and how long it waits between reads that came back without a ref
+ * or that differ from the read before. `settledSnapshot` owns how many reads
+ * are taken for a ref-less answer; `readPage` how many for a page still
+ * changing.
  */
 export const SETTLE_TIMEOUT_MS = 10_000;
 export const SETTLE_RETRY_MS = 400;
 
 /**
  * What one observation may spend: the timeout on a single element's facts read,
- * and the budget for reading all of them. Both are declared here rather than
- * inherited from the action timeout — see `readWithinBudget` for the live run
- * that measured why a phase the engine's rails cannot interrupt must bound
- * itself.
+ * and the budget for every facts read of every read the observation takes.
+ * Both are declared here rather than inherited from the action timeout — see
+ * `readWithinBudget` for the live run that measured why a phase the engine's
+ * rails cannot interrupt must bound itself. The budget is one deadline for
+ * the whole observation, not one per read: with reads taken until two agree,
+ * a budget per read would be the same hazard multiplied.
  */
 export const FACTS_TIMEOUT_MS = 1_000;
 export const OBSERVE_BUDGET_MS = 20_000;
@@ -81,57 +81,25 @@ export const OBSERVE_BUDGET_MS = 20_000;
  */
 export const PAGE_READS = 3;
 
-/** One read of the page, and what it could not reach. */
-interface PageReading {
-  snapshot: string;
-  elements: ObservedElement[];
-  unreadElements: number;
-  unreadSnapshotLines: number;
-}
-
 /**
- * Whether a read failed wholesale rather than finding little. Both halves are
- * facts about the read, never a guess about the page: every ref dead means the
- * snapshot's map is stale, and no node from a snapshot with lines in it means
- * the text was not read.
+ * How many further reads a page that keeps changing is given before it is
+ * reported as it stands. A page is reported only once two reads in a row
+ * agree on every fact the goal renders — the same identity the session's
+ * stall rail compares.
+ *
+ * Measured live on 2026-10-07: a search landing page was observed a second
+ * after its own reload, before its search control had rendered, and
+ * reported without it — thirteen steps in a row, each after a fresh reload;
+ * and a job page was observed between the click that opened its application
+ * dialog and the dialog's render. A read taken while the page is still
+ * arriving is a fact about the moment, not about the page.
  */
-const failedWholesale = (reading: PageReading): boolean =>
-  reading.unreadSnapshotLines > 0 || (reading.unreadElements > 0 && reading.elements.length === 0);
+const STABLE_READS = 4;
+
 const SCROLL_PX = 600;
-const ROLE_MAX = 40;
-const INPUT_TYPE_MAX = 30;
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error);
-
-function toObservedElement(node: SnapshotNode, facts: ElementFacts): ObservedElement {
-  return {
-    ref: node.ref ?? '',
-    role: clip(node.role, ROLE_MAX),
-    name: clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target),
-    kind: elementKind(node.role, facts),
-    inputType: facts.inputType === null ? null : clip(facts.inputType, INPUT_TYPE_MAX),
-    value: facts.value === null ? null : clip(facts.value, ELEMENT_VALUE_BOUND.target),
-    options:
-      facts.options === null
-        ? null
-        : facts.options
-            .slice(0, OPTIONS_BOUND.target)
-            .map((option) => clip(option, OPTION_BOUND.target)),
-    required: facts.required,
-    disabled: facts.disabled || node.attributes['disabled'] === true,
-    visible: facts.visible,
-    maxLength: facts.maxLength,
-    hiddenTraits: hiddenTraitsOf(facts),
-    context: facts.context === null ? null : clip(facts.context, ELEMENT_NAME_BOUND.target),
-  };
-}
-
-/** Visible, enabled elements first, then the rest, each half in document order. */
-const ordered = (elements: readonly ObservedElement[]): ObservedElement[] => [
-  ...elements.filter((element) => element.visible && !element.disabled),
-  ...elements.filter((element) => !(element.visible && !element.disabled)),
-];
 
 export class PlaywrightBrowser implements BrowserPort {
   private context: BrowserContext | null = null;
@@ -158,6 +126,10 @@ export class PlaywrightBrowser implements BrowserPort {
     return page;
   }
 
+  private get settleRetryMs(): number {
+    return this.options.settleRetryMs ?? SETTLE_RETRY_MS;
+  }
+
   /**
    * The page as the accessibility tree reports it, read once the document has
    * settled. A read taken mid-navigation comes back with no refs — or with no
@@ -179,64 +151,85 @@ export class PlaywrightBrowser implements BrowserPort {
         return null;
       }
     };
-    return settledSnapshot(read, () => page.waitForTimeout(SETTLE_RETRY_MS));
+    return settledSnapshot(read, () => page.waitForTimeout(this.settleRetryMs));
   }
 
-  /** One read: the snapshot, the elements whose facts came back, and what did not. */
-  private async readOnce(): Promise<PageReading> {
+  /** One read: the snapshot, the elements whose facts came back with the scope and words the tree gives each, and what did not. */
+  private async readOnce(deadline: number): Promise<PageReading> {
     const page = this.page;
     const snapshot = await this.snapshot();
     const nodes = decodeAriaSnapshot(snapshot);
-    const interactive = nodes.filter(
-      (node) => node.ref !== null && elementKindOf(node.role) !== 'static',
+    const scopes = scopesOf(nodes);
+    const interactive = nodes.flatMap((node, index) =>
+      node.ref !== null && elementKindOf(node.role) !== 'static' ? [{ node, index }] : [],
     );
     const { facts, unread } = await readWithinBudget(
-      interactive.map((node) => node.ref ?? ''),
+      interactive.map(({ node }) => node.ref ?? ''),
       (ref) => readElementFacts(page.locator(`aria-ref=${ref}`), FACTS_TIMEOUT_MS),
       () => Date.now(),
-      OBSERVE_BUDGET_MS,
+      Math.max(0, deadline - Date.now()),
     );
-    const elements: ObservedElement[] = interactive.flatMap((node) => {
+    const elements: ObservedElement[] = interactive.flatMap(({ node, index }) => {
       const read = facts.get(node.ref ?? '');
-      return read === undefined ? [] : [toObservedElement(node, read)];
+      return read === undefined
+        ? []
+        : [toObservedElement(node, read, scopes[index] ?? null, subtreeText(nodes, index))];
     });
+    const focused = nodes.findIndex((node) => node.attributes['active'] === true);
     return {
+      url: page.url(),
+      title: await page.title(),
       snapshot,
       elements,
       unreadElements: unread,
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
+      focusedScope: focused < 0 ? null : (scopes[focused] ?? null),
     };
   }
 
   /** The page, read again while a read fails wholesale; what the last read reached, either way. */
-  private async readPage(): Promise<PageReading> {
-    let reading = await this.readOnce();
+  private async readWhole(deadline: number): Promise<PageReading> {
+    let reading = await this.readOnce(deadline);
     for (let read = 2; read <= PAGE_READS && failedWholesale(reading); read += 1) {
-      await this.page.waitForTimeout(SETTLE_RETRY_MS);
-      reading = await this.readOnce();
+      await this.page.waitForTimeout(this.settleRetryMs);
+      reading = await this.readOnce(deadline);
     }
     return reading;
   }
 
+  /**
+   * The page once two reads in a row agree on every fact the goal renders, or
+   * the last read taken when it never settled within `STABLE_READS`. Agreement
+   * is the contracts' own fingerprint, so what the adapter calls settled is
+   * exactly what the session's stall rail calls unchanged — less what the
+   * read could not reach: two reads of one unchanged page can disagree on
+   * `unread` only because the reader ran out of budget, which is a fact about
+   * the read and never about the page. The reads taken, whether they settled
+   * and the time spent ride on the observation, so a live session can size
+   * the reader from data.
+   */
+  private async readPage(): Promise<PageObservation> {
+    const startedAt = Date.now();
+    const deadline = startedAt + OBSERVE_BUDGET_MS;
+    const agreement = (reading: PageReading): string =>
+      observationFingerprint({ ...toObservation(reading, UNSETTLED), unread: null });
+    let reading = await this.readWhole(deadline);
+    let reads = 1;
+    let settled = false;
+    for (let read = 1; read <= STABLE_READS && !settled; read += 1) {
+      await this.page.waitForTimeout(this.settleRetryMs);
+      const again = await this.readWhole(deadline);
+      reads += 1;
+      settled = agreement(again) === agreement(reading);
+      reading = again;
+    }
+    return toObservation(reading, { reads, settled, durationMs: Date.now() - startedAt });
+  }
+
   async observe(): Promise<PageObservation> {
-    const page = this.page;
-    const reading = await this.readPage();
-    const all = ordered(reading.elements);
-    const listed = all.slice(0, ELEMENTS_BOUND.target);
-    this.known = new Map(listed.map((element) => [element.ref, element]));
-    const nothingUnread = reading.unreadElements === 0 && reading.unreadSnapshotLines === 0;
-    return pageObservationSchema.parse({
-      url: clip(page.url(), URL_MAX_LENGTH),
-      title: clip(await page.title(), TITLE_BOUND.target),
-      elements: listed,
-      omittedElements: all.length - listed.length,
-      unread: nothingUnread
-        ? null
-        : { elements: reading.unreadElements, snapshotLines: reading.unreadSnapshotLines },
-      // Reduced only where it would not fit what an observation may carry; the
-      // goal composer fits it to the room the goal actually has.
-      ariaSnapshot: fitSnapshot(reading.snapshot, SNAPSHOT_BOUND.target).text,
-    });
+    const observation = pageObservationSchema.parse(await this.readPage());
+    this.known = new Map(observation.elements.map((element) => [element.ref, element]));
+    return observation;
   }
 
   async act(action: BrowserAction): Promise<void> {

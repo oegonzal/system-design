@@ -42,13 +42,24 @@ const ANSWERS: FieldAnswers = {
 
 const CRITERIA = [{ id: 'c1', kind: 'progress', statement: 'Open the next listing.' }];
 
-const stepInput = (observation: PageObservation = listingObservation()): StepInput => ({
+const stepInput = (
+  observation: PageObservation = listingObservation(),
+  pageUnchanged = false,
+): StepInput => ({
   mission: MISSION_FIXTURE,
   observation,
   history: [],
   ledger: emptyLedger(),
   objections: [],
   criteria: CRITERIA,
+  pageUnchanged,
+  progress: { settled: [], done: [] },
+});
+
+/** The goal the brain composes from a step input: the rubric rides in as the progress section's. */
+const goalInputOf = (observation: PageObservation) => ({
+  ...stepInput(observation),
+  progress: { criteria: CRITERIA, settled: [], done: [] },
 });
 
 /** A brain over the fake loop whose every poll settles what is running, by the script given. */
@@ -107,11 +118,19 @@ describe('the loop brain', () => {
     expect(core.startRequests[0]?.goal).toContain(MISSION_FIXTURE.trim());
     expect(decided.runId).toBe('fake-run-1');
     expect(decided.orchestrationRunId).toBeNull();
+    // On a page that has not changed since the last plan, the loop is asked to revise once in-run.
+    await brain.planStep(stepInput(listingObservation(), true));
+    expect(core.startRequests[1]?.maxIterations).toBe(2);
+    // A criterion the session settled leaves the rubric this run is judged against and enters the goal.
+    await brain.planStep({ ...stepInput(), progress: { settled: ['c1'], done: [] } });
+    expect(core.startRequests[2]?.criteria).toEqual([]);
+    expect(core.startRequests[2]?.goal).toContain('- c1 — Open the next listing.');
     expect(routePlan(decided.run, 1).plan).toEqual(PLAN);
     expect(decided.run.status).toBe('complete');
     expect(decided.composition).toEqual({
       rung: 'full',
       bytes: textBytes(core.startRequests[0]?.goal ?? ''),
+      snapshotRung: 'full',
     });
   });
 
@@ -216,7 +235,7 @@ describe('the loop brain', () => {
         value: 'v'.repeat(400),
       })),
     };
-    const input = stepInput(big);
+    const input = goalInputOf(big);
     const fullBytes = textBytes(composeStepGoal(input));
     expect(composeStepGoalWithinBudget(input, fullBytes)).toMatchObject({
       rung: 'full',
@@ -235,7 +254,10 @@ describe('the loop brain', () => {
       `  - link "result ${i}" [ref=e${i + 1}] [cursor=pointer]:`,
       `    - /url: https://example.test/${'p'.repeat(60)}/${i}`,
     ]).flat();
-    const huge = stepInput({ ...big, ariaSnapshot: ['- generic [ref=e1]:', ...lines].join('\n') });
+    const huge = goalInputOf({
+      ...big,
+      ariaSnapshot: ['- generic [ref=e1]:', ...lines].join('\n'),
+    });
     const bare = textBytes(composeStepGoal({ ...huge, observation: { ...big, ariaSnapshot: '' } }));
     const roomy = composeStepGoalWithinBudget(huge, bare + 20_000);
     expect(roomy.rung).toBe('full');

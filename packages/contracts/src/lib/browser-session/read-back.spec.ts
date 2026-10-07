@@ -136,11 +136,24 @@ const plan: StepPlan = {
 };
 
 describe('routePlan', () => {
-  it('[QL-36] executes an accepted plan whose policy gate is open, in full when nobody objected', () => {
-    const readout = routePlan(run({ artifact: plan }), 1);
+  it('[QL-36] executes an accepted plan whose policy gate is open, in full when nobody objected, and says what the evaluator passed', () => {
+    const readout = routePlan(
+      run({
+        artifact: plan,
+        criteria: [
+          { criterionId: 'c1', result: 'pass' },
+          { criterionId: 'c2', result: 'not_applicable' },
+          { criterionId: 'c3', kind: 'safety', result: 'pass' },
+        ],
+      }),
+      1,
+    );
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(4);
     expect(readout.objections).toEqual([]);
+    // Every criterion settled pass, whatever its kind: which may be settled is the session's to decide.
+    expect(readout.passed).toEqual(['c1', 'c3']);
+    expect(routePlan(run({ artifact: plan }), 1).passed).toEqual([]);
   });
 
   it('[QL-36] hands back any plan the loop did not accept, naming the findings for the next goal', () => {
@@ -162,6 +175,31 @@ describe('routePlan', () => {
     expect(readout.objections).toEqual([
       { step: 7, from: 'missed_stop', at: [], detail: 'the limit text is visible' },
     ]);
+  });
+
+  it('[QL-36] a plan nothing cut is held to the loop’s verdict, while a plan cut at a position runs up to it whatever the score', () => {
+    // Declared policy, pinned: measured 2026-10-07, eleven of twenty-two plans
+    // ended in a claim the validators cut, and so would run their prefix at
+    // any score, while the one plan nothing cut was refused on its score.
+    const claimCut: ValidationReport = {
+      validatorId: 'limits',
+      gate: 'cut',
+      problems: [
+        {
+          severity: 'high',
+          message: 'done follows the click at action.3: it claims what the page shows',
+          locationRefs: ['action.4'],
+        },
+      ],
+    };
+    const belowTheBar = routePlan(
+      run({ artifact: plan, finalDecision: 'escalate', validation: [claimCut] }),
+      1,
+    );
+    expect(belowTheBar).toMatchObject({ executable: true, executePrefix: 3, reason: null });
+    const uncutBelowTheBar = routePlan(run({ artifact: plan, finalDecision: 'escalate' }), 1);
+    expect(uncutBelowTheBar.executable).toBe(false);
+    expect(uncutBelowTheBar.reason).toContain('decided escalate');
   });
 
   it('[QL-36] runs a handed-back plan up to the first action a cutting validator pointed at, carrying the cut as the objection', () => {

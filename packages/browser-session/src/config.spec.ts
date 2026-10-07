@@ -73,6 +73,9 @@ describe('the session configuration', () => {
     expect(flagKey('maxFailures')).toBe('max-failures');
 
     expect(railsOf({})).toEqual(DEFAULT_RAILS);
+    expect(flagKey('maxStalledSteps')).toBe('max-stalled-steps');
+    expect(railsOf({ maxStalledSteps: '12' }).maxStalledSteps).toBe(12);
+    expect(() => railsOf({ maxStalledSteps: '0' })).toThrow('--max-stalled-steps');
     expect(railsOf({ maxTasks: '2', maxMinutes: '5', maxFailures: '1' })).toEqual({
       maxTasks: 2,
       maxMinutes: 5,

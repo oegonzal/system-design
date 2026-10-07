@@ -11,7 +11,6 @@ import {
   openTaskLedger,
   renderDocumentGoal,
   resumeChunk,
-  SNAPSHOT_BOUND,
   textBytes,
   type ObservedElement,
   type PageObservation,
@@ -22,7 +21,6 @@ import { FENCE_CLOSE, FENCE_OPEN, GOAL_MAX_BYTES } from '../../core/contracts';
 import { ADMISSIONS } from '../../core/outputs';
 import { fill } from '../../core/testing';
 import { readIndex } from './input';
-import { stepGoal } from './testing';
 
 /** A page at the adapter's cap: every element listed, names and context as long as a form writes them, the snapshot full. */
 function maximalObservation(): PageObservation {
@@ -32,6 +30,7 @@ function maximalObservation(): PageObservation {
       ref: `e${position + 1}`,
       role: selectable ? 'combobox' : 'textbox',
       name: fill(40, 'n'),
+      text: null,
       kind: selectable ? 'selectable' : 'fillable',
       inputType: selectable ? null : 'text',
       value: null,
@@ -42,6 +41,7 @@ function maximalObservation(): PageObservation {
       maxLength: null,
       hiddenTraits: [],
       context: fill(40, 'c'),
+      scope: null,
     };
   };
   return {
@@ -50,7 +50,13 @@ function maximalObservation(): PageObservation {
     elements: Array.from({ length: ELEMENTS_BOUND.target }, (_, position) => element(position)),
     omittedElements: 12,
     unread: null,
-    ariaSnapshot: fill(SNAPSHOT_BOUND.target, 's'),
+    activeScope: null,
+    snapshotRung: 'full',
+    reading: { reads: 1, settled: true, durationMs: 0 },
+    // The snapshot an observation may carry is the whole goal budget; it is the
+    // session's composer that fits it to the room every other cap leaves, and
+    // that room is what this page measures.
+    ariaSnapshot: '',
   };
 }
 
@@ -63,10 +69,13 @@ describe('the browser-step input codec', () => {
       history: [{ action: 'click e6', outcome: 'ok', note: null }],
       ledger: openTaskLedger(),
       objections: [],
+      progress: { criteria: [], settled: [], done: [] },
     });
     expect(goal).toContain(MISSION_FIXTURE.trim());
+    // A field the page hides is counted, not listed — and still in the index, so a plan that touches it is refused.
+    expect(goal).not.toMatch(/^- e3 · /m);
     expect(goal).toContain(
-      '- e3 · textbox · "Website" · type text · not visible · hidden: offscreen, autocomplete-off-bait',
+      '(1 interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)',
     );
     expect(readIndex(goal)).toEqual({
       pipeline: 'browser-step',
@@ -75,13 +84,13 @@ describe('the browser-step input codec', () => {
         ref: element.ref,
         kind: element.kind,
         disabled: element.disabled,
+        visible: element.visible,
+        behind: false,
         options: element.options,
         hiddenTraits: element.hiddenTraits,
       })),
-      openTask: true,
       pageShowsContent: true,
     });
-    expect(readIndex(stepGoal())?.openTask).toBe(false);
   });
 
   it('[QL-39] a plain mission, another codec’s index or a broken fence reads as no index', () => {
@@ -90,7 +99,7 @@ describe('the browser-step input codec', () => {
     expect(readIndex('## Index\n\n```json\n{ not json')).toBeNull();
   });
 
-  it('[QL-39] a page at the adapter’s cap renders under the engine’s budget, and one past it is refused rather than clipped', () => {
+  it('[QL-39] a page at every cap but the snapshot’s renders under the engine’s budget with room for one, and one past the budget is refused rather than clipped', () => {
     const observation = maximalObservation();
     const goal = composeStepGoal({
       mission: MISSION_FIXTURE,
@@ -102,8 +111,10 @@ describe('the browser-step input codec', () => {
       })),
       ledger: openTaskLedger(),
       objections: [],
+      progress: { criteria: [], settled: [], done: [] },
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
+    expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);
     expect(readIndex(goal)?.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(goal).toContain('(12 more interactive elements not listed)');
     expect(() =>
@@ -114,6 +125,7 @@ describe('the browser-step input codec', () => {
           history: [],
           ledger: openTaskLedger(),
           objections: [],
+          progress: { criteria: [], settled: [], done: [] },
         },
         1000,
       ),

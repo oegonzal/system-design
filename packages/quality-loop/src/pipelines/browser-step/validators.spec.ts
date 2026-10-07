@@ -1,4 +1,5 @@
 import {
+  dialogObservation,
   formObservation,
   listingObservation,
   openTaskLedger,
@@ -67,10 +68,15 @@ describe('the browser-step validators', () => {
     expect(problems(samplePlan([done(), click('e3')])).limits).toEqual([
       { severity: 'high', locationRefs: ['action.1'], message: 'done must be the last action' },
     ]);
-    // The schema caps a plan at eight; the index can state a tighter limit.
+    // The schema caps a plan at eight; the index can state a tighter limit. The
+    // cut lands at the first action past it, so the actions within it run.
     const tighter = listing.replace('"maxActions":8', '"maxActions":1');
     expect(problems(samplePlan([click('e3'), click('e4')]), tighter).limits).toEqual([
-      { severity: 'high', locationRefs: [], message: '2 actions planned; the limit is 1' },
+      {
+        severity: 'high',
+        locationRefs: ['action.2'],
+        message: '2 actions planned; the limit is 1',
+      },
     ]);
     expect(listing).not.toBe(tighter);
   });
@@ -146,24 +152,101 @@ describe('the browser-step validators', () => {
     ]);
   });
 
-  it('[QL-36] a unit of work opens only while none is open and closes only while one is, tracked through the plan', () => {
-    expect(problems(samplePlan([click('e3'), taskDone()])).limits).toEqual([
+  it('[QL-36] a claim rests on the page as observed: a taskDone or terminate after an action that could change the page is refused there', () => {
+    // Measured 2026-10-07: `taskStart, askFields, click Next, taskDone done`
+    // on page 1 of 9 of an application form. The task rule that voided it is
+    // gone — a redundant taskStart is the executor's to skip — and without
+    // this rule the plan would run whole and close the session's one unit of
+    // work as done on the far side of the click.
+    const open = stepGoal(formObservation(), openTaskLedger());
+    expect(
+      problems(samplePlan([taskStart(), askFields(['e1', 'e2']), click('e6'), taskDone()]), open)
+        .limits,
+    ).toEqual([
       {
         severity: 'high',
-        locationRefs: ['action.2'],
-        message: 'taskDone while no unit of work is open',
+        locationRefs: ['action.4'],
+        message:
+          'taskDone follows the askFields at action.2: it claims what the page shows, and that page has not been observed',
       },
     ]);
+    // Every action that could change the page: a navigate, a touch, a key, the fields.
+    for (const first of [
+      click('e6'),
+      fill('e1', '6'),
+      select('e2', 'Yes'),
+      { kind: 'press', key: 'Enter', reason: 'submit', expect: null } as StepAction,
+    ]) {
+      expect(
+        problems(samplePlan([first, taskDone()]), open).limits.map((p) => p.locationRefs),
+      ).toEqual([['action.2']]);
+      expect(problems(samplePlan([first, terminate()]), open).limits).toHaveLength(1);
+    }
+    // A claim on the page as observed stands: first, or after actions that change nothing.
+    const scrollDown: StepAction = {
+      kind: 'scroll',
+      direction: 'down',
+      ref: null,
+      reason: 'look',
+      expect: null,
+    };
+    const waitHere: StepAction = {
+      kind: 'waitFor',
+      until: 'element',
+      value: 'e6',
+      reason: 'w',
+      expect: null,
+    };
+    expect(problems(samplePlan([taskDone()]), open).limits).toEqual([]);
+    expect(problems(samplePlan([taskDone(), terminate()]), open).limits).toEqual([]);
+    expect(problems(samplePlan([scrollDown, waitHere, taskDone()]), open).limits).toEqual([]);
+    // `done` claims nothing, so it may follow anything.
+    expect(problems(samplePlan([askFields(['e1']), click('e6'), done()]), open).limits).toEqual([]);
+  });
+
+  it('[QL-36] a redundant taskStart or taskDone is not a reason to refuse a plan: the executor records and skips it, so the browser actions beside it still run', () => {
+    // Measured 2026-10-07: five of seven plans on an application form were
+    // voided whole at action.1 for a taskStart while the unit was already
+    // open, their correct askFields and click Next never run.
     const openGoal = stepGoal(listingObservation(), openTaskLedger());
-    expect(problems(samplePlan([taskStart()]), openGoal).limits).toEqual([
+    expect(problems(samplePlan([taskStart(), click('e3')]), openGoal).limits).toEqual([]);
+    expect(problems(samplePlan([taskDone()])).limits).toEqual([]);
+  });
+
+  it('[QL-36] an element behind the open dialog, or one the page does not show, is not touched', () => {
+    // Measured 2026-10-07: a form page listed 150 elements with the open
+    // dialog's five fields among them unmarked, and the plans touched the
+    // page behind it.
+    const dialog = stepGoal(dialogObservation(), openTaskLedger());
+    expect(problems(samplePlan([askFields(['e11', 'e12']), click('e13')]), dialog).limits).toEqual(
+      [],
+    );
+    expect(problems(samplePlan([click('e3')]), dialog).limits).toEqual([
       {
         severity: 'high',
         locationRefs: ['action.1'],
-        message: 'taskStart while a unit of work is already open',
+        message: 'e3 is behind the open dialog: a person could not reach it',
       },
     ]);
-    expect(problems(samplePlan([taskStart(), click('e3'), taskDone()])).limits).toEqual([]);
-    expect(problems(samplePlan([click('e3'), taskDone()]), openGoal).limits).toEqual([]);
+    // Waiting for or scrolling to what is behind the dialog is no touch.
+    const waitBehind: StepAction = {
+      kind: 'waitFor',
+      until: 'element',
+      value: 'e3',
+      reason: 'w',
+      expect: null,
+    };
+    expect(problems(samplePlan([waitBehind]), dialog).limits).toEqual([]);
+    // Not visible and not a trap: refused as not visible, never guessed at.
+    const unseen = stepGoal({
+      ...listingObservation(),
+      elements: listingObservation().elements.map((element) =>
+        element.ref === 'e3' ? { ...element, visible: false } : element,
+      ),
+    });
+    expect(problems(samplePlan([click('e3')]), unseen).limits).toEqual([
+      { severity: 'high', locationRefs: ['action.1'], message: 'e3 is not visible' },
+    ]);
   });
 
   it('[QL-36] a goal without an index blocks once; an ill-formed artifact is left to the schema validator', () => {

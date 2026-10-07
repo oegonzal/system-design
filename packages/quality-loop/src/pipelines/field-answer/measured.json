@@ -1,1 +1,18 @@
-{ "since": null, "until": null, "runs": 0, "fields": {}, "caps": {} }
+{
+  "since": "2026-10-05T23:52:30.581Z",
+  "until": "2026-10-06T03:07:10.818Z",
+  "runs": 2,
+  "fields": {
+    "fields": { "n": 2, "max": 5, "p99": 5, "overTarget": 0 },
+    "fields[].basis": { "n": 8, "max": 1, "p99": 1, "overTarget": 0 },
+    "fields[].reason": { "n": 8, "max": 247, "p99": 247, "overTarget": 0 },
+    "fields[].value": { "n": 6, "max": 18, "p99": 18, "overTarget": 0 },
+    "summary": { "n": 2, "max": 487, "p99": 487, "overTarget": 0 }
+  },
+  "caps": {
+    "critic.form": { "n": 2, "max": 2382, "p99": 2382, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 2, "max": 4614, "p99": 4614, "maxApiCalls": 1 },
+    "evaluator.answers": { "n": 2, "max": 2624, "p99": 2624, "maxApiCalls": 1 },
+    "producer": { "n": 2, "max": 2002, "p99": 2002, "maxApiCalls": 1 }
+  }
+}

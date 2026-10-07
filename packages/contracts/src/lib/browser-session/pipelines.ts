@@ -23,6 +23,18 @@ export const FORM_MEMORY_STEP_REASONS = [
 ] as const;
 export type FormMemoryStepReason = (typeof FORM_MEMORY_STEP_REASONS)[number];
 
+/**
+ * The criterion kinds a session settles for the rest of the session once a
+ * plan the evaluator passed them on has run whole and the page has moved: a
+ * step of the mission taken before any unit of work opened is not taken
+ * again on every page after it. A kind not listed here — a never-do line, a
+ * reading of the page — is in force on every page and is never settled.
+ * Measured 2026-10-07: the criterion for the mission's first step was failed
+ * by the evaluator on six pages after it had been taken, and passed for
+ * twelve re-navigations to the page it was taken on.
+ */
+export const SETTLING_CRITERION_KINDS = ['progress'] as const;
+
 /** The pipelines a session derives a rubric for, once, and runs many times. */
 export const BROWSER_SESSION_PIPELINES = {
   plan: BROWSER_STEP_PIPELINE_ID,

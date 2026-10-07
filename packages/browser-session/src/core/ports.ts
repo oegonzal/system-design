@@ -15,6 +15,7 @@ import type {
   PageObservation,
   QualityRunDto,
   SessionRailsDto,
+  SnapshotRung,
   StepAction,
   StepHistoryEntry,
   StepPlan,
@@ -102,10 +103,15 @@ export class BrainFaulted extends Error {
   }
 }
 
-/** How the goal was fitted to the loop's budget: which rung of the ladder, and how big it came out. */
+/**
+ * How the goal was fitted to the loop's budget: which rung of the ladder, how
+ * big it came out, and which rung the snapshot in it is at — null for a goal
+ * that carries no snapshot section.
+ */
 export interface GoalComposition {
   rung: string;
   bytes: number;
+  snapshotRung: SnapshotRung | null;
 }
 
 /**
@@ -132,6 +138,14 @@ export interface StepInput {
   /** Why the plans before this one did not run, newest first. */
   objections: readonly StepObjection[];
   criteria: readonly SuccessCriterion[];
+  /**
+   * Whether this page is the one the last plan was made against. On an
+   * unchanged page there is no fresh observation to beat a revise, so the
+   * brain asks the loop for a second iteration from its own briefing.
+   */
+  pageUnchanged: boolean;
+  /** The criteria settled for the session, which the run's rubric omits, and those done in the open unit, which it keeps. */
+  progress: { settled: readonly string[]; done: readonly string[] };
 }
 
 export interface FieldsInput {

@@ -1,4 +1,4 @@
-import { HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/contracts';
+import { ELEMENT_NAME_BOUND, HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/contracts';
 import type { Locator } from 'playwright';
 
 /**
@@ -21,6 +21,10 @@ export interface ElementFacts {
   context: string | null;
   /** The `name` or `id` attribute, for an element the accessibility tree gives no name — a trap, usually. */
   nameHint: string | null;
+  /** Whether a modal dialog encloses it: `aria-modal` on a dialog ancestor, or a native dialog opened modally. */
+  modal: boolean;
+  /** The text the DOM renders inside it, for an element the tree gives no name; empty when it renders none. */
+  text: string;
 }
 
 /**
@@ -32,7 +36,7 @@ export interface ElementFacts {
  * aria-label, placeholder or title explains — the shape of a honeypot, read
  * from what the page offers a person rather than from a list of names.
  */
-export function elementFactsInPage(el: Element): ElementFacts {
+export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
   const tag = el.tagName.toLowerCase();
   const input = el as HTMLInputElement;
   const attr = (name: string): string | null => el.getAttribute(name);
@@ -153,6 +157,19 @@ export function elementFactsInPage(el: Element): ElementFacts {
     .filter((part) => part.length > 0)
     .join(' · ');
 
+  let modal = false;
+  try {
+    modal =
+      el.closest(
+        '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
+      ) !== null;
+  } catch {
+    // An engine without `:modal` answers the ARIA half alone.
+    modal =
+      el.closest('[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]') !==
+      null;
+  }
+
   return {
     inputType,
     value,
@@ -164,6 +181,8 @@ export function elementFactsInPage(el: Element): ElementFacts {
     hiddenTraits: traits,
     context: context === '' ? null : context,
     nameHint: attr('name') ?? attr('id'),
+    modal,
+    text: ((el as HTMLElement).innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, textMax),
   };
 }
 
@@ -179,7 +198,7 @@ export async function readElementFacts(
   timeout?: number,
 ): Promise<ElementFacts | null> {
   try {
-    return await locator.evaluate(elementFactsInPage, undefined, { timeout });
+    return await locator.evaluate(elementFactsInPage, ELEMENT_NAME_BOUND.target, { timeout });
   } catch {
     return null;
   }

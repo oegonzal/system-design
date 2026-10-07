@@ -1,13 +1,24 @@
-import { ELEMENT_REF, refOf } from '@sysdesign/contracts';
+import {
+  ELEMENT_REF,
+  nodeLineOf,
+  refOf,
+  SCOPE_ROLES,
+  SNAPSHOT_NODE_LINE,
+  SNAPSHOT_RUNGS,
+  VALUE_ROLES,
+  type ActiveScope,
+  type ScopeRole,
+  type SnapshotRung,
+} from '@sysdesign/contracts';
 
 /**
  * The grammar of Playwright's `ariaSnapshot({ mode: 'ai' })`, read back. One
  * node per line, indented two spaces per level: a role, an optional quoted
  * name, bracketed attributes — among them the ref Playwright minted, which
- * `aria-ref=` resolves — and a trailing colon when children or
- * inline text follow. Property lines (`- /url: …`) and text lines
- * (`- text: …`) are not nodes.
- * Nothing here touches a page; the spec runs over fixture text.
+ * `aria-ref=` resolves — and a trailing colon when children or inline text
+ * follow. A text line (`- text: …`) is a node of the one pseudo-role `text`,
+ * carrying what it says as its inline text; a property line (`- /url: …`)
+ * is not a node. Nothing here touches a page; the spec runs over fixture text.
  */
 export interface SnapshotNode {
   depth: number;
@@ -17,12 +28,10 @@ export interface SnapshotNode {
   ref: string | null;
   /** `[disabled]` → `disabled: true`; `[level=2]` → `level: '2'`. */
   attributes: Record<string, string | true>;
+  /** The text after the node's colon — a paragraph's words, a text line's content — or null. */
+  inline: string | null;
 }
 
-const NODE_LINE =
-  /^(?<indent> *)- (?<role>[a-z][\w-]*)(?: "(?<name>(?:[^"\\]|\\.)*)")?(?<attrs>(?: \[[^\]]*\])*)\s*(?::\s*(?<inline>.*))?$/;
-/** The one pseudo-role: a `- text: …` line is a text node, not an element. */
-const TEXT_ROLE = 'text';
 const ATTRIBUTE = /\[([^\]=]+)(?:=([^\]]*))?\]/g;
 
 /** A quoted name with its escapes undone. */
@@ -37,24 +46,71 @@ function attributesOf(text: string): Record<string, string | true> {
   return attributes;
 }
 
-/** Every node line, in document order; lines that are not nodes are skipped. */
+/** Every node line, in document order, text lines included; property lines are skipped. */
 export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
   const nodes: SnapshotNode[] = [];
   for (const line of snapshot.split('\n')) {
-    const match = NODE_LINE.exec(line);
-    const groups = match?.groups;
-    if (!groups?.['role'] || groups['role'] === TEXT_ROLE) continue;
+    const groups = SNAPSHOT_NODE_LINE.exec(line)?.groups;
+    if (!groups?.['role']) continue;
     const attributes = attributesOf(groups['attrs'] ?? '');
     const ref = attributes['ref'];
+    const inline = (groups['inline'] ?? '').trim();
     nodes.push({
       depth: (groups['indent'] ?? '').length / 2,
       role: groups['role'],
       name: groups['name'] === undefined ? null : unescape(groups['name']),
       ref: typeof ref === 'string' && ELEMENT_REF.test(ref) ? ref : null,
       attributes,
+      inline: inline === '' ? null : inline,
     });
   }
   return nodes;
+}
+
+const isScopeRole = (role: string): role is ScopeRole =>
+  (SCOPE_ROLES as readonly string[]).includes(role);
+
+/**
+ * The one walk of a tree's indentation: for each node in document order, the
+ * nearest dialog it sits in — an ancestor is the last node before it at a
+ * smaller depth, and a dialog scopes itself as well as its descendants, so
+ * the dialog node's own ref reads as inside it. `scopesOf` and the scope
+ * rung of `fitSnapshot` both read the tree through this and nothing else.
+ */
+function walkScopes(nodes: readonly SnapshotNode[]): (ActiveScope | null)[] {
+  const stack: { depth: number; scope: ActiveScope | null }[] = [];
+  return nodes.map((node) => {
+    while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= node.depth) stack.pop();
+    const inherited = stack[stack.length - 1]?.scope ?? null;
+    const scope = isScopeRole(node.role) ? { role: node.role, name: node.name ?? '' } : inherited;
+    stack.push({ depth: node.depth, scope });
+    return scope;
+  });
+}
+
+/** For each node, the nearest dialog it sits in, by role and name — the identity a scope keeps across observations. */
+export const scopesOf = (nodes: readonly SnapshotNode[]): (ActiveScope | null)[] =>
+  walkScopes(nodes);
+
+const holdsValue = (role: string): boolean => (VALUE_ROLES as readonly string[]).includes(role);
+
+/**
+ * A node's own words and those of every node beneath it, in document order;
+ * empty when it has none. The inline text of a control that holds a value is
+ * that value, not a word anyone calls it by, and is left out.
+ */
+export function subtreeText(nodes: readonly SnapshotNode[], index: number): string {
+  const root = nodes[index];
+  if (root === undefined) return '';
+  const words: string[] = [];
+  if (root.inline !== null && !holdsValue(root.role)) words.push(root.inline);
+  for (let at = index + 1; at < nodes.length; at += 1) {
+    const node = nodes[at];
+    if (node === undefined || node.depth <= root.depth) break;
+    if (node.name !== null && node.name !== '') words.push(node.name);
+    if (node.inline !== null && !holdsValue(node.role)) words.push(node.inline);
+  }
+  return words.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -128,42 +184,89 @@ export async function settledSnapshot(
   return last;
 }
 
-export const SNAPSHOT_RUNGS = ['full', 'nodes-only', 'refs-only', 'none'] as const;
-export type SnapshotRung = (typeof SNAPSHOT_RUNGS)[number];
-
 export interface FittedSnapshot {
   text: string;
   rung: SnapshotRung;
 }
 
-/** A node line without the inline text after its colon; null for a line that is not a node. */
-function nodeOnly(line: string): string | null {
-  const groups = NODE_LINE.exec(line)?.groups;
-  if (!groups?.['role'] || groups['role'] === TEXT_ROLE) return null;
-  const inline = groups['inline'] ?? '';
-  return inline === '' ? line : line.slice(0, line.length - inline.length).replace(/:\s*$/, '');
-}
-
 const nodeLines = (lines: readonly string[]): string[] =>
   lines.flatMap((line) => {
-    const node = nodeOnly(line);
+    const node = nodeLineOf(line);
     return node === null ? [] : [node];
   });
 
-/** Each rung below `full`, as what it keeps of the snapshot's lines. */
-const REDUCTIONS: Readonly<Record<Exclude<SnapshotRung, 'full'>, (lines: string[]) => string[]>> = {
+/** The rungs that reduce a set of lines, as what each keeps of them. */
+type ReducingRung = Exclude<SnapshotRung, 'full' | 'scope'>;
+const REDUCING_RUNGS = SNAPSHOT_RUNGS.filter(
+  (rung): rung is ReducingRung => rung !== 'full' && rung !== 'scope',
+);
+const REDUCTIONS: Readonly<Record<ReducingRung, (lines: readonly string[]) => string[]>> = {
   'nodes-only': nodeLines,
   'refs-only': (lines) => nodeLines(lines).filter((line) => refOf(line) !== null),
   none: () => [],
 };
 
 const bytesOf = (text: string): number => Buffer.byteLength(text, 'utf8');
+const quote = (text: string): string => JSON.stringify(text);
 
-/** The snapshot at the first rung that fits the budget. */
-export function fitSnapshot(snapshot: string, maxBytes: number): FittedSnapshot {
+const sameScope = (a: ActiveScope | null, b: ActiveScope): boolean =>
+  a !== null && a.role === b.role && a.name === b.name;
+
+/**
+ * The lines of a snapshot inside the named scope — the scope's own node, every
+ * node beneath it, and the property lines that hang off those — and the lines
+ * outside it, each set in document order. A node line's scope is the walk's;
+ * a property line belongs to the node above it.
+ */
+function splitByScope(
+  lines: readonly string[],
+  scope: ActiveScope,
+): { inside: string[]; outside: string[] } {
+  const nodes = decodeAriaSnapshot(lines.join('\n'));
+  const scopes = walkScopes(nodes);
+  const inside: string[] = [];
+  const outside: string[] = [];
+  let at = 0;
+  let lastInScope = false;
+  for (const line of lines) {
+    const isNode = SNAPSHOT_NODE_LINE.exec(line)?.groups?.['role'] !== undefined;
+    if (isNode) {
+      lastInScope = sameScope(scopes[at] ?? null, scope);
+      at += 1;
+    }
+    (lastInScope ? inside : outside).push(line);
+  }
+  return { inside, outside };
+}
+
+/**
+ * The snapshot at the first rung that fits the budget: the whole; with an
+ * open scope, that scope whole and the rest reduced — a dialog's twenty lines
+ * are what the plan acts on, and the page behind it is what the rungs give
+ * up first; then the nodes alone; then only the nodes with refs; then none.
+ * A reduced snapshot opens with a line naming its rung and what it dropped,
+ * so the dump and the model both know. Measured 2026-10-07: at the recorded
+ * density a 1 400-line page lands on `none` inside the room a goal leaves,
+ * so a bound alone would never put the open dialog in front of the model.
+ */
+export function fitSnapshot(
+  snapshot: string,
+  maxBytes: number,
+  scope: ActiveScope | null = null,
+): FittedSnapshot {
   if (bytesOf(snapshot) <= maxBytes) return { text: snapshot, rung: 'full' };
   const lines = snapshot.split('\n').filter((line) => line.trim() !== '');
-  for (const rung of SNAPSHOT_RUNGS.slice(1) as Exclude<SnapshotRung, 'full'>[]) {
+  if (scope !== null) {
+    const { inside, outside } = splitByScope(lines, scope);
+    for (const rung of inside.length > 0 ? REDUCING_RUNGS : []) {
+      const kept = REDUCTIONS[rung](outside);
+      const dropped = lines.length - inside.length - kept.length;
+      const note = `[snapshot reduced to scope: the open ${scope.role} ${quote(scope.name)} whole, the rest ${rung}: ${dropped} of ${lines.length} lines not shown]`;
+      const text = [note, ...inside, ...kept].join('\n');
+      if (bytesOf(text) <= maxBytes) return { text, rung: 'scope' };
+    }
+  }
+  for (const rung of REDUCING_RUNGS) {
     const kept = REDUCTIONS[rung](lines);
     const note = `[snapshot reduced to ${rung}: ${lines.length - kept.length} of ${lines.length} lines not shown]`;
     const text = [note, ...kept].join('\n');

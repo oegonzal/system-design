@@ -64,11 +64,20 @@ export interface SessionState {
   fingerprint: string | null;
   /** Whether this step's page is the same page the last step observed. */
   pageUnchanged: boolean;
-  /** Failed steps in a row on an unchanged page; reset by a step that ran clean or a page that moved. */
+  /** Observations in a row of a page that did not change, whatever the steps between them did; reset by a page that moved. */
   stalledSteps: number;
   operatorStopped: boolean;
   /** What the last executed action promised, checked against the next observation. */
   pending: PendingExpectation | null;
+  /**
+   * The criteria settled by plans that ran whole and moved the page: for the
+   * session, when no unit of work was open; for the open unit otherwise,
+   * cleared when it closes. A step of a unit may repeat on its next page, so
+   * only the session's are taken out of the rubric.
+   */
+  reached: { session: Set<string>; unit: Set<string> };
+  /** What the last plan passed, by id, awaiting the next observation: settled only if the page moved. */
+  pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
   /** The operator's answers this session, by field label. */
   operatorAnswers: Map<string, string>;
   /** The operator's answers during the open unit of work, taught back when it closes. */
@@ -98,6 +107,8 @@ export function createState(ids: {
     stalledSteps: 0,
     operatorStopped: false,
     pending: null,
+    reached: { session: new Set(), unit: new Set() },
+    pendingPass: null,
     operatorAnswers: new Map(),
     guidance: [],
     decisions: 0,
@@ -123,14 +134,31 @@ export const railStateOf = (state: SessionState): RailState => ({
 
 /**
  * The page this step observed, held against the last: the identity is kept
- * for the next comparison, and whether it changed is what a failed step is
- * read with. A page that moved ends any stall whatever the step then does.
+ * for the next comparison, and an observation of the page the last step
+ * already saw is one more the stall rail counts — whether the step between
+ * them was refused, failed, or ran and moved nothing. Measured 2026-10-07:
+ * twelve observations in a row of one unchanged page, each step a navigate
+ * that ran clean, and a count of failed steps saw none of them. A page that
+ * moved ends the stall.
  */
 export function noteObservation(state: SessionState, fingerprint: string): void {
   state.pageUnchanged = state.fingerprint === fingerprint;
   state.fingerprint = fingerprint;
-  if (!state.pageUnchanged) state.stalledSteps = 0;
+  state.stalledSteps = state.pageUnchanged ? state.stalledSteps + 1 : 0;
+  // A pass the evaluator gave the last plan becomes a session fact only once
+  // the engine's own identity says the page moved: one sample's word is
+  // evidence, and the page moving is the corroboration.
+  if (state.pendingPass !== null && !state.pageUnchanged) {
+    for (const id of state.pendingPass.ids) state.reached[state.pendingPass.scope].add(id);
+  }
+  state.pendingPass = null;
 }
+
+/** What the next run is told it has settled, and what the open unit has done. */
+export const progressOf = (state: SessionState): { settled: string[]; done: string[] } => ({
+  settled: [...state.reached.session],
+  done: [...state.reached.unit],
+});
 
 /** The units of work as the next goal is told them. */
 export const ledgerSummaryOf = (

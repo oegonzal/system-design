@@ -32,6 +32,7 @@ export const element = (
   ref,
   role,
   name,
+  text: null,
   kind: 'clickable',
   inputType: null,
   value: null,
@@ -42,6 +43,7 @@ export const element = (
   maxLength: null,
   hiddenTraits: [],
   context: null,
+  scope: null,
   ...overrides,
 });
 
@@ -55,6 +57,9 @@ export const observation = (
   elements,
   omittedElements: 0,
   unread: null,
+  activeScope: null,
+  snapshotRung: 'full',
+  reading: { reads: 1, settled: true, durationMs: 0 },
   ariaSnapshot: elements.map((e) => `- ${e.role} "${e.name}" [ref=${e.ref}]`).join('\n'),
 });
 

@@ -13,7 +13,7 @@ import type { BrowserAction } from './ports';
  * counts as a failed step.
  */
 export type ExactCheck =
-  | { kind: 'url-prefix'; value: string }
+  | { kind: 'url'; value: string }
   | { kind: 'url-contains'; value: string }
   | { kind: 'element'; role: string; name: string };
 
@@ -37,7 +37,7 @@ export function exactCheckOf(
 ): ExactCheck | null {
   switch (action.kind) {
     case 'navigate':
-      return { kind: 'url-prefix', value: action.url };
+      return { kind: 'url', value: action.url };
     case 'waitFor':
       if (action.until === 'url') return { kind: 'url-contains', value: action.value };
       if (action.until === 'element') return elementCheck(action.value, observation);
@@ -47,11 +47,36 @@ export function exactCheckOf(
   }
 }
 
+/**
+ * Whether a page's URL is the one a navigation named: the same origin and
+ * path, and every parameter the navigation carried present with its value.
+ * A site may add parameters of its own on arrival — measured 2026-10-07, a
+ * search page inserted the opened listing's id before the keywords the
+ * navigation had named, and a prefix test called the step failed. A URL that
+ * does not parse is compared as text.
+ */
+export function urlArrivedAt(observed: string, named: string): boolean {
+  let page: URL;
+  let target: URL;
+  try {
+    page = new URL(observed);
+    target = new URL(named);
+  } catch {
+    return observed.startsWith(named);
+  }
+  const path = (url: URL): string => `${url.origin}${url.pathname.replace(/\/+$/, '')}`;
+  if (path(page) !== path(target)) return false;
+  for (const [name, value] of target.searchParams) {
+    if (!page.searchParams.getAll(name).includes(value)) return false;
+  }
+  return true;
+}
+
 /** Whether the next observation bears the check out. */
 export function checkExact(check: ExactCheck, observation: PageObservation): boolean {
   switch (check.kind) {
-    case 'url-prefix':
-      return observation.url.startsWith(check.value);
+    case 'url':
+      return urlArrivedAt(observation.url, check.value);
     case 'url-contains':
       return observation.url.includes(check.value);
     case 'element':
@@ -72,4 +97,4 @@ export function unmetNote(pending: PendingExpectation): string {
 const describeCheck = (check: ExactCheck): string =>
   check.kind === 'element'
     ? `${check.role} "${check.name}"`
-    : `a URL ${check.kind === 'url-prefix' ? 'starting with' : 'containing'} ${check.value}`;
+    : `a URL ${check.kind === 'url' ? 'at' : 'containing'} ${check.value}`;

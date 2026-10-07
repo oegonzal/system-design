@@ -69,7 +69,7 @@ const deps = (llm: ReturnType<typeof fakeLlm>, exchanges: LlmExchange[] = []) =>
 });
 
 describe('the browser-step loop', () => {
-  it('[QL-36] [QL-5] a missed stop the evaluator bears out gates the plan: the loop hands it back as escalate after one iteration, and the session does not execute it', async () => {
+  it('[QL-36] [QL-5] a missed stop the evaluator bears out gates the plan: the loop decides against it after one iteration, and the session does not execute it', async () => {
     const exchanges: LlmExchange[] = [];
     // Each critic's schema offers only the types it owns, and the sequenced
     // fake hands every request the first canned reply that parses against it:
@@ -94,11 +94,12 @@ describe('the browser-step loop', () => {
       { key: 'missed_stop|action.1', lenses: ['critic.safety'], hits: 1, criterionIds: ['c2'] },
     ]);
     expect(only.decision.gates.policyAllowed).toBe(false);
-    expect(only.decision.finalDecision).toBe('escalate');
+    // The standard controller's word for a fixable blocker; with one iteration
+    // the loop ends on its budget, and the session is what reads the verdict.
+    expect(only.decision.finalDecision).toBe('revise');
     expect(only.decision.reason).toContain('missed_stop|action.1');
-    expect(only.decision.reason).toContain('handed back');
-    expect(trace.finalDecision).toBe('escalate');
-    expect(trace.stopReason).toBe('escalated');
+    expect(trace.finalDecision).toBe('revise');
+    expect(trace.stopReason).toBe('max-iterations');
 
     const readout = routePlan(runDto('step-run', trace), 1);
     expect(readout.plan).toEqual(samplePlan());

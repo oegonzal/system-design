@@ -35,6 +35,42 @@ const FORM = `<!doctype html><html><head><title>Apply — step 2</title>
 const NEXT_PAGE = `<!doctype html><html><head><title>Review</title></head><body><button type="button">Submit</button></body></html>`;
 
 /**
+ * The two live shapes of 2026-10-07: a results page whose links carry their
+ * words in child paragraphs, and whose search control is a button with an
+ * icon and a hidden-to-the-tree span; and a modal application dialog open
+ * over that page, holding its fields and a Next button.
+ */
+const DIALOG_PAGE = `<!doctype html><html><head><title>Jobs — apply</title></head><body>
+  <header>
+    <button id="search"><svg width="10" height="10"></svg><span aria-hidden="true">Describe the job you want</span></button>
+    <a href="/jobs/123"><div><p>Senior Engineer</p><p>Acme</p></div></a>
+    <a href="/jobs/124"><div><p>Staff Engineer</p><p>Globex</p></div></a>
+  </header>
+  <main><button>Easy Apply</button></main>
+  <div role="dialog" aria-modal="true" aria-label="Apply to Acme">
+    <h2>Contact info</h2>
+    <label>First name*<input required value="Oscar"></label>
+    <label>Phone<input type="tel"></label>
+    <button>Next</button>
+  </div>
+  <div role="dialog" aria-label="Cookies">
+    <button>Accept cookies</button>
+  </div>
+</body></html>`;
+
+/** A page whose control arrives while it is being read: what a read taken too early misses. */
+const LATE_PAGE = `<!doctype html><html><head><title>Landing</title></head><body>
+  <header id="banner"><button>Menu</button></header>
+  <script>
+    setTimeout(() => {
+      const input = document.createElement('input');
+      input.placeholder = 'Describe the job you want';
+      document.getElementById('banner').appendChild(input);
+    }, 120);
+  </script>
+</body></html>`;
+
+/**
  * The two shapes an ARIA combobox comes in, both met in live runs. The first
  * is a search box: a textarea the author gave the combobox role, typed into
  * like any search field. The second is a dropdown built on a div, which pops
@@ -188,6 +224,64 @@ describe('the Playwright browser', () => {
       ).rejects.toBeInstanceOf(ActionFailed);
     } finally {
       await quick.close();
+    }
+  });
+
+  it('[BRW-2] names the open modal dialog, lists what is inside it first, and reads the words a person sees on an element the tree gave no name', async () => {
+    await browser.page.setContent(DIALOG_PAGE);
+    const observation = await browser.observe();
+    // The modal dialog is the scope in front; the non-modal one is noted and binds nothing.
+    expect(observation.activeScope).toEqual({ role: 'dialog', name: 'Apply to Acme' });
+    expect(observation.snapshotRung).toBe('full');
+    const first = byName(observation, 'textbox', 'First name*');
+    expect(first.scope).toEqual({ role: 'dialog', name: 'Apply to Acme', modal: true });
+    expect(byName(observation, 'button', 'Accept cookies').scope).toEqual({
+      role: 'dialog',
+      name: 'Cookies',
+      modal: false,
+    });
+    expect(byName(observation, 'button', 'Easy Apply').scope).toBeNull();
+    // Inside the dialog first, whatever the document order.
+    expect(observation.elements.slice(0, 3).map((e) => e.name)).toEqual([
+      'First name*',
+      'Phone',
+      'Next',
+    ]);
+    // An unnamed link carries its words; an unnamed button carries what the DOM renders.
+    const links = observation.elements.filter((e) => e.role === 'link');
+    expect(links.map((e) => [e.name, e.text])).toEqual([
+      ['', 'Senior Engineer Acme'],
+      ['', 'Staff Engineer Globex'],
+    ]);
+    // The tree gave the search button no name, so its id stands in and its rendered words travel beside it.
+    expect(byName(observation, 'button', 'search').text).toBe('Describe the job you want');
+    // A named element carries no text of its own.
+    expect(byName(observation, 'button', 'Next').text).toBeNull();
+  });
+
+  it('[BRW-2] reports a page only once two reads agree, so a control that renders a moment after the document is observed', async () => {
+    // Measured live on 2026-10-07: thirteen observations in a row, each a
+    // second after its own reload, reported a landing page without the search
+    // control the screenshot taken moments later shows.
+    const patient = new PlaywrightBrowser({
+      profilesDir: profiles,
+      channel: undefined,
+      settleRetryMs: 150,
+    });
+    await patient.open('spec-patient', { headed: false });
+    try {
+      await patient.page.setContent(LATE_PAGE);
+      const observation = await patient.observe();
+      expect(observation.elements.map((e) => e.name)).toEqual([
+        'Menu',
+        'Describe the job you want',
+      ]);
+      // It took more than one read to see the control, the reads settled, and the time is on the record.
+      expect(observation.reading.reads).toBeGreaterThanOrEqual(2);
+      expect(observation.reading.settled).toBe(true);
+      expect(observation.reading.durationMs).toBeGreaterThan(0);
+    } finally {
+      await patient.close();
     }
   });
 

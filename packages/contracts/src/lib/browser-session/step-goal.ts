@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 
+import type { SuccessCriterion } from '../quality-loop/evidence';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
@@ -15,6 +16,7 @@ import {
 } from '../quality-loop/goal-index';
 import {
   ELEMENT_REF,
+  inScope,
   type ObservedElement,
   type PageObservation,
   OBJECTIONS_BOUND,
@@ -22,9 +24,24 @@ import {
   type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
-import { BROWSER_STEP_PIPELINE_ID } from './pipelines';
+import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
 import { ACTIONS_BOUND } from './step-plan.schema';
 import { ELEMENT_KINDS, HIDDEN_TRAITS } from './vocab';
+
+/**
+ * Where the mission stands, as engine facts: the criteria settled for the
+ * session — passed by the evaluator on a plan that ran whole before any unit
+ * of work opened, with the page then moved — which the rubric this run is
+ * judged against no longer carries; and those passed the same way inside
+ * the open unit of work, still carried and graded, because a step of a unit
+ * may repeat on its next page.
+ */
+export interface StepProgress {
+  /** The session's whole rubric, settled criteria included. */
+  criteria: readonly SuccessCriterion[];
+  settled: readonly string[];
+  done: readonly string[];
+}
 
 export interface StepGoalInput {
   /** The goal document, verbatim. */
@@ -39,6 +56,7 @@ export interface StepGoalInput {
    * about, so each one arrives whole and once.
    */
   objections: readonly StepObjection[];
+  progress: StepProgress;
 }
 
 /** The facts the validators check a plan against; everything else in the goal is for the model. */
@@ -50,17 +68,24 @@ export const stepIndexSchema = z.strictObject({
       ref: z.string().regex(ELEMENT_REF),
       kind: z.enum(ELEMENT_KINDS),
       disabled: z.boolean(),
+      // Written only where it deviates: an index of 150 elements is read by a
+      // model too, and the common case costs nothing to say.
+      visible: z.boolean().default(true),
+      /** Outside the open modal dialog: a person could not reach it. */
+      behind: z.boolean().default(false),
       options: z.array(z.string()).nullable(),
       hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)),
     }),
   ),
-  openTask: z.boolean(),
   /**
-   * Whether the observation shows anything at all — a listed element or a
-   * line of snapshot. A terminate names a stop condition the page shows and a
-   * taskDone an outcome the page shows; on a page that shows nothing there is
-   * nothing for either to rest on, and the validators refuse them there so the
-   * most consequential actions in the vocabulary never rest on a claim alone.
+   * Whether the observation shows anything at all — a listed element, or a
+   * snapshot at a rung above none. A terminate names a stop condition the page
+   * shows and a taskDone an outcome the page shows; on a page that shows
+   * nothing there is nothing for either to rest on, and the validators refuse
+   * them there so the most consequential actions in the vocabulary never rest
+   * on a claim alone. A snapshot at the none rung is its note line — text
+   * that says nothing is shown — and an empty document is an empty snapshot
+   * at the full rung; neither shows a thing.
    */
   pageShowsContent: z.boolean(),
 });
@@ -71,6 +96,8 @@ const quote = (text: string): string => `"${text.replace(/\s+/g, ' ').trim()}"`;
 /** One element as the model reads it: ref, role, name, then only the facts that are true of it. */
 export function renderElementLine(element: ObservedElement): string {
   const parts = [element.ref, element.role, quote(element.name)];
+  // What a person reads on an element the tree gave no name, beside whatever stood in for one.
+  if (element.text !== null && element.text !== '') parts.push(`text ${quote(element.text)}`);
   if (element.inputType !== null) parts.push(`type ${element.inputType}`);
   if (element.value !== null && element.value !== '') parts.push(`value ${quote(element.value)}`);
   if (element.options !== null) parts.push(`options: ${element.options.join(' | ')}`);
@@ -115,28 +142,92 @@ const objectionLines = (objections: readonly StepObjection[]): string[] => {
   return rest === 0 ? lines : [...lines, `(${rest} older objection(s) not listed)`];
 };
 
+/**
+ * The elements as the model reads them: those a person could reach — visible,
+ * and inside the open dialog when one is open — one line each, and the rest
+ * as one count. Every ref stays in the index whether listed or not, so a plan
+ * that cites an unlisted one is refused by the validators rather than guessed
+ * at. Measured 2026-10-07: a form page reached the model as 150 lines, 67 of
+ * them hidden, with the open dialog's five fields among them unmarked.
+ */
+function elementLines(observation: PageObservation): string[] {
+  const { elements, activeScope } = observation;
+  if (elements.length === 0) return ['(no interactive elements)'];
+  const reachable = elements.filter((element) => element.visible && inScope(element, activeScope));
+  const unlisted = elements.length - reachable.length;
+  return [
+    ...(activeScope === null
+      ? []
+      : [
+          `Inside the open ${activeScope.role} ${quote(activeScope.name)} — the rest of the page waits behind it:`,
+        ]),
+    ...(reachable.length > 0
+      ? reachable.map(renderElementLine)
+      : ['(no reachable interactive elements)']),
+    ...(unlisted > 0
+      ? [
+          `(${unlisted} interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)`,
+        ]
+      : []),
+  ];
+}
+
+/**
+ * Where the mission stands: the settled criteria with their statements, since
+ * the rubric this run reads no longer carries them; the ones done in the open
+ * unit by id, since the rubric still does; and the rest of the settling kinds
+ * by id, in the rubric's own order and with no claim about which is next.
+ */
+function progressLines(progress: StepProgress): string[] {
+  const settling = progress.criteria.filter((criterion) =>
+    (SETTLING_CRITERION_KINDS as readonly string[]).includes(criterion.kind),
+  );
+  const settled = settling.filter((criterion) => progress.settled.includes(criterion.id));
+  const done = settling.filter(
+    (criterion) => progress.done.includes(criterion.id) && !progress.settled.includes(criterion.id),
+  );
+  const open = settling.filter(
+    (criterion) =>
+      !progress.settled.includes(criterion.id) && !progress.done.includes(criterion.id),
+  );
+  const ids = (criteria: readonly SuccessCriterion[]): string =>
+    criteria.map((criterion) => criterion.id).join(', ');
+  return [
+    ...(settled.length === 0
+      ? ['- Satisfied earlier this session: none yet.']
+      : [
+          '- Satisfied earlier this session, not graded on this page:',
+          ...settled.map((criterion) => `  - ${criterion.id} — ${criterion.statement}`),
+        ]),
+    `- Done in the open unit of work so far: ${done.length === 0 ? 'none' : ids(done)}.`,
+    `- Still open: ${open.length === 0 ? 'none' : ids(open)}.`,
+  ];
+}
+
 const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   ledger.openTask === null
-    ? '- No unit of work is open.'
-    : `- Open unit of work: ${quote(ledger.openTask.label)} at ${ledger.openTask.url}`,
+    ? '- No unit of work is open: taskStart opens one.'
+    : `- Open unit of work: ${quote(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
   `- Done ${ledger.done} · skipped ${ledger.skipped} · failed ${ledger.failed}${
     ledger.remainingTasks === null ? '' : ` · may still start ${ledger.remainingTasks}`
   }`,
 ];
 
-const indexOf = (input: StepGoalInput): StepIndex => ({
+const indexOf = (input: StepGoalInput): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
   elements: input.observation.elements.map((element) => ({
     ref: element.ref,
     kind: element.kind,
     disabled: element.disabled,
+    ...(element.visible ? {} : { visible: false }),
+    ...(inScope(element, input.observation.activeScope) ? {} : { behind: true }),
     options: element.options,
     hiddenTraits: element.hiddenTraits,
   })),
-  openTask: input.ledger.openTask !== null,
   pageShowsContent:
-    input.observation.elements.length > 0 || input.observation.ariaSnapshot.trim().length > 0,
+    input.observation.elements.length > 0 ||
+    (input.observation.snapshotRung !== 'none' && input.observation.ariaSnapshot.trim() !== ''),
 });
 
 /** The goal, or a refusal when it would not fit the engine's budget. */
@@ -154,9 +245,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     '## Elements',
     '',
-    ...(observation.elements.length > 0
-      ? observation.elements.map(renderElementLine)
-      : ['(no interactive elements)']),
+    ...elementLines(observation),
     ...(observation.omittedElements > 0
       ? [`(${observation.omittedElements} more interactive elements not listed)`]
       : []),
@@ -190,6 +279,10 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     ...ledgerLines(input.ledger),
     '',
+    '## Progress',
+    '',
+    ...progressLines(input.progress),
+    '',
     '## Limits',
     '',
     // A cap reads as a quota unless it says otherwise. Measured on 2026-10-06:
@@ -208,9 +301,12 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     // closed their unit of work and declared the mission complete on the far
     // side of a search they had not yet watched land.
     '- Cite refs only from the Elements list above, which belongs to this observation alone. An action that navigates, submits, or otherwise replaces the page is the LAST action of the plan: anything after it would act on, or claim something about, a page nobody has observed yet — closing a unit of work and terminating included. Plan up to it and leave the page it opens to the next plan.',
-    '- Never act on a disabled element; fill only what can be typed into; select only a listed option.',
+    '- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option.',
     '- A field the page hides is never filled or selected.',
-    '- taskStart only while no unit of work is open; taskDone only while one is.',
+    // A claim rests on the page as observed. Measured 2026-10-07: twelve plans
+    // closed their unit or ended the session past a click or a key press in
+    // the same plan, one of them `done` after Next on page 1 of 9 of a form.
+    '- A taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
     '- Validators check these limits; they are not criteria.',
     '',
     '## Index',

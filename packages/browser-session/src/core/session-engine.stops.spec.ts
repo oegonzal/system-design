@@ -185,6 +185,52 @@ describe('how a plan stops and how a session ends', () => {
     expect(noRubric.detail.status).toBe('stopped');
   });
 
+  it('[BRW-4] counts a step that ran and moved nothing toward the stall, and skips a redundant taskStart rather than refusing the actions beside it', async () => {
+    // Measured 2026-10-07: twelve observations of one unchanged landing page,
+    // each step a navigate that ran clean, and a count of failed steps saw
+    // none of them; and five plans on an application form voided whole for a
+    // taskStart while the unit was already open.
+    const press: StepPlan = {
+      ...PLANS.search,
+      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null }],
+    };
+    const stalled = await run({
+      script: { plans: [decidedPlan(press), decidedPlan(press), decidedPlan(press)] },
+      rails: { maxStalledSteps: 3, maxConsecutiveFailures: 1 },
+    });
+    expect(stalled.outcome.termination).toEqual({
+      reason: 'page-stalled',
+      detail: '3 observations in a row of a page that did not change, limit 3',
+    });
+    // Every press ran and none failed: the stall is the only rail that saw it.
+    expect(stalled.browser.calls.filter((call) => call === 'press Tab')).toHaveLength(3);
+    expect(stalled.brain.planInputs).toHaveLength(3);
+
+    const reopened: StepPlan = {
+      ...PLANS.results,
+      actions: [
+        PLANS.results.actions[0] as StepPlan['actions'][number],
+        { kind: 'done', reason: 'nothing else is due', expect: null },
+      ],
+    };
+    const skipped = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, reopened, PLANS.end].map((p) => decidedPlan(p)),
+      },
+    });
+    // The second taskStart is recorded and skipped; the plan beside it still ran.
+    expect(skipped.brain.planInputs[3]?.history.slice(-2)).toEqual([
+      {
+        action: 'taskStart "Senior Engineer at Acme"',
+        outcome: 'not-executed',
+        note: 'a unit of work is already open',
+      },
+      { action: 'done', outcome: 'ok', note: null },
+    ]);
+    expect(skipped.detail.tasks).toHaveLength(1);
+    expect(skipped.outcome.termination.reason).toBe('mission-complete');
+  });
+
   it('[BRW-4] a browser that throws ends the session failed with the error recorded, the row closed and the dump indexed', async () => {
     const browser = new FakeBrowser(pages());
     browser.observe = async () => {

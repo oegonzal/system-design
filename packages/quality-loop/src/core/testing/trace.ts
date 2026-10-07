@@ -71,7 +71,11 @@ export const decision = (
   ...overrides,
 });
 
-/** A trace of `iterations` alike iterations around one decision and ledger, the last one crowned. */
+/**
+ * A trace of `iterations` alike iterations around one decision and ledger,
+ * the last one crowned. The iteration's validation is the ledger's, as the
+ * engine writes it: one set of reports, recorded in both places.
+ */
 export function traceOf<T = unknown>(
   overrides: {
     artifact?: T | null;
@@ -85,6 +89,7 @@ export function traceOf<T = unknown>(
   } = {},
 ): RunTrace<T> {
   const judged = overrides.decision ?? decision();
+  const evidence = overrides.ledger ?? ledger();
   const count = overrides.iterations ?? 1;
   return {
     pipeline: { id: 'tiny', version: '0.0.1' },
@@ -95,10 +100,10 @@ export function traceOf<T = unknown>(
       artifact: overrides.artifact ?? null,
       locations: [],
       rendered: null,
-      validation: [],
+      validation: evidence.validation,
       critics: [],
       evaluators: [],
-      ledger: overrides.ledger ?? ledger(),
+      ledger: evidence,
       decision: judged,
       remediations: [],
       durationMs: 0,

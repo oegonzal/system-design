@@ -1,0 +1,1193 @@
+[
+  {
+    "step": 16,
+    "recorded": {
+      "runId": "2026-10-07T02-44-35-819-8cd327-quality",
+      "finalDecision": "escalate",
+      "overall": 81.6,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4473257910&eBP=CwEAAAGhFD9HkK2BL04oMDtcXr8DKOW5btzFGU1WIiNmZlF58rvhT5ZdwSQ3FPo932ev8Fudrk-6sOLszauZ6I577RK1XCehkGuEjCP-l4EL40qAFzdbRU8VuMQU-L",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e6",
+          "role": "button",
+          "name": "Close jump menu",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e29",
+          "role": "button",
+          "name": "Home, 1 new notification",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e1307",
+          "role": "button",
+          "name": "Senior Software Engineer - Delivery Tech (Verified job) Gopuff United States (Remote) Dismiss Senior Software Engineer -",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "The page is a job listing for the position of Senior Software Engineer - Delivery Tech at Gopuff on LinkedIn. Currently, the session has opened this listing but has not yet initiated the application process. Actions will focus on applying for this job through the Easy Apply feature and gathering necessary applicant information.",
+      "actions": [
+        {
+          "kind": "taskStart",
+          "label": "Senior Software Engineer - Delivery Tech at Gopuff",
+          "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4473257910&keywords=software%20engineer%20remote%20easy%20apply",
+          "reason": "Starting the application process for the job at Gopuff.",
+          "expect": "Transitioning to the application form for the position."
+        },
+        {
+          "kind": "click",
+          "ref": "f169e1307",
+          "reason": "Pressing the Easy Apply button to begin the application process for the Senior Software Engineer role.",
+          "expect": "Loading the application form where the user can provide necessary information."
+        },
+        {
+          "kind": "askFields",
+          "refs": ["f169e6", "f169e15", "f169e29"],
+          "reason": "Asking for necessary applicant fields to continue the application process, since they are required for submission.",
+          "expect": "Navigating to the next step of the application after collecting required fields."
+        },
+        {
+          "kind": "waitFor",
+          "until": "element",
+          "value": "f169e6",
+          "reason": "Waiting for the form to process the previous request and present the next step in the application.",
+          "expect": "The next page of the application form to be displayed."
+        },
+        {
+          "kind": "press",
+          "key": "Enter",
+          "reason": "Submitting the form to proceed with the application after filling the required fields.",
+          "expect": "Review page of the application form to be displayed."
+        },
+        {
+          "kind": "press",
+          "key": "Enter",
+          "reason": "Submitting the application on the review page to complete the application process.",
+          "expect": "Confirmation message showing that the application was submitted successfully."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "done",
+          "detail": "Successfully submitted the application for Senior Software Engineer - Delivery Tech at Gopuff.",
+          "reason": "Completing the application process for this position.",
+          "expect": "No further actions required; the application has been confirmed."
+        }
+      ]
+    }
+  },
+  {
+    "step": 17,
+    "recorded": {
+      "runId": "2026-10-07T02-44-51-292-afdec3-quality",
+      "finalDecision": "escalate",
+      "overall": 55.2,
+      "executePrefix": 1,
+      "executable": true,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4473257910&eBP=CwEAAAGhFD9HkK2BL04oMDtcXr8DKOW5btzFGU1WIiNmZlF58rvhT5ZdwSQ3FPo932ev8Fudrk-6sOLszauZ6I577RK1XCehkGuEjCP-l4EL40qAFzdbRU8VuMQU-L",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e1250",
+          "role": "button",
+          "name": "Skip to main content",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e6",
+          "role": "button",
+          "name": "Close jump menu",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e1638",
+          "role": "button",
+          "name": "Easy Apply to this job",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "This page is a job listing from LinkedIn, specifically for the position of Senior Software Engineer at Gopuff, which offers remote work. The application process has already started, as a task has been initiated with this listing, and the session shows the action of attempting to gather applicant information for submission.",
+      "actions": [
+        {
+          "kind": "click",
+          "ref": "f169e1638",
+          "reason": "To initiate the application process for the Senior Software Engineer position at Gopuff, which is relevant to the mission of applying to remote software engineering roles.",
+          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+        },
+        {
+          "kind": "askFields",
+          "refs": ["f169e6", "f169e1250"],
+          "reason": "To collect necessary applicant information for the application form since the specifics of the applicant's details are not provided in the evidence available.",
+          "expect": "The application form will now prompt for any required fields related to the applicant's qualifications."
+        },
+        {
+          "kind": "press",
+          "key": "Tab",
+          "reason": "To navigate through the form after asking for fields, ensuring all necessary information is accounted for and allowing progress on the application.",
+          "expect": "The next section of the application form will open, allowing for further input or review."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "skipped",
+          "detail": "The application was set aside because required fields were not provided in evidence and could not be filled.",
+          "reason": "The application process could not proceed due to missing required fields for the applicant, requiring operator input.",
+          "expect": "The unit of work will be marked as skipped, and the session will proceed to the next job listing."
+        }
+      ]
+    }
+  },
+  {
+    "step": 18,
+    "recorded": {
+      "runId": "2026-10-07T02-45-06-842-7bab28-quality",
+      "finalDecision": "escalate",
+      "overall": 68.4,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e1250",
+          "role": "button",
+          "name": "Skip to main content",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e6",
+          "role": "button",
+          "name": "Close jump menu",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e29",
+          "role": "button",
+          "name": "Home, 1 new notification",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e36",
+          "role": "link",
+          "name": "Network, 0 new notifications",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e43",
+          "role": "link",
+          "name": "Jobs, 0 new notifications",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e50",
+          "role": "link",
+          "name": "Messaging, 10 new notifications",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e58",
+          "role": "link",
+          "name": "Notifications, 25 new notifications",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e66",
+          "role": "button",
+          "name": "",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e77",
+          "role": "button",
+          "name": "For Business",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e85",
+          "role": "link",
+          "name": "Learning, 0 new notifications",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e1638",
+          "role": "button",
+          "name": "Easy Apply to this job",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "This page is a job listing on LinkedIn for the position of Senior Software Engineer at Gopuff. The goal is to apply for the job via Easy Apply. The necessary button for this action is visible, indicating that the application process can begin.",
+      "actions": [
+        {
+          "kind": "taskStart",
+          "label": "Senior Software Engineer - Delivery Tech at Gopuff",
+          "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "reason": "Starting the application process for the Senior Software Engineer position at Gopuff as part of the mission.",
+          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+        },
+        {
+          "kind": "click",
+          "ref": "f169e1638",
+          "reason": "To initiate the job application process for the Senior Software Engineer position as part of the mission.",
+          "expect": "The application form page will load, allowing the applicant to start inputting their information."
+        },
+        {
+          "kind": "askFields",
+          "refs": [
+            "f169e6",
+            "f169e1250",
+            "f169e29",
+            "f169e36",
+            "f169e43",
+            "f169e50",
+            "f169e58",
+            "f169e66",
+            "f169e77",
+            "f169e85"
+          ],
+          "reason": "Collecting applicant-specific information that the application form requires for submission.",
+          "expect": "The form fields about the applicant would display, collecting the necessary details required for the application."
+        },
+        {
+          "kind": "press",
+          "key": "Tab",
+          "reason": "Navigating to the next actionable element on the application form to continue the application process.",
+          "expect": "The next section of the application form will be visible, allowing further progress."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "done",
+          "detail": "The application has successfully been submitted and confirmed.",
+          "reason": "Completing the application process for this job listing, marking it as done.",
+          "expect": "A confirmation message appears indicating that the application was submitted successfully."
+        }
+      ]
+    }
+  },
+  {
+    "step": 19,
+    "recorded": {
+      "runId": "2026-10-07T02-45-25-331-18e525-quality",
+      "finalDecision": "escalate",
+      "overall": 69.1,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e2149",
+          "role": "textbox",
+          "name": "First name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Oscar",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "5/1005 of 100 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2158",
+          "role": "textbox",
+          "name": "Last name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Gonzalez",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "8/508 of 50 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2168",
+          "role": "combobox",
+          "name": "Phone country code*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "United States (+1)",
+          "options": [
+            "Andorra (+376)",
+            "United Arab Emirates (+971)",
+            "Afghanistan (+93)",
+            "Antigua & Barbuda (+1)",
+            "Anguilla (+1)",
+            "Albania (+355)",
+            "Armenia (+374)",
+            "Angola (+244)"
+          ],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2173",
+          "role": "textbox",
+          "name": "Mobile phone number*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "tel",
+          "value": null,
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2178",
+          "role": "combobox",
+          "name": "Email address*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "oegonbar@gmail.com",
+          "options": ["oegonbar@gmail.com", "enfav8@gmail.com"],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2182",
+          "role": "button",
+          "name": "Next",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "This page displays the application form for the Senior Software Engineer position at Gopuff where the applicant must fill out required fields using evidence from their profile. The mission is currently focused on completing this application process through LinkedIn's Easy Apply feature.",
+      "actions": [
+        {
+          "kind": "taskStart",
+          "label": "Senior Software Engineer - Delivery Tech at Gopuff",
+          "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "reason": "Starting the application process for the Senior Software Engineer position at Gopuff is essential to complete this unit of work.",
+          "expect": "The next action should open the application form for the position."
+        },
+        {
+          "kind": "askFields",
+          "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
+          "reason": "These fields are required for the application and need to be filled out with known information about the applicant.",
+          "expect": "The fields for First name, Last name, Phone country code, Mobile phone number, and Email address should be populated appropriately."
+        },
+        {
+          "kind": "click",
+          "ref": "f169e2182",
+          "reason": "Pressing 'Next' is required to proceed to the next page of the application form after filling in the necessary fields.",
+          "expect": "The next page of the application form should load, allowing further progress."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "done",
+          "detail": "The application has been submitted successfully after confirming all required fields were filled correctly.",
+          "reason": "Completing and submitting the application marks the end of this unit of work for this listing.",
+          "expect": null
+        }
+      ]
+    }
+  },
+  {
+    "step": 20,
+    "recorded": {
+      "runId": "2026-10-07T02-45-40-776-5cdc4c-quality",
+      "finalDecision": "escalate",
+      "overall": 71.6,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e2149",
+          "role": "textbox",
+          "name": "First name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Oscar",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "5/1005 of 100 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2158",
+          "role": "textbox",
+          "name": "Last name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Gonzalez",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "8/508 of 50 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2168",
+          "role": "combobox",
+          "name": "Phone country code*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "United States (+1)",
+          "options": [
+            "Andorra (+376)",
+            "United Arab Emirates (+971)",
+            "Afghanistan (+93)",
+            "Antigua & Barbuda (+1)",
+            "Anguilla (+1)",
+            "Albania (+355)",
+            "Armenia (+374)",
+            "Angola (+244)"
+          ],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2173",
+          "role": "textbox",
+          "name": "Mobile phone number*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "tel",
+          "value": null,
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2178",
+          "role": "combobox",
+          "name": "Email address*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "oegonbar@gmail.com",
+          "options": ["oegonbar@gmail.com", "enfav8@gmail.com"],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2182",
+          "role": "button",
+          "name": "Next",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "This page is the application form for a Senior Software Engineer position at Gopuff on LinkedIn, where information about the applicant is required for the Easy Apply process. Currently, the session is signed in and ready to begin the application process.",
+      "actions": [
+        {
+          "kind": "taskStart",
+          "label": "Senior Software Engineer - Delivery Tech at Gopuff",
+          "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "reason": "To start the application process for the Senior Software Engineer role.",
+          "expect": "The application form should load, showing required fields."
+        },
+        {
+          "kind": "askFields",
+          "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
+          "reason": "These fields require input from the applicant for the Easy Apply process.",
+          "expect": "The fields should display prompts for input regarding applicant information."
+        },
+        {
+          "kind": "click",
+          "ref": "f169e2182",
+          "reason": "To move forward in the application process after filling required fields.",
+          "expect": "The next page of the application or review should load."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "done",
+          "detail": "Successfully submitted the application for the Senior Software Engineer position.",
+          "reason": "The application has been completed and submitted as per the required steps.",
+          "expect": "A confirmation message should appear, indicating the application was submitted successfully."
+        }
+      ]
+    }
+  },
+  {
+    "step": 21,
+    "recorded": {
+      "runId": "2026-10-07T02-45-53-217-3ec46a-quality",
+      "finalDecision": "escalate",
+      "overall": 67.1,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e2149",
+          "role": "textbox",
+          "name": "First name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Oscar",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "5/1005 of 100 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2158",
+          "role": "textbox",
+          "name": "Last name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Gonzalez",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "8/508 of 50 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2168",
+          "role": "combobox",
+          "name": "Phone country code*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "United States (+1)",
+          "options": [
+            "Andorra (+376)",
+            "United Arab Emirates (+971)",
+            "Afghanistan (+93)",
+            "Antigua & Barbuda (+1)",
+            "Anguilla (+1)",
+            "Albania (+355)",
+            "Armenia (+374)",
+            "Angola (+244)"
+          ],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2173",
+          "role": "textbox",
+          "name": "Mobile phone number*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "tel",
+          "value": null,
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2178",
+          "role": "combobox",
+          "name": "Email address*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "oegonbar@gmail.com",
+          "options": ["oegonbar@gmail.com", "enfav8@gmail.com"],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "form",
+      "assessment": "This page is an application form for a job listing on LinkedIn. The mission is currently open to a listing for a Senior Software Engineer position at Gopuff, where various personal details need to be filled out in the application form.",
+      "actions": [
+        {
+          "kind": "taskStart",
+          "label": "Senior Software Engineer - Delivery Tech at Gopuff",
+          "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "reason": "Starting the application process for the Senior Software Engineer position.",
+          "expect": "Load the application form with fields to fill out."
+        },
+        {
+          "kind": "askFields",
+          "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
+          "reason": "Requesting the required fields about the applicant to ensure all necessary information is included in the application.",
+          "expect": "Fields for first name, last name, phone country code, mobile phone number, and email address will be prepared for input."
+        },
+        {
+          "kind": "press",
+          "key": "Enter",
+          "reason": "Proceeding to the next step in the application form after filling out required information.",
+          "expect": "Advance to the next page of the application form."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "failed",
+          "detail": "Could not submit the application due to a missing required field.",
+          "reason": "Finishing up the application process for the position.",
+          "expect": "The application remains unsubmitted, and the user is informed of the required fields still needing input."
+        }
+      ]
+    }
+  },
+  {
+    "step": 22,
+    "recorded": {
+      "runId": "2026-10-07T02-46-14-733-d27b28-quality",
+      "finalDecision": "escalate",
+      "overall": 44.2,
+      "executePrefix": 0,
+      "executable": false,
+      "blockingFindings": [],
+      "findings": []
+    },
+    "observation": {
+      "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+      "title": "Senior Software Engineer - Delivery Tech | Gopuff | LinkedIn",
+      "elements": [
+        {
+          "ref": "f169e2149",
+          "role": "textbox",
+          "name": "First name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Oscar",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "5/1005 of 100 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2158",
+          "role": "textbox",
+          "name": "Last name*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "text",
+          "value": "Gonzalez",
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": "8/508 of 50 characters",
+          "scope": null
+        },
+        {
+          "ref": "f169e2168",
+          "role": "combobox",
+          "name": "Phone country code*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "United States (+1)",
+          "options": [
+            "Andorra (+376)",
+            "United Arab Emirates (+971)",
+            "Afghanistan (+93)",
+            "Antigua & Barbuda (+1)",
+            "Anguilla (+1)",
+            "Albania (+355)",
+            "Armenia (+374)",
+            "Angola (+244)"
+          ],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2173",
+          "role": "textbox",
+          "name": "Mobile phone number*",
+          "text": null,
+          "kind": "fillable",
+          "inputType": "tel",
+          "value": null,
+          "options": null,
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2178",
+          "role": "combobox",
+          "name": "Email address*",
+          "text": null,
+          "kind": "selectable",
+          "inputType": "select",
+          "value": "oegonbar@gmail.com",
+          "options": ["oegonbar@gmail.com", "enfav8@gmail.com"],
+          "required": true,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        },
+        {
+          "ref": "f169e2182",
+          "role": "button",
+          "name": "Next",
+          "text": null,
+          "kind": "clickable",
+          "inputType": null,
+          "value": null,
+          "options": null,
+          "required": false,
+          "disabled": false,
+          "visible": true,
+          "maxLength": null,
+          "hiddenTraits": [],
+          "context": null,
+          "scope": null
+        }
+      ],
+      "omittedElements": 0,
+      "unread": null,
+      "activeScope": null,
+      "snapshotRung": "none",
+      "reading": {
+        "reads": 1,
+        "settled": true,
+        "durationMs": 0
+      },
+      "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
+    },
+    "openTask": true,
+    "plan": {
+      "pageKind": "detail",
+      "assessment": "This page shows the application form for the position of Senior Software Engineer at Gopuff through LinkedIn's Easy Apply feature. The form requires personal information from the applicant, including their name, phone number, and email. The session has just accessed the form, ready for input.",
+      "actions": [
+        {
+          "kind": "askFields",
+          "refs": ["f169e2149", "f169e2158", "f169e2168", "f169e2173", "f169e2178"],
+          "reason": "To gather required personal information about the applicant for the application form as specified in the mission.",
+          "expect": null
+        },
+        {
+          "kind": "press",
+          "key": "ArrowDown",
+          "reason": "Advancing the form to the next step after providing the necessary information in the fields to continue with the application process.",
+          "expect": null
+        },
+        {
+          "kind": "waitFor",
+          "until": "element",
+          "value": "f169e2182",
+          "reason": "Waiting for the Next button to become available after pressing ArrowDown, indicating readiness to proceed with the application submission.",
+          "expect": "The Next button should be visible and clickable, allowing progression in the application."
+        },
+        {
+          "kind": "press",
+          "key": "Enter",
+          "reason": "Submitting the completed fields to advance to the next page of the application form.",
+          "expect": null
+        },
+        {
+          "kind": "waitFor",
+          "until": "element",
+          "value": "f169e2182",
+          "reason": "Waiting for the next page to load after submission to confirm that the information has been processed.",
+          "expect": "The next page of the application form should load, indicating successful progression."
+        },
+        {
+          "kind": "taskDone",
+          "outcome": "done",
+          "detail": "The application has been successfully submitted, signaling the completion of this unit of work.",
+          "reason": "The current unit of work is completed successfully with the submission of the application as outlined in the mission.",
+          "expect": null
+        }
+      ]
+    }
+  }
+]

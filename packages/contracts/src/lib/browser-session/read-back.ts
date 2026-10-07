@@ -197,24 +197,47 @@ export interface PlanReadout {
   reason: string | null;
   /** Why it did not run, or why its tail was cut: each objection whole, never folded into an action. */
   objections: StepObjection[];
+  /** The criteria the evaluator settled `pass` on this plan, by id — what a session may settle once the page has moved. */
+  passed: string[];
 }
+
+/** The criteria an iteration's ledger settled pass. */
+const passedOf = (iteration: IterationTrace | null): string[] =>
+  iteration === null
+    ? []
+    : iteration.ledger.criteria
+        .filter((evidence) => evidence.result === 'pass')
+        .map((evidence) => evidence.criterionId);
 
 const notExecutable = (
   plan: StepPlan | null,
   reason: string,
   objections: StepObjection[] = [],
+  passed: string[] = [],
 ): PlanReadout => ({
   plan,
   executable: false,
   executePrefix: 0,
   reason,
   objections,
+  passed,
 });
 
 /**
  * A plan runs when the loop accepted it with its policy gate open and no
  * judge objected to the plan as a whole; then only up to the first action a
  * confirmed finding or a validation problem names.
+ *
+ * Two readings of one decision, by declared policy: a plan nothing cut is
+ * held to the loop's own verdict — below the accept bar it does not run —
+ * while a plan something cut at a position runs up to that position whatever
+ * the score, because the actions before the cut were judged on this page and
+ * nobody objected to them. The second reading is the owner's directive that a
+ * limit never discards work; it also means a producer that ends every plan
+ * with a claim the validators cut is never held to the bar. Measured
+ * 2026-10-07: with claims cut, eleven of twenty-two plans would run their
+ * prefix below the bar. Whether the bar should also gate a prefix is a policy
+ * question for a replay over recorded runs, not for this file.
  */
 export function routePlan(run: QualityRunDto, step: number): PlanReadout {
   const best = bestIterationOf(run);
@@ -224,26 +247,36 @@ export function routePlan(run: QualityRunDto, step: number): PlanReadout {
   const plan = parsed.value;
   const blockers = blockersOf(best);
   const objections = objectionsOf(best, step, run.trace?.contract.criteria ?? []);
+  const passed = passedOf(best);
   const cut = cutPointOf(blockers, ACTION_LOCATION);
   if (cut === 'whole') {
     return notExecutable(
       plan,
       `a blocker names the plan as a whole: ${best.decision.reason}`,
       objections,
+      passed,
     );
   }
   if (cut === null) {
     // Nothing blocked, so the decision is about the plan's quality alone; a
     // plan the loop did not accept on that account is not run on it either.
     return run.trace?.finalDecision === 'accept'
-      ? { plan, executable: true, executePrefix: plan.actions.length, reason: null, objections }
+      ? {
+          plan,
+          executable: true,
+          executePrefix: plan.actions.length,
+          reason: null,
+          objections,
+          passed,
+        }
       : notExecutable(
           plan,
           `decided ${run.trace?.finalDecision ?? 'nothing'}: ${best.decision.reason}`,
           objections,
+          passed,
         );
   }
-  if (cut === 0) return notExecutable(plan, 'the first action was faulted', objections);
+  if (cut === 0) return notExecutable(plan, 'the first action was faulted', objections, passed);
   // The actions ahead of the cut were judged only if the lenses judged the
   // plan: a plan the evidence gate found under-assessed has a prefix nobody read.
   if (!best.decision.gates.evidenceSufficient) {
@@ -251,10 +284,11 @@ export function routePlan(run: QualityRunDto, step: number): PlanReadout {
       plan,
       `cut at ${actionLocation(cut)} but under-judged: ${best.decision.reason}`,
       objections,
+      passed,
     );
   }
   // Handed back with the blockers at positions: the session runs up to the first.
-  return { plan, executable: true, executePrefix: cut, reason: null, objections };
+  return { plan, executable: true, executePrefix: cut, reason: null, objections, passed };
 }
 
 export interface FieldReadout {

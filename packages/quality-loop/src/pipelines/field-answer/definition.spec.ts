@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline, validatePipeline } from '../../core/pipeline';
-import { allStages, capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
+import { capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
 import { FIELD_ANSWER } from './definition';
 import measured from './measured.json';
 import { fieldAnswersOutput } from './output';
@@ -61,12 +61,13 @@ describe('the field-answer pipeline', () => {
   });
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
-    // SEEDED, not measured: no live answer run has been recorded yet, so these
-    // are the most each stage is expected to write for a page of up to 40
-    // fields, taken from the shortest recorded pipeline (design-prompt) at
-    // comparable prompt sizes. The first live runs replace them, through
-    // `measured.json` (`pnpm measure:bounds`); a cap is also the call's time
-    // limit, so one a stage outwrites is a call cut short.
+    // The seeds are what each stage was expected to write for a page of up to
+    // 40 fields before any answer run was recorded; `measured.json` (`pnpm
+    // measure:bounds`, two runs as of 2026-10-07) is what they measurably
+    // wrote, and the caps clear both. A cap is also the call's time limit, so
+    // one a stage outwrites is a call cut short. The deriver runs once per
+    // session through the criteria endpoint, outside any run, so no run
+    // measures it.
     const seeds = {
       criteria: 2_500,
       producer: 4_500,
@@ -75,8 +76,14 @@ describe('the field-answer pipeline', () => {
       'evaluator.answers': 4_000,
     };
     expect(capsAgainstMeasured(FIELD_ANSWER, seededCaps(seeds))).toEqual([]);
-    const unrecorded = measured.runs === 0 ? allStages(FIELD_ANSWER, 'no answer run recorded') : {};
-    expect(capsAgainstMeasured(FIELD_ANSWER, measured.caps, { exempt: unrecorded })).toEqual([]);
+    expect(measured.runs).toBeGreaterThan(0);
+    expect(
+      capsAgainstMeasured(FIELD_ANSWER, measured.caps, {
+        exempt: {
+          criteria: 'derived once per session through the criteria endpoint, outside any run',
+        },
+      }),
+    ).toEqual([]);
   });
 
   it('[QL-4] every location the answers expose is printed verbatim where a judge reads it, beside the field’s ref', () => {

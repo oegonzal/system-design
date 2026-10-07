@@ -28,6 +28,11 @@ export const SESSION_FLAGS = {
     valued: true,
     help: 'consecutive failed steps before it stops',
   },
+  maxStalledSteps: {
+    name: '--max-stalled-steps',
+    valued: true,
+    help: 'observations in a row of a page that did not change before it stops',
+  },
   subject: { name: '--subject', valued: true, help: "whom the operator's answers are about" },
   limit: { name: '--limit', valued: true, help: 'how many sessions to list' },
   json: { name: '--json', valued: false, help: 'print the records as JSON' },
@@ -43,8 +48,8 @@ export const SESSION_ENV = {
 } as const;
 
 /**
- * The engine's stop rules when the flags leave them alone; `maxBrainFaults`,
- * `maxUnreadablePages` and `maxStalledSteps` have no flag.
+ * The engine's stop rules when the flags leave them alone; `maxBrainFaults`
+ * and `maxUnreadablePages` have no flag.
  *
  * Twelve hours of wall clock, because a session is a long errand and not a
  * demonstration: one page is one brain call, which runs one to three minutes,
@@ -60,10 +65,14 @@ export const DEFAULT_RAILS: SessionRailsDto = {
   maxBrainFaults: 3,
   maxUnreadablePages: 3,
   // The same budget its sibling rails get. A hand-back's premise is a fresh
-  // observation; three failed steps on a page that has not changed is three
+  // observation; three observations of a page that has not changed is three
   // times that premise failing, however high an operator set the failure
-  // budget for a flaky page. Measured 2026-10-07: twenty steps on one unchanged
-  // empty document, under a failure budget of twenty.
+  // budget for a flaky page, and whether the steps between them were refused
+  // or ran and moved nothing. Measured 2026-10-07: twenty steps on one
+  // unchanged empty document under a failure budget of twenty, then twelve
+  // reloads of one landing page that a count of failed steps never saw. A
+  // page a producer needs many attempts on is what the flag is for: the
+  // default is the sibling rails', not a number this session measured.
   maxStalledSteps: 3,
 };
 
@@ -129,6 +138,7 @@ export function railsOf(values: {
   maxTasks?: string;
   maxMinutes?: string;
   maxFailures?: string;
+  maxStalledSteps?: string;
 }): SessionRailsDto {
   return {
     maxTasks: positiveInteger(values.maxTasks, 'maxTasks') ?? DEFAULT_RAILS.maxTasks,
@@ -137,7 +147,8 @@ export function railsOf(values: {
       positiveInteger(values.maxFailures, 'maxFailures') ?? DEFAULT_RAILS.maxConsecutiveFailures,
     maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
     maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
-    maxStalledSteps: DEFAULT_RAILS.maxStalledSteps,
+    maxStalledSteps:
+      positiveInteger(values.maxStalledSteps, 'maxStalledSteps') ?? DEFAULT_RAILS.maxStalledSteps,
   };
 }
 

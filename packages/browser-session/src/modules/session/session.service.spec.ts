@@ -154,11 +154,12 @@ describe('the session service, end to end', () => {
         : [];
     const stepStarts = core.startRequests.filter((r) => r.pipeline === BROWSER_STEP_PIPELINE_ID);
     expect(stepStarts).toHaveLength(5);
-    expect(
-      stepStarts.every(
-        (r) => r.maxIterations === 1 && JSON.stringify(r.criteria) === JSON.stringify(rubric),
-      ),
-    ).toBe(true);
+    expect(stepStarts.every((r) => JSON.stringify(r.criteria) === JSON.stringify(rubric))).toBe(
+      true,
+    );
+    // One iteration on each new page; the last plan is asked of the page the
+    // plan before it already saw, so the loop may revise once in-run.
+    expect(stepStarts.map((r) => r.maxIterations)).toEqual([1, 1, 1, 1, 2]);
     const orchestrations = core.orchestrations.startRequests;
     expect(orchestrations.map((o) => o.orchestrator)).toEqual([
       FORM_MEMORY_ORCHESTRATOR_ID,

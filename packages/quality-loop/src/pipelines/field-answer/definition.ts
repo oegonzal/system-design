@@ -62,7 +62,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     output: fieldAnswersOutput,
   },
 
-  // Caps are seeded, not measured: no live answer run has been recorded yet.
+  // Caps a fifth above the most each lens has measurably written (`measured.json`, two runs as of 2026-10-07) and above their seeds.
   // The spec holds the seed table; the first live runs replace it, and a cap
   // is also the call's time limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 6000 },

@@ -1,4 +1,4 @@
-import { BROWSER_SESSION_PIPELINES } from '@sysdesign/contracts';
+import { BROWSER_SESSION_PIPELINES, type StepPlan } from '@sysdesign/contracts';
 
 import {
   decidedAnswers,
@@ -75,6 +75,52 @@ describe('the session engine', () => {
       ]),
     );
     expect(browser.closed).toBe(true);
+  });
+
+  it('[BRW-1] settles a progress criterion the evaluator passed once a whole plan moved the page: out of the next rubric for the session, listed as done and still graded inside a unit, cleared when the unit closes', async () => {
+    // Measured 2026-10-07: the criterion for the mission's first step was
+    // failed by the evaluator on six pages after it had been taken, and
+    // passed for twelve re-navigations to the page it was taken on.
+    const { brain } = await run({
+      script: {
+        plans: [
+          // The search ran whole and the page moved: c1 settles for the session.
+          decidedPlan(PLANS.search, { passed: ['c1', 'c2'] }),
+          // Inside the unit the form step passes: done for the unit, still graded.
+          decidedPlan(PLANS.results, { passed: ['c3'] }),
+          decidedPlan(PLANS.form),
+          decidedPlan(PLANS.done),
+          decidedPlan(PLANS.end),
+        ],
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      replies: [{ kind: 'answer', text: 'Yes' }],
+    });
+    const inputs = brain.planInputs;
+    expect(inputs[0]?.progress).toEqual({ settled: [], done: [] });
+    expect(inputs[0]?.criteria.map((c) => c.id)).toEqual(['c1', 'c2', 'c3']);
+    // c1 is a progress criterion: settled. c2 is a never-do line: never settled.
+    expect(inputs[1]?.progress).toEqual({ settled: ['c1'], done: [] });
+    // The unit opened at step 2 and its plan passed c3 with the page moving: done in the unit.
+    expect(inputs[2]?.progress).toEqual({ settled: ['c1'], done: ['c3'] });
+    expect(inputs[3]?.progress).toEqual({ settled: ['c1'], done: ['c3'] });
+    // The unit closed at step 4: its progress is cleared, the session's stays.
+    expect(inputs[4]?.progress).toEqual({ settled: ['c1'], done: [] });
+    // The session hands the brain the whole rubric; the brain is what omits the settled.
+    expect(inputs[4]?.criteria).toEqual(inputs[0]?.criteria);
+  });
+
+  it('[BRW-1] a pass on a plan that did not move the page settles nothing', async () => {
+    const press: StepPlan = {
+      ...PLANS.search,
+      actions: [{ kind: 'press', key: 'Tab', reason: 'move the focus', expect: null }],
+    };
+    const { brain } = await run({
+      script: {
+        plans: [decidedPlan(press, { passed: ['c1'] }), decidedPlan(PLANS.end)],
+      },
+    });
+    expect(brain.planInputs[1]?.progress).toEqual({ settled: [], done: [] });
   });
 
   it('[BRW-1] [QL-36] runs a handed-back plan up to the action a cutting validator pointed at, and tells the next plan what was cut and why', async () => {
