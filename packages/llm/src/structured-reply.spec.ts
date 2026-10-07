@@ -1,15 +1,4 @@
-import {
-  BINDING_CLAIM_BOUND,
-  bound,
-  bounded,
-  CUT_MARKER,
-  designSubmissionSchema,
-  NARRATION_OVERVIEW_BOUND,
-  NODE_CONFIG_STRING_VALUE_BOUND,
-  RESPONSIBILITY_BOUND,
-  SOFT_ISSUE_NOTE,
-  type Bound,
-} from '@sysdesign/contracts';
+import { bound, bounded, CUT_MARKER, SOFT_ISSUE_NOTE } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 

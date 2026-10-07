@@ -117,7 +117,6 @@ export const observationUnreadSchema = z.strictObject({
    */
   snapshotLines: z.number().int().min(0),
 });
-export type ObservationUnread = z.infer<typeof observationUnreadSchema>;
 
 export const pageObservationSchema = z.strictObject({
   url: bounded.id(URL_MAX_LENGTH),

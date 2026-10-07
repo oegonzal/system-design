@@ -31,7 +31,7 @@ export const commandOf = (argv: readonly string[]): Command =>
 /**
  * What a process must have before Nest boots. `serve` and `run` call a
  * model, so they need a valid stale threshold and a provider that will answer
- * — whichever `llm.config.json` names, asked by that provider's own check and
+ * — whichever the chosen `config/llm` file names, asked by that provider's own check and
  * refused here saying how to fix it, never surfaced as a failed call minutes
  * into a run. `replay` reads recorded runs and needs neither. The check is
  * injectable so a spec never spawns a CLI nor reaches a network.

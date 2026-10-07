@@ -2,12 +2,10 @@ import {
   BINDING_CLAIM_BOUND,
   bound,
   bounded,
-  CUT_MARKER,
   designSubmissionSchema,
   NARRATION_OVERVIEW_BOUND,
   NODE_CONFIG_STRING_VALUE_BOUND,
   RESPONSIBILITY_BOUND,
-  SOFT_ISSUE_NOTE,
   type Bound,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
@@ -34,8 +32,6 @@ import { DEFAULT_RETRY_POLICY } from './llm-failure';
 
 /** A client that does not retry, for the specs that are about one call's record. */
 const ONCE = { ...DEFAULT_RETRY_POLICY, attempts: 1 };
-
-const schema = z.object({ answer: z.string(), score: z.number().int() });
 
 /**
  * The canvas coach replies two recorded runs threw away whole (static/runs,

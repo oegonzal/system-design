@@ -39,10 +39,14 @@ curl -s localhost:3003/runs/<runId>                          # poll until status
 pnpm quality:start
 ```
 
+Which model the loop calls is not a variable: `config/engine.json` names a file
+under `config/llm/` (`claude-subscription`, `openai`, `qwen-local`), and the boot
+line says which file it read. A configuration names the VARIABLE holding an API
+key, never a key, so the choice is committed and the credential is not.
+
 | Variable                                                  | Effect                                                                                                                                                                                                                                                                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLAUDE_CODE_OAUTH_TOKEN`                                 | The Claude Code subscription token `claude setup-token` prints, for a process with no `claude login` (a Tilt/Kubernetes pod). On a machine that is logged in, nothing is needed. `serve` and `run` check the login at boot (an account check, no model call) and exit 1 saying how to get one; `replay` needs none. |
-| `LLM_MODEL`                                               | Pins the model the subscription runs; unset, Claude Code picks and the loop reports `claude-code/subscription`.                                                                                                                                                                                                     |
 | `QUALITY_LOOP_RUN_STALE_AFTER_MS`                         | How long a running row may go without a heartbeat before the janitor fails it as `Interrupted`; default `180000`. The heartbeat is written every third of it; a value that is not a positive integer of milliseconds refuses to boot, by name.                                                                      |
 | `QUALITY_LOOP_PORT`                                       | HTTP port, default 3003.                                                                                                                                                                                                                                                                                            |
 | `DB_HOST` `DB_PORT` `DB_USERNAME` `DB_PASSWORD` `DB_NAME` | Postgres for the run tables (`quality_run` and its children); defaults `localhost`/`5433`/`admin`/`admin`/`sysdesign`, the compose server `pnpm stack:db` starts.                                                                                                                                                   |

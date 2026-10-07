@@ -30,8 +30,6 @@ import {
   MAX_ITEMS,
   MAX_KNOWN,
   MAX_LOCATION_IDS,
-  MAX_TOPICS,
-  TOPIC_MAX,
   alias,
   type KnowledgeRecord,
 } from './input';
@@ -179,16 +177,4 @@ export const maximalRecord = (): KnowledgeRecord => ({
   locationIds: Array.from({ length: MAX_LOCATION_IDS }, (_, index) => distinct(REF_MAX, index)),
   rules: [...KNOWLEDGE_RULES],
   maxMemories: MAX_ITEMS,
-});
-
-/** An item at every cap, for the output schema's bounds. */
-export const maximalItem = (): KnowledgeDigest['memories'][number] => ({
-  kind: 'fact',
-  evidence: Array.from({ length: 8 }, (_, index) => `f${index + 1}`),
-  insight: fill(1000),
-  appliesWhen: fill(500),
-  dimension: fill(DIMENSION_MAX),
-  topics: Array.from({ length: MAX_TOPICS }, (_, index) => distinct(TOPIC_MAX, index)),
-  confirms: Array.from({ length: 4 }, (_, index) => alias(index)),
-  contradicts: [],
 });

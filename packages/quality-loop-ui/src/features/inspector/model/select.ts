@@ -57,13 +57,3 @@ export function groupsPresent(timeline: Timeline): ActionGroup[] {
   for (const entry of timeline.entries) present.add(groupOf(entry.action.type));
   return [...present];
 }
-
-/** The iterations the log has seen, ascending — what an "iteration" filter offers. */
-export function iterationsPresent(timeline: Timeline): number[] {
-  const seen = new Set<number>();
-  for (const entry of timeline.entries) {
-    const iteration = entry.action.scope.iteration;
-    if (iteration !== undefined) seen.add(iteration);
-  }
-  return [...seen].sort((a, b) => a - b);
-}

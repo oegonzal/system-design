@@ -90,7 +90,6 @@ const FINDING_LENSES_BOUND = exact(MAX_FINDING_LENSES);
 
 /** What a run's record offers an item to rest on: its confirmed findings and its judged criteria. */
 export const RECORD_EVIDENCE_KINDS = ['finding', 'criterion'] as const;
-export type RecordEvidenceKind = (typeof RECORD_EVIDENCE_KINDS)[number];
 
 const alias = bounded.id(ALIAS_MAX, { min: 1 });
 const iteration = z.number().int().min(1);

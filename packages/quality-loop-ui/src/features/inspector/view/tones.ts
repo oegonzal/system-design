@@ -3,7 +3,6 @@ import type { BadgeTone } from '@sysdesign/design-system';
 
 import type { ChangeKind } from '../model/changes';
 import type { Provenance } from '../model/action';
-import type { LineKind } from '../model/line-diff';
 
 /**
  * The inspector's own vocabularies → badge tone, as data.
@@ -22,12 +21,6 @@ export const CHANGE_TONE: Record<ChangeKind, BadgeTone> = {
   removed: 'critical',
   updated: 'accent',
   moved: 'medium',
-};
-
-export const LINE_TONE: Record<LineKind, BadgeTone> = {
-  same: 'neutral',
-  added: 'success',
-  removed: 'critical',
 };
 
 /** A reconstructed entry makes no claim about when it happened; a recorded one does. */

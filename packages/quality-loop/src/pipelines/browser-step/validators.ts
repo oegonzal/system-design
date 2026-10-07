@@ -60,7 +60,8 @@ const isTerminal = (action: StepAction): boolean =>
  */
 function endingIsAllowed(action: StepAction, rest: readonly StepAction[]): boolean {
   const followers = TERMINAL_FOLLOWERS[action.kind] ?? [];
-  return rest.length === 1 && followers.includes(rest[0]!.kind);
+  const only = rest.length === 1 ? rest[0] : undefined;
+  return only !== undefined && followers.includes(only.kind);
 }
 
 /**

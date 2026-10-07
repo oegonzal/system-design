@@ -206,15 +206,16 @@ login, and the process refuses to boot). An API key is never used.
 
 ## 7. Which switches gate what
 
-| Switch                            | Effect                                                                                                                      |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| a Claude Code login               | the loop grades through this machine's `claude login` — the only route; nothing to export                                   |
-| `CLAUDE_CODE_OAUTH_TOKEN`         | the login where there is none (a Tilt/Kubernetes pod): the token `claude setup-token` prints, from `.env` or the shell      |
-| no login                          | `serve` and `run` exit 1 at boot saying how to get one; `replay` boots without a model. No switch runs the loop without one |
-| `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                            |
-| `LLM_MODEL`                       | pins the model the subscription runs                                                                                        |
-| `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `180000`                             |
-| `QUALITY_LOOP_DUMP_DIR`           | where the loop's run dumps go; default `static/runs`; the specs point it at a temp directory                                |
+| Switch                            | Effect                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `config/engine.json`              | names the file under `config/llm/` that chooses the provider and model; absent, the Claude Code subscription               |
+| a Claude Code login               | what the `claude-subscription` provider grades through — this machine's `claude login`; nothing to export                  |
+| an `openai-compatible` config     | `baseUrl` plus the key named by `apiKeyVar` (never the key itself); covers the OpenAI API and any local server serving it  |
+| `CLAUDE_CODE_OAUTH_TOKEN`         | the login where there is none (a Tilt/Kubernetes pod): the token `claude setup-token` prints, from `.env` or the shell     |
+| no usable provider                | `serve` and `run` exit 1 at boot saying how to fix it; `replay` boots without a model. No switch runs the loop without one |
+| `QUALITY_LOOP_URL`                | where studio-api finds the loop; default `http://localhost:3003`                                                           |
+| `QUALITY_LOOP_RUN_STALE_AFTER_MS` | how long a running row may go without a heartbeat before the janitor fails it; default `180000`                            |
+| `QUALITY_LOOP_DUMP_DIR`           | where the loop's run dumps go; default `static/runs`; the specs point it at a temp directory                               |
 
 ---
 

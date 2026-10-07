@@ -23,18 +23,6 @@ export const FORM_MEMORY_STEP_REASONS = [
 ] as const;
 export type FormMemoryStepReason = (typeof FORM_MEMORY_STEP_REASONS)[number];
 
-/** What the form-memory recall step reports beyond counts. */
-export interface FormMemoryRecallReportDto {
-  probes: number;
-  candidates: number;
-  evidence: number;
-}
-
-/** What the form-memory target step reports: whether the answers may be drawn on. */
-export interface FormMemoryTargetReportDto {
-  admission: string;
-}
-
 /** The pipelines a session derives a rubric for, once, and runs many times. */
 export const BROWSER_SESSION_PIPELINES = {
   plan: BROWSER_STEP_PIPELINE_ID,

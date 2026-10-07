@@ -2,16 +2,10 @@ import type { SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent
 import {
   describeIssue,
   modelSchema,
-  parseLenient,
-  type BoundPath,
-  type DeclaredBound,
   type LlmReplySource,
   type ModelSchema,
-  type Overrun,
-  type Repair,
   type SchemaIssue,
 } from '@sysdesign/contracts';
-import type { ZodType } from 'zod';
 
 import {
   assertCallTimePolicy,
@@ -34,16 +28,13 @@ import {
 } from './llm-failure';
 import type { LlmClient, LlmDetailed, StructuredReply, StructuredRequest } from './llm-client';
 import {
-  closestMiss,
   FEEDBACK_HEADING,
-  jsonCandidates,
   NO_RESULT,
   parseStructured,
   PREVIOUS_REPLY_HEADING,
   SALVAGED,
   SCHEMA_MISS,
   TIMED_OUT,
-  type Extraction,
   type Miss,
   type Read,
 } from './structured-reply';

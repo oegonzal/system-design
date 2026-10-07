@@ -141,7 +141,6 @@ export const RUN_RECALL_REASON_STATUS = {
   'nothing-new': 'empty',
 } as const satisfies Record<string, Extract<RunRecallStatus, 'empty' | 'skipped'>>;
 export type RunRecallReason = keyof typeof RUN_RECALL_REASON_STATUS;
-export const RUN_RECALL_REASONS = Object.keys(RUN_RECALL_REASON_STATUS) as RunRecallReason[];
 
 /**
  * One lesson a producer was handed: the stored lesson, what the curator said

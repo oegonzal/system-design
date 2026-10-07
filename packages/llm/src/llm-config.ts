@@ -54,12 +54,6 @@ export class LlmConfigError extends Error {
   override readonly name = 'LlmConfig';
 }
 
-/**
- * The declared config, read once. A file that is absent is the default; a file
- * that is present and wrong is a refusal naming the field, never a quiet
- * fallback onto a provider the operator did not choose — the whole point of
- * writing it down is that what ran is what the file says.
- */
 /** The configuration in force, and the file it came from — null where nothing was chosen. */
 export interface ChosenLlmConfig {
   config: LlmConfig;

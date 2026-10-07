@@ -30,7 +30,6 @@ import { HIDDEN_TRAITS } from './vocab';
 export const FIELD_CONTEXT_MAX_LENGTH = 300;
 export const EVIDENCE_TEXT_MAX_LENGTH = 1200;
 export const MAX_EVIDENCE = 24;
-export const FIELD_PROSE_MAX_LENGTH = 16_000;
 
 /** One form field as the model and the validators see it: the element's facts, plus the text beside it. */
 export const fieldSpecSchema = z.strictObject({

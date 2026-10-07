@@ -6,9 +6,7 @@ import type {
   DesignSessionDto,
   ExperienceProfileDto,
   PromptDto,
-  PromptGenerationDto,
   PromptStatus,
-  QualityRunStartedDto,
   SaveStarStoryRequest,
   SessionDraft,
   StarStoryDto,
@@ -123,43 +121,6 @@ export async function importPrompt(
   libraryId: string,
 ): Promise<PromptDto> {
   return unwrap(await request.post(`${API_URL}/prompts/import`, { data: { libraryId } }));
-}
-
-/** The stub completes a run in well under a second; a cold API deserves headroom. */
-const GENERATION_TIMEOUT_MS = 30_000;
-const GENERATION_POLL_MS = 250;
-
-/**
- * Generate through the prompt pipeline the way the UI does: start the run,
- * then poll `GET /prompts/generate/:runId` until the studio has claimed the
- * draft as a prompt.
- */
-export async function generatePrompt(
-  request: APIRequestContext,
-  experienceId?: string,
-): Promise<PromptDto> {
-  const id = experienceId ?? (await ticketingExperience(request)).id;
-  const started = await unwrap<QualityRunStartedDto>(
-    await request.post(`${API_URL}/prompts/generate`, { data: { experienceId: id } }),
-  );
-  const deadline = Date.now() + GENERATION_TIMEOUT_MS;
-  for (;;) {
-    const generation = await unwrap<PromptGenerationDto>(
-      await request.get(`${API_URL}/prompts/generate/${encodeURIComponent(started.runId)}`),
-    );
-    if (generation.status === 'complete' && generation.prompt) return generation.prompt;
-    if (generation.status !== 'running') {
-      throw new Error(
-        `prompt generation ${started.runId} ${generation.status}: ${generation.error}`,
-      );
-    }
-    if (Date.now() > deadline) {
-      throw new Error(
-        `prompt generation ${started.runId} still running after ${GENERATION_TIMEOUT_MS} ms`,
-      );
-    }
-    await new Promise((resolve) => setTimeout(resolve, GENERATION_POLL_MS));
-  }
 }
 
 export async function getPrompt(request: APIRequestContext, promptId: string): Promise<PromptDto> {

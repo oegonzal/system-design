@@ -19,7 +19,6 @@ export const TERMINATE_CAUSES = [
   'login-wall',
   'blocked',
 ] as const;
-export type TerminateCause = (typeof TERMINATE_CAUSES)[number];
 
 /** Why the engine ends a session on its own: a declared rail, the operator, or a fault. */
 export const ENGINE_TERMINATIONS = [
@@ -32,7 +31,6 @@ export const ENGINE_TERMINATIONS = [
   'operator-stop',
   'error',
 ] as const;
-export type EngineTermination = (typeof ENGINE_TERMINATIONS)[number];
 
 export const BROWSER_SESSION_TERMINATIONS = [...TERMINATE_CAUSES, ...ENGINE_TERMINATIONS] as const;
 export type BrowserSessionTermination = (typeof BROWSER_SESSION_TERMINATIONS)[number];
@@ -80,7 +78,6 @@ export type BrowserDecisionSource = (typeof BROWSER_DECISION_SOURCES)[number];
 
 /** What the field-answer pipeline may decide for one field. */
 export const FIELD_DECISIONS = ['answer', 'ask-operator', 'leave-blank'] as const;
-export type FieldDecision = (typeof FIELD_DECISIONS)[number];
 
 /** Ordinal confidence a producer states — never a number it invents. */
 export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
@@ -205,7 +202,6 @@ export const PAGE_KINDS = [
   'limit-reached',
   'other',
 ] as const;
-export type PageKind = (typeof PAGE_KINDS)[number];
 
 export const STEP_ACTION_KINDS = [
   'navigate',
@@ -258,14 +254,10 @@ export const PRESS_KEYS = [
   'PageUp',
   'Space',
 ] as const;
-export type PressKey = (typeof PRESS_KEYS)[number];
 
 export const WAIT_UNTIL = ['element', 'text', 'url'] as const;
-export type WaitUntil = (typeof WAIT_UNTIL)[number];
 
 export const SCROLL_DIRECTIONS = ['down', 'up'] as const;
-export type ScrollDirection = (typeof SCROLL_DIRECTIONS)[number];
 
 /** How a recorded step action went, as the next plan is told. */
 export const STEP_OUTCOMES = ['ok', 'failed', 'not-executed'] as const;
-export type StepOutcome = (typeof STEP_OUTCOMES)[number];

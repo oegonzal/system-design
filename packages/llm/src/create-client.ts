@@ -14,9 +14,10 @@ import { OpenAiEmbeddingClient } from './openai-embedding-client';
 /**
  * Which model this repository calls, and the factories that build it.
  *
- * The choice is `llm.config.json`, read once — a provider is a deployment
- * fact and belongs where every process can read the same answer, not in
- * whatever environment happens to launch one. A checkout with no file calls
+ * The choice is `config/engine.json` naming a file under `config/llm/`, read
+ * once — a provider is a deployment fact and belongs where every process can
+ * read the same answer, not in whatever environment happens to launch one. A
+ * checkout that chooses nothing calls
  * the Claude Code subscription, which is what every run before the file
  * existed used: this machine's `claude login`, or a container's long-lived
  * `CLAUDE_CODE_OAUTH_TOKEN`.
@@ -51,7 +52,7 @@ export class MissingModelProviderError extends Error {
   }
 }
 
-/** The model report a boot announces: the pinned `LLM_MODEL`, else the subscription's label. */
+/** The model report a boot announces: the configured model, else the provider's own label. */
 export const describeModelProvider = (config: LlmConfig = readLlmConfig()): LlmModelDto => ({
   model: PROVIDERS[config.provider].label(config),
 });
