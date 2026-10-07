@@ -7,6 +7,8 @@ import {
   OBJECTION_DETAIL_BOUND,
   OBJECTION_FROM_MAX_LENGTH,
   OBJECTIONS_MAX,
+  SPENDING_TASK_OUTCOMES,
+  TASK_OUTCOMES,
   type DocumentChunk,
   type PageObservation,
   type SessionRailsDto,
@@ -15,6 +17,7 @@ import {
   type StepObjection,
   type StepPlan,
   type TaskLedgerSummary,
+  type TaskOutcome,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
@@ -57,7 +60,8 @@ export interface SessionState {
    * reasons, and a plan that was cut short has reasons of its own.
    */
   objections: StepObjection[];
-  tasks: { open: OpenTask | null; started: number; done: number; skipped: number; failed: number };
+  /** The open unit, how many have opened, and how many closed by each outcome. */
+  tasks: { open: OpenTask | null; started: number; counts: Record<TaskOutcome, number> };
   consecutiveFailures: number;
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from; reset by one it could. */
@@ -111,7 +115,7 @@ export function createState(ids: {
     step: 0,
     history: [],
     objections: [],
-    tasks: { open: null, started: 0, done: 0, skipped: 0, failed: 0 },
+    tasks: { open: null, started: 0, counts: zeroCounts() },
     consecutiveFailures: 0,
     brainFaults: 0,
     unreadablePages: 0,
@@ -132,13 +136,23 @@ export function createState(ids: {
   };
 }
 
-export const tasksClosed = (state: SessionState): number =>
-  state.tasks.done + state.tasks.skipped + state.tasks.failed;
+/** One zero per outcome the vocabulary declares. */
+const zeroCounts = (): Record<TaskOutcome, number> =>
+  Object.fromEntries(TASK_OUTCOMES.map((outcome) => [outcome, 0])) as Record<TaskOutcome, number>;
+
+const countOf = (state: SessionState, outcomes: readonly TaskOutcome[]): number =>
+  outcomes.reduce((sum, outcome) => sum + state.tasks.counts[outcome], 0);
+
+/** Units of work closed, whatever their outcome. */
+export const tasksClosed = (state: SessionState): number => countOf(state, TASK_OUTCOMES);
+
+/** Units of work closed by an outcome that spends the budget. */
+export const tasksSpent = (state: SessionState): number => countOf(state, SPENDING_TASK_OUTCOMES);
 
 export const railStateOf = (state: SessionState): RailState => ({
   startedAt: state.startedAt,
   tasksStarted: state.tasks.started,
-  tasksClosed: tasksClosed(state),
+  tasksSpent: tasksSpent(state),
   openTask: state.tasks.open !== null,
   consecutiveFailures: state.consecutiveFailures,
   brainFaults: state.brainFaults,
@@ -182,9 +196,7 @@ export const ledgerSummaryOf = (
 ): TaskLedgerSummary => ({
   openTask:
     state.tasks.open === null ? null : { label: state.tasks.open.label, url: state.tasks.open.url },
-  done: state.tasks.done,
-  skipped: state.tasks.skipped,
-  failed: state.tasks.failed,
+  counts: { ...state.tasks.counts },
   remainingTasks: remainingTasks(railStateOf(state), rails),
 });
 

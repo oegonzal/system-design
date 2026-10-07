@@ -16,7 +16,7 @@ const at = (minutes: number): Date => new Date(START.getTime() + minutes * 60_00
 const state = (overrides: Partial<RailState> = {}): RailState => ({
   startedAt: START,
   tasksStarted: 0,
-  tasksClosed: 0,
+  tasksSpent: 0,
   openTask: false,
   consecutiveFailures: 0,
   brainFaults: 0,
@@ -29,10 +29,9 @@ const state = (overrides: Partial<RailState> = {}): RailState => ({
 describe('the rails', () => {
   it('[BRW-4] hold when nothing has tripped, and trip one at a time by declared order', () => {
     expect(checkRails(state(), RAIL_LIMITS, at(1))).toBeNull();
-    expect(checkRails(state({ tasksClosed: 2 }), RAIL_LIMITS, at(1))?.reason).toBe('max-tasks');
-    expect(
-      checkRails(state({ tasksStarted: 2, openTask: false }), RAIL_LIMITS, at(1))?.reason,
-    ).toBe('max-tasks');
+    expect(checkRails(state({ tasksSpent: 2 }), RAIL_LIMITS, at(1))?.reason).toBe('max-tasks');
+    // Units started, or closed by an outcome that spends nothing, never trip the budget.
+    expect(checkRails(state({ tasksStarted: 2, openTask: false }), RAIL_LIMITS, at(1))).toBeNull();
     expect(checkRails(state({ tasksStarted: 2, openTask: true }), RAIL_LIMITS, at(1))).toBeNull();
     expect(checkRails(state(), RAIL_LIMITS, at(30))?.reason).toBe('max-minutes');
     expect(checkRails(state({ consecutiveFailures: 3 }), RAIL_LIMITS, at(1))?.reason).toBe(
@@ -44,13 +43,13 @@ describe('the rails', () => {
     // The operator's word outranks every limit.
     const everything = state({
       operatorStopped: true,
-      tasksClosed: 9,
+      tasksSpent: 9,
       consecutiveFailures: 9,
       brainFaults: 9,
     });
     expect(checkRails(everything, RAIL_LIMITS, at(99))?.reason).toBe('operator-stop');
-    expect(checkRails(state({ tasksClosed: 2 }), RAIL_LIMITS, at(1))?.detail).toBe(
-      '2 of 2 units of work closed, 0 started',
+    expect(checkRails(state({ tasksSpent: 2 }), RAIL_LIMITS, at(1))?.detail).toBe(
+      '2 of 2 units of work closed done or failed, 0 started',
     );
   });
 
@@ -62,10 +61,11 @@ describe('the rails', () => {
     expect(new Set(RAILS.map((rail) => rail.reason)).size).toBe(RAILS.length);
   });
 
-  it('tells the next plan how many units of work may still open', () => {
+  it('tells the next plan how many units of work may still be spent: the open unit is not subtracted', () => {
     expect(remainingTasks(state(), RAIL_LIMITS)).toBe(2);
-    expect(remainingTasks(state({ tasksStarted: 1 }), RAIL_LIMITS)).toBe(1);
-    expect(remainingTasks(state({ tasksStarted: 5 }), RAIL_LIMITS)).toBe(0);
+    expect(remainingTasks(state({ tasksSpent: 1 }), RAIL_LIMITS)).toBe(1);
+    expect(remainingTasks(state({ tasksSpent: 5 }), RAIL_LIMITS)).toBe(0);
+    expect(remainingTasks(state({ tasksStarted: 1, openTask: true }), RAIL_LIMITS)).toBe(2);
   });
 
   it('[BRW-4] stops on a page that will not read, rather than spending the failure budget on plans written against nothing', () => {

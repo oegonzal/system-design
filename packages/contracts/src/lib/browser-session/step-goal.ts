@@ -27,7 +27,7 @@ import {
 } from './observation.schema';
 import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
 import { ACTIONS_BOUND } from './step-plan.schema';
-import { ELEMENT_KINDS, HIDDEN_TRAITS } from './vocab';
+import { ELEMENT_KINDS, HIDDEN_TRAITS, TASK_OUTCOME_SPENDS, TASK_OUTCOMES } from './vocab';
 
 /**
  * Where the mission stands, as engine facts: the criteria settled for the
@@ -235,8 +235,12 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   ledger.openTask === null
     ? '- No unit of work is open: taskStart opens one.'
     : `- Open unit of work: ${quote(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
-  `- Done ${ledger.done} · skipped ${ledger.skipped} · failed ${ledger.failed}${
-    ledger.remainingTasks === null ? '' : ` · may still start ${ledger.remainingTasks}`
+  `- ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}${
+    ledger.remainingTasks === null
+      ? ''
+      : ` · may still start ${ledger.remainingTasks} (a unit closed ${TASK_OUTCOMES.filter(
+          (outcome) => !TASK_OUTCOME_SPENDS[outcome],
+        ).join(' or ')} spends none)`
   }`,
 ];
 

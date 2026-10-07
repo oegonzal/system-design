@@ -10,7 +10,14 @@ import { z } from 'zod';
 
 import { bound, bounded, exact } from '../bounds';
 import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
-import { ELEMENT_KINDS, HIDDEN_TRAITS, SCOPE_ROLES, SNAPSHOT_RUNGS, STEP_OUTCOMES } from './vocab';
+import {
+  ELEMENT_KINDS,
+  HIDDEN_TRAITS,
+  SCOPE_ROLES,
+  SNAPSHOT_RUNGS,
+  STEP_OUTCOMES,
+  TASK_OUTCOMES,
+} from './vocab';
 
 /** The most elements one observation lists; the adapter keeps those inside the open scope first, then visible, enabled ones. */
 export const ELEMENTS_BOUND = bound(150, 'list');
@@ -282,10 +289,9 @@ export const taskLedgerSummarySchema = z.strictObject({
   openTask: z
     .strictObject({ label: bounded.text(TASK_LABEL_BOUND), url: bounded.id(URL_MAX_LENGTH) })
     .nullable(),
-  done: z.number().int().min(0),
-  skipped: z.number().int().min(0),
-  failed: z.number().int().min(0),
-  /** Units of work the session may still start; null when the rail is not set. */
+  /** Units of work closed so far, by outcome — every outcome the vocabulary declares, zero included. */
+  counts: z.record(z.enum(TASK_OUTCOMES), z.number().int().min(0)),
+  /** Units of work the session may still spend under its rail; null when the rail is not set. */
   remainingTasks: z.number().int().min(0).nullable(),
 });
 export type TaskLedgerSummary = z.infer<typeof taskLedgerSummarySchema>;

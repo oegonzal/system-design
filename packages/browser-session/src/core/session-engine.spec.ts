@@ -194,7 +194,7 @@ describe('the session engine', () => {
     // The page moved (the click opened the form) and the plan ran whole, yet c3 is settled nowhere.
     expect(brain.planInputs[2]?.progress).toEqual({ settled: ['c1'], done: [] });
     expect(brain.planInputs[2]?.ledger.openTask?.label).toBe('Staff Engineer at Globex');
-    expect(brain.planInputs[2]?.ledger.done).toBe(1);
+    expect(brain.planInputs[2]?.ledger.counts['already-done']).toBe(1);
   });
 
   it('[BRW-1] [QL-36] runs a handed-back plan up to the action a cutting validator pointed at, and tells the next plan what was cut and why', async () => {

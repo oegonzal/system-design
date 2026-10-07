@@ -1,6 +1,5 @@
 import {
   TASK_OUTCOME_STATUS,
-  type BrowserTaskStatus,
   type PageObservation,
   type PlanReadout,
   type StepAction,
@@ -33,11 +32,6 @@ const CUT_NOTE = 'past the executable prefix';
  * "after a failed action" and what a judge or validator cut as their words,
  * so the next plan is told both.
  */
-
-/** Which count a closed unit of work moves, by the status its outcome maps to. */
-const TASK_COUNT_BY_STATUS: Readonly<
-  Record<BrowserTaskStatus, 'done' | 'skipped' | 'failed' | null>
-> = { open: null, complete: 'done', abandoned: 'skipped', failed: 'failed' };
 
 function openTask(
   ctx: EngineContext,
@@ -85,8 +79,7 @@ async function closeTask(
     return;
   }
   const status = TASK_OUTCOME_STATUS[action.outcome];
-  const count = TASK_COUNT_BY_STATUS[status];
-  if (count !== null) state.tasks[count] += 1;
+  state.tasks.counts[action.outcome] += 1;
   state.tasks.open = null;
   // What this unit's plans settled was settled for this unit.
   state.reached.unit.clear();

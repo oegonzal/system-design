@@ -98,6 +98,50 @@ describe('how a plan stops and how a session ends', () => {
     expect(byTasks.brain.planInputs).toHaveLength(4);
     expect(byTasks.browser.closed).toBe(true);
 
+    // A unit found already done, or set aside unworked, spends none of the
+    // budget: under the same `maxTasks: 1` the session goes on to a listing it
+    // can work, and stops only when that one closes done. Measured 2026-10-07:
+    // the one unit of a session was a listing applied to before, and the goal
+    // told the planner it could start no other from the moment it opened.
+    const closeAs = (outcome: 'already-done' | 'skipped'): StepPlan => ({
+      ...PLANS.results,
+      actions: [
+        ...PLANS.results.actions.slice(0, 1),
+        {
+          kind: 'taskDone',
+          outcome,
+          detail: 'not this listing',
+          reason: 'the pane shows no form to work',
+          expect: null,
+          serves: [],
+        },
+      ],
+    });
+    const unspent = await run({
+      script: {
+        plans: [
+          PLANS.search,
+          closeAs('already-done'),
+          closeAs('skipped'),
+          PLANS.results,
+          PLANS.form,
+          PLANS.done,
+        ].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      rails: { maxTasks: 1 },
+    });
+    expect(unspent.outcome.termination).toEqual({
+      reason: 'max-tasks',
+      detail: '1 of 1 units of work closed done or failed, 3 started',
+    });
+    expect(unspent.brain.planInputs).toHaveLength(6);
+    expect(unspent.brain.planInputs[3]?.ledger).toMatchObject({
+      openTask: null,
+      counts: { done: 0, 'already-done': 1, skipped: 1, failed: 0 },
+      remainingTasks: 1,
+    });
+
     // The page took a minute and a half to come up: the clock jumps once, and the rail reads it.
     const clock = new FixedClock(new Date('2026-10-03T10:00:00.000Z'), 0);
     const slow = new FakeBrowser(pages());

@@ -144,15 +144,17 @@ export function dialogObservation(): PageObservation {
 }
 
 export function emptyLedger(): TaskLedgerSummary {
-  return { openTask: null, done: 0, skipped: 0, failed: 0, remainingTasks: null };
+  return {
+    openTask: null,
+    counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
+    remainingTasks: null,
+  };
 }
 
 export function openTaskLedger(): TaskLedgerSummary {
   return {
     openTask: { label: 'Senior Engineer at Acme', url: 'https://jobs.example.test/apply/42' },
-    done: 1,
-    skipped: 0,
-    failed: 0,
+    counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: 8,
   };
 }

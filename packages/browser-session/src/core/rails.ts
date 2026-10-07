@@ -1,4 +1,4 @@
-import type { SessionRailsDto } from '@sysdesign/contracts';
+import { SPENDING_TASK_OUTCOMES, type SessionRailsDto } from '@sysdesign/contracts';
 
 import type { Termination } from './ports';
 
@@ -10,9 +10,10 @@ import type { Termination } from './ports';
  */
 export interface RailState {
   startedAt: Date;
-  /** Units of work opened and closed so far. */
+  /** Units of work opened so far. */
   tasksStarted: number;
-  tasksClosed: number;
+  /** Units of work closed by an outcome that spends the budget — worked to their end, however they ended. */
+  tasksSpent: number;
   openTask: boolean;
   consecutiveFailures: number;
   brainFaults: number;
@@ -48,12 +49,15 @@ export const RAILS: readonly Rail[] = [
     detail: () => 'the operator typed /stop',
   },
   {
+    // The budget is spent by units worked to their end, however they ended; a
+    // unit the site reported finished before, or set aside unworked, spends
+    // none (`TASK_OUTCOME_SPENDS`). A session that keeps setting listings aside
+    // moves the page each time, so the stall rail never sees it: `max-minutes`
+    // is its bound.
     reason: 'max-tasks',
-    holds: (state, rails) =>
-      state.tasksClosed >= rails.maxTasks ||
-      (!state.openTask && state.tasksStarted >= rails.maxTasks),
+    holds: (state, rails) => state.tasksSpent >= rails.maxTasks,
     detail: (state, rails) =>
-      `${state.tasksClosed} of ${rails.maxTasks} units of work closed, ${state.tasksStarted} started`,
+      `${state.tasksSpent} of ${rails.maxTasks} units of work closed ${SPENDING_TASK_OUTCOMES.join(' or ')}, ${state.tasksStarted} started`,
   },
   {
     reason: 'max-minutes',
@@ -109,6 +113,12 @@ export function checkRails(
     : { reason: tripped.reason, detail: tripped.detail(state, rails, now) };
 }
 
-/** Units of work the session may still open under its rail — the rail is always set, so never null here. */
+/**
+ * Units of work the session may still spend under its rail — the rail is
+ * always set, so never null here. The open unit is not subtracted: whether it
+ * spends is known only when it closes, and telling the planner it may start
+ * nothing while an already-applied listing was open is what froze a session
+ * on 2026-10-07.
+ */
 export const remainingTasks = (state: RailState, rails: SessionRailsDto): number =>
-  Math.max(0, rails.maxTasks - state.tasksStarted);
+  Math.max(0, rails.maxTasks - state.tasksSpent);

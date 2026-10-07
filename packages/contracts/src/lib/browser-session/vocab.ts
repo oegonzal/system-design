@@ -72,6 +72,26 @@ export const TASK_OUTCOME_STATUS = {
   failed: 'failed',
 } as const satisfies Record<TaskOutcome, BrowserTaskStatus>;
 
+/**
+ * Whether a closed unit spends one of the session's `maxTasks`: a unit worked
+ * to its end does, however it ended; one the site reported finished before, or
+ * set aside unworked, does not. Measured 2026-10-07: under `--max-tasks 1`, a
+ * listing found already applied to would have spent the session's whole budget
+ * before any application, and the goal told the planner it could start no
+ * other unit from the moment that listing was opened.
+ */
+export const TASK_OUTCOME_SPENDS = {
+  done: true,
+  'already-done': false,
+  skipped: false,
+  failed: true,
+} as const satisfies Record<TaskOutcome, boolean>;
+
+/** The outcomes that spend a unit of the budget, in the vocabulary's order. */
+export const SPENDING_TASK_OUTCOMES: readonly TaskOutcome[] = TASK_OUTCOMES.filter(
+  (outcome) => TASK_OUTCOME_SPENDS[outcome],
+);
+
 /** What a recorded decision is: a plan for a page, an answer for a field, or the end of the session. */
 export const BROWSER_DECISION_KINDS = ['step-plan', 'field-answer', 'termination'] as const;
 export type BrowserDecisionKind = (typeof BROWSER_DECISION_KINDS)[number];

@@ -21,7 +21,11 @@ export const SESSION_FLAGS = {
   url: { name: '--url', valued: true, help: 'where to open the profile for signing in' },
   headed: { name: '--headed', valued: false, help: 'show the browser (the default)' },
   headless: { name: '--headless', valued: false, help: 'run without a window' },
-  maxTasks: { name: '--max-tasks', valued: true, help: 'units of work the session may close' },
+  maxTasks: {
+    name: '--max-tasks',
+    valued: true,
+    help: 'units of work the session may close done or failed; one found already done or set aside spends none',
+  },
   maxMinutes: { name: '--max-minutes', valued: true, help: 'wall-clock minutes before it stops' },
   maxFailures: {
     name: '--max-failures',
