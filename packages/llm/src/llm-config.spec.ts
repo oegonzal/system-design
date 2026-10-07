@@ -34,9 +34,25 @@ describe('the model configuration', () => {
       chose('{"provider":"openai-compatible","model":"gpt-4o-mini","apiKeyVar":"OPENAI_API_KEY"}'),
     );
     expect(openai).toMatchObject({ provider: 'openai-compatible', model: 'gpt-4o-mini' });
-    // The settings a file leaves out come from the declared defaults.
+    // The settings a file leaves out come from the declared defaults. A file
+    // that names no API gets the shape every OpenAI-shaped server implements,
+    // so adding the newer one to one endpoint's file cannot reach a local
+    // server that does not serve it — and `store` stays unsent rather than
+    // guessed, since an endpoint with no such notion must not be told about it.
     expect(openai.strict).toBe(true);
     expect(openai.maxInFlight).toBeGreaterThan(0);
+    expect(openai.api).toBe('chat');
+    expect(openai.store).toBeUndefined();
+
+    // And a file that does name one is taken at its word, either way.
+    const hosted = readLlmConfig(
+      '/repo',
+      chose('{"provider":"openai-compatible","api":"responses","store":true}'),
+    );
+    expect(hosted).toMatchObject({ api: 'responses', store: true });
+    expect(() =>
+      readLlmConfig('/repo', chose('{"provider":"openai-compatible","api":"completions"}')),
+    ).toThrow(LlmConfigError);
 
     // A file that is present and wrong is a refusal naming the field: the point
     // of writing the provider down is that what ran is what the file says.

@@ -1,7 +1,9 @@
 {
   "provider": "openai-compatible",
-  "model": "gpt-5.4-mini",
+  "api": "responses",
+  "model": "gpt-4o-mini",
   "baseUrl": "https://api.openai.com/v1",
   "apiKeyVar": "OPENAI_API_KEY",
-  "strict": true
+  "strict": true,
+  "store": true
 }

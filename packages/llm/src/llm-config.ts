@@ -26,12 +26,34 @@ export const LLM_KIND = 'llm';
 export const LLM_PROVIDERS = ['claude-subscription', 'openai-compatible'] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
+/**
+ * Which of OpenAI's two shapes an endpoint is asked through.
+ *
+ * Both are "OpenAI-compatible" and they are not interchangeable: the ask is
+ * written differently, the reply is read differently, and no endpoint is
+ * guaranteed to serve both — so this is a fact about the endpoint, declared
+ * beside its URL rather than decided in code. `chat` is the default because it
+ * is the shape every OpenAI-shaped server implements; `responses` is OpenAI's
+ * newer one, and what a run must use for the exchange to appear in that
+ * provider's own logs under a response id.
+ */
+export const LLM_APIS = ['chat', 'responses'] as const;
+export type LlmApi = (typeof LLM_APIS)[number];
+
 export const llmConfigSchema = z.strictObject({
   provider: z.enum(LLM_PROVIDERS),
   /** The model id as the provider spells it; absent lets the provider choose. */
   model: z.string().min(1).optional(),
   /** Where an OpenAI-compatible endpoint lives — the API itself, or a local server serving its shape. */
   baseUrl: z.string().url().optional(),
+  /** Which OpenAI shape that endpoint is asked through. */
+  api: z.enum(LLM_APIS).default('chat'),
+  /**
+   * Ask the endpoint to retain the exchange, so it shows in the provider's own
+   * logs beside the id the run records. Absent leaves the endpoint's default,
+   * which is what a local server with no such notion wants.
+   */
+  store: z.boolean().optional(),
   /** The NAME of the variable holding the key. Never a key. Absent where the endpoint wants none. */
   apiKeyVar: z
     .string()

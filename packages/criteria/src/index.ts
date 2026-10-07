@@ -301,7 +301,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-22',
     statement:
-      'The loop runs only on a Claude Code subscription login — a machine login or CLAUDE_CODE_OAUTH_TOKEN — which serve and run check at boot without a model call, accepting only the first-party subscription and exiting 1 saying what was found and how to get one otherwise; no API key or gateway token is ever passed to the Claude Code process; replay boots without a login because it calls no model; availability is read from the constructed client, never re-derived from the environment.',
+      'Which model the loop calls is declared, not environmental: config/engine.json names a file under config/llm/ that carries the provider, the model, and for an OpenAI-shaped endpoint its base URL and which of OpenAI’s two APIs it is asked through — a name for the variable holding a key, never a key — and a checkout that chooses nothing runs on the Claude Code subscription. Whichever provider is chosen, serve and run prove at boot without a model call that it will answer and exit 1 saying how to fix it otherwise, announcing the model and the file that chose it; replay boots without one because it calls no model. The Claude Code provider accepts only the first-party subscription — a machine login or CLAUDE_CODE_OAUTH_TOKEN — and no API key or gateway token is ever passed to its process. Availability is read from the constructed client, never re-derived from the environment.',
   },
   {
     id: 'QL-23',

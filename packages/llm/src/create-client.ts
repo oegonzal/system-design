@@ -117,6 +117,8 @@ export const PROVIDERS: Readonly<Record<LlmProvider, ProviderEntry>> = {
         model: config.model,
         baseUrl: config.baseUrl,
         apiKey: apiKeyFor(config, env),
+        api: config.api,
+        store: config.store,
         strict: config.strict,
         gate: providerGate({ ceiling: config.maxInFlight }),
         retry: { ...DEFAULT_RETRY_POLICY, ...retryOf(config) },
