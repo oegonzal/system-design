@@ -65,6 +65,13 @@ describe('the session engine', () => {
       ['click e2 button "Search"', 'ok'],
     ]);
     expect(brain.planInputs[2]?.ledger.openTask?.label).toBe('Senior Engineer at Acme');
+    // Once closed, the unit is listed to the next plan by label and outcome, and counted.
+    expect(brain.planInputs[4]?.ledger).toMatchObject({
+      openTask: null,
+      closed: [{ label: 'Senior Engineer at Acme', outcome: 'done' }],
+      closedOmitted: 0,
+      counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
+    });
     expect(browser.calls).toEqual(
       expect.arrayContaining([
         'fill e1',

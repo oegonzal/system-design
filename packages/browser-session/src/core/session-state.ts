@@ -60,8 +60,19 @@ export interface SessionState {
    * reasons, and a plan that was cut short has reasons of its own.
    */
   objections: StepObjection[];
-  /** The open unit, how many have opened, and how many closed by each outcome. */
-  tasks: { open: OpenTask | null; started: number; counts: Record<TaskOutcome, number> };
+  /**
+   * The open unit, how many have opened, how many closed by each outcome, and
+   * the closed ones by label and outcome — the most recent `CLOSED_TASKS_BOUND`,
+   * the rest counted — so the next goal can say which items this session has
+   * handled.
+   */
+  tasks: {
+    open: OpenTask | null;
+    started: number;
+    counts: Record<TaskOutcome, number>;
+    closed: TaskLedgerSummary['closed'];
+    closedOmitted: number;
+  };
   consecutiveFailures: number;
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from; reset by one it could. */
@@ -115,7 +126,7 @@ export function createState(ids: {
     step: 0,
     history: [],
     objections: [],
-    tasks: { open: null, started: 0, counts: zeroCounts() },
+    tasks: { open: null, started: 0, counts: zeroCounts(), closed: [], closedOmitted: 0 },
     consecutiveFailures: 0,
     brainFaults: 0,
     unreadablePages: 0,
@@ -196,6 +207,8 @@ export const ledgerSummaryOf = (
 ): TaskLedgerSummary => ({
   openTask:
     state.tasks.open === null ? null : { label: state.tasks.open.label, url: state.tasks.open.url },
+  closed: [...state.tasks.closed],
+  closedOmitted: state.tasks.closedOmitted,
   counts: { ...state.tasks.counts },
   remainingTasks: remainingTasks(railStateOf(state), rails),
 });

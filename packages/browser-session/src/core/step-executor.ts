@@ -1,4 +1,5 @@
 import {
+  CLOSED_TASKS_BOUND,
   TASK_OUTCOME_STATUS,
   type PageObservation,
   type PlanReadout,
@@ -80,6 +81,13 @@ async function closeTask(
   }
   const status = TASK_OUTCOME_STATUS[action.outcome];
   state.tasks.counts[action.outcome] += 1;
+  // The next goal lists what this session handled, most recent last; past the
+  // bound the oldest is counted rather than cut without a word.
+  state.tasks.closed.push({ label: task.label, outcome: action.outcome });
+  if (state.tasks.closed.length > CLOSED_TASKS_BOUND.target) {
+    state.tasks.closed.shift();
+    state.tasks.closedOmitted += 1;
+  }
   state.tasks.open = null;
   // What this unit's plans settled was settled for this unit.
   state.reached.unit.clear();

@@ -19,6 +19,8 @@ import {
   OPTIONS_SHOWN,
   pageObservationSchema,
   type StepObjection,
+  CLOSED_TASKS_BOUND,
+  TASK_LABEL_BOUND,
 } from './observation.schema';
 import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
 import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
@@ -133,7 +135,15 @@ describe('composeStepGoal', () => {
         outcome: 'ok' as const,
         note: 'o'.repeat(200),
       })),
-      ledger: openTaskLedger(),
+      // The closed units at their bound, each label at its target, plus older ones counted.
+      ledger: {
+        ...openTaskLedger(),
+        closed: Array.from({ length: CLOSED_TASKS_BOUND.target }, (_, i) => ({
+          label: `${'l'.repeat(TASK_LABEL_BOUND.target - 2)}${String(i).padStart(2, '0')}`,
+          outcome: 'done' as const,
+        })),
+        closedOmitted: 3,
+      },
       // Every objection the goal will carry, each at its ceiling, plus more
       // than it carries — the budget has to hold the worst case, not the mean.
       objections: Array.from({ length: OBJECTIONS_BOUND.target + 3 }, (_, i) =>
@@ -159,6 +169,24 @@ describe('composeStepGoal', () => {
     // Past the declared count they are counted, never cut.
     expect(goal).toContain('(3 older objection(s) not listed)');
     expect(goal.match(/^- step \d+ · /gm)).toHaveLength(OBJECTIONS_BOUND.target);
+    // The closed units are listed by label and outcome, the older ones counted,
+    // and the counts line says which outcomes spend none of the budget.
+    expect(goal).toContain('- Closed this session, oldest first:');
+    expect(goal.match(/^ {2}- "l+\d\d" — done$/gm)).toHaveLength(CLOSED_TASKS_BOUND.target);
+    expect(goal).toContain('  (3 older not listed)');
+    expect(goal).toContain(
+      '- done 1 · already-done 0 · skipped 0 · failed 0 · may still start 8 (a unit closed already-done or skipped spends none)',
+    );
+  });
+
+  it('[QL-39] tells the planner no unit is open, that an item passed over needs none, and that nothing has closed yet', () => {
+    const goal = goalOf(listingObservation(), [], emptyLedger());
+    expect(goal).toContain(
+      '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.',
+    );
+    expect(goal).toContain('- Closed this session: none yet.');
+    expect(goal).toContain('- done 0 · already-done 0 · skipped 0 · failed 0');
+    expect(goal).not.toContain('may still start');
   });
 
   it('[QL-39] refuses a page that would not fit rather than clipping it', () => {

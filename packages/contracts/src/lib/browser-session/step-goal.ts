@@ -231,10 +231,25 @@ function progressLines(progress: StepProgress): string[] {
   ];
 }
 
+/**
+ * The units of work as the planner is told them: the open one, the closed ones
+ * by label and outcome so an item already handled is never taken up again, and
+ * the counts with what the budget has left. Measured 2026-10-07: with only
+ * counts to go on, the planner reopened the one listing the session had
+ * handled, and the mission's "never the same listing twice" had nothing to
+ * rest on.
+ */
 const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   ledger.openTask === null
-    ? '- No unit of work is open: taskStart opens one.'
+    ? '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.'
     : `- Open unit of work: ${quote(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
+  ...(ledger.closed.length === 0
+    ? ['- Closed this session: none yet.']
+    : [
+        '- Closed this session, oldest first:',
+        ...ledger.closed.map((unit) => `  - ${quote(unit.label)} — ${unit.outcome}`),
+        ...(ledger.closedOmitted > 0 ? [`  (${ledger.closedOmitted} older not listed)`] : []),
+      ]),
   `- ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}${
     ledger.remainingTasks === null
       ? ''

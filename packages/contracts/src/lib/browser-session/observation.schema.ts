@@ -53,6 +53,12 @@ export const HISTORY_MAX = 10;
 export const HISTORY_ACTION_BOUND = bound(200);
 export const HISTORY_NOTE_BOUND = bound(300);
 export const TASK_LABEL_BOUND = bound(200);
+/**
+ * The closed units of work the next goal lists, most recent last; older ones
+ * are counted, never cut silently. Measured 2026-10-07: the planner reopened
+ * the listing it had already handled, because nothing told it which it had.
+ */
+export const CLOSED_TASKS_BOUND = bound(10, 'list');
 
 /**
  * What the session carries forward about a plan that did not run: one entry
@@ -289,6 +295,13 @@ export const taskLedgerSummarySchema = z.strictObject({
   openTask: z
     .strictObject({ label: bounded.text(TASK_LABEL_BOUND), url: bounded.id(URL_MAX_LENGTH) })
     .nullable(),
+  /** The units closed this session, oldest first, within the bound; by label, since that is what a list item shows. */
+  closed: bounded.list(
+    CLOSED_TASKS_BOUND,
+    z.strictObject({ label: bounded.text(TASK_LABEL_BOUND), outcome: z.enum(TASK_OUTCOMES) }),
+  ),
+  /** Closed units older than the bound keeps: counted, so the list never reads as the whole. */
+  closedOmitted: z.number().int().min(0),
   /** Units of work closed so far, by outcome — every outcome the vocabulary declares, zero included. */
   counts: z.record(z.enum(TASK_OUTCOMES), z.number().int().min(0)),
   /** Units of work the session may still spend under its rail; null when the rail is not set. */

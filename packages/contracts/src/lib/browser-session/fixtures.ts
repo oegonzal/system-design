@@ -146,6 +146,8 @@ export function dialogObservation(): PageObservation {
 export function emptyLedger(): TaskLedgerSummary {
   return {
     openTask: null,
+    closed: [],
+    closedOmitted: 0,
     counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: null,
   };
@@ -154,6 +156,8 @@ export function emptyLedger(): TaskLedgerSummary {
 export function openTaskLedger(): TaskLedgerSummary {
   return {
     openTask: { label: 'Senior Engineer at Acme', url: 'https://jobs.example.test/apply/42' },
+    closed: [{ label: 'Staff Engineer at Globex', outcome: 'done' }],
+    closedOmitted: 0,
     counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: 8,
   };

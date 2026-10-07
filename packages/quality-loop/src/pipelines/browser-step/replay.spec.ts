@@ -47,6 +47,8 @@ const goalOf = (recorded: RecordedStep): string =>
       openTask: recorded.openTask
         ? { label: 'the open unit', url: recorded.observation.url }
         : null,
+      closed: [],
+      closedOmitted: 0,
       counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
       remainingTasks: 1,
     },
