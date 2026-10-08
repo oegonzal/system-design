@@ -11,7 +11,7 @@ import {
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
 } from './document-digest';
-import { GOAL_BUDGET_BYTES, readFencedIndex, renderFencedIndex, textBytes } from './goal-index';
+import { GOAL_BUDGET_BYTES, readFencedIndex, renderIndexSection, textBytes } from './goal-index';
 import { z } from 'zod';
 
 /**
@@ -107,7 +107,7 @@ describe('renderDocumentGoal', () => {
 describe('goal index fence', () => {
   it('[QL-39] reads back what it wrote, the last fenced block only', () => {
     const schema = z.object({ a: z.number() });
-    const goal = `prose\n${renderFencedIndex({ a: 1 })}\nmore\n${renderFencedIndex({ a: 2 })}`;
+    const goal = `prose\n${renderIndexSection({ a: 1 })}\nmore\n${renderIndexSection({ a: 2 })}`;
     expect(readFencedIndex(goal, schema)).toEqual({ a: 2 });
     expect(readFencedIndex('no fence', schema)).toBeNull();
     expect(readFencedIndex('```json\nnot json\n```', schema)).toBeNull();

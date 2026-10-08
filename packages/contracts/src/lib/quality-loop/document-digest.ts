@@ -7,7 +7,7 @@
  */
 import { z } from 'zod';
 
-import { readFencedIndex, renderFencedIndex, withinBudget } from './goal-index';
+import { readFencedIndex, renderIndexSection, withinBudget } from './goal-index';
 
 export const DOCUMENT_DIGEST_ID = 'document-digest';
 
@@ -151,9 +151,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     '- A section may support several memories; list every section no memory rests on under unused.',
     '- Validators check these limits; they are not criteria.',
     '',
-    '## Index',
-    '',
-    renderFencedIndex(indexOf(chunk)),
+    renderIndexSection(indexOf(chunk)),
   ].join('\n');
   return withinBudget(goal);
 }

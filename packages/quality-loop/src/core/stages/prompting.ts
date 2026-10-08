@@ -2,7 +2,8 @@
  * The engine's half of every prompt. A pipeline's md persona says what a lens
  * knows; this file says how it must behave — cite only listed ids, answer in
  * the schema, be complete and concise — and renders the sections every stage
- * shares. The goal reaches the model verbatim from here and from nowhere else.
+ * shares. The goal reaches the model from here and from nowhere else, less
+ * the index section its composer wrote for the validators.
  */
 import type {
   ArtifactLocation,
@@ -11,6 +12,7 @@ import type {
   UpstreamEvidence,
   ValidationReport,
 } from '@sysdesign/contracts';
+import { stripIndexSection } from '@sysdesign/contracts';
 
 import { capText } from '@sysdesign/run-dump';
 
@@ -56,9 +58,13 @@ export interface GoalSection {
   clipped: boolean;
 }
 
-/** The goal, verbatim, under a heading. */
+/**
+ * The goal under a heading, without the index section its composer wrote for
+ * the validators: a model reading the index reads the engine's bookkeeping
+ * instead of the task, and the validators read the goal as stored.
+ */
 export function goalSection(goal: string): GoalSection {
-  const capped = capText(goal, GOAL_MAX_BYTES);
+  const capped = capText(stripIndexSection(goal), GOAL_MAX_BYTES);
   return {
     text: ['# Goal', '', capped.text, capped.truncated ? '\n[goal truncated]' : ''].join('\n'),
     clipped: capped.truncated,

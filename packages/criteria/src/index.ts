@@ -386,7 +386,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-39',
     statement:
-      "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads.",
+      "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads; a model is shown the goal without its index section, which the validators read from the goal as stored.",
   },
   {
     id: 'QL-40',

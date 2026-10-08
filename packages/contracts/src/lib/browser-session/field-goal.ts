@@ -11,7 +11,7 @@ import { bounded } from '../bounds';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
-  renderFencedIndex,
+  renderIndexSection,
   withinBudget,
 } from '../quality-loop/goal-index';
 import { EVIDENCE_ALIAS, FIELDS_BOUND } from './field-answers.schema';
@@ -154,9 +154,7 @@ export function composeFieldGoal(input: FieldGoalInput, budget = GOAL_BUDGET_BYT
     '- A field the page hides is left blank. A value about the applicant rests only on listed evidence, cited by alias; with no evidence for it, ask the operator.',
     '- Validators check these limits; they are not criteria.',
     '',
-    '## Index',
-    '',
-    renderFencedIndex(indexOf(input)),
+    renderIndexSection(indexOf(input)),
   ].join('\n');
   return withinBudget(goal, budget);
 }

@@ -102,7 +102,9 @@ rather than by review.
 | `run-record.ts`   | One run as the service holds it, and as the wire sees it.              | `RunRecord`, `toRunDto`, `summariseExchange`                                                   |
 
 A validator reads the fenced index, never prose, and reports nothing on a malformed artifact — the
-schema validator owns that report.
+schema validator owns that report. No model reads the index: `goalSection` in `core/stages/prompting.ts`
+shows every stage the goal without its index section (`stripIndexSection` in `@sysdesign/contracts`), so a
+prompt carries the task alone while the validators read the goal as stored.
 
 ### `core/controllers/` — the deterministic decider
 

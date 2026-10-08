@@ -15,16 +15,11 @@ import {
   LESSON_CHUNK_BOUND,
   RECALL_ORIGINS,
   type RecallOrigin,
+  renderIndexSection,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import {
-  FENCE_CLOSE,
-  FENCE_OPEN,
-  GOAL_MAX_BYTES,
-  goalBytes,
-  readFencedIndex,
-} from '../../core/contracts';
+import { GOAL_MAX_BYTES, goalBytes, readFencedIndex } from '../../core/contracts';
 
 export const MEMORY_RECALL_ID = 'memory-recall';
 
@@ -341,9 +336,7 @@ export function renderGoal(input: MemoryQuery): string {
     '- Give every candidate exactly one verdict, kept or dropped.',
     '- Validators check these limits; they are not criteria.',
     '',
-    '## Index',
-    '',
-    `${FENCE_OPEN}${JSON.stringify(indexOf(input), null, 2)}${FENCE_CLOSE}`,
+    renderIndexSection(indexOf(input)),
   ].join('\n');
 }
 

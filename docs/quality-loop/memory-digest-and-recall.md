@@ -179,7 +179,7 @@ digests had no transition to reason about**, which matters for what the lessons 
   ## Findings              3,963 B   "- [f1] data_integrity · high · confidence high · fixable_local · at binding.1, … · weakens r1, r2 · by critic.architecture · seen i1 · remediated · reconciled to r1 — <first critic sentence>"
   ## Rules                   295 B   the three DIGEST_RULES
   ## Limits                  211 B   "Propose at most 8 memories, each resting on 1–4 of the listed aliases. Give every listed alias exactly one place."
-  ## Index                 1,622 B   fenced JSON: every alias → { kind: finding | criterion, ref: finding key | criterion id }
+  ## Index                 1,622 B   fenced JSON: every alias → { kind: finding | criterion, ref: finding key | criterion id } — for the validators; a model is shown the goal without it
 ```
 
 Across all 105 digest dumps the goal is a median 30.8 KB, max 40.0 KB — under the 64 KB budget

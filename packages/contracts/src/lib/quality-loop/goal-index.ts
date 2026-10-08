@@ -39,9 +39,40 @@ export function withinBudget(goal: string, budget = GOAL_BUDGET_BYTES): string {
   return goal;
 }
 
-/** One index, single-line, as the last block of a goal. */
-export const renderFencedIndex = (index: unknown): string =>
-  `${GOAL_INDEX_FENCE_OPEN}${JSON.stringify(index)}${GOAL_INDEX_FENCE_CLOSE}`;
+/** The heading under which a composer writes its index: the last section of a goal, and the one no model is shown. */
+export const GOAL_INDEX_HEADING = '## Index';
+
+/**
+ * The index section a composer ends its goal with: the heading, a blank
+ * line, and the index as one single-line fenced JSON block. One shape for
+ * every composer, so `stripIndexSection` can take it off again whole.
+ */
+export const renderIndexSection = (index: unknown): string =>
+  `${GOAL_INDEX_HEADING}\n\n${GOAL_INDEX_FENCE_OPEN}${JSON.stringify(index)}${GOAL_INDEX_FENCE_CLOSE}`;
+
+/**
+ * The goal without its index section, for a model: the index is written for
+ * the validators, and a model reading it is a model reading the engine's
+ * bookkeeping instead of the page. Measured 2026-10-08: the index was the
+ * largest section of a step goal, 12.5–13.5 KB of 33, 137 of its 150 entries
+ * carrying only default facts, and it reached the producer and all three
+ * lenses on every call. A goal whose last fence is not JSON, or that carries
+ * no index section, is returned as it is.
+ */
+export function stripIndexSection(goal: string): string {
+  const heading = goal.lastIndexOf(`${GOAL_INDEX_HEADING}\n`);
+  if (heading < 0) return goal;
+  const fence = goal.indexOf(GOAL_INDEX_FENCE_OPEN, heading);
+  if (fence < 0) return goal;
+  const close = goal.indexOf(GOAL_INDEX_FENCE_CLOSE, fence + GOAL_INDEX_FENCE_OPEN.length);
+  if (close < 0 || goal.slice(close + GOAL_INDEX_FENCE_CLOSE.length).trim() !== '') return goal;
+  try {
+    JSON.parse(goal.slice(fence + GOAL_INDEX_FENCE_OPEN.length, close));
+  } catch {
+    return goal;
+  }
+  return goal.slice(0, heading).trimEnd();
+}
 
 /** The last fenced JSON block of a goal, parsed against the schema; null when there is none that fits. */
 export function readFencedIndex<I>(goal: string, schema: ZodType<I>): I | null {

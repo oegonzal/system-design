@@ -221,7 +221,7 @@ describe('composeStepGoal', () => {
     // The listing's own links are behind the dialog: counted, not listed.
     expect(elements).not.toMatch(/^- e3 · /m);
     expect(elements).toContain(
-      '(6 interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)',
+      '(6 interactive elements not visible, hidden by the page or behind the open dialog are not listed and are never touched)',
     );
     // Every ref is still in the index, whether listed or not — marked behind the dialog where it is.
     const index = readStepIndex(goal);

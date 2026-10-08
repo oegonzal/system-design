@@ -18,16 +18,14 @@
  * This file renders that record as the goal every stage reads and reads its own
  * bookkeeping back from the last fenced JSON block.
  */
-import { MAX_QUALITY_RUN_ITERATIONS, TRANSITION_KINDS } from '@sysdesign/contracts';
+import {
+  MAX_QUALITY_RUN_ITERATIONS,
+  renderIndexSection,
+  TRANSITION_KINDS,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import {
-  FENCE_CLOSE,
-  FENCE_OPEN,
-  GOAL_MAX_BYTES,
-  goalBytes,
-  readFencedIndex,
-} from '../../core/contracts';
+import { GOAL_MAX_BYTES, goalBytes, readFencedIndex } from '../../core/contracts';
 import {
   ADOPTED_FINDING_NOTE,
   ALIAS_MAX,
@@ -347,9 +345,7 @@ export function renderGoal(record: KnowledgeRecord): string {
     `- At most ${MAX_TOPICS} topics per item, each a general word a reader would search by.`,
     '- Validators check these limits; they are not criteria.',
     '',
-    '## Index',
-    '',
-    `${FENCE_OPEN}${JSON.stringify(indexOf(record))}${FENCE_CLOSE}`,
+    renderIndexSection(indexOf(record)),
   ].join('\n');
 }
 

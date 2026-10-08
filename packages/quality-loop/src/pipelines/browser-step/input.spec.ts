@@ -5,6 +5,7 @@ import {
   GOAL_BUDGET_BYTES,
   GOAL_INDEX_FENCE_CLOSE,
   GOAL_INDEX_FENCE_OPEN,
+  GOAL_INDEX_HEADING,
   GoalBudgetExceeded,
   ELEMENTS_BOUND,
   MISSION_FIXTURE,
@@ -19,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FENCE_CLOSE, FENCE_OPEN, GOAL_MAX_BYTES } from '../../core/contracts';
 import { ADMISSIONS } from '../../core/outputs';
+import { goalSection } from '../../core/stages/prompting';
 import { fill } from '../../core/testing';
 import { readIndex } from './input';
 
@@ -80,7 +82,7 @@ describe('the browser-step input codec', () => {
     // A field the page hides is counted, not listed — and still in the index, so a plan that touches it is refused.
     expect(goal).not.toMatch(/^- e3 · /m);
     expect(goal).toContain(
-      '(1 interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)',
+      '(1 interactive elements not visible, hidden by the page or behind the open dialog are not listed and are never touched)',
     );
     expect(readIndex(goal)).toEqual({
       pipeline: 'browser-step',
@@ -106,6 +108,26 @@ describe('the browser-step input codec', () => {
     expect(readIndex(MISSION_FIXTURE)).toBeNull();
     expect(readIndex(renderDocumentGoal(resumeChunk()))).toBeNull();
     expect(readIndex('## Index\n\n```json\n{ not json')).toBeNull();
+  });
+
+  it('[QL-39] a model is shown the goal without its index, and the validators read the index from the goal as stored', () => {
+    const goal = composeStepGoal({
+      mission: MISSION_FIXTURE,
+      observation: maximalObservation(),
+      history: [],
+      ledger: openTaskLedger(),
+      objections: [],
+      progress: { criteria: [], settled: [], done: [] },
+      pageUnchanged: false,
+      lastRan: [],
+    });
+    const shown = goalSection(goal).text;
+    expect(shown).not.toContain(GOAL_INDEX_HEADING);
+    expect(shown).not.toContain(GOAL_INDEX_FENCE_OPEN);
+    expect(shown).toContain('## Limits');
+    // Measured 2026-10-08: the index was 12.5–13.5 KB of a 33 KB results-page goal.
+    expect(textBytes(goal) - textBytes(shown)).toBeGreaterThan(3_000);
+    expect(readIndex(goal)?.elements).toHaveLength(ELEMENTS_BOUND.target);
   });
 
   it('[QL-39] a page at every cap but the snapshot’s renders under the engine’s budget with room for one, and one past the budget is refused rather than clipped', () => {

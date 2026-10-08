@@ -220,7 +220,8 @@ brief could not give you:
 - **A fenced JSON index at the end.** The same facts the prose carries, in a machine-readable block.
   The pipeline's validators read that block — never the prose — to check deterministically that every
   alias cited was listed, that each got exactly one verdict, and that the kept count is within the
-  limit. The goal is therefore both the prompt and the contract it will be checked against.
+  limit. The goal is therefore both the prompt and the contract it will be checked against; the index
+  section is for the contract alone, and the engine takes it off before every prompt.
 - **Limits stated as limits.** "Keep at most 6 of the 12" sits under its own heading and says plainly
   that validators enforce it and it is not a criterion, so a bound the model must respect is never
   confused with something it is being graded on.

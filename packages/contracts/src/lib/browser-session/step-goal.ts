@@ -12,7 +12,7 @@ import type { SuccessCriterion } from '../quality-loop/evidence';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
-  renderFencedIndex,
+  renderIndexSection,
   withinBudget,
 } from '../quality-loop/goal-index';
 import {
@@ -95,16 +95,17 @@ export const stepIndexSchema = z.strictObject({
     z.strictObject({
       ref: z.string().regex(ELEMENT_REF),
       kind: z.enum(ELEMENT_KINDS),
-      disabled: z.boolean(),
-      // Written only where it deviates: an index of 150 elements is read by a
-      // model too, and the common case costs nothing to say.
+      // Written only where it deviates — the read-back fills every default — so
+      // an index of 150 elements costs what its deviations cost. Measured
+      // 2026-10-08: 137 of 150 entries carried default facts alone.
+      disabled: z.boolean().default(false),
       visible: z.boolean().default(true),
       /** Outside the open modal dialog: a person could not reach it. */
       behind: z.boolean().default(false),
-      options: z.array(z.string()).nullable(),
+      options: z.array(z.string()).nullable().default(null),
       /** Options the page offers past the listed ones; a select is held to the list only when this is zero. */
       optionsOmitted: z.number().int().min(0).default(0),
-      hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)),
+      hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)).default([]),
       /** The mission's marks this element carries, by token; a marked element is passed over, never touched. */
       marks: z.array(bounded.id(MARK_TOKEN_MAX_LENGTH, { min: 1 })).default([]),
     }),
@@ -261,7 +262,7 @@ function elementLines(observation: PageObservation, marks: readonly Mark[]): str
       : ['(no reachable interactive elements)']),
     ...(unlisted > 0
       ? [
-          `(${unlisted} interactive elements not visible, hidden by the page or behind the open dialog are not listed; their refs are in the index and are never touched)`,
+          `(${unlisted} interactive elements not visible, hidden by the page or behind the open dialog are not listed and are never touched)`,
         ]
       : []),
   ];
@@ -336,12 +337,12 @@ const indexOf = (
   elements: input.observation.elements.map((element) => ({
     ref: element.ref,
     kind: element.kind,
-    disabled: element.disabled,
+    ...(element.disabled ? { disabled: true } : {}),
     ...(element.visible ? {} : { visible: false }),
     ...(inScope(element, input.observation.activeScope) ? {} : { behind: true }),
-    options: element.options === null ? null : shownOptions(element).shown,
+    ...(element.options === null ? {} : { options: shownOptions(element).shown }),
     ...(shownOptions(element).more > 0 ? { optionsOmitted: shownOptions(element).more } : {}),
-    hiddenTraits: element.hiddenTraits,
+    ...(element.hiddenTraits.length > 0 ? { hiddenTraits: element.hiddenTraits } : {}),
     ...(marksOn(element, marks).length > 0
       ? { marks: marksOn(element, marks).map((mark) => mark.token) }
       : {}),
@@ -465,9 +466,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it. Act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now.',
     '- Validators check these limits; they are not criteria.',
     '',
-    '## Index',
-    '',
-    renderFencedIndex(indexOf(input, marks)),
+    renderIndexSection(indexOf(input, marks)),
   ].join('\n');
   return withinBudget(goal, budget);
 }
