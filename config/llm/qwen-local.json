@@ -1,6 +1,7 @@
 {
   "provider": "openai-compatible",
-  "model": "qwen3.6:latest",
+  "model": "qwen3.6-cc:latest",
   "baseUrl": "http://localhost:11434/v1",
-  "strict": true
+  "strict": true,
+  "maxInFlight": 1
 }

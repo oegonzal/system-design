@@ -42,7 +42,11 @@ pnpm quality:start
 Which model the loop calls is not a variable: `config/engine.json` names a file
 under `config/llm/` (`claude-subscription`, `openai`, `qwen-local`), and the boot
 line says which file it read. A configuration names the VARIABLE holding an API
-key, never a key, so the choice is committed and the credential is not.
+key, never a key, so the choice is committed and the credential is not. Its
+`maxInFlight` is the ceiling of model calls this process has in flight at once
+(default 8): `1` for a server that takes one request at a time, such as a local
+Ollama, and every call then waits its turn — the wait is recorded as `queuedMs`
+beside the call and never charged to it.
 
 | Variable                                                  | Effect                                                                                                                                                                                                                                                                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

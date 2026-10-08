@@ -119,6 +119,9 @@ function exchangeFiles(exchange: LlmExchange, position: number): DumpFile[] {
         maxTokens: exchange.maxTokens,
         startedAt: exchange.startedAt,
         durationMs: exchange.durationMs,
+        // What the call waited for a permit, apart from what it took: a process
+        // behind a single-request server shows its queue here, not as a slow model.
+        queuedMs: exchange.queuedMs ?? null,
         outcome: exchange.outcome,
         attempt: exchange.attempt ?? 1,
         stopReason: exchange.stopReason,

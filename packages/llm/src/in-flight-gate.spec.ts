@@ -110,4 +110,47 @@ describe('InFlightGate', () => {
     // never throttled by the process ceiling.
     expect(DEFAULT_GATE_POLICY.ceiling).toBeGreaterThanOrEqual(3);
   });
+
+  it('[QL-27] hands a freed permit to the first waiter, so a caller arriving in the same breath never slips past it at a ceiling of one', async () => {
+    // The race, scheduled exactly: the holder settles, and a third caller is
+    // queued as a microtask right behind the holder's release — before the
+    // waiter has resumed. A release that dropped the count and then woke the
+    // waiter let that third caller in, and the waiter took its own permit on
+    // top: two in flight at a ceiling of one.
+    const gate = new InFlightGate({ policy: { ceiling: 1 } });
+    const first = held();
+    const second = held();
+    const admitted: string[] = [];
+    let peak = 0;
+    const note = (name: string): void => {
+      admitted.push(name);
+      peak = Math.max(peak, gate.snapshot().inFlight);
+    };
+    const runFirst = gate.run(() => first.work);
+    await settled();
+    const runSecond = gate.run(async () => {
+      note('second');
+      return second.work;
+    });
+    await settled();
+    expect(gate.snapshot()).toEqual({ ceiling: 1, inFlight: 1, waiting: 1 });
+
+    first.release();
+    const runThird = Promise.resolve().then(() =>
+      gate.run(async () => {
+        note('third');
+        return 'third';
+      }),
+    );
+    await settled();
+    // The waiter holds the permit; the newcomer waits its turn.
+    expect(admitted).toEqual(['second']);
+    expect(gate.snapshot()).toEqual({ ceiling: 1, inFlight: 1, waiting: 1 });
+
+    second.release();
+    expect(await Promise.all([runFirst, runSecond, runThird])).toEqual(['done', 'done', 'third']);
+    expect(admitted).toEqual(['second', 'third']);
+    expect(peak).toBe(1);
+    expect(gate.snapshot()).toEqual({ ceiling: 1, inFlight: 0, waiting: 0 });
+  });
 });

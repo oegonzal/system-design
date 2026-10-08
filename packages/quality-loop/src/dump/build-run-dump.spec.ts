@@ -448,6 +448,7 @@ describe('buildRunDump', () => {
     const exchanges: LlmExchange[] = [
       exchange({
         apiCalls: 2,
+        queuedMs: 120,
         salvage: {
           ...salvage,
           overruns: [
@@ -515,12 +516,14 @@ describe('buildRunDump', () => {
         unknown
       >;
       expect(meta['apiCalls']).toBe(2);
+      // The wait for a permit is recorded apart from the call's own duration.
+      expect(meta['queuedMs']).toBe(120);
       expect(meta['salvage']).toEqual(exchanges[0].salvage);
       const old = JSON.parse(content(dump, '05-llm/03.critic.scale.s2.1.meta.json')) as Record<
         string,
         unknown
       >;
-      expect(old).toMatchObject({ salvage: null, apiCalls: null });
+      expect(old).toMatchObject({ salvage: null, apiCalls: null, queuedMs: null });
     });
 
     it('[QL-48] run.md lists every overrun — asked, accepted, written and how it was handled — and names a resumed, salvaged or re-asked call on its line', () => {

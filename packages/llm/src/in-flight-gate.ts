@@ -74,19 +74,32 @@ export class InFlightGate {
    * Run `work` under a permit. The permit is held for exactly the span of
    * `work`, released whether it settles or throws, and the next waiter is
    * admitted in arrival order.
+   *
+   * A permit is handed to the next waiter, never dropped and re-taken: a
+   * release that decremented the count and then woke the waiter left a gap in
+   * which a caller arriving before the waiter resumed passed the check, and
+   * the waiter then took its permit on top — two in flight at a ceiling of
+   * one, which is the one ceiling a single-request server is run under.
    */
   async run<T>(work: (admitted: Admitted) => Promise<T>): Promise<T> {
     const asked = this.now();
     if (this.inFlight >= this.ceiling) {
       await new Promise<void>((admit) => this.waiting.push(admit));
+    } else {
+      this.inFlight += 1;
     }
-    this.inFlight += 1;
     try {
       return await work({ queuedMs: this.now() - asked });
     } finally {
-      this.inFlight -= 1;
-      this.waiting.shift()?.();
+      this.release();
     }
+  }
+
+  /** The permit goes to the first waiter, who holds it from this moment; with nobody waiting it is freed. */
+  private release(): void {
+    const next = this.waiting.shift();
+    if (next === undefined) this.inFlight -= 1;
+    else next();
   }
 }
 
