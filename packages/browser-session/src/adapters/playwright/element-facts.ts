@@ -38,6 +38,13 @@ export interface ElementFacts {
  * explains — the shape of a honeypot, read from what the page offers a person
  * rather than from a list of names.
  */
+/**
+ * Every fact about one element, read inside the page. One function on
+ * purpose — Playwright serialises it whole into the page, so nothing here may
+ * reach outside it — read as four blocks: what the control is and holds,
+ * what state the page puts it in, whether a person could see and reach it,
+ * and the words around it.
+ */
 export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
   const tag = el.tagName.toLowerCase();
   const input = el as HTMLInputElement;
@@ -57,215 +64,233 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
     text(Array.from((node as HTMLInputElement).labels ?? [])[0]) ||
     text(node);
 
-  const inputType =
-    tag === 'input'
-      ? (attr('type') ?? 'text').toLowerCase()
-      : tag === 'textarea'
-        ? 'textarea'
-        : tag === 'select'
-          ? 'select'
-          : null;
-  const role = attr('role');
+  /** What the control is and holds: its input type, its value, and the options it offers. */
+  const readControl = (): Pick<ElementFacts, 'inputType' | 'value' | 'options'> => {
+    const inputType =
+      tag === 'input'
+        ? (attr('type') ?? 'text').toLowerCase()
+        : tag === 'textarea'
+          ? 'textarea'
+          : tag === 'select'
+            ? 'select'
+            : null;
+    const role = attr('role');
 
-  let value: string | null = null;
-  let options: string[] | null = null;
-  if (tag === 'select') {
-    const select = el as HTMLSelectElement;
-    options = Array.from(select.options)
-      .map((option) => text(option) || option.value)
-      .filter((option) => option.length > 0);
-    const chosen = select.selectedOptions[0];
-    value = chosen ? text(chosen) || chosen.value : null;
-  } else if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio')) {
-    value = input.checked ? 'checked' : 'unchecked';
-  } else if (tag === 'input' || tag === 'textarea') {
-    value = input.value === '' ? null : input.value;
-  } else if ((el as HTMLElement).isContentEditable) {
-    value = text(el) || null;
-  }
-  if (options === null && role === 'radiogroup') {
-    options = Array.from(el.querySelectorAll('[role="radio"], input[type="radio"]'))
-      .map(labelOf)
-      .filter((option) => option.length > 0);
-  }
-  if (options === null && (role === 'listbox' || role === 'combobox')) {
-    const controls = attr('aria-controls');
-    const list =
-      controls !== null
-        ? el.ownerDocument.getElementById(controls)
-        : role === 'listbox'
-          ? el
-          : null;
-    if (list !== null) {
-      options = Array.from(list.querySelectorAll('[role="option"]'))
-        .map((option) => text(option))
+    let value: string | null = null;
+    let options: string[] | null = null;
+    if (tag === 'select') {
+      const select = el as HTMLSelectElement;
+      options = Array.from(select.options)
+        .map((option) => text(option) || option.value)
+        .filter((option) => option.length > 0);
+      const chosen = select.selectedOptions[0];
+      value = chosen ? text(chosen) || chosen.value : null;
+    } else if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio')) {
+      value = input.checked ? 'checked' : 'unchecked';
+    } else if (tag === 'input' || tag === 'textarea') {
+      value = input.value === '' ? null : input.value;
+    } else if ((el as HTMLElement).isContentEditable) {
+      value = text(el) || null;
+    }
+    if (options === null && role === 'radiogroup') {
+      options = Array.from(el.querySelectorAll('[role="radio"], input[type="radio"]'))
+        .map(labelOf)
         .filter((option) => option.length > 0);
     }
-  }
-  if (options !== null && options.length === 0) options = null;
-
-  const required = input.required === true || attr('aria-required') === 'true';
-  const disabled =
-    input.disabled === true ||
-    attr('aria-disabled') === 'true' ||
-    el.closest('fieldset[disabled]') !== null;
-
-  const rect = el.getBoundingClientRect();
-  const style = getComputedStyle(el);
-  const traits: string[] = [];
-  if (el.closest('[aria-hidden="true"]') !== null) traits.push('aria-hidden');
-  // Offscreen means out of anyone's reach: no scrolling of any box that clips
-  // the element, nor of the document, could bring it into view. Walked up the
-  // chain of boxes that clip it — which CSS draws through containing blocks,
-  // not through every ancestor: an absolutely positioned box is clipped only
-  // from its containing block upward, a fixed one only by an ancestor that
-  // transforms or filters, else by the viewport alone, and an inline box clips
-  // nothing. Each clipping box shows at most its own padding box, widened by
-  // however far it can still scroll; what passes it is the part of that box
-  // the element could reach, for the next. A field parked at left:-9999px is
-  // outside every box; a footer below the fold of a dialog that scrolls is
-  // inside its dialog's. Measured 2026-10-07 with the document's own extent
-  // as the only box: a modal over a scroll-locked page had every control
-  // below the fold "offscreen", its one Submit button refused 27 times, and
-  // the fields scrolled above the fold counted as traps.
-  type Box = { left: number; top: number; right: number; bottom: number };
-  const intersects = (a: Box, b: Box): boolean =>
-    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-  const within = (a: Box, b: Box): Box => ({
-    left: Math.max(a.left, b.left),
-    top: Math.max(a.top, b.top),
-    right: Math.min(a.right, b.right),
-    bottom: Math.min(a.bottom, b.bottom),
-  });
-  /** Whether a box establishes the containing block of fixed and absolute descendants: it transforms, filters, or contains. */
-  const anchors = (css: CSSStyleDeclaration): boolean =>
-    css.transform !== 'none' ||
-    css.perspective !== 'none' ||
-    css.filter !== 'none' ||
-    /paint|layout|strict|content/.test(css.contain);
-  const unreachable = (): boolean => {
-    const viewport: Box = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-    let box: Box = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
-    let position = style.position;
-    for (let node = el.parentElement; node !== null; node = node.parentElement) {
-      const css = getComputedStyle(node);
-      // What the box is positioned against: ancestors below it clip nothing of it.
-      if (position === 'fixed' && !anchors(css)) continue;
-      if (position === 'absolute' && css.position === 'static' && !anchors(css)) continue;
-      if (css.display === 'inline' || css.display === 'contents') continue;
-      const overflow = css.overflowX + css.overflowY;
-      const scrolls = /auto|scroll/.test(overflow);
-      if (scrolls || /hidden|clip/.test(overflow)) {
-        const outer = node.getBoundingClientRect();
-        const shown: Box = {
-          left: outer.left + node.clientLeft,
-          top: outer.top + node.clientTop,
-          right: outer.left + node.clientLeft + node.clientWidth,
-          bottom: outer.top + node.clientTop + node.clientHeight,
-        };
-        const reach: Box = scrolls
-          ? {
-              left: box.left - (node.scrollWidth - node.clientWidth - node.scrollLeft),
-              right: box.right + node.scrollLeft,
-              top: box.top - (node.scrollHeight - node.clientHeight - node.scrollTop),
-              bottom: box.bottom + node.scrollTop,
-            }
-          : box;
-        if (!intersects(reach, shown)) return true;
-        box = within(reach, shown);
+    if (options === null && (role === 'listbox' || role === 'combobox')) {
+      const controls = attr('aria-controls');
+      const list =
+        controls !== null
+          ? el.ownerDocument.getElementById(controls)
+          : role === 'listbox'
+            ? el
+            : null;
+      if (list !== null) {
+        options = Array.from(list.querySelectorAll('[role="option"]'))
+          .map((option) => text(option))
+          .filter((option) => option.length > 0);
       }
-      position = css.position;
     }
-    if (position === 'fixed') return !intersects(box, viewport);
-    const root = el.ownerDocument.documentElement;
-    const reach: Box = {
-      left:
-        box.left -
-        (Math.max(root.scrollWidth, root.clientWidth) - root.clientWidth - window.scrollX),
-      right: box.right + window.scrollX,
-      top:
-        box.top -
-        (Math.max(root.scrollHeight, root.clientHeight) - root.clientHeight - window.scrollY),
-      bottom: box.bottom + window.scrollY,
+    if (options !== null && options.length === 0) options = null;
+    return { inputType, value, options };
+  };
+
+  /** What state the page puts it in: required, disabled. */
+  const readState = (): Pick<ElementFacts, 'required' | 'disabled'> => {
+    const required = input.required === true || attr('aria-required') === 'true';
+    const disabled =
+      input.disabled === true ||
+      attr('aria-disabled') === 'true' ||
+      el.closest('fieldset[disabled]') !== null;
+    return { required, disabled };
+  };
+
+  /** Whether a person could see and reach it, and the traits of one they could not. */
+  const readSight = (): Pick<ElementFacts, 'visible' | 'hiddenTraits'> => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    const traits: string[] = [];
+    if (el.closest('[aria-hidden="true"]') !== null) traits.push('aria-hidden');
+    // Offscreen means out of anyone's reach: no scrolling of any box that clips
+    // the element, nor of the document, could bring it into view. Walked up the
+    // chain of boxes that clip it — which CSS draws through containing blocks,
+    // not through every ancestor: an absolutely positioned box is clipped only
+    // from its containing block upward, a fixed one only by an ancestor that
+    // transforms or filters, else by the viewport alone, and an inline box clips
+    // nothing. Each clipping box shows at most its own padding box, widened by
+    // however far it can still scroll; what passes it is the part of that box
+    // the element could reach, for the next. A field parked at left:-9999px is
+    // outside every box; a footer below the fold of a dialog that scrolls is
+    // inside its dialog's. Measured 2026-10-07 with the document's own extent
+    // as the only box: a modal over a scroll-locked page had every control
+    // below the fold "offscreen", its one Submit button refused 27 times, and
+    // the fields scrolled above the fold counted as traps.
+    type Box = { left: number; top: number; right: number; bottom: number };
+    const intersects = (a: Box, b: Box): boolean =>
+      a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    const within = (a: Box, b: Box): Box => ({
+      left: Math.max(a.left, b.left),
+      top: Math.max(a.top, b.top),
+      right: Math.min(a.right, b.right),
+      bottom: Math.min(a.bottom, b.bottom),
+    });
+    /** Whether a box establishes the containing block of fixed and absolute descendants: it transforms, filters, or contains. */
+    const anchors = (css: CSSStyleDeclaration): boolean =>
+      css.transform !== 'none' ||
+      css.perspective !== 'none' ||
+      css.filter !== 'none' ||
+      /paint|layout|strict|content/.test(css.contain);
+    const unreachable = (): boolean => {
+      const viewport: Box = {
+        left: 0,
+        top: 0,
+        right: window.innerWidth,
+        bottom: window.innerHeight,
+      };
+      let box: Box = { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+      let position = style.position;
+      for (let node = el.parentElement; node !== null; node = node.parentElement) {
+        const css = getComputedStyle(node);
+        // What the box is positioned against: ancestors below it clip nothing of it.
+        if (position === 'fixed' && !anchors(css)) continue;
+        if (position === 'absolute' && css.position === 'static' && !anchors(css)) continue;
+        if (css.display === 'inline' || css.display === 'contents') continue;
+        const overflow = css.overflowX + css.overflowY;
+        const scrolls = /auto|scroll/.test(overflow);
+        if (scrolls || /hidden|clip/.test(overflow)) {
+          const outer = node.getBoundingClientRect();
+          const shown: Box = {
+            left: outer.left + node.clientLeft,
+            top: outer.top + node.clientTop,
+            right: outer.left + node.clientLeft + node.clientWidth,
+            bottom: outer.top + node.clientTop + node.clientHeight,
+          };
+          const reach: Box = scrolls
+            ? {
+                left: box.left - (node.scrollWidth - node.clientWidth - node.scrollLeft),
+                right: box.right + node.scrollLeft,
+                top: box.top - (node.scrollHeight - node.clientHeight - node.scrollTop),
+                bottom: box.bottom + node.scrollTop,
+              }
+            : box;
+          if (!intersects(reach, shown)) return true;
+          box = within(reach, shown);
+        }
+        position = css.position;
+      }
+      if (position === 'fixed') return !intersects(box, viewport);
+      const root = el.ownerDocument.documentElement;
+      const reach: Box = {
+        left:
+          box.left -
+          (Math.max(root.scrollWidth, root.clientWidth) - root.clientWidth - window.scrollX),
+        right: box.right + window.scrollX,
+        top:
+          box.top -
+          (Math.max(root.scrollHeight, root.clientHeight) - root.clientHeight - window.scrollY),
+        bottom: box.bottom + window.scrollY,
+      };
+      return !intersects(reach, viewport);
     };
-    return !intersects(reach, viewport);
+    const offscreen = unreachable();
+    if (offscreen) traits.push('offscreen');
+    const clipped =
+      style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+      style.clipPath === 'inset(100%)' ||
+      (style.overflow === 'hidden' && rect.width <= 1 && rect.height <= 1);
+    if (rect.width === 0 || rect.height === 0 || clipped) traits.push('zero-size');
+    const tabindex = attr('tabindex');
+    if (tabindex !== null && Number(tabindex) < 0) traits.push('tabindex-negative');
+    const explained =
+      (input.labels !== undefined && input.labels !== null && input.labels.length > 0) ||
+      attr('aria-label') !== null ||
+      attr('aria-labelledby') !== null ||
+      attr('placeholder') !== null ||
+      attr('title') !== null;
+    if (tag === 'input' && (attr('autocomplete') ?? '').toLowerCase() === 'off' && !explained) {
+      traits.push('autocomplete-off-bait');
+    }
+
+    const visible =
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.visibility !== 'hidden' &&
+      style.display !== 'none' &&
+      style.opacity !== '0' &&
+      !offscreen &&
+      !clipped &&
+      el.closest('[aria-hidden="true"]') === null;
+    return { visible, hiddenTraits: traits };
   };
-  const offscreen = unreachable();
-  if (offscreen) traits.push('offscreen');
-  const clipped =
-    style.clip === 'rect(0px, 0px, 0px, 0px)' ||
-    style.clipPath === 'inset(100%)' ||
-    (style.overflow === 'hidden' && rect.width <= 1 && rect.height <= 1);
-  if (rect.width === 0 || rect.height === 0 || clipped) traits.push('zero-size');
-  const tabindex = attr('tabindex');
-  if (tabindex !== null && Number(tabindex) < 0) traits.push('tabindex-negative');
-  const explained =
-    (input.labels !== undefined && input.labels !== null && input.labels.length > 0) ||
-    attr('aria-label') !== null ||
-    attr('aria-labelledby') !== null ||
-    attr('placeholder') !== null ||
-    attr('title') !== null;
-  if (tag === 'input' && (attr('autocomplete') ?? '').toLowerCase() === 'off' && !explained) {
-    traits.push('autocomplete-off-bait');
-  }
 
-  const visible =
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.visibility !== 'hidden' &&
-    style.display !== 'none' &&
-    style.opacity !== '0' &&
-    !offscreen &&
-    !clipped &&
-    el.closest('[aria-hidden="true"]') === null;
+  /** The words around it, its length cap, whether a modal encloses it, and whether the page marks it invalid. */
+  const readSurroundings = (): Pick<
+    ElementFacts,
+    'maxLength' | 'context' | 'nameHint' | 'modal' | 'invalid' | 'text'
+  > => {
+    const maxLength =
+      (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
+    const context = [
+      byIds(attr('aria-describedby')),
+      attr('placeholder') ?? '',
+      text(el.closest('fieldset')?.querySelector('legend')),
+    ]
+      .filter((part) => part.length > 0)
+      .join(' · ');
 
-  const maxLength =
-    (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
-  const context = [
-    byIds(attr('aria-describedby')),
-    attr('placeholder') ?? '',
-    text(el.closest('fieldset')?.querySelector('legend')),
-  ]
-    .filter((part) => part.length > 0)
-    .join(' · ');
+    let modal = false;
+    try {
+      modal =
+        el.closest(
+          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
+        ) !== null;
+    } catch {
+      // An engine without `:modal` answers the ARIA half alone.
+      modal =
+        el.closest(
+          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
+        ) !== null;
+    }
 
-  let modal = false;
-  try {
-    modal =
-      el.closest(
-        '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
-      ) !== null;
-  } catch {
-    // An engine without `:modal` answers the ARIA half alone.
-    modal =
-      el.closest('[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]') !==
-      null;
-  }
-
-  // Any invalid state the page declares — true, grammar, spelling — or the browser's own.
-  const ariaInvalid = attr('aria-invalid');
-  let invalid = ariaInvalid !== null && ariaInvalid !== 'false';
-  try {
-    invalid = invalid || el.matches(':user-invalid');
-  } catch {
-    // An engine without `:user-invalid` answers the ARIA half alone.
-  }
-
-  return {
-    inputType,
-    value,
-    options,
-    required,
-    invalid,
-    disabled,
-    visible,
-    maxLength,
-    hiddenTraits: traits,
-    context: context === '' ? null : context,
-    nameHint: attr('name') ?? attr('id'),
-    modal,
-    text: ((el as HTMLElement).innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, textMax),
+    // Any invalid state the page declares — true, grammar, spelling — or the browser's own.
+    const ariaInvalid = attr('aria-invalid');
+    let invalid = ariaInvalid !== null && ariaInvalid !== 'false';
+    try {
+      invalid = invalid || el.matches(':user-invalid');
+    } catch {
+      // An engine without `:user-invalid` answers the ARIA half alone.
+    }
+    return {
+      maxLength,
+      context: context === '' ? null : context,
+      nameHint: attr('name') ?? attr('id'),
+      modal,
+      invalid,
+      text: ((el as HTMLElement).innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, textMax),
+    };
   };
+
+  return { ...readControl(), ...readState(), ...readSight(), ...readSurroundings() };
 }
 
 /**

@@ -1,0 +1,269 @@
+import {
+  observationFingerprint,
+  type PageObservation,
+  type PlanReadout,
+  routePlan,
+  SETTLING_CRITERION_KINDS,
+  type StepPlan,
+} from '@sysdesign/contracts';
+
+import type { EngineContext } from './engine-context';
+import { checkExact, unmetNote } from './expectations';
+import { BrainFaulted, type Decided, type Termination } from './ports';
+import { checkRails } from './rails';
+import { observationFiles, stepJsonFile } from './session-dump';
+import {
+  describeRefusedPlan,
+  ledgerSummaryOf,
+  noteObservation,
+  progressOf,
+  pushHistory,
+  pushObjections,
+  railStateOf,
+  tasksClosed,
+} from './session-state';
+import { executeActions, type Executed } from './step-executor';
+
+/**
+ * One page of the session: observe it, ask the loop for a plan, read the plan
+ * back, run what nobody objected to, and check the rails. Each step here is
+ * one of those, and the engine decides nothing of its own along the way.
+ */
+
+/** The previous step's promise, held against this page: only an exact check that fails is counted. */
+function settleExpectation(ctx: EngineContext, observation: PageObservation): void {
+  const { state } = ctx;
+  const pending = state.pending;
+  state.pending = null;
+  if (pending === null || pending.check === null) return;
+  if (checkExact(pending.check, observation)) return;
+  pushHistory(state, pending.action, 'failed', unmetNote(pending));
+  ctx.fail('expectation-unmet');
+}
+
+/** Who objected when nothing named a finding or a problem: the controller's own reason. */
+const CONTROLLER = 'controller';
+
+const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
+  assessment: readout.plan?.assessment ?? null,
+  actions: readout.plan?.actions.length ?? 0,
+  executable: readout.executable,
+  executePrefix: readout.executePrefix,
+  reason: readout.reason,
+  objections: readout.objections,
+  finalDecision: decided.run.trace?.finalDecision ?? null,
+  composition: decided.composition,
+});
+
+/** The rails, checked where every path out of a step checks them. */
+const rails = (ctx: EngineContext): Termination | null =>
+  checkRails(railStateOf(ctx.state), ctx.options.rails, ctx.deps.clock.now());
+
+/** A new step: the page as it is, its screenshot, the last step's promise settled, the files into the dump. */
+async function observe(ctx: EngineContext): Promise<PageObservation> {
+  const { deps, state } = ctx;
+  state.step += 1;
+  state.ordinal = 0;
+  state.teachings = [];
+  const observation = await deps.browser.observe();
+  const screenshot = await deps.browser.screenshot().catch(() => null);
+  noteObservation(state, observationFingerprint(observation));
+  settleExpectation(ctx, observation);
+  ctx.dumpFiles('step files', observationFiles(state.step, observation, screenshot));
+  // A read that did not reach the page is counted, and one that did clears the count.
+  state.unreadablePages = observation.unread === null ? 0 : state.unreadablePages + 1;
+  return observation;
+}
+
+/** A brain that answered nothing: the fault on the record, in the history, and no plan ran. */
+function recordBrainFault(ctx: EngineContext, error: BrainFaulted, durationMs: number): void {
+  const { deps, state } = ctx;
+  state.brainFaults += 1;
+  ctx.record({
+    kind: 'step-plan',
+    source: 'engine',
+    loopRunId: null,
+    loopOrchestrationId: null,
+    ref: null,
+    question: null,
+    answer: null,
+    confidence: null,
+    durationMs,
+    payload: { fault: error.reason, message: error.message },
+  });
+  ctx.dumpFiles('fault', [
+    stepJsonFile(state.step, 'fault', { reason: error.reason, message: error.message }),
+  ]);
+  pushHistory(state, 'plan', 'failed', `brain ${error.reason}: ${error.message}`);
+  state.lastRan = 0;
+  state.ranActions = [];
+  deps.warn(`step ${state.step}: no plan — ${error.message}`);
+}
+
+/** The loop's plan for this page, timed; null once a brain fault has been recorded. */
+async function decide(
+  ctx: EngineContext,
+  observation: PageObservation,
+): Promise<{ decided: Decided<StepPlan>; durationMs: number } | null> {
+  const { deps, state, options } = ctx;
+  const startedAt = deps.clock.now();
+  const elapsed = (): number => deps.clock.now().getTime() - startedAt.getTime();
+  try {
+    const decided = await deps.brain.planStep({
+      mission: ctx.mission,
+      observation,
+      history: [...state.history],
+      ledger: ledgerSummaryOf(state, options.rails),
+      objections: [...state.objections],
+      criteria: ctx.criteria.plan,
+      pageUnchanged: state.pageUnchanged,
+      nothingRan: state.step > 1 && state.lastRan === 0,
+      lastRan: state.ranActions,
+      progress: progressOf(state),
+    });
+    return { decided, durationMs: elapsed() };
+  } catch (error) {
+    if (!(error instanceof BrainFaulted)) throw error;
+    recordBrainFault(ctx, error, elapsed());
+    return null;
+  }
+}
+
+/**
+ * The plan read back: whatever objected is recorded once, whether or not the
+ * plan runs — a plan cut short owes the next producer the reasons as much as
+ * a refused one — and the decision, the plan file and the log line follow.
+ */
+function recordPlan(
+  ctx: EngineContext,
+  decided: Decided<StepPlan>,
+  durationMs: number,
+): PlanReadout {
+  const { deps, state } = ctx;
+  const readout = routePlan(decided.run, state.step);
+  pushObjections(
+    state,
+    readout.objections.length > 0
+      ? readout.objections
+      : readout.reason === null
+        ? []
+        : [{ step: state.step, from: CONTROLLER, at: [], detail: readout.reason }],
+  );
+  ctx.record({
+    kind: 'step-plan',
+    source: 'loop',
+    loopRunId: decided.runId,
+    loopOrchestrationId: decided.orchestrationRunId,
+    ref: null,
+    question: null,
+    answer: null,
+    confidence: null,
+    durationMs,
+    payload: planPayload(readout, decided),
+  });
+  ctx.dumpFiles('plan', [
+    stepJsonFile(state.step, 'plan', {
+      runId: decided.runId,
+      composition: decided.composition,
+      readout: { ...readout, plan: undefined },
+      plan: readout.plan,
+    }),
+  ]);
+  deps.log(
+    `step ${state.step}: ${
+      readout.executable
+        ? `${readout.executePrefix} of ${readout.plan?.actions.length ?? 0} action(s) to run`
+        : `not executed: ${readout.reason}`
+    } (run ${decided.runId})`,
+  );
+  return readout;
+}
+
+/**
+ * A plan that does not run: one history entry for the plan, not one per
+ * action it proposed. Measured on 2026-10-07: a refused six-action plan wrote
+ * six not-executed entries, two refusals filled HISTORY_MAX, and the producer
+ * read its own refused proposals — "terminate limit-reached" among them — as
+ * the session's recent past. The actions themselves stay whole in the step's
+ * plan.json, and why it did not run is an objection, carried once.
+ */
+function refusePlan(ctx: EngineContext, readout: PlanReadout): void {
+  const { state } = ctx;
+  pushHistory(state, describeRefusedPlan(readout.plan), 'not-executed', null);
+  state.lastRan = 0;
+  state.ranActions = [];
+  ctx.fail('plan-not-executed');
+}
+
+/**
+ * What the evaluator passed waits for the next observation: settled, if the
+ * page moved, for the unit when one was open before or after the plan, else
+ * for the session — every pass when the plan ran whole, else the passes an
+ * action that ran said it served. A plan that closed a unit settles nothing:
+ * what it passed was that unit's, and the unit is gone — whether the plan
+ * ended there, went on to open the next unit, or opened and closed one.
+ */
+function settlePasses(
+  ctx: EngineContext,
+  readout: PlanReadout & { plan: StepPlan },
+  executed: Executed,
+  before: { open: boolean; closed: number },
+): void {
+  const { state } = ctx;
+  if (tasksClosed(state) !== before.closed) return;
+  const scope = before.open || state.tasks.open !== null ? 'unit' : 'session';
+  const settling = new Set(
+    ctx.criteria.plan
+      .filter((criterion) =>
+        (SETTLING_CRITERION_KINDS as readonly string[]).includes(criterion.kind),
+      )
+      .map((criterion) => criterion.id),
+  );
+  const served = new Set(
+    readout.plan.actions.slice(0, executed.ranOk).flatMap((action) => action.serves),
+  );
+  const ids = readout.passed.filter(
+    (id) => settling.has(id) && (executed.ranWhole || served.has(id)),
+  );
+  state.pendingPass = ids.length === 0 ? null : { ids, scope };
+}
+
+/** The executable prefix run against the page, and what it passed held for the next observation. */
+async function executePlan(
+  ctx: EngineContext,
+  decided: Decided<StepPlan>,
+  readout: PlanReadout & { plan: StepPlan },
+  observation: PageObservation,
+): Promise<Termination | null> {
+  const { state } = ctx;
+  const before = { open: state.tasks.open !== null, closed: tasksClosed(state) };
+  const executed = await executeActions(ctx, decided, readout, observation);
+  if (executed.termination !== null) return executed.termination;
+  state.lastRan = executed.ranOk;
+  settlePasses(ctx, readout, executed, before);
+  return null;
+}
+
+/** One page: observe, plan through the loop, read the plan back, run what nobody objected to, check the rails. */
+export async function step(ctx: EngineContext): Promise<Termination | null> {
+  const observation = await observe(ctx);
+  // The rails are checked before the brain is asked for anything: a page that
+  // will not read is not a plan anybody can write, and a session out of time
+  // or units of work should not spend another run finding out.
+  const railed = rails(ctx);
+  if (railed !== null) return railed;
+  const planned = await decide(ctx, observation);
+  if (planned === null) return rails(ctx);
+  const readout = recordPlan(ctx, planned.decided, planned.durationMs);
+  if (!readout.executable || readout.plan === null) {
+    refusePlan(ctx, readout);
+    return rails(ctx);
+  }
+  const ended = await executePlan(
+    ctx,
+    planned.decided,
+    { ...readout, plan: readout.plan },
+    observation,
+  );
+  return ended ?? rails(ctx);
+}

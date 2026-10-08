@@ -298,24 +298,26 @@ const summarize = (results: readonly FieldResult[], listed: number): string => {
   }`;
 };
 
-export async function askFields(
-  ctx: EngineContext,
-  refs: readonly string[],
-  observation: PageObservation,
-): Promise<FieldsOutcome> {
-  const { deps, state } = ctx;
-  const fields = refs.flatMap((ref) => {
+/** The listed fields the refs name, in the order asked. */
+const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldSpec[] =>
+  refs.flatMap((ref) => {
     const element = observation.elements.find((candidate) => candidate.ref === ref);
     return element === undefined ? [] : [fieldSpecOf(element)];
   });
-  if (fields.length === 0)
-    return { stopped: false, failed: false, note: 'no listed field matched' };
 
-  // A field that still holds what this session settled for it is not a question.
-  const open = fields.filter(
+/** The fields still open: one that holds what this session settled for it is not a question. */
+const openOf = (fields: readonly FieldSpec[], filled: ReadonlyMap<string, string>): FieldSpec[] =>
+  fields.filter(
     (field) =>
-      !(field.value !== null && field.value !== '' && state.filled.get(field.name) === field.value),
+      !(field.value !== null && field.value !== '' && filled.get(field.name) === field.value),
   );
+
+/** The brain's answers for the open fields, or the fault it threw, timed; nothing is asked for no open field. */
+async function decideFields(
+  ctx: EngineContext,
+  open: readonly FieldSpec[],
+): Promise<{ decided: FieldsDecided | null; fault: BrainFaulted | null; durationMs: number }> {
+  const { deps, state } = ctx;
   const startedAt = deps.clock.now();
   let decided: FieldsDecided | null = null;
   let fault: BrainFaulted | null = null;
@@ -336,28 +338,46 @@ export async function askFields(
       state.brainFaults += 1;
     }
   }
-  const durationMs = deps.clock.now().getTime() - startedAt.getTime();
+  return { decided, fault, durationMs: deps.clock.now().getTime() - startedAt.getTime() };
+}
 
-  const answered = routeFieldsInSession(decided, fault, open, state.operatorAnswers);
-  const routed = fields.map((field, position) => {
+/** Every listed field with its route: the one the answers routed, or a keep for one that was never a question. */
+const routedOf = (fields: readonly FieldSpec[], answered: readonly RoutedField[]): RoutedField[] =>
+  fields.map((field, position) => {
     const found = answered.find((candidate) => candidate.field.ref === field.ref);
     return found === undefined ? keptReadout(field, position) : { ...found, position };
   });
+
+/** Each routed field settled in order and recorded, the operator's guidance taught; a stop or a failure ends the page. */
+async function settleAll(
+  ctx: EngineContext,
+  routed: readonly RoutedField[],
+  observation: PageObservation,
+  decided: FieldsDecided | null,
+  durationMs: number,
+): Promise<{ results: FieldResult[]; stopped: boolean }> {
   const results: FieldResult[] = [];
-  let stopped = false;
   for (const field of routed) {
     const outcome = await settle(ctx, field, observation);
     results.push(outcome);
     const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs));
     if (outcome.guidance !== null) await teach(ctx, decisionId, outcome.guidance);
-    if (outcome.reply === 'stop') {
-      stopped = true;
-      break;
-    }
+    if (outcome.reply === 'stop') return { results, stopped: true };
     if (outcome.outcome === 'failed') break;
   }
+  return { results, stopped: false };
+}
+
+/** The step's fields file: what was decided, how each field was routed, and what became of it. */
+function dumpFields(
+  ctx: EngineContext,
+  routed: readonly RoutedField[],
+  results: readonly FieldResult[],
+  decided: FieldsDecided | null,
+  fault: BrainFaulted | null,
+): void {
   ctx.dumpFiles('fields', [
-    stepJsonFile(state.step, 'fields', {
+    stepJsonFile(ctx.state.step, 'fields', {
       runId: decided?.runId ?? null,
       orchestrationRunId: decided?.orchestrationRunId ?? null,
       admission: decided?.admission ?? null,
@@ -369,6 +389,24 @@ export async function askFields(
       })),
     }),
   ]);
+}
+
+export async function askFields(
+  ctx: EngineContext,
+  refs: readonly string[],
+  observation: PageObservation,
+): Promise<FieldsOutcome> {
+  const fields = fieldsOf(refs, observation);
+  if (fields.length === 0)
+    return { stopped: false, failed: false, note: 'no listed field matched' };
+  const open = openOf(fields, ctx.state.filled);
+  const { decided, fault, durationMs } = await decideFields(ctx, open);
+  const routed = routedOf(
+    fields,
+    routeFieldsInSession(decided, fault, open, ctx.state.operatorAnswers),
+  );
+  const { results, stopped } = await settleAll(ctx, routed, observation, decided, durationMs);
+  dumpFields(ctx, routed, results, decided, fault);
   return {
     stopped,
     failed: results.some((outcome) => outcome.outcome === 'failed'),
