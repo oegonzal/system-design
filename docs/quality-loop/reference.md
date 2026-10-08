@@ -134,12 +134,15 @@ a decision.
 
 ### `core/loop/` — the iteration engine
 
-| File              | What it does                                                            | Exports                                         |
-| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------- |
-| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat. | `runPipeline`, `runLoop`, `RunInput`, `RunDeps` |
-| `materialize.ts`  | Definition plus model client becomes concrete stages.                   | `materialize`, `materializeCriteria`            |
-| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.       | `rubricProblems`                                |
-| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.       | `scopeLlm`, `mapConcurrent`                     |
+| File              | What it does                                                               | Exports                                                 |
+| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.    | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`         |
+| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.   | `runIteration`                                          |
+| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks. | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked` |
+| `waves.ts`        | The lenses in waves by what they consume; the normaliser between waves.    | `runLensWaves`, `Judged`                                |
+| `materialize.ts`  | Definition plus model client becomes concrete stages.                      | `materialize`, `materializeCriteria`                    |
+| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.          | `rubricProblems`                                        |
+| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.          | `scopeLlm`, `mapConcurrent`                             |
 
 A new iteration has to be strictly better to be crowned. An adopted iteration is cloned and runs no
 stage. The output shape's `normalize` is applied only to a produced artifact, never to a supplied
@@ -328,15 +331,15 @@ pipeline that would be chosen, and why — without running anything.
 The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`,
 `RUN_REPOSITORY`.
 
-| File                      | What it does                                                           |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `runs.service.ts`         | Starts, runs, dumps and closes a run. Also exports `heartbeatTicker`.  |
-| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`.                      |
-| `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                          |
-| `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                    |
-| `run-request.ts`          | The request schemas, including the adopt and output rules.             |
-| `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.           |
-| `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository. |
+| File                      | What it does                                                               |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `runs.service.ts`         | Starts and runs a run; `run-recorder.ts` writes what it did and closes it. |
+| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`.                          |
+| `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                              |
+| `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                        |
+| `run-request.ts`          | The request schemas, including the adopt and output rules.                 |
+| `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.               |
+| `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository.     |
 
 A run opens as a `running` header with a heartbeat, records each model exchange as it goes, and
 closes in a single pessimistic-write transaction that inserts every criterion, iteration, finding and

@@ -14,22 +14,18 @@ import {
   type RunRecallDto,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
-import type { LlmClient, LlmExchange } from '@sysdesign/llm';
+import type { LlmClient } from '@sysdesign/llm';
 import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
-import {
-  summariseExchange,
-  toRunDto,
-  type RunProgress,
-  type RunRecord,
-} from '../../core/contracts';
+import { toRunDto, type RunRecord } from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
 import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
 import type { AdvisoryMemory, RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { orNotFound } from '../http/or-not-found';
-import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
+import { RunRecorder } from './run-recorder';
+import type { RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import {
   briefingOf,
@@ -338,116 +334,59 @@ export class RunsService {
     definition: PipelineDefinition<unknown>,
     adoption: Adoption | undefined,
   ): Promise<void> {
-    // The row is alive while this process says so: a model call can run for
-    // minutes with no exchange to record, so the heartbeat ticks on its own.
-    // The record keeps the same beat, so what an in-memory reader is handed
-    // says the same as the row.
-    const beat = () => {
-      record.heartbeatAt = new Date().toISOString();
-    };
-    const ticker = heartbeatTicker(
-      () => {
-        beat();
-        return this.repository.heartbeat(record.runId);
+    const recorder = new RunRecorder(
+      record,
+      {
+        repository: this.repository,
+        recalls: this.recalls,
+        traces: this.traces,
+        logger: this.logger,
       },
       this.janitor.staleAfterMs,
-      (error) => this.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
     );
-    // Live writes are chained, never awaited by the loop: order is kept, a
-    // slow database never stalls a model call, and a failed write is logged.
-    let writes: Promise<void> = Promise.resolve();
-    const write = (what: string, task: () => Promise<void>) => {
-      beat();
-      writes = writes
-        .then(task)
-        .catch((error: unknown) =>
-          this.logger.warn(`run ${record.runId}: ${what} not recorded: ${String(error)}`),
-        );
-    };
-    const sink = (exchange: LlmExchange) => {
-      record.exchanges.push(exchange);
-      const summaries = record.exchanges.map(summariseExchange);
-      write('exchange', () => this.repository.recordExchange(record.runId, summaries));
-    };
-    // Each finished iteration is published as it lands — an adopted one at
-    // once — so a reader sees the run's progress, not only its end. The
-    // record holds it too: an orchestration reading this run in memory sees
-    // what the row says, and a run that throws later still dumps the
-    // iterations it recorded, with their standing and no stop reason.
-    const onIteration = (progress: RunProgress) => {
-      record.trace = progress;
-      write('progress', () => this.repository.recordProgress(record.runId, progress));
-    };
-    // Each move of the recall is published the same way, before any stage runs.
-    const onRecall = (recall: RunRecallDto) => {
-      record.recall = recall;
-      write('recall', () => this.recalls.recordRecall(record.runId, recall));
-    };
     try {
-      // A run that adopted a judged iteration recalls for what is wrong with
-      // it, and screens out what its producer already holds of it.
-      const base: RecallBase | undefined =
-        adoption !== undefined && request.adopt !== undefined
-          ? {
-              runId: request.adopt.runId,
-              pipeline: definition.id,
-              iteration: adoption.iteration,
-              criteria: request.criteria ?? [],
-              adoptedFrom: adoption.adoptedFrom,
-            }
-          : undefined;
-      const memories = await this.recallLessons(record, onRecall, base);
-      record.trace = await runPipeline(
-        definition,
-        {
-          goal: request.goal,
-          output: request.output,
-          maxIterations: request.maxIterations,
-          criteria: request.criteria,
-          adopted: adoption?.iteration,
-          memories,
-        },
-        { llm: this.llm, sink, now: Date.now, onIteration },
+      const memories = await this.recallLessons(
+        record,
+        recorder.onRecall,
+        recallBaseOf(request, definition, adoption),
       );
-      record.status = 'complete';
+      recorder.complete(
+        await runPipeline(
+          definition,
+          {
+            goal: request.goal,
+            output: request.output,
+            maxIterations: request.maxIterations,
+            criteria: request.criteria,
+            adopted: adoption?.iteration,
+            memories,
+          },
+          { llm: this.llm, sink: recorder.sink, now: Date.now, onIteration: recorder.onIteration },
+        ),
+      );
     } catch (error) {
-      record.error = describeError(error);
-      record.status = 'failed';
-      this.logger.error(`run ${record.runId} failed: ${record.error.message}`);
+      recorder.fail(error);
     } finally {
-      ticker.stop();
-      record.finishedAt = new Date().toISOString();
-      record.heartbeatAt = record.finishedAt;
-      this.traces.save(record, describePipeline(definition));
-      await writes;
-      try {
-        const outcome = await this.repository.close(record);
-        if (outcome === 'reclaimed') {
-          this.logger.warn(
-            `run ${record.runId}: the janitor had failed this row as interrupted; overwrote it with the true outcome`,
-          );
-        } else if (outcome === 'refused') {
-          this.logger.error(`run ${record.runId}: not persisted: the row is already terminal`);
-        }
-      } catch (error) {
-        this.logger.error(`run ${record.runId}: not persisted: ${String(error)}`);
-      }
+      await recorder.close(describePipeline(definition));
     }
   }
 }
 
 /**
- * An unref'd interval that refreshes a running row's heartbeat at the loop's
- * one cadence (`heartbeatEveryMs`, a few beats per stale threshold), so a
- * long model call never lets the janitor mistake a live run for a dead one.
- * Never awaited; a failed write is only logged.
+ * A run that adopted a judged iteration recalls for what is wrong with it,
+ * and screens out what its producer already holds of it.
  */
-export function heartbeatTicker(
-  beat: () => Promise<void>,
-  staleAfterMs: number,
-  warn: (error: unknown) => void,
-): { stop(): void } {
-  const timer = setInterval(() => void beat().catch(warn), heartbeatEveryMs(staleAfterMs));
-  timer.unref();
-  return { stop: () => clearInterval(timer) };
-}
+const recallBaseOf = (
+  request: StartQualityRunRequest,
+  definition: PipelineDefinition<unknown>,
+  adoption: Adoption | undefined,
+): RecallBase | undefined =>
+  adoption !== undefined && request.adopt !== undefined
+    ? {
+        runId: request.adopt.runId,
+        pipeline: definition.id,
+        iteration: adoption.iteration,
+        criteria: request.criteria ?? [],
+        adoptedFrom: adoption.adoptedFrom,
+      }
+    : undefined;
