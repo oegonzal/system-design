@@ -6,11 +6,15 @@ Apply, through LinkedIn's Easy Apply, to software engineering roles that can be 
 
 One application: from opening a job listing to the confirmation that the application was sent, or the point at which the listing is set aside. taskStart fires when a listing is opened; taskDone fires when the application is submitted, found already sent, or abandoned.
 
+## Marks
+
+- "Applied ·": applied to before — the card is passed over, unopened, with no unit.
+
 ## Per-unit procedure
 
 1. Open the jobs search at https://www.linkedin.com/jobs/search-results/ and search for `software engineer remote easy apply`; wait for the list of results.
-2. Each result in the list is one card: a button whose long name is the card's whole text and ends in "Easy Apply" whether or not it was applied to — no card is the Easy Apply button. Pressing a card opens the listing in the pane beside the list. A card whose name says "Applied" just before "Posted" was applied to before: pass it over, unopened, with no unit. Open the first card whose name has no "Applied" and is not the title and company of a unit listed under Units of work; say in the assessment which card that is and why.
-3. On the step after the click, when the pane shows the listing, open the unit with taskStart. The Easy Apply button is the short button in the pane named "Easy Apply to this job". When the pane has no such button: if it reports the application's status, the application was sent before — taskDone `already-done`; if it offers only an apply button that is not Easy Apply — taskDone `skipped`. Either way, in the same plan, open the next card by step 2.
+2. Each result in the list is one card: a button whose long name is the card's whole text and ends in "Easy Apply" whether or not it was applied to — no card is the Easy Apply button. Pressing a card opens the listing in the pane beside the list. A card marked "Applied ·" (the Marks above; the Elements list says `marked` on it) was applied to before and is passed over. Open the first card that is not marked and is not the title and company of a unit listed under Units of work; say in the assessment which card that is and why.
+3. On the step after the click, when the pane shows the listing, open the unit with taskStart. The Easy Apply button is the short button in the pane named "Easy Apply to this job" (its visible text reads "Easy Apply"). When the pane has no such button: if it reports the application's status, the application was sent before — taskDone `already-done`; if it offers only an apply button that is not Easy Apply — taskDone `skipped`. Either way, in the same plan, open the next card by step 2.
 4. Press the "Easy Apply to this job" button in the pane and wait for the application form.
 5. On each page of the form, advance: press Next, Review or Submit application, whichever the page offers. Before pressing, ask with askFields for any required field that is still empty and for any field the page has marked invalid; a field that already holds a value is left as it is.
 6. If the page refuses to advance, ask for the fields it marks and press again.

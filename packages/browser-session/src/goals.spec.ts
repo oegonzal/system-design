@@ -5,6 +5,7 @@ import {
   composeStepGoal,
   emptyLedger,
   formObservation,
+  marksOf,
   TASK_OUTCOMES,
   TERMINATE_CAUSES,
 } from '@sysdesign/contracts';
@@ -68,6 +69,8 @@ describe('the goals', () => {
       expect(causes.length).toBeGreaterThan(0);
       for (const cause of causes) expect(TERMINATE_CAUSES).toContain(cause);
       expect(causes).toContain('mission-complete');
+      // A Marks section, when a goal has one, reads whole: a mark nobody reads is a trap.
+      expect(() => marksOf(text)).not.toThrow();
       const events = text.slice(text.indexOf('## Task events'));
       const outcomes = [...events.matchAll(/`([a-z-]+)`/g)].map((match) => match[1]);
       const spoken = outcomes.filter((word) => (TASK_OUTCOMES as readonly string[]).includes(word));

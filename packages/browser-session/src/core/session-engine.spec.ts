@@ -178,7 +178,7 @@ describe('the session engine', () => {
           expect: null,
           serves: ['c3'],
         },
-        { kind: 'click', ref: 'e1', reason: 'open the next listing', expect: null, serves: [] },
+        // A taskStart claims the page as observed, so it comes before the click, never after.
         {
           kind: 'taskStart',
           label: 'Staff Engineer at Globex',
@@ -187,6 +187,7 @@ describe('the session engine', () => {
           expect: null,
           serves: [],
         },
+        { kind: 'click', ref: 'e1', reason: 'open the next listing', expect: null, serves: [] },
       ],
     };
     const { brain } = await run({

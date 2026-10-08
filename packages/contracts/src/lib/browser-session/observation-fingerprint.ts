@@ -44,6 +44,10 @@ export function observationFingerprint(observation: PageObservation): string {
     ]),
     omittedElements: observation.omittedElements,
     unread: observation.unread,
-    snapshot: nodesOnly(observation.ariaSnapshot.replace(/\[ref=[^\]]*\]/g, '')),
+    // The ref goes with the space before it: a token left behind as a double
+    // space fails the node-line grammar, and the line leaves the identity.
+    // Measured 2026-10-07: 117 of 1006 lines — every one carrying another
+    // attribute, `[cursor=pointer]` or `[active]` — were silently dropped.
+    snapshot: nodesOnly(observation.ariaSnapshot.replace(/ \[ref=[^\]]*\]/g, '')),
   });
 }

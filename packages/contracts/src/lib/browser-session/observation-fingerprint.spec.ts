@@ -106,4 +106,21 @@ describe('observationFingerprint', () => {
     expect(observationFingerprint(blank)).toBe(observationFingerprint({ ...blank }));
     expect(observationFingerprint(blank)).not.toBe(observationFingerprint(listingObservation()));
   });
+
+  it('[BRW-4] keeps every snapshot node in the identity, the ones carrying another attribute after the ref included', () => {
+    // Measured 2026-10-07: stripping `[ref=…]` left a double space before
+    // `[cursor=pointer]`, the node-line grammar refused the line, and 117 of
+    // 1006 lines — every clickable node — left the identity unseen.
+    const first = listingObservation();
+    const clickable = {
+      ...first,
+      ariaSnapshot: `${first.ariaSnapshot}\n  - button "Next page" [ref=e9] [cursor=pointer]`,
+    };
+    const renamed = {
+      ...clickable,
+      ariaSnapshot: clickable.ariaSnapshot.replace('Next page', 'Last page'),
+    };
+    expect(observationFingerprint(clickable)).not.toBe(observationFingerprint(first));
+    expect(observationFingerprint(renamed)).not.toBe(observationFingerprint(clickable));
+  });
 });

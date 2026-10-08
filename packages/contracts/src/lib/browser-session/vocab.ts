@@ -284,7 +284,10 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
  * (`PAGE_REPLACING_WAITS`), and a wait for a listed element is a wait on
  * this page. A `taskDone` claims the page and ends nothing: closing a unit of
  * work is bookkeeping on the session's own ledger, so the next unit's click and
- * taskStart may follow it in the same plan. Measured 2026-10-05 and 2026-10-06 on
+ * taskStart may follow it in the same plan. A `taskStart` claims the page too: its label and
+ * URL are read off the page as observed, so after an action that could change the page it
+ * names an item nobody has observed (measured 2026-10-07: a unit opened for one listing with the
+ * URL of the listing beside it, clicked in the same plan). Measured 2026-10-05 and 2026-10-06 on
  * two providers: both reached for `taskDone, terminate` as one thought and were
  * refused, three times each, until the failure rail ended the session; and
  * 2026-10-07: a plan that closed an already-applied listing and moved on was
@@ -314,7 +317,7 @@ export const ACTION_EFFECTS = {
   waitFor: effects(false, 'none'),
   screenshot: effects(false, 'none'),
   askFields: effects(true, 'may-change'),
-  taskStart: effects(false, 'none'),
+  taskStart: effects(false, 'none', true),
   taskDone: effects(false, 'none', true),
   terminate: effects(false, 'none', true, true),
   done: effects(false, 'none', false, true),

@@ -92,6 +92,7 @@ describe('the browser-step input codec', () => {
         options: element.options,
         optionsOmitted: 0,
         hiddenTraits: element.hiddenTraits,
+        marks: [],
       })),
       pageShowsContent: true,
     });

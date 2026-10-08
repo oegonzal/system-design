@@ -131,6 +131,19 @@ function elementFaults(
         `${ref} is hidden (${element.hiddenTraits.join(', ')}); an element the page hides is never touched`,
       );
     }
+    // The mission's word on the item, declared as data and written into the
+    // index: an element carrying a mark is passed over. Measured 2026-10-07,
+    // twice live: a planner told in prose to pass over a card whose name
+    // carried the word clicked that card fifteen times in one session.
+    if (
+      (action.kind === 'fill' || action.kind === 'select' || action.kind === 'click') &&
+      element.marks.length > 0
+    ) {
+      fault(
+        'high',
+        `${ref} is marked ${element.marks.map(quote).join(' and ')}: the mission passes such an item over, so it is never touched`,
+      );
+    }
     if (action.kind === 'fill' && element.kind !== 'fillable') {
       fault('high', `${ref} cannot be typed into (${element.kind})`);
     }

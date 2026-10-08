@@ -2,6 +2,7 @@ import {
   dialogObservation,
   formObservation,
   listingObservation,
+  MISSION_FIXTURE,
   openTaskLedger,
   type StepAction,
   type StepPlan,
@@ -138,6 +139,42 @@ describe('the browser-step validators', () => {
     ]);
     // Asking about it is not an interaction with it: the field-answer pipeline leaves it blank.
     expect(problems(samplePlan([askFields(['e3'])]), form).limits).toEqual([]);
+  });
+
+  it('[QL-36] an element carrying a word the mission declares as a mark is passed over: clicking, filling or selecting it is refused at that action', () => {
+    // Measured 2026-10-07, twice live: told in prose to pass over a card whose
+    // name carried "Applied", the planner clicked that card fifteen times in
+    // one session, and the judges agreed with it. The mark is data the index
+    // carries, and the rule needs no reading of prose.
+    const marked = stepGoal(
+      listingObservation(),
+      undefined,
+      `${MISSION_FIXTURE}\n\n## Marks\n\n- "Globex": not this one.\n`,
+    );
+    expect(marked).toContain('marked "Globex"');
+    expect(problems(samplePlan([click('e4')]), marked).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'e4 is marked "Globex": the mission passes such an item over, so it is never touched',
+      },
+    ]);
+    // An unmarked element on the same page is untouched by the rule; a mission without Marks marks nothing.
+    expect(problems(samplePlan([click('e3')]), marked).limits).toEqual([]);
+    expect(problems(samplePlan([click('e4')])).limits).toEqual([]);
+  });
+
+  it('[QL-36] a taskStart claims the page too: after an action that could change it, the unit it would open names an item nobody has observed', () => {
+    // Measured 2026-10-07: `click card, taskStart` in one plan opened a unit
+    // for one listing with the URL of the listing beside it.
+    const open = stepGoal(listingObservation(), openTaskLedger());
+    expect(
+      problems(samplePlan([click('e3'), taskStart()]), open).limits.map((p) => p.message),
+    ).toEqual([
+      'taskStart follows the click at action.1: it claims what the page shows, and that page has not been observed',
+    ]);
+    expect(problems(samplePlan([taskStart(), click('e3')]), open).limits).toEqual([]);
   });
 
   it('[QL-36] a disabled element binds only what touches it, and not after the fields are answered', () => {
@@ -293,7 +330,7 @@ describe('the browser-step validators', () => {
     expect(problems(samplePlan([taskDone(), terminate()]), open).limits).toEqual([]);
     expect(problems(samplePlan([taskDone(), done()]), open).limits).toEqual([]);
     expect(problems(samplePlan([taskDone(), click('e3')]), open).limits).toEqual([]);
-    expect(problems(samplePlan([taskDone(), click('e3'), taskStart()]), open).limits).toEqual([]);
+    expect(problems(samplePlan([taskDone(), taskStart(), click('e3')]), open).limits).toEqual([]);
 
     // The claim still rests on the page as observed: a taskDone after an action
     // that could change the page is refused by the stale-claim rule.

@@ -7,6 +7,7 @@
  */
 import { z } from 'zod';
 
+import { bounded } from '../bounds';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import {
   GOAL_BUDGET_BYTES,
@@ -25,6 +26,7 @@ import {
   type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
+import { MARK_TOKEN_MAX_LENGTH, marksOf, marksOn, type Mark } from './mission-marks';
 import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
 import { ACTIONS_BOUND } from './step-plan.schema';
 import { ELEMENT_KINDS, HIDDEN_TRAITS, TASK_OUTCOME_SPENDS, TASK_OUTCOMES } from './vocab';
@@ -87,6 +89,8 @@ export const stepIndexSchema = z.strictObject({
       /** Options the page offers past the listed ones; a select is held to the list only when this is zero. */
       optionsOmitted: z.number().int().min(0).default(0),
       hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)),
+      /** The mission's marks this element carries, by token; a marked element is passed over, never touched. */
+      marks: z.array(bounded.id(MARK_TOKEN_MAX_LENGTH, { min: 1 })).default([]),
     }),
   ),
   /**
@@ -120,7 +124,7 @@ const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'
 };
 
 /** One element as the model reads it: ref, role, name, then only the facts that are true of it. */
-export function renderElementLine(element: ObservedElement): string {
+export function renderElementLine(element: ObservedElement, marks: readonly Mark[] = []): string {
   const parts = [element.ref, element.role, quote(element.name)];
   // What a person reads on an element the tree gave no name, beside whatever stood in for one.
   if (element.text !== null && element.text !== '') parts.push(`text ${quote(element.text)}`);
@@ -132,6 +136,8 @@ export function renderElementLine(element: ObservedElement): string {
   if (element.disabled) parts.push('disabled');
   if (!element.visible) parts.push('not visible');
   if (element.hiddenTraits.length > 0) parts.push(`hidden: ${element.hiddenTraits.join(', ')}`);
+  // The mission's word on the item, beside the item: what a long name buries, said once more where it counts.
+  for (const mark of marksOn(element, marks)) parts.push(`marked ${quote(mark.token)}`);
   if (element.context !== null && element.context !== '')
     parts.push(`context ${quote(element.context)}`);
   return `- ${parts.join(' · ')}`;
@@ -177,7 +183,7 @@ const objectionLines = (objections: readonly StepObjection[]): string[] => {
  * at. Measured 2026-10-07: a form page reached the model as 150 lines, 67 of
  * them hidden, with the open dialog's five fields among them unmarked.
  */
-function elementLines(observation: PageObservation): string[] {
+function elementLines(observation: PageObservation, marks: readonly Mark[]): string[] {
   const { elements, activeScope } = observation;
   if (elements.length === 0) return ['(no interactive elements)'];
   const reachable = elements.filter((element) => element.visible && inScope(element, activeScope));
@@ -189,7 +195,7 @@ function elementLines(observation: PageObservation): string[] {
           `Inside the open ${activeScope.role} ${quote(activeScope.name)} — the rest of the page waits behind it:`,
         ]),
     ...(reachable.length > 0
-      ? reachable.map(renderElementLine)
+      ? reachable.map((element) => renderElementLine(element, marks))
       : ['(no reachable interactive elements)']),
     ...(unlisted > 0
       ? [
@@ -259,7 +265,10 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   }`,
 ];
 
-const indexOf = (input: StepGoalInput): z.input<typeof stepIndexSchema> => ({
+const indexOf = (
+  input: StepGoalInput,
+  marks: readonly Mark[],
+): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
   elements: input.observation.elements.map((element) => ({
@@ -271,6 +280,9 @@ const indexOf = (input: StepGoalInput): z.input<typeof stepIndexSchema> => ({
     options: element.options === null ? null : shownOptions(element).shown,
     ...(shownOptions(element).more > 0 ? { optionsOmitted: shownOptions(element).more } : {}),
     hiddenTraits: element.hiddenTraits,
+    ...(marksOn(element, marks).length > 0
+      ? { marks: marksOn(element, marks).map((mark) => mark.token) }
+      : {}),
   })),
   pageShowsContent:
     input.observation.elements.length > 0 ||
@@ -280,6 +292,7 @@ const indexOf = (input: StepGoalInput): z.input<typeof stepIndexSchema> => ({
 /** The goal, or a refusal when it would not fit the engine's budget. */
 export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES): string {
   const { observation } = input;
+  const marks = marksOf(input.mission);
   const goal = [
     '# Mission',
     '',
@@ -295,7 +308,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     '',
     '## Elements',
     '',
-    ...elementLines(observation),
+    ...elementLines(observation, marks),
     ...(observation.omittedElements > 0
       ? [`(${observation.omittedElements} more interactive elements not listed)`]
       : []),
@@ -356,12 +369,17 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     // A claim rests on the page as observed. Measured 2026-10-07: twelve plans
     // closed their unit or ended the session past a click or a key press in
     // the same plan, one of them `done` after Next on page 1 of 9 of a form.
-    '- A taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
+    '- A taskStart, taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
+    ...(marks.length === 0
+      ? []
+      : [
+          `- An element marked ${marks.map((mark) => quote(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
+        ]),
     '- Validators check these limits; they are not criteria.',
     '',
     '## Index',
     '',
-    renderFencedIndex(indexOf(input)),
+    renderFencedIndex(indexOf(input, marks)),
   ].join('\n');
   return withinBudget(goal, budget);
 }

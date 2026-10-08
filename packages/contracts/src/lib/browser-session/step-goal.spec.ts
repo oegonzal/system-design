@@ -22,6 +22,7 @@ import {
   CLOSED_TASKS_BOUND,
   TASK_LABEL_BOUND,
 } from './observation.schema';
+import { MissionMarkMalformed } from './mission-marks';
 import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
 import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
 import { STEP_ACTION_KINDS } from './vocab';
@@ -390,11 +391,60 @@ describe('stepPlanSchema', () => {
     expect(recent).not.toMatch(/^- terminate limit-reached/m);
   });
 
+  it('[BRW-8] renders a mark the mission declares beside every element that carries it, writes it into the index, and says the rule in the Limits', () => {
+    // Measured 2026-10-07: a card name of 200 characters buried the one word
+    // that said the listing was applied to; told in prose, the planner read
+    // the words around it and clicked the card fifteen times.
+    const marked = `${MISSION_FIXTURE}\n\n## Marks\n\n- "Globex": not this one.\n- "Acme": the house account.\n`;
+    const goal = composeStepGoal({
+      mission: marked,
+      observation: listingObservation(),
+      history: [],
+      ledger: emptyLedger(),
+      objections: [],
+      progress: { criteria: [], settled: [], done: [] },
+      pageUnchanged: false,
+    });
+    expect(goal).toMatch(/^- e4 · link · "Staff Engineer — Globex" · marked "Globex"$/m);
+    expect(goal).toMatch(/^- e3 · link · "Senior Engineer — Acme" · marked "Acme"$/m);
+    expect(goal).toContain(
+      '- An element marked "Globex" or "Acme" carries a word the mission\'s Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.',
+    );
+    const index = readStepIndex(goal);
+    expect(index?.elements.map((element) => [element.ref, element.marks])).toEqual([
+      ['e1', []],
+      ['e2', []],
+      ['e3', ['Acme']],
+      ['e4', ['Globex']],
+      ['e5', []],
+      ['e6', []],
+    ]);
+    // A mission without Marks marks nothing and says nothing about marks.
+    const plain = goalOf(listingObservation());
+    expect(plain).not.toContain('marked "');
+    expect(plain).not.toContain('Marks declare');
+    expect(readStepIndex(plain)?.elements.every((element) => element.marks.length === 0)).toBe(
+      true,
+    );
+    // A Marks line the grammar does not read refuses the goal before any page is planned against it.
+    expect(() =>
+      composeStepGoal({
+        mission: `${MISSION_FIXTURE}\n\n## Marks\n\n- Globex without quotes\n`,
+        observation: listingObservation(),
+        history: [],
+        ledger: emptyLedger(),
+        objections: [],
+        progress: { criteria: [], settled: [], done: [] },
+        pageUnchanged: false,
+      }),
+    ).toThrow(MissionMarkMalformed);
+  });
+
   it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {
     const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
     for (const rule of [
       'exactly as the Elements list gives it',
-      'A terminate or done action is last and appears nowhere else; a taskDone comes before any action that could change the page.',
+      'A terminate or done action is last and appears nowhere else; a taskStart or taskDone comes before any action that could change the page.',
       'One of the options the Elements list gives for this ref, verbatim.',
     ]) {
       expect(json, `the model is never told: ${rule}`).toContain(rule);
