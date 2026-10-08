@@ -18,7 +18,11 @@ import type { SessionRailsDto } from '@sysdesign/contracts';
 export const SESSION_FLAGS = {
   goal: { name: '--goal', valued: true, help: 'the mission, a markdown file' },
   profile: { name: '--profile', valued: true, help: 'a persistent Chrome profile, by name' },
-  url: { name: '--url', valued: true, help: 'where to open the profile for signing in' },
+  url: {
+    name: '--url',
+    valued: true,
+    help: 'where to open the browser: the sign-in page for login, the start page for run',
+  },
   headed: { name: '--headed', valued: false, help: 'show the browser (the default)' },
   headless: { name: '--headless', valued: false, help: 'run without a window' },
   maxTasks: {

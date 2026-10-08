@@ -42,6 +42,8 @@ export interface RunSessionOptions {
   rails: SessionRailsDto;
   /** Whom the operator's answers are about, by name. */
   subject: string;
+  /** Where to open the browser before the first plan; unset leaves it on about:blank. */
+  startUrl?: string;
 }
 
 /** The rubric derived once per session, by the role each pipeline plays. */

@@ -420,4 +420,24 @@ describe('the session engine', () => {
     });
     expect(dumps.index).toHaveLength(1);
   });
+
+  it('[BRW-1] opens at the start url before the first plan, so the loop never plans on about:blank', async () => {
+    const { browser } = await run({
+      script: { plans: [decidedPlan(PLANS.end)] },
+      startUrl: 'https://start.test/jobs',
+    });
+    const navigate = browser.calls.indexOf('navigate https://start.test/jobs');
+    const firstObserve = browser.calls.findIndex((call) => call.startsWith('observe'));
+    expect(navigate).toBeGreaterThanOrEqual(0);
+    expect(navigate).toBeLessThan(firstObserve);
+    // Engine setup, not a planned step: no decision row for it.
+    expect(browser.calls[0]).toBe('open spec headless');
+    expect(browser.calls[1]).toBe('navigate https://start.test/jobs');
+  });
+
+  it('[BRW-1] without a start url, opens straight onto the first observation', async () => {
+    const { browser } = await run({ script: { plans: [decidedPlan(PLANS.end)] } });
+    expect(browser.calls[0]).toBe('open spec headless');
+    expect(browser.calls[1]?.startsWith('observe')).toBe(true);
+  });
 });

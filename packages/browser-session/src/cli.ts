@@ -33,7 +33,7 @@ import { renderOutcome, renderSession, renderSessions } from './render';
 const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
-  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('headed')}|${flag('headless')}] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
+  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
             every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
@@ -58,6 +58,8 @@ export type Options =
       rails: SessionRailsDto;
       /** Unset means the configured subject; the service applies that default. */
       subject: string | undefined;
+      /** Where to open the browser before the first plan; unset leaves it on about:blank. */
+      startUrl: string | undefined;
     }
   | { command: 'login'; profile: string; url: string }
   | { command: 'sessions'; limit: number; json: boolean }
@@ -123,6 +125,7 @@ export function parseOptions(argv: readonly string[]): Options | Error {
             maxStalledSteps: text('maxStalledSteps'),
           }),
           subject: text('subject'),
+          startUrl: text('url'),
         };
       case 'login':
         return {

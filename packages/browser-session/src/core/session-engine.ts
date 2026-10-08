@@ -81,6 +81,20 @@ export async function runSession(
       }),
     );
     await deps.browser.open(options.profile, { headed: options.headed });
+    // Open where the work begins, so the loop never plans on about:blank — the
+    // one reliably contentless page, where the judges read "no listings" as a
+    // limit and gate the navigate that would leave it. Engine setup, not a
+    // planned step: no decision row.
+    if (options.startUrl !== undefined) {
+      deps.log(`session ${state.sessionId}: opening at ${options.startUrl}`);
+      await deps.browser.act({
+        kind: 'navigate',
+        url: options.startUrl,
+        reason: 'open at the start url',
+        expect: null,
+        serves: [],
+      });
+    }
     for (;;) {
       const decidedEnd = await step(ctx);
       if (decidedEnd !== null) {

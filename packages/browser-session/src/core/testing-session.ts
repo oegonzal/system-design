@@ -38,6 +38,7 @@ export interface Scenario {
   clock?: FixedClock;
   browser?: FakeBrowser;
   ledger?: InMemoryLedger;
+  startUrl?: string;
 }
 
 export async function runScripted(scenario: Scenario) {
@@ -65,6 +66,7 @@ export async function runScripted(scenario: Scenario) {
       headed: false,
       rails: { ...SPEC_RAILS, ...scenario.rails },
       subject: SPEC_SUBJECT,
+      startUrl: scenario.startUrl,
     },
   );
   const detail = await ledger.getSession(outcome.sessionId);

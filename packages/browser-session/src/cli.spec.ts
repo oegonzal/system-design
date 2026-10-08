@@ -46,7 +46,12 @@ describe('parseOptions', () => {
       headed: true,
       rails: DEFAULT_RAILS,
       subject: undefined,
+      startUrl: undefined,
     });
+    // `--url` on run is where the browser opens, so the loop never plans on about:blank.
+    expect(
+      parsed(['run', '--goal', 'g.md', '--profile', 'p', '--url', 'https://x.test/jobs']),
+    ).toMatchObject({ startUrl: 'https://x.test/jobs' });
     expect(
       parsed([
         'run',
