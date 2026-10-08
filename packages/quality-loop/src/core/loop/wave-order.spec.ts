@@ -1,10 +1,11 @@
 /**
  * The guard on every future change to how a wave is scheduled.
  *
- * Today a wave runs its lenses concurrently and each lens runs its own samples
- * one after another, so declaration order survives by accident of the loop
- * shape. These specs assert it as a property instead, because three things
- * downstream read array order rather than ids: `lensOrder` sorts the lenses on
+ * Today a wave runs every sample of every lens as an independent unit, at
+ * most `concurrency` in flight, and writes each result back into its own
+ * position, so declaration order is a property of the reassembly and not of
+ * the order the answers arrive in. These specs assert it as a property,
+ * because three things downstream read array order rather than ids: `lensOrder` sorts the lenses on
  * a confirmed finding, `annotate` picks a finding's rationale with a
  * first-match `find`, and that rationale rides a remediation into the next
  * iteration's producer prompt. Reassemble a wave by completion order and the

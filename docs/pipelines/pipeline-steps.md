@@ -37,7 +37,7 @@ The two rules that make it hang together:
 
 What that changed in practice: the verification run passed 6 criteria and marked 14 partial, where the same prompt under the flat fan-out passed 20 of 20. The evaluator that had passed determinism was now shown the confirmed contradiction against the same mechanism, and didn't.
 
-The other three pipelines declare consumes: [] everywhere and ['criteria'] on the producer — today's behaviour, now stated explicitly rather than implied by the engine.
+Five pipelines put their evaluators in the second wave with `consumes: ['findings']` — agentic-design, design-prompt, system-design-canvas, browser-step and field-answer — so the evaluator measures with the critics' confirmed defects before it. The three digest pipelines, memory-recall and system-design declare `consumes: []` on every lens, so their critics and evaluators judge the artifact side by side.
 
 Yes — one LLM call per run, before any iteration, with the model boxed in on every side.
 

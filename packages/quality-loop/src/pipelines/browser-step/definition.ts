@@ -131,7 +131,11 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       id: 'evaluator.plan',
       persona: evaluatorPlan,
       samples: 1,
-      consumes: [],
+      // After the critics, with their confirmed defects before it: critics
+      // diagnose, the evaluator measures. Measured 2026-10-08 over 31 steps:
+      // with every lens in one wave the evaluator read no finding, and it
+      // contradicted 38 gated findings it had never seen.
+      consumes: ['findings'],
       maxItems: MAX_CRITERIA,
       maxTokens: 20000,
       criterionKinds: ['progress', 'safety', 'grounding'],
