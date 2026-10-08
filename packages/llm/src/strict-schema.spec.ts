@@ -2,7 +2,7 @@ import { modelSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { strictJsonSchema, strictSchemaFaults } from './strict-schema';
+import { strictJsonSchema, strictSchemaFaults, withoutKeywords } from './strict-schema';
 
 const bounded = z.strictObject({
   answer: z.string().max(400),
@@ -88,5 +88,21 @@ describe('a schema a strict endpoint will accept', () => {
     const strict = strictJsonSchema({ oneOf: modelSchema(either).json['anyOf'] ?? [] });
     expect(strict['oneOf']).toBeUndefined();
     expect(Array.isArray(strict['anyOf'])).toBe(true);
+  });
+  it('[QL-62] leaves the declared keywords out at every depth — a nullable branch and a list item included — and nothing else; none asked, the schema itself', () => {
+    // Measured 2026-10-08: Ollama's grammar compiler refused the step plan's
+    // string length caps and took its ref pattern and list caps.
+    const json = strictJsonSchema(modelSchema(bounded).json);
+    const sent = withoutKeywords(json, ['minLength', 'maxLength']);
+    expect(JSON.stringify(sent)).not.toMatch(/"(minLength|maxLength)"/);
+    expect(JSON.stringify(sent)).toContain('"maxItems":6');
+    expect(JSON.stringify(json)).toContain('"maxLength":400');
+    expect(withoutKeywords(json, [])).toBe(json);
+    const nullable = strictJsonSchema(
+      modelSchema(
+        z.strictObject({ note: z.string().max(10).optional(), items: z.array(z.string().max(5)) }),
+      ).json,
+    );
+    expect(JSON.stringify(withoutKeywords(nullable, ['maxLength']))).not.toContain('maxLength');
   });
 });

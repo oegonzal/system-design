@@ -13,7 +13,7 @@ import {
   type LlmRetryPolicy,
 } from './llm-failure';
 import type { LlmApi } from './llm-config';
-import { strictJsonSchema } from './strict-schema';
+import { strictJsonSchema, withoutKeywords, type OmittableKeyword } from './strict-schema';
 import {
   FEEDBACK_HEADING,
   parseStructured,
@@ -181,6 +181,8 @@ export interface OpenAiCompatibleOptions {
   store?: boolean;
   /** Ask the endpoint to guarantee the schema. Off for a server that refuses the field. */
   strict?: boolean;
+  /** Keywords left out of the schema this endpoint is sent, because its grammar compiler refuses them; the reply is still held to them. */
+  omitKeywords?: readonly OmittableKeyword[];
   gate?: InFlightGate;
   retry?: LlmRetryPolicy;
   sleep?: (ms: number) => Promise<void>;
@@ -226,6 +228,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
   private readonly shape: ApiShape;
   private readonly store: boolean | undefined;
   private readonly strict: boolean;
+  private readonly omitKeywords: readonly OmittableKeyword[];
   private readonly gate: InFlightGate;
   private readonly retry: LlmRetryPolicy;
   private readonly pause: (ms: number) => Promise<void>;
@@ -241,6 +244,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
     this.shape = API_SHAPES[options.api ?? 'chat'];
     this.store = options.store;
     this.strict = options.strict ?? true;
+    this.omitKeywords = options.omitKeywords ?? [];
     this.gate = options.gate ?? new InFlightGate();
     this.retry = options.retry ?? DEFAULT_RETRY_POLICY;
     this.pause =
@@ -297,7 +301,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
     const maxTokens = request.maxTokens ?? DEFAULT_MAX_TOKENS;
     const startedAt = new Date().toISOString();
     const began = Date.now();
-    const strictSchema = strictJsonSchema(json);
+    const strictSchema = withoutKeywords(strictJsonSchema(json), this.omitKeywords);
     const ask = askWith(request.user, previous);
     /**
      * Every attempt is recorded in its own right, whichever way it ended —

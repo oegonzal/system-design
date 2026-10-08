@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OMITTABLE_KEYWORDS } from './strict-schema';
 
 import { chosenConfig, CONFIG_DIR, ENGINE_FILE, type ReadFile } from './engine-config';
 import { DEFAULT_GATE_POLICY } from './in-flight-gate';
@@ -61,6 +62,16 @@ export const llmConfigSchema = z.strictObject({
     .optional(),
   /** Whether the endpoint is asked to guarantee the schema. Off for a server that does not honour it. */
   strict: z.boolean().default(true),
+  /**
+   * JSON Schema keywords left out of the schema the endpoint is sent, for an
+   * endpoint that compiles the schema into a grammar and refuses some of them.
+   * A keyword left out is still enforced on the reply by the zod parse — a
+   * size leniently, as every size is. Measured 2026-10-08: Ollama 0.33.1
+   * answered 400 "failed to parse grammar" to the browser-step producer schema
+   * and to the same schema without `pattern` or `maxItems`; without
+   * `minLength`/`maxLength` it answered in 26 s. OpenAI takes every keyword.
+   */
+  omitKeywords: z.array(z.enum(OMITTABLE_KEYWORDS)).default([]),
   maxInFlight: z.number().int().min(1).default(DEFAULT_GATE_POLICY.ceiling),
   attempts: z.number().int().min(1).default(DEFAULT_RETRY_POLICY.attempts),
   timeoutAttempts: z.number().int().min(1).default(DEFAULT_RETRY_POLICY.timeoutAttempts),

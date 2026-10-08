@@ -56,6 +56,26 @@ const client = (send: HttpTransport, options = {}) =>
   });
 
 describe('an OpenAI-compatible provider', () => {
+  it('[QL-62] leaves the keywords its config says the endpoint cannot take out of the schema it sends, and still holds the reply to them', async () => {
+    // Measured 2026-10-08: Ollama 0.33.1 refused the step plan's string length
+    // caps as a grammar; left out, it answered, and the zod parse still reads
+    // a reply past the ceiling as the size fault it is.
+    const { send, sent } = scripted(replied('{"answer":"ok","score":1}'));
+    await client(send, { omitKeywords: ['maxLength'] }).completeStructured({
+      system: 's',
+      user: 'u',
+      schema,
+    });
+    const body = sent[0]?.body as {
+      response_format: { json_schema: { schema: Record<string, unknown> } };
+    };
+    expect(JSON.stringify(body.response_format.json_schema.schema)).not.toContain('maxLength');
+    // The default sends every keyword.
+    const { send: full, sent: fullSent } = scripted(replied('{"answer":"ok","score":1}'));
+    await client(full).completeStructured({ system: 's', user: 'u', schema });
+    expect(JSON.stringify(fullSent[0]?.body)).toContain('"maxLength":40');
+  });
+
   it('[QL-62] asks for the schema by the endpoint’s own field, in strict mode, and returns the validated object', async () => {
     const { send, sent } = scripted(replied('{"answer":"ok","score":7}'));
     const value = await client(send).completeStructured({

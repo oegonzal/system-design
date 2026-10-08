@@ -28,7 +28,38 @@ import { walkJsonSchema } from '@sysdesign/contracts';
  * well-formed and wrong, and the zod parse refused it a step later. So this
  * sends the schema as it is, and converts the one construct that is genuinely
  * refused.
+ *
+ * Measured again 2026-10-08, on Ollama 0.33.1 with the browser-step producer
+ * schema: the grammar compiler refused the schema outright — 400, *"Failed to
+ * initialize samplers: failed to parse grammar"* — and accepted it once
+ * `minLength`/`maxLength` were left out; `pattern` and `maxItems` were not
+ * the cause. Which keywords an endpoint cannot take is a fact about the
+ * endpoint, declared in its config as `omitKeywords`; `withoutKeywords`
+ * applies it, and the zod parse still enforces every one of them on the reply.
  */
+
+/** The keywords an endpoint's grammar compiler may refuse; each is still enforced on the reply by the zod parse. */
+export const OMITTABLE_KEYWORDS = [
+  'minLength',
+  'maxLength',
+  'minItems',
+  'maxItems',
+  'pattern',
+] as const;
+export type OmittableKeyword = (typeof OMITTABLE_KEYWORDS)[number];
+
+/** The schema without the given keywords at every node — a deep copy, the caller's schema untouched; the schema itself when there are none. */
+export function withoutKeywords(
+  schema: Record<string, unknown>,
+  keywords: readonly OmittableKeyword[],
+): Record<string, unknown> {
+  if (keywords.length === 0) return schema;
+  const copy = structuredClone(schema) as Record<string, unknown>;
+  walkJsonSchema(copy, '', (node) => {
+    for (const keyword of keywords) delete node[keyword];
+  });
+  return copy;
+}
 
 /** What the subset takes instead of `oneOf`; for a closed set of variants the two say the same thing. */
 export const UNION_KEYWORD = 'anyOf';
