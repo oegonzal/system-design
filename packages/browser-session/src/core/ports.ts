@@ -14,6 +14,7 @@ import type {
   FieldSpec,
   PageObservation,
   QualityRunDto,
+  RanAction,
   SessionRailsDto,
   SnapshotRung,
   StepAction,
@@ -153,6 +154,8 @@ export interface StepInput {
    * and a navigate away.
    */
   nothingRan: boolean;
+  /** What the last plan ran, as the page would recognise it again: said in the goal on an unchanged page, where a repeat of it is cut. */
+  lastRan: readonly RanAction[];
   /** The criteria settled for the session, which the run's rubric omits, and those done in the open unit, which it keeps. */
   progress: { settled: readonly string[]; done: readonly string[] };
 }

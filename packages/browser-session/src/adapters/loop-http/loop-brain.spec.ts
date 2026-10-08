@@ -57,6 +57,7 @@ const stepInput = (
   criteria: CRITERIA,
   pageUnchanged,
   nothingRan,
+  lastRan: [],
   progress: { settled: [], done: [] },
 });
 

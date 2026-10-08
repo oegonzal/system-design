@@ -205,6 +205,29 @@ describe('the session engine', () => {
     expect(brain.planInputs[2]?.ledger.counts['already-done']).toBe(1);
   });
 
+  it('[BRW-1] tells the next plan what ran as the page would recognise it again: by role and name, with what it carried', async () => {
+    // Measured 2026-10-08: nine of 31 steps were one click on one already-selected
+    // card, repeated — a repeat the next goal can only cut if it knows what ran.
+    const { brain } = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.done, PLANS.end].map((p) =>
+          decidedPlan(p),
+        ),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      replies: [{ kind: 'answer', text: 'Yes' }],
+    });
+    expect(brain.planInputs[0]?.lastRan).toEqual([]);
+    expect(brain.planInputs[1]?.lastRan).toEqual([
+      { kind: 'fill', role: 'searchbox', name: 'Search', detail: 'software engineer' },
+      { kind: 'click', role: 'button', name: 'Search', detail: null },
+    ]);
+    // A unit event or a wait has no identity to repeat; the click that opened the listing does.
+    expect(brain.planInputs[2]?.lastRan).toEqual([
+      { kind: 'click', role: 'link', name: 'Senior Engineer — Acme', detail: null },
+    ]);
+  });
+
   it('[BRW-1] [QL-36] runs a handed-back plan up to the action a cutting validator pointed at, and tells the next plan what was cut and why', async () => {
     // Measured 2026-10-07: six plans in a row were voided whole for a ref at
     // action.2 or action.3 while action.1 was never faulted, and the session

@@ -126,6 +126,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
       criteria: ctx.criteria.plan,
       pageUnchanged: state.pageUnchanged,
       nothingRan: state.step > 1 && state.lastRan === 0,
+      lastRan: state.ranActions,
       progress: progressOf(state),
     });
   } catch (error) {
@@ -149,6 +150,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     ]);
     pushHistory(state, 'plan', 'failed', `brain ${error.reason}: ${error.message}`);
     state.lastRan = 0;
+    state.ranActions = [];
     deps.warn(`step ${state.step}: no plan — ${error.message}`);
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }
@@ -201,6 +203,7 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     // and why it did not run is an objection, carried once.
     pushHistory(state, describeRefusedPlan(readout.plan), 'not-executed', null);
     state.lastRan = 0;
+    state.ranActions = [];
     ctx.fail('plan-not-executed');
     return checkRails(railStateOf(state), options.rails, deps.clock.now());
   }

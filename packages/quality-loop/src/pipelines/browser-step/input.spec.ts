@@ -73,6 +73,7 @@ describe('the browser-step input codec', () => {
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged: false,
+      lastRan: [],
     });
     expect(goal).toContain(MISSION_FIXTURE.trim());
     // A field the page hides is counted, not listed — and still in the index, so a plan that touches it is refused.
@@ -95,6 +96,8 @@ describe('the browser-step input codec', () => {
         marks: [],
       })),
       pageShowsContent: true,
+      pageUnchanged: false,
+      lastRan: [],
     });
   });
 
@@ -118,6 +121,7 @@ describe('the browser-step input codec', () => {
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged: false,
+      lastRan: [],
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);
@@ -133,6 +137,7 @@ describe('the browser-step input codec', () => {
           objections: [],
           progress: { criteria: [], settled: [], done: [] },
           pageUnchanged: false,
+          lastRan: [],
         },
         1000,
       ),

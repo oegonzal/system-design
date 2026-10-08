@@ -305,6 +305,7 @@ describe('composeStepGoal', () => {
         objections: [],
         progress: NO_PROGRESS,
         pageUnchanged: true,
+        lastRan: [],
       }),
     ).toContain('Unchanged since the last plan: the recent actions moved nothing on this page.');
   });
@@ -438,6 +439,45 @@ describe('stepPlanSchema', () => {
         pageUnchanged: false,
       }),
     ).toThrow(MissionMarkMalformed);
+  });
+
+  it('[QL-39] on an unchanged page says what ran at the last step, writes it into the index by this observation’s refs, and says the rule in the Limits', () => {
+    // Measured 2026-10-08: nine of 31 steps were one click on one already-selected
+    // card, repeated, each on a page the step before had left unchanged.
+    const ran = [
+      { kind: 'click' as const, role: 'link', name: 'Senior Engineer — Acme', detail: null },
+      { kind: 'press' as const, role: null, name: null, detail: 'Enter' },
+      { kind: 'click' as const, role: 'button', name: 'Gone from this page', detail: null },
+    ];
+    const input = (pageUnchanged: boolean) => ({
+      mission: MISSION_FIXTURE,
+      observation: listingObservation(),
+      history: [],
+      ledger: emptyLedger(),
+      objections: [],
+      progress: { criteria: [], settled: [], done: [] },
+      pageUnchanged,
+      lastRan: ran,
+    });
+    const unchanged = composeStepGoal(input(true));
+    expect(unchanged).toContain(
+      'Ran on it at the last step and moved nothing: click link "Senior Engineer — Acme"; press "Enter"; click button "Gone from this page" — repeating any of these is cut.',
+    );
+    expect(readStepIndex(unchanged)).toMatchObject({
+      pageUnchanged: true,
+      lastRan: [
+        { kind: 'click', ref: 'e3', detail: null },
+        { kind: 'press', ref: null, detail: 'Enter' },
+        { kind: 'click', ref: null, detail: null },
+      ],
+    });
+    expect(unchanged).toContain(
+      '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it.',
+    );
+    // A page that moved carries neither the line nor the index entries: what ran is history, not a repeat.
+    const moved = composeStepGoal(input(false));
+    expect(moved).not.toContain('Ran on it at the last step');
+    expect(readStepIndex(moved)).toMatchObject({ pageUnchanged: false, lastRan: [] });
   });
 
   it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {

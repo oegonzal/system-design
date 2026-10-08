@@ -1,5 +1,7 @@
 import {
+  composeStepGoal,
   dialogObservation,
+  emptyLedger,
   formObservation,
   listingObservation,
   MISSION_FIXTURE,
@@ -175,6 +177,37 @@ describe('the browser-step validators', () => {
       'taskStart follows the click at action.1: it claims what the page shows, and that page has not been observed',
     ]);
     expect(problems(samplePlan([taskStart(), click('e3')]), open).limits).toEqual([]);
+  });
+
+  it('[QL-36] an action that ran at the last step on a page that did not change is cut where it stands, with what to do instead', () => {
+    // Measured 2026-10-08: nine of 31 steps were one click on one already-selected
+    // card, repeated, each on a page the step before had left unchanged.
+    const ran = [
+      { kind: 'click' as const, role: 'link', name: 'Senior Engineer — Acme', detail: null },
+    ];
+    const goalOn = (pageUnchanged: boolean): string =>
+      composeStepGoal({
+        mission: MISSION_FIXTURE,
+        observation: listingObservation(),
+        history: [],
+        ledger: emptyLedger(),
+        objections: [],
+        progress: { criteria: [], settled: [], done: [] },
+        pageUnchanged,
+        lastRan: ran,
+      });
+    const unchanged = goalOn(true);
+    expect(problems(samplePlan([click('e3')]), unchanged).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'click on e3 ran at the last step and the page did not change: repeating it is cut — act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now',
+      },
+    ]);
+    // Another element, or the same element on a page that moved, is a new question.
+    expect(problems(samplePlan([click('e4')]), unchanged).limits).toEqual([]);
+    expect(problems(samplePlan([click('e3')]), goalOn(false)).limits).toEqual([]);
   });
 
   it('[QL-36] a disabled element binds only what touches it, and not after the fields are answered', () => {

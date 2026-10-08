@@ -88,6 +88,7 @@ describe('the goals', () => {
           objections: [],
           progress: { criteria: [], settled: [], done: [] },
           pageUnchanged: false,
+          lastRan: [],
         }),
       ).not.toThrow();
     },

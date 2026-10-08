@@ -1,4 +1,7 @@
-import { nodesOnly, type PageObservation } from './observation.schema';
+import { MOMENT_ATTRIBUTES, nodesOnly, type PageObservation } from './observation.schema';
+
+/** A moment attribute as a snapshot line carries it, with the space before it: `[ref=e12]`, `[active]`. */
+const MOMENT_TOKEN = new RegExp(` \\[(?:${MOMENT_ATTRIBUTES.join('|')})(?:=[^\\]]*)?\\]`, 'g');
 
 /**
  * The identity of what an observation showed, as the session compares one
@@ -7,7 +10,7 @@ import { nodesOnly, type PageObservation } from './observation.schema';
  * not read, and the snapshot's text. Two reads of one unchanged page fingerprint equal; a page
  * that changed in any fact the goal renders fingerprints differently.
  *
- * The ref tokens are left OUT. A ref is minted per snapshot by the adapter
+ * The ref tokens and the focus mark are left OUT. A ref is minted per snapshot by the adapter
  * and may differ between two reads of an identical page; a fingerprint that
  * changed on a re-minted ref would call a stalled page "moved", which is the
  * one direction a stall rail may not be wrong in. So is the inline text of
@@ -44,10 +47,10 @@ export function observationFingerprint(observation: PageObservation): string {
     ]),
     omittedElements: observation.omittedElements,
     unread: observation.unread,
-    // The ref goes with the space before it: a token left behind as a double
-    // space fails the node-line grammar, and the line leaves the identity.
-    // Measured 2026-10-07: 117 of 1006 lines — every one carrying another
-    // attribute, `[cursor=pointer]` or `[active]` — were silently dropped.
-    snapshot: nodesOnly(observation.ariaSnapshot.replace(/ \[ref=[^\]]*\]/g, '')),
+    // A moment attribute goes with the space before it: a token left behind as
+    // a double space fails the node-line grammar, and the line leaves the
+    // identity. Measured 2026-10-07: 117 of 1006 lines — every one carrying
+    // another attribute, `[cursor=pointer]` or `[active]` — were silently dropped.
+    snapshot: nodesOnly(observation.ariaSnapshot.replace(MOMENT_TOKEN, '')),
   });
 }

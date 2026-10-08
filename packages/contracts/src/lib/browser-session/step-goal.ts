@@ -26,10 +26,17 @@ import {
   type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
+import { refNowOf, type RanAction } from './action-identity';
 import { MARK_TOKEN_MAX_LENGTH, marksOf, marksOn, type Mark } from './mission-marks';
 import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
 import { ACTIONS_BOUND } from './step-plan.schema';
-import { ELEMENT_KINDS, HIDDEN_TRAITS, TASK_OUTCOME_SPENDS, TASK_OUTCOMES } from './vocab';
+import {
+  ELEMENT_KINDS,
+  HIDDEN_TRAITS,
+  STEP_ACTION_KINDS,
+  TASK_OUTCOME_SPENDS,
+  TASK_OUTCOMES,
+} from './vocab';
 
 /**
  * Where the mission stands, as engine facts: the criteria settled for the
@@ -69,6 +76,13 @@ export interface StepGoalInput {
    * each press "ok".
    */
   pageUnchanged: boolean;
+  /**
+   * What ran at the last step, as the page would recognise it again. On an
+   * unchanged page a repeat of one of these is cut: the page already answered
+   * it. Measured 2026-10-08: nine steps of 31 were one click on one
+   * already-selected card, repeated.
+   */
+  lastRan: readonly RanAction[];
 }
 
 /** The facts the validators check a plan against; everything else in the goal is for the model. */
@@ -104,6 +118,24 @@ export const stepIndexSchema = z.strictObject({
    * at the full rung; neither shows a thing.
    */
   pageShowsContent: z.boolean(),
+  /** Whether this is the page the last plan was made against, unchanged. Written only when it is. */
+  pageUnchanged: z.boolean().default(false),
+  /**
+   * What ran at the last step on this unchanged page, by this observation's
+   * refs — null where the page no longer lists the element, or the action
+   * named none. An action equal in kind, ref and detail is cut. Written only
+   * when the page is unchanged.
+   */
+  lastRan: z
+    .array(
+      z.strictObject({
+        kind: z.enum(STEP_ACTION_KINDS),
+        ref: z.string().regex(ELEMENT_REF).nullable(),
+        detail: z.string().nullable(),
+      }),
+    )
+    .max(ACTIONS_BOUND.ceiling)
+    .default([]),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
 
@@ -287,7 +319,25 @@ const indexOf = (
   pageShowsContent:
     input.observation.elements.length > 0 ||
     (input.observation.snapshotRung !== 'none' && input.observation.ariaSnapshot.trim() !== ''),
+  ...(input.pageUnchanged && input.lastRan.length > 0
+    ? {
+        pageUnchanged: true,
+        lastRan: input.lastRan.map((ran) => ({
+          kind: ran.kind,
+          ref: refNowOf(ran, input.observation.elements),
+          detail: ran.detail,
+        })),
+      }
+    : {}),
 });
+
+/** One action that ran, as the page would know it again: `click button "Next"`, `fill searchbox "Search" "x"`, `press Enter`. */
+const describeRan = (ran: RanAction): string =>
+  [
+    ran.kind,
+    ...(ran.role === null ? [] : [ran.role, quote(ran.name ?? '')]),
+    ...(ran.detail === null ? [] : [quote(ran.detail)]),
+  ].join(' ');
 
 /** The goal, or a refusal when it would not fit the engine's budget. */
 export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES): string {
@@ -304,6 +354,11 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     `Title: ${observation.title}`,
     ...(input.pageUnchanged
       ? ['Unchanged since the last plan: the recent actions moved nothing on this page.']
+      : []),
+    ...(input.pageUnchanged && input.lastRan.length > 0
+      ? [
+          `Ran on it at the last step and moved nothing: ${input.lastRan.map(describeRan).join('; ')} — repeating any of these is cut.`,
+        ]
       : []),
     '',
     '## Elements',
@@ -375,6 +430,9 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
       : [
           `- An element marked ${marks.map((mark) => quote(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
         ]),
+    // The page already answered a repeated question. Measured 2026-10-08: nine
+    // steps of 31 re-clicked the one card the pane already showed.
+    '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it. Act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now.',
     '- Validators check these limits; they are not criteria.',
     '',
     '## Index',

@@ -1,5 +1,6 @@
 import {
   CLOSED_TASKS_BOUND,
+  ranActionOf,
   TASK_OUTCOME_STATUS,
   type PageObservation,
   type PlanReadout,
@@ -228,5 +229,12 @@ export async function executeActions(
   // Every action the plan proposed ran, and none failed: the objections are spent.
   const ranWhole = !failed && actions.length === prefix.length;
   if (ranWhole) clearObjections(state);
-  return { termination: null, ranWhole, ranOk: failed ? next - 1 : next };
+  const ranOk = failed ? next - 1 : next;
+  // What ran, as the page would recognise it again: the next goal says it, and
+  // on an unchanged page a repeat of it is cut.
+  state.ranActions = prefix.slice(0, ranOk).flatMap((action) => {
+    const ran = ranActionOf(action, observation.elements);
+    return ran === null ? [] : [ran];
+  });
+  return { termination: null, ranWhole, ranOk };
 }

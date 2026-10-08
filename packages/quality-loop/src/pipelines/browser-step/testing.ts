@@ -30,6 +30,7 @@ export const stepGoal = (
     objections: [],
     progress: { criteria: [], settled: [], done: [] },
     pageUnchanged: false,
+    lastRan: [],
   });
 
 export const click = (

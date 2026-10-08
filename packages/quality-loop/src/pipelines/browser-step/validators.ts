@@ -20,6 +20,7 @@
  */
 import {
   ACTION_EFFECTS,
+  actionDetail,
   actionLocation,
   actionRefs,
   CLAIMING_ACTION_KINDS,
@@ -204,6 +205,23 @@ const staleClaimFault = (action: StepAction, mutated: Earlier | null): Fault | n
 /** An action earlier in the plan that the one being checked is held against. */
 type Earlier = { position: number; kind: StepAction['kind'] };
 
+/**
+ * An action that ran at the last step on a page that did not change — the
+ * same kind on the same element, with the same detail — asks the page the
+ * question it has answered. Measured 2026-10-08: nine of 31 steps were one
+ * click on one already-selected card, repeated.
+ */
+const repeatFault = (action: StepAction, index: StepIndex): string | null => {
+  if (!index.pageUnchanged) return null;
+  const ref = actionRefs(action)[0] ?? null;
+  const detail = actionDetail(action);
+  const repeated = index.lastRan.some(
+    (ran) => ran.kind === action.kind && ran.ref === ref && ran.detail === detail,
+  );
+  if (!repeated) return null;
+  return `${action.kind}${ref === null ? '' : ` on ${ref}`} ran at the last step and the page did not change: repeating it is cut — act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now`;
+};
+
 const limits: Rule = (plan, index) => {
   const elements = new Map(index.elements.map((element) => [element.ref, element]));
   const problems: ValidationProblem[] = [];
@@ -245,6 +263,8 @@ const limits: Rule = (plan, index) => {
     }
     const claim = claimFault(action, index.pageShowsContent);
     if (claim !== null) problems.push(problem(claim.severity, claim.message, at));
+    const repeat = repeatFault(action, index);
+    if (repeat !== null) problems.push(problem('high', repeat, at));
     // Past a page replacement every action is already refused above; the
     // stale-claim rule says what a replacement rule did not.
     const stale = replaced === null ? staleClaimFault(action, mutated) : null;

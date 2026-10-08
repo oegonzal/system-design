@@ -11,6 +11,7 @@ import {
   TASK_OUTCOMES,
   type DocumentChunk,
   type PageObservation,
+  type RanAction,
   type SessionRailsDto,
   type StepAction,
   type StepHistoryEntry,
@@ -98,6 +99,8 @@ export interface SessionState {
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
   /** How many actions the last plan ran without failing; 0 for a plan refused whole, and before any plan. */
   lastRan: number;
+  /** What the last plan ran, as the page would recognise it again; the next goal says it, and a repeat on an unchanged page is cut. */
+  ranActions: RanAction[];
   /** The operator's answers this session, by field label. */
   operatorAnswers: Map<string, string>;
   /**
@@ -138,6 +141,7 @@ export function createState(ids: {
     reached: { session: new Set(), unit: new Set() },
     pendingPass: null,
     lastRan: 0,
+    ranActions: [],
     operatorAnswers: new Map(),
     filled: new Map(),
     teachings: [],

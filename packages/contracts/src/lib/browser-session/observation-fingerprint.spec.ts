@@ -122,5 +122,14 @@ describe('observationFingerprint', () => {
     };
     expect(observationFingerprint(clickable)).not.toBe(observationFingerprint(first));
     expect(observationFingerprint(renamed)).not.toBe(observationFingerprint(clickable));
+    // Where focus sits is a fact about the moment, not the page: a click that
+    // moved only the `[active]` mark left the page as it was. Measured
+    // 2026-10-08: two re-clicks of an already-selected card differed from the
+    // step before in nothing else.
+    const focused = {
+      ...clickable,
+      ariaSnapshot: clickable.ariaSnapshot.replace('[cursor=pointer]', '[active] [cursor=pointer]'),
+    };
+    expect(observationFingerprint(focused)).toBe(observationFingerprint(clickable));
   });
 });

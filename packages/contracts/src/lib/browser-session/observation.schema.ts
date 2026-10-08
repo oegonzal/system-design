@@ -104,6 +104,16 @@ export const OBJECTION_DETAIL_BOUND = bound(900);
  */
 export const ELEMENT_REF = /^[a-z][a-z0-9]{0,19}$/;
 
+/**
+ * The attributes a snapshot line carries about the moment it was read, not
+ * about the page: the ref token the adapter mints per read, and where focus
+ * sits. Neither is identity — a page a click left as it was has moved only its
+ * focus. Measured 2026-10-08: two re-clicks of an already-selected card
+ * differed from the step before in nothing but `[active]`, and passed for a
+ * page that moved.
+ */
+export const MOMENT_ATTRIBUTES = ['ref', 'active'] as const;
+
 /** The ref a snapshot line carries, read with the one declared grammar, or null when it carries none the session may use. */
 export const refOf = (line: string): string | null => {
   const token = /\[ref=([^\]]*)\]/.exec(line)?.[1];
