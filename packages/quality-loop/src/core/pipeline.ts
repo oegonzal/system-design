@@ -8,6 +8,7 @@
  */
 import type {
   DecisionPolicy,
+  EvidenceLedger,
   GoalSource,
   PipelineSummary,
   ProducerBriefing,
@@ -96,6 +97,20 @@ export interface PipelineDefinition<T> {
   /** The deterministic strategy that decides — declared by reference, composed in `core/controllers`. */
   controller: Controller;
   policy: DecisionPolicy;
+  /**
+   * An optional pass that corrects the ledger from facts the goal already
+   * declares, applied once per iteration before the controller decides — for a
+   * pipeline whose goal carries context the judges cannot be trusted to honour.
+   * browser-step uses it so a stop the page cannot be showing (a contentless
+   * page) does not gate the move that would leave it. A pipeline that declares
+   * none is unaffected; the controller still owns the decision, on a ledger the
+   * engine has corrected rather than one a model alone wrote.
+   */
+  refoundEvidence?: (
+    ledger: EvidenceLedger,
+    goal: string,
+    policy: DecisionPolicy,
+  ) => EvidenceLedger;
 }
 
 /** Stage ids the engine owns; a lens may not take one. */

@@ -27,6 +27,7 @@ import deriveCriteria from './lenses/derive-criteria.md?raw';
 import evaluatorPlan from './lenses/evaluator.plan.md?raw';
 import producer from './lenses/producer.md?raw';
 import { stepPlanOutput } from './output';
+import { refoundOnContentlessPage } from './refound';
 import { limitsValidator, referencesValidator } from './validators';
 
 /**
@@ -99,6 +100,10 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   producer: { persona: producer, maxTokens: 8000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
+  // A stop the page cannot be showing does not gate: on a contentless page a
+  // failed safety criterion is re-founded not-applicable, so the navigate that
+  // would load a page is not blocked by a limit hallucinated on about:blank.
+  refoundEvidence: refoundOnContentlessPage,
 
   // Each critic owns its half of the vocabulary, as data: its schema cannot
   // emit the other's types. The personas said so in prose and the prose did

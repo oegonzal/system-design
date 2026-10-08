@@ -182,10 +182,15 @@ function decide<T>(
     },
     policy,
   );
-  const ledger = {
+  const judgedLedger = {
     ...confirmed,
     findings: annotate(confirmed.findings, judged.critics, checked.locations),
   };
+  // The engine corrects what the judges found from facts the goal declares,
+  // before the controller sees it — a stop the page cannot be showing, say.
+  // A pipeline that declares no pass hands its ledger through unchanged.
+  const ledger =
+    loop.definition.refoundEvidence?.(judgedLedger, contract.goal, policy) ?? judgedLedger;
   const decision = stages.controller.decide(ledger, policy);
   const remediations = noteRemediations(
     decision.selectedRemediations,
