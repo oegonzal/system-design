@@ -120,6 +120,7 @@ describe('composeStepGoal', () => {
       hiddenTraits: [],
       context: i % 5 === 0 ? 'c'.repeat(80) : null,
       scope: null,
+      landmark: null,
     }));
     const observation = pageObservationSchema.parse({
       ...listingObservation(),
@@ -478,6 +479,35 @@ describe('stepPlanSchema', () => {
     const moved = composeStepGoal(input(false));
     expect(moved).not.toContain('Ran on it at the last step');
     expect(readStepIndex(moved)).toMatchObject({ pageUnchanged: false, lastRan: [] });
+  });
+
+  it('[QL-39] lists the main landmark’s elements first and unheaded, then each other landmark under its own line, then the rest', () => {
+    // Measured 2026-10-08: of 134 element lines on a results page, 75 were the
+    // chrome — navigation, filters, feedback, footer — listed among the results.
+    const base = listingObservation();
+    const [search, button, acme, globex, next, save] = base.elements;
+    const observation = {
+      ...base,
+      elements: [
+        { ...search, landmark: 'search' as const },
+        { ...button, landmark: 'search' as const },
+        { ...acme, landmark: 'main' as const },
+        { ...globex, landmark: 'main' as const },
+        { ...next, landmark: 'navigation' as const },
+        save,
+      ],
+    };
+    const lines = goalOf(observation).split('\n');
+    const at = (ref: string): number => lines.findIndex((line) => line.startsWith(`- ${ref} `));
+    expect(at('e3')).toBeLessThan(at('e4'));
+    expect(at('e4')).toBeLessThan(lines.indexOf('In the navigation (1):'));
+    expect(lines.indexOf('In the navigation (1):')).toBe(at('e5') - 1);
+    expect(lines.indexOf('In the search (2):')).toBe(at('e1') - 1);
+    expect(at('e2')).toBe(at('e1') + 1);
+    // The disabled control sits in no landmark and is still listed, last, under no header.
+    expect(at('e6')).toBeGreaterThan(at('e2'));
+    // A page without landmarks reads exactly as before: no headers at all.
+    expect(goalOf(base)).not.toContain('In the ');
   });
 
   it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {

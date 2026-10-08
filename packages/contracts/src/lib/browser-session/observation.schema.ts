@@ -13,6 +13,7 @@ import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
 import {
   ELEMENT_KINDS,
   HIDDEN_TRAITS,
+  LANDMARK_ROLES,
   SCOPE_ROLES,
   SNAPSHOT_RUNGS,
   STEP_OUTCOMES,
@@ -208,6 +209,8 @@ export const observedElementSchema = z.strictObject({
   context: bounded.text(ELEMENT_NAME_BOUND).nullable(),
   /** The dialog it sits in, or null for an element of the page itself. */
   scope: elementScopeSchema.nullable(),
+  /** The top-level landmark it sits in, read from the tree — main, banner, navigation… — or null outside every one. */
+  landmark: z.enum(LANDMARK_ROLES).nullable(),
 });
 export type ObservedElement = z.infer<typeof observedElementSchema>;
 

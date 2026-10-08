@@ -56,6 +56,13 @@ describe('observationFingerprint', () => {
         index === 0 ? { ...element, optionsOmitted: 5 } : element,
       ),
     };
+    // The landmark an element sits in is a fact the goal renders: identity too.
+    const relocated = {
+      ...first,
+      elements: first.elements.map((element, index) =>
+        index === 2 ? { ...element, landmark: 'main' as const } : element,
+      ),
+    };
     for (const changed of [
       retitled,
       oneFewer,
@@ -66,6 +73,7 @@ describe('observationFingerprint', () => {
       dialogInFront,
       invalidNow,
       moreOptions,
+      relocated,
     ]) {
       expect(observationFingerprint(changed)).not.toBe(observationFingerprint(first));
     }

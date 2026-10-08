@@ -33,9 +33,11 @@ import { ACTIONS_BOUND } from './step-plan.schema';
 import {
   ELEMENT_KINDS,
   HIDDEN_TRAITS,
+  LANDMARK_ROLES,
   STEP_ACTION_KINDS,
   TASK_OUTCOME_SPENDS,
   TASK_OUTCOMES,
+  type LandmarkRole,
 } from './vocab';
 
 /**
@@ -215,6 +217,32 @@ const objectionLines = (objections: readonly StepObjection[]): string[] => {
  * at. Measured 2026-10-07: a form page reached the model as 150 lines, 67 of
  * them hidden, with the open dialog's five fields among them unmarked.
  */
+/**
+ * The reachable elements by the landmark they sit in: the main content first
+ * and unheaded, then each other landmark under its own line, then what sits
+ * in none — so a results list is read before the chrome around it, and a
+ * control in the banner's search box is still there to be cited. Measured
+ * 2026-10-08: of 134 element lines on a results page, 75 were navigation,
+ * filters, feedback and footer, listed among the 25 results.
+ */
+function groupedByLandmark(elements: readonly ObservedElement[], marks: readonly Mark[]): string[] {
+  const inLandmark = (landmark: LandmarkRole | null): ObservedElement[] =>
+    elements.filter((element) => element.landmark === landmark);
+  const others = LANDMARK_ROLES.filter(
+    (landmark) => landmark !== 'main' && inLandmark(landmark).length > 0,
+  );
+  const lines = (group: readonly ObservedElement[]): string[] =>
+    group.map((element) => renderElementLine(element, marks));
+  return [
+    ...lines(inLandmark('main')),
+    ...others.flatMap((landmark) => [
+      `In the ${landmark} (${inLandmark(landmark).length}):`,
+      ...lines(inLandmark(landmark)),
+    ]),
+    ...lines(inLandmark(null)),
+  ];
+}
+
 function elementLines(observation: PageObservation, marks: readonly Mark[]): string[] {
   const { elements, activeScope } = observation;
   if (elements.length === 0) return ['(no interactive elements)'];
@@ -227,7 +255,7 @@ function elementLines(observation: PageObservation, marks: readonly Mark[]): str
           `Inside the open ${activeScope.role} ${quote(activeScope.name)} — the rest of the page waits behind it:`,
         ]),
     ...(reachable.length > 0
-      ? reachable.map((element) => renderElementLine(element, marks))
+      ? groupedByLandmark(reachable, marks)
       : ['(no reachable interactive elements)']),
     ...(unlisted > 0
       ? [

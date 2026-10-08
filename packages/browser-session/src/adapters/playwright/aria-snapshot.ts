@@ -2,11 +2,13 @@ import {
   ELEMENT_REF,
   nodeLineOf,
   refOf,
+  LANDMARK_ROLES,
   SCOPE_ROLES,
   SNAPSHOT_NODE_LINE,
   SNAPSHOT_RUNGS,
   VALUE_ROLES,
   type ActiveScope,
+  type LandmarkRole,
   type ScopeRole,
   type SnapshotRung,
 } from '@sysdesign/contracts';
@@ -69,28 +71,45 @@ export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
 
 const isScopeRole = (role: string): role is ScopeRole =>
   (SCOPE_ROLES as readonly string[]).includes(role);
+const isLandmarkRole = (role: string): role is LandmarkRole =>
+  (LANDMARK_ROLES as readonly string[]).includes(role);
+
+/** What a node sits in: the nearest dialog, and the nearest top-level landmark, each itself included. */
+export interface Ancestry {
+  scope: ActiveScope | null;
+  landmark: LandmarkRole | null;
+}
 
 /**
  * The one walk of a tree's indentation: for each node in document order, the
- * nearest dialog it sits in — an ancestor is the last node before it at a
- * smaller depth, and a dialog scopes itself as well as its descendants, so
- * the dialog node's own ref reads as inside it. `scopesOf` and the scope
- * rung of `fitSnapshot` both read the tree through this and nothing else.
+ * nearest dialog and the nearest landmark it sits in — an ancestor is the
+ * last node before it at a smaller depth, and a dialog or a landmark holds
+ * itself as well as its descendants, so the node's own ref reads as inside
+ * it. `scopesOf`, `landmarksOf` and the scope rung of `fitSnapshot` all read
+ * the tree through this and nothing else.
  */
-function walkScopes(nodes: readonly SnapshotNode[]): (ActiveScope | null)[] {
-  const stack: { depth: number; scope: ActiveScope | null }[] = [];
+export function ancestryOf(nodes: readonly SnapshotNode[]): Ancestry[] {
+  const stack: { depth: number; ancestry: Ancestry }[] = [];
   return nodes.map((node) => {
     while (stack.length > 0 && (stack[stack.length - 1]?.depth ?? 0) >= node.depth) stack.pop();
-    const inherited = stack[stack.length - 1]?.scope ?? null;
-    const scope = isScopeRole(node.role) ? { role: node.role, name: node.name ?? '' } : inherited;
-    stack.push({ depth: node.depth, scope });
-    return scope;
+    const inherited = stack[stack.length - 1]?.ancestry ?? { scope: null, landmark: null };
+    const ancestry: Ancestry = {
+      scope: isScopeRole(node.role) ? { role: node.role, name: node.name ?? '' } : inherited.scope,
+      landmark: isLandmarkRole(node.role) ? node.role : inherited.landmark,
+    };
+    stack.push({ depth: node.depth, ancestry });
+    return ancestry;
   });
 }
 
 /** For each node, the nearest dialog it sits in, by role and name — the identity a scope keeps across observations. */
 export const scopesOf = (nodes: readonly SnapshotNode[]): (ActiveScope | null)[] =>
-  walkScopes(nodes);
+  ancestryOf(nodes).map((ancestry) => ancestry.scope);
+
+/** The landmarks the tree lays the page out in, each once, in document order. */
+export const landmarkRolesOf = (nodes: readonly SnapshotNode[]): LandmarkRole[] => [
+  ...new Set(nodes.map((node) => node.role).filter(isLandmarkRole)),
+];
 
 const holdsValue = (role: string): boolean => (VALUE_ROLES as readonly string[]).includes(role);
 
@@ -223,7 +242,7 @@ function splitByScope(
   scope: ActiveScope,
 ): { inside: string[]; outside: string[] } {
   const nodes = decodeAriaSnapshot(lines.join('\n'));
-  const scopes = walkScopes(nodes);
+  const scopes = scopesOf(nodes);
   const inside: string[] = [];
   const outside: string[] = [];
   let at = 0;

@@ -132,6 +132,20 @@ const LATE_PAGE = `<!doctype html><html><head><title>Landing</title></head><body
   </script>
 </body></html>`;
 
+/** A results page whose chrome renders at once and whose main fills a moment later: two early reads agree on the chrome alone. */
+const LATE_MAIN = `<!doctype html><html><head><title>Results</title></head><body>
+  <header><button>Menu</button></header>
+  <main id="results"></main>
+  <script>
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = '/jobs/1';
+      link.textContent = 'Open result';
+      document.getElementById('results').appendChild(link);
+    }, 120);
+  </script>
+</body></html>`;
+
 /**
  * The two shapes an ARIA combobox comes in, both met in live runs. The first
  * is a search box: a textarea the author gave the combobox role, typed into
@@ -421,6 +435,30 @@ describe('the Playwright browser', () => {
       expect(observation.reading.reads).toBeGreaterThanOrEqual(2);
       expect(observation.reading.settled).toBe(true);
       expect(observation.reading.durationMs).toBeGreaterThan(0);
+    } finally {
+      await patient.close();
+    }
+  });
+
+  it('[BRW-2] reads a page again while its main landmark holds nothing, so content that renders after the chrome is observed and placed first', async () => {
+    // Measured 2026-10-08: three observations of a results page agreed twice
+    // over on 33 elements of banner, navigation and search box, with a main
+    // that had nothing beneath it yet; each plan made on them was wasted.
+    const patient = new PlaywrightBrowser({
+      profilesDir: profiles,
+      channel: undefined,
+      settleRetryMs: 150,
+    });
+    await patient.open('spec-late-main', { headed: false });
+    try {
+      await patient.page.setContent(LATE_MAIN);
+      const observation = await patient.observe();
+      expect(observation.elements.map((e) => [e.name, e.landmark])).toEqual([
+        ['Open result', 'main'],
+        ['Menu', 'banner'],
+      ]);
+      expect(observation.reading.reads).toBeGreaterThanOrEqual(3);
+      expect(observation.reading.settled).toBe(true);
     } finally {
       await patient.close();
     }

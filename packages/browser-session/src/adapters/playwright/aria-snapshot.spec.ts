@@ -6,6 +6,8 @@ import {
   scopesOf,
   settledSnapshot,
   subtreeText,
+  ancestryOf,
+  landmarkRolesOf,
 } from './aria-snapshot';
 
 const SNAPSHOT = `- banner [ref=e1]:
@@ -101,6 +103,49 @@ describe('the aria snapshot decoder', () => {
     expect(wordsOf('e14')).toBe('');
     expect(wordsOf('e10')).toBe('');
     expect(subtreeText(nodes, 99)).toBe('');
+  });
+
+  it('[BRW-2] reads the landmark a node sits in from the tree: the nearest declared role, itself included, and a region inside main stays main’s', () => {
+    // Measured 2026-10-08: a results page's chrome — banner, navigation, the
+    // search box — read settled while its main had rendered nothing yet; and
+    // a chart's region sat inside main, so region is no landmark here.
+    const page = [
+      '- banner [ref=e1]:',
+      '  - link "Home" [ref=e2]',
+      '  - search [ref=e3]:',
+      '    - searchbox "Search" [ref=e4]',
+      '- navigation "Pages" [ref=e5]:',
+      '  - link "Next" [ref=e6]',
+      '- main [ref=e7]:',
+      '  - button "Easy Apply" [ref=e8]',
+      '  - region "Chart" [ref=e9]:',
+      '    - button "More" [ref=e10]',
+      '- button "Stray" [ref=e11]',
+      '- contentinfo [ref=e12]:',
+      '  - link "Help" [ref=e13]',
+    ].join('\n');
+    const nodes = decodeAriaSnapshot(page);
+    const ancestry = ancestryOf(nodes);
+    const landmarkOf = (ref: string) =>
+      ancestry[nodes.findIndex((node) => node.ref === ref)]?.landmark;
+    expect(landmarkOf('e1')).toBe('banner');
+    expect(landmarkOf('e2')).toBe('banner');
+    // The nearest landmark wins: a search box inside the banner is the search's.
+    expect(landmarkOf('e4')).toBe('search');
+    expect(landmarkOf('e6')).toBe('navigation');
+    expect(landmarkOf('e8')).toBe('main');
+    expect(landmarkOf('e10')).toBe('main');
+    expect(landmarkOf('e11')).toBeNull();
+    expect(landmarkOf('e13')).toBe('contentinfo');
+    expect(landmarkRolesOf(nodes)).toEqual([
+      'banner',
+      'search',
+      'navigation',
+      'main',
+      'contentinfo',
+    ]);
+    // Scope and landmark are read in the one walk, and a page without dialogs scopes nothing.
+    expect(ancestry.every((entry) => entry.scope === null)).toBe(true);
   });
 
   it('[BRW-2] keeps the open scope whole when the page around it must be reduced, and says so in its first line', () => {

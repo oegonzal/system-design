@@ -153,6 +153,25 @@ export const SCOPE_ROLES = ['dialog', 'alertdialog'] as const;
 export type ScopeRole = (typeof SCOPE_ROLES)[number];
 
 /**
+ * The top-level ARIA landmarks a page is laid out in: what an element sits
+ * in, read from the tree, so the goal can put the main content first and the
+ * reader can tell a page whose main has not rendered from an empty one.
+ * `region` and `form` are not here: they nest inside `main` and would pull
+ * its elements out. Measured 2026-10-08: three observations of a results
+ * page read "settled" with 33 elements, every one in the banner, the
+ * navigation or the search box, and a `main` with nothing beneath it yet.
+ */
+export const LANDMARK_ROLES = [
+  'banner',
+  'navigation',
+  'main',
+  'complementary',
+  'search',
+  'contentinfo',
+] as const;
+export type LandmarkRole = (typeof LANDMARK_ROLES)[number];
+
+/**
  * How a snapshot too big for its budget is reduced, by declared rungs and
  * never a cut mid-page: the whole; the open scope whole and the rest reduced;
  * the nodes alone; only the nodes with refs; none. An observation and a

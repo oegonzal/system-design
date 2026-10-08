@@ -44,6 +44,7 @@ function maximalObservation(): PageObservation {
       hiddenTraits: [],
       context: fill(40, 'c'),
       scope: null,
+      landmark: null,
     };
   };
   return {

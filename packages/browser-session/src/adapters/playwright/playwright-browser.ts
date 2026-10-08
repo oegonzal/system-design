@@ -13,7 +13,8 @@ import { chromium, type BrowserContext, type Locator, type Page } from 'playwrig
 import { ActionFailed, type BrowserAction, type BrowserPort } from '../../core/ports';
 import {
   decodeAriaSnapshot,
-  scopesOf,
+  ancestryOf,
+  landmarkRolesOf,
   settledSnapshot,
   subtreeText,
   unreadSnapshotLines,
@@ -24,6 +25,7 @@ import {
   toObservation,
   toObservedElement,
   type PageReading,
+  mainUnrendered,
 } from './observation-reading';
 
 /** The reading facts of a read taken only to compare: never reported. */
@@ -159,7 +161,7 @@ export class PlaywrightBrowser implements BrowserPort {
     const page = this.page;
     const snapshot = await this.snapshot();
     const nodes = decodeAriaSnapshot(snapshot);
-    const scopes = scopesOf(nodes);
+    const ancestry = ancestryOf(nodes);
     const interactive = nodes.flatMap((node, index) =>
       node.ref !== null && elementKindOf(node.role) !== 'static' ? [{ node, index }] : [],
     );
@@ -173,7 +175,15 @@ export class PlaywrightBrowser implements BrowserPort {
       const read = facts.get(node.ref ?? '');
       return read === undefined
         ? []
-        : [toObservedElement(node, read, scopes[index] ?? null, subtreeText(nodes, index))];
+        : [
+            toObservedElement(
+              node,
+              read,
+              ancestry[index]?.scope ?? null,
+              subtreeText(nodes, index),
+              ancestry[index]?.landmark ?? null,
+            ),
+          ];
     });
     const focused = nodes.findIndex((node) => node.attributes['active'] === true);
     return {
@@ -183,7 +193,8 @@ export class PlaywrightBrowser implements BrowserPort {
       elements,
       unreadElements: unread,
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
-      focusedScope: focused < 0 ? null : (scopes[focused] ?? null),
+      focusedScope: focused < 0 ? null : (ancestry[focused]?.scope ?? null),
+      landmarks: landmarkRolesOf(nodes),
     };
   }
 
@@ -220,7 +231,9 @@ export class PlaywrightBrowser implements BrowserPort {
       await this.page.waitForTimeout(this.settleRetryMs);
       const again = await this.readWhole(deadline);
       reads += 1;
-      settled = agreement(again) === agreement(reading);
+      // Two reads agreeing on a page whose main has nothing in it yet agree on
+      // the chrome, not the page: read again. Measured 2026-10-08, three times.
+      settled = agreement(again) === agreement(reading) && !mainUnrendered(again);
       reading = again;
     }
     return toObservation(reading, { reads, settled, durationMs: Date.now() - startedAt });

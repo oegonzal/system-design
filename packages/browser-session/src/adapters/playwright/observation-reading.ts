@@ -11,6 +11,7 @@ import {
   URL_MAX_LENGTH,
   type ActiveScope,
   type ElementScope,
+  type LandmarkRole,
   type ObservationReading,
   type ObservedElement,
   type PageObservation,
@@ -40,7 +41,20 @@ export interface PageReading {
   unreadSnapshotLines: number;
   /** The scope of the node the page marks active, when it marks one inside a scope. */
   focusedScope: ActiveScope | null;
+  /** The landmarks the tree lays the page out in, each once. */
+  landmarks: readonly LandmarkRole[];
 }
+
+/**
+ * Whether the tree has a `main` landmark that no element sits in yet: the
+ * page's content has not rendered, however settled the chrome around it
+ * reads. Measured 2026-10-08: three observations of a results page agreed
+ * twice over, 33 elements of banner, navigation and search box, and a `main`
+ * with nothing beneath it; each plan made on them was wasted.
+ */
+export const mainUnrendered = (reading: PageReading): boolean =>
+  reading.landmarks.includes('main') &&
+  !reading.elements.some((element) => element.landmark === 'main');
 
 /**
  * Whether a read failed wholesale rather than finding little. Both halves are
@@ -62,6 +76,7 @@ export function toObservedElement(
   facts: ElementFacts,
   scope: ActiveScope | null,
   words: string,
+  landmark: LandmarkRole | null = null,
 ): ObservedElement {
   const unnamed = node.name === null || node.name === '';
   const name = clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target);
@@ -97,6 +112,7 @@ export function toObservedElement(
             name: clip(scope.name, ELEMENT_NAME_BOUND.target),
             modal: facts.modal,
           },
+    landmark,
   };
 }
 
@@ -120,15 +136,27 @@ function activeScopeOf(reading: PageReading): ActiveScope | null {
   return chosen === undefined ? null : { role: chosen.role, name: chosen.name };
 }
 
-/** Inside the open scope first, then the rest of what is visible and enabled, then everything else, each in document order. */
+/**
+ * Inside the open scope first, then what is visible and enabled in the main
+ * landmark, then the rest of what is visible and enabled, then everything
+ * else, each in document order — so under the cap the page's content comes
+ * before its chrome.
+ */
 function ordered(
   elements: readonly ObservedElement[],
   activeScope: ActiveScope | null,
 ): ObservedElement[] {
   const reachable = (element: ObservedElement): boolean => element.visible && !element.disabled;
+  // With no dialog open nothing is "inside the open scope": the page's own order holds.
+  const inOpenScope = (element: ObservedElement): boolean =>
+    activeScope !== null && inScope(element, activeScope);
+  const inMain = (element: ObservedElement): boolean => element.landmark === 'main';
   return [
-    ...elements.filter((element) => reachable(element) && inScope(element, activeScope)),
-    ...elements.filter((element) => reachable(element) && !inScope(element, activeScope)),
+    ...elements.filter((element) => reachable(element) && inOpenScope(element)),
+    ...elements.filter((element) => reachable(element) && !inOpenScope(element) && inMain(element)),
+    ...elements.filter(
+      (element) => reachable(element) && !inOpenScope(element) && !inMain(element),
+    ),
     ...elements.filter((element) => !reachable(element)),
   ];
 }

@@ -44,6 +44,7 @@ export function observationFingerprint(observation: PageObservation): string {
       element.visible,
       element.hiddenTraits,
       element.context,
+      element.landmark,
     ]),
     omittedElements: observation.omittedElements,
     unread: observation.unread,

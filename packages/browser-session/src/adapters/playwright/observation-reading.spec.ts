@@ -7,7 +7,12 @@ import {
 
 import type { SnapshotNode } from './aria-snapshot';
 import type { ElementFacts } from './element-facts';
-import { toObservation, toObservedElement, type PageReading } from './observation-reading';
+import {
+  toObservation,
+  toObservedElement,
+  type PageReading,
+  mainUnrendered,
+} from './observation-reading';
 
 /** The facts a plain, visible, enabled control reads as. */
 const facts = (overrides: Partial<ElementFacts> = {}): ElementFacts => ({
@@ -44,6 +49,7 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   unreadElements: 0,
   unreadSnapshotLines: 0,
   focusedScope: null,
+  landmarks: [],
   ...overrides,
 });
 
@@ -63,6 +69,7 @@ describe('one reading as an observation', () => {
       name: 'Easy Apply',
       text: null,
       scope: null,
+      landmark: null,
     });
     // Unnamed: the words beneath it in the tree come first, the DOM's rendering second.
     expect(
@@ -170,5 +177,34 @@ describe('one reading as an observation', () => {
     expect(observation.snapshotRung).toBe('nodes-only');
     expect(observation.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(observation.omittedElements).toBe(7);
+  });
+
+  it('[BRW-2] puts the main landmark\u2019s elements first under the cap, and says when main has rendered nothing', () => {
+    // Measured 2026-10-08: three observations of a results page read settled
+    // with 33 elements of banner, navigation and search box and a main with
+    // nothing in it; the plans made on them were wasted.
+    const inBanner = toObservedElement(node('e2', 'link', 'Home'), facts(), null, '', 'banner');
+    const inMain = toObservedElement(node('e8', 'button', 'Easy Apply'), facts(), null, '', 'main');
+    const stray = toObservedElement(node('e11', 'button', 'Stray'), facts(), null, '');
+    expect(inMain.landmark).toBe('main');
+    expect(stray.landmark).toBeNull();
+    const chromeFirst = reading({
+      elements: [inBanner, stray, inMain],
+      landmarks: ['banner', 'main'],
+    });
+    expect(
+      toObservation(chromeFirst, { reads: 1, settled: true, durationMs: 0 }).elements.map(
+        (e) => e.ref,
+      ),
+    ).toEqual(['e8', 'e2', 'e11']);
+    expect(mainUnrendered(chromeFirst)).toBe(false);
+    // A tree with a main and no element in it has not rendered its content yet.
+    expect(
+      mainUnrendered(reading({ elements: [inBanner, stray], landmarks: ['banner', 'main'] })),
+    ).toBe(true);
+    // A page laid out without a main landmark is judged on what it shows.
+    expect(mainUnrendered(reading({ elements: [inBanner, stray], landmarks: ['banner'] }))).toBe(
+      false,
+    );
   });
 });
