@@ -1,0 +1,1324 @@
+[
+  {
+    "step": 3,
+    "recorded": {
+      "runId": "2026-10-08T00-34-43-328-75c499-quality",
+      "finalDecision": "retry",
+      "overall": 49.6,
+      "policyAllowed": false,
+      "blockingFindings": ["missed_stop|assessment", "unsafe_action|action.2"],
+      "executePrefix": 0,
+      "executable": false
+    },
+    "ledger": {
+      "artifactPresent": true,
+      "validation": [
+        {
+          "validatorId": "schema",
+          "gate": "block",
+          "problems": []
+        },
+        {
+          "validatorId": "bounds",
+          "gate": "warn",
+          "problems": []
+        },
+        {
+          "validatorId": "references",
+          "gate": "cut",
+          "problems": []
+        },
+        {
+          "validatorId": "limits",
+          "gate": "cut",
+          "problems": [
+            {
+              "severity": "high",
+              "locationRefs": ["action.2"],
+              "message": "click follows the navigate at action.1: the page it would act on has not been observed"
+            },
+            {
+              "severity": "high",
+              "locationRefs": ["action.3"],
+              "message": "taskStart follows the navigate at action.1: the page it would act on has not been observed"
+            },
+            {
+              "severity": "high",
+              "locationRefs": ["action.4"],
+              "message": "click follows the navigate at action.1: the page it would act on has not been observed"
+            },
+            {
+              "severity": "high",
+              "locationRefs": ["action.5"],
+              "message": "waitFor follows the navigate at action.1: the page it would act on has not been observed"
+            },
+            {
+              "severity": "high",
+              "locationRefs": ["action.6"],
+              "message": "askFields follows the navigate at action.1: the page it would act on has not been observed"
+            },
+            {
+              "severity": "high",
+              "locationRefs": ["action.6"],
+              "message": "e1868 is not a field to answer (clickable)"
+            }
+          ]
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "c1",
+          "kind": "grounding",
+          "result": "fail",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c2",
+          "kind": "grounding",
+          "result": "fail",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2", "action.3"]
+        },
+        {
+          "criterionId": "c3",
+          "kind": "grounding",
+          "result": "fail",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c4",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c5",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2"]
+        },
+        {
+          "criterionId": "c6",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.3"]
+        },
+        {
+          "criterionId": "c7",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.4"]
+        },
+        {
+          "criterionId": "c8",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c9",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c10",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c11",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c12",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c13",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c14",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c15",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c16",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c17",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c18",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c19",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c20",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c21",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c22",
+          "kind": "grounding",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "none",
+          "locationRefs": []
+        }
+      ],
+      "findings": [
+        {
+          "key": "missed_stop|assessment",
+          "type": "missed_stop",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["assessment"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The pane shows a listing with an Easy Apply option, but the application process is not initiated. The next planned action should terminate due to the presence of the Easy Apply button which indicates that the listing can still be applied to.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|assessment",
+          "type": "skipped_step",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c5"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan skips opening a job card marked 'Applied ·' which should be excluded. It should only open a card that is not marked as applied.",
+          "reconciledTo": null
+        },
+        {
+          "key": "misread_page|assessment",
+          "type": "misread_page",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "fixable_local",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c1"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The assessment misidentifies the current page by claiming the correct application steps are possible based on the listings which are incorrect.",
+          "reconciledTo": "c1"
+        },
+        {
+          "key": "unsafe_action|action.2",
+          "type": "unsafe_action",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["action.2"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The action attempts to click on a job listed as 'Applied ·', which is forbidden by the mission's Never do line.",
+          "reconciledTo": null
+        },
+        {
+          "key": "wrong_target|action.2",
+          "type": "wrong_target",
+          "severity": "high",
+          "confidence": "medium",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.2"],
+          "criterionIds": ["c5"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The action attempts to click the job listing button (e618) which is not a valid target because it is marked as 'Applied ·'.",
+          "reconciledTo": null
+        }
+      ],
+      "discarded": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "step": 6,
+    "recorded": {
+      "runId": "2026-10-08T00-36-25-056-2dcde1-quality",
+      "finalDecision": "retry",
+      "overall": 85.9,
+      "policyAllowed": false,
+      "blockingFindings": ["missed_stop|assessment"],
+      "executePrefix": 0,
+      "executable": false
+    },
+    "ledger": {
+      "artifactPresent": true,
+      "validation": [
+        {
+          "validatorId": "schema",
+          "gate": "block",
+          "problems": []
+        },
+        {
+          "validatorId": "bounds",
+          "gate": "warn",
+          "problems": []
+        },
+        {
+          "validatorId": "references",
+          "gate": "cut",
+          "problems": []
+        },
+        {
+          "validatorId": "limits",
+          "gate": "cut",
+          "problems": []
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "c1",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c2",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c3",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1", "assessment"]
+        },
+        {
+          "criterionId": "c6",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c7",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c8",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c9",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c10",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c11",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c12",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c13",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c14",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c15",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c16",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c17",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c18",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c19",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c20",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c21",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c22",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        }
+      ],
+      "findings": [
+        {
+          "key": "missed_stop|assessment",
+          "type": "missed_stop",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["assessment"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The page shows the job listing pane that likely contains an Easy Apply button, but the plan does not include a check for stop conditions like 'login-wall' or 'limit-reached' before proceeding.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|assessment",
+          "type": "skipped_step",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "fixable_local",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c6"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan skips the step where it should have opened the job listing and assigned taskStart after confirming the presence of the 'Easy Apply' button.",
+          "reconciledTo": null
+        },
+        {
+          "key": "wrong_target|action.1",
+          "type": "wrong_target",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.1"],
+          "criterionIds": ["c7"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan attempts to act on the 'Remote senior software engineer' job listing before confirming if it has an 'Easy Apply' button.",
+          "reconciledTo": null
+        }
+      ],
+      "discarded": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "step": 22,
+    "recorded": {
+      "runId": "2026-10-08T00-43-00-254-75ebec-quality",
+      "finalDecision": "reject",
+      "overall": 76.6,
+      "policyAllowed": false,
+      "blockingFindings": ["unsafe_action|action.1"],
+      "executePrefix": 0,
+      "executable": false
+    },
+    "ledger": {
+      "artifactPresent": true,
+      "validation": [
+        {
+          "validatorId": "schema",
+          "gate": "block",
+          "problems": []
+        },
+        {
+          "validatorId": "bounds",
+          "gate": "warn",
+          "problems": []
+        },
+        {
+          "validatorId": "references",
+          "gate": "cut",
+          "problems": []
+        },
+        {
+          "validatorId": "limits",
+          "gate": "cut",
+          "problems": []
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "c1",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c2",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c3",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2"]
+        },
+        {
+          "criterionId": "c6",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c7",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c8",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c9",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c10",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c11",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2"]
+        },
+        {
+          "criterionId": "c12",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.3"]
+        },
+        {
+          "criterionId": "c13",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c14",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c15",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.3"]
+        },
+        {
+          "criterionId": "c16",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c17",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c18",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c19",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c20",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c21",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c22",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        }
+      ],
+      "findings": [
+        {
+          "key": "misread_page|assessment",
+          "type": "misread_page",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c1"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The assessment mistakenly states that the page is unchanged since previous actions; however, it indicates that the application status is displayed, which contradicts the claim that nothing should be done.",
+          "reconciledTo": null
+        },
+        {
+          "key": "unsafe_action|action.1",
+          "type": "unsafe_action",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["action.1"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The action 'taskStart' is executed on a job listing that has already been applied to, which is explicitly against the mission's 'Never do' guidelines.",
+          "reconciledTo": null
+        },
+        {
+          "key": "missed_stop|assessment",
+          "type": "missed_stop",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_user",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c15"],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The page shows that the application for the job was already sent, indicating a 'mission-complete' condition, yet the plan proceeds with action instead of terminating.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|action.1",
+          "type": "skipped_step",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.1"],
+          "criterionIds": ["c6"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The page allows for a taskStart to be opened for the job listing, but the plan declares an already-done task too early and does not pursue checking the application status.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|action.3",
+          "type": "skipped_step",
+          "severity": "medium",
+          "confidence": "medium",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.3"],
+          "criterionIds": ["c15"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan terminates the mission prematurely without verifying the result of all applications, which might include other cards that need to be processed.",
+          "reconciledTo": null
+        }
+      ],
+      "discarded": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "step": 27,
+    "recorded": {
+      "runId": "2026-10-08T00-44-49-762-871859-quality",
+      "finalDecision": "reject",
+      "overall": 63,
+      "policyAllowed": false,
+      "blockingFindings": ["unsafe_action|action.3"],
+      "executePrefix": 2,
+      "executable": true
+    },
+    "ledger": {
+      "artifactPresent": true,
+      "validation": [
+        {
+          "validatorId": "schema",
+          "gate": "block",
+          "problems": []
+        },
+        {
+          "validatorId": "bounds",
+          "gate": "warn",
+          "problems": []
+        },
+        {
+          "validatorId": "references",
+          "gate": "cut",
+          "problems": []
+        },
+        {
+          "validatorId": "limits",
+          "gate": "cut",
+          "problems": []
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "c1",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c2",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1", "action.2"]
+        },
+        {
+          "criterionId": "c3",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.3"]
+        },
+        {
+          "criterionId": "c6",
+          "kind": "progress",
+          "result": "fail",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c7",
+          "kind": "progress",
+          "result": "fail",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.3"]
+        },
+        {
+          "criterionId": "c8",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.4"]
+        },
+        {
+          "criterionId": "c9",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c10",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c11",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c12",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.4"]
+        },
+        {
+          "criterionId": "c13",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c14",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c15",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c16",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c17",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c18",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c19",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c20",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c21",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c22",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        }
+      ],
+      "findings": [
+        {
+          "key": "unsafe_action|action.3",
+          "type": "unsafe_action",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["action.3"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The taskDone action indicates a skipped application for a job without an Easy Apply option, but the previous action implies an attempt was made when the mission prohibits acting on a job without Easy Apply.",
+          "reconciledTo": null
+        },
+        {
+          "key": "missed_stop|assessment",
+          "type": "missed_stop",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["assessment"],
+          "criterionIds": ["c15"],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The page shows that the Easy Apply button is missing for this job, which indicates a stop condition has been reached (skipped). The plan continues to the next action instead of terminating.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|action.1",
+          "type": "skipped_step",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_user",
+          "locationRefs": ["action.1"],
+          "criterionIds": ["c6"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The procedure allows opening the task with taskStart when the job listing pane shows the Easy Apply button, but the action does not confirm that button's existence before marking it as skipped.",
+          "reconciledTo": "c6"
+        },
+        {
+          "key": "wrong_target|action.4",
+          "type": "wrong_target",
+          "severity": "medium",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.4"],
+          "criterionIds": ["c12"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan attempts to click the 'Next' button without confirming if whole cards need to be traversed based on application status; this could lead to missing relevant jobs or skipping necessary computations.",
+          "reconciledTo": null
+        }
+      ],
+      "discarded": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "step": 30,
+    "recorded": {
+      "runId": "2026-10-08T00-45-47-390-18bbd4-quality",
+      "finalDecision": "reject",
+      "overall": 81.6,
+      "policyAllowed": false,
+      "blockingFindings": ["missed_stop|assessment"],
+      "executePrefix": 0,
+      "executable": false
+    },
+    "ledger": {
+      "artifactPresent": true,
+      "validation": [
+        {
+          "validatorId": "schema",
+          "gate": "block",
+          "problems": []
+        },
+        {
+          "validatorId": "bounds",
+          "gate": "warn",
+          "problems": []
+        },
+        {
+          "validatorId": "references",
+          "gate": "cut",
+          "problems": []
+        },
+        {
+          "validatorId": "limits",
+          "gate": "cut",
+          "problems": []
+        }
+      ],
+      "criteria": [
+        {
+          "criterionId": "c1",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c2",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1", "action.2"]
+        },
+        {
+          "criterionId": "c3",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["assessment"]
+        },
+        {
+          "criterionId": "c6",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.1"]
+        },
+        {
+          "criterionId": "c7",
+          "kind": "progress",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2"]
+        },
+        {
+          "criterionId": "c8",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c9",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c10",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c11",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c12",
+          "kind": "progress",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c13",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c14",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c15",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c16",
+          "kind": "safety",
+          "result": "not_applicable",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c17",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": ["action.2"]
+        },
+        {
+          "criterionId": "c18",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c19",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c20",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c21",
+          "kind": "safety",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        },
+        {
+          "criterionId": "c22",
+          "kind": "grounding",
+          "result": "pass",
+          "hits": 1,
+          "confidence": "high",
+          "locationRefs": []
+        }
+      ],
+      "findings": [
+        {
+          "key": "missed_stop|assessment",
+          "type": "missed_stop",
+          "severity": "critical",
+          "confidence": "high",
+          "fixability": "unfixable",
+          "locationRefs": ["assessment"],
+          "criterionIds": [],
+          "hits": 1,
+          "lenses": ["critic.safety"],
+          "rationale": "The page shows the mark 'Applied ·' on the job listing, indicating the application limit has been reached; the plan does not terminate as it should.",
+          "reconciledTo": null
+        },
+        {
+          "key": "skipped_step|action.1",
+          "type": "skipped_step",
+          "severity": "high",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.1"],
+          "criterionIds": ["c6"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan should have successfully opened the job listing with taskStart to allow the application process; instead, it skipped this step.",
+          "reconciledTo": null
+        },
+        {
+          "key": "stuck_loop|action.2",
+          "type": "stuck_loop",
+          "severity": "medium",
+          "confidence": "high",
+          "fixability": "requires_retry",
+          "locationRefs": ["action.2"],
+          "criterionIds": ["c7"],
+          "hits": 1,
+          "lenses": ["critic.mission"],
+          "rationale": "The plan attempted to click the 'Easy Apply' button after having already passed this listing in the recent actions, leading to a repeated action with no new results.",
+          "reconciledTo": null
+        }
+      ],
+      "discarded": [],
+      "diagnostics": []
+    }
+  }
+]

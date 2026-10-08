@@ -172,12 +172,16 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       ...STANDARD_SCORING.penalties,
       contradicted: STANDARD_SCORING.confidenceWeights.low,
     },
-    // One sample per lens is one opinion. A blocker that cites criteria is
-    // held to them: it blocks only when the evaluator failed a gating
-    // criterion it cites. Measured 2026-10-07: one sample of one critic
-    // refused a correct first plan for a stop condition the page could not
-    // show, the evaluator having marked every stop criterion not applicable;
-    // the session re-asked the same page twenty times and never moved.
+    // One sample per lens is one opinion. A blocker is held to the criteria
+    // it cites: it blocks only when the evaluator failed a gating criterion it
+    // cites, and one that cites none is priced, never a veto. Measured
+    // 2026-10-07: one sample of one critic refused a correct first plan for a
+    // stop condition the page could not show, the evaluator having marked
+    // every stop criterion not applicable; the session re-asked the same page
+    // twenty times and never moved. Measured 2026-10-08: the same critic,
+    // citing nothing, vetoed five of 31 plans alone, and its fifth rationale
+    // became the next plan's only objection and ended the session on a limit
+    // no page had shown.
     evidence: {
       minHits: 1,
       minAssessedShare: 0.75,

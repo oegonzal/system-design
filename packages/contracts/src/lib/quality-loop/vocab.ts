@@ -157,11 +157,11 @@ export const REFUSING_GATES = ['block', 'cut'] as const satisfies readonly Valid
 /**
  * What a confirmed finding needs, beyond agreement, before it may block.
  * `none`: agreement alone — a confirmed finding of a gating type or a blocking
- * severity closes the gate. `cited`: a blocker that cites criteria is held to
- * them — it blocks only when the evaluator failed a gating criterion it cites,
- * and is priced like any other finding otherwise; one that cites none made no
- * checkable claim and blocks as under `none`. Two judges reading the same
- * fact apart is the agreement a one-sample lens cannot supply for itself.
+ * severity closes the gate. `cited`: a blocker is held to the criteria it
+ * cites — it blocks only when the evaluator failed a gating criterion it
+ * cites, and is priced like any other finding otherwise; one that cites none
+ * made no checkable claim and is priced, never a veto. Two judges reading the
+ * same fact apart is the agreement a one-sample lens cannot supply for itself.
  */
 export const CORROBORATIONS = ['none', 'cited'] as const;
 export type Corroboration = (typeof CORROBORATIONS)[number];

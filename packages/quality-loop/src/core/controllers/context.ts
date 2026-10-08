@@ -295,11 +295,15 @@ const agreed = (item: { hits: number }, policy: DecisionPolicy): boolean =>
 
 /**
  * Whether the evaluator bore a finding out, where the policy asks. Under
- * `cited`, a finding that names criteria is held to them: one of them must be
- * a gating criterion the evaluator failed. A finding that names none made no
- * claim the evaluator could check, and stands on its agreement alone — the
- * safety net for a fault the rubric never spelled out. Under `none`, every
- * finding stands on agreement alone, as every pipeline before the field did.
+ * `cited`, a finding is held to the criteria it names: one of them must be a
+ * gating criterion the evaluator failed. A finding that names none made no
+ * claim the evaluator could check: it is priced by its severity and
+ * confidence like any other, and never blocks. Measured 2026-10-08: one
+ * sample of one critic, citing nothing, vetoed five of a session's 31 plans
+ * by itself, and the fifth veto's words — carried to the next plan as its one
+ * objection — ended the session on a limit no page had shown. Under `none`,
+ * every finding stands on agreement alone, as every pipeline before the
+ * field did.
  */
 const corroborated = (
   finding: ConfirmedFinding,
@@ -307,7 +311,6 @@ const corroborated = (
   policy: DecisionPolicy,
 ): boolean =>
   (policy.evidence.corroboration ?? 'none') === 'none' ||
-  finding.criterionIds.length === 0 ||
   finding.criterionIds.some((id) => failedGating.has(id));
 
 /** How much of the contract was judged at all; zero when there was nothing to judge. */

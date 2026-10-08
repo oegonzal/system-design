@@ -216,7 +216,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-5',
     statement:
-      'Multi-sample agreement confirms an item at or above minHits with lower-middle-median ordinals, discards and traces the rest, and a finding reconciled to a failed or partial criterion is never priced twice; under a pipeline that declares cited corroboration, a confirmed finding that would block — by its type’s gate or its severity — and cites criteria blocks only when the evaluator failed a gating criterion it cites, is priced at the policy’s declared contradicted multiplier when the evaluator judged every criterion it cites pass or not applicable, and one that cites none blocks on its agreement alone; every decision records by key which validators refused, which findings blocked and which gating criteria failed.',
+      'Multi-sample agreement confirms an item at or above minHits with lower-middle-median ordinals, discards and traces the rest, and a finding reconciled to a failed or partial criterion is never priced twice; under a pipeline that declares cited corroboration, a confirmed finding that would block — by its type’s gate or its severity — and cites criteria blocks only when the evaluator failed a gating criterion it cites, is priced at the policy’s declared contradicted multiplier when the evaluator judged every criterion it cites pass or not applicable, and one that cites none is priced and never blocks; every decision records by key which validators refused, which findings blocked and which gating criteria failed.',
   },
   {
     id: 'QL-6',

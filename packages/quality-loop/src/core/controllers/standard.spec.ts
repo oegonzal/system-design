@@ -210,7 +210,7 @@ describe('the standard controller', () => {
     ).toBe(false);
   });
 
-  it('[QL-5] under cited corroboration a blocker that cites criteria blocks only when the evaluator failed a gating one it cites; uncited, it blocks on agreement alone', () => {
+  it('[QL-5] under cited corroboration a blocker that cites criteria blocks only when the evaluator failed a gating one it cites; uncited, it is priced and never blocks', () => {
     // Measured 2026-10-07: one sample of one critic refused a correct plan for
     // a stop condition the page could not show, having cited the four stop
     // criteria — every one of which the evaluator had marked not applicable.
@@ -265,12 +265,17 @@ describe('the standard controller', () => {
       criteria: ['c1'],
     });
 
-    // Cites nothing: no claim the evaluator could check, so agreement stands.
+    // Cites nothing: no claim the evaluator could check, so it is priced and
+    // never a veto. Measured 2026-10-08: one sample citing nothing vetoed five
+    // of 31 plans alone, and its last rationale ended the session on a limit
+    // no page had shown.
     const uncited = decide(
       ledger({ criteria: [evidence({ criterionId: 'c1' })], findings: [blocker([])] }),
       cited,
     );
-    expect(uncited.gates.policyAllowed).toBe(false);
+    expect(uncited.gates.policyAllowed).toBe(true);
+    expect(uncited.blocking.findings).toEqual([]);
+    expect(dimensionOf(uncited, 'form').penalties.map((p) => p.points)).toEqual([40]);
 
     // Cites only a non-gating criterion the evaluator failed: not the same fact.
     const niceOnly = {
