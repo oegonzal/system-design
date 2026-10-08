@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
+import { bulletsUnder } from './mission-sections';
 import type { ObservedElement } from './observation.schema';
 
 /**
@@ -59,17 +60,11 @@ export class MissionMarkMalformed extends Error {
  * grammar does not read refuses the mission.
  */
 export function marksOf(mission: string): Mark[] {
-  const lines = mission.split('\n');
-  const start = lines.findIndex((line) => line.trim() === MARKS_HEADING);
-  if (start === -1) return [];
-  const marks: Mark[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (/^#{1,2} /.test(line)) break;
-    if (line.trim() === '') continue;
-    const groups = MARK_LINE.exec(line.trim())?.groups;
-    if (groups === undefined) throw new MissionMarkMalformed(line.trim());
-    marks.push({ token: groups['token'] ?? '', meaning: groups['meaning'] ?? '' });
-  }
+  const marks = bulletsUnder(mission, MARKS_HEADING).map((line) => {
+    const groups = MARK_LINE.exec(line)?.groups;
+    if (groups === undefined) throw new MissionMarkMalformed(line);
+    return { token: groups['token'] ?? '', meaning: groups['meaning'] ?? '' };
+  });
   return marksSchema.parse(marks);
 }
 

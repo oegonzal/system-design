@@ -222,6 +222,20 @@ const repeatFault = (action: StepAction, index: StepIndex): string | null => {
   return `${action.kind}${ref === null ? '' : ` on ${ref}`} ran at the last step and the page did not change: repeating it is cut — act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now`;
 };
 
+/**
+ * A terminate for a cause the mission ties to words rests on those words
+ * being shown. Measured 2026-10-08: a session ended `limit-reached` on a
+ * results page that showed no word about a limit — the plan rested on a
+ * critic's sentence about a mark, and the evaluator read the same words.
+ * On a page that shows nothing the claim rule above already refuses it.
+ */
+const stopFault = (action: StepAction, index: StepIndex): string | null => {
+  if (action.kind !== 'terminate' || !index.pageShowsContent) return null;
+  const tied = index.stops.filter((stop) => stop.cause === action.cause);
+  if (tied.length === 0 || tied.some((stop) => stop.shown)) return null;
+  return `terminate ${action.cause}: the mission ties it to the words ${tied.map((stop) => quote(stop.token)).join(' or ')}, which this page does not show`;
+};
+
 const limits: Rule = (plan, index) => {
   const elements = new Map(index.elements.map((element) => [element.ref, element]));
   const problems: ValidationProblem[] = [];
@@ -265,6 +279,8 @@ const limits: Rule = (plan, index) => {
     if (claim !== null) problems.push(problem(claim.severity, claim.message, at));
     const repeat = repeatFault(action, index);
     if (repeat !== null) problems.push(problem('high', repeat, at));
+    const stop = stopFault(action, index);
+    if (stop !== null) problems.push(problem('high', stop, at));
     // Past a page replacement every action is already refused above; the
     // stale-claim rule says what a replacement rule did not.
     const stale = replaced === null ? staleClaimFault(action, mutated) : null;

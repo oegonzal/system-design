@@ -14,4 +14,5 @@ export * from './guidance';
 export * from './records';
 export * from './fixtures';
 export * from './mission-marks';
+export * from './mission-stops';
 export * from './action-identity';

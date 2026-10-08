@@ -28,6 +28,7 @@ import {
 } from './observation.schema';
 import { refNowOf, type RanAction } from './action-identity';
 import { MARK_TOKEN_MAX_LENGTH, marksOf, marksOn, type Mark } from './mission-marks';
+import { STOP_TOKEN_MAX_LENGTH, stopsOf, stopsOnPage, type StopOnPage } from './mission-stops';
 import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
 import { ACTIONS_BOUND } from './step-plan.schema';
 import {
@@ -35,6 +36,7 @@ import {
   HIDDEN_TRAITS,
   LANDMARK_ROLES,
   STEP_ACTION_KINDS,
+  TERMINATE_CAUSES,
   TASK_OUTCOME_SPENDS,
   TASK_OUTCOMES,
   type LandmarkRole,
@@ -138,6 +140,21 @@ export const stepIndexSchema = z.strictObject({
       }),
     )
     .max(ACTIONS_BOUND.ceiling)
+    .default([]),
+  /**
+   * The stop conditions the mission ties to words on the page, and whether
+   * this page shows them. A terminate for a tied cause is cut when none of
+   * its words is shown; a cause tied to no words is not listed and is the
+   * judges' to assess. Written only when the mission ties a cause to words.
+   */
+  stops: z
+    .array(
+      z.strictObject({
+        cause: z.enum(TERMINATE_CAUSES),
+        token: bounded.id(STOP_TOKEN_MAX_LENGTH, { min: 1 }),
+        shown: z.boolean(),
+      }),
+    )
     .default([]),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
@@ -331,6 +348,7 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
 const indexOf = (
   input: StepGoalInput,
   marks: readonly Mark[],
+  stops: readonly StopOnPage[],
 ): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
@@ -360,7 +378,18 @@ const indexOf = (
         })),
       }
     : {}),
+  ...(stops.length > 0 ? { stops: [...stops] } : {}),
 });
+
+/** The Limits line for the causes the mission ties to words: what each needs, and which of the words this page shows. */
+function stopsLimit(stops: readonly StopOnPage[]): string {
+  const needs = new Map<string, string[]>();
+  for (const stop of stops) {
+    needs.set(stop.cause, [...(needs.get(stop.cause) ?? []), quote(stop.token)]);
+  }
+  const shown = [...new Set(stops.filter((stop) => stop.shown).map((stop) => quote(stop.token)))];
+  return `- A terminate is cut unless this page shows the words the mission ties to its cause — ${[...needs].map(([cause, tokens]) => `${cause} needs ${tokens.join(' or ')}`).join('; ')}. This page shows ${shown.length === 0 ? 'none of them' : shown.join(' and ')}.`;
+}
 
 /** One action that ran, as the page would know it again: `click button "Next"`, `fill searchbox "Search" "x"`, `press Enter`. */
 const describeRan = (ran: RanAction): string =>
@@ -374,6 +403,7 @@ const describeRan = (ran: RanAction): string =>
 export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES): string {
   const { observation } = input;
   const marks = marksOf(input.mission);
+  const stops = stopsOnPage(stopsOf(input.mission), observation);
   const goal = [
     '# Mission',
     '',
@@ -461,12 +491,13 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
       : [
           `- An element marked ${marks.map((mark) => quote(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
         ]),
+    ...(stops.length === 0 ? [] : [stopsLimit(stops)]),
     // The page already answered a repeated question. Measured 2026-10-08: nine
     // steps of 31 re-clicked the one card the pane already showed.
     '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it. Act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now.',
     '- Validators check these limits; they are not criteria.',
     '',
-    renderIndexSection(indexOf(input, marks)),
+    renderIndexSection(indexOf(input, marks, stops)),
   ].join('\n');
   return withinBudget(goal, budget);
 }

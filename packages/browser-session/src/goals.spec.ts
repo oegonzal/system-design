@@ -6,6 +6,7 @@ import {
   emptyLedger,
   formObservation,
   marksOf,
+  stopsOf,
   TASK_OUTCOMES,
   TERMINATE_CAUSES,
 } from '@sysdesign/contracts';
@@ -64,11 +65,11 @@ describe('the goals', () => {
       for (const heading of TEMPLATE_HEADINGS) {
         expect(`\n${text}`, `missing ${heading}`).toContain(`\n${heading}\n`);
       }
-      const stops = text.slice(text.indexOf('## Stop conditions'), text.indexOf('## Never do'));
-      const causes = [...stops.matchAll(/^- ([a-z-]+):/gm)].map((match) => match[1]);
-      expect(causes.length).toBeGreaterThan(0);
-      for (const cause of causes) expect(TERMINATE_CAUSES).toContain(cause);
-      expect(causes).toContain('mission-complete');
+      // The Stop conditions read whole as the grammar the engine checks them by:
+      // a cause word, the words the page shows when it holds, the meaning.
+      const stops = stopsOf(text);
+      expect(stops.length).toBeGreaterThan(0);
+      expect(stops.map((stop) => stop.cause)).toContain('mission-complete');
       // A Marks section, when a goal has one, reads whole: a mark nobody reads is a trap.
       expect(() => marksOf(text)).not.toThrow();
       const events = text.slice(text.indexOf('## Task events'));

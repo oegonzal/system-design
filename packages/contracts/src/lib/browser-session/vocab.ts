@@ -11,7 +11,9 @@ export type BrowserSessionStatus = (typeof BROWSER_SESSION_STATUSES)[number];
  * Why a plan may end the session — the model's word, chosen from the mission's
  * stop conditions. `limit-reached`: the site says no more today. `login-wall`:
  * the signed-in profile is signed out. `blocked`: the mission cannot proceed
- * from here and no step would change that.
+ * from here and no step would change that. A mission may tie a cause to the
+ * words the page shows when it holds (`mission-stops.ts`); a terminate for
+ * such a cause is cut on a page without them.
  */
 export const TERMINATE_CAUSES = [
   'mission-complete',

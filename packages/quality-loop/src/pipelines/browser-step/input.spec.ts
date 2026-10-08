@@ -101,6 +101,8 @@ describe('the browser-step input codec', () => {
       pageShowsContent: true,
       pageUnchanged: false,
       lastRan: [],
+      // The fixture mission ties one cause to words; the form page shows none of them.
+      stops: [{ cause: 'limit-reached', token: 'no more applications', shown: false }],
     });
   });
 

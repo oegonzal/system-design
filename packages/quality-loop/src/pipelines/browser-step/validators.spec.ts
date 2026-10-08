@@ -386,6 +386,54 @@ describe('the browser-step validators', () => {
     ]);
   });
 
+  it('[QL-36] a terminate for a cause the mission ties to words is cut on a page that does not show them, and stands on one that does', () => {
+    // Measured 2026-10-08: the session ended limit-reached on a results page
+    // none of whose snapshots carried the word; the fixture mission ties the
+    // cause to "no more applications", which the listing does not show.
+    const limit: StepAction = {
+      kind: 'terminate',
+      cause: 'limit-reached',
+      detail: 'the site says the daily limit is reached',
+      reason: "the mission's stop condition is on the page",
+      expect: null,
+      serves: [],
+    };
+    expect(problems(samplePlan([limit])).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'terminate limit-reached: the mission ties it to the words "no more applications", which this page does not show',
+      },
+    ]);
+    // A cause the mission ties to no words is the judges' to assess.
+    expect(problems(samplePlan([terminate()])).limits).toEqual([]);
+    // The words shown by an element's name — or by any one of several bullets for the cause — carry the terminate.
+    const shown = MISSION_FIXTURE.replace(
+      '- limit-reached "no more applications":',
+      '- limit-reached "Globex":',
+    );
+    expect(
+      problems(samplePlan([limit]), stepGoal(listingObservation(), emptyLedger(), shown)).limits,
+    ).toEqual([]);
+    const either = MISSION_FIXTURE.replace(
+      '- limit-reached "no more applications":',
+      '- limit-reached "Globex": the one card.\n- limit-reached "no more applications":',
+    );
+    expect(
+      problems(samplePlan([limit]), stepGoal(listingObservation(), emptyLedger(), either)).limits,
+    ).toEqual([]);
+    const neither = either.replace('"Globex"', '"Initech"');
+    expect(
+      problems(samplePlan([limit]), stepGoal(listingObservation(), emptyLedger(), neither)).limits,
+    ).toMatchObject([
+      {
+        message:
+          'terminate limit-reached: the mission ties it to the words "Initech" or "no more applications", which this page does not show',
+      },
+    ]);
+  });
+
   it('[QL-36] a terminate or taskDone on a page that shows nothing is refused there: no stop condition or outcome is shown to rest it on', () => {
     // Measured 2026-10-07: twelve plans in a row terminated an empty document
     // for a limit the page could not show. Read from the index's own account of
