@@ -3,12 +3,12 @@ import { join } from 'node:path';
 
 import {
   composeStepGoal,
-  emptyLedger,
   formObservation,
   marksOf,
   stopsOf,
   TASK_OUTCOMES,
   TERMINATE_CAUSES,
+  stepGoalInput,
 } from '@sysdesign/contracts';
 
 /**
@@ -81,16 +81,7 @@ describe('the goals', () => {
       ))
         expect(TASK_OUTCOMES).toContain(word);
       expect(() =>
-        composeStepGoal({
-          mission: text,
-          observation: formObservation(),
-          history: [],
-          ledger: emptyLedger(),
-          objections: [],
-          progress: { criteria: [], settled: [], done: [] },
-          pageUnchanged: false,
-          lastRan: [],
-        }),
+        composeStepGoal(stepGoalInput({ mission: text, observation: formObservation() })),
       ).not.toThrow();
     },
   );

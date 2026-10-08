@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { keptAtMost, LESSON_CHUNK_BOUND } from '@sysdesign/contracts';
+import { keptAtMost, LESSON_CHUNK_BOUND, GOAL_BUDGET_BYTES, textBytes } from '@sysdesign/contracts';
 
-import { GOAL_MAX_BYTES, goalBytes } from '../../../core/contracts';
 import {
   KNOWN_HEADING,
   MAX_CANDIDATES,
@@ -47,7 +46,7 @@ describe('the recall query', () => {
     expect(longest.candidates.map((candidate) => candidate.source.runId)).toEqual(
       Array.from({ length: longest.candidates.length }, (_, index) => `run-${index}`),
     );
-    expect(goalBytes(renderQuery(longest))).toBeLessThanOrEqual(GOAL_MAX_BYTES);
+    expect(textBytes(renderQuery(longest))).toBeLessThanOrEqual(GOAL_BUDGET_BYTES);
   });
 
   it('[QL-16] [QL-52] counts the lessons the goal budget left out of the query, and none when every one fit', () => {

@@ -5,10 +5,16 @@
  * verbatim. This file renders that record as the goal every stage reads and
  * reads its own bookkeeping back from the last fenced JSON block.
  */
-import { bound, bounded, renderIndexSection } from '@sysdesign/contracts';
+import {
+  bound,
+  bounded,
+  renderIndexSection,
+  GOAL_BUDGET_BYTES,
+  textBytes,
+  readFencedIndex,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
-import { GOAL_MAX_BYTES, goalBytes, readFencedIndex } from '../../core/contracts';
 import {
   ADOPTED_FINDING_NOTE,
   ALIAS_MAX,
@@ -94,8 +100,8 @@ export type ExperienceRecord = z.infer<typeof recordShape>;
  * it; an orchestrator handing one over gets a refusal instead of a clip.
  */
 export const experienceRecordSchema = recordShape.refine(
-  (record) => goalBytes(renderGoal(record)) <= GOAL_MAX_BYTES,
-  { message: `the record renders beyond the goal budget of ${GOAL_MAX_BYTES} bytes` },
+  (record) => textBytes(renderGoal(record)) <= GOAL_BUDGET_BYTES,
+  { message: `the record renders beyond the goal budget of ${GOAL_BUDGET_BYTES} bytes` },
 );
 
 /** Rules an orchestrator can state as they are; they guide the producer and the critics. */

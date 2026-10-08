@@ -5,6 +5,7 @@ import {
   type PageObservation,
   type StepAction,
   type StepPlan,
+  observedElement,
 } from '@sysdesign/contracts';
 
 import type { ScriptedPage } from './testing';
@@ -22,33 +23,6 @@ export const JOURNEY_URLS = {
   listing: 'https://jobs.example.test/apply/42',
   done: 'https://jobs.example.test/apply/42/done',
 } as const;
-
-export const element = (
-  ref: string,
-  role: string,
-  name: string,
-  overrides: Partial<ObservedElement> = {},
-): ObservedElement => ({
-  ref,
-  role,
-  name,
-  text: null,
-  kind: 'clickable',
-  inputType: null,
-  value: null,
-  options: null,
-  optionsOmitted: 0,
-  required: false,
-  invalid: false,
-  disabled: false,
-  visible: true,
-  maxLength: null,
-  hiddenTraits: [],
-  context: null,
-  scope: null,
-  landmark: null,
-  ...overrides,
-});
 
 export const observation = (
   url: string,
@@ -70,17 +44,17 @@ export const journeyPages = (): ScriptedPage[] => [
   {
     id: 'search',
     observation: observation(JOURNEY_URLS.search, 'Search', [
-      element('e1', 'searchbox', 'Search', { kind: 'fillable' }),
-      element('e2', 'button', 'Search'),
+      observedElement('e1', 'searchbox', 'Search', { kind: 'fillable' }),
+      observedElement('e2', 'button', 'Search'),
     ]),
     transitions: { 'click e2': 'results' },
   },
   {
     id: 'results',
     observation: observation(JOURNEY_URLS.results, 'Results', [
-      element('e1', 'link', 'Senior Engineer — Acme'),
-      element('e2', 'link', 'Staff Engineer — Globex'),
-      element('e3', 'button', 'Next page'),
+      observedElement('e1', 'link', 'Senior Engineer — Acme'),
+      observedElement('e2', 'link', 'Staff Engineer — Globex'),
+      observedElement('e3', 'button', 'Next page'),
     ]),
     transitions: { 'click e1': 'form' },
   },
@@ -88,7 +62,7 @@ export const journeyPages = (): ScriptedPage[] => [
   {
     id: 'done',
     observation: observation(JOURNEY_URLS.done, 'Application sent', [
-      element('e1', 'button', 'Dismiss'),
+      observedElement('e1', 'button', 'Dismiss'),
     ]),
   },
 ];

@@ -25,7 +25,13 @@ import {
 } from './input';
 import type { ExperienceDigest } from './output';
 
-export { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun } from '../../core/testing';
+export {
+  PERSISTED_KEY,
+  RESOLVED_KEY,
+  sampleIterations,
+  sampleRun,
+  sampleTrace,
+} from '../../core/testing';
 
 export const sampleDigest = (overrides: Partial<ExperienceDigest> = {}): ExperienceDigest => ({
   summary:

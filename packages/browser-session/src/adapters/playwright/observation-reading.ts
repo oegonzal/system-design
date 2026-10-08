@@ -15,9 +15,9 @@ import {
   type ObservationReading,
   type ObservedElement,
   type PageObservation,
+  excerpt,
 } from '@sysdesign/contracts';
 
-import { clip } from '../../core/text';
 import { fitSnapshot, type FittedSnapshot, type SnapshotNode } from './aria-snapshot';
 import { hiddenTraitsOf, type ElementFacts } from './element-facts';
 
@@ -79,22 +79,22 @@ export function toObservedElement(
   landmark: LandmarkRole | null = null,
 ): ObservedElement {
   const unnamed = node.name === null || node.name === '';
-  const name = clip(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target);
-  const text = unnamed ? clip(words || facts.text, ELEMENT_NAME_BOUND.target) : '';
+  const name = excerpt(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target);
+  const text = unnamed ? excerpt(words || facts.text, ELEMENT_NAME_BOUND.target) : '';
   return {
     ref: node.ref ?? '',
-    role: clip(node.role, ROLE_MAX),
+    role: excerpt(node.role, ROLE_MAX),
     name,
     text: text === '' ? null : text,
     kind: elementKind(node.role, facts),
-    inputType: facts.inputType === null ? null : clip(facts.inputType, INPUT_TYPE_MAX),
-    value: facts.value === null ? null : clip(facts.value, ELEMENT_VALUE_BOUND.target),
+    inputType: facts.inputType === null ? null : excerpt(facts.inputType, INPUT_TYPE_MAX),
+    value: facts.value === null ? null : excerpt(facts.value, ELEMENT_VALUE_BOUND.target),
     options:
       facts.options === null
         ? null
         : facts.options
             .slice(0, OPTIONS_BOUND.target)
-            .map((option) => clip(option, OPTION_BOUND.target)),
+            .map((option) => excerpt(option, OPTION_BOUND.target)),
     optionsOmitted:
       facts.options === null ? 0 : Math.max(0, facts.options.length - OPTIONS_BOUND.target),
     required: facts.required,
@@ -103,13 +103,13 @@ export function toObservedElement(
     visible: facts.visible,
     maxLength: facts.maxLength,
     hiddenTraits: hiddenTraitsOf(facts),
-    context: facts.context === null ? null : clip(facts.context, ELEMENT_NAME_BOUND.target),
+    context: facts.context === null ? null : excerpt(facts.context, ELEMENT_NAME_BOUND.target),
     scope:
       scope === null
         ? null
         : {
             role: scope.role,
-            name: clip(scope.name, ELEMENT_NAME_BOUND.target),
+            name: excerpt(scope.name, ELEMENT_NAME_BOUND.target),
             modal: facts.modal,
           },
     landmark,
@@ -168,8 +168,8 @@ export function toObservation(reading: PageReading, read: ObservationReading): P
   const listed = all.slice(0, ELEMENTS_BOUND.target);
   const nothingUnread = reading.unreadElements === 0 && reading.unreadSnapshotLines === 0;
   return {
-    url: clip(reading.url, URL_MAX_LENGTH),
-    title: clip(reading.title, TITLE_BOUND.target),
+    url: excerpt(reading.url, URL_MAX_LENGTH),
+    title: excerpt(reading.title, TITLE_BOUND.target),
     elements: listed,
     omittedElements: all.length - listed.length,
     unread: nothingUnread

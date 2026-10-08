@@ -9,6 +9,7 @@ import {
   listingObservation,
   MISSION_FIXTURE,
   openTaskLedger,
+  stepGoalInput,
 } from './fixtures';
 import type { ObservedElement, PageObservation } from './observation.schema';
 import {
@@ -43,15 +44,9 @@ const goalOf = (
   ledger = emptyLedger(),
   objections: readonly StepObjection[] = [],
 ) =>
-  composeStepGoal({
-    mission: MISSION_FIXTURE,
-    observation,
-    history,
-    ledger,
-    objections,
-    progress: NO_PROGRESS,
-    pageUnchanged: false,
-  });
+  composeStepGoal(
+    stepGoalInput({ observation, history, ledger, objections, progress: NO_PROGRESS }),
+  );
 
 /** One objection at its declared ceiling, as a maximal goal would carry it. */
 const maximalObjection = (step: number): StepObjection => ({
@@ -263,15 +258,12 @@ describe('composeStepGoal', () => {
       { id: 'c5', kind: 'safety', statement: 'Never sign in.' },
       { id: 'c6', kind: 'progress', statement: 'Submit on the review page.' },
     ];
-    const goal = composeStepGoal({
-      mission: MISSION_FIXTURE,
-      observation: listingObservation(),
-      history: [],
-      ledger: openTaskLedger(),
-      objections: [],
-      progress: { criteria, settled: ['c2'], done: ['c3'] },
-      pageUnchanged: false,
-    });
+    const goal = composeStepGoal(
+      stepGoalInput({
+        ledger: openTaskLedger(),
+        progress: { criteria, settled: ['c2'], done: ['c3'] },
+      }),
+    );
     const section = between(goal, '## Progress', '## Limits');
     expect(section).toContain('- Satisfied earlier this session, not graded on this page:');
     expect(section).toContain('  - c2 — Open the jobs search and run the search.');
@@ -302,16 +294,13 @@ describe('composeStepGoal', () => {
     // The page section says when nothing moved, and only then.
     expect(goalOf(formObservation())).not.toContain('Unchanged since the last plan');
     expect(
-      composeStepGoal({
-        mission: MISSION_FIXTURE,
-        observation: formObservation(),
-        history: [],
-        ledger: emptyLedger(),
-        objections: [],
-        progress: NO_PROGRESS,
-        pageUnchanged: true,
-        lastRan: [],
-      }),
+      composeStepGoal(
+        stepGoalInput({
+          observation: formObservation(),
+          progress: NO_PROGRESS,
+          pageUnchanged: true,
+        }),
+      ),
     ).toContain('Unchanged since the last plan: the recent actions moved nothing on this page.');
   });
 
@@ -402,15 +391,7 @@ describe('stepPlanSchema', () => {
     // that said the listing was applied to; told in prose, the planner read
     // the words around it and clicked the card fifteen times.
     const marked = `${MISSION_FIXTURE}\n\n## Marks\n\n- "Globex": not this one.\n- "Acme": the house account.\n`;
-    const goal = composeStepGoal({
-      mission: marked,
-      observation: listingObservation(),
-      history: [],
-      ledger: emptyLedger(),
-      objections: [],
-      progress: { criteria: [], settled: [], done: [] },
-      pageUnchanged: false,
-    });
+    const goal = composeStepGoal(stepGoalInput({ mission: marked }));
     expect(goal).toMatch(/^- e4 · link · "Staff Engineer — Globex" · marked "Globex"$/m);
     expect(goal).toMatch(/^- e3 · link · "Senior Engineer — Acme" · marked "Acme"$/m);
     expect(goal).toContain(
@@ -434,15 +415,9 @@ describe('stepPlanSchema', () => {
     );
     // A Marks line the grammar does not read refuses the goal before any page is planned against it.
     expect(() =>
-      composeStepGoal({
-        mission: `${MISSION_FIXTURE}\n\n## Marks\n\n- Globex without quotes\n`,
-        observation: listingObservation(),
-        history: [],
-        ledger: emptyLedger(),
-        objections: [],
-        progress: { criteria: [], settled: [], done: [] },
-        pageUnchanged: false,
-      }),
+      composeStepGoal(
+        stepGoalInput({ mission: `${MISSION_FIXTURE}\n\n## Marks\n\n- Globex without quotes\n` }),
+      ),
     ).toThrow(MissionMarkMalformed);
   });
 

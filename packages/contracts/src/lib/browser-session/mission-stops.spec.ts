@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { emptyLedger, listingObservation, MISSION_FIXTURE } from './fixtures';
+import { listingObservation, MISSION_FIXTURE, stepGoalInput } from './fixtures';
 import {
   MissionStopMalformed,
   STOPS_BOUND,
@@ -73,17 +73,7 @@ describe('the stop conditions a mission declares', () => {
   });
 
   it('[BRW-8] the composer writes the tied causes into the index and tells the planner what each needs and what this page shows', () => {
-    const compose = (mission: string): string =>
-      composeStepGoal({
-        mission,
-        observation: listingObservation(),
-        history: [],
-        ledger: emptyLedger(),
-        objections: [],
-        progress: { criteria: [], settled: [], done: [] },
-        pageUnchanged: false,
-        lastRan: [],
-      });
+    const compose = (mission: string): string => composeStepGoal(stepGoalInput({ mission }));
     const goal = compose(
       withStops(
         '- limit-reached "no more applications": none left today.\n- limit-reached "try again": asked to come back.\n- login-wall "Globex": the house account.\n- mission-complete: no listing is left.',

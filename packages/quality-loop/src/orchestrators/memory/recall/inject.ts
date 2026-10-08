@@ -3,7 +3,7 @@
  * advisory section under a marker heading, appended within the engine's goal
  * budget. `bareGoal` strips at the marker, so nothing parses prose.
  */
-import { GOAL_MAX_BYTES } from '../../../core/contracts';
+import { GOAL_BUDGET_BYTES } from '@sysdesign/contracts';
 import { lessonOf } from './provenance';
 import type { UsableMemory } from './read-pack';
 
@@ -44,7 +44,7 @@ const rememberedLine = (usable: UsableMemory): string => {
 export function withMemory(
   goal: string,
   usable: readonly UsableMemory[],
-  budget = GOAL_MAX_BYTES,
+  budget = GOAL_BUDGET_BYTES,
 ): { goal: string; injected: number } | null {
   const bytes = (text: string): number => Buffer.byteLength(text, 'utf8');
   if (usable.length === 0 || bytes(goal) >= budget) return null;

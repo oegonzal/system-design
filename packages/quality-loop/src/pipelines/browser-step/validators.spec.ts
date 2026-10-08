@@ -8,6 +8,7 @@ import {
   openTaskLedger,
   type StepAction,
   type StepPlan,
+  stepGoalInput,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -186,16 +187,7 @@ describe('the browser-step validators', () => {
       { kind: 'click' as const, role: 'link', name: 'Senior Engineer — Acme', detail: null },
     ];
     const goalOn = (pageUnchanged: boolean): string =>
-      composeStepGoal({
-        mission: MISSION_FIXTURE,
-        observation: listingObservation(),
-        history: [],
-        ledger: emptyLedger(),
-        objections: [],
-        progress: { criteria: [], settled: [], done: [] },
-        pageUnchanged,
-        lastRan: ran,
-      });
+      composeStepGoal(stepGoalInput({ pageUnchanged, lastRan: ran }));
     const unchanged = goalOn(true);
     expect(problems(samplePlan([click('e3')]), unchanged).limits).toEqual([
       {

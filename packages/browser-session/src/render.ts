@@ -1,3 +1,4 @@
+import { excerpt } from '@sysdesign/contracts';
 import type {
   BrowserDecisionDto,
   BrowserSessionDetailDto,
@@ -6,7 +7,6 @@ import type {
 } from '@sysdesign/contracts';
 
 import type { SessionOutcome } from './core/session-engine';
-import { clip } from './core/text';
 import { isLive, SESSION_STALE_AFTER_MS } from './core/write-queue';
 
 /**
@@ -66,7 +66,7 @@ const taskRows = (tasks: readonly BrowserTaskDto[]): string =>
         ['#', 'label', 'status', 'outcome', 'steps', 'ref'],
         tasks.map((task) => [
           String(task.ordinal),
-          clip(task.label, 48),
+          excerpt(task.label, 48),
           task.status,
           task.outcome ?? '',
           `${task.startStep}${task.endStep === null ? '…' : `–${task.endStep}`}`,
@@ -85,8 +85,8 @@ const decisionRows = (decisions: readonly BrowserDecisionDto[]): string =>
           decision.source,
           decision.loopRunId ?? '',
           decision.ref ?? '',
-          clip(decision.question ?? '', 40),
-          clip(decision.answer ?? '', 32),
+          excerpt(decision.question ?? '', 40),
+          excerpt(decision.answer ?? '', 32),
           decision.confidence ?? '',
           decision.teachOrchestrationId ?? '',
         ]),

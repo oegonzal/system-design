@@ -93,16 +93,15 @@ rather than by review.
 
 ### `core/contracts/` — the vocabulary of a task
 
-| File              | What it does                                                           | Exports                                                                                        |
-| ----------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `task.ts`         | The pipeline's code half: parse, address and render an artifact.       | `OutputShape`, `TaskSpec`, `TaskContract`, `GOAL_MAX_BYTES`, `goalBytes`                       |
-| `output-shape.ts` | The layout habits every output shape shares.                           | `numbered`, `section`, `numberedSection`                                                       |
-| `goal-index.ts`   | Reads a codec's bookkeeping from the last fenced JSON block of a goal. | `readFencedIndex`, `FENCE_OPEN`, `FENCE_CLOSE`                                                 |
-| `validation.ts`   | The shape of an exact, blocking check a pipeline brings.               | `indexedValidator`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
-| `run-record.ts`   | One run as the service holds it, and as the wire sees it.              | `RunRecord`, `toRunDto`, `summariseExchange`                                                   |
+| File              | What it does                                                     | Exports                                                                                        |
+| ----------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `task.ts`         | The pipeline's code half: parse, address and render an artifact. | `OutputShape`, `TaskSpec`, `TaskContract`                                                      |
+| `output-shape.ts` | The layout habits every output shape shares.                     | `numbered`, `section`, `numberedSection`                                                       |
+| `validation.ts`   | The shape of an exact, blocking check a pipeline brings.         | `indexedValidator`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
+| `run-record.ts`   | One run as the service holds it, and as the wire sees it.        | `RunRecord`, `toRunDto`, `summariseExchange`                                                   |
 
-A validator reads the fenced index, never prose, and reports nothing on a malformed artifact — the
-schema validator owns that report. No model reads the index: `goalSection` in `core/stages/prompting.ts`
+A validator reads the fenced index — the codec is `goal-index.ts` in `@sysdesign/contracts`, shared with every
+composer — never prose, and reports nothing on a malformed artifact — the schema validator owns that report. No model reads the index: `goalSection` in `core/stages/prompting.ts`
 shows every stage the goal without its index section (`stripIndexSection` in `@sysdesign/contracts`), so a
 prompt carries the task alone while the validators read the goal as stored.
 

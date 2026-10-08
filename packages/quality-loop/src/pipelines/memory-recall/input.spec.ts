@@ -5,10 +5,11 @@ import {
   LESSON_INSIGHT_BOUND,
   lessonText,
   modelSchema,
+  GOAL_BUDGET_BYTES,
+  textBytes,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
 import { fill } from '../../core/testing';
 import {
   KNOWN_HEADING,
@@ -109,10 +110,10 @@ describe('the memory-recall input codec', () => {
     expect(fitted.candidates).toEqual(longest.candidates.slice(0, offered));
     expect(memoryQuerySchema.safeParse(fitted).success).toBe(true);
     const goal = renderGoal(fitted);
-    expect(goalBytes(goal)).toBeLessThanOrEqual(GOAL_MAX_BYTES);
+    expect(textBytes(goal)).toBeLessThanOrEqual(GOAL_BUDGET_BYTES);
     expect(readIndex(goal)?.candidates).toHaveLength(offered);
     const oneMore = { ...longest, candidates: longest.candidates.slice(0, offered + 1) };
-    expect(goalBytes(renderGoal(oneMore))).toBeGreaterThan(GOAL_MAX_BYTES);
+    expect(textBytes(renderGoal(oneMore))).toBeGreaterThan(GOAL_BUDGET_BYTES);
 
     // Lessons the length a digest asks for, every other field at its longest: all sixteen.
     const asked = maximalQuery(LESSON_CHUNK_BOUND.target);

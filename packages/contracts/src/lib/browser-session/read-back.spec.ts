@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type { IterationTrace } from '../quality-loop/decision';
 import type {
   ConfirmedFinding,
   CriterionEvidence,
   SuccessCriterion,
   ValidationReport,
 } from '../quality-loop/evidence';
+import { fakeRun } from '../quality-loop/run-fixtures';
 import type { QualityRunDto } from '../quality-loop/runs';
-import { REFUSING_GATES, type Decision } from '../quality-loop/vocab';
+import { type Decision } from '../quality-loop/vocab';
 import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
 import { fieldSpecOf } from './field-goal';
 import { formObservation } from './fixtures';
@@ -28,37 +28,28 @@ interface RunShape {
 /** A finished run with one iteration, judged as described; every other field is the quiet default. */
 function run(shape: RunShape): QualityRunDto {
   const finalDecision = shape.finalDecision ?? 'accept';
-  const findings: ConfirmedFinding[] = (shape.findings ?? []).map((f, i) => ({
-    key: f.key ?? `${f.type ?? 'defect'}|${(f.locationRefs ?? []).join(',')}`,
-    type: f.type ?? 'defect',
-    severity: f.severity ?? 'medium',
-    confidence: f.confidence ?? 'high',
-    fixability: f.fixability ?? 'fixable_local',
-    locationRefs: f.locationRefs ?? [],
-    criterionIds: f.criterionIds ?? [],
-    hits: 1,
-    lenses: [`critic.${i}`],
-    rationale: f.rationale ?? null,
-    reconciledTo: null,
-  }));
-  const policyAllowed = shape.policyAllowed ?? true;
-  const refusing = (shape.validation ?? []).filter(
-    (report) =>
-      (REFUSING_GATES as readonly string[]).includes(report.gate) && report.problems.length > 0,
-  );
-  const iteration: IterationTrace = {
-    iteration: 1,
-    mode: 'initial',
-    artifact: shape.artifact,
-    locations: [],
-    rendered: 'rendered',
-    validation: shape.validation ?? [],
-    critics: [],
-    evaluators: [],
-    ledger: {
-      artifactPresent: true,
-      validation: shape.validation ?? [],
-      criteria: (shape.criteria ?? []).map((c) => ({
+  return fakeRun(
+    'browser-step',
+    shape.artifact,
+    {
+      runId: 'run-1',
+      decision: finalDecision,
+      policyAllowed: shape.policyAllowed,
+      validation: shape.validation,
+      findings: (shape.findings ?? []).map((f, i) => ({
+        key: f.key ?? `${f.type ?? 'defect'}|${(f.locationRefs ?? []).join(',')}`,
+        type: f.type ?? 'defect',
+        severity: f.severity ?? 'medium',
+        confidence: f.confidence ?? 'high',
+        fixability: f.fixability ?? 'fixable_local',
+        locationRefs: f.locationRefs ?? [],
+        criterionIds: f.criterionIds ?? [],
+        hits: 1,
+        lenses: [`critic.${i}`],
+        rationale: f.rationale ?? null,
+        reconciledTo: null,
+      })),
+      evidence: (shape.criteria ?? []).map((c) => ({
         criterionId: c.criterionId ?? 'c1',
         kind: c.kind ?? 'progress',
         result: c.result ?? 'pass',
@@ -66,62 +57,12 @@ function run(shape: RunShape): QualityRunDto {
         confidence: 'high',
         locationRefs: c.locationRefs ?? [],
       })),
-      findings,
-      discarded: [],
-      diagnostics: [],
-    },
-    decision: {
-      finalDecision,
-      gates: {
-        artifactPresent: true,
-        validatorsPassed: refusing.length === 0,
-        evidenceSufficient: true,
-        policyAllowed,
-      },
-      // As the engine records it: every refusing report, and every finding
-      // when the policy gate is closed — never a finding when it is open.
-      blocking: {
-        validators: refusing.map((report) => report.validatorId),
-        findings: policyAllowed ? [] : findings.map((finding) => finding.key),
-        criteria: [],
-      },
-      scores: { dimensions: {}, overall: 80 },
-      selectedRemediations: [],
-      reason: `decided ${finalDecision}`,
-      trace: { steps: [], dimensions: [], weightSum: 1, weightedTotal: 80 },
-    },
-    remediations: [],
-    durationMs: 1,
-  };
-  return {
-    runId: 'run-1',
-    pipeline: 'browser-step',
-    status: 'complete',
-    startedAt: '2026-10-02T00:00:00.000Z',
-    finishedAt: '2026-10-02T00:01:00.000Z',
-    heartbeatAt: '2026-10-02T00:01:00.000Z',
-    llm: { model: 'fake' },
-    request: {
-      goal: 'g',
-      outputProvided: false,
       criteriaProvided: true,
-      adoptedFrom: null,
-      maxIterations: 1,
+      overall: 80,
+      reason: `decided ${finalDecision}`,
     },
-    parentRunId: null,
-    recall: null,
-    trace: {
-      pipeline: { id: 'browser-step', version: '1.0.0' },
-      contract: { goal: 'g', criteria: shape.contract ?? [] },
-      iterations: [iteration],
-      bestIteration: 1,
-      finalDecision,
-      stopReason: finalDecision === 'accept' ? 'accepted' : 'escalated',
-      lessons: [],
-    },
-    exchanges: [],
-    error: null,
-  };
+    shape.contract ?? [],
+  );
 }
 
 const plan: StepPlan = {

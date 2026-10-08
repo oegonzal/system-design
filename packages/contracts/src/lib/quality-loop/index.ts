@@ -8,6 +8,7 @@ export * from './decision';
 export * from './pipeline';
 export * from './run-dump';
 export * from './runs';
+export * from './run-fixtures';
 export * from './health';
 export * from './criteria';
 export * from './prompt-library';

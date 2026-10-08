@@ -1,8 +1,8 @@
+import { quoted } from '@sysdesign/contracts';
 import { createInterface } from 'node:readline/promises';
 
 import { fieldTypeOf } from '../../core/field-routing';
 import type { OperatorPort, OperatorPrompt, OperatorReply } from '../../core/ports';
-import { quote } from '../../core/text';
 
 /**
  * The operator at the terminal. A field that needs a person is highlighted
@@ -40,7 +40,7 @@ export function renderOperatorPrompt(prompt: OperatorPrompt): string[] {
   );
   const lines = [
     '──── operator needed ────',
-    `Field: ${quote(field.name)} (${facts.join(', ')})${field.context ? ` — ${field.context}` : ''}`,
+    `Field: ${quoted(field.name)} (${facts.join(', ')})${field.context ? ` — ${field.context}` : ''}`,
   ];
   if (field.options !== null) lines.push(`Options: ${field.options.join(' | ')}`);
   if (field.maxLength !== null) lines.push(`At most ${field.maxLength} characters.`);
@@ -50,7 +50,7 @@ export function renderOperatorPrompt(prompt: OperatorPrompt): string[] {
   lines.push(
     prompt.suggestion === null
       ? `No suggested value — ${prompt.why}`
-      : `Suggested: ${quote(prompt.suggestion)} — not trusted: ${prompt.why}`,
+      : `Suggested: ${quoted(prompt.suggestion)} — not trusted: ${prompt.why}`,
   );
   lines.push(
     `Type the answer, or fill the field in the browser and press Enter to read it back; ${OPERATOR_COMMANDS.blank} leaves it empty; ${OPERATOR_COMMANDS.stop} ends the session.`,

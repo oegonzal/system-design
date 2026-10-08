@@ -1,7 +1,8 @@
+import { finding } from '@sysdesign/contracts';
 import type { StepPlan } from '@sysdesign/contracts';
 
 import { BrainFaulted } from './ports';
-import { decidedAnswers, decidedPlan, FakeBrowser, finding, FixedClock, refusing } from './testing';
+import { decidedAnswers, decidedPlan, FakeBrowser, FixedClock, refusing } from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,

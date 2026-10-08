@@ -12,6 +12,7 @@ import {
   type FieldSpec,
   type OperatorGuidanceDto,
   type PageObservation,
+  excerpt,
 } from '@sysdesign/contracts';
 
 import type { DecisionInput, EngineContext } from './engine-context';
@@ -24,7 +25,6 @@ import {
   type OperatorReply,
 } from './ports';
 import { stepJsonFile } from './session-dump';
-import { clip } from './text';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
@@ -123,7 +123,7 @@ function remember(
   const { state } = ctx;
   state.operatorAnswers.set(field.name, answer);
   state.filled.set(field.name, answer);
-  const page = clip(observation.title, GUIDANCE_PAGE_MAX_LENGTH);
+  const page = excerpt(observation.title, GUIDANCE_PAGE_MAX_LENGTH);
   return {
     sessionId: state.sessionId,
     capturedAt: ctx.deps.clock.now().toISOString(),
@@ -135,7 +135,7 @@ function remember(
       options: field.options === null ? null : field.options.slice(0, OPTIONS_SHOWN),
     },
     context: { taskLabel: state.tasks.open?.label ?? null, page: page === '' ? null : page },
-    answer: clip(answer, GUIDANCE_ANSWER_MAX_LENGTH),
+    answer: excerpt(answer, GUIDANCE_ANSWER_MAX_LENGTH),
   };
 }
 

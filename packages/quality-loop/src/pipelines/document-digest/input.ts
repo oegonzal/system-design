@@ -11,9 +11,8 @@ import {
   DOCUMENT_DIGEST_ID,
   documentIndexSchema,
   type DocumentIndex,
+  readFencedIndex,
 } from '@sysdesign/contracts';
-
-import { readFencedIndex } from '../../core/contracts';
 
 export { DOCUMENT_DIGEST_ID };
 export type { DocumentIndex };

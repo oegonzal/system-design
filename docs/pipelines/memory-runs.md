@@ -279,7 +279,7 @@ this work.
   source. Free-text items stay positional (`gap.N`, `memory.N`).
 - **The schema is the byte budget.** `memoryQuerySchema` and
   `experienceRecordSchema` each carry a `.refine` asserting that
-  `renderGoal(x)` fits `GOAL_MAX_BYTES` (64,000). Without it a composed goal
+  `renderGoal(x)` fits `GOAL_BUDGET_BYTES` (64,000). Without it a composed goal
   would be clipped by `goalSection` for the model while the validators read
   the whole thing. `experience-digest/from-run.ts` exports `fit`, which trims
   in a fixed order — artifact, prompt, trailing findings, trailing criteria —

@@ -13,6 +13,7 @@ import {
   MAX_EVIDENCE,
   type EvidenceItem,
   type FieldSpec,
+  excerpt,
 } from '@sysdesign/contracts';
 
 import { VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../memory/ports';
@@ -91,15 +92,11 @@ export function fieldEvidence(
   return chosen;
 }
 
-/** A stored text within the goal's bound for one item, marked where it was cut. */
-const clip = (text: string, max: number): string =>
-  text.length <= max ? text : `${text.slice(0, max - 1)}…`;
-
 /** The hits as the goal lists them: aliased `m1..` in order, with where each came from. */
 export const evidenceItems = (hits: readonly MemoryHit[]): EvidenceItem[] =>
   hits.map((hit, position) => ({
     alias: evidenceAlias(position),
-    text: clip(hit.text, EVIDENCE_TEXT_MAX_LENGTH),
+    text: excerpt(hit.text, EVIDENCE_TEXT_MAX_LENGTH),
     when: hit.source.when,
     source: { runId: hit.source.runId, pipeline: hit.source.pipeline, ref: hit.source.ref },
   }));

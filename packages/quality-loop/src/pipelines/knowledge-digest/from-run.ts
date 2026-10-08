@@ -9,9 +9,9 @@
  * dimension map arrive as data from whoever composed the record, which is what
  * keeps the codec testable and the pipeline ignorant of where either came from.
  */
+import { GOAL_BUDGET_BYTES } from '@sysdesign/contracts';
 import type { QualityRunDto } from '@sysdesign/contracts';
 
-import { GOAL_MAX_BYTES } from '../../core/contracts';
 import { experienceOf, fitToBudget, trimExperience } from '../../core/outputs';
 import {
   KNOWLEDGE_RULES,
@@ -61,7 +61,7 @@ const trimRecord = (record: KnowledgeRecord): KnowledgeRecord | null => {
 };
 
 /** Fit a record to the goal budget, deterministically, one cheapest trim at a time. */
-export const fit = (record: KnowledgeRecord, budget = GOAL_MAX_BYTES): KnowledgeRecord =>
+export const fit = (record: KnowledgeRecord, budget = GOAL_BUDGET_BYTES): KnowledgeRecord =>
   fitToBudget(record, renderGoal, trimRecord, budget);
 
 /**

@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { bounded } from '../bounds';
+import { quoted } from '../text';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import {
   GOAL_BUDGET_BYTES,
@@ -159,8 +160,6 @@ export const stepIndexSchema = z.strictObject({
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
 
-const quote = (text: string): string => `"${text.replace(/\s+/g, ' ').trim()}"`;
-
 /** The first `OPTIONS_SHOWN` options, then a count of those the page offers past them, so a cut list never reads as the whole. */
 const shownOptions = (
   element: Pick<ObservedElement, 'options' | 'optionsOmitted'>,
@@ -177,11 +176,11 @@ const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'
 
 /** One element as the model reads it: ref, role, name, then only the facts that are true of it. */
 export function renderElementLine(element: ObservedElement, marks: readonly Mark[] = []): string {
-  const parts = [element.ref, element.role, quote(element.name)];
+  const parts = [element.ref, element.role, quoted(element.name)];
   // What a person reads on an element the tree gave no name, beside whatever stood in for one.
-  if (element.text !== null && element.text !== '') parts.push(`text ${quote(element.text)}`);
+  if (element.text !== null && element.text !== '') parts.push(`text ${quoted(element.text)}`);
   if (element.inputType !== null) parts.push(`type ${element.inputType}`);
-  if (element.value !== null && element.value !== '') parts.push(`value ${quote(element.value)}`);
+  if (element.value !== null && element.value !== '') parts.push(`value ${quoted(element.value)}`);
   if (element.options !== null) parts.push(optionsPart(element));
   if (element.required) parts.push('required');
   if (element.invalid) parts.push('marked invalid by the page');
@@ -189,9 +188,9 @@ export function renderElementLine(element: ObservedElement, marks: readonly Mark
   if (!element.visible) parts.push('not visible');
   if (element.hiddenTraits.length > 0) parts.push(`hidden: ${element.hiddenTraits.join(', ')}`);
   // The mission's word on the item, beside the item: what a long name buries, said once more where it counts.
-  for (const mark of marksOn(element, marks)) parts.push(`marked ${quote(mark.token)}`);
+  for (const mark of marksOn(element, marks)) parts.push(`marked ${quoted(mark.token)}`);
   if (element.context !== null && element.context !== '')
-    parts.push(`context ${quote(element.context)}`);
+    parts.push(`context ${quoted(element.context)}`);
   return `- ${parts.join(' · ')}`;
 }
 
@@ -272,7 +271,7 @@ function elementLines(observation: PageObservation, marks: readonly Mark[]): str
     ...(activeScope === null
       ? []
       : [
-          `Inside the open ${activeScope.role} ${activeScope.name === '' ? '(unnamed)' : quote(activeScope.name)} — the rest of the page waits behind it; an element not listed here may be behind the dialog, so its absence says nothing about the page:`,
+          `Inside the open ${activeScope.role} ${activeScope.name === '' ? '(unnamed)' : quoted(activeScope.name)} — the rest of the page waits behind it; an element not listed here may be behind the dialog, so its absence says nothing about the page:`,
         ]),
     ...(reachable.length > 0
       ? groupedByLandmark(reachable, marks)
@@ -328,12 +327,12 @@ function progressLines(progress: StepProgress): string[] {
 const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   ledger.openTask === null
     ? '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.'
-    : `- Open unit of work: ${quote(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
+    : `- Open unit of work: ${quoted(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
   ...(ledger.closed.length === 0
     ? ['- Closed this session: none yet.']
     : [
         '- Closed this session, oldest first:',
-        ...ledger.closed.map((unit) => `  - ${quote(unit.label)} — ${unit.outcome}`),
+        ...ledger.closed.map((unit) => `  - ${quoted(unit.label)} — ${unit.outcome}`),
         ...(ledger.closedOmitted > 0 ? [`  (${ledger.closedOmitted} older not listed)`] : []),
       ]),
   `- ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}${
@@ -385,9 +384,9 @@ const indexOf = (
 function stopsLimit(stops: readonly StopOnPage[]): string {
   const needs = new Map<string, string[]>();
   for (const stop of stops) {
-    needs.set(stop.cause, [...(needs.get(stop.cause) ?? []), quote(stop.token)]);
+    needs.set(stop.cause, [...(needs.get(stop.cause) ?? []), quoted(stop.token)]);
   }
-  const shown = [...new Set(stops.filter((stop) => stop.shown).map((stop) => quote(stop.token)))];
+  const shown = [...new Set(stops.filter((stop) => stop.shown).map((stop) => quoted(stop.token)))];
   return `- A terminate is cut unless this page shows the words the mission ties to its cause — ${[...needs].map(([cause, tokens]) => `${cause} needs ${tokens.join(' or ')}`).join('; ')}. This page shows ${shown.length === 0 ? 'none of them' : shown.join(' and ')}.`;
 }
 
@@ -395,8 +394,8 @@ function stopsLimit(stops: readonly StopOnPage[]): string {
 const describeRan = (ran: RanAction): string =>
   [
     ran.kind,
-    ...(ran.role === null ? [] : [ran.role, quote(ran.name ?? '')]),
-    ...(ran.detail === null ? [] : [quote(ran.detail)]),
+    ...(ran.role === null ? [] : [ran.role, quoted(ran.name ?? '')]),
+    ...(ran.detail === null ? [] : [quoted(ran.detail)]),
   ].join(' ');
 
 /** The goal, or a refusal when it would not fit the engine's budget. */
@@ -489,7 +488,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...(marks.length === 0
       ? []
       : [
-          `- An element marked ${marks.map((mark) => quote(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
+          `- An element marked ${marks.map((mark) => quoted(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
         ]),
     ...(stops.length === 0 ? [] : [stopsLimit(stops)]),
     // The page already answered a repeated question. Measured 2026-10-08: nine

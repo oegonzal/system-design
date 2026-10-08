@@ -16,10 +16,11 @@ import {
   RECALL_ORIGINS,
   type RecallOrigin,
   renderIndexSection,
+  GOAL_BUDGET_BYTES,
+  textBytes,
+  readFencedIndex,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
-
-import { GOAL_MAX_BYTES, goalBytes, readFencedIndex } from '../../core/contracts';
 
 export const MEMORY_RECALL_ID = 'memory-recall';
 
@@ -176,7 +177,7 @@ const queryShape = z.strictObject({
 export type MemoryQuery = z.infer<typeof queryShape>;
 
 const withinGoalBudget = (query: MemoryQuery): boolean =>
-  goalBytes(renderGoal(query)) <= GOAL_MAX_BYTES;
+  textBytes(renderGoal(query)) <= GOAL_BUDGET_BYTES;
 
 /**
  * The shape plus the one invariant the caps alone cannot state: a query must
@@ -188,7 +189,7 @@ const withinGoalBudget = (query: MemoryQuery): boolean =>
  * one handing over more gets a refusal.
  */
 export const memoryQuerySchema = queryShape.refine(withinGoalBudget, {
-  message: `the query renders beyond the goal budget of ${GOAL_MAX_BYTES} bytes`,
+  message: `the query renders beyond the goal budget of ${GOAL_BUDGET_BYTES} bytes`,
 });
 
 /**

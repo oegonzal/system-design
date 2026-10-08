@@ -14,6 +14,7 @@ import type {
   QualityRunDto,
   RawFinding,
   Remediation,
+  RunTrace,
 } from '@sysdesign/contracts';
 
 export const RESOLVED_KEY = 'unhandled_failure|flow.1';
@@ -243,4 +244,11 @@ export const sampleRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto
     error: null,
     ...overrides,
   };
+};
+
+/** The sample run's trace, for a spec that reshapes one: the sample carries a trace by construction. */
+export const sampleTrace = (overrides: Partial<QualityRunDto> = {}): RunTrace => {
+  const { trace } = sampleRun(overrides);
+  if (trace === null) throw new Error('the sample run carries a trace');
+  return trace;
 };

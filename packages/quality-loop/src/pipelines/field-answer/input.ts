@@ -7,9 +7,12 @@
  * here through the engine's own fence reader, pinned equal to the composer's
  * by the browser-step input spec.
  */
-import { FIELD_ANSWER_PIPELINE_ID, fieldIndexSchema, type FieldIndex } from '@sysdesign/contracts';
-
-import { readFencedIndex } from '../../core/contracts';
+import {
+  FIELD_ANSWER_PIPELINE_ID,
+  fieldIndexSchema,
+  type FieldIndex,
+  readFencedIndex,
+} from '@sysdesign/contracts';
 
 export { FIELD_ANSWER_PIPELINE_ID };
 export type { FieldIndex };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sampleRun } from '../../core/testing';
+import { sampleRun, sampleTrace } from '../../core/testing';
 import {
   fakeEmbeddings,
   InMemoryEmbeddingCache,
@@ -15,12 +15,6 @@ import { digest, known, store } from './steps';
 import { childRun, knowledgePorts, sourceSummary, stepContext, KNOWN_TEXT } from './steps.testing';
 
 const source = () => sampleRun();
-const traceOf = () => {
-  const run = sampleRun();
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
-
 /** A knowledge-digest child run that endorses the sample item. */
 const digestChild = (goal: string) =>
   childRun(
@@ -105,11 +99,11 @@ describe('the knowledge orchestrator’s steps', () => {
         target: {
           ...source(),
           trace: {
-            ...traceOf(),
+            ...sampleTrace(),
             iterations: [
               {
-                ...traceOf().iterations[1],
-                ledger: { ...traceOf().iterations[1].ledger, findings: [], criteria: [] },
+                ...sampleTrace().iterations[1],
+                ledger: { ...sampleTrace().iterations[1].ledger, findings: [], criteria: [] },
               },
             ],
             bestIteration: 2,
@@ -167,7 +161,7 @@ describe('the knowledge orchestrator’s steps', () => {
     });
 
     const running = stepContext(null, {
-      outputs: { target: { ...source(), trace: { ...traceOf(), stopReason: null } } },
+      outputs: { target: { ...source(), trace: { ...sampleTrace(), stopReason: null } } },
     });
     expect(await digest(running)).toMatchObject({ status: 'skipped', reason: 'nothing-to-digest' });
 
@@ -264,10 +258,10 @@ describe('the knowledge orchestrator’s steps', () => {
           target: {
             ...source(),
             trace: {
-              ...traceOf(),
+              ...sampleTrace(),
               contract: {
-                ...traceOf().contract,
-                goal: `${traceOf().contract.goal}\n\n## Remembered evidence (advisory)\n\n- [m1] ${KNOWN_TEXT}`,
+                ...sampleTrace().contract,
+                goal: `${sampleTrace().contract.goal}\n\n## Remembered evidence (advisory)\n\n- [m1] ${KNOWN_TEXT}`,
               },
             },
           },

@@ -15,6 +15,7 @@ import {
   type FieldSpec,
   type Severity,
   type ValidationProblem,
+  quotedJson,
 } from '@sysdesign/contracts';
 
 import {
@@ -32,8 +33,6 @@ export { LIMITS_VALIDATOR_ID, REFERENCES_VALIDATOR_ID };
 
 type Rule = IndexedRule<FieldAnswers, FieldIndex>;
 type Fault = { severity: Severity; message: string };
-
-const quote = (text: string): string => JSON.stringify(text);
 
 /** Every listed field answered exactly once, every basis alias listed. */
 const references: Rule = (answers, index) => {
@@ -95,10 +94,10 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
     field.optionsOmitted === 0 &&
     !field.options.includes(value)
   ) {
-    fault('medium', `${quote(value)} is not an option of ${ref}`);
+    fault('medium', `${quotedJson(value)} is not an option of ${ref}`);
   }
   if (value !== null && field.inputType === 'number' && !isNumeric(value)) {
-    fault('medium', `${ref} takes a number; ${quote(value)} is not one`);
+    fault('medium', `${ref} takes a number; ${quotedJson(value)} is not one`);
   }
   if (answer.decision === 'leave-blank' && field.required && field.hiddenTraits.length === 0) {
     fault('medium', `${ref} is required and visible, yet left blank`);

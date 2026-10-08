@@ -12,11 +12,10 @@ import type {
   UpstreamEvidence,
   ValidationReport,
 } from '@sysdesign/contracts';
-import { stripIndexSection } from '@sysdesign/contracts';
+import { stripIndexSection, GOAL_BUDGET_BYTES } from '@sysdesign/contracts';
 
 import { capText } from '@sysdesign/run-dump';
 
-import { GOAL_MAX_BYTES } from '../contracts';
 import { actionable } from '../controllers/context';
 import type { AdvisoryMemory, UpstreamEvidenceBundle } from '../ports';
 
@@ -64,7 +63,7 @@ export interface GoalSection {
  * instead of the task, and the validators read the goal as stored.
  */
 export function goalSection(goal: string): GoalSection {
-  const capped = capText(stripIndexSection(goal), GOAL_MAX_BYTES);
+  const capped = capText(stripIndexSection(goal), GOAL_BUDGET_BYTES);
   return {
     text: ['# Goal', '', capped.text, capped.truncated ? '\n[goal truncated]' : ''].join('\n'),
     clipped: capped.truncated,

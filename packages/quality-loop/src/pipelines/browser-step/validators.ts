@@ -33,6 +33,7 @@ import {
   type StepIndex,
   type StepPlan,
   type ValidationProblem,
+  quotedJson,
 } from '@sysdesign/contracts';
 
 import {
@@ -50,8 +51,6 @@ export { LIMITS_VALIDATOR_ID, REFERENCES_VALIDATOR_ID };
 type Rule = IndexedRule<StepPlan, StepIndex>;
 type Element = StepIndex['elements'][number];
 type Fault = { severity: Severity; message: string };
-
-const quote = (text: string): string => JSON.stringify(text);
 
 /** Every ref an action cites is one the page listed; located at the action, so the caller stops before it. */
 const references: Rule = (plan, index) => {
@@ -142,7 +141,7 @@ function elementFaults(
     ) {
       fault(
         'high',
-        `${ref} is marked ${element.marks.map(quote).join(' and ')}: the mission passes such an item over, so it is never touched`,
+        `${ref} is marked ${element.marks.map(quotedJson).join(' and ')}: the mission passes such an item over, so it is never touched`,
       );
     }
     if (action.kind === 'fill' && element.kind !== 'fillable') {
@@ -156,7 +155,7 @@ function elementFaults(
         element.optionsOmitted === 0 &&
         !element.options.includes(action.option)
       ) {
-        fault('high', `${quote(action.option)} is not an option of ${ref}`);
+        fault('high', `${quotedJson(action.option)} is not an option of ${ref}`);
       }
     }
     if (
@@ -233,7 +232,7 @@ const stopFault = (action: StepAction, index: StepIndex): string | null => {
   if (action.kind !== 'terminate' || !index.pageShowsContent) return null;
   const tied = index.stops.filter((stop) => stop.cause === action.cause);
   if (tied.length === 0 || tied.some((stop) => stop.shown)) return null;
-  return `terminate ${action.cause}: the mission ties it to the words ${tied.map((stop) => quote(stop.token)).join(' or ')}, which this page does not show`;
+  return `terminate ${action.cause}: the mission ties it to the words ${tied.map((stop) => quotedJson(stop.token)).join(' or ')}, which this page does not show`;
 };
 
 const limits: Rule = (plan, index) => {

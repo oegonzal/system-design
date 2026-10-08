@@ -147,7 +147,11 @@ function scoreDimension(
     .filter((finding) => policy.findingTypes[finding.type].dimension === dimension)
     .sort(compareFindings);
   const base =
-    criteria.length > 0 ? (100 * earned) / totalWeight : findings.length > 0 ? 100 : null;
+    criteria.length > 0
+      ? (SCORE_MAX * earned) / totalWeight
+      : findings.length > 0
+        ? SCORE_MAX
+        : null;
 
   const { penalties, penaltyTotal, clampScale } = chargeFindings(findings, policy, contradicted);
   const score = base === null ? null : round1(clamp(base - penaltyTotal, SCORE_MIN, SCORE_MAX));

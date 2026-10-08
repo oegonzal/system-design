@@ -1,6 +1,6 @@
+import { GOAL_BUDGET_BYTES } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES } from '../../../core/contracts';
 import { outputsOf } from '../../../core/outputs';
 import { renderGoal as renderQuery } from '../../../pipelines/memory-recall/input';
 import { samplePack } from '../../../pipelines/memory-recall/testing';
@@ -83,7 +83,7 @@ describe('memory in the goal', () => {
       '- [m1] lesson · run run-a · system-design · iteration 1 · decided accept · 2026-09-06 · ref memory.1: serve the list from a store the page owns — serves: availability of the list read; insight: a read path with a single store behind it went down with the POS',
     );
 
-    const tight = GOAL_MAX_BYTES - Buffer.byteLength(GOAL) - 10;
+    const tight = GOAL_BUDGET_BYTES - Buffer.byteLength(GOAL) - 10;
     expect(withMemory(GOAL, usable, Buffer.byteLength(GOAL) + tight)).not.toBeNull();
     expect(withMemory(GOAL, usable, Buffer.byteLength(GOAL))).toBeNull();
     expect(withMemory(GOAL, [])).toBeNull();

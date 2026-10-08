@@ -3,7 +3,6 @@ import {
   composeStepGoal,
   formObservation,
   GOAL_BUDGET_BYTES,
-  GOAL_INDEX_FENCE_CLOSE,
   GOAL_INDEX_FENCE_OPEN,
   GOAL_INDEX_HEADING,
   GoalBudgetExceeded,
@@ -15,10 +14,10 @@ import {
   textBytes,
   type ObservedElement,
   type PageObservation,
+  stepGoalInput,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { FENCE_CLOSE, FENCE_OPEN, GOAL_MAX_BYTES } from '../../core/contracts';
 import { ADMISSIONS } from '../../core/outputs';
 import { goalSection } from '../../core/stages/prompting';
 import { fill } from '../../core/testing';
@@ -68,16 +67,13 @@ function maximalObservation(): PageObservation {
 describe('the browser-step input codec', () => {
   it('[QL-39] a composed goal round-trips: the index read back is the page the session wrote', () => {
     const observation = formObservation();
-    const goal = composeStepGoal({
-      mission: MISSION_FIXTURE,
-      observation,
-      history: [{ action: 'click e6', outcome: 'ok', note: null }],
-      ledger: openTaskLedger(),
-      objections: [],
-      progress: { criteria: [], settled: [], done: [] },
-      pageUnchanged: false,
-      lastRan: [],
-    });
+    const goal = composeStepGoal(
+      stepGoalInput({
+        observation,
+        history: [{ action: 'click e6', outcome: 'ok', note: null }],
+        ledger: openTaskLedger(),
+      }),
+    );
     expect(goal).toContain(MISSION_FIXTURE.trim());
     // A field the page hides is counted, not listed — and still in the index, so a plan that touches it is refused.
     expect(goal).not.toMatch(/^- e3 · /m);
@@ -113,16 +109,9 @@ describe('the browser-step input codec', () => {
   });
 
   it('[QL-39] a model is shown the goal without its index, and the validators read the index from the goal as stored', () => {
-    const goal = composeStepGoal({
-      mission: MISSION_FIXTURE,
-      observation: maximalObservation(),
-      history: [],
-      ledger: openTaskLedger(),
-      objections: [],
-      progress: { criteria: [], settled: [], done: [] },
-      pageUnchanged: false,
-      lastRan: [],
-    });
+    const goal = composeStepGoal(
+      stepGoalInput({ observation: maximalObservation(), ledger: openTaskLedger() }),
+    );
     const shown = goalSection(goal).text;
     expect(shown).not.toContain(GOAL_INDEX_HEADING);
     expect(shown).not.toContain(GOAL_INDEX_FENCE_OPEN);
@@ -153,26 +142,11 @@ describe('the browser-step input codec', () => {
     expect(readIndex(goal)?.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(goal).toContain('(12 more interactive elements not listed)');
     expect(() =>
-      composeStepGoal(
-        {
-          mission: MISSION_FIXTURE,
-          observation,
-          history: [],
-          ledger: openTaskLedger(),
-          objections: [],
-          progress: { criteria: [], settled: [], done: [] },
-          pageUnchanged: false,
-          lastRan: [],
-        },
-        1000,
-      ),
+      composeStepGoal(stepGoalInput({ observation, ledger: openTaskLedger() }), 1000),
     ).toThrow(GoalBudgetExceeded);
   });
 
-  it('[QL-39] the fence the composers write, the budget they refuse past and the admissions they read are pinned to the engine’s', () => {
-    expect(GOAL_INDEX_FENCE_OPEN).toBe(FENCE_OPEN);
-    expect(GOAL_INDEX_FENCE_CLOSE).toBe(FENCE_CLOSE);
-    expect(GOAL_BUDGET_BYTES).toBe(GOAL_MAX_BYTES);
+  it('[QL-39] the admissions the composers read are pinned to the engine’s', () => {
     expect([...CONTRACT_ADMISSIONS]).toEqual([...ADMISSIONS]);
   });
 });

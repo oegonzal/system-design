@@ -6,16 +6,19 @@
  * is the contract's — the session routes the accepted answers with the same
  * one, and the form-memory orchestrator reports their admission.
  */
-import { fieldAnswersSchema, type FieldAnswer, type FieldAnswers } from '@sysdesign/contracts';
+import {
+  fieldAnswersSchema,
+  type FieldAnswer,
+  type FieldAnswers,
+  quotedJson,
+} from '@sysdesign/contracts';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
-
-const quote = (text: string): string => JSON.stringify(text);
 
 /** `e1 — answer "6" — confidence high — basis m1 — reason`: the ref, the decision, what rests on what. */
 const fieldLine = (answer: FieldAnswer): string =>
   [
-    `${answer.ref} — ${answer.decision}${answer.value === null ? '' : ` ${quote(answer.value)}`}`,
+    `${answer.ref} — ${answer.decision}${answer.value === null ? '' : ` ${quotedJson(answer.value)}`}`,
     `confidence ${answer.confidence}`,
     `basis ${answer.basis.length > 0 ? answer.basis.join(', ') : 'none'}`,
     answer.reason,

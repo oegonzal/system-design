@@ -1,4 +1,4 @@
-import { fieldSpecOf, formObservation, type FieldAnswers } from '@sysdesign/contracts';
+import { fieldSpecOf, formObservation, type FieldAnswers, finding } from '@sysdesign/contracts';
 
 import {
   faultedReadouts,
@@ -7,7 +7,7 @@ import {
   withOperatorCache,
 } from './field-routing';
 import { BrainFaulted } from './ports';
-import { decidedAnswers, finding } from './testing';
+import { decidedAnswers } from './testing';
 
 const fields = formObservation()
   .elements.filter((e) => ['e1', 'e2', 'e3', 'e4'].includes(e.ref))

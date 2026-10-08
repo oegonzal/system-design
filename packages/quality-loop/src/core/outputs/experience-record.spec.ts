@@ -1,18 +1,19 @@
 import type { IterationTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun } from '../testing/experience';
+import {
+  PERSISTED_KEY,
+  RESOLVED_KEY,
+  sampleIterations,
+  sampleRun,
+  sampleTrace,
+} from '../testing/experience';
 import {
   MAX_FINDINGS,
   MAX_FINDING_CRITERIA,
   MAX_FINDING_REFS,
   experienceOf,
 } from './experience-record';
-
-const traceOf = (run: ReturnType<typeof sampleRun>) => {
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
 
 describe('reducing a finished run to the facts a digest reasons over', () => {
   it('[QL-15] records what the engine established: remediation, reconciliation, transitions, deltas', () => {
@@ -79,7 +80,7 @@ describe('reducing a finished run to the facts a digest reasons over', () => {
     const [first] = sampleIterations();
     const single = experienceOf({
       ...run,
-      trace: { ...traceOf(run), iterations: [first], bestIteration: 1, lessons: [] },
+      trace: { ...sampleTrace(), iterations: [first], bestIteration: 1, lessons: [] },
     });
     expect(single?.iterations).toHaveLength(1);
     expect(single?.iterations[0].overallDelta).toBeNull();
@@ -89,7 +90,7 @@ describe('reducing a finished run to the facts a digest reasons over', () => {
     expect(experienceOf(sampleRun({ status: 'running', trace: null }))).toBeNull();
     // A run still going publishes its iterations so far, with no stop: nothing to learn yet.
     expect(
-      experienceOf({ ...run, status: 'running', trace: { ...traceOf(run), stopReason: null } }),
+      experienceOf({ ...run, status: 'running', trace: { ...sampleTrace(), stopReason: null } }),
     ).toBeNull();
   });
 
@@ -107,7 +108,10 @@ describe('reducing a finished run to the facts a digest reasons over', () => {
         })),
       },
     };
-    const record = experienceOf({ ...run, trace: { ...traceOf(run), iterations: [many, second] } });
+    const record = experienceOf({
+      ...run,
+      trace: { ...sampleTrace(), iterations: [many, second] },
+    });
     expect(record?.findings).toHaveLength(MAX_FINDINGS);
     expect(record?.omitted.findings).toBe(6);
   });
@@ -134,7 +138,10 @@ describe('reducing a finished run to the facts a digest reasons over', () => {
         ],
       },
     };
-    const record = experienceOf({ ...run, trace: { ...traceOf(run), iterations: [wide, second] } });
+    const record = experienceOf({
+      ...run,
+      trace: { ...sampleTrace(), iterations: [wide, second] },
+    });
     expect(record?.findings[0].locationRefs).toHaveLength(MAX_FINDING_REFS);
     expect(record?.findings[0].criteria).toHaveLength(MAX_FINDING_CRITERIA);
     // The widest refs are kept in order, not sampled.

@@ -5,10 +5,10 @@ import {
   textBytes,
   type PageObservation,
   type StepGoalInput,
+  quoted,
 } from '@sysdesign/contracts';
 
 import type { FieldsInput, GoalComposition } from '../../core/ports';
-import { quote } from '../../core/text';
 // The snapshot's own codec, not a browser: it reduces snapshot text by the
 // declared rungs and never touches a page.
 import { fitSnapshot } from '../playwright/aria-snapshot';
@@ -160,6 +160,6 @@ export function renderFieldProse(input: Pick<FieldsInput, 'mission' | 'task'>): 
     '',
     input.task === null
       ? 'No unit of work is open.'
-      : `${quote(input.task.label)} at ${input.task.url}`,
+      : `${quoted(input.task.label)} at ${input.task.url}`,
   ].join('\n');
 }

@@ -1,14 +1,11 @@
-import { BROWSER_SESSION_PIPELINES, type StepPlan } from '@sysdesign/contracts';
-
 import {
-  decidedAnswers,
-  decidedPlan,
+  BROWSER_SESSION_PIPELINES,
   FAKE_RUBRIC,
-  FakeBrowser,
+  type StepPlan,
   finding,
-  InMemoryLedger,
-  refusing,
-} from './testing';
+} from '@sysdesign/contracts';
+
+import { decidedAnswers, decidedPlan, FakeBrowser, InMemoryLedger, refusing } from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,

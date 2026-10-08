@@ -1,4 +1,4 @@
-import type { IterationTrace } from '@sysdesign/contracts';
+import type { RunTrace, IterationTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { teachesNothingNew } from '../../core/outputs';
@@ -11,12 +11,7 @@ import {
   renderGoal,
   type ExperienceRecord,
 } from './input';
-import { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun } from './testing';
-
-const traceOf = (run: ReturnType<typeof sampleRun>) => {
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
+import { PERSISTED_KEY, RESOLVED_KEY, sampleIterations, sampleRun, sampleTrace } from './testing';
 
 describe('the experience-digest record', () => {
   it('[QL-15] is the engine’s reduction of the run plus what this codec’s stages read', () => {
@@ -55,35 +50,34 @@ const adopting = (first: IterationTrace): IterationTrace => ({ ...first, mode: '
 /** The record of the sample run over these iterations; it must compose. */
 const recordOver = (
   iterations: IterationTrace[],
-  rest: Partial<ReturnType<typeof traceOf>> = {},
+  rest: Partial<RunTrace> = {},
 ): ExperienceRecord => {
   const run = sampleRun();
-  const record = fromRun({ ...run, trace: { ...traceOf(run), iterations, ...rest } });
+  const record = fromRun({ ...run, trace: { ...sampleTrace(), iterations, ...rest } });
   if (record === null) throw new Error('the run must compose');
   return record;
 };
 
 describe('a run that adopted an earlier run’s iteration', () => {
   it('[QL-61] teaches nothing new when the adopted iteration is the only one with an artifact, as the measured siblings went', () => {
-    const run = sampleRun();
     const [first, second] = sampleIterations();
     // Iteration 1 adopted from a grade, iteration 2 produced nothing: every judged row is the grade's.
     expect(
       teachesNothingNew({
-        ...traceOf(run),
+        ...sampleTrace(),
         iterations: [adopting(first), lost(second, 2)],
         bestIteration: 1,
         lessons: [],
       }),
     ).toBe(true);
     // A revision of its own was produced and judged: that is this run's evidence.
-    expect(teachesNothingNew({ ...traceOf(run), iterations: [adopting(first), second] })).toBe(
+    expect(teachesNothingNew({ ...sampleTrace(), iterations: [adopting(first), second] })).toBe(
       false,
     );
     // Nothing adopted is nothing copied, whatever else the run lacked.
-    expect(teachesNothingNew(traceOf(run))).toBe(false);
+    expect(teachesNothingNew(sampleTrace())).toBe(false);
     expect(
-      teachesNothingNew({ ...traceOf(run), iterations: [lost(first, 1)], bestIteration: 1 }),
+      teachesNothingNew({ ...sampleTrace(), iterations: [lost(first, 1)], bestIteration: 1 }),
     ).toBe(false);
   });
 

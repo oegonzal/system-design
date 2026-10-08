@@ -7,12 +7,6 @@ import {
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
-/** Enough for any prompt a person would write; a larger goal is clipped and traced. */
-export const GOAL_MAX_BYTES = 64_000;
-
-/** How much of the budget a goal spends: bytes, since that is what the model is billed. */
-export const goalBytes = (goal: string): number => Buffer.byteLength(goal, 'utf8');
-
 /**
  * The pipeline's code half: how an output is parsed, addressed and shown to a
  * judge. Everything else about a task is data, and every wire type lives in

@@ -11,6 +11,8 @@ import {
   type LandmarkRole,
   type ScopeRole,
   type SnapshotRung,
+  quotedJson,
+  textBytes,
 } from '@sysdesign/contracts';
 
 /**
@@ -243,9 +245,6 @@ const REDUCTIONS: Readonly<Record<ReducingRung, (lines: readonly string[]) => st
   none: () => [],
 };
 
-const bytesOf = (text: string): number => Buffer.byteLength(text, 'utf8');
-const quote = (text: string): string => JSON.stringify(text);
-
 const sameScope = (a: ActiveScope | null, b: ActiveScope): boolean =>
   a !== null && a.role === b.role && a.name === b.name;
 
@@ -292,23 +291,23 @@ export function fitSnapshot(
   maxBytes: number,
   scope: ActiveScope | null = null,
 ): FittedSnapshot {
-  if (bytesOf(snapshot) <= maxBytes) return { text: snapshot, rung: 'full' };
+  if (textBytes(snapshot) <= maxBytes) return { text: snapshot, rung: 'full' };
   const lines = snapshot.split('\n').filter((line) => line.trim() !== '');
   if (scope !== null) {
     const { inside, outside } = splitByScope(lines, scope);
     for (const rung of inside.length > 0 ? REDUCING_RUNGS : []) {
       const kept = REDUCTIONS[rung](outside);
       const dropped = lines.length - inside.length - kept.length;
-      const note = `[snapshot reduced to scope: the open ${scope.role} ${quote(scope.name)} whole, the rest ${rung}: ${dropped} of ${lines.length} lines not shown]`;
+      const note = `[snapshot reduced to scope: the open ${scope.role} ${quotedJson(scope.name)} whole, the rest ${rung}: ${dropped} of ${lines.length} lines not shown]`;
       const text = [note, ...inside, ...kept].join('\n');
-      if (bytesOf(text) <= maxBytes) return { text, rung: 'scope' };
+      if (textBytes(text) <= maxBytes) return { text, rung: 'scope' };
     }
   }
   for (const rung of REDUCING_RUNGS) {
     const kept = REDUCTIONS[rung](lines);
     const note = `[snapshot reduced to ${rung}: ${lines.length - kept.length} of ${lines.length} lines not shown]`;
     const text = [note, ...kept].join('\n');
-    if (bytesOf(text) <= maxBytes) return { text, rung };
+    if (textBytes(text) <= maxBytes) return { text, rung };
   }
   // Unreachable: the `none` rung is one short line.
   return { text: '', rung: 'none' };

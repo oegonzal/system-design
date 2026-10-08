@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sampleRun } from '../../../core/testing';
+import { sampleRun, sampleTrace } from '../../../core/testing';
 import { describePipeline } from '../../../core/pipeline';
 import { SYSTEM_DESIGN } from '../../../pipelines/system-design/definition';
 import { InMemoryMemoryStore } from '../../../modules/memory/testing';
@@ -13,12 +13,6 @@ import { claimsOf, indexKnowledge, OWNED_KINDS } from './index-knowledge';
 
 const KNOWN = { runId: 'run-known', ref: 'memory.1' };
 const KNOWN_TEXT = 'Give every read path that depends on an upstream a story for it being down';
-
-const traceOf = () => {
-  const run = sampleRun();
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
 
 const item = (overrides: Partial<KnowledgeToStore> = {}): KnowledgeToStore => ({
   position: 1,
@@ -38,7 +32,7 @@ const item = (overrides: Partial<KnowledgeToStore> = {}): KnowledgeToStore => ({
 
 const writing = (items: KnowledgeToStore[]) => {
   const run = sampleRun();
-  const trace = traceOf();
+  const trace = sampleTrace();
   return {
     source: run,
     trace,

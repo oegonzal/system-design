@@ -1,19 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { sampleIterations, sampleRun } from '../../../core/testing';
+import { sampleIterations, sampleTrace } from '../../../core/testing';
 import { KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
 import { VECTOR_NAMES } from '../../memory/ports';
 import { KNOWN_PER_PROBE, MAX_KNOWN_PROBES, knownFilter, knownProbes, probesOf } from './probes';
 
-const traceOf = () => {
-  const run = sampleRun();
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
-
 describe('what the store is asked about a finished run', () => {
   it('[QL-43] asks with the run’s own evidence, defects worst-first and then the conditions', () => {
-    const lines = knownProbes(traceOf());
+    const lines = knownProbes(sampleTrace());
     // The judged iteration is i2, whose ledger holds the one finding that
     // persisted and both criteria. Its own critics said nothing again, so the
     // defect is asked about by what the engine recorded there — its type and
@@ -26,7 +20,7 @@ describe('what the store is asked about a finished run', () => {
   });
 
   it('[QL-43] a shortfall is asked about before a pass, and the worst defect before the rest', () => {
-    const trace = traceOf();
+    const trace = sampleTrace();
     const [first] = sampleIterations();
     // i1 has two findings — high and medium — and one partial criterion.
     const lines = knownProbes({ ...trace, iterations: [first], bestIteration: 1 });
@@ -37,7 +31,7 @@ describe('what the store is asked about a finished run', () => {
   });
 
   it('[QL-43] repeats are asked once, nothing is asked of a run with no evidence, and the count is bounded', () => {
-    const trace = traceOf();
+    const trace = sampleTrace();
     const [first] = sampleIterations();
     const bare = {
       ...first,

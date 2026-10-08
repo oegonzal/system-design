@@ -6,11 +6,9 @@
  * element on one page. The schema is the contract's — the session reads the
  * accepted plan back with the same one.
  */
-import { stepPlanSchema, type StepAction, type StepPlan } from '@sysdesign/contracts';
+import { stepPlanSchema, type StepAction, type StepPlan, quotedJson } from '@sysdesign/contracts';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
-
-const quote = (text: string): string => JSON.stringify(text);
 
 /** What an action does, in the plan's closed vocabulary: the kind, then what it acts on. */
 export function describeAction(action: StepAction): string {
@@ -20,21 +18,21 @@ export function describeAction(action: StepAction): string {
     case 'click':
       return `click ${action.ref}`;
     case 'fill':
-      return `fill ${action.ref} with ${quote(action.value)}`;
+      return `fill ${action.ref} with ${quotedJson(action.value)}`;
     case 'select':
-      return `select ${quote(action.option)} on ${action.ref}`;
+      return `select ${quotedJson(action.option)} on ${action.ref}`;
     case 'press':
       return `press ${action.key}`;
     case 'scroll':
       return `scroll ${action.direction}${action.ref === null ? '' : ` to ${action.ref}`}`;
     case 'waitFor':
-      return `waitFor ${action.until} ${quote(action.value)}`;
+      return `waitFor ${action.until} ${quotedJson(action.value)}`;
     case 'screenshot':
-      return `screenshot ${quote(action.label)}`;
+      return `screenshot ${quotedJson(action.label)}`;
     case 'askFields':
       return `askFields ${action.refs.join(', ')}`;
     case 'taskStart':
-      return `taskStart ${quote(action.label)} at ${action.url}`;
+      return `taskStart ${quotedJson(action.label)} at ${action.url}`;
     case 'taskDone':
       return `taskDone ${action.outcome}${action.detail.length > 0 ? ` — ${action.detail}` : ''}`;
     case 'terminate':

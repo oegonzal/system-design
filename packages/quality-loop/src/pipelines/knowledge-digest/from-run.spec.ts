@@ -1,15 +1,10 @@
 import type { IterationTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { sampleIterations, sampleRun } from '../../core/testing';
+import { sampleIterations, sampleRun, sampleTrace } from '../../core/testing';
 import { fromRun } from './from-run';
 import { MAX_KNOWN, MAX_LOCATION_IDS, heldThroughout } from './input';
 import { sampleKnown, sampleSource } from './testing';
-
-const traceOf = (run: ReturnType<typeof sampleRun>) => {
-  if (run.trace === null) throw new Error('the sample run carries a trace');
-  return run.trace;
-};
 
 describe('composing a knowledge record from a finished run', () => {
   it('[QL-42] carries the source policy, what is known under engine aliases, and the judged artifact’s own places', () => {
@@ -54,14 +49,14 @@ describe('composing a knowledge record from a finished run', () => {
     });
     const run = sampleRun();
     const partly = fromRun(
-      { ...run, trace: { ...traceOf(run), iterations: [first, silent(second)] } },
+      { ...run, trace: { ...sampleTrace(), iterations: [first, silent(second)] } },
       sampleSource(),
     );
     expect(partly?.criteria.map((criterion) => heldThroughout(criterion))).toEqual([false, true]);
 
     // A criterion no iteration ever judged held nothing: there is no pass to rest on.
     const never = fromRun(
-      { ...run, trace: { ...traceOf(run), iterations: [silent(first), silent(second)] } },
+      { ...run, trace: { ...sampleTrace(), iterations: [silent(first), silent(second)] } },
       sampleSource(),
     );
     expect(never?.criteria.map((criterion) => heldThroughout(criterion))).toEqual([false, false]);
@@ -85,7 +80,7 @@ describe('composing a knowledge record from a finished run', () => {
       })),
     };
     const wide = fromRun(
-      { ...run, trace: { ...traceOf(run), iterations: [first, crowded] } },
+      { ...run, trace: { ...sampleTrace(), iterations: [first, crowded] } },
       sampleSource(),
     );
     expect(wide?.locationIds).toHaveLength(MAX_LOCATION_IDS);
@@ -102,7 +97,7 @@ describe('composing a knowledge record from a finished run', () => {
     const run = sampleRun();
     expect(
       fromRun(
-        { ...run, status: 'running', trace: { ...traceOf(run), stopReason: null } },
+        { ...run, status: 'running', trace: { ...sampleTrace(), stopReason: null } },
         sampleSource(),
       ),
     ).toBeNull();

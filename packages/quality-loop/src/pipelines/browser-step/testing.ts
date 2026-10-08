@@ -14,6 +14,7 @@ import {
   type StepPlan,
   type SuccessCriterion,
   type TaskLedgerSummary,
+  stepGoalInput,
 } from '@sysdesign/contracts';
 
 /** The mission over a page, with no recent actions. */
@@ -21,17 +22,7 @@ export const stepGoal = (
   observation: PageObservation = listingObservation(),
   ledger: TaskLedgerSummary = emptyLedger(),
   mission: string = MISSION_FIXTURE,
-): string =>
-  composeStepGoal({
-    mission,
-    observation,
-    history: [],
-    ledger,
-    objections: [],
-    progress: { criteria: [], settled: [], done: [] },
-    pageUnchanged: false,
-    lastRan: [],
-  });
+): string => composeStepGoal(stepGoalInput({ mission, observation, ledger }));
 
 export const click = (
   ref: string,

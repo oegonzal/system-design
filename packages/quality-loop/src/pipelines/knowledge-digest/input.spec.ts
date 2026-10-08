@@ -1,6 +1,6 @@
+import { GOAL_BUDGET_BYTES, textBytes } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
 import { sampleRun } from '../../core/testing';
 import { fit, fromRun } from './from-run';
 import { KNOWN_HEADING, knowledgeRecordSchema, readIndex, renderGoal, vocabularyOf } from './input';
@@ -126,7 +126,7 @@ describe('the knowledge-digest input codec', () => {
 
     const fitted = fit(record);
     expect(knowledgeRecordSchema.safeParse(fitted).success).toBe(true);
-    expect(goalBytes(renderGoal(fitted))).toBeLessThanOrEqual(GOAL_MAX_BYTES);
+    expect(textBytes(renderGoal(fitted))).toBeLessThanOrEqual(GOAL_BUDGET_BYTES);
     // A record at every cap needs more than its context: the known items go
     // first and in full, and whatever evidence follows them is counted, never
     // silently dropped.
@@ -144,7 +144,7 @@ describe('the knowledge-digest input codec', () => {
     // evidence: a dropped known item costs at most a delta a later run can
     // recall again, where a dropped finding is gone for good.
     const small = compose([sampleKnown(), sampleKnown({ ref: 'memory.3' })]);
-    const tight = fit(small, goalBytes(renderGoal(small)) - 10);
+    const tight = fit(small, textBytes(renderGoal(small)) - 10);
     expect(tight.known).toHaveLength(1);
     expect(tight.findings).toHaveLength(small.findings.length);
     expect(tight.criteria).toHaveLength(small.criteria.length);

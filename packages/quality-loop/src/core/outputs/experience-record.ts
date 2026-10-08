@@ -34,12 +34,12 @@ import {
   type Lesson,
   type QualityRunDto,
   type RunTrace,
+  textBytes,
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
 import { z } from 'zod';
 
 import { round1 } from '../arithmetic';
-import { goalBytes } from '../contracts';
 import { annotate } from '../evidence/annotate';
 import { outputsOf } from './run-outputs';
 
@@ -415,7 +415,7 @@ export function experienceOf(run: QualityRunDto): Experience | null {
 /** Below this, trimming the text loses more than dropping evidence would. */
 const TEXT_FLOOR = 2_000;
 
-const halve = (text: string): string => cap(text, Math.floor(goalBytes(text) / 2));
+const halve = (text: string): string => cap(text, Math.floor(textBytes(text) / 2));
 
 /**
  * The cheapest single trim left over the facts: the artifact text, then the
@@ -425,10 +425,10 @@ const halve = (text: string): string => cap(text, Math.floor(goalBytes(text) / 2
  * back to this.
  */
 export function trimExperience<R extends Experience>(record: R): R | null {
-  if (record.artifact !== null && goalBytes(record.artifact) > TEXT_FLOOR) {
+  if (record.artifact !== null && textBytes(record.artifact) > TEXT_FLOOR) {
     return { ...record, artifact: halve(record.artifact) };
   }
-  if (goalBytes(record.prompt) > TEXT_FLOOR) return { ...record, prompt: halve(record.prompt) };
+  if (textBytes(record.prompt) > TEXT_FLOOR) return { ...record, prompt: halve(record.prompt) };
   if (record.findings.length > 0) {
     return {
       ...record,
@@ -459,7 +459,7 @@ export function fitToBudget<R>(
   budget: number,
 ): R {
   let current = record;
-  while (goalBytes(render(current)) > budget) {
+  while (textBytes(render(current)) > budget) {
     const trimmed = trim(current);
     if (trimmed === null) return current;
     current = trimmed;

@@ -19,11 +19,12 @@ import {
   type StepPlan,
   type TaskLedgerSummary,
   type TaskOutcome,
+  excerpt,
+  quoted,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
 import { remainingTasks, type RailState } from './rails';
-import { clip, quote } from './text';
 
 /**
  * What the engine carries between steps: counts the rails read, the recent
@@ -228,11 +229,11 @@ export function pushObjections(state: SessionState, objections: readonly StepObj
   state.objections.unshift(
     ...objections.map((objection) => ({
       step: objection.step,
-      from: clip(objection.from, OBJECTION_FROM_MAX_LENGTH),
+      from: excerpt(objection.from, OBJECTION_FROM_MAX_LENGTH),
       at: objection.at
         .slice(0, OBJECTION_AT_BOUND.target)
-        .map((ref) => clip(ref, OBJECTION_AT_MAX_LENGTH)),
-      detail: clip(objection.detail, OBJECTION_DETAIL_BOUND.target),
+        .map((ref) => excerpt(ref, OBJECTION_AT_MAX_LENGTH)),
+      detail: excerpt(objection.detail, OBJECTION_DETAIL_BOUND.target),
     })),
   );
   if (state.objections.length > OBJECTIONS_MAX) state.objections.length = OBJECTIONS_MAX;
@@ -250,9 +251,9 @@ export function pushHistory(
   note: string | null,
 ): void {
   state.history.push({
-    action: clip(action, HISTORY_ACTION_BOUND.target),
+    action: excerpt(action, HISTORY_ACTION_BOUND.target),
     outcome,
-    note: note === null ? null : clip(note, HISTORY_NOTE_BOUND.target),
+    note: note === null ? null : excerpt(note, HISTORY_NOTE_BOUND.target),
   });
   if (state.history.length > HISTORY_MAX)
     state.history.splice(0, state.history.length - HISTORY_MAX);
@@ -260,7 +261,7 @@ export function pushHistory(
 
 const named = (ref: string, observation: PageObservation): string => {
   const element = observation.elements.find((candidate) => candidate.ref === ref);
-  return element === undefined ? ref : `${ref} ${element.role} ${quote(element.name)}`;
+  return element === undefined ? ref : `${ref} ${element.role} ${quoted(element.name)}`;
 };
 
 /**
@@ -281,21 +282,21 @@ export function describeAction(action: StepAction, observation: PageObservation)
     case 'click':
       return `click ${named(action.ref, observation)}`;
     case 'fill':
-      return `fill ${named(action.ref, observation)} with ${quote(action.value)}`;
+      return `fill ${named(action.ref, observation)} with ${quoted(action.value)}`;
     case 'select':
-      return `select ${quote(action.option)} in ${named(action.ref, observation)}`;
+      return `select ${quoted(action.option)} in ${named(action.ref, observation)}`;
     case 'press':
       return `press ${action.key}`;
     case 'scroll':
       return `scroll ${action.direction}${action.ref === null ? '' : ` to ${named(action.ref, observation)}`}`;
     case 'waitFor':
-      return `waitFor ${action.until} ${action.until === 'element' ? named(action.value, observation) : quote(action.value)}`;
+      return `waitFor ${action.until} ${action.until === 'element' ? named(action.value, observation) : quoted(action.value)}`;
     case 'screenshot':
-      return `screenshot ${quote(action.label)}`;
+      return `screenshot ${quoted(action.label)}`;
     case 'askFields':
       return `askFields ${action.refs.map((ref) => named(ref, observation)).join(', ')}`;
     case 'taskStart':
-      return `taskStart ${quote(action.label)}`;
+      return `taskStart ${quoted(action.label)}`;
     // A terminal action's detail is a claim about the page. An executed
     // terminate ends the session, so one in the history by construction never
     // ran; rendered with its words it read, a step later, as a limit that was

@@ -248,8 +248,8 @@ export class MemoryService implements OnModuleInit {
     if (query.runId === undefined) return null;
     const run = await this.runs.get(query.runId);
     if (run === null) throw new NotFoundException(`run ${query.runId} not found`);
-    // A recall run names the brief through its parent; any other run is its own.
-    const goal = run.pipeline === MEMORY_RECALL_ID ? await this.briefOf(run) : run.request.goal;
+    // A run another run opened names the brief through its parent; a run of its own is its own brief.
+    const goal = (await this.briefOf(run)) ?? run.request.goal;
     return goal === null ? null : goalHashOf(goal);
   }
 

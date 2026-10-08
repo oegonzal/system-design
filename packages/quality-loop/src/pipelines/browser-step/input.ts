@@ -7,9 +7,12 @@
  * pins the fence the composer writes equal to the one the engine reads — so
  * no rule ever parses prose.
  */
-import { BROWSER_STEP_PIPELINE_ID, stepIndexSchema, type StepIndex } from '@sysdesign/contracts';
-
-import { readFencedIndex } from '../../core/contracts';
+import {
+  BROWSER_STEP_PIPELINE_ID,
+  stepIndexSchema,
+  type StepIndex,
+  readFencedIndex,
+} from '@sysdesign/contracts';
 
 export { BROWSER_STEP_PIPELINE_ID };
 export type { StepIndex };

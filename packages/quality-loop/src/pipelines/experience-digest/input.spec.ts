@@ -1,6 +1,6 @@
+import { GOAL_BUDGET_BYTES, textBytes } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { GOAL_MAX_BYTES, goalBytes } from '../../core/contracts';
 import { fit, fromRun } from './from-run';
 import { experienceRecordSchema, RATIONALE_MAX, readIndex, renderGoal } from './input';
 import { maximalRecord, sampleRun } from './testing';
@@ -104,9 +104,9 @@ describe('the experience-digest input codec', () => {
     const fitted = fit(record);
     expect(experienceRecordSchema.safeParse(fitted).success).toBe(true);
     const goal = renderGoal(fitted);
-    expect(goalBytes(goal)).toBeLessThanOrEqual(GOAL_MAX_BYTES);
-    expect(goalBytes(fitted.artifact ?? '')).toBeLessThan(goalBytes(record.artifact ?? ''));
-    expect(goalBytes(fitted.prompt)).toBeLessThan(goalBytes(record.prompt));
+    expect(textBytes(goal)).toBeLessThanOrEqual(GOAL_BUDGET_BYTES);
+    expect(textBytes(fitted.artifact ?? '')).toBeLessThan(textBytes(record.artifact ?? ''));
+    expect(textBytes(fitted.prompt)).toBeLessThan(textBytes(record.prompt));
     expect(fitted.findings.length + fitted.omitted.findings).toBe(
       record.findings.length + record.omitted.findings,
     );

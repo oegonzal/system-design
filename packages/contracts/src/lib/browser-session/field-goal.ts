@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { bounded } from '../bounds';
+import { quoted } from '../text';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
@@ -106,22 +107,21 @@ export const FIELD_EVIDENCE_HEADING = '## Evidence about the applicant';
 const NO_EVIDENCE =
   '(none recalled: answer nothing about the applicant from memory; route such fields to the operator)';
 
-const quote = (text: string): string => `"${text.replace(/\s+/g, ' ').trim()}"`;
-
 export function renderFieldLine(field: FieldSpec): string {
-  const parts = [field.ref, `${field.role} ${quote(field.name)}`];
+  const parts = [field.ref, `${field.role} ${quoted(field.name)}`];
   if (field.inputType !== null) parts.push(`type ${field.inputType}`);
   if (field.options !== null) {
     parts.push(
       `options: ${field.options.join(' | ')}${field.optionsOmitted > 0 ? ` (${field.optionsOmitted} more the page offers)` : ''}`,
     );
   }
-  if (field.value !== null && field.value !== '') parts.push(`holds ${quote(field.value)} now`);
+  if (field.value !== null && field.value !== '') parts.push(`holds ${quoted(field.value)} now`);
   if (field.required) parts.push('required');
   if (field.invalid) parts.push('marked invalid by the page');
   if (field.maxLength !== null) parts.push(`at most ${field.maxLength} characters`);
   if (field.hiddenTraits.length > 0) parts.push(`hidden: ${field.hiddenTraits.join(', ')}`);
-  if (field.context !== null && field.context !== '') parts.push(`context ${quote(field.context)}`);
+  if (field.context !== null && field.context !== '')
+    parts.push(`context ${quoted(field.context)}`);
   return `- ${parts.join(' · ')}`;
 }
 
