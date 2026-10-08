@@ -28,6 +28,8 @@ export interface FakeRunOptions {
   criteriaProvided?: boolean;
   overall?: number;
   reason?: string;
+  /** Whether the lenses assessed enough of the rubric; false for a run the evidence gate found under-judged. */
+  evidenceSufficient?: boolean;
 }
 
 let sequence = 0;
@@ -130,7 +132,7 @@ export function fakeRun(
             gates: {
               artifactPresent: artifact !== null,
               validatorsPassed: !blocked,
-              evidenceSufficient: true,
+              evidenceSufficient: options.evidenceSufficient ?? true,
               policyAllowed,
             },
             blocking,

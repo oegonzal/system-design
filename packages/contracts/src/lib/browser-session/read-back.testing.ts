@@ -17,6 +17,7 @@ export interface RunShape {
   validation?: ValidationReport[];
   criteria?: Partial<CriterionEvidence>[];
   contract?: SuccessCriterion[];
+  evidenceSufficient?: boolean;
 }
 
 /** A finished run with one iteration, judged as described. */
@@ -54,6 +55,7 @@ export function judgedRun(shape: RunShape): QualityRunDto {
       criteriaProvided: true,
       overall: 80,
       reason: `decided ${finalDecision}`,
+      evidenceSufficient: shape.evidenceSufficient ?? true,
     },
     shape.contract ?? [],
   );

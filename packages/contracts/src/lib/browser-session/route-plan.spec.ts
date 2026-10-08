@@ -28,6 +28,29 @@ const plan: StepPlan = {
   ],
 };
 
+/** A plan that ends the session: a move, then a terminate — only the judges verify the stop. */
+const terminatePlan: StepPlan = {
+  assessment: 'Every card in view is applied to; the mission is complete.',
+  actions: [
+    {
+      kind: 'taskDone',
+      outcome: 'done',
+      detail: 'the application was submitted',
+      reason: 'the last unit is submitted',
+      expect: null,
+      serves: [],
+    },
+    {
+      kind: 'terminate',
+      cause: 'mission-complete',
+      detail: 'no listing is left to apply to',
+      reason: 'the mission is complete',
+      expect: null,
+      serves: [],
+    },
+  ],
+};
+
 describe('routePlan', () => {
   it('[QL-36] executes an accepted plan whose policy gate is open, in full when nobody objected, and says what the evaluator passed', () => {
     const readout = routePlan(
@@ -70,10 +93,18 @@ describe('routePlan', () => {
     ]);
   });
 
-  it('[QL-36] a plan nothing cut is held to the loop’s verdict, while a plan cut at a position runs up to it whatever the score', () => {
-    // Declared policy, pinned: measured 2026-10-07, eleven of twenty-two plans
-    // ended in a claim the validators cut, and so would run their prefix at
-    // any score, while the one plan nothing cut was refused on its score.
+  it('[QL-36] a plan of moves nothing cut runs whatever the score; a terminate it did not accept, or a plan under-judged, is held', () => {
+    // The opening navigate off about:blank is the archetype: nothing objects,
+    // it scores low because its grounding has nothing to ground, and it must
+    // still run or the page never loads. Measured 2026-10-08: ten sessions
+    // died on about:blank when a nothing-cut move was refused on its score.
+    const moves = routePlan(judgedRun({ artifact: plan, finalDecision: 'escalate' }), 1);
+    expect(moves).toMatchObject({
+      executable: true,
+      executePrefix: plan.actions.length,
+      reason: null,
+    });
+    // A plan cut at a position still runs up to it, whatever the score.
     const claimCut: ValidationReport = {
       validatorId: 'limits',
       gate: 'cut',
@@ -90,9 +121,25 @@ describe('routePlan', () => {
       1,
     );
     expect(belowTheBar).toMatchObject({ executable: true, executePrefix: 3, reason: null });
-    const uncutBelowTheBar = routePlan(judgedRun({ artifact: plan, finalDecision: 'escalate' }), 1);
-    expect(uncutBelowTheBar.executable).toBe(false);
-    expect(uncutBelowTheBar.reason).toContain('decided escalate');
+    // A terminate ends the session and only the judges verify it: one the loop
+    // did not accept is held, so a mission-complete a page did not earn never
+    // ends a session — but an accepted one runs.
+    const unearned = routePlan(
+      judgedRun({ artifact: terminatePlan, finalDecision: 'escalate' }),
+      1,
+    );
+    expect(unearned.executable).toBe(false);
+    expect(unearned.reason).toContain('decided escalate');
+    expect(
+      routePlan(judgedRun({ artifact: terminatePlan, finalDecision: 'accept' }), 1).executable,
+    ).toBe(true);
+    // A plan the evidence gate found under-judged had a prefix no lens read —
+    // and a safety lens that did not run is a 'nothing objected' worth nothing.
+    const underJudged = routePlan(
+      judgedRun({ artifact: plan, finalDecision: 'escalate', evidenceSufficient: false }),
+      1,
+    );
+    expect(underJudged.executable).toBe(false);
   });
 
   it('[QL-36] runs a handed-back plan up to the first action a cutting validator pointed at, carrying the cut as the objection', () => {
@@ -177,10 +224,9 @@ describe('routePlan', () => {
       }),
       1,
     );
-    // Nothing blocked and the loop did not accept: the plan does not run on
-    // quality alone — and the next plan is not told to answer the advice.
-    expect(readout.executable).toBe(false);
-    expect(readout.reason).toContain('decided escalate');
+    // Nothing blocked, so the plan's moves run whatever the score — and the
+    // next plan is not told to answer the advice: it blocked nothing.
+    expect(readout.executable).toBe(true);
     expect(readout.objections).toEqual([]);
   });
 
@@ -277,7 +323,7 @@ describe('routePlan', () => {
     ]);
   });
 
-  it('[QL-36] refuses a plan whose first action was faulted, one handed back with nothing to cut at, or an artifact-wide blocker', () => {
+  it('[QL-36] refuses a plan whose first action was faulted, an artifact-wide blocker, no artifact, or an unparseable one', () => {
     expect(
       routePlan(
         judgedRun({
@@ -288,10 +334,6 @@ describe('routePlan', () => {
         }),
         1,
       ).executable,
-    ).toBe(false);
-    expect(
-      routePlan(judgedRun({ artifact: plan, finalDecision: 'escalate', policyAllowed: false }), 1)
-        .executable,
     ).toBe(false);
     expect(
       routePlan(
