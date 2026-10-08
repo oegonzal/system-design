@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
 import {
@@ -7,26 +6,25 @@ import {
   emptyLedger,
   formObservation,
   listingObservation,
-  MISSION_FIXTURE,
   openTaskLedger,
   stepGoalInput,
 } from './fixtures';
-import type { ObservedElement, PageObservation } from './observation.schema';
 import {
+  CLOSED_TASKS_BOUND,
   ELEMENTS_BOUND,
   OBJECTION_AT_BOUND,
   OBJECTION_DETAIL_BOUND,
   OBJECTIONS_BOUND,
+  type ObservedElement,
   OPTIONS_SHOWN,
+  type PageObservation,
   pageObservationSchema,
   type StepObjection,
-  CLOSED_TASKS_BOUND,
   TASK_LABEL_BOUND,
 } from './observation.schema';
-import { MissionMarkMalformed } from './mission-marks';
-import { composeStepGoal, readStepIndex, renderElementLine } from './step-goal';
-import { ACTIONS_BOUND, stepActionSchema, stepPlanSchema } from './step-plan.schema';
-import { STEP_ACTION_KINDS } from './vocab';
+import { composeStepGoal, renderElementLine } from './step-goal';
+import { readStepIndex } from './step-index';
+import { ACTIONS_BOUND } from './step-plan.schema';
 
 const NO_PROGRESS = { criteria: [], settled: [], done: [] };
 
@@ -96,6 +94,7 @@ describe('composeStepGoal', () => {
    * selects is the one shape that does not fit; the session degrades such a
    * page before composing.
    */
+
   it('[QL-39] renders a plausible maximal page under the engine budget, with room left for a snapshot', () => {
     const elements: ObservedElement[] = Array.from({ length: ELEMENTS_BOUND.target }, (_, i) => ({
       ref: `e${i + 1}`,
@@ -347,15 +346,6 @@ describe('composeStepGoal', () => {
       '- e3 · link · "Senior Engineer — Acme"',
     );
   });
-});
-
-describe('stepPlanSchema', () => {
-  it('[QL-36] is a closed vocabulary of actions, the same one the records use, with no number a model writes', () => {
-    const kinds = stepActionSchema.options.map((option) => option.shape.kind.value);
-    expect([...kinds].sort()).toEqual([...STEP_ACTION_KINDS].sort());
-    const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
-    expect(json).not.toMatch(/"type":"(number|integer)"/);
-  });
 
   it('[QL-36] a recent action that did not run leads with that fact, so a refused terminate never reads as a stop the session was given', () => {
     // Measured 2026-10-07: refused plans wrote their actions into the history
@@ -386,80 +376,6 @@ describe('stepPlanSchema', () => {
     expect(recent).not.toMatch(/^- terminate limit-reached/m);
   });
 
-  it('[BRW-8] renders a mark the mission declares beside every element that carries it, writes it into the index, and says the rule in the Limits', () => {
-    // Measured 2026-10-07: a card name of 200 characters buried the one word
-    // that said the listing was applied to; told in prose, the planner read
-    // the words around it and clicked the card fifteen times.
-    const marked = `${MISSION_FIXTURE}\n\n## Marks\n\n- "Globex": not this one.\n- "Acme": the house account.\n`;
-    const goal = composeStepGoal(stepGoalInput({ mission: marked }));
-    expect(goal).toMatch(/^- e4 · link · "Staff Engineer — Globex" · marked "Globex"$/m);
-    expect(goal).toMatch(/^- e3 · link · "Senior Engineer — Acme" · marked "Acme"$/m);
-    expect(goal).toContain(
-      '- An element marked "Globex" or "Acme" carries a word the mission\'s Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.',
-    );
-    const index = readStepIndex(goal);
-    expect(index?.elements.map((element) => [element.ref, element.marks])).toEqual([
-      ['e1', []],
-      ['e2', []],
-      ['e3', ['Acme']],
-      ['e4', ['Globex']],
-      ['e5', []],
-      ['e6', []],
-    ]);
-    // A mission without Marks marks nothing and says nothing about marks.
-    const plain = goalOf(listingObservation());
-    expect(plain).not.toContain('marked "');
-    expect(plain).not.toContain('Marks declare');
-    expect(readStepIndex(plain)?.elements.every((element) => element.marks.length === 0)).toBe(
-      true,
-    );
-    // A Marks line the grammar does not read refuses the goal before any page is planned against it.
-    expect(() =>
-      composeStepGoal(
-        stepGoalInput({ mission: `${MISSION_FIXTURE}\n\n## Marks\n\n- Globex without quotes\n` }),
-      ),
-    ).toThrow(MissionMarkMalformed);
-  });
-
-  it('[QL-39] on an unchanged page says what ran at the last step, writes it into the index by this observation’s refs, and says the rule in the Limits', () => {
-    // Measured 2026-10-08: nine of 31 steps were one click on one already-selected
-    // card, repeated, each on a page the step before had left unchanged.
-    const ran = [
-      { kind: 'click' as const, role: 'link', name: 'Senior Engineer — Acme', detail: null },
-      { kind: 'press' as const, role: null, name: null, detail: 'Enter' },
-      { kind: 'click' as const, role: 'button', name: 'Gone from this page', detail: null },
-    ];
-    const input = (pageUnchanged: boolean) => ({
-      mission: MISSION_FIXTURE,
-      observation: listingObservation(),
-      history: [],
-      ledger: emptyLedger(),
-      objections: [],
-      progress: { criteria: [], settled: [], done: [] },
-      pageUnchanged,
-      lastRan: ran,
-    });
-    const unchanged = composeStepGoal(input(true));
-    expect(unchanged).toContain(
-      'Ran on it at the last step and moved nothing: click link "Senior Engineer — Acme"; press "Enter"; click button "Gone from this page" — repeating any of these is cut.',
-    );
-    expect(readStepIndex(unchanged)).toMatchObject({
-      pageUnchanged: true,
-      lastRan: [
-        { kind: 'click', ref: 'e3', detail: null },
-        { kind: 'press', ref: null, detail: 'Enter' },
-        { kind: 'click', ref: null, detail: null },
-      ],
-    });
-    expect(unchanged).toContain(
-      '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it.',
-    );
-    // A page that moved carries neither the line nor the index entries: what ran is history, not a repeat.
-    const moved = composeStepGoal(input(false));
-    expect(moved).not.toContain('Ran on it at the last step');
-    expect(readStepIndex(moved)).toMatchObject({ pageUnchanged: false, lastRan: [] });
-  });
-
   it('[QL-39] lists the main landmark’s elements first and unheaded, then each other landmark under its own line, then the rest', () => {
     // Measured 2026-10-08: of 134 element lines on a results page, 75 were the
     // chrome — navigation, filters, feedback, footer — listed among the results.
@@ -487,41 +403,6 @@ describe('stepPlanSchema', () => {
     expect(at('e6')).toBeGreaterThan(at('e2'));
     // A page without landmarks reads exactly as before: no headers at all.
     expect(goalOf(base)).not.toContain('In the ');
-  });
-
-  it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {
-    const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
-    for (const rule of [
-      'exactly as the Elements list gives it',
-      'A terminate or done action is last and appears nowhere else; a taskStart or taskDone comes before any action that could change the page.',
-      'One of the options the Elements list gives for this ref, verbatim.',
-    ]) {
-      expect(json, `the model is never told: ${rule}`).toContain(rule);
-    }
-  });
-  it('[QL-36] says in the Limits what the validators refuse, including that the action cap is a ceiling and not a quota', () => {
-    const goal = goalOf(listingObservation());
-
-    // `references` refuses a ref the current observation did not list, so the
-    // section that exists to say what the validators enforce has to say that an
-    // Elements list belongs to one observation. Measured on 2026-10-06: without
-    // it, five of eight plans navigated and then cited refs for the page they
-    // had not opened yet, and every one of them was refused.
-    expect(goal).toContain('belongs to this observation alone');
-    // And not only what it may cite — what it may claim: a `taskDone` after a
-    // submit names no ref and still asserts a page nobody has observed.
-    expect(goal).toMatch(/navigates.*is the LAST action of the plan/);
-    expect(goal).toContain('closing a unit of work and terminating included');
-    // And a claim rests on the page as observed: never after an action that could change it.
-    expect(goal).toContain('press or askFields, never after');
-
-    // And a cap reads as a quota unless it says otherwise: asked for "at most
-    // 8", the same producer returned seven or eight nearly every time.
-    expect(goal).toContain('never a number to reach');
-    expect(goal).toContain(`At most ${ACTIONS_BOUND.target} actions`);
-
-    // Still said once, where the validators' own rules are said.
-    expect(goal.split('belongs to this observation alone')).toHaveLength(2);
   });
 
   it('[QL-39] tells a reader what it could not read, apart from what it left past its cap, so "nothing listed" and "more than are listed" can never describe one page', () => {

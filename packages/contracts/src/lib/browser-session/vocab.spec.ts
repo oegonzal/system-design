@@ -7,7 +7,7 @@ import {
   elementKind,
   elementKindOf,
   NON_TEXT_INPUT_TYPES,
-} from './vocab';
+} from './element-kind';
 
 describe('what an element affords', () => {
   it('[BRW-2] settles an ambiguous role by the control beneath it, and leaves every unambiguous role to the table', () => {

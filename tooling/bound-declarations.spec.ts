@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Every bound a model writes into is declared once, through `bounded`.
  *
- * A bound is a target and a ceiling (`packages/contracts/src/lib/bounds.ts`):
+ * A bound is a target and a ceiling (`packages/contracts/src/lib/bounds/`):
  * the model is asked for the target, the schema accepts the ceiling, and the
  * parse keeps what runs past it. A raw `.max()` on a string or a list is a
  * bound with no target — one number that is both the ask and the refusal —
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * the files that declare their bounds (`SCHEMA_FILES`; a file joins the list
  * when it migrates) and fails three ways:
  *
- * - a `.max(` on a `z.string(…)` or `z.array(…)` chain, outside `bounds.ts`;
+ * - a `.max(` on a `z.string(…)` or `z.array(…)` chain, outside `bounds/bounded.ts`;
  * - a `bounded.*` call that is not the last member call of its chain, since
  *   zod clones on `.min/.max/.describe` and the clone is not the node that
  *   was registered — only `.optional()`, `.nullable()`, `.nullish()` and
@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest';
  *   the raw number it was meant to replace.
  */
 const REPO = join(__dirname, '..');
-const BOUNDS_FILE = 'packages/contracts/src/lib/bounds.ts';
+const BOUNDS_FILE = 'packages/contracts/src/lib/bounds/bounded.ts';
 
 /** The schema files that declare their bounds through `bounded`. */
 const SCHEMA_FILES = [

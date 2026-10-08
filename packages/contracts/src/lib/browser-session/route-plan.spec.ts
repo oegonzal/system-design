@@ -1,69 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  ConfirmedFinding,
-  CriterionEvidence,
-  SuccessCriterion,
-  ValidationReport,
-} from '../quality-loop/evidence';
-import { fakeRun } from '../quality-loop/run-fixtures';
-import type { QualityRunDto } from '../quality-loop/runs';
-import { type Decision } from '../quality-loop/vocab';
-import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
-import { fieldSpecOf } from './field-goal';
-import { formObservation } from './fixtures';
-import { routeFields, routePlan } from './read-back';
+import { type ValidationReport } from '../quality-loop/evidence';
+import { routePlan } from './read-back';
+import { judgedRun } from './read-back.testing';
 import { ASSESSMENT_BOUND, type StepPlan } from './step-plan.schema';
-
-interface RunShape {
-  artifact: unknown;
-  finalDecision?: Decision;
-  policyAllowed?: boolean;
-  findings?: Partial<ConfirmedFinding>[];
-  validation?: ValidationReport[];
-  criteria?: Partial<CriterionEvidence>[];
-  contract?: SuccessCriterion[];
-}
-
-/** A finished run with one iteration, judged as described; every other field is the quiet default. */
-function run(shape: RunShape): QualityRunDto {
-  const finalDecision = shape.finalDecision ?? 'accept';
-  return fakeRun(
-    'browser-step',
-    shape.artifact,
-    {
-      runId: 'run-1',
-      decision: finalDecision,
-      policyAllowed: shape.policyAllowed,
-      validation: shape.validation,
-      findings: (shape.findings ?? []).map((f, i) => ({
-        key: f.key ?? `${f.type ?? 'defect'}|${(f.locationRefs ?? []).join(',')}`,
-        type: f.type ?? 'defect',
-        severity: f.severity ?? 'medium',
-        confidence: f.confidence ?? 'high',
-        fixability: f.fixability ?? 'fixable_local',
-        locationRefs: f.locationRefs ?? [],
-        criterionIds: f.criterionIds ?? [],
-        hits: 1,
-        lenses: [`critic.${i}`],
-        rationale: f.rationale ?? null,
-        reconciledTo: null,
-      })),
-      evidence: (shape.criteria ?? []).map((c) => ({
-        criterionId: c.criterionId ?? 'c1',
-        kind: c.kind ?? 'progress',
-        result: c.result ?? 'pass',
-        hits: 1,
-        confidence: 'high',
-        locationRefs: c.locationRefs ?? [],
-      })),
-      criteriaProvided: true,
-      overall: 80,
-      reason: `decided ${finalDecision}`,
-    },
-    shape.contract ?? [],
-  );
-}
 
 const plan: StepPlan = {
   assessment: 'A listing page; open the first result.',
@@ -91,7 +31,7 @@ const plan: StepPlan = {
 describe('routePlan', () => {
   it('[QL-36] executes an accepted plan whose policy gate is open, in full when nobody objected, and says what the evaluator passed', () => {
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         criteria: [
           { criterionId: 'c1', result: 'pass' },
@@ -106,12 +46,12 @@ describe('routePlan', () => {
     expect(readout.objections).toEqual([]);
     // Every criterion settled pass, whatever its kind: which may be settled is the session's to decide.
     expect(readout.passed).toEqual(['c1', 'c3']);
-    expect(routePlan(run({ artifact: plan }), 1).passed).toEqual([]);
+    expect(routePlan(judgedRun({ artifact: plan }), 1).passed).toEqual([]);
   });
 
   it('[QL-36] hands back any plan the loop did not accept, naming the findings for the next goal', () => {
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         policyAllowed: false,
@@ -146,11 +86,11 @@ describe('routePlan', () => {
       ],
     };
     const belowTheBar = routePlan(
-      run({ artifact: plan, finalDecision: 'escalate', validation: [claimCut] }),
+      judgedRun({ artifact: plan, finalDecision: 'escalate', validation: [claimCut] }),
       1,
     );
     expect(belowTheBar).toMatchObject({ executable: true, executePrefix: 3, reason: null });
-    const uncutBelowTheBar = routePlan(run({ artifact: plan, finalDecision: 'escalate' }), 1);
+    const uncutBelowTheBar = routePlan(judgedRun({ artifact: plan, finalDecision: 'escalate' }), 1);
     expect(uncutBelowTheBar.executable).toBe(false);
     expect(uncutBelowTheBar.reason).toContain('decided escalate');
   });
@@ -161,7 +101,7 @@ describe('routePlan', () => {
     // taken the session off an empty document — was never faulted. The loop
     // still hands such a plan back; the session runs what nobody objected to.
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         validation: [
@@ -189,7 +129,7 @@ describe('routePlan', () => {
 
   it('[QL-36] a handed-back plan with a blocking finding at an action runs up to it; one at the assessment runs not at all', () => {
     const atAction = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         policyAllowed: false,
@@ -204,7 +144,7 @@ describe('routePlan', () => {
     // An objection to the plan's reading of the page: nothing planned on a
     // misread page is trusted, however far from action.1 the words sit.
     const atAssessment = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         policyAllowed: false,
@@ -222,7 +162,7 @@ describe('routePlan', () => {
     // producer as a fact about the page; twelve plans later the session was
     // terminating for it.
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         policyAllowed: true,
@@ -246,7 +186,7 @@ describe('routePlan', () => {
 
   it('[QL-36] carries every criterion the evaluator settled short, with its statement, so a plan handed back on its score is told why', () => {
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         criteria: [
@@ -275,7 +215,7 @@ describe('routePlan', () => {
     // `action.1`. Ten steps of a session went that way and the page never
     // moved. What a judge said is carried as an objection; it is not a veto
     // the controller did not reach.
-    const advised = run({
+    const advised = judgedRun({
       artifact: plan,
       findings: [
         { type: 'skipped_step', severity: 'low', locationRefs: ['action.1'], rationale: 'thin' },
@@ -294,7 +234,7 @@ describe('routePlan', () => {
     // producer as "blocked by validator(s) limits" and nothing more — never the
     // message that said which element could not be typed into.
     const readout = routePlan(
-      run({
+      judgedRun({
         artifact: plan,
         finalDecision: 'escalate',
         validation: [
@@ -340,7 +280,7 @@ describe('routePlan', () => {
   it('[QL-36] refuses a plan whose first action was faulted, one handed back with nothing to cut at, or an artifact-wide blocker', () => {
     expect(
       routePlan(
-        run({
+        judgedRun({
           artifact: plan,
           finalDecision: 'escalate',
           policyAllowed: false,
@@ -350,12 +290,12 @@ describe('routePlan', () => {
       ).executable,
     ).toBe(false);
     expect(
-      routePlan(run({ artifact: plan, finalDecision: 'escalate', policyAllowed: false }), 1)
+      routePlan(judgedRun({ artifact: plan, finalDecision: 'escalate', policyAllowed: false }), 1)
         .executable,
     ).toBe(false);
     expect(
       routePlan(
-        run({
+        judgedRun({
           artifact: plan,
           finalDecision: 'escalate',
           policyAllowed: false,
@@ -364,199 +304,15 @@ describe('routePlan', () => {
         1,
       ).executable,
     ).toBe(false);
-    expect(routePlan(run({ artifact: null }), 1).reason).toBe('no-artifact');
-    expect(routePlan(run({ artifact: { not: 'a plan' } }), 1).reason).toContain('schema');
+    expect(routePlan(judgedRun({ artifact: null }), 1).reason).toBe('no-artifact');
+    expect(routePlan(judgedRun({ artifact: { not: 'a plan' } }), 1).reason).toContain('schema');
   });
 
   it('[QL-36] [QL-58] executes a plan whose assessment the seam kept past its ceiling, read as it was kept', () => {
     const assessment = 'a'.repeat(ASSESSMENT_BOUND.ceiling + 1);
-    const readout = routePlan(run({ artifact: { ...plan, assessment } }), 1);
+    const readout = routePlan(judgedRun({ artifact: { ...plan, assessment } }), 1);
     expect(readout.executable).toBe(true);
     expect(readout.executePrefix).toBe(4);
     expect(readout.plan?.assessment).toBe(assessment);
-  });
-});
-
-const fields = () =>
-  formObservation()
-    .elements.filter((e) => e.kind !== 'clickable')
-    .map(fieldSpecOf);
-
-const answers = (
-  overrides: Partial<Record<string, Partial<FieldAnswers['fields'][number]>>> = {},
-): FieldAnswers => ({
-  summary: 'Four fields; evidence covers the first.',
-  fields: [
-    {
-      ref: 'e1',
-      decision: 'answer',
-      value: '6',
-      confidence: 'high',
-      basis: ['m1'],
-      reason: 'from m1',
-    },
-    {
-      ref: 'e2',
-      decision: 'answer',
-      value: 'Yes',
-      confidence: 'medium',
-      basis: [],
-      reason: 'likely',
-    },
-    {
-      ref: 'e3',
-      decision: 'answer',
-      value: 'https://x',
-      confidence: 'high',
-      basis: [],
-      reason: 'oops',
-    },
-    {
-      ref: 'e4',
-      decision: 'leave-blank',
-      value: null,
-      confidence: 'high',
-      basis: [],
-      reason: 'bait',
-    },
-  ].map((answer) => ({ ...answer, ...(overrides[answer.ref] ?? {}) })) as FieldAnswers['fields'],
-});
-
-describe('routeFields', () => {
-  it('[QL-37] fills a grounded answer, asks for an ungrounded medium one, and blanks a hidden field whatever the model said', () => {
-    const routes = routeFields(run({ artifact: answers() }), 'admitted', fields());
-    expect(routes.map((r) => [r.field.ref, r.route, r.source])).toEqual([
-      ['e1', 'fill', 'memory'],
-      ['e2', 'ask-operator', 'loop'],
-      ['e3', 'leave-blank', 'blank'],
-      ['e4', 'leave-blank', 'blank'],
-    ]);
-    expect(routes[0].value).toBe('6');
-    expect(routes[2].reason).toContain('trap-skipped');
-  });
-
-  it('[QL-37] never fills a field a confirmed finding or a validation warning points at', () => {
-    const routes = routeFields(
-      run({
-        artifact: answers(),
-        findings: [
-          { type: 'ungrounded', locationRefs: ['field.1'], rationale: 'no evidence says 6' },
-        ],
-        validation: [
-          {
-            validatorId: 'limits',
-            gate: 'warn',
-            problems: [{ severity: 'medium', locationRefs: ['field.2'], message: 'not an option' }],
-          },
-        ],
-      }),
-      'admitted',
-      fields(),
-    );
-    expect(routes[0].route).toBe('ask-operator');
-    expect(routes[0].faults).toEqual(['ungrounded: no evidence says 6']);
-    expect(routes[0].value).toBe('6');
-    expect(routes[1].faults).toEqual(['limits: not an option']);
-  });
-
-  it('[QL-37] a run that fell short demotes nothing by itself; a page nothing judged asks for its required fields and blanks the optional ones; a required field left blank is asked', () => {
-    const fellShort = routeFields(run({ artifact: answers() }), 'fell-short', fields());
-    expect(fellShort.map((r) => r.route)).toEqual([
-      'fill',
-      'ask-operator',
-      'leave-blank',
-      'leave-blank',
-    ]);
-    const unjudged = routeFields(run({ artifact: answers() }), 'no-rubric', fields());
-    expect(unjudged.map((r) => [r.route, r.source])).toEqual([
-      ['ask-operator', 'engine'],
-      ['ask-operator', 'engine'],
-      ['leave-blank', 'blank'],
-      ['leave-blank', 'engine'],
-    ]);
-    expect(unjudged[0].reason).toBe('page-escalated: no-rubric');
-    expect(unjudged[3].reason).toBe('optional, left blank: page-escalated: no-rubric');
-
-    const blankRequired = routeFields(
-      run({ artifact: answers({ e1: { decision: 'leave-blank', value: null } }) }),
-      'admitted',
-      fields(),
-    );
-    expect(blankRequired[0].route).toBe('ask-operator');
-    expect(blankRequired[0].reason).toContain('required field left blank');
-  });
-
-  it('[QL-37] keeps what a field holds when the model says so or answers with the same value, asks when a keep has nothing to keep, and blanks an optional field a judge faulted', () => {
-    const holding = fields().map((field) =>
-      field.ref === 'e1' ? { ...field, value: '6' } : field,
-    );
-    const kept = routeFields(
-      run({ artifact: answers({ e1: { decision: 'keep', value: null } }) }),
-      'admitted',
-      holding,
-    );
-    expect(kept[0]).toMatchObject({ route: 'keep', value: '6', source: 'memory' });
-    const same = routeFields(run({ artifact: answers() }), 'admitted', holding);
-    expect(same[0]).toMatchObject({
-      route: 'keep',
-      value: '6',
-      reason: 'holds it already: from m1',
-    });
-    const empty = routeFields(
-      run({ artifact: answers({ e1: { decision: 'keep', value: null } }) }),
-      'admitted',
-      fields(),
-    );
-    expect(empty[0]).toMatchObject({ route: 'ask-operator', reason: 'nothing to keep: from m1' });
-    // A judge pointed at an optional field: left blank with the fault on the row, never the operator's.
-    const faulted = routeFields(
-      run({
-        artifact: answers({ e4: { decision: 'answer', value: 'none' } }),
-        findings: [{ type: 'ungrounded', locationRefs: ['field.4'], rationale: 'invented' }],
-      }),
-      'admitted',
-      fields(),
-    );
-    expect(faulted[3]).toMatchObject({
-      route: 'leave-blank',
-      source: 'loop',
-      reason: 'optional, left blank: faulted',
-      faults: ['ungrounded: invented'],
-    });
-  });
-
-  it('[QL-37] asks when the model answered with low confidence or did not answer at all', () => {
-    const low = routeFields(
-      run({ artifact: answers({ e1: { confidence: 'low' } }) }),
-      'admitted',
-      fields(),
-    );
-    expect(low[0].route).toBe('ask-operator');
-    expect(low[0].value).toBe('6');
-
-    const partial = answers();
-    partial.fields = partial.fields.filter((f) => f.ref !== 'e2');
-    const missing = routeFields(run({ artifact: partial }), 'admitted', fields());
-    expect(missing[1]).toMatchObject({
-      route: 'ask-operator',
-      reason: 'unanswered',
-      source: 'engine',
-    });
-  });
-
-  it('[QL-37] [QL-58] routes every answer of a page whose reason the seam kept just past its ceiling', () => {
-    const reason = 'r'.repeat(ANSWER_REASON_BOUND.ceiling + 1);
-    const routes = routeFields(
-      run({ artifact: answers({ e1: { reason } }) }),
-      'admitted',
-      fields(),
-    );
-    expect(routes.map((r) => [r.field.ref, r.route, r.source])).toEqual([
-      ['e1', 'fill', 'memory'],
-      ['e2', 'ask-operator', 'loop'],
-      ['e3', 'leave-blank', 'blank'],
-      ['e4', 'leave-blank', 'blank'],
-    ]);
-    expect(routes[0]).toMatchObject({ value: '6', reason });
   });
 });

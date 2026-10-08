@@ -5,43 +5,25 @@
  * read the bookkeeping back from the last fenced block. Nothing here parses
  * prose: every fact a validator needs is in the index.
  */
-import { z } from 'zod';
-
-import { bounded } from '../bounds';
 import { quoted } from '../text';
 import type { SuccessCriterion } from '../quality-loop/evidence';
+import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
+import type { RanAction } from './action-identity';
+import { marksOf, marksOn, type Mark } from './mission-marks';
+import { stopsOf, stopsOnPage } from './mission-stops';
 import {
-  GOAL_BUDGET_BYTES,
-  readFencedIndex,
-  renderIndexSection,
-  withinBudget,
-} from '../quality-loop/goal-index';
-import {
-  ELEMENT_REF,
-  OPTIONS_SHOWN,
   inScope,
+  OBJECTIONS_BOUND,
   type ObservedElement,
   type PageObservation,
-  OBJECTIONS_BOUND,
   type StepHistoryEntry,
   type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
-import { refNowOf, type RanAction } from './action-identity';
-import { MARK_TOKEN_MAX_LENGTH, marksOf, marksOn, type Mark } from './mission-marks';
-import { STOP_TOKEN_MAX_LENGTH, stopsOf, stopsOnPage, type StopOnPage } from './mission-stops';
-import { BROWSER_STEP_PIPELINE_ID, SETTLING_CRITERION_KINDS } from './pipelines';
-import { ACTIONS_BOUND } from './step-plan.schema';
-import {
-  ELEMENT_KINDS,
-  HIDDEN_TRAITS,
-  LANDMARK_ROLES,
-  STEP_ACTION_KINDS,
-  TERMINATE_CAUSES,
-  TASK_OUTCOME_SPENDS,
-  TASK_OUTCOMES,
-  type LandmarkRole,
-} from './vocab';
+import { SETTLING_CRITERION_KINDS } from './pipelines';
+import { indexOf, shownOptions, type StepPageState } from './step-index';
+import { limitsLines } from './step-limits';
+import { LANDMARK_ROLES, TASK_OUTCOME_SPENDS, TASK_OUTCOMES, type LandmarkRole } from './vocab';
 
 /**
  * Where the mission stands, as engine facts: the criteria settled for the
@@ -59,10 +41,9 @@ export interface StepProgress {
   done: readonly string[];
 }
 
-export interface StepGoalInput {
+export interface StepGoalInput extends StepPageState {
   /** The goal document, verbatim. */
   mission: string;
-  observation: PageObservation;
   /** Most recent last. */
   history: readonly StepHistoryEntry[];
   ledger: TaskLedgerSummary;
@@ -73,101 +54,7 @@ export interface StepGoalInput {
    */
   objections: readonly StepObjection[];
   progress: StepProgress;
-  /**
-   * Whether this is the page the last plan was made against, unchanged: the
-   * recent actions moved nothing on it. Said in the goal, because a recent
-   * action marked ok reads as a step that worked. Measured 2026-10-07: a
-   * producer pressed Enter and Tab on one unchanged dialog for twenty steps,
-   * each press "ok".
-   */
-  pageUnchanged: boolean;
-  /**
-   * What ran at the last step, as the page would recognise it again. On an
-   * unchanged page a repeat of one of these is cut: the page already answered
-   * it. Measured 2026-10-08: nine steps of 31 were one click on one
-   * already-selected card, repeated.
-   */
-  lastRan: readonly RanAction[];
 }
-
-/** The facts the validators check a plan against; everything else in the goal is for the model. */
-export const stepIndexSchema = z.strictObject({
-  pipeline: z.literal(BROWSER_STEP_PIPELINE_ID),
-  maxActions: z.number().int().min(1),
-  elements: z.array(
-    z.strictObject({
-      ref: z.string().regex(ELEMENT_REF),
-      kind: z.enum(ELEMENT_KINDS),
-      // Written only where it deviates — the read-back fills every default — so
-      // an index of 150 elements costs what its deviations cost. Measured
-      // 2026-10-08: 137 of 150 entries carried default facts alone.
-      disabled: z.boolean().default(false),
-      visible: z.boolean().default(true),
-      /** Outside the open modal dialog: a person could not reach it. */
-      behind: z.boolean().default(false),
-      options: z.array(z.string()).nullable().default(null),
-      /** Options the page offers past the listed ones; a select is held to the list only when this is zero. */
-      optionsOmitted: z.number().int().min(0).default(0),
-      hiddenTraits: z.array(z.enum(HIDDEN_TRAITS)).default([]),
-      /** The mission's marks this element carries, by token; a marked element is passed over, never touched. */
-      marks: z.array(bounded.id(MARK_TOKEN_MAX_LENGTH, { min: 1 })).default([]),
-    }),
-  ),
-  /**
-   * Whether the observation shows anything at all — a listed element, or a
-   * snapshot at a rung above none. A terminate names a stop condition the page
-   * shows and a taskDone an outcome the page shows; on a page that shows
-   * nothing there is nothing for either to rest on, and the validators refuse
-   * them there so the most consequential actions in the vocabulary never rest
-   * on a claim alone. A snapshot at the none rung is its note line — text
-   * that says nothing is shown — and an empty document is an empty snapshot
-   * at the full rung; neither shows a thing.
-   */
-  pageShowsContent: z.boolean(),
-  /** Whether this is the page the last plan was made against, unchanged. Written only when it is. */
-  pageUnchanged: z.boolean().default(false),
-  /**
-   * What ran at the last step on this unchanged page, by this observation's
-   * refs — null where the page no longer lists the element, or the action
-   * named none. An action equal in kind, ref and detail is cut. Written only
-   * when the page is unchanged.
-   */
-  lastRan: z
-    .array(
-      z.strictObject({
-        kind: z.enum(STEP_ACTION_KINDS),
-        ref: z.string().regex(ELEMENT_REF).nullable(),
-        detail: z.string().nullable(),
-      }),
-    )
-    .max(ACTIONS_BOUND.ceiling)
-    .default([]),
-  /**
-   * The stop conditions the mission ties to words on the page, and whether
-   * this page shows them. A terminate for a tied cause is cut when none of
-   * its words is shown; a cause tied to no words is not listed and is the
-   * judges' to assess. Written only when the mission ties a cause to words.
-   */
-  stops: z
-    .array(
-      z.strictObject({
-        cause: z.enum(TERMINATE_CAUSES),
-        token: bounded.id(STOP_TOKEN_MAX_LENGTH, { min: 1 }),
-        shown: z.boolean(),
-      }),
-    )
-    .default([]),
-});
-export type StepIndex = z.infer<typeof stepIndexSchema>;
-
-/** The first `OPTIONS_SHOWN` options, then a count of those the page offers past them, so a cut list never reads as the whole. */
-const shownOptions = (
-  element: Pick<ObservedElement, 'options' | 'optionsOmitted'>,
-): { shown: string[]; more: number } => {
-  const options = element.options ?? [];
-  const shown = options.slice(0, OPTIONS_SHOWN);
-  return { shown, more: options.length - shown.length + element.optionsOmitted };
-};
 
 const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'>): string => {
   const { shown, more } = shownOptions(element);
@@ -344,52 +231,6 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
   }`,
 ];
 
-const indexOf = (
-  input: StepGoalInput,
-  marks: readonly Mark[],
-  stops: readonly StopOnPage[],
-): z.input<typeof stepIndexSchema> => ({
-  pipeline: BROWSER_STEP_PIPELINE_ID,
-  maxActions: ACTIONS_BOUND.target,
-  elements: input.observation.elements.map((element) => ({
-    ref: element.ref,
-    kind: element.kind,
-    ...(element.disabled ? { disabled: true } : {}),
-    ...(element.visible ? {} : { visible: false }),
-    ...(inScope(element, input.observation.activeScope) ? {} : { behind: true }),
-    ...(element.options === null ? {} : { options: shownOptions(element).shown }),
-    ...(shownOptions(element).more > 0 ? { optionsOmitted: shownOptions(element).more } : {}),
-    ...(element.hiddenTraits.length > 0 ? { hiddenTraits: element.hiddenTraits } : {}),
-    ...(marksOn(element, marks).length > 0
-      ? { marks: marksOn(element, marks).map((mark) => mark.token) }
-      : {}),
-  })),
-  pageShowsContent:
-    input.observation.elements.length > 0 ||
-    (input.observation.snapshotRung !== 'none' && input.observation.ariaSnapshot.trim() !== ''),
-  ...(input.pageUnchanged && input.lastRan.length > 0
-    ? {
-        pageUnchanged: true,
-        lastRan: input.lastRan.map((ran) => ({
-          kind: ran.kind,
-          ref: refNowOf(ran, input.observation.elements),
-          detail: ran.detail,
-        })),
-      }
-    : {}),
-  ...(stops.length > 0 ? { stops: [...stops] } : {}),
-});
-
-/** The Limits line for the causes the mission ties to words: what each needs, and which of the words this page shows. */
-function stopsLimit(stops: readonly StopOnPage[]): string {
-  const needs = new Map<string, string[]>();
-  for (const stop of stops) {
-    needs.set(stop.cause, [...(needs.get(stop.cause) ?? []), quoted(stop.token)]);
-  }
-  const shown = [...new Set(stops.filter((stop) => stop.shown).map((stop) => quoted(stop.token)))];
-  return `- A terminate is cut unless this page shows the words the mission ties to its cause — ${[...needs].map(([cause, tokens]) => `${cause} needs ${tokens.join(' or ')}`).join('; ')}. This page shows ${shown.length === 0 ? 'none of them' : shown.join(' and ')}.`;
-}
-
 /** One action that ran, as the page would know it again: `click button "Next"`, `fill searchbox "Search" "x"`, `press Enter`. */
 const describeRan = (ran: RanAction): string =>
   [
@@ -398,109 +239,70 @@ const describeRan = (ran: RanAction): string =>
     ...(ran.detail === null ? [] : [quoted(ran.detail)]),
   ].join(' ');
 
+/** A heading, a blank line, the lines, a blank line: the shape every section of the goal has. */
+const section = (heading: string, lines: readonly string[]): string[] => [
+  heading,
+  '',
+  ...lines,
+  '',
+];
+
+/** The page's address, and whether the last plan moved it — said, because a recent action marked ok reads as a step that worked. */
+const pageLines = (input: StepGoalInput): string[] => [
+  `URL: ${input.observation.url}`,
+  `Title: ${input.observation.title}`,
+  ...(input.pageUnchanged
+    ? ['Unchanged since the last plan: the recent actions moved nothing on this page.']
+    : []),
+  ...(input.pageUnchanged && input.lastRan.length > 0
+    ? [
+        `Ran on it at the last step and moved nothing: ${input.lastRan.map(describeRan).join('; ')} — repeating any of these is cut.`,
+      ]
+    : []),
+];
+
+/** The elements, then what was left past the cap and what could not be read, each fact beside the thing it is about. */
+const elementsSection = (observation: PageObservation, marks: readonly Mark[]): string[] => [
+  ...elementLines(observation, marks),
+  ...(observation.omittedElements > 0
+    ? [`(${observation.omittedElements} more interactive elements not listed)`]
+    : []),
+  // Each fact beside the thing it is about, so "nothing listed" and "more
+  // than are listed" can never read as one page: an element that would not
+  // read is not an element you have.
+  ...(observation.unread !== null && observation.unread.elements > 0
+    ? [
+        `(${observation.unread.elements} interactive elements were seen and could not be read: this observation is incomplete, and nothing follows from what it does not list)`,
+      ]
+    : []),
+];
+
+/** The snapshot as fitted, or that there is none — and when its lines could not be read, that this is not an empty page. */
+const snapshotLines = (observation: PageObservation): string[] => [
+  observation.ariaSnapshot.trim() || '(empty)',
+  ...(observation.unread !== null && observation.unread.snapshotLines > 0
+    ? [
+        `(the page's own snapshot could not be read: ${observation.unread.snapshotLines} lines came back with nothing the session could use, so this is not a picture of an empty page)`,
+      ]
+    : []),
+];
+
 /** The goal, or a refusal when it would not fit the engine's budget. */
 export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES): string {
   const { observation } = input;
   const marks = marksOf(input.mission);
   const stops = stopsOnPage(stopsOf(input.mission), observation);
   const goal = [
-    '# Mission',
-    '',
-    input.mission.trim(),
-    '',
-    '## Page',
-    '',
-    `URL: ${observation.url}`,
-    `Title: ${observation.title}`,
-    ...(input.pageUnchanged
-      ? ['Unchanged since the last plan: the recent actions moved nothing on this page.']
-      : []),
-    ...(input.pageUnchanged && input.lastRan.length > 0
-      ? [
-          `Ran on it at the last step and moved nothing: ${input.lastRan.map(describeRan).join('; ')} — repeating any of these is cut.`,
-        ]
-      : []),
-    '',
-    '## Elements',
-    '',
-    ...elementLines(observation, marks),
-    ...(observation.omittedElements > 0
-      ? [`(${observation.omittedElements} more interactive elements not listed)`]
-      : []),
-    // Each fact beside the thing it is about, so "nothing listed" and "more
-    // than are listed" can never read as one page: an element that would not
-    // read is not an element you have.
-    ...(observation.unread !== null && observation.unread.elements > 0
-      ? [
-          `(${observation.unread.elements} interactive elements were seen and could not be read: this observation is incomplete, and nothing follows from what it does not list)`,
-        ]
-      : []),
-    '',
-    '## Snapshot',
-    '',
-    observation.ariaSnapshot.trim() || '(empty)',
-    ...(observation.unread !== null && observation.unread.snapshotLines > 0
-      ? [
-          `(the page's own snapshot could not be read: ${observation.unread.snapshotLines} lines came back with nothing the session could use, so this is not a picture of an empty page)`,
-        ]
-      : []),
-    '',
-    '## Recent actions',
-    '',
-    ...historyLines(input.history),
-    '',
-    '## Objections to answer',
-    '',
-    ...objectionLines(input.objections),
-    '',
-    '## Units of work',
-    '',
-    ...ledgerLines(input.ledger),
-    '',
-    '## Progress',
-    '',
-    ...progressLines(input.progress),
-    '',
-    '## Limits',
-    '',
-    // A cap reads as a quota unless it says otherwise. Measured on 2026-10-06:
-    // asked for "at most 8 actions", a producer returned seven or eight nearly
-    // every time — planning the whole mission in one step, citing refs for
-    // pages it had not opened yet, and being refused by the two validators
-    // this section is describing. Saying it is a ceiling costs five words.
-    `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A terminate or done action is last and appears nowhere else. A taskDone closes a unit of work and touches no page: the plan may go on from it — the next unit's click and taskStart included — but it comes before any action that could change the page.`,
-    // The `references` validator enforces exactly this, and the section that
-    // exists to say what the validators enforce did not say it: an Elements
-    // list belongs to one observation, so a plan that navigates and then cites
-    // a ref is citing one that will not exist by the time it runs.
-    // Not only what a plan may cite: what it may claim. A `taskDone` after a
-    // submit names no ref and still asserts that a page nobody has observed
-    // says what the plan hoped. Measured on 2026-10-06, five plans in eight
-    // closed their unit of work and declared the mission complete on the far
-    // side of a search they had not yet watched land.
-    '- Cite refs only from the Elements list above, which belongs to this observation alone. An action that navigates, submits, or otherwise replaces the page is the LAST action of the plan: anything after it would act on, or claim something about, a page nobody has observed yet — closing a unit of work and terminating included. Plan up to it and leave the page it opens to the next plan.',
-    '- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option, or where the list counts more the page offers, one of those, verbatim.',
-    '- A field the page hides is never filled or selected.',
-    // A claim rests on the page as observed. Measured 2026-10-07: twelve plans
-    // closed their unit or ended the session past a click or a key press in
-    // the same plan, one of them `done` after Next on page 1 of 9 of a form.
-    '- A taskStart, taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
-    ...(marks.length === 0
-      ? []
-      : [
-          `- An element marked ${marks.map((mark) => quoted(mark.token)).join(' or ')} carries a word the mission's Marks declare: it is passed over — never clicked, filled or selected, and never a unit of work.`,
-        ]),
-    ...(stops.length === 0 ? [] : [stopsLimit(stops)]),
-    // The page already answered a repeated question. Measured 2026-10-08: nine
-    // steps of 31 re-clicked the one card the pane already showed.
-    '- On a page unchanged since the last plan, an action that ran at the last step — the same kind on the same element by role and name, with the same value, option, key or URL — is cut: the page already answered it. Act on another element this page lists, press a different key, scroll, or open or close the unit of work from what the page shows now.',
-    '- Validators check these limits; they are not criteria.',
-    '',
+    ...section('# Mission', [input.mission.trim()]),
+    ...section('## Page', pageLines(input)),
+    ...section('## Elements', elementsSection(observation, marks)),
+    ...section('## Snapshot', snapshotLines(observation)),
+    ...section('## Recent actions', historyLines(input.history)),
+    ...section('## Objections to answer', objectionLines(input.objections)),
+    ...section('## Units of work', ledgerLines(input.ledger)),
+    ...section('## Progress', progressLines(input.progress)),
+    ...section('## Limits', limitsLines({ marks, stops })),
     renderIndexSection(indexOf(input, marks, stops)),
   ].join('\n');
   return withinBudget(goal, budget);
 }
-
-/** The index this codec wrote, or null for a goal that is not a browser step. */
-export const readStepIndex = (goal: string): StepIndex | null =>
-  readFencedIndex(goal, stepIndexSchema);

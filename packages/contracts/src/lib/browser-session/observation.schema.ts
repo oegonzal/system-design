@@ -10,15 +10,9 @@ import { z } from 'zod';
 
 import { bound, bounded, exact } from '../bounds';
 import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
-import {
-  ELEMENT_KINDS,
-  HIDDEN_TRAITS,
-  LANDMARK_ROLES,
-  SCOPE_ROLES,
-  SNAPSHOT_RUNGS,
-  STEP_OUTCOMES,
-  TASK_OUTCOMES,
-} from './vocab';
+import { STEP_OUTCOMES } from './action-effects';
+import { ELEMENT_KINDS } from './element-kind';
+import { HIDDEN_TRAITS, LANDMARK_ROLES, SCOPE_ROLES, SNAPSHOT_RUNGS, TASK_OUTCOMES } from './vocab';
 
 /** The most elements one observation lists; the adapter keeps those inside the open scope first, then visible, enabled ones. */
 export const ELEMENTS_BOUND = bound(150, 'list');

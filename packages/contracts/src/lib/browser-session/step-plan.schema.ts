@@ -11,13 +11,8 @@ import { z } from 'zod';
 import { bound, bounded } from '../bounds';
 import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
-import {
-  PRESS_KEYS,
-  SCROLL_DIRECTIONS,
-  TASK_OUTCOMES,
-  TERMINATE_CAUSES,
-  WAIT_UNTIL,
-} from './vocab';
+import { PRESS_KEYS, SCROLL_DIRECTIONS, WAIT_UNTIL } from './action-effects';
+import { TASK_OUTCOMES, TERMINATE_CAUSES } from './vocab';
 
 export const ACTIONS_BOUND = bound(8, 'list');
 export const ASK_FIELDS_BOUND = bound(40, 'list');

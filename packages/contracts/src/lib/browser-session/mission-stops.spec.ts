@@ -8,7 +8,8 @@ import {
   stopsOf,
   stopsOnPage,
 } from './mission-stops';
-import { composeStepGoal, readStepIndex } from './step-goal';
+import { composeStepGoal } from './step-goal';
+import { readStepIndex } from './step-index';
 
 /** The fixture mission with its Stop conditions replaced by the given bullets. */
 const withStops = (bullets: string): string =>

@@ -2,11 +2,15 @@
 // runs, what it observes, the two artifacts it reads back and how, the goal
 // codecs both sides parse, what the operator taught, and its records.
 export * from './vocab';
+export * from './element-kind';
+export * from './action-effects';
 export * from './pipelines';
 export * from './observation-fingerprint';
 export * from './observation.schema';
 export * from './step-plan.schema';
 export * from './step-goal';
+export * from './step-index';
+export * from './step-limits';
 export * from './field-answers.schema';
 export * from './field-goal';
 export * from './read-back';
