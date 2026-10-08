@@ -134,10 +134,18 @@ export function subtreeText(nodes: readonly SnapshotNode[], index: number): stri
 
 /**
  * How a snapshot too big for its byte budget is reduced: by declared rungs,
- * never a cut mid-page. The whole snapshot; then its nodes alone — property
- * lines, text lines and a node's inline text dropped; then only the nodes
- * Playwright minted refs for; then none. A reduced snapshot opens with a line
- * naming its rung and what it dropped, so the dump and the model both know.
+ * never a cut mid-page. The whole snapshot; then the lines that carry words —
+ * a name, inline text, a text line — with the wordless node lines and the
+ * property lines gone, refs or not; then its nodes alone — property lines,
+ * text lines and a node's inline text dropped; then only the nodes Playwright
+ * minted refs for; then none. A reduced snapshot opens with a line naming its
+ * rung and what it dropped, so the dump and the model both know.
+ *
+ * Measured 2026-10-08 on a results page: 1,012 node lines, 765 of them unnamed
+ * containers carrying refs and no words, so nodes-only (56 KB) and refs-only
+ * (55 KB) both overran the room a goal left and the model read none, while the
+ * lines with words were 18.5 KB. The words come first because they are what a
+ * plan reads; the elements a page lists carry their refs whatever the rung.
  */
 /**
  * Whether a snapshot carries a node the session can act on: one the grammar
@@ -214,12 +222,22 @@ const nodeLines = (lines: readonly string[]): string[] =>
     return node === null ? [] : [node];
   });
 
+/** A node line that says something a reader can read: a name, inline text, or a text line's words. */
+const carriesWords = (line: string): boolean => {
+  const groups = SNAPSHOT_NODE_LINE.exec(line)?.groups;
+  return (
+    groups?.['role'] !== undefined &&
+    ((groups['name'] ?? '') !== '' || (groups['inline'] ?? '').trim() !== '')
+  );
+};
+
 /** The rungs that reduce a set of lines, as what each keeps of them. */
 type ReducingRung = Exclude<SnapshotRung, 'full' | 'scope'>;
 const REDUCING_RUNGS = SNAPSHOT_RUNGS.filter(
   (rung): rung is ReducingRung => rung !== 'full' && rung !== 'scope',
 );
 const REDUCTIONS: Readonly<Record<ReducingRung, (lines: readonly string[]) => string[]>> = {
+  'words-only': (lines) => lines.filter(carriesWords),
   'nodes-only': nodeLines,
   'refs-only': (lines) => nodeLines(lines).filter((line) => refOf(line) !== null),
   none: () => [],
@@ -262,7 +280,8 @@ function splitByScope(
  * The snapshot at the first rung that fits the budget: the whole; with an
  * open scope, that scope whole and the rest reduced — a dialog's twenty lines
  * are what the plan acts on, and the page behind it is what the rungs give
- * up first; then the nodes alone; then only the nodes with refs; then none.
+ * up first; then the lines with words; then the nodes alone; then only the
+ * nodes with refs; then none.
  * A reduced snapshot opens with a line naming its rung and what it dropped,
  * so the dump and the model both know. Measured 2026-10-07: at the recorded
  * density a 1 400-line page lands on `none` inside the room a goal leaves,
