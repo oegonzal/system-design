@@ -210,7 +210,11 @@ describe('composeStepGoal', () => {
     const goal = goalOf(dialogObservation());
     const elements = between(goal, '## Elements', '## Snapshot');
     expect(elements).toContain(
-      'Inside the open dialog "Apply to Acme" — the rest of the page waits behind it:',
+      'Inside the open dialog "Apply to Acme" — the rest of the page waits behind it; an element not listed here may be behind the dialog, so its absence says nothing about the page:',
+    );
+    // A dialog the page gives no name is still named as the open scope, never as `""`.
+    expect(goalOf({ ...dialogObservation(), activeScope: { role: 'dialog', name: '' } })).toContain(
+      'Inside the open dialog (unnamed) — the rest of the page waits behind it;',
     );
     expect(elements).toMatch(/^- e11 · textbox · "First name"/m);
     expect(elements).toMatch(/^- e13 · button · "Next"/m);

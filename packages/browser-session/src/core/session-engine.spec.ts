@@ -65,6 +65,11 @@ describe('the session engine', () => {
       ['click e2 button "Search"', 'ok'],
     ]);
     expect(brain.planInputs[2]?.ledger.openTask?.label).toBe('Senior Engineer at Acme');
+    // The form step's note counts the field the operator was asked about as asked,
+    // although its row became a fill once the operator answered.
+    expect(brain.planInputs[3]?.history.map((h) => h.note).join('\n')).toMatch(
+      /3 field\(s\): \d filled, \d kept, 1 asked \(1 answered by the operator\), \d blank/,
+    );
     // Once closed, the unit is listed to the next plan by label and outcome, and counted.
     expect(brain.planInputs[4]?.ledger).toMatchObject({
       openTask: null,

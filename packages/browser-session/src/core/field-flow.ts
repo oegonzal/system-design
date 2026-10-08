@@ -276,15 +276,26 @@ const decisionOf = (
   },
 });
 
-/** The step's history line: what became of the listed fields, the ones not reached counted too. */
+/**
+ * The step's history line: what became of the listed fields, the ones not
+ * reached counted too. A field the operator was asked about is counted as
+ * asked whatever its row says afterwards — an answer turns the row into a
+ * fill from the operator — so the four counts are disjoint and the asks are
+ * never read as none. Measured 2026-10-08: one field went to the operator,
+ * who answered, and the note read "0 asked".
+ */
 const summarize = (results: readonly FieldResult[], listed: number): string => {
+  const asked = results.filter((r) => r.reply !== null);
+  const answered = asked.filter((r) => r.reply === 'answer' || r.reply === 'read-back').length;
   const count = (route: FieldRoute): number =>
-    results.filter((r) => r.route === route && r.outcome === 'ok').length;
+    results.filter((r) => r.reply === null && r.route === route && r.outcome === 'ok').length;
   const failed = results.filter((r) => r.outcome === 'failed').length;
   const unattempted = listed - results.length;
-  return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${count('ask-operator')} asked, ${count('leave-blank')} blank${
-    failed > 0 ? `, ${failed} failed` : ''
-  }${unattempted > 0 ? `, ${unattempted} not attempted` : ''}`;
+  return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${asked.length} asked${
+    asked.length > 0 ? ` (${answered} answered by the operator)` : ''
+  }, ${count('leave-blank')} blank${failed > 0 ? `, ${failed} failed` : ''}${
+    unattempted > 0 ? `, ${unattempted} not attempted` : ''
+  }`;
 };
 
 export async function askFields(

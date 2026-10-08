@@ -249,10 +249,12 @@ function elementLines(observation: PageObservation, marks: readonly Mark[]): str
   const reachable = elements.filter((element) => element.visible && inScope(element, activeScope));
   const unlisted = elements.length - reachable.length;
   return [
+    // What is not listed inside the dialog may be behind it: a unit closed on
+    // "the pane shows no Easy Apply button" while the dialog hid the pane.
     ...(activeScope === null
       ? []
       : [
-          `Inside the open ${activeScope.role} ${quote(activeScope.name)} — the rest of the page waits behind it:`,
+          `Inside the open ${activeScope.role} ${activeScope.name === '' ? '(unnamed)' : quote(activeScope.name)} — the rest of the page waits behind it; an element not listed here may be behind the dialog, so its absence says nothing about the page:`,
         ]),
     ...(reachable.length > 0
       ? groupedByLandmark(reachable, marks)
