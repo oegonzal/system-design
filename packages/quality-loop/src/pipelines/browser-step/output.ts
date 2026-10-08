@@ -60,7 +60,7 @@ export const stepPlanOutput: OutputShape<StepPlan> = {
 
   render: (plan) =>
     [
-      `[assessment] ${plan.pageKind} — ${plan.assessment}`,
+      `[assessment] ${plan.assessment}`,
       ...numberedSection('Actions', 'action', plan.actions, actionLine),
     ].join('\n'),
 };

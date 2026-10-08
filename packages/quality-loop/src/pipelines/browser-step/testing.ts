@@ -109,7 +109,6 @@ export const samplePlan = (
   ],
   overrides: Partial<StepPlan> = {},
 ): StepPlan => ({
-  pageKind: 'listing',
   assessment:
     'A results page with two listings; no unit of work is open, so the first listing is next.',
   actions,

@@ -99,7 +99,7 @@ describe('the ledger in Postgres', () => {
       question: null,
       answer: null,
       confidence: null,
-      payload: { pageKind: 'listing' },
+      payload: { assessment: 'a listing' },
       durationMs: 90_000,
       createdAt: at(10),
     });

@@ -83,7 +83,6 @@ function settleExpectation(ctx: EngineContext, observation: PageObservation): vo
 const CONTROLLER = 'controller';
 
 const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
-  pageKind: readout.plan?.pageKind ?? null,
   assessment: readout.plan?.assessment ?? null,
   actions: readout.plan?.actions.length ?? 0,
   executable: readout.executable,
@@ -187,9 +186,9 @@ async function step(ctx: EngineContext): Promise<Termination | null> {
     }),
   ]);
   deps.log(
-    `step ${state.step}: ${readout.plan?.pageKind ?? 'no plan'} — ${
+    `step ${state.step}: ${
       readout.executable
-        ? `${readout.executePrefix} action(s) to run`
+        ? `${readout.executePrefix} of ${readout.plan?.actions.length ?? 0} action(s) to run`
         : `not executed: ${readout.reason}`
     } (run ${decided.runId})`,
   );

@@ -348,7 +348,7 @@ describe('the browser-step validators', () => {
       ],
       limits: [],
     });
-    const broken = { pageKind: 'listing' } as unknown as StepPlan;
+    const broken = { assessment: 'a page, and no actions' } as unknown as StepPlan;
     expect(problems(broken)).toEqual({ references: [], limits: [] });
   });
 

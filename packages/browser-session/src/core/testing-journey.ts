@@ -95,9 +95,8 @@ export const journeyPages = (): ScriptedPage[] => [
 
 const act = <A extends StepAction>(action: A): A => action;
 const common = { reason: 'the procedure says so', expect: null, serves: [] };
-const plan = (pageKind: StepPlan['pageKind'], actions: StepAction[]): StepPlan => ({
-  pageKind,
-  assessment: `a ${pageKind} page; carrying the mission forward`,
+const plan = (page: string, actions: StepAction[]): StepPlan => ({
+  assessment: `a ${page} page; carrying the mission forward`,
   actions,
 });
 

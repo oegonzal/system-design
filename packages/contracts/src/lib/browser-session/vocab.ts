@@ -272,18 +272,6 @@ export const elementKind = (
   return typed !== undefined && acceptsTypedText(facts.inputType) ? typed : elementKindOf(role);
 };
 
-/** What kind of page the plan believes it is on — a reading, not a route. */
-export const PAGE_KINDS = [
-  'listing',
-  'detail',
-  'form',
-  'review',
-  'confirmation',
-  'login-wall',
-  'limit-reached',
-  'other',
-] as const;
-
 export const STEP_ACTION_KINDS = [
   'navigate',
   'click',

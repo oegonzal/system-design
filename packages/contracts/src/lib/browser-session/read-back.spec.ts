@@ -125,7 +125,6 @@ function run(shape: RunShape): QualityRunDto {
 }
 
 const plan: StepPlan = {
-  pageKind: 'listing',
   assessment: 'A listing page; open the first result.',
   actions: [
     {

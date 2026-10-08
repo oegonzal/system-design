@@ -12,7 +12,6 @@ import { bound, bounded } from '../bounds';
 import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import {
-  PAGE_KINDS,
   PRESS_KEYS,
   SCROLL_DIRECTIONS,
   TASK_OUTCOMES,
@@ -144,7 +143,6 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
 export type StepAction = z.infer<typeof stepActionSchema>;
 
 export const stepPlanSchema = z.strictObject({
-  pageKind: z.enum(PAGE_KINDS),
   assessment: bounded.text(ASSESSMENT_BOUND, {
     min: 1,
     description:
