@@ -51,7 +51,9 @@ describe('createLlmEvaluator', () => {
       { ...ctx, upstream },
     );
     expect(calls[0].user).toContain('# Confirmed upstream defects');
-    expect(calls[0].user).toContain('[medium] gap at text → criteria c1');
+    // One sample's finding is shown as a claim to weigh, never as agreement.
+    expect(calls[0].user).toContain('[medium] gap at text → criteria c1 (one sample)');
+    expect(calls[0].user).toContain('a claim to weigh, not a fact');
     expect(calls[0].user).toContain('the text is thin');
 
     await runLens(createLlmEvaluator<TinyOutput>(definition.evaluators[0], [llm]), {

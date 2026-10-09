@@ -186,14 +186,20 @@ export function upstreamSections(
       const at = finding.locationRefs.length > 0 ? finding.locationRefs.join(', ') : '(unlocated)';
       const names =
         finding.criterionIds.length > 0 ? ` → criteria ${finding.criterionIds.join(', ')}` : '';
+      const seen = finding.hits > 1 ? `${finding.hits} samples agreed` : 'one sample';
       const why = finding.rationale ? `\n  ${finding.rationale}` : '';
-      return `- [${finding.severity}] ${finding.type} at ${at}${names}${why}`;
+      return `- [${finding.severity}] ${finding.type} at ${at}${names} (${seen})${why}`;
     });
+    // How much a finding is to be trusted is said per finding, from how many
+    // samples raised it: a judge told to defer to one sample is an echo of it,
+    // never the second reading that corroboration counts on. Measured
+    // 2026-10-08: one critic sample's stop on a page that showed none was
+    // borne out by the evaluator it had been shown to, and vetoed the plan.
     sections.push(
       [
         '# Confirmed upstream defects',
         '',
-        'Independent samples agreed on each of these. A criterion one of them names is at most partial unless you show the defect does not touch it.',
+        "The critics' findings the engine confirmed, each with how many samples raised it. One raised by a single sample is a claim to weigh, not a fact: judge each criterion it names from the goal and the artifact yourself, and say where you disagree. Where independent samples agreed on a finding, a criterion it names is at most partial unless you show the defect does not touch it.",
         '',
         ...(lines.length > 0 ? lines : ['(none confirmed)']),
       ].join('\n'),
