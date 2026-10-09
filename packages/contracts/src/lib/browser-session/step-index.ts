@@ -22,10 +22,28 @@ import {
   type PageObservation,
 } from './observation.schema';
 import { BROWSER_STEP_PIPELINE_ID } from './pipelines';
-import { ACTIONS_BOUND } from './step-plan.schema';
+import { ACTIONS_BOUND, type StepAction } from './step-plan.schema';
 import { HIDDEN_TRAITS, TERMINATE_CAUSES } from './vocab';
 
-/** The page as the step sees it: what was observed, whether the last plan moved it, and what ran on it. */
+/**
+ * What the last step did, as the next plan is told it — engine facts, never a
+ * ref (a ref belongs to one observation): how many of the plan's actions ran,
+ * the page actions among them as the page would recognise them again, and the
+ * kinds it proposed after them that did not run. Measured 2026-10-08: told
+ * only "not-executed … past the executable prefix", a planner whose click had
+ * opened a listing clicked a card again on the next page instead of opening
+ * the unit, twelve steps of 23.
+ */
+export interface LastStep {
+  /** How many of the plan's actions ran without failing, the session's own events included. */
+  ran: number;
+  /** The page actions that ran, as the page would recognise them again; the last one led here. */
+  touched: readonly RanAction[];
+  /** The kinds the plan proposed after what ran, which did not run. */
+  held: readonly StepAction['kind'][];
+}
+
+/** The page as the step sees it: what was observed, whether the last plan moved it, and what the last step did. */
 export interface StepPageState {
   observation: PageObservation;
   /**
@@ -37,12 +55,12 @@ export interface StepPageState {
    */
   pageUnchanged: boolean;
   /**
-   * What ran at the last step, as the page would recognise it again. On an
-   * unchanged page a repeat of one of these is cut: the page already answered
-   * it. Measured 2026-10-08: nine steps of 31 were one click on one
-   * already-selected card, repeated.
+   * What the last step did; null before the first plan. On an unchanged page a
+   * repeat of what it touched is cut: the page already answered it. Measured
+   * 2026-10-08: nine steps of 31 were one click on one already-selected card,
+   * repeated.
    */
-  lastRan: readonly RanAction[];
+  lastStep: LastStep | null;
 }
 
 /** The facts the validators check a plan against; everything else in the goal is for the model. */
@@ -148,10 +166,10 @@ export const indexOf = (
   pageShowsContent:
     page.observation.elements.length > 0 ||
     (page.observation.snapshotRung !== 'none' && page.observation.ariaSnapshot.trim() !== ''),
-  ...(page.pageUnchanged && page.lastRan.length > 0
+  ...(page.pageUnchanged && (page.lastStep?.touched.length ?? 0) > 0
     ? {
         pageUnchanged: true,
-        lastRan: page.lastRan.map((ran) => ({
+        lastRan: (page.lastStep?.touched ?? []).map((ran) => ({
           kind: ran.kind,
           ref: refNowOf(ran, page.observation.elements),
           detail: ran.detail,

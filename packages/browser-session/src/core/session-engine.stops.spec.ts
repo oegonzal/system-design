@@ -42,16 +42,19 @@ describe('how a plan stops and how a session ends', () => {
     // The history says what each action did; a note belongs to its own action.
     expect(cut.brain.planInputs[1]?.history.map((h) => [h.action, h.outcome, h.note])).toEqual([
       [
-        'fill e1 searchbox "Search" with "software engineer"',
+        'fill searchbox "Search" with "software engineer"',
         'failed',
         'fill e1: the element is detached',
       ],
-      ['click e2 button "Search"', 'not-executed', 'after a failed action'],
-      // The judge's objection no longer cuts the plan — the controller accepted
-      // it and found nothing blocking — so what stopped this one is the page
-      // refusing an action, and every action after it says so.
-      ['press Enter', 'not-executed', 'after a failed action'],
     ]);
+    // The judge's objection no longer cuts the plan — the controller accepted
+    // it and found nothing blocking — so what stopped this one is the page
+    // refusing an action; what came after it is held, not history.
+    expect(cut.brain.planInputs[1]?.lastStep).toEqual({
+      ran: 0,
+      touched: [],
+      held: ['click', 'press'],
+    });
     // The controller accepted the plan and found nothing blocking, so what the
     // judge said is advice on the run's record — not an objection the next
     // plan has to answer. Measured 2026-10-07: advice carried as objections
@@ -73,10 +76,10 @@ describe('how a plan stops and how a session ends', () => {
     expect(form.browser.pageId).toBe('form');
     expect(form.browser.calls).not.toContain('click e6');
     expect(form.operator.prompts).toEqual([]);
-    expect(form.brain.planInputs[3]?.history.slice(-2).map((h) => [h.outcome, h.note])).toEqual([
+    expect(form.brain.planInputs[3]?.history.slice(-1).map((h) => [h.outcome, h.note])).toEqual([
       ['failed', '3 field(s): 0 filled, 0 kept, 0 asked, 0 blank, 1 failed, 2 not attempted'],
-      ['not-executed', 'after a failed action'],
     ]);
+    expect(form.brain.planInputs[3]?.lastStep?.held).toEqual(['click']);
     const rows = form.detail.decisions.filter((d) => d.kind === 'field-answer');
     expect(rows.map((d) => [d.ref, d.payload['outcome']])).toEqual([['e1', 'failed']]);
     const dumped = JSON.parse(form.dumps.text('01-steps/03/fields.json')) as {

@@ -156,6 +156,12 @@ describe('composeStepGoal', () => {
         done: ['c13'],
       },
       pageUnchanged: false,
+      // The longest hand-off the page section can carry: a long element name, and a full plan held past it.
+      lastStep: {
+        ran: 1,
+        touched: [{ kind: 'click', role: 'link', name: 'n'.repeat(300), detail: null }],
+        held: ['taskStart', 'press', 'waitFor', 'click', 'askFields', 'press', 'taskDone'],
+      },
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     // The room such a page leaves a snapshot: measured 2026-10-07, a dialog of
@@ -290,17 +296,42 @@ describe('composeStepGoal', () => {
     expect(indexed?.options).toHaveLength(OPTIONS_SHOWN);
     expect(indexed?.optionsOmitted).toBe(207);
     expect(readStepIndex(goalOf(formObservation()))?.elements[1].optionsOmitted).toBe(0);
-    // The page section says when nothing moved, and only then.
-    expect(goalOf(formObservation())).not.toContain('Unchanged since the last plan');
-    expect(
-      composeStepGoal(
-        stepGoalInput({
-          observation: formObservation(),
-          progress: NO_PROGRESS,
-          pageUnchanged: true,
-        }),
-      ),
-    ).toContain('Unchanged since the last plan: the recent actions moved nothing on this page.');
+    // Before the first plan the page section says only where the page is.
+    expect(between(goalOf(formObservation()), '## Page', '## Elements')).not.toContain('last');
+  });
+
+  it('[QL-36] the page section says what the last step did to this page, from engine facts alone', () => {
+    // Measured 2026-10-08: told only "not-executed … past the executable
+    // prefix", a planner whose click had opened a listing clicked a card again
+    // on the next page instead of opening the unit, twelve steps of 23.
+    const pageOf = (lastStep: StepGoalInput['lastStep'], pageUnchanged: boolean): string =>
+      between(
+        composeStepGoal(stepGoalInput({ progress: NO_PROGRESS, lastStep, pageUnchanged })),
+        '## Page',
+        '## Elements',
+      );
+    const click = {
+      kind: 'click' as const,
+      role: 'link',
+      name: 'Senior Engineer — Acme',
+      detail: null,
+    };
+    // A click that moved the page: what led here, and what was held for this page.
+    const moved = pageOf({ ran: 1, touched: [click], held: ['taskStart', 'press'] }, false);
+    expect(moved).toContain(
+      'Reached by the last action that ran: click link "Senior Engineer — Acme".',
+    );
+    expect(moved).toContain(
+      'Planned after it and not run: taskStart, press — they were planned before this page could be seen; decide them from what this page shows.',
+    );
+    // The same click on a page that did not change: what ran, and that repeating it is cut.
+    expect(pageOf({ ran: 1, touched: [click], held: [] }, true)).toContain(
+      'The last step ran click link "Senior Engineer — Acme" and this page did not change — repeating any of these is cut.',
+    );
+    // A plan that did not run says so, and never that the recent actions moved nothing.
+    const refused = pageOf({ ran: 0, touched: [], held: [] }, true);
+    expect(refused).toContain('The last plan did not run: this is the page it was planned on.');
+    expect(refused).not.toContain('moved nothing');
   });
 
   it('prints only the facts that are true of an element', () => {

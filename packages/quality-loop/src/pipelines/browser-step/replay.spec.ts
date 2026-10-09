@@ -55,7 +55,7 @@ const goalOf = (recorded: RecordedStep): string =>
     objections: [],
     progress: { criteria: [], settled: [], done: [] },
     pageUnchanged: false,
-    lastRan: [],
+    lastStep: null,
   });
 
 const validate = (recorded: RecordedStep): ValidationReport[] => {

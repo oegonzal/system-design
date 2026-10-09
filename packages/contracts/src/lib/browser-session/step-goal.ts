@@ -21,7 +21,7 @@ import {
   type TaskLedgerSummary,
 } from './observation.schema';
 import { SETTLING_CRITERION_KINDS } from './pipelines';
-import { indexOf, shownOptions, type StepPageState } from './step-index';
+import { indexOf, shownOptions, type LastStep, type StepPageState } from './step-index';
 import { limitsLines } from './step-limits';
 import { LANDMARK_ROLES, TASK_OUTCOME_SPENDS, TASK_OUTCOMES, type LandmarkRole } from './vocab';
 
@@ -247,18 +247,46 @@ const section = (heading: string, lines: readonly string[]): string[] => [
   '',
 ];
 
-/** The page's address, and whether the last plan moved it — said, because a recent action marked ok reads as a step that worked. */
+/**
+ * What the last step did to this page, from engine facts: a plan that did not
+ * run left the page as it was planned on; one that ran and moved nothing is
+ * told so, with what it ran, since a recent action marked ok reads as a step
+ * that worked; one that moved the page is told which action led here and what
+ * it had planned past that action, which was held because the page it would
+ * act on had not been seen yet — this is that page.
+ */
+function lastStepLines(last: LastStep, pageUnchanged: boolean): string[] {
+  const touched = last.touched.map(describeRan);
+  if (last.ran === 0) {
+    return [
+      pageUnchanged
+        ? 'The last plan did not run: this is the page it was planned on.'
+        : 'The last plan did not run, and the page has changed since it was planned.',
+    ];
+  }
+  if (pageUnchanged) {
+    return [
+      touched.length === 0
+        ? 'The last step ran, and this page did not change.'
+        : `The last step ran ${touched.join('; ')} and this page did not change — repeating any of these is cut.`,
+    ];
+  }
+  const reachedBy = touched.at(-1);
+  return [
+    ...(reachedBy === undefined ? [] : [`Reached by the last action that ran: ${reachedBy}.`]),
+    ...(last.held.length === 0
+      ? []
+      : [
+          `Planned after it and not run: ${last.held.join(', ')} — they were planned before this page could be seen; decide them from what this page shows.`,
+        ]),
+  ];
+}
+
+/** The page's address, then what the last step did to it. */
 const pageLines = (input: StepGoalInput): string[] => [
   `URL: ${input.observation.url}`,
   `Title: ${input.observation.title}`,
-  ...(input.pageUnchanged
-    ? ['Unchanged since the last plan: the recent actions moved nothing on this page.']
-    : []),
-  ...(input.pageUnchanged && input.lastRan.length > 0
-    ? [
-        `Ran on it at the last step and moved nothing: ${input.lastRan.map(describeRan).join('; ')} — repeating any of these is cut.`,
-      ]
-    : []),
+  ...(input.lastStep === null ? [] : lastStepLines(input.lastStep, input.pageUnchanged)),
 ];
 
 /** The elements, then what was left past the cap and what could not be read, each fact beside the thing it is about. */

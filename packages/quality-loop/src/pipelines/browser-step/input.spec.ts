@@ -135,7 +135,7 @@ describe('the browser-step input codec', () => {
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged: false,
-      lastRan: [],
+      lastStep: null,
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);

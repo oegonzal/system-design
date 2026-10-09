@@ -1,6 +1,5 @@
 import {
   CLOSED_TASKS_BOUND,
-  ranActionOf,
   TASK_OUTCOME_STATUS,
   type PageObservation,
   type PlanReadout,
@@ -19,20 +18,23 @@ import {
   type Termination,
 } from './ports';
 import { labelledScreenshot } from './session-dump';
-import { clearObjections, describeAction, pushHistory, type OpenTask } from './session-state';
+import {
+  clearObjections,
+  describeAction,
+  pushHistory,
+  touchedBy,
+  type OpenTask,
+} from './session-state';
 
-/** What a history entry says about an action the plan proposed past its executable prefix. */
-const CUT_NOTE = 'past the executable prefix';
 /**
- * Running the unfaulted prefix of an accepted plan, action by action. A
- * browser action goes to the browser and leaves its promise pending for the
- * next observation; the engine's own events — units of work opening and
- * closing, fields asked, a screenshot, the end — are handled here. The
- * first `ActionFailed` — a browser action's or a field fill's — stops the
- * plan and counts one failed step; what did not run is carried into the
- * history as not-executed with its reason, the rest of the prefix as
- * "after a failed action" and what a judge or validator cut as their words,
- * so the next plan is told both.
+ * Running the unfaulted prefix of a plan, action by action. A browser action
+ * goes to the browser and leaves its promise pending for the next
+ * observation; the engine's own events — units of work opening and closing,
+ * fields asked, a screenshot, the end — are handled here. The first
+ * `ActionFailed` — a browser action's or a field fill's — stops the plan and
+ * counts one failed step. The history records what happened, each action
+ * once; what the plan proposed and did not run is the last step's `held`,
+ * which the next goal states beside the page it was held for.
  */
 
 function openTask(
@@ -66,7 +68,7 @@ function openTask(
       startedAt,
     }),
   );
-  pushHistory(state, label, 'ok', action.expect);
+  pushHistory(state, label, 'ok', null);
 }
 
 async function closeTask(
@@ -100,7 +102,7 @@ async function closeTask(
     finishedAt: deps.clock.now(),
   };
   queue.write(`task ${task.ordinal} close`, () => deps.ledger.closeTask(task.id, close));
-  pushHistory(state, label, 'ok', action.expect);
+  pushHistory(state, label, 'ok', null);
 }
 
 /** One of the engine's own events; true when it failed and the plan must stop. */
@@ -115,7 +117,7 @@ async function perform(
     case 'screenshot': {
       const bytes = await deps.browser.screenshot();
       ctx.dumpFiles('screenshot', [labelledScreenshot(state.step, action.label, bytes)]);
-      pushHistory(state, label, 'ok', action.expect);
+      pushHistory(state, label, 'ok', null);
       return { failed: false, stopped: false };
     }
     case 'askFields': {
@@ -131,7 +133,7 @@ async function perform(
       await closeTask(ctx, action, label);
       return { failed: false, stopped: false };
     case 'done':
-      pushHistory(state, label, 'ok', action.expect);
+      pushHistory(state, label, 'ok', null);
       return { failed: false, stopped: false };
   }
 }
@@ -151,7 +153,7 @@ async function act(
     pushHistory(state, label, 'failed', error.message);
     return true;
   }
-  pushHistory(state, label, 'ok', action.expect);
+  pushHistory(state, label, 'ok', null);
   state.pending = {
     action: label,
     expect: action.expect,
@@ -214,27 +216,17 @@ export async function executeActions(
   if (failed) ctx.fail('action-failed');
   else state.consecutiveFailures = 0;
 
-  for (const action of prefix.slice(next)) {
-    pushHistory(
-      state,
-      describeAction(action, observation),
-      'not-executed',
-      'after a failed action',
-    );
-  }
-  for (const action of actions.slice(prefix.length)) {
-    // Why it was cut is an objection the next goal carries whole; the note says only that it was.
-    pushHistory(state, describeAction(action, observation), 'not-executed', CUT_NOTE);
-  }
   // Every action the plan proposed ran, and none failed: the objections are spent.
   const ranWhole = !failed && actions.length === prefix.length;
   if (ranWhole) clearObjections(state);
   const ranOk = failed ? next - 1 : next;
-  // What ran, as the page would recognise it again: the next goal says it, and
-  // on an unchanged page a repeat of it is cut.
-  state.ranActions = prefix.slice(0, ranOk).flatMap((action) => {
-    const ran = ranActionOf(action, observation.elements);
-    return ran === null ? [] : [ran];
-  });
+  state.lastStep = {
+    ran: ranOk,
+    // What ran, as the page would recognise it again: the next goal says what
+    // led to its page, and on an unchanged page a repeat of it is cut.
+    touched: touchedBy(prefix.slice(0, ranOk), observation.elements),
+    // What the plan proposed past what ran: planned before the next page could be seen.
+    held: actions.slice(next).map((action) => action.kind),
+  };
   return { termination: null, ranWhole, ranOk };
 }

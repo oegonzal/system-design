@@ -71,11 +71,11 @@ describe('the Limits a step goal states', () => {
       objections: [],
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged,
-      lastRan: ran,
+      lastStep: { ran: ran.length, touched: ran, held: [] },
     });
     const unchanged = composeStepGoal(input(true));
     expect(unchanged).toContain(
-      'Ran on it at the last step and moved nothing: click link "Senior Engineer — Acme"; press "Enter"; click button "Gone from this page" — repeating any of these is cut.',
+      'The last step ran click link "Senior Engineer — Acme"; press "Enter"; click button "Gone from this page" and this page did not change — repeating any of these is cut.',
     );
     expect(readStepIndex(unchanged)).toMatchObject({
       pageUnchanged: true,
@@ -90,7 +90,7 @@ describe('the Limits a step goal states', () => {
     );
     // A page that moved carries neither the line nor the index entries: what ran is history, not a repeat.
     const moved = composeStepGoal(input(false));
-    expect(moved).not.toContain('Ran on it at the last step');
+    expect(moved).not.toContain('this page did not change');
     expect(readStepIndex(moved)).toMatchObject({ pageUnchanged: false, lastRan: [] });
   });
 

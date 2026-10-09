@@ -7,9 +7,9 @@ import {
   type SessionCriteria,
   type SessionDeps,
 } from './engine-context';
-import { BrainFaulted, type Termination } from './ports';
+import { BrainFaulted, type BrowserAction, type Termination } from './ports';
 import { closeSession, warnOf } from './session-close';
-import { createState } from './session-state';
+import { createState, pushHistory, touchedBy } from './session-state';
 import { step } from './step-flow';
 import { createWriteQueue, heartbeatTicker, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
 
@@ -87,13 +87,17 @@ export async function runSession(
     // planned step: no decision row.
     if (options.startUrl !== undefined) {
       deps.log(`session ${state.sessionId}: opening at ${options.startUrl}`);
-      await deps.browser.act({
+      const opening: BrowserAction = {
         kind: 'navigate',
         url: options.startUrl,
         reason: 'open at the start url',
         expect: null,
         serves: [],
-      });
+      };
+      await deps.browser.act(opening);
+      // Told to the first plan as what led to its page, so it does not open it again.
+      pushHistory(state, `navigate ${options.startUrl}`, 'ok', null);
+      state.lastStep = { ran: 1, touched: touchedBy([opening], []), held: [] };
     }
     for (;;) {
       const decidedEnd = await step(ctx);

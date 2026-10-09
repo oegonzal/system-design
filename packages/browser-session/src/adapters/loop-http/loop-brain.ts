@@ -129,7 +129,7 @@ export class LoopBrain implements BrainPort {
         goal: composed.goal,
         criteria,
         maxIterations:
-          input.pageUnchanged && input.nothingRan
+          input.pageUnchanged && input.lastStep?.ran === 0
             ? DECISION_ITERATIONS_WHEN_NOTHING_RAN
             : DECISION_ITERATIONS,
       });

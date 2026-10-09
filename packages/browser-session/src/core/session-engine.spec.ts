@@ -58,8 +58,8 @@ describe('the session engine', () => {
     expect(brain.fieldInputs[0]?.criteria).toEqual(FAKE_RUBRIC);
     // The next plan is told what ran, with refs named by role and name.
     expect(brain.planInputs[1]?.history.map((h) => [h.action, h.outcome])).toEqual([
-      ['fill e1 searchbox "Search" with "software engineer"', 'ok'],
-      ['click e2 button "Search"', 'ok'],
+      ['fill searchbox "Search" with "software engineer"', 'ok'],
+      ['click button "Search"', 'ok'],
     ]);
     expect(brain.planInputs[2]?.ledger.openTask?.label).toBe('Senior Engineer at Acme');
     // The form step's note counts the field the operator was asked about as asked,
@@ -140,7 +140,8 @@ describe('the session engine', () => {
     });
     // c1 was served by the click that ran, and the page moved; c3 was served by nothing that ran.
     expect(brain.planInputs[1]?.progress).toEqual({ settled: ['c1'], done: [] });
-    expect(brain.planInputs[1]?.nothingRan).toBe(false);
+    // The click ran and the fill failed: one action ran, and nothing was held past the failure.
+    expect(brain.planInputs[1]?.lastStep).toMatchObject({ ran: 1, held: [] });
   });
 
   it('[BRW-1] a pass on a plan that did not move the page settles nothing', async () => {
@@ -219,13 +220,13 @@ describe('the session engine', () => {
       },
       replies: [{ kind: 'answer', text: 'Yes' }],
     });
-    expect(brain.planInputs[0]?.lastRan).toEqual([]);
-    expect(brain.planInputs[1]?.lastRan).toEqual([
+    expect(brain.planInputs[0]?.lastStep).toBeNull();
+    expect(brain.planInputs[1]?.lastStep?.touched).toEqual([
       { kind: 'fill', role: 'searchbox', name: 'Search', detail: 'software engineer' },
       { kind: 'click', role: 'button', name: 'Search', detail: null },
     ]);
     // A unit event or a wait has no identity to repeat; the click that opened the listing does.
-    expect(brain.planInputs[2]?.lastRan).toEqual([
+    expect(brain.planInputs[2]?.lastStep?.touched).toEqual([
       { kind: 'click', role: 'link', name: 'Senior Engineer — Acme', detail: null },
     ]);
   });
@@ -257,11 +258,15 @@ describe('the session engine', () => {
     expect(outcome.steps).toBe(2);
     expect(browser.calls).toContain('fill e1');
     expect(browser.calls).not.toContain('click e2');
-    // The next plan sees the action that ran, the one that was cut, and the cut itself as the objection.
+    // The history holds what ran; the cut action is the last step's `held`, and why it was cut is the objection.
     expect(brain.planInputs[1]?.history.map((h) => [h.action, h.outcome, h.note])).toEqual([
-      ['fill e1 searchbox "Search" with "software engineer"', 'ok', null],
-      ['click e2 button "Search"', 'not-executed', 'past the executable prefix'],
+      ['fill searchbox "Search" with "software engineer"', 'ok', null],
     ]);
+    expect(brain.planInputs[1]?.lastStep).toEqual({
+      ran: 1,
+      touched: [{ kind: 'fill', role: 'searchbox', name: 'Search', detail: 'software engineer' }],
+      held: ['click'],
+    });
     expect(brain.planInputs[1]?.objections).toEqual([
       { step: 1, from: 'references', at: ['action.2'], detail: 'e2 is not a listed element' },
     ]);
@@ -422,9 +427,18 @@ describe('the session engine', () => {
   });
 
   it('[BRW-1] opens at the start url before the first plan, so the loop never plans on about:blank', async () => {
-    const { browser } = await run({
+    const { browser, brain } = await run({
       script: { plans: [decidedPlan(PLANS.end)] },
       startUrl: 'https://start.test/jobs',
+    });
+    // The first plan is told the session opened its page, so it does not open it again.
+    expect(brain.planInputs[0]?.history).toEqual([
+      { action: 'navigate https://start.test/jobs', outcome: 'ok', note: null },
+    ]);
+    expect(brain.planInputs[0]?.lastStep).toEqual({
+      ran: 1,
+      touched: [{ kind: 'navigate', role: null, name: null, detail: 'https://start.test/jobs' }],
+      held: [],
     });
     const navigate = browser.calls.indexOf('navigate https://start.test/jobs');
     const firstObserve = browser.calls.findIndex((call) => call.startsWith('observe'));

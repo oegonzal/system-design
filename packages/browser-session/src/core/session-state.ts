@@ -10,6 +10,7 @@ import {
   SPENDING_TASK_OUTCOMES,
   TASK_OUTCOMES,
   type DocumentChunk,
+  type LastStep,
   type PageObservation,
   type RanAction,
   type SessionRailsDto,
@@ -21,6 +22,7 @@ import {
   type TaskOutcome,
   excerpt,
   quoted,
+  ranActionOf,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
@@ -98,10 +100,8 @@ export interface SessionState {
   reached: { session: Set<string>; unit: Set<string> };
   /** What the last plan passed, by id, awaiting the next observation: settled only if the page moved. */
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
-  /** How many actions the last plan ran without failing; 0 for a plan refused whole, and before any plan. */
-  lastRan: number;
-  /** What the last plan ran, as the page would recognise it again; the next goal says it, and a repeat on an unchanged page is cut. */
-  ranActions: RanAction[];
+  /** What the last step did, as the next goal tells it; null before the first plan. */
+  lastStep: LastStep | null;
   /** The operator's answers this session, by field label. */
   operatorAnswers: Map<string, string>;
   /**
@@ -141,8 +141,7 @@ export function createState(ids: {
     pending: null,
     reached: { session: new Set(), unit: new Set() },
     pendingPass: null,
-    lastRan: 0,
-    ranActions: [],
+    lastStep: null,
     operatorAnswers: new Map(),
     filled: new Map(),
     teachings: [],
@@ -259,9 +258,30 @@ export function pushHistory(
     state.history.splice(0, state.history.length - HISTORY_MAX);
 }
 
+/** The last step of a plan that ran nothing: refused whole, faulted, or never answered. */
+export const NOTHING_RAN: LastStep = { ran: 0, touched: [], held: [] };
+
+/** The page actions among those that ran, as the page would recognise them again: a wait, a scroll or a unit event has no such identity. */
+export const touchedBy = (
+  actions: readonly StepAction[],
+  elements: PageObservation['elements'],
+): RanAction[] =>
+  actions.flatMap((action) => {
+    const ran = ranActionOf(action, elements);
+    return ran === null ? [] : [ran];
+  });
+
+/**
+ * An element as the next goal names it: by role and name. A ref is minted per
+ * observation and names nothing on the next, so a history that carried refs
+ * offered the planner tokens it could not cite. Measured 2026-10-08: a plan
+ * cited `e114`, a ref from four observations before, and was refused.
+ */
 const named = (ref: string, observation: PageObservation): string => {
   const element = observation.elements.find((candidate) => candidate.ref === ref);
-  return element === undefined ? ref : `${ref} ${element.role} ${quoted(element.name)}`;
+  return element === undefined
+    ? 'an element no longer listed'
+    : `${element.role} ${quoted(element.name)}`;
 };
 
 /**
@@ -274,7 +294,7 @@ export const describeRefusedPlan = (plan: StepPlan | null): string =>
     ? 'plan'
     : `plan of ${plan.actions.length} action(s): ${plan.actions.map((action) => action.kind).join(', ')}`;
 
-/** One action as the next goal reads it back: refs with the role and name they had, so a new page's refs are never mistaken for them. */
+/** One action as the next goal reads it back: its element by role and name, never by a ref the next page will not have. */
 export function describeAction(action: StepAction, observation: PageObservation): string {
   switch (action.kind) {
     case 'navigate':

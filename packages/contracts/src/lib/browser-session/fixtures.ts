@@ -228,6 +228,6 @@ export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalI
   objections: [],
   progress: { criteria: [], settled: [], done: [] },
   pageUnchanged: false,
-  lastRan: [],
+  lastStep: null,
   ...overrides,
 });

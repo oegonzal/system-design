@@ -16,6 +16,7 @@ import {
   describeRefusedPlan,
   ledgerSummaryOf,
   noteObservation,
+  NOTHING_RAN,
   progressOf,
   pushHistory,
   pushObjections,
@@ -95,8 +96,7 @@ function recordBrainFault(ctx: EngineContext, error: BrainFaulted, durationMs: n
     stepJsonFile(state.step, 'fault', { reason: error.reason, message: error.message }),
   ]);
   pushHistory(state, 'plan', 'failed', `brain ${error.reason}: ${error.message}`);
-  state.lastRan = 0;
-  state.ranActions = [];
+  state.lastStep = NOTHING_RAN;
   deps.warn(`step ${state.step}: no plan — ${error.message}`);
 }
 
@@ -117,8 +117,7 @@ async function decide(
       objections: [...state.objections],
       criteria: ctx.criteria.plan,
       pageUnchanged: state.pageUnchanged,
-      nothingRan: state.step > 1 && state.lastRan === 0,
-      lastRan: state.ranActions,
+      lastStep: state.lastStep,
       progress: progressOf(state),
     });
     return { decided, durationMs: elapsed() };
@@ -190,8 +189,7 @@ function recordPlan(
 function refusePlan(ctx: EngineContext, readout: PlanReadout): void {
   const { state } = ctx;
   pushHistory(state, describeRefusedPlan(readout.plan), 'not-executed', null);
-  state.lastRan = 0;
-  state.ranActions = [];
+  state.lastStep = NOTHING_RAN;
   ctx.fail('plan-not-executed');
 }
 
@@ -239,7 +237,6 @@ async function executePlan(
   const before = { open: state.tasks.open !== null, closed: tasksClosed(state) };
   const executed = await executeActions(ctx, decided, readout, observation);
   if (executed.termination !== null) return executed.termination;
-  state.lastRan = executed.ranOk;
   settlePasses(ctx, readout, executed, before);
   return null;
 }

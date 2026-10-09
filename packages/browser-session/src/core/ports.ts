@@ -12,9 +12,9 @@ import type {
   DocumentChunk,
   FieldAnswers,
   FieldSpec,
+  LastStep,
   PageObservation,
   QualityRunDto,
-  RanAction,
   SessionRailsDto,
   SnapshotRung,
   StepAction,
@@ -146,16 +146,12 @@ export interface StepInput {
    */
   pageUnchanged: boolean;
   /**
-   * Whether the last plan ran nothing — refused whole, or cut before its first
-   * action. Only then is a revise worth a second iteration: the engine's own
-   * briefing is all there is to answer. Measured 2026-10-07: 23 second
-   * iterations on unchanged pages after plans that had run, 8.3 minutes, and
-   * the four that changed what ran chose an improvised key press, a Dismiss
-   * and a navigate away.
+   * What the last step did — how many actions ran, what they touched, what
+   * was held past them — or null before the first plan. The goal tells the
+   * next plan what led to this page from it, and a last step that ran nothing
+   * on an unchanged page is when the brain asks for a second iteration.
    */
-  nothingRan: boolean;
-  /** What the last plan ran, as the page would recognise it again: said in the goal on an unchanged page, where a repeat of it is cut. */
-  lastRan: readonly RanAction[];
+  lastStep: LastStep | null;
   /** The criteria settled for the session, which the run's rubric omits, and those done in the open unit, which it keeps. */
   progress: { settled: readonly string[]; done: readonly string[] };
 }

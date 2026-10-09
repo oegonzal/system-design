@@ -43,7 +43,9 @@ describe('the browser-step validators: what a plan claims about the page, and in
       { kind: 'click' as const, role: 'link', name: 'Senior Engineer — Acme', detail: null },
     ];
     const goalOn = (pageUnchanged: boolean): string =>
-      composeStepGoal(stepGoalInput({ pageUnchanged, lastRan: ran }));
+      composeStepGoal(
+        stepGoalInput({ pageUnchanged, lastStep: { ran: ran.length, touched: ran, held: [] } }),
+      );
     const unchanged = goalOn(true);
     expect(problems(samplePlan([click('e3')]), unchanged).limits).toEqual([
       {
