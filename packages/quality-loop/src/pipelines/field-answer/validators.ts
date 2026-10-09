@@ -125,15 +125,12 @@ export const referencesValidator: Validator<FieldAnswers> = indexedValidator(
 );
 
 /**
- * Warn rather than block, and withhold nothing: a value past a field's own
- * maxLength, or a numeric field answered with prose, is one field's problem.
- * Blocking would close admission on the whole page and the operator would be
- * asked to fill every field of it; withholding would drop the answers this
- * validator located, which is the same page lost by a quieter route. Located
- * warnings route exactly the faulted fields to the operator and leave the rest
- * to be filled.
+ * Warn rather than block: a value past a field's own maxLength, or a numeric
+ * field answered with prose, is one field's problem. Blocking would close
+ * admission on the whole page and the operator would be asked to fill every
+ * field of it. Located warnings route exactly the faulted fields to the
+ * operator (`routeFields`) and leave the rest to be filled.
  */
 export const limitsValidator: Validator<FieldAnswers> = asWarning(
   indexedValidator(LIMITS_VALIDATOR_ID, readIndex, limits, []),
-  'none',
 );
