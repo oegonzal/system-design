@@ -165,8 +165,6 @@ export function composeStepGoalWithinBudget(
 /** The prose half of a field-answer goal: the mission verbatim, and the unit of work the fields belong to. */
 export function renderFieldProse(input: Pick<FieldsInput, 'mission' | 'task'>): string {
   return [
-    '# Mission',
-    '',
     input.mission.trim(),
     '',
     '## Open unit of work',

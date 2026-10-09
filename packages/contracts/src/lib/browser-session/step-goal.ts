@@ -240,12 +240,12 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
         ...ledger.closed.map((unit) => `  - ${quoted(unit.label)} — ${unit.outcome}`),
         ...(ledger.closedOmitted > 0 ? [`  (${ledger.closedOmitted} older not listed)`] : []),
       ]),
-  `- ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}${
+  `- Closed so far: ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}.${
     ledger.remainingTasks === null
       ? ''
-      : ` · may still start ${ledger.remainingTasks} (a unit closed ${TASK_OUTCOMES.filter(
+      : ` Units that may still be started: ${ledger.remainingTasks} — one closed ${TASK_OUTCOMES.filter(
           (outcome) => !TASK_OUTCOME_SPENDS[outcome],
-        ).join(' or ')} spends none)`
+        ).join(' or ')} does not count.`
   }`,
 ];
 
@@ -339,7 +339,10 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
   const marks = marksOf(input.mission);
   const { stops } = input;
   const goal = [
-    ...section('# Mission', [input.mission.trim()]),
+    // The mission brings its own heading — the template requires its `# Mission` — so the
+    // goal never doubles it.
+    input.mission.trim(),
+    '',
     ...section('## Page', pageLines(input)),
     ...section('## Elements', elementsSection(observation, marks)),
     ...section('## Snapshot', snapshotLines(observation)),

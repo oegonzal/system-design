@@ -12,14 +12,16 @@ describe('stepPlanSchema', () => {
     expect(json).not.toMatch(/"type":"(number|integer)"/);
   });
 
-  it('[QL-36] carries every rule the validators enforce as a description the model reads', () => {
+  it("[QL-36] says what each field means where the model reads it, and leaves the order a plan takes to the goal's Limits", () => {
     const json = JSON.stringify(z.toJSONSchema(stepPlanSchema));
-    for (const rule of [
+    for (const meaning of [
       'exactly as the Elements list gives it',
-      'A terminate or done action is last and appears nowhere else; a taskStart or taskDone comes before any action that could change the page.',
       'One of the options the Elements list gives for this ref, verbatim.',
     ]) {
-      expect(json, `the model is never told: ${rule}`).toContain(rule);
+      expect(json, `the model is never told: ${meaning}`).toContain(meaning);
     }
+    // One rule, one place: the order of a plan's claims is said in the Limits
+    // (`step-limits.ts`), never again in the schema.
+    expect(json).not.toContain('comes before any action that could change the page');
   });
 });

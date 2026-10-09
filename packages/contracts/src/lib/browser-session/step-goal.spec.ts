@@ -180,7 +180,7 @@ describe('composeStepGoal', () => {
     expect(goal.match(/^ {2}- "l+\d\d" — done$/gm)).toHaveLength(CLOSED_TASKS_BOUND.target);
     expect(goal).toContain('  (3 older not listed)');
     expect(goal).toContain(
-      '- done 1 · already-done 0 · skipped 0 · failed 0 · may still start 8 (a unit closed already-done or skipped spends none)',
+      '- Closed so far: done 1 · already-done 0 · skipped 0 · failed 0. Units that may still be started: 8 — one closed already-done or skipped does not count.',
     );
   });
 
@@ -190,8 +190,8 @@ describe('composeStepGoal', () => {
       '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.',
     );
     expect(goal).toContain('- Closed this session: none yet.');
-    expect(goal).toContain('- done 0 · already-done 0 · skipped 0 · failed 0');
-    expect(goal).not.toContain('may still start');
+    expect(goal).toContain('- Closed so far: done 0 · already-done 0 · skipped 0 · failed 0.');
+    expect(goal).not.toContain('may still be started');
   });
 
   it('[QL-39] refuses a page that would not fit rather than clipping it', () => {

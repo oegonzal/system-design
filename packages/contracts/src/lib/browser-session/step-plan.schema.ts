@@ -103,7 +103,7 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
     refs: bounded.list(ASK_FIELDS_BOUND, ref, {
       min: 1,
       description:
-        'Form fields about the applicant; the field-answer pipeline answers them before the next action runs.',
+        "The form's own fields to answer; the field-answer pipeline answers them before the next action runs.",
     }),
     ...common,
   }),
@@ -111,7 +111,7 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('taskStart'),
     label: bounded.text(TASK_LABEL_BOUND, {
       min: 1,
-      description: 'The unit of work in the mission\'s terms, e.g. "Senior Engineer at Acme".',
+      description: "The unit of work in the mission's own terms.",
     }),
     url: url(),
     ...common,
@@ -145,8 +145,7 @@ export const stepPlanSchema = z.strictObject({
   }),
   actions: bounded.list(ACTIONS_BOUND, stepActionSchema, {
     min: 1,
-    description:
-      'In the order they run, stopping at the next page transition. A terminate or done action is last and appears nowhere else; a taskStart or taskDone comes before any action that could change the page.',
+    description: 'In the order they run, stopping at the next page transition.',
   }),
 });
 export type StepPlan = z.infer<typeof stepPlanSchema>;
