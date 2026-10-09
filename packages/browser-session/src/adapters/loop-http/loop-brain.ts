@@ -13,7 +13,6 @@ import {
   type FieldAnswers,
   type QualityRunDto,
   type StepPlan,
-  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
   awaitOrchestration,

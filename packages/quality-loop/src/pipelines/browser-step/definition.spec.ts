@@ -38,7 +38,6 @@ describe('the browser-step pipeline', () => {
     expect(BROWSER_STEP.policy.evidence.corroboration).toBe('cited');
     // Every lens judges the plan apart: the evaluator is the second reading a
     // veto needs, so it is never shown what the critics found.
-    expect(BROWSER_STEP.critics.map((lens) => lens.consumes)).toEqual([[], []]);
     expect(BROWSER_STEP.evaluators.map((lens) => lens.consumes)).toEqual([[]]);
     // A fault at action.N refuses action.N and after; the lenses still judge.
     expect(BROWSER_STEP.validators.map((validator) => validator.gate)).toEqual(['cut', 'cut']);

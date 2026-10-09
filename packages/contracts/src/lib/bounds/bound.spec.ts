@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { bound, composedBound, exact } from './bound';
-import { bounded } from './bounded';
 
 const CLAIM = bound(300);
 

@@ -67,8 +67,8 @@ describe('runPipeline', () => {
     );
     const definition = tinyPipeline({
       critics: [
-        { id: 'critic.a', persona: 'A', samples: 2, maxItems: 4, maxTokens: 100, consumes: [] },
-        { id: 'critic.b', persona: 'B', samples: 1, maxItems: 4, maxTokens: 100, consumes: [] },
+        { id: 'critic.a', persona: 'A', samples: 2, maxItems: 4, maxTokens: 100 },
+        { id: 'critic.b', persona: 'B', samples: 1, maxItems: 4, maxTokens: 100 },
       ],
       evaluators: [
         {

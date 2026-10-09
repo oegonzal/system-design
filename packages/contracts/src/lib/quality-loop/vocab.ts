@@ -114,11 +114,11 @@ export const GOAL_SOURCES = ['brief', 'composed'] as const;
 export type GoalSource = (typeof GOAL_SOURCES)[number];
 
 /**
- * What a lens may declare it consumes from the wave before it: the findings
- * the normaliser confirmed, or the criterion results it settled. Never a raw
- * report — the deterministic normaliser is the boundary between tiers.
+ * What an evaluator may declare it consumes from the critics' wave before it:
+ * the findings the normaliser confirmed. Never a raw report — the
+ * deterministic normaliser is the boundary between tiers.
  */
-export const UPSTREAM_EVIDENCE = ['findings', 'results'] as const;
+export const UPSTREAM_EVIDENCE = ['findings'] as const;
 export type UpstreamEvidence = (typeof UPSTREAM_EVIDENCE)[number];
 
 /**

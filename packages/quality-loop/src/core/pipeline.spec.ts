@@ -210,7 +210,11 @@ describe('validatePipeline', () => {
     });
     expect(() =>
       validatePipeline(
-        asAny(tinyPipeline({ critics: [{ ...base.critics[0], consumes: ['memories' as never] }] })),
+        asAny(
+          tinyPipeline({
+            evaluators: [{ ...base.evaluators[0], consumes: ['memories' as never] }],
+          }),
+        ),
       ),
     ).toThrow(/consumes unknown evidence memories/);
     expect(() =>
@@ -310,16 +314,8 @@ describe('validatePipeline', () => {
     expect(() =>
       validatePipeline(
         asAny(
-          tinyPipeline({
-            critics: [{ ...base.critics[0], consumes: ['results'] }],
-            evaluators: [{ ...base.evaluators[0], consumes: ['results'] }],
-          }),
+          tinyPipeline({ evaluators: [{ ...base.evaluators[0], consumes: ['vibes' as never] }] }),
         ),
-      ),
-    ).toThrow(/consumes results but no evaluator/);
-    expect(() =>
-      validatePipeline(
-        asAny(tinyPipeline({ critics: [{ ...base.critics[0], consumes: ['vibes' as never] }] })),
       ),
     ).toThrow(/unknown evidence/);
     expect(() =>

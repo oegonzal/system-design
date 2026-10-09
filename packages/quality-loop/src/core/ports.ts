@@ -7,7 +7,6 @@ import type {
   ArtifactLocation,
   ConfirmedFinding,
   ControllerSummary,
-  CriterionEvidence,
   CriticReport,
   DecisionPolicy,
   Diagnostic,
@@ -112,15 +111,14 @@ export interface Validator<T> {
 }
 
 /**
- * What the normaliser confirmed from the wave before. A lens receives only the
- * kinds it declared it consumes; a first-wave lens receives it empty.
+ * What the normaliser confirmed from the critics, for an evaluator that
+ * declared it consumes them; a first-wave lens receives it empty.
  */
 export interface UpstreamEvidenceBundle {
   findings: ConfirmedFinding[];
-  results: CriterionEvidence[];
 }
 
-export const emptyUpstream = (): UpstreamEvidenceBundle => ({ findings: [], results: [] });
+export const emptyUpstream = (): UpstreamEvidenceBundle => ({ findings: [] });
 
 export interface LensContext<T> {
   contract: TaskContract<T>;
@@ -153,13 +151,12 @@ export type LensUnit<R> = () => Promise<LensOutcome<R>>;
  */
 export interface Critic<T> {
   readonly id: string;
-  /** Declared upstream evidence; the runner schedules the lens after it exists. */
-  readonly consumes: readonly UpstreamEvidence[];
   plan(ctx: LensContext<T>): readonly LensUnit<CriticReport>[];
 }
 
 export interface Evaluator<T> {
   readonly id: string;
+  /** Declared upstream evidence; the runner schedules the evaluator after the critics when it names any. */
   readonly consumes: readonly UpstreamEvidence[];
   plan(ctx: LensContext<T>): readonly LensUnit<EvaluationReport>[];
 }

@@ -40,8 +40,7 @@ describe('the field-answer pipeline', () => {
       { id: 'limits', gate: 'warn' },
     ]);
     expect(FIELD_ANSWER.producer.consumes).toEqual(['criteria', 'memories']);
-    // The critics judge the answers alone; the evaluator runs after them and is shown what they confirmed.
-    expect(FIELD_ANSWER.critics.map((lens) => lens.consumes)).toEqual([[], []]);
+    // The evaluator runs after the critics and is shown what they confirmed.
     expect(FIELD_ANSWER.evaluators.map((lens) => lens.consumes)).toEqual([['findings']]);
     const gated = Object.entries(FIELD_ANSWER.policy.findingTypes)
       .filter(([, mapped]) => mapped.gate)

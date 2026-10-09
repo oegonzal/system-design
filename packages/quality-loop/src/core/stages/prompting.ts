@@ -205,16 +205,6 @@ export function upstreamSections(
       ].join('\n'),
     );
   }
-  if (consumes.includes('results')) {
-    const lines = bundle.results.map(
-      (evidence) => `- ${evidence.criterionId} [${evidence.kind}]: ${evidence.result}`,
-    );
-    sections.push(
-      ['# Upstream criterion results', '', ...(lines.length > 0 ? lines : ['(none yet)'])].join(
-        '\n',
-      ),
-    );
-  }
   return sections;
 }
 

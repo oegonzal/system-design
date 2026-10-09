@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { confirmed, ledger } from '../testing';
 import {
   withheldItems,
-  withheldRefs,
   withholdingOf,
   WITHHOLD_EVERY_REF,
   type WithholdingRules,

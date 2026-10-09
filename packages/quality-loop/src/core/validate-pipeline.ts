@@ -108,22 +108,17 @@ function checkJudges(definition: Definition, fail: Fail): void {
 
 /**
  * A declared dependency on evidence nobody produces is a malformed pipeline:
- * the first wave must contain a lens of the kind that produces it.
+ * an evaluator that consumes the critics' findings needs a critic to run
+ * before it.
  */
 function checkWaves(definition: Definition, fail: Fail): void {
-  const lenses = [...definition.critics, ...definition.evaluators];
-  const firstWaveCritics = definition.critics.filter((lens) => lens.consumes.length === 0);
-  const firstWaveEvaluators = definition.evaluators.filter((lens) => lens.consumes.length === 0);
-  for (const lens of lenses) {
-    for (const evidence of lens.consumes) {
+  for (const evaluator of definition.evaluators) {
+    for (const evidence of evaluator.consumes) {
       if (!(UPSTREAM_EVIDENCE as readonly string[]).includes(evidence))
-        fail(`lens ${lens.id} consumes unknown evidence ${evidence}`);
+        fail(`evaluator ${evaluator.id} consumes unknown evidence ${evidence}`);
     }
-    if (lens.consumes.includes('findings') && firstWaveCritics.length === 0)
-      fail(`lens ${lens.id} consumes findings but no critic runs before it`);
-
-    if (lens.consumes.includes('results') && firstWaveEvaluators.length === 0)
-      fail(`lens ${lens.id} consumes results but no evaluator runs before it`);
+    if (evaluator.consumes.includes('findings') && definition.critics.length === 0)
+      fail(`evaluator ${evaluator.id} consumes findings but no critic runs before it`);
   }
 }
 

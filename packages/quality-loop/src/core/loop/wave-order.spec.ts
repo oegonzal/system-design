@@ -38,7 +38,6 @@ const sameDefect = (rationale: string): RawFinding =>
  */
 const delayed = (id: string, settleAfter: number): Critic<TinyOutput> => ({
   id,
-  consumes: [],
   plan: () =>
     [1, 2].map((sample) => async () => {
       for (let turn = 0; turn < settleAfter; turn += 1) await Promise.resolve();
@@ -121,7 +120,6 @@ describe('a wave of lenses', () => {
     let peak = 0;
     const watched = (id: string): Critic<TinyOutput> => ({
       id,
-      consumes: [],
       plan: () =>
         [1, 2, 3].map((sample) => async () => {
           inFlight += 1;
@@ -146,7 +144,6 @@ describe('a wave of lenses', () => {
             samples: 3,
             maxItems: 4,
             maxTokens: 500,
-            consumes: [],
           },
         ],
         evaluators: [],

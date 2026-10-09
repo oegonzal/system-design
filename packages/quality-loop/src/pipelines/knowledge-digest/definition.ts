@@ -119,7 +119,6 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
       id: 'critic.grounding',
       persona: criticGrounding,
       samples: 2,
-      consumes: [],
       maxItems: 10,
       // Seeded from the parent's provenance critic, which has written 32,261
       // output tokens: a fifth above it, as the parent's own cap is.
@@ -129,7 +128,6 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
       id: 'critic.generality',
       persona: criticGenerality,
       samples: 2,
-      consumes: [],
       maxItems: 10,
       maxTokens: 24000,
     },
@@ -137,7 +135,6 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
       id: 'critic.novelty',
       persona: criticNovelty,
       samples: 2,
-      consumes: [],
       maxItems: 10,
       maxTokens: 24000,
     },

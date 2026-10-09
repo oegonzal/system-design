@@ -54,8 +54,8 @@ describe('runLoop', () => {
     );
     expect(order).toEqual(['critic', 'evaluator']);
     // the first wave is shown nothing
-    expect(seen[0]).toEqual({ findings: [], results: [] });
-    // the second is shown the CONFIRMED finding, with the critic's words, and no unsettled criteria
+    expect(seen[0]).toEqual({ findings: [] });
+    // the second is shown the CONFIRMED finding, with the critic's words
     expect(seen[1].findings).toEqual([
       expect.objectContaining({
         key: 'gap|text',
@@ -63,7 +63,6 @@ describe('runLoop', () => {
         rationale: 'the text is thin',
       }),
     ]);
-    expect(seen[1].results).toEqual([]);
     // and the final ledger holds both waves
     const [only] = trace.iterations;
     expect(only.ledger.findings).toHaveLength(1);

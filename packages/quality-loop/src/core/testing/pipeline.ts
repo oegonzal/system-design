@@ -82,7 +82,6 @@ export function tinyPipeline(
         samples: 1,
         maxItems: 4,
         maxTokens: 500,
-        consumes: [],
       },
     ],
     evaluators: [
@@ -171,12 +170,10 @@ export const scriptedProducer = (
 export const scriptedCritic = (
   id: string,
   perIteration: readonly (readonly RawFinding[][])[],
-  consumes: readonly UpstreamEvidence[] = [],
 ): Critic<TinyOutput> => {
   let call = 0;
   return {
     id,
-    consumes,
     // Planned once per iteration, exactly as the real lens is, so a spec that
     // counts lens calls still counts iterations.
     plan: () => {

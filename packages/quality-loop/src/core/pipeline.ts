@@ -22,7 +22,7 @@ import type {
 import type { TaskSpec } from './contracts';
 import type { Controller, Validator } from './ports';
 
-/** What every lens declares: who it is, how often it samples, how much it may write, what it judges with. */
+/** What every lens declares: who it is, how often it samples, how much it may write. */
 export interface LensSpec {
   id: string;
   /** The lens's expertise, as markdown text — imported with `?raw` beside the pipeline. */
@@ -30,16 +30,13 @@ export interface LensSpec {
   /** Independent samples per iteration; agreement across them is what confirms an item. */
   samples: number;
   maxTokens: number;
-  /**
-   * Upstream ledger evidence this lens judges with. Empty: it runs in the
-   * first wave from the artifact alone. Non-empty: it runs after that wave and
-   * is shown what the normaliser CONFIRMED from it — never a raw report. The
-   * declaration drives both when the lens runs and what it is shown.
-   */
-  consumes: readonly UpstreamEvidence[];
 }
 
-/** A critic: defect-oriented, so it declares how many findings a sample may name and which types it owns. */
+/**
+ * A critic: defect-oriented, so it declares how many findings a sample may
+ * name and which types it owns. Every critic judges the artifact alone, in
+ * the first wave.
+ */
 export interface CriticSpec extends LensSpec {
   /** Cap on findings per sample, in the response schema. */
   maxItems: number;
@@ -65,6 +62,13 @@ export interface CriticSpec extends LensSpec {
 export interface EvaluatorSpec extends LensSpec {
   /** The criterion kinds this evaluator judges — each kind has exactly one judge. */
   criterionKinds: readonly string[];
+  /**
+   * What it judges with beyond the artifact. Empty: it runs in the first wave,
+   * beside the critics, from the artifact alone. `findings`: it runs after the
+   * critics and is shown what the normaliser CONFIRMED from them — never a raw
+   * report. The declaration drives both when it runs and what it is shown.
+   */
+  consumes: readonly UpstreamEvidence[];
 }
 
 export interface StageSpec {

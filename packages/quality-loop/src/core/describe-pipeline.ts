@@ -9,19 +9,13 @@ import { projectStep } from './controllers/compose';
 import { providedStatementLimit } from './contracts';
 import type { CriticSpec, EvaluatorSpec, PipelineDefinition } from './pipeline';
 
-const summariseCritic = ({
+/** A critic consumes nothing — it judges the artifact alone — and the summary says so in the lens shape every lens shares. */
+const summariseCritic = ({ id, samples, maxItems, maxTokens, findingTypes }: CriticSpec) => ({
   id,
   samples,
   maxItems,
   maxTokens,
-  consumes,
-  findingTypes,
-}: CriticSpec) => ({
-  id,
-  samples,
-  maxItems,
-  maxTokens,
-  consumes: [...consumes],
+  consumes: [],
   ...(findingTypes === undefined ? {} : { findingTypes: [...findingTypes] }),
 });
 
