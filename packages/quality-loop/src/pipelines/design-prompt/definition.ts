@@ -116,7 +116,6 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         persona: evaluatorPrompt,
         samples: 1,
         consumes: ['findings'],
-        maxItems: MAX_CRITERIA,
         maxTokens: 8000,
         criterionKinds: ['fidelity', 'gradeability', 'scope'],
       },

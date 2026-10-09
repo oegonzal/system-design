@@ -90,7 +90,6 @@ export function tinyPipeline(
         id: 'evaluator.tiny',
         persona: 'You judge criteria.',
         samples: 1,
-        maxItems: 8,
         maxTokens: 500,
         criterionKinds: ['must', 'nice'],
         consumes: [],

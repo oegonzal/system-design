@@ -102,7 +102,6 @@ export const EXPERIENCE_DIGEST: PipelineDefinition<ExperienceDigest> = {
       persona: evaluatorAttribution,
       samples: 2,
       consumes: [],
-      maxItems: MAX_CRITERIA,
       maxTokens: 16000,
       criterionKinds: ['signal', 'transition'],
     },

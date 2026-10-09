@@ -141,7 +141,6 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       // with every lens in one wave the evaluator read no finding, and it
       // contradicted 38 gated findings it had never seen.
       consumes: ['findings'],
-      maxItems: MAX_CRITERIA,
       maxTokens: 20000,
       criterionKinds: ['progress', 'safety', 'grounding'],
     },

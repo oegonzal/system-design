@@ -39,9 +39,6 @@ describe('the system-design-canvas pipeline', () => {
       ...CANVAS_FINDING_TYPES,
     ]);
     expect(SYSTEM_DESIGN_CANVAS.task.maxCriteria).toBe(CANVAS_MAX_CRITERIA);
-    for (const evaluator of SYSTEM_DESIGN_CANVAS.evaluators) {
-      expect(evaluator.maxItems).toBe(CANVAS_MAX_CRITERIA);
-    }
     expect(SYSTEM_DESIGN_CANVAS.goalSource).toBe('composed');
     expect(SYSTEM_DESIGN_CANVAS.producer.consumes).toEqual(['criteria', 'memories', 'setbacks']);
     const submission = sampleSubmission();

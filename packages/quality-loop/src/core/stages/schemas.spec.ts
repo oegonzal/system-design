@@ -41,7 +41,7 @@ describe('per-request schemas', () => {
   });
 
   it('[QL-4] an evaluator may only judge the criteria it was handed', () => {
-    const schema = evaluationSchema(['c1'], ['text'], 1);
+    const schema = evaluationSchema(['c1'], ['text']);
     expect(schema.safeParse({ results: [result()], advisoryVerdict: null }).success).toBe(true);
     expect(
       schema.safeParse({ results: [result({ criterionId: 'c2' })], advisoryVerdict: 'accept' })
@@ -54,17 +54,34 @@ describe('per-request schemas', () => {
     ).toBe(false);
   });
 
+  it('[QL-4] an evaluator answers every criterion it was handed: a reply that stops short is refused, never read as a verdict', () => {
+    // Measured 2026-10-08: bounded only from above, an evaluator answered 10
+    // of 18 criteria in six of 23 step runs, and each such plan was refused
+    // whole as under-judged.
+    const schema = evaluationSchema(['c1', 'c2'], ['text']);
+    const both = [result({ criterionId: 'c1' }), result({ criterionId: 'c2' })];
+    expect(schema.safeParse({ results: both, advisoryVerdict: null }).success).toBe(true);
+    expect(schema.safeParse({ results: both.slice(0, 1), advisoryVerdict: null }).success).toBe(
+      false,
+    );
+    const shown = modelSchema(schema).json as {
+      properties: { results: { minItems?: number; maxItems?: number } };
+    };
+    expect(shown.properties.results.minItems).toBe(2);
+    expect(shown.properties.results.maxItems).toBe(2);
+  });
+
   it('[QL-4] [QL-49] every bound a lens is shown sits above what any lens has measurably written', () => {
     // `measured.json` beside this file: what every critic and evaluator of
     // every pipeline wrote, refreshed by `pnpm measure:bounds`. How many
-    // findings or results a lens returns is its own declared `maxItems`,
-    // which the engine slices to — an exact list no measurement holds. A
-    // deriver's statements are held per pipeline, since the bound is the
-    // task's.
+    // findings a critic returns is its own declared `maxItems`, and how many
+    // results an evaluator returns is one per criterion it judges — exact
+    // lists no measurement holds. A deriver's statements are held per
+    // pipeline, since the bound is the task's.
     expect(measured.runs).toBeGreaterThan(0);
     expect(
       boundsAgainstMeasured(
-        [findingsSchema(['gap'], ['c1'], ['text'], 4), evaluationSchema(['c1'], ['text'], 4)],
+        [findingsSchema(['gap'], ['c1'], ['text'], 4), evaluationSchema(['c1'], ['text'])],
         measured.fields,
       ),
     ).toEqual([]);
@@ -91,7 +108,7 @@ describe('per-request schemas', () => {
       criteriaSchema(['must'], 3, bound(400)),
       findingsSchema(['gap'], ['c1'], ['text'], 4),
       findingsSchema(['gap'], [], [], 4),
-      evaluationSchema(['c1'], ['text'], 1),
+      evaluationSchema(['c1'], ['text']),
     ];
     for (const schema of schemas) {
       expect(strictSchemaFaults(modelSchema(schema).json)).toEqual([]);
@@ -102,7 +119,7 @@ describe('per-request schemas', () => {
     const schemas = [
       criteriaSchema(['must'], 3, bound(400)),
       findingsSchema(['gap'], ['c1'], ['text'], 4),
-      evaluationSchema(['c1'], ['text'], 1),
+      evaluationSchema(['c1'], ['text']),
       findingsSchema(['gap'], [], [], 4),
     ];
     for (const schema of schemas) {

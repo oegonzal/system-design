@@ -30,14 +30,13 @@ import { validatePolicy } from './policy';
 import type { Controller, Validator } from './ports';
 import { BOUNDS_VALIDATOR_ID, SCHEMA_VALIDATOR_ID } from './stages/schema-validator';
 
+/** What every lens declares: who it is, how often it samples, how much it may write, what it judges with. */
 export interface LensSpec {
   id: string;
   /** The lens's expertise, as markdown text — imported with `?raw` beside the pipeline. */
   persona: string;
   /** Independent samples per iteration; agreement across them is what confirms an item. */
   samples: number;
-  /** Cap on items per sample, in the response schema. */
-  maxItems: number;
   maxTokens: number;
   /**
    * Upstream ledger evidence this lens judges with. Empty: it runs in the
@@ -46,6 +45,12 @@ export interface LensSpec {
    * declaration drives both when the lens runs and what it is shown.
    */
   consumes: readonly UpstreamEvidence[];
+}
+
+/** A critic: defect-oriented, so it declares how many findings a sample may name and which types it owns. */
+export interface CriticSpec extends LensSpec {
+  /** Cap on findings per sample, in the response schema. */
+  maxItems: number;
   /**
    * The finding types this lens may emit — its response schema offers only
    * these, and the types section names only these. Undeclared, every type the
@@ -57,6 +62,14 @@ export interface LensSpec {
   findingTypes?: readonly string[];
 }
 
+/**
+ * An evaluator: criteria-oriented. It answers every criterion of its kinds,
+ * once — the response schema asks for exactly that many results, so a reply
+ * that stops short is refused and asked again rather than read as a verdict.
+ * Measured 2026-10-08: with the results bounded only from above, an evaluator
+ * answered 10 of 18 criteria in six of 23 step runs, and each such plan was
+ * refused whole as under-judged.
+ */
 export interface EvaluatorSpec extends LensSpec {
   /** The criterion kinds this evaluator judges — each kind has exactly one judge. */
   criterionKinds: readonly string[];
@@ -92,7 +105,7 @@ export interface PipelineDefinition<T> {
   deriveCriteria: StageSpec;
   producer: ProducerSpec;
   validators: readonly Validator<T>[];
-  critics: readonly LensSpec[];
+  critics: readonly CriticSpec[];
   evaluators: readonly EvaluatorSpec[];
   /** The deterministic strategy that decides — declared by reference, composed in `core/controllers`. */
   controller: Controller;
@@ -139,9 +152,11 @@ function checkLenses(definition: Definition, fail: Fail): void {
         `lens ${lens.id} runs ${lens.samples} sample(s) but minHits is ${definition.policy.evidence.minHits}`,
       );
     }
-    if (!(lens.maxItems >= 1 && lens.maxTokens >= 1))
-      fail(`lens ${lens.id} needs maxItems and maxTokens ≥ 1`);
+    if (!(lens.maxTokens >= 1)) fail(`lens ${lens.id} needs maxTokens ≥ 1`);
     if (lens.persona.trim().length === 0) fail(`lens ${lens.id} has an empty persona`);
+  }
+  for (const critic of definition.critics) {
+    if (!(critic.maxItems >= 1)) fail(`critic ${critic.id} needs maxItems ≥ 1`);
   }
   checkFindingTypeOwners(definition, fail);
 }
@@ -331,7 +346,14 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   }
 }
 
-const summariseLens = ({ id, samples, maxItems, maxTokens, consumes, findingTypes }: LensSpec) => ({
+const summariseCritic = ({
+  id,
+  samples,
+  maxItems,
+  maxTokens,
+  consumes,
+  findingTypes,
+}: CriticSpec) => ({
   id,
   samples,
   maxItems,
@@ -340,22 +362,21 @@ const summariseLens = ({ id, samples, maxItems, maxTokens, consumes, findingType
   ...(findingTypes === undefined ? {} : { findingTypes: [...findingTypes] }),
 });
 
-/** Key order is the summary's wire order: what it judges comes before what it consumes. */
-const summariseEvaluator = ({
-  id,
-  samples,
-  maxItems,
-  maxTokens,
-  criterionKinds,
-  consumes,
-}: EvaluatorSpec) => ({
-  id,
-  samples,
-  maxItems,
-  maxTokens,
-  criterionKinds: [...criterionKinds],
-  consumes: [...consumes],
-});
+/**
+ * Key order is the summary's wire order: what it judges comes before what it
+ * consumes. An evaluator answers one result per criterion of its kinds, so the
+ * most it returns is the task's own cap.
+ */
+const summariseEvaluator =
+  (maxCriteria: number) =>
+  ({ id, samples, maxTokens, criterionKinds, consumes }: EvaluatorSpec) => ({
+    id,
+    samples,
+    maxItems: maxCriteria,
+    maxTokens,
+    criterionKinds: [...criterionKinds],
+    consumes: [...consumes],
+  });
 
 /** The serialisable projection: what `GET /pipelines` returns and the dump stores. */
 export function describePipeline(definition: PipelineDefinition<unknown>): PipelineSummary {
@@ -373,8 +394,8 @@ export function describePipeline(definition: PipelineDefinition<unknown>): Pipel
     },
     producer: { consumes: [...definition.producer.consumes] },
     validators: definition.validators.map(({ id, gate }) => ({ id, gate })),
-    critics: definition.critics.map(summariseLens),
-    evaluators: definition.evaluators.map(summariseEvaluator),
+    critics: definition.critics.map(summariseCritic),
+    evaluators: definition.evaluators.map(summariseEvaluator(task.maxCriteria)),
     controller: {
       id: definition.controller.summary.id,
       steps: definition.controller.summary.steps.map(projectStep),

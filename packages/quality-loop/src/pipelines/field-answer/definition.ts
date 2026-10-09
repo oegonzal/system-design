@@ -100,7 +100,6 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       // After the critics, with their confirmed defects before it: an
       // ungrounded value the grounding critic found is measured, not missed.
       consumes: ['findings'],
-      maxItems: MAX_CRITERIA,
       maxTokens: 8000,
       criterionKinds: ['grounding', 'compliance', 'coverage'],
     },

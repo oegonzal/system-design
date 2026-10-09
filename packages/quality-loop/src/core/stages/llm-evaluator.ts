@@ -49,7 +49,6 @@ export function createLlmEvaluator<T>(
         schema: evaluationSchema(
           ids,
           ctx.locations.map((location) => location.id),
-          Math.min(spec.maxItems, ids.length),
         ),
         maxTokens: spec.maxTokens,
       };

@@ -8,7 +8,7 @@ import type { CriticReport } from '@sysdesign/contracts';
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { TaskSpec } from '../contracts';
-import type { LensSpec } from '../pipeline';
+import type { CriticSpec } from '../pipeline';
 import type { Critic, LensContext } from '../ports';
 import {
   artifactSection,
@@ -25,7 +25,7 @@ import { enumTuple, findingsSchema } from './schemas';
 import { planned, sampleUnits, skipped } from './shared';
 
 export function createLlmCritic<T>(
-  spec: LensSpec,
+  spec: CriticSpec,
   task: TaskSpec<T>,
   clients: readonly LlmClient[],
 ): Critic<T> {

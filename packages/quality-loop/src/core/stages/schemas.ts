@@ -119,14 +119,16 @@ export function findingsSchema(
   });
 }
 
-export function evaluationSchema(
-  criterionIds: EnumTuple,
-  locationIds: readonly string[],
-  maxResults: number,
-) {
+/**
+ * The evaluator's answer: one result for every criterion it judges — the list
+ * is asked for at exactly that size and refused below it, so a reply that
+ * stops short is a structural fault the seam asks again, never a verdict on
+ * half the checklist.
+ */
+export function evaluationSchema(criterionIds: EnumTuple, locationIds: readonly string[]) {
   return z.strictObject({
     results: bounded.list(
-      exact(maxResults),
+      exact(criterionIds.length),
       z.strictObject({
         criterionId: z.enum(criterionIds),
         result: z
@@ -142,7 +144,10 @@ export function evaluationSchema(
         ),
         rationale: bounded.text(RATIONALE_BOUND, { description: 'Why, in one sentence.' }),
       }),
-      { description: 'Exactly one result per listed criterion, in the listed order.' },
+      {
+        min: criterionIds.length,
+        description: 'Exactly one result per listed criterion, in the listed order.',
+      },
     ),
     advisoryVerdict: z
       .enum(DECISIONS)
