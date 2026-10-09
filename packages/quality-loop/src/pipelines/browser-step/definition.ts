@@ -97,7 +97,14 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   // run, so no run measures it.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 6000 },
   // The planner sees the checklist: a session derives it once and supplies it on every run.
-  producer: { persona: producer, maxTokens: 8000, consumes: ['criteria'] },
+  producer: {
+    persona: producer,
+    maxTokens: 8000,
+    consumes: ['criteria'],
+    // The checklist covers the mission; a plan covers one page.
+    instruction:
+      'Plan the next actions on this page, up to the next page transition. The success criteria cover the whole mission: serve those this page allows and leave the rest to the plans after this one; a stop condition is served only by terminating on a page that shows it.',
+  },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
   // A stop the page cannot be showing does not gate: on a contentless page a

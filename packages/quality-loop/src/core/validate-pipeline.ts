@@ -97,8 +97,7 @@ function checkJudges(definition: Definition, fail: Fail): void {
 
 /**
  * A declared dependency on evidence nobody produces is a malformed pipeline:
- * the first wave must contain a lens of the kind that produces it. The same
- * for what the producer is briefed with.
+ * the first wave must contain a lens of the kind that produces it.
  */
 function checkWaves(definition: Definition, fail: Fail): void {
   const lenses = [...definition.critics, ...definition.evaluators];
@@ -115,10 +114,16 @@ function checkWaves(definition: Definition, fail: Fail): void {
     if (lens.consumes.includes('results') && firstWaveEvaluators.length === 0)
       fail(`lens ${lens.id} consumes results but no evaluator runs before it`);
   }
-  for (const briefing of definition.producer.consumes) {
+}
+
+/** The producer: briefed only with what the engine can brief it with, and asked in words when it declares its ask. */
+function checkProducer(definition: Definition, fail: Fail): void {
+  const { producer } = definition;
+  for (const briefing of producer.consumes) {
     if (!(PRODUCER_BRIEFING as readonly string[]).includes(briefing))
       fail(`producer consumes unknown briefing ${briefing}`);
   }
+  if (producer.instruction?.trim() === '') fail('producer instruction is empty');
 }
 
 /**
@@ -222,6 +227,7 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkLenses(definition, fail);
   checkJudges(definition, fail);
   checkWaves(definition, fail);
+  checkProducer(definition, fail);
   checkTask(definition, fail);
   checkValidators(definition, fail);
   checkController(definition, fail);

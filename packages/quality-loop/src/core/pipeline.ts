@@ -80,6 +80,16 @@ export interface ProducerSpec extends StageSpec {
    * unaffected: feedback is not the answer key.
    */
   consumes: readonly ProducerBriefing[];
+  /**
+   * What a first draft is asked for, in the pipeline's own terms; unset, the
+   * engine asks for the artifact — addressing every success criterion when the
+   * producer is shown them. A pipeline whose checklist covers more than one
+   * artifact says what part of it this artifact serves. Measured 2026-10-08:
+   * told to address every criterion, a planner for one page ended five of 23
+   * plans with a stop the page did not show and planned the whole mission in
+   * eight actions on nine.
+   */
+  instruction?: string;
 }
 
 export interface PipelineDefinition<T> {

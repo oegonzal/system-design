@@ -38,12 +38,23 @@ const SETBACKS_HEADING =
 /** A setback's refs point into an artifact this prompt does not show, so its notes go without them. */
 const unlocated = (note: RemediationNote): RemediationNote => ({ ...note, targetRefs: [] });
 
+/** What a revision and a fresh start are asked for: the loop's mechanics, the same for every pipeline. */
 const INSTRUCTIONS = {
-  initial: 'Produce the artifact for this goal, addressing every success criterion.',
   revise:
     'Return the WHOLE artifact again with every remediation applied and everything that was not criticised preserved.',
   retry: 'Start over from the goal. Avoid every listed pitfall.',
 } as const;
+
+/**
+ * What a first draft is asked for: the pipeline's own words when it declares
+ * them; otherwise the artifact, with the success criteria named only when the
+ * producer is shown them — never a checklist it cannot see.
+ */
+const firstAsk = (spec: ProducerSpec): string =>
+  spec.instruction ??
+  (spec.consumes.includes('criteria')
+    ? 'Produce the artifact for this goal, addressing every success criterion.'
+    : 'Produce the artifact for this goal.');
 
 /**
  * What the producer is briefed with: the goal, the criteria if it consumes
@@ -78,7 +89,9 @@ function briefing<T>(
     const notes = refusals.filter((note) => refusedBy(note) === kind);
     if (notes.length > 0) sections.push(remediationsSection(heading, notes));
   }
-  sections.push(['# Instructions', '', INSTRUCTIONS[mode]].join('\n'));
+  sections.push(
+    ['# Instructions', '', mode === 'initial' ? firstAsk(spec) : INSTRUCTIONS[mode]].join('\n'),
+  );
   return { sections, clipped: goal.clipped };
 }
 

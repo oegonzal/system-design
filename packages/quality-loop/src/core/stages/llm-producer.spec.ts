@@ -53,8 +53,19 @@ describe('createLlmProducer', () => {
     );
     expect(calls[0].user).toContain('# Goal');
     expect(calls[0].user).not.toContain('# Success criteria');
+    // Never asked to address a checklist it is not shown.
+    expect(calls[0].user).toContain('Produce the artifact for this goal.');
+    expect(calls[0].user).not.toContain('addressing every success criterion');
     await createLlmProducer(definition.task, definition.producer, llm).produce(input);
     expect(calls[1].user).toContain('# Success criteria');
+    expect(calls[1].user).toContain('addressing every success criterion');
+    // A pipeline that declares its first ask is asked in its own words.
+    await createLlmProducer(
+      definition.task,
+      { ...definition.producer, instruction: 'Plan this page only.' },
+      llm,
+    ).produce(input);
+    expect(calls[2].user).toContain('# Instructions\n\nPlan this page only.');
   });
 
   it('[QL-32] is briefed with memories under their advisory heading only when it consumes them and was handed some', async () => {
