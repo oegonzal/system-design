@@ -141,6 +141,7 @@ export async function runLoop<T>(
   let stop: StopReason | null = null;
   let lost = 0;
 
+  // BOOKMARK
   for (let iteration = 1; iteration <= maxIterations && stop === null; iteration++) {
     const previous = iterations[iterations.length - 1] ?? null;
     const entry: IterationTrace<T> =

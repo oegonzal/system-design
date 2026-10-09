@@ -80,6 +80,7 @@ type Record = (
   facts?: DecisionFacts,
 ) => void;
 
+// BOOKMARK
 /** Gates in order until one settles, every later one skipped; the route settles what no gate did. */
 function consultGates(parts: ControllerParts, ctx: GateContext, record: Record): Settled {
   let settled: Settled | null = null;
@@ -115,6 +116,7 @@ export function composeController(id: string, parts: ControllerParts): Controlle
   validateParts(id, parts);
   const steps = [...parts.gates, parts.route].map(projectStep);
 
+  // BOOKMARK
   const decide = (ledger: EvidenceLedger, policy: DecisionPolicy): QualityControlDecision => {
     const ctx = buildContext(ledger, policy);
     const trace: DecisionStep[] = [];
