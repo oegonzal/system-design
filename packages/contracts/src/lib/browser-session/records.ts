@@ -37,6 +37,8 @@ export interface BrowserSessionDto {
   headed: boolean;
   status: BrowserSessionStatus;
   terminationReason: BrowserSessionTermination | null;
+  /** Which of its mission's stops ended the session, by the mission's cause word; null for any other end. */
+  terminationCause: string | null;
   terminationDetail: string | null;
   limits: SessionRailsDto;
   steps: number;

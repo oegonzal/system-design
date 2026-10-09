@@ -150,7 +150,12 @@ describe('the ledger in Postgres', () => {
     });
     await ledger.closeSession(sessionId, {
       status: 'complete',
-      termination: { reason: 'mission-complete', detail: 'nothing left' },
+      termination: {
+        reason: 'mission-stop',
+        cause: 'mission-complete',
+        ending: 'complete',
+        detail: 'nothing left',
+      },
       steps: 5,
       finishedAt: at(60),
       error: null,
@@ -159,7 +164,8 @@ describe('the ledger in Postgres', () => {
     const detail = await ledger.getSession(sessionId);
     expect(detail).toMatchObject({
       status: 'complete',
-      terminationReason: 'mission-complete',
+      terminationReason: 'mission-stop',
+      terminationCause: 'mission-complete',
       terminationDetail: 'nothing left',
       steps: 5,
       finishedAt: at(60).toISOString(),

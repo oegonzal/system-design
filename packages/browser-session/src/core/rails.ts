@@ -1,4 +1,8 @@
-import { SPENDING_TASK_OUTCOMES, type SessionRailsDto } from '@sysdesign/contracts';
+import {
+  SPENDING_TASK_OUTCOMES,
+  type EngineTermination,
+  type SessionRailsDto,
+} from '@sysdesign/contracts';
 
 import type { Termination } from './ports';
 
@@ -33,7 +37,8 @@ export const STEP_FAILURE_EVENTS = [
 export type StepFailureEvent = (typeof STEP_FAILURE_EVENTS)[number];
 
 interface Rail {
-  reason: Termination['reason'];
+  /** A rail is the engine's own: it never ends a session as the mission's stop. */
+  reason: EngineTermination;
   holds(state: RailState, rails: SessionRailsDto, now: Date): boolean;
   detail(state: RailState, rails: SessionRailsDto, now: Date): string;
 }

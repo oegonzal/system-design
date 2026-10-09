@@ -13,6 +13,8 @@ import { ACTIONS_BOUND } from './step-plan.schema';
 export interface LimitFacts {
   marks: readonly Mark[];
   stops: readonly StopOnPage[];
+  /** Every cause the mission's Stop conditions declare. */
+  causes: readonly string[];
 }
 
 interface Limit {
@@ -71,6 +73,11 @@ const STEP_LIMITS: readonly Limit[] = [
       '- A taskStart, taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
   },
   { when: ({ marks }) => marks.length > 0, line: ({ marks }) => marksLimit(marks) },
+  {
+    when: ({ causes }) => causes.length > 0,
+    line: ({ causes }) =>
+      `- A terminate names one of the causes the mission's Stop conditions declare: ${causes.join(', ')}.`,
+  },
   { when: ({ stops }) => stops.length > 0, line: ({ stops }) => stopsLimit(stops) },
   // The page already answered a repeated question. Measured 2026-10-08: nine
   // steps of 31 re-clicked the one card the pane already showed.

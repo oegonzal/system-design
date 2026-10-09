@@ -228,6 +228,16 @@ const repeatFault = (action: StepAction, index: StepIndex): string | null => {
  * critic's sentence about a mark, and the evaluator read the same words.
  * On a page that shows nothing the claim rule above already refuses it.
  */
+/**
+ * A terminate names one of the stops the mission declares: the cause is the
+ * mission's word, and a cause it never declared would end the session on
+ * nothing the mission said.
+ */
+const causeFault = (action: StepAction, index: StepIndex): string | null =>
+  action.kind === 'terminate' && !index.causes.includes(action.cause)
+    ? `terminate ${action.cause}: the mission declares no such stop condition — it declares ${index.causes.join(', ') || 'none'}`
+    : null;
+
 const stopFault = (action: StepAction, index: StepIndex): string | null => {
   if (action.kind !== 'terminate' || !index.pageShowsContent) return null;
   const tied = index.stops.filter((stop) => stop.cause === action.cause);
@@ -278,6 +288,8 @@ const limits: Rule = (plan, index) => {
     if (claim !== null) problems.push(problem(claim.severity, claim.message, at));
     const repeat = repeatFault(action, index);
     if (repeat !== null) problems.push(problem('high', repeat, at));
+    const cause = causeFault(action, index);
+    if (cause !== null) problems.push(problem('high', cause, at));
     const stop = stopFault(action, index);
     if (stop !== null) problems.push(problem('high', stop, at));
     // Past a page replacement every action is already refused above; the

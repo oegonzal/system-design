@@ -19,22 +19,28 @@ const withStops = (bullets: string): string =>
   );
 
 describe('the stop conditions a mission declares', () => {
-  it('[BRW-8] reads every bullet as a cause, the words the page shows when it holds, and the meaning — the words optional', () => {
+  it("[BRW-8] reads every bullet as the mission's cause word, the status it ends the session in, the words the page shows when it holds, and the meaning — the words optional", () => {
     expect(stopsOf(MISSION_FIXTURE)).toEqual([
       {
         cause: 'limit-reached',
+        ending: 'complete',
         token: 'no more applications',
         meaning: 'the site says no more applications are allowed today.',
       },
-      { cause: 'login-wall', token: null, meaning: 'a sign-in form appears.' },
-      { cause: 'mission-complete', token: null, meaning: 'no listing is left.' },
+      { cause: 'login-wall', ending: 'stopped', token: null, meaning: 'a sign-in form appears.' },
+      {
+        cause: 'mission-complete',
+        ending: 'complete',
+        token: null,
+        meaning: 'no listing is left.',
+      },
     ]);
     expect(stopsOf('# Mission\n\nNo stops declared.\n')).toEqual([]);
     // A cause may be tied to several words, one bullet each; a meaning may quote.
     expect(
       stopsOf(
         withStops(
-          '- limit-reached "limit": the daily limit.\n- limit-reached "try again": asked to come back.\n- login-wall: a "confirm it is you" page.',
+          '- limit-reached (complete) "limit": the daily limit.\n- limit-reached (complete) "try again": asked to come back.\n- login-wall (stopped): a "confirm it is you" page.',
         ),
       ).map((stop) => [stop.cause, stop.token]),
     ).toEqual([
@@ -44,14 +50,29 @@ describe('the stop conditions a mission declares', () => {
     ]);
   });
 
-  it('[BRW-8] refuses a mission whose Stop conditions hold a line the grammar does not read or a cause the vocabulary does not know, naming the line', () => {
+  it('[BRW-8] reads any cause the mission names, and refuses a line the grammar does not read, an ending it does not know, or a cause given two endings, naming the line', () => {
+    // The cause is the mission's word: the engine knows none of them.
+    expect(stopsOf(withStops('- out-of-credit (stopped): the balance is gone.'))).toEqual([
+      { cause: 'out-of-credit', ending: 'stopped', token: null, meaning: 'the balance is gone.' },
+    ]);
     expect(() => stopsOf(withStops('- limit-reached — no colon'))).toThrow(MissionStopMalformed);
+    // No ending: the status a stop leaves the session in is never implied.
     expect(() => stopsOf(withStops('- out-of-credit: the balance is gone.'))).toThrow(
       /not a stop condition — expected .*: - out-of-credit: the balance is gone\./,
     );
+    expect(() => stopsOf(withStops('- out-of-credit (paused): the balance is gone.'))).toThrow(
+      MissionStopMalformed,
+    );
+    expect(() =>
+      stopsOf(
+        withStops(
+          '- limit-reached (complete) "limit": a.\n- limit-reached (stopped) "try again": b.',
+        ),
+      ),
+    ).toThrow(/one ending per cause/);
     const many = Array.from(
       { length: STOPS_BOUND.ceiling + 1 },
-      (_, i) => `- blocked "w${i}": meaning ${i}.`,
+      (_, i) => `- blocked (stopped) "w${i}": meaning ${i}.`,
     );
     expect(() => stopsOf(withStops(many.join('\n')))).toThrow();
   });
@@ -60,7 +81,7 @@ describe('the stop conditions a mission declares', () => {
     const observation = listingObservation();
     const stops = stopsOf(
       withStops(
-        '- limit-reached "no more applications": none left today.\n- login-wall "Globex": the house account.\n- blocked "globex": lower case is another word.\n- mission-complete: no listing is left.',
+        '- limit-reached (complete) "no more applications": none left today.\n- login-wall (stopped) "Globex": the house account.\n- blocked (stopped) "globex": lower case is another word.\n- mission-complete (complete): no listing is left.',
       ),
     );
     expect(stopsOnPage(stops, observation)).toEqual([
@@ -73,12 +94,20 @@ describe('the stop conditions a mission declares', () => {
     ).toEqual({ cause: 'limit-reached', token: 'no more applications', shown: true });
   });
 
-  it('[BRW-8] the composer writes the tied causes into the index and tells the planner what each needs and what this page shows', () => {
+  it("[BRW-8] the composer writes every declared cause and the tied ones' words into the index, and tells the planner which causes exist, what each tied one needs and what this page shows", () => {
     const compose = (mission: string): string => composeStepGoal(stepGoalInput({ mission }));
     const goal = compose(
       withStops(
-        '- limit-reached "no more applications": none left today.\n- limit-reached "try again": asked to come back.\n- login-wall "Globex": the house account.\n- mission-complete: no listing is left.',
+        '- limit-reached (complete) "no more applications": none left today.\n- limit-reached (complete) "try again": asked to come back.\n- login-wall (stopped) "Globex": the house account.\n- mission-complete (complete): no listing is left.',
       ),
+    );
+    expect(readStepIndex(goal)?.causes).toEqual([
+      'limit-reached',
+      'login-wall',
+      'mission-complete',
+    ]);
+    expect(goal).toContain(
+      "- A terminate names one of the causes the mission's Stop conditions declare: limit-reached, login-wall, mission-complete.",
     );
     expect(readStepIndex(goal)?.stops).toEqual([
       { cause: 'limit-reached', token: 'no more applications', shown: false },
@@ -89,8 +118,9 @@ describe('the stop conditions a mission declares', () => {
       '- A terminate is cut unless this page shows the words the mission ties to its cause — limit-reached needs "no more applications" or "try again"; login-wall needs "Globex". This page shows "Globex".',
     );
     // A mission that ties no cause to words writes no entry and says nothing.
-    const plain = compose(withStops('- mission-complete: no listing is left.'));
+    const plain = compose(withStops('- mission-complete (complete): no listing is left.'));
     expect(readStepIndex(plain)?.stops).toEqual([]);
+    expect(readStepIndex(plain)?.causes).toEqual(['mission-complete']);
     expect(plain).not.toContain('A terminate is cut unless');
     expect(compose(MISSION_FIXTURE)).toContain('This page shows none of them.');
   });

@@ -181,15 +181,15 @@ describe('the browser-step validators: what a plan claims about the page, and in
     expect(problems(samplePlan([terminate()])).limits).toEqual([]);
     // The words shown by an element's name — or by any one of several bullets for the cause — carry the terminate.
     const shown = MISSION_FIXTURE.replace(
-      '- limit-reached "no more applications":',
-      '- limit-reached "Globex":',
+      '- limit-reached (complete) "no more applications":',
+      '- limit-reached (complete) "Globex":',
     );
     expect(
       problems(samplePlan([limit]), stepGoal(listingObservation(), emptyLedger(), shown)).limits,
     ).toEqual([]);
     const either = MISSION_FIXTURE.replace(
-      '- limit-reached "no more applications":',
-      '- limit-reached "Globex": the one card.\n- limit-reached "no more applications":',
+      '- limit-reached (complete) "no more applications":',
+      '- limit-reached (complete) "Globex": the one card.\n- limit-reached (complete) "no more applications":',
     );
     expect(
       problems(samplePlan([limit]), stepGoal(listingObservation(), emptyLedger(), either)).limits,
@@ -203,6 +203,35 @@ describe('the browser-step validators: what a plan claims about the page, and in
           'terminate limit-reached: the mission ties it to the words "Initech" or "no more applications", which this page does not show',
       },
     ]);
+  });
+
+  it('[QL-36] a terminate names a stop the mission declares: any other cause is cut, naming the causes the mission does declare', () => {
+    // The cause words are the mission's own; the engine knows none of them.
+    const invented: StepAction = {
+      kind: 'terminate',
+      cause: 'out-of-credit',
+      detail: 'the balance is gone',
+      reason: "the mission's stop condition is on the page",
+      expect: null,
+      serves: [],
+    };
+    expect(problems(samplePlan([invented])).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'terminate out-of-credit: the mission declares no such stop condition — it declares limit-reached, login-wall, mission-complete',
+      },
+    ]);
+    // The same word, once the mission declares it, is a stop like any other.
+    const declared = MISSION_FIXTURE.replace(
+      '- mission-complete (complete): no listing is left.',
+      '- mission-complete (complete): no listing is left.\n- out-of-credit (stopped): the balance is gone.',
+    );
+    expect(
+      problems(samplePlan([invented]), stepGoal(listingObservation(), emptyLedger(), declared))
+        .limits,
+    ).toEqual([]);
   });
 
   it('[QL-36] a terminate or taskDone on a page that shows nothing is refused there: no stop condition or outcome is shown to rest it on', () => {

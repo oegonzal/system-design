@@ -193,9 +193,9 @@ Answer about the applicant only from the evidence listed; otherwise ask the oper
 
 ## Stop conditions
 
-- limit-reached "no more applications": the site says no more applications are allowed today.
-- login-wall: a sign-in form appears.
-- mission-complete: no listing is left.
+- limit-reached (complete) "no more applications": the site says no more applications are allowed today.
+- login-wall (stopped): a sign-in form appears.
+- mission-complete (complete): no listing is left.
 
 ## Never do
 

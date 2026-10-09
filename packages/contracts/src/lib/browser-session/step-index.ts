@@ -13,7 +13,7 @@ import { STEP_ACTION_KINDS } from './action-effects';
 import { refNowOf, type RanAction } from './action-identity';
 import { ELEMENT_KINDS } from './element-kind';
 import { MARK_TOKEN_MAX_LENGTH, marksOn, type Mark } from './mission-marks';
-import { STOP_TOKEN_MAX_LENGTH, type StopOnPage } from './mission-stops';
+import { STOP_CAUSE_MAX_LENGTH, STOP_TOKEN_MAX_LENGTH, type StopOnPage } from './mission-stops';
 import {
   ELEMENT_REF,
   inScope,
@@ -23,7 +23,7 @@ import {
 } from './observation.schema';
 import { BROWSER_STEP_PIPELINE_ID } from './pipelines';
 import { ACTIONS_BOUND, type StepAction } from './step-plan.schema';
-import { HIDDEN_TRAITS, TERMINATE_CAUSES } from './vocab';
+import { HIDDEN_TRAITS } from './vocab';
 
 /**
  * What the last step did, as the next plan is told it — engine facts, never a
@@ -124,12 +124,18 @@ export const stepIndexSchema = z.strictObject({
   stops: z
     .array(
       z.strictObject({
-        cause: z.enum(TERMINATE_CAUSES),
+        cause: bounded.id(STOP_CAUSE_MAX_LENGTH, { min: 1 }),
         token: bounded.id(STOP_TOKEN_MAX_LENGTH, { min: 1 }),
         shown: z.boolean(),
       }),
     )
     .default([]),
+  /**
+   * Every cause the mission's Stop conditions declare: a terminate names one of
+   * them, or the limits validator cuts it. Written only when the mission
+   * declares any.
+   */
+  causes: z.array(bounded.id(STOP_CAUSE_MAX_LENGTH, { min: 1 })).default([]),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
 
@@ -147,6 +153,7 @@ export const indexOf = (
   page: StepPageState,
   marks: readonly Mark[],
   stops: readonly StopOnPage[],
+  causes: readonly string[],
 ): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
@@ -177,6 +184,7 @@ export const indexOf = (
       }
     : {}),
   ...(stops.length > 0 ? { stops: [...stops] } : {}),
+  ...(causes.length > 0 ? { causes: [...causes] } : {}),
 });
 
 /** The index this codec wrote, or null for a goal that is not a browser step. */

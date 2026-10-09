@@ -1,4 +1,4 @@
-import { TERMINATION_STATUS } from '@sysdesign/contracts';
+import { MISSION_STOP, TERMINATION_STATUS } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import type { EngineContext, SessionDeps } from './engine-context';
@@ -31,7 +31,12 @@ export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise
   const { deps, options, state, dump, queue } = ctx;
   const warn = warnOf(deps, state.sessionId);
   const finishedAt = deps.clock.now();
-  const status = TERMINATION_STATUS[end.termination.reason];
+  // A stop the mission declares leaves the session in the status the mission
+  // gave it; every other end is the engine's, classified where it is declared.
+  const status =
+    end.termination.reason === MISSION_STOP
+      ? end.termination.ending
+      : TERMINATION_STATUS[end.termination.reason];
   await queue.drain();
   try {
     await deps.ledger.closeSession(state.sessionId, {

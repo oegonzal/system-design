@@ -3,17 +3,22 @@ import { z } from 'zod';
 import { bound, bounded } from '../bounds';
 import { bulletsUnder } from './mission-sections';
 import type { PageObservation } from './observation.schema';
-import { TERMINATE_CAUSES } from './vocab';
+import { STOP_ENDINGS } from './vocab';
 
 /**
  * Stop conditions: why a plan may end the session, declared by the mission
- * under its own heading, one bullet per cause — and, where the mission can,
- * the words the page shows when the cause holds:
+ * under its own heading, one bullet per cause — its cause word, the status it
+ * leaves the session in, and, where the mission can, the words the page shows
+ * when the cause holds:
  *
  *     ## Stop conditions
  *
- *     - limit-reached "limit": the site says the daily application limit is reached.
- *     - mission-complete: no listing is left.
+ *     - limit-reached (complete) "limit": the site says the daily limit is reached.
+ *     - mission-complete (complete): no item is left.
+ *     - login-wall (stopped) "Sign in": a sign-in form appears.
+ *
+ * The cause words and their endings are the mission's: the engine reads them
+ * back as data, and no cause is the engine's own.
  *
  * A cause tied to words is checked, not believed: the composer writes into
  * the step index whether this page shows them, and the limits validator cuts
@@ -29,10 +34,15 @@ export const STOPS_HEADING = '## Stop conditions';
 /** The most stop conditions a mission declares: one bullet per cause, a cause tied to several words once per word. */
 export const STOPS_BOUND = bound(8, 'list');
 export const STOP_TOKEN_MAX_LENGTH = 60;
+export const STOP_CAUSE_MAX_LENGTH = 40;
+/** A cause word: lower-case words joined by hyphens, as a mission names it. */
+const STOP_CAUSE = /^[a-z][a-z0-9-]*$/;
 export const STOP_MEANING_BOUND = bound(300);
 
 const stopConditionSchema = z.strictObject({
-  cause: z.enum(TERMINATE_CAUSES),
+  cause: z.string().regex(STOP_CAUSE).max(STOP_CAUSE_MAX_LENGTH),
+  /** The status a stop leaves the session in, as the mission declares it. */
+  ending: z.enum(STOP_ENDINGS),
   /** The exact text the page shows when the cause holds, matched as written; null when the mission ties the cause to no words. */
   token: bounded.id(STOP_TOKEN_MAX_LENGTH, { min: 1 }).nullable(),
   /** What the mission says the cause means, for the planner. */
@@ -43,38 +53,47 @@ export type StopCondition = z.infer<typeof stopConditionSchema>;
 
 /** A stop condition the mission ties to words, as this page bears on it: the step index's entry. */
 export interface StopOnPage {
-  cause: StopCondition['cause'];
+  cause: string;
   token: string;
   shown: boolean;
 }
 
-/** One bullet: the cause word, an optional quoted token, a colon, the meaning. */
-const STOP_LINE = /^- (?<cause>[a-z-]+)(?: "(?<token>[^"]+)")?: (?<meaning>.+)$/;
+/** One bullet: the cause word, its ending in parentheses, an optional quoted token, a colon, the meaning. */
+const STOP_LINE =
+  /^- (?<cause>[a-z][a-z0-9-]*) \((?<ending>[a-z]+)\)(?: "(?<token>[^"]+)")?: (?<meaning>.+)$/;
 
 /** A Stop conditions bullet the grammar does not read; the mission is refused before any page is. */
 export class MissionStopMalformed extends Error {
   override readonly name = 'MissionStopMalformed';
   constructor(readonly line: string) {
     super(
-      `a line under ${STOPS_HEADING} is not a stop condition — expected \`- <cause>: <meaning>\` or \`- <cause> "<text the page shows>": <meaning>\`, the cause one of ${TERMINATE_CAUSES.join(', ')}: ${line}`,
+      `a line under ${STOPS_HEADING} is not a stop condition — expected \`- <cause> (<ending>): <meaning>\` or \`- <cause> (<ending>) "<text the page shows>": <meaning>\`, the ending one of ${STOP_ENDINGS.join(', ')}, and one ending per cause: ${line}`,
     );
   }
 }
 
-const isCause = (word: string): word is StopCondition['cause'] =>
-  (TERMINATE_CAUSES as readonly string[]).includes(word);
-
 /**
  * The stop conditions a mission declares, in order; none when the section is
- * absent. A bullet the grammar does not read, or a cause the vocabulary does
- * not know, refuses the mission.
+ * absent. A bullet the grammar does not read, an ending the vocabulary does
+ * not know, or a cause declared twice with two endings refuses the mission.
  */
 export function stopsOf(mission: string): StopCondition[] {
+  const endings = new Map<string, string>();
   const stops = bulletsUnder(mission, STOPS_HEADING).map((line) => {
     const groups = STOP_LINE.exec(line)?.groups;
-    const cause = groups?.['cause'] ?? '';
-    if (groups === undefined || !isCause(cause)) throw new MissionStopMalformed(line);
-    return { cause, token: groups['token'] ?? null, meaning: groups['meaning'] ?? '' };
+    if (groups === undefined) throw new MissionStopMalformed(line);
+    const cause = groups['cause'] ?? '';
+    const ending = groups['ending'] ?? '';
+    if (endings.has(cause) && endings.get(cause) !== ending) throw new MissionStopMalformed(line);
+    endings.set(cause, ending);
+    const parsed = stopConditionSchema.safeParse({
+      cause,
+      ending,
+      token: groups['token'] ?? null,
+      meaning: groups['meaning'] ?? '',
+    });
+    if (!parsed.success) throw new MissionStopMalformed(line);
+    return parsed.data;
   });
   return stopConditionsSchema.parse(stops);
 }

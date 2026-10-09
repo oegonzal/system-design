@@ -7,7 +7,6 @@ import {
   marksOf,
   stopsOf,
   TASK_OUTCOMES,
-  TERMINATE_CAUSES,
   stepGoalInput,
 } from '@sysdesign/contracts';
 
@@ -48,16 +47,16 @@ describe('the goals', () => {
       // a cause word, the words the page shows when it holds, the meaning.
       const stops = stopsOf(text);
       expect(stops.length).toBeGreaterThan(0);
-      expect(stops.map((stop) => stop.cause)).toContain('mission-complete');
+      // A mission declares how it completes: some stop of its own ends the session complete.
+      expect(stops.some((stop) => stop.ending === 'complete')).toBe(true);
+      const causes: readonly string[] = stops.map((stop) => stop.cause);
       // A Marks section, when a goal has one, reads whole: a mark nobody reads is a trap.
       expect(() => marksOf(text)).not.toThrow();
       const events = text.slice(text.indexOf('## Task events'));
       const outcomes = [...events.matchAll(/`([a-z-]+)`/g)].map((match) => match[1]);
       const spoken = outcomes.filter((word) => (TASK_OUTCOMES as readonly string[]).includes(word));
       expect(spoken).toContain('done');
-      for (const word of outcomes.filter(
-        (w) => !(TERMINATE_CAUSES as readonly string[]).includes(w),
-      ))
+      for (const word of outcomes.filter((w) => !causes.includes(w)))
         expect(TASK_OUTCOMES).toContain(word);
       expect(() =>
         composeStepGoal(stepGoalInput({ mission: text, observation: formObservation() })),

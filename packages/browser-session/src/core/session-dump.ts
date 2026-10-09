@@ -14,7 +14,7 @@ import {
   type DumpFile,
 } from '@sysdesign/run-dump';
 
-import type { DumpStore, Termination } from './ports';
+import { causeOf, type DumpStore, type Termination } from './ports';
 
 /**
  * The session dump: everything one session saw and decided, laid out the way
@@ -143,6 +143,7 @@ export const indexRowOf = (manifest: SessionManifest): string =>
     status: manifest.status,
     sessionId: manifest.sessionId,
     termination: manifest.termination.reason,
+    cause: causeOf(manifest.termination),
     steps: manifest.steps,
     tasks: manifest.tasks.closed,
     decisions: manifest.decisions,

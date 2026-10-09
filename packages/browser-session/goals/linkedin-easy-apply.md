@@ -28,10 +28,10 @@ Answer about the applicant only from the evidence listed in the goal, citing it;
 
 ## Stop conditions
 
-- limit-reached "limit": the site says the daily application limit is reached or asks to try again later — in its own words about a limit; a mark on a card is never a limit.
-- login-wall "Sign in": a sign-in form, a verification challenge or a "confirm it is you" page appears.
-- mission-complete: no next page of results is listed and every card in view carries "Applied" or is a unit listed under Units of work.
-- blocked: the form cannot be advanced or submitted after one retry, and no other listing is in view.
+- limit-reached (complete) "limit": the site says the daily application limit is reached or asks to try again later — in its own words about a limit; a mark on a card is never a limit.
+- login-wall (stopped) "Sign in": a sign-in form, a verification challenge or a "confirm it is you" page appears.
+- mission-complete (complete): no next page of results is listed and every card in view carries "Applied" or is a unit listed under Units of work.
+- blocked (stopped): the form cannot be advanced or submitted after one retry, and no other listing is in view.
 
 ## Never do
 

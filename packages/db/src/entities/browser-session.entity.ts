@@ -7,10 +7,7 @@ const STATUSES = ['running', 'complete', 'stopped', 'failed'] as const satisfies
 
 type ContractTerminations = (typeof Contracts)['BROWSER_SESSION_TERMINATIONS'];
 const TERMINATIONS = [
-  'mission-complete',
-  'limit-reached',
-  'login-wall',
-  'blocked',
+  'mission-stop',
   'max-tasks',
   'max-minutes',
   'max-failures',
@@ -48,6 +45,10 @@ const TERMINATIONS = [
   name: 'browser_session_termination_reason_check',
   expression: `termination_reason is null or termination_reason in (${TERMINATIONS.map((t) => `'${t}'`).join(', ')})`,
 })
+@Check({
+  name: 'browser_session_termination_cause_check',
+  expression: `(termination_reason = 'mission-stop') = (termination_cause is not null)`,
+})
 export class BrowserSession {
   @PrimaryKey({ type: 'uuid' })
   id: string = crypto.randomUUID();
@@ -78,9 +79,13 @@ export class BrowserSession {
   @Property({ type: 'text' })
   status: Opt<Contracts.BrowserSessionStatus> = 'running';
 
-  /** Why it ended — the plan's cause word or the engine's rail — once it has. */
+  /** Why it ended — a stop the mission declares, or the engine's own rail or fault — once it has. */
   @Property({ type: 'text', nullable: true })
   terminationReason: Contracts.BrowserSessionTermination | null = null;
+
+  /** Which of its mission's stops ended it, by the mission's cause word; set exactly when the reason is `mission-stop`. */
+  @Property({ type: 'text', nullable: true })
+  terminationCause: string | null = null;
 
   @Property({ type: 'text', nullable: true })
   terminationDetail: string | null = null;

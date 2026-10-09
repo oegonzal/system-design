@@ -138,7 +138,10 @@ describe('the session service, end to end', () => {
       },
     });
     expect(outcome.status).toBe('complete');
-    expect(outcome.termination.reason).toBe('mission-complete');
+    expect(outcome.termination).toMatchObject({
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+    });
     expect(outcome.steps).toBe(5);
     expect(browser.opened).toEqual({ profile: 'spec', headed: false });
     expect(browser.closed).toBe(true);
@@ -174,7 +177,8 @@ describe('the session service, end to end', () => {
     const detail = await service.show(outcome.sessionId);
     expect(detail).toMatchObject({
       status: 'complete',
-      terminationReason: 'mission-complete',
+      terminationReason: 'mission-stop',
+      terminationCause: 'mission-complete',
       steps: 5,
     });
     expect(

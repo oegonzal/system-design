@@ -27,10 +27,17 @@ describe('the session engine', () => {
       replies: [{ kind: 'answer', text: 'Yes' }],
     });
     expect(outcome.status).toBe('complete');
-    expect(outcome.termination).toEqual({ reason: 'mission-complete', detail: 'nothing left' });
+    // The mission's own stop ended it, in the status the mission declares for it.
+    expect(outcome.termination).toEqual({
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+      ending: 'complete',
+      detail: 'nothing left',
+    });
     expect(outcome.steps).toBe(5);
     expect(detail.status).toBe('complete');
-    expect(detail.terminationReason).toBe('mission-complete');
+    expect(detail.terminationReason).toBe('mission-stop');
+    expect(detail.terminationCause).toBe('mission-complete');
 
     const plans = detail.decisions.filter((d) => d.kind === 'step-plan');
     expect(plans).toHaveLength(5);

@@ -61,7 +61,10 @@ describe('how a plan stops and how a session ends', () => {
     // taught a producer a stop condition the page never showed.
     expect(cut.brain.planInputs[1]?.objections).toEqual([]);
     expect(cut.browser.calls).not.toContain('click e2');
-    expect(cut.outcome.termination.reason).toBe('mission-complete');
+    expect(cut.outcome.termination).toMatchObject({
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+    });
 
     // A field the page refuses stops the fields after it and the plan's click, and moves the count once.
     const form = await run({
@@ -72,7 +75,10 @@ describe('how a plan stops and how a session ends', () => {
       browser: refusingFills('form'),
       rails: { maxConsecutiveFailures: 2 },
     });
-    expect(form.outcome.termination.reason).toBe('mission-complete');
+    expect(form.outcome.termination).toMatchObject({
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+    });
     expect(form.browser.pageId).toBe('form');
     expect(form.browser.calls).not.toContain('click e6');
     expect(form.operator.prompts).toEqual([]);
@@ -259,7 +265,10 @@ describe('how a plan stops and how a session ends', () => {
       { action: 'done', outcome: 'ok', note: null },
     ]);
     expect(skipped.detail.tasks).toHaveLength(1);
-    expect(skipped.outcome.termination.reason).toBe('mission-complete');
+    expect(skipped.outcome.termination).toMatchObject({
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+    });
   });
 
   it('[BRW-4] a browser that throws ends the session failed with the error recorded, the row closed and the dump indexed', async () => {

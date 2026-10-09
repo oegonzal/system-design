@@ -18,7 +18,8 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   profile: 'smoke',
   headed: true,
   status: 'complete',
-  terminationReason: 'mission-complete',
+  terminationReason: 'mission-stop',
+  terminationCause: 'mission-complete',
   terminationDetail: 'results shown',
   limits: DEFAULT_RAILS,
   steps: 3,
@@ -33,7 +34,10 @@ const outcome = (status: SessionOutcome['status']): SessionOutcome => ({
   sessionId: 'session-1',
   dumpRunId: 'dump-1',
   status,
-  termination: { reason: status === 'failed' ? 'error' : 'mission-complete', detail: 'x' },
+  termination:
+    status === 'failed'
+      ? { reason: 'error', detail: 'x' }
+      : { reason: 'mission-stop', cause: 'mission-complete', ending: 'complete', detail: 'x' },
   steps: 3,
 });
 
@@ -136,7 +140,9 @@ describe('execute', () => {
     expect(
       await execute(parsed(['run', '--goal', 'g.md', '--profile', 'p']), service(), sink),
     ).toBe(0);
-    expect(out[0]).toContain('session session-1 complete after 3 step(s) — mission-complete');
+    expect(out[0]).toContain(
+      "session session-1 complete after 3 step(s) — the mission's stop mission-complete",
+    );
     expect(
       await execute(
         parsed(['run', '--goal', 'g.md', '--profile', 'p']),
@@ -163,7 +169,9 @@ describe('execute', () => {
     expect(JSON.parse(json.out[0] ?? '')).toEqual([session()]);
     const shown = io();
     expect(await execute(parsed(['show', 'session-1']), service(), shown.sink)).toBe(0);
-    expect(shown.out[0]).toContain('session session-1 · complete · ended by mission-complete');
+    expect(shown.out[0]).toContain(
+      "session session-1 · complete · ended by the mission's stop mission-complete",
+    );
     const missing = io();
     expect(
       await execute(parsed(['show', 'nope']), service({ show: async () => null }), missing.sink),

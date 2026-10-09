@@ -17,6 +17,7 @@ import type {
   SessionClose,
   TaskClose,
 } from '../../core/ports';
+import { causeOf } from '../../core/ports';
 
 /**
  * The records in Postgres. Every write runs on a fork of its own: the writes
@@ -36,6 +37,7 @@ export const toSessionDto = (row: BrowserSession): BrowserSessionDto => ({
   headed: row.headed,
   status: row.status,
   terminationReason: row.terminationReason,
+  terminationCause: row.terminationCause,
   terminationDetail: row.terminationDetail,
   limits: row.limits,
   steps: row.steps,
@@ -182,6 +184,7 @@ export class MikroOrmLedger implements LedgerPort {
       {
         status: close.status,
         terminationReason: close.termination.reason,
+        terminationCause: causeOf(close.termination),
         terminationDetail: close.termination.detail,
         steps: close.steps,
         finishedAt: close.finishedAt,

@@ -101,6 +101,8 @@ describe('the browser-step input codec', () => {
       lastRan: [],
       // The fixture mission ties one cause to words; the form page shows none of them.
       stops: [{ cause: 'limit-reached', token: 'no more applications', shown: false }],
+      // Every cause the fixture mission declares, which a terminate must name.
+      causes: ['limit-reached', 'login-wall', 'mission-complete'],
     });
   });
 

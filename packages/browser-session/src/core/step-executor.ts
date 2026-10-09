@@ -1,5 +1,7 @@
 import {
   CLOSED_TASKS_BOUND,
+  MISSION_STOP,
+  stopsOf,
   TASK_OUTCOME_STATUS,
   type PageObservation,
   type PlanReadout,
@@ -194,9 +196,19 @@ export async function executeActions(
     const label = describeAction(action, observation);
     if (action.kind === 'terminate') {
       pushHistory(state, label, 'ok', null);
+      // The cause is one the mission declares — the limits validator cuts any
+      // other — and its ending is the status the mission gave it. A cause no
+      // stop declares (a loop that ran no validator) ends the session stopped,
+      // never complete.
+      const declared = stopsOf(ctx.mission).find((stop) => stop.cause === action.cause);
       return {
         termination: ctx.terminate(
-          { reason: action.cause, detail: action.detail },
+          {
+            reason: MISSION_STOP,
+            cause: action.cause,
+            ending: declared?.ending ?? 'stopped',
+            detail: action.detail,
+          },
           'loop',
           decided.runId,
         ),

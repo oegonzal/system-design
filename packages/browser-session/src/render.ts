@@ -6,6 +6,7 @@ import type {
   BrowserTaskDto,
 } from '@sysdesign/contracts';
 
+import { causeOf } from './core/ports';
 import type { SessionOutcome } from './core/session-engine';
 import { isLive, SESSION_STALE_AFTER_MS } from './core/write-queue';
 
@@ -50,7 +51,7 @@ export function renderSessions(sessions: readonly BrowserSessionDto[], now: Date
       session.id,
       session.startedAt,
       liveness(session, now),
-      session.terminationReason ?? '',
+      session.terminationCause ?? session.terminationReason ?? '',
       String(session.steps),
       session.profile,
       session.goalPath,
@@ -96,7 +97,7 @@ export function renderSession(detail: BrowserSessionDetailDto, now: Date): strin
   const ended =
     detail.terminationReason === null
       ? ''
-      : ` · ended by ${detail.terminationReason}${detail.terminationDetail ? `: ${detail.terminationDetail}` : ''}`;
+      : ` · ended by ${endedBy(detail.terminationReason, detail.terminationCause)}${detail.terminationDetail ? `: ${detail.terminationDetail}` : ''}`;
   return [
     `session ${detail.id} · ${liveness(detail, now)}${ended}`,
     `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile} · ${
@@ -112,5 +113,11 @@ export function renderSession(detail: BrowserSessionDetailDto, now: Date): strin
 }
 
 export function renderOutcome(outcome: SessionOutcome): string {
-  return `session ${outcome.sessionId} ${outcome.status} after ${outcome.steps} step(s) — ${outcome.termination.reason}: ${outcome.termination.detail}\ndump ${outcome.dumpRunId}`;
+  const ended = endedBy(outcome.termination.reason, causeOf(outcome.termination));
+  return `session ${outcome.sessionId} ${outcome.status} after ${outcome.steps} step(s) — ${ended}: ${outcome.termination.detail}\ndump ${outcome.dumpRunId}`;
+}
+
+/** What ended a session, in words: the mission's stop by its cause word, or the engine's own reason. */
+function endedBy(reason: string, cause: string | null): string {
+  return cause === null ? reason : `the mission's stop ${cause}`;
 }

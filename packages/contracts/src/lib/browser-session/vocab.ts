@@ -8,19 +8,12 @@ export const BROWSER_SESSION_STATUSES = ['running', 'complete', 'stopped', 'fail
 export type BrowserSessionStatus = (typeof BROWSER_SESSION_STATUSES)[number];
 
 /**
- * Why a plan may end the session — the model's word, chosen from the mission's
- * stop conditions. `limit-reached`: the site says no more today. `login-wall`:
- * the signed-in profile is signed out. `blocked`: the mission cannot proceed
- * from here and no step would change that. A mission may tie a cause to the
- * words the page shows when it holds (`mission-stops.ts`); a terminate for
- * such a cause is cut on a page without them.
+ * A plan ended the session on one of the stops its mission declares under
+ * `## Stop conditions` (`mission-stops.ts`). Which stop — its cause word — and
+ * the status it leaves the session in are the mission's to declare; the engine
+ * records only that a mission stop ended the session, and which one.
  */
-export const TERMINATE_CAUSES = [
-  'mission-complete',
-  'limit-reached',
-  'login-wall',
-  'blocked',
-] as const;
+export const MISSION_STOP = 'mission-stop';
 
 /** Why the engine ends a session on its own: a declared rail, the operator, or a fault. */
 export const ENGINE_TERMINATIONS = [
@@ -41,15 +34,24 @@ export const ENGINE_TERMINATIONS = [
   'error',
 ] as const;
 
-export const BROWSER_SESSION_TERMINATIONS = [...TERMINATE_CAUSES, ...ENGINE_TERMINATIONS] as const;
+export type EngineTermination = (typeof ENGINE_TERMINATIONS)[number];
+
+export const BROWSER_SESSION_TERMINATIONS = [MISSION_STOP, ...ENGINE_TERMINATIONS] as const;
 export type BrowserSessionTermination = (typeof BROWSER_SESSION_TERMINATIONS)[number];
 
-/** The status each termination leaves the session in. Exhaustive, so a new cause is classified where it is declared. */
+/** The statuses a mission's stop may leave the session in; which one, the mission declares beside the cause. */
+export const STOP_ENDINGS = [
+  'complete',
+  'stopped',
+] as const satisfies readonly BrowserSessionStatus[];
+export type StopEnding = (typeof STOP_ENDINGS)[number];
+
+/**
+ * The status each engine termination leaves the session in. Exhaustive, so a
+ * new one is classified where it is declared; a mission stop's status is the
+ * mission's (`STOP_ENDINGS`).
+ */
 export const TERMINATION_STATUS = {
-  'mission-complete': 'complete',
-  'limit-reached': 'complete',
-  'login-wall': 'stopped',
-  blocked: 'stopped',
   'max-tasks': 'stopped',
   'max-minutes': 'stopped',
   'max-failures': 'stopped',
@@ -58,7 +60,7 @@ export const TERMINATION_STATUS = {
   'page-stalled': 'stopped',
   'operator-stop': 'stopped',
   error: 'failed',
-} as const satisfies Record<BrowserSessionTermination, BrowserSessionStatus>;
+} as const satisfies Record<EngineTermination, BrowserSessionStatus>;
 
 export const BROWSER_TASK_STATUSES = ['open', 'complete', 'abandoned', 'failed'] as const;
 export type BrowserTaskStatus = (typeof BROWSER_TASK_STATUSES)[number];

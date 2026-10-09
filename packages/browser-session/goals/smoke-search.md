@@ -19,10 +19,10 @@ Fill no field but the search box: any other field, visible or hidden, is left al
 
 ## Stop conditions
 
-- mission-complete: the results page is visible and the unit of work is closed.
-- login-wall: the site demands a sign-in before searching.
-- limit-reached: the site refuses the search as automated or rate-limited.
-- blocked: the search box cannot be found after one page load and one scroll.
+- mission-complete (complete): the results page is visible and the unit of work is closed.
+- login-wall (stopped): the site demands a sign-in before searching.
+- limit-reached (complete): the site refuses the search as automated or rate-limited.
+- blocked (stopped): the search box cannot be found after one page load and one scroll.
 
 ## Never do
 

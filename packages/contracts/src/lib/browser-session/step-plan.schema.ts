@@ -12,7 +12,8 @@ import { bound, bounded } from '../bounds';
 import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import { PRESS_KEYS, SCROLL_DIRECTIONS, WAIT_UNTIL } from './action-effects';
-import { TASK_OUTCOMES, TERMINATE_CAUSES } from './vocab';
+import { STOP_CAUSE_MAX_LENGTH } from './mission-stops';
+import { TASK_OUTCOMES } from './vocab';
 
 export const ACTIONS_BOUND = bound(8, 'list');
 export const ASK_FIELDS_BOUND = bound(40, 'list');
@@ -124,7 +125,11 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('terminate'),
-    cause: z.enum(TERMINATE_CAUSES).describe("The mission's stop condition this page shows."),
+    cause: bounded.id(STOP_CAUSE_MAX_LENGTH, {
+      min: 1,
+      description:
+        "The cause word of the mission's stop condition this page shows, as its Stop conditions declare it.",
+    }),
     detail: bounded.text(DETAIL_BOUND, { min: 1 }),
     ...common,
   }),

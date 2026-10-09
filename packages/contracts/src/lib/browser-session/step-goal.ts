@@ -10,7 +10,7 @@ import type { SuccessCriterion } from '../quality-loop/evidence';
 import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
 import type { RanAction } from './action-identity';
 import { marksOf, marksOn, type Mark } from './mission-marks';
-import type { StopOnPage } from './mission-stops';
+import { stopsOf, type StopOnPage } from './mission-stops';
 import {
   inScope,
   OBJECTIONS_BOUND,
@@ -339,6 +339,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
   const { observation } = input;
   const marks = marksOf(input.mission);
   const { stops } = input;
+  const causes = [...new Set(stopsOf(input.mission).map((stop) => stop.cause))];
   const goal = [
     // The mission brings its own heading — the template requires its `# Mission` — so the
     // goal never doubles it.
@@ -351,8 +352,8 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...section('## Objections to answer', objectionLines(input.objections)),
     ...section('## Units of work', ledgerLines(input.ledger)),
     ...section('## Progress', progressLines(input.progress)),
-    ...section('## Limits', limitsLines({ marks, stops })),
-    renderIndexSection(indexOf(input, marks, stops)),
+    ...section('## Limits', limitsLines({ marks, stops, causes })),
+    renderIndexSection(indexOf(input, marks, stops, causes)),
   ].join('\n');
   return withinBudget(goal, budget);
 }

@@ -24,7 +24,12 @@ const manifest = () =>
     profile: 'spec',
     headed: false,
     status: 'complete',
-    termination: { reason: 'mission-complete', detail: 'done' },
+    termination: {
+      reason: 'mission-stop',
+      cause: 'mission-complete',
+      ending: 'complete',
+      detail: 'done',
+    },
     limits: {
       maxTasks: 1,
       maxMinutes: 1,
@@ -99,7 +104,8 @@ describe('the session dump', () => {
       at: '2026-10-03T10:05:00.000Z',
       status: 'complete',
       sessionId: 'session-1',
-      termination: 'mission-complete',
+      termination: 'mission-stop',
+      cause: 'mission-complete',
       steps: 2,
       tasks: 1,
       decisions: 3,
@@ -107,7 +113,7 @@ describe('the session dump', () => {
     expect(JSON.parse(readFileSync(join(dir, sink.runId, 'manifest.json'), 'utf8'))).toMatchObject({
       kind: 'session',
       durationMs: 300_000,
-      termination: { reason: 'mission-complete' },
+      termination: { reason: 'mission-stop', cause: 'mission-complete', ending: 'complete' },
     });
     expect(readFileSync(join(dir, sink.runId, 'goal.md'), 'utf8')).toBe('# Mission\n');
   });

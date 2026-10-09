@@ -6,7 +6,7 @@ import type {
   BrowserSessionDetailDto,
   BrowserSessionDto,
   BrowserSessionStatus,
-  BrowserSessionTermination,
+  EngineTermination,
   BrowserTaskStatus,
   ConfidenceLevel,
   DocumentChunk,
@@ -23,7 +23,9 @@ import type {
   SuccessCriterion,
   TaskLedgerSummary,
   TaskOutcome,
+  StopEnding,
 } from '@sysdesign/contracts';
+import { MISSION_STOP } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
 /**
@@ -174,10 +176,18 @@ export interface BrainPort {
 
 // ---- the ledger ---------------------------------------------------------------
 
-export interface Termination {
-  reason: BrowserSessionTermination;
-  detail: string;
-}
+/**
+ * How a session ended: by a rail, the operator or a fault, each the engine's
+ * own word; or by a stop its mission declares — which one, by the mission's
+ * cause word, and the status the mission says it leaves the session in.
+ */
+export type Termination =
+  | { reason: EngineTermination; detail: string }
+  | { reason: typeof MISSION_STOP; cause: string; ending: StopEnding; detail: string };
+
+/** The mission's cause word when one of its stops ended the session; null for any other end. */
+export const causeOf = (termination: Termination): string | null =>
+  termination.reason === MISSION_STOP ? termination.cause : null;
 
 export interface NewSession {
   id: string;

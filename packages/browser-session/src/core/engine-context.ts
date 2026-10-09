@@ -13,6 +13,7 @@ import type {
   OperatorPort,
   Termination,
 } from './ports';
+import { causeOf } from './ports';
 import type { StepFailureEvent } from './rails';
 import type { SessionState } from './session-state';
 import type { WriteQueue } from './write-queue';
@@ -130,7 +131,11 @@ export function createEngineContext(parts: EngineParts): EngineContext {
         answer: null,
         confidence: null,
         durationMs: null,
-        payload: { reason: termination.reason, detail: termination.detail },
+        payload: {
+          reason: termination.reason,
+          cause: causeOf(termination),
+          detail: termination.detail,
+        },
       });
       state.terminationRecorded = true;
       return termination;

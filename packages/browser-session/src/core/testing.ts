@@ -12,6 +12,7 @@ import {
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
 import {
+  causeOf,
   ActionFailed,
   type BrowserAction,
   type BrowserPort,
@@ -176,6 +177,7 @@ export class InMemoryLedger implements LedgerPort {
         ...rest,
         status: 'running',
         terminationReason: null,
+        terminationCause: null,
         terminationDetail: null,
         criteria: null,
         steps: 0,
@@ -255,6 +257,7 @@ export class InMemoryLedger implements LedgerPort {
       Object.assign(session, {
         status: close.status,
         terminationReason: close.termination.reason,
+        terminationCause: causeOf(close.termination),
         terminationDetail: close.termination.detail,
         steps: close.steps,
         finishedAt: close.finishedAt.toISOString(),

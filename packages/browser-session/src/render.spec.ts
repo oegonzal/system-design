@@ -13,7 +13,8 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   profile: 'smoke',
   headed: true,
   status: 'complete',
-  terminationReason: 'mission-complete',
+  terminationReason: 'mission-stop',
+  terminationCause: 'mission-complete',
   terminationDetail: 'results shown',
   limits: DEFAULT_RAILS,
   steps: 3,
@@ -89,7 +90,7 @@ describe('the CLI renderer', () => {
     };
     const text = renderSession(detail, NOW);
     expect(text).toContain(
-      'session session-1 · complete · ended by mission-complete: results shown',
+      "session session-1 · complete · ended by the mission's stop mission-complete: results shown",
     );
     // Read from the declaration: the rails line reports what was declared, and
     // a spec that retypes the numbers only ever tests the retyping.
