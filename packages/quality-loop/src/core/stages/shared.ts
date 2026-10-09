@@ -19,6 +19,8 @@ import type { LensUnit } from '../ports';
 export const CRITERIA_STAGE = 'criteria';
 export const PRODUCER_STAGE = 'producer';
 export const LENSES_STAGE = 'lenses';
+/** The engine's correction of the ledger from facts the goal declares (`PipelineDefinition.refoundEvidence`). */
+export const REFOUND_STAGE = 'refound';
 
 export const diagnostic = (
   stage: string,

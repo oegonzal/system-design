@@ -1,4 +1,4 @@
-import { routePlan } from '@sysdesign/contracts';
+import { listingObservation, routePlan } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
@@ -136,6 +136,45 @@ describe('the browser-step loop', () => {
     // finding is not an objection the next producer is told to answer.
     const readout = routePlan(runDto('contested', trace), 1);
     expect(readout.objections).toEqual([]);
+  });
+
+  it('[QL-36] on a page that shows nothing, the engine re-founds a failed gating criterion before the controller decides, and the trace names each result it rewrote', async () => {
+    const blank = stepGoal({
+      ...listingObservation(),
+      url: 'about:blank',
+      title: '',
+      elements: [],
+      ariaSnapshot: '',
+    });
+    const leave = samplePlan([
+      {
+        kind: 'navigate',
+        url: 'https://jobs.example.test/search',
+        reason: 'open the page the mission starts on',
+        expect: null,
+        serves: [],
+      },
+    ]);
+    const trace = await runPipeline(
+      BROWSER_STEP,
+      { goal: blank, criteria: sessionCriteria() },
+      deps(sequencedLlm(leave, missedStop, clean, resultsFailingStop)),
+    );
+    const [only] = trace.iterations;
+    const answered = only.evaluators[0].report?.results ?? [];
+    // The evaluator's own answer stays on its report…
+    expect(answered.find((each) => each.criterionId === 'c2')?.result).toBe('fail');
+    // …the ledger the controller decided on carries the engine's correction, and says so.
+    expect(only.ledger.criteria.find((each) => each.criterionId === 'c2')?.result).toBe(
+      'not_applicable',
+    );
+    expect(only.ledger.diagnostics).toContainEqual({
+      stage: 'refound',
+      sample: null,
+      reason: 'refounded',
+      detail: 'c2 fail → not_applicable',
+    });
+    expect(only.decision.gates.policyAllowed).toBe(true);
   });
 
   it('[QL-36] an accepted plan runs whole: what the judges said is advice on the record, neither a veto nor an objection', async () => {

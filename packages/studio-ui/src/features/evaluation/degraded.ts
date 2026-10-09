@@ -9,6 +9,7 @@ const SAMPLE_MISSING: Record<DiagnosticReason, string> = {
   'llm-artifact-rejected': 'its answer did not fit the report',
   'not-applicable': 'not applicable',
   overrun: 'it answered past the size it was asked for',
+  refounded: 'the engine re-founded a criterion from the goal',
 };
 
 /** One missing lens sample as a reader names it: `critic scale #1 (the model did not answer)`. */

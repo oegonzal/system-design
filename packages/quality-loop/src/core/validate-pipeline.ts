@@ -19,9 +19,15 @@ import { criterionLengthBound, providedStatementLimit } from './contracts';
 import type { PipelineDefinition } from './pipeline';
 import { validatePolicy } from './policy';
 import { BOUNDS_VALIDATOR_ID, SCHEMA_VALIDATOR_ID } from './stages/schema-validator';
+import { CRITERIA_STAGE, LENSES_STAGE, PRODUCER_STAGE, REFOUND_STAGE } from './stages/shared';
 
-/** Stage ids the engine owns; a lens may not take one. */
-const RESERVED_STAGE_IDS = ['producer', 'criteria', 'lenses'] as const;
+/** Stage ids the engine owns, as its diagnostics name them; a lens may not take one. */
+const RESERVED_STAGE_IDS: readonly string[] = [
+  PRODUCER_STAGE,
+  CRITERIA_STAGE,
+  LENSES_STAGE,
+  REFOUND_STAGE,
+];
 
 /** The validators the engine runs on every artifact, first; a pipeline's own may not take their ids. */
 const ENGINE_VALIDATOR_IDS: readonly string[] = [SCHEMA_VALIDATOR_ID, BOUNDS_VALIDATOR_ID];
@@ -44,7 +50,7 @@ function checkLenses(definition: Definition, fail: Fail): void {
   const ids = lenses.map((lens) => lens.id);
   if (new Set(ids).size !== ids.length) fail('lens ids must be unique');
   for (const id of ids) {
-    if ((RESERVED_STAGE_IDS as readonly string[]).includes(id)) fail(`lens id ${id} is reserved`);
+    if (RESERVED_STAGE_IDS.includes(id)) fail(`lens id ${id} is reserved`);
   }
   for (const lens of lenses) {
     if (!(lens.samples >= definition.policy.evidence.minHits)) {

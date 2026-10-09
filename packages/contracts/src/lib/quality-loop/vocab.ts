@@ -34,7 +34,9 @@ export type Fixability = (typeof FIXABILITIES)[number];
  * Why a stage produced nothing, or what it noted about what it did produce.
  * A model that answers nothing is `llm-failed`; there is no "off". `overrun`
  * is a field a reply wrote past the size it was asked for — kept, and
- * recorded once per field, never a loss.
+ * recorded once per field, never a loss. `refounded` is a criterion result
+ * the pipeline's declared refound pass rewrote from a fact its goal declares;
+ * the evaluator's own answer stays on its report.
  */
 export const DIAGNOSTIC_REASONS = [
   'llm-failed',
@@ -42,6 +44,7 @@ export const DIAGNOSTIC_REASONS = [
   'llm-artifact-rejected',
   'not-applicable',
   'overrun',
+  'refounded',
 ] as const;
 export type DiagnosticReason = (typeof DIAGNOSTIC_REASONS)[number];
 
@@ -58,6 +61,7 @@ export const DIAGNOSTIC_DEGRADES = {
   'llm-artifact-rejected': true,
   'not-applicable': false,
   overrun: false,
+  refounded: false,
 } as const satisfies Record<DiagnosticReason, boolean>;
 
 /**

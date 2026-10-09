@@ -5,6 +5,7 @@
  */
 import type {
   ArtifactLocation,
+  DecisionPolicy,
   Diagnostic,
   EvidenceLedger,
   IterationTrace,
@@ -17,7 +18,14 @@ import type {
 import { annotate, noteRemediations } from '../evidence/annotate';
 import { normalize } from '../evidence/normalize';
 import { emptyUpstream } from '../ports';
-import { LENSES_STAGE, overrunDiagnostic, PRODUCER_STAGE, stageDiagnostic } from '../stages/shared';
+import type { PipelineDefinition } from '../pipeline';
+import {
+  LENSES_STAGE,
+  overrunDiagnostic,
+  PRODUCER_STAGE,
+  REFOUND_STAGE,
+  stageDiagnostic,
+} from '../stages/shared';
 import { refusalsOf, setbacksOf } from './briefing';
 import type { Loop } from './run-pipeline';
 import { runLensWaves, type Judged } from './waves';
@@ -182,15 +190,12 @@ function decide<T>(
     },
     policy,
   );
-  const judgedLedger = {
-    ...confirmed,
-    findings: annotate(confirmed.findings, judged.critics, checked.locations),
-  };
-  // The engine corrects what the judges found from facts the goal declares,
-  // before the controller sees it — a stop the page cannot be showing, say.
-  // A pipeline that declares no pass hands its ledger through unchanged.
-  const ledger =
-    loop.definition.refoundEvidence?.(judgedLedger, contract.goal, policy) ?? judgedLedger;
+  const ledger = refound(
+    loop.definition,
+    { ...confirmed, findings: annotate(confirmed.findings, judged.critics, checked.locations) },
+    contract.goal,
+    policy,
+  );
   const decision = stages.controller.decide(ledger, policy);
   const remediations = noteRemediations(
     decision.selectedRemediations,
@@ -200,4 +205,38 @@ function decide<T>(
     checked.validation,
   );
   return { ledger, decision, remediations };
+}
+
+/**
+ * The pipeline's declared refound pass — the engine correcting what the
+ * judges found from facts the goal declares, a stop the page cannot be
+ * showing, say — before the controller sees the ledger. Every criterion
+ * result it rewrites is noted as a diagnostic, so a reader of the trace sees
+ * which results the engine settled and which the evaluator did. A pipeline
+ * that declares no pass hands its ledger through unchanged.
+ */
+function refound<T>(
+  definition: PipelineDefinition<T>,
+  judged: EvidenceLedger,
+  goal: string,
+  policy: DecisionPolicy,
+): EvidenceLedger {
+  const pass = definition.refoundEvidence;
+  if (pass === undefined) return judged;
+  const corrected = pass(judged, goal, policy);
+  const before = new Map(
+    judged.criteria.map((evidence) => [evidence.criterionId, evidence.result]),
+  );
+  const notes = corrected.criteria
+    .filter((evidence) => before.get(evidence.criterionId) !== evidence.result)
+    .map((evidence) =>
+      stageDiagnostic(
+        REFOUND_STAGE,
+        'refounded',
+        `${evidence.criterionId} ${before.get(evidence.criterionId) ?? 'absent'} → ${evidence.result}`,
+      ),
+    );
+  return notes.length === 0
+    ? corrected
+    : { ...corrected, diagnostics: [...corrected.diagnostics, ...notes] };
 }
