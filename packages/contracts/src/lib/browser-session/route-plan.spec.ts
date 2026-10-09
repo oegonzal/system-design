@@ -254,6 +254,34 @@ describe('routePlan', () => {
     ]);
   });
 
+  it("[QL-36] a shortfall carries the evaluator's reason — the run's own remediation note — not only the statement it fell short of", () => {
+    const run = judgedRun({
+      artifact: plan,
+      finalDecision: 'revise',
+      criteria: [{ criterionId: 'c1', result: 'fail', locationRefs: ['action.1'] }],
+      contract: [{ id: 'c1', kind: 'progress', statement: 'Open the next listing.' }],
+    });
+    for (const iteration of run.trace?.iterations ?? []) {
+      iteration.remediations = [
+        {
+          subject: { criterion: 'c1' },
+          action: 'revise',
+          severity: 'high',
+          targetRefs: ['action.1'],
+          note: 'Open the next listing.: the plan clicked the listing already open',
+        },
+      ];
+    }
+    expect(routePlan(run, 2).objections).toEqual([
+      {
+        step: 2,
+        from: 'c1',
+        at: ['action.1'],
+        detail: 'fail: Open the next listing.: the plan clicked the listing already open',
+      },
+    ]);
+  });
+
   it('[QL-36] runs a plan the decision accepted in full, however much advice the judges left on it', () => {
     // Measured on 2026-10-06: a plan every gate passed — `policyAllowed` true,
     // overall 73.3 against a threshold of 70 — never ran, because one `low`

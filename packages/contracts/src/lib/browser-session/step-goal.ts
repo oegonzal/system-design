@@ -98,19 +98,25 @@ const historyLines = (history: readonly StepHistoryEntry[]): string[] =>
       });
 
 /**
- * The objections the next plan must answer, newest first and each whole. Past
- * the declared count the rest are counted rather than cut, the way an
- * observation counts the elements it does not list.
+ * The objections the next plan must answer: why the plans made on this page
+ * did not run or were cut, newest first and each whole, by the position it
+ * points at — never by the engine's step count or the id of the lens or
+ * validator that raised it. Past the declared count the rest are counted
+ * rather than cut, the way an observation counts the elements it does not list.
  */
 const objectionLines = (objections: readonly StepObjection[]): string[] => {
-  if (objections.length === 0) return ['(none — no plan has been refused yet)'];
+  if (objections.length === 0) return ['(none — no plan made on this page has been refused)'];
   const carried = objections.slice(0, OBJECTIONS_BOUND.target);
   const lines = carried.map((objection) => {
     const at = objection.at.length === 0 ? 'the plan as a whole' : objection.at.join(', ');
-    return `- step ${objection.step} · ${objection.from} at ${at} — ${objection.detail}`;
+    return `- ${at} — ${objection.detail}`;
   });
   const rest = objections.length - carried.length;
-  return rest === 0 ? lines : [...lines, `(${rest} older objection(s) not listed)`];
+  return [
+    'Why the plans made on this page did not run, or were cut, newest first:',
+    ...lines,
+    ...(rest === 0 ? [] : [`(${rest} older objection(s) not listed)`]),
+  ];
 };
 
 /**

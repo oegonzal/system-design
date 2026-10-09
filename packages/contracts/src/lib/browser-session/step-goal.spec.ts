@@ -170,7 +170,9 @@ describe('composeStepGoal', () => {
     expect(goal).toContain('(12 more interactive elements not listed)');
     // Past the declared count they are counted, never cut.
     expect(goal).toContain('(3 older objection(s) not listed)');
-    expect(goal.match(/^- step \d+ · /gm)).toHaveLength(OBJECTIONS_BOUND.target);
+    expect(
+      between(goal, '## Objections to answer', '## Units of work').match(/^- action\.1, /gm),
+    ).toHaveLength(OBJECTIONS_BOUND.target);
     // The closed units are listed by label and outcome, the older ones counted,
     // and the counts line says which outcomes spend none of the budget.
     expect(goal).toContain('- Closed this session, oldest first:');

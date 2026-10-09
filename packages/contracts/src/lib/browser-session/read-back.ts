@@ -156,7 +156,9 @@ function faultedPositions(
 /**
  * What the next plan is told to answer: everything that refused or cut this
  * one, and every criterion the evaluator settled fail or partial — with the
- * criterion's own statement, since an id says nothing to a producer. Advice
+ * criterion's statement and the evaluator's reason, the run's own remediation
+ * note, since an id says nothing to a producer and a verdict without its
+ * reason says only that the plan was wrong. Advice
  * that blocked nothing stays on the run's record for a reader and is not
  * carried: measured on 2026-10-07, carried as objections, one critic's
  * uncorroborated finding was read by the next producer as a fact about the
@@ -170,6 +172,11 @@ export function objectionsOf(
   criteria: readonly SuccessCriterion[],
 ): StepObjection[] {
   const statements = new Map(criteria.map((criterion) => [criterion.id, criterion.statement]));
+  const reasons = new Map(
+    iteration.remediations.flatMap((note) =>
+      'criterion' in note.subject ? [[note.subject.criterion, note.note] as const] : [],
+    ),
+  );
   const blockers = blockersOf(iteration)
     .filter((objector) => !statements.has(objector.from))
     .map((objector) => ({
@@ -184,7 +191,11 @@ export function objectionsOf(
       step,
       from: evidence.criterionId,
       at: [...evidence.locationRefs],
-      detail: `${evidence.result}: ${statements.get(evidence.criterionId) ?? evidence.criterionId}`,
+      detail: `${evidence.result}: ${
+        reasons.get(evidence.criterionId) ??
+        statements.get(evidence.criterionId) ??
+        evidence.criterionId
+      }`,
     }));
   return [...blockers, ...shortfalls];
 }

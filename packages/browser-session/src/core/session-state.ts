@@ -59,9 +59,9 @@ export interface SessionState {
   /** Most recent last, at most `HISTORY_MAX`. */
   history: StepHistoryEntry[];
   /**
-   * Why the plans before this one did not run, newest first. Kept until a plan
-   * runs every action it proposed: until then the next producer is owed the
-   * reasons, and a plan that was cut short has reasons of its own.
+   * Why the plans made on this page did not run, or were cut, newest first.
+   * Kept while the page stays the one they were raised on, and until a plan
+   * runs every action it proposed: a plan for a new page answers that page.
    */
   objections: StepObjection[];
   /**
@@ -188,6 +188,12 @@ export const railStateOf = (state: SessionState): RailState => ({
 export function noteObservation(state: SessionState, fingerprint: string): void {
   state.pageUnchanged = state.fingerprint === fingerprint;
   state.fingerprint = fingerprint;
+  // An objection is about a plan made on another page once this one has
+  // moved: carried on, it reads as one to this page. Measured 2026-10-08: a
+  // click that opened a listing was followed, step after step, by the last
+  // page's "taskStart follows the click" and "open the first card" — and the
+  // planner clicked a card again, twelve steps of 23.
+  if (!state.pageUnchanged) clearObjections(state);
   state.stalledSteps = state.pageUnchanged ? state.stalledSteps + 1 : 0;
   // A pass the evaluator gave the last plan becomes a session fact only once
   // the engine's own identity says the page moved: one sample's word is
@@ -238,10 +244,10 @@ export function pushObjections(state: SessionState, objections: readonly StepObj
   if (state.objections.length > OBJECTIONS_MAX) state.objections.length = OBJECTIONS_MAX;
 }
 
-/** A plan ran every action it proposed: nothing is owed to the next producer. */
-export const clearObjections = (state: SessionState): void => {
+/** Nothing is owed to the next producer: a plan ran every action it proposed, or the page moved. */
+export function clearObjections(state: SessionState): void {
   state.objections.length = 0;
-};
+}
 
 export function pushHistory(
   state: SessionState,
