@@ -127,6 +127,28 @@ function checkProducer(definition: Definition, fail: Fail): void {
 }
 
 /**
+ * Under `cited` corroboration a finding blocks only when an evaluator failed a
+ * gating criterion it cites: the evaluator is the second reading the veto
+ * rests on. An evaluator that judges a gating kind therefore reads the
+ * artifact apart from the critics — one shown their findings first agrees
+ * with what it was shown, and the veto stands on the one reading it was meant
+ * to check.
+ */
+function checkCorroboration(definition: Definition, fail: Fail): void {
+  if (definition.policy.evidence.corroboration !== 'cited') return;
+  for (const evaluator of definition.evaluators) {
+    const gating = evaluator.criterionKinds.filter(
+      (kind) => definition.policy.criterionKinds[kind]?.gate === true,
+    );
+    if (gating.length > 0 && evaluator.consumes.includes('findings')) {
+      fail(
+        `evaluator ${evaluator.id} judges gating kind(s) ${gating.join(', ')} under cited corroboration, so it reads the artifact apart from the critics and may not consume findings`,
+      );
+    }
+  }
+}
+
+/**
  * Every validator: a unique id the engine does not run itself, and what its
  * problems withhold — when it says — a declared withholding on a `warn`
  * validator. A failing `block` validator closes admission, so no reader ever
@@ -227,6 +249,7 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkLenses(definition, fail);
   checkJudges(definition, fail);
   checkWaves(definition, fail);
+  checkCorroboration(definition, fail);
   checkProducer(definition, fail);
   checkTask(definition, fail);
   checkValidators(definition, fail);

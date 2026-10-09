@@ -36,6 +36,31 @@ describe('validatePipeline', () => {
     expect(() => validatePipeline(asAny(none))).toThrow(/kind nice has no evaluator/);
   });
 
+  it('[QL-5] under cited corroboration, refuses an evaluator of a gating kind that reads the critics first — the veto needs a second reading, not an echo', () => {
+    const base = tinyPipeline();
+    const gatingMust = {
+      ...base.policy,
+      criterionKinds: {
+        ...base.policy.criterionKinds,
+        must: { ...base.policy.criterionKinds['must'], gate: true },
+      },
+    };
+    const cited = {
+      ...gatingMust,
+      evidence: { ...gatingMust.evidence, corroboration: 'cited' as const },
+    };
+    const afterCritics = [{ ...base.evaluators[0], consumes: ['findings' as const] }];
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ policy: cited, evaluators: afterCritics }))),
+    ).toThrow(/evaluator .* judges gating kind\(s\) must under cited corroboration/);
+    // Beside the critics it is a second reading; and where nothing is held to
+    // a citation, nothing is lost by reading the critics first.
+    expect(() => validatePipeline(asAny(tinyPipeline({ policy: cited })))).not.toThrow();
+    expect(() =>
+      validatePipeline(asAny(tinyPipeline({ policy: gatingMust, evaluators: afterCritics }))),
+    ).not.toThrow();
+  });
+
   it('[QL-1] refuses a lens that could never reach minHits, a reserved id, and a duplicate id', () => {
     const base = tinyPipeline();
     expect(() =>

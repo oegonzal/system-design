@@ -36,9 +36,10 @@ describe('the browser-step pipeline', () => {
     // One sample of one critic is one opinion: a blocker that cites criteria is
     // held to them, and blocks only when the evaluator failed one it cites.
     expect(BROWSER_STEP.policy.evidence.corroboration).toBe('cited');
-    // The critics judge the plan alone; the evaluator runs after them and is shown what they confirmed.
+    // Every lens judges the plan apart: the evaluator is the second reading a
+    // veto needs, so it is never shown what the critics found.
     expect(BROWSER_STEP.critics.map((lens) => lens.consumes)).toEqual([[], []]);
-    expect(BROWSER_STEP.evaluators.map((lens) => lens.consumes)).toEqual([['findings']]);
+    expect(BROWSER_STEP.evaluators.map((lens) => lens.consumes)).toEqual([[]]);
     // A fault at action.N refuses action.N and after; the lenses still judge.
     expect(BROWSER_STEP.validators.map((validator) => validator.gate)).toEqual(['cut', 'cut']);
     // Only the declared type gates veto; a severity word is the critic's to choose.

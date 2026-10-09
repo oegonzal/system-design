@@ -85,15 +85,11 @@ describe('the browser-step loop', () => {
     expect(exchanges.filter((exchange) => exchange.scope === 'criteria')).toHaveLength(0);
     expect(exchanges).toHaveLength(4);
     expect(trace.contract.criteria.map((criterion) => criterion.id)).toEqual(['c1', 'c2', 'c3']);
-    // The critics ran first; the evaluator ran last and was shown the finding
-    // they confirmed, with the critic's one sentence, before it judged c2.
-    const briefed = exchanges.filter((exchange) =>
-      exchange.user.includes('# Confirmed upstream defects'),
-    );
-    expect(briefed).toHaveLength(1);
-    expect(exchanges.indexOf(briefed[0])).toBe(3);
-    expect(briefed[0].user).toContain('- [high] missed_stop at action.1 → criteria c2');
-    expect(briefed[0].user).toContain('the snapshot says no more applications are allowed today');
+    // The evaluator judged beside the critics and was never shown what they
+    // found: its failed c2 is a second reading of the page, not an echo.
+    expect(
+      exchanges.some((exchange) => exchange.user.includes('# Confirmed upstream defects')),
+    ).toBe(false);
 
     expect(trace.iterations).toHaveLength(1);
     const [only] = trace.iterations;

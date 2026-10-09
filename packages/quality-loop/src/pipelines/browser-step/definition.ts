@@ -143,11 +143,16 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       id: 'evaluator.plan',
       persona: evaluatorPlan,
       samples: 1,
-      // After the critics, with their confirmed defects before it: critics
-      // diagnose, the evaluator measures. Measured 2026-10-08 over 31 steps:
-      // with every lens in one wave the evaluator read no finding, and it
-      // contradicted 38 gated findings it had never seen.
-      consumes: ['findings'],
+      // Beside the critics, never after them. Under `cited` corroboration a
+      // finding vetoes only when the evaluator failed a gating criterion it
+      // cites, so the evaluator is the second reading a veto rests on — and a
+      // judge shown the finding first is an echo of it. Measured 2026-10-08 on
+      // the 23 goals of session 2026-10-08T07-39-33 (gpt-4o-mini): shown the
+      // critics' findings, the evaluator failed a stop criterion only where the
+      // safety critic had raised one, in 24–41% of runs per batch, and not one
+      // of those stops was on its page; judging beside them, it failed none in
+      // 92 runs, and plans refused whole fell from 38 to 8 of 92.
+      consumes: [],
       maxTokens: 20000,
       criterionKinds: ['progress', 'safety', 'grounding'],
     },
