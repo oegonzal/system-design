@@ -11,7 +11,9 @@ so every number and the final decision belong to the policy. Every run writes a 
 dump folder.
 
 It is an Nx application, so there is no `package.json` and no barrel file to read. Its public surface
-is the HTTP API on port 3003, two CLI commands, and the dump layout. `src/main.ts` picks one of three
+is the HTTP API on port 3003, two CLI commands, and the dump layout. To follow one debate between the
+lenses — who is shown what, in which order, and where the engine decides — read
+[`lens-debate.md`](lens-debate.md) beside this reference. `src/main.ts` picks one of three
 modes from the first argument — `run`, `replay`, or anything else meaning serve — and `src/boot.ts`
 refuses to start without a model login before Nest loads.
 
@@ -28,16 +30,23 @@ refuses to start without a model login before Nest loads.
         |              (or supplied, or adopted from an earlier run - no model call)
         v
   validators           core/stages/schema-validator.ts       always runs first
-        |              + pipelines/<id>/validators.ts        a blocking failure skips every lens
+        |              + pipelines/<id>/validators.ts        a `block` failure skips every lens;
+        |                                                    a `cut` refuses the positions it
+        |                                                    names; a `warn` only informs
         v
   critics              core/stages/llm-critic.ts             findings: type, severity, confidence
   evaluators           core/stages/llm-evaluator.ts          pass | partial | fail | not_applicable
-        |              A lens declaring consumes: [] runs in the first wave from the artifact
-        |              alone. A non-empty consumes puts it in a later wave, shown only what
-        |              the normaliser confirmed.
+        |              Every critic, and every evaluator declaring consumes: [], runs in the
+        |              first wave from the artifact alone. An evaluator declaring
+        |              consumes: ['findings'] runs after the critics, shown only what the
+        |              normaliser confirmed.
         v
   normalize            core/evidence/normalize.ts            the ledger: ids, enums and counts
         |              admits, keys structurally, confirms by agreement across samples
+        v
+  refound              the pipeline's refoundEvidence        optional: a fact the goal declares
+        |              (browser-step only)                   corrects the ledger, each change
+        |                                                    noted as a `refounded` diagnostic
         v
   controller           core/controllers/                     accept | revise | retry |
         |              scores first, then gates in a fixed order    escalate | reject
@@ -54,7 +63,7 @@ refuses to start without a model login before Nest loads.
 | Folder           | What it is                                                                      |
 | ---------------- | ------------------------------------------------------------------------------- |
 | `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
-| `pipelines/`     | The six pipelines, one folder each, plus the registry.                          |
+| `pipelines/`     | The ten pipelines, one folder each, plus the registry.                          |
 | `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
 | `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
 | `cli/`           | The two command-line entry points, `run` and `replay`.                          |
@@ -70,35 +79,42 @@ convention: `tooling/quality-loop-guarantees.spec.ts` walks every non-spec file 
 fails the build on `Date.now`, `Math.random`, `node:fs` or `process.env`, on a number appearing in
 the judging schemas under `core/stages/`, and on the normaliser or a controller touching prose.
 
-### The four loose files
+### The six loose files
 
-| File            | What it does                                                            | Exports                                                                                                                                                   |
-| --------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pipeline.ts`   | Defines what a pipeline is, and fails boot on a malformed one.          | `PipelineDefinition`, `LensSpec`, `EvaluatorSpec`, `ProducerSpec`, `StageSpec`, `validatePipeline`, `describePipeline`                                    |
-| `policy.ts`     | Refuses a malformed decision policy before it can grade anything.       | `STANDARD_SCORING`, `validatePolicy`                                                                                                                      |
-| `ports.ts`      | The interfaces the loop runs over — stages, stores, the run repository. | `Producer`, `Critic`, `Evaluator`, `CriteriaDeriver`, `Validator`, `Controller`, `Stages`, `TraceStore`, `ExchangeSink`, `RunRepository`, `emptyUpstream` |
-| `arithmetic.ts` | The three numeric idioms, so a replayed decision compares byte-equal.   | `sum`, `round1`, `round4`                                                                                                                                 |
+| File                   | What it does                                                            | Exports                                                                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pipeline.ts`          | Defines what a pipeline is — the declaration alone.                     | `PipelineDefinition`, `LensSpec`, `CriticSpec`, `EvaluatorSpec`, `ProducerSpec`, `StageSpec`                                                              |
+| `validate-pipeline.ts` | Fails boot on a malformed declaration.                                  | `validatePipeline`                                                                                                                                        |
+| `describe-pipeline.ts` | The serialisable summary `GET /pipelines` and the dump carry.           | `describePipeline`                                                                                                                                        |
+| `policy.ts`            | Refuses a malformed decision policy before it can grade anything.       | `STANDARD_SCORING`, `validatePolicy`                                                                                                                      |
+| `ports.ts`             | The interfaces the loop runs over — stages, stores, the run repository. | `Producer`, `Critic`, `Evaluator`, `CriteriaDeriver`, `Validator`, `Controller`, `Stages`, `TraceStore`, `ExchangeSink`, `RunRepository`, `emptyUpstream` |
+| `arithmetic.ts`        | The three numeric idioms, so a replayed decision compares byte-equal.   | `sum`, `round1`, `round4`                                                                                                                                 |
 
 `PipelineDefinition<T>` is the interface everything else is written against: `id`, `version`,
-`description`, `goalSource`, `task` (criterion kinds, finding types, the output shape), then
-`deriveCriteria`, `producer`, `validators`, `critics`, `evaluators`, `controller` and `policy`.
+`description`, `goalSource`, `task` (criterion kinds, finding types, `maxCriteria`, any
+`fixedCriteria` that head every rubric, the output shape), then `deriveCriteria`, `producer` (its
+persona, what it `consumes`, and an optional `instruction` — the first-draft ask in the pipeline's
+own terms), `validators`, `critics`, `evaluators`, `controller`, `policy`, and an optional
+`refoundEvidence` pass that corrects the ledger from facts the goal declares.
 Nothing outside a pipeline folder may import a concrete pipeline — the registry hands out
 `PipelineDefinition<unknown>`.
 
 `validatePipeline` runs at boot and again at every run: lens ids unique and not reserved, every
-criterion kind judged by exactly one evaluator, no lens consuming evidence no earlier wave produces,
-a valid controller projection, and the output schema convertible to JSON Schema. `Controller.decide`
+model-facing stage with a persona and a token cap, every criterion kind judged by exactly one
+evaluator, no evaluator consuming findings with no critic before it, under `cited` corroboration no
+evaluator of a gating kind reading the critics first (`checkCorroboration`), a valid controller
+projection, and the output schema convertible to JSON Schema. `Controller.decide`
 is synchronous by contract, which is how "the controller never awaits a model" is held by the type
 rather than by review.
 
 ### `core/contracts/` — the vocabulary of a task
 
-| File              | What it does                                                     | Exports                                                                                        |
-| ----------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `task.ts`         | The pipeline's code half: parse, address and render an artifact. | `OutputShape`, `TaskSpec`, `TaskContract`                                                      |
-| `output-shape.ts` | The layout habits every output shape shares.                     | `numbered`, `section`, `numberedSection`                                                       |
-| `validation.ts`   | The shape of an exact, blocking check a pipeline brings.         | `indexedValidator`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
-| `run-record.ts`   | One run as the service holds it, and as the wire sees it.        | `RunRecord`, `toRunDto`, `summariseExchange`                                                   |
+| File              | What it does                                                             | Exports                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `task.ts`         | The pipeline's code half: parse, address and render an artifact.         | `OutputShape`, `TaskSpec`, `TaskContract`                                                                   |
+| `output-shape.ts` | The layout habits every output shape shares.                             | `numbered`, `section`, `numberedSection`                                                                    |
+| `validation.ts`   | The shape of an exact check a pipeline brings: `block`, `cut` or `warn`. | `indexedValidator`, `asWarning`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
+| `run-record.ts`   | One run as the service holds it, and as the wire sees it.                | `RunRecord`, `toRunDto`, `summariseExchange`                                                                |
 
 A validator reads the fenced index — the codec is `goal-index.ts` in `@sysdesign/contracts`, shared with every
 composer — never prose, and reports nothing on a malformed artifact — the schema validator owns that report. No model reads the index: `goalSection` in `core/stages/prompting.ts`
@@ -128,21 +144,21 @@ module load, so a malformed composition fails at boot.
 | `annotate.ts`  | Attaches prose after the fact, for readers and the producer.             | `annotate`, `noteRemediations`, `unannotated`                                                      |
 | `lessons.ts`   | What the run taught across its iterations.                               | `deriveLessons`                                                                                    |
 
-`normalize.ts` is the tier boundary: a later-wave lens sees only what was confirmed, never a raw
-report. The evaluator's advisory verdict is recorded and goes no further, so flipping it cannot move
+`normalize.ts` is the tier boundary: a second-wave evaluator sees only what was confirmed, never a
+raw report. The evaluator's advisory verdict is recorded and goes no further, so flipping it cannot move
 a decision.
 
 ### `core/loop/` — the iteration engine
 
-| File              | What it does                                                               | Exports                                                 |
-| ----------------- | -------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.    | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`         |
-| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.   | `runIteration`                                          |
-| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks. | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked` |
-| `waves.ts`        | The lenses in waves by what they consume; the normaliser between waves.    | `runLensWaves`, `Judged`                                |
-| `materialize.ts`  | Definition plus model client becomes concrete stages.                      | `materialize`, `materializeCriteria`                    |
-| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.          | `rubricProblems`                                        |
-| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.          | `scopeLlm`, `mapConcurrent`                             |
+| File              | What it does                                                                          | Exports                                                 |
+| ----------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.               | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`         |
+| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.              | `runIteration`                                          |
+| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks.            | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked` |
+| `waves.ts`        | The critics, then any evaluator that consumes their findings; the normaliser between. | `runLensWaves`, `Judged`                                |
+| `materialize.ts`  | Definition plus model client becomes concrete stages.                                 | `materialize`, `materializeCriteria`                    |
+| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.                     | `rubricProblems`                                        |
+| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.                     | `scopeLlm`, `mapConcurrent`                             |
 
 A new iteration has to be strictly better to be crowned. An adopted iteration is cloned and runs no
 stage. The output shape's `normalize` is applied only to a produced artifact, never to a supplied
@@ -163,7 +179,7 @@ on a pipeline.
 
 | File                  | What it does                                                  | Exports                                                                                                                                                                                                 |
 | --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared.ts`           | Stage names, diagnostics, one sample per scoped client.       | `CRITERIA_STAGE`, `PRODUCER_STAGE`, `LENSES_STAGE`, `diagnostic`, `stageDiagnostic`, `skipped`, `sampleEach`                                                                                            |
+| `shared.ts`           | Stage names, diagnostics, one sample per scoped client.       | `CRITERIA_STAGE`, `PRODUCER_STAGE`, `LENSES_STAGE`, `REFOUND_STAGE`, `diagnostic`, `stageDiagnostic`, `failedDiagnostic`, `overrunDiagnostic`, `skipped`, `sampleUnits`, `planned`                      |
 | `prompting.ts`        | The engine's half of every prompt, section by section.        | `systemPrompt`, `goalSection`, `kindsSection`, `typesSection`, `criteriaSection`, `artifactSection`, `locationsSection`, `validationSection`, `remediationsSection`, `upstreamSections`, `joinSections` |
 | `schemas.ts`          | The only zod a model sees, built per request over real ids.   | `criteriaSchema`, `findingsSchema`, `evaluationSchema`, `enumTuple`                                                                                                                                     |
 | `derive-criteria.ts`  | One structured extraction of criteria from the goal.          | `createCriteriaDeriver`                                                                                                                                                                                 |
@@ -187,26 +203,27 @@ diagnostic, never evidence.
 These are pure and import nothing from vitest, so they compile under the app tsconfig even though
 only specs use them.
 
-## `pipelines/` — the six pipelines
+## `pipelines/` — the ten pipelines
 
 ### The folder layout, once
 
 Every pipeline is `src/pipelines/<id>/` and repeats the same shape.
 
-| File                 | Always | What it is                                                                       |
-| -------------------- | ------ | -------------------------------------------------------------------------------- |
-| `definition.ts`      | yes    | The exported `PipelineDefinition`. Pure data apart from its imports.             |
-| `lenses/*.md`        | yes    | One markdown persona per stage, imported `?raw`. The filename is the lens id.    |
-| `output.ts`          | yes    | The output shape: a zod schema, `locate` for positional ids, `render`.           |
-| `definition.spec.ts` | yes    | Validity, a JSON-round-trippable summary, personas long enough to be real.       |
-| `input.ts`           | 2 of 6 | A codec, when the goal is more than a prompt. Renders a typed input to markdown. |
-| `validators.ts`      | 4 of 6 | Deterministic checks, each gating `block` or `warn`. Never read prose.           |
-| `testing.ts`         | 4 of 6 | Pure sample builders shared by the folder's specs.                               |
-| `run.spec.ts`        | 4 of 6 | An end-to-end loop spec over a fake model.                                       |
-| `controller.ts`      | 1 of 6 | Only when the pipeline has a decision rule of its own.                           |
-| `from-run.ts`        | 1 of 6 | Only `experience-digest`: a finished run becomes the next pipeline's input.      |
+| File                 | Always  | What it is                                                                               |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `definition.ts`      | yes     | The exported `PipelineDefinition`. Pure data apart from its imports.                     |
+| `lenses/*.md`        | yes     | One markdown persona per stage, imported `?raw`. The filename is the lens id.            |
+| `output.ts`          | yes     | The output shape: a zod schema, `locate` for positional ids, `render`.                   |
+| `definition.spec.ts` | yes     | Validity, a JSON-round-trippable summary, personas long enough to be real.               |
+| `input.ts`           | 6 of 10 | A codec, when the goal is more than a prompt. Renders a typed input to markdown.         |
+| `validators.ts`      | 8 of 10 | Deterministic checks, each gating `block`, `cut` or `warn`. Never read prose.            |
+| `testing.ts`         | 8 of 10 | Pure sample builders shared by the folder's specs.                                       |
+| `run.spec.ts`        | 8 of 10 | An end-to-end loop spec over a fake model.                                               |
+| `controller.ts`      | 1 of 10 | Only when the pipeline has a decision rule of its own (`system-design-canvas`).          |
+| `from-run.ts`        | 2 of 10 | A finished run becomes the next pipeline's input (the experience and knowledge digests). |
+| `refound.ts`         | 1 of 10 | Only `browser-step`: the pipeline's `refoundEvidence` pass.                              |
 
-### The six
+### The ten
 
 **`system-design/`** — produces a structured design answer (summary, assumptions, components, flows,
 data model, tradeoffs, risks, capacity) from a markdown prompt, for a person practising. Four
@@ -239,9 +256,31 @@ functional requirements, an NFR table, a scale table, constraints. The smallest 
 critics, one evaluator, one sample each, the only warn-only validator. Its gated finding is
 `brand_leak`, the one defect no score can offset.
 
+**`browser-step/`** — produces one plan for the page in front of a browser session: an assessment
+and the actions up to the next page transition. Its goal is composed by the session (mission, page,
+elements, snapshot, recent actions, units of work, limits, index); two `cut` validators read the
+index, so a fault refuses only the actions from it on. Two critics and one evaluator, one sample
+each, all in one wave: under `cited` corroboration a finding vetoes only when the evaluator, reading
+the page apart, failed a gating criterion it cites. The only pipeline that declares a refound pass.
+[`lens-debate.md`](lens-debate.md) walks one of its steps end to end.
+
+**`field-answer/`** — answers every field of one form page about the session's subject from the
+evidence the goal lists, routing a field no evidence settles to the operator. A `block` references
+validator and a `warn` limits validator; its evaluator runs after the critics, shown what they
+confirmed. The only gated type is a trap answered.
+
+**`document-digest/`** — digests one chunk of a document — a résumé page, a notes file, the
+operator's answers from a session — into facts in the store's own item shape, each resting on the
+sections that state it. Three critics and two evaluators, every lens sampled twice.
+
+**`knowledge-digest/`** — digests a finished run into typed knowledge — a fact, an anti-pattern, a
+pattern, a procedure — written against what the store already knows. Its `from-run.ts` composes the
+input from engine facts. Three critics and two evaluators, every lens sampled twice; two validators
+read its index, and three warnings withhold or keep an item as each declares.
+
 ### The registry
 
-`pipelines/index.ts` imports the six definitions, erases their type parameter and exports `PIPELINES`
+`pipelines/index.ts` imports the ten definitions, erases their type parameter and exports `PIPELINES`
 keyed by id. Exactly one place consumes it: `modules/runs/pipelines.module.ts`, which provides it as
 `PIPELINES_TOKEN`. Adding a pipeline is a folder, one line in `index.ts`, and one line in the ordered
 list in `index.spec.ts`. Nothing in `core/` changes.

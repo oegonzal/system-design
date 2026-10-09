@@ -46,9 +46,11 @@ pnpm browser-session run --goal packages/browser-session/goals/smoke-search.md \
   --profile smoke --headed --max-tasks 1 --max-minutes 5
 ```
 
-Read: exit 0; `pnpm browser-session sessions` shows the session `complete`
-with `mission-complete`; `show <id>` lists one unit of work `done` and one
-`step-plan` decision per page, each with a `loopRunId`;
+Read: exit 0; `pnpm browser-session sessions` shows the session `complete`,
+ended by the mission's stop `mission-complete`; `show <id>` lists one unit of
+work `done` and one `step-plan` decision per page, each with a `loopRunId`;
+`static/sessions/<dumpId>/00-rubrics.json` names, per pipeline, the rubric and
+the `<stamp>-criteria` dump of the call that derived it;
 `ls static/sessions/<dumpId>/01-steps` has one folder per step with
 `observation.json`, `snapshot.txt`, `screenshot.png`, `plan.json`; and
 `select status, termination_reason, termination_cause, steps from browser_session order by started_at desc limit 1`
@@ -59,8 +61,13 @@ agrees. Repeat with `--headless`.
 ```bash
 pnpm browser-session login --profile linkedin --url https://www.linkedin.com/login   # sign in yourself
 pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-apply.md \
-  --profile linkedin --headed --max-tasks 2 --max-minutes 45
+  --profile linkedin --headed --subject "Your Name" \
+  --url https://www.linkedin.com/jobs/search-results/ --max-tasks 2 --max-minutes 45
 ```
+
+`--url` opens the browser where the work begins, so no plan is ever made on
+about:blank; `--subject` names whom the operator's answers are about, so the
+facts they teach are self-contained.
 
 Read, per form page: one `form-memory` orchestration whose `recall` step
 counts `{probes, candidates, evidence}` and whose `target` step reports
@@ -70,10 +77,14 @@ routed to you, or the model answered with low confidence; after each
 operator-sourced decision rows. The dump's `fields.json` per step names the
 route and source of every field.
 
+To read why a step did what it did, walk its debate from the dump: the step's
+`plan.json` names the loop run, and
+[`docs/quality-loop/lens-debate.md`](../quality-loop/lens-debate.md) §4 lists
+that run's files in the order to read them.
+
 ## 4. Pin the caps
 
-From the runs above, read `static/runs/<runId>/05-llm/*.meta.json`
-`usage.outputTokens` per stage for `browser-step`, `field-answer` and
-`document-digest`, and replace the seeded tables in each pipeline's
-`definition.spec.ts` with the measured maxima; the `[QL-33]` assertion
-holds the declared caps at 1.2× those.
+From the runs above, `pnpm measure:bounds` reads `static/runs` read-only and
+regenerates each pipeline's `measured.json` — what each stage wrote, field by
+field and call by call; the `[QL-33]` assertion in each `definition.spec.ts`
+holds the declared caps at a fifth above those.
