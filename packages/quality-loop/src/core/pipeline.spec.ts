@@ -251,7 +251,7 @@ describe('validatePipeline', () => {
     }
     expect(() =>
       validatePipeline(asAny(tinyPipeline({ validators: [declaring('warn', 'some-refs')] }))),
-    ).toThrow(/validator own withholds some-refs, not one of every-ref, all-but-one, none/);
+    ).toThrow(/validator own withholds some-refs, not one of every-ref, none/);
     // A failing blocking validator closes admission, so no reader ever sees its
     // problems: what it would withhold is a declaration about nothing.
     for (const withholds of WITHHOLDINGS) {

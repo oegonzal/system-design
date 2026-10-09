@@ -109,11 +109,8 @@ function namingsOf(
 
 /**
  * The items of `items` — location ids, in the artifact's order — that a
- * reader of this ledger withholds, each with what withheld it. An item named
- * to be withheld whole goes first; then each group a duplicate names keeps
- * the one of its members still standing with the most support, ties to the
- * first, and withholds the rest — so a pair whose better half is faulted for
- * itself keeps the other.
+ * reader of this ledger withholds, each with what withheld it: every item a
+ * naming that withholds `every-ref` names, once per naming.
  */
 export function withheldItems(
   ledger: EvidenceLedger,
@@ -132,19 +129,6 @@ export function withheldItems(
   };
   for (const naming of namings.filter((each) => each.withholds === 'every-ref')) {
     add(naming, naming.refs);
-  }
-  const whole = new Set(withheld.map((item) => item.ref));
-  const support = supportIn(ledger);
-  for (const naming of namings.filter((each) => each.withholds === 'all-but-one')) {
-    const standing = naming.refs.filter((ref) => !whole.has(ref));
-    const kept = standing.reduce<string | null>(
-      (best, ref) => (best === null || support(ref) > support(best) ? ref : best),
-      null,
-    );
-    add(
-      naming,
-      naming.refs.filter((ref) => ref !== kept),
-    );
   }
   return withheld;
 }

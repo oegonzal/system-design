@@ -1,9 +1,8 @@
 import type { Withholding } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { confirmed, evidence, ledger } from '../testing';
+import { confirmed, ledger } from '../testing';
 import {
-  supportIn,
   withheldItems,
   withheldRefs,
   withholdingOf,
@@ -31,14 +30,6 @@ const declaring = (table: Record<string, Withholding>): WithholdingRules =>
     validators: [],
   });
 
-/** Passing criteria citing each ref as many times as given: what supports it. */
-const supporting = (counts: Record<string, number>) =>
-  Object.entries(counts).flatMap(([ref, count]) =>
-    Array.from({ length: count }, (_, index) =>
-      evidence({ criterionId: `c-${ref}-${index}`, locationRefs: [ref] }),
-    ),
-  );
-
 describe('withheldItems', () => {
   it('[QL-53] an undeclared finding withholds every item it names — the rule before any was declared', () => {
     const faulted = ledger({ findings: [naming('wrong', ['memory.2', 'memory.3', 'summary'])] });
@@ -49,46 +40,6 @@ describe('withheldItems', () => {
     ]);
     // Only the reader's items are ever withheld: `summary` is not one.
     expect(withheldItems(faulted, ITEMS, WITHHOLD_EVERY_REF)).toEqual(withheld);
-  });
-
-  it('[QL-53] a duplicate keeps its best-supported member, ties to the first, and withholds the rest', () => {
-    const duplicate = naming('duplicate', ['memory.3', 'memory.2', 'memory.4']);
-    const rules = declaring({ duplicate: 'all-but-one' });
-
-    // Equal support: the first in the artifact stays, whatever order the finding cites.
-    expect([
-      ...withheldRefs(withheldItems(ledger({ findings: [duplicate] }), ITEMS, rules)),
-    ]).toEqual(['memory.3', 'memory.4']);
-
-    // More support wins.
-    const supported = ledger({
-      findings: [duplicate],
-      criteria: supporting({ 'memory.4': 2, 'memory.2': 1 }),
-    });
-    expect(supportIn(supported)('memory.4')).toBe(2);
-    expect([...withheldRefs(withheldItems(supported, ITEMS, rules))]).toEqual([
-      'memory.2',
-      'memory.3',
-    ]);
-  });
-
-  it('[QL-53] a pair whose better half is faulted for itself keeps the other half', () => {
-    const withheld = withheldItems(
-      ledger({
-        findings: [
-          naming('duplicate', ['memory.1', 'memory.2']),
-          naming('misattributed', ['memory.1']),
-        ],
-        criteria: supporting({ 'memory.1': 3 }),
-      }),
-      ITEMS,
-      declaring({ duplicate: 'all-but-one', misattributed: 'every-ref' }),
-    );
-    expect(withheld).toEqual([
-      { ref: 'memory.1', source: 'finding', by: 'misattributed' },
-      { ref: 'memory.1', source: 'finding', by: 'duplicate' },
-    ]);
-    expect(withheldRefs(withheld).has('memory.2')).toBe(false);
   });
 
   it('[QL-53] a finding whose remedy is a rewrite names every item and withholds none', () => {

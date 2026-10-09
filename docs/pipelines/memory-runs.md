@@ -1525,11 +1525,10 @@ disagree about them.
 **What a confirmed finding withholds is declared, per type.** A pipeline's
 policy gives each finding type a `withholds` from `WITHHOLDINGS`:
 
-| Value         | What it does to the items the finding names                                            |
-| ------------- | -------------------------------------------------------------------------------------- |
-| `every-ref`   | withholds each of them — also what any type that declares nothing does                 |
-| `all-but-one` | keeps the one with the most support (passing criteria that cite it), ties to the first |
-| `none`        | withholds nothing: the finding names the item without faulting it                      |
+| Value       | What it does to the items the finding names                            |
+| ----------- | ---------------------------------------------------------------------- |
+| `every-ref` | withholds each of them — also what any type that declares nothing does |
+| `none`      | withholds nothing: the finding names the item without faulting it      |
 
 The value is chosen by what storing the item **as written** would put in the
 store, never by the type's name: false or misleading there — a wrong fact or
@@ -1542,9 +1541,8 @@ failing blocking validator closes admission and no reader ever sees its
 problems. `validatePipeline` refuses an unknown value, and a declaration on a
 blocking validator, at boot. The one rule is `withheldItems` in
 `core/outputs/withheld.ts`: it reads engine facts only — the ledger's confirmed
-findings, its validation reports and the criteria's citations for support —
-withholds the `every-ref` items first, then keeps the best still standing of
-each `all-but-one` group; a finding type or validator that declares nothing
+findings and its validation reports — and withholds every item an
+`every-ref` naming names; a finding type or validator that declares nothing
 withholds every item it names. Its readers are a digest's memories
 (`endorsedMemories`, for the experience, document and knowledge digests) and a
 recall's kept chunks (`readPack`), and each binds `withholdingOf(definition)` —
@@ -1571,9 +1569,9 @@ survivor. Classifying the confirmed findings of three or more items in
 For example `[8, 3]` and `[7, 8]` in one run's iteration 2 confirm as
 `{3, 7, 8}`; `{1, 6, 8}` confirmed with no claim made twice; `{4, 5, 6}` rests
 `memory.5` on one sample. A dropped bystander is lost for good, since a run is
-not re-digested; a stored twin costs one bounded, recoverable slot. `all-but-one`
-stays in the vocabulary for a type whose findings name exactly one duplicate
-set.
+not re-digested; a stored twin costs one bounded, recoverable slot. A rule that
+keeps one member of a set would need findings that name exactly one duplicate
+set; none does, and the vocabulary has no such value.
 
 **A stored lesson is stamped from the evidence it cites.** The digest's index
 names, for every finding and criterion, the source run's iterations it was

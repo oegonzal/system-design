@@ -200,14 +200,14 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
     // experience digest this type alone cost 51 of 245 narrow exclusions.
     //
     // **Nothing** for `duplicate_item` either, measured rather than reasoned.
-    // `all-but-one` was the declared value on the strength of 42 of 43 recorded
+    // Keeping all but one member of a named set was the declared rule on the strength of 42 of 43 recorded
     // duplicate findings naming two or more items — which establishes that the
     // rule has something to act on, and not that the named set contains only
     // the duplication. It does not: of the eight `duplicate_memory` findings in
     // ten recorded parent runs, three name three items, and in all three the
     // rationale identifies a pair and the third item is unrelated — a shared
     // store keyed by one identity beside two lessons about narration claims, a
-    // p99 latency check beside two about a synchronous write. `all-but-one`
+    // p99 latency check beside two about a synchronous write. That rule
     // keeps one of the three, so it drops a bystander every time, and no rule
     // of this shape can avoid it: it cannot know which members of a named set
     // are the pair. A peer measured 18 of 75 (24%) on the same type over a

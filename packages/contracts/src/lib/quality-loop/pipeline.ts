@@ -10,10 +10,8 @@ import type {
 /**
  * What a confirmed finding does to the items it names when a reader draws on
  * a run's best iteration — a digest's memories, a recall's kept chunks.
- * `every-ref`: each item it names is withheld. `all-but-one`: all but the one
- * with the most support — passing criteria that cite it — are, ties to the
- * first in the artifact. `none`: it names an item without faulting it, and
- * withholds nothing.
+ * `every-ref`: each item it names is withheld. `none`: it names an item
+ * without faulting it, and withholds nothing.
  *
  * Declared by what storing the item as written would put in the store, never
  * by the type's name: if the item would be false or misleading there — a
@@ -35,11 +33,11 @@ import type {
  * asymmetry decides it: a dropped bystander is lost for good, because a run is
  * not re-digested, while a stored twin costs one bounded, recoverable slot —
  * at recall the next-best still enters the fused top N; a curated pack is not
- * refilled; twins from different runs never meet in one finding anyway.
- * `all-but-one` stays in the vocabulary for a type whose confirmed findings
- * name exactly one duplicate set, and for no other.
+ * refilled; twins from different runs never meet in one finding anyway. A
+ * rule that kept one member of a named set would need findings that name
+ * exactly one duplicate set, which the normaliser does not produce.
  */
-export const WITHHOLDINGS = ['every-ref', 'all-but-one', 'none'] as const;
+export const WITHHOLDINGS = ['every-ref', 'none'] as const;
 export type Withholding = (typeof WITHHOLDINGS)[number];
 
 /**
