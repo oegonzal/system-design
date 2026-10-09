@@ -156,6 +156,7 @@ describe('composeStepGoal', () => {
         done: ['c13'],
       },
       pageUnchanged: false,
+      stops: [],
       // The longest hand-off the page section can carry: a long element name, and a full plan held past it.
       lastStep: {
         ran: 1,
@@ -432,8 +433,10 @@ describe('composeStepGoal', () => {
     expect(lines.indexOf('In the navigation (1):')).toBe(at('e5') - 1);
     expect(lines.indexOf('In the search (2):')).toBe(at('e1') - 1);
     expect(at('e2')).toBe(at('e1') + 1);
-    // The disabled control sits in no landmark and is still listed, last, under no header.
+    // The disabled control sits in no landmark and is still listed, last, under its own
+    // header — never read as part of the landmark listed just above it.
     expect(at('e6')).toBeGreaterThan(at('e2'));
+    expect(lines.indexOf('Outside every landmark (1):')).toBe(at('e6') - 1);
     // A page without landmarks reads exactly as before: no headers at all.
     expect(goalOf(base)).not.toContain('In the ');
   });

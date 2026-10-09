@@ -7,6 +7,7 @@
 import type { DocumentChunk } from '../quality-loop/document-digest';
 import { DOCUMENT_RULES } from '../quality-loop/document-digest';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
+import { stopsOf, stopsOnPage } from './mission-stops';
 import type { StepGoalInput } from './step-goal';
 
 /** One element as the page reports it, every fact the quiet default; a spec overrides what it is about. */
@@ -220,14 +221,19 @@ export function resumeChunk(): DocumentChunk {
 }
 
 /** What a step goal composes from, every field the quiet default; a spec overrides what it is about. */
-export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalInput => ({
-  mission: MISSION_FIXTURE,
-  observation: listingObservation(),
-  history: [],
-  ledger: emptyLedger(),
-  objections: [],
-  progress: { criteria: [], settled: [], done: [] },
-  pageUnchanged: false,
-  lastStep: null,
-  ...overrides,
-});
+export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalInput => {
+  const mission = overrides.mission ?? MISSION_FIXTURE;
+  const observation = overrides.observation ?? listingObservation();
+  return {
+    mission,
+    observation,
+    history: [],
+    ledger: emptyLedger(),
+    objections: [],
+    progress: { criteria: [], settled: [], done: [] },
+    pageUnchanged: false,
+    lastStep: null,
+    stops: stopsOnPage(stopsOf(mission), observation),
+    ...overrides,
+  };
+};

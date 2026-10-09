@@ -10,7 +10,7 @@ import type { SuccessCriterion } from '../quality-loop/evidence';
 import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
 import type { RanAction } from './action-identity';
 import { marksOf, marksOn, type Mark } from './mission-marks';
-import { stopsOf, stopsOnPage } from './mission-stops';
+import type { StopOnPage } from './mission-stops';
 import {
   inScope,
   OBJECTIONS_BOUND,
@@ -54,6 +54,13 @@ export interface StepGoalInput extends StepPageState {
    */
   objections: readonly StepObjection[];
   progress: StepProgress;
+  /**
+   * The mission's stop words and whether the page shows them, read from the
+   * page as the browser read it — before any fitting, so the room a goal had
+   * for its snapshot never decides whether a stop is shown and a correct
+   * terminate is never cut for words a reduced snapshot dropped.
+   */
+  stops: readonly StopOnPage[];
 }
 
 const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'>): string => {
@@ -143,13 +150,18 @@ function groupedByLandmark(elements: readonly ObservedElement[], marks: readonly
   );
   const lines = (group: readonly ObservedElement[]): string[] =>
     group.map((element) => renderElementLine(element, marks));
+  const outside = inLandmark(null);
   return [
     ...lines(inLandmark('main')),
     ...others.flatMap((landmark) => [
       `In the ${landmark} (${inLandmark(landmark).length}):`,
       ...lines(inLandmark(landmark)),
     ]),
-    ...lines(inLandmark(null)),
+    // Headed whenever a landmark is headed above them, so they never read as that landmark's.
+    ...(others.length > 0 && outside.length > 0
+      ? [`Outside every landmark (${outside.length}):`]
+      : []),
+    ...lines(outside),
   ];
 }
 
@@ -325,7 +337,7 @@ const snapshotLines = (observation: PageObservation): string[] => [
 export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES): string {
   const { observation } = input;
   const marks = marksOf(input.mission);
-  const stops = stopsOnPage(stopsOf(input.mission), observation);
+  const { stops } = input;
   const goal = [
     ...section('# Mission', [input.mission.trim()]),
     ...section('## Page', pageLines(input)),

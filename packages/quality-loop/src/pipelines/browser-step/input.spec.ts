@@ -15,6 +15,8 @@ import {
   type ObservedElement,
   type PageObservation,
   stepGoalInput,
+  stopsOf,
+  stopsOnPage,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -136,6 +138,7 @@ describe('the browser-step input codec', () => {
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged: false,
       lastStep: null,
+      stops: stopsOnPage(stopsOf(MISSION_FIXTURE), observation),
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);

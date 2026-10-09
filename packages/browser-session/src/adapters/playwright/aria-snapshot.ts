@@ -1,6 +1,5 @@
 import {
   ELEMENT_REF,
-  nodeLineOf,
   refOf,
   LANDMARK_ROLES,
   SCOPE_ROLES,
@@ -135,19 +134,19 @@ export function subtreeText(nodes: readonly SnapshotNode[], index: number): stri
 }
 
 /**
- * How a snapshot too big for its byte budget is reduced: by declared rungs,
- * never a cut mid-page. The whole snapshot; then the lines that carry words —
- * a name, inline text, a text line — with the wordless node lines and the
- * property lines gone, refs or not; then its nodes alone — property lines,
- * text lines and a node's inline text dropped; then only the nodes Playwright
- * minted refs for; then none. A reduced snapshot opens with a line naming its
- * rung and what it dropped, so the dump and the model both know.
+ * How a snapshot too big for its byte budget is reduced, by declared rungs:
+ * the whole snapshot; then the lines that carry words — a name, inline text,
+ * a text line — with the wordless node lines and the property lines gone;
+ * then those lines with words cut where the room ends, in document order;
+ * then none. A reduced snapshot opens with a line naming its rung and what it
+ * dropped, so the dump and the model both know.
  *
- * Measured 2026-10-08 on a results page: 1,012 node lines, 765 of them unnamed
- * containers carrying refs and no words, so nodes-only (56 KB) and refs-only
- * (55 KB) both overran the room a goal left and the model read none, while the
- * lines with words were 18.5 KB. The words come first because they are what a
- * plan reads; the elements a page lists carry their refs whatever the rung.
+ * The words are what a snapshot adds to a goal: the elements a plan may act
+ * on are listed with their refs whatever the rung, so a line with no words
+ * says nothing the Elements list does not. Measured 2026-10-08: the rungs
+ * that kept node lines without their words left the 35 KB snapshot of a
+ * results page with 308 wordless lines and none of the open listing's text,
+ * and every lens read the page as showing no listings.
  */
 /**
  * Whether a snapshot carries a node the session can act on: one the grammar
@@ -166,9 +165,9 @@ export const carriesRefNode = (snapshot: string): boolean =>
  *
  * `decodeAriaSnapshot` returning nothing says two different things — the page
  * has nothing on it, or its text could not be read — and until this counted
- * the difference, nothing downstream could tell them apart. A snapshot the
- * grammar cannot read also empties the `refs-only` rung, so one failure to
- * read blinded the producer twice over, with no sign that anything had failed.
+ * the difference, nothing downstream could tell them apart, and a populated
+ * page whose text the grammar could not read was told to the producer as an
+ * empty one, with no sign that anything had failed.
  */
 export function unreadSnapshotLines(snapshot: string, nodes: readonly SnapshotNode[]): number {
   if (nodes.length > 0) return 0;
@@ -213,16 +212,28 @@ export async function settledSnapshot(
   return last;
 }
 
+/**
+ * The snapshot with every ref the observation does not list taken off its
+ * line: such a ref can never be cited — the references validator refuses it —
+ * so a goal that shows one offers the planner a token it cannot use. The ref
+ * attribute is the snapshot format's own (`[ref=…]`, read by `refOf`); the
+ * rest of the line, its words included, stays. Measured 2026-10-08: plans
+ * cited `f13e216` and `f13e220`, refs only the snapshot carried, and were cut.
+ */
+export function withoutUnlistedRefs(snapshot: string, listed: ReadonlySet<string>): string {
+  return snapshot
+    .split('\n')
+    .map((line) => {
+      const ref = refOf(line);
+      return ref === null || listed.has(ref) ? line : line.replace(` [ref=${ref}]`, '');
+    })
+    .join('\n');
+}
+
 export interface FittedSnapshot {
   text: string;
   rung: SnapshotRung;
 }
-
-const nodeLines = (lines: readonly string[]): string[] =>
-  lines.flatMap((line) => {
-    const node = nodeLineOf(line);
-    return node === null ? [] : [node];
-  });
 
 /** A node line that says something a reader can read: a name, inline text, or a text line's words. */
 const carriesWords = (line: string): boolean => {
@@ -233,15 +244,29 @@ const carriesWords = (line: string): boolean => {
   );
 };
 
-/** The rungs that reduce a set of lines, as what each keeps of them. */
+/** The longest run of lines from the first that fits the room, joined one per line. */
+const firstThatFit = (lines: readonly string[], room: number): string[] => {
+  const kept: string[] = [];
+  let used = 0;
+  for (const line of lines) {
+    const cost = textBytes(line) + 1;
+    if (used + cost > room) break;
+    kept.push(line);
+    used += cost;
+  }
+  return kept;
+};
+
+/** The rungs that reduce a set of lines, as what each keeps of them within the room it has. */
 type ReducingRung = Exclude<SnapshotRung, 'full' | 'scope'>;
 const REDUCING_RUNGS = SNAPSHOT_RUNGS.filter(
   (rung): rung is ReducingRung => rung !== 'full' && rung !== 'scope',
 );
-const REDUCTIONS: Readonly<Record<ReducingRung, (lines: readonly string[]) => string[]>> = {
+const REDUCTIONS: Readonly<
+  Record<ReducingRung, (lines: readonly string[], room: number) => string[]>
+> = {
   'words-only': (lines) => lines.filter(carriesWords),
-  'nodes-only': nodeLines,
-  'refs-only': (lines) => nodeLines(lines).filter((line) => refOf(line) !== null),
+  'words-cut': (lines, room) => firstThatFit(lines.filter(carriesWords), room),
   none: () => [],
 };
 
@@ -279,8 +304,8 @@ function splitByScope(
  * The snapshot at the first rung that fits the budget: the whole; with an
  * open scope, that scope whole and the rest reduced — a dialog's twenty lines
  * are what the plan acts on, and the page behind it is what the rungs give
- * up first; then the lines with words; then the nodes alone; then only the
- * nodes with refs; then none.
+ * up first; then the lines with words; then those cut where the room ends;
+ * then none.
  * A reduced snapshot opens with a line naming its rung and what it dropped,
  * so the dump and the model both know. Measured 2026-10-07: at the recorded
  * density a 1 400-line page lands on `none` inside the room a goal leaves,
@@ -293,18 +318,26 @@ export function fitSnapshot(
 ): FittedSnapshot {
   if (textBytes(snapshot) <= maxBytes) return { text: snapshot, rung: 'full' };
   const lines = snapshot.split('\n').filter((line) => line.trim() !== '');
+  // The longest a note can be: its counts at their largest, so a cut never overruns the budget.
+  const noteRoom = (heading: string): number =>
+    maxBytes - textBytes(`${heading}: ${lines.length} of ${lines.length} lines not shown]`) - 1;
   if (scope !== null) {
     const { inside, outside } = splitByScope(lines, scope);
+    const heading = `[snapshot reduced to scope: the open ${scope.role} ${quotedJson(scope.name)} whole, the rest`;
     for (const rung of inside.length > 0 ? REDUCING_RUNGS : []) {
-      const kept = REDUCTIONS[rung](outside);
+      const room = noteRoom(`${heading} ${rung}`) - textBytes(inside.join('\n')) - 1;
+      const kept = REDUCTIONS[rung](outside, room);
+      // A reduction that keeps no line is the none rung, and says so.
+      if (kept.length === 0 && rung !== 'none') continue;
       const dropped = lines.length - inside.length - kept.length;
-      const note = `[snapshot reduced to scope: the open ${scope.role} ${quotedJson(scope.name)} whole, the rest ${rung}: ${dropped} of ${lines.length} lines not shown]`;
+      const note = `${heading} ${rung}: ${dropped} of ${lines.length} lines not shown]`;
       const text = [note, ...inside, ...kept].join('\n');
       if (textBytes(text) <= maxBytes) return { text, rung: 'scope' };
     }
   }
   for (const rung of REDUCING_RUNGS) {
-    const kept = REDUCTIONS[rung](lines);
+    const kept = REDUCTIONS[rung](lines, noteRoom(`[snapshot reduced to ${rung}`));
+    if (kept.length === 0 && rung !== 'none') continue;
     const note = `[snapshot reduced to ${rung}: ${lines.length - kept.length} of ${lines.length} lines not shown]`;
     const text = [note, ...kept].join('\n');
     if (textBytes(text) <= maxBytes) return { text, rung };

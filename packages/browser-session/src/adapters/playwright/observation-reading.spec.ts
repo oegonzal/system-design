@@ -174,7 +174,9 @@ describe('one reading as an observation', () => {
     expect(Buffer.byteLength(observation.ariaSnapshot, 'utf8')).toBeLessThanOrEqual(
       SNAPSHOT_BOUND.target,
     );
-    expect(observation.snapshotRung).toBe('nodes-only');
+    // Every line carries words, so the words are cut where the bound ends rather than dropped.
+    expect(observation.snapshotRung).toBe('words-cut');
+    expect(observation.ariaSnapshot).toContain('- paragraph [ref=e0]: words');
     expect(observation.elements).toHaveLength(ELEMENTS_BOUND.target);
     expect(observation.omittedElements).toBe(7);
   });

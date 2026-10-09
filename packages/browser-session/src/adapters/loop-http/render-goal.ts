@@ -1,5 +1,7 @@
 import {
   composeStepGoal,
+  stopsOf,
+  stopsOnPage,
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
   textBytes,
@@ -11,7 +13,7 @@ import {
 import type { FieldsInput, GoalComposition } from '../../core/ports';
 // The snapshot's own codec, not a browser: it reduces snapshot text by the
 // declared rungs and never touches a page.
-import { fitSnapshot } from '../playwright/aria-snapshot';
+import { fitSnapshot, withoutUnlistedRefs } from '../playwright/aria-snapshot';
 
 /**
  * The goals the session composes for the loop, fitted to the loop's budget
@@ -83,9 +85,15 @@ function snapshotFitted(
     Number.MAX_SAFE_INTEGER,
   );
   const room = Math.max(0, budget - textBytes(bare));
-  // The open scope is kept whole and the page behind it reduced first: the
-  // dialog's lines are what the plan acts on.
-  const fitted = fitSnapshot(observation.ariaSnapshot, room, observation.activeScope);
+  // A ref the observation does not list cannot be cited, so it leaves its line
+  // before the room is measured; the open scope is kept whole and the page
+  // behind it reduced first: the dialog's lines are what the plan acts on.
+  const listed = new Set(observation.elements.map((element) => element.ref));
+  const fitted = fitSnapshot(
+    withoutUnlistedRefs(observation.ariaSnapshot, listed),
+    room,
+    observation.activeScope,
+  );
   return {
     observation: {
       ...observation,
@@ -123,9 +131,14 @@ function attempt(
 }
 
 export function composeStepGoalWithinBudget(
-  input: StepGoalInput,
+  page: Omit<StepGoalInput, 'stops'>,
   budget = GOAL_BUDGET_BYTES,
 ): ComposedGoal {
+  // Read from the page as the browser read it, before any rung below reduces it.
+  const input: StepGoalInput = {
+    ...page,
+    stops: stopsOnPage(stopsOf(page.mission), page.observation),
+  };
   const { observation: full, rung } = snapshotFitted(input, input.observation, budget);
   const trimmed = trimmedContext(full);
   const fitted =

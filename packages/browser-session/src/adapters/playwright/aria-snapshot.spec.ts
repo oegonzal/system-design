@@ -8,6 +8,7 @@ import {
   subtreeText,
   ancestryOf,
   landmarkRolesOf,
+  withoutUnlistedRefs,
 } from './aria-snapshot';
 
 const SNAPSHOT = `- banner [ref=e1]:
@@ -177,18 +178,18 @@ describe('the aria snapshot decoder', () => {
     const scope = { role: 'dialog' as const, name: 'Apply to Acme' };
     const bytes = (text: string): number => Buffer.byteLength(text, 'utf8');
 
-    // Room for the dialog and the nodes of the page behind it, not for their words.
+    // Room for the dialog and the first of the words behind it, never their wordless lines.
     const scoped = fitSnapshot(page, 5_000, scope);
     expect(scoped.rung).toBe('scope');
     const lines = scoped.text.split('\n');
-    expect(lines[0]).toBe(
-      '[snapshot reduced to scope: the open dialog "Apply to Acme" whole, the rest nodes-only: 60 of 187 lines not shown]',
+    expect(lines[0]).toMatch(
+      /^\[snapshot reduced to scope: the open dialog "Apply to Acme" whole, the rest words-cut: \d+ of 187 lines not shown\]$/,
     );
-    // The dialog first and whole, text line and value included; the page behind it as nodes.
+    // The dialog first and whole, text line and value included; then the words behind it, in order.
     expect(lines.slice(1, 7)).toEqual(dialog);
-    expect(scoped.text).toContain('  - link [ref=e100] [cursor=pointer]');
+    expect(scoped.text).toContain('Senior Engineer at a company');
+    expect(scoped.text).not.toContain('  - link [ref=e100] [cursor=pointer]');
     expect(scoped.text).not.toContain('/url: /jobs/0');
-    expect(scoped.text).not.toContain('Senior Engineer at a company');
     expect(bytes(scoped.text)).toBeLessThanOrEqual(5_000);
 
     // Less room: the page behind it goes, the dialog stays.
@@ -200,13 +201,13 @@ describe('the aria snapshot decoder', () => {
     // No room even for the dialog: the ordinary rungs over the whole page.
     expect(fitSnapshot(page, 120, scope).rung).toBe('none');
     // No open scope, or a scope the page does not carry: the ordinary rungs.
-    expect(fitSnapshot(page, 5_000).rung).toBe('nodes-only');
-    expect(fitSnapshot(page, 5_000, { role: 'dialog', name: 'Cookies' }).rung).toBe('nodes-only');
+    expect(fitSnapshot(page, 5_000).rung).toBe('words-cut');
+    expect(fitSnapshot(page, 5_000, { role: 'dialog', name: 'Cookies' }).rung).toBe('words-cut');
     // And a page that fits is whole whatever scope is open.
     expect(fitSnapshot(page, 100_000, scope)).toEqual({ text: page, rung: 'full' });
   });
 
-  it('[BRW-2] fits an oversized snapshot by declared rungs — words only, nodes only, refs only, none — never a cut, and says which rung it used', () => {
+  it('[BRW-2] fits an oversized snapshot by declared rungs — the lines with words, then those cut where the room ends, then none — and says which rung it used', () => {
     const bytes = (text: string): number => Buffer.byteLength(text, 'utf8');
     const lines = (text: string): string[] => text.split('\n').slice(1);
     // Twenty pages of the fixture, refs kept unique, so each rung's saving dwarfs its note line.
@@ -230,42 +231,28 @@ describe('the aria snapshot decoder', () => {
     expect(lines(words.text)).not.toContain('    - /url: /');
     expect(lines(words.text).every((line) => page.includes(line))).toBe(true);
 
-    // Too small for the words: the nodes alone, property, text and inline-text lines gone.
-    const nodes = fitSnapshot(page, bytes(words.text) - 1);
-    expect(nodes.rung).toBe('nodes-only');
-    expect(nodes.text.split('\n')[0]).toBe(
-      '[snapshot reduced to nodes-only: 40 of 300 lines not shown]',
+    // Too small for the words: the same lines in the same order, cut where the room ends.
+    const cut = fitSnapshot(page, bytes(words.text) - 1);
+    expect(cut.rung).toBe('words-cut');
+    expect(cut.text.split('\n')[0]).toMatch(
+      /^\[snapshot reduced to words-cut: \d+ of 300 lines not shown\]$/,
     );
-    expect(lines(nodes.text)).not.toContain('    - /url: /');
-    expect(lines(nodes.text)).not.toContain('- text: Some prose the page shows');
-    expect(lines(nodes.text)).toContain('  - paragraph');
-    expect(lines(nodes.text)).toContain('  - option "Yes" [selected]');
-    // Every kept element node still decodes with the ref it had; the text lines are what the rung dropped.
-    const elementRefs = (text: string) =>
-      decodeAriaSnapshot(text)
-        .filter((node) => node.role !== 'text')
-        .map((node) => node.ref);
-    expect(elementRefs(nodes.text)).toEqual(elementRefs(page));
+    const kept = lines(cut.text);
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept).toEqual(lines(words.text).slice(0, kept.length));
 
-    // Too small for the nodes: only those with refs, each a whole line of the original.
-    const refs = fitSnapshot(page, bytes(nodes.text) - 1);
-    expect(refs.rung).toBe('refs-only');
-    expect(lines(refs.text).every((line) => /\[ref=e\d+\]/.test(line))).toBe(true);
-    expect(lines(refs.text).every((line) => page.includes(line))).toBe(true);
-    expect(lines(refs.text)).toHaveLength(200);
-
-    // Too small even for that: nothing but the note.
-    const none = fitSnapshot(page, bytes(refs.text) - 1);
+    // Too small for one line of words: nothing but the note — never a wordless page.
+    const none = fitSnapshot(page, bytes('[snapshot reduced to none: 300 of 300 lines not shown]'));
     expect(none).toEqual({
       text: '[snapshot reduced to none: 300 of 300 lines not shown]',
       rung: 'none',
     });
-    for (const fitted of [words, nodes, refs, none]) {
+    for (const fitted of [words, cut, none]) {
       expect(bytes(fitted.text)).toBeLessThanOrEqual(bytes(page) - 1);
     }
   });
 
-  it('[BRW-2] keeps the lines that carry words when the nodes alone do not fit, and reports none rather than a wordless page when those do not fit either', () => {
+  it('[BRW-2] keeps the lines that carry words, and cuts them where the room ends rather than reporting a wordless page or none', () => {
     // Measured 2026-10-08 on a results page: 1,012 node lines, 765 of them
     // unnamed containers carrying refs and no words, so nodes-only (56 KB) and
     // refs-only (55 KB) both overran the room a goal left and the model read
@@ -290,8 +277,30 @@ describe('the aria snapshot decoder', () => {
     expect(words.text).toContain('    - link "Result 0 · Posted today" [ref=e2]:');
     expect(words.text).toContain('- text: Application status');
     expect(words.text).not.toContain('generic');
-    // Every container carries a ref, so the two rungs beneath are both larger than the words here.
-    expect(fitSnapshot(page, Buffer.byteLength(words.text, 'utf8') - 1).rung).toBe('none');
+    // One byte short of the words: the first of them, in order — never the wordless containers.
+    const cut = fitSnapshot(page, Buffer.byteLength(words.text, 'utf8') - 1);
+    expect(cut.rung).toBe('words-cut');
+    expect(cut.text).toContain('    - link "Result 0 · Posted today" [ref=e2]:');
+    expect(cut.text).not.toContain('generic');
+  });
+});
+
+describe('a snapshot shown in a goal', () => {
+  it('[BRW-2] carries only the refs the observation lists: an unlisted one leaves its line, the words stay', () => {
+    // Measured 2026-10-08: plans cited `f13e216` and `f13e220`, refs only the
+    // snapshot carried, and the references validator cut them.
+    const snapshot = [
+      '- link "Apply on company website" [ref=e7] [cursor=pointer]:',
+      '  - paragraph [ref=e9]: United States · Over 100 people clicked apply',
+      '  - generic [ref=e10]',
+    ].join('\n');
+    expect(withoutUnlistedRefs(snapshot, new Set(['e7']))).toBe(
+      [
+        '- link "Apply on company website" [ref=e7] [cursor=pointer]:',
+        '  - paragraph: United States · Over 100 people clicked apply',
+        '  - generic',
+      ].join('\n'),
+    );
   });
 });
 
@@ -351,11 +360,11 @@ describe('reading a page that has not settled', () => {
   });
 });
 describe('the refs Playwright mints', () => {
-  it('[BRW-2] carries a frame-scoped ref as readily as a same-document one, in the decoder and in the rung that keeps ref lines', () => {
+  it('[BRW-2] carries a frame-scoped ref as readily as a same-document one, in the decoder and in a reduced snapshot', () => {
     // Measured live: a search-results page renders in a frame, so every ref
     // came back `f1e7` rather than `e7`. Against a grammar of `e\d+` the page
-    // read as having no interactive element at all, and the refs-only rung —
-    // filtering by the same shape in a second place — kept none of its lines.
+    // read as having no interactive element at all, and a reduction filtering
+    // by the same shape in a second place kept none of its lines.
     const framed = [
       '- generic [ref=f1e1]:',
       '  - link "site home" [ref=f1e7] [cursor=pointer]:',
@@ -365,18 +374,16 @@ describe('the refs Playwright mints', () => {
     expect(decodeAriaSnapshot(framed).map((node) => node.ref)).toEqual(['f1e1', 'f1e7', 'f1e17']);
     expect(carriesRefNode(framed)).toBe(true);
 
-    // The rung keeps those lines, as it does a same-document page's. The page
-    // is built so reducing it reduces: property lines outnumber node lines,
-    // which is the shape of a real results page.
+    // A reduced snapshot keeps those lines, as it does a same-document page's.
+    // The page is built so reducing it reduces: more words than the room.
     const big = [
       '- generic [ref=f1e1]:',
       ...Array.from({ length: 40 }, (_, i) => `  - link "r${i}" [ref=f1e${i + 2}]`),
-      // Ref-less nodes the rung above keeps whole: what makes refs-only the
-      // first rung that fits, so the test reaches the rung it is about.
+      // Named nodes past the links: more words than the room, so the cut is what fits.
       ...Array.from({ length: 200 }, () => `  - generic "${'x'.repeat(80)}"`),
     ].join('\n');
     const fitted = fitSnapshot(big, 4_000);
-    expect(fitted.rung).toBe('refs-only');
+    expect(fitted.rung).toBe('words-cut');
     expect(fitted.text).toContain('[ref=f1e2]');
     expect(fitted.text).not.toContain('/url:');
 

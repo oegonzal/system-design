@@ -180,12 +180,5 @@ export type LandmarkRole = (typeof LANDMARK_ROLES)[number];
  * nodes alone, their words gone; only the nodes with refs; none. An
  * observation and a composed goal each say which rung the model is reading at.
  */
-export const SNAPSHOT_RUNGS = [
-  'full',
-  'scope',
-  'words-only',
-  'nodes-only',
-  'refs-only',
-  'none',
-] as const;
+export const SNAPSHOT_RUNGS = ['full', 'scope', 'words-only', 'words-cut', 'none'] as const;
 export type SnapshotRung = (typeof SNAPSHOT_RUNGS)[number];

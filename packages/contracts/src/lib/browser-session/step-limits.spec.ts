@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { emptyLedger, listingObservation, MISSION_FIXTURE, stepGoalInput } from './fixtures';
 import { MissionMarkMalformed } from './mission-marks';
+import { stopsOf, stopsOnPage } from './mission-stops';
 import { type PageObservation, type StepObjection } from './observation.schema';
 import { composeStepGoal } from './step-goal';
 import { readStepIndex } from './step-index';
@@ -72,6 +73,7 @@ describe('the Limits a step goal states', () => {
       progress: { criteria: [], settled: [], done: [] },
       pageUnchanged,
       lastStep: { ran: ran.length, touched: ran, held: [] },
+      stops: stopsOnPage(stopsOf(MISSION_FIXTURE), listingObservation()),
     });
     const unchanged = composeStepGoal(input(true));
     expect(unchanged).toContain(

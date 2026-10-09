@@ -19,6 +19,8 @@ import {
   type FieldAnswers,
   type PageObservation,
   type StepPlan,
+  stopsOf,
+  stopsOnPage,
 } from '@sysdesign/contracts';
 import { LoopRefused } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
@@ -57,6 +59,12 @@ const stepInput = (
   pageUnchanged,
   lastStep,
   progress: { settled: [], done: [] },
+});
+
+/** A goal input with the stop facts the composer is handed, read from its own page. */
+const withStops = <I extends { mission: string; observation: PageObservation }>(input: I) => ({
+  ...input,
+  stops: stopsOnPage(stopsOf(input.mission), input.observation),
 });
 
 /** The goal the brain composes from a step input: the rubric rides in as the progress section's. */
@@ -243,7 +251,7 @@ describe('the loop brain', () => {
       })),
     };
     const input = goalInputOf(big);
-    const fullBytes = textBytes(composeStepGoal(input));
+    const fullBytes = textBytes(composeStepGoal(withStops(input)));
     expect(composeStepGoalWithinBudget(input, fullBytes)).toMatchObject({
       rung: 'full',
       omittedElements: 0,
@@ -265,7 +273,9 @@ describe('the loop brain', () => {
       ...big,
       ariaSnapshot: ['- generic [ref=e1]:', ...lines].join('\n'),
     });
-    const bare = textBytes(composeStepGoal({ ...huge, observation: { ...big, ariaSnapshot: '' } }));
+    const bare = textBytes(
+      composeStepGoal(withStops({ ...huge, observation: { ...big, ariaSnapshot: '' } })),
+    );
     const roomy = composeStepGoalWithinBudget(huge, bare + 20_000);
     expect(roomy.rung).toBe('full');
     expect(roomy.goal).toContain('[ref=e1]');
@@ -273,7 +283,9 @@ describe('the loop brain', () => {
     // And it used the room: far more snapshot than the old fixed cut left.
     expect(textBytes(roomy.goal) - bare).toBeGreaterThan(10_000);
 
-    const noSnapshot = composeStepGoal({ ...input, observation: { ...big, ariaSnapshot: '' } });
+    const noSnapshot = composeStepGoal(
+      withStops({ ...input, observation: { ...big, ariaSnapshot: '' } }),
+    );
     const withoutSnapshot = composeStepGoalWithinBudget(input, textBytes(noSnapshot));
     expect(withoutSnapshot.rung).toBe('without-snapshot');
     expect(withoutSnapshot.goal).not.toContain('lorem ipsum');
@@ -290,6 +302,22 @@ describe('the loop brain', () => {
     expect(fewer.omittedElements).toBeGreaterThan(0);
     expect(fewer.goal).toContain(`(${fewer.omittedElements} more interactive elements not listed)`);
     expect(fewer.bytes).toBeLessThan(trimmed.bytes);
+
+    // Whether a stop's words are shown is read from the page as the browser read it: a
+    // goal with no room for its snapshot still says the page shows them, so a correct
+    // terminate is never cut for words a reduced snapshot dropped.
+    const stopShown = goalInputOf({
+      ...big,
+      ariaSnapshot: `${big.ariaSnapshot}\n- text: no more applications today`,
+    });
+    // Room for everything but the snapshot, the stop line saying what the page as read shows.
+    const stopFree = textBytes(
+      composeStepGoal({ ...withStops(stopShown), observation: { ...big, ariaSnapshot: '' } }),
+    );
+    const reduced = composeStepGoalWithinBudget(stopShown, stopFree);
+    expect(reduced.rung).toBe('without-snapshot');
+    expect(reduced.goal).not.toContain('no more applications today');
+    expect(reduced.goal).toContain('This page shows "no more applications"');
 
     expect(() => composeStepGoalWithinBudget(input, 100)).toThrow(GoalBudgetExceeded);
     const { brain } = harness(() => undefined);

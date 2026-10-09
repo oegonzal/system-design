@@ -5,6 +5,8 @@ import {
   type PageObservation,
   type StepPlan,
   type ValidationReport,
+  stopsOf,
+  stopsOnPage,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -56,6 +58,7 @@ const goalOf = (recorded: RecordedStep): string =>
     progress: { criteria: [], settled: [], done: [] },
     pageUnchanged: false,
     lastStep: null,
+    stops: stopsOnPage(stopsOf(MISSION_FIXTURE), recorded.observation),
   });
 
 const validate = (recorded: RecordedStep): ValidationReport[] => {
