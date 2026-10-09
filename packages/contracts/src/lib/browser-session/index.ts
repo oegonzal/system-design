@@ -14,6 +14,8 @@ export * from './step-limits';
 export * from './field-answers.schema';
 export * from './field-goal';
 export * from './read-back';
+export * from './route-plan';
+export * from './route-fields';
 export * from './guidance';
 export * from './records';
 export * from './fixtures';

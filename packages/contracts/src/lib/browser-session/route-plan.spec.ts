@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { type ValidationReport } from '../quality-loop/evidence';
-import { routePlan } from './read-back';
+import { routePlan } from './route-plan';
 import { judgedRun } from './read-back.testing';
 import { ASSESSMENT_BOUND, type StepPlan } from './step-plan.schema';
 
