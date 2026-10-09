@@ -3,6 +3,7 @@ import {
   composeFieldGoal,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
+  FORM_MEMORY_TARGET_STEP,
   GoalBudgetExceeded,
   isAdmission,
   renderDocumentGoal,
@@ -48,8 +49,6 @@ import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
  * bug and is rethrown.
  */
 
-/** The form-memory orchestrator's step that runs the field-answer pipeline. */
-export const FORM_MEMORY_TARGET_STEP = 'target';
 /** One judged plan or answer set: a fresh observation beats a blind revise. */
 export const DECISION_ITERATIONS = 1;
 /**

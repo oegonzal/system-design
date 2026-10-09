@@ -21,12 +21,13 @@ import {
   type StepPlan,
   stopsOf,
   stopsOnPage,
+  FORM_MEMORY_TARGET_STEP,
 } from '@sysdesign/contracts';
 import { LoopRefused } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
 import { BrainFaulted, type StepInput } from '../../core/ports';
-import { FORM_MEMORY_TARGET_STEP, LoopBrain, toBrainFault } from './loop-brain';
+import { LoopBrain, toBrainFault } from './loop-brain';
 import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
 
 const PLAN: StepPlan = {

@@ -2,6 +2,7 @@ import type { PipelineSummary, SuccessCriterion } from '@sysdesign/contracts';
 import {
   FIELD_EVIDENCE_HEADING,
   FORM_MEMORY_STEP_REASONS,
+  FORM_MEMORY_TARGET_STEP,
   renderDocumentGoal,
   resumeChunk,
 } from '@sysdesign/contracts';
@@ -24,7 +25,7 @@ describe('the form-memory orchestrator', () => {
     expect(FORM_MEMORY.reasons).toBe(FORM_MEMORY_STEP_REASONS);
     expect(FORM_MEMORY.steps.map((step) => [step.id, step.pipeline, step.needs])).toEqual([
       ['recall', undefined, undefined],
-      ['target', 'field-answer', undefined],
+      [FORM_MEMORY_TARGET_STEP, 'field-answer', undefined],
     ]);
   });
 
@@ -82,7 +83,7 @@ describe('the form-memory orchestrator', () => {
     expect(asked[0].goal).toContain(FIELD_EVIDENCE_HEADING);
     expect(asked[0].goal).toContain('- [m1] ');
     expect(asked[0].criteria).toEqual(criteria);
-    expect(record.steps['target']).toMatchObject({
+    expect(record.steps[FORM_MEMORY_TARGET_STEP]).toMatchObject({
       status: 'complete',
       reason: null,
       runIds: ['field-answer-run'],

@@ -11,6 +11,7 @@ import {
   FORM_MEMORY_ORCHESTRATOR_ID,
   MISSION_FIXTURE,
   type StepPlan,
+  FORM_MEMORY_TARGET_STEP,
 } from '@sysdesign/contracts';
 import {
   BrowserDecision,
@@ -22,7 +23,7 @@ import {
 import { LoopClient } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
-import { FORM_MEMORY_TARGET_STEP, LoopBrain } from '../../adapters/loop-http/loop-brain';
+import { LoopBrain } from '../../adapters/loop-http/loop-brain';
 import type { SessionConfig } from '../../config';
 import {
   FakeBrowser,

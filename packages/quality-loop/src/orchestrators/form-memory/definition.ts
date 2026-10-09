@@ -9,6 +9,7 @@
  * its facts route to the operator.
  */
 import {
+  FORM_MEMORY_TARGET_STEP,
   FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
   FORM_MEMORY_STEP_REASONS,
@@ -40,6 +41,6 @@ export const FORM_MEMORY: OrchestratorDefinition<FormMemoryOutputs, FormMemoryPo
 
   steps: [
     { id: 'recall', run: recall },
-    { id: 'target', pipeline: FIELD_ANSWER_PIPELINE_ID, run: target },
+    { id: FORM_MEMORY_TARGET_STEP, pipeline: FIELD_ANSWER_PIPELINE_ID, run: target },
   ],
 };

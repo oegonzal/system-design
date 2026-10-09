@@ -13,6 +13,9 @@ export const FIELD_ANSWER_PIPELINE_ID = 'field-answer';
 /** Recalls facts for a form's fields without a model call, then runs the field-answer pipeline. */
 export const FORM_MEMORY_ORCHESTRATOR_ID = 'form-memory';
 
+/** The form-memory step that runs the field-answer pipeline: the run a session reads its answers from. */
+export const FORM_MEMORY_TARGET_STEP = 'target';
+
 /** Why the form-memory recall step skipped or failed — beyond the runner's own reasons. */
 export const FORM_MEMORY_STEP_REASONS = [
   'embeddings-disabled',
