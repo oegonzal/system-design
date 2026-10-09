@@ -24,6 +24,7 @@ export * from './entities/quality-run-finding.entity';
 export * from './entities/quality-run-iteration.entity';
 export * from './entities/quality-run.entity';
 export * from './entities/star-story.entity';
+export * from './migrator';
 export * from './orm.options';
 export * from './revision-factory';
 export * from './testing/ensure-database';

@@ -2,6 +2,7 @@ import { join } from 'path';
 import { Migrator } from '@mikro-orm/migrations';
 import { defineConfig } from '@mikro-orm/postgresql';
 
+import { migratorSettings } from './src/migrator';
 import { ormOptions } from './src/orm.options';
 
 /**
@@ -20,13 +21,8 @@ export default defineConfig({
 
   extensions: [Migrator],
 
-  migrations: {
-    path: join(__dirname, 'src/migrations'),
-    tableName: 'mikro_orm_migrations',
-    transactional: true,
-    allOrNothing: true,
-    snapshot: false,
-  },
+  // The workspace root is two levels up; the folder and table are declared once, in `src/migrator.ts`.
+  migrations: migratorSettings(join(__dirname, '..', '..')),
 
   debug: true,
 });

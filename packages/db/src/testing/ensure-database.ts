@@ -5,6 +5,7 @@ import { MikroORM } from '@mikro-orm/postgresql';
 import { Client } from 'pg';
 
 import { connectionSettings } from '../connection';
+import { migratorSettings } from '../migrator';
 import { ormOptions } from '../orm.options';
 import { assertTestDatabase } from './test-database';
 
@@ -49,13 +50,8 @@ async function createAndMigrate(connection: ReturnType<typeof connectionSettings
     ...ormOptions,
     ...connection,
     extensions: [Migrator],
-    migrations: {
-      path: join(__dirname, '../migrations'),
-      tableName: 'mikro_orm_migrations',
-      transactional: true,
-      allOrNothing: true,
-      snapshot: false,
-    },
+    // The same migrator settings the CLI applies; the workspace root is four levels up.
+    migrations: migratorSettings(join(__dirname, '..', '..', '..', '..')),
   });
   try {
     await orm.migrator.up();

@@ -9,6 +9,8 @@ pnpm db:migrate:create          # scaffold the next migration (then rewrite it a
 DB_NAME=sysdesign_test_<lane> pnpm db:migrate   # a test lane; `ensureDatabase()` does this for specs
 ```
 
+Where the migrations live and which table records them is declared once, in `src/migrator.ts`: the CLI and `ensureDatabase()` apply them with `migratorSettings`, and an app that must not run against a database behind its checkout calls `assertMigrated(em)` before it touches a row — the browser session does, and refuses with the migrations to apply.
+
 Conventions: a status column is `text` with a `@Check` built from an `as const satisfies` copy of the contracts vocabulary, so a word added to `@sysdesign/contracts` fails compilation here until the check is widened by a migration. Ids the quality loop mints are `varchar(80)` columns, never foreign keys — the loop is another service that sweeps its own rows. Specs that touch Postgres call `ensureDatabase()` first and empty tables only through `truncateTestTables`.
 
 ## Browser session ledger

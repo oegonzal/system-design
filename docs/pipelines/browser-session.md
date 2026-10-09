@@ -17,6 +17,10 @@ curl -s localhost:3003/pipelines | jq -r '.data[].id'        # lists browser-ste
 curl -s localhost:3003/health | jq .heartbeat                # the stale window the session's awaiting reads
 ```
 
+A session refuses to start against a database that has not applied every
+migration this checkout carries — exit 2, naming each one and the
+`pnpm db:migrate` that applies them — before the browser opens.
+
 ## 1. Facts before forms
 
 ```bash

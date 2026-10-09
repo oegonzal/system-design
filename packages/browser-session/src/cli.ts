@@ -7,13 +7,16 @@
  * `parseOptions` reads argv against the declared flags; `execute` runs the
  * options over the service and writes through `io`; `cli` loads the
  * configuration, boots the Nest context around them and exits by the result:
- * 2 for a usage or configuration problem, 1 for a failed session or an
- * unknown id, 0 otherwise — a session the rails or the operator stopped is 0.
+ * 2 for a usage or configuration problem — or a database that has not applied
+ * every migration this checkout carries — 1 for a failed session or an
+ * unknown id, 0 otherwise; a session the rails or the operator stopped is 0.
  */
 import { parseArgs } from 'node:util';
 
+import { EntityManager } from '@mikro-orm/postgresql';
 import { NestFactory } from '@nestjs/core';
 import type { SessionRailsDto } from '@sysdesign/contracts';
+import { assertMigrated } from '@sysdesign/db';
 
 import {
   DEFAULT_LIST_LIMIT,
@@ -40,12 +43,12 @@ export const USAGE = `usage: browser-session <command> [options]
   sessions  [${flag('limit')} n] [${flag('json')}]
   show      <id> [${flag('json')}]`;
 
-/** The commands, as data: what each takes as a positional. */
+/** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
-  run: { positionals: 0 },
-  login: { positionals: 0 },
-  sessions: { positionals: 0 },
-  show: { positionals: 1 },
+  run: { positionals: 0, ledger: true },
+  login: { positionals: 0, ledger: false },
+  sessions: { positionals: 0, ledger: true },
+  show: { positionals: 1, ledger: true },
 } as const;
 export type Command = keyof typeof COMMANDS;
 
@@ -200,6 +203,17 @@ export async function cli(argv: readonly string[]): Promise<number> {
     logger: ['error', 'warn'],
   });
   try {
+    // The tables this checkout reads and writes must be the tables the
+    // database has: one behind it stops here, naming the migrations to apply,
+    // before the browser opens or a row is touched.
+    if (COMMANDS[options.command].ledger) {
+      try {
+        await assertMigrated(app.get(EntityManager));
+      } catch (error) {
+        console.error(messageOf(error));
+        return 2;
+      }
+    }
     const service = app.get(SessionService);
     return await execute(options, service, {
       out: (text) => console.log(text),
