@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -12,12 +12,11 @@ import {
 } from '@sysdesign/contracts';
 
 /**
- * The goals are the only place a site may be named. These specs hold the
- * package to that, and hold each goal to the template the deriver personas
- * read by heading name.
+ * Each goal is held to the template the deriver personas read by heading
+ * name. That no site or line of work is named outside a goal is held across
+ * the engine by `tooling/site-words.spec.ts`.
  */
 const GOALS_DIR = join(__dirname, '..', 'goals');
-const SRC_DIR = __dirname;
 
 /** The headings the browser-step and field-answer derivers reference by name. */
 const TEMPLATE_HEADINGS = [
@@ -30,33 +29,13 @@ const TEMPLATE_HEADINGS = [
   '## Task events',
 ];
 
-/** The site names the shipped goals carry; none may appear under `src/`. */
-const SITE_WORDS = ['linkedin', 'duckduckgo'];
-
-const files = (dir: string): string[] =>
-  readdirSync(dir).flatMap((entry) => {
-    const path = join(dir, entry);
-    return statSync(path).isDirectory() ? files(path) : [path];
-  });
-
 const goals = readdirSync(GOALS_DIR)
   .filter((name) => name.endsWith('.md'))
   .map((name) => ({ name, text: readFileSync(join(GOALS_DIR, name), 'utf8') }));
 
 describe('the goals', () => {
-  it('[BRW-8] names no site anywhere under src — the mission lives in the goal and the same program runs any goal', () => {
-    const offenders = files(SRC_DIR)
-      .filter((path) => !path.endsWith('goals.spec.ts'))
-      .filter((path) => {
-        const text = readFileSync(path, 'utf8').toLowerCase();
-        return SITE_WORDS.some((word) => text.includes(word));
-      })
-      .map((path) => path.slice(SRC_DIR.length + 1));
-    expect(offenders).toEqual([]);
-    expect(goals.map((goal) => goal.name).sort()).toEqual([
-      'linkedin-easy-apply.md',
-      'smoke-search.md',
-    ]);
+  it('[BRW-8] are markdown files beside the program, at least one', () => {
+    expect(goals.length).toBeGreaterThan(0);
   });
 
   it.each(goals.map((goal) => [goal.name, goal.text] as const))(
