@@ -33,18 +33,11 @@ describe('the pipeline registry', () => {
     }
   });
 
-  it('[QL-62] [QL-46] every pipeline declares what a lost sample and a lost produce cost: a sample scores without gating, one produce is asked again', () => {
+  it('[QL-62] every pipeline declares what a lost produce costs: one produce is asked again', () => {
     for (const definition of PIPELINES.values()) {
-      expect([definition.id, definition.policy.evidence.lostSample]).toEqual([
-        definition.id,
-        'score-only',
-      ]);
       expect([definition.id, definition.policy.loop.lostProduces]).toEqual([definition.id, 1]);
       // What `GET /pipelines` and the dump carry says so too.
-      expect(describePipeline(definition).policy).toMatchObject({
-        evidence: { lostSample: 'score-only' },
-        loop: { lostProduces: 1 },
-      });
+      expect(describePipeline(definition).policy).toMatchObject({ loop: { lostProduces: 1 } });
     }
   });
 

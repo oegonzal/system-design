@@ -291,8 +291,8 @@ const isBlocker = (finding: ConfirmedFinding, policy: DecisionPolicy): boolean =
 
 /**
  * Whether enough samples saw an item for it to block. An item a lens
- * confirmed after losing a sample (`lostSample: 'score-only'`) carries fewer
- * hits than `minHits`: it prices like any other, and blocks nothing.
+ * confirmed after losing a sample carries fewer hits than `minHits`: it
+ * prices like any other, and blocks nothing.
  */
 const agreed = (item: { hits: number }, policy: DecisionPolicy): boolean =>
   item.hits >= policy.evidence.minHits;

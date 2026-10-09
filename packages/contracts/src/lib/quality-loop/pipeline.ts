@@ -1,11 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type {
-  AxisFactorLevel,
-  Corroboration,
-  GoalSource,
-  LostSamplePolicy,
-  Severity,
-} from './vocab';
+import type { AxisFactorLevel, Corroboration, GoalSource, Severity } from './vocab';
 
 /**
  * What a confirmed finding does to the items it names when a reader draws on
@@ -91,12 +85,14 @@ export interface DecisionPolicy {
   };
   blockingSeverities: readonly Severity[];
   evidence: {
-    /** Samples an item must recur in to count — and to block. */
+    /**
+     * Samples an item must recur in to count — and to block. A lens that lost
+     * a sample is held to the samples it has left: what they agree on is
+     * confirmed with the hits it has, so it scores, and blocks nothing.
+     */
     minHits: number;
     /** Share of criteria that must be assessed before a score means anything. */
     minAssessedShare: number;
-    /** What a lens sample that answered nothing does to agreement (`LOST_SAMPLE_POLICIES`). */
-    lostSample: LostSamplePolicy;
     /** What a blocker needs beyond agreement (`CORROBORATIONS`); `none` when undeclared. */
     corroboration?: Corroboration;
   };

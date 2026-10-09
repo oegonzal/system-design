@@ -151,7 +151,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
 
       ...STANDARD_SCORING,
 
-      evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
+      evidence: { minHits: 1, minAssessedShare: 0.75 },
 
       thresholds: { acceptAt: 75, rejectBelow: 30 },
 

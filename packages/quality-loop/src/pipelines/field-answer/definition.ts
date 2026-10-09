@@ -131,7 +131,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     // fields were answered right from memory. A severity word is the critic's
     // to choose; a gate is declared here.
     blockingSeverities: [],
-    evidence: { minHits: 1, minAssessedShare: 0.75, lostSample: 'score-only' },
+    evidence: { minHits: 1, minAssessedShare: 0.75 },
     thresholds: { acceptAt: 70, rejectBelow: 30 },
     // One iteration: the caller reads the judged page field by field.
     loop: { maxIterations: 1, plateauAfter: 1, concurrency: 3, lostProduces: 1 },

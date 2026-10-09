@@ -246,7 +246,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
     // Two samples on every lens and two hits to confirm: a constraint
     // violation gates, and one sample must never be able to block a run.
-    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
+    evidence: { minHits: 2, minAssessedShare: 0.75 },
 
     thresholds: { acceptAt: 75, rejectBelow: 30 },
 

@@ -2,13 +2,7 @@
  * `validatePolicy` refuses a malformed decision policy (the shape lives in
  * `@sysdesign/contracts`) before it can grade anything.
  */
-import {
-  AXIS_FACTOR_LEVELS,
-  CORROBORATIONS,
-  LOST_SAMPLE_POLICIES,
-  SEVERITIES,
-  WITHHOLDINGS,
-} from '@sysdesign/contracts';
+import { AXIS_FACTOR_LEVELS, CORROBORATIONS, SEVERITIES, WITHHOLDINGS } from '@sysdesign/contracts';
 import type { DecisionPolicy } from '@sysdesign/contracts';
 
 import { sum } from './arithmetic';
@@ -147,9 +141,6 @@ function checkPricing(policy: DecisionPolicy, fail: Fail): void {
 function checkLoop(policy: DecisionPolicy, fail: Fail): void {
   if (!(policy.evidence.minHits >= 1)) fail('evidence.minHits must be ≥ 1');
   if (!inUnit(policy.evidence.minAssessedShare)) fail('evidence.minAssessedShare must be in [0,1]');
-  if (!(LOST_SAMPLE_POLICIES as readonly string[]).includes(policy.evidence.lostSample)) {
-    fail(`evidence.lostSample must be one of ${LOST_SAMPLE_POLICIES.join(', ')}`);
-  }
   const { corroboration } = policy.evidence;
   if (
     corroboration !== undefined &&

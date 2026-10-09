@@ -239,7 +239,7 @@ export const KNOWLEDGE_DIGEST: PipelineDefinition<KnowledgeDigest> = {
     // samples of a critic to agree before an item is withheld.
     // A lost sample scores and never gates, and one lost produce is asked
     // again — as the sibling digests declare.
-    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
+    evidence: { minHits: 2, minAssessedShare: 0.75 },
     thresholds: { acceptAt: 75, rejectBelow: 30 },
     loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
   },

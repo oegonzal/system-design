@@ -396,7 +396,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-46',
     statement:
-      "A lost sample scores but cannot gate: under the declared score-only policy a lens that lost a sample confirms what the samples it has left agree on, with the hits it really has, so the item is priced like any other — and since fewer samples saw it than the policy's agreement asks, no finding or criterion short of that agreement ever blocks; a lens that lost nothing is held to the full agreement; the lost sample keeps the faults its reply was refused for; and every pipeline declares what a lost sample and a lost produce do, checked when it boots.",
+      "A lost sample scores but cannot gate: a lens that lost a sample confirms what the samples it has left agree on, with the hits it really has, so the item is priced like any other — and since fewer samples saw it than the policy's agreement asks, no finding or criterion short of that agreement ever blocks; a lens that lost nothing is held to the full agreement; and the lost sample keeps the faults its reply was refused for.",
   },
   {
     id: 'QL-47',

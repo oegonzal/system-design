@@ -46,10 +46,6 @@ describe('validatePolicy', () => {
       { confidenceWeights: { none: 0, low: 0.9, medium: 0.5, high: 1 } },
     ],
     [
-      'a lost-sample policy it does not know',
-      { evidence: { ...tinyPolicy().evidence, lostSample: 'ignore' as never } },
-    ],
-    [
       'a contradicted discount where no finding is ever contradicted',
       { penalties: { ...tinyPolicy().penalties, contradicted: 0.5 } },
     ],

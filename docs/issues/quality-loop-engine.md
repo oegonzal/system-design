@@ -56,10 +56,8 @@ memory-runs, not judged by feel.
 
 **Status** closed · **Closed by** `a0d2145 feat(quality-loop): the engine keeps work` and `8af8916 feat(llm): the seam salvages` (SEAM-2) · **Where** `core/evidence/normalize.ts` (criteria agreement), the `evidence` policy of `memory-recall`, `experience-digest`, `agentic-design`
 
-**Closed.** Every pipeline declares what a lost sample does
-(`evidence.lostSample`, `score-only` on all of them, checked at boot). Under
-`score-only` a lens that lost a sample confirms what its remaining samples
-agree on, with the hits they really have, so the item is priced like any
+**Closed.** A lost sample scores but cannot gate, for every pipeline: a lens
+that lost a sample confirms what its remaining samples agree on, with the hits they really have, so the item is priced like any
 other — and since fewer samples saw it than `minHits` asks, nothing short of
 that agreement blocks (`controllers/context.ts` counts only items with
 `hits >= minHits` toward a gate). A lens that lost nothing is held to the

@@ -205,7 +205,6 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
     evidence: {
       minHits: 1,
       minAssessedShare: 0.75,
-      lostSample: 'score-only',
       corroboration: 'cited',
     },
     thresholds: { acceptAt: 70, rejectBelow: 30 },

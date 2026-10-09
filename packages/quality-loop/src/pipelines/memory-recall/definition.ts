@@ -171,7 +171,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
     ...STANDARD_SCORING,
     // Two samples everywhere and two hits to confirm: a reject for
     // `no_usable_memory` needs both samples of a critic to agree.
-    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
+    evidence: { minHits: 2, minAssessedShare: 0.75 },
     thresholds: { acceptAt: 75, rejectBelow: 30 },
     loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
   },

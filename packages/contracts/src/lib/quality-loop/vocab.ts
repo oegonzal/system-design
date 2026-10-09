@@ -64,15 +64,6 @@ export const DIAGNOSTIC_DEGRADES = {
   refounded: false,
 } as const satisfies Record<DiagnosticReason, boolean>;
 
-/**
- * What a lens's lost sample does to agreement. `score-only`: what the samples
- * that answered agree on is confirmed with the hits it has — it scores, but
- * fewer than `minHits` samples saw it, so it cannot block. `discard`: the
- * policy's `minHits` stands, so one lost sample can silence its lens.
- */
-export const LOST_SAMPLE_POLICIES = ['score-only', 'discard'] as const;
-export type LostSamplePolicy = (typeof LOST_SAMPLE_POLICIES)[number];
-
 /** Why the loop ended — the runner's reason, distinct from the last decision. */
 export const STOP_REASONS = [
   'accepted',

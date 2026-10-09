@@ -205,7 +205,7 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
 
     // Two samples everywhere and two hits to confirm: three finding types gate
     // here, and one sample should never be able to block a run on its own.
-    evidence: { minHits: 2, minAssessedShare: 0.75, lostSample: 'score-only' },
+    evidence: { minHits: 2, minAssessedShare: 0.75 },
 
     thresholds: { acceptAt: 75, rejectBelow: 30 },
 

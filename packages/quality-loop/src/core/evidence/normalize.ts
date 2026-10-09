@@ -4,11 +4,10 @@
  * conservative median, and reconciled so one shortfall is charged once. The
  * result carries ids, enums and counts only: the policy reads nothing else.
  *
- * Agreement is counted against the samples a lens still has. Under the
- * policy's `lostSample: 'score-only'`, a lens that lost a sample confirms what
- * every sample it has left agrees on, with the hits it really has: the item
- * scores, and since fewer than `minHits` samples saw it, the controller never
- * lets it block. Under `discard`, `minHits` stands whatever was lost.
+ * Agreement is counted against the samples a lens still has. A lens that lost
+ * a sample confirms what every sample it has left agrees on, with the hits it
+ * really has: the item scores, and since fewer than `minHits` samples saw it,
+ * the controller never lets it block.
  */
 import {
   DIAGNOSTIC_DEGRADES,
@@ -95,12 +94,12 @@ const tally = (counts: Map<string, number>, lens: string): void => {
 
 /**
  * The agreement each lens is held to. A lens that lost no sample is held to
- * `minHits`, however many it answered with; under `score-only`, one that lost
- * a sample — it should have answered and did not — is held to the samples it
- * has left. Only a sample's own diagnostic says it was lost.
+ * `minHits`, however many it answered with; one that lost a sample — it
+ * should have answered and did not — is held to the samples it has left.
+ * Only a sample's own diagnostic says it was lost.
  */
 function thresholdOf<T>(input: NormalizeInput<T>, policy: DecisionPolicy): Threshold {
-  const { minHits, lostSample } = policy.evidence;
+  const { minHits } = policy.evidence;
   const answered = new Map<string, number>();
   const lost = new Map<string, number>();
   const outcomes: { lens: string | null; outcome: LensOutcome<unknown> }[] = [
@@ -114,9 +113,7 @@ function thresholdOf<T>(input: NormalizeInput<T>, policy: DecisionPolicy): Thres
     }
   }
   return (lens) =>
-    lostSample === 'score-only' && (lost.get(lens) ?? 0) > 0
-      ? Math.max(1, Math.min(minHits, answered.get(lens) ?? 0))
-      : minHits;
+    (lost.get(lens) ?? 0) > 0 ? Math.max(1, Math.min(minHits, answered.get(lens) ?? 0)) : minHits;
 }
 
 const knownIn = <T>(input: NormalizeInput<T>): Known => ({

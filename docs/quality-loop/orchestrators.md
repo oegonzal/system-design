@@ -586,7 +586,7 @@ end. Only a structural fault — a wrong type, a missing field, an unknown id or
 required string — refuses the reply, and the next attempt within the same call is told each fault,
 with the reply as written when it is at most 60,000 characters. A turn that ended without a result
 is still read from what it streamed. A lens sample that is lost scores but cannot gate
-(`evidence.lostSample: 'score-only'`): what the lens's other sample saw is priced with the hits it
+(`thresholdOf` in `core/evidence/normalize.ts`): what the lens's other sample saw is priced with the hits it
 really has, and nothing short of the policy's agreement blocks. Every stage is told this rule, and
 the HTTP edge measures a goal in bytes, as the engine does.
 
