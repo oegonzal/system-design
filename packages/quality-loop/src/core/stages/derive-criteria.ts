@@ -44,11 +44,12 @@ export function createCriteriaDeriver<T>(
     // Boot refuses a pipeline whose fixed criteria leave no room, so this is ≥ 1.
     const room = task.maxCriteria - fixed.length;
     const goalText = goalSection(goal);
+    const fixedSection = fixedCriteriaSection(fixed);
     const reply = await asDetailed(llm).completeStructuredDetailed({
       system: systemPrompt('criteria', spec.persona),
       user: joinSections(
         kindsSection(task.criterionKinds),
-        ...(fixedCriteriaSection(fixed) === null ? [] : [fixedCriteriaSection(fixed)!]),
+        ...(fixedSection === null ? [] : [fixedSection]),
         goalText.text,
       ),
       schema: criteriaSchema(kinds, room, criterionLengthBound(task)),
