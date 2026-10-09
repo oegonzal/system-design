@@ -81,7 +81,7 @@ export type DocumentChunk = z.infer<typeof documentChunkSchema>;
 export const DOCUMENT_RULES: readonly string[] = [
   'A memory states one fact the cited sections state about the subject, and nothing they do not.',
   'An insight is a complete statement a form field could take or compute from: absolute dates and figures, names as the document spells them, the subject named.',
-  'An appliesWhen names the situation a form puts the applicant in — the field or question that calls for the fact.',
+  'An appliesWhen names the situation a form puts the subject in — the field or question that calls for the fact.',
   "Where a cited section qualifies a claim — reported rather than audited, a design, a learning exercise or a planned project, an interpretation — the insight carries that qualifier in the section's own words; a section that states a fact plainly needs none.",
 ];
 

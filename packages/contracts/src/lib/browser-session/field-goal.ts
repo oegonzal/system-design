@@ -103,9 +103,9 @@ export const fieldIndexSchema = z.strictObject({
 export type FieldIndex = z.infer<typeof fieldIndexSchema>;
 
 export const FIELDS_HEADING = '## Fields to answer';
-export const FIELD_EVIDENCE_HEADING = '## Evidence about the applicant';
+export const FIELD_EVIDENCE_HEADING = '## Evidence about the subject';
 const NO_EVIDENCE =
-  '(none recalled: answer nothing about the applicant from memory; route such fields to the operator)';
+  '(none recalled: answer nothing about the subject from memory; route such fields to the operator)';
 
 export function renderFieldLine(field: FieldSpec): string {
   const parts = [field.ref, `${field.role} ${quoted(field.name)}`];
@@ -151,7 +151,7 @@ export function composeFieldGoal(input: FieldGoalInput, budget = GOAL_BUDGET_BYT
     '',
     '- Answer every listed field exactly once, by its ref, in the order listed.',
     "- A value stays within the field's character limit; a selectable field takes one of its listed options, or where the list counts more the page offers, one of those verbatim; a number field takes a number.",
-    '- A field the page hides is left blank. A value about the applicant rests only on listed evidence, cited by alias; with no evidence for it, ask the operator.',
+    '- A field the page hides is left blank. A value about the subject rests only on listed evidence, cited by alias; with no evidence for it, ask the operator.',
     '- Validators check these limits; they are not criteria.',
     '',
     renderIndexSection(indexOf(input)),

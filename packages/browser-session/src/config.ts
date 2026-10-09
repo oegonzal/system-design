@@ -52,7 +52,7 @@ export const SESSION_ENV = {
   loopUrl: { name: 'QUALITY_LOOP_URL', fallback: 'http://localhost:3003' },
   dumpDir: { name: 'BROWSER_SESSION_DUMP_DIR', fallback: 'static/sessions' },
   profilesDir: { name: 'BROWSER_PROFILES_DIR', fallback: 'static/browser-profiles' },
-  subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the applicant' },
+  subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the subject' },
 } as const;
 
 /**
@@ -61,7 +61,7 @@ export const SESSION_ENV = {
  *
  * Twelve hours of wall clock, because a session is a long errand and not a
  * demonstration: one page is one brain call, which runs one to three minutes,
- * so an hour buys twenty or thirty pages — less than one job application of
+ * so an hour buys twenty or thirty pages — less than one unit of work of
  * any depth. The clock is a backstop against a session nobody is watching,
  * not a budget anybody should plan against; what ends a working session is
  * closing the units of work it was given.

@@ -1,5 +1,5 @@
 /**
- * The form-memory orchestrator: recall facts about the applicant for the
+ * The form-memory orchestrator: recall facts about the subject for the
  * fields of one form page without a model call, then answer the fields over
  * them. Two steps over one registered pipeline, declared here as data; the
  * adapters beside it are the only code. It chooses its own pipeline, so a
@@ -31,7 +31,7 @@ export const FORM_MEMORY: OrchestratorDefinition<FormMemoryOutputs, FormMemoryPo
   id: FORM_MEMORY_ORCHESTRATOR_ID,
   version: '1.0.0',
   description:
-    'Recall facts about the applicant for the fields of one form page without a model call, then answer the fields over them.',
+    'Recall facts about the subject for the fields of one form page without a model call, then answer the fields over them.',
   takesTarget: false,
   reasons: FORM_MEMORY_STEP_REASONS,
   refuse: refuseNonForm,

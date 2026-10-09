@@ -22,7 +22,7 @@ Every flag and variable is declared once in `src/config.ts`, with its default; n
 | `QUALITY_LOOP_URL`         | `http://localhost:3003`   | the loop the session asks                                                                                  |
 | `BROWSER_SESSION_DUMP_DIR` | `static/sessions`         | where session dumps are written                                                                            |
 | `BROWSER_PROFILES_DIR`     | `static/browser-profiles` | where persistent Chrome profiles live, one folder per `--profile` name — never commit them                 |
-| `BROWSER_SESSION_SUBJECT`  | `the applicant`           | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
+| `BROWSER_SESSION_SUBJECT`  | `the subject`             | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
 
 Rails (`--max-tasks 10`, `--max-minutes 720`, `--max-failures 3`, `--max-stalled-steps 3`; brain faults are capped at 3) are the engine's only decisions of its own. The browser is headed unless `--headless` is given.
 

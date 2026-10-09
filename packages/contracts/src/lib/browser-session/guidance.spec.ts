@@ -25,7 +25,7 @@ const item = (overrides: Partial<OperatorGuidanceDto> = {}): OperatorGuidanceDto
 describe('guidance', () => {
   it('[QL-40] renders one answer as one section that names the field, the question, the unit of work and the day', () => {
     expect(renderGuidanceSection(item())).toBe(
-      'Form field "Years of experience with Python" — Whole years, professional only. on an application for Senior Engineer at Acme (Additional questions), 2026-10-02: the operator answered "6".',
+      'Form field "Years of experience with Python" — Whole years, professional only. in the unit of work "Senior Engineer at Acme" (Additional questions), 2026-10-02: the operator answered "6".',
     );
     expect(
       renderGuidanceSection(

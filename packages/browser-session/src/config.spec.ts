@@ -27,7 +27,7 @@ describe('the session configuration', () => {
       loopUrl: 'http://localhost:3003',
       dumpDir: 'static/sessions',
       profilesDir: 'static/browser-profiles',
-      subject: 'the applicant',
+      subject: 'the subject',
     });
     expect(
       sessionConfigFromEnv({

@@ -1,6 +1,6 @@
 /**
  * What a form recall searches with, and what it makes of what comes back —
- * pure of every port. A field's label is a question an applicant is asked,
+ * pure of every port. A field's label is a question the subject is asked,
  * and a stored fact's condition is written as that very question
  * (`appliesWhen`), so the label is the probe: no model is asked to derive
  * one. Each field's hits are fused on their own, then the fields' lists are

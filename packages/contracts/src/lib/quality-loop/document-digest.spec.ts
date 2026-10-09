@@ -20,7 +20,7 @@ import { z } from 'zod';
  * that growing it is a decision someone makes rather than a side effect they
  * ship; every byte here is a byte of content a chunk cannot carry.
  */
-const FIXED_GOAL_BYTES = 1573;
+const FIXED_GOAL_BYTES = 1571;
 /** The smallest `--chunk-bytes` worth packing to; below half of it a chunk is mostly instructions. */
 const MIN_SENSIBLE_CHUNK_BYTES = 3200;
 
@@ -62,7 +62,8 @@ describe('renderDocumentGoal', () => {
     // ingester packs against. Measured 2026-10-03: the fourth rule and the
     // per-memory kind line together grew this from roughly 950 to 1573, which is
     // 26% of the ingester's default 6000 and cost about 12% more chunks per
-    // document. That was bought deliberately. What was missing is anything
+    // document. That was bought deliberately. (1571 since 2026-10-08, when a
+    // rule's role word gave way to "the subject".) What was missing is anything
     // noticing the next one — a rule or kind added without updating this number
     // surfaces as an unexplained rise in ingest cost, somewhere that does not
     // name the cause.

@@ -171,8 +171,9 @@ function elementLines(observation: PageObservation, marks: readonly Mark[]): str
   const reachable = elements.filter((element) => element.visible && inScope(element, activeScope));
   const unlisted = elements.length - reachable.length;
   return [
-    // What is not listed inside the dialog may be behind it: a unit closed on
-    // "the pane shows no Easy Apply button" while the dialog hid the pane.
+    // What is not listed inside the dialog may be behind it. A unit was once
+    // closed because a control seemed to be missing, when the open dialog was
+    // only hiding it.
     ...(activeScope === null
       ? []
       : [

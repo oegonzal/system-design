@@ -1,6 +1,6 @@
 /**
  * The browser session's answerer: every field of one form page, answered
- * from the evidence the goal lists about the applicant, routed to the
+ * from the evidence the goal lists about the subject, routed to the
  * operator, or left blank by rule — judged once. The goal is composed by the
  * session and recomposed by the form-memory orchestrator with the recalled
  * evidence in it; the artifact is the answers the session routes field by
@@ -35,12 +35,12 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
   // A goal another program composes; never a route, a target, or a choice in the UI.
   goalSource: 'composed',
   description:
-    "Every field of one form page answered about an applicant from the evidence the goal lists, judged for resting on that evidence, for honouring the mission's answering policy and traps, and for settling every field.",
+    "Every field of one form page answered about its subject from the evidence the goal lists, judged for resting on that evidence, for honouring the mission's answering policy and traps, and for settling every field.",
 
   task: {
     criterionKinds: {
       grounding:
-        'A value about the applicant must rest on listed evidence, cited by alias; a field no evidence settles is asked of the operator.',
+        'A value about the subject must rest on listed evidence, cited by alias; a field no evidence settles is asked of the operator.',
       compliance:
         "A line of the mission's answering policy or its never-do list the answers must honour: a hidden field left blank, a bot question never answered, nothing invented.",
       coverage:
@@ -48,7 +48,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     },
     findingTypes: {
       ungrounded:
-        'A value about the applicant that no cited evidence states, or that rests on no evidence at all.',
+        'A value about the subject that no cited evidence states, or that rests on no evidence at all.',
       inconsistent:
         'Two answers that cannot both be true, or a value that contradicts the evidence it cites.',
       trap_answered:

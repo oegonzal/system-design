@@ -54,7 +54,7 @@ const day = (at: IsoDateString): string => at.slice(0, 10);
 /** One answer as a section the digest can cite. */
 export function renderGuidanceSection(item: OperatorGuidanceDto): string {
   const where =
-    item.context.taskLabel === null ? '' : ` on an application for ${item.context.taskLabel}`;
+    item.context.taskLabel === null ? '' : ` in the unit of work "${item.context.taskLabel}"`;
   const page = item.context.page === null ? '' : ` (${item.context.page})`;
   const question = item.field.question === null ? '' : ` — ${item.field.question}`;
   const options = item.field.options === null ? '' : `, offering ${item.field.options.join(' | ')}`;

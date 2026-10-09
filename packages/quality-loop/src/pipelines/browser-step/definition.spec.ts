@@ -128,7 +128,7 @@ describe('the browser-step pipeline', () => {
     expect(rendered).toContain(
       '[action.2] click e3 — open the first listing — expect: the listing detail',
     );
-    expect(rendered).toContain('[action.3] askFields e1, e2 — questions about the applicant');
+    expect(rendered).toContain('[action.3] askFields e1, e2 — questions about the subject');
     expect(stepPlanOutput.schema.safeParse(plan).success).toBe(true);
   });
 

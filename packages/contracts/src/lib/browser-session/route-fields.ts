@@ -20,7 +20,7 @@ import type { BrowserDecisionSource, FieldRoute } from './vocab';
  * The positions of a positional artifact that something pointed at, for a
  * caller that must leave every one of them alone — every validator's problem
  * and, when asked, every confirmed finding, blocking or not. A field writes
- * the applicant's own words into someone's form, so it is left alone wherever
+ * the subject's own words into someone's form, so it is left alone wherever
  * ANY judge pointed; the costs are not symmetric with a plan's, and neither
  * is the rule.
  */

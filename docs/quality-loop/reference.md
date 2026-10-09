@@ -372,7 +372,7 @@ several times over, `reconcileStep` reads those runs and reports where they disa
 | `router`          | classify, judge               | You have a brief and do not want to choose the pipeline yourself.             |
 | `calibration`     | panel, reconcile              | You want to measure end-to-end variance before trusting a score.              |
 | `second-opinion`  | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree. |
-| `form-memory`     | recall, target                | A form page needs the applicant's facts before it is answered.                |
+| `form-memory`     | recall, target                | A form page needs the subject's facts before it is answered.                  |
 | `document-memory` | digest, store                 | A document chunk should become facts about its subject.                       |
 
 `memory/` and `knowledge/` are the largest. In `memory/`, `recall/` builds the query, fuses the hits

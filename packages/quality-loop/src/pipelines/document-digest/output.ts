@@ -72,7 +72,7 @@ export const documentDigestSchema = z.strictObject({
       appliesWhen: bounded.text(LESSON_APPLIES_WHEN_BOUND, {
         min: 1,
         description:
-          'The form situation that calls for the fact — the field or question an applicant would be asked.',
+          'The form situation that calls for the fact — the field or question the subject would be asked.',
       }),
     }),
   ),

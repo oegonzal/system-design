@@ -1,6 +1,6 @@
 # Mission
 
-Run one web search on a public site and confirm that results appear. This is a smoke test of the session itself: it proves that the browser opens, that pages are observed, that a plan is decided and carried out, and that the session ends by its own stop condition. Nothing about the applicant is asked or answered.
+Run one web search on a public site and confirm that results appear. This is a smoke test of the session itself: it proves that the browser opens, that pages are observed, that a plan is decided and carried out, and that the session ends by its own stop condition. No form is answered.
 
 ## Unit of work
 
@@ -15,7 +15,7 @@ One search: from the search box to a page of results. taskStart fires when the s
 
 ## Answering policy
 
-Fill no field but the search box. There is no applicant here: any other field, visible or hidden, is left alone, and a form that asks about a person routes every field to the operator.
+Fill no field but the search box: any other field, visible or hidden, is left alone, and a form that asks about a person routes every field to the operator.
 
 ## Stop conditions
 
