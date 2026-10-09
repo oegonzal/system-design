@@ -25,7 +25,8 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
  * whether it touches the element it cites (a touch on a disabled, hidden or
  * unreachable element fails in the browser), what it can do to the page
  * (`replaces` it for certain; `may-change` it; nothing), whether it claims
- * something the page shows, and whether it ends the plan. Every list the
+ * something the page shows, whether it ends the plan, and whether it ends the
+ * session. Every list the
  * validators read is derived from here, so a new kind declares its effects
  * once and no rule has to be told about it. A wait is `none` by kind: a wait
  * for a URL or for text is its own declaration that the page will change
@@ -44,16 +45,29 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
 export interface ActionEffects {
   readonly touches: boolean;
   readonly page: 'none' | 'may-change' | 'replaces';
+  /** It asserts something the page shows. */
   readonly claims: boolean;
+  /** It ends the plan: nothing may follow it. */
   readonly terminal: boolean;
+  /**
+   * It ends the session — the one action no next observation can check, so a
+   * plan carrying one runs only when the loop accepted it.
+   */
+  readonly endsSession: boolean;
 }
 
+/** An action's effects: what it touches and does to the page, and by name the ones few actions have. */
 const effects = (
   touches: boolean,
   page: ActionEffects['page'],
-  claims = false,
-  terminal = false,
-): ActionEffects => ({ touches, page, claims, terminal });
+  otherEffects: Partial<Pick<ActionEffects, 'claims' | 'terminal' | 'endsSession'>> = {},
+): ActionEffects => ({
+  touches,
+  page,
+  claims: otherEffects.claims ?? false,
+  terminal: otherEffects.terminal ?? false,
+  endsSession: otherEffects.endsSession ?? false,
+});
 
 export const ACTION_EFFECTS = {
   navigate: effects(false, 'replaces'),
@@ -65,10 +79,10 @@ export const ACTION_EFFECTS = {
   waitFor: effects(false, 'none'),
   screenshot: effects(false, 'none'),
   askFields: effects(true, 'may-change'),
-  taskStart: effects(false, 'none', true),
-  taskDone: effects(false, 'none', true),
-  terminate: effects(false, 'none', true, true),
-  done: effects(false, 'none', false, true),
+  taskStart: effects(false, 'none', { claims: true }),
+  taskDone: effects(false, 'none', { claims: true }),
+  terminate: effects(false, 'none', { claims: true, terminal: true, endsSession: true }),
+  done: effects(false, 'none', { terminal: true }),
 } as const satisfies Record<StepActionKind, ActionEffects>;
 
 const kindsWhere = (holds: (effect: ActionEffects) => boolean): readonly StepActionKind[] =>
@@ -106,7 +120,7 @@ export const TERMINAL_ACTION_KINDS = kindsWhere((effect) => effect.terminal);
  */
 export const MUTATING_ACTION_KINDS = kindsWhere((effect) => effect.page !== 'none');
 
-/** The terminal actions that claim something the page shows; `done` claims nothing. */
+/** The actions that claim something the page shows — a unit opened or closed, a stop reached; `done` claims nothing. */
 export const CLAIMING_ACTION_KINDS = kindsWhere((effect) => effect.claims);
 
 export const PRESS_KEYS = [

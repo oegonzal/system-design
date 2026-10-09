@@ -16,6 +16,7 @@ import type { IterationTrace } from '../quality-loop/decision';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import type { QualityRunDto } from '../quality-loop/runs';
 import type { StepObjection } from './observation.schema';
+import { ACTION_EFFECTS } from './action-effects';
 import { ACTION_LOCATION, actionLocation, positionOf } from './pipelines';
 import { bestIterationOf } from './read-back';
 import { stepPlanSchema, type StepPlan } from './step-plan.schema';
@@ -185,24 +186,22 @@ const notExecutable = (
 });
 
 /**
- * A plan runs when the loop accepted it with its policy gate open and no
- * judge objected to the plan as a whole; then only up to the first action a
- * confirmed finding or a validation problem names.
+ * How much of a plan the session runs. The deterministic objections and the
+ * rails decide what the browser does, not the score — the owner's directive:
  *
- * Two readings of one decision, by declared policy. A plan something cut at a
- * position runs up to that position whatever the score, because the actions
- * before the cut were judged on this page and nobody objected to them. A plan
- * nothing cut runs whole whatever the score too — a plan is work the session
- * does, and a move's only check is the page it leads to — except a `terminate`
- * ends the session and only the judges verify it, so a terminate the loop did
- * not accept is held back, as is a plan the evidence gate found under-judged.
- * Both readings are the owner's directive that the deterministic objections
- * and the rails, not the score, decide what the browser does; the score gates
- * the one irreversible action and the verdict recorded. Measured 2026-10-08:
- * ten recorded sessions died on about:blank because the opening `navigate`
- * scored below the bar and was refused, so the page never loaded; and holding
- * a terminate to the bar is what still refuses a `terminate mission-complete`
- * a full page did not earn.
+ * - a blocker that names the plan as a whole: nothing runs;
+ * - a blocker or validator at a position: the actions before it run, since
+ *   they were judged on this page and nobody objected to them — unless the
+ *   evidence gate found the plan under-judged, when nobody read them;
+ * - nothing cut: the whole plan runs, whatever the score, because a move's
+ *   only check is the page it leads to. Held to the accept bar are only a
+ *   plan carrying an action that ends the session (`ActionEffects.endsSession`
+ *   — the one move no next page can answer) and an under-judged plan.
+ *
+ * Measured 2026-10-08: ten recorded sessions died on about:blank because the
+ * opening `navigate` scored below the bar and was refused, so the page never
+ * loaded; and holding a terminate to the bar is what still refuses a
+ * `terminate mission-complete` a full page did not earn.
  */
 export function routePlan(run: QualityRunDto, step: number): PlanReadout {
   const best = bestIterationOf(run);
@@ -223,24 +222,8 @@ export function routePlan(run: QualityRunDto, step: number): PlanReadout {
     );
   }
   if (cut === null) {
-    // Nothing objected to this plan. A plan is work the session does, not a
-    // draft to grade: its actions run, and the next observation is the only
-    // check a move needs — a move that went wrong shows in the page it led
-    // to, and the rails bound a plan that moves and achieves nothing. Two
-    // things stay held to the accept bar, because neither is a move the page
-    // can answer: a `terminate` ENDS the session, so one the loop did not
-    // accept (a mission-complete the judges scored low) is handed back rather
-    // than run; and a plan the evidence gate found under-assessed had a
-    // prefix no lens read. Measured 2026-10-08: a correct opening `navigate`
-    // off about:blank scored 30 — its grounding criteria had nothing to
-    // ground and its one mission step read as not-yet-done — was refused for
-    // being below the bar, and the page never loaded, so the session died on
-    // the launchpad over three such steps; while `taskDone; terminate
-    // mission-complete` on a full results page was validator-clean, so
-    // holding a terminate to the bar is what keeps a false completion from
-    // ending the session.
     const accepted = run.trace?.finalDecision === 'accept';
-    const endsSession = plan.actions.some((action) => action.kind === 'terminate');
+    const endsSession = plan.actions.some((action) => ACTION_EFFECTS[action.kind].endsSession);
     const held = !accepted && (endsSession || !best.decision.gates.evidenceSufficient);
     return held
       ? notExecutable(
