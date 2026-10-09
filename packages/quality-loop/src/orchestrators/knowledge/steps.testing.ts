@@ -9,7 +9,7 @@ import type { MemoryContextDto, PipelineSummary, QualityRunDto } from '@sysdesig
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
 import { SYSTEM_DESIGN } from '../../pipelines/system-design/definition';
-import { describePipeline } from '../../core/pipeline';
+import { describePipeline } from '../../core/describe-pipeline';
 import {
   fakeEmbeddings,
   InMemoryEmbeddingCache,

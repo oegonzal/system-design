@@ -19,7 +19,9 @@ import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
-import { describePipeline, validatePipeline, type PipelineDefinition } from '../../core/pipeline';
+import { describePipeline } from '../../core/describe-pipeline';
+import { validatePipeline } from '../../core/validate-pipeline';
+import { type PipelineDefinition } from '../../core/pipeline';
 import type { AdvisoryMemory, RunListQuery, RunRepository, TraceStore } from '../../core/ports';
 import { rubricProblems } from '../../core/loop/rubric';
 import { runPipeline } from '../../core/loop/run-pipeline';

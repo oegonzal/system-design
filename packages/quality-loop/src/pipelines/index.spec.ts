@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { describePipeline, validatePipeline, type PipelineDefinition } from '../core/pipeline';
+import { describePipeline } from '../core/describe-pipeline';
+import { validatePipeline } from '../core/validate-pipeline';
+import { type PipelineDefinition } from '../core/pipeline';
 import { PIPELINES } from './index';
 
 /**

@@ -1,7 +1,8 @@
 import { boundsAgainstMeasured, modelSchema, parseLenient } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { describePipeline } from '../../core/describe-pipeline';
+import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
 import { MEMORY_RECALL } from './definition';
 import measured from './measured.json';

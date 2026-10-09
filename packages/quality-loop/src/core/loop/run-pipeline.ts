@@ -24,7 +24,8 @@ import type {
 import type { LlmClient } from '@sysdesign/llm';
 
 import type { RunProgress, TaskContract } from '../contracts';
-import { validatePipeline, type PipelineDefinition } from '../pipeline';
+import { validatePipeline } from '../validate-pipeline';
+import { type PipelineDefinition } from '../pipeline';
 import type { AdvisoryMemory, DerivedCriteria, ExchangeSink, Stages } from '../ports';
 import { rubricOverruns } from '../stages/derive-criteria';
 import { CRITERIA_STAGE, overrunDiagnostic } from '../stages/shared';

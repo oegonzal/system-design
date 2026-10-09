@@ -6,7 +6,8 @@ import {
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { describePipeline, validatePipeline } from '../../core/pipeline';
+import { describePipeline } from '../../core/describe-pipeline';
+import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import measured from './measured.json';

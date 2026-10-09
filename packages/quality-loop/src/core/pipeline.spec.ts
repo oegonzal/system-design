@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { criterionLengthBound } from './contracts';
-import { describePipeline, validatePipeline } from './pipeline';
+import { describePipeline } from './describe-pipeline';
+import { validatePipeline } from './validate-pipeline';
 import { tinyPipeline } from './testing';
 
 const asAny = (definition: ReturnType<typeof tinyPipeline>) => definition as never;

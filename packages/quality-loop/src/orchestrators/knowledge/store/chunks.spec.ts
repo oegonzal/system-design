@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { sampleRun, sampleTrace } from '../../../core/testing';
-import { describePipeline } from '../../../core/pipeline';
+import { describePipeline } from '../../../core/describe-pipeline';
 import { SYSTEM_DESIGN } from '../../../pipelines/system-design/definition';
 import { originOf } from '../../memory/store/index-memories';
 import type { KnowledgeToStore } from '../digest/read-knowledge-digest';

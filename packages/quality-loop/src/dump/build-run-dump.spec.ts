@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD } from '../core/controllers';
 import { runLoop } from '../core/loop/run-pipeline';
-import { describePipeline } from '../core/pipeline';
+import { describePipeline } from '../core/describe-pipeline';
 import {
   criterion,
   finding,

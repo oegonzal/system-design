@@ -1,7 +1,7 @@
 import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 import { composeController } from '../controllers';
-import { describePipeline } from '../pipeline';
+import { describePipeline } from '../describe-pipeline';
 import { DRAFT_1, fakeLlm, result, scriptedStages, tinyPipeline, tinyPolicy } from '../testing';
 import { runLoop, runPipeline } from './run-pipeline';
 
