@@ -61,6 +61,50 @@ describe('validatePipeline', () => {
     ).not.toThrow();
   });
 
+  it('[QL-1] holds every model-facing stage to a persona and a cap — a lens, the producer and the deriver alike', () => {
+    const base = tinyPipeline();
+    const refused: [string, Partial<ReturnType<typeof tinyPipeline>>, RegExp][] = [
+      [
+        'an empty lens persona',
+        { critics: [{ ...base.critics[0], persona: ' ' }] },
+        /lens .* has an empty persona/,
+      ],
+      [
+        'a lens with no room',
+        { evaluators: [{ ...base.evaluators[0], maxTokens: 0 }] },
+        /lens .* needs maxTokens/,
+      ],
+      [
+        'an empty producer persona',
+        { producer: { ...base.producer, persona: '' } },
+        /producer has an empty persona/,
+      ],
+      [
+        'a producer with no room',
+        { producer: { ...base.producer, maxTokens: 0 } },
+        /producer needs maxTokens/,
+      ],
+      [
+        'an empty producer ask',
+        { producer: { ...base.producer, instruction: ' ' } },
+        /producer instruction is empty/,
+      ],
+      [
+        'an empty deriver persona',
+        { deriveCriteria: { ...base.deriveCriteria, persona: '\n' } },
+        /deriveCriteria has an empty persona/,
+      ],
+      [
+        'a deriver with no room',
+        { deriveCriteria: { ...base.deriveCriteria, maxTokens: 0 } },
+        /deriveCriteria needs maxTokens/,
+      ],
+    ];
+    for (const [label, override, message] of refused) {
+      expect(() => validatePipeline(asAny(tinyPipeline(override))), label).toThrow(message);
+    }
+  });
+
   it('[QL-1] refuses a lens that could never reach minHits, a reserved id, and a duplicate id', () => {
     const base = tinyPipeline();
     expect(() =>

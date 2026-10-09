@@ -32,6 +32,12 @@ const describePipelineId = (definition: PipelineDefinition<unknown>): string =>
 type Fail = (message: string) => never;
 type Definition = PipelineDefinition<unknown>;
 
+/** A model-facing stage — a lens, the producer, the deriver — has a persona to speak from and room to answer. */
+function checkStage(name: string, stage: { persona: string; maxTokens: number }, fail: Fail): void {
+  if (!(stage.maxTokens >= 1)) fail(`${name} needs maxTokens ≥ 1`);
+  if (stage.persona.trim().length === 0) fail(`${name} has an empty persona`);
+}
+
 /** Every lens: a unique, unreserved id, enough samples to ever confirm anything, sane caps, a persona. */
 function checkLenses(definition: Definition, fail: Fail): void {
   const lenses = [...definition.critics, ...definition.evaluators];
@@ -46,8 +52,7 @@ function checkLenses(definition: Definition, fail: Fail): void {
         `lens ${lens.id} runs ${lens.samples} sample(s) but minHits is ${definition.policy.evidence.minHits}`,
       );
     }
-    if (!(lens.maxTokens >= 1)) fail(`lens ${lens.id} needs maxTokens ≥ 1`);
-    if (lens.persona.trim().length === 0) fail(`lens ${lens.id} has an empty persona`);
+    checkStage(`lens ${lens.id}`, lens, fail);
   }
   for (const critic of definition.critics) {
     if (!(critic.maxItems >= 1)) fail(`critic ${critic.id} needs maxItems ≥ 1`);
@@ -116,9 +121,15 @@ function checkWaves(definition: Definition, fail: Fail): void {
   }
 }
 
-/** The producer: briefed only with what the engine can brief it with, and asked in words when it declares its ask. */
+/**
+ * The producer and the deriver: each a persona and a cap; the producer briefed
+ * only with what the engine can brief it with, and asked in words when it
+ * declares its ask.
+ */
 function checkProducer(definition: Definition, fail: Fail): void {
   const { producer } = definition;
+  checkStage('producer', producer, fail);
+  checkStage('deriveCriteria', definition.deriveCriteria, fail);
   for (const briefing of producer.consumes) {
     if (!(PRODUCER_BRIEFING as readonly string[]).includes(briefing))
       fail(`producer consumes unknown briefing ${briefing}`);

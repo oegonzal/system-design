@@ -130,6 +130,14 @@ function checkPricing(policy: DecisionPolicy, fail: Fail): void {
   if (contradicted !== undefined && !inUnit(contradicted)) {
     fail('penalties.contradicted must be in [0,1]');
   }
+  // A finding is contradicted only where the policy holds findings to the
+  // criteria they cite; under any other corroboration no finding ever is, and
+  // the discount would be a number nothing reads.
+  if (contradicted !== undefined && policy.evidence.corroboration !== 'cited') {
+    fail(
+      "penalties.contradicted prices a contradicted finding, which only evidence.corroboration 'cited' names",
+    );
+  }
   if (policy.blockingSeverities.some((severity) => !SEVERITIES.includes(severity))) {
     fail('blockingSeverities names an unknown severity');
   }
