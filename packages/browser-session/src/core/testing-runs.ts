@@ -15,6 +15,7 @@ import {
   BrainFaulted,
   type BrainPort,
   type Decided,
+  type DerivedRubric,
   type FieldsInput,
   type StepInput,
 } from './ports';
@@ -72,10 +73,13 @@ export class ScriptedBrain implements BrainPort {
     this.answers = [...(script.answers ?? [])];
   }
 
-  async deriveRubric(pipeline: string, goal: string): Promise<SuccessCriterion[]> {
+  async deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
     if (this.script.deriveFault) throw this.script.deriveFault;
     this.derived.push({ pipeline, goal });
-    return (this.script.rubric ?? FAKE_RUBRIC).map((criterion) => ({ ...criterion }));
+    return {
+      criteria: (this.script.rubric ?? FAKE_RUBRIC).map((criterion) => ({ ...criterion })),
+      dumpRunId: `${pipeline}-criteria-dump`,
+    };
   }
 
   async planStep(input: StepInput): Promise<Decided<StepPlan>> {

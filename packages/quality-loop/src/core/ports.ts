@@ -16,6 +16,7 @@ import type {
   LensOutcome,
   ListQualityRunsQuery,
   LlmExchangeSummaryDto,
+  LlmModelDto,
   Overrun,
   PipelineSummary,
   ProduceMode,
@@ -31,6 +32,7 @@ import type {
   Withholding,
 } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
+import type { GitContext } from '@sysdesign/run-dump';
 
 import type { RunProgress, RunRecord, TaskContract } from './contracts';
 
@@ -195,8 +197,24 @@ export interface Stages<T> {
   controller: Controller;
 }
 
+/** One rubric derived alone (`POST /criteria`), as its dump records it. */
+export interface CriteriaDerivation {
+  runId: string;
+  pipeline: PipelineSummary;
+  goal: string;
+  criteria: SuccessCriterion[];
+  diagnostic: Diagnostic | null;
+  llm: LlmModelDto;
+  git: GitContext;
+  exchanges: LlmExchange[];
+  startedAt: string;
+  finishedAt: string;
+}
+
 export interface TraceStore {
   save(record: RunRecord, pipeline: PipelineSummary | null): void;
+  /** A derived rubric as a dump of its own: the folder's id, or null when the disk refused it. */
+  saveCriteria(derivation: CriteriaDerivation): string | null;
 }
 
 /** Where attributed model exchanges go — the dump collector, in production. */

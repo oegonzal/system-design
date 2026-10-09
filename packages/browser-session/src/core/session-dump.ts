@@ -14,7 +14,7 @@ import {
   type DumpFile,
 } from '@sysdesign/run-dump';
 
-import { causeOf, type DumpStore, type Termination } from './ports';
+import { causeOf, type DerivedRubric, type DumpStore, type Termination } from './ports';
 
 /**
  * The session dump: everything one session saw and decided, laid out the way
@@ -24,6 +24,7 @@ import { causeOf, type DumpStore, type Termination } from './ports';
  *
  * NOTE FOR READERS: these files contain the goal, page text and screenshots.
  */
+export const RUBRICS_FILE = '00-rubrics.json';
 export const STEPS_DIR = '01-steps';
 export const TASKS_FILE = '02-tasks.json';
 export const MANIFEST_FILE = 'manifest.json';
@@ -49,6 +50,16 @@ const withNewline = (text: string): string =>
 export const stepDir = (step: number): string => `${STEPS_DIR}/${pad(step)}`;
 export const stepFile = (step: number, name: StepFile): string =>
   `${stepDir(step)}/${STEP_FILES[name]}`;
+
+/**
+ * `00-rubrics.json`: the rubric each pipeline's runs are judged by, derived
+ * once at open, keyed by pipeline id, each beside the loop's dump of its
+ * derivation — where the deriver's prompt and reply can be read.
+ */
+export const rubricsFile = (rubrics: Readonly<Record<string, DerivedRubric>>): DumpFile => ({
+  path: RUBRICS_FILE,
+  content: json(rubrics),
+});
 
 /** What the step saw: the observation without its snapshot, the snapshot as text, the screenshot as bytes. */
 export function observationFiles(

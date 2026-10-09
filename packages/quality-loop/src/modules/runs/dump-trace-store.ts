@@ -3,7 +3,8 @@ import type { PipelineSummary } from '@sysdesign/contracts';
 import { describeError, writeDump } from '@sysdesign/run-dump';
 
 import type { RunRecord } from '../../core/contracts';
-import type { TraceStore } from '../../core/ports';
+import type { CriteriaDerivation, TraceStore } from '../../core/ports';
+import { buildCriteriaDump } from '../../dump/build-criteria-dump';
 import { buildRunDump } from '../../dump/build-run-dump';
 
 /**
@@ -22,6 +23,19 @@ export class DumpTraceStore implements TraceStore {
       this.logger.log(`run ${record.runId} ${record.status} → ${runDir}`);
     } catch (error) {
       this.logger.error(`run ${record.runId}: dump not written: ${describeError(error).message}`);
+    }
+  }
+
+  saveCriteria(derivation: CriteriaDerivation): string | null {
+    try {
+      const { runDir } = writeDump(buildCriteriaDump(derivation), this.dir);
+      this.logger.log(`criteria ${derivation.runId} → ${runDir}`);
+      return derivation.runId;
+    } catch (error) {
+      this.logger.error(
+        `criteria ${derivation.runId}: dump not written: ${describeError(error).message}`,
+      );
+      return null;
     }
   }
 }

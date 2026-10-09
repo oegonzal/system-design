@@ -33,6 +33,7 @@ import {
   type BrainFaultReason,
   type BrainPort,
   type Decided,
+  type DerivedRubric,
   type FieldsInput,
   type StepInput,
 } from '../../core/ports';
@@ -108,8 +109,11 @@ export class LoopBrain implements BrainPort {
     private readonly options: LoopBrainOptions = {},
   ) {}
 
-  deriveRubric(pipeline: string, goal: string): Promise<SuccessCriterion[]> {
-    return guarded(async () => (await this.client.deriveCriteria({ pipeline, goal })).criteria);
+  deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
+    return guarded(async () => {
+      const { criteria, dumpRunId } = await this.client.deriveCriteria({ pipeline, goal });
+      return { criteria, dumpRunId };
+    });
   }
 
   planStep(input: StepInput): Promise<Decided<StepPlan>> {

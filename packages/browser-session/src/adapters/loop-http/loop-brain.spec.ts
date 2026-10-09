@@ -112,8 +112,13 @@ const completeFormMemory =
 describe('the loop brain', () => {
   it('[BRW-1] derives the rubric through the loop and plans a step as one browser-step run with the rubric supplied', async () => {
     const { core, brain } = harness(completeRuns(PLAN));
-    const rubric = await brain.deriveRubric(BROWSER_STEP_PIPELINE_ID, MISSION_FIXTURE);
+    const { criteria: rubric, dumpRunId } = await brain.deriveRubric(
+      BROWSER_STEP_PIPELINE_ID,
+      MISSION_FIXTURE,
+    );
     expect(rubric.length).toBeGreaterThan(0);
+    // The loop names the dump of its derivation; this fake loop writes none.
+    expect(dumpRunId).toBeNull();
     expect(core.criteriaRequests[0]).toEqual({
       pipeline: BROWSER_STEP_PIPELINE_ID,
       goal: MISSION_FIXTURE,

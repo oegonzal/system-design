@@ -14,7 +14,7 @@ import {
   type RunRecallDto,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
-import type { LlmClient } from '@sysdesign/llm';
+import type { LlmClient, LlmExchange } from '@sysdesign/llm';
 import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
@@ -104,20 +104,39 @@ export class RunsService {
   }
 
   /**
-   * The derive-criteria stage alone: one model call, no run row, no dump.
-   * When the model derives nothing the criteria are empty and the diagnostic
-   * says why — the controller turns that into 503; a rubric is never invented.
+   * The derive-criteria stage alone: one model call and no run row. When the
+   * model derives nothing the criteria are empty and the diagnostic says why —
+   * the controller turns that into 503; a rubric is never invented. The call
+   * is dumped as its own folder either way, so the rubric every run of a
+   * session is judged by can be read where it was made.
    */
   async deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto> {
     const definition = this.resolve(request.pipeline);
-    const derive = materializeCriteria(definition, this.llm, () => undefined);
+    const startedAt = new Date();
+    const exchanges: LlmExchange[] = [];
+    const derive = materializeCriteria(definition, this.llm, (exchange) => {
+      exchanges.push(exchange);
+    });
     const { criteria, diagnostic } = await derive(request.goal);
-    return {
+    const derived = {
       pipeline: request.pipeline,
       criteria: criteria ?? [],
       diagnostic,
       llm: this.availability(),
     };
+    const dumpRunId = this.traces.saveCriteria({
+      runId: makeRunId(startedAt.getTime(), 'criteria'),
+      pipeline: describePipeline(definition),
+      goal: request.goal,
+      criteria: derived.criteria,
+      diagnostic,
+      llm: derived.llm,
+      git: gitContext(),
+      exchanges,
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+    });
+    return { ...derived, dumpRunId };
   }
 
   /** Start in the background; the row is readable at once. */

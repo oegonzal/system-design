@@ -165,9 +165,15 @@ export interface FieldsInput {
   criteria: readonly SuccessCriterion[];
 }
 
+/** A rubric derived from the mission, and the loop's dump of the derivation — null when none was written. */
+export interface DerivedRubric {
+  criteria: SuccessCriterion[];
+  dumpRunId: string | null;
+}
+
 export interface BrainPort {
   /** The rubric for one pipeline, derived from the mission alone. */
-  deriveRubric(pipeline: string, goal: string): Promise<SuccessCriterion[]>;
+  deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric>;
   planStep(input: StepInput): Promise<Decided<StepPlan>>;
   answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & { admission: Admission }>;
   /** Hand a document to the memory; answers as soon as the orchestration is open. */

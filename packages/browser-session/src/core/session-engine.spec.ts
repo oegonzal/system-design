@@ -316,6 +316,7 @@ describe('the session engine', () => {
       script: { plans: [PLANS.search, PLANS.end].map((p) => decidedPlan(p)) },
     });
     expect([...dumps.files.keys()].sort()).toEqual([
+      '00-rubrics.json',
       '01-steps/01/observation.json',
       '01-steps/01/plan.json',
       '01-steps/01/screenshot.png',
@@ -329,6 +330,11 @@ describe('the session engine', () => {
       'manifest.json',
     ]);
     expect(dumps.text('goal.md')).toContain('# Mission');
+    // Each pipeline's rubric, beside the loop's dump of the call that derived it.
+    expect(JSON.parse(dumps.text('00-rubrics.json'))).toMatchObject({
+      'browser-step': { dumpRunId: 'browser-step-criteria-dump' },
+      'field-answer': { dumpRunId: 'field-answer-criteria-dump' },
+    });
     expect(JSON.parse(dumps.text('01-steps/01/plan.json'))).toMatchObject({
       composition: { rung: 'full' },
       readout: { executable: true, executePrefix: 2 },

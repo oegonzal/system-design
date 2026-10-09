@@ -311,23 +311,37 @@ describe('the HTTP surface', () => {
     expect(((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total).toBe(before);
   });
 
-  it('[QL-20] POST /criteria derives a rubric with one model call and writes no run', async () => {
+  it('[QL-20] POST /criteria derives a rubric with one model call, writes no run, and dumps the derivation as a folder of its own', async () => {
     const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
     const response = await postJson(url, '/criteria', {
       pipeline: 'tiny',
       goal: '# Goal\n\nMake a thing.',
     });
     expect(response.status).toBe(200);
-    expect((await response.json()) as unknown).toEqual({
-      data: {
-        pipeline: 'tiny',
-        criteria: [{ id: 'c1', kind: 'must', statement: 'has text' }],
-        diagnostic: null,
-        llm: { model: 'test-model' },
-      },
+    const { data } = (await response.json()) as { data: { dumpRunId: string } };
+    expect(data).toEqual({
+      pipeline: 'tiny',
+      criteria: [{ id: 'c1', kind: 'must', statement: 'has text' }],
+      diagnostic: null,
+      llm: { model: 'test-model' },
+      dumpRunId: expect.stringMatching(/-criteria$/),
     });
     const after = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
     expect(after).toBe(before);
+    // The rubric can be read where it was made: the goal, the criteria and the one exchange.
+    const dumpDir = join(DUMP_DIR, data.dumpRunId);
+    expect(readFileSync(join(dumpDir, '01-goal.md'), 'utf8')).toBe('# Goal\n\nMake a thing.\n');
+    expect(JSON.parse(readFileSync(join(dumpDir, '02-criteria.json'), 'utf8'))).toEqual([
+      { id: 'c1', kind: 'must', statement: 'has text' },
+    ]);
+    expect(JSON.parse(readFileSync(join(dumpDir, 'manifest.json'), 'utf8'))).toMatchObject({
+      kind: 'criteria',
+      pipeline: 'tiny@0.0.1',
+      criteria: 1,
+      exchangeCount: 1,
+    });
+    expect(existsSync(join(dumpDir, '05-llm/01.criteria.1.user.txt'))).toBe(true);
+    expect(readFileSync(join(DUMP_DIR, 'index.jsonl'), 'utf8')).toContain(data.dumpRunId);
     expect((await postJson(url, '/criteria', { pipeline: 'nope', goal: 'g' })).status).toBe(404);
     expect((await postJson(url, '/criteria', { pipeline: 'tiny', goal: '' })).status).toBe(400);
   });

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { describePipeline } from '../../core/describe-pipeline';
 import { fakeLlm, result, tinyPipeline } from '../../core/testing';
 import { bootApp, getJson, type Envelope } from '../http/testing';
 import { DumpTraceStore } from './dump-trace-store';
@@ -63,5 +64,25 @@ describe('a dump the disk refuses', () => {
     expect(row).toMatchObject({ status: 'complete', error: null, finishedAt: expect.any(String) });
     expect(row.trace?.finalDecision).toBe('accept');
     expect(await em.fork().count(QualityRunIteration, { run: record.runId })).toBe(1);
+  });
+
+  it('[QL-13] a derived rubric the disk refuses is logged, and named by no dump id', () => {
+    const logged = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const dumpRunId = new DumpTraceStore(blocked).saveCriteria({
+      runId: '2026-10-08T00-00-00-000-abcdef-criteria',
+      pipeline: describePipeline(tinyPipeline()),
+      goal: '# Goal',
+      criteria: RUBRIC,
+      diagnostic: null,
+      llm: { model: 'test-model' },
+      git: { branch: 'main', headSha: 'abc' },
+      exchanges: [],
+      startedAt: '2026-10-08T00:00:00.000Z',
+      finishedAt: '2026-10-08T00:00:01.000Z',
+    });
+    const messages = logged.mock.calls.map(([message]) => message);
+    logged.mockRestore();
+    expect(dumpRunId).toBeNull();
+    expect(messages).toContainEqual(expect.stringContaining('dump not written'));
   });
 });

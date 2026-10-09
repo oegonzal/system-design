@@ -6,10 +6,10 @@ import { criteriaRequestSchema } from './criteria-request';
 import { RunsService } from './runs.service';
 
 /**
- * The derive-criteria stage alone: one model call, no run, no dump. A caller
- * that stores a rubric once (and cites its ids across runs) gets it here. A
- * derivation the model fails is 503 with the diagnostic — never an empty
- * list a run could be started against.
+ * The derive-criteria stage alone: one model call and no run, dumped as a
+ * folder of its own (`dumpRunId`). A caller that stores a rubric once (and
+ * cites its ids across runs) gets it here. A derivation the model fails is 503
+ * with the diagnostic — never an empty list a run could be started against.
  */
 @Controller('criteria')
 export class CriteriaController {

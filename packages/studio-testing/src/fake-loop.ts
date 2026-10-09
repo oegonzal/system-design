@@ -138,6 +138,8 @@ export class FakeLoop {
       criteria: criteriaFromMarkdown(request.goal),
       diagnostic: null,
       llm: this.llm,
+      // A fake derivation leaves no dump to name.
+      dumpRunId: null,
     };
   }
 

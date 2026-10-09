@@ -7,8 +7,9 @@ import {
   type SessionCriteria,
   type SessionDeps,
 } from './engine-context';
-import { BrainFaulted, type BrowserAction, type Termination } from './ports';
+import { BrainFaulted, type BrowserAction, type DerivedRubric, type Termination } from './ports';
 import { closeSession, warnOf } from './session-close';
+import { rubricsFile } from './session-dump';
 import { createState, pushHistory, touchedBy } from './session-state';
 import { step } from './step-flow';
 import { createWriteQueue, heartbeatTicker, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
@@ -34,7 +35,10 @@ export interface SessionOutcome {
 }
 
 /** The rubric for both pipelines, once; a fault here ends the session before the browser opens. */
-async function deriveRubrics(deps: SessionDeps, mission: string): Promise<SessionCriteria> {
+async function deriveRubrics(
+  deps: SessionDeps,
+  mission: string,
+): Promise<Record<keyof SessionCriteria, DerivedRubric>> {
   return {
     plan: await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES.plan, mission),
     answer: await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES.answer, mission),
@@ -73,7 +77,15 @@ export async function runSession(
   let termination: Termination = { reason: 'error', detail: 'the session ended before deciding' };
   let error: { name: string; message: string } | null = null;
   try {
-    ctx.criteria = await deriveRubrics(deps, goal.markdown);
+    const rubrics = await deriveRubrics(deps, goal.markdown);
+    ctx.criteria = { plan: rubrics.plan.criteria, answer: rubrics.answer.criteria };
+    // Where each rubric was made: the loop dumped each derivation as a folder of its own.
+    ctx.dumpFiles('rubrics', [
+      rubricsFile({
+        [BROWSER_SESSION_PIPELINES.plan]: rubrics.plan,
+        [BROWSER_SESSION_PIPELINES.answer]: rubrics.answer,
+      }),
+    ]);
     queue.write('criteria', () =>
       deps.ledger.recordCriteria(state.sessionId, {
         [BROWSER_SESSION_PIPELINES.plan]: ctx.criteria.plan,
