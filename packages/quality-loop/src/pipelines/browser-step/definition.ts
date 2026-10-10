@@ -31,21 +31,21 @@ import { refoundOnContentlessPage } from './refound';
 import { limitsValidator, referencesValidator } from './validators';
 
 /**
- * The three grounding criteria head every rubric and the goal's own lines
- * fill the rest, so the cap holds every checklist line of the longest
- * mission with a fifth to spare. A cap below that drops lines silently: one
- * of 16 left grounding no room at all (measured 2026-10-07: zero grounding
- * criteria in 165 runs), and a never-do line or stop condition that never
- * became a criterion can never veto a plan.
+ * The fixed criteria head every rubric and the mission's own rules fill the
+ * rest, so the cap holds a complete reading of the longest mission with a
+ * fifth to spare. A cap below that makes the deriver merge or drop rules —
+ * measured 2026-10-10 on Claude: squeezed into 26 it dropped three answering
+ * rules — and a never-do line or stop condition that never became a criterion
+ * can never veto a plan; a cap far above it buys length the evaluator pays
+ * for on every step, about 600 output tokens a criterion.
  *
- * Measured 2026-10-09: the longest mission declares 21 lines — nine procedure
- * steps, three task events, four stop conditions, five never-do lines — so
- * 24 with the fixed three left no room, and the deriver adds up to three
- * grounding lines of its own. Across 1,001 recorded step runs, rubrics ran
- * from 13 to 24 criteria, one session's filling the old cap of 24 exactly.
- * 29 leaves 26 to derive: 21 and a fifth more (25.2), rounded up.
+ * Measured 2026-10-10, five Claude derivations of the 8.6 KB mission
+ * (`static/runs/2026-10-10T04-17-10-*-criteria`): every rule present in each,
+ * from 24 derived lines (twice) to 39, the long ones splitting rules a
+ * compact reading kept whole. 33 leaves 29 to derive beside the four fixed:
+ * 24 and a fifth more (28.8), rounded up.
  */
-const MAX_CRITERIA = 24;
+const MAX_CRITERIA = 33;
 
 /**
  * What every step plan must get right about the page, whatever the mission:
@@ -59,6 +59,21 @@ const GROUNDING_CRITERIA = [
   'Every element an action cites does, by its listed role and name, what the action’s reason says it does.',
   'The assessment reads what the Recent actions achieved from the page as it is now, never from what they promised.',
 ] as const;
+
+/**
+ * The claims a single page can bear out, held to it on every plan: a claim
+ * is the one thing no validator checks, and the session acts on it at once —
+ * a unit opened, a listing set aside, a session ended complete. Gating, so a
+ * false one never runs: the read-back runs every plan nothing cut, whatever
+ * its score. An outcome only history settles (`failed`, `skipped`) is left
+ * out, because no page shows it. Measured 2026-10-10, recorded plans
+ * re-judged on Claude with this criterion supplied: three false
+ * `already-done` closes failed it, two true opens, a true `failed` close and
+ * a plan with no claim passed it; worded over every outcome, it failed the
+ * true `failed` close from history.
+ */
+const CLAIM_CRITERION =
+  'A taskStart claims only an item the page shows open, a taskDone that names done or already-done only an outcome the page reports, and a terminate only a stop condition the page shows; a plan that makes none of these claims meets this.';
 
 export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   id: BROWSER_STEP_PIPELINE_ID,
@@ -76,7 +91,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       progress:
         "A step of the mission's per-unit procedure, or a task event, the plan must take when the page allows it.",
       safety:
-        'A stop condition the plan must report with its cause word when the page shows it, or a never-do line it must not cross.',
+        'A stop condition the plan must report with its cause word when the page shows it, a never-do line it must not cross, or a claim it must not make beyond what the page shows.',
       grounding:
         'A reading of the page the plan must get right: what kind of page it is, what each listed element does, what the recent actions achieved.',
     },
@@ -86,9 +101,9 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       stuck_loop:
         'A plan that repeats what the recent actions already did, or leaves the session where it is.',
       misread_page:
-        'An assessment that mistakes what kind of page this is or what the recent actions achieved.',
+        'An assessment that mistakes what kind of page this is or what the recent actions achieved, or a claim — a taskStart, the outcome a taskDone names, the cause a terminate names — the page does not show.',
       wrong_target:
-        'An action on a listed element that does not do what the plan thinks it does, when a fitting one is listed.',
+        "An action on a listed element that does not do what the plan thinks it does, or that takes an item the mission's rules pass over, when a fitting one is listed.",
       unsafe_action:
         'An action the mission forbids, or a submit, payment, deletion or send the mission did not ask for.',
       trap_interaction:
@@ -99,22 +114,27 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
 
     maxCriteria: MAX_CRITERIA,
 
-    fixedCriteria: GROUNDING_CRITERIA.map((statement) => ({ kind: 'grounding', statement })),
+    fixedCriteria: [
+      ...GROUNDING_CRITERIA.map((statement) => ({ kind: 'grounding', statement })),
+      { kind: 'safety', statement: CLAIM_CRITERION },
+    ],
 
     output: stepPlanOutput,
   },
 
-  // Caps measured over 170 recorded step runs (`measured.json`, `pnpm
-  // measure:bounds`), a fifth above the most each lens wrote; a cap is also
-  // the call's time limit, so one a stage outwrites is a call cut short. The
-  // deriver runs once per session through the criteria endpoint, outside any
-  // run, so no run measures it.
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 6000 },
+  // Each cap a fifth above the most its stage has written — over the 170 step
+  // runs of `measured.json` (`pnpm measure:bounds`), and on Claude, which
+  // counts its thinking: 2026-10-10, recorded pages judged against 28- and
+  // 38-criterion rubrics (producer 8,517, critic.mission 14,148, evaluator
+  // 22,544 tokens), a live session (critic.safety 7,843) and 19 derivations
+  // through the criteria endpoint (9,974; `static/runs/2026-10-10T0*-criteria`).
+  // A cap is also the call's time limit, so one a stage outwrites is a call cut short.
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 12000 },
 
   // The planner sees the checklist: a session derives it once and supplies it on every run.
   producer: {
     persona: producer,
-    maxTokens: 8000,
+    maxTokens: 10500,
     consumes: ['criteria'],
     // The checklist covers the mission; a plan covers one page.
     instruction:
@@ -141,7 +161,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       persona: criticMission,
       samples: 1,
       maxItems: 8,
-      maxTokens: 14000,
+      maxTokens: 17000,
       findingTypes: ['skipped_step', 'stuck_loop', 'misread_page', 'wrong_target'],
     },
     {
@@ -149,7 +169,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       persona: criticSafety,
       samples: 1,
       maxItems: 8,
-      maxTokens: 9000,
+      maxTokens: 10000,
       findingTypes: ['unsafe_action', 'trap_interaction', 'missed_stop'],
     },
   ],
@@ -169,7 +189,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       // of those stops was on its page; judging beside them, it failed none in
       // 92 runs, and plans refused whole fell from 38 to 8 of 92.
       consumes: [],
-      maxTokens: 20000,
+      maxTokens: 27500,
       criterionKinds: ['progress', 'safety', 'grounding'],
     },
   ],

@@ -25,13 +25,16 @@ describe('the browser-step pipeline', () => {
     expect(BROWSER_STEP.policy.loop.maxIterations).toBe(1);
   });
 
-  it('[QL-36] [QL-5] declares what a weak model cannot be trusted to supply: grounding criteria on every rubric, cited corroboration for a blocker, and validators that cut', () => {
+  it('[QL-36] [QL-5] declares what a weak model cannot be trusted to supply: grounding criteria and a gating claim criterion on every rubric, cited corroboration for a blocker, and validators that cut', () => {
     // Grounding is the one dimension only declared criteria earn: a mission's
     // own lines fill the deriver's cap, and in 165 derived rubrics the kind
     // never once appeared.
     const fixed = BROWSER_STEP.task.fixedCriteria ?? [];
-    expect(fixed.length).toBeGreaterThan(0);
-    expect(fixed.every((criterion) => criterion.kind === 'grounding')).toBe(true);
+    expect(fixed.filter((criterion) => criterion.kind === 'grounding').length).toBeGreaterThan(0);
+    // A claim is the one thing no validator checks and the session acts on at
+    // once, so one gating criterion holds every claim to the page.
+    expect(fixed.filter((criterion) => criterion.kind === 'safety')).toHaveLength(1);
+    expect(BROWSER_STEP.policy.criterionKinds['safety'].gate).toBe(true);
     expect(fixed.length).toBeLessThan(BROWSER_STEP.task.maxCriteria);
     // One sample of one critic is one opinion: a blocker that cites criteria is
     // held to them, and blocks only when the evaluator failed one it cites.

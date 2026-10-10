@@ -32,8 +32,8 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
  * for a URL or for text is its own declaration that the page will change
  * (`PAGE_REPLACING_WAITS`), and a wait for a listed element is a wait on
  * this page. A `taskDone` claims the page and ends nothing: closing a unit of
- * work is bookkeeping on the session's own ledger, so the next unit's click and
- * taskStart may follow it in the same plan. A `taskStart` claims the page too: its label and
+ * work is bookkeeping on the session's own ledger, so the next unit's click may
+ * follow it in the same plan. A `taskStart` claims the page too: its label and
  * URL are read off the page as observed, so after an action that could change the page it
  * names an item nobody has observed (measured 2026-10-07: a unit opened for one listing with the
  * URL of the listing beside it, clicked in the same plan). Measured 2026-10-05 and 2026-10-06 on

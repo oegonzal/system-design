@@ -3,8 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 import { nestBuildConfig, testDatabaseEnv } from '../../vite.nest';
 
-/** The spec that launches a real (headless, bundled) Chromium against `page.setContent` fixtures. */
-const BROWSER_SPECS = ['src/adapters/playwright/playwright-browser.spec.ts'];
+/** The specs that launch a real (headless, bundled) Chromium against `page.setContent` fixtures. */
+const BROWSER_SPECS = ['src/adapters/playwright/playwright-browser*.spec.ts'];
 /** The specs that need Postgres: the ledger adapter and the scripted end-to-end dry run. */
 const DB_SPECS = [
   'src/adapters/mikro-orm/*.spec.ts',

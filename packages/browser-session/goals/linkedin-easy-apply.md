@@ -1,48 +1,65 @@
 # Mission
 
-Apply, through LinkedIn's Easy Apply, to software engineering roles that can be worked remotely, answering every application form from the evidence recalled about the applicant and asking the operator for anything the evidence does not settle. The session is signed in already; it never signs in itself.
+Apply, through LinkedIn's Easy Apply, to software engineering roles that can be worked remotely: one application per listing, every form answered from the evidence recalled about the applicant, and the operator asked for anything the evidence does not settle. The session is signed in already; it never signs in itself.
 
 ## Unit of work
 
-One application: from opening a job listing to the confirmation that the application was sent, or the point at which the listing is set aside. taskStart fires when a listing is opened; taskDone fires when the application is submitted, found already sent, or abandoned.
+One application: from opening a listing's card to the confirmation that the application was sent, or the point at which the listing is set aside. Its label is the job title and the company as the listing names them.
 
 ## Marks
 
 - "Applied ·": applied to before — the card is passed over, unopened, with no unit. A mark is a word on a card, never a stop condition.
 
+## The results page
+
+- The search box is the textbox "Describe the job you want"; it shows the query the results are for. The banner's "I’m looking for..." box is a different control and stays empty. Before any search the page lists suggested searches as links — "Remote senior software engineer", "Internships tackling climate issues" and the like — which are other searches, not job cards.
+- The results are a list of about 25 cards to a page. Each card is one button whose name is the card's whole text — job title, company, place, sometimes pay and badges, "Posted …" — ending in "Easy Apply" when the listing takes an Easy Apply application. A card applied to before carries "Applied ·" just before "Posted". Each card also holds a "Dismiss <job title> job" control, which hides the listing.
+- Clicking a card shows its listing in the pane beside the list: the title, the company, and how to apply — a button "Easy Apply to this job" (its visible text reads "Easy Apply"); or, for a listing applied to before, a heading "Application status" over "Application submitted" and its age; or a link "Apply on company website"; or the words "No longer accepting applications".
+- Below the list, buttons "Page 1", "Page 2", … and "Next" page through the results, out of view until the list is scrolled down. The application form's advance button is also named "Next"; that one is inside the dialog.
+
+## The application form
+
+- "Easy Apply to this job" opens the listing's own page (its address has /jobs/view/) with a dialog over it headed "Apply to <Company>", a progress bar and the page count ("1/6"). While the dialog is open the page behind it cannot be reached and the unit is in progress: the Easy Apply button is behind the dialog.
+- Each page of the form ends in one button that advances it — "Next", then "Review", then "Submit application" on the last; "Back" returns a page and "Dismiss" closes the dialog.
+- Contact info comes filled in — first and last name, email address, phone country code; "Mobile phone number" may be empty. The résumés uploaded before are radio buttons with one selected, beside an "Upload resume" button.
+- A question the form requires is marked "*", or shows "This field is required" under it after a refused advance. Some forms ask, as a "Yes"/"No" radio question, whether the applicant agrees to the site's additional job application terms.
+- The last page shows a ticked checkbox "Follow <Company> to stay up to date with their page" beside "Submit application".
+- After "Submit application" a dialog says the application was sent, with a "Done" button.
+- "Dismiss" before submitting asks "Save this application?" with "Discard" and "Save".
+
 ## Per-unit procedure
 
-1. Open the jobs search at https://www.linkedin.com/jobs/search-results/ and search for `software engineer remote easy apply`; wait for the list of results. The search is made once: never navigate away from a results page or search again — the Next control below the list pages through the results.
-2. Each result in the list is one card: a button whose long name is the card's whole text and ends in "Easy Apply" whether or not it was applied to — no card is the Easy Apply button. Pressing a card opens the listing in the pane beside the list. A card marked "Applied ·" (the Marks above; the Elements list says `marked` on it) was applied to before and is passed over. Open the first card that is not marked and is not the title and company of a unit listed under Units of work; say in the assessment which card that is and why. When the pane already shows the listing you mean, do not click its card again: go on to step 3.
-3. On the step after the click, when the pane shows the listing and no dialog is open, open the unit with taskStart. The Easy Apply button is the short button in the pane named "Easy Apply to this job" (its visible text reads "Easy Apply"). When the pane has no such button and no dialog is open: if it reports the application's status, the application was sent before — taskDone `already-done`; if it offers only an apply button that is not Easy Apply — taskDone `skipped`. Either way, in the same plan, open the next card by step 2.
-4. Press the "Easy Apply to this job" button in the pane and wait for the application form.
-5. On each page of the form, advance: press Next, Review or Submit application, whichever the page offers. Before pressing, ask with askFields for any required field that is still empty and for any field the page has marked invalid; a field that already holds a value is left as it is. While the application dialog is open the unit is in progress: the Easy Apply button is behind the dialog, and its absence from the Elements list means nothing. From inside the form the unit closes only `done` after the confirmation, `failed` when the form cannot be submitted after one retry, or `skipped` when the operator says /blank to every field of a page.
-6. If the page refuses to advance, ask for the fields it marks and press again.
-7. After Submit application, wait for the confirmation and dismiss it.
-8. Mark the unit `done`.
-9. When every card in view carries "Applied" or is a unit listed under Units of work, open the next page of results with the Next control below the list, scrolling down first when it is not in view. When there is no next page, the search has no more results.
+1. Search. When the page is not the results of `easy apply software engineer remote` — the bare search page, another query's results, or a listing's own page after its unit closed — navigate to https://www.linkedin.com/jobs/search-results/?keywords=easy%20apply%20software%20engineer%20remote and wait for the list; if the textbox "Describe the job you want" then does not hold the query, fill it with exactly that text and press Enter. Suggested searches are never clicked. Once the list is the query's, it is paged, never searched again.
+2. Choose. Open the first card, top down, whose name ends in "Easy Apply", that is not marked "Applied ·", and that is not the title and company of a unit listed under Units of work: click it, and say in the assessment which card and why. A card whose name does not end in "Easy Apply" is passed over unopened, with no unit; a card's "Dismiss … job" control is never clicked. A card whose listing the pane already shows is not clicked again — go on to step 3.
+3. Open the unit. On the step after the click, with the listing in the pane and no dialog open: taskStart, then, in the same plan, by what the pane offers — "Easy Apply to this job": click it; "Application status": taskDone `already-done`; only "Apply on company website" or "No longer accepting applications": taskDone `skipped`. After either close, the next card by step 2.
+4. Each form page. One askFields for every required field still empty and every field marked invalid — never fill a fact about the applicant yourself; a field holding a value is left as it is, and so is the selected résumé; "Upload resume" is never clicked. A question asking to agree to the site's additional job application terms is not asked: click the radio that reads "Yes". Then, in the same plan, click the page's advance button — "Next", "Review" or "Submit application". A button is clicked; no key is pressed for it.
+5. Submit. On the page with "Submit application": untick "Follow <Company> to stay up to date with their page" when it is ticked, then click "Submit application".
+6. Refused. If the page will not advance, ask for the fields it marks and click its advance button once more. Refused again: taskDone `failed`, click "Dismiss", then "Discard", and return to the list by step 1.
+7. Confirmation. On the dialog that says the application was sent: taskDone `done`, then click "Done".
+8. Next page. When no card in view qualifies — each is marked "Applied ·", lacks "Easy Apply", or is a unit listed under Units of work — scroll down to the buttons below the list and click "Next". With no next page, the search has no more results.
 
 ## Answering policy
 
-Answer about the applicant only from the evidence listed in the goal, citing it; a field no evidence settles goes to the operator. A field with options takes one listed option verbatim. A number field takes a whole number. A field that offers to upload a résumé is left to the operator. A field the page hides is left blank. A field that asks whether you are a bot, or any other question a person would find odd, is left blank.
+Answer about the applicant only from the evidence listed in the goal, citing it; a field no evidence settles goes to the operator. A field that already holds a value — the contact details, the selected résumé — is kept. A field with options takes one listed option verbatim. A number field takes a whole number. A question asking to agree to the site's additional job application terms is answered "Yes". A résumé is never uploaded; a field that only offers an upload goes to the operator. A field the page hides is left blank. A field that asks whether you are a bot, or any other question a person would find odd, is left blank.
 
 ## Stop conditions
 
-- limit-reached (complete) "limit": the site says the daily application limit is reached or asks to try again later — in its own words about a limit; a mark on a card is never a limit.
+- limit-reached (complete) "limit daily submissions": the site says it limits daily submissions — today's Easy Apply applications are spent; a mark on a card is never a limit.
+- limit-reached (complete) "daily limit": the site says a daily limit is reached.
+- limit-reached (complete) "application limit": the site says an application limit is reached.
 - login-wall (stopped) "Sign in": a sign-in form, a verification challenge or a "confirm it is you" page appears.
-- mission-complete (complete): no next page of results is listed and every card in view carries "Applied" or is a unit listed under Units of work.
-- blocked (stopped): the form cannot be advanced or submitted after one retry, and no other listing is in view.
+- mission-complete (complete): no next page of results is listed and no card in view qualifies.
 
 ## Never do
 
 - Never type into a field the page hides or that asks whether you are a bot.
 - Never sign in, change the password or touch account settings.
-- Never submit an application with a required field left blank.
-- Never send a message to a recruiter or follow a company.
+- Never click "Submit application" with a required field left blank or with no unit of work open.
+- Never send a message to a recruiter, and never follow a company: the "Follow <Company>" box is unticked before "Submit application".
 - Never apply to the same listing twice in a session.
 
 ## Task events
 
-- taskStart on the step after a card is clicked, when the pane shows the listing, labelled `<job title> at <company>`, with the page's URL. A card passed over unopened is no unit: no taskStart, no taskDone.
-- taskDone `done` after the confirmation; `already-done` when the pane, with no dialog open, reports the application was sent before; `skipped` when the opened listing is set aside before the form (no Easy Apply button, or the operator says /blank to every field of a page); `failed` when the form was started and could not be submitted.
+- taskStart on the step after a card is clicked, when the pane shows the listing, labelled "<job title> at <company>", with the page's URL. A card passed over unopened is no unit: no taskStart, no taskDone.
+- taskDone `done` on the dialog that says the application was sent — a unit whose "Submit application" ran closes `done`, never `already-done`; `already-done` only for a listing whose pane showed "Application status" when it was first opened; `skipped` when the opened listing is set aside before the form — no Easy Apply button, or the operator says /blank to every field of a page; `failed` when the form was started and could not be submitted after one retry.
 - terminate with the stop condition's cause word as soon as its page is seen; for a cause the Stop conditions tie to words, only on a page that shows those words.

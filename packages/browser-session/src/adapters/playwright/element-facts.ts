@@ -25,7 +25,7 @@ export interface ElementFacts {
   nameHint: string | null;
   /** Whether a modal dialog encloses it: `aria-modal` on a dialog ancestor, or a native dialog opened modally. */
   modal: boolean;
-  /** The text the DOM renders inside it, for an element the tree gives no name; empty when it renders none. */
+  /** The text the DOM renders inside it — what a person reads on it; empty when it renders none. */
   text: string;
 }
 
@@ -63,6 +63,45 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
     byIds(node.getAttribute('aria-labelledby')) ||
     text(Array.from((node as HTMLInputElement).labels ?? [])[0]) ||
     text(node);
+  /**
+   * A radio group's options, each once — a native input drawn inside a
+   * styled `role="radio"` is that option's control, not an option of its
+   * own — and what a person reads on each: its own words, else its label.
+   * Measured 2026-10-09: a form named both radios of a yes/no question after
+   * the question itself, showed "Yes" and "No" only as their words, and
+   * declared required on neither radio nor group.
+   */
+  const radios =
+    attr('role') === 'radiogroup'
+      ? Array.from(el.querySelectorAll('[role="radio"], input[type="radio"]')).filter(
+          (radio) => radio.parentElement?.closest('[role="radio"]') == null,
+        )
+      : [];
+  const optionLabel = (option: Element): string => text(option) || labelOf(option);
+  const isChecked = (radio: Element): boolean =>
+    radio.getAttribute('aria-checked') === 'true' ||
+    (radio as HTMLInputElement).checked === true ||
+    radio.querySelector('input[type="radio"]:checked') !== null;
+  const radioSays = (radio: Element, name: string): boolean => {
+    const own = radio.getAttribute(name);
+    const control = radio.querySelector('input[type="radio"]');
+    return (
+      (own !== null && own !== 'false') || (control?.getAttribute(name) ?? 'false') !== 'false'
+    );
+  };
+  /** The question every option of a radio group is named after, when none of them reads it. */
+  const sharedQuestion = (): string => {
+    const names = radios.map(
+      (radio) => radio.getAttribute('aria-label') || byIds(radio.getAttribute('aria-labelledby')),
+    );
+    const first = names[0] ?? '';
+    return names.length > 1 &&
+      first !== '' &&
+      names.every((name) => name === first) &&
+      !radios.some((radio) => text(radio) === first)
+      ? first
+      : '';
+  };
 
   /** What the control is and holds: its input type, its value, and the options it offers. */
   const readControl = (): Pick<ElementFacts, 'inputType' | 'value' | 'options'> => {
@@ -93,9 +132,9 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
       value = text(el) || null;
     }
     if (options === null && role === 'radiogroup') {
-      options = Array.from(el.querySelectorAll('[role="radio"], input[type="radio"]'))
-        .map(labelOf)
-        .filter((option) => option.length > 0);
+      options = radios.map(optionLabel).filter((option) => option.length > 0);
+      const chosen = radios.find(isChecked);
+      value = chosen === undefined ? null : optionLabel(chosen) || null;
     }
     if (options === null && (role === 'listbox' || role === 'combobox')) {
       const controls = attr('aria-controls');
@@ -117,7 +156,10 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
 
   /** What state the page puts it in: required, disabled. */
   const readState = (): Pick<ElementFacts, 'required' | 'disabled'> => {
-    const required = input.required === true || attr('aria-required') === 'true';
+    const required =
+      input.required === true ||
+      attr('aria-required') === 'true' ||
+      radios.some((radio) => radioSays(radio, 'required') || radioSays(radio, 'aria-required'));
     const disabled =
       input.disabled === true ||
       attr('aria-disabled') === 'true' ||
@@ -254,6 +296,7 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
       byIds(attr('aria-describedby')),
       attr('placeholder') ?? '',
       text(el.closest('fieldset')?.querySelector('legend')),
+      sharedQuestion(),
     ]
       .filter((part) => part.length > 0)
       .join(' · ');
@@ -274,7 +317,9 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
 
     // Any invalid state the page declares — true, grammar, spelling — or the browser's own.
     const ariaInvalid = attr('aria-invalid');
-    let invalid = ariaInvalid !== null && ariaInvalid !== 'false';
+    let invalid =
+      (ariaInvalid !== null && ariaInvalid !== 'false') ||
+      radios.some((radio) => radioSays(radio, 'aria-invalid'));
     try {
       invalid = invalid || el.matches(':user-invalid');
     } catch {

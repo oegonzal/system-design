@@ -45,7 +45,7 @@ const STEP_LIMITS: readonly Limit[] = [
   // this section is describing. Saying it is a ceiling costs five words.
   {
     line: () =>
-      `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A terminate or done action is last and appears nowhere else. A taskDone closes a unit of work and touches no page: the plan may go on from it, the next unit's click and taskStart included.`,
+      `- At most ${ACTIONS_BOUND.target} actions, in the order they run — a ceiling the validators enforce, never a number to reach. A terminate or done action is last and appears nowhere else. A taskDone closes a unit of work and touches no page: the plan may go on from it to the next unit's click, whose taskStart comes on the next step, once that page shows the item.`,
   },
   // The `references` validator enforces exactly this, and the section that
   // exists to say what the validators enforce did not say it: an Elements

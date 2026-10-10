@@ -30,6 +30,8 @@ import { hiddenTraitsOf, type ElementFacts } from './element-facts';
  */
 const ROLE_MAX = 40;
 const INPUT_TYPE_MAX = 30;
+/** The roles a person picks: one may be named after the question it answers, and read as the answer. */
+const CHOICE_ROLES: ReadonlySet<string> = new Set(['radio', 'checkbox']);
 
 /** One read of the page, and what it could not reach. */
 export interface PageReading {
@@ -69,7 +71,9 @@ export const failedWholesale = (reading: PageReading): boolean =>
  * the `name` or `id` attribute, which is what names a honeypot. What a person
  * reads on such an element is kept apart, as `text`: the words beneath it in
  * the tree, else what the DOM renders inside it. An element the tree named
- * carries no text of its own.
+ * carries no text of its own — except a choice whose name is not what it
+ * reads: a radio named after its question keeps the "Yes" a person reads on it,
+ * so two answers named alike can still be told apart.
  */
 export function toObservedElement(
   node: SnapshotNode,
@@ -80,7 +84,12 @@ export function toObservedElement(
 ): ObservedElement {
   const unnamed = node.name === null || node.name === '';
   const name = excerpt(node.name ?? facts.nameHint ?? '', ELEMENT_NAME_BOUND.target);
-  const text = unnamed ? excerpt(words || facts.text, ELEMENT_NAME_BOUND.target) : '';
+  const reads = unnamed
+    ? words || facts.text
+    : CHOICE_ROLES.has(node.role) && facts.text !== node.name
+      ? facts.text
+      : '';
+  const text = excerpt(reads, ELEMENT_NAME_BOUND.target);
   return {
     ref: node.ref ?? '',
     role: excerpt(node.role, ROLE_MAX),

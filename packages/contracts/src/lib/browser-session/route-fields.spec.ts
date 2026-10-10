@@ -154,6 +154,38 @@ describe('routeFields', () => {
     });
   });
 
+  it('[QL-37] asks for a choice the page asks with nothing chosen, marked required or not, and leaves one that holds an answer to the model', () => {
+    // Measured 2026-10-09: the form marked every select and text field
+    // required and none of its radio questions; each was left blank as
+    // optional, and the page refused to advance past it.
+    const question = (value: string | null) =>
+      fields().map((field) =>
+        field.ref === 'e4'
+          ? {
+              ...field,
+              role: 'radiogroup',
+              inputType: null,
+              options: ['Yes', 'No'],
+              required: false,
+              value,
+            }
+          : field,
+      );
+    const asked = routeFields(
+      judgedRun({ artifact: answers({ e4: { decision: 'ask-operator', value: null } }) }),
+      'admitted',
+      question(null),
+    );
+    expect(asked[3]).toMatchObject({ route: 'ask-operator', source: 'loop' });
+    const blanked = routeFields(judgedRun({ artifact: answers() }), 'admitted', question(null));
+    expect(blanked[3]).toMatchObject({
+      route: 'ask-operator',
+      reason: 'unanswered choice left blank: bait',
+    });
+    const answered = routeFields(judgedRun({ artifact: answers() }), 'admitted', question('Yes'));
+    expect(answered[3]).toMatchObject({ route: 'leave-blank', source: 'blank' });
+  });
+
   it('[QL-37] asks when the model answered with low confidence or did not answer at all', () => {
     const low = routeFields(
       judgedRun({ artifact: answers({ e1: { confidence: 'low' } }) }),

@@ -84,6 +84,18 @@ const readout = (
 /** What the field holds already, as a value worth a keep: non-empty. */
 const holds = (field: FieldSpec): boolean => field.value !== null && field.value !== '';
 
+/**
+ * Whether the page needs a value in the field: one it marks required, or a
+ * choice it asks with nothing chosen. A radio group can say it is required
+ * only through attributes its radios may never carry, and leaving a question
+ * unanswered is a choice about the subject, so it is the operator's to make
+ * — `/blank` included. Measured 2026-10-09: a form that marked every select
+ * and text field required marked none of its radio questions, each was left
+ * blank as optional, and the page refused to advance past the blank.
+ */
+const needsValue = (field: FieldSpec): boolean =>
+  field.required || (field.role === 'radiogroup' && !holds(field));
+
 /** The answers of the best iteration by ref, when its artifact read as answers. */
 const answersOf = (best: IterationTrace | null): Map<string, FieldAnswer> => {
   const parsed =
@@ -100,14 +112,14 @@ interface FieldCase {
   answer: FieldAnswer | null;
 }
 
-/** A field the answers could not settle: the operator's when required, else left blank and said so. */
+/** A field the answers could not settle: the operator's when the page needs a value in it, else left blank and said so. */
 const unsettled = (
   { position, field, answer }: FieldCase,
   source: BrowserDecisionSource,
   reason: string,
   faults: string[] = [],
 ): FieldReadout =>
-  field.required
+  needsValue(field)
     ? readout(position, field, answer, 'ask-operator', source, reason, faults)
     : readout(
         position,
@@ -132,14 +144,14 @@ function answerRoute(fieldCase: FieldCase, answer: FieldAnswer): FieldReadout {
     case 'ask-operator':
       return unsettled(fieldCase, 'loop', answer.reason);
     case 'leave-blank':
-      return field.required
+      return needsValue(field)
         ? readout(
             position,
             field,
             answer,
             'ask-operator',
             'loop',
-            `required field left blank: ${answer.reason}`,
+            `${field.required ? 'required field' : 'unanswered choice'} left blank: ${answer.reason}`,
           )
         : readout(position, field, answer, 'leave-blank', 'blank', answer.reason);
     case 'answer':
@@ -196,8 +208,9 @@ function fieldRoute(
  * own facts first (a hidden field stays blank whatever the model said), then
  * an admission that says nothing was judged at all, then what a judge or a
  * validator pointed at, then the model's decision read with its confidence
- * and basis. The operator is asked only for a required field: an optional
- * one the answers could not settle is left blank, and the row says why.
+ * and basis. The operator is asked only for a field the page needs a value
+ * in — one it marks required, or a choice it asks with nothing chosen: any
+ * other the answers could not settle is left blank, and the row says why.
  *
  * A run that fell short is recorded on the row and demotes nothing by
  * itself: the judges' objections arrive as faults at the fields they are

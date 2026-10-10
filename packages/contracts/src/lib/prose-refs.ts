@@ -11,6 +11,7 @@
  * looks like one: an id nobody listed is left as written, and so is a run or a
  * list any member of which nobody listed.
  */
+import { escapeRegExp } from './text';
 
 /** One place prose names listed ids. */
 export interface RefMention {
@@ -26,8 +27,6 @@ export interface RefMention {
 
 export const REF_MENTION_FORMS = ['one', 'run', 'list'] as const;
 export type RefMentionForm = (typeof REF_MENTION_FORMS)[number];
-
-const escapeRegExp = (literal: string): string => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * A global pattern matching any of `ids` as a whole token — longest first, so

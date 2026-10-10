@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   actionRefs,
   elementKindOf,
+  escapeRegExp,
   observationFingerprint,
   pageObservationSchema,
   type ObservedElement,
@@ -102,6 +103,9 @@ const SCROLL_PX = 600;
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error);
+
+/** Words an element shows whole, around its own whitespace — never a longer text they begin. */
+const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
 
 export class PlaywrightBrowser implements BrowserPort {
   private context: BrowserContext | null = null;
@@ -342,7 +346,12 @@ export class PlaywrightBrowser implements BrowserPort {
     }
   }
 
-  /** A `<select>` takes the option by label; a radio group checks the named radio; anything else opens and picks. */
+  /**
+   * A `<select>` takes the option by label; a radio group checks the radio
+   * its option names — by its accessible name when that names one radio, else
+   * by the words it shows, as the observation read its options; anything else
+   * opens and picks.
+   */
   private async select(target: ObservedElement | null, ref: string, option: string): Promise<void> {
     const locator = this.locate(ref);
     if (target?.inputType === 'select') {
@@ -350,7 +359,12 @@ export class PlaywrightBrowser implements BrowserPort {
       return;
     }
     if (target?.role === 'radiogroup') {
-      await locator.getByRole('radio', { name: option, exact: true }).check();
+      const named = locator.getByRole('radio', { name: option, exact: true });
+      const radio =
+        (await named.count()) === 1
+          ? named
+          : locator.getByRole('radio').filter({ hasText: wholeText(option) });
+      await radio.first().check();
       return;
     }
     if (target?.role === 'radio') {

@@ -25,7 +25,13 @@ import producer from './lenses/producer.md?raw';
 import { fieldAnswersOutput } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
-/** An answering policy of a few lines plus its never-do lines. */
+/**
+ * An answering policy of a few lines plus the never-do lines about what a
+ * field takes. Measured 2026-10-10, five Claude derivations of the 8.6 KB
+ * mission (`static/runs/2026-10-10T04-17-10-*-criteria`): 8 to 10 criteria
+ * once the never-do lines about what the session clicks, submits or sends
+ * were left to the planner; 12 is 10 and a fifth more.
+ */
 const MAX_CRITERIA = 12;
 
 export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
@@ -65,7 +71,9 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
   // Caps a fifth above the most each lens has measurably written (`measured.json`, two runs as of 2026-10-07) and above their seeds.
   // The spec holds the seed table; the first live runs replace it, and a cap
   // is also the call's time limit, so one a stage outwrites is a call cut short.
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 6000 },
+  // On Claude, which counts its thinking (2026-10-10): the deriver wrote up to
+  // 7,931 tokens over five derivations; a live session's 28 lens calls, 2,002.
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 10000 },
   // The answerer sees the checklist a session derived once; `memories` keeps
   // `recall: true` legal on a run, unused by default — the form-memory
   // orchestrator puts the evidence into the goal every stage reads instead.

@@ -171,9 +171,9 @@ Where each part comes from
 criteriaSchema in quality-loop/src/core/stages/schemas.ts builds it per pipeline, and modelSchema turns it into the JSON Schema above:
 
 - kind enum is the keys of the pipeline's task.criterionKinds. Any other kind refuses the whole reply, and the deriver is asked again with the fault named.
-- maxItems: 26 is the room the fixed criteria leave: browser-step's maxCriteria (29) minus its 3 fixed grounding criteria.
+- maxItems: 29 is the room the fixed criteria leave: browser-step's maxCriteria (33) minus its 4 fixed criteria (3 grounding, 1 claim).
 - maxLength: 400 is the target of the statement bound. browser-step declares no statementBound, so the default CRITERION_STATEMENT_BOUND applies, with a ceiling of 500.
-  A statement past 400 is kept and recorded as an overrun, and a list longer than 26 is cut from its end. Only a structural fault — wrong type, missing field, unknown kind, empty statement — refuses the reply.
+  A statement past 400 is kept and recorded as an overrun, and a list longer than 29 is cut from its end. Only a structural fault — wrong type, missing field, unknown kind, empty statement — refuses the reply.
 - No id field. The model never numbers criteria; the engine does.
 
 What the reply becomes
@@ -189,8 +189,8 @@ A reply like this (statements taken from your 07-39 session's rubric):
 
 …becomes the rubric every run is judged by (createCriteriaDeriver in derive-criteria.ts):
 
-- the three fixed grounding criteria go first, as c1–c3;
-- the derived ones follow, cut to the room and numbered c4, c5, … in the order the model wrote them.
+- the four fixed criteria go first: the three grounding ones as c1–c3, the claim criterion as c4;
+- the derived ones follow, cut to the room and numbered c5, c6, … in the order the model wrote them.
 
 So in that session, "Open the first card…" was c5. c4, the mission's first procedure step, was likely left out because the session had already settled it.
 
@@ -407,7 +407,7 @@ What values they take
 ┌─────────────────┬────────────────────────────────────────────────────────────────────────────────────┬────────────────────┐
 │ Pipeline │ locationRefs (artifact parts) │ criterionIds │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤
-│ browser-step │ assessment, action.1 … action.N │ c1 … cN (up to 29) │
+│ browser-step │ assessment, action.1 … action.N │ c1 … cN (up to 33) │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤
 │ field-answer │ summary, field.1 … │ c1 … │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤
@@ -475,13 +475,13 @@ All three, for different purposes. Small note: criteria have kinds; types belong
 │ # Goal │ the mission, with the index │ The source of every derived criterion │
 │ │ stripped │ │
 ├───────────────────────┼───────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────┤
-│ schema │ maxCriteria − fixed count; │ At most 21 derived criteria for browser-step, at most 400 characters each │
+│ schema │ maxCriteria − fixed count; │ At most 29 derived criteria for browser-step, at most 400 characters each │
 │ │ statement bound │ │
 └───────────────────────┴───────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────┘
 
 So the model derives from the goal, classifies by the kinds, and steers around the fixed criteria.
 The fixed criteria come verbatim from the definition, and the engine prepends them; the model never writes them.
-browser-step declares three fixed grounding criteria in definition.ts (GROUNDING_CRITERIA), because derived rubrics never contained a grounding criterion: the mission's own lines always filled the cap first.
+browser-step declares three fixed grounding criteria in definition.ts (GROUNDING_CRITERIA), because derived rubrics never contained a grounding criterion: the mission's own lines always filled the cap first. Since 2026-10-10 it also declares one fixed safety criterion (CLAIM_CRITERION), which gates every taskStart, taskDone done/already-done and terminate on what the page shows.
 
 A target like "50 applications" has a specific home in this design, and it isn't the mission's prose. To answer exactly, I'm checking how the session counts units of work and what each of the three actions does when it runs.
 
@@ -624,19 +624,14 @@ A validator refusal decides before any veto is even considered.
 
 One naming trap: "blocking" is used in both senses. A block validator is one gate kind, while a "blocking finding" or "blocking criterion" is a veto blocker. The decision's blocking field lists everything that refused — validators, findings and criteria — together.
 
-
-
-
-
-
-
-
 ## Prenote that made me take all the extra notes in this file
+
 Short answer: browser-step's veto rule only works if the evaluator judges the page on its own. In the second wave it was shown the critic's finding before judging, so it mostly agreed with it. One model's hallucination was then counted as two independent judgments, and the plan was vetoed.
 
 The rule it broke
 
 A wave is when a lens runs (runLensWaves in core/loop/waves.ts):
+
 - Wave 1: every critic, plus each evaluator that declares consumes: []. They run in parallel and see only the goal and the plan.
 - Wave 2: evaluators that declare consumes: ['findings']. They run after wave 1, and their prompt includes the critics' confirmed findings under # Confirmed upstream defects.
 
@@ -647,15 +642,15 @@ What the second wave did
 c9d062b put the evaluator in wave 2. Before judging c12 ("report limit-reached when the site says…"), it was now shown something like missed_stop at action.1 → criteria c12: the page shows the daily limit is reached. Measured on the same 23 goals:
 
 ┌────────────────────────────────────────────────────┬─────────────────────────────────────────┬────────────────────────────────────────┐
-│                                                    │ Evaluator after the critics (7 batches) │ Evaluator beside the critics (92 runs) │
+│ │ Evaluator after the critics (7 batches) │ Evaluator beside the critics (92 runs) │
 ├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
-│ Critic invents a stop                              │ 89–100% of runs                         │ 98%                                    │
+│ Critic invents a stop │ 89–100% of runs │ 98% │
 ├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
-│ Evaluator fails that stop                          │ 24–41% of runs                          │ 0                                      │
+│ Evaluator fails that stop │ 24–41% of runs │ 0 │
 ├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
-│ Of those failures, ones the critic had just raised │ all of them, in every batch             │ —                                      │
+│ Of those failures, ones the critic had just raised │ all of them, in every batch │ — │
 ├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
-│ Plans vetoed for the stop                          │ 17–39%                                  │ 0                                      │
+│ Plans vetoed for the stop │ 17–39% │ 0 │
 └────────────────────────────────────────────────────┴─────────────────────────────────────────┴────────────────────────────────────────┘
 
 On the same pages, with the same invented claims from the critic, the evaluator judging on its own never agreed. Every "agreement" before was it repeating what it had been shown. Rewording its prompt (55c207e: "one sample's finding is a claim to weigh, judge it yourself") didn't fix it: 24% in the batch it landed, then 30% and 41%.
@@ -669,17 +664,17 @@ Why "browser-step alone"
 I checked all ten definitions. Only browser-step declares cited:
 
 ┌───────────────────────┬──────────────────────────┬───────────────┬─────────┐
-│       Pipeline        │ Evaluator reads findings │ Corroboration │ minHits │
+│ Pipeline │ Evaluator reads findings │ Corroboration │ minHits │
 ├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
-│ browser-step (before) │ yes                      │ cited         │ 1       │
+│ browser-step (before) │ yes │ cited │ 1 │
 ├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
-│ agentic-design        │ yes                      │ none          │ 2       │
+│ agentic-design │ yes │ none │ 2 │
 ├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
-│ system-design-canvas  │ yes                      │ none          │ 2       │
+│ system-design-canvas │ yes │ none │ 2 │
 ├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
-│ design-prompt         │ yes                      │ none          │ 1       │
+│ design-prompt │ yes │ none │ 1 │
 ├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
-│ field-answer          │ yes                      │ none          │ 1       │
+│ field-answer │ yes │ none │ 1 │
 └───────────────────────┴──────────────────────────┴───────────────┴─────────┘
 
 In the other four, a gated finding vetoes on agreement among the critic's own samples, and no rule treats the evaluator as an independent check. Showing it the findings is the intended "critics diagnose, then evaluators measure" design there. The contradiction (a rule that needs independence, plus a layout that removes it) lived in one declaration. So the fix was one line in browser-step (consumes: []), plus a general boot check, checkCorroboration, that refuses this combination in any pipeline. There is no browser-step special case in the engine.

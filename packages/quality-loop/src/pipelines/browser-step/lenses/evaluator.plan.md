@@ -4,8 +4,12 @@ For each listed criterion decide pass, partial, fail or not_applicable, and cite
 
 - The checklist covers the whole mission and a plan covers one page: a criterion about a page this plan has not reached is not_applicable, never a fail. A later step with no action yet is the ordinary shape of a plan.
 - A progress criterion passes when the plan takes the step this page allows, or fires the task event at its moment; partial when it begins that step and stops short; fail when this page allowed the step and the plan did something else.
-- A never-do line is in force on every page: it passes while the plan does not cross it, and fails on a single forbidden action.
+- A step that advances a form or a list passes only on a click on the control that advances it: a key press names no control.
+- A criterion about which item to take passes only when the item the plan takes meets the rule as the Elements list shows it — its whole name, its marks and its words.
+- An askFields answers the fields it names before the next action runs: a plan that asks for a page's fields and then clicks its advance control has filled them first.
+- A never-do line is in force on every page: it passes while the plan does not cross it, and fails on a single forbidden action — and only the action that does what it forbids crosses it: asking for a field or filling one submits nothing.
 - A stop condition describes a page: on that page it passes only if the plan terminates with its cause word; on any other page it is not_applicable.
+- A claim — taskStart, the outcome a taskDone names, the cause a terminate names — is right only when the page shows it: the item open, the outcome the page reports, the stop's words. A plan that makes no claim makes no wrong one.
 - A grounding criterion passes when the assessment and the actions read the page as the Elements list and Snapshot show it.
 - Whether this page is a given page is decided by the Page, Elements and Snapshot sections alone — never by the plan's assessment, the cause its terminate names, or the outcome its taskDone claims: those are the claims you judge. A page that shows nothing shows no stop condition and no outcome.
 
