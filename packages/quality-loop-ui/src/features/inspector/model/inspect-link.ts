@@ -22,6 +22,11 @@ export interface InspectTarget {
   orchestration: string | null;
   /** The key of the selected action, so a shared link reopens the same moment. */
   action: string | null;
+  /**
+   * Only what one caller opened, by the id it gave (`RunOpenerDto.id`). A filter
+   * on the lists rather than a selection: it points the inspector at nothing.
+   */
+  openedBy: string | null;
 }
 
 /** The least a query-string reader has to offer. `URLSearchParams` satisfies it. */
@@ -29,14 +34,19 @@ export interface QueryReader {
   get(name: string): string | null;
 }
 
-export const EMPTY_TARGET: InspectTarget = { run: null, orchestration: null, action: null };
+export const EMPTY_TARGET: InspectTarget = {
+  run: null,
+  orchestration: null,
+  action: null,
+  openedBy: null,
+};
 
 /**
  * The parameter names, in the order an href writes them. Declared once as
  * data: the parser reads these keys and the writer writes them, so a renamed
  * parameter cannot be renamed on one side only.
  */
-const PARAMS = ['run', 'orchestration', 'action'] as const;
+const PARAMS = ['run', 'orchestration', 'action', 'openedBy'] as const;
 
 /** A value worth carrying, or `null`. Whitespace is not a selection. */
 const cleaned = (value: string | null | undefined): string | null => {
@@ -51,6 +61,7 @@ export function parseInspectTarget(params: QueryReader | null | undefined): Insp
     run: cleaned(params.get('run')),
     orchestration: cleaned(params.get('orchestration')),
     action: cleaned(params.get('action')),
+    openedBy: cleaned(params.get('openedBy')),
   };
 }
 
@@ -59,6 +70,7 @@ export const normaliseTarget = (target: Partial<InspectTarget>): InspectTarget =
   run: cleaned(target.run),
   orchestration: cleaned(target.orchestration),
   action: cleaned(target.action),
+  openedBy: cleaned(target.openedBy),
 });
 
 /** Whether the inspector has anything to show. */

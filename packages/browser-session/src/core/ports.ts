@@ -133,7 +133,18 @@ export interface Decided<T> {
   readonly decides?: T;
 }
 
+/**
+ * The session and step a decision is asked in. The loop records it as who
+ * opened the run, so a session's runs can be listed together, and reads it
+ * for nothing else.
+ */
+export interface SessionStepRef {
+  sessionId: string;
+  step: number;
+}
+
 export interface StepInput {
+  session: SessionStepRef;
   mission: string;
   observation: PageObservation;
   history: readonly StepHistoryEntry[];
@@ -159,6 +170,7 @@ export interface StepInput {
 }
 
 export interface FieldsInput {
+  session: SessionStepRef;
   mission: string;
   task: { label: string; url: string } | null;
   fields: readonly FieldSpec[];
@@ -177,7 +189,7 @@ export interface BrainPort {
   planStep(input: StepInput): Promise<Decided<StepPlan>>;
   answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & { admission: Admission }>;
   /** Hand a document to the memory; answers as soon as the orchestration is open. */
-  teach(document: DocumentChunk): Promise<{ orchestrationRunId: string }>;
+  teach(document: DocumentChunk, session: SessionStepRef): Promise<{ orchestrationRunId: string }>;
 }
 
 // ---- the ledger ---------------------------------------------------------------

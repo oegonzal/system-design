@@ -5,6 +5,9 @@ import type * as Contracts from '@sysdesign/contracts';
 type ContractStatuses = (typeof Contracts)['QUALITY_RUN_STATUSES'];
 const STATUSES = ['running', 'complete', 'failed'] as const satisfies ContractStatuses;
 
+type ContractOpenerKinds = (typeof Contracts)['RUN_OPENER_KINDS'];
+const OPENER_KINDS = ['browser-session'] as const satisfies ContractOpenerKinds;
+
 /**
  * One orchestration run: a declared map of pipelines executed in order over
  * ordinary quality runs, which keep their own rows. This row holds what exists
@@ -18,6 +21,13 @@ const STATUSES = ['running', 'complete', 'failed'] as const satisfies ContractSt
 @Index({ properties: ['orchestrator'] })
 @Index({ properties: ['pipeline'] })
 @Index({ properties: ['status'] })
+@Index({ properties: ['openedById'] })
+// `= any (array[…])`, not `in (…)`: Postgres keeps this form at any size, while
+// it stores a one-item `in` as `=`, which the migration check reads as drift.
+@Check({
+  name: 'orchestration_run_opened_by_kind_check',
+  expression: `opened_by_kind is null or opened_by_kind = any (array[${OPENER_KINDS.map((k) => `'${k}'`).join(', ')}])`,
+})
 @Check({
   name: 'orchestration_run_status_check',
   expression: `status in (${STATUSES.map((s) => `'${s}'`).join(', ')})`,
@@ -38,6 +48,21 @@ export class OrchestrationRun {
 
   @Property({ type: 'json' })
   request!: Contracts.OrchestrationRequestSummary;
+
+  /**
+   * Who opened the orchestration, as its caller said: a kind from the contracts'
+   * vocabulary, the caller's own id — indexed, for "what this caller opened" —
+   * and what the orchestration was to it. All three null when nobody said; the loop
+   * records them and reads them for nothing else.
+   */
+  @Property({ type: 'text', nullable: true })
+  openedByKind: Contracts.RunOpenerKind | null = null;
+
+  @Property({ type: 'varchar', length: 80, nullable: true })
+  openedById: string | null = null;
+
+  @Property({ type: 'text', nullable: true })
+  openedByLabel: string | null = null;
 
   @Property({ type: 'json' })
   context!: Record<string, unknown>;

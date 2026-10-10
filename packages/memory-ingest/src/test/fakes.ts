@@ -87,6 +87,7 @@ export const settledOrchestration = (
     maxIterations: 2,
     samples: null,
   },
+  openedBy: null,
   context: {},
   steps: STORED_STEPS,
   error: null,

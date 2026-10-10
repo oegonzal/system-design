@@ -25,6 +25,7 @@ import type {
   QualityRunStatus,
   RemediationNote,
   RunErrorDto,
+  RunOpenerDto,
   RunRecallDto,
   Severity,
   StopReason,
@@ -45,6 +46,7 @@ export interface QualityRunRow {
   llm: LlmModelDto;
   request: QualityRunRequestSummary;
   parentRunId: string | null;
+  openedBy: RunOpenerDto | null;
   recall: RunRecallDto | null;
   git: GitContext;
   exchanges: LlmExchangeSummaryDto[];

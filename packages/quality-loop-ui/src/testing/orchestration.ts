@@ -57,6 +57,7 @@ export const makeOrchestration = (
     maxIterations: 1,
     samples: 3,
   },
+  openedBy: null,
   context: { available: ['system-design'], unavailable: [] },
   steps: {
     panel: {
@@ -138,6 +139,7 @@ export const makeMemoryOrchestration = (
     maxIterations: 1,
     samples: null,
   },
+  openedBy: null,
   context: { available: ['experience-digest'], unavailable: [] },
   steps: {
     recall: {

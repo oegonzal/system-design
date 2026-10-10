@@ -3,8 +3,12 @@ import { Badge, Stack, Table, Text } from '@sysdesign/design-system';
 
 import type { LinkComponent } from '../../components/link-context';
 import { STATUS_TONE } from '../results/tones';
+import { OpenedBy } from './view/opened-by';
 
-/** The orchestrations available to inspect, newest first as the service lists them. Presentational. */
+/**
+ * The orchestrations available to inspect, in the order the caller lists them,
+ * each with who opened it. Presentational.
+ */
 
 export interface OrchestrationPickerProps {
   orchestrations: readonly OrchestrationRunDto[];
@@ -44,6 +48,7 @@ export function OrchestrationPicker({
             <th>Target</th>
             <th>Status</th>
             <th>Steps</th>
+            <th>Opened by</th>
           </tr>
         </thead>
         <tbody>
@@ -69,6 +74,9 @@ export function OrchestrationPicker({
                 <Badge tone={STATUS_TONE[record.status]}>{record.status}</Badge>
               </td>
               <td>{stepCounts(record)}</td>
+              <td>
+                <OpenedBy openedBy={record.openedBy} />
+              </td>
             </tr>
           ))}
         </tbody>

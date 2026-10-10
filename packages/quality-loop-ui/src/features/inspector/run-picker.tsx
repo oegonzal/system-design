@@ -3,6 +3,7 @@ import { Badge, DECISION_TONE, Stack, Table, Text } from '@sysdesign/design-syst
 
 import type { LinkComponent } from '../../components/link-context';
 import { STATUS_TONE } from '../results/tones';
+import { OpenedBy } from './view/opened-by';
 
 export interface RunPickerProps {
   runs: readonly QualityRunSummaryDto[];
@@ -15,7 +16,10 @@ export interface RunPickerProps {
 
 const when = (iso: string): string => new Date(iso).toLocaleString();
 
-/** The runs available to inspect, newest first as the service lists them. Presentational. */
+/**
+ * The runs available to inspect, in the order the caller lists them, each with
+ * the size of the rubric it was judged by and who opened it. Presentational.
+ */
 export function RunPicker({ runs, selectedRunId, hrefFor, link: Link }: RunPickerProps) {
   if (runs.length === 0) {
     return (
@@ -33,6 +37,8 @@ export function RunPicker({ runs, selectedRunId, hrefFor, link: Link }: RunPicke
             <th>Pipeline</th>
             <th>Status</th>
             <th>Outcome</th>
+            <th>Criteria</th>
+            <th>Opened by</th>
           </tr>
         </thead>
         <tbody>
@@ -58,6 +64,10 @@ export function RunPicker({ runs, selectedRunId, hrefFor, link: Link }: RunPicke
                     —
                   </Text>
                 )}
+              </td>
+              <td>{run.criteria}</td>
+              <td>
+                <OpenedBy openedBy={run.openedBy} />
               </td>
             </tr>
           ))}

@@ -12,6 +12,9 @@ import type * as Contracts from '@sysdesign/contracts';
 type ContractStatuses = (typeof Contracts)['QUALITY_RUN_STATUSES'];
 const STATUSES = ['running', 'complete', 'failed'] as const satisfies ContractStatuses;
 
+type ContractOpenerKinds = (typeof Contracts)['RUN_OPENER_KINDS'];
+const OPENER_KINDS = ['browser-session'] as const satisfies ContractOpenerKinds;
+
 type ContractDecisions = (typeof Contracts)['DECISIONS'];
 const DECISIONS = [
   'accept',
@@ -55,6 +58,13 @@ export interface QualityRunGit {
 @Index({ properties: ['startedAt'] })
 @Index({ properties: ['pipeline'] })
 @Index({ properties: ['status'] })
+@Index({ properties: ['openedById'] })
+// `= any (array[…])`, not `in (…)`: Postgres keeps this form at any size, while
+// it stores a one-item `in` as `=`, which the migration check reads as drift.
+@Check({
+  name: 'quality_run_opened_by_kind_check',
+  expression: `opened_by_kind is null or opened_by_kind = any (array[${OPENER_KINDS.map((k) => `'${k}'`).join(', ')}])`,
+})
 @Check({
   name: 'quality_run_status_check',
   expression: `status in (${STATUSES.map((s) => `'${s}'`).join(', ')})`,
@@ -113,6 +123,21 @@ export class QualityRun {
   @Index()
   @ManyToOne(() => QualityRun, { nullable: true, mapToPk: true, deleteRule: 'set null' })
   parentRun: string | null = null;
+
+  /**
+   * Who opened the run, as its caller said: a kind from the contracts'
+   * vocabulary, the caller's own id — indexed, for "what this caller opened" —
+   * and what the run was to it. All three null when nobody said; the loop
+   * records them and reads them for nothing else.
+   */
+  @Property({ type: 'text', nullable: true })
+  openedByKind: Contracts.RunOpenerKind | null = null;
+
+  @Property({ type: 'varchar', length: 80, nullable: true })
+  openedById: string | null = null;
+
+  @Property({ type: 'text', nullable: true })
+  openedByLabel: string | null = null;
 
   /**
    * What the run recalled before it produced, lessons included — written as

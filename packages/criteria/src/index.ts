@@ -478,6 +478,11 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A lost attempt costs one attempt, never a run: a produce that answers nothing is still decided on the record — no artifact, so it escalates — and spends its iteration, and the loop asks again in the same mode from the same best, its remediations unchanged and every fault the schema refused the reply for named under its own heading; the iteration takes no crown from an artifact and counts toward no plateau; the run stops as produce-lost only when it has lost more produce calls than its policy declares, or has no iteration left to ask in; and the run's final decision is the last one made on an artifact.",
   },
+  {
+    id: 'QL-63',
+    statement:
+      "A run says who opened it only when its caller does: the opener — a declared kind, the caller's id and a label — is recorded on the run, carried by every run an orchestration opens and by a recall child, kept by an orchestration started from a run, returned on the record and the list row, and filters both lists by the caller's id; the engine never reads it, and a row recorded before the columns existed reads as opened by nobody.",
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
@@ -543,6 +548,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'QLU-13',
     statement:
       "A model call's own transcript is readable beside the record: the system prompt, the user prompt, the raw reply and the call's metadata, read out of the dump by the two fields the record carries — the call's scope and its ordinal. A file's name is decomposed exactly rather than matched by substring, so one scope can never claim another's files, and the position prefix is never read as a label because measured on disk it means something different in nearly every run. A run with no dump says so where the transcript would be and costs nothing else.",
+  },
+  {
+    id: 'QLU-14',
+    statement:
+      'The inspector says who opened each run and orchestration and how many criteria each run was judged by, and narrows both lists to one opener named in the URL — read from the server, every record that opener opened — keeping the filter on every link the lists offer.',
   },
   // Govcon web client (packages/govcon-ui)
   {

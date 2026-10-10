@@ -221,6 +221,17 @@ describe('a run that recalls lessons for its producer', () => {
     expect(recallRows.data.find((row) => row.runId === recallRunId)?.parentRunId).toBe(runId);
   });
 
+  it('[QL-63] the recall run carries the opener of the run it was opened for, and one filter lists them both', async () => {
+    const openedBy = { kind: 'browser-session', id: 'session-recall', label: 'step 2' };
+    const runId = await start(url, { pipeline: 'coach', goal: GOAL, recall: true, openedBy });
+    const run = await settled(url, runId);
+    expect(run.openedBy).toEqual(openedBy);
+    const recallRunId = run.recall?.recallRunId ?? '';
+    expect((await runOf(url, recallRunId)).openedBy).toEqual(openedBy);
+    const listed = await getJson<Page<QualityRunSummaryDto>>(url, '/runs?openedBy=session-recall');
+    expect(listed.data.map((row) => row.runId).sort()).toEqual([runId, recallRunId].sort());
+  });
+
   it('[QL-34] [QL-51] a run that adopts a judged iteration hands its recall that iteration, and records it as the focus and the chain it screened against', async () => {
     const sourceId = await start(url, { pipeline: 'coach', goal: GOAL });
     const source = await settled(url, sourceId);

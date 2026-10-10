@@ -89,6 +89,7 @@ export class MikroOrmOrchestrationRunRepository implements OrchestrationRunRepos
       orchestrator: query.orchestrator,
       pipeline: query.pipeline,
       status: query.status,
+      openedById: query.openedBy,
     });
     const [rows, total] = await this.em.fork().findAndCount(OrchestrationRun, where, {
       limit: query.limit,

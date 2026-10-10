@@ -150,6 +150,7 @@ export function fromRows(
       adoptedFrom: run.request.adoptedFrom ?? null,
     },
     parentRunId: run.parentRunId ?? null,
+    openedBy: run.openedBy ?? null,
     // Null on every run that did not ask to recall, every row older than recall
     // included; a row older than the focus recalled for the prompt alone, one
     // older than the screen screened nothing, and one older than the budget

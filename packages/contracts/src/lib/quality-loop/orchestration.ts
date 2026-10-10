@@ -10,6 +10,7 @@ import type {
   QualityRunRequestSummary,
   QualityRunStatus,
   RunErrorDto,
+  RunOpenerDto,
   StartQualityRunRequest,
 } from './runs';
 
@@ -67,6 +68,8 @@ export interface OrchestrationRunDto {
   finishedAt: IsoDateString | null;
   /** The bare goal as requested; a child's own record carries whatever the orchestrator appended. */
   request: OrchestrationRequestSummary;
+  /** Who opened it, as its caller said; every run it opens carries the same. Null when nobody said. */
+  openedBy: RunOpenerDto | null;
   /** What the orchestrator observed at open — availability, mostly. Its own shape, declared by the orchestrator. */
   context: Record<string, unknown>;
   /** The step ledger: the declared step ids, in declared order. */
@@ -105,6 +108,8 @@ export interface ListOrchestrationRunsQuery {
   orchestrator?: string;
   pipeline?: string;
   status?: QualityRunStatus;
+  /** Only the orchestrations one caller opened, by the id it gave (`RunOpenerDto.id`). */
+  openedBy?: string;
   limit?: number;
   offset?: number;
 }

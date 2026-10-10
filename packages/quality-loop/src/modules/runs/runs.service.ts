@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  openedAs,
   openingRecall,
   recallInProgress,
   recallWithout,
@@ -296,6 +297,7 @@ export class RunsService {
       git: gitContext(),
       request: summary,
       parentRunId,
+      openedBy: request.openedBy ?? null,
       // Decided from the request as the row opens. A run that asked is
       // recalling from the moment the row exists, so a reader polling it sees
       // that before anything else moves — unless it can never call its
@@ -329,9 +331,10 @@ export class RunsService {
       outcome = recallWithout('recall-unavailable');
     } else {
       let recallRunId: string | null = null;
+      // A recall run is opened by whoever opened the run it serves.
       const execute = async (child: StartQualityRunRequest): Promise<QualityRunDto> =>
         toRunDto(
-          await this.executeFor(record.runId, child, (opened) => {
+          await this.executeFor(record.runId, openedAs(child, record.openedBy), (opened) => {
             recallRunId = opened.runId;
             publish({ ...recallInProgress(), recallRunId });
           }),

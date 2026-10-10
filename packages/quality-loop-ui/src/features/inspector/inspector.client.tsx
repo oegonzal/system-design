@@ -30,6 +30,7 @@ import { groupsPresent, timelineRows } from './model/select';
 import { beforeOf, entryByKey, latestState, type Timeline } from './model/timeline';
 import { OrchestrationPicker } from './orchestration-picker';
 import { RunPicker } from './run-picker';
+import { useInspectLists } from './use-inspect-lists';
 import { useInspectTarget } from './use-inspect-target';
 import { useOrchestrationTimeline } from './use-orchestration-timeline';
 import { useRunTimeline } from './use-run-timeline';
@@ -38,9 +39,8 @@ import { ExchangeViewer } from './view/exchange-viewer';
 import { FlowPanel } from './view/flow-panel';
 import { Inspector } from './view/inspector';
 import { LensPanel } from './view/lens-panel';
+import { OpenerFilter } from './view/opener-filter';
 import { PolicyPanel } from './view/policy-panel';
-
-const RECENT_LIMIT = 30;
 
 const ALL_GROUPS = new Set(Object.keys(ACTION_GROUPS) as ActionGroup[]);
 
@@ -65,11 +65,7 @@ const ALL_GROUPS = new Set(Object.keys(ACTION_GROUPS) as ActionGroup[]);
 export function InspectorClient() {
   const { target, point } = useInspectTarget();
   const Link = useLink();
-  const runs = useResource((signal) => api.listRuns({ limit: RECENT_LIMIT }, { signal }), []);
-  const orchestrations = useResource(
-    (signal) => api.listOrchestrations({ limit: RECENT_LIMIT }, { signal }),
-    [],
-  );
+  const lists = useInspectLists(target.openedBy);
   const pipelines = useResource((signal) => api.listPipelines({ signal }), []);
 
   const watchingOrchestration = target.orchestration !== null;
@@ -90,15 +86,12 @@ export function InspectorClient() {
   // which is when a new one is most likely to exist — the same rule the run page
   // already follows for its own recent list.
   const wasPolling = useRef(false);
-  const reloadRuns = runs.reload;
-  const reloadOrchestrations = orchestrations.reload;
+  const reloadLists = lists.reload;
   useEffect(() => {
     const ended = wasPolling.current && !isPolling;
     wasPolling.current = isPolling;
-    if (!ended) return;
-    reloadRuns();
-    reloadOrchestrations();
-  }, [isPolling, reloadRuns, reloadOrchestrations]);
+    if (ended) reloadLists();
+  }, [isPolling, reloadLists]);
 
   // The transcript: which model call is open, and which of its files is being
   // read. Both are local rather than in the URL — a prompt is something a reader
@@ -155,6 +148,7 @@ export function InspectorClient() {
 
   const onSelect = useCallback((key: string) => point({ action: key }), [point]);
   const onFollow = useCallback(() => point({ action: null }), [point]);
+  const onOpenedBy = useCallback((openedBy: string | null) => point({ openedBy }), [point]);
 
   // The panels read the state the selected action produced, which is what makes
   // the rail a scrubber over the whole run rather than a log of it.
@@ -322,6 +316,12 @@ export function InspectorClient() {
             agreement, how the evidence became a number, what changed between iterations — or an
             orchestration to read its steps and the runs they opened.
           </Text>
+          <OpenerFilter
+            options={lists.openers}
+            value={target.openedBy}
+            hint={lists.hint}
+            onChange={onOpenedBy}
+          />
           {/* Which picker is open is the reader's own choice, not a function
               of what is selected — slaving it to the target made the
               orchestration list unreachable until an orchestration was already
@@ -332,29 +332,29 @@ export function InspectorClient() {
               <Tab value="orchestrations">Orchestrations</Tab>
             </TabList>
             <TabPanel value="runs">
-              {runs.data ? (
+              {lists.runs.records ? (
                 <RunPicker
-                  runs={runs.data.data}
+                  runs={lists.runs.records}
                   selectedRunId={watchingOrchestration ? null : target.run}
-                  hrefFor={(runId) => inspectHref({ run: runId })}
+                  hrefFor={(runId) => inspectHref({ run: runId, openedBy: target.openedBy })}
                   link={Link}
                 />
-              ) : runs.error ? (
-                <Alert tone="danger">{runs.error}</Alert>
+              ) : lists.runs.error ? (
+                <Alert tone="danger">{lists.runs.error}</Alert>
               ) : (
                 <Spinner label="Loading runs" />
               )}
             </TabPanel>
             <TabPanel value="orchestrations">
-              {orchestrations.data ? (
+              {lists.orchestrations.records ? (
                 <OrchestrationPicker
-                  orchestrations={orchestrations.data.data}
+                  orchestrations={lists.orchestrations.records}
                   selectedId={target.orchestration}
-                  hrefFor={(id) => inspectHref({ orchestration: id })}
+                  hrefFor={(id) => inspectHref({ orchestration: id, openedBy: target.openedBy })}
                   link={Link}
                 />
-              ) : orchestrations.error ? (
-                <Alert tone="danger">{orchestrations.error}</Alert>
+              ) : lists.orchestrations.error ? (
+                <Alert tone="danger">{lists.orchestrations.error}</Alert>
               ) : (
                 <Spinner label="Loading orchestrations" />
               )}

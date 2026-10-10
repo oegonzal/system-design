@@ -205,7 +205,10 @@ async function teach(
     day(deps.clock.now()),
   );
   try {
-    const { orchestrationRunId } = await deps.brain.teach(document);
+    const { orchestrationRunId } = await deps.brain.teach(document, {
+      sessionId: state.sessionId,
+      step: state.step,
+    });
     queue.write(`decision ${decisionId} teaching`, () =>
       deps.ledger.recordTeaching([decisionId], orchestrationRunId),
     );
@@ -336,6 +339,7 @@ async function decideFields(
   if (open.length > 0) {
     try {
       decided = await deps.brain.answerFields({
+        session: { sessionId: state.sessionId, step: state.step },
         mission: ctx.mission,
         task:
           state.tasks.open === null

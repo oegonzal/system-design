@@ -115,6 +115,7 @@ export const makeRunSummary = (
   exchangeCount: 4,
   llm: { model: 'test-model' },
   parentRunId: null,
+  openedBy: null,
   recall: null,
   ...overrides,
 });

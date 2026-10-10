@@ -11,7 +11,7 @@ import type {
   StartOrchestrationFromRunRequest,
   StartOrchestrationRequest,
 } from '@sysdesign/contracts';
-import { DEFAULT_QUALITY_RUN_ITERATIONS } from '@sysdesign/contracts';
+import { DEFAULT_QUALITY_RUN_ITERATIONS, openedAs } from '@sysdesign/contracts';
 
 import { validateOrchestrator } from '../../orchestrators/runner/definition';
 import { openRecord } from '../../orchestrators/runner/record';
@@ -86,8 +86,8 @@ export class OrchestrationService {
   /**
    * Start from a run that already happened. Where a step declares a stand-in,
    * the source stands in for it; otherwise the source is only the request's
-   * origin — its goal and budget — and the record says nothing of it, since
-   * every step then runs afresh over those inputs.
+   * origin — its goal, its budget and who opened it — and the record says
+   * nothing else of it, since every step then runs afresh over those inputs.
    */
   async startFromRun(
     orchestrator: string,
@@ -105,12 +105,15 @@ export class OrchestrationService {
     );
     const normalized = this.admit(
       host,
-      {
-        ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
-        goal: source.request.goal,
-        maxIterations: source.request.maxIterations,
-        ...(body.samples === undefined ? {} : { samples: body.samples }),
-      },
+      openedAs<StartOrchestrationRequest>(
+        {
+          ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
+          goal: source.request.goal,
+          maxIterations: source.request.maxIterations,
+          ...(body.samples === undefined ? {} : { samples: body.samples }),
+        },
+        source.openedBy,
+      ),
       stands,
     );
     const provided = seeds ? source : null;

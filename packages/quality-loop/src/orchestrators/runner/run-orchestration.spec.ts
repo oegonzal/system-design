@@ -28,6 +28,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
     maxIterations: 1,
   },
   parentRunId: null,
+  openedBy: null,
   recall: null,
   trace: null,
   exchanges: [],
@@ -185,6 +186,21 @@ describe('runOrchestration', () => {
     expect(execute).not.toHaveBeenCalled();
     expect(record.steps['b']).toMatchObject({ status: 'complete' });
     expect(record.status).toBe('complete');
+  });
+
+  it('[QL-63] every run a step opens is opened by whoever opened the orchestration, and by nobody when nobody said', async () => {
+    const openedBy = { kind: 'browser-session' as const, id: 'session-1', label: 'step 6' };
+    const def = definition();
+    const asked: StartQualityRunRequest[] = [];
+    const deps = harness((input) => {
+      asked.push(input);
+      return Promise.resolve(child());
+    });
+    const opened = openRecord(def, { ...request, openedBy }, null, {}, 1, () => 'now');
+    expect(opened.openedBy).toEqual(openedBy);
+    await runOrchestration(def, opened, request, null, deps);
+    await runOrchestration(def, open(def), request, null, deps);
+    expect(asked.map((one) => one.openedBy)).toEqual([openedBy, undefined]);
   });
 });
 

@@ -1,6 +1,10 @@
 import { EntityManager } from '@mikro-orm/postgresql';
 import type { INestApplication } from '@nestjs/common';
-import type { QualityRunDto, QualityRunSummaryDto } from '@sysdesign/contracts';
+import {
+  RUN_OPENER_ID_MAX_LENGTH,
+  type QualityRunDto,
+  type QualityRunSummaryDto,
+} from '@sysdesign/contracts';
 import {
   QualityRunCriterion,
   QualityRunCriterionResult,
@@ -160,6 +164,41 @@ describe('the HTTP surface', () => {
       llm: { model: 'test-model' },
       heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
     });
+  });
+
+  it('[QL-63] records who opened a run, lists it under that opener alone, and refuses an opener it does not declare', async () => {
+    const openedBy = { kind: 'browser-session', id: 'session-http', label: 'step 6 · form page' };
+    const started = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal', openedBy });
+    expect(started.status).toBe(202);
+    const { data } = (await started.json()) as Envelope<{ runId: string }>;
+    expect((await settledRun(data.runId)).openedBy).toEqual(openedBy);
+    // A run whose caller named nobody says so.
+    expect(record?.openedBy).toBeNull();
+
+    const mine = await getJson<Page<QualityRunSummaryDto>>(url, '/runs?openedBy=session-http');
+    expect(mine.data.map((row) => [row.runId, row.openedBy])).toEqual([[data.runId, openedBy]]);
+    const others = await getJson<Page<unknown>>(url, '/runs?openedBy=session-other');
+    expect(others.meta.total).toBe(0);
+    expect((await fetch(`${url}/runs?openedBy=`)).status).toBe(400);
+
+    const before = ((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total;
+    const refused: [string, unknown][] = [
+      ['openedBy.kind', { ...openedBy, kind: 'studio' }],
+      ['openedBy.id', { ...openedBy, id: '' }],
+      ['openedBy.id', { ...openedBy, id: 'x'.repeat(RUN_OPENER_ID_MAX_LENGTH + 1) }],
+      ['openedBy', { ...openedBy, step: 6 }],
+    ];
+    for (const [path, opener] of refused) {
+      const answer = await postJson(url, '/runs', {
+        pipeline: 'tiny',
+        goal: 'g',
+        openedBy: opener,
+      });
+      expect(answer.status).toBe(400);
+      const { issues } = (await answer.json()) as { issues: { path: string }[] };
+      expect(issues.map((issue) => issue.path)).toEqual([path]);
+    }
+    expect(((await (await fetch(`${url}/runs`)).json()) as Page<unknown>).meta.total).toBe(before);
   });
 
   it('[QL-20] a supplied rubric skips the criteria exchange and is persisted under its own ids', async () => {

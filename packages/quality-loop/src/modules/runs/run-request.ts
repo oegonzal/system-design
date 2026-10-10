@@ -7,6 +7,9 @@ import {
   MAX_PROVIDED_STATEMENT_LENGTH,
   MAX_QUALITY_RUN_ITERATIONS,
   QUALITY_RUN_STATUSES,
+  RUN_OPENER_ID_MAX_LENGTH,
+  RUN_OPENER_KINDS,
+  RUN_OPENER_LABEL_MAX_LENGTH,
 } from '@sysdesign/contracts';
 import { pageFields } from '@sysdesign/nest-kit';
 import { z } from 'zod';
@@ -21,6 +24,16 @@ export const providedCriterionSchema = z.strictObject({
   kind: z.string().min(1).max(CRITERION_KIND_MAX_LENGTH),
   statement: z.string().min(1).max(MAX_PROVIDED_STATEMENT_LENGTH),
 });
+
+/** Who is opening a record, as its caller says: recorded and listed by, read for nothing else. */
+const openerSchema = z.strictObject({
+  kind: z.enum(RUN_OPENER_KINDS),
+  id: z.string().min(1).max(RUN_OPENER_ID_MAX_LENGTH),
+  label: z.string().max(RUN_OPENER_LABEL_MAX_LENGTH),
+});
+
+/** The opener a list asks for, by the id it gave. */
+export const openedByFilter = z.string().min(1).max(RUN_OPENER_ID_MAX_LENGTH).optional();
 
 /**
  * The HTTP body of `POST /runs`. `output` is any JSON; the pipeline's schema
@@ -44,6 +57,7 @@ export const runRequestShape = z.strictObject({
     })
     .optional(),
   recall: z.boolean().optional(),
+  openedBy: openerSchema.optional(),
 });
 
 /** The shape with the two rules a body can break on its own; a request that extends the shape adds its own. */
@@ -61,6 +75,7 @@ export const runRequestSchema = runRequestShape
 export const listRunsQuerySchema = z.strictObject({
   pipeline: z.string().min(1).optional(),
   status: z.enum(QUALITY_RUN_STATUSES).optional(),
+  openedBy: openedByFilter,
   ...pageFields(MAX_LIST_LIMIT, DEFAULT_LIST_LIMIT),
 });
 export type ListRunsQuery = z.output<typeof listRunsQuerySchema>;

@@ -1,6 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { OrchestrationRunDto, RouteReportDto } from '@sysdesign/contracts';
+import type {
+  OrchestrationRunDto,
+  QualityRunDto,
+  QualityRunSummaryDto,
+  RouteReportDto,
+} from '@sysdesign/contracts';
 import {
   OrchestrationRun,
   OrchestrationRunChild,
@@ -13,7 +18,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
 import { GOAL } from '../../orchestrators/memory/testing';
-import { bootApp, claimDumpDir, postJson, type Envelope } from '../http/testing';
+import {
+  bootApp,
+  claimDumpDir,
+  getJson,
+  postJson,
+  type Envelope,
+  type Page,
+} from '../http/testing';
 import { InMemoryMemoryStore } from '../memory/testing';
 import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
@@ -166,6 +178,58 @@ describe('the orchestrations HTTP surface', () => {
       status: 'skipped',
       reason: 'embeddings-disabled',
     });
+  });
+
+  it('[QL-63] an orchestration and every run it opens carry who opened it, one filter lists them, and a start from one of its runs keeps it', async () => {
+    const openedBy = { kind: 'browser-session', id: 'session-orch', label: 'step 3 · form page' };
+    const started = await postJson(url, '/orchestrations/calibration', {
+      pipeline: 'system-design',
+      goal: GOAL,
+      samples: 2,
+      maxIterations: 1,
+      openedBy,
+    });
+    expect(started.status).toBe(202);
+    const record = await settle(
+      ((await started.json()) as Envelope<{ orchestrationRunId: string }>).data.orchestrationRunId,
+    );
+    expect(record.openedBy).toEqual(openedBy);
+    const children = record.steps['panel']?.runIds ?? [];
+    expect(children).toHaveLength(2);
+    for (const childId of children) {
+      const child = await getJson<Envelope<QualityRunDto>>(url, `/runs/${childId}`);
+      expect(child.data.openedBy).toEqual(openedBy);
+    }
+
+    const mine = await getJson<Page<OrchestrationRunDto>>(
+      url,
+      '/orchestrations?openedBy=session-orch',
+    );
+    expect(mine.data.map((row) => row.orchestrationRunId)).toEqual([record.orchestrationRunId]);
+    const runs = await getJson<Page<QualityRunSummaryDto>>(url, '/runs?openedBy=session-orch');
+    expect(runs.data.map((row) => row.runId).sort()).toEqual([...children].sort());
+    expect((await fetch(`${url}/orchestrations?openedBy=`)).status).toBe(400);
+    // A record whose caller named nobody says so.
+    expect(
+      (await getJson<Page<OrchestrationRunDto>>(url, '/orchestrations')).data.some(
+        (row) => row.openedBy === null,
+      ),
+    ).toBe(true);
+
+    // Started from one of its runs — standing in for a step (memory) or only seeding the request
+    // (calibration) — the record is opened by whoever opened that run.
+    const fromRuns: [string, Record<string, unknown>][] = [
+      ['/orchestrations/memory/from-run', { runId: children[0] }],
+      ['/orchestrations/calibration/from-run', { runId: children[0], samples: 2 }],
+    ];
+    for (const [path, body] of fromRuns) {
+      const again = await postJson(url, path, body);
+      expect(again.status).toBe(202);
+      const fromRun = await settle(
+        ((await again.json()) as Envelope<{ orchestrationRunId: string }>).data.orchestrationRunId,
+      );
+      expect(fromRun.openedBy).toEqual(openedBy);
+    }
   });
 
   it('[QL-19] the router refuses a named pipeline, reports the judge it would pick, and judges once with it', async () => {

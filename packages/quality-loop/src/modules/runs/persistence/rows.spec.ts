@@ -208,6 +208,7 @@ describe('the run rows', () => {
       exchangeCount: 2,
       llm: { model: 'test-model' },
       parentRunId: null,
+      openedBy: null,
       recall: null,
     });
   });
@@ -294,5 +295,19 @@ describe('the run rows', () => {
     const olderRow = older as typeof rows.run;
     expect(roundtrip({ ...toRows(fullRecord()), run: olderRow }).parentRunId).toBeNull();
     expect(toSummary(olderRow, { iterations: 1, criteria: 2 }).parentRunId).toBeNull();
+  });
+
+  it('[QL-63] who opened a run round-trips and is on its list row; a row from before the columns reads as nobody', () => {
+    const openedBy = { kind: 'browser-session' as const, id: 'session-1', label: 'step 6' };
+    const opened = fullRecord({ openedBy });
+    const rows = toRows(opened);
+    expect(rows.run.openedBy).toEqual(openedBy);
+    expect(roundtrip(rows)).toEqual(toRunDto(opened));
+    expect(toSummary(rows.run, { iterations: 1, criteria: 2 }).openedBy).toEqual(openedBy);
+
+    const { openedBy: _absent, ...older } = toRows(fullRecord()).run;
+    const olderRow = older as typeof rows.run;
+    expect(roundtrip({ ...toRows(fullRecord()), run: olderRow }).openedBy).toBeNull();
+    expect(toSummary(olderRow, { iterations: 1, criteria: 2 }).openedBy).toBeNull();
   });
 });

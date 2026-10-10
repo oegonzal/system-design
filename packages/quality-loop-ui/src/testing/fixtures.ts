@@ -37,6 +37,7 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
     maxIterations: 1,
   },
   parentRunId: null,
+  openedBy: null,
   recall: null,
   trace: makeTrace(),
   exchanges: [

@@ -137,6 +137,7 @@ export const runDto = (
     maxIterations: 1,
   },
   parentRunId: null,
+  openedBy: null,
   recall: null,
   trace,
   exchanges: [],

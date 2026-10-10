@@ -40,14 +40,20 @@ export class FakeOrchestrations {
   start(orchestrator: string, request: StartOrchestrationRequest): OrchestrationRunStartedDto {
     this.startRequests.push({ orchestrator, request });
     const orchestrationRunId = `${this.deps.prefix()}-orchestration-${++this.sequence}`;
-    return this.open(orchestrationRunId, orchestrator, request.pipeline ?? null, {
-      goal: request.goal,
-      outputProvided: request.output !== undefined,
-      criteriaProvided: request.criteria !== undefined,
-      adoptedFrom: request.adopt ?? null,
-      maxIterations: request.maxIterations ?? 1,
-      samples: request.samples ?? null,
-    });
+    return this.open(
+      orchestrationRunId,
+      orchestrator,
+      request.pipeline ?? null,
+      {
+        goal: request.goal,
+        outputProvided: request.output !== undefined,
+        criteriaProvided: request.criteria !== undefined,
+        adoptedFrom: request.adopt ?? null,
+        maxIterations: request.maxIterations ?? 1,
+        samples: request.samples ?? null,
+      },
+      request.openedBy ?? null,
+    );
   }
 
   startFromRun(
@@ -58,10 +64,14 @@ export class FakeOrchestrations {
     if (run === null) throw new LoopRefused(404, `run ${request.runId} not found`);
     this.digested.push(request.runId);
     const orchestrationRunId = `${this.deps.prefix()}-digest-${this.digested.length}`;
-    return this.open(orchestrationRunId, orchestrator, run.pipeline, {
-      ...run.request,
-      samples: request.samples ?? null,
-    });
+    // As the loop does: a start from a run is opened by whoever opened that run.
+    return this.open(
+      orchestrationRunId,
+      orchestrator,
+      run.pipeline,
+      { ...run.request, samples: request.samples ?? null },
+      run.openedBy,
+    );
   }
 
   get(orchestrationRunId: string): OrchestrationRunDto | null {
@@ -108,6 +118,7 @@ export class FakeOrchestrations {
     orchestrator: string,
     pipeline: string | null,
     request: OrchestrationRunDto['request'],
+    openedBy: OrchestrationRunDto['openedBy'],
   ): OrchestrationRunStartedDto {
     this.records.set(orchestrationRunId, {
       orchestrationRunId,
@@ -117,6 +128,7 @@ export class FakeOrchestrations {
       startedAt: this.deps.now(),
       finishedAt: null,
       request,
+      openedBy,
       context: {},
       steps: {},
       error: null,

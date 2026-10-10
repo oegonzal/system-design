@@ -12,6 +12,7 @@ import {
   type DocumentChunk,
   type FieldAnswers,
   type QualityRunDto,
+  type RunOpenerDto,
   type StepPlan,
 } from '@sysdesign/contracts';
 import {
@@ -34,6 +35,7 @@ import {
   type Decided,
   type DerivedRubric,
   type FieldsInput,
+  type SessionStepRef,
   type StepInput,
 } from '../../core/ports';
 import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
@@ -102,6 +104,13 @@ const settled = (run: QualityRunDto): QualityRunDto => {
 
 export type LoopBrainOptions = Pick<AwaitOptions, 'pollEveryMs' | 'staleAfterMs' | 'now' | 'sleep'>;
 
+/** Who opens a run for the session: the session by its id, and what the run was to it — "step 6 · form page". */
+const openedBy = (session: SessionStepRef, what: string | null): RunOpenerDto => ({
+  kind: 'browser-session',
+  id: session.sessionId,
+  label: what === null ? `step ${session.step}` : `step ${session.step} · ${what}`,
+});
+
 export class LoopBrain implements BrainPort {
   constructor(
     private readonly client: LoopClient,
@@ -130,6 +139,7 @@ export class LoopBrain implements BrainPort {
         pipeline: BROWSER_STEP_PIPELINE_ID,
         goal: composed.goal,
         criteria,
+        openedBy: openedBy(input.session, null),
         maxIterations:
           input.pageUnchanged && input.lastStep?.ran === 0
             ? DECISION_ITERATIONS_WHEN_NOTHING_RAN
@@ -158,7 +168,12 @@ export class LoopBrain implements BrainPort {
       });
       const { orchestrationRunId } = await this.client.startOrchestration(
         FORM_MEMORY_ORCHESTRATOR_ID,
-        { goal, criteria: [...input.criteria], maxIterations: DECISION_ITERATIONS },
+        {
+          goal,
+          criteria: [...input.criteria],
+          maxIterations: DECISION_ITERATIONS,
+          openedBy: openedBy(input.session, 'form page'),
+        },
       );
       const orchestration = await awaitOrchestration(this.client, orchestrationRunId, this.options);
       if (orchestration.status === 'failed') {
@@ -191,11 +206,15 @@ export class LoopBrain implements BrainPort {
     });
   }
 
-  teach(document: DocumentChunk): Promise<{ orchestrationRunId: string }> {
+  teach(document: DocumentChunk, session: SessionStepRef): Promise<{ orchestrationRunId: string }> {
     return guarded(async () => {
       const { orchestrationRunId } = await this.client.startOrchestration(
         DOCUMENT_MEMORY_ORCHESTRATOR_ID,
-        { goal: renderDocumentGoal(document), maxIterations: TEACH_ITERATIONS },
+        {
+          goal: renderDocumentGoal(document),
+          maxIterations: TEACH_ITERATIONS,
+          openedBy: openedBy(session, 'teaching'),
+        },
       );
       return { orchestrationRunId };
     });

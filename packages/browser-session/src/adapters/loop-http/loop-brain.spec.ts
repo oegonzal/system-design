@@ -46,11 +46,15 @@ const ANSWERS: FieldAnswers = {
 
 const CRITERIA = [{ id: 'c1', kind: 'progress', statement: 'Open the next listing.' }];
 
+/** The session and step every decision below is asked in. */
+const SESSION = { sessionId: 'session-1', step: 6 };
+
 const stepInput = (
   observation: PageObservation = listingObservation(),
   pageUnchanged = false,
   lastStep: StepInput['lastStep'] = null,
 ): StepInput => ({
+  session: SESSION,
   mission: MISSION_FIXTURE,
   observation,
   history: [],
@@ -130,6 +134,8 @@ describe('the loop brain', () => {
       pipeline: BROWSER_STEP_PIPELINE_ID,
       criteria: CRITERIA,
       maxIterations: 1,
+      // Who opened the run, for the loop's lists: the session, and the step it was.
+      openedBy: { kind: 'browser-session', id: 'session-1', label: 'step 6' },
     });
     expect(core.startRequests[0]?.goal).toContain('## Index');
     expect(core.startRequests[0]?.goal).toContain(MISSION_FIXTURE.trim());
@@ -158,6 +164,7 @@ describe('the loop brain', () => {
   it('[BRW-3] answers fields through the form-memory orchestration, reading the target run and the admission the server reports', async () => {
     const fields = formObservation().elements.slice(0, 2).map(fieldSpecOf);
     const input = {
+      session: SESSION,
       mission: MISSION_FIXTURE,
       task: { label: 'Acme', url: 'https://x.test/1' },
       fields,
@@ -167,7 +174,11 @@ describe('the loop brain', () => {
     const decided = await admitted.brain.answerFields(input);
     const started = admitted.core.orchestrations.startRequests[0];
     expect(started?.orchestrator).toBe(FORM_MEMORY_ORCHESTRATOR_ID);
-    expect(started?.request).toMatchObject({ criteria: CRITERIA, maxIterations: 1 });
+    expect(started?.request).toMatchObject({
+      criteria: CRITERIA,
+      maxIterations: 1,
+      openedBy: { kind: 'browser-session', id: 'session-1', label: 'step 6 · form page' },
+    });
     expect(started?.request.goal).toContain(FIELDS_HEADING);
     expect(started?.request.goal).toContain('- e1 · textbox "Years of experience with Python"');
     expect(started?.request.goal).toContain(renderFieldProse(input));
@@ -201,11 +212,15 @@ describe('the loop brain', () => {
 
   it('teaches a document as a document-memory orchestration and does not wait for it', async () => {
     const { core, brain } = harness(() => undefined);
-    const { orchestrationRunId } = await brain.teach(resumeChunk());
+    const { orchestrationRunId } = await brain.teach(resumeChunk(), SESSION);
     expect(orchestrationRunId).toBe('fake-run-orchestration-1');
     expect(core.orchestrations.startRequests[0]).toEqual({
       orchestrator: DOCUMENT_MEMORY_ORCHESTRATOR_ID,
-      request: { goal: renderDocumentGoal(resumeChunk()), maxIterations: 2 },
+      request: {
+        goal: renderDocumentGoal(resumeChunk()),
+        maxIterations: 2,
+        openedBy: { kind: 'browser-session', id: 'session-1', label: 'step 6 · teaching' },
+      },
     });
     expect(core.orchestrations.get(orchestrationRunId)?.status).toBe('running');
   });

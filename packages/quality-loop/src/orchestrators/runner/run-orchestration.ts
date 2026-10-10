@@ -11,7 +11,7 @@ import type {
   StartOrchestrationRequest,
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
-import { ORCHESTRATION_REASONS } from '@sysdesign/contracts';
+import { openedAs, ORCHESTRATION_REASONS } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
@@ -113,12 +113,16 @@ function stepContextFor<O extends object, P>(
     acceptAtOf: acceptBarIn(registry),
     execute: async (input, pipeline) => {
       const { criteria, ...rest } = input;
+      // Every run a step opens is opened by whoever opened the orchestration.
       const child = await deps.execute(
-        {
-          ...rest,
-          ...(criteria === undefined ? {} : { criteria: [...criteria] }),
-          pipeline: chosen(step.id, declared, pipeline),
-        },
+        openedAs<StartQualityRunRequest>(
+          {
+            ...rest,
+            ...(criteria === undefined ? {} : { criteria: [...criteria] }),
+            pipeline: chosen(step.id, declared, pipeline),
+          },
+          record.openedBy,
+        ),
         (opened) => {
           void ledger.child(step.id, opened.runId);
         },

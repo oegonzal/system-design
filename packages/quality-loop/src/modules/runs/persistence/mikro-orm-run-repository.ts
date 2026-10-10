@@ -18,7 +18,14 @@ import {
 import { isSettled, type RunProgress, type RunRecord } from '../../../core/contracts';
 import type { CloseOutcome, RunListQuery, RunRepository } from '../../../core/ports';
 import type { RunRecallRecorder } from '../recall/run-recall';
-import { INTERRUPTED, interruptedError, NEWEST_FIRST, presentFilters } from './conventions';
+import {
+  INTERRUPTED,
+  interruptedError,
+  NEWEST_FIRST,
+  openerColumns,
+  openerOf,
+  presentFilters,
+} from './conventions';
 import { fromRows } from './from-rows';
 import type { QualityRunRow, RunRows } from './rows';
 import { readSnapshot } from './snapshot';
@@ -44,9 +51,14 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
 
   async open(record: RunRecord, pipelineVersion: string): Promise<void> {
     const em = this.em.fork();
-    const { parentRunId, ...header } = toRows(record).run;
+    const { parentRunId, openedBy, ...header } = toRows(record).run;
     // The header carries the heartbeat: a row opens alive as of its start.
-    em.create(QualityRun, { ...header, parentRun: parentRunId, pipelineVersion });
+    em.create(QualityRun, {
+      ...header,
+      ...openerColumns(openedBy),
+      parentRun: parentRunId,
+      pipelineVersion,
+    });
     await em.flush();
   }
 
@@ -97,8 +109,14 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
     const rows = toRows(record);
     const settled = isSettled(record.trace);
     return this.em.fork().transactional(async (tem) => {
-      // The parent is the open's to write: a run is opened for its parent once.
-      const { id, pipelineVersion, parentRunId: _opened, ...header } = rows.run;
+      // The parent and the opener are the open's to write: a run is opened once.
+      const {
+        id,
+        pipelineVersion,
+        parentRunId: _parent,
+        openedBy: _openedBy,
+        ...header
+      } = rows.run;
       const row = await tem.findOne(QualityRun, { id }, { lockMode: LockMode.PESSIMISTIC_WRITE });
       if (row === null) return 'refused';
       const reclaimable = row.status === 'failed' && row.error?.name === INTERRUPTED;
@@ -141,7 +159,11 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
     const em = this.em.fork();
     const [runs, total] = await em.findAndCount(
       QualityRun,
-      presentFilters({ pipeline: query.pipeline, status: query.status }),
+      presentFilters({
+        pipeline: query.pipeline,
+        status: query.status,
+        openedById: query.openedBy,
+      }),
       { limit: query.limit, offset: query.offset, orderBy: NEWEST_FIRST },
     );
     const counts = await countsFor(
@@ -163,8 +185,12 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
   }
 }
 
-/** The header entity as its row: the parent relation flattened to the id the row names it by. */
-const headerRow = (run: QualityRun): QualityRunRow => ({ ...run, parentRunId: run.parentRun });
+/** The header entity as its row: the parent relation flattened to the id the row names it by, the opener's columns to the opener. */
+const headerRow = (run: QualityRun): QualityRunRow => ({
+  ...run,
+  parentRunId: run.parentRun,
+  openedBy: openerOf(run),
+});
 
 /**
  * The run's criteria and iterations, replacing whatever an earlier snapshot

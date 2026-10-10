@@ -99,6 +99,7 @@ export function openRecord<O extends object, P>(
     startedAt: at,
     finishedAt: null,
     request: requestSummary(request, provided, maxIterations),
+    openedBy: request.openedBy ?? null,
     context,
     steps,
     error: null,

@@ -25,6 +25,7 @@ export function toSummary(
     llm: run.llm,
     // A row from before the column has none.
     parentRunId: run.parentRunId ?? null,
+    openedBy: run.openedBy ?? null,
     recall: run.recall ? recallSummary(run.recall) : null,
   };
 }

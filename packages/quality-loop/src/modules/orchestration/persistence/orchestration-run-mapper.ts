@@ -6,9 +6,17 @@
 import type { OrchestrationRunDto } from '@sysdesign/contracts';
 import type { OrchestrationRun } from '@sysdesign/db';
 
-import { toDate, toDateOrNull, toIso, toIsoOrNull } from '../../runs/persistence/conventions';
+import {
+  openerColumns,
+  openerOf,
+  toDate,
+  toDateOrNull,
+  toIso,
+  toIsoOrNull,
+  type OpenerColumns,
+} from '../../runs/persistence/conventions';
 
-export interface OrchestrationRunRow {
+export interface OrchestrationRunRow extends OpenerColumns {
   id: string;
   orchestrator: string;
   pipeline: string | null;
@@ -41,6 +49,7 @@ export function toRow(record: OrchestrationRunDto): OrchestrationRunRow {
     pipeline: record.pipeline,
     status: record.status,
     request: record.request,
+    ...openerColumns(record.openedBy),
     context: record.context,
     steps: record.steps,
     error: record.error,
@@ -63,6 +72,7 @@ export function fromRow(row: OrchestrationRun): OrchestrationRunDto {
       criteriaProvided: row.request.criteriaProvided ?? false,
       adoptedFrom: row.request.adoptedFrom ?? null,
     },
+    openedBy: openerOf(row),
     context: row.context,
     steps: row.steps,
     error: row.error,

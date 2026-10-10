@@ -110,6 +110,7 @@ async function decide(
   const elapsed = (): number => deps.clock.now().getTime() - startedAt.getTime();
   try {
     const decided = await deps.brain.planStep({
+      session: { sessionId: state.sessionId, step: state.step },
       mission: ctx.mission,
       observation,
       history: [...state.history],

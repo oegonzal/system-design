@@ -28,6 +28,7 @@ function headerOf(record: RunRecord, dto: QualityRunDto): QualityRunRow {
     llm: dto.llm,
     request: dto.request,
     parentRunId: dto.parentRunId,
+    openedBy: dto.openedBy,
     recall: dto.recall,
     git: record.git,
     exchanges: dto.exchanges,

@@ -95,6 +95,7 @@ export function fakeRun(
       maxIterations: 1,
     },
     parentRunId: null,
+    openedBy: null,
     recall: null,
     trace: {
       pipeline: { id: pipeline, version: 'fake' },

@@ -40,6 +40,7 @@ const memoryRun = (digestRunId: string, targetRunId: string): OrchestrationRunDt
     startedAt: '2026-09-07T00:00:00.000Z',
     finishedAt: '2026-09-07T00:02:00.000Z',
     request: { ...sampleRun().request, samples: null },
+    openedBy: null,
     context: {},
     steps: {
       recall: { ...step, runIds: [] },

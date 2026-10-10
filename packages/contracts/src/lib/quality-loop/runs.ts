@@ -7,6 +7,36 @@ import { LARGEST_STATEMENT_BOUND, type SuccessCriterion } from './evidence';
 import type { RunRecallDto, RunRecallSummaryDto } from './recall';
 import { STOP_REASON_CAUSES, type Decision, type StopReason } from './vocab';
 
+/**
+ * Who may say they opened a run. A caller whose runs belong together — a
+ * browser session's pages, form pages and teachings — names itself on each;
+ * the loop records it, returns it, filters by it, and reads it for nothing
+ * else: a pipeline never learns who called it.
+ */
+export const RUN_OPENER_KINDS = ['browser-session'] as const;
+export type RunOpenerKind = (typeof RUN_OPENER_KINDS)[number];
+/** The longest opener id the loop records: a session's UUID fits with room. */
+export const RUN_OPENER_ID_MAX_LENGTH = 80;
+/** The longest opener label the loop records: what the run was to its caller — "step 6 · form page". */
+export const RUN_OPENER_LABEL_MAX_LENGTH = 80;
+
+/** Who opened a run, as the caller said: its kind, its own id, and what this run was to it. */
+export interface RunOpenerDto {
+  kind: RunOpenerKind;
+  id: string;
+  label: string;
+}
+
+/**
+ * A request for a run opened on behalf of another — a run's recall, an
+ * orchestration's steps, an orchestration started from a run — as opened by
+ * whoever opened that other; one nobody named stays unnamed.
+ */
+export const openedAs = <R extends { openedBy?: RunOpenerDto }>(
+  request: R,
+  opener: RunOpenerDto | null,
+): R => (opener === null ? request : { ...request, openedBy: opener });
+
 export const QUALITY_RUN_STATUSES = ['running', 'complete', 'failed'] as const;
 export type QualityRunStatus = (typeof QUALITY_RUN_STATUSES)[number];
 
@@ -149,6 +179,12 @@ export interface QualityRunDto {
    */
   parentRunId: string | null;
   /**
+   * Who opened the run, as its caller said — or, for a recall run and an
+   * orchestration's children, as the request that opened their parent said.
+   * Null when nobody said. Recorded and listed by, never read by a pipeline.
+   */
+  openedBy: RunOpenerDto | null;
+  /**
    * The lessons recalled for the goal before the run produced — `recalling`
    * from the moment the run opens until they are in — and the producer saw
    * exactly `recall.lessons`. Null when the run did not ask to recall.
@@ -193,6 +229,8 @@ export interface StartQualityRunRequest {
    * consume memories.
    */
   recall?: boolean;
+  /** Who is opening the run, for the record and its lists: the loop reads it for nothing else. */
+  openedBy?: RunOpenerDto;
 }
 
 /** HTTP-edge cap on a supplied rubric; the pipeline's own `maxCriteria` is the real limit. */
@@ -234,6 +272,8 @@ export interface QualityRunSummaryDto {
   llm: LlmModelDto;
   /** The run this one was opened for, as on `QualityRunDto.parentRunId`: a list of recall runs names the run each served. */
   parentRunId: string | null;
+  /** As on `QualityRunDto.openedBy`: who opened the run, so a list can be read caller by caller. */
+  openedBy: RunOpenerDto | null;
   /** The run's recall without its lessons; null when it did not ask to recall. */
   recall: RunRecallSummaryDto | null;
 }
@@ -242,6 +282,8 @@ export interface QualityRunSummaryDto {
 export interface ListQualityRunsQuery {
   pipeline?: string;
   status?: QualityRunStatus;
+  /** Only the runs one caller opened, by the id it gave (`RunOpenerDto.id`). */
+  openedBy?: string;
   limit?: number;
   offset?: number;
 }

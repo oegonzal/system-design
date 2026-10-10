@@ -20,6 +20,7 @@ export const record = (overrides: Partial<RunRecord>): RunRecord => ({
     maxIterations: 3,
   },
   parentRunId: null,
+  openedBy: null,
   recall: null,
   trace: null,
   exchanges: [],
