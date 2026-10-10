@@ -32,7 +32,9 @@ export async function captureAfter(
   outcome: CaptureRecord['outcome'],
 ): Promise<void> {
   const { capture } = ctx.options;
-  if (outcome === 'ok' ? !capture.after.includes(action.kind) : !capture.failures) return;
+  // An action that ran is imaged when the policy names its kind; one the page refused, when it asks for refusals.
+  const wanted = outcome === 'ok' ? capture.after.includes(action.kind) : capture.failures;
+  if (!wanted) return;
   const { deps, state } = ctx;
   const outline = ENTRY_KINDS.includes(action.kind) ? (actionRefs(action)[0] ?? null) : null;
   let bytes: Uint8Array;
