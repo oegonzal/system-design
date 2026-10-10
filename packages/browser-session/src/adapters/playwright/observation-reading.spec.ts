@@ -181,6 +181,35 @@ describe('one reading as an observation', () => {
     expect(observation.omittedElements).toBe(7);
   });
 
+  it('[BRW-2] keeps an open dialog whole when the snapshot is cut, modal or not, and a non-modal one blocks nothing', () => {
+    // Measured 2026-10-10: the dialog confirming an application was sent
+    // carried no aria-modal and sat last in the snapshot, and the cut dropped it.
+    const page = Array.from(
+      { length: 2_000 },
+      (_, i) => `- paragraph [ref=e${i}]: ${'words '.repeat(12)}`,
+    );
+    const confirmation = [
+      '- dialog [ref=e5000]:',
+      '  - button "Not now" [ref=e5001]',
+      '  - heading "Your application was sent to Acme!" [level=3] [ref=e5002]',
+    ];
+    const sent = { role: 'dialog' as const, name: '' };
+    const observation = toObservation(
+      reading({
+        snapshot: [...page, ...confirmation].join('\n'),
+        elements: [
+          toObservedElement(node('e1', 'link', 'Result 1'), facts(), null, ''),
+          toObservedElement(node('e5001', 'button', 'Not now', 2), facts(), sent, ''),
+        ],
+      }),
+      READ,
+    );
+    expect(observation.activeScope).toBeNull();
+    expect(observation.snapshotRung).toBe('scope');
+    expect(observation.ariaSnapshot).toContain('Your application was sent to Acme!');
+    expect(observation.elements.map((e) => e.ref)).toEqual(['e1', 'e5001']);
+  });
+
   it('[BRW-2] puts the main landmark\u2019s elements first under the cap, and says when main has rendered nothing', () => {
     // Measured 2026-10-08: three observations of a results page read settled
     // with 33 elements of banner, navigation and search box and a main with

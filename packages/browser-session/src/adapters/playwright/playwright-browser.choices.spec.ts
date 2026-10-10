@@ -84,6 +84,28 @@ describe('the Playwright browser, on radio questions', () => {
     expect(answers.map((answer) => answer.text)).toEqual(['Yes', 'No']);
   });
 
+  it('[BRW-2] says why an action gave up: the call log’s last reason travels with the failure', async () => {
+    const quick = new PlaywrightBrowser({
+      profilesDir: profiles,
+      channel: undefined,
+      actionTimeoutMs: 1_500,
+    });
+    await quick.open('spec-quick', { headed: false });
+    try {
+      await quick.page.setContent(`<!doctype html><html><body>
+        <button type="button">Covered</button>
+        <div style="position:fixed;inset:0;background:transparent"></div>
+      </body></html>`);
+      const covered = (await quick.observe()).elements.find((e) => e.name === 'Covered');
+      if (covered === undefined) throw new Error('the covered button was not observed');
+      await expect(
+        quick.act({ kind: 'click', ref: covered.ref, reason: 'try', expect: null, serves: [] }),
+      ).rejects.toThrow(/Timeout 1500ms exceeded.*intercepts pointer events/);
+    } finally {
+      await quick.close();
+    }
+  });
+
   it('[BRW-2] picks an answer by the words it shows when its name is the question, and reads the choice back as the group value', async () => {
     await browser.page.setContent(QUESTIONS);
     const [terms, relocate] = groups(await browser.observe());

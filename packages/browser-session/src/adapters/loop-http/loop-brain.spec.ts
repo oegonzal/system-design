@@ -331,4 +331,44 @@ describe('the loop brain', () => {
       brain.planStep({ ...stepInput(), mission: 'm'.repeat(70_000) }),
     ).rejects.toMatchObject({ reason: 'goal-budget' });
   });
+
+  it('[BRW-2] keeps an open dialog whole when the goal cuts the snapshot, modal or not', () => {
+    // Measured 2026-10-10: the dialog confirming an application was sent
+    // carried no aria-modal and sat last in the snapshot; the goal's cut
+    // dropped its heading, and the judges read the outcome from the pane alone.
+    const base = listingObservation();
+    const [first] = base.elements;
+    if (first === undefined) throw new Error('the listing fixture lists no element');
+    const page = Array.from({ length: 380 }, (_, i) => [
+      `  - link "result ${i}" [ref=e${i + 1}] [cursor=pointer]:`,
+      `    - /url: https://example.test/${'p'.repeat(60)}/${i}`,
+    ]).flat();
+    const observation: PageObservation = {
+      ...base,
+      elements: [
+        ...base.elements,
+        {
+          ...first,
+          ref: 'e9001',
+          role: 'button',
+          name: 'Not now',
+          scope: { role: 'dialog', name: '', modal: false },
+        },
+      ],
+      ariaSnapshot: [
+        '- generic [ref=e1]:',
+        ...page,
+        '- dialog:',
+        '  - button "Not now" [ref=e9001]',
+        '  - heading "Your application was sent to Acme!" [level=3]',
+      ].join('\n'),
+    };
+    const input = goalInputOf(observation);
+    const bare = textBytes(
+      composeStepGoal(withStops({ ...input, observation: { ...observation, ariaSnapshot: '' } })),
+    );
+    const fitted = composeStepGoalWithinBudget(input, bare + 4_000);
+    expect(fitted.goal).toContain('reduced to scope');
+    expect(fitted.goal).toContain('Your application was sent to Acme!');
+  });
 });

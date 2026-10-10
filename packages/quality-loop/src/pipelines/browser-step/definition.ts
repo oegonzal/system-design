@@ -126,7 +126,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   // runs of `measured.json` (`pnpm measure:bounds`), and on Claude, which
   // counts its thinking: 2026-10-10, recorded pages judged against 28- and
   // 38-criterion rubrics (producer 8,517, critic.mission 14,148, evaluator
-  // 22,544 tokens), a live session (critic.safety 7,843) and 19 derivations
+  // 22,544 tokens), live sessions (critic.safety 9,822) and 19 derivations
   // through the criteria endpoint (9,974; `static/runs/2026-10-10T0*-criteria`).
   // A cap is also the call's time limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 12000 },
@@ -169,7 +169,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       persona: criticSafety,
       samples: 1,
       maxItems: 8,
-      maxTokens: 10000,
+      maxTokens: 12000,
       findingTypes: ['unsafe_action', 'trap_interaction', 'missed_stop'],
     },
   ],

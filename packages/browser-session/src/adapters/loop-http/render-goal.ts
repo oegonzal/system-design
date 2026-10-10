@@ -14,6 +14,7 @@ import type { FieldsInput, GoalComposition } from '../../core/ports';
 // The snapshot's own codec, not a browser: it reduces snapshot text by the
 // declared rungs and never touches a page.
 import { fitSnapshot, withoutUnlistedRefs } from '../playwright/aria-snapshot';
+import { snapshotScopeOf } from '../playwright/observation-reading';
 
 /**
  * The goals the session composes for the loop, fitted to the loop's budget
@@ -86,13 +87,13 @@ function snapshotFitted(
   );
   const room = Math.max(0, budget - textBytes(bare));
   // A ref the observation does not list cannot be cited, so it leaves its line
-  // before the room is measured; the open scope is kept whole and the page
-  // behind it reduced first: the dialog's lines are what the plan acts on.
+  // before the room is measured; an open dialog, modal or not, is kept whole
+  // and the rest of the page reduced first: its lines are what the plan acts on.
   const listed = new Set(observation.elements.map((element) => element.ref));
   const fitted = fitSnapshot(
     withoutUnlistedRefs(observation.ariaSnapshot, listed),
     room,
-    observation.activeScope,
+    snapshotScopeOf(observation.activeScope, observation.elements),
   );
   return {
     observation: {

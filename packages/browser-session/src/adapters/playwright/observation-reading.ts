@@ -146,6 +146,26 @@ function activeScopeOf(reading: PageReading): ActiveScope | null {
 }
 
 /**
+ * The scope a snapshot keeps whole when it has to be cut: the modal dialog in
+ * front, else the last dialog an element sits in, modal or not. A dialog that
+ * does not block the page never becomes the active scope — the elements
+ * behind it stay in reach — but it is what the page is saying now. Measured
+ * 2026-10-10: the dialog confirming an application was sent carried no
+ * aria-modal, sat last in a 696-line snapshot, and was the part the goal's cut
+ * dropped, so planner and judges read the outcome from the pane alone.
+ */
+export function snapshotScopeOf(
+  activeScope: ActiveScope | null,
+  elements: readonly ObservedElement[],
+): ActiveScope | null {
+  if (activeScope !== null) return activeScope;
+  const dialogs = elements.flatMap((element) =>
+    element.scope === null ? [] : [{ role: element.scope.role, name: element.scope.name }],
+  );
+  return dialogs[dialogs.length - 1] ?? null;
+}
+
+/**
  * Inside the open scope first, then what is visible and enabled in the main
  * landmark, then the rest of what is visible and enabled, then everything
  * else, each in document order — so under the cap the page's content comes
@@ -185,10 +205,16 @@ export function toObservation(reading: PageReading, read: ObservationReading): P
       ? null
       : { elements: reading.unreadElements, snapshotLines: reading.unreadSnapshotLines },
     activeScope,
-    // Reduced only where it would not fit what an observation may carry, the
-    // open scope kept whole; the goal composer fits it again to the room the
+    // Reduced only where it would not fit what an observation may carry, an
+    // open dialog kept whole; the goal composer fits it again to the room the
     // goal actually has.
-    ...snapshotAt(fitSnapshot(reading.snapshot, SNAPSHOT_BOUND.target, activeScope)),
+    ...snapshotAt(
+      fitSnapshot(
+        reading.snapshot,
+        SNAPSHOT_BOUND.target,
+        snapshotScopeOf(activeScope, reading.elements),
+      ),
+    ),
     reading: read,
   };
 }
