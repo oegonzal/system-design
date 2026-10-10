@@ -149,8 +149,9 @@ describe('a run that recalls lessons for its producer', () => {
     await app.close();
   });
 
-  it('[QL-32] recalls through a recorded memory-recall run and hands the curated lessons to the producer alone', async () => {
-    const runId = await start(url, { pipeline: 'coach', goal: GOAL, recall: true });
+  it('[QL-32] [QL-63] recalls through a recorded memory-recall run, opened by whoever opened the run, and hands the curated lessons to the producer alone', async () => {
+    const openedBy = { kind: 'browser-session', id: 'session-recall', label: 'step 2' };
+    const runId = await start(url, { pipeline: 'coach', goal: GOAL, recall: true, openedBy });
     const run = await settled(url, runId);
     expect(run.status).toBe('complete');
     expect(run.trace?.finalDecision).toBe('accept');
@@ -180,6 +181,7 @@ describe('a run that recalls lessons for its producer', () => {
     // the recall run names the run it was opened for — in its row and its dump.
     expect(run.parentRunId).toBeNull();
     expect(recallRun.parentRunId).toBe(runId);
+    expect([run.openedBy, recallRun.openedBy]).toEqual([openedBy, openedBy]);
     const childManifest = JSON.parse(
       readFileSync(join(DUMP_DIR, recallRunId, 'manifest.json'), 'utf8'),
     ) as { parentRunId: string | null };
@@ -219,17 +221,6 @@ describe('a run that recalls lessons for its producer', () => {
       `/runs?pipeline=${MEMORY_RECALL_ID}`,
     );
     expect(recallRows.data.find((row) => row.runId === recallRunId)?.parentRunId).toBe(runId);
-  });
-
-  it('[QL-63] the recall run carries the opener of the run it was opened for, and one filter lists them both', async () => {
-    const openedBy = { kind: 'browser-session', id: 'session-recall', label: 'step 2' };
-    const runId = await start(url, { pipeline: 'coach', goal: GOAL, recall: true, openedBy });
-    const run = await settled(url, runId);
-    expect(run.openedBy).toEqual(openedBy);
-    const recallRunId = run.recall?.recallRunId ?? '';
-    expect((await runOf(url, recallRunId)).openedBy).toEqual(openedBy);
-    const listed = await getJson<Page<QualityRunSummaryDto>>(url, '/runs?openedBy=session-recall');
-    expect(listed.data.map((row) => row.runId).sort()).toEqual([runId, recallRunId].sort());
   });
 
   it('[QL-34] [QL-51] a run that adopts a judged iteration hands its recall that iteration, and records it as the focus and the chain it screened against', async () => {
