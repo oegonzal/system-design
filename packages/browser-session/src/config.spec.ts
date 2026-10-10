@@ -77,6 +77,7 @@ describe('the session configuration', () => {
     expect(railsOf({ maxStalledSteps: '12' }).maxStalledSteps).toBe(12);
     expect(() => railsOf({ maxStalledSteps: '0' })).toThrow('--max-stalled-steps');
     expect(railsOf({ maxTasks: '2', maxMinutes: '5', maxFailures: '1' })).toEqual({
+      targetDone: null,
       maxTasks: 2,
       maxMinutes: 5,
       maxConsecutiveFailures: 1,
@@ -94,6 +95,20 @@ describe('the session configuration', () => {
     );
     expect(() => positiveInteger('many', 'limit')).toThrow('--limit must be a positive integer');
     expect(positiveInteger(undefined, 'limit')).toBeUndefined();
+
+    // A target is the session's goal on `done` alone; a done unit spends the
+    // task budget too, so a target above the budget is refused by name.
+    expect(flagKey('targetDone')).toBe('target-done');
+    expect(railsOf({ targetDone: '50', maxTasks: '50' })).toMatchObject({
+      targetDone: 50,
+      maxTasks: 50,
+    });
+    expect(() => railsOf({ targetDone: '50' })).toThrow(
+      '--target-done 50 is above --max-tasks 10: every done unit spends the budget too, so the session would stop first — set --max-tasks to at least 50, more to leave room for failed units',
+    );
+    expect(() => railsOf({ targetDone: '0', maxTasks: '5' })).toThrow(
+      '--target-done must be a positive integer',
+    );
 
     expect(headedOf({})).toBe(true);
     expect(headedOf({ headless: true })).toBe(false);

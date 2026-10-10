@@ -167,6 +167,7 @@ export const tasksSpent = (state: SessionState): number => countOf(state, SPENDI
 export const railStateOf = (state: SessionState): RailState => ({
   startedAt: state.startedAt,
   tasksStarted: state.tasks.started,
+  tasksDone: state.tasks.counts.done,
   tasksSpent: tasksSpent(state),
   openTask: state.tasks.open !== null,
   consecutiveFailures: state.consecutiveFailures,
@@ -221,6 +222,7 @@ export const ledgerSummaryOf = (
   closedOmitted: state.tasks.closedOmitted,
   counts: { ...state.tasks.counts },
   remainingTasks: remainingTasks(railStateOf(state), rails),
+  targetDone: rails.targetDone,
 });
 
 /**

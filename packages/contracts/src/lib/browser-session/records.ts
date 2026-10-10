@@ -17,6 +17,12 @@ import type {
 
 /** The engine's own stop rules, declared per session; never a judgement. */
 export interface SessionRailsDto {
+  /**
+   * Units of work to close `done` before the session ends complete — the
+   * session's goal, counted on that one outcome; null when none is set. A
+   * `done` unit spends the `maxTasks` budget too, so it is never above it.
+   */
+  targetDone: number | null;
   maxTasks: number;
   maxMinutes: number;
   maxConsecutiveFailures: number;

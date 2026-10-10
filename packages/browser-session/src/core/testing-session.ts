@@ -21,6 +21,7 @@ import { journeyPages } from './testing-journey';
  * and the session row. No vitest import, so any spec project can use it.
  */
 export const SPEC_RAILS: SessionRailsDto = {
+  targetDone: null,
   maxTasks: 10,
   maxMinutes: 60,
   maxConsecutiveFailures: 3,

@@ -25,6 +25,11 @@ export const SESSION_FLAGS = {
   },
   headed: { name: '--headed', valued: false, help: 'show the browser (the default)' },
   headless: { name: '--headless', valued: false, help: 'run without a window' },
+  targetDone: {
+    name: '--target-done',
+    valued: true,
+    help: 'end the session complete once this many units of work close done',
+  },
   maxTasks: {
     name: '--max-tasks',
     valued: true,
@@ -67,6 +72,7 @@ export const SESSION_ENV = {
  * closing the units of work it was given.
  */
 export const DEFAULT_RAILS: SessionRailsDto = {
+  targetDone: null,
   maxTasks: 10,
   maxMinutes: 720,
   maxConsecutiveFailures: 3,
@@ -141,15 +147,28 @@ export function positiveInteger(raw: string | undefined, flag: SessionFlag): num
   return Number(raw);
 }
 
-/** The rails as the flags set them, over the defaults. */
+/**
+ * The rails as the flags set them, over the defaults. A target above the task
+ * budget is refused by name: every unit closed `done` spends the budget too,
+ * so the budget would end the session before the target could.
+ */
 export function railsOf(values: {
+  targetDone?: string;
   maxTasks?: string;
   maxMinutes?: string;
   maxFailures?: string;
   maxStalledSteps?: string;
 }): SessionRailsDto {
+  const targetDone = positiveInteger(values.targetDone, 'targetDone') ?? DEFAULT_RAILS.targetDone;
+  const maxTasks = positiveInteger(values.maxTasks, 'maxTasks') ?? DEFAULT_RAILS.maxTasks;
+  if (targetDone !== null && targetDone > maxTasks) {
+    throw new SessionConfigError(
+      `${SESSION_FLAGS.targetDone.name} ${targetDone} is above ${SESSION_FLAGS.maxTasks.name} ${maxTasks}: every done unit spends the budget too, so the session would stop first — set ${SESSION_FLAGS.maxTasks.name} to at least ${targetDone}, more to leave room for failed units`,
+    );
+  }
   return {
-    maxTasks: positiveInteger(values.maxTasks, 'maxTasks') ?? DEFAULT_RAILS.maxTasks,
+    targetDone,
+    maxTasks,
     maxMinutes: positiveInteger(values.maxMinutes, 'maxMinutes') ?? DEFAULT_RAILS.maxMinutes,
     maxConsecutiveFailures:
       positiveInteger(values.maxFailures, 'maxFailures') ?? DEFAULT_RAILS.maxConsecutiveFailures,

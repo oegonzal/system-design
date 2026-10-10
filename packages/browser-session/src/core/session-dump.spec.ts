@@ -31,6 +31,7 @@ const manifest = () =>
       detail: 'done',
     },
     limits: {
+      targetDone: null,
       maxTasks: 1,
       maxMinutes: 1,
       maxConsecutiveFailures: 1,

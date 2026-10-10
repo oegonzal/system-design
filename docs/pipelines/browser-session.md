@@ -71,7 +71,9 @@ pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-app
 
 `--url` opens the browser where the work begins, so no plan is ever made on
 about:blank; `--subject` names whom the operator's answers are about, so the
-facts they teach are self-contained.
+facts they teach are self-contained. To run until a number of applications are
+submitted, add `--target-done n` (with `--max-tasks` at least n): the session
+ends `complete`, reason `target-reached`, once n units have closed `done`.
 
 Read, per form page: one `form-memory` orchestration whose `recall` step
 counts `{probes, candidates, evidence}` and whose `target` step reports

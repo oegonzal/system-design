@@ -8,6 +8,7 @@ const STATUSES = ['running', 'complete', 'stopped', 'failed'] as const satisfies
 type ContractTerminations = (typeof Contracts)['BROWSER_SESSION_TERMINATIONS'];
 const TERMINATIONS = [
   'mission-stop',
+  'target-reached',
   'max-tasks',
   'max-minutes',
   'max-failures',

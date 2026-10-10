@@ -19,6 +19,34 @@ describe('how a plan stops and how a session ends', () => {
   const refusingFills = (pageId: string): FakeBrowser =>
     refusing(new FakeBrowser(pages()), 'fill', pageId);
 
+  it("[BRW-4] ends complete the moment its target is reached: after the step whose plan closed the last unit done, before the mission's own stop is ever planned", async () => {
+    const { outcome, brain, detail } = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.done, PLANS.end].map((p) =>
+          decidedPlan(p),
+        ),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      replies: [{ kind: 'answer', text: 'Yes' }],
+      rails: { targetDone: 1 },
+    });
+    expect(outcome.status).toBe('complete');
+    expect(outcome.termination).toEqual({
+      reason: 'target-reached',
+      detail: '1 of 1 units of work closed done',
+    });
+    // The fifth plan — the mission's own terminate — was never asked for.
+    expect(outcome.steps).toBe(4);
+    expect(brain.planInputs).toHaveLength(4);
+    expect(detail).toMatchObject({
+      status: 'complete',
+      terminationReason: 'target-reached',
+      terminationCause: null,
+    });
+    // Each goal told the planner where the session stood toward its target.
+    expect(brain.planInputs[3]?.ledger.targetDone).toBe(1);
+  });
+
   it('[BRW-1] stops a plan at the first action the page refuses — a field fill included — tells the next plan what did not run and why, and counts one failed step', async () => {
     // A judge cut the plan at its third action and the page refuses the first: the history says both.
     const searchThenEnter: StepPlan = {

@@ -11,6 +11,7 @@ import {
 import { MikroOrmLedger } from './mikro-orm-ledger';
 
 const RAILS = {
+  targetDone: null,
   maxTasks: 2,
   maxMinutes: 30,
   maxConsecutiveFailures: 3,
@@ -207,5 +208,51 @@ describe('the ledger in Postgres', () => {
       createdAt: at(40).toISOString(),
     });
     expect(await ledger.getSession(crypto.randomUUID())).toBeNull();
+  });
+
+  it('[BRW-4] records a session that reached its target as complete, and reads rails stored before the target existed as having none', async () => {
+    const ledger = new MikroOrmLedger(orm.em);
+    const reached = crypto.randomUUID();
+    await ledger.openSession({
+      id: reached,
+      dumpRunId: '2026-10-09T10-00-00-000-abcdef-session',
+      goalPath: 'goals/test.md',
+      goalHash: 'b'.repeat(64),
+      goalMarkdown: '# Mission\n',
+      profile: 'spec',
+      headed: false,
+      limits: { ...RAILS, targetDone: 2 },
+      startedAt: T0,
+    });
+    await ledger.closeSession(reached, {
+      status: 'complete',
+      termination: { reason: 'target-reached', detail: '2 of 2 units of work closed done' },
+      steps: 7,
+      finishedAt: at(60),
+      error: null,
+    });
+    expect(await ledger.getSession(reached)).toMatchObject({
+      status: 'complete',
+      terminationReason: 'target-reached',
+      terminationCause: null,
+      limits: { targetDone: 2 },
+    });
+
+    // A row written before the field: its stored rails have no target, and read as none.
+    const older = crypto.randomUUID();
+    await ledger.openSession({
+      id: older,
+      dumpRunId: '2026-10-08T10-00-00-000-abcdef-session',
+      goalPath: 'goals/test.md',
+      goalHash: 'c'.repeat(64),
+      goalMarkdown: '# Mission\n',
+      profile: 'spec',
+      headed: false,
+      limits: RAILS,
+      startedAt: T0,
+    });
+    const { targetDone: _dropped, ...stored } = RAILS;
+    await orm.em.fork().nativeUpdate(BrowserSession, { id: older }, { limits: stored as never });
+    expect((await ledger.getSession(older))?.limits.targetDone).toBeNull();
   });
 });

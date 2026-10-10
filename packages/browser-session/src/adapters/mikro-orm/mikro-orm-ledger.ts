@@ -39,7 +39,8 @@ export const toSessionDto = (row: BrowserSession): BrowserSessionDto => ({
   terminationReason: row.terminationReason,
   terminationCause: row.terminationCause,
   terminationDetail: row.terminationDetail,
-  limits: row.limits,
+  // A session recorded before the target existed has none in its stored rails.
+  limits: { ...row.limits, targetDone: row.limits.targetDone ?? null },
   steps: row.steps,
   startedAt: iso(row.startedAt),
   heartbeatAt: iso(row.heartbeatAt),

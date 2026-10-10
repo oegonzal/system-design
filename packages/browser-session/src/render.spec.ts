@@ -97,7 +97,21 @@ describe('the CLI renderer', () => {
     expect(text).toContain(
       `rails: ${DEFAULT_RAILS.maxTasks} tasks · ${DEFAULT_RAILS.maxMinutes} min · ${DEFAULT_RAILS.maxConsecutiveFailures} failures · ${DEFAULT_RAILS.maxBrainFaults} brain faults`,
     );
+    expect(text).not.toContain('target');
     expect(text).toContain('error: Error: boom');
+    // A session with a target says so on its rails line.
+    const targeted = renderSession(
+      {
+        ...detail,
+        limits: { ...DEFAULT_RAILS, targetDone: 5, maxTasks: 6 },
+        terminationReason: 'target-reached',
+        terminationCause: null,
+        terminationDetail: '5 of 5 units of work closed done',
+      },
+      NOW,
+    );
+    expect(targeted).toContain('3 brain faults · target 5 done');
+    expect(targeted).toContain('ended by target-reached: 5 of 5 units of work closed done');
     expect(text).toMatch(/1\s+Senior Engineer at Acme\s+complete\s+done\s+2–4/);
     expect(text).toMatch(
       /3\.2\s+field-answer\s+operator\s+run-9\s+e2\s+Work authorisation\s+Yes\s+low\s+teach-1/,

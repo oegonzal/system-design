@@ -36,7 +36,7 @@ import { renderOutcome, renderSession, renderSessions } from './render';
 const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
-  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
+  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
             every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
@@ -122,6 +122,7 @@ export function parseOptions(argv: readonly string[]): Options | Error {
           profile: required(text('profile'), 'profile'),
           headed: headedOf({ headed: on('headed'), headless: on('headless') }),
           rails: railsOf({
+            targetDone: text('targetDone'),
             maxTasks: text('maxTasks'),
             maxMinutes: text('maxMinutes'),
             maxFailures: text('maxFailures'),

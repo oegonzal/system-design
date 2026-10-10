@@ -3,6 +3,7 @@ import { BROWSER_SESSION_TERMINATIONS, TERMINATION_STATUS } from '@sysdesign/con
 import { checkRails, RAILS, remainingTasks, type RailState } from './rails';
 
 const RAIL_LIMITS = {
+  targetDone: null,
   maxTasks: 2,
   maxMinutes: 30,
   maxConsecutiveFailures: 3,
@@ -16,6 +17,7 @@ const at = (minutes: number): Date => new Date(START.getTime() + minutes * 60_00
 const state = (overrides: Partial<RailState> = {}): RailState => ({
   startedAt: START,
   tasksStarted: 0,
+  tasksDone: 0,
   tasksSpent: 0,
   openTask: false,
   consecutiveFailures: 0,
@@ -53,12 +55,34 @@ describe('the rails', () => {
     );
   });
 
-  it('[BRW-4] names only engine terminations, each with a status in the termination table', () => {
+  it('[BRW-4] names only engine terminations, each with a status in the termination table: the target ends complete, every limit stopped', () => {
     for (const rail of RAILS) {
       expect(BROWSER_SESSION_TERMINATIONS).toContain(rail.reason);
-      expect(TERMINATION_STATUS[rail.reason]).toBe('stopped');
+      expect(TERMINATION_STATUS[rail.reason]).toBe(
+        rail.reason === 'target-reached' ? 'complete' : 'stopped',
+      );
     }
     expect(new Set(RAILS.map((rail) => rail.reason)).size).toBe(RAILS.length);
+  });
+
+  it("[BRW-4] ends the session complete once the target's units close done — counted on done alone, the goal before the limit, the operator before both", () => {
+    const target = { ...RAIL_LIMITS, targetDone: 2 };
+    expect(checkRails(state({ tasksDone: 1, tasksSpent: 1 }), target, at(1))).toBeNull();
+    // The unit that reaches the target is also the budget's last: the goal is what is reported.
+    const reached = checkRails(state({ tasksDone: 2, tasksSpent: 2 }), target, at(1));
+    expect(reached?.reason).toBe('target-reached');
+    expect(reached?.detail).toBe('2 of 2 units of work closed done');
+    // A failed unit spends the budget and counts nothing toward the target.
+    expect(checkRails(state({ tasksDone: 1, tasksSpent: 2 }), target, at(1))?.reason).toBe(
+      'max-tasks',
+    );
+    // With no target set, done units only spend.
+    expect(checkRails(state({ tasksDone: 1, tasksSpent: 1 }), RAIL_LIMITS, at(1))).toBeNull();
+    // The operator's word still outranks it.
+    expect(
+      checkRails(state({ tasksDone: 2, tasksSpent: 2, operatorStopped: true }), target, at(1))
+        ?.reason,
+    ).toBe('operator-stop');
   });
 
   it('tells the next plan how many units of work may still be spent: the open unit is not subtracted', () => {

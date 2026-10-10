@@ -17,6 +17,13 @@ export const MISSION_STOP = 'mission-stop';
 
 /** Why the engine ends a session on its own: a declared rail, the operator, or a fault. */
 export const ENGINE_TERMINATIONS = [
+  /**
+   * The session's own goal, not a limit: the number of units of work it was
+   * asked to close `done` (`SessionRailsDto.targetDone`) closed so. Every
+   * other rail is a limit and ends the session stopped; this one ends it
+   * complete.
+   */
+  'target-reached',
   'max-tasks',
   'max-minutes',
   'max-failures',
@@ -52,6 +59,7 @@ export type StopEnding = (typeof STOP_ENDINGS)[number];
  * mission's (`STOP_ENDINGS`).
  */
 export const TERMINATION_STATUS = {
+  'target-reached': 'complete',
   'max-tasks': 'stopped',
   'max-minutes': 'stopped',
   'max-failures': 'stopped',

@@ -159,6 +159,7 @@ export function emptyLedger(): TaskLedgerSummary {
     closedOmitted: 0,
     counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: null,
+    targetDone: null,
   };
 }
 
@@ -169,6 +170,7 @@ export function openTaskLedger(): TaskLedgerSummary {
     closedOmitted: 0,
     counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: 8,
+    targetDone: null,
   };
 }
 

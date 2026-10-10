@@ -248,6 +248,12 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
           (outcome) => !TASK_OUTCOME_SPENDS[outcome],
         ).join(' or ')} does not count.`
   }`,
+  // The session's goal, as the engine counts it: the planner never has to end the session for it.
+  ...(ledger.targetDone === null
+    ? []
+    : [
+        `- Target: ${ledger.counts.done} of ${ledger.targetDone} closed done — the session ends complete when it is reached.`,
+      ]),
 ];
 
 /** One action that ran, as the page would know it again: `click button "Next"`, `fill searchbox "Search" "x"`, `press Enter`. */

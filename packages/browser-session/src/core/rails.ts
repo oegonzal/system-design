@@ -16,6 +16,8 @@ export interface RailState {
   startedAt: Date;
   /** Units of work opened so far. */
   tasksStarted: number;
+  /** Units of work closed `done`: what the session's target counts. */
+  tasksDone: number;
   /** Units of work closed by an outcome that spends the budget — worked to their end, however they ended. */
   tasksSpent: number;
   openTask: boolean;
@@ -52,6 +54,15 @@ export const RAILS: readonly Rail[] = [
     reason: 'operator-stop',
     holds: (state) => state.operatorStopped,
     detail: () => 'the operator typed /stop',
+  },
+  {
+    // The session's goal, checked before its limits: when the unit that
+    // reaches the target is also the budget's last, the session reports the
+    // goal. Only `done` counts — a unit found already done was done before
+    // this session, and one set aside or failed was not done at all.
+    reason: 'target-reached',
+    holds: (state, rails) => rails.targetDone !== null && state.tasksDone >= rails.targetDone,
+    detail: (state, rails) => `${state.tasksDone} of ${rails.targetDone} units of work closed done`,
   },
   {
     // The budget is spent by units worked to their end, however they ended; a

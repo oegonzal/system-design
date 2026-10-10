@@ -24,7 +24,7 @@ Every flag and variable is declared once in `src/config.ts`, with its default; n
 | `BROWSER_PROFILES_DIR`     | `static/browser-profiles` | where persistent Chrome profiles live, one folder per `--profile` name — never commit them                 |
 | `BROWSER_SESSION_SUBJECT`  | `the subject`             | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
 
-Rails (`--max-tasks 10`, `--max-minutes 720`, `--max-failures 3`, `--max-stalled-steps 3`; brain faults are capped at 3) are the engine's only decisions of its own. The browser is headed unless `--headless` is given.
+Rails (`--max-tasks 10`, `--max-minutes 720`, `--max-failures 3`, `--max-stalled-steps 3`; brain faults are capped at 3) are the engine's only decisions of its own. Each is a limit and ends the session `stopped`; the one goal among them, `--target-done n`, ends it `complete` once n units of work have closed `done` — counted on that outcome alone, and refused at start when it is above `--max-tasks`, since a done unit spends that budget too. The browser is headed unless `--headless` is given.
 
 ## How a step goes
 

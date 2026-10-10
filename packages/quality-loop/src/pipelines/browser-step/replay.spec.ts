@@ -53,6 +53,7 @@ const goalOf = (recorded: RecordedStep): string =>
       closedOmitted: 0,
       counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
       remainingTasks: 1,
+      targetDone: null,
     },
     objections: [],
     progress: { criteria: [], settled: [], done: [] },

@@ -103,7 +103,9 @@ export function renderSession(detail: BrowserSessionDetailDto, now: Date): strin
     `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile} · ${
       detail.headed ? 'headed' : 'headless'
     } · ${detail.steps} step(s) · dump ${detail.dumpRunId}`,
-    `rails: ${detail.limits.maxTasks} tasks · ${detail.limits.maxMinutes} min · ${detail.limits.maxConsecutiveFailures} failures · ${detail.limits.maxBrainFaults} brain faults`,
+    `rails: ${detail.limits.maxTasks} tasks · ${detail.limits.maxMinutes} min · ${detail.limits.maxConsecutiveFailures} failures · ${detail.limits.maxBrainFaults} brain faults${
+      detail.limits.targetDone === null ? '' : ` · target ${detail.limits.targetDone} done`
+    }`,
     ...(detail.error === null ? [] : [`error: ${detail.error.name}: ${detail.error.message}`]),
     '',
     taskRows(detail.tasks),

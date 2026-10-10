@@ -192,6 +192,15 @@ describe('composeStepGoal', () => {
     expect(goal).toContain('- Closed this session: none yet.');
     expect(goal).toContain('- Closed so far: done 0 · already-done 0 · skipped 0 · failed 0.');
     expect(goal).not.toContain('may still be started');
+    // No target was set, so none is told.
+    expect(goal).not.toContain('- Target:');
+  });
+
+  it('[QL-39] tells the planner how far the session is toward its target, counted on done units alone, and that reaching it ends the session', () => {
+    const ledger = { ...openTaskLedger(), targetDone: 3 };
+    expect(goalOf(listingObservation(), [], ledger)).toContain(
+      '- Target: 1 of 3 closed done — the session ends complete when it is reached.',
+    );
   });
 
   it('[QL-39] refuses a page that would not fit rather than clipping it', () => {

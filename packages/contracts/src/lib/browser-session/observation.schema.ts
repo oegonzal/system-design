@@ -313,5 +313,7 @@ export const taskLedgerSummarySchema = z.strictObject({
   counts: z.record(z.enum(TASK_OUTCOMES), z.number().int().min(0)),
   /** Units of work the session may still spend under its rail; null when the rail is not set. */
   remainingTasks: z.number().int().min(0).nullable(),
+  /** Units of work the session is asked to close `done` before it ends complete; null when no target is set. */
+  targetDone: z.number().int().min(1).nullable(),
 });
 export type TaskLedgerSummary = z.infer<typeof taskLedgerSummarySchema>;

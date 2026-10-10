@@ -129,6 +129,7 @@ describe('the session service, end to end', () => {
       profile: 'spec',
       headed: false,
       rails: {
+        targetDone: null,
         maxTasks: 3,
         maxMinutes: 30,
         maxConsecutiveFailures: 3,
