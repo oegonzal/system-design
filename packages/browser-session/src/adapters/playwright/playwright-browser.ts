@@ -129,6 +129,17 @@ const messageOf = (error: unknown): string => {
   return waitedFor === '' ? first : `${first} (${waitedFor})`;
 };
 
+/** The attribute an element carries while its capture is taken, and never after. */
+const CAPTURE_MARK = 'data-session-capture';
+/**
+ * How a marked element shows in its capture: an outline apart from the
+ * operator highlight's, which stays on a field once it was asked about and
+ * would otherwise make every such field read as the one just entered.
+ */
+const CAPTURE_STYLE = `[${CAPTURE_MARK}] { outline: 3px solid #2563eb !important; outline-offset: 2px !important; }`;
+/** How long marking an element may take: an image documents, and an element that is gone is not worth a wait. */
+const MARK_TIMEOUT_MS = 1_000;
+
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
 const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
 
@@ -310,8 +321,23 @@ export class PlaywrightBrowser implements BrowserPort {
     }
   }
 
-  async screenshot(): Promise<Uint8Array> {
-    return new Uint8Array(await this.page.screenshot({ type: 'png' }));
+  /**
+   * The page at CSS scale — legible, and a quarter of a retina screen's
+   * pixels — with the element `outline` names marked while it is taken.
+   */
+  async screenshot(outline: string | null): Promise<Uint8Array> {
+    const marked = outline === null ? null : await this.mark(outline);
+    try {
+      return new Uint8Array(
+        await this.page.screenshot({ type: 'png', scale: 'css', style: CAPTURE_STYLE }),
+      );
+    } finally {
+      await marked
+        ?.evaluate((el, name) => el.removeAttribute(name), CAPTURE_MARK, {
+          timeout: MARK_TIMEOUT_MS,
+        })
+        .catch(() => undefined);
+    }
   }
 
   async close(): Promise<void> {
@@ -319,6 +345,19 @@ export class PlaywrightBrowser implements BrowserPort {
     this.context = null;
     this.known.clear();
     if (context !== null) await context.close();
+  }
+
+  /** The element under the ref, marked for a capture; null when it cannot be — gone, or never listed. */
+  private async mark(ref: string): Promise<Locator | null> {
+    try {
+      const locator = this.locate(this.resolve(ref, 'capture').ref);
+      await locator.evaluate((el, name) => el.setAttribute(name, ''), CAPTURE_MARK, {
+        timeout: MARK_TIMEOUT_MS,
+      });
+      return locator;
+    } catch {
+      return null;
+    }
   }
 
   private locate(ref: string): Locator {

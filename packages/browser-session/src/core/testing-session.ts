@@ -1,5 +1,6 @@
 import { MISSION_FIXTURE, type SessionRailsDto } from '@sysdesign/contracts';
 
+import type { CapturePolicy } from './engine-context';
 import type { OperatorReply } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
@@ -32,6 +33,9 @@ export const SPEC_RAILS: SessionRailsDto = {
 
 export const SPEC_SUBJECT = 'Alex Example';
 
+/** No images beyond each step's own screenshot: the step specs pin each step's files exactly. */
+export const NO_CAPTURE: CapturePolicy = { after: [], failures: false };
+
 export interface Scenario {
   script: BrainScript;
   replies?: OperatorReply[];
@@ -40,6 +44,7 @@ export interface Scenario {
   browser?: FakeBrowser;
   ledger?: InMemoryLedger;
   startUrl?: string;
+  capture?: CapturePolicy;
 }
 
 export async function runScripted(scenario: Scenario) {
@@ -68,6 +73,8 @@ export async function runScripted(scenario: Scenario) {
       rails: { ...SPEC_RAILS, ...scenario.rails },
       subject: SPEC_SUBJECT,
       startUrl: scenario.startUrl,
+      capture: scenario.capture ?? NO_CAPTURE,
+      settingsSources: {},
     },
   );
   const detail = await ledger.getSession(outcome.sessionId);

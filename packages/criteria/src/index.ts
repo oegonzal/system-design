@@ -762,12 +762,17 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-7',
     statement:
-      'Every flag and environment variable the session reads is declared once as data with its default, validated by name before anything boots, and nothing else in the package reads the environment.',
+      "Every flag and environment variable the session reads is declared once as data with its default, and how a session runs and what it images are files in the package's own config/ — a choices file naming one complete file per kind, every value in the files alone, a flag overriding its field for one run — all validated by name before anything boots, a kind left unchosen refused naming the file; nothing else in the package reads the environment.",
   },
   {
     id: 'BRW-8',
     statement:
       'The package names no site: the mission, its units of work, its procedure, its stop conditions and its answering policy live in a markdown goal, and the same program runs any goal.',
+  },
+  {
+    id: 'BRW-9',
+    statement:
+      "A session documents what it did as images beside each step's own screenshot, as its declared capture policy says: the browser actions it names once they ran — a plan's own and every field entry, a value the operator typed and the session read back included — and, when it asks, an action the page refused as the page stood; a field entry is outlined in its image and unmarked after, every image is the page at CSS scale, each step lists its images with the action that made them, a file name never carries the value entered, and an image that could not be taken never fails the session.",
   },
   {
     id: 'QL-41',

@@ -22,16 +22,19 @@ import {
   DEFAULT_LIST_LIMIT,
   flagKey,
   headedOf,
+  PACKAGE_ROOT,
   parseArgsOptions,
   positiveInteger,
   railsOf,
   SESSION_FLAGS,
   sessionConfigFromEnv,
   SessionConfigError,
+  type SessionConfig,
 } from './config';
 import { AppModule } from './modules/app/app.module';
 import { SessionService } from './modules/session/session.service';
 import { renderOutcome, renderSession, renderSessions } from './render';
+import { readSessionSettings, type SessionDefaults } from './settings';
 
 const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
 
@@ -91,8 +94,8 @@ const required = (value: string | undefined, key: keyof typeof SESSION_FLAGS): s
   return value;
 };
 
-/** argv → options, or an Error whose message is the usage problem. */
-export function parseOptions(argv: readonly string[]): Options | Error {
+/** argv → options over the settings' defaults, or an Error whose message is the usage problem. */
+export function parseOptions(argv: readonly string[], defaults: SessionDefaults): Options | Error {
   const [command, ...rest] = argv;
   if (!isCommand(command)) return new Error(USAGE);
   try {
@@ -120,14 +123,17 @@ export function parseOptions(argv: readonly string[]): Options | Error {
           command,
           goalPath: required(text('goal'), 'goal'),
           profile: required(text('profile'), 'profile'),
-          headed: headedOf({ headed: on('headed'), headless: on('headless') }),
-          rails: railsOf({
-            targetDone: text('targetDone'),
-            maxTasks: text('maxTasks'),
-            maxMinutes: text('maxMinutes'),
-            maxFailures: text('maxFailures'),
-            maxStalledSteps: text('maxStalledSteps'),
-          }),
+          headed: headedOf({ headed: on('headed'), headless: on('headless') }, defaults.headed),
+          rails: railsOf(
+            {
+              targetDone: text('targetDone'),
+              maxTasks: text('maxTasks'),
+              maxMinutes: text('maxMinutes'),
+              maxFailures: text('maxFailures'),
+              maxStalledSteps: text('maxStalledSteps'),
+            },
+            defaults.rails,
+          ),
           subject: text('subject'),
           startUrl: text('url'),
         };
@@ -188,16 +194,16 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
 }
 
 export async function cli(argv: readonly string[]): Promise<number> {
-  const options = parseOptions(argv);
-  if (options instanceof Error) {
-    console.error(options.message);
-    return 2;
-  }
-  let config;
+  let config: SessionConfig;
   try {
-    config = sessionConfigFromEnv();
+    config = { ...sessionConfigFromEnv(), settings: readSessionSettings(PACKAGE_ROOT) };
   } catch (error) {
     console.error(messageOf(error));
+    return 2;
+  }
+  const options = parseOptions(argv, config.settings.session);
+  if (options instanceof Error) {
+    console.error(options.message);
     return 2;
   }
   const app = await NestFactory.createApplicationContext(AppModule.register(config), {

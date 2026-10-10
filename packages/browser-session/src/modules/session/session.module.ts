@@ -8,7 +8,7 @@ import { LoopBrain } from '../../adapters/loop-http/loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
 import { CHROME_CHANNEL, PlaywrightBrowser } from '../../adapters/playwright/playwright-browser';
 import { TerminalOperator } from '../../adapters/terminal-operator/terminal-operator';
-import { LOOP_RECOVERY, type SessionConfig } from '../../config';
+import type { SessionConfig } from '../../config';
 import type { Clock } from '../../core/ports';
 import { fsDumpStore } from '../../core/session-dump';
 import { SessionService } from './session.service';
@@ -41,7 +41,8 @@ export class SessionModule {
         { provide: SESSION_CONFIG, useValue: config },
         {
           provide: LoopClient,
-          useFactory: () => new HttpLoopClient(config.loopUrl, fetch, LOOP_RECOVERY),
+          useFactory: () =>
+            new HttpLoopClient(config.loopUrl, fetch, config.settings.session.loopRecovery),
         },
         {
           provide: BRAIN,

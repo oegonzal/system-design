@@ -1,3 +1,4 @@
+import { EngineConfigError } from '@sysdesign/config-kit';
 import { describe, expect, it } from 'vitest';
 
 import { PROVIDERS } from './create-client';
@@ -6,7 +7,6 @@ import {
   DEFAULT_LLM_CONFIG,
   llmConfigSchema,
   LLM_PROVIDERS,
-  LlmConfigError,
   readChosenLlmConfig,
   readLlmConfig,
 } from './llm-config';
@@ -21,14 +21,14 @@ const chose = (json: string) =>
   disk({ 'config/engine.json': '{"llm":"chosen"}', 'config/llm/chosen.json': json });
 
 describe('the model configuration', () => {
-  it('[QL-62] runs on the subscription when no file names anything else, so a checkout without one is unchanged', () => {
+  it('[QL-22] runs on the subscription when no file names anything else, so a checkout without one is unchanged', () => {
     expect(readLlmConfig('/repo', disk({}))).toEqual(DEFAULT_LLM_CONFIG);
     expect(DEFAULT_LLM_CONFIG.provider).toBe('claude-subscription');
     // Every provider the vocabulary declares is one the table can build.
     expect(Object.keys(PROVIDERS).sort()).toEqual([...LLM_PROVIDERS].sort());
   });
 
-  it('[QL-62] takes the file as the whole answer, and refuses one it cannot read rather than falling back to a provider nobody chose', () => {
+  it('[QL-22] takes the file as the whole answer, and refuses one it cannot read rather than falling back to a provider nobody chose', () => {
     const openai = readLlmConfig(
       '/repo',
       chose('{"provider":"openai-compatible","model":"gpt-4o-mini","apiKeyVar":"OPENAI_API_KEY"}'),
@@ -52,15 +52,15 @@ describe('the model configuration', () => {
     expect(hosted).toMatchObject({ api: 'responses', store: true });
     expect(() =>
       readLlmConfig('/repo', chose('{"provider":"openai-compatible","api":"completions"}')),
-    ).toThrow(LlmConfigError);
+    ).toThrow(EngineConfigError);
 
     // A file that is present and wrong is a refusal naming the field: the point
     // of writing the provider down is that what ran is what the file says.
-    expect(() => readLlmConfig('/repo', chose('{"provider":"gpt"}'))).toThrow(LlmConfigError);
-    expect(() => readLlmConfig('/repo', chose('not json'))).toThrow(LlmConfigError);
+    expect(() => readLlmConfig('/repo', chose('{"provider":"gpt"}'))).toThrow(EngineConfigError);
+    expect(() => readLlmConfig('/repo', chose('not json'))).toThrow(EngineConfigError);
     expect(() =>
       readLlmConfig('/repo', chose('{"provider":"openai-compatible","nope":1}')),
-    ).toThrow(LlmConfigError);
+    ).toThrow(EngineConfigError);
 
     // And the file it came from travels with it, so a boot can say which.
     expect(readChosenLlmConfig('/repo', chose('{"provider":"claude-subscription"}')).source).toBe(
@@ -69,7 +69,7 @@ describe('the model configuration', () => {
     expect(readChosenLlmConfig('/repo', disk({})).source).toBeNull();
   });
 
-  it('[QL-62] names the variable holding a key and never a key, so the file is safe to commit', () => {
+  it('[QL-22] names the variable holding a key and never a key, so the file is safe to commit', () => {
     // A value that looks like a secret is refused in the field that names one.
     expect(() =>
       llmConfigSchema.parse({ provider: 'openai-compatible', apiKeyVar: 'sk-abc123' }),

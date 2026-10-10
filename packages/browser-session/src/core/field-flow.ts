@@ -16,6 +16,7 @@ import {
   excerpt,
 } from '@sysdesign/contracts';
 
+import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { fieldTypeOf, routeFieldsInSession, type RoutedField } from './field-routing';
 import { askListed } from './operator-reply';
@@ -27,6 +28,7 @@ import {
   type OperatorReply,
 } from './ports';
 import { stepJsonFile } from './session-dump';
+import { describeAction } from './session-state';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
@@ -103,6 +105,12 @@ const settled = (into: Map<string, string>, field: FieldSpec, value: string): vo
   if (key !== null) into.set(key, value);
 };
 
+/** A field entry as its capture names it: the action as the history reads it, the field by what it asks. */
+const entryOf = (field: FieldSpec, action: BrowserAction, observation: PageObservation) => ({
+  label: describeAction(action, observation),
+  touched: fieldKeyOf(field) ?? field.role,
+});
+
 /** The page refused the fill: the result says so, and the caller stops. */
 async function fill(
   ctx: EngineContext,
@@ -110,15 +118,20 @@ async function fill(
   value: string,
   source: BrowserDecisionSource,
   reply: OperatorReply['kind'] | null,
+  observation: PageObservation,
 ): Promise<FieldResult> {
+  const action = fillActionOf(field.field, value);
+  const entry = entryOf(field.field, action, observation);
   try {
-    await ctx.deps.browser.act(fillActionOf(field.field, value));
-    settled(ctx.state.filled, field.field, value);
-    return result(field, 'fill', source, value, reply);
+    await ctx.deps.browser.act(action);
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
+    await captureAfter(ctx, action, entry, 'failed');
     return result(field, 'fill', source, value, reply, 'failed', error.message);
   }
+  await captureAfter(ctx, action, entry, 'ok');
+  settled(ctx.state.filled, field.field, value);
+  return result(field, 'fill', source, value, reply);
 }
 
 /** Keep what the operator said for the next form that asks the same, and shape it as the item taught back at once. */
@@ -167,7 +180,7 @@ async function ask(
     case 'blank':
       return result(field, 'leave-blank', 'operator', null, 'blank');
     case 'answer': {
-      const filled = await fill(ctx, field, reply.text, 'operator', 'answer');
+      const filled = await fill(ctx, field, reply.text, 'operator', 'answer', observation);
       if (filled.outcome !== 'ok') return filled;
       return { ...filled, guidance: remember(ctx, field.field, reply.text, observation) };
     }
@@ -176,6 +189,9 @@ async function ask(
       if (value === null || value === '') {
         return result(field, 'leave-blank', 'operator', null, 'read-back', 'ok', 'left empty');
       }
+      // What the operator typed into the page is an entry like any other.
+      const typed = fillActionOf(field.field, value);
+      await captureAfter(ctx, typed, entryOf(field.field, typed, observation), 'ok');
       return {
         ...result(field, 'fill', 'operator', value, 'read-back'),
         guidance: remember(ctx, field.field, value, observation),
@@ -248,7 +264,7 @@ const settle = (
       if (field.value !== null) settled(ctx.state.filled, field.field, field.value);
       return Promise.resolve(result(field, 'keep', field.source, field.value, null));
     case 'fill':
-      return fill(ctx, field, field.value ?? '', field.source, null);
+      return fill(ctx, field, field.value ?? '', field.source, null, observation);
     case 'ask-operator':
       return ask(ctx, field, observation);
   }

@@ -56,7 +56,9 @@ work `done` and one `step-plan` decision per page, each with a `loopRunId`;
 `static/sessions/<dumpId>/00-rubrics.json` names, per pipeline, the rubric and
 the `<stamp>-criteria` dump of the call that derived it;
 `ls static/sessions/<dumpId>/01-steps` has one folder per step with
-`observation.json`, `snapshot.txt`, `screenshot.png`, `plan.json`; and
+`observation.json`, `snapshot.txt`, `screenshot.png`, `plan.json` — and, under
+the chosen capture settings, `captures.json` with a `captures/` image of each
+field entry; and
 `select status, termination_reason, termination_cause, steps from browser_session order by started_at desc limit 1`
 agrees. Repeat with `--headless`.
 

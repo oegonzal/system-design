@@ -82,6 +82,8 @@ export function actionKey(action: BrowserAction): string {
 
 export class FakeBrowser implements BrowserPort {
   readonly calls: string[] = [];
+  /** What each screenshot was asked to mark, in order — apart from `calls`, which the step specs pin. */
+  readonly shots: (string | null)[] = [];
   readonly values = new Map<string, string>();
   opened: { profile: string; headed: boolean } | null = null;
   closed = false;
@@ -141,7 +143,8 @@ export class FakeBrowser implements BrowserPort {
     return this.current.observation.elements.find((e) => e.ref === ref)?.value ?? null;
   }
 
-  async screenshot(): Promise<Uint8Array> {
+  async screenshot(outline: string | null): Promise<Uint8Array> {
+    this.shots.push(outline);
     return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
   }
 

@@ -9,6 +9,7 @@ import {
   type StepPlan,
 } from '@sysdesign/contracts';
 
+import { captureAfter, touchedName } from './capture';
 import type { EngineContext } from './engine-context';
 import { exactCheckOf } from './expectations';
 import { askFields } from './field-flow';
@@ -117,7 +118,7 @@ async function perform(
   const { deps, state } = ctx;
   switch (action.kind) {
     case 'screenshot': {
-      const bytes = await deps.browser.screenshot();
+      const bytes = await deps.browser.screenshot(null);
       ctx.dumpFiles('screenshot', [labelledScreenshot(state.step, action.label, bytes)]);
       pushHistory(state, label, 'ok', null);
       return { failed: false, stopped: false };
@@ -148,14 +149,17 @@ async function act(
   observation: PageObservation,
 ): Promise<boolean> {
   const { deps, state } = ctx;
+  const described = { label, touched: touchedName(action, observation) };
   try {
     await deps.browser.act(action);
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
     pushHistory(state, label, 'failed', error.message);
+    await captureAfter(ctx, action, described, 'failed');
     return true;
   }
   pushHistory(state, label, 'ok', null);
+  await captureAfter(ctx, action, described, 'ok');
   state.pending = {
     action: label,
     expect: action.expect,

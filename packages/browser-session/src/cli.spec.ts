@@ -1,11 +1,19 @@
 import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/contracts';
 
 import { execute, parseOptions, USAGE, type CliService, type Io, type Options } from './cli';
-import { DEFAULT_RAILS } from './config';
+import { SPEC_RAILS } from './core/testing-session';
 import type { SessionOutcome } from './core/session-engine';
+import type { SessionDefaults } from './settings';
+
+/** The settings a parse reads its defaults from. */
+const DEFAULTS: SessionDefaults = {
+  headed: true,
+  rails: SPEC_RAILS,
+  loopRecovery: { windowMs: 0, pauseMs: 1 },
+};
 
 const parsed = (argv: string[]): Options => {
-  const options = parseOptions(argv);
+  const options = parseOptions(argv, DEFAULTS);
   if (options instanceof Error) throw options;
   return options;
 };
@@ -21,7 +29,7 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   terminationReason: 'mission-stop',
   terminationCause: 'mission-complete',
   terminationDetail: 'results shown',
-  limits: DEFAULT_RAILS,
+  limits: SPEC_RAILS,
   steps: 3,
   startedAt: '2026-10-03T10:00:00.000Z',
   heartbeatAt: '2026-10-03T10:04:00.000Z',
@@ -48,7 +56,7 @@ describe('parseOptions', () => {
       goalPath: 'g.md',
       profile: 'p',
       headed: true,
-      rails: DEFAULT_RAILS,
+      rails: SPEC_RAILS,
       subject: undefined,
       startUrl: undefined,
     });
@@ -109,7 +117,7 @@ describe('parseOptions', () => {
     [['show', 'a', 'b'], 'show takes one id'],
     [['sessions', 'extra'], 'sessions takes no positional'],
   ])('refuses %j', (argv, message) => {
-    const result = parseOptions(argv);
+    const result = parseOptions(argv, DEFAULTS);
     expect(result).toBeInstanceOf(Error);
     expect((result as Error).message).toContain(message);
   });

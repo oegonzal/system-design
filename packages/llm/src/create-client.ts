@@ -1,3 +1,4 @@
+import { CONFIG_DIR } from '@sysdesign/config-kit';
 import type { LlmModelDto } from '@sysdesign/contracts';
 
 import { describeAccount, readClaudeAccount, signedIn, type ClaudeAccount } from './claude-account';
@@ -6,7 +7,6 @@ import { DisabledEmbeddingClient, type EmbeddingClient } from './embedding-clien
 import { providerGate } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY, type LlmRetryPolicy } from './llm-failure';
 import type { LlmClient } from './llm-client';
-import { CONFIG_DIR } from './engine-config';
 import { apiKeyFor, LLM_KIND, readLlmConfig, type LlmConfig, type LlmProvider } from './llm-config';
 import { OpenAiCompatibleLlmClient } from './openai-compatible-client';
 import { OpenAiEmbeddingClient } from './openai-embedding-client';

@@ -1,0 +1,16 @@
+{
+  "headed": true,
+  "rails": {
+    "targetDone": null,
+    "maxTasks": 10,
+    "maxMinutes": 720,
+    "maxConsecutiveFailures": 3,
+    "maxBrainFaults": 3,
+    "maxUnreadablePages": 3,
+    "maxStalledSteps": 3
+  },
+  "loopRecovery": {
+    "windowMs": 60000,
+    "pauseMs": 2000
+  }
+}

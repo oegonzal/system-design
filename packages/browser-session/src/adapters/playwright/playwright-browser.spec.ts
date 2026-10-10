@@ -265,7 +265,7 @@ describe('the Playwright browser', () => {
     expect(byName(again, 'spinbutton', 'Years of experience with Python').value).toBe('6');
     expect(byName(again, 'combobox', 'Work authorisation').value).toBe('No');
     expect(byName(again, 'checkbox', 'Remote only').value).toBe('checked');
-    expect((await browser.screenshot()).byteLength).toBeGreaterThan(100);
+    expect((await browser.screenshot(null)).byteLength).toBeGreaterThan(100);
     await browser.act({ kind: 'press', key: 'Tab', reason: 'move on', expect: null, serves: [] });
     await browser.act({
       kind: 'scroll',

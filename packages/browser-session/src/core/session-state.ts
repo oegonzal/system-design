@@ -27,6 +27,7 @@ import {
 
 import type { PendingExpectation } from './expectations';
 import { remainingTasks, type RailState } from './rails';
+import type { CaptureRecord } from './session-dump';
 
 /**
  * What the engine carries between steps: counts the rails read, the recent
@@ -115,6 +116,8 @@ export interface SessionState {
   filled: Map<string, string>;
   /** What this step taught the memory, one record per operator answer, for the step's dump. */
   teachings: Teaching[];
+  /** What this step captured after its actions, in order, for the step's dump. */
+  captures: CaptureRecord[];
   /** Decisions recorded so far, and the next ordinal within the current step. */
   decisions: number;
   ordinal: number;
@@ -146,6 +149,7 @@ export function createState(ids: {
     operatorAnswers: new Map(),
     filled: new Map(),
     teachings: [],
+    captures: [],
     decisions: 0,
     ordinal: 0,
     terminationRecorded: false,

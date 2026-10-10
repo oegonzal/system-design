@@ -8,6 +8,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
+      "@sysdesign/config-kit": ["./packages/config-kit/src/index.ts"],
       "@sysdesign/contracts": ["./packages/contracts/src/index.ts"],
       "@sysdesign/criteria": ["./packages/criteria/src/index.ts"],
       "@sysdesign/db": ["./packages/db/src/index.ts"],

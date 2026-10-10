@@ -23,7 +23,8 @@ describe('the dependency matrix', () => {
   it.each([
     ['criteria', ['contracts']],
     ['db', ['contracts']],
-    ['llm', ['contracts']],
+    ['config-kit', []],
+    ['llm', ['contracts', 'config-kit']],
     ['run-dump', []],
     ['nest-kit', ['contracts', 'db']],
     ['design-system', ['contracts']],
@@ -39,7 +40,7 @@ describe('the dependency matrix', () => {
     ['govcon', ['contracts', 'db', 'nest-kit']],
     [
       'browser-session',
-      ['contracts', 'db', 'nest-kit', 'run-dump', 'loop-client', 'studio-testing'],
+      ['contracts', 'db', 'nest-kit', 'run-dump', 'loop-client', 'config-kit', 'studio-testing'],
     ],
     ['memory-ingest', ['contracts', 'loop-client', 'studio-testing']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {

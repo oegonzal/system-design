@@ -17,6 +17,13 @@ Exit codes: a session that ended `complete` or `stopped` is 0, `failed` is 1, a 
 
 Every flag and variable is declared once in `src/config.ts`, with its default; nothing else in the package reads the environment.
 
+How a session runs when its flags say nothing, and what it images, are files in the package's own `config/`, laid out like the repository's: `config/engine.json` names one file per kind, and each kind's files sit complete under `config/<kind>/` — switching is a one-word edit. Both kinds must be chosen; the values live in the files alone (`src/settings.ts` declares and checks them), and a session says which files are in force when it starts and records them in its manifest.
+
+| Kind      | Files                                                    | What it decides                                                                                                                                                                                                                                                                                   |
+| --------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capture` | `field-entries` (chosen), `every-action`, `observations` | the images a session keeps beside each step's own screenshot: `after` names the browser actions imaged once they ran — a plan's own and every field entry, a value read back included, each entry outlined in its image — and `failures` whether an action the page refused is imaged as it stood |
+| `session` | `standard` (chosen)                                      | `headed`, the `rails` and the `loopRecovery` window a run uses unless a flag overrides its field                                                                                                                                                                                                  |
+
 | Variable                   | Default                   | Meaning                                                                                                    |
 | -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `QUALITY_LOOP_URL`         | `http://localhost:3003`   | the loop the session asks                                                                                  |
@@ -24,7 +31,7 @@ Every flag and variable is declared once in `src/config.ts`, with its default; n
 | `BROWSER_PROFILES_DIR`     | `static/browser-profiles` | where persistent Chrome profiles live, one folder per `--profile` name — never commit them                 |
 | `BROWSER_SESSION_SUBJECT`  | `the subject`             | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
 
-Rails (`--max-tasks 10`, `--max-minutes 720`, `--max-failures 3`, `--max-stalled-steps 3`; brain faults are capped at 3) are the engine's only decisions of its own. Each is a limit and ends the session `stopped`; the one goal among them, `--target-done n`, ends it `complete` once n units of work have closed `done` — counted on that outcome alone, and refused at start when it is above `--max-tasks`, since a done unit spends that budget too. The browser is headed unless `--headless` is given.
+Rails (`--max-tasks`, `--max-minutes`, `--max-failures`, `--max-stalled-steps` over the session file's values; brain faults in a row and unreadable pages in a row only from the file) are the engine's only decisions of its own. Each is a limit and ends the session `stopped`; the one goal among them, `--target-done n`, ends it `complete` once n units of work have closed `done` — counted on that outcome alone, and refused at start when it is above `--max-tasks`, since a done unit spends that budget too. Whether the browser shows is the session file's choice; `--headed` or `--headless` decides for one run.
 
 ## How a step goes
 
@@ -52,7 +59,7 @@ The answer is filled, recorded with `source: operator`, cached for the session b
 
 ## The dump
 
-`static/sessions/<dump run id>/` — `manifest.json`, `goal.md`, `01-steps/NN/{observation.json, snapshot.txt, screenshot.png, plan.json | fault.json, fields.json, teach.json}`, `02-tasks.json`; one row in `static/sessions/index.jsonl` once the session is whole. `plan.json` records which rung of the goal ladder the step used.
+`static/sessions/<dump run id>/` — `manifest.json` (the settings files in force among it), `goal.md`, `01-steps/NN/{observation.json, snapshot.txt, screenshot.png, plan.json | fault.json, fields.json, teach.json, captures.json, captures/MM-<kind>-<what it touched>.png}`, `02-tasks.json`; every image is the page at CSS scale, and a capture's file name never carries the value entered — `captures.json` lists each image with the action that made it; one row in `static/sessions/index.jsonl` once the session is whole. `plan.json` records which rung of the goal ladder the step used.
 
 ## Records
 

@@ -24,8 +24,14 @@ import {
   SESSION_CONFIG,
 } from './tokens';
 
-/** What the command line asks of a run: the engine's options, the subject falling back to the configured one. */
-export type RunOptions = Omit<RunSessionOptions, 'subject'> & { subject?: string | undefined };
+/**
+ * What the command line asks of a run: the engine's options, the subject
+ * falling back to the configured one, and what to image and where the
+ * settings came from taken from the settings files.
+ */
+export type RunOptions = Omit<RunSessionOptions, 'subject' | 'capture' | 'settingsSources'> & {
+  subject?: string | undefined;
+};
 
 /**
  * The four things the command line asks for. `run` is the engine over the
@@ -51,6 +57,13 @@ export class SessionService {
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
+    const { capture, sources } = this.config.settings;
+    // A configuration read once at boot is invisible afterwards: say which files are in force.
+    this.operator.notify(
+      `settings: ${Object.entries(sources)
+        .map(([kind, source]) => `${kind} ${source}`)
+        .join(' · ')}`,
+    );
     return runSession(
       {
         browser: this.browser,
@@ -63,7 +76,12 @@ export class SessionService {
         warn: (text) => this.logger.warn(text),
         log: (text) => this.operator.notify(text),
       },
-      { ...options, subject: options.subject ?? this.config.subject },
+      {
+        ...options,
+        subject: options.subject ?? this.config.subject,
+        capture,
+        settingsSources: sources,
+      },
     );
   }
 

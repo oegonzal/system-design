@@ -1,9 +1,9 @@
+import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
 import { z } from 'zod';
-import { OMITTABLE_KEYWORDS } from './strict-schema';
 
-import { chosenConfig, CONFIG_DIR, ENGINE_FILE, type ReadFile } from './engine-config';
 import { DEFAULT_GATE_POLICY } from './in-flight-gate';
 import { DEFAULT_RETRY_POLICY } from './llm-failure';
+import { OMITTABLE_KEYWORDS } from './strict-schema';
 
 /**
  * Which model serves this repository.
@@ -83,10 +83,6 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = llmConfigSchema.parse({
   provider: 'claude-subscription',
 });
 
-export class LlmConfigError extends Error {
-  override readonly name = 'LlmConfig';
-}
-
 /** The configuration in force, and the file it came from — null where nothing was chosen. */
 export interface ChosenLlmConfig {
   config: LlmConfig;
@@ -107,22 +103,12 @@ export function readChosenLlmConfig(
   root: string = process.cwd(),
   read?: ReadFile,
 ): ChosenLlmConfig {
-  const chosen = chosenConfig(LLM_KIND, root, read);
-  if (chosen.text === null) return { config: DEFAULT_LLM_CONFIG, source: null };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(chosen.text);
-  } catch (cause) {
-    throw new LlmConfigError(`${chosen.path} is not JSON: ${(cause as Error).message}`);
-  }
-  const result = llmConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const faults = result.error.issues
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-      .join('; ');
-    throw new LlmConfigError(`${chosen.path} is not a model configuration — ${faults}`);
-  }
-  return { config: result.data, source: `${CONFIG_DIR}/${LLM_KIND}/${chosen.name}.json` };
+  return (
+    readChosen(LLM_KIND, llmConfigSchema, root, read) ?? {
+      config: DEFAULT_LLM_CONFIG,
+      source: null,
+    }
+  );
 }
 
 /** The chosen configuration alone, for a caller with no use for where it came from. */

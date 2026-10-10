@@ -27,6 +27,9 @@ anything the map already generates is deliberately absent, because a second copy
 - `criteria` — the brief's completion criteria as data, each claimed by a tagged test title.
 - `db` — the MikroORM entities, the hand-written migrations, the seed, and the one declaration of
   the connection defaults.
+- `config-kit` — choosing a program's configuration by name: a root's `config/engine.json` names
+  one file per kind under `config/<kind>/`, and the kind's owner reads it against its own schema —
+  the repository's root for the model the loop calls, a package's own for that program's settings.
 - `llm` — the model-client abstraction: one interface, one provider adapter (the Claude Code
   subscription, through the Agent SDK), and a login check that asks Claude Code whether it is signed
   in — a process that needs a model and has no login fails at boot. Beside it, the embeddings port:

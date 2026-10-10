@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The goals are the only place a site or a line of work may be named. The
- * engine that runs a mission — the browser session, its contracts, and the
+ * engine that runs a mission — the browser session, its settings, its contracts, and the
  * pipelines and orchestrators the session drives — is written about the shape
  * of the work: a page, a form, a unit of work, the subject the answers are
  * about. A site's name or a line of work's role word in that code, or in a
@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 const WORKSPACE = join(__dirname, '..');
 const ENGINE = [
   'packages/browser-session/src',
+  'packages/browser-session/config',
   'packages/contracts/src/lib/browser-session',
   'packages/quality-loop/src/pipelines/browser-step',
   'packages/quality-loop/src/pipelines/field-answer',
@@ -39,7 +40,7 @@ const files = (dir: string): string[] =>
 describe('the engine', () => {
   it('[BRW-8] names no site and no line of work — in code or in a persona a model reads — outside a goal', () => {
     const offenders = ENGINE.flatMap((dir) => files(join(WORKSPACE, dir)))
-      .filter((path) => /\.(ts|md)$/.test(path) && !EXAMPLE.test(path))
+      .filter((path) => /\.(ts|md|json)$/.test(path) && !EXAMPLE.test(path))
       .flatMap((path) => {
         const text = readFileSync(path, 'utf8').toLowerCase();
         return FORBIDDEN.filter((word) => text.includes(word)).map(

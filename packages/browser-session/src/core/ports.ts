@@ -75,7 +75,12 @@ export interface BrowserPort {
   highlight(ref: string): Promise<void>;
   /** What the field holds now — what the operator typed into the page — or null when unreadable. */
   readValue(ref: string): Promise<string | null>;
-  screenshot(): Promise<Uint8Array>;
+  /**
+   * The page as an image, with the element `outline` names marked while it is
+   * taken and unmarked after; null marks nothing, and an element that is gone
+   * leaves the image unmarked rather than failing it.
+   */
+  screenshot(outline: string | null): Promise<Uint8Array>;
   close(): Promise<void>;
 }
 

@@ -1,0 +1,4 @@
+{
+  "after": ["click", "fill", "select", "press", "scroll"],
+  "failures": true
+}

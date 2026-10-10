@@ -3,6 +3,7 @@ import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
 import type {
   BrainPort,
+  BrowserActionKind,
   BrowserPort,
   Clock,
   DumpSink,
@@ -36,6 +37,15 @@ export interface SessionDeps {
   log(text: string): void;
 }
 
+/**
+ * What a session leaves as images beside each step's own screenshot: the
+ * browser actions captured once they ran, and whether one the page refused is.
+ */
+export interface CapturePolicy {
+  after: readonly BrowserActionKind[];
+  failures: boolean;
+}
+
 export interface RunSessionOptions {
   goalPath: string;
   profile: string;
@@ -45,6 +55,9 @@ export interface RunSessionOptions {
   subject: string;
   /** Where to open the browser before the first plan; unset leaves it on about:blank. */
   startUrl?: string;
+  capture: CapturePolicy;
+  /** The settings files in force, by kind, as the manifest records them. */
+  settingsSources: Readonly<Record<string, string>>;
 }
 
 /** The rubric derived once per session, by the role each pipeline plays. */

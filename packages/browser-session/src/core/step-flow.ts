@@ -66,8 +66,9 @@ async function observe(ctx: EngineContext): Promise<PageObservation> {
   state.step += 1;
   state.ordinal = 0;
   state.teachings = [];
+  state.captures = [];
   const observation = await deps.browser.observe();
-  const screenshot = await deps.browser.screenshot().catch(() => null);
+  const screenshot = await deps.browser.screenshot(null).catch(() => null);
   noteObservation(state, observationFingerprint(observation));
   settleExpectation(ctx, observation);
   ctx.dumpFiles('step files', observationFiles(state.step, observation, screenshot));

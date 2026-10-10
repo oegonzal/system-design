@@ -60,6 +60,7 @@ export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise
       status,
       termination: end.termination,
       limits: options.rails,
+      settings: options.settingsSources,
       steps: state.step,
       tasks: { started: state.tasks.started, closed: tasksClosed(state) },
       decisions: state.decisions,

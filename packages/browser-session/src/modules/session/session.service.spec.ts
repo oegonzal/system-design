@@ -24,7 +24,7 @@ import { LoopClient } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
-import type { SessionConfig } from '../../config';
+import { PACKAGE_ROOT, type SessionConfig } from '../../config';
 import {
   FakeBrowser,
   JOURNEY_ANSWERS,
@@ -32,6 +32,7 @@ import {
   journeyPages,
   ScriptedOperator,
 } from '../../core/testing';
+import { readSessionSettings } from '../../settings';
 import { AppModule } from '../app/app.module';
 import { SessionService } from './session.service';
 import { BRAIN, BROWSER, OPERATOR } from './tokens';
@@ -89,6 +90,8 @@ describe('the session service, end to end', () => {
       dumpDir: join(home, 'sessions'),
       profilesDir: join(home, 'profiles'),
       subject: 'Alex Example',
+      // The settings this package ships, so the run below is the one a session gets.
+      settings: readSessionSettings(PACKAGE_ROOT),
     };
     core = new FakeLoop({ now: () => new Date().toISOString() });
     const client = new FakeLoopClient(core);
@@ -122,7 +125,7 @@ describe('the session service, end to end', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('[BRW-1] drives the journey through the loop: the same rubric on every run, form-memory for the fields, one teach the moment the operator answers, rows and dump to match', async () => {
+  it('[BRW-1] [BRW-9] drives the journey through the loop: the same rubric on every run, form-memory for the fields, one teach the moment the operator answers, each entry imaged, rows and dump to match', async () => {
     const service = moduleRef.get(SessionService);
     const outcome = await service.run({
       goalPath: join(home, 'goal.md'),
@@ -211,8 +214,11 @@ describe('the session service, end to end', () => {
     // The dump on disk: step files as the steps happened, the closing files, one index row.
     const dumpDir = join(home, 'sessions', outcome.dumpRunId);
     expect(readdirSync(join(dumpDir, '01-steps')).sort()).toEqual(['01', '02', '03', '04', '05']);
-    // The answer was taught at the step it was given, not when the unit closed.
+    // The answer was taught at the step it was given, not when the unit closed;
+    // each entry on the form was imaged, outlined, under the shipped settings.
     expect(readdirSync(join(dumpDir, '01-steps', '03')).sort()).toEqual([
+      'captures',
+      'captures.json',
       'fields.json',
       'observation.json',
       'plan.json',
@@ -220,12 +226,31 @@ describe('the session service, end to end', () => {
       'snapshot.txt',
       'teach.json',
     ]);
+    const captures = JSON.parse(
+      readFileSync(join(dumpDir, '01-steps', '03', 'captures.json'), 'utf8'),
+    ) as { file: string; kind: string; label: string; outcome: string }[];
+    expect(captures.map((c) => [c.file, c.kind, c.outcome])).toEqual([
+      ['captures/01-fill-years-of-experience-with-python.png', 'fill', 'ok'],
+      ['captures/02-select-work-authorisation.png', 'select', 'ok'],
+    ]);
+    // The value entered is in the list, never in a file name.
+    expect(captures[1]?.label).toContain('"Yes"');
+    expect(readdirSync(join(dumpDir, '01-steps', '03', 'captures')).sort()).toEqual(
+      captures.map((c) => c.file.slice('captures/'.length)),
+    );
+    expect(browser.shots.filter((ref) => ref !== null)).toContain('e2');
     expect(existsSync(join(dumpDir, '01-steps', '04', 'teach.json'))).toBe(false);
     expect(JSON.parse(readFileSync(join(dumpDir, 'manifest.json'), 'utf8'))).toMatchObject({
       kind: 'session',
       sessionId: outcome.sessionId,
       status: 'complete',
+      settings: {
+        capture: expect.stringMatching(/config\/capture\/field-entries\.json$/),
+        session: expect.stringMatching(/config\/session\/standard\.json$/),
+      },
     });
+    // The operator was told which files were in force before the session began.
+    expect(operator.notices[0]).toMatch(/^settings: capture .*field-entries\.json · session /);
     expect(
       readFileSync(join(home, 'sessions', 'index.jsonl'), 'utf8')
         .trim()

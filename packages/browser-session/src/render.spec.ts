@@ -1,6 +1,6 @@
 import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/contracts';
 
-import { DEFAULT_RAILS } from './config';
+import { SPEC_RAILS } from './core/testing-session';
 import { liveness, renderOutcome, renderSession, renderSessions } from './render';
 
 const NOW = new Date('2026-10-03T10:05:00.000Z');
@@ -16,7 +16,7 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   terminationReason: 'mission-stop',
   terminationCause: 'mission-complete',
   terminationDetail: 'results shown',
-  limits: DEFAULT_RAILS,
+  limits: SPEC_RAILS,
   steps: 3,
   startedAt: '2026-10-03T10:00:00.000Z',
   heartbeatAt: '2026-10-03T10:04:00.000Z',
@@ -95,7 +95,7 @@ describe('the CLI renderer', () => {
     // Read from the declaration: the rails line reports what was declared, and
     // a spec that retypes the numbers only ever tests the retyping.
     expect(text).toContain(
-      `rails: ${DEFAULT_RAILS.maxTasks} tasks · ${DEFAULT_RAILS.maxMinutes} min · ${DEFAULT_RAILS.maxConsecutiveFailures} failures · ${DEFAULT_RAILS.maxBrainFaults} brain faults`,
+      `rails: ${SPEC_RAILS.maxTasks} tasks · ${SPEC_RAILS.maxMinutes} min · ${SPEC_RAILS.maxConsecutiveFailures} failures · ${SPEC_RAILS.maxBrainFaults} brain faults`,
     );
     expect(text).not.toContain('target');
     expect(text).toContain('error: Error: boom');
@@ -103,7 +103,7 @@ describe('the CLI renderer', () => {
     const targeted = renderSession(
       {
         ...detail,
-        limits: { ...DEFAULT_RAILS, targetDone: 5, maxTasks: 6 },
+        limits: { ...SPEC_RAILS, targetDone: 5, maxTasks: 6 },
         terminationReason: 'target-reached',
         terminationCause: null,
         terminationDetail: '5 of 5 units of work closed done',

@@ -2,7 +2,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  DEFAULT_RAILS,
   flagKey,
   headedOf,
   parseArgsOptions,
@@ -13,6 +12,7 @@ import {
   sessionConfigFromEnv,
   SessionConfigError,
 } from './config';
+import { SPEC_RAILS } from './core/testing-session';
 
 const sources = (dir: string): string[] =>
   readdirSync(dir).flatMap((entry) => {
@@ -72,25 +72,25 @@ describe('the session configuration', () => {
     expect(Object.keys(parseArgsOptions())).toHaveLength(Object.keys(SESSION_FLAGS).length);
     expect(flagKey('maxFailures')).toBe('max-failures');
 
-    expect(railsOf({})).toEqual(DEFAULT_RAILS);
+    expect(railsOf({}, SPEC_RAILS)).toEqual(SPEC_RAILS);
     expect(flagKey('maxStalledSteps')).toBe('max-stalled-steps');
-    expect(railsOf({ maxStalledSteps: '12' }).maxStalledSteps).toBe(12);
-    expect(() => railsOf({ maxStalledSteps: '0' })).toThrow('--max-stalled-steps');
-    expect(railsOf({ maxTasks: '2', maxMinutes: '5', maxFailures: '1' })).toEqual({
+    expect(railsOf({ maxStalledSteps: '12' }, SPEC_RAILS).maxStalledSteps).toBe(12);
+    expect(() => railsOf({ maxStalledSteps: '0' }, SPEC_RAILS)).toThrow('--max-stalled-steps');
+    expect(railsOf({ maxTasks: '2', maxMinutes: '5', maxFailures: '1' }, SPEC_RAILS)).toEqual({
       targetDone: null,
       maxTasks: 2,
       maxMinutes: 5,
       maxConsecutiveFailures: 1,
-      // Rails with no flag of their own come from the declaration, so adding one
+      // Rails with no flag of their own come from the settings, so adding one
       // cannot silently leave a session running without it.
-      maxBrainFaults: DEFAULT_RAILS.maxBrainFaults,
-      maxUnreadablePages: DEFAULT_RAILS.maxUnreadablePages,
-      maxStalledSteps: DEFAULT_RAILS.maxStalledSteps,
+      maxBrainFaults: SPEC_RAILS.maxBrainFaults,
+      maxUnreadablePages: SPEC_RAILS.maxUnreadablePages,
+      maxStalledSteps: SPEC_RAILS.maxStalledSteps,
     });
-    expect(() => railsOf({ maxTasks: '0' })).toThrow(
+    expect(() => railsOf({ maxTasks: '0' }, SPEC_RAILS)).toThrow(
       '--max-tasks must be a positive integer, got "0"',
     );
-    expect(() => railsOf({ maxMinutes: '1.5' })).toThrow(
+    expect(() => railsOf({ maxMinutes: '1.5' }, SPEC_RAILS)).toThrow(
       '--max-minutes must be a positive integer',
     );
     expect(() => positiveInteger('many', 'limit')).toThrow('--limit must be a positive integer');
@@ -99,21 +99,23 @@ describe('the session configuration', () => {
     // A target is the session's goal on `done` alone; a done unit spends the
     // task budget too, so a target above the budget is refused by name.
     expect(flagKey('targetDone')).toBe('target-done');
-    expect(railsOf({ targetDone: '50', maxTasks: '50' })).toMatchObject({
+    expect(railsOf({ targetDone: '50', maxTasks: '50' }, SPEC_RAILS)).toMatchObject({
       targetDone: 50,
       maxTasks: 50,
     });
-    expect(() => railsOf({ targetDone: '50' })).toThrow(
+    expect(() => railsOf({ targetDone: '50' }, SPEC_RAILS)).toThrow(
       '--target-done 50 is above --max-tasks 10: every done unit spends the budget too, so the session would stop first — set --max-tasks to at least 50, more to leave room for failed units',
     );
-    expect(() => railsOf({ targetDone: '0', maxTasks: '5' })).toThrow(
+    expect(() => railsOf({ targetDone: '0', maxTasks: '5' }, SPEC_RAILS)).toThrow(
       '--target-done must be a positive integer',
     );
 
-    expect(headedOf({})).toBe(true);
-    expect(headedOf({ headless: true })).toBe(false);
-    expect(headedOf({ headed: true })).toBe(true);
-    expect(() => headedOf({ headed: true, headless: true })).toThrow(
+    // Neither flag: the settings decide; either flag decides for one run.
+    expect(headedOf({}, true)).toBe(true);
+    expect(headedOf({}, false)).toBe(false);
+    expect(headedOf({ headless: true }, true)).toBe(false);
+    expect(headedOf({ headed: true }, false)).toBe(true);
+    expect(() => headedOf({ headed: true, headless: true }, true)).toThrow(
       '--headed and --headless contradict each other',
     );
   });

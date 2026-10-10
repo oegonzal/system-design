@@ -39,6 +39,7 @@ const manifest = () =>
       maxUnreadablePages: 1,
       maxStalledSteps: 1,
     },
+    settings: { capture: 'packages/browser-session/config/capture/field-entries.json' },
     steps: 2,
     tasks: { started: 1, closed: 1 },
     decisions: 3,

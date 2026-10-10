@@ -14,7 +14,8 @@ import type { ChangedFile } from './index';
  *   contracts      -> (nothing)         the shared vocabulary; the root of the graph
  *   criteria       -> contracts         completion criteria as data
  *   db             -> contracts         MikroORM entities and migrations
- *   llm            -> contracts         provider adapters
+ *   config-kit     -> (nothing)         a program's configuration chosen by name from its config folder
+ *   llm            -> contracts, config-kit   provider adapters
  *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
  *   nest-kit       -> contracts, db     the Nest apps' shared plumbing (zod pipe, db root, cors, health)
  *   design-system  -> contracts         tokens and domain-free primitives
@@ -28,7 +29,7 @@ import type { ChangedFile } from './index';
  *   studio-api     -> contracts, db, nest-kit, loop-client, studio-testing (specs and the test folder only)
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
- *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, studio-testing (specs only)   a Playwright session the loop decides for
+ *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
@@ -39,7 +40,8 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   contracts: [],
   criteria: ['contracts'],
   db: ['contracts'],
-  llm: ['contracts'],
+  'config-kit': [],
+  llm: ['contracts', 'config-kit'],
   'run-dump': [],
   'nest-kit': ['contracts', 'db'],
   'design-system': ['contracts'],
@@ -53,7 +55,15 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
   govcon: ['contracts', 'db', 'nest-kit'],
-  'browser-session': ['contracts', 'db', 'nest-kit', 'run-dump', 'loop-client', 'studio-testing'],
+  'browser-session': [
+    'contracts',
+    'db',
+    'nest-kit',
+    'run-dump',
+    'loop-client',
+    'config-kit',
+    'studio-testing',
+  ],
   'memory-ingest': ['contracts', 'loop-client', 'studio-testing'],
   storybook: null,
   'studio-e2e': null,

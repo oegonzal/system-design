@@ -14,7 +14,13 @@ import {
   type DumpFile,
 } from '@sysdesign/run-dump';
 
-import { causeOf, type DerivedRubric, type DumpStore, type Termination } from './ports';
+import {
+  causeOf,
+  type BrowserActionKind,
+  type DerivedRubric,
+  type DumpStore,
+  type Termination,
+} from './ports';
 
 /**
  * The session dump: everything one session saw and decided, laid out the way
@@ -39,8 +45,14 @@ export const STEP_FILES = {
   fault: 'fault.json',
   fields: 'fields.json',
   teach: 'teach.json',
+  captures: 'captures.json',
 } as const;
 export type StepFile = keyof typeof STEP_FILES;
+
+/** Where a step's images of its actions land, beside the step's own screenshot. */
+const CAPTURES_DIR = 'captures';
+/** How much of a name a file name carries: a name is the page's, a file name has a bound. */
+const SLUG_MAX_LENGTH = 60;
 
 const json = (value: unknown): string => `${JSON.stringify(jsonSafe(value), null, 2)}\n`;
 const pad = (value: number): string => String(value).padStart(2, '0');
@@ -50,6 +62,14 @@ const withNewline = (text: string): string =>
 export const stepDir = (step: number): string => `${STEPS_DIR}/${pad(step)}`;
 export const stepFile = (step: number, name: StepFile): string =>
   `${stepDir(step)}/${STEP_FILES[name]}`;
+
+/** A name as a file name carries it: lower case, words joined by dashes, bounded. */
+const slugOf = (name: string): string =>
+  name
+    .replace(/[^a-z0-9]+/gi, '-')
+    .toLowerCase()
+    .slice(0, SLUG_MAX_LENGTH)
+    .replace(/^-+|-+$/g, '');
 
 /**
  * `00-rubrics.json`: the rubric each pipeline's runs are judged by, derived
@@ -84,9 +104,46 @@ export const stepJsonFile = (
 
 /** A labelled screenshot the plan asked for, beside the step's own. */
 export const labelledScreenshot = (step: number, label: string, bytes: Uint8Array): DumpBytes => ({
-  path: `${stepDir(step)}/screenshot-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`,
+  path: `${stepDir(step)}/screenshot-${slugOf(label)}.png`,
   bytes,
 });
+
+/** One image a step left after an action, as the step's `captures.json` lists it. */
+export interface CaptureRecord {
+  ordinal: number;
+  /** Relative to the step's folder. */
+  file: string;
+  kind: BrowserActionKind;
+  /** The action as the history reads it — a fill with its value, which no file name carries. */
+  label: string;
+  outcome: 'ok' | 'failed';
+  at: string;
+}
+
+/**
+ * Where a capture's image goes: its place in the step, its kind and the name
+ * of what it touched — never the value it entered, which is personal and
+ * unbounded and lives in `captures.json` alone.
+ */
+export const captureFileName = (
+  ordinal: number,
+  kind: BrowserActionKind,
+  touched: string | null,
+): string => {
+  const slug = touched === null ? '' : slugOf(touched);
+  return `${CAPTURES_DIR}/${pad(ordinal)}-${kind}${slug === '' ? '' : `-${slug}`}.png`;
+};
+
+/** A capture's image, and the step's list of captures so far, rewritten whole. */
+export const captureFiles = (
+  step: number,
+  record: CaptureRecord,
+  bytes: Uint8Array,
+  all: readonly CaptureRecord[],
+): (DumpFile | DumpBytes)[] => [
+  { path: `${stepDir(step)}/${record.file}`, bytes },
+  { path: stepFile(step, 'captures'), content: json(all) },
+];
 
 export interface ManifestInput {
   dumpRunId: string;
@@ -98,6 +155,8 @@ export interface ManifestInput {
   status: BrowserSessionStatus;
   termination: Termination;
   limits: SessionRailsDto;
+  /** The settings files in force, by kind. */
+  settings: Readonly<Record<string, string>>;
   steps: number;
   tasks: { started: number; closed: number };
   decisions: number;
@@ -120,6 +179,7 @@ export function manifestOf(input: ManifestInput) {
     status: input.status,
     termination: input.termination,
     limits: input.limits,
+    settings: input.settings,
     steps: input.steps,
     tasks: input.tasks,
     decisions: input.decisions,
