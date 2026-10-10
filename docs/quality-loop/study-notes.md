@@ -171,9 +171,9 @@ Where each part comes from
 criteriaSchema in quality-loop/src/core/stages/schemas.ts builds it per pipeline, and modelSchema turns it into the JSON Schema above:
 
 - kind enum is the keys of the pipeline's task.criterionKinds. Any other kind refuses the whole reply, and the deriver is asked again with the fault named.
-- maxItems: 21 is the room the fixed criteria leave: browser-step's maxCriteria (24) minus its 3 fixed grounding criteria.
+- maxItems: 26 is the room the fixed criteria leave: browser-step's maxCriteria (29) minus its 3 fixed grounding criteria.
 - maxLength: 400 is the target of the statement bound. browser-step declares no statementBound, so the default CRITERION_STATEMENT_BOUND applies, with a ceiling of 500.
-  A statement past 400 is kept and recorded as an overrun, and a list longer than 21 is cut from its end. Only a structural fault — wrong type, missing field, unknown kind, empty statement — refuses the reply.
+  A statement past 400 is kept and recorded as an overrun, and a list longer than 26 is cut from its end. Only a structural fault — wrong type, missing field, unknown kind, empty statement — refuses the reply.
 - No id field. The model never numbers criteria; the engine does.
 
 What the reply becomes
@@ -407,7 +407,7 @@ What values they take
 ┌─────────────────┬────────────────────────────────────────────────────────────────────────────────────┬────────────────────┐
 │ Pipeline │ locationRefs (artifact parts) │ criterionIds │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤
-│ browser-step │ assessment, action.1 … action.N │ c1 … cN (up to 24) │
+│ browser-step │ assessment, action.1 … action.N │ c1 … cN (up to 29) │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤
 │ field-answer │ summary, field.1 … │ c1 … │
 ├─────────────────┼────────────────────────────────────────────────────────────────────────────────────┼────────────────────┤

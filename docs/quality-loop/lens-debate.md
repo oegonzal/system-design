@@ -357,7 +357,6 @@ stop's words, and a re-click of the card that had just run on an unchanged page.
   - whether the page fingerprint should keep text lines;
   - `PAGE_REPLACING_WAITS`;
   - `autocomplete-off-bait`;
-  - browser-step's `MAX_CRITERIA`;
   - whether a cut should decide `revise` rather than `retry`. It was measured once, before the
     evaluator judged apart: the revision applied the hallucinated remediations, so it was not
     kept.

@@ -32,12 +32,20 @@ import { limitsValidator, referencesValidator } from './validators';
 
 /**
  * The three grounding criteria head every rubric and the goal's own lines
- * fill the rest. Sized from the longest mission run so far — eight procedure
- * steps, four stop conditions, five never-do lines and two task events, 19
- * lines, of which a cap of 16 silently dropped three and left grounding no
- * room at all (measured 2026-10-07: zero grounding criteria in 165 runs).
+ * fill the rest, so the cap holds every checklist line of the longest
+ * mission with a fifth to spare. A cap below that drops lines silently: one
+ * of 16 left grounding no room at all (measured 2026-10-07: zero grounding
+ * criteria in 165 runs), and a never-do line or stop condition that never
+ * became a criterion can never veto a plan.
+ *
+ * Measured 2026-10-09: the longest mission declares 21 lines — nine procedure
+ * steps, three task events, four stop conditions, five never-do lines — so
+ * 24 with the fixed three left no room, and the deriver adds up to three
+ * grounding lines of its own. Across 1,001 recorded step runs, rubrics ran
+ * from 13 to 24 criteria, one session's filling the old cap of 24 exactly.
+ * 29 leaves 26 to derive: 21 and a fifth more (25.2), rounded up.
  */
-const MAX_CRITERIA = 10;
+const MAX_CRITERIA = 24;
 
 /**
  * What every step plan must get right about the page, whatever the mission:
