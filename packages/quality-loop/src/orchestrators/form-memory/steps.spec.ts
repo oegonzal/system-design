@@ -29,7 +29,7 @@ import {
 } from '../../pipelines/field-answer/testing';
 import { CachedEmbeddings } from '../memory/embeddings';
 import type { MemoryPorts } from '../memory/ports';
-import { childRun, memoryContext, memoryPorts, sampleHits } from '../memory/steps.testing';
+import { childRun, memoryContext, memoryPorts, sampleFacts } from '../memory/steps.testing';
 import { passed, readoutTrace } from '../memory/testing';
 import { fakeStepContext } from '../runner/testing';
 import type { FormMemoryPorts } from './ports';
@@ -78,16 +78,20 @@ function ctx(
   };
   return {
     executed,
-    ...fakeStepContext<FormMemoryOutputs, FormMemoryPorts>(memoryPorts(overrides.ports), execute, {
-      request: {
-        goal: overrides.goal ?? GOAL,
-        ...(overrides.criteria === undefined ? {} : { criteria: overrides.criteria }),
+    ...fakeStepContext<FormMemoryOutputs, FormMemoryPorts>(
+      memoryPorts(overrides.ports, sampleFacts),
+      execute,
+      {
+        request: {
+          goal: overrides.goal ?? GOAL,
+          ...(overrides.criteria === undefined ? {} : { criteria: overrides.criteria }),
+        },
+        context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
+        outputs: overrides.outputs ?? {},
+        pipelines: ['field-answer'],
+        acceptAtOf: () => (overrides.acceptAt === undefined ? 70 : overrides.acceptAt),
       },
-      context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
-      outputs: overrides.outputs ?? {},
-      pipelines: ['field-answer'],
-      acceptAtOf: () => (overrides.acceptAt === undefined ? 70 : overrides.acceptAt),
-    }),
+    ),
   };
 }
 
@@ -109,7 +113,7 @@ describe('the form-memory steps', () => {
     const goal = result.output?.goal ?? '';
     expect(goal).toContain(FIELD_EVIDENCE_HEADING);
     expect(readFieldIndex(goal)?.evidence).toEqual([{ alias: 'm1' }, { alias: 'm2' }]);
-    for (const hit of sampleHits) expect(goal).toContain(hit.text);
+    for (const hit of sampleFacts) expect(goal).toContain(hit.text);
     expect(goal).toContain('· stored 2026-09-06 · system-design memory.');
     // The prose and the fields are the session's, untouched; only the evidence changed.
     expect(splitFieldGoal(goal)).toEqual({ prose: ANSWERING_PROSE, fields: sampleFields() });

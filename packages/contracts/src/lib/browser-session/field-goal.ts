@@ -89,6 +89,17 @@ export const fieldKeyOf = (field: Pick<FieldSpec, 'name' | 'context'>): string |
       ? field.context
       : null;
 
+/**
+ * The options a value for the field must be one of: its listed ones when the
+ * page offers no more, else null — the list is open, and a value the page
+ * offers past it may stand. The one statement of a closed list, whoever the
+ * value comes from: the answerer's validators and the operator's prompt.
+ */
+export const closedOptionsOf = (
+  field: Pick<FieldSpec, 'options' | 'optionsOmitted'>,
+): readonly string[] | null =>
+  field.options !== null && field.optionsOmitted === 0 ? field.options : null;
+
 /** One recalled fact, with where it came from, as the goal lists it. */
 export const evidenceItemSchema = z.strictObject({
   alias: z.string().regex(EVIDENCE_ALIAS),

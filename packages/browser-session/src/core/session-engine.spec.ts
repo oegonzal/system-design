@@ -295,6 +295,34 @@ describe('the session engine', () => {
     expect(asked?.teachOrchestrationId).toBe('fake-teach-1');
   });
 
+  it('[BRW-3] fills, records and teaches the operator’s answer in the page’s spelling of the option it names', async () => {
+    // Measured 2026-10-10: "yes" typed for a Yes | No question matched no option and the fill timed out.
+    const browser = new FakeBrowser(pages());
+    const selected: string[] = [];
+    const act = browser.act.bind(browser);
+    browser.act = async (action) => {
+      if (action.kind === 'select') selected.push(`${action.ref}=${action.option}`);
+      return act(action);
+    };
+    const { detail, brain, operator } = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.formOnly, PLANS.done, PLANS.end].map((p) =>
+          decidedPlan(p),
+        ),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      replies: [{ kind: 'answer', text: 'yes' }],
+      browser,
+    });
+    const asked = detail.decisions.find(
+      (d) => d.kind === 'field-answer' && d.step === 3 && d.ref === 'e2',
+    );
+    expect(asked).toMatchObject({ source: 'operator', answer: 'Yes' });
+    expect(selected).toEqual(['e2=Yes']);
+    expect([operator.prompts.length, operator.notices]).toEqual([1, []]);
+    expect(brain.taught[0]?.parts[0]).toContain('the operator answered "Yes"');
+  });
+
   it('[BRW-5] writes rows through the queue so a failing write is reported, not thrown, and the session still closes', async () => {
     const ledger = new InMemoryLedger();
     ledger.recordDecision = async () => {

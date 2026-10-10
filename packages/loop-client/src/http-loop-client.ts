@@ -14,6 +14,7 @@ import type {
   StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
+import { defaultSleep } from './await-run';
 import { LoopClient } from './loop-client';
 import { DerivationFailed, LoopRefused, LoopTimeout, LoopUnreachable } from './loop-errors';
 
@@ -27,6 +28,34 @@ interface Answer {
   status: number;
   body: unknown;
 }
+
+/** One request's outcome: the loop's answer, or the error that came instead of one. */
+type Attempt = { answer: Answer } | { error: LoopTimeout | LoopUnreachable };
+
+/**
+ * How long a caller rides out a loop that is restarting. Within the window a
+ * call that is safe to ask again is asked again at the pause: one that never
+ * reached the loop — the connection failed, never a timeout, which the loop
+ * may have received — and a read the loop answered 5xx. A start the loop
+ * answered is never repeated, whatever it said: it may have opened a run.
+ * Past the window the call fails as it would have at once.
+ */
+export interface LoopRecovery {
+  windowMs: number;
+  pauseMs: number;
+  /** The clock and the wait, injectable so a spec need not wait. */
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** No window: a caller that serves people says the loop is down rather than wait on it. */
+const NO_RECOVERY: LoopRecovery = { windowMs: 0, pauseMs: 0 };
+
+/** Whether an attempt may be asked again: the loop never had it, or it was a read the loop failed. */
+const repeatable = (method: Method, attempt: Attempt): boolean =>
+  'error' in attempt
+    ? attempt.error instanceof LoopUnreachable
+    : method === 'GET' && attempt.answer.status >= 500;
 
 const isTimeout = (error: unknown): boolean =>
   error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
@@ -53,12 +82,15 @@ const segment = encodeURIComponent;
  * message and the route, and a 503 from `/criteria` — no model — is
  * `DerivationFailed` carrying the availability, so a caller can say why. A 404
  * on a read is `null`, not an error: the caller decides what a missing run
- * means. The one thing this adapter knows about Nest is nothing.
+ * means. A caller that declares a `LoopRecovery` has a restarting loop ridden
+ * out within its window; none does by default. The one thing this adapter
+ * knows about Nest is nothing.
  */
 export class HttpLoopClient extends LoopClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly recovery: LoopRecovery = NO_RECOVERY,
   ) {
     super();
   }
@@ -146,12 +178,31 @@ export class HttpLoopClient extends LoopClient {
     return data<T>(answer.body);
   }
 
+  /** The loop's answer, asked again within the declared recovery while the attempt is repeatable. */
   private async call(
     method: Method,
     path: string,
     body: unknown,
     timeoutMs: number,
   ): Promise<Answer> {
+    const { windowMs, pauseMs, now = Date.now, sleep = defaultSleep } = this.recovery;
+    const deadline = now() + windowMs;
+    for (;;) {
+      const attempt = await this.attempt(method, path, body, timeoutMs);
+      if (!repeatable(method, attempt) || now() + pauseMs >= deadline) {
+        if ('error' in attempt) throw attempt.error;
+        return attempt.answer;
+      }
+      await sleep(pauseMs);
+    }
+  }
+
+  private async attempt(
+    method: Method,
+    path: string,
+    body: unknown,
+    timeoutMs: number,
+  ): Promise<Attempt> {
     let response: Response;
     try {
       response = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -161,8 +212,11 @@ export class HttpLoopClient extends LoopClient {
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      if (isTimeout(error)) throw new LoopTimeout(`${method} ${path}`, timeoutMs);
-      throw new LoopUnreachable(describeCause(error));
+      return {
+        error: isTimeout(error)
+          ? new LoopTimeout(`${method} ${path}`, timeoutMs)
+          : new LoopUnreachable(describeCause(error)),
+      };
     }
     const text = await response.text();
     let parsed: unknown;
@@ -171,7 +225,7 @@ export class HttpLoopClient extends LoopClient {
     } catch {
       parsed = text;
     }
-    return { status: response.status, body: parsed };
+    return { answer: { status: response.status, body: parsed } };
   }
 
   private refused(route: string, answer: Answer): LoopRefused {

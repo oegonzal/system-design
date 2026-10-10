@@ -22,6 +22,7 @@ export interface RailState {
   tasksSpent: number;
   openTask: boolean;
   consecutiveFailures: number;
+  /** Brain calls in a row that answered nothing; an answered one clears it. */
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from. */
   unreadablePages: number;
@@ -90,7 +91,8 @@ export const RAILS: readonly Rail[] = [
   {
     reason: 'brain-unavailable',
     holds: (state, rails) => state.brainFaults >= rails.maxBrainFaults,
-    detail: (state, rails) => `${state.brainFaults} brain faults, limit ${rails.maxBrainFaults}`,
+    detail: (state, rails) =>
+      `${state.brainFaults} brain faults in a row, limit ${rails.maxBrainFaults}`,
   },
   {
     // A page that will not read is not a plan the brain can be asked for. The

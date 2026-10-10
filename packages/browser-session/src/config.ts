@@ -1,4 +1,5 @@
 import type { SessionRailsDto } from '@sysdesign/contracts';
+import type { LoopRecovery } from '@sysdesign/loop-client';
 
 /**
  * The session's configuration, declared once.
@@ -89,6 +90,15 @@ export const DEFAULT_RAILS: SessionRailsDto = {
   // default is the sibling rails', not a number this session measured.
   maxStalledSteps: 3,
 };
+
+/**
+ * How long a session rides out a loop that is restarting before a call to it
+ * is a brain fault: a call that never reached the loop, or a read it failed,
+ * is asked again every two seconds for a minute. Measured 2026-10-10: fifteen
+ * watch-mode restarts of the loop each listened again within six seconds, and
+ * three calls in three seconds of one restart ended a session forty minutes in.
+ */
+export const LOOP_RECOVERY: LoopRecovery = { windowMs: 60_000, pauseMs: 2_000 };
 
 /** A session shows its browser unless told otherwise: the operator is expected to watch. */
 export const DEFAULT_HEADED = true;

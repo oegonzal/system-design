@@ -1,4 +1,9 @@
-import { EVIDENCE_TEXT_MAX_LENGTH, MAX_EVIDENCE, type FieldSpec } from '@sysdesign/contracts';
+import {
+  DOCUMENT_MEMORY_KINDS,
+  EVIDENCE_TEXT_MAX_LENGTH,
+  MAX_EVIDENCE,
+  type FieldSpec,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { fill } from '../../core/testing';
@@ -55,7 +60,7 @@ describe('the form recall’s probes', () => {
     expect(many.byField.slice(-2)).toEqual([null, null]);
   });
 
-  it('[QL-38] every probe is asked of every named vector in one batch, each with the same small budget', () => {
+  it('[QL-38] every probe is asked of every named vector in one batch, each with the same small budget, and only of what documents taught about the subject', () => {
     const probes = searchProbes([
       [1, 0],
       [0, 1],
@@ -66,6 +71,9 @@ describe('the form recall’s probes', () => {
       ['condition', HITS_PER_PROBE],
       ['lesson', HITS_PER_PROBE],
     ]);
+    // Never a design lesson: a probe for this person's career reads the kinds a document teaches.
+    expect(probes.every((probe) => probe.filter?.kinds === DOCUMENT_MEMORY_KINDS)).toBe(true);
+    expect(DOCUMENT_MEMORY_KINDS).not.toContain('lesson');
     expect(probes.map((probe) => probe.vector)).toEqual([
       [1, 0],
       [1, 0],
@@ -74,16 +82,43 @@ describe('the form recall’s probes', () => {
     ]);
   });
 
-  it('[QL-38] each field’s lists are fused on their own, the fields joined in field order, one slot per lesson, under a cap', () => {
+  it('[QL-38] each field’s lists are fused on their own, then dealt out by rank — every field’s best before any field’s second — one slot per fact, under a cap', () => {
     const probes = fieldProbes([field('e1', 'Python'), field('e2', 'Location')]);
     // Field 1: b is ranked by both named vectors, a by one; field 2: c first, then a again.
     const ranked = [[a, b], [b], [c, a], [c]];
     expect(distinctHits(ranked)).toBe(3);
-    expect(fieldEvidence(probes, ranked).map((hit) => hit.text)).toEqual([b.text, a.text, c.text]);
-    expect(fieldEvidence(probes, ranked, 2).map((hit) => hit.text)).toEqual([b.text, a.text]);
+    // Both fields' best first; field 2's second is a, already taken by field 1's.
+    expect(fieldEvidence(probes, ranked).map((hit) => hit.text)).toEqual([b.text, c.text, a.text]);
+    expect(fieldEvidence(probes, ranked, 2).map((hit) => hit.text)).toEqual([b.text, c.text]);
     expect(MAX_EVIDENCE).toBe(24);
     // A field with no probe contributes nothing; an empty search is empty evidence.
     expect(fieldEvidence({ texts: [], byField: [null] }, [])).toEqual([]);
+  });
+
+  it('[QL-38] a long page never starves its last fields: eleven fields of three distinct hits each under the cap of 24 give every field its best and at least two', () => {
+    // Measured 2026-10-10: an eleven-field page joined field by field spent
+    // the cap before its last field, and that question was asked with none.
+    const count = 11;
+    const fields = Array.from({ length: count }, (_, index) =>
+      field(`e${index}`, `question ${index}`),
+    );
+    const hitsFor = (index: number) =>
+      [1, 2, 3].map((rank) =>
+        hitOf(`fact ${rank} for question ${index}`, `digest-${index}`, `memory.${rank}`),
+      );
+    // One list per named vector per probe, as `searchProbes` asked them: the same ranking under both.
+    const ranked = fields.flatMap((_, index) => [hitsFor(index), hitsFor(index)]);
+    const chosen = fieldEvidence(fieldProbes(fields), ranked);
+    expect(chosen).toHaveLength(MAX_EVIDENCE);
+    const perField = fields.map(
+      (_, index) => chosen.filter((hit) => hit.source.runId === `digest-${index}`).length,
+    );
+    // Eleven bests, eleven seconds, then the cap's last two slots to the first fields' thirds.
+    expect(perField).toEqual([3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
+    // Every field's best is in, the last field's included.
+    expect(chosen.slice(0, count).map((hit) => hit.text)).toEqual(
+      fields.map((_, index) => `fact 1 for question ${index}`),
+    );
   });
 
   it('[QL-38] the evidence is aliased m1.. in order, carries where each fact came from, and stays within the goal’s bound per item', () => {

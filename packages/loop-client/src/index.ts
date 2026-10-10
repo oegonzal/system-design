@@ -13,7 +13,12 @@ export {
   LoopTimeout,
   LoopUnreachable,
 } from './loop-errors';
-export { DERIVE_TIMEOUT_MS, HttpLoopClient, READ_TIMEOUT_MS } from './http-loop-client';
+export {
+  DERIVE_TIMEOUT_MS,
+  HttpLoopClient,
+  READ_TIMEOUT_MS,
+  type LoopRecovery,
+} from './http-loop-client';
 export {
   awaitOrchestration,
   awaitRun,

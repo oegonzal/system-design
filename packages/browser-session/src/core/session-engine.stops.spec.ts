@@ -250,6 +250,34 @@ describe('how a plan stops and how a session ends', () => {
     expect(noRubric.detail.status).toBe('stopped');
   });
 
+  it('[BRW-4] counts brain faults in a row: an answered plan clears the count, so faults apart never stop a session and three in a row still do', async () => {
+    // Measured 2026-10-10: three faults in three seconds of one loop restart ended a session forty minutes in.
+    const fault = new BrainFaulted('unreachable', 'the loop is restarting');
+    const apart = await run({
+      script: {
+        plans: [
+          fault,
+          fault,
+          decidedPlan(PLANS.search),
+          fault,
+          fault,
+          decidedPlan(PLANS.results),
+          fault,
+          fault,
+          fault,
+        ],
+        answers: [decidedAnswers(ANSWERS)],
+      },
+    });
+    expect(apart.outcome.termination).toEqual({
+      reason: 'brain-unavailable',
+      detail: '3 brain faults in a row, limit 3',
+    });
+    expect(
+      apart.detail.decisions.filter((d) => d.kind === 'step-plan' && d.source === 'engine'),
+    ).toHaveLength(7);
+  });
+
   it('[BRW-4] counts a step that ran and moved nothing toward the stall, and skips a redundant taskStart rather than refusing the actions beside it', async () => {
     // Measured 2026-10-07: twelve observations of one unchanged landing page,
     // each step a navigate that ran clean, and a count of failed steps saw

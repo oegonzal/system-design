@@ -78,6 +78,7 @@ export interface SessionState {
     closedOmitted: number;
   };
   consecutiveFailures: number;
+  /** Brain calls in a row that answered nothing; reset by one that answered. */
   brainFaults: number;
   /** Observations in a row the adapter could not read the page from; reset by one it could. */
   unreadablePages: number;

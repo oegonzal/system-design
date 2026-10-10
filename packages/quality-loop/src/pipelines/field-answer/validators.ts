@@ -8,6 +8,7 @@
  * Nothing here reads prose: every fact is in the index the composer wrote.
  */
 import {
+  closedOptionsOf,
   fieldLocation,
   type FieldAnswer,
   type FieldAnswers,
@@ -88,12 +89,8 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
       `${ref} takes at most ${field.maxLength} characters; the value runs to ${value.length}`,
     );
   }
-  if (
-    value !== null &&
-    field.options !== null &&
-    field.optionsOmitted === 0 &&
-    !field.options.includes(value)
-  ) {
+  const closed = closedOptionsOf(field);
+  if (value !== null && closed !== null && !closed.includes(value)) {
     fault('medium', `${quotedJson(value)} is not an option of ${ref}`);
   }
   if (value !== null && field.inputType === 'number' && !isNumeric(value)) {

@@ -16,7 +16,7 @@ import {
 import type { StepContext } from '../runner/definition';
 import { fakeStepContext } from '../runner/testing';
 import { CachedEmbeddings } from './embeddings';
-import type { MemoryPorts, QueryProbes } from './ports';
+import type { MemoryHit, MemoryPorts, QueryProbes } from './ports';
 import type { MemoryOutputs } from './steps';
 import { ACCEPT_AT, GOAL, hitOf } from './testing';
 
@@ -24,6 +24,12 @@ export const sampleHits = [
   hitOf('serve the list from a store the page owns', 'run-a', 'memory.1'),
   hitOf('record each status transition as a row', 'run-a', 'memory.2'),
 ];
+
+/** The same two items as a document taught them about its subject: what a form's recall may read. */
+export const sampleFacts = sampleHits.map((hit) => ({
+  ...hit,
+  source: { ...hit.source, kind: 'profile_fact' as const },
+}));
 
 /** A child run as `RunsService.execute` resolves it. */
 export const childRun = (pipeline: string, trace: RunTrace | null, failed = false): RunRecord => ({
@@ -68,11 +74,15 @@ export const memoryContext = (overrides: Partial<MemoryContextDto> = {}): Memory
 /** Derives nothing; recall falls back to the goal — the default probes a spec runs over. */
 export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
 
-export function memoryPorts(overrides: Partial<MemoryPorts> = {}): MemoryPorts {
+/** The memory ports over a store seeded with `seeded` — design lessons unless a spec says otherwise. */
+export function memoryPorts(
+  overrides: Partial<MemoryPorts> = {},
+  seeded: readonly MemoryHit[] = sampleHits,
+): MemoryPorts {
   const store = new InMemoryMemoryStore();
   void store.replaceRunChunks(
     'run-a',
-    sampleHits.map((hit) => {
+    seeded.map((hit) => {
       const keys = { condition: `when ${hit.text}`, lesson: hit.text };
       return {
         text: hit.text,

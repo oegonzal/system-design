@@ -121,6 +121,8 @@ async function decide(
       lastStep: state.lastStep,
       progress: progressOf(state),
     });
+    // An answered plan clears the count: the rail stops on faults in a row.
+    state.brainFaults = 0;
     return { decided, durationMs: elapsed() };
   } catch (error) {
     if (!(error instanceof BrainFaulted)) throw error;

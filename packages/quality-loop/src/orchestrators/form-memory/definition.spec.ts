@@ -9,7 +9,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { fieldGoal, policyCriteria, sampleAnswers } from '../../pipelines/field-answer/testing';
-import { childRun, memoryPorts } from '../memory/steps.testing';
+import { childRun, memoryPorts, sampleFacts } from '../memory/steps.testing';
 import { passed, readoutTrace } from '../memory/testing';
 import { validateOrchestrator } from '../runner/definition';
 import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
@@ -41,7 +41,7 @@ describe('the form-memory orchestrator', () => {
   });
 
   it('[QL-38] run over the runner, the answerer sees the recalled evidence and the request’s rubric, and the record reports the admission', async () => {
-    const ports = memoryPorts();
+    const ports = memoryPorts({}, sampleFacts);
     const asked: { pipeline: string; goal: string; criteria: SuccessCriterion[] | undefined }[] =
       [];
     const deps = orchestrationDeps(

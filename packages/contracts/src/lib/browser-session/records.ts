@@ -26,6 +26,7 @@ export interface SessionRailsDto {
   maxTasks: number;
   maxMinutes: number;
   maxConsecutiveFailures: number;
+  /** Brain calls in a row that answered nothing before the session stops; an answered one clears the count. */
   maxBrainFaults: number;
   /** Observations in a row the page could not be read before the session stops. */
   maxUnreadablePages: number;

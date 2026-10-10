@@ -381,7 +381,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-38',
     statement:
-      "A form's fields are answered over facts recalled without a model call: each field's own label is a probe, the hits are fused per field and listed as evidence every stage reads, aliased in field order; a recall that cannot run or finds nothing never blocks the answer, which still runs over the goal as composed; and the target step reports the run's admission so the caller never recomputes it.",
+      "A form's fields are answered over facts recalled without a model call: each field's own label is a probe searched only among what documents taught about the subject, the hits are fused per field and dealt out by rank under one cap — every field's best before any field's second — and listed as evidence every stage reads; a recall that cannot run or finds nothing never blocks the answer, which still runs over the goal as composed; and the target step reports the run's admission so the caller never recomputes it.",
   },
   {
     id: 'QL-39',
@@ -722,6 +722,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'LC-2',
     statement:
       "A run awaited through the client is judged alive by its heartbeat against the loop's own stale window, never by its exchange count or status; a run the loop no longer has is lost, one whose beat has stopped is stale, and an orchestration is awaited the same way through the child run its running step has open.",
+  },
+  {
+    id: 'LC-3',
+    statement:
+      'A caller may declare how long it rides out a restarting loop: within that window a call that never reached the loop, or a read the loop answered 5xx, is asked again at a declared pause, while a timeout and an answered start are never repeated; past the window the call fails as it would have at once, and a caller that declares nothing is never kept waiting.',
   },
   // Browser session (packages/browser-session)
   {

@@ -43,7 +43,7 @@ const storedFact = () => {
     source: {
       runId: 'digest-run-1',
       pipeline: 'document-digest',
-      kind: 'lesson' as const,
+      kind: 'profile_fact' as const,
       ref: 'memory.1',
       decision: 'accept' as const,
       iteration: 1,

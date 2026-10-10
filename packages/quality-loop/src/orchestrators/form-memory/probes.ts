@@ -3,11 +3,13 @@
  * pure of every port. A field's label is a question the subject is asked,
  * and a stored fact's condition is written as that very question
  * (`appliesWhen`), so the label is the probe: no model is asked to derive
- * one. Each field's hits are fused on their own, then the fields' lists are
- * joined in field order under one cap, so the first fields' facts are never
- * crowded out by a long page.
+ * one. The search reads only what documents taught about the subject. Each
+ * field's hits are fused on their own, then dealt out by rank under one cap —
+ * every field's best before any field's second — so neither the first fields
+ * nor the last are crowded out by a long page.
  */
 import {
+  DOCUMENT_MEMORY_KINDS,
   evidenceAlias,
   EVIDENCE_TEXT_MAX_LENGTH,
   MAX_EVIDENCE,
@@ -16,7 +18,7 @@ import {
   excerpt,
 } from '@sysdesign/contracts';
 
-import { VECTOR_NAMES, type MemoryHit, type MemoryProbe } from '../memory/ports';
+import { VECTOR_NAMES, type MemoryHit, type MemoryProbe, type ProbeFilter } from '../memory/ports';
 import { fuse } from '../memory/recall/fusion';
 
 /** How many distinct probes one page may search under; a page lists at most as many fields. */
@@ -54,12 +56,23 @@ export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
   return { texts, byField };
 }
 
-/** Every named vector asked of every probe, as one batch, each with the same small budget. */
+/**
+ * What a form's answer may rest on: what a document taught about the subject
+ * — facts, stories and the bounds on claiming them. Never a design lesson: a
+ * probe for this person's career must not return engineering knowledge.
+ * Measured 2026-10-10: a page asking "Do you reside in CST or EST?" spent two
+ * of its evidence slots on time-zone lessons from design runs.
+ */
+export const FORM_EVIDENCE_FILTER: ProbeFilter = { kinds: DOCUMENT_MEMORY_KINDS };
+
+/** Every named vector asked of every probe, as one batch, each with the same small budget and filter. */
 export const searchProbes = (
   vectors: readonly (readonly number[])[],
   limit = HITS_PER_PROBE,
 ): MemoryProbe[] =>
-  vectors.flatMap((vector) => VECTOR_NAMES.map((using) => ({ vector, using, limit })));
+  vectors.flatMap((vector) =>
+    VECTOR_NAMES.map((using) => ({ vector, using, limit, filter: FORM_EVIDENCE_FILTER })),
+  );
 
 /** The ranked lists that answer probe `index`: one per named vector, as `searchProbes` asked them. */
 const listsOf = (ranked: readonly (readonly MemoryHit[])[], index: number) =>
@@ -70,21 +83,27 @@ export const distinctHits = (ranked: readonly (readonly MemoryHit[])[]): number 
   new Set(ranked.flat().map((hit) => hit.contentHash)).size;
 
 /**
- * The evidence for a page: each field's lists fused on their own, the
- * fields' results joined in field order, one slot per distinct lesson, capped.
+ * The evidence for a page: each field's lists fused on their own, then dealt
+ * out by rank — every field's best in field order, then every field's second —
+ * one slot per distinct fact, capped. Measured 2026-10-10: joined field by
+ * field, an eleven-field page spent the cap before its last fields, and the
+ * question 37 stored facts about the subject spoke to was asked with none.
  */
 export function fieldEvidence(
   probes: FieldProbeSet,
   ranked: readonly (readonly MemoryHit[])[],
   limit = MAX_EVIDENCE,
 ): MemoryHit[] {
+  const perField = probes.byField.map((probe) =>
+    probe === null ? [] : fuse(listsOf(ranked, probe), HITS_PER_PROBE),
+  );
   const seen = new Set<string>();
   const chosen: MemoryHit[] = [];
-  for (const probe of probes.byField) {
-    if (probe === null) continue;
-    for (const hit of fuse(listsOf(ranked, probe), HITS_PER_PROBE)) {
+  for (let rank = 0; rank < HITS_PER_PROBE; rank++) {
+    for (const hits of perField) {
+      const hit = hits[rank];
+      if (hit === undefined || seen.has(hit.contentHash)) continue;
       if (chosen.length === limit) return chosen;
-      if (seen.has(hit.contentHash)) continue;
       seen.add(hit.contentHash);
       chosen.push(hit);
     }

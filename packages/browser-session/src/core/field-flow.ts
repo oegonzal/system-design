@@ -18,6 +18,7 @@ import {
 
 import type { DecisionInput, EngineContext } from './engine-context';
 import { fieldTypeOf, routeFieldsInSession, type RoutedField } from './field-routing';
+import { askListed } from './operator-reply';
 import {
   ActionFailed,
   BrainFaulted,
@@ -153,7 +154,7 @@ async function ask(
 ): Promise<FieldResult> {
   const { deps, state } = ctx;
   await deps.browser.highlight(field.field.ref).catch(() => undefined);
-  const reply = await deps.operator.ask({
+  const reply = await askListed(deps.operator, {
     field: field.field,
     suggestion: field.value,
     why: [field.reason, ...field.faults].join(' — '),
@@ -348,6 +349,7 @@ async function decideFields(
         fields: open,
         criteria: ctx.criteria.answer,
       });
+      state.brainFaults = 0;
     } catch (error) {
       if (!(error instanceof BrainFaulted)) throw error;
       fault = error;
