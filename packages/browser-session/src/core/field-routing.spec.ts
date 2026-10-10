@@ -1,4 +1,10 @@
-import { fieldSpecOf, formObservation, type FieldAnswers, finding } from '@sysdesign/contracts';
+import {
+  fieldSpecOf,
+  formObservation,
+  type FieldAnswers,
+  type FieldSpec,
+  finding,
+} from '@sysdesign/contracts';
 
 import {
   faultedReadouts,
@@ -104,6 +110,61 @@ describe('field routing in a session', () => {
     );
     expect(routeFieldsInSession(null, null, fields, new Map())).toEqual([]);
     expect(withOperatorCache([], new Map())).toEqual([]);
+  });
+
+  it('[BRW-3] reuses an operator answer only for the question it answered, and never for a field that asks nothing it can be told by', () => {
+    // Measured 2026-10-10: every radio question of a form had an empty name,
+    // so one answer stood in for three questions the operator never saw.
+    const question = (ref: string, context: string | null): FieldSpec => ({
+      ref,
+      role: 'radiogroup',
+      name: '',
+      inputType: null,
+      options: ['Yes', 'No'],
+      optionsOmitted: 0,
+      value: null,
+      required: false,
+      invalid: false,
+      maxLength: null,
+      hiddenTraits: [],
+      context,
+    });
+    const questions = [
+      question('e21', 'Will you now or in the future require sponsorship?'),
+      question('e22', 'Are you legally authorized to work in the United States?'),
+      question('e23', null),
+    ];
+    const asked = decidedAnswers({
+      summary: 'three questions no evidence settles',
+      fields: questions.map((field) => ({
+        ref: field.ref,
+        decision: 'ask-operator' as const,
+        value: null,
+        confidence: 'low' as const,
+        basis: [],
+        reason: 'no evidence',
+      })),
+    });
+    const routed = routeFieldsInSession(
+      asked,
+      null,
+      questions,
+      new Map([
+        ['Will you now or in the future require sponsorship?', 'No'],
+        ['', 'Yes'],
+      ]),
+    );
+    expect(routed.map((r) => [r.route, r.value, r.cached])).toEqual([
+      ['fill', 'No', true],
+      ['ask-operator', null, false],
+      ['ask-operator', null, false],
+    ]);
+    expect(routed[0]?.reason).toBe(
+      'the operator answered "Will you now or in the future require sponsorship?" earlier this session',
+    );
+    // With no run to read, an unanswered choice is still the operator's, as the route table has it.
+    const faulted = faultedReadouts(questions, new BrainFaulted('unreachable', 'nobody home'));
+    expect(faulted.map((r) => r.route)).toEqual(['ask-operator', 'ask-operator', 'ask-operator']);
   });
 
   it("names a field's control kind from its role and input type", () => {

@@ -1,5 +1,6 @@
 import {
   elementKind,
+  fieldKeyOf,
   fieldSpecOf,
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
@@ -95,6 +96,12 @@ const result = (
   guidance: null,
 });
 
+/** What the session settled for a field, kept by what the field asks; one that asks nothing it can be told by is kept by nothing. */
+const settled = (into: Map<string, string>, field: FieldSpec, value: string): void => {
+  const key = fieldKeyOf(field);
+  if (key !== null) into.set(key, value);
+};
+
 /** The page refused the fill: the result says so, and the caller stops. */
 async function fill(
   ctx: EngineContext,
@@ -105,7 +112,7 @@ async function fill(
 ): Promise<FieldResult> {
   try {
     await ctx.deps.browser.act(fillActionOf(field.field, value));
-    ctx.state.filled.set(field.field.name, value);
+    settled(ctx.state.filled, field.field, value);
     return result(field, 'fill', source, value, reply);
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
@@ -121,8 +128,8 @@ function remember(
   observation: PageObservation,
 ): OperatorGuidanceDto {
   const { state } = ctx;
-  state.operatorAnswers.set(field.name, answer);
-  state.filled.set(field.name, answer);
+  settled(state.operatorAnswers, field, answer);
+  settled(state.filled, field, answer);
   const page = excerpt(observation.title, GUIDANCE_PAGE_MAX_LENGTH);
   return {
     sessionId: state.sessionId,
@@ -234,7 +241,7 @@ const settle = (
     case 'leave-blank':
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
     case 'keep':
-      if (field.value !== null) ctx.state.filled.set(field.field.name, field.value);
+      if (field.value !== null) settled(ctx.state.filled, field.field, field.value);
       return Promise.resolve(result(field, 'keep', field.source, field.value, null));
     case 'fill':
       return fill(ctx, field, field.value ?? '', field.source, null);
@@ -307,10 +314,15 @@ const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldS
 
 /** The fields still open: one that holds what this session settled for it is not a question. */
 const openOf = (fields: readonly FieldSpec[], filled: ReadonlyMap<string, string>): FieldSpec[] =>
-  fields.filter(
-    (field) =>
-      !(field.value !== null && field.value !== '' && filled.get(field.name) === field.value),
-  );
+  fields.filter((field) => {
+    const key = fieldKeyOf(field);
+    return !(
+      field.value !== null &&
+      field.value !== '' &&
+      key !== null &&
+      filled.get(key) === field.value
+    );
+  });
 
 /** The brain's answers for the open fields, or the fault it threw, timed; nothing is asked for no open field. */
 async function decideFields(

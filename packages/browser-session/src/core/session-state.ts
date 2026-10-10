@@ -102,10 +102,10 @@ export interface SessionState {
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
   /** What the last step did, as the next goal tells it; null before the first plan. */
   lastStep: LastStep | null;
-  /** The operator's answers this session, by field label. */
+  /** The operator's answers this session, by what each field asks (`fieldKeyOf`). */
   operatorAnswers: Map<string, string>;
   /**
-   * What this session settled into fields, by label — filled, kept, or
+   * What this session settled into fields, by what each asks — filled, kept, or
    * answered by the operator — so a field that still holds one of these
    * values is kept without a run. Measured 2026-10-07: three fields the site
    * had filled were sent to the answerer thirty-two times, every fill

@@ -23,7 +23,7 @@ One application: from opening a listing's card to the confirmation that the appl
 - Each page of the form ends in one button that advances it — "Next", then "Review", then "Submit application" on the last; "Back" returns a page and "Dismiss" closes the dialog.
 - Contact info comes filled in — first and last name, email address, phone country code; "Mobile phone number" may be empty. The résumés uploaded before are radio buttons with one selected, beside an "Upload resume" button.
 - A question the form requires is marked "*", or shows "This field is required" under it after a refused advance. Some forms ask, as a "Yes"/"No" radio question, whether the applicant agrees to the site's additional job application terms.
-- The last page shows a ticked checkbox "Follow <Company> to stay up to date with their page" beside "Submit application".
+- The last page may show a ticked checkbox "Follow <Company> to stay up to date with their page" beside "Submit application"; some forms have none.
 - After "Submit application" a dialog headed "Next best action" says "Your application was sent to <Company>!", with "Not now", "Update profile" and "Dismiss". It does not block the page, and the pane beside it then shows "Application status" over "Application submitted" and how long ago ("now"). The dialog is dismissed with "Not now" (or "Dismiss"), never "Update profile"; then the list is where the next job not yet applied to is found.
 - "Dismiss" before submitting asks "Save this application?" with "Discard" and "Save".
 

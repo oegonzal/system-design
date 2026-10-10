@@ -74,6 +74,21 @@ export const fieldSpecOf = (element: ObservedElement): FieldSpec => ({
   context: element.context,
 });
 
+/**
+ * What a field asks, as the session tells one field from another across
+ * pages and forms: its name, else the words beside it — the question a radio
+ * group's answers are named after — else nothing, and a field that asks
+ * nothing it can be told by is never taken for another. Measured 2026-10-10:
+ * every radio question of a form had an empty name, so an answer the operator
+ * gave to one stood in for three questions on the next form they never saw.
+ */
+export const fieldKeyOf = (field: Pick<FieldSpec, 'name' | 'context'>): string | null =>
+  field.name !== ''
+    ? field.name
+    : field.context !== null && field.context !== ''
+      ? field.context
+      : null;
+
 /** One recalled fact, with where it came from, as the goal lists it. */
 export const evidenceItemSchema = z.strictObject({
   alias: z.string().regex(EVIDENCE_ALIAS),

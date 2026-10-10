@@ -1,4 +1,8 @@
 import {
+  excerpt,
+  fieldKeyOf,
+  needsValue,
+  quoted,
   routeFields,
   type Admission,
   type FieldReadout,
@@ -12,8 +16,9 @@ import type { BrainFaulted } from './ports';
 /**
  * The contracts' route table, with the one thing only a running session
  * knows: what the operator already answered. A field the operator settled
- * earlier in the session — the same label on a later form — is filled with
- * that answer rather than asked again, and the row says so. The precedence
+ * earlier in the session — the same question on a later form, told apart by
+ * `fieldKeyOf` — is filled with that answer rather than asked again, and the
+ * row says so. The precedence
  * the contracts declare is untouched: a hidden field stays blank before the
  * cache is consulted, because the cache only ever stands in for an ask.
  */
@@ -22,26 +27,30 @@ export interface RoutedField extends FieldReadout {
   cached: boolean;
 }
 
+/** How much of the question a cached answer's reason quotes. */
+const CACHED_QUESTION_MAX = 120;
+
 /** The operator's answer standing in for an ask; every other readout is passed through. */
 export function withOperatorCache(
   readouts: readonly FieldReadout[],
   cache: ReadonlyMap<string, string>,
 ): RoutedField[] {
   return readouts.map((readout) => {
-    const cached = readout.route === 'ask-operator' ? cache.get(readout.field.name) : undefined;
-    if (cached === undefined) return { ...readout, cached: false };
+    const key = fieldKeyOf(readout.field);
+    const cached = readout.route === 'ask-operator' && key !== null ? cache.get(key) : undefined;
+    if (key === null || cached === undefined) return { ...readout, cached: false };
     return {
       ...readout,
       route: 'fill',
       value: cached,
       source: 'operator',
-      reason: `the operator answered "${readout.field.name}" earlier this session`,
+      reason: `the operator answered ${quoted(excerpt(key, CACHED_QUESTION_MAX))} earlier this session`,
       cached: true,
     };
   });
 }
 
-/** With no run to read — the brain faulted — a required field goes to the operator and an optional one is left blank; the row says why. */
+/** With no run to read — the brain faulted — a field the page needs a value in goes to the operator and any other is left blank; the row says why. */
 export function faultedReadouts(fields: readonly FieldSpec[], fault: BrainFaulted): FieldReadout[] {
   return fields.map((field, position) => {
     const hidden = field.hiddenTraits.length > 0;
@@ -50,12 +59,12 @@ export function faultedReadouts(fields: readonly FieldSpec[], fault: BrainFaulte
       position,
       field,
       answer: null,
-      route: hidden || !field.required ? 'leave-blank' : 'ask-operator',
+      route: hidden || !needsValue(field) ? 'leave-blank' : 'ask-operator',
       value: null,
       source: hidden ? 'blank' : 'engine',
       reason: hidden
         ? 'trap-skipped: the page hides this field'
-        : field.required
+        : needsValue(field)
           ? reason
           : `optional, left blank: ${reason}`,
       faults: [],

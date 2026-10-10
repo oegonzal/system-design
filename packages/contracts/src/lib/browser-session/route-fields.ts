@@ -93,7 +93,7 @@ const holds = (field: FieldSpec): boolean => field.value !== null && field.value
  * and text field required marked none of its radio questions, each was left
  * blank as optional, and the page refused to advance past the blank.
  */
-const needsValue = (field: FieldSpec): boolean =>
+export const needsValue = (field: FieldSpec): boolean =>
   field.required || (field.role === 'radiogroup' && !holds(field));
 
 /** The answers of the best iteration by ref, when its artifact read as answers. */
