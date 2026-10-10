@@ -623,3 +623,71 @@ The controller asks in this order:
 A validator refusal decides before any veto is even considered.
 
 One naming trap: "blocking" is used in both senses. A block validator is one gate kind, while a "blocking finding" or "blocking criterion" is a veto blocker. The decision's blocking field lists everything that refused — validators, findings and criteria — together.
+
+
+
+
+
+
+
+
+## Prenote that made me take all the extra notes in this file
+Short answer: browser-step's veto rule only works if the evaluator judges the page on its own. In the second wave it was shown the critic's finding before judging, so it mostly agreed with it. One model's hallucination was then counted as two independent judgments, and the plan was vetoed.
+
+The rule it broke
+
+A wave is when a lens runs (runLensWaves in core/loop/waves.ts):
+- Wave 1: every critic, plus each evaluator that declares consumes: []. They run in parallel and see only the goal and the plan.
+- Wave 2: evaluators that declare consumes: ['findings']. They run after wave 1, and their prompt includes the critics' confirmed findings under # Confirmed upstream defects.
+
+browser-step's policy declares corroboration: 'cited' with one sample per lens. Under that rule (corroborated in core/controllers/context.ts), a gated finding like missed_stop vetoes only if the evaluator also failed a gating criterion the finding cites. With one critic sample, that second judge is the only thing between a single model's claim and a veto. A second opinion is only worth something if it's formed independently.
+
+What the second wave did
+
+c9d062b put the evaluator in wave 2. Before judging c12 ("report limit-reached when the site says…"), it was now shown something like missed_stop at action.1 → criteria c12: the page shows the daily limit is reached. Measured on the same 23 goals:
+
+┌────────────────────────────────────────────────────┬─────────────────────────────────────────┬────────────────────────────────────────┐
+│                                                    │ Evaluator after the critics (7 batches) │ Evaluator beside the critics (92 runs) │
+├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
+│ Critic invents a stop                              │ 89–100% of runs                         │ 98%                                    │
+├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
+│ Evaluator fails that stop                          │ 24–41% of runs                          │ 0                                      │
+├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
+│ Of those failures, ones the critic had just raised │ all of them, in every batch             │ —                                      │
+├────────────────────────────────────────────────────┼─────────────────────────────────────────┼────────────────────────────────────────┤
+│ Plans vetoed for the stop                          │ 17–39%                                  │ 0                                      │
+└────────────────────────────────────────────────────┴─────────────────────────────────────────┴────────────────────────────────────────┘
+
+On the same pages, with the same invented claims from the critic, the evaluator judging on its own never agreed. Every "agreement" before was it repeating what it had been shown. Rewording its prompt (55c207e: "one sample's finding is a claim to weigh, judge it yourself") didn't fix it: 24% in the batch it landed, then 30% and 41%.
+
+c9d062b's reasoning was that "38 gated findings were contradicted by an evaluator that had not seen them", which it read as the evaluator missing defects. The stop counts show those findings were mostly invented stops, so those contradictions were the check working.
+
+The cost: a real defect that the critic catches and the evaluator misses on its own no longer vetoes. It is still priced into the score, handed to the producer as a remediation, and told to the next plan as an objection. That is the trade the cited rule already declares. A stop's words appeared on a page only twice in 558 recorded goals, both false matches.
+
+Why "browser-step alone"
+
+I checked all ten definitions. Only browser-step declares cited:
+
+┌───────────────────────┬──────────────────────────┬───────────────┬─────────┐
+│       Pipeline        │ Evaluator reads findings │ Corroboration │ minHits │
+├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
+│ browser-step (before) │ yes                      │ cited         │ 1       │
+├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
+│ agentic-design        │ yes                      │ none          │ 2       │
+├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
+│ system-design-canvas  │ yes                      │ none          │ 2       │
+├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
+│ design-prompt         │ yes                      │ none          │ 1       │
+├───────────────────────┼──────────────────────────┼───────────────┼─────────┤
+│ field-answer          │ yes                      │ none          │ 1       │
+└───────────────────────┴──────────────────────────┴───────────────┴─────────┘
+
+In the other four, a gated finding vetoes on agreement among the critic's own samples, and no rule treats the evaluator as an independent check. Showing it the findings is the intended "critics diagnose, then evaluators measure" design there. The contradiction (a rule that needs independence, plus a layout that removes it) lived in one declaration. So the fix was one line in browser-step (consumes: []), plus a general boot check, checkCorroboration, that refuses this combination in any pipeline. There is no browser-step special case in the engine.
+
+One caveat I didn't measure: in those four pipelines the same echo could fail a gating criterion: constraint in agentic-design and system-design-canvas, scope in design-prompt. That would turn a non-gated finding into a veto. The two with minHits: 2 only ever show findings two samples agreed on, which makes this much weaker. design-prompt shows single-sample findings. Worth measuring if those pipelines veto more than you'd expect.
+
+The lines you quoted
+
+- "down from 27/92": stop vetoes over the two batches just before the move (11 + 16), against 0 after.
+- "84 vs 54": runs whose first action actually executed, after against before.
+- "settles S1.10": S1.10 was a prepared change to make stop criteria never veto, by splitting safety into a priced stop kind and a gating never kind. It existed to stop hallucinated stop vetoes. After the move there were none. The 8 remaining refusals were all deterministic validator cuts: 4 terminates on pages without the stop's words, and 4 re-clicks of the same card on an unchanged page. That left S1.10 nothing to fix. Keeping stops gating means a real stop still vetoes when both judges see it independently.
