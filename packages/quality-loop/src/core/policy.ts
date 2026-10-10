@@ -23,12 +23,15 @@ export const STANDARD_SCORING: Pick<
   'resultValues' | 'confidenceWeights' | 'penalties' | 'blockingSeverities'
 > = {
   resultValues: { pass: 1, partial: 0.5, fail: 0 },
+
   confidenceWeights: { none: 0, low: 0.33, medium: 0.67, high: 1 },
+
   penalties: {
     bySeverity: { critical: 40, high: 25, medium: 12, low: 5, info: 0 },
     decay: 0.7,
     maxPerDimension: 60,
   },
+
   blockingSeverities: ['critical'],
 };
 

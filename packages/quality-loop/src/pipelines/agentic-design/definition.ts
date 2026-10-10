@@ -183,9 +183,13 @@ export const AGENTIC_DESIGN: PipelineDefinition<AgenticDesign> = {
 
     findingTypes: {
       missing_requirement: { dimension: 'completeness', gate: false },
+
       constraint_violation: { dimension: 'compliance', gate: true },
+
       contract_mismatch: { dimension: 'interfaces', gate: false },
+
       sequence_gap: { dimension: 'interfaces', gate: false },
+
       // Gated, alone among the reuse-shaped failures: a workflow that only
       // works on the brief it was written for is the one defect a later,
       // unanticipated input cannot recover from, and every brief here asks for
