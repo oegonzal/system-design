@@ -1,0 +1,44 @@
+load('../../tilt/dotenv.Tiltfile', 'env_secret', 'env_value')
+
+docker_build(
+    'notifications',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'notifications'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './packages/contracts',
+        './packages/db',
+        './packages/nest-kit',
+        './packages/config-kit',
+        './packages/notifications',
+    ],
+)
+
+if not env_value('TELEGRAM_API_KEY'):
+    warn(
+        'notifications: no TELEGRAM_API_KEY in this shell or in .env.\n'
+        + '  packages/notifications/config/engine.json runs the Telegram channel, so the pod\n'
+        + '  refuses to boot without the bot token, naming the variable.\n'
+        + '  Fix: put the token in .env as TELEGRAM_API_KEY, or choose channels "none" there.'
+    )
+
+# The bot's token and the one chat it serves. Telegram takes one poller per
+# token: run the service here or with `pnpm notifications:serve`, never both.
+k8s_yaml(env_secret('notifications-telegram', ['TELEGRAM_API_KEY', 'TELEGRAM_CHAT_ID']))
+
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+k8s_resource(
+    'notifications',
+    objects=['notifications-telegram:secret'],
+    port_forwards=3005,
+    resource_deps=['db: migration:up'],
+    labels=['backend'],
+    links=['http://localhost:3005/health']
+)

@@ -36,16 +36,16 @@ There is one local stack, whichever launcher starts it:
 - **The schema and reference data.** `pnpm db:migrate` applies any pending
   migrations and `pnpm db:seed` re-seeds the reference experiences; both are
   idempotent, and the seed never touches your sessions.
-- **The apps.** The API (3000), the quality loop (3003), govcon (3004) and
-  the three web clients (4200, 4201, 4202) find the stores and one another at
-  their defaults, so no connection variable is set.
+- **The apps.** The API (3000), the quality loop (3003), govcon (3004),
+  notifications (3005) and the three web clients (4200, 4201, 4202) find the
+  stores and one another at their defaults, so no connection variable is set.
 
 The launchers differ only in where the apps run:
 
 ```bash
 # from the repo root, with the repo's Node on PATH
 pnpm stack:up   # stores → migrate → seed → the API, the loop and the studio UI as local processes
-tilt up         # stores → migrate → seed → the API, the loop and govcon as pods; the web clients locally
+tilt up         # stores → migrate → seed → the API, the loop, govcon and notifications as pods; the web clients locally
 ```
 
 `pnpm stack:up` runs `scripts/stack.sh` and keeps the studio in the
@@ -376,6 +376,33 @@ the suite needs only Postgres (`pnpm stack:db`). Locally it reuses a server on
 its own lane's ports that an earlier run left up, so a re-run skips the cold
 start.
 
+## Answering from your phone: the Telegram channel
+
+`packages/notifications` is the project's event bus (`:3005`), and its
+Telegram channel puts every prompt published on it in front of you as a
+message from the bot — the question, its choices lettered `a`, `b`, `c`…, a
+button per letter and per command — and brings your answer back as an
+`interaction.answered` event for whoever asked. Tap a button, type the
+letter, type your own answer where the prompt takes one, or reply to the
+message you are answering when several wait.
+
+Pairing, once:
+
+1. The bot's token goes in the repo's `.env` as `TELEGRAM_API_KEY` (BotFather
+   gives it when the bot is created). Without it the service refuses to boot
+   while `config/engine.json` chooses the `telegram` channel; choose
+   `"channels": "none"` to run the bus alone.
+2. Start the service — `pnpm notifications:serve`, or `tilt up` — and send
+   `/start` to the bot in Telegram. Until a chat is named the bot serves no
+   one: it answers `/start` with your chat id and delivers nothing.
+3. Put that id in `.env` as `TELEGRAM_CHAT_ID` and restart the service. From
+   then on it serves that chat alone and ignores every other.
+
+Telegram takes one poller per bot token: run the service under Tilt or with
+`pnpm notifications:serve`, never both at once — the second is refused, and
+the service logs it and waits. A prompt nobody withdraws expires at the time
+its asker gave it; the bot then edits its message to say so.
+
 ## Notes / gotchas
 
 - Port **5433** is the app's default (`packages/db/src/connection.ts`) and
@@ -387,14 +414,15 @@ start.
   no `claude login`; `claude setup-token` prints the token). `OPENAI_API_KEY`
   and `OPENAI_EMBEDDING_MODEL` ride in the same Secret, so memory runs in the
   pod as on this machine, and govcon's `SAM_GOV_API_KEY` reaches its pod the
-  same way, through the Secret `govcon-sam`. With no token Tilt warns and the
-  loop's pod exits at boot with the loop's own message.
+  same way, through the Secret `govcon-sam`; so do `TELEGRAM_API_KEY` and
+  `TELEGRAM_CHAT_ID`, through `notifications-telegram`. With no token Tilt warns
+  and the loop's pod exits at boot with the loop's own message.
 - Under Tilt the loop's audit dumps land on the volume claim
   `quality-loop-runs`, mounted at its default `static/runs`, which outlives
   restarts and `tilt down`. Copy them out with
   `kubectl cp <quality-loop pod>:/app/static/runs <dir>`.
-- Under Tilt the host reaches the API (3000), the loop (3003) and govcon
-  (3004) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+- Under Tilt the host reaches the API (3000), the loop (3003), govcon (3004)
+  and notifications (3005) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
   host-published container on the same port, racing Tilt's forward. A cluster
   that ran the old manifests may keep a Service stuck deleting, and then Tilt

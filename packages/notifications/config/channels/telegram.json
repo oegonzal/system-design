@@ -1,0 +1,11 @@
+{
+  "telegram": {
+    "pollTimeoutSeconds": 25,
+    "requestTimeoutMs": 15000,
+    "maxRetryAfterMs": 30000,
+    "conflictBackoffMs": 15000,
+    "errorBackoffMs": 5000,
+    "maxChoiceButtons": 24,
+    "buttonsPerRow": 6
+  }
+}

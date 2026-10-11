@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  labels:
+    app: notifications
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications
+  template:
+    metadata:
+      labels:
+        app: notifications
+    spec:
+      containers:
+        - name: notifications
+          image: notifications
+          ports:
+            - containerPort: 3005
+          # Everything else is the package's own config/ files: the stores are
+          # on the host, and the bot's token and chat come from the Secret the
+          # Tiltfile builds.
+          envFrom:
+            - configMapRef:
+                name: local-stores
+            - secretRef:
+                name: notifications-telegram
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-service
+spec:
+  selector:
+    app: notifications
+  ports:
+    - protocol: TCP
+      port: 3005
+      targetPort: 3005
+  # In-cluster only: the host reaches it through Tilt's port-forward.
+  type: ClusterIP

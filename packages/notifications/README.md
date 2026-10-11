@@ -25,6 +25,10 @@ Delivery is at least once: a pull hands out the same events until they are ackno
 
 A prompt (`interaction.prompted`) declares how it is answered — lettered choices, free text within a length, slash commands — and every channel reads a reply with the contracts' `readReply`, so `b` means the same everywhere. The dispatcher, an ordinary subscriber of the bus, delivers each prompt once per channel, and shows on every message it sent how the prompt ended: an answer (`interaction.answered`, published by the service), a withdrawal by its asker (`interaction.withdrawn`), or its expiry. A reply resolves to the prompt whose message it replies to, else to the one prompt open on its address.
 
+## Telegram
+
+The first channel (`src/channels/telegram/`). It long-polls the Bot API, so no public URL is needed, and serves exactly one chat: `TELEGRAM_CHAT_ID`. While that is unset it answers `/start` with the chat id to set, and delivers nothing; once set, every other chat is ignored. A prompt arrives as a message with a button per letter (up to `maxChoiceButtons`; past that the letters are typed) and per command; a button sends exactly what typing it would. The bot token is `TELEGRAM_API_KEY`, never logged. One poller per token — Telegram refuses a second, and the channel backs off. Pairing steps are in the root `RUNBOOK.md`.
+
 ## Layout
 
 `src/bus/` → `src/interactions/` → `src/channels/<id>/`, each reaching the one below only through its `index.ts` or `channels/port.ts`; `src/layers.spec.ts` holds every file to that. A channel is its own folder plus one line in `channels/index.ts`: its settings join the `channels` kind and its variables join the declared environment.

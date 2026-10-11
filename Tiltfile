@@ -18,6 +18,7 @@
 #   API             → localhost:3000/api                            [k8s + docker]
 #   Quality loop    → localhost:3003/health                         [k8s + docker]
 #   Govcon          → localhost:3004/health                         [k8s + docker]
+#   Notifications   → localhost:3005/health                         [k8s + docker]
 #   Frontend        → localhost:4200                                [local next dev]
 #   Quality loop UI → localhost:4201                                [local next dev]
 #   Govcon UI       → localhost:4202                                [local next dev]
@@ -30,6 +31,7 @@ include('./tilt/stores/Tiltfile')
 include('./packages/studio-api/Tiltfile')
 include('./packages/quality-loop/Tiltfile')
 include('./packages/govcon/Tiltfile')
+include('./packages/notifications/Tiltfile')
 include('./packages/studio-ui/Tiltfile')
 include('./packages/quality-loop-ui/Tiltfile')
 include('./packages/govcon-ui/Tiltfile')

@@ -1,10 +1,10 @@
 import { INTERACTION_TOPICS, type InteractionPrompt } from '@sysdesign/contracts';
 
 import { inMemoryBus } from '../bus/testing';
-import { FakeChannel } from '../channels/testing';
+import { FakeChannel, promptOf } from '../channels/testing';
 import { Dispatcher } from './dispatcher';
 import { Inbound } from './inbound';
-import { InMemoryInteractionStore, promptOf } from './testing';
+import { InMemoryInteractionStore } from './testing';
 
 const NOW = new Date('2026-10-11T12:00:00Z');
 

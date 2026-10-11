@@ -1,6 +1,24 @@
+import { randomUUID } from 'node:crypto';
+
 import type { InteractionPrompt } from '@sysdesign/contracts';
 
 import type { ChannelDelivery, InboundSink, InboundVerdict, NotificationChannel } from './port';
+
+/** A prompt a spec can put: a closed question with two choices and one command, its time a day away. */
+export const promptOf = (overrides: Partial<InteractionPrompt> = {}): InteractionPrompt => ({
+  id: randomUUID(),
+  origin: { kind: 'spec', id: 'asker-1', label: 'step 3 · Acme' },
+  title: 'Gender',
+  details: ['Field: "Gender" (combobox, required)'],
+  choices: [
+    { id: 'male', label: 'Male', note: null },
+    { id: 'female', label: 'Female', note: null },
+  ],
+  freeText: null,
+  commands: [{ id: 'blank', label: 'Leave it empty' }],
+  expiresAt: '2026-10-12T00:00:00.000Z',
+  ...overrides,
+});
 
 /**
  * A channel with one person on it, for specs: it records what it delivered and

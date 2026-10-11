@@ -14,8 +14,8 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 
-import { FakeChannel } from '../channels/testing';
-import { promptOf, until } from '../interactions/testing';
+import { FakeChannel, promptOf } from '../channels/testing';
+import { until } from '../interactions/testing';
 import { bootApp } from './testing';
 
 type Envelope<T> = { data: T };

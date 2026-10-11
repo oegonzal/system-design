@@ -8,7 +8,7 @@ import type { TopicPublisher } from '@sysdesign/contracts';
 export class UndeclaredTopic extends Error {
   override readonly name = 'UndeclaredTopic';
   constructor(readonly topics: readonly string[]) {
-    super(`no such topic: ${topics.join(', ')}`);
+    super(`undeclared ${topics.length === 1 ? 'topic' : 'topics'}: ${topics.join(', ')}`);
   }
 }
 

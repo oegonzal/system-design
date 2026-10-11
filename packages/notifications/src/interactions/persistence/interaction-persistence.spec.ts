@@ -8,7 +8,7 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 
-import { promptOf } from '../testing';
+import { promptOf } from '../../channels/testing';
 import { MikroOrmInteractionStore } from './mikro-orm-interaction-store';
 
 const AT = new Date('2026-10-11T12:00:00Z');

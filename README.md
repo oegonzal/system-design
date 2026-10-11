@@ -33,7 +33,7 @@ Kubernetes enabled, [Tilt](https://docs.tilt.dev/install.html).
 
 ```bash
 bash scripts/setup.sh   # verifies the toolchain, installs dependencies
-tilt up                 # stores → migrations → seed → api, quality loop, govcon → web apps
+tilt up                 # stores → migrations → seed → api, quality loop, govcon, notifications → web apps
 ```
 
 | Service         | Where                                                |
@@ -44,6 +44,7 @@ tilt up                 # stores → migrations → seed → api, quality loop, 
 | API             | http://localhost:3000/api                            |
 | Quality loop    | http://localhost:3003/health                         |
 | Govcon          | http://localhost:3004/health                         |
+| Notifications   | http://localhost:3005/health                         |
 | Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
 | Qdrant          | http://localhost:6333                                |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
@@ -98,6 +99,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                                                               |
 | `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                |
 | `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                   |
+| `packages/notifications`   | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back   |
 | `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                 |
 | `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                                                                |
 | `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub                                                        |
@@ -149,6 +151,7 @@ pnpm test:stories                                          # render every story,
 pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
 pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
+pnpm notifications:serve                   # the event bus on :3005, Telegram polling with TELEGRAM_API_KEY (needs the db)
 ```
 
 The dev servers need no Nx daemon: `nx run studio-api:serve` and

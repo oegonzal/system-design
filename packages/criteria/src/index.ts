@@ -842,6 +842,16 @@ export const CRITERIA: readonly Criterion[] = [
       'An answer, a withdrawal or an expiry closes a prompt on every channel it reached, idempotently; a withdrawal after an answer marks that answer unused; a prompt past its time is withdrawn by the service itself.',
   },
   {
+    id: 'NTF-7',
+    statement:
+      'The Telegram channel serves only the chat its environment names — answering /start with the chat id to name while none is, and delivering nothing then — hands the service what that chat types or presses exactly as typed, confirms each update only once handled, answers every button press, waits out a rate limit within its cap and a second poller with a backoff, takes an edit Telegram refuses as done, refuses to start on a rejected token, and never writes its token into a log or an error.',
+  },
+  {
+    id: 'NTF-8',
+    statement:
+      'A prompt renders on Telegram as escaped HTML — its title, who asks, its details, its choices lettered a…z then aa… with their notes, and how it is answered — in as few parts as fit a message with room kept for its outcome, nothing cut inside a tag or an entity, a button per letter up to the declared count and per command under the last part, each sending exactly what typing it would within 64 bytes.',
+  },
+  {
     id: 'NTF-9',
     statement:
       'Every variable the service reads is declared once — its own and each chosen channel’s — and every setting is a file chosen by name; a chosen channel missing a variable it requires refuses boot naming it, and nothing else in the package reads the environment.',

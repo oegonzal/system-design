@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
 import type { ChannelDefinition, ChannelLog, NotificationChannel } from './port';
+import { TELEGRAM } from './telegram/definition';
+
+/** A channel's definition with its settings read back through its own schema, so the registry holds every channel alike. */
+const declared = <S>(definition: ChannelDefinition<S>): ChannelDefinition => ({
+  ...definition,
+  create: (input) =>
+    definition.create({ ...input, settings: definition.settings.parse(input.settings) }),
+});
 
 /**
  * Every channel the service can run, declared once. A channel is its own
@@ -8,7 +16,7 @@ import type { ChannelDefinition, ChannelLog, NotificationChannel } from './port'
  * its variables join the service's declared environment, and nothing else in
  * the package names it.
  */
-export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [];
+export const CHANNEL_DEFINITIONS: readonly ChannelDefinition[] = [declared(TELEGRAM)];
 
 /** The `channels` settings: one optional entry per declared channel, and a channel runs exactly when its entry is present. */
 export const channelSettingsSchema = z.strictObject(

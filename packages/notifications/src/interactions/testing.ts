@@ -1,25 +1,7 @@
-import { randomUUID } from 'node:crypto';
-
 import type { InteractionOutcome, InteractionPrompt } from '@sysdesign/contracts';
 
 import type { ChannelDelivery } from '../channels/port';
 import type { DeliveryRecord, InteractionRecord, InteractionStore } from './ports';
-
-/** A prompt a specs can put: a closed question with two choices and one command, its time a day away. */
-export const promptOf = (overrides: Partial<InteractionPrompt> = {}): InteractionPrompt => ({
-  id: randomUUID(),
-  origin: { kind: 'spec', id: 'asker-1', label: 'step 3 · Acme' },
-  title: 'Gender',
-  details: ['Field: "Gender" (combobox, required)'],
-  choices: [
-    { id: 'male', label: 'Male', note: null },
-    { id: 'female', label: 'Female', note: null },
-  ],
-  freeText: null,
-  commands: [{ id: 'blank', label: 'Leave it empty' }],
-  expiresAt: '2026-10-12T00:00:00.000Z',
-  ...overrides,
-});
 
 /** Polls until `holds` is true, for what a background consumer does; fails after `ms`. */
 export async function until(holds: () => boolean, ms = 3_000): Promise<void> {
