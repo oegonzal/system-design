@@ -1,4 +1,4 @@
-import { createWriteQueue, heartbeatTicker, isLive, SESSION_STALE_AFTER_MS } from './write-queue';
+import { createWriteQueue, isLive, SESSION_STALE_AFTER_MS } from './write-queue';
 
 describe('the write queue', () => {
   it('[BRW-5] keeps order, never makes the caller wait, reports a failed write and drains to the last one', async () => {
@@ -33,33 +33,7 @@ describe('the write queue', () => {
   });
 });
 
-describe('the heartbeat ticker', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it('[BRW-5] beats on its own timer, reports a failed beat, and stops when told', async () => {
-    const beats: number[] = [];
-    const reports: unknown[] = [];
-    let fail = false;
-    const ticker = heartbeatTicker(
-      async () => {
-        if (fail) throw new Error('no connection');
-        beats.push(Date.now());
-      },
-      1_000,
-      (error) => reports.push(error),
-    );
-    await vi.advanceTimersByTimeAsync(3_500);
-    expect(beats).toHaveLength(3);
-    fail = true;
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(reports).toHaveLength(1);
-    ticker.stop();
-    await vi.advanceTimersByTimeAsync(5_000);
-    expect(beats).toHaveLength(3);
-    expect(reports).toHaveLength(1);
-  });
-
+describe("a session's beat", () => {
   it('[BRW-5] tells a live session from a dead one by its beat against the declared window', () => {
     const now = new Date('2026-10-03T10:01:00.000Z');
     expect(isLive('2026-10-03T10:00:30.000Z', now)).toBe(true);

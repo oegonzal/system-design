@@ -1,5 +1,11 @@
 import type { Logger } from '@nestjs/common';
-import type { PipelineSummary, RunRecallDto, RunTrace } from '@sysdesign/contracts';
+import {
+  startPeriodic,
+  type Periodic,
+  type PipelineSummary,
+  type RunRecallDto,
+  type RunTrace,
+} from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -19,8 +25,10 @@ export interface RecorderPorts {
 /**
  * What a running run writes as it goes, and how it closes. The row is alive
  * while this process says so — a model call can run for minutes with no
- * exchange to record, so the heartbeat ticks on its own, and the record keeps
- * the same beat so an in-memory reader is handed what the row says. Live
+ * exchange to record, so the heartbeat ticks on its own at the loop's one
+ * cadence (`heartbeatEveryMs`, a few beats per stale threshold), and the
+ * record keeps the same beat so an in-memory reader is handed what the row
+ * says; a beat in flight is let finish before the close is written. Live
  * writes are chained and never awaited by the loop: order is kept, a slow
  * database never stalls a model call, and a failed write is logged. Each
  * finished iteration is published as it lands — an adopted one at once — so
@@ -30,19 +38,19 @@ export interface RecorderPorts {
  */
 export class RunRecorder {
   private writes: Promise<void> = Promise.resolve();
-  private readonly ticker: { stop(): void };
+  private readonly ticker: Periodic;
 
   constructor(
     private readonly record: RunRecord,
     private readonly ports: RecorderPorts,
     staleAfterMs: number,
   ) {
-    this.ticker = heartbeatTicker(
+    this.ticker = startPeriodic(
+      { everyMs: heartbeatEveryMs(staleAfterMs), atStart: false },
       () => {
         this.beat();
         return ports.repository.heartbeat(record.runId);
       },
-      staleAfterMs,
       (error) => ports.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
     );
   }
@@ -84,7 +92,7 @@ export class RunRecorder {
   /** Stop the beat, settle the times, save the dump, drain the live writes, and close the row with the truth. */
   async close(summary: PipelineSummary): Promise<void> {
     const { record, ports } = this;
-    this.ticker.stop();
+    await this.ticker.stop();
     record.finishedAt = new Date().toISOString();
     record.heartbeatAt = record.finishedAt;
     ports.traces.save(record, summary);
@@ -115,20 +123,4 @@ export class RunRecorder {
         this.ports.logger.warn(`run ${this.record.runId}: ${what} not recorded: ${String(error)}`),
       );
   }
-}
-
-/**
- * An unref'd interval that refreshes a running row's heartbeat at the loop's
- * one cadence (`heartbeatEveryMs`, a few beats per stale threshold), so a
- * long model call never lets the janitor mistake a live run for a dead one.
- * Never awaited; a failed write is only logged.
- */
-export function heartbeatTicker(
-  beat: () => Promise<void>,
-  staleAfterMs: number,
-  warn: (error: unknown) => void,
-): { stop(): void } {
-  const timer = setInterval(() => void beat().catch(warn), heartbeatEveryMs(staleAfterMs));
-  timer.unref();
-  return { stop: () => clearInterval(timer) };
 }

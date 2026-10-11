@@ -11,15 +11,14 @@ import type {
   StartOrchestrationFromRunRequest,
   StartOrchestrationRequest,
 } from '@sysdesign/contracts';
-import { DEFAULT_QUALITY_RUN_ITERATIONS, openedAs } from '@sysdesign/contracts';
+import { DEFAULT_QUALITY_RUN_ITERATIONS, openedAs, startPeriodic } from '@sysdesign/contracts';
 
 import { validateOrchestrator } from '../../orchestrators/runner/definition';
 import { openRecord } from '../../orchestrators/runner/record';
 import { runOrchestration } from '../../orchestrators/runner/run-orchestration';
 import { orNotFound } from '../http/or-not-found';
-import type { RunJanitorOptions } from '../janitor/stale-after';
+import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
-import { heartbeatTicker } from '../runs/run-recorder';
 import { RunsService } from '../runs/runs.service';
 import { isOrchestrationRunId } from './orchestration-request';
 import type { OrchestrationListQuery, OrchestrationRunRepository, OrchestratorHost } from './ports';
@@ -182,9 +181,9 @@ export class OrchestrationService {
     provided: QualityRunDto | null,
   ): Promise<void> {
     const label = `${host.definition.id} run ${record.orchestrationRunId}`;
-    const ticker = heartbeatTicker(
+    const ticker = startPeriodic(
+      { everyMs: heartbeatEveryMs(this.janitor.staleAfterMs), atStart: false },
       () => this.repository.heartbeat(record.orchestrationRunId),
-      this.janitor.staleAfterMs,
       (error) => this.logger.warn(`${label}: heartbeat not written: ${String(error)}`),
     );
     try {
@@ -197,7 +196,8 @@ export class OrchestrationService {
         warn: (message) => this.logger.warn(`${label}: ${message}`),
       });
     } finally {
-      ticker.stop();
+      // A beat in flight is let finish before the close is written.
+      await ticker.stop();
       try {
         const outcome = await this.repository.close(record);
         if (outcome === 'reclaimed') {

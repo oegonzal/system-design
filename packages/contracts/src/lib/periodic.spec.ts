@@ -1,33 +1,46 @@
 import { startPeriodic } from './periodic';
 
-describe('a periodic sweep', () => {
+describe('a periodic job', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('[NTF-3] runs at boot and on its schedule, logs a failure without throwing, and never runs when it has no schedule', async () => {
+  it('[NTF-3] [QL-13] [BRW-5] runs at the start when asked, then on its schedule, reports a failure without throwing, and never runs without a schedule', async () => {
     vi.useFakeTimers();
     let runs = 0;
-    const warnings: string[] = [];
+    const reports: unknown[] = [];
     const periodic = startPeriodic(
-      1_000,
+      { everyMs: 1_000, atStart: true },
       async () => {
         runs += 1;
         if (runs === 2) throw new Error('the store went away');
       },
-      (message) => warnings.push(message),
+      (error) => reports.push(error),
     );
     expect(runs).toBe(1);
     await vi.advanceTimersByTimeAsync(2_500);
     expect(runs).toBe(3);
-    expect(warnings).toEqual(['sweep failed: Error: the store went away']);
+    expect(reports).toEqual([new Error('the store went away')]);
     await periodic.stop();
     await vi.advanceTimersByTimeAsync(5_000);
     expect(runs).toBe(3);
 
+    let waited = 0;
+    const later = startPeriodic(
+      { everyMs: 1_000, atStart: false },
+      async () => {
+        waited += 1;
+      },
+      () => undefined,
+    );
+    expect(waited).toBe(0);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(waited).toBe(1);
+    await later.stop();
+
     let never = 0;
     await startPeriodic(
-      null,
+      { everyMs: null, atStart: true },
       async () => {
         never += 1;
       },
@@ -36,12 +49,12 @@ describe('a periodic sweep', () => {
     expect(never).toBe(0);
   });
 
-  it('[NTF-3] stops only once the sweep in flight has finished, and never runs a sweep slower than its schedule twice at once', async () => {
+  it('[NTF-3] [QL-13] [BRW-5] stops only once the run in flight has finished, and never starts a run slower than its schedule twice at once', async () => {
     vi.useFakeTimers();
     let runs = 0;
     let finish = (): void => undefined;
     const periodic = startPeriodic(
-      1_000,
+      { everyMs: 1_000, atStart: true },
       () => {
         runs += 1;
         return new Promise<void>((resolve) => {
@@ -50,7 +63,7 @@ describe('a periodic sweep', () => {
       },
       () => undefined,
     );
-    // Three ticks pass while the boot sweep is still running: none starts another.
+    // Three ticks pass while the first run is still going: none starts another.
     await vi.advanceTimersByTimeAsync(3_500);
     expect(runs).toBe(1);
     let stopped = false;

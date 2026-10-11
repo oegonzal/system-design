@@ -5,6 +5,7 @@ import {
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
+import { startPeriodic, type Periodic } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import type { RunRepository } from '../../core/ports';
@@ -24,7 +25,7 @@ import { RUN_JANITOR_OPTIONS } from './tokens';
 @Injectable()
 export class RunJanitor implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RunJanitor.name);
-  private timer: NodeJS.Timeout | null = null;
+  private periodic: Periodic | null = null;
 
   constructor(
     @Inject(RUN_JANITOR_OPTIONS) private readonly options: RunJanitorOptions,
@@ -35,15 +36,17 @@ export class RunJanitor implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     await this.sweep();
-    if (this.options.intervalMs !== null) {
-      this.timer = setInterval(() => void this.sweep(), this.options.intervalMs);
-      // A CLI run must still exit when its work is done.
-      this.timer.unref();
-    }
+    // On a timer that never holds the process open: a CLI run must still exit when its work is done.
+    this.periodic = startPeriodic(
+      { everyMs: this.options.intervalMs, atStart: false },
+      () => this.sweep(),
+      (error) => this.logger.error(`sweep failed: ${describeError(error).message}`),
+    );
   }
 
-  onModuleDestroy(): void {
-    if (this.timer !== null) clearInterval(this.timer);
+  /** Before the store closes: the sweep in flight let finish. */
+  async onModuleDestroy(): Promise<void> {
+    await this.periodic?.stop();
   }
 
   /** Fail every run and orchestration run whose heartbeat is older than the threshold. */

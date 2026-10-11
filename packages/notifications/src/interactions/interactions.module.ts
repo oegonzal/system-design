@@ -8,12 +8,12 @@ import {
   type OnModuleDestroy,
 } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { startPeriodic, type Periodic } from '@sysdesign/contracts';
 import { Interaction, InteractionDelivery } from '@sysdesign/db';
 
 import { Bus } from '../bus';
 import type { ChannelLog, NotificationChannel } from '../channels/port';
 import { CLOCK, type Clock } from '../common/clock';
-import { startPeriodic, type Periodic } from '../common/periodic';
 import { Dispatcher, sweepInteractions } from './dispatcher';
 import { Inbound } from './inbound';
 import { MikroOrmInteractionStore } from './persistence/mikro-orm-interaction-store';
@@ -47,7 +47,7 @@ class InteractionsLifecycle implements OnApplicationBootstrap, OnModuleDestroy {
   async onApplicationBootstrap(): Promise<void> {
     await this.dispatcher.start(this.inbound);
     this.periodic = startPeriodic(
-      this.settings.sweepEveryMs,
+      { everyMs: this.settings.sweepEveryMs, atStart: true },
       async () => {
         const swept = await sweepInteractions(this.bus, this.store, this.settings, this.clock());
         if (swept.expired + swept.purged > 0) {
@@ -56,7 +56,7 @@ class InteractionsLifecycle implements OnApplicationBootstrap, OnModuleDestroy {
           );
         }
       },
-      log.warn,
+      (error) => log.warn(`sweep failed: ${String(error)}`),
     );
   }
 

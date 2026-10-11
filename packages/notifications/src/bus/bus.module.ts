@@ -8,11 +8,10 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { NOTIFICATION_TOPICS } from '@sysdesign/contracts';
+import { NOTIFICATION_TOPICS, startPeriodic, type Periodic } from '@sysdesign/contracts';
 import { BusEvent, BusSubscription } from '@sysdesign/db';
 
 import { CLOCK, type Clock } from '../common/clock';
-import { startPeriodic, type Periodic } from '../common/periodic';
 import { Bus } from './bus';
 import { EventsController } from './http/events.controller';
 import { SubscriptionsController } from './http/subscriptions.controller';
@@ -36,14 +35,14 @@ class BusLifecycle implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.periodic = startPeriodic(
-      this.settings.sweepEveryMs,
+      { everyMs: this.settings.sweepEveryMs, atStart: true },
       async () => {
         const swept = await this.bus.sweep(this.settings);
         if (swept.events + swept.subscriptions > 0) {
           logger.log(`swept ${swept.events} events and ${swept.subscriptions} idle subscriptions`);
         }
       },
-      (message) => logger.warn(message),
+      (error) => logger.warn(`sweep failed: ${String(error)}`),
     );
   }
 

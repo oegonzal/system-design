@@ -1,4 +1,8 @@
-import { BROWSER_SESSION_PIPELINES, type BrowserSessionStatus } from '@sysdesign/contracts';
+import {
+  BROWSER_SESSION_PIPELINES,
+  startPeriodic,
+  type BrowserSessionStatus,
+} from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import {
@@ -12,7 +16,7 @@ import { closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createState, pushHistory, touchedBy } from './session-state';
 import { step } from './step-flow';
-import { createWriteQueue, heartbeatTicker, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
+import { createWriteQueue, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
 
 /**
  * The session loop. It decides nothing of its own: every plan, every field
@@ -76,9 +80,9 @@ export async function runSession(
   });
   const warn = warnOf(deps, state.sessionId);
   const queue = createWriteQueue((what, error) => warn(`${what} not recorded`, error));
-  const ticker = heartbeatTicker(
+  const ticker = startPeriodic(
+    { everyMs: SESSION_HEARTBEAT_EVERY_MS, atStart: false },
     () => deps.ledger.heartbeat(state.sessionId, deps.clock.now(), state.step),
-    SESSION_HEARTBEAT_EVERY_MS,
     (error) => warn('heartbeat not written', error),
   );
   const ctx = createEngineContext({ deps, options, state, mission: goal.markdown, dump, queue });
@@ -136,7 +140,8 @@ export async function runSession(
     }
     if (!state.terminationRecorded) ctx.terminate(termination, 'engine', null);
   } finally {
-    ticker.stop();
+    // A beat in flight is let finish before the session's closing writes.
+    await ticker.stop();
     await deps.browser.close().catch((caught: unknown) => warn('browser not closed', caught));
   }
   return closeSession(ctx, { goal, startedAt, termination, error });

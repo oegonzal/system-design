@@ -2,9 +2,10 @@
  * The session's live writes, and its sign of life. Both after the quality
  * loop's own run service: writes are chained and never awaited by the engine,
  * so order is kept, a slow database never stalls the browser, and a failed
- * write is reported, not thrown; the heartbeat ticks on a timer of its own,
- * unref'd, so a long wait on the loop costs no beats and a finished process
- * is not kept alive by it.
+ * write is reported, not thrown; the heartbeat is a periodic job of its own
+ * (`startPeriodic`), so a long wait on the loop costs no beats, a finished
+ * process is not kept alive by it, and a beat in flight is let finish before
+ * the session closes.
  */
 
 /** How often a running session beats, and how long a silence a reader takes for death. */
@@ -38,17 +39,6 @@ export function createWriteQueue(report: (what: string, error: unknown) => void)
       return pending;
     },
   };
-}
-
-/** An unref'd interval that beats; a failed beat is reported, never thrown. */
-export function heartbeatTicker(
-  beat: () => Promise<void>,
-  everyMs: number,
-  report: (error: unknown) => void,
-): { stop(): void } {
-  const timer = setInterval(() => void beat().catch(report), everyMs);
-  timer.unref();
-  return { stop: () => clearInterval(timer) };
 }
 
 /** Whether a session that says `running` is still alive, by its beat. */

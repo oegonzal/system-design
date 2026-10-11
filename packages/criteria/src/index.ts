@@ -256,7 +256,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-13',
     statement:
-      'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, listing newest first, and surviving a restart: a row left running by a dead process is failed only once its heartbeat is stale, and a late close from its owner reclaims it with the true outcome.',
+      'Runs persist through MikroORM in normalized tables — run, criteria, iterations, findings, criterion results — reassembling the wire record exactly, listing newest first, and surviving a restart: a row left running by a dead process is failed only once its heartbeat is stale, and a late close from its owner reclaims it with the true outcome; the janitor’s sweep and every heartbeat never overlap their own last run and are let finish before the store closes.',
   },
   {
     id: 'QL-14',
@@ -762,7 +762,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-5',
     statement:
-      "A session's rows — session, units of work and decisions — are written through a chained write queue that never stalls the browser, with a heartbeat ticker on its own timer, so a reader tells a live session from a dead one by its beat.",
+      "A session's rows — session, units of work and decisions — are written through a chained write queue that never stalls the browser, with a heartbeat on its own timer, let finish before the session closes, so a reader tells a live session from a dead one by its beat.",
   },
   {
     id: 'BRW-6',

@@ -168,8 +168,8 @@ describe('the layers', () => {
     expect(violations('channels/index.ts', ['./pager/render'])).toEqual([
       'channels/index.ts reaches channels/pager/render.ts',
     ]);
-    expect(violations('common/periodic.ts', ['../bus'])).toEqual([
-      'common/periodic.ts reaches bus/index.ts',
+    expect(violations('common/clock.ts', ['../bus'])).toEqual([
+      'common/clock.ts reaches bus/index.ts',
     ]);
     // A spec takes the fakes of a layer its folder reaches, and of no other.
     expect(
