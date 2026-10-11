@@ -2,10 +2,12 @@ import { createHash } from 'node:crypto';
 
 import {
   actionRefs,
+  readReply,
   type BrowserDecisionDto,
   type BrowserSessionDetailDto,
   type BrowserSessionDto,
   type BrowserTaskDto,
+  type InteractionAnswer,
   type PageObservation,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
@@ -25,10 +27,11 @@ import {
   type NewSession,
   type NewTask,
   type OperatorPort,
-  type OperatorPrompt,
-  type OperatorReply,
+  type OperatorQuestion,
+  QuestionWithdrawn,
   type SessionClose,
   type TaskClose,
+  type Withdrawal,
 } from './ports';
 
 export * from './testing-runs';
@@ -299,28 +302,53 @@ export class InMemoryLedger implements LedgerPort {
   }
 }
 
-/** An operator who answers from a script; past the script, every field is left blank. */
+/**
+ * An operator who types from a script, as a person would at the terminal:
+ * each line read the one declared way, an empty one as the question's Enter.
+ * Past the script a field is left blank, and anything else goes on. A line
+ * the question refuses is a spec that typed the wrong thing, and fails it.
+ * It answers a turn later, so a question can be withdrawn while it waits.
+ */
 export class ScriptedOperator implements OperatorPort {
-  readonly prompts: OperatorPrompt[] = [];
+  readonly name = 'scripted';
+  readonly questions: OperatorQuestion[] = [];
   readonly notices: string[] = [];
-  readonly pauses: string[] = [];
-  private readonly replies: OperatorReply[];
+  readonly unusedAnswers: Withdrawal[] = [];
+  private readonly lines: string[];
+  private answered = 0;
 
-  constructor(replies: readonly OperatorReply[] = []) {
-    this.replies = [...replies];
+  constructor(lines: readonly string[] = []) {
+    this.lines = [...lines];
   }
 
-  async ask(prompt: OperatorPrompt): Promise<OperatorReply> {
-    this.prompts.push(prompt);
-    return this.replies.shift() ?? { kind: 'blank' };
+  async ask(question: OperatorQuestion, signal?: AbortSignal): Promise<InteractionAnswer> {
+    this.questions.push(question);
+    await new Promise((resolve) => setImmediate(resolve));
+    if (signal?.aborted === true) throw new QuestionWithdrawn(this.name);
+    const offers = (id: string): boolean =>
+      question.prompt.commands.some((command) => command.id === id);
+    const line = this.lines.shift() ?? (offers('blank') ? '/blank' : '');
+    const typed = line.trim() === '' && question.enter !== null ? `/${question.enter}` : line;
+    const reading = readReply(question.prompt, typed);
+    if (reading.kind === 'refused') {
+      throw new Error(
+        `the script typed ${JSON.stringify(line)}, which the question refuses: ${reading.reason}`,
+      );
+    }
+    this.answered += 1;
+    return {
+      promptId: question.prompt.id,
+      reply: reading.reply,
+      via: { channel: this.name, ref: `line-${this.answered}` },
+    };
+  }
+
+  async unused(_question: OperatorQuestion, withdrawal: Withdrawal): Promise<void> {
+    this.unusedAnswers.push(withdrawal);
   }
 
   notify(text: string): void {
     this.notices.push(text);
-  }
-
-  async pause(text: string): Promise<void> {
-    this.pauses.push(text);
   }
 }
 

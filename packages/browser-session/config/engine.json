@@ -1,4 +1,1 @@
-{
-  "capture": "field-entries",
-  "session": "standard"
-}
+{ "capture": "field-entries", "session": "standard", "operator": "terminal-and-notifications" }

@@ -29,7 +29,8 @@ import type { ChangedFile } from './index';
  *   studio-api     -> contracts, db, nest-kit, loop-client, studio-testing (specs and the test folder only)
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
- *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
+ *   notifications-client -> contracts   the notifications bus as one port, its HTTP adapter, and asking a person through it
+ *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, notifications-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
@@ -52,6 +53,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'loop-client': ['contracts'],
+  'notifications-client': ['contracts'],
   'studio-testing': ['contracts', 'loop-client'],
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],
@@ -62,6 +64,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'nest-kit',
     'run-dump',
     'loop-client',
+    'notifications-client',
     'config-kit',
     'studio-testing',
   ],

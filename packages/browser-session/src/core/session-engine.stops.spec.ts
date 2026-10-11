@@ -27,7 +27,7 @@ describe('how a plan stops and how a session ends', () => {
         ),
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'Yes' }],
+      lines: ['Yes'],
       rails: { targetDone: 1 },
     });
     expect(outcome.status).toBe('complete');
@@ -109,7 +109,7 @@ describe('how a plan stops and how a session ends', () => {
     });
     expect(form.browser.pageId).toBe('form');
     expect(form.browser.calls).not.toContain('click e6');
-    expect(form.operator.prompts).toEqual([]);
+    expect(form.operator.questions).toEqual([]);
     expect(form.brain.planInputs[3]?.history.slice(-1).map((h) => [h.outcome, h.note])).toEqual([
       ['failed', '3 field(s): 0 filled, 0 kept, 0 asked, 0 blank, 1 failed, 2 not attempted'],
     ]);
@@ -237,7 +237,7 @@ describe('how a plan stops and how a session ends', () => {
         plans: [PLANS.search, PLANS.results, PLANS.form].map((p) => decidedPlan(p)),
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'stop' }],
+      lines: ['/stop'],
     });
     expect(byOperator.outcome.termination.reason).toBe('operator-stop');
     expect(byOperator.outcome.status).toBe('stopped');

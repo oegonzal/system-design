@@ -1,7 +1,6 @@
 import { MISSION_FIXTURE, type SessionRailsDto } from '@sysdesign/contracts';
 
 import type { CapturePolicy } from './engine-context';
-import type { OperatorReply } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
   FakeBrowser,
@@ -36,9 +35,13 @@ export const SPEC_SUBJECT = 'Alex Example';
 /** No images beyond each step's own screenshot: the step specs pin each step's files exactly. */
 export const NO_CAPTURE: CapturePolicy = { after: [], failures: false };
 
+/** How long a spec's questions are offered: long past any spec. */
+export const SPEC_QUESTION_EXPIRY_MS = 3_600_000;
+
 export interface Scenario {
   script: BrainScript;
-  replies?: OperatorReply[];
+  /** What the operator types, line by line. */
+  lines?: string[];
   rails?: Partial<SessionRailsDto>;
   clock?: FixedClock;
   browser?: FakeBrowser;
@@ -51,7 +54,7 @@ export async function runScripted(scenario: Scenario) {
   const browser = scenario.browser ?? new FakeBrowser(journeyPages());
   const brain = new ScriptedBrain(scenario.script);
   const ledger = scenario.ledger ?? new InMemoryLedger();
-  const operator = new ScriptedOperator(scenario.replies ?? []);
+  const operator = new ScriptedOperator(scenario.lines ?? []);
   const dumps = new InMemoryDumpStore();
   const warnings: string[] = [];
   const outcome: SessionOutcome = await runSession(
@@ -74,6 +77,7 @@ export async function runScripted(scenario: Scenario) {
       subject: SPEC_SUBJECT,
       startUrl: scenario.startUrl,
       capture: scenario.capture ?? NO_CAPTURE,
+      questionExpiresAfterMs: SPEC_QUESTION_EXPIRY_MS,
       settingsSources: {},
     },
   );

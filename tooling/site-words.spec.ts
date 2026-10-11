@@ -26,8 +26,12 @@ const ENGINE = [
   'packages/quality-loop/src/orchestrators/form-memory',
   'packages/quality-loop/src/orchestrators/document-memory',
 ];
-/** The sites the shipped goals name, and the role words of the line of work they pursue. */
-const FORBIDDEN = ['linkedin', 'duckduckgo', 'easy apply', 'applicant', 'recruiter'];
+/**
+ * The sites the shipped goals name, the role words of the line of work they
+ * pursue, and the channel the operator is reached on beyond the terminal —
+ * the session asks the notifications service, which alone knows its channels.
+ */
+const FORBIDDEN = ['linkedin', 'duckduckgo', 'easy apply', 'applicant', 'recruiter', 'telegram'];
 /** Where a concrete example belongs: a spec, a spec's builder, a fixture module or a recorded fixture. */
 const EXAMPLE = /(\.spec\.ts$|testing(-[a-z]+)?\.ts$|\.testing\.ts$|\/fixtures(\/|\.ts$))/;
 

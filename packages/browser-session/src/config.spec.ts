@@ -25,6 +25,7 @@ describe('the session configuration', () => {
   it('[BRW-7] declares every variable once with its default and reads them nowhere else', () => {
     expect(sessionConfigFromEnv({})).toEqual({
       loopUrl: 'http://localhost:3003',
+      notificationsUrl: 'http://localhost:3005',
       dumpDir: 'static/sessions',
       profilesDir: 'static/browser-profiles',
       subject: 'the subject',
@@ -32,12 +33,14 @@ describe('the session configuration', () => {
     expect(
       sessionConfigFromEnv({
         [SESSION_ENV.loopUrl.name]: 'http://loop.test:1234',
+        [SESSION_ENV.notificationsUrl.name]: 'http://bus.test:4321',
         [SESSION_ENV.dumpDir.name]: '/tmp/dumps',
         [SESSION_ENV.profilesDir.name]: ' /tmp/profiles ',
         [SESSION_ENV.subject.name]: 'Alex Example',
       }),
     ).toEqual({
       loopUrl: 'http://loop.test:1234',
+      notificationsUrl: 'http://bus.test:4321',
       dumpDir: '/tmp/dumps',
       profilesDir: '/tmp/profiles',
       subject: 'Alex Example',
@@ -48,6 +51,9 @@ describe('the session configuration', () => {
     );
     expect(() => sessionConfigFromEnv({ [SESSION_ENV.loopUrl.name]: 'not a url' })).toThrow(
       new SessionConfigError('QUALITY_LOOP_URL must be a URL, got "not a url"'),
+    );
+    expect(() => sessionConfigFromEnv({ [SESSION_ENV.notificationsUrl.name]: 'bus' })).toThrow(
+      new SessionConfigError('NOTIFICATIONS_URL must be a URL, got "bus"'),
     );
 
     // Only this file reads the environment.

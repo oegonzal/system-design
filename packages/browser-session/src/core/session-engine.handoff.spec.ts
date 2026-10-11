@@ -21,7 +21,7 @@ describe('the hand-off between steps', () => {
         ),
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'Yes' }],
+      lines: ['Yes'],
     });
     expect(brain.planInputs[0]?.lastStep).toBeNull();
     expect(brain.planInputs[1]?.lastStep?.touched).toEqual([

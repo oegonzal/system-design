@@ -31,7 +31,7 @@ const journey = (capture: CapturePolicy, browser = new FakeBrowser(pages())) =>
       plans: JOURNEY_SEQUENCE.map((p) => decidedPlan(p)),
       answers: [decidedAnswers(ANSWERS)],
     },
-    replies: [{ kind: 'answer', text: 'Yes' }],
+    lines: ['Yes'],
     capture,
     browser,
   });

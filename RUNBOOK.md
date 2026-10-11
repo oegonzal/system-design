@@ -253,8 +253,9 @@ stop conditions and never-do rules — and decides nothing itself. Each page is
 a `browser-step` run that returns a bounded plan; each form page is a
 `form-memory` orchestration that recalls facts about you from the memory
 store without a model call and runs `field-answer` over them; a field the
-loop could not settle is put to you at the terminal, and what you answer is
-taught back as a `guidance` document when the unit of work ends. The
+loop could not settle is put to you at the terminal and, with the
+notifications service running, on Telegram at once — the first answer is
+taken — and what you answer is taught back as a `guidance` document. The
 LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`;
 the same program runs any goal.
 
@@ -272,10 +273,13 @@ pnpm browser-session sessions            # what ran, how it ended
 pnpm browser-session show <sessionId>    # units of work and every decision, by loop run id
 ```
 
-When a field needs you, the field is outlined in Chrome and the terminal
-shows the question, the loop's suggested value and why it was not trusted.
-Type the answer, or fill the field in the browser and press Enter and the
-value is read back; `/blank` leaves it empty, `/stop` ends the session. A
+When a field needs you, the field is outlined in Chrome and the question —
+its options lettered, the loop's suggested value marked with why it was not
+trusted — shows at the terminal and, when the notifications service runs, on
+Telegram. Type or tap a letter, type the answer where the field takes one, or
+fill the field in the browser and press Enter (`/readback`) and the value is
+read back; `/blank` leaves it empty, `/stop` ends the session. Answer on either
+channel: the other says who answered. A
 session's trace — each step's observation, snapshot, screenshot and plan —
 lands under `static/sessions/<id>/`, indexed like a run dump. The rows are
 `browser_session`, `browser_task` and `browser_decision`.

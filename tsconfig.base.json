@@ -17,6 +17,7 @@
       "@sysdesign/design-system": ["./packages/design-system/src/index.ts"],
       "@sysdesign/llm": ["./packages/llm/src/index.ts"],
       "@sysdesign/loop-client": ["./packages/loop-client/src/index.ts"],
+      "@sysdesign/notifications-client": ["./packages/notifications-client/src/index.ts"],
       "@sysdesign/nest-kit": ["./packages/nest-kit/src/index.ts"],
       "@sysdesign/run-dump": ["./packages/run-dump/src/index.ts"],
       "@sysdesign/studio-testing": ["./packages/studio-testing/src/index.ts"],

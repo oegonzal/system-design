@@ -1,8 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/contracts';
+import {
+  excerpt,
+  type BrowserSessionDetailDto,
+  type BrowserSessionDto,
+} from '@sysdesign/contracts';
 
 import type { SessionConfig } from '../../config';
 import type { RunSessionOptions } from '../../core/engine-context';
+import { pauseQuestion } from '../../core/operator-interaction';
 import type {
   BrainPort,
   BrowserPort,
@@ -29,7 +34,10 @@ import {
  * falling back to the configured one, and what to image and where the
  * settings came from taken from the settings files.
  */
-export type RunOptions = Omit<RunSessionOptions, 'subject' | 'capture' | 'settingsSources'> & {
+export type RunOptions = Omit<
+  RunSessionOptions,
+  'subject' | 'capture' | 'settingsSources' | 'questionExpiresAfterMs'
+> & {
   subject?: string | undefined;
 };
 
@@ -57,7 +65,7 @@ export class SessionService {
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
-    const { capture, sources } = this.config.settings;
+    const { capture, operator, sources } = this.config.settings;
     // A configuration read once at boot is invisible afterwards: say which files are in force.
     this.operator.notify(
       `settings: ${Object.entries(sources)
@@ -80,6 +88,7 @@ export class SessionService {
         ...options,
         subject: options.subject ?? this.config.subject,
         capture,
+        questionExpiresAfterMs: operator.expiresAfterMs,
         settingsSources: sources,
       },
     );
@@ -96,8 +105,16 @@ export class SessionService {
         expect: null,
         serves: [],
       });
-      await this.operator.pause(
-        `Sign in at ${url} in the browser window. The profile "${profile}" keeps the cookies for later sessions.`,
+      await this.operator.ask(
+        pauseQuestion(
+          `Sign in at ${url} in the browser window, then continue. The profile "${profile}" keeps the cookies for later sessions.`,
+          {
+            origin: { kind: 'browser-session', id: excerpt(profile, 80), label: 'sign-in' },
+            expiresAt: new Date(
+              this.clock.now().getTime() + this.config.settings.operator.expiresAfterMs,
+            ),
+          },
+        ),
       );
     } finally {
       await this.browser.close();

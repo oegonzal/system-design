@@ -87,6 +87,7 @@ describe('the session service, end to end', () => {
     writeFileSync(join(home, 'goal.md'), MISSION_FIXTURE);
     const config: SessionConfig = {
       loopUrl: 'http://unused.test',
+      notificationsUrl: 'http://unused.test',
       dumpDir: join(home, 'sessions'),
       profilesDir: join(home, 'profiles'),
       subject: 'Alex Example',
@@ -96,7 +97,7 @@ describe('the session service, end to end', () => {
     core = new FakeLoop({ now: () => new Date().toISOString() });
     const client = new FakeLoopClient(core);
     browser = new FakeBrowser(journeyPages());
-    operator = new ScriptedOperator([{ kind: 'answer', text: 'Yes' }]);
+    operator = new ScriptedOperator(['Yes']);
     moduleRef = await Test.createTestingModule({ imports: [AppModule.register(config)] })
       .overrideProvider(LoopClient)
       .useValue(client)
@@ -209,7 +210,9 @@ describe('the session service, end to end', () => {
       source: 'loop',
       loopRunId: expect.stringMatching(/^fake-run-/),
     });
-    expect(operator.prompts.map((p) => p.field.name)).toEqual(['Work authorisation']);
+    expect(operator.questions.map((question) => question.prompt.title)).toEqual([
+      'Work authorisation',
+    ]);
 
     // The dump on disk: step files as the steps happened, the closing files, one index row.
     const dumpDir = join(home, 'sessions', outcome.dumpRunId);

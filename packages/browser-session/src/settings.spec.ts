@@ -30,14 +30,20 @@ describe('the session settings', () => {
     expect(shipped.session.headed).toBe(true);
     expect(shipped.sources.capture).toMatch(/config\/capture\/field-entries\.json$/);
     expect(shipped.sources.session).toMatch(/config\/session\/standard\.json$/);
+    // The operator is asked at the terminal and through the notifications service.
+    expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);
+    expect(Object.keys(shipped.operator.channels)).toEqual(['notifications']);
 
     // Every file a choice could name is a complete, valid configuration of its kind.
     expect(profiles('capture').sort()).toEqual(['every-action', 'field-entries', 'observations']);
+    expect(profiles('operator').sort()).toEqual(['terminal', 'terminal-and-notifications']);
     for (const capture of profiles('capture')) {
       for (const session of profiles('session')) {
-        expect(() =>
-          readSessionSettings(PACKAGE_ROOT, choosing({ capture, session })),
-        ).not.toThrow();
+        for (const operator of profiles('operator')) {
+          expect(() =>
+            readSessionSettings(PACKAGE_ROOT, choosing({ capture, session, operator })),
+          ).not.toThrow();
+        }
       }
     }
   });
@@ -53,7 +59,7 @@ describe('the session settings', () => {
       readSessionSettings(
         PACKAGE_ROOT,
         choosing(
-          { capture: 'field-entries', session: 'standard' },
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
           { 'capture/field-entries.json': '{"after":["fill"],"failures":true,"fullPage":true}' },
         ),
       ),
@@ -62,7 +68,7 @@ describe('the session settings', () => {
       readSessionSettings(
         PACKAGE_ROOT,
         choosing(
-          { capture: 'field-entries', session: 'standard' },
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
           { 'capture/field-entries.json': '{"after":["fill","fill"],"failures":true}' },
         ),
       ),
@@ -75,10 +81,20 @@ describe('the session settings', () => {
       readSessionSettings(
         PACKAGE_ROOT,
         choosing(
-          { capture: 'field-entries', session: 'standard' },
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
           { 'session/standard.json': JSON.stringify(overTarget) },
         ),
       ),
     ).toThrow(/rails\.targetDone: is above maxTasks/);
+    // A channel the session cannot build is refused by name.
+    expect(() =>
+      readSessionSettings(
+        PACKAGE_ROOT,
+        choosing(
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
+          { 'operator/terminal.json': '{"expiresAfterMs":1000,"channels":{"carrier-pigeon":{}}}' },
+        ),
+      ),
+    ).toThrow(EngineConfigError);
   });
 });

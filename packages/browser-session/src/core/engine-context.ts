@@ -56,6 +56,8 @@ export interface RunSessionOptions {
   /** Where to open the browser before the first plan; unset leaves it on about:blank. */
   startUrl?: string;
   capture: CapturePolicy;
+  /** How long a question stays offered on a channel that honours expiry, should the session never withdraw it. */
+  questionExpiresAfterMs: number;
   /** The settings files in force, by kind, as the manifest records them. */
   settingsSources: Readonly<Record<string, string>>;
 }

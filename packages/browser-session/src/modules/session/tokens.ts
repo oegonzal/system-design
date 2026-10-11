@@ -9,6 +9,7 @@ export const BROWSER = Symbol('BROWSER');
 export const BRAIN = Symbol('BRAIN');
 export const LEDGER = Symbol('LEDGER');
 export const OPERATOR = Symbol('OPERATOR');
+export const TERMINAL = Symbol('TERMINAL');
 export const GOAL_SOURCE = Symbol('GOAL_SOURCE');
 export const CLOCK = Symbol('CLOCK');
 export const DUMP_STORE = Symbol('DUMP_STORE');

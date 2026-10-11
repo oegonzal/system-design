@@ -1,80 +1,133 @@
+import { PassThrough } from 'node:stream';
+
 import { fieldSpecOf, formObservation } from '@sysdesign/contracts';
 
-import type { OperatorPrompt } from '../../core/ports';
+import { fieldQuestion } from '../../core/operator-interaction';
+import { OperatorInterrupted, QuestionWithdrawn, type OperatorQuestion } from '../../core/ports';
 import {
-  CONTINUE_PROMPT,
-  OPERATOR_COMMANDS,
   OPERATOR_PROMPT,
-  renderOperatorPrompt,
-  replyOf,
+  renderQuestion,
   TerminalOperator,
+  terminalIo,
   type TerminalIo,
 } from './terminal-operator';
 
-const prompt = (): OperatorPrompt => ({
-  field: fieldSpecOf(formObservation().elements[1]),
-  suggestion: 'Yes',
-  why: 'low confidence: a guess — ungrounded: no evidence names the country',
-  task: 'Senior Engineer at Acme',
-  page: 'Apply — additional questions',
-});
+const asked = (): OperatorQuestion =>
+  fieldQuestion(
+    {
+      field: fieldSpecOf(formObservation().elements[1]),
+      untrusted: 'Yes',
+      why: 'low confidence: a guess',
+      task: 'Senior Engineer at Acme',
+      page: 'Apply — additional questions',
+    },
+    {
+      origin: { kind: 'browser-session', id: 's1', label: 'step 3 · Senior Engineer at Acme' },
+      expiresAt: new Date('2026-10-12T00:00:00Z'),
+    },
+  ).question;
 
+/** A terminal that types from a list, and records what was written and asked. */
 const terminal = (lines: string[]) => {
   const written: string[] = [];
-  const asked: string[] = [];
+  const prompts: string[] = [];
   const io: TerminalIo = {
-    question: async (text) => {
-      asked.push(text);
+    question: async (text, signal) => {
+      prompts.push(text);
+      if (signal?.aborted === true) throw new QuestionWithdrawn('the terminal');
       return lines.shift() ?? '';
     },
-    write: (text) => written.push(text),
+    write: (text) => {
+      written.push(text);
+    },
+    close: () => undefined,
   };
-  return { io, written, asked, operator: new TerminalOperator(io) };
+  return { io, written, prompts, operator: new TerminalOperator(io) };
 };
 
 describe('the terminal operator', () => {
-  it('[BRW-3] shows the field, its question, the suggested value and why it was not trusted, then reads the reply', async () => {
-    const { operator, written, asked } = terminal(['No']);
-    expect(await operator.ask(prompt())).toEqual({ kind: 'answer', text: 'No' });
-    expect(asked).toEqual([OPERATOR_PROMPT]);
-    const lines = renderOperatorPrompt(prompt());
-    expect(written[0]).toBe(lines.join('\n'));
-    expect(lines[1]).toBe(
-      'Field: "Work authorisation" (select, required) — Are you authorised to work in this country?',
-    );
-    expect(lines[2]).toBe('Options: Yes | No');
-    expect(lines).toContain(
-      'Page: Apply — additional questions · Unit of work: Senior Engineer at Acme',
-    );
-    expect(lines).toContain(
-      'Suggested: "Yes" — not trusted: low confidence: a guess — ungrounded: no evidence names the country',
-    );
-    expect(lines[lines.length - 1]).toContain(OPERATOR_COMMANDS.blank);
-    expect(lines[lines.length - 1]).toContain(OPERATOR_COMMANDS.stop);
-    expect(renderOperatorPrompt({ ...prompt(), suggestion: null, task: null })).toContain(
-      'No suggested value — low confidence: a guess — ungrounded: no evidence names the country',
-    );
+  it('[BRW-11] shows the field the way every channel does: its options lettered, the answerer’s pick marked, its commands', () => {
+    const question = asked();
+    expect(renderQuestion(question)).toEqual([
+      '──── operator needed ────',
+      'Work authorisation',
+      'select, required',
+      'Are you authorised to work in this country?',
+      'Page: Apply — additional questions',
+      'Unit of work: Senior Engineer at Acme',
+      'Suggested: "Yes" — not trusted: low confidence: a guess',
+      '',
+      "  a) Yes   (the answerer's pick — not trusted: low confidence: a guess)",
+      '  b) No',
+      '',
+      '  /readback  I filled it in the browser: read it back   (Enter alone)',
+      '  /blank     Leave it empty',
+      '  /stop      End the session',
+      'Reply with a letter (a, b), or /readback, /blank, /stop.',
+    ]);
   });
 
-  it('[BRW-3] reads an empty Enter as "read the field back", and the two commands as themselves', async () => {
-    expect(replyOf('')).toEqual({ kind: 'read-back' });
-    expect(replyOf('   ')).toEqual({ kind: 'read-back' });
-    expect(replyOf(OPERATOR_COMMANDS.blank)).toEqual({ kind: 'blank' });
-    expect(replyOf(` ${OPERATOR_COMMANDS.stop} `)).toEqual({ kind: 'stop' });
-    expect(replyOf('  6 years ')).toEqual({ kind: 'answer', text: '6 years' });
-    const { operator } = terminal(['', '/blank', '/stop']);
-    expect(await operator.ask(prompt())).toEqual({ kind: 'read-back' });
-    expect(await operator.ask(prompt())).toEqual({ kind: 'blank' });
-    expect(await operator.ask(prompt())).toEqual({ kind: 'stop' });
+  it('[BRW-11] reads a letter, an option as the list spells it, Enter and a command, and asks again after a reply it refuses', async () => {
+    const { operator, written, prompts } = terminal(['maybe', 'B', 'no', '', '/stop']);
+    const question = asked();
+    const choice = (id: string) =>
+      expect.objectContaining({ reply: { kind: 'choice', choiceId: id } });
+    expect(await operator.ask(question)).toEqual(choice('c2'));
+    expect(written[1]).toBe(
+      '"maybe" is none of the choices. Reply with a letter (a, b), or /readback, /blank, /stop.',
+    );
+    expect(prompts).toEqual([OPERATOR_PROMPT, OPERATOR_PROMPT]);
+    expect(await operator.ask(question)).toEqual(choice('c2'));
+    expect(await operator.ask(question)).toMatchObject({
+      reply: { kind: 'command', commandId: 'readback' },
+      via: { channel: 'terminal' },
+    });
+    expect(await operator.ask(question)).toMatchObject({
+      reply: { kind: 'command', commandId: 'stop' },
+    });
   });
 
-  it('notifies without waiting and pauses until Enter', async () => {
-    const { operator, written, asked } = terminal(['']);
+  it('[BRW-11] says who answered when the question is withdrawn, and when its own answer went unused', async () => {
+    const { operator, written } = terminal([]);
+    const withdrawn = new AbortController();
+    withdrawn.abort({ reason: 'answered-elsewhere', note: 'answered via telegram: b: No' });
+    await expect(operator.ask(asked(), withdrawn.signal)).rejects.toBeInstanceOf(QuestionWithdrawn);
+    expect(written.at(-1)).toBe('── answered via telegram: b: No ──');
+    await operator.unused(asked(), {
+      reason: 'answered-elsewhere',
+      note: 'answered via telegram: a: Yes',
+    });
+    expect(written.at(-1)).toBe('── not used: answered via telegram: a: Yes ──');
     operator.notify('step 3: form');
-    expect(written).toEqual(['step 3: form']);
-    expect(asked).toEqual([]);
-    await operator.pause('Sign in, then press Enter.');
-    expect(written[1]).toBe('Sign in, then press Enter.');
-    expect(asked).toEqual([CONTINUE_PROMPT]);
+    expect(written.at(-1)).toBe('step 3: form');
+  });
+
+  it('[BRW-11] reads one line per open question, says a line typed with none open is unused, and turns Ctrl-C into an interruption', async () => {
+    const input = Object.assign(new PassThrough(), { isTTY: true, setRawMode: () => input });
+    const output = new PassThrough();
+    const shown: string[] = [];
+    output.on('data', (chunk: Buffer) => shown.push(chunk.toString()));
+    const io = terminalIo(input, output);
+
+    const first = io.question('> ');
+    input.write('yes\r');
+    expect(await first).toBe('yes');
+    // Typed with no question open: said, and not kept for the next question.
+    input.write('stray\r');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(shown.join('')).toContain('(no question is open: that line was not used)');
+    const second = io.question('> ');
+    input.write('no\r');
+    expect(await second).toBe('no');
+
+    const leaving = new AbortController();
+    const third = io.question('> ', leaving.signal);
+    leaving.abort();
+    await expect(third).rejects.toBeInstanceOf(QuestionWithdrawn);
+
+    const fourth = io.question('> ');
+    input.write('\x03');
+    await expect(fourth).rejects.toBeInstanceOf(OperatorInterrupted);
+    io.close();
   });
 });

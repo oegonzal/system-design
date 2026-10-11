@@ -775,6 +775,16 @@ export const CRITERIA: readonly Criterion[] = [
       "A session documents what it did as images beside each step's own screenshot, as its declared capture policy says: the browser actions it names once they ran — a plan's own and every field entry, a value the operator typed and the session read back included — and, when it asks, an action the page refused as the page stood; a field entry is outlined in its image and unmarked after, every image is the page at CSS scale, each step lists its images with the action that made them, a file name never carries the value entered, and an image that could not be taken never fails the session.",
   },
   {
+    id: 'BRW-10',
+    statement:
+      'The operator is asked on every channel at once — the terminal always, and each channel the settings add — and the first answer is taken: every other channel is withdrawn with who answered and what, its withdrawal awaited, and one that answered in the same moment is told its answer went unused; a channel that fails while another still asks is said once and its recovery once, only every channel failing fails the question, and Ctrl-C at the terminal withdraws the rest and ends the session.',
+  },
+  {
+    id: 'BRW-11',
+    statement:
+      'A field is put to the operator one way on every channel: its options as lettered choices, the answerer’s untrusted pick marked with why, free text where the field takes it, and the commands to read back, leave blank or stop; a reply is read with the contracts’ one resolver, the full value behind a choice is what is filled, the decision row records the channel and what the answer was chosen from, and a line typed at the terminal with no question open is said to be unused, never kept for the next.',
+  },
+  {
     id: 'QL-41',
     statement:
       "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",
@@ -860,5 +870,16 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'NTF-10',
     statement:
       'The service is layered bus, interactions, channels, each folder reaching another only through its declared door; a channel is a folder plus one registration line, and no other file names it.',
+  },
+  // Notifications client (packages/notifications-client)
+  {
+    id: 'NTC-1',
+    statement:
+      'The bus client makes each call on its route and unwraps the envelope; it names a missing subscription as such, a refusal with the service’s own words, a call that never reached the service, one that timed out past a pull’s own wait, and one its caller abandoned — and asks again, within the declared recovery window, a call that never reached a restarting service.',
+  },
+  {
+    id: 'NTC-2',
+    statement:
+      'Asking a person through the bus subscribes before it publishes the prompt, passes over every other prompt’s answer, returns its own and unsubscribes; a prompt the service expires ends the ask as expired, and an abort withdraws the prompt with the reason it carries, or as abandoned when it carries none.',
   },
 ] as const;

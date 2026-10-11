@@ -31,25 +31,31 @@ const WITHDRAWAL_REASONS = ['answered-elsewhere', 'superseded', 'abandoned', 'ex
 /** A command's id: what a person types after a slash, in the grammar chat apps give bot commands. */
 const COMMAND_ID = /^[a-z][a-z0-9_]{0,31}$/;
 
-/** The longest answer a person may type, whatever the prompt allows. */
-const ANSWER_TEXT_MAX_LENGTH = 10_000;
 /** The longest note a withdrawal carries. */
-const WITHDRAWAL_NOTE_MAX_LENGTH = 300;
+export const WITHDRAWAL_NOTE_MAX_LENGTH = 300;
 const ID_MAX_LENGTH = 80;
 const CHANNEL_MAX_LENGTH = 40;
-/** A choice holds a page's option or a drafted answer whole. */
-const LABEL_MAX_LENGTH = 2_000;
-const NOTE_MAX_LENGTH = 300;
-const TITLE_MAX_LENGTH = 500;
-const DETAIL_MAX_LENGTH = 1_000;
-const DETAILS_MAX = 12;
-/** A country list runs to about 250 options, and every one of them is a choice. */
-const CHOICES_MAX = 400;
-const COMMANDS_MAX = 8;
+
+/** What a prompt may hold, for an asker to fit its question to: no part of a prompt is ever cut by the schema. */
+export const PROMPT_LIMITS = {
+  titleMaxLength: 500,
+  detailMaxLength: 1_000,
+  details: 12,
+  /** A choice holds a page's option or a drafted answer whole. */
+  choiceLabelMaxLength: 2_000,
+  noteMaxLength: 300,
+  /** A country list runs to about 250 options, and every one of them is a choice. */
+  choices: 400,
+  commands: 8,
+  /** The longest answer a person may type, whatever the prompt allows. */
+  answerMaxLength: 10_000,
+} as const;
+const ANSWER_TEXT_MAX_LENGTH = PROMPT_LIMITS.answerMaxLength;
+const NOTE_MAX_LENGTH = PROMPT_LIMITS.noteMaxLength;
 
 const choiceSchema = z.strictObject({
   id: z.string().min(1).max(ID_MAX_LENGTH),
-  label: z.string().min(1).max(LABEL_MAX_LENGTH),
+  label: z.string().min(1).max(PROMPT_LIMITS.choiceLabelMaxLength),
   /** What a person should know about it: where it came from, why it was not trusted. */
   note: z.string().max(NOTE_MAX_LENGTH).nullable(),
 });
@@ -70,17 +76,17 @@ export const interactionPromptSchema = z
       id: z.string().min(1).max(ID_MAX_LENGTH),
       label: z.string().max(NOTE_MAX_LENGTH),
     }),
-    title: z.string().min(1).max(TITLE_MAX_LENGTH),
-    details: z.array(z.string().max(DETAIL_MAX_LENGTH)).max(DETAILS_MAX),
+    title: z.string().min(1).max(PROMPT_LIMITS.titleMaxLength),
+    details: z.array(z.string().max(PROMPT_LIMITS.detailMaxLength)).max(PROMPT_LIMITS.details),
     /** Lettered in order by every channel: the first is `a`. */
-    choices: z.array(choiceSchema).max(CHOICES_MAX),
+    choices: z.array(choiceSchema).max(PROMPT_LIMITS.choices),
     /** Whether a person may type an answer of their own, and how long it may run; null when only a choice or a command answers. */
     freeText: z
       .strictObject({
         maxLength: z.number().int().positive().max(ANSWER_TEXT_MAX_LENGTH).nullable(),
       })
       .nullable(),
-    commands: z.array(commandSchema).max(COMMANDS_MAX),
+    commands: z.array(commandSchema).max(PROMPT_LIMITS.commands),
     /** When the service stops offering it, should its asker never withdraw it. */
     expiresAt: z.iso.datetime(),
   })
@@ -123,7 +129,7 @@ export const interactionWithdrawnSchema = z.strictObject({
   /** What a person watching the prompt close should read — "answered at the terminal: Yes". */
   note: z.string().max(WITHDRAWAL_NOTE_MAX_LENGTH).nullable(),
 });
-type InteractionWithdrawn = z.infer<typeof interactionWithdrawnSchema>;
+export type InteractionWithdrawn = z.infer<typeof interactionWithdrawnSchema>;
 
 /** How a prompt closed: the answer a channel took, or a withdrawal — the last word on whether an answer was used. */
 export type InteractionOutcome =

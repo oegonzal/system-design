@@ -17,16 +17,18 @@ Exit codes: a session that ended `complete` or `stopped` is 0, `failed` is 1, a 
 
 Every flag and variable is declared once in `src/config.ts`, with its default; nothing else in the package reads the environment.
 
-How a session runs when its flags say nothing, and what it images, are files in the package's own `config/`, laid out like the repository's: `config/engine.json` names one file per kind, and each kind's files sit complete under `config/<kind>/` — switching is a one-word edit. Both kinds must be chosen; the values live in the files alone (`src/settings.ts` declares and checks them), and a session says which files are in force when it starts and records them in its manifest.
+How a session runs when its flags say nothing, and what it images, are files in the package's own `config/`, laid out like the repository's: `config/engine.json` names one file per kind, and each kind's files sit complete under `config/<kind>/` — switching is a one-word edit. Every kind must be chosen; the values live in the files alone (`src/settings.ts` declares and checks them), and a session says which files are in force when it starts and records them in its manifest.
 
-| Kind      | Files                                                    | What it decides                                                                                                                                                                                                                                                                                   |
-| --------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `capture` | `field-entries` (chosen), `every-action`, `observations` | the images a session keeps beside each step's own screenshot: `after` names the browser actions imaged once they ran — a plan's own and every field entry, a value read back included, each entry outlined in its image — and `failures` whether an action the page refused is imaged as it stood |
-| `session` | `standard` (chosen)                                      | `headed`, the `rails` and the `loopRecovery` window a run uses unless a flag overrides its field                                                                                                                                                                                                  |
+| Kind       | Files                                                    | What it decides                                                                                                                                                                                                                                                                                   |
+| ---------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capture`  | `field-entries` (chosen), `every-action`, `observations` | the images a session keeps beside each step's own screenshot: `after` names the browser actions imaged once they ran — a plan's own and every field entry, a value read back included, each entry outlined in its image — and `failures` whether an action the page refused is imaged as it stood |
+| `session`  | `standard` (chosen)                                      | `headed`, the `rails` and the `loopRecovery` window a run uses unless a flag overrides its field                                                                                                                                                                                                  |
+| `operator` | `terminal-and-notifications` (chosen), `terminal`        | where the operator is asked besides the terminal, which always is: `channels.notifications` asks through the notifications service too, at once, the first answer taken; `expiresAfterMs` is how long a channel keeps offering a question a crashed session never withdrew                        |
 
 | Variable                   | Default                   | Meaning                                                                                                    |
 | -------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `QUALITY_LOOP_URL`         | `http://localhost:3003`   | the loop the session asks                                                                                  |
+| `NOTIFICATIONS_URL`        | `http://localhost:3005`   | the notifications service the operator is also asked through                                               |
 | `BROWSER_SESSION_DUMP_DIR` | `static/sessions`         | where session dumps are written                                                                            |
 | `BROWSER_PROFILES_DIR`     | `static/browser-profiles` | where persistent Chrome profiles live, one folder per `--profile` name — never commit them                 |
 | `BROWSER_SESSION_SUBJECT`  | `the subject`             | whom the operator's answers are about, by name, so taught facts are self-contained (`--subject` overrides) |
@@ -44,18 +46,28 @@ Rails (`--max-tasks`, `--max-minutes`, `--max-failures`, `--max-stalled-steps` o
 
 ## The operator prompt
 
-When a field needs a person the field is highlighted in Chrome and the terminal shows:
+When a field needs a person the field is highlighted in Chrome and the question goes to every operator channel at once — the terminal always, and the notifications service when the `operator` settings add it, which puts it on its own channels (Telegram among them). Every channel shows it the one way the notifications contracts describe — options lettered, the answerer's untrusted pick marked with why, the commands — and reads a reply with the contracts' `readReply`, so `b` means the same at the terminal as on a phone. At the terminal:
 
 ```
 ──── operator needed ────
-Field: "Years of experience with Python" (number, required) — Whole years, professional only.
-Page: Apply — additional questions · Unit of work: Senior Engineer at Acme
-Suggested: "6" — not trusted: low confidence: the evidence names TypeScript, not Python
-Type the answer, or fill the field in the browser and press Enter to read it back; /blank leaves it empty; /stop ends the session.
+Work authorisation
+select, required
+Are you authorised to work in this country?
+Page: Apply — additional questions
+Unit of work: Senior Engineer at Acme
+Suggested: "Yes" — not trusted: low confidence: a guess
+
+  a) Yes   (the answerer's pick — not trusted: low confidence: a guess)
+  b) No
+
+  /readback  I filled it in the browser: read it back   (Enter alone)
+  /blank     Leave it empty
+  /stop      End the session
+Reply with a letter (a, b), or /readback, /blank, /stop.
 >
 ```
 
-The answer is filled, recorded with `source: operator`, cached for the session by field label, and taught back at once.
+The first answer is taken (`src/core/first-answer.ts`); every other channel is withdrawn and says who answered and what. The answer is filled — the full value behind a choice — recorded with `source: operator` and, in its payload, the channel it came on (`via`) and what it was chosen from (`chosen`: an option, the answerer's value, or typed), cached for the session by field label, and taught back at once. A line typed at the terminal while no question is open is said to be unused, never kept for the next question; Ctrl-C during a question ends the session.
 
 ## The dump
 
@@ -86,4 +98,4 @@ select asked.question, min(asked.created_at) as first_asked, min(learned.created
 
 ## Layout
 
-`src/core` (pure: ports, the engine, step execution, the field flow, rails, the write queue and heartbeat, the dump layout, the fakes), `src/adapters/{playwright,loop-http,mikro-orm,terminal-operator,fs-goal}`, `src/modules/{app,session}` (the composition root), `src/cli.ts` + `src/render.ts`, `goals/`.
+`src/core` (pure: ports, the engine, step execution, the field flow, rails, the write queue and heartbeat, the dump layout, the fakes), `src/adapters/{playwright,loop-http,mikro-orm,terminal-operator,notifications-http,fs-goal}`, `src/modules/{app,session}` (the composition root), `src/cli.ts` + `src/render.ts`, `goals/`.

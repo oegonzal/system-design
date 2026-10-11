@@ -24,7 +24,7 @@ describe('the session engine', () => {
         ),
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'Yes' }],
+      lines: ['Yes'],
     });
     expect(outcome.status).toBe('complete');
     // The mission's own stop ended it, in the status the mission declares for it.
@@ -108,7 +108,7 @@ describe('the session engine', () => {
         ],
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'Yes' }],
+      lines: ['Yes'],
     });
     const inputs = brain.planInputs;
     expect(inputs[0]?.progress).toEqual({ settled: [], done: [] });
@@ -224,7 +224,7 @@ describe('the session engine', () => {
         ].map((p) => decidedPlan(p)),
         answers: [decidedAnswers(ANSWERS), decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'Yes' }],
+      lines: ['Yes'],
     });
     const fields = detail.decisions.filter((d) => d.kind === 'field-answer' && d.step === 3);
     expect(fields.map((d) => [d.ref, d.source, d.answer, d.confidence])).toEqual([
@@ -234,11 +234,19 @@ describe('the session engine', () => {
     ]);
     expect(fields[2]?.payload['reason']).toContain('trap-skipped');
     expect(fields.every((d) => d.loopRunId !== null && d.loopOrchestrationId !== null)).toBe(true);
-    // The operator saw the suggestion and why it was not trusted, once.
-    expect(operator.prompts).toHaveLength(1);
-    expect(operator.prompts[0]?.field.name).toBe('Work authorisation');
-    expect(operator.prompts[0]?.suggestion).toBe('Yes');
-    expect(operator.prompts[0]?.why).toContain('low confidence');
+    // The operator saw the options lettered, the answerer's pick marked with why it was not trusted, once.
+    expect(operator.questions).toHaveLength(1);
+    const prompt = operator.questions[0]?.prompt;
+    expect(prompt?.title).toBe('Work authorisation');
+    expect(prompt?.choices.map((choice) => choice.label)).toEqual(['Yes', 'No']);
+    expect(prompt?.choices[0]?.note).toMatch(
+      /^the answerer's pick — not trusted: .*low confidence/,
+    );
+    expect(prompt?.details).toContainEqual(
+      expect.stringMatching(/^Suggested: "Yes" — not trusted: /),
+    );
+    expect(prompt?.freeText).toBeNull();
+    expect(fields[1]?.payload).toMatchObject({ via: 'scripted', chosen: 'option' });
     // The second form did not ask again: the cache answered, and the row says so.
     const again = detail.decisions.find((d) => d.kind === 'field-answer' && d.step === 4);
     expect(again?.source).toBe('operator');
@@ -277,7 +285,7 @@ describe('the session engine', () => {
         ].map((p) => decidedPlan(p)),
         answers: [decidedAnswers(ANSWERS), decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'read-back' }],
+      lines: [''],
       browser,
     });
     const asked = detail.decisions.find(
@@ -311,7 +319,7 @@ describe('the session engine', () => {
         ),
         answers: [decidedAnswers(ANSWERS)],
       },
-      replies: [{ kind: 'answer', text: 'yes' }],
+      lines: ['yes'],
       browser,
     });
     const asked = detail.decisions.find(
@@ -319,7 +327,7 @@ describe('the session engine', () => {
     );
     expect(asked).toMatchObject({ source: 'operator', answer: 'Yes' });
     expect(selected).toEqual(['e2=Yes']);
-    expect([operator.prompts.length, operator.notices]).toEqual([1, []]);
+    expect([operator.questions.length, operator.notices]).toEqual([1, []]);
     expect(brain.taught[0]?.parts[0]).toContain('the operator answered "Yes"');
   });
 

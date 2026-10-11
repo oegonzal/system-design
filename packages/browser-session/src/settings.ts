@@ -13,14 +13,14 @@ import { BROWSER_ACTION_KINDS } from './core/ports';
  * The session's settings, as files: the package's own `config/`, laid out the
  * way the repository's is — `config/engine.json` names one file per kind, and
  * each kind's files sit side by side under `config/<kind>/`, complete and
- * readable on their own, so switching is a one-word edit. Both kinds must be
+ * readable on their own, so switching is a one-word edit. Every kind must be
  * chosen: the values live in the files and nowhere else, so a choice that is
  * missing is a refusal naming the file, never a quiet default.
  *
  * Each field's meaning, and what its value was measured against, is said
  * here; the value itself only in the file, so the two can never disagree.
  */
-type SettingsKind = 'capture' | 'session';
+type SettingsKind = 'capture' | 'session' | 'operator';
 
 const unique = (kinds: readonly string[]): boolean => new Set(kinds).size === kinds.length;
 
@@ -77,13 +77,15 @@ const railsSchema = z
   }) satisfies z.ZodType<SessionRailsDto>;
 
 /**
- * How long a session rides out a loop that is restarting before a call to it
- * is a brain fault. Measured 2026-10-10: fifteen watch-mode restarts of the
- * loop each listened again within six seconds, and three calls in the three
- * seconds of one restart ended a session forty minutes in.
+ * How long a session rides out a service it calls that is restarting — the
+ * loop, before a call to it is a brain fault; the notifications service,
+ * before a channel through it is unavailable. Measured 2026-10-10: fifteen
+ * watch-mode restarts of the loop each listened again within six seconds, and
+ * three calls in the three seconds of one restart ended a session forty
+ * minutes in.
  */
-const loopRecoverySchema = z.strictObject({
-  /** How long a call that never reached the loop, or a read it failed, is asked again. */
+const recoverySchema = z.strictObject({
+  /** How long a call that never reached the service, or a read it failed, is asked again. */
   windowMs: z.number().int().min(0),
   /** The pause between those asks. */
   pauseMs: z.number().int().positive(),
@@ -94,19 +96,48 @@ const sessionDefaultsSchema = z.strictObject({
   /** Whether the browser shows; the operator is expected to watch, and is asked beside a highlighted field. */
   headed: z.boolean(),
   rails: railsSchema,
-  loopRecovery: loopRecoverySchema,
+  loopRecovery: recoverySchema,
 });
 export type SessionDefaults = z.infer<typeof sessionDefaultsSchema>;
+
+/**
+ * Asking the operator through the notifications service, which puts the
+ * question on every channel it runs and brings the answer back as an event.
+ */
+const notificationsChannelSchema = z.strictObject({
+  /** How long one wait for the answer lasts before it is asked again; within the service's own limit. */
+  pullWaitMs: positive,
+  /** The most events one wait takes: the session's own answer, and other askers' it passes over. */
+  eventsPerPull: positive,
+  /** How long a question rides out a notifications service that is restarting. */
+  recovery: recoverySchema,
+});
+
+/**
+ * Where the operator is asked. The terminal always is; each channel present
+ * here is asked beside it, at once, and the first answer taken.
+ */
+const operatorSettingsSchema = z.strictObject({
+  /**
+   * How long a channel keeps offering a question the session never withdrew —
+   * one that ended mid-question. A session waits on its operator for as long
+   * as it takes; this only clears what a crash left behind.
+   */
+  expiresAfterMs: positive,
+  channels: z.strictObject({ notifications: notificationsChannelSchema.optional() }),
+});
+export type OperatorSettings = z.infer<typeof operatorSettingsSchema>;
 
 export interface SessionSettings {
   capture: CapturePolicy;
   session: SessionDefaults;
+  operator: OperatorSettings;
   /** Where each kind's settings came from, as a path from the working directory. */
   sources: Readonly<Record<SettingsKind, string>>;
 }
 
 /**
- * Both kinds, read once at boot and checked by name. A file that is not JSON
+ * Every kind, read once at boot and checked by name. A file that is not JSON
  * or names a field the schema does not is the kit's refusal; a kind the
  * choices leave out is this one, naming where the choices were looked for —
  * a session started from the wrong place reads no choices at all.
@@ -123,9 +154,11 @@ export function readSessionSettings(root: string, read?: ReadFile): SessionSetti
   };
   const capture = chosen('capture', capturePolicySchema);
   const session = chosen('session', sessionDefaultsSchema);
+  const operator = chosen('operator', operatorSettingsSchema);
   return {
     capture: capture.config,
     session: session.config,
-    sources: { capture: capture.source, session: session.source },
+    operator: operator.config,
+    sources: { capture: capture.source, session: session.source, operator: operator.source },
   };
 }

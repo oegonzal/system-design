@@ -18,7 +18,9 @@ import type { SessionSettings } from './settings';
  * package to that.
  *
  * Model access is deliberately absent: the session never calls a model. It
- * asks the quality loop, at `QUALITY_LOOP_URL`, and the loop owns the model.
+ * asks the quality loop, at `QUALITY_LOOP_URL`, and the loop owns the model;
+ * it reaches the operator beyond the terminal through the notifications
+ * service, at `NOTIFICATIONS_URL`.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -65,6 +67,7 @@ export type SessionFlag = keyof typeof SESSION_FLAGS;
 /** Every variable the session reads, with the value it takes when unset. */
 export const SESSION_ENV = {
   loopUrl: { name: 'QUALITY_LOOP_URL', fallback: 'http://localhost:3003' },
+  notificationsUrl: { name: 'NOTIFICATIONS_URL', fallback: 'http://localhost:3005' },
   dumpDir: { name: 'BROWSER_SESSION_DUMP_DIR', fallback: 'static/sessions' },
   profilesDir: { name: 'BROWSER_PROFILES_DIR', fallback: 'static/browser-profiles' },
   subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the subject' },
@@ -75,6 +78,7 @@ export const DEFAULT_LIST_LIMIT = 20;
 /** The environment half of the configuration. */
 export interface SessionEnv {
   loopUrl: string;
+  notificationsUrl: string;
   dumpDir: string;
   profilesDir: string;
   /** Whom the operator's answers are about, by name, so a stored fact is self-contained. */
@@ -98,21 +102,25 @@ const set = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
 const nonEmpty = (env: NodeJS.ProcessEnv, variable: { name: string; fallback: string }): string =>
   set(env, variable.name) ?? variable.fallback;
 
+/** A variable that must be a URL, or a refusal naming it. */
+const url = (env: NodeJS.ProcessEnv, variable: { name: string; fallback: string }): string => {
+  const value = nonEmpty(env, variable);
+  try {
+    new URL(value);
+  } catch {
+    throw new SessionConfigError(`${variable.name} must be a URL, got ${JSON.stringify(value)}`);
+  }
+  return value;
+};
+
 /**
  * The one read of the environment. A URL that does not parse and a directory
  * given as blank are refused here, by variable name, before anything boots.
  */
 export function sessionConfigFromEnv(env: NodeJS.ProcessEnv = process.env): SessionEnv {
-  const loopUrl = nonEmpty(env, SESSION_ENV.loopUrl);
-  try {
-    new URL(loopUrl);
-  } catch {
-    throw new SessionConfigError(
-      `${SESSION_ENV.loopUrl.name} must be a URL, got ${JSON.stringify(loopUrl)}`,
-    );
-  }
   return {
-    loopUrl,
+    loopUrl: url(env, SESSION_ENV.loopUrl),
+    notificationsUrl: url(env, SESSION_ENV.notificationsUrl),
     dumpDir: nonEmpty(env, SESSION_ENV.dumpDir),
     profilesDir: nonEmpty(env, SESSION_ENV.profilesDir),
     subject: nonEmpty(env, SESSION_ENV.subject),

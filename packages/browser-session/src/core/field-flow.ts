@@ -19,14 +19,13 @@ import {
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { fieldTypeOf, routeFieldsInSession, type RoutedField } from './field-routing';
-import { askListed } from './operator-reply';
 import {
-  ActionFailed,
-  BrainFaulted,
-  type BrowserAction,
-  type Decided,
+  fieldQuestion,
+  fieldReplyOf,
+  type AnswerSource,
   type OperatorReply,
-} from './ports';
+} from './operator-interaction';
+import { ActionFailed, BrainFaulted, type BrowserAction, type Decided } from './ports';
 import { stepJsonFile } from './session-dump';
 import { describeAction } from './session-state';
 
@@ -51,6 +50,9 @@ export interface FieldResult {
   value: string | null;
   outcome: 'ok' | 'failed';
   reply: OperatorReply['kind'] | null;
+  /** The channel the operator answered on, and what the answer was chosen from; null when nobody was asked. */
+  via: string | null;
+  chosen: AnswerSource | null;
   cached: boolean;
   detail: string | null;
   /** The answer the operator gave here, taught back as soon as it was given. */
@@ -94,6 +96,8 @@ const result = (
   value,
   outcome,
   reply,
+  via: null,
+  chosen: null,
   cached: field.cached,
   detail,
   guidance: null,
@@ -167,33 +171,54 @@ async function ask(
 ): Promise<FieldResult> {
   const { deps, state } = ctx;
   await deps.browser.highlight(field.field.ref).catch(() => undefined);
-  const reply = await askListed(deps.operator, {
-    field: field.field,
-    suggestion: field.value,
-    why: [field.reason, ...field.faults].join(' — '),
-    task: state.tasks.open?.label ?? null,
-    page: observation.title,
-  });
+  const task = state.tasks.open?.label ?? null;
+  const asked = fieldQuestion(
+    {
+      field: field.field,
+      untrusted: field.value,
+      why: [field.reason, ...field.faults].join(' — '),
+      task,
+      page: observation.title,
+    },
+    {
+      origin: {
+        kind: 'browser-session',
+        id: state.sessionId,
+        label: `step ${state.step}${task === null ? '' : ` · ${task}`}`,
+      },
+      expiresAt: new Date(deps.clock.now().getTime() + ctx.options.questionExpiresAfterMs),
+    },
+  );
+  const answer = await deps.operator.ask(asked.question);
+  const { reply, chosen } = fieldReplyOf(asked, answer);
+  const asking = { via: answer.via.channel, chosen };
   switch (reply.kind) {
     case 'stop':
-      return result(field, 'ask-operator', 'operator', null, 'stop');
+      return { ...result(field, 'ask-operator', 'operator', null, 'stop'), ...asking };
     case 'blank':
-      return result(field, 'leave-blank', 'operator', null, 'blank');
+      return { ...result(field, 'leave-blank', 'operator', null, 'blank'), ...asking };
     case 'answer': {
-      const filled = await fill(ctx, field, reply.text, 'operator', 'answer', observation);
+      const filled = {
+        ...(await fill(ctx, field, reply.text, 'operator', 'answer', observation)),
+        ...asking,
+      };
       if (filled.outcome !== 'ok') return filled;
       return { ...filled, guidance: remember(ctx, field.field, reply.text, observation) };
     }
     case 'read-back': {
       const value = await deps.browser.readValue(field.field.ref);
       if (value === null || value === '') {
-        return result(field, 'leave-blank', 'operator', null, 'read-back', 'ok', 'left empty');
+        return {
+          ...result(field, 'leave-blank', 'operator', null, 'read-back', 'ok', 'left empty'),
+          ...asking,
+        };
       }
       // What the operator typed into the page is an entry like any other.
       const typed = fillActionOf(field.field, value);
       await captureAfter(ctx, typed, entryOf(field.field, typed, observation), 'ok');
       return {
         ...result(field, 'fill', 'operator', value, 'read-back'),
+        ...asking,
         guidance: remember(ctx, field.field, value, observation),
       };
     }
@@ -295,6 +320,8 @@ const decisionOf = (
     suggestion: field.value,
     admission: decided?.admission ?? null,
     reply: outcome.reply,
+    via: outcome.via,
+    chosen: outcome.chosen,
     cached: field.cached,
     outcome: outcome.outcome,
     detail: outcome.detail,
