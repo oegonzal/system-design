@@ -1,18 +1,18 @@
 {
   "since": "2026-10-05T23:52:30.581Z",
-  "until": "2026-10-06T03:07:10.818Z",
-  "runs": 2,
+  "until": "2026-10-11T07:41:56.473Z",
+  "runs": 85,
   "fields": {
-    "fields": { "n": 2, "max": 5, "p99": 5, "overTarget": 0 },
-    "fields[].basis": { "n": 8, "max": 1, "p99": 1, "overTarget": 0 },
-    "fields[].reason": { "n": 8, "max": 247, "p99": 247, "overTarget": 0 },
-    "fields[].value": { "n": 6, "max": 18, "p99": 18, "overTarget": 0 },
-    "summary": { "n": 2, "max": 487, "p99": 487, "overTarget": 0 }
+    "fields": { "n": 82, "max": 14, "p99": 14, "overTarget": 0 },
+    "fields[].basis": { "n": 312, "max": 4, "p99": 3, "overTarget": 0 },
+    "fields[].reason": { "n": 312, "max": 366, "p99": 261, "overTarget": 2 },
+    "fields[].value": { "n": 182, "max": 460, "p99": 203, "overTarget": 0 },
+    "summary": { "n": 82, "max": 713, "p99": 713, "overTarget": 7 }
   },
   "caps": {
-    "critic.form": { "n": 2, "max": 2382, "p99": 2382, "maxApiCalls": 1 },
-    "critic.grounding": { "n": 2, "max": 4614, "p99": 4614, "maxApiCalls": 1 },
-    "evaluator.answers": { "n": 2, "max": 2624, "p99": 2624, "maxApiCalls": 1 },
-    "producer": { "n": 2, "max": 2002, "p99": 2002, "maxApiCalls": 1 }
+    "critic.form": { "n": 85, "max": 8858, "p99": 8858, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 85, "max": 9969, "p99": 9969, "maxApiCalls": 1 },
+    "evaluator.answers": { "n": 86, "max": 13339, "p99": 13339, "maxApiCalls": 1 },
+    "producer": { "n": 82, "max": 11408, "p99": 11408, "maxApiCalls": 1 }
   }
 }

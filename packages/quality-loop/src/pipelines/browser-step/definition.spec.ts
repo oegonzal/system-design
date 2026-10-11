@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
+import { capsAgainstMeasured, jsonSchemaTypes } from '../../core/testing';
 import { BROWSER_STEP } from './definition';
 import measured from './measured.json';
 import { stepPlanOutput } from './output';
@@ -86,21 +86,12 @@ describe('the browser-step pipeline', () => {
     expect(BROWSER_STEP.policy.criterionKinds['safety'].gate).toBe(true);
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
-    // The seeds are what each stage was expected to write before any step run
-    // was recorded; `measured.json` (`pnpm measure:bounds`, 170 runs as of
-    // 2026-10-07) is what they measurably wrote, and the caps clear both. A
-    // cap is also the call's time limit, so one a stage outwrites is a call
-    // cut short. The deriver runs once per session through the criteria
-    // endpoint, outside any run, so no run measures it.
-    const seeds = {
-      criteria: 2_500,
-      producer: 4_000,
-      'critic.mission': 4_000,
-      'critic.safety': 4_000,
-      'evaluator.plan': 4_000,
-    };
-    expect(capsAgainstMeasured(BROWSER_STEP, seededCaps(seeds))).toEqual([]);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // `measured.json` (`pnpm measure:bounds`, 1,120 runs as of 2026-10-11) is
+    // what each stage measurably wrote. A cap is also the call's time limit,
+    // so one a stage outwrites is a call cut short. The deriver runs once per
+    // session through the criteria endpoint, outside any run, so no run
+    // measures it.
     expect(measured.runs).toBeGreaterThan(0);
     expect(
       capsAgainstMeasured(BROWSER_STEP, measured.caps, {

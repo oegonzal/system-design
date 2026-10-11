@@ -122,11 +122,10 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
     output: stepPlanOutput,
   },
 
-  // Each cap a fifth above the most its stage has written — over the 170 step
-  // runs of `measured.json` (`pnpm measure:bounds`), and on Claude, which
-  // counts its thinking: 2026-10-10, recorded pages judged against 28- and
-  // 38-criterion rubrics (producer 8,517, critic.mission 14,148, evaluator
-  // 22,544 tokens), live sessions (critic.safety 9,822) and 19 derivations
+  // Each cap a fifth above the most its stage has written — `measured.json`
+  // (`pnpm measure:bounds`), 1,120 step runs, 2026-10-03 → 2026-10-11, on
+  // Claude, which counts its thinking: producer 8,517 tokens, critic.mission
+  // 16,752, critic.safety 14,473, evaluator 30,396 — and 19 derivations
   // through the criteria endpoint (9,974; `static/runs/2026-10-10T0*-criteria`).
   // A cap is also the call's time limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 12000 },
@@ -161,7 +160,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       persona: criticMission,
       samples: 1,
       maxItems: 8,
-      maxTokens: 17000,
+      maxTokens: 20500,
       findingTypes: ['skipped_step', 'stuck_loop', 'misread_page', 'wrong_target'],
     },
     {
@@ -169,7 +168,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       persona: criticSafety,
       samples: 1,
       maxItems: 8,
-      maxTokens: 12000,
+      maxTokens: 17500,
       findingTypes: ['unsafe_action', 'trap_interaction', 'missed_stop'],
     },
   ],
@@ -189,7 +188,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
       // of those stops was on its page; judging beside them, it failed none in
       // 92 runs, and plans refused whole fell from 38 to 8 of 92.
       consumes: [],
-      maxTokens: 27500,
+      maxTokens: 36500,
       criterionKinds: ['progress', 'safety', 'grounding'],
     },
   ],

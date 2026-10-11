@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
+import { capsAgainstMeasured, jsonSchemaTypes } from '../../core/testing';
 import { FIELD_ANSWER } from './definition';
 import measured from './measured.json';
 import { fieldAnswersOutput } from './output';
@@ -65,22 +65,12 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.critics[0].persona).toContain('requires_user');
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
-    // The seeds are what each stage was expected to write for a page of up to
-    // 40 fields before any answer run was recorded; `measured.json` (`pnpm
-    // measure:bounds`, two runs as of 2026-10-07) is what they measurably
-    // wrote, and the caps clear both. A cap is also the call's time limit, so
-    // one a stage outwrites is a call cut short. The deriver runs once per
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
+    // `measured.json` (`pnpm measure:bounds`, 85 runs as of 2026-10-11) is
+    // what each stage measurably wrote. A cap is also the call's time limit,
+    // so one a stage outwrites is a call cut short. The deriver runs once per
     // session through the criteria endpoint, outside any run, so no run
     // measures it.
-    const seeds = {
-      criteria: 2_500,
-      producer: 4_500,
-      'critic.grounding': 4_000,
-      'critic.form': 4_000,
-      'evaluator.answers': 4_000,
-    };
-    expect(capsAgainstMeasured(FIELD_ANSWER, seededCaps(seeds))).toEqual([]);
     expect(measured.runs).toBeGreaterThan(0);
     expect(
       capsAgainstMeasured(FIELD_ANSWER, measured.caps, {

@@ -68,16 +68,17 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     output: fieldAnswersOutput,
   },
 
-  // Caps a fifth above the most each lens has measurably written (`measured.json`, two runs as of 2026-10-07) and above their seeds.
-  // The spec holds the seed table; the first live runs replace it, and a cap
-  // is also the call's time limit, so one a stage outwrites is a call cut short.
-  // On Claude, which counts its thinking (2026-10-10): the deriver wrote up to
-  // 7,931 tokens over five derivations; a live session's 28 lens calls, 2,002.
+  // Caps a fifth above the most each stage has written (`measured.json`,
+  // `pnpm measure:bounds`): 85 runs on Claude, which counts its thinking,
+  // 2026-10-05 → 2026-10-11 — the producer to 11,408 tokens, the grounding
+  // critic 9,969, the form critic 8,858, the evaluator 13,339 — and five
+  // derivations through the criteria endpoint to 7,931 (2026-10-10). A cap is
+  // also the call's time limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 10000 },
   // The answerer sees the checklist a session derived once; `memories` keeps
   // `recall: true` legal on a run, unused by default — the form-memory
   // orchestrator puts the evidence into the goal every stage reads instead.
-  producer: { persona: producer, maxTokens: 8000, consumes: ['criteria', 'memories'] },
+  producer: { persona: producer, maxTokens: 14000, consumes: ['criteria', 'memories'] },
   validators: [referencesValidator, limitsValidator],
   controller: STANDARD,
 
@@ -87,14 +88,14 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       persona: criticGrounding,
       samples: 1,
       maxItems: 10,
-      maxTokens: 8000,
+      maxTokens: 12000,
     },
     {
       id: 'critic.form',
       persona: criticForm,
       samples: 1,
       maxItems: 10,
-      maxTokens: 8000,
+      maxTokens: 11000,
     },
   ],
 
@@ -106,7 +107,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       // After the critics, with their confirmed defects before it: an
       // ungrounded value the grounding critic found is measured, not missed.
       consumes: ['findings'],
-      maxTokens: 8000,
+      maxTokens: 16500,
       criterionKinds: ['grounding', 'compliance', 'coverage'],
     },
   ],
