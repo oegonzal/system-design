@@ -51,6 +51,17 @@ export type OperatorGuidanceDto = z.infer<typeof operatorGuidanceSchema> & {
 
 const day = (at: IsoDateString): string => at.slice(0, 10);
 
+/**
+ * How an answer becomes a memory a later question can rest on: the subject's
+ * answer to its question, the question as the key, the unit of work as
+ * provenance. Measured 2026-10-10: answers stored as one unit of work's events
+ * — "for that application, the operator answered…" — were recalled for the
+ * same question reworded and refused by the grounding judge as another
+ * application's, so the operator was asked again.
+ */
+export const GUIDANCE_RULE =
+  "A section records the operator's answer to one question about the subject: state it as the subject's answer to that question, the question verbatim in the appliesWhen; the unit of work it was given in is provenance, kept in the insight only when the question asks about that unit itself.";
+
 /** One answer as a section the digest can cite. */
 export function renderGuidanceSection(item: OperatorGuidanceDto): string {
   const where =
@@ -81,7 +92,7 @@ export function guidanceDocument(
     chunk: { index: 1, of: 1 },
     context: null,
     parts,
-    rules: [...DOCUMENT_RULES],
+    rules: [...DOCUMENT_RULES, GUIDANCE_RULE],
     maxMemories: Math.max(1, Math.min(parts.length, DOCUMENT_MAX_MEMORIES)),
   };
 }

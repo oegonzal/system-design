@@ -20,7 +20,7 @@ import {
   subtreeText,
   unreadSnapshotLines,
 } from './aria-snapshot';
-import { readElementFacts, readWithinBudget } from './element-facts';
+import { MODAL_DIALOGS, readElementFacts, readWithinBudget } from './element-facts';
 import {
   failedWholesale,
   toObservation,
@@ -129,6 +129,10 @@ const messageOf = (error: unknown): string => {
   return waitedFor === '' ? first : `${first} (${waitedFor})`;
 };
 
+/** What says a region is still loading, by ARIA: busy, or a progressbar with no current value. */
+const BUSY_INDICATORS =
+  '[aria-busy="true"], [role="progressbar"]:not([aria-valuenow]), progress:not([value])';
+
 /** The attribute an element carries while its capture is taken, and never after. */
 const CAPTURE_MARK = 'data-session-capture';
 /**
@@ -235,7 +239,32 @@ export class PlaywrightBrowser implements BrowserPort {
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
       focusedScope: focused < 0 ? null : (ancestry[focused]?.scope ?? null),
       landmarks: landmarkRolesOf(nodes),
+      scopeBusy: await this.modalBusy(),
     };
+  }
+
+  /** Whether a dialog in front of the page shows it is still loading; a page that cannot answer is not. */
+  private async modalBusy(): Promise<boolean> {
+    try {
+      return await this.page.evaluate(
+        ({ modal, busy }) => {
+          let scopes: Element[];
+          try {
+            scopes = Array.from(document.querySelectorAll(modal.any));
+          } catch {
+            scopes = Array.from(document.querySelectorAll(modal.aria));
+          }
+          return scopes.some((scope) =>
+            [scope, ...Array.from(scope.querySelectorAll(busy))].some(
+              (el) => el.matches(busy) && el.checkVisibility(),
+            ),
+          );
+        },
+        { modal: MODAL_DIALOGS, busy: BUSY_INDICATORS },
+      );
+    } catch {
+      return false;
+    }
   }
 
   /** The page, read again while a read fails wholesale; what the last read reached, either way. */
@@ -273,7 +302,9 @@ export class PlaywrightBrowser implements BrowserPort {
       reads += 1;
       // Two reads agreeing on a page whose main has nothing in it yet agree on
       // the chrome, not the page: read again. Measured 2026-10-08, three times.
-      settled = agreement(again) === agreement(reading) && !mainUnrendered(again);
+      // The same for a dialog in front that says it is still loading.
+      settled =
+        agreement(again) === agreement(reading) && !mainUnrendered(again) && !again.scopeBusy;
       reading = again;
     }
     return toObservation(reading, { reads, settled, durationMs: Date.now() - startedAt });

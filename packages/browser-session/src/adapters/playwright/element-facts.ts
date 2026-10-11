@@ -45,7 +45,22 @@ export interface ElementFacts {
  * what state the page puts it in, whether a person could see and reach it,
  * and the words around it.
  */
-export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
+/**
+ * A dialog in front of the page, as the page declares it: `aria-modal` on a
+ * dialog role, or a native dialog opened modally. Declared once for every
+ * in-page reader — the element facts and the busy read — and passed into the
+ * page, where a module constant does not reach.
+ */
+export const MODAL_DIALOGS = {
+  any: '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
+  /** For an engine without `:modal`: the ARIA half alone. */
+  aria: '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
+} as const;
+
+export function elementFactsInPage(
+  el: Element,
+  { textMax, modal: modalDialogs }: { textMax: number; modal: typeof MODAL_DIALOGS },
+): ElementFacts {
   const tag = el.tagName.toLowerCase();
   const input = el as HTMLInputElement;
   const attr = (name: string): string | null => el.getAttribute(name);
@@ -303,16 +318,10 @@ export function elementFactsInPage(el: Element, textMax: number): ElementFacts {
 
     let modal = false;
     try {
-      modal =
-        el.closest(
-          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
-        ) !== null;
+      modal = el.closest(modalDialogs.any) !== null;
     } catch {
       // An engine without `:modal` answers the ARIA half alone.
-      modal =
-        el.closest(
-          '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
-        ) !== null;
+      modal = el.closest(modalDialogs.aria) !== null;
     }
 
     // Any invalid state the page declares — true, grammar, spelling — or the browser's own.
@@ -350,7 +359,11 @@ export async function readElementFacts(
   timeout?: number,
 ): Promise<ElementFacts | null> {
   try {
-    return await locator.evaluate(elementFactsInPage, ELEMENT_NAME_BOUND.target, { timeout });
+    return await locator.evaluate(
+      elementFactsInPage,
+      { textMax: ELEMENT_NAME_BOUND.target, modal: MODAL_DIALOGS },
+      { timeout },
+    );
   } catch {
     return null;
   }

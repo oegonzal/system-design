@@ -45,6 +45,16 @@ export interface PageReading {
   focusedScope: ActiveScope | null;
   /** The landmarks the tree lays the page out in, each once. */
   landmarks: readonly LandmarkRole[];
+  /**
+   * Whether a dialog in front of the page says it is still loading, as ARIA
+   * says it: busy, or showing a progressbar with no current value — an
+   * indeterminate one. A read of such a dialog is never settled. Measured
+   * 2026-10-10: two reads 1.2 s apart agreed on a dialog holding only its
+   * close button, a heading and such a progressbar; the form it was loading
+   * rendered a moment later, and the plan made on the shell spent a step
+   * waiting for it — twice in one session.
+   */
+  scopeBusy: boolean;
 }
 
 /**

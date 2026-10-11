@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DOCUMENT_MAX_PARTS,
+  DOCUMENT_RULES,
   documentChunkSchema,
   readDocumentIndex,
   renderDocumentGoal,
 } from '../quality-loop/document-digest';
-import { guidanceDocument, renderGuidanceSection, type OperatorGuidanceDto } from './guidance';
+import {
+  GUIDANCE_RULE,
+  guidanceDocument,
+  renderGuidanceSection,
+  type OperatorGuidanceDto,
+} from './guidance';
 
 const item = (overrides: Partial<OperatorGuidanceDto> = {}): OperatorGuidanceDto => ({
   sessionId: 'session-1',
@@ -51,6 +57,13 @@ describe('guidance', () => {
     const index = readDocumentIndex(renderDocumentGoal(chunk));
     expect(index?.document.kind).toBe('guidance');
     expect(index?.evidence.map((e) => e.alias)).toEqual(['section.1', 'section.2']);
+  });
+
+  it("[QL-40] asks the digest for the subject's answer to its question, the question as the key and the unit of work as provenance", () => {
+    const document = guidanceDocument('s', 'Alex', [item()], '2026-10-02');
+    expect(document.rules).toEqual([...DOCUMENT_RULES, GUIDANCE_RULE]);
+    // The digest reads the rule where it reads every rule of the document.
+    expect(renderDocumentGoal(document)).toContain(`- ${GUIDANCE_RULE}`);
   });
 
   it('[QL-40] takes at most the part cap and never fewer than one memory', () => {

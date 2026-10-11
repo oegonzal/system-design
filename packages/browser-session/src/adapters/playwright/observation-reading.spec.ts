@@ -49,6 +49,7 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   unreadElements: 0,
   unreadSnapshotLines: 0,
   focusedScope: null,
+  scopeBusy: false,
   landmarks: [],
   ...overrides,
 });
