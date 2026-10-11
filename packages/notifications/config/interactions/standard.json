@@ -1,0 +1,8 @@
+{
+  "pullWaitMs": 25000,
+  "eventsPerPull": 20,
+  "deliveryAttempts": 3,
+  "retryPauseMs": 2000,
+  "closedRetentionMs": 2592000000,
+  "sweepEveryMs": 60000
+}

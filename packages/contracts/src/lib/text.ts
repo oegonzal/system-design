@@ -18,3 +18,17 @@ export const quotedJson = (text: string): string => JSON.stringify(text);
 /** A literal as a pattern matches it: every character a regular expression reads as syntax, escaped. */
 export const escapeRegExp = (literal: string): string =>
   literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The option a typed answer names, spelled as the list spells it: the option
+ * itself, else the one option equal to it but for case; null when it names
+ * none, or more than one.
+ */
+export function listedOptionOf(options: readonly string[], typed: string): string | null {
+  const text = typed.trim();
+  if (options.includes(text)) return text;
+  const named = options.filter(
+    (option) => option.localeCompare(text, undefined, { sensitivity: 'accent' }) === 0,
+  );
+  return named.length === 1 ? (named[0] ?? null) : null;
+}

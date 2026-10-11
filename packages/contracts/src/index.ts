@@ -44,3 +44,4 @@ export * from './lib/studio-resources';
 export * from './lib/quality-loop';
 export * from './lib/govcon';
 export * from './lib/browser-session';
+export * from './lib/notifications';

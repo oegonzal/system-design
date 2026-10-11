@@ -1,6 +1,6 @@
 import { fieldSpecOf, formObservation, type FieldSpec } from '@sysdesign/contracts';
 
-import { askListed, listedOptionOf } from './operator-reply';
+import { askListed } from './operator-reply';
 import type { OperatorPrompt } from './ports';
 import { ScriptedOperator } from './testing';
 
@@ -22,16 +22,6 @@ const promptFor = (field: FieldSpec): OperatorPrompt => ({
 });
 
 describe('an operator reply to a field with listed options', () => {
-  it('[BRW-3] names an option in the page’s spelling: the option itself, else the one equal to it but for case', () => {
-    expect(listedOptionOf(['Yes', 'No'], 'Yes')).toBe('Yes');
-    expect(listedOptionOf(['Yes', 'No'], ' yes ')).toBe('Yes');
-    expect(listedOptionOf(['Yes', 'No'], 'NO')).toBe('No');
-    expect(listedOptionOf(['Yes', 'No'], 'maybe')).toBeNull();
-    // An exact option wins; two options equal but for case are named by neither fold.
-    expect(listedOptionOf(['Yes', 'YES'], 'YES')).toBe('YES');
-    expect(listedOptionOf(['Yes', 'YES'], 'yes')).toBeNull();
-  });
-
   it('[BRW-3] holds the answer to the closed list, asking again with the options when it names none', async () => {
     const operator = new ScriptedOperator([
       { kind: 'answer', text: 'maybe' },

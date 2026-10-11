@@ -31,6 +31,7 @@ import type { ChangedFile } from './index';
  *   govcon         -> contracts, db, nest-kit   SAM.gov opportunities: search, store, rank
  *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
+ *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -65,6 +66,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'studio-testing',
   ],
   'memory-ingest': ['contracts', 'loop-client', 'studio-testing'],
+  notifications: ['contracts', 'db', 'nest-kit', 'config-kit'],
   storybook: null,
   'studio-e2e': null,
 };

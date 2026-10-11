@@ -1,6 +1,6 @@
 # db
 
-Every Postgres table the workspace shares, as MikroORM entities with hand-written SQL migrations: the studio's sessions, revisions and coaching runs; the quality loop's runs and orchestrations; govcon's notices, bids, awards and registrants; and the browser session's ledger. `ormOptions` is the one object every DbModule and the migration CLI configure from, so an app and the CLI cannot disagree about a column name.
+Every Postgres table the workspace shares, as MikroORM entities with hand-written SQL migrations: the studio's sessions, revisions and coaching runs; the quality loop's runs and orchestrations; govcon's notices, bids, awards and registrants; the browser session's ledger; and the notifications service's event bus and the prompts it put to people. `ormOptions` is the one object every DbModule and the migration CLI configure from, so an app and the CLI cannot disagree about a column name.
 
 ```bash
 pnpm db:migrate                 # apply pending migrations to DB_NAME (default sysdesign)

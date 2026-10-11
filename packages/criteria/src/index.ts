@@ -810,4 +810,45 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "Documents are read through a declared table of readers by extension — PDF text from the page's own geometry, markdown and plain text verbatim, JSON Lines one record per titled section through a declared field map — and an extension the table does not name, or a record the map cannot read, is refused by name, never guessed and never skipped.",
   },
+  // Notifications (packages/notifications)
+  {
+    id: 'NTF-1',
+    statement:
+      'The bus accepts an event only on a declared topic, with a payload that topic’s schema accepts, from a publisher the topic allows — an answer to a prompt only from the service itself — and commits events in sequence order, so a cursor never passes an event still being written.',
+  },
+  {
+    id: 'NTF-2',
+    statement:
+      'A subscription is a named cursor, created at the head and replaced idempotently by name; a pull returns what lies past it oldest first or waits for it, woken by a publish with no wakeup lost and released on shutdown or when its client leaves; an acknowledgement only moves the cursor forward, so delivery is at least once.',
+  },
+  {
+    id: 'NTF-3',
+    statement:
+      'The bus forgets an event only once it is older than the declared retention and behind every subscription’s cursor, keeps its newest event so its head never moves back, removes subscriptions idle past the declared age, and a sweep never throws.',
+  },
+  {
+    id: 'NTF-4',
+    statement:
+      'A prompt is opened once and delivered once per channel however often its event is replayed or the service restarts; a channel that fails is retried within declared bounds and then passed over, never holding back the events behind it.',
+  },
+  {
+    id: 'NTF-5',
+    statement:
+      'Every channel reads a reply the one declared way — a command by its slash, a choice by its key or by its label as the list spells it, the person’s own words within their length — and refuses anything else saying how the prompt is answered; a reply resolves to the prompt it replies to, else to the one prompt open on its address; one accepted reply publishes one answer, a reply to a closed prompt is refused politely, and a replayed one is ignored.',
+  },
+  {
+    id: 'NTF-6',
+    statement:
+      'An answer, a withdrawal or an expiry closes a prompt on every channel it reached, idempotently; a withdrawal after an answer marks that answer unused; a prompt past its time is withdrawn by the service itself.',
+  },
+  {
+    id: 'NTF-9',
+    statement:
+      'Every variable the service reads is declared once — its own and each chosen channel’s — and every setting is a file chosen by name; a chosen channel missing a variable it requires refuses boot naming it, and nothing else in the package reads the environment.',
+  },
+  {
+    id: 'NTF-10',
+    statement:
+      'The service is layered bus, interactions, channels, each folder reaching another only through its declared door; a channel is a folder plus one registration line, and no other file names it.',
+  },
 ] as const;

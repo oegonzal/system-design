@@ -1,6 +1,8 @@
 export * from './entities/browser-decision.entity';
 export * from './entities/browser-session.entity';
 export * from './entities/browser-task.entity';
+export * from './entities/bus-event.entity';
+export * from './entities/bus-subscription.entity';
 export * from './entities/coaching-run.entity';
 export * from './entities/design-revision.entity';
 export * from './entities/design-session.entity';
@@ -12,6 +14,8 @@ export * from './entities/govcon-opportunity.entity';
 export * from './entities/govcon-saved-search.entity';
 export * from './entities/govcon-search-profile.entity';
 export * from './entities/govcon-source-call.entity';
+export * from './entities/interaction-delivery.entity';
+export * from './entities/interaction.entity';
 export * from './entities/memory-embedding.entity';
 export * from './entities/memory-support.entity';
 export * from './entities/orchestration-run-child.entity';

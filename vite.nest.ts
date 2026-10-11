@@ -4,7 +4,7 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { TEST_DATABASE_NAME } from './packages/db/src/testing/test-database';
 
 /**
- * Shared Vite build shape for the NestJS apps (studio-api, quality-loop, govcon).
+ * Shared Vite build shape for the NestJS apps (studio-api, quality-loop, govcon, notifications).
  *
  * One externals list, maintained once: everything here stays a runtime
  * `require` in the bundled `dist/main.js` and is provided by `node_modules`

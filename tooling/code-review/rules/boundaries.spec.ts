@@ -43,6 +43,7 @@ describe('the dependency matrix', () => {
       ['contracts', 'db', 'nest-kit', 'run-dump', 'loop-client', 'config-kit', 'studio-testing'],
     ],
     ['memory-ingest', ['contracts', 'loop-client', 'studio-testing']],
+    ['notifications', ['contracts', 'db', 'nest-kit', 'config-kit']],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
     expect(ALLOWED[pkg]).toEqual(allowed);
   });

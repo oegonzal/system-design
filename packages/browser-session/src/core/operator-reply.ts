@@ -1,20 +1,6 @@
-import { closedOptionsOf, quoted } from '@sysdesign/contracts';
+import { closedOptionsOf, listedOptionOf, quoted } from '@sysdesign/contracts';
 
 import type { OperatorPort, OperatorPrompt, OperatorReply } from './ports';
-
-/**
- * The option a typed answer names, spelled as the page lists it: the option
- * itself, else the one option equal to it but for case; null when it names
- * none, or more than one.
- */
-export function listedOptionOf(options: readonly string[], typed: string): string | null {
-  const text = typed.trim();
-  if (options.includes(text)) return text;
-  const named = options.filter(
-    (option) => option.localeCompare(text, undefined, { sensitivity: 'accent' }) === 0,
-  );
-  return named.length === 1 ? (named[0] ?? null) : null;
-}
 
 /**
  * The operator's reply to a field, held to the field's closed option list the

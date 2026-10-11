@@ -5,6 +5,8 @@ import { connectionSettings } from './connection';
 import { BrowserDecision } from './entities/browser-decision.entity';
 import { BrowserSession } from './entities/browser-session.entity';
 import { BrowserTask } from './entities/browser-task.entity';
+import { BusEvent } from './entities/bus-event.entity';
+import { BusSubscription } from './entities/bus-subscription.entity';
 import { CoachingRun } from './entities/coaching-run.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
@@ -16,6 +18,8 @@ import { GovconOpportunity } from './entities/govcon-opportunity.entity';
 import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
 import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
+import { Interaction } from './entities/interaction.entity';
+import { InteractionDelivery } from './entities/interaction-delivery.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -31,8 +35,9 @@ import { StarStory } from './entities/star-story.entity';
 
 /**
  * ORM settings shared by every entry point that configures MikroORM: the
- * studio API's, the quality loop's and govcon's DbModules, and
- * `mikro-orm.config.ts` (the CLI that creates and applies migrations).
+ * studio API's, the quality loop's, govcon's and the notifications service's
+ * DbModules, and `mikro-orm.config.ts` (the CLI that creates and applies
+ * migrations).
  *
  * They have to agree. `namingStrategy` in particular decides whether the apps
  * query `revision_number` or `revisionNumber` — and since migrations are
@@ -69,6 +74,10 @@ export const ormOptions = {
     GovconBid,
     GovconAward,
     GovconEntity,
+    BusEvent,
+    BusSubscription,
+    Interaction,
+    InteractionDelivery,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

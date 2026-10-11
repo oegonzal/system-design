@@ -1,0 +1,7 @@
+{
+  "retentionMs": 604800000,
+  "idleSubscriptionMs": 86400000,
+  "maxWaitMs": 30000,
+  "maxEventsPerPull": 100,
+  "sweepEveryMs": 600000
+}
