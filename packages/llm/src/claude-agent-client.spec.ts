@@ -285,7 +285,7 @@ describe('a call that failed once', () => {
     const detailed = await new ClaudeAgentLlmClient({
       query: sequence([[succeeded(good)]]).run,
     }).completeStructuredDetailed({ system: 's', user: 'u', schema: answer });
-    expect(detailed).toEqual({ value: { answer: 'hi' }, issues: [], overruns: [] });
+    expect(detailed).toEqual({ value: { answer: 'hi' }, issues: [], overruns: [], cause: null });
   });
 
   it('[QL-28] the first attempt stays visible, so the miss rate is still measurable', async () => {
@@ -309,6 +309,21 @@ describe('a call that failed once', () => {
     // One ask, because a credential does not become valid in a second.
     expect(script.calls()).toBe(1);
     expect(calls).toHaveLength(1);
+  });
+
+  it('[QL-28] a call the provider refuses says why: its reply carries the error its record keeps', async () => {
+    const calls: LlmCall[] = [];
+    const script = sequence([errored('oauth_org_not_allowed')]);
+    const reply = await new ClaudeAgentLlmClient({ query: script.run })
+      .withRecorder((call) => calls.push(call))
+      .completeStructuredDetailed({ system: 's', user: 'u', schema: answer });
+
+    expect(reply.value).toBeNull();
+    // Refused for good — one ask — and the reason in the reply as on the record.
+    expect(script.calls()).toBe(1);
+    const recorded = calls[0]?.error;
+    expect(recorded?.name).toBe('oauth_org_not_allowed');
+    expect(reply.cause).toBe(`${recorded?.name}: ${recorded?.message}`);
   });
 
   it('[QL-28] a strained provider is asked again, after waiting', async () => {

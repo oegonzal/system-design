@@ -3,7 +3,13 @@ import { modelSchema, type SchemaIssue } from '@sysdesign/contracts';
 import { CALL_TIME_POLICY, callTimeLimitMs, type CallTimePolicy } from './call-time-limit';
 import type { LlmCall, LlmCallSink, LlmRecordable } from './exchange';
 import { InFlightGate } from './in-flight-gate';
-import type { LlmClient, LlmDetailed, StructuredReply, StructuredRequest } from './llm-client';
+import {
+  causeOf,
+  type LlmClient,
+  type LlmDetailed,
+  type StructuredReply,
+  type StructuredRequest,
+} from './llm-client';
 import {
   backoffFor,
   classifyFailure,
@@ -352,6 +358,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
       });
       if (!response.ok) {
         const detail = (await response.text().catch(() => '')).slice(0, 400);
+        const error = { name: `Http${response.status}`, message: detail };
         record({
           outcome: 'error',
           stopReason: String(response.status),
@@ -361,14 +368,15 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
           // A refusal carries no body id, so the header is the only handle on
           // it — and the one the provider's own support asks for.
           requestId: response.headers.get('x-request-id'),
-          error: { name: `Http${response.status}`, message: detail },
+          error,
         });
-        return this.failed(failureForStatus(response.status));
+        return this.failed(failureForStatus(response.status), error);
       }
       completion = this.shape.read(await response.json());
     } catch (cause) {
       // Our own abort is the only timeout here; anything else never reached a reply.
       const aborted = cause instanceof Error && cause.name === 'TimeoutError';
+      const error = { name: aborted ? TIMED_OUT : 'Transport', message: messageOf(cause) };
       record({
         outcome: 'error',
         stopReason: null,
@@ -376,9 +384,9 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
         text: null,
         response: null,
         requestId: null,
-        error: { name: aborted ? TIMED_OUT : 'Transport', message: messageOf(cause) },
+        error,
       });
-      return this.failed(aborted ? 'timeout' : 'transport');
+      return this.failed(aborted ? 'timeout' : 'transport', error);
     }
     const { text, stopReason, usage, requestId } = completion;
 
@@ -394,11 +402,17 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
         error: null,
       });
       return {
-        reply: { value: extraction.value, issues: [], overruns: extraction.overruns },
+        reply: {
+          value: extraction.value,
+          issues: [],
+          overruns: extraction.overruns,
+          cause: null,
+        },
         failure: null,
         issues: [],
       };
     }
+    const missed = { name: SCHEMA_MISS, message: extraction.reason };
     record({
       outcome: 'schema-miss',
       stopReason,
@@ -406,18 +420,23 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
       text,
       response: null,
       requestId,
-      error: { name: SCHEMA_MISS, message: extraction.reason },
+      error: missed,
     });
     return {
-      reply: { value: null, issues: extraction.issues, overruns: [] },
+      reply: { value: null, issues: extraction.issues, overruns: [], cause: causeOf(missed) },
       // The shared classifier owns what a miss is worth, for either provider.
       failure: classifyFailure({ schemaMiss: true }),
       issues: extraction.issues,
     };
   }
 
-  private failed<T>(failure: LlmFailureKind): Attempt<T> {
-    return { reply: { value: null, issues: [], overruns: [] }, failure, issues: [] };
+  /** A call that never reached a reply: its kind for the retry rule, its record's words for the caller. */
+  private failed<T>(failure: LlmFailureKind, error: { name: string; message: string }): Attempt<T> {
+    return {
+      reply: { value: null, issues: [], overruns: [], cause: causeOf(error) },
+      failure,
+      issues: [],
+    };
   }
 }
 

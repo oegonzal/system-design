@@ -113,7 +113,7 @@ export function createLlmProducer<T>(
       if (reply.value === null) {
         return {
           output: null,
-          diagnostic: failedDiagnostic(PRODUCER_STAGE, null, reply.issues),
+          diagnostic: failedDiagnostic(PRODUCER_STAGE, null, reply),
           model: llm.model,
           issues: reply.issues,
           overruns: [],

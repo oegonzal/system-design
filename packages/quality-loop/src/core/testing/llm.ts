@@ -5,6 +5,7 @@
 import { describeIssue, modelSchema, parseLenient, type LenientParse } from '@sysdesign/contracts';
 import {
   asDetailed,
+  causeOf,
   closestMiss,
   SCHEMA_MISS,
   type LlmCallSink,
@@ -41,13 +42,15 @@ export function fakeLlm(...canned: readonly unknown[]): FakeLlm {
         parseLenient(request.schema, candidate, shown.bounds),
       );
       const hit = parses.find((parse) => parse.ok);
+      const issues = hit?.ok ? [] : closestMiss(parses.map((parse) => parse.issues));
+      // A miss is recorded and answered in the same words, as the real seam's is.
+      const missed = {
+        name: SCHEMA_MISS,
+        message: issues.map(describeIssue).join('; ') || 'no canned answer',
+      };
       const reply: StructuredReply<T> = hit?.ok
-        ? { value: hit.value, issues: [], overruns: hit.overruns }
-        : {
-            value: null,
-            issues: closestMiss(parses.map((parse) => parse.issues)),
-            overruns: [],
-          };
+        ? { value: hit.value, issues: [], overruns: hit.overruns, cause: null }
+        : { value: null, issues, overruns: [], cause: causeOf(missed) };
       const salvage: LlmSalvage = hit?.ok
         ? {
             overruns: hit.overruns,
@@ -71,13 +74,7 @@ export function fakeLlm(...canned: readonly unknown[]): FakeLlm {
         requestId: null,
         text: null,
         response: reply.value,
-        error:
-          reply.value === null
-            ? {
-                name: SCHEMA_MISS,
-                message: reply.issues.map(describeIssue).join('; ') || 'no canned answer',
-              }
-            : null,
+        error: reply.value === null ? missed : null,
         salvage,
         apiCalls: 1,
       });

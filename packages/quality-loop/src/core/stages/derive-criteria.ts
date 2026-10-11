@@ -58,7 +58,7 @@ export function createCriteriaDeriver<T>(
     if (reply.value === null) {
       return {
         criteria: null,
-        diagnostic: failedDiagnostic(CRITERIA_STAGE, null, reply.issues),
+        diagnostic: failedDiagnostic(CRITERIA_STAGE, null, reply),
         overruns: [],
       };
     }

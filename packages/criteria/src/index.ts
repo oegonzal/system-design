@@ -291,7 +291,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-20',
     statement:
-      'A run may carry its rubric: supplied criteria are used verbatim and the deriver is never asked, a rubric that does not fit the pipeline is refused before any row exists, POST /criteria derives a rubric from a goal alone and answers 503 rather than an empty rubric when the model derives none, and the health report names the model backing the loop.',
+      'A run may carry its rubric: supplied criteria are used verbatim and the deriver is never asked, a rubric that does not fit the pipeline is refused before any row exists, POST /criteria derives a rubric from a goal alone and answers 503 rather than an empty rubric when the model derives none — its message saying what ended the call, the provider’s or CLI’s own error where the model was never reached — and the health report names the model backing the loop.',
   },
   {
     id: 'QL-21',

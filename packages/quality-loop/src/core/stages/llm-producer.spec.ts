@@ -1,4 +1,5 @@
-import type { LlmCall } from '@sysdesign/llm';
+import { describeIssue } from '@sysdesign/contracts';
+import { SCHEMA_MISS, type LlmCall } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { criterion, fakeLlm, tinyPipeline, type TinyOutput } from '../testing';
@@ -121,7 +122,7 @@ describe('createLlmProducer', () => {
     });
   });
 
-  it('[QL-62] a reply the schema refused answers nothing, with every fault it was refused for — on the diagnostic as well', async () => {
+  it('[QL-62] a reply the schema refused answers nothing, with every fault it was refused for — on the diagnostic as well, beside what ended the call', async () => {
     const produced = await createLlmProducer(
       definition.task,
       definition.producer,
@@ -143,7 +144,7 @@ describe('createLlmProducer', () => {
       stage: 'producer',
       sample: null,
       reason: 'llm-failed',
-      detail: null,
+      detail: `${SCHEMA_MISS}: ${produced.issues.map(describeIssue).join('; ')}`,
       facts: { issues: produced.issues },
     });
   });

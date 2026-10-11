@@ -259,6 +259,17 @@ describe('an OpenAI-compatible provider', () => {
     expect(calls[2]).toMatchObject({ outcome: 'error', requestId: 'req_abc' });
   });
 
+  it('[QL-62] a call the provider refuses says why: its reply carries the status and body its record keeps', async () => {
+    const refused = new Response('{"error":{"message":"invalid key"}}', { status: 401 });
+    const reply = await client(scripted(refused).send).completeStructuredDetailed({
+      system: 's',
+      user: 'u',
+      schema,
+    });
+    expect(reply.value).toBeNull();
+    expect(reply.cause).toBe('Http401: {"error":{"message":"invalid key"}}');
+  });
+
   it('[QL-22] reads a reply cut at the token ceiling as this shape spells it', async () => {
     const cut = new Response(
       JSON.stringify({

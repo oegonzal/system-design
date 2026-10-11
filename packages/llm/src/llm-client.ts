@@ -65,7 +65,18 @@ export interface StructuredReply<T> {
   issues: SchemaIssue[];
   /** Beside a value: every field past its target, as the seam kept it. Empty beside null. */
   overruns: Overrun[];
+  /**
+   * On a null value: what ended the call, in the words its record keeps — the
+   * provider's or the CLI's own error, `name: message` — so a caller can say
+   * why the model never answered rather than that it answered nothing. Null
+   * beside a value, and where the client cannot say.
+   */
+  cause: string | null;
 }
+
+/** What ended a call, in the one wording its reply and its record share. */
+export const causeOf = (error: { name: string; message: string }): string =>
+  `${error.name}: ${error.message}`;
 
 /**
  * A client that can answer in detail. A separate capability, like
@@ -93,6 +104,7 @@ export function asDetailed(client: LlmClient): LlmDetailed {
       value: await client.completeStructured(request),
       issues: [],
       overruns: [],
+      cause: null,
     }),
   };
 }

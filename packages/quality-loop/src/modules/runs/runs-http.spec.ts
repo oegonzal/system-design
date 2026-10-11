@@ -14,6 +14,7 @@ import {
 } from '@sysdesign/db';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { SCHEMA_MISS } from '@sysdesign/llm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { criterionLengthBound, providedStatementLimit } from '../../core/contracts';
 import { fakeLlm, tinyPipeline } from '../../core/testing';
@@ -385,7 +386,7 @@ describe('the HTTP surface', () => {
     expect((await postJson(url, '/criteria', { pipeline: 'tiny', goal: '' })).status).toBe(400);
   });
 
-  it('[QL-20] a derivation the model fails answers 503 with the diagnostic and never an empty rubric', async () => {
+  it('[QL-20] a derivation the model fails answers 503 with the diagnostic, says what ended the call, and never an empty rubric', async () => {
     // A model with no answers: every call is a schema miss.
     const dark = await bootApp([[QUALITY_LOOP_LLM, fakeLlm()], tinyOnly()]);
     try {
@@ -395,6 +396,7 @@ describe('the HTTP surface', () => {
       expect(response.status).toBe(503);
       const body = (await response.json()) as Record<string, unknown>;
       expect(body).toMatchObject({
+        message: `no criteria were derived — llm-failed: ${SCHEMA_MISS}: no canned answer`,
         llm: { model: 'test-model' },
         diagnostic: { stage: 'criteria', reason: 'llm-failed' },
       });

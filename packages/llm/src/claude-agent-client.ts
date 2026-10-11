@@ -26,7 +26,13 @@ import {
   type LlmFailureKind,
   type LlmRetryPolicy,
 } from './llm-failure';
-import type { LlmClient, LlmDetailed, StructuredReply, StructuredRequest } from './llm-client';
+import {
+  causeOf,
+  type LlmClient,
+  type LlmDetailed,
+  type StructuredReply,
+  type StructuredRequest,
+} from './llm-client';
 import {
   FEEDBACK_HEADING,
   NO_RESULT,
@@ -304,7 +310,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
         apiCalls: transcript.apiCalls,
       });
       return {
-        reply: { value: read.value, issues: [], overruns: read.overruns },
+        reply: { value: read.value, issues: [], overruns: read.overruns, cause: null },
         kind: null,
         refusal: null,
       };
@@ -330,7 +336,12 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
         apiCalls: transcript.apiCalls,
       });
       return {
-        reply: { value: null, issues: miss?.issues ?? [], overruns: [] },
+        reply: {
+          value: null,
+          issues: miss?.issues ?? [],
+          overruns: [],
+          cause: ended.error === null ? null : causeOf(ended.error),
+        },
         kind,
         refusal: miss !== null && miss.issues.length > 0 ? { issues: miss.issues, text } : null,
       };

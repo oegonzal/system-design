@@ -1,4 +1,4 @@
-import type { LlmCall } from '@sysdesign/llm';
+import { SCHEMA_MISS, type LlmCall } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { criterionLengthBound } from '../contracts';
@@ -8,11 +8,15 @@ import { createCriteriaDeriver } from './derive-criteria';
 const { task, deriveCriteria } = tinyPipeline();
 
 describe('createCriteriaDeriver', () => {
-  it('[QL-2] a completion the model fails is llm-failed and no criteria — never an invented rubric', async () => {
+  it('[QL-2] a completion the model fails is llm-failed and no criteria — never an invented rubric — and says what ended the call', async () => {
     const derived = await createCriteriaDeriver(task, deriveCriteria, fakeLlm())('goal');
     expect(derived).toEqual({
       criteria: null,
-      diagnostic: expect.objectContaining({ stage: 'criteria', reason: 'llm-failed' }),
+      diagnostic: expect.objectContaining({
+        stage: 'criteria',
+        reason: 'llm-failed',
+        detail: `${SCHEMA_MISS}: no canned answer`,
+      }),
       overruns: [],
     });
   });

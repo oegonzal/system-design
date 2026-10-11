@@ -10,9 +10,13 @@ import {
   type DiagnosticReason,
   type LensOutcome,
   type Overrun,
-  type SchemaIssue,
 } from '@sysdesign/contracts';
-import { asDetailed, type LlmClient, type StructuredRequest } from '@sysdesign/llm';
+import {
+  asDetailed,
+  type LlmClient,
+  type StructuredReply,
+  type StructuredRequest,
+} from '@sysdesign/llm';
 
 import type { LensUnit } from '../ports';
 
@@ -39,21 +43,22 @@ export const stageDiagnostic = (
 ): Diagnostic => diagnostic(stage, null, reason, detail, facts);
 
 /**
- * A model that answered nothing, with the faults of the reply the schema
- * refused when there was one — kept as facts, so whoever asks next can name
- * them. Nothing parsed, or an API error, leaves none.
+ * A model that answered nothing: what ended the call, in its record's words,
+ * as the detail — the provider's or the CLI's own error, so a trace says why
+ * the model never answered — and the faults of the reply the schema refused
+ * when there was one, kept as facts so whoever asks next can name them.
  */
 export const failedDiagnostic = (
   stage: string,
   sample: number | null,
-  issues: readonly SchemaIssue[],
+  reply: Pick<StructuredReply<unknown>, 'issues' | 'cause'>,
 ): Diagnostic =>
   diagnostic(
     stage,
     sample,
     'llm-failed',
-    null,
-    issues.length > 0 ? { issues: [...issues] } : undefined,
+    reply.cause,
+    reply.issues.length > 0 ? { issues: [...reply.issues] } : undefined,
   );
 
 /** One field a reply wrote past the size it was asked for, as the seam handled it. */
@@ -88,7 +93,7 @@ export function sampleUnits<Response, R>(
     const sample = index + 1;
     const reply = await asDetailed(llm).completeStructuredDetailed(request);
     return reply.value === null
-      ? { report: null, diagnostic: failedDiagnostic(lensId, sample, reply.issues) }
+      ? { report: null, diagnostic: failedDiagnostic(lensId, sample, reply) }
       : { report: report(sample, reply.value), diagnostic: null };
   });
 }
