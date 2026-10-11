@@ -60,8 +60,9 @@ class InteractionsLifecycle implements OnApplicationBootstrap, OnModuleDestroy {
     );
   }
 
+  /** Before the store closes: the sweep in flight let finish, then the dispatcher and its channels stopped. */
   async onModuleDestroy(): Promise<void> {
-    this.periodic?.stop();
+    await this.periodic?.stop();
     await this.dispatcher.stop();
   }
 }

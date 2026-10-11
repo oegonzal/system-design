@@ -849,7 +849,7 @@ export const CRITERIA: readonly Criterion[] = [
   {
     id: 'NTF-3',
     statement:
-      'The bus forgets an event only once it is older than the declared retention and behind every subscription’s cursor, keeps its newest event so its head never moves back, removes subscriptions idle past the declared age, and a sweep never throws.',
+      'The bus forgets an event only once it is older than the declared retention and behind every subscription’s cursor, keeps its newest event so its head never moves back, removes subscriptions idle past the declared age, and a sweep never throws, never runs beside the one before it, and is let finish before the store closes.',
   },
   {
     id: 'NTF-4',

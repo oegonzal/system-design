@@ -47,9 +47,10 @@ class BusLifecycle implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  onModuleDestroy(): void {
-    this.periodic?.stop();
+  /** Before the store closes: the waiting pulls released, then the sweep in flight let finish. */
+  async onModuleDestroy(): Promise<void> {
     this.wakeup.close();
+    await this.periodic?.stop();
   }
 }
 
