@@ -58,7 +58,7 @@ function maximalObservation(): PageObservation {
     unread: null,
     activeScope: null,
     snapshotRung: 'full',
-    reading: { reads: 1, settled: true, durationMs: 0 },
+    reading: { reads: 1, settled: true, durationMs: 0, busy: [] },
     // The snapshot an observation may carry is the whole goal budget; it is the
     // session's composer that fits it to the room every other cap leaves, and
     // that room is what this page measures.

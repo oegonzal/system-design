@@ -10,6 +10,7 @@ import {
   TITLE_BOUND,
   URL_MAX_LENGTH,
   type ActiveScope,
+  type BusyRead,
   type ElementScope,
   type LandmarkRole,
   type ObservationReading,
@@ -55,6 +56,8 @@ export interface PageReading {
    * waiting for it — twice in one session.
    */
   scopeBusy: boolean;
+  /** What that check saw, candidate by candidate, so a dump can say why it held or did not. */
+  busyRead: BusyRead;
 }
 
 /**

@@ -223,17 +223,58 @@ export const observationUnreadSchema = z.strictObject({
   snapshotLines: z.number().int().min(0),
 });
 
+/** How many candidates one read's loading check records whole; the rest are counted. */
+export const BUSY_SIGHTS_BOUND = bound(8, 'list');
+/** A tag or attribute value, as the page wrote it on a candidate. */
+export const BUSY_ATTRIBUTE_BOUND = bound(80);
+/** One loading check per whole read an observation takes: the first, and up to four more until two agree. */
+const BUSY_READS_BOUND = bound(5, 'list');
+
+/**
+ * One element the loading check looked at inside a dialog in front of the
+ * page — anything that can say "still loading" by ARIA: `aria-busy`, a
+ * progressbar, a progress element — with the facts the rule decides on, and
+ * whether it held the read back. Recorded because the verdict alone never
+ * said why it held: measured 2026-10-10, a dialog holding only its close
+ * button, a heading and a progressbar read as settled twice, and nothing in
+ * the dump told a bar that carried a value from one the check could not see.
+ */
+const busySightSchema = z.strictObject({
+  tag: bounded.text(BUSY_ATTRIBUTE_BOUND, { min: 1 }),
+  role: bounded.text(BUSY_ATTRIBUTE_BOUND).nullable(),
+  ariaBusy: bounded.text(BUSY_ATTRIBUTE_BOUND).nullable(),
+  ariaValueNow: bounded.text(BUSY_ATTRIBUTE_BOUND).nullable(),
+  ariaValueText: bounded.text(BUSY_ATTRIBUTE_BOUND).nullable(),
+  /** A progress element's `value` attribute, as written. */
+  value: bounded.text(BUSY_ATTRIBUTE_BOUND).nullable(),
+  /** What the browser's `checkVisibility()` answered for it. */
+  visible: z.boolean(),
+  /** Whether it held the read back: a busy indicator by the rule, and visible. */
+  counted: z.boolean(),
+});
+
+/** What one read's loading check saw: the dialogs in front it looked inside, and every candidate it found there, in page order. */
+const busyReadSchema = z.strictObject({
+  scopes: z.number().int().min(0),
+  seen: bounded.list(BUSY_SIGHTS_BOUND, busySightSchema),
+  /** Candidates past the bound, counted. */
+  unseen: z.number().int().min(0),
+});
+export type BusyRead = z.infer<typeof busyReadSchema>;
+
 /**
  * What the read itself cost, apart from what it found: how many whole reads
- * it took for two in a row to agree, whether they did, and how long the
- * observation took. Facts about the reader, never about the page — the
- * fingerprint leaves them out — kept so a live session can size the reader
- * from data.
+ * it took for two in a row to agree, whether they did, how long the
+ * observation took, and what each read's loading check saw. Facts about the
+ * reader, never about the page — the fingerprint leaves them out — kept so a
+ * live session can size the reader, and judge its rules, from data.
  */
 export const observationReadingSchema = z.strictObject({
   reads: z.number().int().min(1),
   settled: z.boolean(),
   durationMs: z.number().int().min(0),
+  /** One entry per read counted in `reads`, in order. */
+  busy: bounded.list(BUSY_READS_BOUND, busyReadSchema),
 });
 export type ObservationReading = z.infer<typeof observationReadingSchema>;
 

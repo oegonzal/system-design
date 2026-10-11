@@ -57,7 +57,7 @@ export function listingObservation(): PageObservation {
     unread: null,
     activeScope: null,
     snapshotRung: 'full',
-    reading: { reads: 1, settled: true, durationMs: 0 },
+    reading: { reads: 1, settled: true, durationMs: 0, busy: [] },
     ariaSnapshot:
       '- searchbox "Search by title" [ref=e1]\n- button "Search" [ref=e2]\n- list:\n  - link "Senior Engineer — Acme" [ref=e3]\n  - link "Staff Engineer — Globex" [ref=e4]\n- button "Next page" [ref=e5]\n- button "Save search" [disabled] [ref=e6]',
   };
@@ -103,7 +103,7 @@ export function formObservation(): PageObservation {
     unread: null,
     activeScope: null,
     snapshotRung: 'full',
-    reading: { reads: 1, settled: true, durationMs: 0 },
+    reading: { reads: 1, settled: true, durationMs: 0, busy: [] },
     ariaSnapshot:
       '- textbox "Years of experience with Python" [required] [ref=e1]\n- combobox "Work authorisation" [required] [ref=e2]\n- textbox "If you are a bot, what is your favorite activation function?" [ref=e4]\n- button "Back" [ref=e5]\n- button "Next" [ref=e6]',
   };
@@ -140,7 +140,7 @@ export function dialogObservation(): PageObservation {
     ],
     activeScope: { role: 'dialog', name: 'Apply to Acme' },
     snapshotRung: 'full',
-    reading: { reads: 1, settled: true, durationMs: 0 },
+    reading: { reads: 1, settled: true, durationMs: 0, busy: [] },
     ariaSnapshot: [
       '- dialog "Apply to Acme" [ref=e10]:',
       '  - textbox "First name" [required] [ref=e11]: Alex',

@@ -82,7 +82,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -229,7 +230,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -513,7 +515,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -725,7 +728,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -919,7 +923,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -1093,7 +1098,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },
@@ -1287,7 +1293,8 @@
       "reading": {
         "reads": 1,
         "settled": true,
-        "durationMs": 0
+        "durationMs": 0,
+        "busy": []
       },
       "ariaSnapshot": "[snapshot reduced to none: 1418 of 1418 lines not shown]"
     },

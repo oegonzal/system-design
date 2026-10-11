@@ -9,7 +9,8 @@ import { PlaywrightBrowser } from './playwright-browser';
  * until it has loaded, against the Chromium Playwright bundles, headless. The
  * loading dialog is drawn the way a live one drew it on 2026-10-10: its close
  * button, its heading and a progressbar with no value, the form arriving a
- * moment later. Run with the `browser` project.
+ * moment later. Every read records what the check saw, counted or not, so a
+ * live dialog the rule misses says why. Run with the `browser` project.
  */
 const dialogLoading = (
   busy: string,
@@ -36,6 +37,7 @@ const DIALOG_LOADED = `<!doctype html><html><head><title>Apply</title></head><bo
     <button type="button">Dismiss</button>
     <h2>Apply</h2>
     <progress value="11" max="100"></progress> 1/9 pages
+    <div role="progressbar" aria-valuenow="0" aria-valuetext="Uploading"></div>
     <label for="first">First name</label> <input id="first"> <button type="button">Next</button>
   </div>
 </body></html>`;
@@ -57,23 +59,55 @@ describe('the Playwright browser, on a dialog still loading', () => {
 
   it.each(['progressbar', 'aria-busy'])(
     '[BRW-2] reads a dialog that says it is loading (%s) again until its form has rendered',
-    async (busy) => {
-      await browser.page.setContent(dialogLoading(busy));
+    async (trigger) => {
+      await browser.page.setContent(dialogLoading(trigger));
       const observation = await browser.observe();
       // Two reads of the shell agree; without the rule the plan was made on it.
       expect(observation.elements.map((element) => element.name)).toEqual(
         expect.arrayContaining(['First name', 'Next']),
       );
       expect(observation.reading.reads).toBeGreaterThan(2);
+      // One record per read; the first saw the dialog loading and said by what.
+      const { busy } = observation.reading;
+      expect(busy).toHaveLength(observation.reading.reads);
+      expect(busy[0]?.scopes).toBe(1);
+      expect(busy[0]?.seen).toContainEqual(
+        expect.objectContaining(
+          trigger === 'progressbar'
+            ? { role: 'progressbar', ariaValueNow: null, visible: true, counted: true }
+            : { tag: 'div', ariaBusy: 'true', visible: true, counted: true },
+        ),
+      );
+      // The read that settled saw nothing holding it back.
+      expect(busy[busy.length - 1]?.seen.some((sight) => sight.counted)).toBe(false);
     },
   );
 
-  it('[BRW-2] takes no extra read for a dialog whose progress bar carries its value', async () => {
+  it('[BRW-2] takes no extra read for a dialog whose progress bars carry their values, and records them uncounted', async () => {
     await browser.page.setContent(DIALOG_LOADED);
     const observation = await browser.observe();
     expect(observation.elements.map((element) => element.name)).toEqual(
       expect.arrayContaining(['First name', 'Next']),
     );
     expect(observation.reading).toMatchObject({ settled: true, reads: 2 });
+    expect(observation.reading.busy[0]?.seen).toEqual([
+      expect.objectContaining({ tag: 'progress', value: '11', counted: false }),
+      expect.objectContaining({
+        role: 'progressbar',
+        ariaValueNow: '0',
+        ariaValueText: 'Uploading',
+        counted: false,
+      }),
+    ]);
+  });
+
+  it('[BRW-2] records nothing for a page with no dialog in front', async () => {
+    await browser.page.setContent(
+      '<!doctype html><html><body><main><div role="progressbar"></div><a href="#x">A link</a></main></body></html>',
+    );
+    const observation = await browser.observe();
+    expect(
+      observation.reading.busy.every((read) => read.scopes === 0 && read.seen.length === 0),
+    ).toBe(true);
   });
 });

@@ -36,7 +36,7 @@ export const observation = (
   unread: null,
   activeScope: null,
   snapshotRung: 'full',
-  reading: { reads: 1, settled: true, durationMs: 0 },
+  reading: { reads: 1, settled: true, durationMs: 0, busy: [] },
   ariaSnapshot: elements.map((e) => `- ${e.role} "${e.name}" [ref=${e.ref}]`).join('\n'),
 });
 

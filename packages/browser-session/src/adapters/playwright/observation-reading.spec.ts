@@ -50,12 +50,13 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   unreadSnapshotLines: 0,
   focusedScope: null,
   scopeBusy: false,
+  busyRead: { scopes: 0, seen: [], unseen: 0 },
   landmarks: [],
   ...overrides,
 });
 
 const dialog = { role: 'dialog' as const, name: 'Apply to Acme' };
-const READ = { reads: 2, settled: true, durationMs: 850 };
+const READ = { reads: 2, settled: true, durationMs: 850, busy: [] };
 
 describe('one reading as an observation', () => {
   it('[BRW-2] names an element by the tree, else by its name or id attribute, and keeps what a person reads on an unnamed one apart as text', () => {
@@ -225,7 +226,7 @@ describe('one reading as an observation', () => {
       landmarks: ['banner', 'main'],
     });
     expect(
-      toObservation(chromeFirst, { reads: 1, settled: true, durationMs: 0 }).elements.map(
+      toObservation(chromeFirst, { reads: 1, settled: true, durationMs: 0, busy: [] }).elements.map(
         (e) => e.ref,
       ),
     ).toEqual(['e8', 'e2', 'e11']);
