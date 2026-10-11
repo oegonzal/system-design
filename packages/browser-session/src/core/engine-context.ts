@@ -62,6 +62,8 @@ export interface RunSessionOptions {
   capture: CapturePolicy;
   /** How long a question stays offered on a channel that honours expiry, should the session never withdraw it. */
   questionExpiresAfterMs: number;
+  /** How many times a question is put back once the page refused the operator's answer to it. */
+  asksAfterRefusal: number;
   /** The settings files in force, by kind, as the manifest records them. */
   settingsSources: Readonly<Record<string, string>>;
 }

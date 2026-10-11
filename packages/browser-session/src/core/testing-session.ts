@@ -38,6 +38,9 @@ export const NO_CAPTURE: CapturePolicy = { after: [], failures: false };
 /** How long a spec's questions are offered: long past any spec. */
 export const SPEC_QUESTION_EXPIRY_MS = 3_600_000;
 
+/** A refused answer is put back once, as the shipped operator settings declare. */
+const SPEC_ASKS_AFTER_REFUSAL = 1;
+
 export interface Scenario {
   script: BrainScript;
   /** What the operator types, line by line. */
@@ -50,6 +53,8 @@ export interface Scenario {
   ledger?: InMemoryLedger;
   startUrl?: string;
   capture?: CapturePolicy;
+  /** How many times a refused answer is put back; the shipped settings' once unless a scenario says. */
+  asksAfterRefusal?: number;
 }
 
 export async function runScripted(scenario: Scenario) {
@@ -80,6 +85,7 @@ export async function runScripted(scenario: Scenario) {
       startUrl: scenario.startUrl,
       capture: scenario.capture ?? NO_CAPTURE,
       questionExpiresAfterMs: SPEC_QUESTION_EXPIRY_MS,
+      asksAfterRefusal: scenario.asksAfterRefusal ?? SPEC_ASKS_AFTER_REFUSAL,
       settingsSources: {},
     },
   );

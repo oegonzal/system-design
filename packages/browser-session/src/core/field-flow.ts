@@ -1,34 +1,26 @@
 import {
-  elementKind,
   fieldKeyOf,
   fieldSpecOf,
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
   guidanceDocument,
   OPTIONS_SHOWN,
-  type BrowserDecisionSource,
   type FieldAnswers,
   type FieldRoute,
   type FieldSpec,
   type OperatorGuidanceDto,
   type PageObservation,
   excerpt,
+  quoted,
 } from '@sysdesign/contracts';
 
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { fieldTypeOf, routeFieldsInSession, type RoutedField } from './field-routing';
+import { entryOf, fill, fillActionOf, result, settled, type FieldResult } from './field-fill';
 import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './operator-ask';
-import type { AnswerSource, OperatorReply } from './operator-interaction';
-import {
-  ActionFailed,
-  BrainFaulted,
-  type BrowserAction,
-  type Decided,
-  type FormReport,
-} from './ports';
+import { BrainFaulted, type Decided, type FormReport } from './ports';
 import { stepJsonFile } from './session-dump';
-import { describeAction } from './session-state';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
@@ -40,26 +32,9 @@ import { describeAction } from './session-state';
  * taught back the moment they are given. One decision row per field settled.
  * A fill the page refuses stops the flow where it is — the page may have
  * moved on — so the fields after it are not attempted, and the plan stops
- * with it; the failure is counted once, by the step.
+ * with it; the failure is counted once, by the step. The operator's own
+ * answer is put back to them first, as the operator settings declare.
  */
-export interface FieldResult {
-  ref: string;
-  label: string;
-  /** What was done, after the operator's say. */
-  route: FieldRoute;
-  source: BrowserDecisionSource;
-  value: string | null;
-  outcome: 'ok' | 'failed';
-  reply: OperatorReply['kind'] | null;
-  /** The channel the operator answered on, and what the answer was chosen from; null when nobody was asked. */
-  via: string | null;
-  chosen: AnswerSource | null;
-  cached: boolean;
-  detail: string | null;
-  /** The answer the operator gave here, taught back as soon as it was given. */
-  guidance: OperatorGuidanceDto | null;
-}
-
 export interface FieldsOutcome {
   stopped: boolean;
   failed: boolean;
@@ -67,77 +42,6 @@ export interface FieldsOutcome {
 }
 
 type FieldsDecided = Decided<FieldAnswers> & FormReport;
-
-/** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
-export const fillActionOf = (field: FieldSpec, value: string): BrowserAction =>
-  elementKind(field.role, field) === 'selectable'
-    ? {
-        kind: 'select',
-        ref: field.ref,
-        option: value,
-        reason: 'field answer',
-        expect: null,
-        serves: [],
-      }
-    : { kind: 'fill', ref: field.ref, value, reason: 'field answer', expect: null, serves: [] };
-
-const result = (
-  field: RoutedField,
-  route: FieldRoute,
-  source: BrowserDecisionSource,
-  value: string | null,
-  reply: OperatorReply['kind'] | null,
-  outcome: 'ok' | 'failed' = 'ok',
-  detail: string | null = null,
-): FieldResult => ({
-  ref: field.field.ref,
-  label: field.field.name,
-  route,
-  source,
-  value,
-  outcome,
-  reply,
-  via: null,
-  chosen: null,
-  cached: field.cached,
-  detail,
-  guidance: null,
-});
-
-/** What the session settled for a field, kept by what the field asks; one that asks nothing it can be told by is kept by nothing. */
-const settled = (into: Map<string, string>, field: FieldSpec, value: string): void => {
-  const key = fieldKeyOf(field);
-  if (key !== null) into.set(key, value);
-};
-
-/** A field entry as its capture names it: the action as the history reads it, the field by what it asks. */
-const entryOf = (field: FieldSpec, action: BrowserAction, observation: PageObservation) => ({
-  label: describeAction(action, observation),
-  touched: fieldKeyOf(field) ?? field.role,
-});
-
-/** The page refused the fill: the result says so, and the caller stops. */
-async function fill(
-  ctx: EngineContext,
-  field: RoutedField,
-  value: string,
-  source: BrowserDecisionSource,
-  reply: OperatorReply['kind'] | null,
-  observation: PageObservation,
-): Promise<FieldResult> {
-  const action = fillActionOf(field.field, value);
-  const entry = entryOf(field.field, action, observation);
-  try {
-    await ctx.deps.browser.act(action);
-  } catch (error) {
-    if (!(error instanceof ActionFailed)) throw error;
-    await captureAfter(ctx, action, entry, 'failed');
-    return result(field, 'fill', source, value, reply, 'failed', error.message);
-  }
-  await captureAfter(ctx, action, entry, 'ok');
-  settled(ctx.state.filled, field.field, value);
-  return result(field, 'fill', source, value, reply);
-}
 
 /** Keep what the operator said for the next form that asks the same, and shape it as the item taught back at once. */
 function remember(
@@ -165,6 +69,17 @@ function remember(
   };
 }
 
+/** How much of a refused answer the question it comes back with quotes. */
+const REFUSED_ANSWER_QUOTED = 80;
+
+/**
+ * The operator's answer to a field. An answer the page refuses is put back,
+ * with why, as many times as the operator settings declare — the person can
+ * choose again, or fix the field in the browser and have it read back, which
+ * keeps and teaches what they chose — and only past that does the refusal
+ * stand. Measured 2026-10-11: a refused answer the operator then fixed by hand
+ * was never recorded, and the next form asked the same question again.
+ */
 async function ask(
   ctx: EngineContext,
   field: RoutedField,
@@ -173,47 +88,59 @@ async function ask(
 ): Promise<FieldResult> {
   const { deps, state } = ctx;
   await deps.browser.highlight(field.field.ref).catch(() => undefined);
-  const { answer, reply, chosen } = await askOperator(
-    ctx,
-    {
-      field: field.field,
-      untrusted: field.value,
-      why: [field.reason, ...field.faults].join(' — '),
-      task: state.tasks.open?.label ?? null,
-      page: observation.title,
-    },
-    prefetch,
-  );
-  const asking = { via: answer.via.channel, chosen };
-  switch (reply.kind) {
-    case 'stop':
-      return { ...result(field, 'ask-operator', 'operator', null, 'stop'), ...asking };
-    case 'blank':
-      return { ...result(field, 'leave-blank', 'operator', null, 'blank'), ...asking };
-    case 'answer': {
-      const filled = {
-        ...(await fill(ctx, field, reply.text, 'operator', 'answer', observation)),
-        ...asking,
-      };
-      if (filled.outcome !== 'ok') return filled;
-      return { ...filled, guidance: remember(ctx, field.field, reply.text, observation) };
-    }
-    case 'read-back': {
-      const value = await deps.browser.readValue(field.field.ref);
-      if (value === null || value === '') {
-        return {
-          ...result(field, 'leave-blank', 'operator', null, 'read-back', 'ok', 'left empty'),
+  let refusal: string | null = null;
+  for (let asked = 0; ; asked += 1) {
+    const { answer, reply, chosen } = await askOperator(
+      ctx,
+      {
+        field: field.field,
+        // A refused answer is not offered back; the question says why it returned.
+        untrusted: refusal === null ? field.value : null,
+        why: refusal ?? [field.reason, ...field.faults].join(' — '),
+        task: state.tasks.open?.label ?? null,
+        page: observation.title,
+      },
+      prefetch,
+    );
+    const asking = { via: answer.via.channel, chosen };
+    switch (reply.kind) {
+      case 'stop':
+        return { ...result(field, 'ask-operator', 'operator', null, 'stop'), ...asking };
+      case 'blank':
+        return { ...result(field, 'leave-blank', 'operator', null, 'blank'), ...asking };
+      case 'answer': {
+        const filled = {
+          ...(await fill(ctx, field, reply.text, 'operator', 'answer', observation)),
           ...asking,
         };
+        if (filled.outcome === 'ok') {
+          return { ...filled, guidance: remember(ctx, field.field, reply.text, observation) };
+        }
+        if (asked >= ctx.options.asksAfterRefusal) return filled;
+        const answered = quoted(excerpt(reply.text, REFUSED_ANSWER_QUOTED));
+        refusal = `the page refused ${answered} (${filled.detail ?? 'no reason given'}): choose again, or fill it in the browser and read it back`;
+        deps.log(
+          `step ${state.step}: ${quoted(field.field.name)} refused ${answered}; asking again`,
+        );
+        continue;
       }
-      // What the operator typed into the page is an entry like any other.
-      const typed = fillActionOf(field.field, value);
-      await captureAfter(ctx, typed, entryOf(field.field, typed, observation), 'ok');
-      return {
-        ...result(field, 'fill', 'operator', value, 'read-back'),
-        ...asking,
-        guidance: remember(ctx, field.field, value, observation),
-      };
+      case 'read-back': {
+        const value = await deps.browser.readValue(field.field.ref);
+        if (value === null || value === '') {
+          return {
+            ...result(field, 'leave-blank', 'operator', null, 'read-back', 'ok', 'left empty'),
+            ...asking,
+          };
+        }
+        // What the operator typed into the page is an entry like any other.
+        const typed = fillActionOf(field.field, value);
+        await captureAfter(ctx, typed, entryOf(field.field, typed, observation), 'ok');
+        return {
+          ...result(field, 'fill', 'operator', value, 'read-back'),
+          ...asking,
+          guidance: remember(ctx, field.field, value, observation),
+        };
+      }
     }
   }
 }

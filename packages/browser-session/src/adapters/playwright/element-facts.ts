@@ -118,7 +118,15 @@ export function elementFactsInPage(
       : '';
   };
 
-  /** What the control is and holds: its input type, its value, and the options it offers. */
+  /**
+   * What the control is and holds: its input type, its value, and the options
+   * a person can answer with. Never an option the page disables, nor the
+   * placeholder label option the HTML standard defines for a required select —
+   * the first, empty-valued option, chosen only to mean nothing is; a select
+   * resting on either holds nothing yet. Measured 2026-10-11: offered as a
+   * lettered choice, a dropdown's disabled "Select an option" was picked, and
+   * filling it timed out because the browser would not select it.
+   */
   const readControl = (): Pick<ElementFacts, 'inputType' | 'value' | 'options'> => {
     const inputType =
       tag === 'input'
@@ -134,11 +142,24 @@ export function elementFactsInPage(
     let options: string[] | null = null;
     if (tag === 'select') {
       const select = el as HTMLSelectElement;
+      const first = select.options[0];
+      const placeholder =
+        select.required &&
+        !select.multiple &&
+        select.size <= 1 &&
+        first !== undefined &&
+        first.value === '' &&
+        first.parentElement === select
+          ? first
+          : null;
+      const answerable = (option: HTMLOptionElement): boolean =>
+        option !== placeholder && !option.matches(':disabled');
       options = Array.from(select.options)
+        .filter(answerable)
         .map((option) => text(option) || option.value)
         .filter((option) => option.length > 0);
       const chosen = select.selectedOptions[0];
-      value = chosen ? text(chosen) || chosen.value : null;
+      value = chosen !== undefined && answerable(chosen) ? text(chosen) || chosen.value : null;
     } else if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio')) {
       value = input.checked ? 'checked' : 'unchecked';
     } else if (tag === 'input' || tag === 'textarea') {
@@ -147,7 +168,10 @@ export function elementFactsInPage(
       value = text(el) || null;
     }
     if (options === null && role === 'radiogroup') {
-      options = radios.map(optionLabel).filter((option) => option.length > 0);
+      options = radios
+        .filter((radio) => !radioSays(radio, 'disabled') && !radioSays(radio, 'aria-disabled'))
+        .map(optionLabel)
+        .filter((option) => option.length > 0);
       const chosen = radios.find(isChecked);
       value = chosen === undefined ? null : optionLabel(chosen) || null;
     }
@@ -161,6 +185,7 @@ export function elementFactsInPage(
             : null;
       if (list !== null) {
         options = Array.from(list.querySelectorAll('[role="option"]'))
+          .filter((option) => option.getAttribute('aria-disabled') !== 'true')
           .map((option) => text(option))
           .filter((option) => option.length > 0);
       }

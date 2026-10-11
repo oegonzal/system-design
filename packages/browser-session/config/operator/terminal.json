@@ -1,1 +1,5 @@
-{ "expiresAfterMs": 43200000, "channels": {} }
+{
+  "expiresAfterMs": 43200000,
+  "asksAfterRefusal": 1,
+  "channels": {}
+}

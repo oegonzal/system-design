@@ -25,7 +25,7 @@ describe('a prompt as Telegram messages', () => {
         '<b>a</b> — Yes <i>(from your record)</i>',
         '<b>b</b> — No &lt;never&gt;',
         '',
-        'Reply with a letter (a, b), or /blank.',
+        'Reply with a letter (a, b) or the option as written, or /blank.',
       ].join('\n'),
     ]);
     // A button sends exactly what typing it would.

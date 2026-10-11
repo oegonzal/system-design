@@ -76,7 +76,8 @@ describe('a prompt and the replies it takes', () => {
     const asked = prompt();
     expect(readReply(asked, 'maybe')).toEqual({
       kind: 'refused',
-      reason: '"maybe" is none of the choices. Reply with a letter (a, b, c), or /blank, /stop.',
+      reason:
+        '"maybe" is none of the choices. Reply with a letter (a, b, c) or the option as written, or /blank, /stop.',
     });
     expect(readReply(asked, '/skip')).toMatchObject({
       kind: 'refused',
@@ -116,7 +117,7 @@ describe('a prompt and the replies it takes', () => {
       })),
       commands: [],
     });
-    expect(howToAnswer(long)).toBe('Reply with a letter (a–ad).');
+    expect(howToAnswer(long)).toBe('Reply with a letter (a–ad) or the option as written.');
     expect(readReply(long, 'ad')).toEqual({
       kind: 'reply',
       reply: { kind: 'choice', choiceId: 'o29' },

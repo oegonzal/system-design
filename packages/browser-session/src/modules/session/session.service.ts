@@ -36,7 +36,7 @@ import {
  */
 export type RunOptions = Omit<
   RunSessionOptions,
-  'subject' | 'capture' | 'settingsSources' | 'questionExpiresAfterMs'
+  'subject' | 'capture' | 'settingsSources' | 'questionExpiresAfterMs' | 'asksAfterRefusal'
 > & {
   subject?: string | undefined;
 };
@@ -89,6 +89,7 @@ export class SessionService {
         subject: options.subject ?? this.config.subject,
         capture,
         questionExpiresAfterMs: operator.expiresAfterMs,
+        asksAfterRefusal: operator.asksAfterRefusal,
         settingsSources: sources,
       },
     );

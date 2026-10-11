@@ -203,7 +203,9 @@ describe('the Playwright browser', () => {
     });
     const auth = byName(observation, 'combobox', 'Work authorisation');
     expect(auth).toMatchObject({ kind: 'selectable', inputType: 'select', required: true });
-    expect(auth.options).toEqual(['Choose…', 'Yes', 'No']);
+    // "Choose…" is the required select's placeholder label option: choosing it is choosing nothing.
+    expect(auth.options).toEqual(['Yes', 'No']);
+    expect(auth.value).toBeNull();
     expect(byName(observation, 'checkbox', 'Remote only')).toMatchObject({ value: 'unchecked' });
     expect(byName(observation, 'button', 'Save').disabled).toBe(true);
     expect(byName(observation, 'button', 'Hidden helper').hiddenTraits).toEqual([

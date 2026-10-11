@@ -76,7 +76,7 @@ describe('what people send back', () => {
     const { phone, store, answers } = await delivered(prompt);
     expect(await phone.send('maybe', 'r1')).toEqual({
       kind: 'refused',
-      text: '"maybe" is none of the choices. Reply with a letter (a, b), or /blank.',
+      text: '"maybe" is none of the choices. Reply with a letter (a, b) or the option as written, or /blank.',
     });
     expect(answers()).toEqual([]);
     expect((await store.find(prompt.id))?.state).toBe('open');

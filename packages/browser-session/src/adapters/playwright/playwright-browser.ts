@@ -315,11 +315,11 @@ export class PlaywrightBrowser implements BrowserPort {
 
   async readValue(ref: string): Promise<string | null> {
     try {
-      return await this.locate(this.resolve(ref, 'readValue').ref).evaluate((el) => {
-        if (el instanceof HTMLSelectElement) {
-          const chosen = el.selectedOptions[0];
-          return chosen ? chosen.textContent?.trim() || chosen.value : null;
-        }
+      const located = this.locate(this.resolve(ref, 'readValue').ref);
+      // A select holds what an observation reads it to hold — never an option no one can answer with.
+      const facts = await readElementFacts(located);
+      if (facts?.inputType === 'select') return facts.value;
+      return await located.evaluate((el) => {
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
         return el.textContent?.trim() ?? null;
       });

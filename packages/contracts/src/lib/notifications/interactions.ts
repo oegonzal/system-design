@@ -156,7 +156,16 @@ const keysOf = (prompt: InteractionPrompt): string => {
 /** How a prompt may be answered, as one line every channel shows. */
 export function howToAnswer(prompt: InteractionPrompt): string {
   const ways: string[] = [];
-  if (prompt.choices.length > 0) ways.push(`a letter (${keysOf(prompt)})`);
+  // A choice is taken by its words as well as its letter; where no own answer
+  // is taken, saying so answers a long list without hunting for the letter.
+  // Measured 2026-10-11: picking a country out of 250 lettered lines took 73 s.
+  if (prompt.choices.length > 0) {
+    ways.push(
+      prompt.freeText === null
+        ? `a letter (${keysOf(prompt)}) or the option as written`
+        : `a letter (${keysOf(prompt)})`,
+    );
+  }
   if (prompt.freeText !== null) {
     ways.push(
       prompt.freeText.maxLength === null

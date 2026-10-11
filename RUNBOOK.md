@@ -283,7 +283,10 @@ channel: the other says who answered. An open question — one with no options �
 is asked at once and asked again, a minute or two later, with suggested
 answers lettered: from your record first, then drafts marked `transferable` or
 `invented — not in your record`, as the goal's `## Suggesting policy` allows.
-Pick a letter to use one whole, or answer before they come. A
+Pick a letter to use one whole, or answer before they come. On a long list,
+type the option itself — "United States" — rather than hunting for its letter.
+If the page refuses your answer, the question comes back saying why: choose
+again, or fix the field in the browser and send `/readback`. A
 session's trace — each step's observation, snapshot, screenshot and plan —
 lands under `static/sessions/<id>/`, indexed like a run dump. The rows are
 `browser_session`, `browser_task` and `browser_decision`.

@@ -64,7 +64,7 @@ describe('the terminal operator', () => {
       '  /readback  I filled it in the browser: read it back   (Enter alone)',
       '  /blank     Leave it empty',
       '  /stop      End the session',
-      'Reply with a letter (a, b), or /readback, /blank, /stop.',
+      'Reply with a letter (a, b) or the option as written, or /readback, /blank, /stop.',
     ]);
   });
 
@@ -75,7 +75,7 @@ describe('the terminal operator', () => {
       expect.objectContaining({ reply: { kind: 'choice', choiceId: id } });
     expect(await operator.ask(question)).toEqual(choice('c2'));
     expect(written[1]).toBe(
-      '"maybe" is none of the choices. Reply with a letter (a, b), or /readback, /blank, /stop.',
+      '"maybe" is none of the choices. Reply with a letter (a, b) or the option as written, or /readback, /blank, /stop.',
     );
     expect(prompts).toEqual([OPERATOR_PROMPT, OPERATOR_PROMPT]);
     expect(await operator.ask(question)).toEqual(choice('c2'));

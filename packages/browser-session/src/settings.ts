@@ -124,6 +124,12 @@ const operatorSettingsSchema = z.strictObject({
    * as it takes; this only clears what a crash left behind.
    */
   expiresAfterMs: positive,
+  /**
+   * How many times a question is put back, with why, once the page refused
+   * the operator's answer to it — so an answer can be chosen again, or one
+   * fixed in the browser read back and kept; past that, the refusal stands.
+   */
+  asksAfterRefusal: z.number().int().nonnegative(),
   channels: z.strictObject({ notifications: notificationsChannelSchema.optional() }),
 });
 export type OperatorSettings = z.infer<typeof operatorSettingsSchema>;

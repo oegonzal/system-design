@@ -1,10 +1,14 @@
 {
   "expiresAfterMs": 43200000,
+  "asksAfterRefusal": 1,
   "channels": {
     "notifications": {
       "pullWaitMs": 25000,
       "eventsPerPull": 20,
-      "recovery": { "windowMs": 60000, "pauseMs": 2000 }
+      "recovery": {
+        "windowMs": 60000,
+        "pauseMs": 2000
+      }
     }
   }
 }
