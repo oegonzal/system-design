@@ -3,41 +3,106 @@ import {
   FIELD_EVIDENCE_HEADING,
   FORM_MEMORY_STEP_REASONS,
   FORM_MEMORY_TARGET_STEP,
+  FORM_PIPELINES,
   renderDocumentGoal,
   resumeChunk,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { sampleSuggestions, suggestionsGoal } from '../../pipelines/answer-suggestions/testing';
 import { fieldGoal, policyCriteria, sampleAnswers } from '../../pipelines/field-answer/testing';
 import { childRun, memoryPorts, sampleFacts } from '../memory/steps.testing';
-import { passed, readoutTrace } from '../memory/testing';
+import { faulting, passed, readoutTrace } from '../memory/testing';
 import { validateOrchestrator } from '../runner/definition';
 import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
 import { FORM_MEMORY } from './definition';
 
 const GOAL = fieldGoal([]);
-const registry: PipelineSummary[] = [summaryOf('field-answer', 70, 'composed')];
+const registry: PipelineSummary[] = [
+  summaryOf('field-answer', 70, 'composed'),
+  summaryOf('answer-suggestions', 70, 'composed'),
+];
 
 describe('the form-memory orchestrator', () => {
-  it('[QL-38] is valid data: a recall over no pipeline, then a target that runs field-answer without needing it', () => {
+  it('[QL-38] [QL-65] is valid data: a recall over no pipeline, then a target that runs the form pipeline the request names, without needing the recall', () => {
     expect(() => validateOrchestrator(FORM_MEMORY as never)).not.toThrow();
-    expect(FORM_MEMORY.takesTarget).toBe(false);
+    expect(FORM_MEMORY.takesTarget).toBe(true);
     expect(FORM_MEMORY.reasons).toBe(FORM_MEMORY_STEP_REASONS);
     expect(FORM_MEMORY.steps.map((step) => [step.id, step.pipeline, step.needs])).toEqual([
       ['recall', undefined, undefined],
-      [FORM_MEMORY_TARGET_STEP, 'field-answer', undefined],
+      [FORM_MEMORY_TARGET_STEP, FORM_PIPELINES, undefined],
     ]);
   });
 
-  it('[QL-38] refuses a goal the field codec did not compose, and nothing else', () => {
-    expect(FORM_MEMORY.refuse?.({ goal: 'Just a policy.' }, registry)).toMatch(
-      /carries no field-answer index/,
+  it('[QL-38] [QL-65] refuses a goal the form codec did not compose, and one composed for another pipeline than the request names', () => {
+    expect(
+      FORM_MEMORY.refuse?.({ goal: 'Just a policy.', pipeline: 'field-answer' }, registry),
+    ).toMatch(/carries no form index/);
+    expect(
+      FORM_MEMORY.refuse?.(
+        { goal: renderDocumentGoal(resumeChunk()), pipeline: 'field-answer' },
+        registry,
+      ),
+    ).toMatch(/form index/);
+    expect(FORM_MEMORY.refuse?.({ goal: GOAL, pipeline: 'field-answer' }, registry)).toBeNull();
+    expect(
+      FORM_MEMORY.refuse?.({ goal: fieldGoal(), pipeline: 'field-answer' }, registry),
+    ).toBeNull();
+    expect(
+      FORM_MEMORY.refuse?.({ goal: suggestionsGoal(), pipeline: 'answer-suggestions' }, registry),
+    ).toBeNull();
+    expect(FORM_MEMORY.refuse?.({ goal: GOAL, pipeline: 'answer-suggestions' }, registry)).toBe(
+      'form-memory runs the form pipeline its goal was composed for: the goal is for field-answer, the request names answer-suggestions',
     );
-    expect(FORM_MEMORY.refuse?.({ goal: renderDocumentGoal(resumeChunk()) }, registry)).toMatch(
-      /field-answer/,
+    expect(FORM_MEMORY.refuse?.({ goal: GOAL }, registry)).toMatch(/the request names none$/);
+  });
+
+  it('[QL-65] reports what a reader of the suggestions run withholds, as that pipeline declares it', async () => {
+    const ports = memoryPorts({}, sampleFacts);
+    const deps = orchestrationDeps(
+      ports,
+      (request, onOpened) => {
+        const run = childRun(
+          'answer-suggestions',
+          readoutTrace({
+            pipeline: 'answer-suggestions',
+            goal: request.goal,
+            artifact: sampleSuggestions(),
+            locations: [
+              'summary',
+              'field.1',
+              'field.1.1',
+              'field.2',
+              'field.3',
+              'field.3.1',
+              'field.3.2',
+            ],
+            criteria: request.criteria ?? [],
+            results: [passed('c1', 'grounding', ['field.1.1'])],
+            // A mislabelled draft is kept from the operator; a repeat is not.
+            findings: [
+              faulting('mislabelled', ['field.3.2']),
+              faulting('duplicate', ['field.3.1']),
+            ],
+          }),
+        );
+        onOpened?.(run);
+        return Promise.resolve(run);
+      },
+      { pipelines: () => registry },
     );
-    expect(FORM_MEMORY.refuse?.({ goal: GOAL }, registry)).toBeNull();
-    expect(FORM_MEMORY.refuse?.({ goal: fieldGoal() }, registry)).toBeNull();
+    const record = await performed(
+      FORM_MEMORY,
+      { goal: suggestionsGoal([]), pipeline: 'answer-suggestions', criteria: policyCriteria() },
+      deps,
+      { context: await FORM_MEMORY.context(ports) },
+    );
+    expect(record.pipeline).toBe('answer-suggestions');
+    expect(record.steps[FORM_MEMORY_TARGET_STEP]).toMatchObject({
+      status: 'complete',
+      runIds: ['answer-suggestions-run'],
+      report: { admission: 'admitted', withheld: ['field.3.2'] },
+    });
   });
 
   it('[QL-38] run over the runner, the answerer sees the recalled evidence and the request’s rubric, and the record reports the admission', async () => {
@@ -65,12 +130,15 @@ describe('the form-memory orchestrator', () => {
       { pipelines: () => registry },
     );
     const criteria = policyCriteria();
-    const record = await performed(FORM_MEMORY, { goal: GOAL, criteria }, deps, {
-      context: await FORM_MEMORY.context(ports),
-    });
+    const record = await performed(
+      FORM_MEMORY,
+      { goal: GOAL, pipeline: 'field-answer', criteria },
+      deps,
+      { context: await FORM_MEMORY.context(ports) },
+    );
 
     expect(record.status).toBe('complete');
-    expect(record.pipeline).toBeNull();
+    expect(record.pipeline).toBe('field-answer');
     expect(record.context).toMatchObject({ store: { ready: true, chunks: 2 } });
     expect(record.steps['recall']).toMatchObject({
       status: 'complete',
@@ -88,7 +156,7 @@ describe('the form-memory orchestrator', () => {
       reason: null,
       runIds: ['field-answer-run'],
       counts: { iterations: 1 },
-      report: { admission: 'admitted' },
+      report: { admission: 'admitted', withheld: [] },
     });
     expect(record.request.criteriaProvided).toBe(true);
   });

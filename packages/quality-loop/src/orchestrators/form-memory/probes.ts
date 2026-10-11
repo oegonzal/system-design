@@ -13,6 +13,7 @@ import {
   evidenceAlias,
   EVIDENCE_TEXT_MAX_LENGTH,
   MAX_EVIDENCE,
+  type DocumentMemoryKind,
   type EvidenceItem,
   type FieldSpec,
   excerpt,
@@ -111,11 +112,26 @@ export function fieldEvidence(
   return chosen;
 }
 
-/** The hits as the goal lists them: aliased `m1..` in order, with where each came from. */
+/** A hit of a kind the form evidence holds — what documents taught about the subject. */
+const isDocumentMemory = (
+  hit: MemoryHit,
+): hit is MemoryHit & { source: { kind: DocumentMemoryKind } } =>
+  (DOCUMENT_MEMORY_KINDS as readonly string[]).includes(hit.source.kind);
+
+/**
+ * The hits as the goal lists them: aliased `m1..` in order, each with where it
+ * came from and what the store holds it as. The search reads only document
+ * kinds; a hit of any other kind is no evidence about the subject.
+ */
 export const evidenceItems = (hits: readonly MemoryHit[]): EvidenceItem[] =>
-  hits.map((hit, position) => ({
+  hits.filter(isDocumentMemory).map((hit, position) => ({
     alias: evidenceAlias(position),
     text: excerpt(hit.text, EVIDENCE_TEXT_MAX_LENGTH),
     when: hit.source.when,
-    source: { runId: hit.source.runId, pipeline: hit.source.pipeline, ref: hit.source.ref },
+    source: {
+      runId: hit.source.runId,
+      pipeline: hit.source.pipeline,
+      ref: hit.source.ref,
+      kind: hit.source.kind,
+    },
   }));

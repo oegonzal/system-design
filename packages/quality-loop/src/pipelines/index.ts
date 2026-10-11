@@ -4,6 +4,7 @@
  */
 import type { PipelineDefinition } from '../core/pipeline';
 import { AGENTIC_DESIGN } from './agentic-design/definition';
+import { ANSWER_SUGGESTIONS } from './answer-suggestions/definition';
 import { BROWSER_STEP } from './browser-step/definition';
 import { DESIGN_PROMPT } from './design-prompt/definition';
 import { DOCUMENT_DIGEST } from './document-digest/definition';
@@ -23,6 +24,7 @@ const declared: PipelineDefinition<unknown>[] = [
   DESIGN_PROMPT as PipelineDefinition<unknown>,
   BROWSER_STEP as PipelineDefinition<unknown>,
   FIELD_ANSWER as PipelineDefinition<unknown>,
+  ANSWER_SUGGESTIONS as PipelineDefinition<unknown>,
   DOCUMENT_DIGEST as PipelineDefinition<unknown>,
   KNOWLEDGE_DIGEST as PipelineDefinition<unknown>,
 ];

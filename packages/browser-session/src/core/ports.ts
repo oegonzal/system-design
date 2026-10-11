@@ -1,6 +1,7 @@
 import type {
   StepObjection,
   Admission,
+  AnswerSuggestions,
   BrowserDecisionKind,
   BrowserDecisionSource,
   BrowserSessionDetailDto,
@@ -177,6 +178,12 @@ export interface StepInput {
   progress: { settled: readonly string[]; done: readonly string[] };
 }
 
+/** What the form-memory orchestration reports of the run it opened: its admission, and the locations a reader withholds. */
+export interface FormReport {
+  admission: Admission;
+  withheld: readonly string[];
+}
+
 export interface FieldsInput {
   session: SessionStepRef;
   mission: string;
@@ -195,7 +202,9 @@ export interface BrainPort {
   /** The rubric for one pipeline, derived from the mission alone. */
   deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric>;
   planStep(input: StepInput): Promise<Decided<StepPlan>>;
-  answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & { admission: Admission }>;
+  answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport>;
+  /** A few suggested answers for fields the operator is about to be asked, judged once. */
+  suggestAnswers(input: FieldsInput): Promise<Decided<AnswerSuggestions> & FormReport>;
   /** Hand a document to the memory; answers as soon as the orchestration is open. */
   teach(document: DocumentChunk, session: SessionStepRef): Promise<{ orchestrationRunId: string }>;
 }

@@ -17,12 +17,13 @@ import {
  */
 const GOALS_DIR = join(__dirname, '..', 'goals');
 
-/** The headings the browser-step and field-answer derivers reference by name. */
+/** The headings the browser-step, field-answer and answer-suggestions derivers reference by name. */
 const TEMPLATE_HEADINGS = [
   '# Mission',
   '## Unit of work',
   '## Per-unit procedure',
   '## Answering policy',
+  '## Suggesting policy',
   '## Stop conditions',
   '## Never do',
   '## Task events',

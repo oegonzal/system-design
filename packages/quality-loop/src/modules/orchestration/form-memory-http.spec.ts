@@ -117,25 +117,38 @@ describe('the form-memory HTTP surface', () => {
   });
 
   it('[QL-38] a form page is answered over the facts recalled for its fields: the evidence reaches the run with the supplied rubric, and the target reports its admission', async () => {
-    const refused = await postJson(url, '/orchestrations/form-memory', { goal: 'Just a policy.' });
-    expect(refused.status).toBe(400);
-    expect(((await refused.json()) as { message: string }).message).toMatch(
-      /carries no field-answer index/,
-    );
-    const named = await postJson(url, '/orchestrations/form-memory', {
-      goal: GOAL,
+    const refused = await postJson(url, '/orchestrations/form-memory', {
+      goal: 'Just a policy.',
       pipeline: 'field-answer',
     });
-    expect(named.status).toBe(400);
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { message: string }).message).toMatch(
+      /carries no form index/,
+    );
+    // The request names the form pipeline its goal was composed for, and no other.
+    const unnamed = await postJson(url, '/orchestrations/form-memory', { goal: GOAL });
+    expect(unnamed.status).toBe(400);
+    const crossed = await postJson(url, '/orchestrations/form-memory', {
+      goal: GOAL,
+      pipeline: 'answer-suggestions',
+    });
+    expect(crossed.status).toBe(400);
+    expect(((await crossed.json()) as { message: string }).message).toMatch(
+      /the goal is for field-answer, the request names answer-suggestions/,
+    );
 
     const criteria = policyCriteria();
-    const started = await postJson(url, '/orchestrations/form-memory', { goal: GOAL, criteria });
+    const started = await postJson(url, '/orchestrations/form-memory', {
+      goal: GOAL,
+      pipeline: 'field-answer',
+      criteria,
+    });
     expect(started.status).toBe(202);
     const { data } = (await started.json()) as Envelope<{ orchestrationRunId: string }>;
     const record: OrchestrationRunDto = await settledOrchestration(url, data.orchestrationRunId);
 
     expect(record.status).toBe('complete');
-    expect(record.pipeline).toBeNull();
+    expect(record.pipeline).toBe('field-answer');
     expect(record.request).toMatchObject({ goal: GOAL, criteriaProvided: true, maxIterations: 1 });
     expect(record.context['store']).toMatchObject({ ready: true, chunks: 1 });
     // No model was called for the recall: the fields' labels were the probes.
@@ -149,7 +162,7 @@ describe('the form-memory HTTP surface', () => {
       status: 'complete',
       reason: null,
       counts: { iterations: 1 },
-      report: { admission: 'admitted' },
+      report: { admission: 'admitted', withheld: [] },
     });
     expect(record.steps['target'].runIds).toHaveLength(1);
 
@@ -160,7 +173,7 @@ describe('the form-memory HTTP surface', () => {
     expect(child.request.criteriaProvided).toBe(true);
     expect(child.request.goal).toContain(FIELD_EVIDENCE_HEADING);
     expect(child.request.goal).toContain(
-      '- [m1] Alex Example has six years of professional Python, 2020–2026, at Acme — applies when a form asks how many years of Python experience the applicant has · stored 2026-10-02 · document-digest memory.1 (run digest-run-1)',
+      '- [m1] profile_fact — Alex Example has six years of professional Python, 2020–2026, at Acme — applies when a form asks how many years of Python experience the applicant has · stored 2026-10-02 · document-digest memory.1 (run digest-run-1)',
     );
     expect(child.trace?.contract.criteria.map((criterion) => criterion.id)).toEqual([
       'c1',

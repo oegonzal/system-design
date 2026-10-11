@@ -5,9 +5,11 @@ import {
   excerpt,
   PROMPT_LIMITS,
   quoted,
+  SUGGESTION_BASES,
   type FieldSpec,
   type InteractionAnswer,
   type InteractionPrompt,
+  type SuggestionBasis,
 } from '@sysdesign/contracts';
 
 import { fieldTypeOf } from './field-routing';
@@ -17,10 +19,11 @@ import type { OperatorQuestion } from './ports';
  * A field put to the operator, the one way every channel shows it, and the
  * answer read back as what the session does with the field. The question is
  * the notifications contracts' prompt: the field's options as lettered
- * choices — or, for a field with none, the answerer's untrusted value as one —
- * free text where the field takes it, and the commands a person may give
- * instead of an answer. Each choice's full value is kept by its id, so what is
- * filled is never a label shortened to fit.
+ * choices — or, for a field with none, the suggested answers readied for it,
+ * labelled by what they rest on, and the answerer's untrusted value — free
+ * text where the field takes it, and the commands a person may give instead
+ * of an answer. Each choice's full value is kept by its id, so what is filled
+ * is never a label shortened to fit.
  */
 
 /** The commands a field question offers, by the ids a person types after a slash. */
@@ -37,8 +40,25 @@ const FIELD_ENTER = 'readback';
 export type OperatorReply =
   { kind: 'answer'; text: string } | { kind: 'read-back' } | { kind: 'blank' } | { kind: 'stop' };
 
-/** Where a filled answer came from: a listed option, the answerer's untrusted value, or the person's own words. */
-export type AnswerSource = 'option' | 'answerer' | 'typed';
+/**
+ * Where a filled answer came from: a listed option, the answerer's untrusted
+ * value, a suggestion by what it rests on, or the person's own words.
+ */
+export type AnswerSource = 'option' | 'answerer' | SuggestionBasis | 'typed';
+
+/** A suggested answer as the operator is offered it: its text, what it rests on, and why. */
+export interface OfferedSuggestion {
+  text: string;
+  basis: SuggestionBasis;
+  why: string;
+}
+
+/** How each kind of suggestion is labelled for the person choosing it. */
+const SUGGESTION_NOTES: Readonly<Record<SuggestionBasis, string>> = {
+  record: 'from your record',
+  transfer: 'draft: transferable',
+  invented: 'draft: invented — not in your record',
+};
 
 /** A field that needs a person, and everything the person should see beside it. */
 export interface OperatorPrompt {
@@ -49,6 +69,8 @@ export interface OperatorPrompt {
   why: string;
   task: string | null;
   page: string;
+  /** The suggested answers readied for a field with no options; none while they are still coming. */
+  suggestions: readonly OfferedSuggestion[];
 }
 
 /** Who asks, as every channel names it, and until when a channel keeps offering the question. */
@@ -92,8 +114,21 @@ export function fieldQuestion(prompt: OperatorPrompt, asking: Asking): AskedFiel
           : null,
       );
     }
-  } else if (prompt.untrusted !== null) {
-    choose(prompt.untrusted, 'answerer', note(`the answerer's value — not trusted: ${prompt.why}`));
+  } else {
+    // Record first, then what is drafted: the order every channel letters them in.
+    for (const basis of SUGGESTION_BASES) {
+      for (const suggestion of prompt.suggestions.filter((offered) => offered.basis === basis)) {
+        choose(suggestion.text, basis, note(`${SUGGESTION_NOTES[basis]} — ${suggestion.why}`));
+      }
+    }
+    const offered = prompt.suggestions.some((suggestion) => suggestion.text === prompt.untrusted);
+    if (prompt.untrusted !== null && !offered) {
+      choose(
+        prompt.untrusted,
+        'answerer',
+        note(`the answerer's value — not trusted: ${prompt.why}`),
+      );
+    }
   }
   const title = titleOf(field);
   const facts = [

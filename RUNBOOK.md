@@ -279,7 +279,11 @@ trusted — shows at the terminal and, when the notifications service runs, on
 Telegram. Type or tap a letter, type the answer where the field takes one, or
 fill the field in the browser and press Enter (`/readback`) and the value is
 read back; `/blank` leaves it empty, `/stop` ends the session. Answer on either
-channel: the other says who answered. A
+channel: the other says who answered. An open question — one with no options —
+is asked at once and asked again, a minute or two later, with suggested
+answers lettered: from your record first, then drafts marked `transferable` or
+`invented — not in your record`, as the goal's `## Suggesting policy` allows.
+Pick a letter to use one whole, or answer before they come. A
 session's trace — each step's observation, snapshot, screenshot and plan —
 lands under `static/sessions/<id>/`, indexed like a run dump. The rows are
 `browser_session`, `browser_task` and `browser_decision`.

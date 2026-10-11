@@ -4,6 +4,7 @@ import {
   fieldQuestion,
   fieldReplyOf,
   pauseQuestion,
+  type OfferedSuggestion,
   type OperatorPrompt,
 } from './operator-interaction';
 
@@ -19,12 +20,17 @@ const fieldOf = (ref: string): FieldSpec => {
   return fieldSpecOf(element);
 };
 
-const promptOf = (field: FieldSpec, untrusted: string | null): OperatorPrompt => ({
+const promptOf = (
+  field: FieldSpec,
+  untrusted: string | null,
+  suggestions: OfferedSuggestion[] = [],
+): OperatorPrompt => ({
   field,
   untrusted,
   why: 'low confidence: a guess',
   task: 'Senior Engineer at Acme',
   page: 'Apply',
+  suggestions,
 });
 
 const answer = (reply: unknown) =>
@@ -104,6 +110,40 @@ describe('a field put to the operator', () => {
     expect(() => fieldReplyOf(asked, answer({ kind: 'choice', choiceId: 'c9' }))).toThrow(
       'the answer names choice c9, which the question never offered',
     );
+  });
+
+  it('[BRW-12] letters the suggestions for a field with no options record first, then each draft labelled by what it rests on, the answerer’s value after them unless one is the same, and fills the one chosen whole', () => {
+    const field = { ...fieldOf('e1'), maxLength: 50_000 };
+    const RECORD = 'Six years building services at Acme.';
+    const TRANSFER = 'The queue work at Acme carries over.';
+    const INVENTED = 'Led a service-mesh migration.';
+    const suggestions: OfferedSuggestion[] = [
+      { text: TRANSFER, basis: 'transfer', why: 'm2: the same patterns' },
+      { text: INVENTED, basis: 'invented', why: 'modelled on m1' },
+      { text: RECORD, basis: 'record', why: 'm1 states it' },
+    ];
+    const same = fieldQuestion(promptOf(field, RECORD, suggestions), ASKING);
+    expect(same.question.prompt.choices).toEqual([
+      { id: 'c1', label: RECORD, note: 'from your record — m1 states it' },
+      { id: 'c2', label: TRANSFER, note: 'draft: transferable — m2: the same patterns' },
+      { id: 'c3', label: INVENTED, note: 'draft: invented — not in your record — modelled on m1' },
+    ]);
+    expect(fieldReplyOf(same, answer({ kind: 'choice', choiceId: 'c3' }))).toEqual({
+      reply: { kind: 'answer', text: INVENTED },
+      chosen: 'invented',
+    });
+    const other = fieldQuestion(promptOf(field, 'Seven years.', suggestions), ASKING);
+    expect(other.question.prompt.choices.slice(3)).toEqual([
+      {
+        id: 'c4',
+        label: 'Seven years.',
+        note: "the answerer's value — not trusted: low confidence: a guess",
+      },
+    ]);
+    expect(fieldReplyOf(other, answer({ kind: 'choice', choiceId: 'c1' }))).toEqual({
+      reply: { kind: 'answer', text: RECORD },
+      chosen: 'record',
+    });
   });
 
   it('[BRW-11] puts a wait to the operator as a question answered by going on', () => {

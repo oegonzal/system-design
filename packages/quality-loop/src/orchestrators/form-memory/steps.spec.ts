@@ -53,13 +53,19 @@ const answersTrace = (goal: string, decision: RunTrace['finalDecision'] = 'accep
 const disabledEmbeddings = (): CachedEmbeddings =>
   new CachedEmbeddings(new DisabledEmbeddingClient('no-key'), new InMemoryEmbeddingCache());
 
-type Asked = { goal: string; criteria: readonly SuccessCriterion[] | undefined };
+type Asked = {
+  goal: string;
+  criteria: readonly SuccessCriterion[] | undefined;
+  pipeline: string | undefined;
+};
 
 /** A context for one step: `execute` answers with a child over the goal it was asked for, recording the ask. */
 function ctx(
   answer: ((goal: string) => RunRecord) | null,
   overrides: {
     goal?: string;
+    /** The form pipeline the request names; field-answer unless a case says otherwise, absent when null. */
+    pipeline?: string | null;
     criteria?: SuccessCriterion[];
     context?: Partial<MemoryContextDto>;
     outputs?: Partial<FormMemoryOutputs>;
@@ -68,11 +74,11 @@ function ctx(
   } = {},
 ) {
   const executed: Asked[] = [];
-  const execute = (input: {
-    goal: string;
-    criteria?: readonly SuccessCriterion[];
-  }): Promise<QualityRunDto> => {
-    executed.push({ goal: input.goal, criteria: input.criteria });
+  const execute = (
+    input: { goal: string; criteria?: readonly SuccessCriterion[] },
+    pipeline?: string,
+  ): Promise<QualityRunDto> => {
+    executed.push({ goal: input.goal, criteria: input.criteria, pipeline });
     if (!answer) throw new Error('no child run was expected');
     return Promise.resolve(toRunDto(answer(input.goal)));
   };
@@ -84,6 +90,9 @@ function ctx(
       {
         request: {
           goal: overrides.goal ?? GOAL,
+          ...(overrides.pipeline === null
+            ? {}
+            : { pipeline: overrides.pipeline ?? 'field-answer' }),
           ...(overrides.criteria === undefined ? {} : { criteria: overrides.criteria }),
         },
         context: memoryContext(overrides.context) as unknown as Record<string, unknown>,
@@ -116,7 +125,11 @@ describe('the form-memory steps', () => {
     for (const hit of sampleFacts) expect(goal).toContain(hit.text);
     expect(goal).toContain('· stored 2026-09-06 · system-design memory.');
     // The prose and the fields are the session's, untouched; only the evidence changed.
-    expect(splitFieldGoal(goal)).toEqual({ prose: ANSWERING_PROSE, fields: sampleFields() });
+    expect(splitFieldGoal(goal)).toEqual({
+      pipeline: 'field-answer',
+      prose: ANSWERING_PROSE,
+      fields: sampleFields(),
+    });
   });
 
   it('[QL-38] an empty store is store-empty, and the target still runs over the goal as composed', async () => {
@@ -193,11 +206,13 @@ describe('the form-memory steps', () => {
     const criteria = policyCriteria();
     const withEvidence = ctx(answered(), { outputs: { recall: recalled }, criteria });
     const admitted = await target(withEvidence);
-    expect(withEvidence.executed).toEqual([{ goal: recalled.goal, criteria }]);
+    expect(withEvidence.executed).toEqual([
+      { goal: recalled.goal, criteria, pipeline: 'field-answer' },
+    ]);
     expect(admitted).toMatchObject({
       status: 'complete',
       counts: { iterations: 1 },
-      report: { admission: 'admitted' },
+      report: { admission: 'admitted', withheld: [] },
     });
     expect(admitted.output?.trace?.contract.goal).toBe(recalled.goal);
 
@@ -213,6 +228,11 @@ describe('the form-memory steps', () => {
       status: 'skipped',
       reason: 'pipeline-unavailable',
       note: 'field-answer',
+    });
+    // A request naming no form pipeline runs nothing.
+    expect(await target(ctx(null, { pipeline: null }))).toMatchObject({
+      status: 'skipped',
+      reason: 'pipeline-unavailable',
     });
   });
 });

@@ -1,5 +1,7 @@
 import {
   type Admission,
+  ANSWER_SUGGESTIONS_PIPELINE_ID,
+  type AnswerSuggestions,
   BROWSER_STEP_PIPELINE_ID,
   type DocumentChunk,
   FIELD_ANSWER_PIPELINE_ID,
@@ -17,6 +19,7 @@ import {
   type Decided,
   type DerivedRubric,
   type FieldsInput,
+  type FormReport,
   type StepInput,
 } from './ports';
 
@@ -32,7 +35,7 @@ export function decidedPlan(plan: StepPlan, options: FakeRunOptions = {}): Decid
 export function decidedAnswers(
   answers: FieldAnswers,
   options: FakeRunOptions & { admission?: Admission; orchestrationRunId?: string } = {},
-): Decided<FieldAnswers> & { admission: Admission } {
+): Decided<FieldAnswers> & FormReport {
   const run = fakeRun(FIELD_ANSWER_PIPELINE_ID, answers, options);
   return {
     runId: run.runId,
@@ -40,6 +43,23 @@ export function decidedAnswers(
     run,
     composition: FULL,
     admission: options.admission ?? 'admitted',
+    withheld: [],
+  };
+}
+
+/** Suggested answers as the form-memory orchestration would have run them, with what it reports a reader withholds. */
+export function decidedSuggestions(
+  suggestions: AnswerSuggestions,
+  options: FakeRunOptions & { admission?: Admission; withheld?: string[] } = {},
+): Decided<AnswerSuggestions> & FormReport {
+  const run = fakeRun(ANSWER_SUGGESTIONS_PIPELINE_ID, suggestions, options);
+  return {
+    runId: run.runId,
+    orchestrationRunId: `${run.runId}-orchestration`,
+    run,
+    composition: FULL,
+    admission: options.admission ?? 'admitted',
+    withheld: options.withheld ?? [],
   };
 }
 
@@ -50,7 +70,11 @@ export interface BrainScript {
   /** Thrown by `deriveRubric`, when set. */
   deriveFault?: BrainFaulted;
   plans: Scripted<Decided<StepPlan>>[];
-  answers?: Scripted<Decided<FieldAnswers> & { admission: Admission }>[];
+  answers?: Scripted<Decided<FieldAnswers> & FormReport>[];
+  /** Suggestions in turn; past the script a suggestions run faults. */
+  suggestions?: Scripted<Decided<AnswerSuggestions> & FormReport>[];
+  /** Holds every suggestions run until it settles, so a question can be asked before they arrive. */
+  suggestionsGate?: Promise<void>;
   /** Thrown by `teach`, when set. */
   teachFault?: BrainFaulted;
 }
@@ -64,13 +88,16 @@ export class ScriptedBrain implements BrainPort {
   readonly derived: { pipeline: string; goal: string }[] = [];
   readonly planInputs: StepInput[] = [];
   readonly fieldInputs: FieldsInput[] = [];
+  readonly suggestionInputs: FieldsInput[] = [];
   readonly taught: DocumentChunk[] = [];
   private readonly plans: Scripted<Decided<StepPlan>>[];
-  private readonly answers: Scripted<Decided<FieldAnswers> & { admission: Admission }>[];
+  private readonly answers: Scripted<Decided<FieldAnswers> & FormReport>[];
+  private readonly suggestions: Scripted<Decided<AnswerSuggestions> & FormReport>[];
 
   constructor(private readonly script: BrainScript) {
     this.plans = [...script.plans];
     this.answers = [...(script.answers ?? [])];
+    this.suggestions = [...(script.suggestions ?? [])];
   }
 
   async deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
@@ -90,12 +117,20 @@ export class ScriptedBrain implements BrainPort {
     return next;
   }
 
-  async answerFields(
-    input: FieldsInput,
-  ): Promise<Decided<FieldAnswers> & { admission: Admission }> {
+  async answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport> {
     this.fieldInputs.push(input);
     const next = this.answers.shift();
     if (next === undefined) throw new Error('the scripted brain has no more field answers');
+    if (next instanceof BrainFaulted) throw next;
+    return next;
+  }
+
+  /** Past the script a suggestions run faults: a session asks without them, as it would live. */
+  async suggestAnswers(input: FieldsInput): Promise<Decided<AnswerSuggestions> & FormReport> {
+    this.suggestionInputs.push(input);
+    await this.script.suggestionsGate;
+    const next = this.suggestions.shift();
+    if (next === undefined) throw new BrainFaulted('no-artifact', 'no suggestions were scripted');
     if (next instanceof BrainFaulted) throw next;
     return next;
   }

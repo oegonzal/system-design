@@ -42,6 +42,10 @@ One application: from opening a listing's card to the confirmation that the appl
 
 Answer about the applicant only from the evidence listed in the goal, citing it; a field no evidence settles goes to the operator. A field that already holds a value — the contact details, the selected résumé — is kept. A field with options takes one listed option verbatim. A number field takes a whole number. A question asking to agree to the site's additional job application terms is answered "Yes". A résumé is never uploaded; a field that only offers an upload goes to the operator. A field the page hides is left blank. A field that asks whether you are a bot, or any other question a person would find odd, is left blank. An answer the operator gave before to a question about the applicant — work authorization, sponsorship, years with a skill, an account of past work — is evidence for the same question on every application however it is worded, and the latest answer stands; a question about one employer — whether you work for it, whether it may contact you — takes only that employer's answer, and a question asking a different figure, skill or period takes none.
 
+## Suggesting policy
+
+Where the record answers a question, lead with record suggestions. Where it is silent on a question about the applicant's experience, offer a transferable draft when adjacent work is recorded, and an invented draft modelled on the applicant's past. A fact the record lacks — a name, a date, a figure, an employer, a contact — gets no invented draft. A recorded boundary against filling gaps in the record binds record and transferable suggestions and every value given without the operator; it does not withhold an invented draft, which is offered for the operator to accept or refuse. A boundary against a particular claim — work authorization, a credential, a present employer — binds every suggestion.
+
 ## Stop conditions
 
 - limit-reached (complete) "limit daily submissions": the site says it limits daily submissions — today's Easy Apply applications are spent; a mark on a card is never a limit.

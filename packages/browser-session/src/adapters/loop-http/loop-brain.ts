@@ -1,16 +1,19 @@
 import {
+  ANSWER_SUGGESTIONS_PIPELINE_ID,
   BROWSER_STEP_PIPELINE_ID,
   composeFieldGoal,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
+  FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
   FORM_MEMORY_TARGET_STEP,
   GoalBudgetExceeded,
   isAdmission,
   renderDocumentGoal,
   textBytes,
-  type Admission,
+  type AnswerSuggestions,
   type DocumentChunk,
   type FieldAnswers,
+  type FormPipeline,
   type QualityRunDto,
   type RunOpenerDto,
   type StepPlan,
@@ -35,6 +38,7 @@ import {
   type Decided,
   type DerivedRubric,
   type FieldsInput,
+  type FormReport,
   type SessionStepRef,
   type StepInput,
 } from '../../core/ports';
@@ -159,9 +163,28 @@ export class LoopBrain implements BrainPort {
     });
   }
 
-  answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & { admission: Admission }> {
+  answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport> {
+    return this.formRun(input, FIELD_ANSWER_PIPELINE_ID, 'form page');
+  }
+
+  suggestAnswers(input: FieldsInput): Promise<Decided<AnswerSuggestions> & FormReport> {
+    return this.formRun(input, ANSWER_SUGGESTIONS_PIPELINE_ID, 'suggested answers');
+  }
+
+  /**
+   * One form pipeline over the fields, through the form-memory orchestration:
+   * the goal composed for the pipeline named, the run it opened read back, and
+   * what the orchestration reported of it — its admission, and the locations
+   * a reader withholds.
+   */
+  private formRun<T>(
+    input: FieldsInput,
+    pipeline: FormPipeline,
+    what: string,
+  ): Promise<Decided<T> & FormReport> {
     return guarded(async () => {
       const goal = composeFieldGoal({
+        pipeline,
         prose: renderFieldProse(input),
         fields: input.fields,
         evidence: [],
@@ -169,10 +192,11 @@ export class LoopBrain implements BrainPort {
       const { orchestrationRunId } = await this.client.startOrchestration(
         FORM_MEMORY_ORCHESTRATOR_ID,
         {
+          pipeline,
           goal,
           criteria: [...input.criteria],
           maxIterations: DECISION_ITERATIONS,
-          openedBy: openedBy(input.session, 'form page'),
+          openedBy: openedBy(input.session, what),
         },
       );
       const orchestration = await awaitOrchestration(this.client, orchestrationRunId, this.options);
@@ -196,12 +220,17 @@ export class LoopBrain implements BrainPort {
       if (fetched === null) throw new BrainFaulted('lost', `the loop no longer has run ${runId}`);
       const run = settled(fetched);
       const reported = target.report?.['admission'];
+      const withheld = target.report?.['withheld'];
       return {
         runId,
         orchestrationRunId,
         run,
         composition: { rung: 'full', bytes: textBytes(goal), snapshotRung: null },
         admission: isAdmission(reported) ? reported : 'fell-short',
+        // A report that names none withholds nothing it could name.
+        withheld: Array.isArray(withheld)
+          ? withheld.filter((ref): ref is string => typeof ref === 'string')
+          : [],
       };
     });
   }

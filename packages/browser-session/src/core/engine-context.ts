@@ -1,4 +1,8 @@
-import type { SessionRailsDto, SuccessCriterion } from '@sysdesign/contracts';
+import type {
+  BROWSER_SESSION_PIPELINES,
+  SessionRailsDto,
+  SuccessCriterion,
+} from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
 import type {
@@ -63,10 +67,7 @@ export interface RunSessionOptions {
 }
 
 /** The rubric derived once per session, by the role each pipeline plays. */
-export interface SessionCriteria {
-  plan: SuccessCriterion[];
-  answer: SuccessCriterion[];
-}
+export type SessionCriteria = Record<keyof typeof BROWSER_SESSION_PIPELINES, SuccessCriterion[]>;
 
 /** A decision as the flows record it: the engine fills in the ids, the step and the ordinal. */
 export type DecisionInput = Omit<
@@ -112,7 +113,7 @@ export function createEngineContext(parts: EngineParts): EngineContext {
   const { deps, state, dump, queue } = parts;
   const ctx: EngineContext = {
     ...parts,
-    criteria: { plan: [], answer: [] },
+    criteria: { plan: [], answer: [], suggest: [] },
     record(decision) {
       state.ordinal += 1;
       state.decisions += 1;

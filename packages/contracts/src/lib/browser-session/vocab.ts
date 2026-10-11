@@ -119,6 +119,15 @@ export type BrowserDecisionSource = (typeof BROWSER_DECISION_SOURCES)[number];
 /** What the field-answer pipeline may decide for one field: a value, the value it already holds, an ask, a blank. */
 export const FIELD_DECISIONS = ['answer', 'keep', 'ask-operator', 'leave-blank'] as const;
 
+/**
+ * What a suggested answer rests on: the record itself, the subject's real
+ * adjacent work carried over, or experience the record does not hold,
+ * modelled on the subject's past. Labelled apart, because a chosen suggestion
+ * becomes the operator's own answer.
+ */
+export const SUGGESTION_BASES = ['record', 'transfer', 'invented'] as const;
+export type SuggestionBasis = (typeof SUGGESTION_BASES)[number];
+
 /** Ordinal confidence a producer states — never a number it invents. */
 export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];

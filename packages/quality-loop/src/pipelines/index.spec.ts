@@ -24,6 +24,7 @@ describe('the pipeline registry', () => {
       'design-prompt',
       'browser-step',
       'field-answer',
+      'answer-suggestions',
       'document-digest',
       'knowledge-digest',
     ]);

@@ -22,6 +22,7 @@ const ENGINE = [
   'packages/contracts/src/lib/browser-session',
   'packages/quality-loop/src/pipelines/browser-step',
   'packages/quality-loop/src/pipelines/field-answer',
+  'packages/quality-loop/src/pipelines/answer-suggestions',
   'packages/quality-loop/src/pipelines/document-digest',
   'packages/quality-loop/src/orchestrators/form-memory',
   'packages/quality-loop/src/orchestrators/document-memory',

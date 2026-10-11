@@ -20,6 +20,7 @@ const asked = (): OperatorQuestion =>
       why: 'low confidence: a guess',
       task: 'Senior Engineer at Acme',
       page: 'Apply — additional questions',
+      suggestions: [],
     },
     {
       origin: { kind: 'browser-session', id: 's1', label: 'step 3 · Senior Engineer at Acme' },

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
+  BROWSER_SESSION_PIPELINES,
   BROWSER_STEP_PIPELINE_ID,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   FIELD_ANSWER_PIPELINE_ID,
@@ -151,11 +152,10 @@ describe('the session service, end to end', () => {
     expect(browser.opened).toEqual({ profile: 'spec', headed: false });
     expect(browser.closed).toBe(true);
 
-    // The rubric was derived once per pipeline, and every start request carried it.
-    expect(core.criteriaRequests.map((r) => r.pipeline)).toEqual([
-      BROWSER_STEP_PIPELINE_ID,
-      FIELD_ANSWER_PIPELINE_ID,
-    ]);
+    // The rubric was derived once for each pipeline the session runs, and every start request carried it.
+    expect(core.criteriaRequests.map((r) => r.pipeline)).toEqual(
+      Object.values(BROWSER_SESSION_PIPELINES),
+    );
     const rubric =
       core.criteriaRequests.length > 0
         ? core.deriveCriteria({ pipeline: BROWSER_STEP_PIPELINE_ID, goal: MISSION_FIXTURE })

@@ -10,10 +10,22 @@ export const BROWSER_STEP_PIPELINE_ID = 'browser-step';
 /** Every field of one form page answered from evidence, or routed to the operator. */
 export const FIELD_ANSWER_PIPELINE_ID = 'field-answer';
 
-/** Recalls facts for a form's fields without a model call, then runs the field-answer pipeline. */
+/** Several suggested answers for each field the operator is asked, from the record, or drafted and labelled so. */
+export const ANSWER_SUGGESTIONS_PIPELINE_ID = 'answer-suggestions';
+
+/**
+ * The pipelines whose goal is one form's fields with evidence recalled about
+ * the subject: the codec writes which one a goal is for into its index, and
+ * the form-memory orchestrator runs exactly the one a request names from this
+ * list.
+ */
+export const FORM_PIPELINES = [FIELD_ANSWER_PIPELINE_ID, ANSWER_SUGGESTIONS_PIPELINE_ID] as const;
+export type FormPipeline = (typeof FORM_PIPELINES)[number];
+
+/** Recalls facts for a form's fields without a model call, then runs the form pipeline the request names. */
 export const FORM_MEMORY_ORCHESTRATOR_ID = 'form-memory';
 
-/** The form-memory step that runs the field-answer pipeline: the run a session reads its answers from. */
+/** The form-memory step that runs the form pipeline: the run a session reads its answers from. */
 export const FORM_MEMORY_TARGET_STEP = 'target';
 
 /** Why the form-memory recall step skipped or failed — beyond the runner's own reasons. */
@@ -42,6 +54,7 @@ export const SETTLING_CRITERION_KINDS = ['progress'] as const;
 export const BROWSER_SESSION_PIPELINES = {
   plan: BROWSER_STEP_PIPELINE_ID,
   answer: FIELD_ANSWER_PIPELINE_ID,
+  suggest: ANSWER_SUGGESTIONS_PIPELINE_ID,
 } as const;
 
 /** Positional location ids the pipelines assign and the session reads back. */
@@ -49,6 +62,9 @@ export const actionLocation = (position: number): string => `action.${position +
 export const fieldLocation = (position: number): string => `field.${position + 1}`;
 export const ACTION_LOCATION = /^action\.(\d+)$/;
 export const FIELD_LOCATION = /^field\.(\d+)$/;
+/** One suggestion of one field: `field.2.1` is the second field's first suggestion. */
+export const suggestionLocation = (field: number, suggestion: number): string =>
+  `field.${field + 1}.${suggestion + 1}`;
 
 /** The zero-based position a location names, or null for another location. */
 export function positionOf(location: string, grammar: RegExp): number | null {

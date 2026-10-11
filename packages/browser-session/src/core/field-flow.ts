@@ -6,7 +6,6 @@ import {
   GUIDANCE_PAGE_MAX_LENGTH,
   guidanceDocument,
   OPTIONS_SHOWN,
-  type Admission,
   type BrowserDecisionSource,
   type FieldAnswers,
   type FieldRoute,
@@ -19,13 +18,15 @@ import {
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { fieldTypeOf, routeFieldsInSession, type RoutedField } from './field-routing';
+import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './operator-ask';
+import type { AnswerSource, OperatorReply } from './operator-interaction';
 import {
-  fieldQuestion,
-  fieldReplyOf,
-  type AnswerSource,
-  type OperatorReply,
-} from './operator-interaction';
-import { ActionFailed, BrainFaulted, type BrowserAction, type Decided } from './ports';
+  ActionFailed,
+  BrainFaulted,
+  type BrowserAction,
+  type Decided,
+  type FormReport,
+} from './ports';
 import { stepJsonFile } from './session-dump';
 import { describeAction } from './session-state';
 
@@ -65,7 +66,7 @@ export interface FieldsOutcome {
   note: string;
 }
 
-type FieldsDecided = Decided<FieldAnswers> & { admission: Admission };
+type FieldsDecided = Decided<FieldAnswers> & FormReport;
 
 /** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
 export const fillActionOf = (field: FieldSpec, value: string): BrowserAction =>
@@ -168,29 +169,21 @@ async function ask(
   ctx: EngineContext,
   field: RoutedField,
   observation: PageObservation,
+  prefetch: SuggestionsPrefetch | null,
 ): Promise<FieldResult> {
   const { deps, state } = ctx;
   await deps.browser.highlight(field.field.ref).catch(() => undefined);
-  const task = state.tasks.open?.label ?? null;
-  const asked = fieldQuestion(
+  const { answer, reply, chosen } = await askOperator(
+    ctx,
     {
       field: field.field,
       untrusted: field.value,
       why: [field.reason, ...field.faults].join(' — '),
-      task,
+      task: state.tasks.open?.label ?? null,
       page: observation.title,
     },
-    {
-      origin: {
-        kind: 'browser-session',
-        id: state.sessionId,
-        label: `step ${state.step}${task === null ? '' : ` · ${task}`}`,
-      },
-      expiresAt: new Date(deps.clock.now().getTime() + ctx.options.questionExpiresAfterMs),
-    },
+    prefetch,
   );
-  const answer = await deps.operator.ask(asked.question);
-  const { reply, chosen } = fieldReplyOf(asked, answer);
   const asking = { via: answer.via.channel, chosen };
   switch (reply.kind) {
     case 'stop':
@@ -281,6 +274,7 @@ const settle = (
   ctx: EngineContext,
   field: RoutedField,
   observation: PageObservation,
+  prefetch: SuggestionsPrefetch | null,
 ): Promise<FieldResult> => {
   switch (field.route) {
     case 'leave-blank':
@@ -291,7 +285,7 @@ const settle = (
     case 'fill':
       return fill(ctx, field, field.value ?? '', field.source, null, observation);
     case 'ask-operator':
-      return ask(ctx, field, observation);
+      return ask(ctx, field, observation, prefetch);
   }
 };
 
@@ -416,10 +410,11 @@ async function settleAll(
   observation: PageObservation,
   decided: FieldsDecided | null,
   durationMs: number,
+  prefetch: SuggestionsPrefetch | null,
 ): Promise<{ results: FieldResult[]; stopped: boolean }> {
   const results: FieldResult[] = [];
   for (const field of routed) {
-    const outcome = await settle(ctx, field, observation);
+    const outcome = await settle(ctx, field, observation, prefetch);
     results.push(outcome);
     const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs));
     if (outcome.guidance !== null) await teach(ctx, decisionId, outcome.guidance);
@@ -436,6 +431,7 @@ function dumpFields(
   results: readonly FieldResult[],
   decided: FieldsDecided | null,
   fault: BrainFaulted | null,
+  suggestions: SuggestionsRecord | null,
 ): void {
   ctx.dumpFiles('fields', [
     stepJsonFile(ctx.state.step, 'fields', {
@@ -444,6 +440,8 @@ function dumpFields(
       admission: decided?.admission ?? null,
       composition: decided?.composition ?? null,
       fault: fault === null ? null : { reason: fault.reason, message: fault.message },
+      // What became of the suggestions — offered, faulted, or still coming when the form was settled.
+      suggestions,
       fields: routed.map((field, position) => ({
         ...field,
         result: results[position] ?? null,
@@ -466,8 +464,16 @@ export async function askFields(
     fields,
     routeFieldsInSession(decided, fault, open, ctx.state.operatorAnswers),
   );
-  const { results, stopped } = await settleAll(ctx, routed, observation, decided, durationMs);
-  dumpFields(ctx, routed, results, decided, fault);
+  const prefetch = SuggestionsPrefetch.for(ctx, routed);
+  const { results, stopped } = await settleAll(
+    ctx,
+    routed,
+    observation,
+    decided,
+    durationMs,
+    prefetch,
+  );
+  dumpFields(ctx, routed, results, decided, fault, prefetch?.record() ?? null);
   return {
     stopped,
     failed: results.some((outcome) => outcome.outcome === 'failed'),

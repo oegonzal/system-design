@@ -8,15 +8,14 @@
  * Nothing here reads prose: every fact is in the index the composer wrote.
  */
 import {
-  closedOptionsOf,
   fieldLocation,
+  valueFaults,
   type FieldAnswer,
   type FieldAnswers,
   type FieldIndex,
   type FieldSpec,
   type Severity,
   type ValidationProblem,
-  quotedJson,
 } from '@sysdesign/contracts';
 
 import {
@@ -60,10 +59,6 @@ const references: Rule = (answers, index) => {
   return problems;
 };
 
-/** A number input takes a number: not blank, and one `Number` reads whole. */
-const isNumeric = (value: string): boolean =>
-  value.trim().length > 0 && Number.isFinite(Number(value));
-
 /** What one answer does that its field cannot take, in the order the page would refuse it. */
 function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
   const faults: Fault[] = [];
@@ -77,25 +72,7 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
   if (answer.decision !== 'answer' && value !== null) {
     fault('medium', `${ref} carries a value although the decision is ${answer.decision}`);
   }
-  if (value !== null && field.hiddenTraits.length > 0) {
-    fault(
-      'high',
-      `${ref} is hidden (${field.hiddenTraits.join(', ')}); a field the page hides is given no value`,
-    );
-  }
-  if (value !== null && field.maxLength !== null && value.length > field.maxLength) {
-    fault(
-      'medium',
-      `${ref} takes at most ${field.maxLength} characters; the value runs to ${value.length}`,
-    );
-  }
-  const closed = closedOptionsOf(field);
-  if (value !== null && closed !== null && !closed.includes(value)) {
-    fault('medium', `${quotedJson(value)} is not an option of ${ref}`);
-  }
-  if (value !== null && field.inputType === 'number' && !isNumeric(value)) {
-    fault('medium', `${ref} takes a number; ${quotedJson(value)} is not one`);
-  }
+  if (value !== null) faults.push(...valueFaults(field, value));
   if (answer.decision === 'leave-blank' && field.required && field.hiddenTraits.length === 0) {
     fault('medium', `${ref} is required and visible, yet left blank`);
   }

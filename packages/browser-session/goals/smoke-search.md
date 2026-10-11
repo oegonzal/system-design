@@ -17,6 +17,10 @@ One search: from the search box to a page of results. taskStart fires when the s
 
 Fill no field but the search box: any other field, visible or hidden, is left alone, and a form that asks about a person routes every field to the operator.
 
+## Suggesting policy
+
+Suggest only what the record states: a question the record does not answer gets no draft.
+
 ## Stop conditions
 
 - mission-complete (complete): the results page is visible and the unit of work is closed.

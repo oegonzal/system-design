@@ -8,6 +8,7 @@
  */
 import {
   composeFieldGoal,
+  FIELD_ANSWER_PIPELINE_ID,
   type EvidenceItem,
   type FieldAnswer,
   type FieldAnswers,
@@ -74,7 +75,7 @@ const fact = (alias: string, text: string, ref: string): EvidenceItem => ({
   alias,
   text,
   when: '2026-10-02',
-  source: { runId: 'digest-run-1', pipeline: 'document-digest', ref },
+  source: { runId: 'digest-run-1', pipeline: 'document-digest', ref, kind: 'profile_fact' },
 });
 
 export const sampleEvidence = (): EvidenceItem[] => [
@@ -94,7 +95,13 @@ export const sampleEvidence = (): EvidenceItem[] => [
 export const fieldGoal = (
   evidence: EvidenceItem[] = sampleEvidence(),
   fields: FieldSpec[] = sampleFields(),
-): string => composeFieldGoal({ prose: ANSWERING_PROSE, fields, evidence });
+): string =>
+  composeFieldGoal({
+    pipeline: FIELD_ANSWER_PIPELINE_ID,
+    prose: ANSWERING_PROSE,
+    fields,
+    evidence,
+  });
 
 export const answer = (ref: string, overrides: Partial<FieldAnswer> = {}): FieldAnswer => ({
   ref,

@@ -45,6 +45,8 @@ export interface Scenario {
   rails?: Partial<SessionRailsDto>;
   clock?: FixedClock;
   browser?: FakeBrowser;
+  /** The operator, when a spec watches its questions as they are asked; else one typing `lines`. */
+  operator?: ScriptedOperator;
   ledger?: InMemoryLedger;
   startUrl?: string;
   capture?: CapturePolicy;
@@ -54,7 +56,7 @@ export async function runScripted(scenario: Scenario) {
   const browser = scenario.browser ?? new FakeBrowser(journeyPages());
   const brain = new ScriptedBrain(scenario.script);
   const ledger = scenario.ledger ?? new InMemoryLedger();
-  const operator = new ScriptedOperator(scenario.lines ?? []);
+  const operator = scenario.operator ?? new ScriptedOperator(scenario.lines ?? []);
   const dumps = new InMemoryDumpStore();
   const warnings: string[] = [];
   const outcome: SessionOutcome = await runSession(

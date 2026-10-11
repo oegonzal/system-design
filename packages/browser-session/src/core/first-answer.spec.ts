@@ -30,6 +30,7 @@ const QUESTION: OperatorQuestion = fieldQuestion(
     why: 'no evidence',
     task: null,
     page: 'Apply',
+    suggestions: [],
   },
   {
     origin: { kind: 'browser-session', id: 's1', label: 'step 3' },

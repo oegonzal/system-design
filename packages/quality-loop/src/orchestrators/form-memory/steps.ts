@@ -1,26 +1,40 @@
 /**
  * The form-memory orchestrator's two steps, as adapters over its ports.
  * `recall` turns the page's own field labels into probes, searches the store
- * once and composes what came back into the goal every stage of the answerer
- * reads — a fact is evidence the answer must rest on, so the judges see it,
- * unlike a coach's lessons. `target` runs the field-answer pipeline over
- * that goal and reports the run's admission, so the caller never recomputes
- * it. Recall never blocks the target: a page with no evidence is still
- * answered, and its facts route to the operator.
+ * once and composes what came back into the goal every stage of the form
+ * pipeline reads — a fact is evidence a value must rest on, so the judges see
+ * it, unlike a coach's lessons. `target` runs the form pipeline the request
+ * names over that goal and reports the run's admission and what a reader of
+ * it withholds, each read off that pipeline's own definition, so the caller
+ * never recomputes either. Recall never blocks the target: a page with no
+ * evidence is still run, and its facts route to the operator.
  */
 import {
+  ANSWER_SUGGESTIONS_PIPELINE_ID,
   composeFieldGoal,
   FIELD_ANSWER_PIPELINE_ID,
+  FORM_PIPELINES,
   GoalBudgetExceeded,
   splitFieldGoal,
   type FieldSpec,
   type FormMemoryStepReason,
+  type FormPipeline,
   type MemoryContextDto,
   type QualityRunDto,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
-import { admission, outputsOf } from '../../core/outputs';
+import {
+  admission,
+  outputsOf,
+  withheldItems,
+  withheldRefs,
+  withholdingOf,
+  type RunOutputs,
+} from '../../core/outputs';
+import type { PipelineDefinition } from '../../core/pipeline';
+import { ANSWER_SUGGESTIONS } from '../../pipelines/answer-suggestions/definition';
+import { FIELD_ANSWER } from '../../pipelines/field-answer/definition';
 import { requestInput, runTarget, skipped, storeReadiness } from '../common';
 import type { MemoryHit } from '../memory/ports';
 import type { StepContext, StepResult } from '../runner/definition';
@@ -43,18 +57,42 @@ const skip = (
 
 const contextOf = (ctx: Ctx): MemoryContextDto => ctx.context as unknown as MemoryContextDto;
 
+/** The form pipelines this orchestrator runs, each read back the way its own definition declares. */
+const FORM_DEFINITIONS: Readonly<Record<FormPipeline, PipelineDefinition<unknown>>> = {
+  [FIELD_ANSWER_PIPELINE_ID]: FIELD_ANSWER as PipelineDefinition<unknown>,
+  [ANSWER_SUGGESTIONS_PIPELINE_ID]: ANSWER_SUGGESTIONS as PipelineDefinition<unknown>,
+};
+
+const formPipelineOf = (named: string | undefined): FormPipeline | null =>
+  FORM_PIPELINES.find((pipeline) => pipeline === named) ?? null;
+
+/**
+ * The locations of the run's best artifact a reader withholds: every one a
+ * confirmed finding or a validator problem names, as far as what named it
+ * withholds — read off the pipeline's own declarations, over engine facts only.
+ */
+function withheldOf(definition: PipelineDefinition<unknown>, outputs: RunOutputs): string[] {
+  const { best } = outputs;
+  if (best === null) return [];
+  const parsed = definition.task.output.schema.safeParse(best.artifact);
+  if (!parsed.success) return [];
+  const items = definition.task.output.locate(parsed.data).map((location) => location.id);
+  return [...withheldRefs(withheldItems(best.ledger, items, withholdingOf(definition)))];
+}
+
 /**
  * The goal with as much of the evidence as fits the engine's budget, the
  * lowest-ranked items dropped first; null when not even one fits. Aliases
  * are positional, so a prefix keeps every alias the way it would have read.
  */
 function composeWithinBudget(
-  split: { prose: string; fields: readonly FieldSpec[] },
+  split: { pipeline: FormPipeline; prose: string; fields: readonly FieldSpec[] },
   hits: readonly MemoryHit[],
 ): { goal: string; evidence: number } | null {
   for (let count = hits.length; count > 0; count -= 1) {
     try {
       const goal = composeFieldGoal({
+        pipeline: split.pipeline,
         prose: split.prose,
         fields: split.fields,
         evidence: evidenceItems(hits.slice(0, count)),
@@ -113,18 +151,29 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
 }
 
 /**
- * Answer the fields over whatever recall handed on, with the rubric the
- * request carries; the run's admission rides on the step's report, so the
- * caller reads it there and never recomputes it.
+ * Run the form pipeline the request names over whatever recall handed on,
+ * with the rubric the request carries; the run's admission and the locations
+ * a reader of it withholds ride on the step's report, so the caller reads
+ * them there and never recomputes them.
  */
 export async function target(ctx: Ctx): Promise<StepResult<QualityRunDto>> {
-  const acceptAt = ctx.acceptAtOf(FIELD_ANSWER_PIPELINE_ID);
-  if (acceptAt === null) return skip('pipeline-unavailable', FIELD_ANSWER_PIPELINE_ID);
+  const pipeline = formPipelineOf(ctx.request.pipeline);
+  if (pipeline === null) return skip('pipeline-unavailable', ctx.request.pipeline ?? null);
+  const acceptAt = ctx.acceptAtOf(pipeline);
+  if (acceptAt === null) return skip('pipeline-unavailable', pipeline);
   const result = await runTarget(
     ctx,
     requestInput(ctx.request, ctx.outputs.recall?.goal ?? ctx.request.goal),
+    pipeline,
   );
   const trace = result.output?.trace ?? null;
   if (result.status !== 'complete' || trace === null) return result;
-  return { ...result, report: { admission: admission(outputsOf(trace), acceptAt) } };
+  const outputs = outputsOf(trace);
+  return {
+    ...result,
+    report: {
+      admission: admission(outputs, acceptAt),
+      withheld: withheldOf(FORM_DEFINITIONS[pipeline], outputs),
+    },
+  };
 }

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fill } from '../../core/testing';
 import { sampleFields } from '../../pipelines/field-answer/testing';
+import type { MemoryHit } from '../memory/ports';
 import { hitOf } from '../memory/testing';
 import {
   distinctHits,
@@ -121,15 +122,30 @@ describe('the form recall’s probes', () => {
     );
   });
 
-  it('[QL-38] the evidence is aliased m1.. in order, carries where each fact came from, and stays within the goal’s bound per item', () => {
-    const long = hitOf(fill(EVIDENCE_TEXT_MAX_LENGTH + 40, 'f'), 'digest-3', 'memory.4');
-    const items = evidenceItems([a, long]);
+  it('[QL-38] the evidence is aliased m1.. in order, carries where each fact came from and what the store holds it as, and stays within the goal’s bound per item', () => {
+    const fact = (hit: MemoryHit, kind: 'profile_fact' | 'claim_boundary'): MemoryHit => ({
+      ...hit,
+      source: { ...hit.source, kind },
+    });
+    const long = fact(
+      hitOf(fill(EVIDENCE_TEXT_MAX_LENGTH + 40, 'f'), 'digest-3', 'memory.4'),
+      'claim_boundary',
+    );
+    // A hit of a kind no document wrote is no evidence about the subject.
+    const items = evidenceItems([fact(a, 'profile_fact'), b, long]);
+    expect(items).toHaveLength(2);
     expect(items[0]).toEqual({
       alias: 'm1',
       text: a.text,
       when: '2026-09-06',
-      source: { runId: 'digest-1', pipeline: 'system-design', ref: 'memory.1' },
+      source: {
+        runId: 'digest-1',
+        pipeline: 'system-design',
+        ref: 'memory.1',
+        kind: 'profile_fact',
+      },
     });
+    expect(items[1]?.source.kind).toBe('claim_boundary');
     expect(items[1].alias).toBe('m2');
     expect(items[1].text).toHaveLength(EVIDENCE_TEXT_MAX_LENGTH);
     expect(items[1].text.endsWith('…')).toBe(true);

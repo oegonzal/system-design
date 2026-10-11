@@ -49,11 +49,8 @@ describe('the session engine', () => {
     expect(end?.loopRunId).toBe(plans[4]?.loopRunId);
     expect(detail.decisions.filter((d) => d.source === 'engine')).toEqual([]);
 
-    // The same rubric on every request, derived once per pipeline.
-    expect(brain.derived.map((d) => d.pipeline)).toEqual([
-      BROWSER_SESSION_PIPELINES.plan,
-      BROWSER_SESSION_PIPELINES.answer,
-    ]);
+    // The same rubric on every request, derived once for each pipeline the session runs.
+    expect(brain.derived.map((d) => d.pipeline)).toEqual(Object.values(BROWSER_SESSION_PIPELINES));
     expect(
       brain.planInputs.every((input) => input.criteria === brain.planInputs[0]?.criteria),
     ).toBe(true);
@@ -370,6 +367,7 @@ describe('the session engine', () => {
     expect(JSON.parse(dumps.text('00-rubrics.json'))).toMatchObject({
       'browser-step': { dumpRunId: 'browser-step-criteria-dump' },
       'field-answer': { dumpRunId: 'field-answer-criteria-dump' },
+      'answer-suggestions': { dumpRunId: 'answer-suggestions-criteria-dump' },
     });
     expect(JSON.parse(dumps.text('01-steps/01/plan.json'))).toMatchObject({
       composition: { rung: 'full' },

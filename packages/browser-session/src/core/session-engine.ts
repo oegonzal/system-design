@@ -34,16 +34,24 @@ export interface SessionOutcome {
   steps: number;
 }
 
-/** The rubric for both pipelines, once; a fault here ends the session before the browser opens. */
+type Role = keyof SessionCriteria;
+const ROLES = Object.keys(BROWSER_SESSION_PIPELINES) as Role[];
+
+/** The rubric for every pipeline the session runs, once; a fault here ends the session before the browser opens. */
 async function deriveRubrics(
   deps: SessionDeps,
   mission: string,
-): Promise<Record<keyof SessionCriteria, DerivedRubric>> {
-  return {
-    plan: await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES.plan, mission),
-    answer: await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES.answer, mission),
-  };
+): Promise<Record<Role, DerivedRubric>> {
+  const rubrics: Partial<Record<Role, DerivedRubric>> = {};
+  for (const role of ROLES) {
+    rubrics[role] = await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES[role], mission);
+  }
+  return rubrics as Record<Role, DerivedRubric>;
 }
+
+/** One record per pipeline the session runs, keyed by the pipeline's id. */
+const byPipeline = <T>(of: (role: Role) => T): Record<string, T> =>
+  Object.fromEntries(ROLES.map((role) => [BROWSER_SESSION_PIPELINES[role], of(role)]));
 
 // BOOKMARK
 export async function runSession(
@@ -79,19 +87,16 @@ export async function runSession(
   let error: { name: string; message: string } | null = null;
   try {
     const rubrics = await deriveRubrics(deps, goal.markdown);
-    ctx.criteria = { plan: rubrics.plan.criteria, answer: rubrics.answer.criteria };
+    ctx.criteria = Object.fromEntries(
+      ROLES.map((role) => [role, rubrics[role].criteria]),
+    ) as SessionCriteria;
     // Where each rubric was made: the loop dumped each derivation as a folder of its own.
-    ctx.dumpFiles('rubrics', [
-      rubricsFile({
-        [BROWSER_SESSION_PIPELINES.plan]: rubrics.plan,
-        [BROWSER_SESSION_PIPELINES.answer]: rubrics.answer,
-      }),
-    ]);
+    ctx.dumpFiles('rubrics', [rubricsFile(byPipeline((role) => rubrics[role]))]);
     queue.write('criteria', () =>
-      deps.ledger.recordCriteria(state.sessionId, {
-        [BROWSER_SESSION_PIPELINES.plan]: ctx.criteria.plan,
-        [BROWSER_SESSION_PIPELINES.answer]: ctx.criteria.answer,
-      }),
+      deps.ledger.recordCriteria(
+        state.sessionId,
+        byPipeline((role) => ctx.criteria[role]),
+      ),
     );
     await deps.browser.open(options.profile, { headed: options.headed });
     // Open where the work begins, so the loop never plans on about:blank — the

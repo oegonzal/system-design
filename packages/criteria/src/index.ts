@@ -483,6 +483,16 @@ export const CRITERIA: readonly Criterion[] = [
     statement:
       "A run says who opened it only when its caller does: the opener — a declared kind, the caller's id and a label — is recorded on the run, carried by every run an orchestration opens and by a recall child, kept by an orchestration started from a run, returned on the record and the list row, and filters both lists by the caller's id; the engine never reads it, and a row recorded before the columns existed reads as opened by nobody.",
   },
+  {
+    id: 'QL-64',
+    statement:
+      "Suggested answers for a form's operator questions are labelled by what they rest on — the record, recorded work carried over, or experience the record does not hold where the goal's suggesting policy allows — with what each label promises fixed for every goal; a suggestion for a field the form never listed or resting on an alias it never listed blocks the iteration, while one that cites nothing it should or that its field cannot take only warns at that suggestion; every faulted suggestion but a repeat is withheld from whoever offers them, nothing gates, and the run is judged once.",
+  },
+  {
+    id: 'QL-65',
+    statement:
+      'The form-memory orchestrator runs exactly the form pipeline a request names, from its declared list, and only over a goal the form codec composed for that pipeline; the evidence it composes in says what the store holds each item as, and its target reports the run’s admission and the locations a reader of the run withholds, each read off that pipeline’s own definition.',
+  },
   // Quality-loop web client (packages/quality-loop-ui)
   {
     id: 'QLU-1',
@@ -783,6 +793,11 @@ export const CRITERIA: readonly Criterion[] = [
     id: 'BRW-11',
     statement:
       'A field is put to the operator one way on every channel: its options as lettered choices, the answerer’s untrusted pick marked with why, free text where the field takes it, and the commands to read back, leave blank or stop; a reply is read with the contracts’ one resolver, the full value behind a choice is what is filled, the decision row records the channel and what the answer was chosen from, and a line typed at the terminal with no question open is said to be unused, never kept for the next.',
+  },
+  {
+    id: 'BRW-12',
+    statement:
+      'A field with no options that goes to the operator is asked at once, and suggested answers are asked for once per form, for exactly those fields, under the session’s own derived rubric: they are lettered record first, then the drafts labelled apart as transferable or invented, less every one the run’s report withholds and none from a run no judge saw; when they arrive before an answer the question is withdrawn as superseded and asked again with them, an answer given first is taken and nothing is asked again, a faulted run is warned once and leaves the question as asked, the full text behind a letter is what is filled, cached and taught, the decision row records what it rested on, and the fields file records what became of the suggestions.',
   },
   {
     id: 'QL-41',

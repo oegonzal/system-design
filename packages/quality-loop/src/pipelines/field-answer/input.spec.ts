@@ -1,5 +1,6 @@
 import {
   composeFieldGoal,
+  FIELD_ANSWER_PIPELINE_ID,
   FIELD_EVIDENCE_HEADING,
   GoalBudgetExceeded,
   MISSION_FIXTURE,
@@ -19,7 +20,8 @@ describe('the field-answer input codec', () => {
     expect(goal).toContain(
       '- e1 · textbox "Years of experience with Python" · type number · required · at most 3 characters · context "Whole years, professional only."',
     );
-    expect(goal).toContain(`${FIELD_EVIDENCE_HEADING}\n\n- [m1] Alex Example has six years`);
+    expect(goal).toContain(`${FIELD_EVIDENCE_HEADING}\n\nKinds: profile_fact — `);
+    expect(goal).toContain('\n\n- [m1] profile_fact — Alex Example has six years');
     expect(readIndex(goal)).toEqual({
       pipeline: 'field-answer',
       fields: sampleFields(),
@@ -32,7 +34,11 @@ describe('the field-answer input codec', () => {
     expect(bare).toContain('(none recalled');
     expect(readIndex(bare)?.evidence).toEqual([]);
     const split = splitFieldGoal(bare);
-    expect(split).toEqual({ prose: ANSWERING_PROSE, fields: sampleFields() });
+    expect(split).toEqual({
+      pipeline: FIELD_ANSWER_PIPELINE_ID,
+      prose: ANSWERING_PROSE,
+      fields: sampleFields(),
+    });
     if (split === null) throw new Error('the composed goal must split');
     const recomposed = composeFieldGoal({ ...split, evidence: sampleEvidence() });
     expect(recomposed).toBe(fieldGoal());
@@ -50,7 +56,12 @@ describe('the field-answer input codec', () => {
   it('[QL-39] a goal past the budget is refused rather than clipped', () => {
     expect(() =>
       composeFieldGoal(
-        { prose: ANSWERING_PROSE, fields: sampleFields(), evidence: sampleEvidence() },
+        {
+          pipeline: FIELD_ANSWER_PIPELINE_ID,
+          prose: ANSWERING_PROSE,
+          fields: sampleFields(),
+          evidence: sampleEvidence(),
+        },
         500,
       ),
     ).toThrow(GoalBudgetExceeded);
