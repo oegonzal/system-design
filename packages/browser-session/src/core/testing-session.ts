@@ -1,6 +1,7 @@
 import { MISSION_FIXTURE, type SessionRailsDto } from '@sysdesign/contracts';
 
 import type { CapturePolicy } from './engine-context';
+import type { StopSignal } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
   FakeBrowser,
@@ -8,11 +9,13 @@ import {
   InMemoryDumpStore,
   InMemoryGoalSource,
   InMemoryLedger,
+  RecordingEvents,
   ScriptedBrain,
   ScriptedOperator,
   type BrainScript,
 } from './testing';
 import { journeyPages } from './testing-journey';
+import type { ConfiguredAdvisor } from './unit-advice';
 
 /**
  * One scripted session for the engine's specs: the fakes composed around
@@ -41,8 +44,41 @@ export const SPEC_QUESTION_EXPIRY_MS = 3_600_000;
 /** A refused answer is put back once, as the shipped operator settings declare. */
 const SPEC_ASKS_AFTER_REFUSAL = 1;
 
+/** How long a spec's close waits for its events: long past a recording bus, short enough to time out a held one. */
+export const SPEC_EVENTS_DRAIN_MS = 50;
+
+/** The operator's interrupt a spec can press. */
+export class FakeStopSignal implements StopSignal {
+  private readonly handlers = new Set<() => void>();
+
+  onStop(handler: () => void): () => void {
+    this.handlers.add(handler);
+    return () => {
+      this.handlers.delete(handler);
+    };
+  }
+
+  /** Ctrl-C. */
+  press(): void {
+    for (const handler of this.handlers) handler();
+  }
+
+  get listening(): boolean {
+    return this.handlers.size > 0;
+  }
+}
+
 export interface Scenario {
   script: BrainScript;
+  /** The mission the session runs; the shared fixture unless a scenario declares more. */
+  mission?: string;
+  /** The advisors the environment configures; the mission names which to ask. */
+  advisors?: ConfiguredAdvisor[];
+  events?: RecordingEvents;
+  stop?: FakeStopSignal;
+  dumps?: InMemoryDumpStore;
+  /** Whether the subject was given for the run; a spec says false to run on the fallback. */
+  subjectDeclared?: boolean;
   /** What the operator types, line by line. */
   lines?: string[];
   rails?: Partial<SessionRailsDto>;
@@ -62,19 +98,25 @@ export async function runScripted(scenario: Scenario) {
   const brain = new ScriptedBrain(scenario.script);
   const ledger = scenario.ledger ?? new InMemoryLedger();
   const operator = scenario.operator ?? new ScriptedOperator(scenario.lines ?? []);
-  const dumps = new InMemoryDumpStore();
+  const dumps = scenario.dumps ?? new InMemoryDumpStore();
+  const events = scenario.events ?? new RecordingEvents();
+  const stop = scenario.stop ?? new FakeStopSignal();
   const warnings: string[] = [];
+  const logs: string[] = [];
   const outcome: SessionOutcome = await runSession(
     {
       browser,
       brain,
       ledger,
       operator,
-      goals: new InMemoryGoalSource({ 'goals/test.md': MISSION_FIXTURE }),
+      goals: new InMemoryGoalSource({ 'goals/test.md': scenario.mission ?? MISSION_FIXTURE }),
       clock: scenario.clock ?? new FixedClock(),
       dumps,
+      advisors: scenario.advisors ?? [],
+      events,
+      stop,
       warn: (text) => warnings.push(text),
-      log: () => undefined,
+      log: (text) => logs.push(text),
     },
     {
       goalPath: 'goals/test.md',
@@ -82,6 +124,8 @@ export async function runScripted(scenario: Scenario) {
       headed: false,
       rails: { ...SPEC_RAILS, ...scenario.rails },
       subject: SPEC_SUBJECT,
+      subjectDeclared: scenario.subjectDeclared ?? true,
+      eventsDrainMs: SPEC_EVENTS_DRAIN_MS,
       startUrl: scenario.startUrl,
       capture: scenario.capture ?? NO_CAPTURE,
       questionExpiresAfterMs: SPEC_QUESTION_EXPIRY_MS,
@@ -91,5 +135,5 @@ export async function runScripted(scenario: Scenario) {
   );
   const detail = await ledger.getSession(outcome.sessionId);
   if (detail === null) throw new Error('the session row is gone');
-  return { outcome, browser, brain, ledger, operator, dumps, warnings, detail };
+  return { outcome, browser, brain, ledger, operator, dumps, events, stop, warnings, logs, detail };
 }

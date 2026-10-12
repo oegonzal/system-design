@@ -14,8 +14,10 @@ import {
 import { BrainFaulted, type BrowserAction, type DerivedRubric, type Termination } from './ports';
 import { closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
+import { createSessionEvents, startedEvent } from './session-events';
 import { createState, pushHistory, touchedBy } from './session-state';
 import { step } from './step-flow';
+import { resolveAdvisors } from './unit-advice';
 import { createWriteQueue, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
 
 /**
@@ -25,9 +27,11 @@ import { createWriteQueue, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
  * What the engine adds is declared — the rails in `rails.ts`, the routing
  * in the contracts' read-back — and the bookkeeping: rows through a chained
  * write queue that never stalls the browser, a heartbeat on its own timer,
- * step files into the dump as they come (`step-flow.ts`), and on every path
- * out — a plan's cause, a rail, the operator, a fault — the browser closed,
- * the queue drained, the session row closed and the dump indexed
+ * step files into the dump as they come (`step-flow.ts`), what happened said
+ * on the bus for whoever keeps a record beyond the session
+ * (`session-events.ts`), and on every path out — a plan's cause, a rail, the
+ * operator at the terminal or by Ctrl-C, a fault — the browser closed, the
+ * queues drained, the session row closed and the dump indexed
  * (`session-close.ts`).
  */
 export interface SessionOutcome {
@@ -63,9 +67,14 @@ export async function runSession(
   options: RunSessionOptions,
 ): Promise<SessionOutcome> {
   const goal = await deps.goals.read(options.goalPath);
+  const sessionId = crypto.randomUUID();
+  // Every declared section parsed and every advisor the mission names resolved
+  // and asked once, before a row, a beat or a dump folder exists: a malformed
+  // mission or an advisor nobody runs refuses the session like a bad flag.
+  const advisors = await resolveAdvisors(deps, goal.markdown, options, sessionId);
   const startedAt = deps.clock.now();
   const dump = deps.dumps.open(startedAt);
-  const state = createState({ sessionId: crypto.randomUUID(), dumpRunId: dump.runId, startedAt });
+  const state = createState({ sessionId, dumpRunId: dump.runId, startedAt });
   // The one awaited write: a ledger that refuses the row stops the session before the browser opens.
   await deps.ledger.openSession({
     id: state.sessionId,
@@ -81,12 +90,32 @@ export async function runSession(
   });
   const warn = warnOf(deps, state.sessionId);
   const queue = createWriteQueue((what, error) => warn(`${what} not recorded`, error));
+  const events = createSessionEvents(deps.events, (what, error) =>
+    warn(`${what} not published`, error),
+  );
+  events.publish(startedEvent({ state, options }));
+  // Ctrl-C is the operator's word: the session ends after the step in flight,
+  // through every closing write, instead of dying with a running row behind it.
+  const release = deps.stop.onStop(() => {
+    if (!state.operatorStopped)
+      deps.log(`session ${state.sessionId}: interrupted — ending after this step`);
+    state.operatorStopped = true;
+  });
   const ticker = startPeriodic(
     { everyMs: SESSION_HEARTBEAT_EVERY_MS, atStart: false },
     () => deps.ledger.heartbeat(state.sessionId, deps.clock.now(), state.step),
     (error) => warn('heartbeat not written', error),
   );
-  const ctx = createEngineContext({ deps, options, state, mission: goal.markdown, dump, queue });
+  const ctx = createEngineContext({
+    deps,
+    options,
+    state,
+    mission: goal.markdown,
+    dump,
+    queue,
+    advisors,
+    events,
+  });
 
   let termination: Termination = { reason: 'error', detail: 'the session ended before deciding' };
   let error: { name: string; message: string } | null = null;
@@ -141,6 +170,7 @@ export async function runSession(
     }
     if (!state.terminationRecorded) ctx.terminate(termination, 'engine', null);
   } finally {
+    release();
     // A beat in flight is let finish before the session's closing writes.
     await ticker.stop();
     await deps.browser.close().catch((caught: unknown) => warn('browser not closed', caught));

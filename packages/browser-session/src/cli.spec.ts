@@ -3,13 +3,17 @@ import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/cont
 import { execute, parseOptions, USAGE, type CliService, type Io, type Options } from './cli';
 import { SPEC_RAILS } from './core/testing-session';
 import type { SessionOutcome } from './core/session-engine';
+import { SessionRefused } from './core/unit-advice';
 import type { SessionDefaults } from './settings';
 
 /** The settings a parse reads its defaults from. */
+const AT_ONCE = { windowMs: 0, pauseMs: 1 };
 const DEFAULTS: SessionDefaults = {
   headed: true,
   rails: SPEC_RAILS,
-  loopRecovery: { windowMs: 0, pauseMs: 1 },
+  loopRecovery: AT_ONCE,
+  advisorRecovery: AT_ONCE,
+  busRecovery: AT_ONCE,
 };
 
 const parsed = (argv: string[]): Options => {
@@ -99,6 +103,7 @@ describe('parseOptions', () => {
       json: true,
     });
     expect(parsed(['show', 'abc', '--json'])).toEqual({ command: 'show', id: 'abc', json: true });
+    expect(parsed(['replay-events', 'abc'])).toEqual({ command: 'replay-events', id: 'abc' });
   });
 
   it.each([
@@ -117,6 +122,7 @@ describe('parseOptions', () => {
     [['show'], 'show takes one id'],
     [['show', 'a', 'b'], 'show takes one id'],
     [['sessions', 'extra'], 'sessions takes no positional'],
+    [['replay-events'], 'replay-events takes one id'],
   ])('refuses %j', (argv, message) => {
     const result = parseOptions(argv, DEFAULTS);
     expect(result).toBeInstanceOf(Error);
@@ -141,6 +147,7 @@ describe('execute', () => {
     login: async () => undefined,
     list: async () => [session()],
     show: async () => detail(),
+    replayEvents: async () => 4,
     ...overrides,
   });
 
@@ -217,5 +224,55 @@ describe('execute', () => {
       ),
     ).toBe(1);
     expect(down.errors).toEqual(['connection refused']);
+  });
+
+  it('exits 2 for a session refused before it had a row, like a bad flag', async () => {
+    const { errors, sink } = io();
+    expect(
+      await execute(
+        parsed(['run', '--goal', 'g.md', '--profile', 'p']),
+        service({
+          run: async () => {
+            throw new SessionRefused(
+              'the mission names the advisor record, and no configured advisor answers to it',
+            );
+          },
+        }),
+        sink,
+      ),
+    ).toBe(2);
+    expect(errors).toEqual([
+      'the mission names the advisor record, and no configured advisor answers to it',
+    ]);
+  });
+
+  it('publishes a recorded session’s events again, exiting 1 for an unknown id', async () => {
+    const { out, sink } = io();
+    const replayed: string[] = [];
+    expect(
+      await execute(
+        parsed(['replay-events', 'session-1']),
+        service({
+          replayEvents: async (id) => {
+            replayed.push(id);
+            return 4;
+          },
+        }),
+        sink,
+      ),
+    ).toBe(0);
+    expect([replayed, out]).toEqual([
+      ['session-1'],
+      ['4 event(s) published again for session session-1'],
+    ]);
+    const missing = io();
+    expect(
+      await execute(
+        parsed(['replay-events', 'nope']),
+        service({ replayEvents: async () => null }),
+        missing.sink,
+      ),
+    ).toBe(1);
+    expect(missing.errors).toEqual(['no session nope']);
   });
 });

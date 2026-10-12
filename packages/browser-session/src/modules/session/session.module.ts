@@ -10,9 +10,11 @@ import { BrowserDecision, BrowserSession, BrowserTask } from '@sysdesign/db';
 import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 import { HttpBusClient, InteractionClient } from '@sysdesign/notifications-client';
 
+import { HttpUnitAdvisor } from '../../adapters/advisor-http/http-unit-advisor';
 import { FsGoalSource } from '../../adapters/fs-goal/fs-goal-source';
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
+import { BusSessionEvents } from '../../adapters/notifications-http/bus-session-events';
 import {
   NotificationsOperator,
   SESSION_SOURCE,
@@ -21,8 +23,9 @@ import { CHROME_CHANNEL, PlaywrightBrowser } from '../../adapters/playwright/pla
 import { TerminalOperator } from '../../adapters/terminal-operator/terminal-operator';
 import type { SessionConfig } from '../../config';
 import { FirstAnswer } from '../../core/first-answer';
-import type { Clock, OperatorChannel } from '../../core/ports';
+import type { Clock, OperatorChannel, StopSignal } from '../../core/ports';
 import { fsDumpStore } from '../../core/session-dump';
+import type { ConfiguredAdvisor } from '../../core/unit-advice';
 import { SessionService } from './session.service';
 import {
   BRAIN,
@@ -33,16 +36,48 @@ import {
   LEDGER,
   OPERATOR,
   SESSION_CONFIG,
+  SESSION_EVENTS,
+  STOP_SIGNAL,
   TERMINAL,
+  UNIT_ADVISORS,
 } from './tokens';
 
 const systemClock: Clock = { now: () => new Date() };
 
-/** The channels the operator settings add beside the terminal, each built from its own settings. */
-function remoteOperators(config: SessionConfig): OperatorChannel[] {
+/**
+ * Ctrl-C as the operator's word. The first press hands the engine its stop,
+ * and the session ends after the step in flight through every closing write;
+ * a second press exits at once, as the process would with no handler. The
+ * exit code is the shell's for an interrupt.
+ */
+const INTERRUPTED_EXIT_CODE = 130;
+const processStopSignal: StopSignal = {
+  onStop(handler) {
+    let presses = 0;
+    const listener = (): void => {
+      presses += 1;
+      if (presses > 1) process.exit(INTERRUPTED_EXIT_CODE);
+      handler();
+    };
+    process.on('SIGINT', listener);
+    return () => {
+      process.off('SIGINT', listener);
+    };
+  },
+};
+
+/** Every advisor the environment lists, by its entry; the mission names which are asked. */
+const configuredAdvisors = (config: SessionConfig): ConfiguredAdvisor[] =>
+  config.advisors.map((entry) => ({
+    id: entry.id,
+    where: entry.text,
+    port: new HttpUnitAdvisor(entry.url, { recovery: config.settings.session.advisorRecovery }),
+  }));
+
+/** The channels the operator settings add beside the terminal, over the one bus client the session has. */
+function remoteOperators(config: SessionConfig, bus: HttpBusClient): OperatorChannel[] {
   const { notifications } = config.settings.operator.channels;
   if (notifications === undefined) return [];
-  const bus = new HttpBusClient(config.notificationsUrl, { recovery: notifications.recovery });
   const interactions = new InteractionClient(bus, {
     source: SESSION_SOURCE,
     pullWaitMs: notifications.pullWaitMs,
@@ -64,12 +99,18 @@ class TerminalLifecycle implements OnModuleDestroy {
 /**
  * The composition root: every port bound to its adapter, the configuration
  * taken as data rather than read here. The scripted end-to-end run keeps
- * this module and overrides the browser, the operator and the loop client
- * by token, so what it exercises is the wiring that ships.
+ * this module and overrides the browser, the operator, the loop client, the
+ * events and the stop signal by token, so what it exercises is the wiring
+ * that ships.
  */
 @Module({})
 export class SessionModule {
   static register(config: SessionConfig): DynamicModule {
+    // One bus client, whatever the session says on it — a question, an event —
+    // riding out a restart within the one declared window.
+    const bus = new HttpBusClient(config.notificationsUrl, {
+      recovery: config.settings.session.busRecovery,
+    });
     return {
       module: SessionModule,
       imports: [MikroOrmModule.forFeature([BrowserSession, BrowserTask, BrowserDecision])],
@@ -95,13 +136,16 @@ export class SessionModule {
         {
           provide: OPERATOR,
           useFactory: (terminal: TerminalOperator) =>
-            new FirstAnswer(terminal, remoteOperators(config)),
+            new FirstAnswer(terminal, remoteOperators(config, bus)),
           inject: [TERMINAL],
         },
         TerminalLifecycle,
         { provide: GOAL_SOURCE, useClass: FsGoalSource },
         { provide: CLOCK, useValue: systemClock },
         { provide: DUMP_STORE, useFactory: () => fsDumpStore(config.dumpDir) },
+        { provide: UNIT_ADVISORS, useFactory: () => configuredAdvisors(config) },
+        { provide: SESSION_EVENTS, useFactory: () => new BusSessionEvents(bus) },
+        { provide: STOP_SIGNAL, useValue: processStopSignal },
         SessionService,
       ],
       exports: [SessionService],

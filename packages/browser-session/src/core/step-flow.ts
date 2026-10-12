@@ -1,5 +1,4 @@
 import {
-  NO_UNITS_ON_RECORD,
   observationFingerprint,
   type PageObservation,
   type PlanReadout,
@@ -25,6 +24,7 @@ import {
   tasksClosed,
 } from './session-state';
 import { executeActions, type Executed } from './step-executor';
+import { adviceSummary, recallAdvice, type AdviceRecord } from './unit-advice';
 
 /**
  * One page of the session: observe it, ask the loop for a plan, read the plan
@@ -46,7 +46,7 @@ function settleExpectation(ctx: EngineContext, observation: PageObservation): vo
 /** Who objected when nothing named a finding or a problem: the controller's own reason. */
 const CONTROLLER = 'controller';
 
-const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
+const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>, advice: AdviceRecord) => ({
   assessment: readout.plan?.assessment ?? null,
   actions: readout.plan?.actions.length ?? 0,
   executable: readout.executable,
@@ -55,6 +55,7 @@ const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>) => ({
   objections: readout.objections,
   finalDecision: decided.run.trace?.finalDecision ?? null,
   composition: decided.composition,
+  advice: adviceSummary(advice),
 });
 
 /** The rails, checked where every path out of a step checks them. */
@@ -106,8 +107,15 @@ function recordBrainFault(ctx: EngineContext, error: BrainFaulted, durationMs: n
 async function decide(
   ctx: EngineContext,
   observation: PageObservation,
-): Promise<{ decided: Decided<StepPlan>; durationMs: number } | null> {
+): Promise<{ decided: Decided<StepPlan>; durationMs: number; advice: AdviceRecord } | null> {
   const { deps, state, options } = ctx;
+  // What the advisors know of units beyond this session, asked before every
+  // plan: the next item is chosen inside the plan that closes the unit, so no
+  // step can go without. The step's file records what the composer saw.
+  const advice = await recallAdvice(ctx);
+  if (advice.outcome !== 'no-advisors') {
+    ctx.dumpFiles('advice', [stepJsonFile(state.step, 'advice', advice)]);
+  }
   const startedAt = deps.clock.now();
   const elapsed = (): number => deps.clock.now().getTime() - startedAt.getTime();
   try {
@@ -122,11 +130,11 @@ async function decide(
       pageUnchanged: state.pageUnchanged,
       lastStep: state.lastStep,
       progress: progressOf(state),
-      onRecord: NO_UNITS_ON_RECORD,
+      onRecord: advice.onRecord,
     });
     // An answered plan clears the count: the rail stops on faults in a row.
     state.brainFaults = 0;
-    return { decided, durationMs: elapsed() };
+    return { decided, durationMs: elapsed(), advice };
   } catch (error) {
     if (!(error instanceof BrainFaulted)) throw error;
     recordBrainFault(ctx, error, elapsed());
@@ -143,6 +151,7 @@ function recordPlan(
   ctx: EngineContext,
   decided: Decided<StepPlan>,
   durationMs: number,
+  advice: AdviceRecord,
 ): PlanReadout {
   const { deps, state } = ctx;
   const readout = routePlan(decided.run, state.step);
@@ -164,7 +173,7 @@ function recordPlan(
     answer: null,
     confidence: null,
     durationMs,
-    payload: planPayload(readout, decided),
+    payload: planPayload(readout, decided, advice),
   });
   ctx.dumpFiles('plan', [
     stepJsonFile(state.step, 'plan', {
@@ -257,7 +266,7 @@ export async function step(ctx: EngineContext): Promise<Termination | null> {
   if (railed !== null) return railed;
   const planned = await decide(ctx, observation);
   if (planned === null) return rails(ctx);
-  const readout = recordPlan(ctx, planned.decided, planned.durationMs);
+  const readout = recordPlan(ctx, planned.decided, planned.durationMs, planned.advice);
   if (!readout.executable || readout.plan === null) {
     refusePlan(ctx, readout);
     return rails(ctx);

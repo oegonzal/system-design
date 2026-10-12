@@ -71,6 +71,16 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       'A unit of work carries the identity its mission declares: the facts named under Unit identity, read by the one declared-section grammar every mission section uses, carried by every taskStart as facets with their values as the page names them, compared across sessions by one fixed-locale key, stored on the task row and rendered beside each open and closed unit; the units an advisor puts on record are rendered under Units of work by stance within a bound, and only the forbidden ones reach the goal’s index.',
   },
+  {
+    id: 'BRW-14',
+    statement:
+      'A mission names its advisors and the environment says only where each is: every declared section is parsed and every named advisor described, matched to its name, held to the facets the mission declares and asked once before the session has a row, a beat or a dump folder — an advisor nobody runs, one needing an undeclared fact, or a session with no subject of its own refuses the session by name — and before every plan each advisor is asked again, its answer composed into the goal with the forbidden units in the index, a faulting advisor said once and ridden on its last good advice with a single probe a step until it answers again, the step’s advice file and the plan row recording what the composer saw.',
+  },
+  {
+    id: 'BRW-15',
+    statement:
+      'A session says what happened for whoever keeps a record of its units beyond it — started, unit opened, unit closed, ended — as declared bus topics carrying the engine-minted unit id, its declared identity and the session’s own lifetime, published on a queue of their own so a bus riding out a restart never holds a row behind it, the end said before the drain, the close waiting one window for them all and recording what stayed unsent; and a recorded session’s events can be published again from its rows.',
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

@@ -87,6 +87,14 @@ const sessionDefaultsSchema = z.strictObject({
    * three seconds of one restart ended a session forty minutes in.
    */
   loopRecovery: recoverySchema,
+  /** How long a session rides out an advisor that is restarting before it plans on the advisor's last advice. */
+  advisorRecovery: recoverySchema,
+  /**
+   * How long anything the session says on the notifications bus — a question
+   * to the operator, an event for the record — rides out a service that is
+   * restarting; and how long the close waits for the last events, in all.
+   */
+  busRecovery: recoverySchema,
 });
 export type SessionDefaults = z.infer<typeof sessionDefaultsSchema>;
 
@@ -99,8 +107,6 @@ const notificationsChannelSchema = z.strictObject({
   pullWaitMs: positive,
   /** The most events one wait takes: the session's own answer, and other askers' it passes over. */
   eventsPerPull: positive,
-  /** How long a question rides out a notifications service that is restarting. */
-  recovery: recoverySchema,
 });
 
 /**

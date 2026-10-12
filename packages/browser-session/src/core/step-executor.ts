@@ -21,6 +21,7 @@ import {
   type Termination,
 } from './ports';
 import { labelledScreenshot } from './session-dump';
+import { unitClosedEvent, unitOpenedEvent } from './session-events';
 import {
   clearObjections,
   describeAction,
@@ -73,6 +74,7 @@ function openTask(
       startedAt,
     }),
   );
+  ctx.events.publish(unitOpenedEvent(ctx, task));
   pushHistory(state, label, 'ok', null);
 }
 
@@ -107,6 +109,7 @@ async function closeTask(
     finishedAt: deps.clock.now(),
   };
   queue.write(`task ${task.ordinal} close`, () => deps.ledger.closeTask(task.id, close));
+  ctx.events.publish(unitClosedEvent(ctx, task, action.outcome));
   pushHistory(state, label, 'ok', null);
 }
 

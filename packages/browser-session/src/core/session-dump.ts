@@ -46,6 +46,7 @@ export const STEP_FILES = {
   fields: 'fields.json',
   teach: 'teach.json',
   captures: 'captures.json',
+  advice: 'advice.json',
 } as const;
 export type StepFile = keyof typeof STEP_FILES;
 
@@ -163,6 +164,8 @@ export interface ManifestInput {
   startedAt: Date;
   finishedAt: Date;
   error: { name: string; message: string } | null;
+  /** Events still unpublished when the close stopped waiting for the bus; `replay-events` sends them again. */
+  unsentEvents: readonly string[];
 }
 
 /** `manifest.json`: the session at a glance, every number the index row repeats. */
@@ -187,6 +190,7 @@ export function manifestOf(input: ManifestInput) {
     finishedAt: input.finishedAt.toISOString(),
     durationMs: input.finishedAt.getTime() - input.startedAt.getTime(),
     error: input.error,
+    unsentEvents: [...input.unsentEvents],
     note: 'Contains the goal, page text and screenshots verbatim.',
   };
 }

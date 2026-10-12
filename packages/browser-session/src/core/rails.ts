@@ -54,7 +54,7 @@ export const RAILS: readonly Rail[] = [
   {
     reason: 'operator-stop',
     holds: (state) => state.operatorStopped,
-    detail: () => 'the operator typed /stop',
+    detail: () => 'the operator ended the session: /stop, or Ctrl-C at the terminal',
   },
   {
     // The session's goal, checked before its limits: when the unit that

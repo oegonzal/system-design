@@ -5,7 +5,7 @@ import {
   type BrowserSessionDto,
 } from '@sysdesign/contracts';
 
-import type { SessionConfig } from '../../config';
+import { SESSION_ENV, type SessionConfig } from '../../config';
 import type { RunSessionOptions } from '../../core/engine-context';
 import { pauseQuestion } from '../../core/operator-interaction';
 import type {
@@ -16,8 +16,11 @@ import type {
   GoalSource,
   LedgerPort,
   OperatorPort,
+  StopSignal,
 } from '../../core/ports';
 import { runSession, type SessionOutcome } from '../../core/session-engine';
+import { sessionEventsOf, type SessionEventsPort } from '../../core/session-events';
+import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
 import {
   BRAIN,
   BROWSER,
@@ -27,6 +30,9 @@ import {
   LEDGER,
   OPERATOR,
   SESSION_CONFIG,
+  SESSION_EVENTS,
+  STOP_SIGNAL,
+  UNIT_ADVISORS,
 } from './tokens';
 
 /**
@@ -36,18 +42,24 @@ import {
  */
 export type RunOptions = Omit<
   RunSessionOptions,
-  'subject' | 'capture' | 'settingsSources' | 'questionExpiresAfterMs' | 'asksAfterRefusal'
+  | 'subject'
+  | 'subjectDeclared'
+  | 'eventsDrainMs'
+  | 'capture'
+  | 'settingsSources'
+  | 'questionExpiresAfterMs'
+  | 'asksAfterRefusal'
 > & {
   subject?: string | undefined;
 };
 
 /**
- * The four things the command line asks for. `run` is the engine over the
+ * The five things the command line asks for. `run` is the engine over the
  * bound ports; `login` opens the profile headed at a URL and waits for the
  * operator, so the cookies persist for later sessions; `list` and `show`
- * read the ledger. Progress goes to the operator's terminal, so a session
- * can be watched with the Nest logger quiet; a write that did not land is
- * a warning.
+ * read the ledger; `replayEvents` publishes a recorded session's events
+ * again. Progress goes to the operator's terminal, so a session can be
+ * watched with the Nest logger quiet; a write that did not land is a warning.
  */
 @Injectable()
 export class SessionService {
@@ -61,11 +73,14 @@ export class SessionService {
     @Inject(GOAL_SOURCE) private readonly goals: GoalSource,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(DUMP_STORE) private readonly dumps: DumpStore,
+    @Inject(UNIT_ADVISORS) private readonly advisors: readonly ConfiguredAdvisor[],
+    @Inject(SESSION_EVENTS) private readonly events: SessionEventsPort,
+    @Inject(STOP_SIGNAL) private readonly stop: StopSignal,
     @Inject(SESSION_CONFIG) private readonly config: SessionConfig,
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
-    const { capture, operator, sources } = this.config.settings;
+    const { capture, operator, session, sources } = this.config.settings;
     // A configuration read once at boot is invisible afterwards: say which files are in force.
     this.operator.notify(
       `settings: ${Object.entries(sources)
@@ -81,12 +96,19 @@ export class SessionService {
         goals: this.goals,
         clock: this.clock,
         dumps: this.dumps,
+        advisors: this.advisors,
+        events: this.events,
+        stop: this.stop,
         warn: (text) => this.logger.warn(text),
         log: (text) => this.operator.notify(text),
       },
       {
         ...options,
         subject: options.subject ?? this.config.subject,
+        // Given by the flag, or set in the environment: anything but the declared fallback.
+        subjectDeclared:
+          options.subject !== undefined || this.config.subject !== SESSION_ENV.subject.fallback,
+        eventsDrainMs: session.busRecovery.windowMs,
         capture,
         questionExpiresAfterMs: operator.expiresAfterMs,
         asksAfterRefusal: operator.asksAfterRefusal,
@@ -128,5 +150,24 @@ export class SessionService {
 
   show(id: string): Promise<BrowserSessionDetailDto | null> {
     return this.ledger.getSession(id);
+  }
+
+  /**
+   * A recorded session's events published again, from its rows, for a record
+   * that missed them; how many went out, or null for a session nobody has.
+   * A session from before subjects were kept has no record to belong to.
+   */
+  async replayEvents(id: string): Promise<number | null> {
+    const detail = await this.ledger.getSession(id);
+    if (detail === null) return null;
+    const { subject } = detail;
+    if (subject === null) {
+      throw new SessionRefused(
+        `session ${id} ran before subjects were kept: its units have no record to belong to`,
+      );
+    }
+    const events = sessionEventsOf({ ...detail, subject });
+    for (const event of events) await this.events.publish(event);
+    return events.length;
   }
 }

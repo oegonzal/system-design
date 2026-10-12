@@ -43,6 +43,7 @@ const manifest = () =>
     steps: 2,
     tasks: { started: 1, closed: 1 },
     decisions: 3,
+    unsentEvents: [],
     startedAt: new Date('2026-10-03T10:00:00.000Z'),
     finishedAt: new Date('2026-10-03T10:05:00.000Z'),
     error: null,

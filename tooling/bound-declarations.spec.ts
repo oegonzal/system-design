@@ -44,6 +44,8 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/units/identity.ts',
   'packages/contracts/src/lib/units/record.ts',
   'packages/contracts/src/lib/units/mission-identity.ts',
+  'packages/contracts/src/lib/units/advice.ts',
+  'packages/contracts/src/lib/units/session-events.ts',
   'packages/quality-loop/src/core/stages/schemas.ts',
   'packages/quality-loop/src/core/outputs/experience-record.ts',
   'packages/quality-loop/src/pipelines/experience-digest/output.ts',

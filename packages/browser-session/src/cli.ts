@@ -3,13 +3,15 @@
  * `main.js login --profile <name> --url <url>`
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
+ * `main.js replay-events <id>`
  *
  * `parseOptions` reads argv against the declared flags; `execute` runs the
  * options over the service and writes through `io`; `cli` loads the
  * configuration, boots the Nest context around them and exits by the result:
- * 2 for a usage or configuration problem — or a database that has not applied
- * every migration this checkout carries — 1 for a failed session or an
- * unknown id, 0 otherwise; a session the rails or the operator stopped is 0.
+ * 2 for a usage or configuration problem — a database that has not applied
+ * every migration this checkout carries, a session refused before it had a
+ * row — 1 for a failed session or an unknown id, 0 otherwise; a session the
+ * rails or the operator stopped is 0.
  */
 import { parseArgs } from 'node:util';
 
@@ -31,6 +33,7 @@ import {
   SessionConfigError,
   type SessionConfig,
 } from './config';
+import { SessionRefused } from './core/unit-advice';
 import { AppModule } from './modules/app/app.module';
 import { SessionService } from './modules/session/session.service';
 import { renderOutcome, renderSession, renderSessions } from './render';
@@ -44,7 +47,9 @@ export const USAGE = `usage: browser-session <command> [options]
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
   sessions  [${flag('limit')} n] [${flag('json')}]
-  show      <id> [${flag('json')}]`;
+  show      <id> [${flag('json')}]
+  replay-events <id>
+            publishes a recorded session's events again, for a record that missed them`;
 
 /** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
@@ -52,6 +57,7 @@ export const COMMANDS = {
   login: { positionals: 0, ledger: false },
   sessions: { positionals: 0, ledger: true },
   show: { positionals: 1, ledger: true },
+  'replay-events': { positionals: 1, ledger: true },
 } as const;
 export type Command = keyof typeof COMMANDS;
 
@@ -69,7 +75,8 @@ export type Options =
     }
   | { command: 'login'; profile: string; url: string }
   | { command: 'sessions'; limit: number; json: boolean }
-  | { command: 'show'; id: string; json: boolean };
+  | { command: 'show'; id: string; json: boolean }
+  | { command: 'replay-events'; id: string };
 
 /** What `execute` writes to and how it is answered. */
 export interface Io {
@@ -79,7 +86,7 @@ export interface Io {
 }
 
 /** The slice of the service the CLI drives — the fake in the spec implements exactly this. */
-export type CliService = Pick<SessionService, 'run' | 'login' | 'list' | 'show'>;
+export type CliService = Pick<SessionService, 'run' | 'login' | 'list' | 'show' | 'replayEvents'>;
 
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
@@ -151,6 +158,8 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
         };
       case 'show':
         return { command, id: positionals[0] ?? '', json: on('json') ?? false };
+      case 'replay-events':
+        return { command, id: positionals[0] ?? '' };
     }
   } catch (error) {
     return error instanceof Error ? error : new Error(messageOf(error));
@@ -186,10 +195,20 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
         io.out(options.json ? json(detail) : renderSession(detail, io.now()));
         return 0;
       }
+      case 'replay-events': {
+        const published = await service.replayEvents(options.id);
+        if (published === null) {
+          io.error(`no session ${options.id}`);
+          return 1;
+        }
+        io.out(`${published} event(s) published again for session ${options.id}`);
+        return 0;
+      }
     }
   } catch (error) {
     io.error(messageOf(error));
-    return 1;
+    // A session refused before it had a row is a configuration problem, like a bad flag.
+    return error instanceof SessionRefused ? 2 : 1;
   }
 }
 

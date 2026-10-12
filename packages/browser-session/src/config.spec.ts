@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  advisorEntries,
   flagKey,
   headedOf,
   parseArgsOptions,
@@ -29,6 +30,7 @@ describe('the session configuration', () => {
       dumpDir: 'static/sessions',
       profilesDir: 'static/browser-profiles',
       subject: 'the subject',
+      advisors: [],
     });
     expect(
       sessionConfigFromEnv({
@@ -37,6 +39,7 @@ describe('the session configuration', () => {
         [SESSION_ENV.dumpDir.name]: '/tmp/dumps',
         [SESSION_ENV.profilesDir.name]: ' /tmp/profiles ',
         [SESSION_ENV.subject.name]: 'Alex Example',
+        [SESSION_ENV.advisors.name]: 'record=http://advisor.test:3006, http://other.test',
       }),
     ).toEqual({
       loopUrl: 'http://loop.test:1234',
@@ -44,7 +47,27 @@ describe('the session configuration', () => {
       dumpDir: '/tmp/dumps',
       profilesDir: '/tmp/profiles',
       subject: 'Alex Example',
+      advisors: [
+        { id: 'record', url: 'http://advisor.test:3006', text: 'record=http://advisor.test:3006' },
+        { id: null, url: 'http://other.test', text: 'http://other.test' },
+      ],
     });
+    // An advisor entry is `none`, or `[<id>=]<url>` in the grammar a mission names an advisor by.
+    expect(advisorEntries({}, SESSION_ENV.advisors)).toEqual([]);
+    const entries = (value: string) => () =>
+      advisorEntries({ [SESSION_ENV.advisors.name]: value }, SESSION_ENV.advisors);
+    expect(entries('Record=http://advisor.test')).toThrow(
+      'UNIT_ADVISOR_URLS entry "Record=http://advisor.test" must be [<id>=]<url>, the id lower-case words joined by hyphens',
+    );
+    expect(entries('record=nowhere')).toThrow('must be [<id>=]<url>, got no URL');
+    expect(entries('record=http://a.test,record=http://b.test')).toThrow(
+      'UNIT_ADVISOR_URLS names an advisor id twice',
+    );
+    expect(entries(' , ')).toThrow('UNIT_ADVISOR_URLS must be none or [<id>=]<url> entries');
+    // A URL with a query is still one entry, never split at its `=`.
+    expect(entries('http://advisor.test/?tenant=a')()).toEqual([
+      { id: null, url: 'http://advisor.test/?tenant=a', text: 'http://advisor.test/?tenant=a' },
+    ]);
     // A blank value is unset, not a blank directory.
     expect(sessionConfigFromEnv({ [SESSION_ENV.dumpDir.name]: '  ' }).dumpDir).toBe(
       'static/sessions',

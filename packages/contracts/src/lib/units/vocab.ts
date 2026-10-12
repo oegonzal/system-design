@@ -37,3 +37,9 @@ export const UNIT_NOTE_BOUND = bound(80);
 /** The most advisors a mission names. */
 export const ADVISORS_BOUND = bound(4, 'list');
 export const ADVISOR_ID_MAX_LENGTH = 40;
+/**
+ * The most units an advisor answers with; the rest it counts as omitted. Both
+ * sides read it here, so a request carries no limit of its own: the goal
+ * renders `UNITS_ON_RECORD_BOUND` of them and counts the rest again.
+ */
+export const ADVICE_UNITS_BOUND = bound(200, 'list');

@@ -36,6 +36,7 @@ import {
 
 export * from './testing-runs';
 export * from './testing-journey';
+export * from './testing-advisor';
 
 /**
  * The ports as fakes, for the engine's specs and the scripted end-to-end
@@ -380,8 +381,11 @@ export class InMemoryDumpStore implements DumpStore {
   readonly files = new Map<string, string | Uint8Array>();
   readonly index: string[] = [];
   readonly runId = 'fake-session-dump';
+  /** How many sessions opened a folder here: a refused session opens none. */
+  opened = 0;
 
   open(): DumpSink {
+    this.opened += 1;
     return {
       runId: this.runId,
       write: (files: readonly (DumpFile | DumpBytes)[]) => {

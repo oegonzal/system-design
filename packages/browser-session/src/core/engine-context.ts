@@ -16,11 +16,14 @@ import type {
   LedgerPort,
   NewDecision,
   OperatorPort,
+  StopSignal,
   Termination,
 } from './ports';
 import { causeOf } from './ports';
 import type { StepFailureEvent } from './rails';
+import type { SessionEvents, SessionEventsPort } from './session-events';
 import type { SessionState } from './session-state';
+import type { ConfiguredAdvisor, ResolvedAdvisor } from './unit-advice';
 import type { WriteQueue } from './write-queue';
 
 /**
@@ -36,6 +39,11 @@ export interface SessionDeps {
   goals: GoalSource;
   clock: Clock;
   dumps: DumpStore;
+  /** Every advisor the environment configures; the mission names which to ask. */
+  advisors: readonly ConfiguredAdvisor[];
+  /** Where the session says what happened, for whoever keeps a record of its units beyond it. */
+  events: SessionEventsPort;
+  stop: StopSignal;
   /** A write that did not land, a beat that was missed: reported, never thrown. */
   warn(text: string): void;
   log(text: string): void;
@@ -57,6 +65,10 @@ export interface RunSessionOptions {
   rails: SessionRailsDto;
   /** Whom the operator's answers are about, by name. */
   subject: string;
+  /** Whether the subject was given for this run, or is the configured fallback — a record is kept by subject, so an advisor is refused without one. */
+  subjectDeclared: boolean;
+  /** How long the close waits for the session's events to publish, in all: the bus recovery window, so a bus down for the window costs one window, not one per event. */
+  eventsDrainMs: number;
   /** Where to open the browser before the first plan; unset leaves it on about:blank. */
   startUrl?: string;
   capture: CapturePolicy;
@@ -85,6 +97,9 @@ export interface EngineContext {
   criteria: SessionCriteria;
   queue: WriteQueue;
   dump: DumpSink;
+  /** The advisors the mission named, resolved before the session opened. */
+  advisors: ResolvedAdvisor[];
+  events: SessionEvents;
   /** Queue one decision row for the current step; answers its id. */
   record(decision: DecisionInput): string;
   /** Queue dump files; a write that fails is reported under `what`. */
@@ -103,6 +118,8 @@ export interface EngineParts {
   mission: string;
   dump: DumpSink;
   queue: WriteQueue;
+  advisors: ResolvedAdvisor[];
+  events: SessionEvents;
 }
 
 /**

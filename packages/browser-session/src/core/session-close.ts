@@ -5,6 +5,7 @@ import type { EngineContext, SessionDeps } from './engine-context';
 import type { GoalSource, Termination } from './ports';
 import { closingFiles, indexRowOf, manifestOf } from './session-dump';
 import type { SessionOutcome } from './session-engine';
+import { endedEvent } from './session-events';
 import { tasksClosed } from './session-state';
 
 /** A write that did not land, a beat that was missed: reported under the session, never thrown. */
@@ -23,14 +24,17 @@ export interface SessionEnd {
 
 /**
  * Every path out of a session — a plan's cause, a rail, the operator, a
- * fault — ends here: the queue drained, the session row closed, the dump
- * closed and indexed, the outcome logged and returned. A close that fails is
- * reported, never thrown: what the session did is already on the record.
+ * fault — ends here: the end said on the bus, the queue drained, the session
+ * row closed, the events waited for one window in all, the dump closed and
+ * indexed, the outcome logged and returned. A close that fails is reported,
+ * never thrown: what the session did is already on the record.
  */
 export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise<SessionOutcome> {
-  const { deps, options, state, dump, queue } = ctx;
+  const { deps, options, state, dump, queue, events } = ctx;
   const warn = warnOf(deps, state.sessionId);
   const finishedAt = deps.clock.now();
+  // Whoever keeps the record learns the session is over before anything else closes.
+  events.publish(endedEvent(state.sessionId));
   // A stop the mission declares leaves the session in the status the mission
   // gave it; every other end is the engine's, classified where it is declared.
   const status =
@@ -48,6 +52,14 @@ export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise
     });
   } catch (caught) {
     warn('session row not closed', caught);
+  }
+  // The events ride their own queue: one window for them all, and what is
+  // still unsent is said and recorded, never waited on for good.
+  const unsentEvents = await events.drain(options.eventsDrainMs);
+  if (unsentEvents.length > 0) {
+    deps.warn(
+      `session ${state.sessionId}: ${unsentEvents.length} event(s) not published within ${options.eventsDrainMs} ms — ${unsentEvents.join(', ')}`,
+    );
   }
   try {
     const manifest = manifestOf({
@@ -67,6 +79,7 @@ export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise
       startedAt: end.startedAt,
       finishedAt,
       error: end.error,
+      unsentEvents,
     });
     const tasks = (await deps.ledger.getSession(state.sessionId))?.tasks ?? [];
     dump.write(closingFiles(manifest, end.goal.markdown, tasks));

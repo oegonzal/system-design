@@ -11,6 +11,7 @@ import {
   FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
   MISSION_FIXTURE,
+  SESSION_TOPICS,
   type StepPlan,
   FORM_MEMORY_TARGET_STEP,
 } from '@sysdesign/contracts';
@@ -31,20 +32,23 @@ import {
   JOURNEY_ANSWERS,
   JOURNEY_SEQUENCE,
   journeyPages,
+  RecordingEvents,
   ScriptedOperator,
 } from '../../core/testing';
+import { FakeStopSignal } from '../../core/testing-session';
 import { readSessionSettings } from '../../settings';
 import { AppModule } from '../app/app.module';
 import { SessionService } from './session.service';
-import { BRAIN, BROWSER, OPERATOR } from './tokens';
+import { BRAIN, BROWSER, OPERATOR, SESSION_EVENTS, STOP_SIGNAL } from './tokens';
 
 /**
  * The scripted end-to-end dry run: the module as it ships, with the browser
- * and the operator faked and the quality loop the shared fake — so what runs
- * is the real brain adapter over a loop that settles each run with a
- * scripted artifact, the real ledger in Postgres, the real dump on disk and
- * the real goal source. The fake loop's settle hook plays the orchestrator:
- * a form-memory orchestration gets a target run and a reported admission.
+ * and the operator faked, the bus a recorder and the quality loop the shared
+ * fake — so what runs is the real brain adapter over a loop that settles each
+ * run with a scripted artifact, the real ledger in Postgres, the real dump on
+ * disk and the real goal source. The fake loop's settle hook plays the
+ * orchestrator: a form-memory orchestration gets a target run and a reported
+ * admission.
  */
 describe('the session service, end to end', () => {
   let home: string;
@@ -52,6 +56,7 @@ describe('the session service, end to end', () => {
   let core: FakeLoop;
   let browser: FakeBrowser;
   let operator: ScriptedOperator;
+  let events: RecordingEvents;
   const plans: StepPlan[] = [...JOURNEY_SEQUENCE];
 
   const settle = (): void => {
@@ -92,6 +97,7 @@ describe('the session service, end to end', () => {
       dumpDir: join(home, 'sessions'),
       profilesDir: join(home, 'profiles'),
       subject: 'Alex Example',
+      advisors: [],
       // The settings this package ships, so the run below is the one a session gets.
       settings: readSessionSettings(PACKAGE_ROOT),
     };
@@ -99,6 +105,7 @@ describe('the session service, end to end', () => {
     const client = new FakeLoopClient(core);
     browser = new FakeBrowser(journeyPages());
     operator = new ScriptedOperator(['Yes']);
+    events = new RecordingEvents();
     moduleRef = await Test.createTestingModule({ imports: [AppModule.register(config)] })
       .overrideProvider(LoopClient)
       .useValue(client)
@@ -108,6 +115,10 @@ describe('the session service, end to end', () => {
       .useValue(browser)
       .overrideProvider(OPERATOR)
       .useValue(operator)
+      .overrideProvider(SESSION_EVENTS)
+      .useValue(events)
+      .overrideProvider(STOP_SIGNAL)
+      .useValue(new FakeStopSignal())
       .compile();
     await moduleRef.init();
     await truncateTestTables(moduleRef.get(EntityManager), [
@@ -262,5 +273,22 @@ describe('the session service, end to end', () => {
 
     const listed = await service.list(10);
     expect(listed.map((s) => s.id)).toEqual([outcome.sessionId]);
+
+    // What the session said on the bus, through the wiring that ships: its start, the unit's open and close by the row's id, its end.
+    expect(events.published.map((event) => event.topic)).toEqual([
+      SESSION_TOPICS.started,
+      SESSION_TOPICS.unitOpened,
+      SESSION_TOPICS.unitClosed,
+      SESSION_TOPICS.ended,
+    ]);
+    expect(events.published[1]?.payload).toMatchObject({
+      sessionId: outcome.sessionId,
+      subject: 'Alex Example',
+      unit: { id: detail?.tasks[0]?.id, ordinal: 1 },
+    });
+    // The same events again from the rows, through the same bus.
+    expect(await service.replayEvents(outcome.sessionId)).toBe(4);
+    expect(events.published).toHaveLength(8);
+    expect(await service.replayEvents(crypto.randomUUID())).toBeNull();
   });
 });

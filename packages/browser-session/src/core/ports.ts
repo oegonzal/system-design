@@ -38,8 +38,10 @@ import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
  * The ports the session engine drives. The engine is pure over these: a
  * browser that observes and acts, a brain that is the quality loop, a ledger
  * for the records, an operator at a terminal, a goal to read, a clock and a
- * dump to write. Every adapter lives under `adapters/`; every fake under
- * `core/testing.ts`; nothing here names a site, a database or a model.
+ * dump to write, and the operator's interrupt. The advisor and the session
+ * events ports live beside their flows, in `unit-advice.ts` and
+ * `session-events.ts`. Every adapter lives under `adapters/`; every fake under
+ * `core/testing*.ts`; nothing here names a site, a database or a model.
  */
 
 // ---- the browser ------------------------------------------------------------
@@ -381,4 +383,16 @@ export interface DumpSink {
 
 export interface DumpStore {
   open(now: Date): DumpSink;
+}
+
+// ---- the operator's interrupt ---------------------------------------------------
+
+/**
+ * Ctrl-C as the operator's word, through a port: the engine ends the session
+ * after the step in flight, through every closing write, and a spec can press
+ * it. How a second press is handled is the adapter's.
+ */
+export interface StopSignal {
+  /** Calls the handler when the operator asks the process to stop; answers how to stop listening. */
+  onStop(handler: () => void): () => void;
 }

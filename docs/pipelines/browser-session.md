@@ -96,3 +96,26 @@ From the runs above, `pnpm measure:bounds` reads `static/runs` read-only and
 regenerates each pipeline's `measured.json` — what each stage wrote, field by
 field and call by call; the `[QL-33]` assertion in each `definition.spec.ts`
 holds the declared caps at a fifth above those.
+
+## 5. A record beyond the session
+
+A mission that declares `## Unit identity` and `## Advisors` runs only with the
+advisors it names configured — `UNIT_ADVISOR_URLS=<id>=<url>[,…]`, or `none` —
+and a subject of its own (`--subject`, or `BROWSER_SESSION_SUBJECT`); without
+either the session is refused by name before it has a row. Then:
+
+```bash
+curl -s <advisor url>/advisor | jq .data                 # who it is, which declared facets it keeps its record by
+pnpm browser-session run --goal <mission.md> --profile <name> --subject "Your Name" --max-tasks 2
+cat static/sessions/<id>/01-steps/01/advice.json         # what the advisor said before the first plan, and what the goal was composed with
+pnpm browser-session show <sessionId>                    # each unit with its identity beside its label
+```
+
+What to read: `advice.json` per step — `answered` on every step, or `stale`
+with the step the advice is from and the fault that opened the streak; the
+goal in the run dump (`static/runs/<runId>/01-goal.md`) renders the units on
+record under `## Units of work` by stance and lists the forbidden ones in its
+index; a `taskStart` naming one is cut by the limits validator and the next
+plan's objection says so. `manifest.json` lists `unsentEvents` when the bus
+was down past `busRecovery.windowMs` at the close; `replay-events <id>` sends
+a session's events again from its rows.

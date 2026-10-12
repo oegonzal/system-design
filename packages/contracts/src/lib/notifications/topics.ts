@@ -1,3 +1,10 @@
+import {
+  SESSION_TOPICS,
+  sessionEndedSchema,
+  sessionStartedSchema,
+  sessionUnitClosedSchema,
+  sessionUnitOpenedSchema,
+} from '../units/session-events';
 import type { TopicDeclaration } from './bus';
 import {
   INTERACTION_TOPICS,
@@ -17,4 +24,9 @@ export const NOTIFICATION_TOPICS: Readonly<Record<string, TopicDeclaration>> = {
   [INTERACTION_TOPICS.prompted]: { schema: interactionPromptSchema, publishedBy: 'anyone' },
   [INTERACTION_TOPICS.answered]: { schema: interactionAnswerSchema, publishedBy: 'service' },
   [INTERACTION_TOPICS.withdrawn]: { schema: interactionWithdrawnSchema, publishedBy: 'anyone' },
+  // What a browser session says happened, for whoever keeps a record of its units beyond it.
+  [SESSION_TOPICS.started]: { schema: sessionStartedSchema, publishedBy: 'anyone' },
+  [SESSION_TOPICS.unitOpened]: { schema: sessionUnitOpenedSchema, publishedBy: 'anyone' },
+  [SESSION_TOPICS.unitClosed]: { schema: sessionUnitClosedSchema, publishedBy: 'anyone' },
+  [SESSION_TOPICS.ended]: { schema: sessionEndedSchema, publishedBy: 'anyone' },
 };

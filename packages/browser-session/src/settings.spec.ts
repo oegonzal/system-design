@@ -33,6 +33,15 @@ describe('the session settings', () => {
     // The operator is asked at the terminal and through the notifications service.
     expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);
     expect(Object.keys(shipped.operator.channels)).toEqual(['notifications']);
+    // One window per service the session rides out, all three declared on the session.
+    expect(Object.keys(shipped.session)).toEqual([
+      'headed',
+      'rails',
+      'loopRecovery',
+      'advisorRecovery',
+      'busRecovery',
+    ]);
+    expect(shipped.session.busRecovery).toEqual({ windowMs: 60000, pauseMs: 2000 });
 
     // Every file a choice could name is a complete, valid configuration of its kind.
     expect(profiles('capture').sort()).toEqual(['every-action', 'field-entries', 'observations']);
@@ -93,6 +102,19 @@ describe('the session settings', () => {
         choosing(
           { capture: 'field-entries', session: 'standard', operator: 'terminal' },
           { 'operator/terminal.json': '{"expiresAfterMs":1000,"channels":{"carrier-pigeon":{}}}' },
+        ),
+      ),
+    ).toThrow(EngineConfigError);
+    // A channel's own recovery window is a field no schema declares: the session's one bus window serves it.
+    expect(() =>
+      readSessionSettings(
+        PACKAGE_ROOT,
+        choosing(
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
+          {
+            'operator/terminal.json':
+              '{"expiresAfterMs":1000,"asksAfterRefusal":1,"channels":{"notifications":{"pullWaitMs":1000,"eventsPerPull":5,"recovery":{"windowMs":1,"pauseMs":1}}}}',
+          },
         ),
       ),
     ).toThrow(EngineConfigError);

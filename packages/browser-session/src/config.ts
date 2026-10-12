@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 
-import type { SessionRailsDto } from '@sysdesign/contracts';
+import { ADVISOR_ID_PATTERN, type SessionRailsDto } from '@sysdesign/contracts';
 
 import type { SessionSettings } from './settings';
 
@@ -20,7 +20,9 @@ import type { SessionSettings } from './settings';
  * Model access is deliberately absent: the session never calls a model. It
  * asks the quality loop, at `QUALITY_LOOP_URL`, and the loop owns the model;
  * it reaches the operator beyond the terminal through the notifications
- * service, at `NOTIFICATIONS_URL`.
+ * service, at `NOTIFICATIONS_URL`, and asks what is on record of units beyond
+ * the session at the advisors `UNIT_ADVISOR_URLS` lists — the mission names
+ * which of them, the environment only where each is.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -71,7 +73,11 @@ export const SESSION_ENV = {
   dumpDir: { name: 'BROWSER_SESSION_DUMP_DIR', fallback: 'static/sessions' },
   profilesDir: { name: 'BROWSER_PROFILES_DIR', fallback: 'static/browser-profiles' },
   subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the subject' },
+  advisors: { name: 'UNIT_ADVISOR_URLS', fallback: 'none' },
 } as const;
+
+/** The value that configures no advisor: a mission naming one is then refused by name, never run blind. */
+export const NO_ADVISORS = 'none';
 
 export const DEFAULT_LIST_LIMIT = 20;
 
@@ -83,6 +89,19 @@ export interface SessionEnv {
   profilesDir: string;
   /** Whom the operator's answers are about, by name, so a stored fact is self-contained. */
   subject: string;
+  /** The advisors configured, in order; none under `none`. */
+  advisors: AdvisorEntry[];
+}
+
+/**
+ * One configured advisor: the id its entry named — or null for one the
+ * session describes at boot to learn — its URL, and the entry as written,
+ * for a refusal to name.
+ */
+export interface AdvisorEntry {
+  id: string | null;
+  url: string;
+  text: string;
 }
 
 /** What the module is composed from: the environment, and the settings files. */
@@ -113,9 +132,58 @@ const url = (env: NodeJS.ProcessEnv, variable: { name: string; fallback: string 
   return value;
 };
 
+/** `<id>=<url>`: whatever stands before the first `=` with no sign of being a URL itself is the id, held to the mission's grammar below. */
+const KEYED_ENTRY = /^([^=:/\s]+)=(.+)$/;
+
 /**
- * The one read of the environment. A URL that does not parse and a directory
- * given as blank are refused here, by variable name, before anything boots.
+ * Comma-separated `[<id>=]<url>` entries, or `none`. An entry that is neither
+ * — no URL, an id the grammar does not read, an id named twice — is refused by
+ * variable name before anything boots.
+ */
+export function advisorEntries(
+  env: NodeJS.ProcessEnv,
+  variable: { name: string; fallback: string },
+): AdvisorEntry[] {
+  const value = nonEmpty(env, variable);
+  if (value === NO_ADVISORS) return [];
+  const entries = value
+    .split(',')
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+    .map((text): AdvisorEntry => {
+      const keyed = KEYED_ENTRY.exec(text);
+      const id = keyed?.[1] ?? null;
+      const address = keyed?.[2] ?? text;
+      if (id !== null && !ADVISOR_ID_PATTERN.test(id)) {
+        throw new SessionConfigError(
+          `${variable.name} entry ${JSON.stringify(text)} must be [<id>=]<url>, the id lower-case words joined by hyphens`,
+        );
+      }
+      try {
+        new URL(address);
+      } catch {
+        throw new SessionConfigError(
+          `${variable.name} entry ${JSON.stringify(text)} must be [<id>=]<url>, got no URL`,
+        );
+      }
+      return { id, url: address, text };
+    });
+  if (entries.length === 0) {
+    throw new SessionConfigError(
+      `${variable.name} must be ${NO_ADVISORS} or [<id>=]<url> entries, got ${JSON.stringify(value)}`,
+    );
+  }
+  const ids = entries.map((entry) => entry.id).filter((id): id is string => id !== null);
+  if (new Set(ids).size !== ids.length) {
+    throw new SessionConfigError(`${variable.name} names an advisor id twice`);
+  }
+  return entries;
+}
+
+/**
+ * The one read of the environment. A URL that does not parse, a directory
+ * given as blank and an advisor entry that is neither `none` nor `[<id>=]<url>`
+ * are refused here, by variable name, before anything boots.
  */
 export function sessionConfigFromEnv(env: NodeJS.ProcessEnv = process.env): SessionEnv {
   return {
@@ -124,6 +192,7 @@ export function sessionConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Sess
     dumpDir: nonEmpty(env, SESSION_ENV.dumpDir),
     profilesDir: nonEmpty(env, SESSION_ENV.profilesDir),
     subject: nonEmpty(env, SESSION_ENV.subject),
+    advisors: advisorEntries(env, SESSION_ENV.advisors),
   };
 }
 

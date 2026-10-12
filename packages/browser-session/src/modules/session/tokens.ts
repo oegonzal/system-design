@@ -13,3 +13,6 @@ export const TERMINAL = Symbol('TERMINAL');
 export const GOAL_SOURCE = Symbol('GOAL_SOURCE');
 export const CLOCK = Symbol('CLOCK');
 export const DUMP_STORE = Symbol('DUMP_STORE');
+export const UNIT_ADVISORS = Symbol('UNIT_ADVISORS');
+export const SESSION_EVENTS = Symbol('SESSION_EVENTS');
+export const STOP_SIGNAL = Symbol('STOP_SIGNAL');

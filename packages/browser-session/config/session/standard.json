@@ -12,5 +12,13 @@
   "loopRecovery": {
     "windowMs": 60000,
     "pauseMs": 2000
+  },
+  "advisorRecovery": {
+    "windowMs": 60000,
+    "pauseMs": 2000
+  },
+  "busRecovery": {
+    "windowMs": 60000,
+    "pauseMs": 2000
   }
 }

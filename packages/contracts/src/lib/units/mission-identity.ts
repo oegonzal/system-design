@@ -38,6 +38,8 @@ const WORD = '[a-z][a-z0-9-]*';
 const IDENTITY_LINE = new RegExp(`^- (?<name>${WORD}): .+$`);
 /** One bullet: an advisor's id, nothing else. */
 const ADVISOR_LINE = new RegExp(`^- (?<id>${WORD})$`);
+/** An advisor's id as one whole word: what a mission names, and what a configured entry may be keyed by. */
+export const ADVISOR_ID_PATTERN = new RegExp(`^${WORD}$`);
 
 export class MissionIdentityMalformed extends Error {
   override readonly name = 'MissionIdentityMalformed';
