@@ -21,8 +21,8 @@ export interface AwaitOptions {
   signal?: AbortSignal;
 }
 
-/** A real wait: what every pause in this client is unless a spec injects its own. */
-export const defaultSleep = (ms: number): Promise<void> =>
+/** A real wait: what every pause while awaiting a run is unless a spec injects its own. */
+const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 interface Pacing {

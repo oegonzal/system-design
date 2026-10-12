@@ -117,9 +117,8 @@ describe('HttpLoopClient', () => {
   it('[LC-3] rides out a restarting loop within a declared window: asks again what never arrived and a read the loop failed, never a timeout or an answered start', async () => {
     let clock = 0;
     const slept: number[] = [];
-    const recovery = {
-      windowMs: 10_000,
-      pauseMs: 2_000,
+    const recovery = { windowMs: 10_000, pauseMs: 2_000 };
+    const ticking = {
       now: () => clock,
       sleep: async (ms: number) => {
         slept.push(ms);
@@ -132,9 +131,9 @@ describe('HttpLoopClient', () => {
     // A read that cannot connect twice, then answers.
     let reads = 0;
     const reading = scripted(() => (++reads <= 2 ? dead() : json(200, { data: run })));
-    expect(await new HttpLoopClient('http://loop', reading.fetch, recovery).getRun('r1')).toEqual(
-      run,
-    );
+    expect(
+      await new HttpLoopClient('http://loop', reading.fetch, recovery, ticking).getRun('r1'),
+    ).toEqual(run);
     expect([reading.calls.length, slept]).toEqual([3, [2_000, 2_000]]);
 
     // A read the loop failed while it came back, then answered.
@@ -144,9 +143,9 @@ describe('HttpLoopClient', () => {
         ? json(503, { statusCode: 503, message: 'starting' })
         : json(200, { data: run }),
     );
-    expect(await new HttpLoopClient('http://loop', failing.fetch, recovery).getRun('r1')).toEqual(
-      run,
-    );
+    expect(
+      await new HttpLoopClient('http://loop', failing.fetch, recovery, ticking).getRun('r1'),
+    ).toEqual(run);
     expect(failing.calls).toHaveLength(2);
 
     // A start that never connected is asked again; one the loop answered is not.
@@ -155,7 +154,7 @@ describe('HttpLoopClient', () => {
       ++starts === 1 ? dead() : json(202, { data: { runId: 'r2', status: 'running' } }),
     );
     expect(
-      await new HttpLoopClient('http://loop', connecting.fetch, recovery).startRun({
+      await new HttpLoopClient('http://loop', connecting.fetch, recovery, ticking).startRun({
         pipeline: 'p',
         goal: 'g',
       }),
@@ -164,7 +163,7 @@ describe('HttpLoopClient', () => {
       json(500, { statusCode: 500, message: 'Internal server error' }),
     );
     await expect(
-      new HttpLoopClient('http://loop', refusing.fetch, recovery).startRun({
+      new HttpLoopClient('http://loop', refusing.fetch, recovery, ticking).startRun({
         pipeline: 'p',
         goal: 'g',
       }),
@@ -176,14 +175,14 @@ describe('HttpLoopClient', () => {
     timeout.name = 'TimeoutError';
     const slow = scripted(() => timeout);
     await expect(
-      new HttpLoopClient('http://loop', slow.fetch, recovery).health(),
+      new HttpLoopClient('http://loop', slow.fetch, recovery, ticking).health(),
     ).rejects.toBeInstanceOf(LoopTimeout);
     expect(slow.calls).toHaveLength(1);
 
     // Past the window — a pause at 0, 2, 4, 6 and 8 s of a 10 s window — the error it would have raised at once.
     const down = scripted(dead);
     await expect(
-      new HttpLoopClient('http://loop', down.fetch, recovery).health(),
+      new HttpLoopClient('http://loop', down.fetch, recovery, ticking).health(),
     ).rejects.toBeInstanceOf(LoopUnreachable);
     expect(down.calls).toHaveLength(5);
 

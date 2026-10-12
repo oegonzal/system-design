@@ -121,9 +121,8 @@ describe('the bus over HTTP', () => {
 
   it('[NTC-1] asks again while the service is unreachable within the recovery window, and gives up past it', async () => {
     let clock = 0;
-    const recovery = {
-      windowMs: 1_000,
-      pauseMs: 300,
+    const recovery = { windowMs: 1_000, pauseMs: 300 };
+    const ticking = {
       now: () => clock,
       sleep: async (ms: number) => {
         clock += ms;
@@ -134,7 +133,11 @@ describe('the bus over HTTP', () => {
       new TypeError('fetch failed'),
       { status: 200, body: { data: SUBSCRIPTION } },
     ]);
-    const bus = new HttpBusClient('http://bus.test', { recovery, fetchImpl: restarting.fetchImpl });
+    const bus = new HttpBusClient('http://bus.test', {
+      recovery,
+      clock: ticking,
+      fetchImpl: restarting.fetchImpl,
+    });
     expect(await bus.subscribe('ask.x', { topics: ['interaction.answered'] })).toEqual(
       SUBSCRIPTION,
     );
@@ -143,12 +146,11 @@ describe('the bus over HTTP', () => {
     clock = 0;
     const gone = scripted(Array.from({ length: 10 }, () => new TypeError('fetch failed')));
     await expect(
-      new HttpBusClient('http://bus.test', { recovery, fetchImpl: gone.fetchImpl }).subscribe(
-        'ask.x',
-        {
-          topics: ['interaction.answered'],
-        },
-      ),
+      new HttpBusClient('http://bus.test', {
+        recovery,
+        clock: ticking,
+        fetchImpl: gone.fetchImpl,
+      }).subscribe('ask.x', { topics: ['interaction.answered'] }),
     ).rejects.toBeInstanceOf(BusUnreachable);
     expect(gone.calls).toHaveLength(4);
   });

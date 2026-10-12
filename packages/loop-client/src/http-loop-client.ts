@@ -1,20 +1,24 @@
-import type {
-  ApiResponse,
-  DeriveCriteriaRequest,
-  DerivedCriteriaDto,
-  OrchestrationRunDto,
-  OrchestrationRunStartedDto,
-  PromptLibraryDocumentDto,
-  PromptLibraryEntryDto,
-  QualityLoopHealthDto,
-  QualityRunDto,
-  QualityRunStartedDto,
-  StartOrchestrationFromRunRequest,
-  StartOrchestrationRequest,
-  StartQualityRunRequest,
+import {
+  type ApiResponse,
+  type DeriveCriteriaRequest,
+  type DerivedCriteriaDto,
+  NO_RECOVERY,
+  type OrchestrationRunDto,
+  type OrchestrationRunStartedDto,
+  type PromptLibraryDocumentDto,
+  type PromptLibraryEntryDto,
+  type QualityLoopHealthDto,
+  type QualityRunDto,
+  type QualityRunStartedDto,
+  type Recovery,
+  type RecoveryClock,
+  rideOut,
+  type Settled,
+  type StartOrchestrationFromRunRequest,
+  type StartOrchestrationRequest,
+  type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 
-import { defaultSleep } from './await-run';
 import { LoopClient } from './loop-client';
 import { DerivationFailed, LoopRefused, LoopTimeout, LoopUnreachable } from './loop-errors';
 
@@ -29,33 +33,16 @@ interface Answer {
   body: unknown;
 }
 
-/** One request's outcome: the loop's answer, or the error that came instead of one. */
-type Attempt = { answer: Answer } | { error: LoopTimeout | LoopUnreachable };
-
 /**
- * How long a caller rides out a loop that is restarting. Within the window a
- * call that is safe to ask again is asked again at the pause: one that never
- * reached the loop — the connection failed, never a timeout, which the loop
- * may have received — and a read the loop answered 5xx. A start the loop
- * answered is never repeated, whatever it said: it may have opened a run.
- * Past the window the call fails as it would have at once.
+ * Whether an attempt may be asked again within the declared recovery: one
+ * that never reached the loop — the connection failed, never a timeout, which
+ * the loop may have received — or a read the loop answered 5xx. A start the
+ * loop answered is never repeated, whatever it said: it may have opened a run.
  */
-export interface LoopRecovery {
-  windowMs: number;
-  pauseMs: number;
-  /** The clock and the wait, injectable so a spec need not wait. */
-  now?: () => number;
-  sleep?: (ms: number) => Promise<void>;
-}
-
-/** No window: a caller that serves people says the loop is down rather than wait on it. */
-const NO_RECOVERY: LoopRecovery = { windowMs: 0, pauseMs: 0 };
-
-/** Whether an attempt may be asked again: the loop never had it, or it was a read the loop failed. */
-const repeatable = (method: Method, attempt: Attempt): boolean =>
-  'error' in attempt
-    ? attempt.error instanceof LoopUnreachable
-    : method === 'GET' && attempt.answer.status >= 500;
+const repeatable = (method: Method, outcome: Settled<Answer>): boolean =>
+  'error' in outcome
+    ? outcome.error instanceof LoopUnreachable
+    : method === 'GET' && outcome.value.status >= 500;
 
 const isTimeout = (error: unknown): boolean =>
   error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
@@ -82,15 +69,17 @@ const segment = encodeURIComponent;
  * message and the route, and a 503 from `/criteria` — no model — is
  * `DerivationFailed` carrying the availability, so a caller can say why. A 404
  * on a read is `null`, not an error: the caller decides what a missing run
- * means. A caller that declares a `LoopRecovery` has a restarting loop ridden
- * out within its window; none does by default. The one thing this adapter
- * knows about Nest is nothing.
+ * means. A caller that declares a `Recovery` has a restarting loop ridden out
+ * within its window; none does by default. The one thing this adapter knows
+ * about Nest is nothing.
  */
 export class HttpLoopClient extends LoopClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly recovery: LoopRecovery = NO_RECOVERY,
+    private readonly recovery: Recovery = NO_RECOVERY,
+    /** The clock the recovery is kept by; a spec passes one that need not wait. */
+    private readonly clock?: RecoveryClock,
   ) {
     super();
   }
@@ -179,30 +168,22 @@ export class HttpLoopClient extends LoopClient {
   }
 
   /** The loop's answer, asked again within the declared recovery while the attempt is repeatable. */
-  private async call(
-    method: Method,
-    path: string,
-    body: unknown,
-    timeoutMs: number,
-  ): Promise<Answer> {
-    const { windowMs, pauseMs, now = Date.now, sleep = defaultSleep } = this.recovery;
-    const deadline = now() + windowMs;
-    for (;;) {
-      const attempt = await this.attempt(method, path, body, timeoutMs);
-      if (!repeatable(method, attempt) || now() + pauseMs >= deadline) {
-        if ('error' in attempt) throw attempt.error;
-        return attempt.answer;
-      }
-      await sleep(pauseMs);
-    }
+  private call(method: Method, path: string, body: unknown, timeoutMs: number): Promise<Answer> {
+    return rideOut(
+      this.recovery,
+      () => this.attempt(method, path, body, timeoutMs),
+      (outcome) => repeatable(method, outcome),
+      this.clock,
+    );
   }
 
+  /** One request: the loop's answer, or `LoopTimeout` / `LoopUnreachable` thrown instead of one. */
   private async attempt(
     method: Method,
     path: string,
     body: unknown,
     timeoutMs: number,
-  ): Promise<Attempt> {
+  ): Promise<Answer> {
     let response: Response;
     try {
       response = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -212,11 +193,9 @@ export class HttpLoopClient extends LoopClient {
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
-      return {
-        error: isTimeout(error)
-          ? new LoopTimeout(`${method} ${path}`, timeoutMs)
-          : new LoopUnreachable(describeCause(error)),
-      };
+      throw isTimeout(error)
+        ? new LoopTimeout(`${method} ${path}`, timeoutMs)
+        : new LoopUnreachable(describeCause(error));
     }
     const text = await response.text();
     let parsed: unknown;
@@ -225,7 +204,7 @@ export class HttpLoopClient extends LoopClient {
     } catch {
       parsed = text;
     }
-    return { answer: { status: response.status, body: parsed } };
+    return { status: response.status, body: parsed };
   }
 
   private refused(route: string, answer: Answer): LoopRefused {

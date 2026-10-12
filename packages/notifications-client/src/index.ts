@@ -12,5 +12,5 @@ export {
   PromptExpired,
   SubscriptionMissing,
 } from './bus-errors';
-export { HttpBusClient, type BusRecovery, type HttpBusOptions } from './http-bus-client';
+export { HttpBusClient, type HttpBusOptions } from './http-bus-client';
 export { InteractionClient, type InteractionOptions, type Withdrawal } from './interaction-client';

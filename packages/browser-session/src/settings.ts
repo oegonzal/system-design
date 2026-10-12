@@ -1,8 +1,7 @@
 import { relative, resolve } from 'node:path';
 
 import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
-import type { SessionRailsDto } from '@sysdesign/contracts';
-import type { LoopRecovery } from '@sysdesign/loop-client';
+import { recoverySchema, type SessionRailsDto } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { SessionConfigError, targetWithinBudget } from './config';
@@ -76,26 +75,17 @@ const railsSchema = z
     path: ['targetDone'],
   }) satisfies z.ZodType<SessionRailsDto>;
 
-/**
- * How long a session rides out a service it calls that is restarting — the
- * loop, before a call to it is a brain fault; the notifications service,
- * before a channel through it is unavailable. Measured 2026-10-10: fifteen
- * watch-mode restarts of the loop each listened again within six seconds, and
- * three calls in the three seconds of one restart ended a session forty
- * minutes in.
- */
-const recoverySchema = z.strictObject({
-  /** How long a call that never reached the service, or a read it failed, is asked again. */
-  windowMs: z.number().int().min(0),
-  /** The pause between those asks. */
-  pauseMs: z.number().int().positive(),
-}) satisfies z.ZodType<LoopRecovery>;
-
 /** How a session runs when its command line says nothing else: each flag overrides its field for one run. */
 const sessionDefaultsSchema = z.strictObject({
   /** Whether the browser shows; the operator is expected to watch, and is asked beside a highlighted field. */
   headed: z.boolean(),
   rails: railsSchema,
+  /**
+   * How long a session rides out a loop that is restarting before a call to
+   * it is a brain fault. Measured 2026-10-10: fifteen watch-mode restarts of
+   * the loop each listened again within six seconds, and three calls in the
+   * three seconds of one restart ended a session forty minutes in.
+   */
   loopRecovery: recoverySchema,
 });
 export type SessionDefaults = z.infer<typeof sessionDefaultsSchema>;

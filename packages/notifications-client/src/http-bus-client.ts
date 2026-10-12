@@ -1,8 +1,12 @@
-import type {
-  EventEnvelope,
-  PublishEventRequest,
-  SubscribeRequest,
-  Subscription,
+import {
+  type EventEnvelope,
+  NO_RECOVERY,
+  type PublishEventRequest,
+  type Recovery,
+  type RecoveryClock,
+  rideOut,
+  type SubscribeRequest,
+  type Subscription,
 } from '@sysdesign/contracts';
 
 import { BusClient } from './bus-client';
@@ -18,30 +22,19 @@ import {
 const CALL_TIMEOUT_MS = 15_000;
 
 export interface HttpBusOptions {
-  recovery?: BusRecovery;
+  /**
+   * How long a call that never reached the service is asked again at the
+   * pause. Every bus call may be: a subscribe, an acknowledgement and a delete
+   * are idempotent by the bus's own contract, and a prompt or a withdrawal
+   * published twice is one prompt, one withdrawal, to the service that reads it.
+   */
+  recovery?: Recovery;
+  /** The clock the recovery is kept by; a spec passes one that need not wait. */
+  clock?: RecoveryClock;
   /** How long a call may take, a pull on top of its own wait. */
   callTimeoutMs?: number;
   fetchImpl?: typeof fetch;
 }
-
-/**
- * How long a caller rides out a service that is restarting: a call that never
- * reached it is asked again at the pause until the window closes. Every bus
- * call may be: a subscribe, an acknowledgement and a delete are idempotent by
- * the bus's own contract, and a prompt or a withdrawal published twice is one
- * prompt, one withdrawal, to the service that reads it.
- */
-export interface BusRecovery {
-  windowMs: number;
-  pauseMs: number;
-  /** The clock and the wait, injectable so a spec need not wait. */
-  now?: () => number;
-  sleep?: (ms: number) => Promise<void>;
-}
-
-const NO_RECOVERY: BusRecovery = { windowMs: 0, pauseMs: 0 };
-
-const sleepFor = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
@@ -57,7 +50,8 @@ const messageOf = (body: unknown): string => {
 
 /** The notifications bus over HTTP. */
 export class HttpBusClient extends BusClient {
-  private readonly recovery: BusRecovery;
+  private readonly recovery: Recovery;
+  private readonly clock: RecoveryClock | undefined;
   private readonly callTimeoutMs: number;
   private readonly fetchImpl: typeof fetch;
 
@@ -67,6 +61,7 @@ export class HttpBusClient extends BusClient {
   ) {
     super();
     this.recovery = options.recovery ?? NO_RECOVERY;
+    this.clock = options.clock;
     this.callTimeoutMs = options.callTimeoutMs ?? CALL_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
@@ -116,23 +111,19 @@ export class HttpBusClient extends BusClient {
   }
 
   /** The service's answer, asked again within the declared recovery while it never reached the service. */
-  private async call(
+  private call(
     method: Method,
     path: string,
     body: unknown,
     timeoutMs = this.callTimeoutMs,
     signal?: AbortSignal,
   ): Promise<{ status: number; body: unknown }> {
-    const { windowMs, pauseMs, now = Date.now, sleep = sleepFor } = this.recovery;
-    const deadline = now() + windowMs;
-    for (;;) {
-      try {
-        return await this.attempt(method, path, body, timeoutMs, signal);
-      } catch (error) {
-        if (!(error instanceof BusUnreachable) || now() + pauseMs >= deadline) throw error;
-        await sleep(pauseMs);
-      }
-    }
+    return rideOut(
+      this.recovery,
+      () => this.attempt(method, path, body, timeoutMs, signal),
+      (outcome) => 'error' in outcome && outcome.error instanceof BusUnreachable,
+      this.clock,
+    );
   }
 
   private async attempt(
